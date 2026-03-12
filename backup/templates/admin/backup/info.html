@@ -716,7 +716,7 @@
             </td>
             <td style="color:var(--text2);">{{ log.duration }}s</td>
             <td style="white-space:nowrap; display:flex; gap:6px; align-items:center;">
-              {% if log.status == 'ok' and log.file_path and not '*' in log.file_path %}
+              {% if log.status == 'ok' and log.file_path and log.backup_type != 'full' %}
               <a href="{% url 'admin:backup_download_file' log.pk %}"
                  style="background:#1e5c1e;color:#4caf50;border:1px solid #2e7d32;
                         border-radius:5px;padding:4px 10px;font-size:12px;
