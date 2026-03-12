@@ -265,16 +265,8 @@ class BackupAdmin(admin.ModelAdmin):
         password = request.POST.get("password", "").strip()
         if not password:
             return JsonResponse({"error": "Пароль не може бути порожнім"}, status=400)
-        log = utils.backup_settings(password)
-        return JsonResponse({
-            "pk": log.pk,
-            "status": log.status,
-            "file": P(log.file_path).name if log.file_path else "",
-            "size": _fmt(log.file_size),
-            "duration": log.duration,
-            "error": log.error_msg,
-            "created_at": log.created_at.strftime("%d.%m.%Y %H:%M:%S"),
-        })
+        result = utils.backup_settings(password)
+        return JsonResponse(result)
 
     def settings_restore_view(self, request):
         """AJAX — decrypt and restore settings from .mbackup (file upload or NAS path)."""

@@ -366,14 +366,16 @@ def _derive_key(password: str, salt: bytes) -> bytes:
     return base64.urlsafe_b64encode(kdf.derive(password.encode("utf-8")))
 
 
-def backup_settings(password: str) -> BackupLog:
-    """Serialize selected config models to JSON and save encrypted as .mbackup file."""
+def backup_settings(password: str) -> dict:
+    """Serialize selected config models to JSON and save encrypted as .mbackup file.
+
+    Returns a plain dict (not BackupLog) so it works even if the DB is unavailable.
+    """
     import json
     from django.apps import apps as django_apps
     from django.core import serializers as dj_serializers
     from cryptography.fernet import Fernet
 
-    log = BackupLog.objects.create(backup_type=BackupLog.TYPE_SETTINGS, status=BackupLog.STATUS_RUNNING)
     start = time.time()
     try:
         backup_dir = get_backup_dir()
@@ -404,18 +406,41 @@ def backup_settings(password: str) -> BackupLog:
             f.write(salt)
             f.write(ciphertext)
 
-        log.file_path = str(filepath)
-        log.file_size = filepath.stat().st_size
-        log.status = BackupLog.STATUS_OK
-        log.duration = round(time.time() - start, 1)
-        log.save()
+        size = filepath.stat().st_size
+        duration = round(time.time() - start, 1)
+
+        # Try to save log entry (non-fatal if DB unavailable)
+        try:
+            BackupLog.objects.create(
+                backup_type=BackupLog.TYPE_SETTINGS,
+                status=BackupLog.STATUS_OK,
+                file_path=str(filepath),
+                file_size=size,
+                duration=duration,
+            )
+        except Exception:
+            pass
+
+        return {
+            "ok": True,
+            "status": "ok",
+            "file": filepath.name,
+            "size": fmt_size(size),
+            "duration": duration,
+        }
 
     except Exception as exc:
-        log.status = BackupLog.STATUS_ERROR
-        log.error_msg = str(exc)
-        log.duration = round(time.time() - start, 1)
-        log.save()
-    return log
+        duration = round(time.time() - start, 1)
+        try:
+            BackupLog.objects.create(
+                backup_type=BackupLog.TYPE_SETTINGS,
+                status=BackupLog.STATUS_ERROR,
+                error_msg=str(exc),
+                duration=duration,
+            )
+        except Exception:
+            pass
+        return {"ok": False, "status": "error", "error": str(exc), "duration": duration}
 
 
 def restore_settings(source, password: str) -> dict:
