@@ -526,7 +526,7 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
           {% endif %}
 
           <!-- DHL Cancel -->
-          {% if shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
+          {% if shipment.carrier.carrier_type == "dhl" and shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
           <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
             <div style="font-size:11px;color:#f44336;font-weight:700;text-transform:uppercase;
                         letter-spacing:.05em;margin-bottom:10px">🗑️ Скасувати в DHL</div>
