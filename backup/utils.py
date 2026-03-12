@@ -500,7 +500,7 @@ _GIT_DIR = Path("/app")  # working tree inside Docker container
 
 def _git(*args, timeout=30) -> subprocess.CompletedProcess:
     return subprocess.run(
-        ["git", *args],
+        ["git", "-c", f"safe.directory={_GIT_DIR}", *args],
         cwd=str(_GIT_DIR),
         capture_output=True,
         text=True,
