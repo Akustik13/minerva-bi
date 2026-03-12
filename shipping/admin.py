@@ -285,6 +285,11 @@ class ShipmentAdmin(admin.ModelAdmin):
                 name="shipping_shipment_set_tracking",
             ),
             path(
+                "<int:shipment_id>/set-jumingo-id/",
+                self.admin_site.admin_view(self.set_jumingo_id_view),
+                name="shipping_shipment_set_jumingo_id",
+            ),
+            path(
                 "order-tracking/",
                 self.admin_site.admin_view(self.order_tracking_view),
                 name="shipping_order_tracking",
@@ -1097,6 +1102,25 @@ class ShipmentAdmin(admin.ModelAdmin):
             shipment.order.save(update_fields=["tracking_number"])
 
         messages.success(request, f"✅ Трекінг-номер збережено: {tn}")
+        return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+    # ── Set Jumingo shipment ID manually ─────────────────────────────────────
+
+    def set_jumingo_id_view(self, request, shipment_id):
+        """POST — зберігає carrier_shipment_id вручну для підключення до Jumingo API."""
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        jumingo_id = (request.POST.get("carrier_shipment_id") or "").strip()
+
+        if not jumingo_id:
+            messages.error(request, "❌ Jumingo Shipment ID не може бути порожнім.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        shipment.carrier_shipment_id = jumingo_id
+        shipment.save(update_fields=["carrier_shipment_id"])
+        messages.success(request, f"✅ Jumingo ID підключено: {jumingo_id}")
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
     # ── Jumingo Confirm (preview before API call) ─────────────────────────────
