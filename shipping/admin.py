@@ -1949,10 +1949,12 @@ class ShipmentAdmin(admin.ModelAdmin):
         covered_order_ids = set()
 
         # 1. Shipments created via Minerva that have a tracking number
+        # Exclude cancelled — вони не потребують трекінгу
         minerva_shipments = (
             Shipment.objects
             .exclude(tracking_number="")
             .filter(tracking_number__isnull=False)
+            .exclude(status=Shipment.Status.CANCELLED)
             .select_related("carrier", "order")
             .order_by("-created_at")
         )
@@ -1970,8 +1972,15 @@ class ShipmentAdmin(admin.ModelAdmin):
                 if ct == "dhl":
                     info["auto"] = bool(tn)
                 elif ct == "jumingo":
-                    # Auto-track via Jumingo API when we have a shipment ID
-                    info["auto"] = bool(shipment.carrier_shipment_id)
+                    # Jumingo auto-track тільки якщо shipment ще активний (не delivered)
+                    # Після оплати/відправки — трекінг через TN напряму (UPS/DHL)
+                    info["auto"] = (
+                        bool(shipment.carrier_shipment_id)
+                        and shipment.status not in (
+                            Shipment.Status.DELIVERED,
+                            Shipment.Status.LABEL_READY,
+                        )
+                    )
             rows.append({
                 "order":       shipment.order,
                 "tn":          tn,
@@ -2015,10 +2024,11 @@ class ShipmentAdmin(admin.ModelAdmin):
 
         order = get_object_or_404(SalesOrder, pk=order_id)
 
-        # Знаходимо пов'язаний Shipment (Minerva)
+        # Знаходимо АКТИВНИЙ пов'язаний Shipment (не cancelled)
         minerva_ship = (
             Shipment.objects
             .filter(order=order)
+            .exclude(status=Shipment.Status.CANCELLED)
             .select_related("carrier")
             .order_by("-created_at")
             .first()
