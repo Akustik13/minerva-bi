@@ -548,17 +548,22 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
           {% endif %}
 
           <!-- Manual Jumingo ID -->
-          {% if shipment.carrier.carrier_type == "jumingo" and not shipment.carrier_shipment_id and shipment.status not in "cancelled,delivered" %}
+          {% if shipment.carrier.carrier_type == "jumingo" and shipment.status not in "cancelled,delivered" %}
           <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
             <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;
                         letter-spacing:.05em;margin-bottom:6px">🔗 Jumingo Shipment ID</div>
-            <div style="font-size:11px;color:#455a64;margin-bottom:8px">
-              Знайти на jumingo.com → Відправлення → скопіювати ID (s_...)
+            {% if shipment.carrier_shipment_id %}
+            <div style="font-size:11px;color:#455a64;margin-bottom:6px;font-family:monospace;
+                        word-break:break-all">
+              Поточний: <span style="color:#64b5f6">{{ shipment.carrier_shipment_id }}</span>
             </div>
+            {% endif %}
             <form method="post" action="{% url 'admin:shipping_shipment_set_jumingo_id' shipment.pk %}">
               {% csrf_token %}
               <div style="display:flex;gap:8px">
-                <input type="text" name="carrier_shipment_id" placeholder="s_xxxxxxxxxxxxxxxx..."
+                <input type="text" name="carrier_shipment_id"
+                  value="{{ shipment.carrier_shipment_id }}"
+                  placeholder="s_xxxxxxxxxxxxxxxx..."
                   style="flex:1;background:#111c26;color:#c9d8e4;border:1px solid #2a3f52;
                          border-radius:4px;padding:7px 10px;font-size:13px;outline:none;
                          font-family:monospace">
@@ -566,7 +571,7 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
                   style="background:#1565c0;color:#fff;border:none;border-radius:4px;
                          padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;
                          white-space:nowrap">
-                  🔗 Підключити
+                  💾 Зберегти
                 </button>
               </div>
             </form>
