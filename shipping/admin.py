@@ -275,6 +275,11 @@ class ShipmentAdmin(admin.ModelAdmin):
                 name="shipping_shipment_jumingo_cancel",
             ),
             path(
+                "<int:shipment_id>/jumingo-confirm/",
+                self.admin_site.admin_view(self.jumingo_confirm_view),
+                name="shipping_shipment_jumingo_confirm",
+            ),
+            path(
                 "order-tracking/",
                 self.admin_site.admin_view(self.order_tracking_view),
                 name="shipping_order_tracking",
@@ -1057,6 +1062,82 @@ class ShipmentAdmin(admin.ModelAdmin):
             return redirect(reverse("admin:sales_salesorder_change", args=[order.pk]))
         return redirect(reverse("admin:shipping_shipment_changelist"))
 
+    # ── Jumingo Confirm (preview before API call) ─────────────────────────────
+
+    def jumingo_confirm_view(self, request, shipment_id):
+        """GET — показує preview даних перед відправкою на Jumingo API.
+           POST — виконує create_shipment() + patch_tariff()."""
+        from datetime import date, timedelta
+        from .services.jumingo import JumingoService
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        if not shipment.selected_tariff_id:
+            messages.error(request, "❌ Спочатку оберіть тариф.")
+            return redirect(reverse("admin:shipping_shipment_rates", args=[shipment.pk]))
+
+        service = JumingoService(shipment.carrier)
+
+        # ── POST: виконати відправку ──────────────────────────────────────────
+        if request.method == "POST":
+            old_preview_id = shipment.carrier_shipment_id
+            full_result = service.create_shipment(shipment)
+
+            if full_result.success and full_result.carrier_shipment_id:
+                shipment.carrier_shipment_id = full_result.carrier_shipment_id
+                shipment.save(update_fields=["carrier_shipment_id"])
+                if old_preview_id and old_preview_id != full_result.carrier_shipment_id:
+                    service.delete_shipment(old_preview_id)
+                if shipment.carrier:
+                    request.session.pop(f"jumingo_preview_{shipment.carrier.pk}", None)
+            else:
+                messages.error(
+                    request,
+                    f"❌ Jumingo API: {full_result.error_message or 'невідома помилка'}"
+                )
+                return redirect(reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]))
+
+            # PATCH тариф — наступний робочий день
+            pickup_date = date.today() + timedelta(days=1)
+            while pickup_date.weekday() >= 5:
+                pickup_date += timedelta(days=1)
+            result = service.patch_tariff(
+                shipment.carrier_shipment_id,
+                shipment.selected_tariff_id,
+                pickup_date.strftime("%Y-%m-%d"),
+            )
+            if not result.get("success"):
+                messages.warning(
+                    request,
+                    f"⚠️ Тариф збережено в Minerva, але PATCH до Jumingo не вдався: "
+                    f"{result.get('error', '')}. Оберіть тариф вручну на Jumingo."
+                )
+            else:
+                messages.success(
+                    request,
+                    f"✅ Відправлення створено на Jumingo: {shipment.carrier_service} "
+                    f"— {shipment.carrier_price} EUR"
+                )
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        # ── GET: показати preview ─────────────────────────────────────────────
+        payload = service._build_payload(shipment)
+        customs = payload.get("customs_invoice")
+
+        return render(request, "admin/shipping/jumingo_confirm.html", {
+            **self.admin_site.each_context(request),
+            "title":    f"Підтвердити відправлення #{shipment.pk}",
+            "shipment": shipment,
+            "payload":  payload,
+            "from_address": payload.get("from_address", {}),
+            "to_address":   payload.get("to_address", {}),
+            "packages":     payload.get("packages", []),
+            "details":      payload.get("details", {}),
+            "customs":      customs,
+            "confirm_url":  reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]),
+            "back_url":     reverse("admin:shipping_shipment_rates", args=[shipment.pk]),
+        })
+
     # ── DHL Track Lookup (standalone) ────────────────────────────────────────
 
     def dhl_track_lookup_view(self, request):
@@ -1353,62 +1434,8 @@ class ShipmentAdmin(admin.ModelAdmin):
             "carrier_price", "carrier_service", "selected_tariff_id", "carrier_currency"
         ])
 
-        service = get_service(shipment.carrier)
-
-        # ── Замінити preview-shipment на повний ──────────────────────────────
-        # get_rates_preview() створює мінімальний Jumingo shipment (без customs,
-        # без реальних адрес) — через це він відображається червоним/неактивним.
-        # 1) Зберігаємо старий preview_id
-        # 2) Створюємо новий повний shipment
-        # 3) Видаляємо старий preview → на Jumingo залишається тільки один (зелений)
-        old_preview_id = shipment.carrier_shipment_id
-        full_result = service.create_shipment(shipment)
-        if full_result.success and full_result.carrier_shipment_id:
-            shipment.carrier_shipment_id = full_result.carrier_shipment_id
-            shipment.save(update_fields=["carrier_shipment_id"])
-            # Видаляємо стару preview-відправку щоб не було дублікату на Jumingo
-            if old_preview_id and old_preview_id != full_result.carrier_shipment_id:
-                service.delete_shipment(old_preview_id)
-            # Очищаємо сесійний preview_id — він більше не потрібен
-            if shipment.carrier:
-                prev_key = f"jumingo_preview_{shipment.carrier.pk}"
-                request.session.pop(prev_key, None)
-        else:
-            messages.warning(
-                request,
-                f"⚠️ Не вдалося створити повне відправлення на Jumingo: "
-                f"{full_result.error_message or '—'}. Використовується попередній ID."
-            )
-
-        # PATCH тариф — наступний робочий день
-        pickup_date = date.today() + timedelta(days=1)
-        while pickup_date.weekday() >= 5:
-            pickup_date += timedelta(days=1)
-        pickup_date = pickup_date.strftime("%Y-%m-%d")
-        result = service.patch_tariff(shipment.carrier_shipment_id, tariff_id, pickup_date)
-        if not result.get("success"):
-            messages.warning(
-                request,
-                f"⚠️ Тариф збережено в Minerva, але PATCH до Jumingo не вдався: "
-                f"{result.get('error', '')}. Оберіть тариф вручну на Jumingo."
-            )
-        else:
-            messages.success(request, f"✅ Тариф обрано: {shipment.carrier_service} — {tariff_price} EUR")
-
-        # Якщо ?book=1 — одразу бронювати через API
-        if request.GET.get("book") == "1":
-            return redirect(reverse("admin:shipping_shipment_book", args=[shipment.pk]))
-
-        # Повертаємось у Minerva — посилання на Jumingo у повідомленні
-        from .services.jumingo import JUMINGO_APP_URL
-        jumingo_link = f"{JUMINGO_APP_URL}/de-de/shipment/{shipment.carrier_shipment_id}"
-        messages.info(
-            request,
-            f'💰 Тариф збережено. Перейдіть на '
-            f'<a href="{JUMINGO_APP_URL}/de-de/" target="_blank" style="color:#2196f3">'
-            f'Jumingo</a> → Відправлення → знайдіть #{shipment.carrier_shipment_id[:12]}... → Оплатити.',
-        )
-        return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+        # Тариф збережено → показуємо preview перед відправкою на Jumingo API
+        return redirect(reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]))
 
     # ── Бронювання через API (Variant 3) ─────────────────────────────────────
 

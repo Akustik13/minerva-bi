@@ -1,0 +1,203 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+  .jc-wrap   { max-width: 860px; margin: 0 auto; padding: 0 0 40px; }
+  .jc-card   { background: #1e2a35; border: 1px solid #2a3f52; border-radius: 8px;
+               margin-bottom: 16px; overflow: hidden; }
+  .jc-head   { background: #162030; padding: 10px 16px; font-size: 12px;
+               font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+               color: #9aafbe; display: flex; align-items: center; gap: 8px; }
+  .jc-body   { padding: 14px 16px; }
+  .jc-row    { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .jc-lbl    { color: #607d8b; min-width: 140px; flex-shrink: 0; }
+  .jc-val    { color: #c9d8e4; font-weight: 500; }
+  .jc-val.accent { color: #64b5f6; }
+  .jc-2col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .jc-table  { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .jc-table th { background: #1a3347; color: #9aafbe; padding: 8px 10px;
+                 text-align: left; font-weight: 600; }
+  .jc-table td { padding: 8px 10px; color: #c9d8e4; border-bottom: 1px solid #1a2a38; }
+  .jc-table tr:last-child td { border-bottom: none; }
+  .jc-actions { display: flex; gap: 12px; margin-top: 24px; }
+  .btn-confirm { background: #2e7d32; color: #fff; border: none; padding: 12px 28px;
+                 border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer;
+                 transition: background .15s; }
+  .btn-confirm:hover { background: #1b5e20; }
+  .btn-back   { background: #1e2a35; color: #9aafbe; border: 1px solid #2a3f52;
+                padding: 12px 20px; border-radius: 6px; font-size: 13px;
+                font-weight: 600; text-decoration: none; transition: background .15s; }
+  .btn-back:hover { background: #243347; color: #c9d8e4; }
+  .warn-banner { background: #2d1f00; border: 1px solid #ff9800; border-radius: 6px;
+                 padding: 12px 16px; color: #ffcc02; font-size: 13px; margin-bottom: 16px; }
+</style>
+
+<div class="jc-wrap">
+  <h1 style="color:#e3f2fd;font-size:20px;margin-bottom:20px">
+    📦 Перевірте дані перед відправкою на Jumingo
+  </h1>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="warn-banner">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Тариф -->
+  <div class="jc-card">
+    <div class="jc-head">🚚 Обраний тариф</div>
+    <div class="jc-body">
+      <div class="jc-row">
+        <span class="jc-lbl">Перевізник / тариф</span>
+        <span class="jc-val accent">{{ shipment.carrier_service|default:"—" }}</span>
+      </div>
+      <div class="jc-row">
+        <span class="jc-lbl">Вартість</span>
+        <span class="jc-val accent">{{ shipment.carrier_price|default:"—" }} {{ shipment.carrier_currency|default:"EUR" }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Відправник / Отримувач -->
+  <div class="jc-2col">
+
+    <!-- Відправник -->
+    <div class="jc-card">
+      <div class="jc-head">📤 Відправник</div>
+      <div class="jc-body">
+        {% with a=from_address %}
+        {% if a.company %}
+        <div class="jc-row"><span class="jc-lbl">Компанія</span><span class="jc-val">{{ a.company }}</span></div>
+        {% endif %}
+        <div class="jc-row"><span class="jc-lbl">Ім'я</span><span class="jc-val">{{ a.name|default:"—" }}</span></div>
+        <div class="jc-row"><span class="jc-lbl">Вулиця</span><span class="jc-val">{{ a.street|default:"—" }}</span></div>
+        <div class="jc-row"><span class="jc-lbl">Місто / ZIP</span><span class="jc-val">{{ a.city|default:"—" }}, {{ a.zip|default:"" }}</span></div>
+        <div class="jc-row"><span class="jc-lbl">Країна</span><span class="jc-val">{{ a.country|default:"—" }}</span></div>
+        {% if a.phone %}
+        <div class="jc-row"><span class="jc-lbl">Телефон</span><span class="jc-val">{{ a.phone }}</span></div>
+        {% endif %}
+        {% endwith %}
+      </div>
+    </div>
+
+    <!-- Отримувач -->
+    <div class="jc-card">
+      <div class="jc-head">📥 Отримувач</div>
+      <div class="jc-body">
+        {% with a=to_address %}
+        {% if a.company %}
+        <div class="jc-row"><span class="jc-lbl">Компанія</span><span class="jc-val">{{ a.company }}</span></div>
+        {% endif %}
+        <div class="jc-row"><span class="jc-lbl">Ім'я</span><span class="jc-val">{{ a.name|default:"—" }}</span></div>
+        <div class="jc-row"><span class="jc-lbl">Вулиця</span><span class="jc-val">{{ a.street|default:"—" }}</span></div>
+        <div class="jc-row"><span class="jc-lbl">Місто / ZIP</span><span class="jc-val">{{ a.city|default:"—" }}, {{ a.zip|default:"" }}</span></div>
+        {% if a.state %}
+        <div class="jc-row"><span class="jc-lbl">Штат</span><span class="jc-val">{{ a.state }}</span></div>
+        {% endif %}
+        <div class="jc-row"><span class="jc-lbl">Країна</span><span class="jc-val">{{ a.country|default:"—" }}</span></div>
+        {% if a.phone %}
+        <div class="jc-row"><span class="jc-lbl">Телефон</span><span class="jc-val">{{ a.phone }}</span></div>
+        {% endif %}
+        {% with email=a.settings.email %}{% if email %}
+        <div class="jc-row"><span class="jc-lbl">Email</span><span class="jc-val">{{ email }}</span></div>
+        {% endif %}{% endwith %}
+        {% endwith %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Пакет + Деталі -->
+  <div class="jc-2col">
+
+    <!-- Пакет -->
+    <div class="jc-card">
+      <div class="jc-head">📦 Пакет</div>
+      <div class="jc-body">
+        {% for pkg in packages %}
+        <div class="jc-row"><span class="jc-lbl">Вага</span><span class="jc-val accent">{{ pkg.weight }} кг</span></div>
+        <div class="jc-row"><span class="jc-lbl">Розміри (Д×Ш×В)</span>
+          <span class="jc-val">{{ pkg.length }} × {{ pkg.width }} × {{ pkg.height }} см</span></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Деталі -->
+    <div class="jc-card">
+      <div class="jc-head">📋 Деталі відправлення</div>
+      <div class="jc-body">
+        <div class="jc-row"><span class="jc-lbl">Оголошена вартість</span>
+          <span class="jc-val accent">{{ details.value_amount|default:"—" }} EUR</span></div>
+        <div class="jc-row"><span class="jc-lbl">Страхування</span>
+          <span class="jc-val">{{ details.extra_insurance_value|default:"—" }} EUR</span></div>
+        <div class="jc-row"><span class="jc-lbl">Опис вмісту</span>
+          <span class="jc-val">{{ details.content_description|default:"—" }}</span></div>
+        {% if details.reference_number %}
+        <div class="jc-row"><span class="jc-lbl">Reference</span>
+          <span class="jc-val">{{ details.reference_number }}</span></div>
+        {% endif %}
+        {% if details.settings.export_reason %}
+        <div class="jc-row"><span class="jc-lbl">Export reason</span>
+          <span class="jc-val">{{ details.settings.export_reason }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Митна декларація -->
+  {% if customs %}
+  <div class="jc-card">
+    <div class="jc-head">🛃 Митна декларація</div>
+    <div class="jc-body">
+      <div class="jc-row" style="margin-bottom:12px">
+        <span class="jc-lbl">Валюта</span><span class="jc-val">{{ customs.currency }}</span>
+        <span class="jc-lbl" style="margin-left:24px">Причина</span>
+        <span class="jc-val">{{ customs.exportReason }}</span>
+      </div>
+      <table class="jc-table">
+        <thead>
+          <tr>
+            <th>Опис</th>
+            <th style="text-align:center">К-сть</th>
+            <th style="text-align:right">Вартість</th>
+            {% if customs.lineItems.0.hsTariffNumber %}
+            <th>HS код</th>
+            {% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in customs.lineItems %}
+          <tr>
+            <td>{{ item.content }}</td>
+            <td style="text-align:center">{{ item.quantity }} {{ item.unitOfMeasurement }}</td>
+            <td style="text-align:right;color:#4caf50;font-weight:700">
+              {{ item.value }} {{ customs.currency }}</td>
+            {% if customs.lineItems.0.hsTariffNumber %}
+            <td style="color:#607d8b">{{ item.hsTariffNumber|default:"—" }}</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Кнопки -->
+  <div class="jc-actions">
+    <form method="post" action="{{ confirm_url }}">
+      {% csrf_token %}
+      <button type="submit" class="btn-confirm"
+        onclick="return confirm('Відправити дані на Jumingo API?\n\nПісля підтвердження відправлення буде створено на Jumingo.')">
+        ✅ Підтвердити і відправити на Jumingo
+      </button>
+    </form>
+    <a href="{{ back_url }}" class="btn-back">← Назад до тарифів</a>
+  </div>
+
+</div>
+{% endblock %}
