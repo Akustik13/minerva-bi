@@ -373,25 +373,18 @@ def backup_settings(password: str) -> dict:
     """
     start = time.time()
     try:
-        import json
+        import json, threading as _threading
         from django.apps import apps as django_apps
         from django.core import serializers as dj_serializers
         from cryptography.fernet import Fernet
-        backup_dir = get_backup_dir()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filepath = backup_dir / f"settings_{timestamp}.mbackup"
 
-        # Перевірити чи доступна БД (швидкий ping)
-        db_available = False
-        try:
-            from django.db import connection
-            connection.ensure_connection()
-            db_available = True
-        except Exception:
-            pass
+        # Серіалізацію моделей виконуємо у daemon-потоці з таймаутом
+        # щоб не зависати при недоступній БД
+        _result = [None]
+        _done   = _threading.Event()
 
-        all_entries = []
-        if db_available:
+        def _serialize_models():
+            entries = []
             for model_label in _SETTINGS_MODELS:
                 try:
                     app_label, model_name = model_label.split(".")
@@ -399,21 +392,33 @@ def backup_settings(password: str) -> dict:
                     objs = list(model.objects.all())
                     if objs:
                         serialized = dj_serializers.serialize("json", objs, indent=2)
-                        all_entries.append({"model": model_label, "data": json.loads(serialized)})
+                        entries.append({"model": model_label, "data": json.loads(serialized)})
                 except LookupError:
                     pass
                 except Exception:
                     pass
+            _result[0] = entries
+            _done.set()
 
-        if not db_available:
+        _t = _threading.Thread(target=_serialize_models, daemon=True)
+        _t.start()
+
+        if not _done.wait(timeout=5):
             return {"ok": False, "status": "error",
-                    "error": "БД недоступна. Запустіть сервер і спробуйте знову.",
+                    "error": "БД недоступна (таймаут 5с). Для бекапу налаштувань потрібна запущена PostgreSQL.",
                     "duration": round(time.time() - start, 1)}
+
+        all_entries = _result[0] or []
 
         if not all_entries:
             return {"ok": False, "status": "error",
-                    "error": "Нічого не знайдено для бекапу (всі моделі порожні).",
+                    "error": "Нічого не знайдено для бекапу (БД порожня або недоступна).",
                     "duration": round(time.time() - start, 1)}
+
+        # Тепер БД доступна — отримуємо директорію для бекапу
+        backup_dir = get_backup_dir()
+        timestamp  = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filepath   = backup_dir / f"settings_{timestamp}.mbackup"
 
         payload = json.dumps(all_entries, ensure_ascii=False, indent=2).encode("utf-8")
 
