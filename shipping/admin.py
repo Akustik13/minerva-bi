@@ -1049,8 +1049,8 @@ class ShipmentAdmin(admin.ModelAdmin):
         else:
             messages.error(
                 request,
-                f"❌ Jumingo API не змогло видалити відправлення {shipment.carrier_shipment_id}. "
-                f"Можливо воно вже оплачене — скасуй вручну на сайті Jumingo."
+                f"❌ Jumingo API повернуло помилку для відправлення {shipment.carrier_shipment_id}. "
+                f"Оплачені відправлення не можна видалити через API — скасуй вручну на сайті Jumingo."
             )
 
         if order:
