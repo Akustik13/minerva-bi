@@ -731,9 +731,10 @@ def _process_marketplace_order(order: dict, stats: dict):
     client    = company or f"{first} {last}".strip()
     contact   = f"{first} {last}".strip()
 
-    street = " ".join(filter(None, [addr.get("street1", ""), addr.get("street2", "").strip()]))
-    phone  = addr.get("phoneNumber", "")
-    email  = customer.get("customerEmail", "")
+    street       = " ".join(filter(None, [addr.get("street1", ""), addr.get("street2", "").strip()]))
+    phone        = addr.get("phoneNumber", "")
+    email        = customer.get("customerEmail", "")
+    addr_country = _normalize_country(addr.get("countryCode") or "")
 
     # Legacy raw address block
     shipping_address_raw = "\n".join(filter(None, [
@@ -761,7 +762,7 @@ def _process_marketplace_order(order: dict, stats: dict):
         "addr_city":        addr.get("city", ""),
         "addr_state":       addr.get("state", "") if addr_country in ("US", "CA") else "",
         "addr_zip":         addr.get("postalCode", ""),
-        "addr_country":     _normalize_country(addr.get("countryCode") or ""),
+        "addr_country":     addr_country,
         "lieferschein_nr":  po_number,
         "shipping_deadline": deadline,
     }
