@@ -6,12 +6,11 @@
 #
 # Інтервали (секунди):
 #   TRACK_INTERVAL  — авто-трекінг відправлень (default: 300 = 5 хв)
-#   SYNC_INTERVAL   — DigiKey синхронізація   (default: 1800 = 30 хв)
+#   sync_digikey_orders — інтервал читається з DigiKeyConfig.sync_interval_minutes в БД
 
 set -e
 
 TRACK_INTERVAL="${TRACK_INTERVAL:-300}"
-SYNC_INTERVAL="${SYNC_INTERVAL:-1800}"
 
 echo "⏳ Waiting for PostgreSQL..."
 until pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" \
@@ -20,10 +19,9 @@ until pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" \
 done
 echo "✅ PostgreSQL ready — cron runner started"
 echo "   track_shipments     every ${TRACK_INTERVAL}s"
-echo "   sync_digikey_orders every ${SYNC_INTERVAL}s"
+echo "   sync_digikey_orders interval controlled by DigiKeyConfig in DB"
 
 LAST_TRACK=0
-LAST_SYNC=0
 
 while true; do
   NOW=$(date +%s)
@@ -35,12 +33,9 @@ while true; do
     LAST_TRACK=$(date +%s)
   fi
 
-  # ── DigiKey синхронізація ────────────────────────────────
-  if [ $((NOW - LAST_SYNC)) -ge "$SYNC_INTERVAL" ]; then
-    echo "[$(date '+%H:%M:%S')] Running sync_digikey_orders..."
-    python manage.py sync_digikey_orders 2>&1 || true
-    LAST_SYNC=$(date +%s)
-  fi
+  # ── DigiKey синхронізація — інтервал з БД ────────────────
+  echo "[$(date '+%H:%M:%S')] Running sync_digikey_orders..."
+  python manage.py sync_digikey_orders 2>&1 || true
 
   sleep 60
 done

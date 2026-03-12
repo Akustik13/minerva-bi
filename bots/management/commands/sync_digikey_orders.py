@@ -44,6 +44,19 @@ class Command(BaseCommand):
             self.stdout.write("⏸ Синхронізація вимкнена (sync_enabled=False). Використайте --force для ручного запуску.")
             return
 
+        # Перевіряємо інтервал (якщо не --force)
+        if not force and config.last_synced_at and config.sync_interval_minutes:
+            from django.utils import timezone
+            elapsed = (timezone.now() - config.last_synced_at).total_seconds() / 60
+            if elapsed < config.sync_interval_minutes:
+                remaining = int(config.sync_interval_minutes - elapsed)
+                self.stdout.write(
+                    f"⏸ Ще рано (остання синхронізація {int(elapsed)} хв тому, "
+                    f"інтервал {config.sync_interval_minutes} хв). "
+                    f"Наступна через ~{remaining} хв."
+                )
+                return
+
         if dry_run:
             self.stdout.write("🔍 DRY-RUN: дані не будуть збережені в БД.")
             # Just test connection
