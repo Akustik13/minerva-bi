@@ -206,7 +206,17 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
   </div>
 
   {% elif shipment.status == "cancelled" %}
-  <div class="sd-info-block">🚫 Відправлення скасовано.</div>
+  <div class="sd-info-block" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+    <span>🚫 Відправлення скасовано.</span>
+    <form method="post" action="{% url 'admin:shipping_shipment_clone' shipment.pk %}" style="margin:0;flex-shrink:0">
+      {% csrf_token %}
+      <button type="submit"
+        onclick="return confirm('Створити нове відправлення на основі #{{ shipment.pk }}?\n\nВсі дані отримувача, параметри посилки і митна декларація будуть скопійовані.')"
+        class="sd-btn sd-btn-green" style="border:none;cursor:pointer;padding:8px 18px;display:inline-block">
+        🔁 Повторити відправлення
+      </button>
+    </form>
+  </div>
   {% endif %}
 
   <!-- ── Timeline ── -->

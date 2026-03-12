@@ -290,6 +290,11 @@ class ShipmentAdmin(admin.ModelAdmin):
                 name="shipping_shipment_set_jumingo_id",
             ),
             path(
+                "<int:shipment_id>/clone/",
+                self.admin_site.admin_view(self.clone_view),
+                name="shipping_shipment_clone",
+            ),
+            path(
                 "order-tracking/",
                 self.admin_site.admin_view(self.order_tracking_view),
                 name="shipping_order_tracking",
@@ -879,6 +884,19 @@ class ShipmentAdmin(admin.ModelAdmin):
                                  "url": reverse("admin:shipping_shipment_dhl_track", args=[shipment.pk]),
                                  "cls": "yellow"})
 
+        # Скасовано / Помилка — повторна відправка (клонування в новий DRAFT)
+        if st in ("cancelled", "error"):
+            actions.append({
+                "label":   "🔁 Повторити відправлення",
+                "url":     reverse("admin:shipping_shipment_clone", args=[shipment.pk]),
+                "cls":     "green",
+                "confirm": (
+                    f"Створити нове відправлення на основі #{shipment.pk}?\n\n"
+                    "Всі дані отримувача, параметри посилки і митна декларація будуть скопійовані. "
+                    "Ви зможете відредагувати їх перед відправкою."
+                ),
+            })
+
         # Завжди — назад до замовлення
         actions.append({"label": "← Замовлення",
                          "url": reverse("admin:sales_salesorder_change", args=[order.pk]),
@@ -1122,6 +1140,54 @@ class ShipmentAdmin(admin.ModelAdmin):
         shipment.save(update_fields=["carrier_shipment_id"])
         messages.success(request, f"✅ Jumingo ID підключено: {jumingo_id}")
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+    # ── Клонування відправлення (для повторної відправки після скасування) ────
+
+    def clone_view(self, request, shipment_id):
+        """POST — клонує відправлення в новий DRAFT, зберігаючи дані одержувача,
+        параметри посилки і митну декларацію. Перенаправляє на редагування нового чернетки."""
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+
+        orig = get_object_or_404(Shipment, pk=shipment_id)
+
+        clone = Shipment(
+            order             = orig.order,
+            carrier           = orig.carrier,
+            status            = Shipment.Status.DRAFT,
+            # Отримувач
+            recipient_name    = orig.recipient_name,
+            recipient_company = orig.recipient_company,
+            recipient_street  = orig.recipient_street,
+            recipient_city    = orig.recipient_city,
+            recipient_zip     = orig.recipient_zip,
+            recipient_state   = orig.recipient_state,
+            recipient_country = orig.recipient_country,
+            recipient_phone   = orig.recipient_phone,
+            recipient_email   = orig.recipient_email,
+            # Параметри посилки
+            weight_kg         = orig.weight_kg,
+            length_cm         = orig.length_cm,
+            width_cm          = orig.width_cm,
+            height_cm         = orig.height_cm,
+            description       = orig.description,
+            export_reason     = orig.export_reason,
+            declared_value    = orig.declared_value,
+            declared_currency = orig.declared_currency,
+            reference         = orig.reference,
+            # Митна декларація
+            customs_articles  = orig.customs_articles,
+            # Автор
+            created_by        = request.user,
+        )
+        clone.save()
+
+        messages.success(
+            request,
+            f"✅ Створено нове відправлення #{clone.pk} на основі #{orig.pk}. "
+            f"Перевірте дані та виправте митну декларацію за потреби."
+        )
+        return redirect(reverse("admin:shipping_shipment_edit_draft", args=[clone.pk]))
 
     # ── Jumingo Confirm (preview before API call) ─────────────────────────────
 
