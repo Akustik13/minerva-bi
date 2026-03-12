@@ -2,9 +2,10 @@ from __future__ import annotations
 from decimal import Decimal
 from django.contrib import admin, messages
 from django.db.models import Sum, Count, Max
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from django.urls import path
 from django.utils.html import format_html
+from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 from .models import Customer, CustomerNote
 from sales.models import SalesOrder, SalesOrderLine
@@ -134,6 +135,7 @@ class RFMSegmentFilter(admin.SimpleListFilter):
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
     change_list_template = "admin/crm/customer_changelist.html"
+    change_form_template = "admin/crm/customer/change_form.html"
 
     actions = [
         # Статус
@@ -225,8 +227,41 @@ class CustomerAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.sync_view),
                 name="crm_customer_sync",
             ),
+            path(
+                "<int:pk>/new-order/",
+                self.admin_site.admin_view(self.new_order_view),
+                name="crm_customer_new_order",
+            ),
         ]
         return custom + urls
+
+    def new_order_view(self, request, pk):
+        """Редирект на форму нового замовлення з pre-filled даними клієнта."""
+        customer = get_object_or_404(Customer, pk=pk)
+        params = {}
+        if customer.company:
+            params["_prefill_client"] = customer.company
+            params["_prefill_contact_name"] = customer.name
+        else:
+            params["_prefill_client"] = customer.name
+        if customer.email:
+            params["_prefill_email"] = customer.email
+        if customer.phone:
+            params["_prefill_phone"] = customer.phone
+        if customer.addr_street:
+            params["_prefill_addr_street"] = customer.addr_street
+        if customer.addr_city:
+            params["_prefill_addr_city"] = customer.addr_city
+        if customer.addr_zip:
+            params["_prefill_addr_zip"] = customer.addr_zip
+        if customer.addr_state:
+            params["_prefill_addr_state"] = customer.addr_state
+        if customer.country:
+            params["_prefill_addr_country"] = customer.country
+        if customer.shipping_address and not customer.addr_street:
+            params["_prefill_shipping_address"] = customer.shipping_address
+        add_url = "/admin/sales/salesorder/add/?" + urlencode(params)
+        return redirect(add_url)
 
     def sync_view(self, request):
         """Запускає повну синхронізацію CRM з усіх замовлень."""

@@ -1411,7 +1411,27 @@ class SalesOrderAdmin(admin.ModelAdmin):
     
     change_list_template = 'admin/sales/salesorder_changelist.html'
     change_form_template = 'admin/sales/salesorder_change_form.html'
-    
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        mapping = {
+            '_prefill_client':          'client',
+            '_prefill_contact_name':    'contact_name',
+            '_prefill_email':           'email',
+            '_prefill_phone':           'phone',
+            '_prefill_addr_street':     'addr_street',
+            '_prefill_addr_city':       'addr_city',
+            '_prefill_addr_zip':        'addr_zip',
+            '_prefill_addr_state':      'addr_state',
+            '_prefill_addr_country':    'addr_country',
+            '_prefill_shipping_address':'shipping_address',
+        }
+        for param, field in mapping.items():
+            val = request.GET.get(param)
+            if val:
+                initial[field] = val
+        return initial
+
     def get_urls(self):
         """Додаємо URL для manual import, завантаження документів та PDF-генерації."""
         urls = super().get_urls()

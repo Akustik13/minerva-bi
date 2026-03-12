@@ -1,0 +1,31 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+  {% if original %}
+    {% if original.email %}
+    <li>
+      <a href="mailto:{{ original.email }}"
+         style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:4px;
+                text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap">
+        📧 Написати
+      </a>
+    </li>
+    {% endif %}
+    <li>
+      <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ original.email|default:original.name }}"
+         style="background:#1b5e20;color:#fff;padding:6px 14px;border-radius:4px;
+                text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap">
+        📋 Усі замовлення
+      </a>
+    </li>
+    <li>
+      <a href="{% url 'admin:crm_customer_new_order' original.pk %}"
+         style="background:#e65100;color:#fff;padding:6px 14px;border-radius:4px;
+                text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap">
+        ➕ Нове замовлення
+      </a>
+    </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

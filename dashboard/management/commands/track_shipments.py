@@ -137,7 +137,8 @@ class Command(BaseCommand):
                 f"[track_shipments] Готово: оновлено {updated}/{total}, помилок {errors}"
             ))
             # Сповіщення якщо були зміни
-            if updated or errors:
+            # errors без updated — не сповіщаємо (API errors ≠ зміни замовлень)
+            if updated or (notify_always and errors):
                 try:
                     from dashboard.notifications import notify_sync_result
                     notify_sync_result("Авто-трекінг відправлень", {
