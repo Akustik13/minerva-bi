@@ -280,6 +280,11 @@ class ShipmentAdmin(admin.ModelAdmin):
                 name="shipping_shipment_jumingo_confirm",
             ),
             path(
+                "<int:shipment_id>/set-tracking/",
+                self.admin_site.admin_view(self.set_tracking_view),
+                name="shipping_shipment_set_tracking",
+            ),
+            path(
                 "order-tracking/",
                 self.admin_site.admin_view(self.order_tracking_view),
                 name="shipping_order_tracking",
@@ -1061,6 +1066,38 @@ class ShipmentAdmin(admin.ModelAdmin):
         if order:
             return redirect(reverse("admin:sales_salesorder_change", args=[order.pk]))
         return redirect(reverse("admin:shipping_shipment_changelist"))
+
+    # ── Set tracking number manually ─────────────────────────────────────────
+
+    def set_tracking_view(self, request, shipment_id):
+        """POST — зберігає трекінг-номер вручну і оновлює статус відправлення."""
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        tn = (request.POST.get("tracking_number") or "").strip()
+
+        if not tn:
+            messages.error(request, "❌ Трекінг-номер не може бути порожнім.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        update_fields = ["tracking_number"]
+        shipment.tracking_number = tn
+
+        # Якщо статус draft/submitted — переводимо в label_ready
+        if shipment.status in (Shipment.Status.DRAFT, Shipment.Status.SUBMITTED):
+            shipment.status = Shipment.Status.LABEL_READY
+            update_fields.append("status")
+
+        shipment.save(update_fields=update_fields)
+
+        # Копіюємо TN на SalesOrder якщо там ще немає
+        if shipment.order and not shipment.order.tracking_number:
+            shipment.order.tracking_number = tn
+            shipment.order.save(update_fields=["tracking_number"])
+
+        messages.success(request, f"✅ Трекінг-номер збережено: {tn}")
+        return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
     # ── Jumingo Confirm (preview before API call) ─────────────────────────────
 

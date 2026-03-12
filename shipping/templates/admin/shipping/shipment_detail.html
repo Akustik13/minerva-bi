@@ -525,6 +525,28 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
           </div>
           {% endif %}
 
+          <!-- Manual tracking number -->
+          {% if not shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
+            <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;
+                        letter-spacing:.05em;margin-bottom:10px">📝 Трекінг-номер</div>
+            <form method="post" action="{% url 'admin:shipping_shipment_set_tracking' shipment.pk %}">
+              {% csrf_token %}
+              <div style="display:flex;gap:8px">
+                <input type="text" name="tracking_number" placeholder="Введіть трекінг-номер..."
+                  style="flex:1;background:#111c26;color:#c9d8e4;border:1px solid #2a3f52;
+                         border-radius:4px;padding:7px 10px;font-size:13px;outline:none">
+                <button type="submit"
+                  style="background:#1565c0;color:#fff;border:none;border-radius:4px;
+                         padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;
+                         white-space:nowrap">
+                  💾 Зберегти
+                </button>
+              </div>
+            </form>
+          </div>
+          {% endif %}
+
           <!-- DHL Cancel -->
           {% if shipment.carrier.carrier_type == "dhl" and shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
           <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
