@@ -361,7 +361,7 @@ def _derive_key(password: str, salt: bytes) -> bytes:
         algorithm=hashes.SHA256(),
         length=32,
         salt=salt,
-        iterations=480_000,
+        iterations=100_000,
     )
     return base64.urlsafe_b64encode(kdf.derive(password.encode("utf-8")))
 
@@ -381,19 +381,39 @@ def backup_settings(password: str) -> dict:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = backup_dir / f"settings_{timestamp}.mbackup"
 
+        # Перевірити чи доступна БД (швидкий ping)
+        db_available = False
+        try:
+            from django.db import connection
+            connection.ensure_connection()
+            db_available = True
+        except Exception:
+            pass
+
         all_entries = []
-        for model_label in _SETTINGS_MODELS:
-            try:
-                app_label, model_name = model_label.split(".")
-                model = django_apps.get_model(app_label, model_name)
-                objs = list(model.objects.all())
-                if objs:
-                    serialized = dj_serializers.serialize("json", objs, indent=2)
-                    all_entries.append({"model": model_label, "data": json.loads(serialized)})
-            except LookupError:
-                pass
-            except Exception:
-                pass
+        if db_available:
+            for model_label in _SETTINGS_MODELS:
+                try:
+                    app_label, model_name = model_label.split(".")
+                    model = django_apps.get_model(app_label, model_name)
+                    objs = list(model.objects.all())
+                    if objs:
+                        serialized = dj_serializers.serialize("json", objs, indent=2)
+                        all_entries.append({"model": model_label, "data": json.loads(serialized)})
+                except LookupError:
+                    pass
+                except Exception:
+                    pass
+
+        if not db_available:
+            return {"ok": False, "status": "error",
+                    "error": "БД недоступна. Запустіть сервер і спробуйте знову.",
+                    "duration": round(time.time() - start, 1)}
+
+        if not all_entries:
+            return {"ok": False, "status": "error",
+                    "error": "Нічого не знайдено для бекапу (всі моделі порожні).",
+                    "duration": round(time.time() - start, 1)}
 
         payload = json.dumps(all_entries, ensure_ascii=False, indent=2).encode("utf-8")
 
