@@ -136,6 +136,8 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
 .sd-btn-orange { background: #e65100; color: #fff; }
 .sd-btn-teal   { background: #00695c; color: #fff; }
 .sd-btn-yellow { background: #f9a825; color: #000; }
+.sd-btn-red    { background: #b71c1c; color: #fff; }
+.sd-btn-pink   { background: #880e4f; color: #fff; }
 .sd-btn-pink   { background: #ad1457; color: #fff; }
 .sd-btn-green  { background: #2e7d32; color: #fff; }
 .sd-btn-ghost  { background: transparent; color: #607d8b; border: 1px solid #2a3f52; }
@@ -505,8 +507,19 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
                         letter-spacing:.05em;margin-bottom:10px">⚡ Дії</div>
             <div class="sd-actions">
               {% for a in actions %}
+              {% if a.confirm %}
+              <form method="post" action="{{ a.url }}" style="margin:0">
+                {% csrf_token %}
+                <button type="submit"
+                  onclick="return confirm('{{ a.confirm }}')"
+                  class="sd-btn sd-btn-{{ a.cls }}" style="width:100%;border:none;cursor:pointer">
+                  {{ a.label }}
+                </button>
+              </form>
+              {% else %}
               <a href="{{ a.url }}"{% if a.external %} target="_blank"{% endif %}
                  class="sd-btn sd-btn-{{ a.cls }}">{{ a.label }}</a>
+              {% endif %}
               {% endfor %}
             </div>
           </div>

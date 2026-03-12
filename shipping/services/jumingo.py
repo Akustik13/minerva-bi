@@ -176,16 +176,13 @@ class JumingoService(BaseCarrierService):
           value, hsTariffNumber, manufacturingCountry, netWeight
         """
         mapped = {
-            "content":              (item.get("description") or "")[:35],
-            "quantity":             int(item.get("quantity") or 1),
-            "unitOfMeasurement":    "PCS",   # required; завжди штуки для електроніки
-            "value":                float(item.get("value") or 0),
-            "hsTariffNumber":       item.get("customs_number") or "",
-            "manufacturingCountry": item.get("origin_country") or "DE",
+            "content":           (item.get("description") or "")[:35],
+            "quantity":          int(item.get("quantity") or 1),
+            "unitOfMeasurement": "PCS",   # required; завжди штуки для електроніки
+            "value":             float(item.get("value") or 0),
         }
-        # netWeight — загальна вага позиції (не за штуку)
-        if item.get("weight"):
-            mapped["netWeight"] = float(item["weight"])
+        if item.get("customs_number"):
+            mapped["hsTariffNumber"] = item["customs_number"]
         return mapped
 
     def _build_customs_invoice(self, shipment) -> dict | None:

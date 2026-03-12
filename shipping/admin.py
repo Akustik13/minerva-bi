@@ -270,6 +270,11 @@ class ShipmentAdmin(admin.ModelAdmin):
                 name="shipping_shipment_dhl_cancel",
             ),
             path(
+                "<int:shipment_id>/jumingo-cancel/",
+                self.admin_site.admin_view(self.jumingo_cancel_view),
+                name="shipping_shipment_jumingo_cancel",
+            ),
+            path(
                 "order-tracking/",
                 self.admin_site.admin_view(self.order_tracking_view),
                 name="shipping_order_tracking",
@@ -826,6 +831,9 @@ class ShipmentAdmin(admin.ModelAdmin):
                     {"label": "🔗 Відкрити Jumingo",
                      "url": f"{JUMINGO_APP_URL}/de-de/shipments/",
                      "cls": "pink", "external": True},
+                    {"label": "🗑️ Скасувати відправлення",
+                     "url": reverse("admin:shipping_shipment_jumingo_cancel", args=[shipment.pk]),
+                     "cls": "red", "confirm": "Скасувати це відправлення на Jumingo і видалити з системи?"},
                 ]
             if has_dhl:
                 actions.append({"label": "🟡 DHL Тарифи",
@@ -1011,6 +1019,43 @@ class ShipmentAdmin(admin.ModelAdmin):
                 messages.info(request, f"URL запиту: {result['url']}")
 
         return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+    # ── Jumingo Cancel ────────────────────────────────────────────────────────
+
+    def jumingo_cancel_view(self, request, shipment_id):
+        """DELETE /v1/shipments/{id} — скасування відправлення Jumingo + видалення з Minerva."""
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        if not shipment.carrier_shipment_id:
+            messages.error(request, "❌ Jumingo Shipment ID відсутній — нічого скасовувати.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        from .services.jumingo import JumingoService
+        service = JumingoService(shipment.carrier)
+        ok = service.delete_shipment(shipment.carrier_shipment_id)
+
+        order = shipment.order
+        if ok:
+            shipment.status = Shipment.Status.CANCELLED
+            shipment.error_message = f"Скасовано вручну. Jumingo ID: {shipment.carrier_shipment_id}"
+            shipment.save(update_fields=["status", "error_message"])
+            messages.success(
+                request,
+                f"✅ Відправлення #{shipment.pk} скасовано на Jumingo і позначено як Скасоване."
+            )
+        else:
+            messages.error(
+                request,
+                f"❌ Jumingo API не змогло видалити відправлення {shipment.carrier_shipment_id}. "
+                f"Можливо воно вже оплачене — скасуй вручну на сайті Jumingo."
+            )
+
+        if order:
+            return redirect(reverse("admin:sales_salesorder_change", args=[order.pk]))
+        return redirect(reverse("admin:shipping_shipment_changelist"))
 
     # ── DHL Track Lookup (standalone) ────────────────────────────────────────
 
