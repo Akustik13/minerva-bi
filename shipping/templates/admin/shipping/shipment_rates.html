@@ -1,0 +1,311 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Тарифи Jumingo | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}">#{{ shipment.pk }}</a>
+  &rsaquo; Тарифи
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+#content { padding: 0 !important; }
+#content-main { max-width: none !important; }
+
+.sr-wrap { padding: 24px 32px 60px; max-width: 960px; }
+
+.sr-header {
+  background: #1a2535; border: 1px solid #243347;
+  border-radius: 10px; padding: 18px 24px; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+.sr-header h2 { margin: 0; font-size: 18px; color: #c9d8e4; }
+.sr-header .sr-meta { font-size: 12px; color: #607d8b; }
+
+.sr-open-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #e91e63; color: #fff; padding: 10px 20px;
+  border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 13px;
+  transition: opacity .15s;
+}
+.sr-open-btn:hover { opacity: .85; color: #fff; }
+
+.sr-info {
+  background: #162030; border: 1px solid #2a3f52; border-left: 4px solid #2196f3;
+  border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: #9aafbe;
+}
+.sr-info strong { color: #c9d8e4; }
+
+.sr-error {
+  background: #1e1014; border: 1px solid #c62828; border-left: 4px solid #f44336;
+  border-radius: 8px; padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: #ef9a9a;
+}
+
+.sr-table-wrap {
+  background: #1a2535; border: 1px solid #243347; border-radius: 10px; overflow: hidden;
+}
+.sr-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.sr-table thead th {
+  background: #162030; color: #9aafbe; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .05em; padding: 10px 14px; border-bottom: 1px solid #243347;
+  text-align: left;
+}
+.sr-table tbody tr { border-bottom: 1px solid #1e2d3e; }
+.sr-table tbody tr:last-child { border-bottom: none; }
+.sr-table tbody tr:hover { background: #1e2d3e; }
+.sr-table td { padding: 11px 14px; color: #c9d8e4; vertical-align: middle; }
+
+.sr-carrier-name { font-weight: 600; color: #e3f2fd; }
+.sr-service { font-size: 12px; color: #80cbc4; }
+.sr-eta { color: #ffb74d; font-weight: 600; }
+.sr-price {
+  font-size: 15px; font-weight: 700; color: #4caf50;
+  font-family: monospace; white-space: nowrap;
+}
+.sr-price-orig { font-size: 11px; color: #607d8b; text-decoration: line-through; }
+.sr-best {
+  background: rgba(76,175,80,.08); border-left: 3px solid #4caf50;
+}
+.sr-best-badge {
+  display: inline-block; background: #4caf50; color: #fff;
+  font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px;
+  margin-left: 6px; vertical-align: middle;
+}
+
+.sr-empty {
+  text-align: center; padding: 48px; color: #607d8b; font-size: 14px;
+}
+.sr-empty svg { width: 48px; height: 48px; opacity: .4; display: block; margin: 0 auto 12px; }
+
+.sr-footer {
+  margin-top: 24px; padding: 16px 20px; background: #162030;
+  border: 1px solid #243347; border-radius: 8px; font-size: 12px; color: #607d8b;
+}
+.sr-footer a { color: #2196f3; }
+
+.sr-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-radius: 6px; text-decoration: none;
+  font-size: 12px; font-weight: 700; white-space: nowrap; transition: opacity .15s;
+}
+.sr-btn:hover { opacity: .82; }
+.sr-btn-select  { background: #2196f3; color: #fff; }
+.sr-btn-book    { background: #9c27b0; color: #fff; }
+.sr-btn-cheapest{ background: #4caf50; color: #fff; }
+
+.sr-copy-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #1e2d3e; border: 1px solid #2a3f52; color: #9aafbe;
+  padding: 6px 12px; border-radius: 6px; cursor: pointer;
+  font-size: 12px; font-family: monospace; transition: background .15s;
+  white-space: nowrap; user-select: none;
+}
+.sr-copy-btn:hover { background: #243347; color: #c9d8e4; }
+.sr-copy-btn.copied { border-color: #4caf50; color: #4caf50; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sr-wrap">
+
+  {# Header #}
+  <div class="sr-header">
+    <div>
+      <h2>💰 Тарифи Jumingo</h2>
+      <div class="sr-meta">
+        Відправлення #{{ shipment.pk }} &bull;
+        {{ shipment.recipient_name }}{% if shipment.recipient_country %}, {{ shipment.recipient_country }}{% endif %} &bull;
+        {{ shipment.weight_kg }} кг
+        {% if shipment.length_cm %}&bull; {{ shipment.length_cm }}×{{ shipment.width_cm }}×{{ shipment.height_cm }} см{% endif %}
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      {% if shipment.carrier_shipment_id %}
+      <button class="sr-copy-btn" id="copy-jid-btn"
+              onclick="(function(){
+                var id='{{ shipment.carrier_shipment_id }}';
+                navigator.clipboard.writeText(id).then(function(){
+                  var b=document.getElementById('copy-jid-btn');
+                  b.innerHTML='✅ Скопійовано!';
+                  b.classList.add('copied');
+                  setTimeout(function(){
+                    b.innerHTML='📋 {{ shipment.carrier_shipment_id|truncatechars:18 }}';
+                    b.classList.remove('copied');
+                  },2000);
+                });
+              })()"
+              title="Скопіювати Jumingo ID — вставте в пошук на порталі Jumingo">
+        📋 {{ shipment.carrier_shipment_id|truncatechars:18 }}
+      </button>
+      {% endif %}
+      <a href="{{ jumingo_url }}" target="_blank" class="sr-open-btn"
+         title="Відкрити список відправлень на Jumingo — знайдіть за скопійованим ID">
+        <svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16">
+          <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"/>
+          <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"/>
+        </svg>
+        Відкрити Jumingo
+      </a>
+    </div>
+  </div>
+
+  {# Info block #}
+  <div class="sr-info">
+    <strong>Jumingo ID:</strong> <code>{{ shipment.carrier_shipment_id }}</code>
+    &nbsp;
+    <small style="color:#607d8b">← скопіюйте кнопкою вище, вставте в пошук на <a href="{{ jumingo_url }}" target="_blank" style="color:#2196f3">jumingo.com</a></small><br>
+    <strong>✅ Обрати</strong> — зберегти тариф в Minerva (PATCH до Jumingo) → далі вручну оплатіть на <a href="{{ jumingo_url }}" target="_blank" style="color:#2196f3">Jumingo → Мої відправлення</a>.<br>
+    <strong>⚡ API</strong> — оформити замовлення через Jumingo API автоматично (потрібен метод оплати на Jumingo: Zahlungsmethoden).
+    Після оплати трекінг-номер з'явиться автоматично (або натисніть «🔄 Оновити трекінг»).
+  </div>
+
+  {# Error #}
+  {% if rates_error %}
+  <div class="sr-error">
+    ❌ Помилка отримання тарифів: <strong>{{ rates_error }}</strong>
+  </div>
+  {% endif %}
+
+  {# Variant 1: auto-select cheapest #}
+  {% if tariffs %}
+  {% with cheapest=tariffs.0 %}
+  <div style="background:#162030;border:1px solid #2a3f52;border-left:4px solid #4caf50;
+              border-radius:8px;padding:14px 18px;margin-bottom:18px;
+              display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div style="font-weight:700;color:#c9d8e4;margin-bottom:4px">
+        🏆 Найдешевший варіант
+      </div>
+      <div style="font-size:13px;color:#9aafbe">
+        <strong style="color:#4caf50">{{ cheapest.price_brutto }} {{ cheapest.currency|default:"EUR" }}</strong>
+        &nbsp;&bull;&nbsp;
+        {{ cheapest.shipper.name|default:"—" }} — {{ cheapest.name|default:"" }}
+        {% if cheapest.dates.transit_time_range.days %}
+          &nbsp;&bull;&nbsp; {{ cheapest.dates.transit_time_range.days }} дн.
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="sr-btn sr-btn-cheapest"
+         href="{% url 'admin:shipping_shipment_select_tariff' shipment.pk %}?tariff_id={{ cheapest.id }}&name={{ cheapest.name|urlencode }}&price={{ cheapest.price_brutto }}&shipper={{ cheapest.shipper.name|urlencode }}"
+         title="Зберегти та перейти на Jumingo для оплати">
+        ✅ Обрати + Jumingo
+      </a>
+      <a class="sr-btn sr-btn-book"
+         href="{% url 'admin:shipping_shipment_select_tariff' shipment.pk %}?tariff_id={{ cheapest.id }}&name={{ cheapest.name|urlencode }}&price={{ cheapest.price_brutto }}&shipper={{ cheapest.shipper.name|urlencode }}&book=1"
+         title="Оформити замовлення через API автоматично"
+         onclick="return confirm('Автоматично оформити найдешевший тариф через API?\nОплата bill/invoice. Продовжити?')">
+        ⚡ Замовити через API
+      </a>
+    </div>
+  </div>
+  {% endwith %}
+  {% endif %}
+
+  {# Tariffs table #}
+  {% if tariffs %}
+  <div class="sr-table-wrap">
+    <table class="sr-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Перевізник / Послуга</th>
+          <th>Доставка (орієнтовно)</th>
+          <th>Ціна</th>
+          <th>Дія</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tariffs %}
+        <tr{% if forloop.first %} class="sr-best"{% endif %}>
+          <td style="color:#607d8b;font-size:12px">{{ forloop.counter }}</td>
+          <td>
+            <div class="sr-carrier-name">
+              {{ t.shipper.name|default:"—" }}
+              {% if forloop.first %}<span class="sr-best-badge">найкраща</span>{% endif %}
+            </div>
+            <div class="sr-service">{{ t.name|default:"" }}</div>
+          </td>
+          <td class="sr-eta">
+            {% if t.dates.transit_time_range.days %}
+              {{ t.dates.transit_time_range.days }} дн.
+            {% elif t.transit_time_min %}
+              {{ t.transit_time_min }}–{{ t.transit_time_max }} дн.
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <div class="sr-price">{{ t.price_brutto|default:"—" }} {{ t.currency|default:"EUR" }}</div>
+            {% if t.price_netto %}
+            <div class="sr-price-orig">нетто {{ t.price_netto }} {{ t.currency|default:"EUR" }}</div>
+            {% endif %}
+          </td>
+          <td style="white-space:nowrap">
+            {# Variant 2: зберегти тариф + відкрити Jumingo для оплати #}
+            <a class="sr-btn sr-btn-select"
+               href="{% url 'admin:shipping_shipment_select_tariff' shipment.pk %}?tariff_id={{ t.id }}&name={{ t.name|urlencode }}&price={{ t.price_brutto }}&shipper={{ t.shipper.name|urlencode }}"
+               title="Зберегти тариф і відкрити Jumingo для оплати">
+              ✅ Обрати
+            </a>
+            {# Variant 3: тариф + одразу book через API #}
+            <a class="sr-btn sr-btn-book"
+               href="{% url 'admin:shipping_shipment_select_tariff' shipment.pk %}?tariff_id={{ t.id }}&name={{ t.name|urlencode }}&price={{ t.price_brutto }}&shipper={{ t.shipper.name|urlencode }}&book=1"
+               title="Оформити замовлення через Jumingo API (оплата bill/invoice)"
+               onclick="return confirm('Оформити замовлення через Jumingo API?\nОплата: bill/invoice. Продовжити?')">
+              ⚡ API
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% elif not rates_error %}
+  <div class="sr-table-wrap">
+    <div class="sr-empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round"
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11"/>
+      </svg>
+      <div style="margin-bottom:12px">
+        Тарифи не знайдено — Jumingo повернув порожню відповідь.<br>
+        <span style="font-size:12px">Можливо, відправлення прострочено або ще не оброблено Jumingo (~1-2 хв).</span>
+      </div>
+      <a href="{{ resubmit_url }}"
+         style="display:inline-block;background:#4caf50;color:#fff;padding:9px 20px;
+                border-radius:7px;text-decoration:none;font-weight:700;font-size:13px"
+         onclick="return confirm('Перестворити відправлення в Jumingo?\nОтримаємо новий Jumingo ID і перейдемо до тарифів.')">
+        🔄 Перестворити відправлення
+      </a>
+    </div>
+  </div>
+
+  {# Debug: raw API response #}
+  {% if rates_raw %}
+  <details style="margin-top:12px">
+    <summary style="cursor:pointer;color:#607d8b;font-size:12px;padding:6px 0">
+      🔍 Raw API відповідь (debug)
+    </summary>
+    <pre style="background:#0d1117;border:1px solid #2a3f52;border-radius:6px;
+                padding:12px;font-size:11px;color:#80cbc4;overflow-x:auto;margin-top:6px">{{ rates_raw }}</pre>
+  </details>
+  {% endif %}
+
+  {% endif %}
+
+  {# Footer actions #}
+  <div class="sr-footer">
+    <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}">← Повернутись до відправлення</a>
+    &nbsp;&bull;&nbsp;
+    <a href="{% url 'admin:shipping_shipment_rates' shipment.pk %}">🔁 Оновити тарифи</a>
+    &nbsp;&bull;&nbsp;
+    <a href="{% url 'admin:shipping_shipment_track' shipment.pk %}">🔄 Оновити трекінг</a>
+  </div>
+
+</div>
+{% endblock %}

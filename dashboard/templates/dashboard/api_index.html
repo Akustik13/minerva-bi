@@ -1,0 +1,355 @@
+{% extends "admin/base_site.html" %}
+{% block title %}API Інтеграції | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'bots_index' %}">AI та APIs</a> &rsaquo;
+  API Інтеграції
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.api-wrap { padding: 16px 20px 40px; }
+
+.api-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--sec-color, #58a6ff);
+  font-size: 13px; font-weight: 700; color: #9aafbe;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+.api-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  gap: 12px;
+  margin-bottom: 32px;
+}
+
+.api-card {
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid var(--card-accent, #58a6ff);
+  border-radius: 8px;
+  padding: 16px;
+}
+.api-card-head {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 10px;
+}
+.api-card-icon { font-size: 22px; line-height: 1; }
+.api-card-title { font-size: 14px; font-weight: 700; color: #c9d8e4; }
+.api-card-sub { font-size: 11px; color: #607d8b; margin-top: 2px; }
+
+.api-status {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 600; padding: 3px 9px;
+  border-radius: 10px; margin-bottom: 10px;
+}
+.api-status.ok  { background: #0d2a1a; color: #4caf50; border: 1px solid #2e6b3e; }
+.api-status.warn{ background: #2a1f0d; color: #ff9800; border: 1px solid #6b4a1a; }
+.api-status.off { background: #1a1a2a; color: #607d8b; border: 1px solid #2a3047; }
+
+.api-meta { font-size: 11.5px; color: #9aafbe; margin-bottom: 12px; line-height: 1.7; }
+.api-meta b { color: #c9d8e4; }
+
+.api-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.api-btn {
+  display: inline-block; font-size: 11.5px; font-weight: 600;
+  padding: 5px 12px; border-radius: 5px; text-decoration: none !important;
+  transition: opacity .15s;
+}
+.api-btn:hover { opacity: .85; }
+.api-btn-prim { background: #1e3a5c; color: #58a6ff; border: 1px solid #2a5580; }
+.api-btn-sec  { background: #1a2535; color: #9aafbe; border: 1px solid #2a3f52; }
+.api-btn-cons { background: #0d2a1a; color: #4caf50; border: 1px solid #2e6b3e; }
+
+.api-endpoint-list {
+  list-style: none; margin: 0 0 10px; padding: 0;
+}
+.api-endpoint-list li {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; padding: 3px 0;
+  border-bottom: 1px solid #1e2d3d;
+  color: #9aafbe;
+}
+.api-endpoint-list li:last-child { border-bottom: none; }
+.api-method {
+  font-family: monospace; font-size: 10px; font-weight: 700;
+  padding: 1px 5px; border-radius: 3px; min-width: 36px; text-align: center;
+}
+.m-get    { background: #0a2a1a; color: #4caf50; }
+.m-post   { background: #1a2a0a; color: #8bc34a; }
+.m-put    { background: #2a1a0a; color: #ff9800; }
+.m-patch  { background: #1a0a2a; color: #ce93d8; }
+.m-delete { background: #2a0a0a; color: #ef5350; }
+.api-path { font-family: monospace; color: #58a6ff; }
+
+.api-key-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: #111c26; border: 1px solid #2a3f52;
+  border-radius: 4px; padding: 3px 8px;
+  font-family: monospace; font-size: 11px; color: #c9d8e4;
+  margin: 2px 0;
+}
+.api-key-scope {
+  font-size: 9px; background: #1e2d40; color: #9aafbe;
+  border-radius: 3px; padding: 1px 4px;
+}
+
+.api-console-banner {
+  background: #0d1f0d;
+  border: 1px solid #2e6b3e;
+  border-radius: 8px;
+  padding: 14px 18px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.api-console-banner p { margin: 0; font-size: 13px; color: #9aafbe; }
+.api-console-banner strong { color: #4caf50; }
+</style>
+
+<div class="api-wrap">
+
+  <!-- Console banner -->
+  <div class="api-console-banner">
+    <div>
+      <strong>🖥 Developer Console</strong>
+      <p style="margin-top:4px">Відправляй запити до будь-якого API та переглядай відповіді в реальному часі.</p>
+    </div>
+    <a href="{% url 'api_console' %}" class="api-btn api-btn-cons" style="white-space:nowrap;font-size:13px;padding:8px 16px">
+      Відкрити Console →
+    </a>
+  </div>
+
+  <!-- ── Section 1: Minerva REST API ── -->
+  <h2 class="api-section-hdr" style="--sec-color:#58a6ff">
+    <span>🏠</span> Minerva REST API
+  </h2>
+  <div class="api-grid">
+
+    <!-- Minerva endpoints card -->
+    <div class="api-card" style="--card-accent:#58a6ff">
+      <div class="api-card-head">
+        <span class="api-card-icon">🌐</span>
+        <div>
+          <div class="api-card-title">REST Endpoints</div>
+          <div class="api-card-sub">Внутрішній API Minerva</div>
+        </div>
+      </div>
+      <div class="api-status ok">🟢 Активний</div>
+      <ul class="api-endpoint-list">
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/orders/</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/api/v1/orders/</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/products/</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/api/v1/products/</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/customers/</span></li>
+      </ul>
+      <div class="api-actions">
+        <a href="/api/v1/" class="api-btn api-btn-prim">Browsable API</a>
+        <a href="{% url 'api_console' %}" class="api-btn api-btn-cons">Console</a>
+      </div>
+    </div>
+
+    <!-- API Keys card -->
+    <div class="api-card" style="--card-accent:#00bcd4">
+      <div class="api-card-head">
+        <span class="api-card-icon">🔑</span>
+        <div>
+          <div class="api-card-title">API Ключі</div>
+          <div class="api-card-sub">Токени з правами доступу (scopes)</div>
+        </div>
+      </div>
+      {% if api_keys_count %}
+      <div class="api-status ok">🟢 {{ api_keys_count }} активних ключів</div>
+      {% else %}
+      <div class="api-status warn">⚠️ Ключів немає — API недоступний</div>
+      {% endif %}
+      <div class="api-meta">
+        <b>Авторизація:</b> <code style="color:#58a6ff">Authorization: Token &lt;key&gt;</code><br>
+        <b>Scopes:</b> orders, products, customers (read/write)
+      </div>
+      {% if api_keys %}
+      <div style="margin-bottom:10px">
+        {% for k in api_keys %}
+        <div class="api-key-pill">
+          🔑 {{ k.name }}
+          {% for s in k.scopes %}<span class="api-key-scope">{{ s }}</span>{% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      <div class="api-actions">
+        <a href="/admin/api/apikey/" class="api-btn api-btn-prim">Управління ключами</a>
+        <a href="/admin/api/apikey/add/" class="api-btn api-btn-sec">+ Новий ключ</a>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Section 2: Shipping APIs ── -->
+  <h2 class="api-section-hdr" style="--sec-color:#2196f3">
+    <span>🚚</span> Shipping APIs
+  </h2>
+  <div class="api-grid">
+
+    <!-- Jumingo -->
+    <div class="api-card" style="--card-accent:#2196f3">
+      <div class="api-card-head">
+        <span class="api-card-icon">📦</span>
+        <div>
+          <div class="api-card-title">Jumingo</div>
+          <div class="api-card-sub">Shipments, Labels, Tracking</div>
+        </div>
+      </div>
+      {% if jumingo_carrier %}
+      <div class="api-status ok">🟢 Налаштовано</div>
+      <div class="api-meta">
+        <b>Акаунт:</b> {{ jumingo_carrier.name }}<br>
+        <b>Відправник:</b> {{ jumingo_carrier.sender_city }}, {{ jumingo_carrier.sender_country }}<br>
+        <b>Endpoint:</b> <code style="color:#58a6ff">https://api.jumingo.com/v1</code>
+      </div>
+      {% else %}
+      <div class="api-status off">⚪ Не налаштовано</div>
+      <div class="api-meta">Додай Carrier типу Jumingo в адмінці.</div>
+      {% endif %}
+      <ul class="api-endpoint-list">
+        <li><span class="api-method m-post">POST</span><span class="api-path">/v1/shipments</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/v1/shipment-rates</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/v1/shipments/{id}</span></li>
+      </ul>
+      <div class="api-actions">
+        <a href="/admin/shipping/carrier/" class="api-btn api-btn-prim">Carrier</a>
+        <a href="/admin/shipping/shipment/" class="api-btn api-btn-sec">Відправлення</a>
+        <a href="{% url 'api_console' %}?preset=jumingo" class="api-btn api-btn-cons">Console</a>
+      </div>
+    </div>
+
+    <!-- DHL Rates -->
+    <div class="api-card" style="--card-accent:#ffcc00">
+      <div class="api-card-head">
+        <span class="api-card-icon" style="background:#ffcc00;border-radius:4px;padding:2px 6px;font-size:14px;font-weight:800;color:#000">DHL</span>
+        <div style="margin-left:4px">
+          <div class="api-card-title">DHL Express — Тарифи</div>
+          <div class="api-card-sub">MyDHL API · Rate Shopping</div>
+        </div>
+      </div>
+      {% if dhl_carrier %}
+      <div class="api-status ok">🟢 Налаштовано</div>
+      <div class="api-meta">
+        <b>Акаунт:</b> {{ dhl_carrier.name }}<br>
+        <b>Account №:</b> {{ dhl_carrier.connection_uuid|default:"—" }}<br>
+        <b>Mode:</b> {% if dhl_carrier.api_url == "test" %}Sandbox{% else %}Production{% endif %}
+      </div>
+      {% else %}
+      <div class="api-status off">⚪ Не налаштовано</div>
+      <div class="api-meta">
+        Додай Carrier типу DHL з API Key/Secret.<br>
+        Ключі: <code style="color:#58a6ff">developer.dhl.com</code> → MyDHL API
+      </div>
+      {% endif %}
+      <ul class="api-endpoint-list">
+        <li><span class="api-method m-get">GET</span><span class="api-path">mydhlapi/rates</span></li>
+      </ul>
+      <div class="api-actions">
+        <a href="/admin/shipping/carrier/" class="api-btn api-btn-prim">Carrier</a>
+        <a href="{% url 'api_console' %}?preset=dhl" class="api-btn api-btn-cons">Console</a>
+      </div>
+    </div>
+
+    <!-- DHL Tracking -->
+    <div class="api-card" style="--card-accent:#f9a825">
+      <div class="api-card-head">
+        <span class="api-card-icon" style="background:#f9a825;border-radius:4px;padding:2px 6px;font-size:14px;font-weight:800;color:#000">DHL</span>
+        <div style="margin-left:4px">
+          <div class="api-card-title">DHL Tracking</div>
+          <div class="api-card-sub">Shipment Tracking – Unified API</div>
+        </div>
+      </div>
+      {% if dhl_track_ok %}
+      <div class="api-status ok">🟢 Ключ налаштовано</div>
+      {% elif dhl_carrier %}
+      <div class="api-status warn">⚠️ Tracking API Key не вказано</div>
+      {% else %}
+      <div class="api-status off">⚪ Не налаштовано</div>
+      {% endif %}
+      <div class="api-meta">
+        Пошук будь-якого відправлення DHL за трекінг-номером.<br>
+        {% if not dhl_track_ok %}
+        Ключ: <code style="color:#58a6ff">developer.dhl.com</code> → My Apps →<br>
+        <b>Shipment Tracking – Unified</b> → API Key
+        {% endif %}
+      </div>
+      <ul class="api-endpoint-list">
+        <li><span class="api-method m-get">GET</span><span class="api-path">api-eu.dhl.com/track/shipments</span></li>
+      </ul>
+      <div class="api-actions">
+        <a href="/admin/shipping/shipment/dhl-track-lookup/" class="api-btn api-btn-prim">🔍 Трекінг</a>
+        {% if not dhl_track_ok %}
+        <a href="/admin/shipping/carrier/" class="api-btn api-btn-sec">Налаштувати</a>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Section 3: Marketplace APIs ── -->
+  <h2 class="api-section-hdr" style="--sec-color:#ff6f00">
+    <span>🛒</span> Marketplace APIs
+  </h2>
+  <div class="api-grid">
+
+    <!-- DigiKey -->
+    <div class="api-card" style="--card-accent:#ff6f00">
+      <div class="api-card-head">
+        <span class="api-card-icon">🛒</span>
+        <div>
+          <div class="api-card-title">DigiKey</div>
+          <div class="api-card-sub">Orders Sync (Marketplace Seller)</div>
+        </div>
+      </div>
+      {% if digikey_ok %}
+      <div class="api-status ok">🟢 Налаштовано</div>
+      <div class="api-meta">
+        <b>Mode:</b> {% if digikey.use_sandbox %}Sandbox{% else %}Production{% endif %}<br>
+        <b>Sync:</b> {% if digikey.sync_enabled %}кожні {{ digikey.sync_interval_minutes }} хв{% else %}вимкнено{% endif %}<br>
+        <b>Остання синхр.:</b> {{ digikey.last_synced_at|default:"ніколи" }}
+      </div>
+      {% else %}
+      <div class="api-status off">⚪ Не налаштовано</div>
+      <div class="api-meta">Client ID та Secret не вказані.</div>
+      {% endif %}
+      <ul class="api-endpoint-list">
+        <li><span class="api-method m-post">POST</span><span class="api-path">/v1/oauth2/token</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/orderstatus/v4/orders</span></li>
+      </ul>
+      <div class="api-actions">
+        <a href="/admin/bots/digikeyconfig/" class="api-btn api-btn-prim">Налаштування</a>
+        <a href="{% url 'api_console' %}?preset=digikey" class="api-btn api-btn-cons">Console</a>
+      </div>
+    </div>
+
+    <!-- Placeholder для майбутнього -->
+    <div class="api-card" style="--card-accent:#37474f;opacity:.55">
+      <div class="api-card-head">
+        <span class="api-card-icon">＋</span>
+        <div>
+          <div class="api-card-title">Наступна інтеграція</div>
+          <div class="api-card-sub">Shopify / WooCommerce / Mouser</div>
+        </div>
+      </div>
+      <div class="api-status off">⚪ Заплановано</div>
+      <div class="api-meta">Фаза 2 Roadmap.</div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,183 @@
+{% extends "admin/base_site.html" %}
+{% block title %}DigiKey PO Пошук | Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}">DigiKey Config</a>
+  &rsaquo; Пошук за PO номером
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+#content { padding: 0 !important; }
+
+.dkpo-wrap { max-width: 900px; margin: 0 auto; padding: 32px 24px 60px; }
+
+.dkpo-search {
+  background: #1a2535; border: 1px solid #243347; border-radius: 12px;
+  padding: 28px 32px 24px; margin-bottom: 28px;
+}
+.dkpo-title { font-size: 20px; font-weight: 700; color: #c9d8e4; margin-bottom: 6px; }
+.dkpo-sub   { font-size: 12px; color: #607d8b; margin-bottom: 20px; }
+.dkpo-search form { display: flex; gap: 10px; }
+.dkpo-input {
+  flex: 1; background: #111c26; border: 1px solid #2a3f52; color: #c9d8e4;
+  border-radius: 7px; padding: 11px 14px; font-size: 14px; font-family: monospace;
+  outline: none; transition: border-color .2s;
+}
+.dkpo-input:focus { border-color: #9c27b0; }
+.dkpo-input::placeholder { color: #3a5570; }
+.dkpo-btn {
+  background: #7b1fa2; color: #fff; border: none; border-radius: 7px;
+  padding: 11px 22px; font-size: 13px; font-weight: 700; cursor: pointer;
+  white-space: nowrap; transition: background .15s;
+}
+.dkpo-btn:hover { background: #9c27b0; }
+
+.dkpo-warn {
+  background: rgba(255,152,0,.07); border: 1px solid rgba(255,152,0,.3);
+  border-left: 4px solid #ff9800; border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: #ffb74d;
+}
+.dkpo-warn a { color: #ffd54f; }
+.dkpo-error {
+  background: rgba(244,67,54,.07); border: 1px solid rgba(244,67,54,.3);
+  border-left: 4px solid #f44336; border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: #ef9a9a;
+  white-space: pre-wrap;
+}
+.dkpo-empty {
+  background: rgba(96,125,139,.07); border: 1px solid rgba(96,125,139,.2);
+  border-radius: 8px; padding: 20px 24px; font-size: 13px; color: #607d8b;
+  text-align: center;
+}
+
+.dkpo-card {
+  background: #1a2535; border: 1px solid #243347; border-radius: 10px;
+  padding: 22px 26px; margin-bottom: 20px;
+}
+.dkpo-card-title {
+  font-size: 11px; font-weight: 700; color: #9aafbe;
+  text-transform: uppercase; letter-spacing: .05em;
+  margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1px solid #243347;
+}
+
+.dkpo-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.dkpo-table th {
+  text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 700;
+  color: #607d8b; text-transform: uppercase; letter-spacing: .04em;
+  border-bottom: 1px solid #243347;
+}
+.dkpo-table td {
+  padding: 10px 12px; color: #c9d8e4;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.dkpo-table tr:last-child td { border-bottom: none; }
+.dkpo-table tr:hover td { background: rgba(255,255,255,.03); }
+.dkpo-mono { font-family: monospace; }
+
+.dkpo-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 700;
+}
+.dkpo-badge-open      { background: rgba(33,150,243,.15); color: #64b5f6; }
+.dkpo-badge-shipped   { background: rgba(76,175,80,.15);  color: #81c784; }
+.dkpo-badge-delivered { background: rgba(76,175,80,.2);   color: #4caf50; }
+.dkpo-badge-cancelled { background: rgba(244,67,54,.15);  color: #ef9a9a; }
+.dkpo-badge-other     { background: rgba(96,125,139,.15); color: #9aafbe; }
+
+.dkpo-count {
+  font-size: 12px; color: #607d8b; margin-bottom: 14px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dkpo-wrap">
+
+  <div class="dkpo-search">
+    <div class="dkpo-title">🔍 DigiKey — Пошук за PO номером</div>
+    <div class="dkpo-sub">
+      OrderManagement API v1 · Bearer Token
+      {% if config.use_sandbox %} · <span style="color:#ff9800">Sandbox</span>{% endif %}
+    </div>
+    <form method="get">
+      <input class="dkpo-input" type="text" name="po"
+             value="{{ po_number }}"
+             placeholder="Введіть PO номер замовлення..."
+             autofocus autocomplete="off" spellcheck="false">
+      <button class="dkpo-btn" type="submit">Знайти</button>
+    </form>
+  </div>
+
+  {% if no_credentials %}
+  <div class="dkpo-warn">
+    ⚠️ <b>DigiKey API не налаштовано.</b><br>
+    Перейди до <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}">DigiKey Config</a>
+    та заповни <b>Client ID</b> і <b>Client Secret</b>.
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="dkpo-error">❌ {{ error }}</div>
+  {% endif %}
+
+  {% if results is not None %}
+    {% if results %}
+    <div class="dkpo-card">
+      <div class="dkpo-card-title">📋 Результати</div>
+      <div class="dkpo-count">Знайдено: {{ results|length }} замовлень для PO «{{ po_number }}»</div>
+      <table class="dkpo-table">
+        <thead>
+          <tr>
+            <th>Sales Order ID</th>
+            <th>Назва замовлення</th>
+            <th>PO номер</th>
+            <th>Дата</th>
+            <th>Статус</th>
+            <th>Customer ID</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for order in results %}
+          <tr>
+            <td class="dkpo-mono">{{ order.SalesOrderId|default:"—" }}</td>
+            <td>{{ order.OrderName|default:"—" }}</td>
+            <td class="dkpo-mono">{{ order.PurchaseOrder|default:"—" }}</td>
+            <td class="dkpo-mono">
+              {% if order.DateEntered %}
+                {{ order.DateEntered|slice:":10" }}
+              {% else %}—{% endif %}
+            </td>
+            <td>
+              {% with state=order.ProcessingState|default:"" %}
+              {% if state == "Shipped" or state == "PartialShipped" %}
+                <span class="dkpo-badge dkpo-badge-shipped">{{ state }}</span>
+              {% elif state == "Delivered" or state == "Closed" %}
+                <span class="dkpo-badge dkpo-badge-delivered">{{ state }}</span>
+              {% elif state == "Cancelled" %}
+                <span class="dkpo-badge dkpo-badge-cancelled">{{ state }}</span>
+              {% elif state == "Open" or state == "Processing" or state == "Unconfirmed" %}
+                <span class="dkpo-badge dkpo-badge-open">{{ state }}</span>
+              {% elif state %}
+                <span class="dkpo-badge dkpo-badge-other">{{ state }}</span>
+              {% else %}—{% endif %}
+              {% endwith %}
+            </td>
+            <td class="dkpo-mono" style="color:#607d8b">{{ order.CustomerId|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% elif po_number %}
+    <div class="dkpo-empty">
+      📭 Замовлень за PO «{{ po_number }}» не знайдено.
+    </div>
+    {% endif %}
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,63 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>🔌 Інтеграції</h1>
+<p style="color:#9aafbe;margin-bottom:24px">
+  Огляд усіх налаштованих інтеграцій. Для зміни налаштувань — натисніть «Налаштувати».
+</p>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">
+{% for i in integrations %}
+<div style="background:#1e2a35;border:1px solid {% if i.enabled %}#2e7d32{% elif '❌' in i.status %}#b71c1c{% else %}#2a3f52{% endif %};border-radius:8px;overflow:hidden">
+
+  <!-- Header -->
+  <div style="padding:14px 18px;display:flex;justify-content:space-between;align-items:center;
+              background:{% if i.enabled %}rgba(46,125,50,.15){% elif '❌' in i.status %}rgba(183,28,28,.1){% else %}rgba(0,0,0,.2){% endif %}">
+    <div style="font-size:16px;font-weight:700;color:#c9d8e4">
+      {{ i.icon }} {{ i.name }}
+    </div>
+    <span style="font-size:12px;padding:3px 10px;border-radius:10px;font-weight:600;
+                 background:{% if i.enabled %}#1b5e20{% elif '❌' in i.status %}#7f0000{% elif '⚠️' in i.status %}#4a3000{% else %}#1a2a38{% endif %};
+                 color:{% if i.enabled %}#a5d6a7{% elif '❌' in i.status %}#ef9a9a{% elif '⚠️' in i.status %}#ffe082{% else %}#9aafbe{% endif %}">
+      {{ i.status }}
+    </span>
+  </div>
+
+  <!-- Details -->
+  <div style="padding:12px 18px">
+    {% for label, value in i.details %}
+    <div style="display:flex;justify-content:space-between;padding:4px 0;
+                border-bottom:1px solid #1a2a38;font-size:13px">
+      <span style="color:#607d8b">{{ label }}</span>
+      <span style="color:#c9d8e4">{{ value }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Actions -->
+  <div style="padding:10px 18px 14px;display:flex;flex-wrap:wrap;gap:8px">
+    <a href="{{ i.settings_url }}"
+       style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:4px;
+              text-decoration:none;font-size:13px;font-weight:600">
+      ⚙️ Налаштувати
+    </a>
+    {% for label, url in i.extra_links %}
+    <a href="{{ url }}"
+       style="background:#2a3f52;color:#9aafbe;padding:6px 14px;border-radius:4px;
+              text-decoration:none;font-size:13px">
+      {{ label }}
+    </a>
+    {% endfor %}
+  </div>
+
+</div>
+{% endfor %}
+</div>
+
+<div style="margin-top:24px">
+  <a href="/admin/config/notificationsettings/1/change/"
+     style="color:#9aafbe;text-decoration:none;font-size:13px">
+    ← Налаштування сповіщень
+  </a>
+</div>
+{% endblock %}

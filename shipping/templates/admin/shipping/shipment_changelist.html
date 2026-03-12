@@ -1,0 +1,26 @@
+{% extends "admin/change_list.html" %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="{% url 'admin:shipping_order_tracking' %}"
+           style="background:#2196f3;color:#fff;padding:8px 16px;border-radius:6px;
+                  text-decoration:none;font-weight:600;display:inline-block">
+            📡 Відслідковування
+        </a>
+    </li>
+    <li>
+        <a href="{% url 'admin:shipping_dhl_track_lookup' %}"
+           style="background:#f9a825;color:#000;padding:8px 16px;border-radius:6px;
+                  text-decoration:none;font-weight:600;display:inline-block">
+            🔍 DHL Трекінг
+        </a>
+    </li>
+    <li>
+        <a href="{% url 'admin:shipping_carrier_changelist' %}"
+           style="background:#607d8b;color:white;padding:8px 16px;border-radius:6px;
+                  text-decoration:none;font-weight:600;display:inline-block">
+            ⚙️ Перевізники
+        </a>
+    </li>
+{% endblock %}

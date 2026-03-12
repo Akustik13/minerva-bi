@@ -1,0 +1,663 @@
+{% extends "admin/base.html" %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+/* ── Minerva tooltip (?-кружок) ──────────────────────── */
+.mtip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: rgba(88,166,255,.15); border: 1px solid rgba(88,166,255,.35);
+  color: #58a6ff; font-size: 10px; font-weight: 700; font-style: normal;
+  cursor: help; position: relative; margin-left: 5px; vertical-align: middle;
+  flex-shrink: 0; line-height: 1; user-select: none;
+}
+.mtip .mtip-body { display: none; }
+#mtip-float {
+  position: fixed; z-index: 999999;
+  min-width: 320px; max-width: 420px;
+  background: #1a2535; border: 1px solid #3a5570;
+  color: #c9d8e4; padding: 13px 17px; border-radius: 9px;
+  font-size: 12.5px; line-height: 1.75;
+  white-space: pre-wrap; box-shadow: 0 6px 28px rgba(0,0,0,.6);
+  pointer-events: none; display: none;
+}
+#mtip-float b { color: #58a6ff; font-size: 13px; display: block; margin-bottom: 6px; }
+#mtip-float::after {
+  content: ''; position: absolute; top: 100%; left: 24px;
+  border: 7px solid transparent; border-top-color: #3a5570;
+}
+
+/* ════════════════════════════════════════════════════
+   SIDEBAR — уніфікована кольорова гамма
+   ════════════════════════════════════════════════════ */
+
+/* Перевизначаємо Django teal (#417690) для всіх caption у сайдбарі */
+#nav-sidebar .module > table > caption {
+  background: #111d2b !important;
+  color: #7a9ab0 !important;
+  border-bottom: 1px solid #1e2d3d !important;
+  padding: 7px 10px 7px 14px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: none !important;
+  /* flex layout для посилання + стрілки */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+#nav-sidebar .module > table > caption > a {
+  color: #7a9ab0 !important;
+  text-decoration: none !important;
+  flex: 1;
+}
+#nav-sidebar .module > table > caption > a:hover { color: #c9d8e4 !important; }
+
+/* ── Головні групи-заголовки ── */
+.mg-group { margin: 0; }
+.mg-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px 10px 14px;
+  cursor: pointer; user-select: none;
+  background: #0d1520;
+  border-top: 2px solid #1e2d3d;
+  border-bottom: 1px solid #1e2d3d;
+  border-left: 3px solid #2a4a6a;
+  color: #b0c8da;
+  font-size: 12.5px; font-weight: 700;
+  transition: color .15s, background .15s, border-left-color .15s;
+}
+.mg-header:hover { color: #ddeeff; background: #111d2b; border-left-color: #2196f3; }
+.mg-group:first-child .mg-header { border-top: none; }
+
+.mg-arrow {
+  font-size: 9px; color: #3a5570; flex-shrink: 0;
+  transition: transform .2s ease; display: inline-block;
+}
+.mg-group.collapsed .mg-arrow   { transform: rotate(-90deg); }
+.mg-group.collapsed .mg-content { display: none; }
+
+/* ── Заголовок-посилання (для груп з одним app) ── */
+.mg-header-link {
+  color: inherit !important; text-decoration: none !important; flex: 1;
+}
+.mg-header-link:hover { color: #ddeeff !important; }
+
+/* ── Посилання в Аналітиці ── */
+.mg-link {
+  display: flex; align-items: center;
+  padding: 7px 16px 7px 20px;
+  color: #9aafbe; text-decoration: none !important;
+  font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.04);
+  transition: color .15s, background .15s;
+}
+.mg-link:hover { color: #c9d8e4; background: rgba(255,255,255,.04); }
+.mg-link.mg-red  { color: #ff9492; } .mg-link.mg-red:hover  { color: #ffb3b1; }
+.mg-link.mg-gold { color: #e8d5a3; } .mg-link.mg-gold:hover { color: #f5e9c0; }
+
+/* ── Стрілка всередині caption (collapse sub-module) ── */
+.mg-mod-arrow {
+  font-size: 8px; color: #3a5570; cursor: pointer;
+  padding: 2px 5px; border-radius: 3px; flex-shrink: 0;
+  transition: color .15s, transform .2s;
+  user-select: none; line-height: 1;
+}
+.mg-mod-arrow:hover { color: #9aafbe; }
+.mg-mod-collapsed .mg-mod-arrow { transform: rotate(-90deg); }
+.mg-mod-collapsed tbody { display: none; }
+
+/* Modules всередині груп — прибираємо зайві border-radius */
+.mg-content .module { margin: 0; border-radius: 0; border: none; }
+
+/* ── Закріплений пункт FAQ ── */
+.mg-pinned {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  border-top: 2px solid #1e2d3d;
+  background: #0a1018;
+}
+.mg-pinned a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  color: #7ab3cc !important;
+  text-decoration: none !important;
+  font-size: 13px;
+  font-weight: 600;
+  transition: color .15s, background .15s;
+}
+.mg-pinned a:hover {
+  color: #ddeeff !important;
+  background: rgba(33,150,243,.08);
+}
+.mg-pinned a .mp-badge {
+  margin-left: auto;
+  font-size: 10px;
+  background: rgba(33,150,243,.15);
+  border: 1px solid rgba(33,150,243,.35);
+  color: #58a6ff;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-weight: 700;
+  letter-spacing: .4px;
+}
+
+/* ── Drag & Drop sort handles ── */
+.mg-handle {
+  font-size: 14px; color: #2a3f52; cursor: grab;
+  padding: 0 5px 0 0; flex-shrink: 0; opacity: 0;
+  transition: opacity .15s, color .15s;
+  line-height: 1; user-select: none;
+}
+.mg-header:hover .mg-handle { opacity: 1; color: #607d8b; }
+.mg-handle:active { cursor: grabbing; color: #9aafbe; }
+.mg-label { flex: 1; }
+.mg-group.mg-dragging { opacity: .3; }
+.mg-group.mg-drag-over-top { box-shadow: inset 0 2px 0 #2196f3; }
+.mg-group.mg-drag-over-bot { box-shadow: inset 0 -2px 0 #2196f3; }
+.mg-sort-reset {
+  display: block; text-align: center; padding: 8px 14px;
+  font-size: 11px; color: #3a5570; cursor: pointer;
+  border-top: 1px solid #1e2d3d;
+  transition: color .15s, background .15s; user-select: none;
+}
+.mg-sort-reset:hover { color: #9aafbe; background: rgba(255,255,255,.03); }
+
+/* ═══════════════════════════════════════════════════════
+   Minerva — Header Motto
+   ═══════════════════════════════════════════════════════ */
+#header {
+  display: grid !important;
+  grid-template-columns: auto 1fr auto !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+#branding   { grid-column: 1; min-width: 0; }
+#user-tools { grid-column: 3; min-width: 0; white-space: nowrap; }
+
+#minerva-motto {
+  grid-column: 2;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+  padding: 4px 8px;
+}
+.mv-m-rule {
+  height: 1px;
+  margin: 0 auto;
+  width: 88%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201,168,76,.18) 20%,
+    rgba(232,213,163,.55) 50%,
+    rgba(201,168,76,.18) 80%,
+    transparent 100%
+  );
+}
+.mv-m-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 4px 0 3px;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-family: 'Georgia', 'Times New Roman', serif;
+  background: linear-gradient(
+    180deg,
+    #f5ecd4 0%,
+    #e8d5a3 30%,
+    #c9a84c 65%,
+    #a07830 100%
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  white-space: nowrap;
+}
+.mv-m-sep {
+  margin: 0 11px;
+  font-size: 22px;
+  font-weight: 300;
+  opacity: 0.55;
+  -webkit-text-fill-color: rgba(201,168,76,.7);
+  letter-spacing: 0;
+}
+/* ── Fix select height: текст не обрізається ──────────────── */
+#content select,
+.field-box select,
+.form-row select,
+.inline-group select,
+.related-widget-wrapper select {
+  height: auto !important;
+  min-height: 34px !important;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+  line-height: 1.4 !important;
+}
+</style>
+
+<div id="mtip-float"></div>
+<script>
+/* ── Tooltip ── */
+(function(){
+  var fl = document.getElementById('mtip-float'), cur = null;
+  document.addEventListener('mouseover', function(e){
+    var el = e.target.closest('.mtip');
+    if (!el || el === cur) return;
+    cur = el;
+    var inner = el.querySelector('.mtip-body');
+    if (!inner) return;
+    fl.innerHTML = inner.innerHTML; fl.style.display = 'block'; pos(e);
+  });
+  document.addEventListener('mousemove', function(e){ if (cur) pos(e); });
+  document.addEventListener('mouseout', function(e){
+    if (!cur) return;
+    var rel = e.relatedTarget;
+    if (rel && rel.closest && rel.closest('.mtip') === cur) return;
+    cur = null; fl.style.display = 'none';
+  });
+  function pos(e){
+    var gap=14, w=fl.offsetWidth||340, h=fl.offsetHeight||200;
+    var x=e.clientX+gap, y=e.clientY-h-gap;
+    if (x+w>window.innerWidth-8) x=e.clientX-w-gap;
+    if (y<8) y=e.clientY+gap;
+    fl.style.left=x+'px'; fl.style.top=y+'px';
+  }
+})();
+
+/* ── Sidebar groups ── */
+document.addEventListener('DOMContentLoaded', function(){
+  /* Django 5.x: #nav-sidebar IS the container.
+     App modules: class="app-{label} module", no id attribute. */
+  var sidebar = document.getElementById('nav-sidebar');
+  if (!sidebar) return;
+
+  /* ── Drag-and-drop order persistence ── */
+  var _ORDER_KEY = 'mg-order';
+  var _dragId = null;
+  var _fromHandle = false;
+
+  function _saveOrder() {
+    var ids = [];
+    sidebar.querySelectorAll('.mg-group[data-group-id]').forEach(function(el){
+      ids.push(el.dataset.groupId);
+    });
+    localStorage.setItem(_ORDER_KEY, JSON.stringify(ids));
+  }
+
+  function _loadOrder() {
+    try { return JSON.parse(localStorage.getItem(_ORDER_KEY)) || []; }
+    catch(e) { return []; }
+  }
+
+  var GROUPS = [
+    {
+      id: 'analytics', label: '📊 Аналітика',
+      href: '/dashboard/analytics/',
+      links: [
+        { href: '/dashboard/',         label: '📊 Статистика', cls: 'mg-gold' },
+        { href: '/dashboard/signals/', label: '🚨 Сигнали',    cls: 'mg-red'  },
+      ],
+      apps: []
+    },
+    { id: 'crm',        label: '👥 CRM',            apps: ['crm'] },
+    { id: 'accounting', label: '💰 Бухгалтерія',   apps: ['accounting'] },
+    { id: 'sales',      label: '🛒 Продажі',       apps: ['sales'] },
+    { id: 'shipping', label: '🚚 Доставка', apps: ['shipping'] },
+    { id: 'inventory', label: '📦 Склад',       apps: ['inventory'] },
+    { id: 'tasks',     label: '📋 Задачі',      apps: ['tasks'] },
+    { id: 'bots',      label: '🧠 AI та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
+    {
+      id: 'integrations', label: '🔌 Інтеграції',
+      href: '/admin/config/integrations/',
+      links: [
+        { href: '/admin/bots/digikeyconfig/1/change/',             label: '🛒 DigiKey' },
+        { href: '/admin/shipping/carrier/',                        label: '🚚 Перевізники (DHL/Jumingo)' },
+        { href: '/admin/config/notificationsettings/1/change/',    label: '🔔 Сповіщення (Email/Telegram)' },
+      ],
+      apps: []
+    },
+    {
+      id: 'system', label: '⚙️ Система',
+      href: '/dashboard/system/',
+      links: [
+        { href: '/dashboard/import/', label: '📥 Імпорт даних' },
+        { href: '/dashboard/help/',   label: '📖 Довідник' },
+      ],
+      apps: ['backup', 'auth']
+    },
+  ];
+
+  /* Сортуємо GROUPS за збереженим порядком */
+  var _savedOrder = _loadOrder();
+  if (_savedOrder.length) {
+    GROUPS.sort(function(a, b){
+      var ai = _savedOrder.indexOf(a.id);
+      var bi = _savedOrder.indexOf(b.id);
+      if (ai === -1) ai = 999;
+      if (bi === -1) bi = 999;
+      return ai - bi;
+    });
+  }
+
+  /* Збираємо app-модулі */
+  var mods = {};
+  sidebar.querySelectorAll('.module').forEach(function(el){
+    var m = el.className.match(/\bapp-(\S+)/);
+    if (m) { mods[m[1]] = el; el.remove(); }
+  });
+
+  /* Додаємо 🧠 AI як рядок у bots-модуль */
+  if (mods['bots']) {
+    var botsTbody = mods['bots'].querySelector('tbody');
+    if (botsTbody) {
+      var aiRow = document.createElement('tr');
+      aiRow.innerHTML = '<th scope="row"><a href="/admin/bots/bot/ai-info/">🧠 AI (Штучний інтелект)</a></th>';
+      botsTbody.appendChild(aiRow);
+    }
+  }
+
+  /* ── Доставка: Відслідковування + DHL Трекінг перед Перевізниками ── */
+  if (mods['shipping']) {
+    var shTbody = mods['shipping'].querySelector('tbody');
+    if (shTbody) {
+      var carrierRow = null;
+      shTbody.querySelectorAll('tr').forEach(function(row) {
+        var a = row.querySelector('a');
+        if (a && a.href.indexOf('/shipping/carrier') !== -1) carrierRow = row;
+      });
+      var otRow = document.createElement('tr');
+      otRow.innerHTML = '<th scope="row"><a href="/admin/shipping/shipment/order-tracking/" style="color:#2196f3">📡 Відслідковування</a></th>';
+      shTbody.insertBefore(otRow, carrierRow);
+      var trackRow = document.createElement('tr');
+      trackRow.innerHTML = '<th scope="row"><a href="/admin/shipping/shipment/dhl-track-lookup/" style="color:#f9a825">🔍 DHL Трекінг</a></th>';
+      shTbody.insertBefore(trackRow, carrierRow);
+    }
+  }
+
+  /* ── Авто-розкриття активного розділу ── */
+  var _URL_GROUP = {
+    '/admin/crm/':         'crm',
+    '/admin/accounting/':  'accounting',
+    '/admin/sales/':       'sales',
+    '/admin/shipping/':  'shipping',
+    '/admin/shipping/shipment/dhl-track-lookup/': 'shipping',
+    '/admin/shipping/shipment/order-tracking/':   'shipping',
+    '/admin/inventory/': 'inventory',
+    '/admin/tasks/':     'tasks',
+    '/admin/bots/':      'bots',
+    '/admin/config/integrations/':            'integrations',
+    '/admin/config/notificationsettings/':    'integrations',
+    '/admin/shipping/carrier/':               'integrations',
+    '/admin/backup/':    'system',
+    '/admin/auth/':      'system',
+    '/dashboard/import/':       'system',
+    '/onboarding/clear-system/':'system',
+    '/onboarding/delete-demo/': 'system',
+    '/dashboard/':            'analytics',
+    '/dashboard/analytics/': 'analytics',
+    '/dashboard/bots/':      'bots',
+    '/dashboard/api/':       'bots',
+    '/dashboard/system/':    'system',
+    '/admin/api/':           'bots',
+    '/api/v1/':              'bots',
+  };
+  var _curPath = window.location.pathname;
+  var _activeGroup = null;
+  Object.keys(_URL_GROUP).forEach(function(prefix) {
+    if (_curPath.startsWith(prefix)) _activeGroup = _URL_GROUP[prefix];
+  });
+
+  /* Робить caption кожного модуля клікабельним (тогл tbody) */
+  function makeModCollapsible(mod) {
+    var caption = mod.querySelector('caption');
+    var tbody   = mod.querySelector('tbody');
+    if (!caption || !tbody) return;
+    var m   = mod.className.match(/\bapp-(\S+)/);
+    var key = 'mg-mod-' + (m ? m[1] : 'x');
+    var arrow = document.createElement('span');
+    arrow.className = 'mg-mod-arrow';
+    arrow.textContent = '▼';
+    caption.appendChild(arrow);
+    if (localStorage.getItem(key) === '1') mod.classList.add('mg-mod-collapsed');
+    arrow.addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
+      var c = mod.classList.toggle('mg-mod-collapsed');
+      localStorage.setItem(key, c ? '1' : '0');
+    });
+  }
+
+  /* Будуємо групи */
+  GROUPS.forEach(function(grp){
+    var hasLinks = grp.links && grp.links.length;
+    var appsFound = (grp.apps || []).filter(function(a){ return mods[a]; });
+    if (!hasLinks && !appsFound.length) return;
+
+    var collapsed;
+    if (_activeGroup !== null) {
+      collapsed = (grp.id !== _activeGroup);
+      localStorage.setItem('mg-' + grp.id, collapsed ? '1' : '0');
+    } else {
+      collapsed = localStorage.getItem('mg-' + grp.id) === '1';
+    }
+    var group = document.createElement('div');
+    group.className = 'mg-group' + (collapsed ? ' collapsed' : '');
+    group.dataset.groupId = grp.id;
+    group.draggable = true;
+
+    /* ── Заголовок групи ── */
+    var hdr = document.createElement('div');
+    hdr.className = 'mg-header';
+
+    var labelHtml = grp.label;
+    if (grp.href) {
+      labelHtml = '<a href="' + grp.href + '" class="mg-header-link">' + grp.label + '</a>';
+    } else if (!hasLinks && appsFound.length === 1) {
+      var capLink = mods[appsFound[0]].querySelector('caption a');
+      if (capLink) {
+        labelHtml = '<a href="' + capLink.href + '" class="mg-header-link">' + grp.label + '</a>';
+        var innerCap = mods[appsFound[0]].querySelector('caption');
+        if (innerCap) innerCap.style.display = 'none';
+      }
+    }
+
+    hdr.innerHTML =
+      '<span class="mg-handle" title="Перетягнути">⠿</span>' +
+      '<span class="mg-label">' + labelHtml + '</span>' +
+      '<span class="mg-arrow">▼</span>';
+
+    hdr.addEventListener('click', function(e){
+      if (e.target.closest('.mg-header-link')) return;
+      if (e.target.closest('.mg-handle')) return;
+      var c = group.classList.toggle('collapsed');
+      localStorage.setItem('mg-' + grp.id, c ? '1' : '0');
+    });
+    group.appendChild(hdr);
+
+    /* ── Вміст ── */
+    var content = document.createElement('div');
+    content.className = 'mg-content';
+
+    if (grp.links) {
+      grp.links.forEach(function(lnk){
+        var a = document.createElement('a');
+        a.href = lnk.href;
+        a.className = 'mg-link' + (lnk.cls ? ' ' + lnk.cls : '');
+        a.textContent = lnk.label;
+        content.appendChild(a);
+      });
+    }
+
+    appsFound.forEach(function(name){
+      if (appsFound.length > 1) makeModCollapsible(mods[name]);
+      content.appendChild(mods[name]);
+    });
+
+    group.appendChild(content);
+    sidebar.appendChild(group);
+  });
+
+  /* ── Drag-and-drop handlers ── */
+  sidebar.addEventListener('mousedown', function(e){
+    _fromHandle = !!e.target.closest('.mg-handle');
+  });
+
+  sidebar.addEventListener('dragstart', function(e){
+    var grpEl = e.target.closest('.mg-group[data-group-id]');
+    if (!grpEl || !_fromHandle) { e.preventDefault(); return; }
+    _dragId = grpEl.dataset.groupId;
+    grpEl.classList.add('mg-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', _dragId);
+  });
+
+  sidebar.addEventListener('dragend', function(e){
+    sidebar.querySelectorAll('.mg-group').forEach(function(el){
+      el.classList.remove('mg-dragging', 'mg-drag-over-top', 'mg-drag-over-bot');
+    });
+    _dragId = null;
+  });
+
+  sidebar.addEventListener('dragover', function(e){
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var over = e.target.closest('.mg-group[data-group-id]');
+    sidebar.querySelectorAll('.mg-group').forEach(function(el){
+      el.classList.remove('mg-drag-over-top', 'mg-drag-over-bot');
+    });
+    if (!over || over.dataset.groupId === _dragId) return;
+    var rect = over.getBoundingClientRect();
+    var mid  = rect.top + rect.height / 2;
+    over.classList.add(e.clientY < mid ? 'mg-drag-over-top' : 'mg-drag-over-bot');
+  });
+
+  sidebar.addEventListener('dragleave', function(e){
+    var over = e.target.closest('.mg-group[data-group-id]');
+    if (over) over.classList.remove('mg-drag-over-top', 'mg-drag-over-bot');
+  });
+
+  sidebar.addEventListener('drop', function(e){
+    e.preventDefault();
+    var over = e.target.closest('.mg-group[data-group-id]');
+    if (!over || !_dragId || over.dataset.groupId === _dragId) return;
+    var dragged = sidebar.querySelector('.mg-group[data-group-id="' + _dragId + '"]');
+    if (!dragged) return;
+    var rect = over.getBoundingClientRect();
+    var insertBefore = e.clientY < (rect.top + rect.height / 2);
+    sidebar.insertBefore(dragged, insertBefore ? over : over.nextSibling);
+    sidebar.querySelectorAll('.mg-group').forEach(function(el){
+      el.classList.remove('mg-drag-over-top', 'mg-drag-over-bot', 'mg-dragging');
+    });
+    _saveOrder();
+  });
+
+  /* ── Кнопка скидання порядку ── */
+  var resetBtn = document.createElement('div');
+  resetBtn.className = 'mg-sort-reset';
+  resetBtn.id = 'mg-reset-btn';
+  resetBtn.textContent = '↺ Скинути порядок';
+  resetBtn.addEventListener('click', function(){
+    localStorage.removeItem(_ORDER_KEY);
+    location.reload();
+  });
+  sidebar.appendChild(resetBtn);
+
+  /* ── Закріплений пункт FAQ — завжди видимий ── */
+  var pinned = document.createElement('div');
+  pinned.className = 'mg-pinned';
+  pinned.innerHTML =
+    '<a href="/admin/faq/faqplaceholder/">' +
+      '❓ FAQ та підтримка' +
+      '<span class="mp-badge">Послуги</span>' +
+    '</a>';
+  sidebar.appendChild(pinned);
+});
+</script>
+
+<script>
+/* ── Motto: вставляємо між логотипом і user-tools ── */
+document.addEventListener('DOMContentLoaded', function(){
+  var branding = document.getElementById('branding');
+  if (!branding) return;
+  var el = document.createElement('div');
+  el.id = 'minerva-motto';
+  el.innerHTML =
+    '<div class="mv-m-rule"></div>' +
+    '<div class="mv-m-text">' +
+      'Sapientia' +
+      '<span class="mv-m-sep">&middot;</span>' +
+      'Visio' +
+      '<span class="mv-m-sep">&middot;</span>' +
+      'Imperium' +
+    '</div>' +
+    '<div class="mv-m-rule"></div>';
+  branding.insertAdjacentElement('afterend', el);
+});
+</script>
+{% endblock %}
+
+{% block branding %}
+<style>
+  .minerva-brand { display: inline-flex; align-items: center; gap: 11px; text-decoration: none; }
+  .minerva-logo {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, #c9a84c, #e8d5a3);
+    border-radius: 9px; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 19px; flex-shrink: 0;
+    box-shadow: 0 2px 12px rgba(201,168,76,.5);
+  }
+  .minerva-text { line-height: 1.2; }
+  .minerva-name {
+    font-size: 18px; font-weight: 800; display: block; letter-spacing: -0.3px;
+    background: linear-gradient(90deg, #e8d5a3, #c9a84c, #f0e6c0);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .minerva-tagline {
+    font-size: 10px; color: rgba(255,255,255,.38); font-weight: 500;
+    letter-spacing: 1.2px; text-transform: uppercase; display: block;
+  }
+</style>
+<a href="/" class="minerva-brand">
+  <span class="minerva-logo">🏛️</span>
+  <span class="minerva-text">
+    <span class="minerva-name">Minerva</span>
+    <span class="minerva-tagline">Business Intelligence System</span>
+  </span>
+</a>
+{% endblock %}
+
+{% block usertools %}{{ block.super }}{% endblock %}
+
+{% block footer %}
+<style>
+#minerva-footer {
+  border-top: 1px solid rgba(255,255,255,.08); padding: 12px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; color: rgba(255,255,255,.28); background: #1a1a1a;
+}
+#minerva-footer a { color: rgba(255,255,255,.35); text-decoration: none; transition: color .2s; }
+#minerva-footer a:hover { color: rgba(255,255,255,.65); }
+#minerva-footer .mf-sep { margin: 0 8px; opacity: .3; }
+</style>
+<div id="minerva-footer">
+  <span>
+    🏛️ <strong style="color:rgba(255,255,255,.45)">Minerva Business Intelligence System</strong>
+    <span class="mf-sep">·</span>
+    © 2024–2026 <a href="mailto:prym.via@gmail.com">Viacheslav Pryimak</a>
+  </span>
+  <span>
+    <a href="{% url 'admin:faq_faqplaceholder_changelist' %}">❓ FAQ</a>
+    <span class="mf-sep">·</span>
+    <a href="{% url 'admin:faq_faqplaceholder_changelist' %}">📜 Ліцензія</a>
+    <span class="mf-sep">·</span>
+    <a href="mailto:prym.via@gmail.com?subject=Minerva%20%E2%80%94%20%D0%97%D0%B0%D0%BF%D0%B8%D1%82%20%D0%BD%D0%B0%20%D0%BF%D0%BE%D1%81%D0%BB%D1%83%D0%B3%D0%B8">💼 Послуги</a>
+    <span class="mf-sep">·</span>
+    Proprietary · All rights reserved
+  </span>
+</div>
+{% endblock footer %}

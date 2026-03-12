@@ -1,0 +1,83 @@
+services:
+
+  # ── PostgreSQL ─────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       tabele
+      POSTGRES_USER:     tabele
+      POSTGRES_PASSWORD: tabele
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # Synology DSM займає порт 5432 власним PostgreSQL.
+    # Наш db доступний ззовні на 5433 (всередині мережі Docker — завжди 5432).
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tabele -d tabele"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  # ── Django (web) ────────────────────────────────────────
+  web:
+    build: .
+    restart: unless-stopped
+    environment: &django_env
+      # ⚠️  Змініть SECRET_KEY перед deploy на production!
+      DJANGO_SECRET_KEY:  "change-me-to-a-long-random-string-in-production"
+      DJANGO_DEBUG:       "0"
+      DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,akustik.synology.me,192.168.2.123"
+
+      # База даних
+      DB_NAME:     tabele
+      DB_USER:     tabele
+      DB_PASSWORD: tabele
+      DB_HOST:     db
+      DB_PORT:     "5432"
+
+      # Суперюзер — створюється автоматично при першому старті
+      DJANGO_SUPERUSER_USERNAME: admin
+      DJANGO_SUPERUSER_EMAIL:    admin@minerva.local
+      DJANGO_SUPERUSER_PASSWORD: Minerva
+
+      TZ: "Europe/Berlin"
+
+      # DigiKey OAuth redirect (потрібен для 3-legged auth, якщо активується)
+      DIGIKEY_OAUTH_REDIRECT_URI: ""
+    entrypoint: ["sh", "/app/entrypoint.sh"]
+    volumes: &app_volumes
+      - ./:/app                          # Код (дозволяє оновлювати без rebuild)
+      - media_data:/app/media            # Медіафайли та завантажені документи
+      - ./media/labels:/app/media/labels # Етикетки DYMO — пряма папка з хоста
+      - ./media/orders:/app/media/orders # Документи замовлень — пряма папка з хоста
+      - backup_data:/app/backups         # Резервні копії БД
+      - static_data:/app/staticfiles     # Static files — колектяться при старті
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Cron (авто-трекінг + DigiKey sync) ──────────────────
+  cron:
+    build: .
+    restart: unless-stopped
+    environment:
+      <<: *django_env
+      # Інтервали в секундах (override тут якщо потрібно)
+      TRACK_INTERVAL: "300"    # 5 хв — авто-трекінг відправлень
+      SYNC_INTERVAL:  "1800"   # 30 хв — DigiKey синхронізація
+    entrypoint: ["sh", "/app/cron_runner.sh"]
+    volumes: *app_volumes
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:       # Дані PostgreSQL
+  media_data:   # Завантажені файли (накладні, фото, етикетки)
+  backup_data:  # Резервні копії БД
+  static_data:  # Django static files (collectstatic)

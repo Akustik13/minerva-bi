@@ -1,0 +1,436 @@
+from django.contrib import admin
+from django.shortcuts import redirect, render
+from django.urls import path, reverse
+from django.utils.html import format_html
+
+from config.models import SystemSettings, DocumentSettings, NotificationSettings
+
+
+@admin.register(SystemSettings)
+class SystemSettingsAdmin(admin.ModelAdmin):
+    # Singleton: redirect changelist → change view for pk=1
+    def changelist_view(self, request, extra_context=None):
+        obj, _ = SystemSettings.objects.get_or_create(pk=1, defaults={
+            "company_name": "Моя компанія",
+        })
+        return redirect(reverse("admin:config_systemsettings_change", args=[obj.pk]))
+
+    fieldsets = [
+        ("🏢 Компанія", {
+            "fields": ("company_name", "logo", "default_currency", "timezone"),
+        }),
+        ("📦 Активні модулі", {
+            "fields": ("enabled_modules", "accounting_level"),
+            "description": (
+                "enabled_modules — список app labels через кому або JSON-масив. "
+                "Доступні: crm, accounting, sales, shipping, inventory, bots"
+            ),
+        }),
+        ("💰 Фінанси", {
+            "fields": ("default_vat_rate",),
+            "description": "Стандартна ставка ПДВ — підставляється автоматично у нові рахунки-фактури.",
+        }),
+        ("📐 Одиниці виміру та формати", {
+            "fields": ("weight_unit", "dimension_unit", "country_code_format"),
+            "description": (
+                "Одиниці відображення у відправленнях та пакувальних матеріалах. "
+                "Формат країни — ISO-2 (DE) або ISO-3 (DEU) — впливає на адмін-інтерфейс."
+            ),
+        }),
+        ("⚙️ Система", {
+            "fields": ("is_onboarding_complete",),
+            "description": "Скидайте is_onboarding_complete для повторного запуску wizard.",
+        }),
+    ]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(DocumentSettings)
+class DocumentSettingsAdmin(admin.ModelAdmin):
+    # Singleton: redirect changelist → change view for pk=1
+    def changelist_view(self, request, extra_context=None):
+        obj = DocumentSettings.get()
+        return redirect(reverse("admin:config_documentsettings_change", args=[obj.pk]))
+
+    fieldsets = [
+        ("🌐 Загальне", {
+            "fields": ("doc_language",),
+            "description": "Мова заголовків і службового тексту у PDF-документах.",
+        }),
+        ("📦 Пакувальний лист", {
+            "fields": ("packing_list_show_prices", "packing_list_footer_note"),
+            "description": "Налаштування для Packing List — супровідний список позицій.",
+        }),
+        ("📄 Proforma Invoice", {
+            "fields": ("proforma_payment_terms", "proforma_notes"),
+            "description": "Умови оплати та додаткові примітки для proforma.",
+        }),
+        ("🛃 Митна декларація CN23", {
+            "fields": ("customs_default_type", "customs_reason"),
+            "description": (
+                "Тип декларації підставляється коли у замовленні не вказано тип документа. "
+                "Опис використовується як fallback якщо товар не має назви для документів."
+            ),
+        }),
+    ]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(NotificationSettings)
+class NotificationSettingsAdmin(admin.ModelAdmin):
+    # Singleton: redirect changelist → change view for pk=1
+    def changelist_view(self, request, extra_context=None):
+        obj = NotificationSettings.get()
+        return redirect(reverse("admin:config_notificationsettings_change", args=[obj.pk]))
+
+    readonly_fields = ("alert_actions", "last_alert_sent")
+
+    fieldsets = [
+        ("📧 Email (SMTP)", {
+            "fields": (
+                "email_enabled",
+                ("email_host", "email_port"),
+                ("email_use_tls", "email_use_ssl"),
+                "email_host_user", "email_host_password",
+                "email_from", "email_to",
+            ),
+            "description": (
+                "Gmail: host=smtp.gmail.com, port=587, TLS=✓. "
+                "Потрібен App Password: Google Account → Security → "
+                "2-Step Verification → App Passwords."
+            ),
+        }),
+        ("📬 Нові замовлення", {
+            "fields": (
+                ("new_order_email", "new_order_telegram"),
+            ),
+            "description": (
+                "Миттєве сповіщення при надходженні нового замовлення. "
+                "Надсилається через email та/або Telegram."
+            ),
+        }),
+        ("⚙️ Оновлення системи (синхронізації)", {
+            "fields": (
+                ("sync_result_email", "sync_result_telegram"),
+                "sync_skip_if_no_changes",
+            ),
+            "description": (
+                "Надсилати підсумок після автоматичних синхронізацій — "
+                "DigiKey (нові замовлення) та авто-трекінг (зміни статусу відправлень). "
+                "Сповіщення надходить лише якщо були реальні зміни."
+            ),
+        }),
+        ("🔄 Зміна статусу замовлення", {
+            "fields": (
+                ("status_change_email", "status_change_telegram"),
+                ("notify_on_processing", "notify_on_shipped",
+                 "notify_on_delivered", "notify_on_cancelled"),
+            ),
+            "description": (
+                "Сповіщення при зміні статусу. "
+                "Оберіть канал (Email / Telegram) та які саме зміни статусу надсилати."
+            ),
+        }),
+        ("🔔 Планові сповіщення (cron)", {
+            "fields": (
+                "stock_alerts_enabled",
+                "deadline_alerts_enabled",
+                "deadline_overdue_days",
+            ),
+            "description": "Запускаються автоматично через cron (send_alerts).",
+        }),
+        ("⏱️ Розклад", {
+            "fields": ("alert_min_interval_hours", "last_alert_sent"),
+            "description": (
+                "Для автоматичного надсилання додайте cron: "
+                "<code>0 */12 * * * docker-compose exec -T web python manage.py send_alerts</code>"
+            ),
+        }),
+        ("📱 Telegram", {
+            "fields": ("telegram_enabled", "telegram_bot_token", "telegram_chat_id"),
+            "classes": ("collapse",),
+            "description": (
+                "1. @BotFather → /newbot → скопіювати токен. "
+                "2. Додати бота в чат/канал (для каналу — зробити адміністратором). "
+                "3. Chat ID: для каналу @username або числовий ID (дізнатись через @userinfobot)."
+            ),
+        }),
+        ("🚀 Дії", {
+            "fields": ("alert_actions",),
+            "description": (
+                "Тест перевіряє SMTP без реальних даних. "
+                "'Надіслати зараз' — ігнорує інтервал і перевіряє реальні алерти."
+            ),
+        }),
+    ]
+
+    def alert_actions(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="../test-email/" style="'
+            'display:inline-block;padding:8px 18px;margin-right:10px;'
+            'background:#1976d2;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '📧 Надіслати тест</a>'
+            '<a href="../send-now/" style="'
+            'display:inline-block;padding:8px 18px;margin-right:10px;'
+            'background:#ff9800;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '🔔 Перевірити та надіслати зараз</a>'
+            '<a href="../test-telegram/" style="'
+            'display:inline-block;padding:8px 18px;'
+            'background:#0088cc;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '📱 Тест Telegram</a>'
+        )
+    alert_actions.short_description = "Дії"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "",
+                self.admin_site.admin_view(self._redirect_singleton),
+                name="config_notificationsettings_changelist",
+            ),
+            path(
+                "<int:pk>/test-email/",
+                self.admin_site.admin_view(self._test_email),
+                name="config_notificationsettings_test_email",
+            ),
+            path(
+                "<int:pk>/send-now/",
+                self.admin_site.admin_view(self._send_now),
+                name="config_notificationsettings_send_now",
+            ),
+            path(
+                "<int:pk>/test-telegram/",
+                self.admin_site.admin_view(self._test_telegram),
+                name="config_notificationsettings_test_telegram",
+            ),
+        ]
+        return custom + urls
+
+    def _redirect_singleton(self, request):
+        obj = NotificationSettings.get()
+        return redirect(reverse("admin:config_notificationsettings_change", args=[obj.pk]))
+
+    def _test_email(self, request, pk):
+        from django.contrib import messages
+        from dashboard.notifications import run_alerts
+        result = run_alerts(is_test=True, test_channel='email')
+        if result.get('sent'):
+            messages.success(request, "✅ Тестовий email надіслано! Перевірте поштову скриньку.")
+        else:
+            err = (
+                result.get('email', {}).get('error')
+                or result.get('error')
+                or result.get('reason')
+                or '?'
+            )
+            messages.error(request, f"❌ Email помилка: {err}")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def _send_now(self, request, pk):
+        from django.contrib import messages
+        from dashboard.notifications import run_alerts
+        result = run_alerts(force=True)
+        if result.get('sent'):
+            messages.success(request, (
+                f"✅ Надіслано: {result.get('critical', 0)} critical stock, "
+                f"{result.get('overdue', 0)} overdue orders"
+            ))
+        elif result.get('ok'):
+            messages.info(request, f"ℹ️ {result.get('reason', 'Немає алертів для надсилання')}")
+        else:
+            messages.error(request, f"❌ Помилка: {result.get('error') or result.get('reason', '?')}")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def _test_telegram(self, request, pk):
+        from django.contrib import messages
+        from dashboard.notifications import run_alerts
+        result = run_alerts(is_test=True, test_channel='telegram')
+        tg = result.get('telegram', {})
+        if tg.get('sent'):
+            messages.success(request, "✅ Тестове Telegram-повідомлення надіслано! Перевірте чат.")
+        elif tg.get('error'):
+            messages.error(request, f"❌ Telegram помилка: {tg['error']}")
+        else:
+            messages.warning(request, "⚠️ Telegram вимкнено або не налаштований (Bot Token / Chat ID).")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+# ── Integrations Hub ──────────────────────────────────────────────────────────
+
+def integrations_hub_view(request):
+    """Centralised read-only overview of all configured integrations."""
+    integrations = []
+
+    # ── DigiKey ───────────────────────────────────────────────────────────────
+    try:
+        from bots.models import DigiKeyConfig
+        dk = DigiKeyConfig.get()
+        has_creds = bool(dk.client_id and dk.client_secret)
+        has_marketplace = bool(dk.marketplace_access_token or dk.marketplace_refresh_token)
+        integrations.append({
+            "name":    "DigiKey Marketplace",
+            "icon":    "🛒",
+            "enabled": dk.sync_enabled and has_creds,
+            "status":  (
+                "✅ Активна" if (dk.sync_enabled and has_creds)
+                else ("⚠️ Credentials відсутні" if not has_creds else "⏸ Вимкнено")
+            ),
+            "details": [
+                ("Режим",             "Sandbox" if dk.use_sandbox else "Production"),
+                ("Sync",              "Увімкнено" if dk.sync_enabled else "Вимкнено"),
+                ("Marketplace OAuth", "✅ Є токен" if has_marketplace else "❌ Не авторизовано"),
+                ("Остання синхр.",    dk.last_synced_at.strftime("%d.%m.%Y %H:%M") if dk.last_synced_at else "—"),
+            ],
+            "settings_url": "/admin/bots/digikeyconfig/1/change/",
+            "extra_links": [
+                ("📋 Marketplace замовлення", "/admin/bots/digikeyconfig/1/marketplace-orders/"),
+                ("🔍 Звірка",                 "/admin/bots/digikeyconfig/1/reconcile/"),
+            ],
+        })
+    except Exception as e:
+        integrations.append({"name": "DigiKey", "icon": "🛒", "enabled": False,
+                              "status": f"❌ Помилка: {e}", "details": [],
+                              "settings_url": "/admin/bots/", "extra_links": []})
+
+    # ── Carriers (Jumingo / DHL / UPS / FedEx) ────────────────────────────────
+    try:
+        from shipping.models import Carrier
+        carriers = Carrier.objects.all().order_by("carrier_type", "name")
+        type_icons = {"jumingo": "🚚", "dhl": "📦", "ups": "🟤", "fedex": "🟣", "other": "🔗"}
+        for c in carriers:
+            icon = type_icons.get(c.carrier_type, "🔗")
+            has_key = bool(c.api_key)
+            integrations.append({
+                "name":    c.name,
+                "icon":    icon,
+                "enabled": c.is_active and has_key,
+                "status":  (
+                    "✅ Активний" if (c.is_active and has_key)
+                    else ("⚠️ Немає API ключа" if not has_key else "⏸ Вимкнено")
+                ),
+                "details": [
+                    ("Тип",        c.get_carrier_type_display()),
+                    ("Режим",      c.api_url if c.api_url else "Production"),
+                    ("За замовч.", "✅ Так" if c.is_default else "—"),
+                    ("API ключ",   "✅ Є" if c.api_key else "❌ Відсутній"),
+                ],
+                "settings_url": f"/admin/shipping/carrier/{c.pk}/change/",
+                "extra_links": [],
+            })
+        if not carriers.exists():
+            integrations.append({
+                "name": "Перевізники (Jumingo / DHL)", "icon": "🚚", "enabled": False,
+                "status": "➕ Не налаштовано",
+                "details": [("Підказка", "Додайте перевізника у модулі Доставка")],
+                "settings_url": "/admin/shipping/carrier/add/",
+                "extra_links": [],
+            })
+    except Exception as e:
+        integrations.append({"name": "Перевізники", "icon": "🚚", "enabled": False,
+                              "status": f"❌ Помилка: {e}", "details": [],
+                              "settings_url": "/admin/shipping/", "extra_links": []})
+
+    # ── Auto Tracking ─────────────────────────────────────────────────────────
+    try:
+        from shipping.models import ShippingSettings
+        st = ShippingSettings.get()
+        last_run = st.last_tracking_run.strftime("%d.%m.%Y %H:%M") if st.last_tracking_run else "—"
+        integrations.append({
+            "name":    "Авто-трекінг відправлень",
+            "icon":    "🔄",
+            "enabled": st.auto_tracking_enabled,
+            "status":  "✅ Увімкнено" if st.auto_tracking_enabled else "⏸ Вимкнено",
+            "details": [
+                ("Інтервал",      f"{st.tracking_interval_minutes} хв"),
+                ("Останній запуск", last_run),
+            ],
+            "settings_url": "/admin/shipping/shippingsettings/1/change/",
+            "extra_links": [
+                ("🔄 Запустити зараз", "/admin/shipping/shippingsettings/1/run-tracking/"),
+            ],
+        })
+    except Exception as e:
+        integrations.append({"name": "Авто-трекінг", "icon": "🔄", "enabled": False,
+                              "status": f"❌ {e}", "details": [],
+                              "settings_url": "/admin/shipping/shippingsettings/1/change/", "extra_links": []})
+
+    # ── Email (SMTP) ──────────────────────────────────────────────────────────
+    try:
+        ns = NotificationSettings.get()
+        integrations.append({
+            "name":    "Email (SMTP)",
+            "icon":    "📧",
+            "enabled": ns.email_enabled,
+            "status":  "✅ Увімкнено" if ns.email_enabled else "⏸ Вимкнено",
+            "details": [
+                ("Host",         ns.email_host or "—"),
+                ("Port",         str(ns.email_port)),
+                ("TLS/SSL",      "TLS" if ns.email_use_tls else ("SSL" if ns.email_use_ssl else "Немає")),
+                ("Отримувачі",   ns.email_to or "—"),
+            ],
+            "settings_url": "/admin/config/notificationsettings/1/change/",
+            "extra_links": [
+                ("📧 Тест email", "/admin/config/notificationsettings/1/test-email/"),
+            ],
+        })
+    except Exception as e:
+        integrations.append({"name": "Email", "icon": "📧", "enabled": False,
+                              "status": f"❌ {e}", "details": [],
+                              "settings_url": "/admin/config/notificationsettings/1/change/", "extra_links": []})
+
+    # ── Telegram ──────────────────────────────────────────────────────────────
+    try:
+        ns = NotificationSettings.get()
+        has_tg = bool(ns.telegram_bot_token and ns.telegram_chat_id)
+        integrations.append({
+            "name":    "Telegram Bot",
+            "icon":    "📱",
+            "enabled": ns.telegram_enabled and has_tg,
+            "status":  (
+                "✅ Увімкнено" if (ns.telegram_enabled and has_tg)
+                else ("⚠️ Токен або Chat ID відсутній" if not has_tg else "⏸ Вимкнено")
+            ),
+            "details": [
+                ("Bot Token",      "✅ Є" if ns.telegram_bot_token else "❌ Відсутній"),
+                ("Chat ID",        ns.telegram_chat_id or "❌ Відсутній"),
+                ("Нові замовл.",   "✅" if ns.new_order_telegram else "—"),
+                ("Зміна статусу",  "✅" if ns.status_change_telegram else "—"),
+            ],
+            "settings_url": "/admin/config/notificationsettings/1/change/",
+            "extra_links": [
+                ("📱 Тест Telegram", "/admin/config/notificationsettings/1/test-telegram/"),
+            ],
+        })
+    except Exception as e:
+        integrations.append({"name": "Telegram", "icon": "📱", "enabled": False,
+                              "status": f"❌ {e}", "details": [],
+                              "settings_url": "/admin/config/notificationsettings/1/change/", "extra_links": []})
+
+    context = {
+        "title": "Інтеграції",
+        "integrations": integrations,
+        **admin.site.each_context(request),
+    }
+    return render(request, "admin/config/integrations.html", context)

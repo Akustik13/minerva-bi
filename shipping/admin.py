@@ -1,0 +1,2387 @@
+"""
+shipping/admin.py — Адмін-панель модуля доставки
+"""
+import logging
+
+from django.contrib import admin, messages
+from django.http import JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import path, reverse
+from django.utils.html import format_html
+from django.utils import timezone
+
+logger = logging.getLogger(__name__)
+
+from .models import Carrier, Shipment, PackagingMaterial, OrderPackaging, ProductPackaging, ShippingSettings
+from .services.registry import get_service
+
+
+# ── PackagingMaterial Admin ───────────────────────────────────────────────────
+
+@admin.register(PackagingMaterial)
+class PackagingMaterialAdmin(admin.ModelAdmin):
+    list_display  = ('type_badge', 'name', 'dimensions_col', 'tare_weight_kg',
+                     'max_weight_kg', 'volume_col', 'cost', 'is_active')
+    list_filter   = ('box_type', 'is_active')
+    list_editable = ('is_active',)
+    search_fields = ('name',)
+
+    fieldsets = (
+        ('📦 Упаковка', {
+            'fields': ('box_type', 'name', 'is_active', 'notes'),
+        }),
+        ('📐 Розміри', {
+            'fields': (('length_cm', 'width_cm', 'height_cm'),),
+            'description': 'Внутрішні розміри коробки в сантиметрах',
+        }),
+        ('⚖️ Вага', {
+            'fields': (('tare_weight_kg', 'max_weight_kg'),),
+        }),
+        ('💰 Вартість', {
+            'fields': ('cost',),
+        }),
+    )
+
+    def type_badge(self, obj):
+        colors = {
+            'box':      '#1565c0', 'envelope': '#6a1b9a',
+            'tube':     '#4e342e', 'bag':      '#2e7d32', 'custom': '#455a64',
+        }
+        bg = colors.get(obj.box_type, '#455a64')
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 8px;'
+            'border-radius:10px;font-size:11px">{}</span>',
+            bg, obj.get_box_type_display(),
+        )
+    type_badge.short_description = 'Тип'
+
+    def dimensions_col(self, obj):
+        return format_html(
+            '<span style="font-family:monospace;color:#80cbc4">'
+            '{}×{}×{} см</span>',
+            obj.length_cm, obj.width_cm, obj.height_cm,
+        )
+    dimensions_col.short_description = 'Розміри (Д×Ш×В)'
+
+    def volume_col(self, obj):
+        return format_html('<span style="color:#607d8b">{} см³</span>', obj.volume_cm3)
+    volume_col.short_description = 'Об\'єм'
+
+
+# ── Carrier Admin ─────────────────────────────────────────────────────────────
+
+@admin.register(Carrier)
+class CarrierAdmin(admin.ModelAdmin):
+    list_display  = ("name", "carrier_type_badge", "is_active", "is_default",
+                     "sender_name", "sender_country", "has_credentials")
+    list_filter   = ("carrier_type", "is_active", "is_default")
+    list_editable = ("is_active", "is_default")
+
+    fieldsets = (
+        ("🚚 Перевізник", {
+            "fields": ("name", "carrier_type", "is_active", "is_default", "notes")
+        }),
+        ("🔑 API налаштування", {
+            "fields": ("api_key", "api_secret", "api_url", "connection_uuid", "track_api_key"),
+            "description": (
+                "<b>Jumingo:</b> api_key = X-AUTH-TOKEN (Settings → API), connection_uuid = UUID інтеграції (Integrations).<br>"
+                "<b>DHL:</b> api_key = API Key, api_secret = API Secret (developer.dhl.com → MyDHL API), connection_uuid = Account Number, api_url = <code>test</code> для sandbox.<br>"
+                "<b>DHL Tracking:</b> track_api_key = окремий ключ з developer.dhl.com → Shipment Tracking – Unified API.<br>"
+                "<b>UPS / FedEx:</b> api_key = Client ID, api_secret = Client Secret."
+            ),
+        }),
+        ("📤 Дані відправника", {
+            "fields": (
+                ("sender_name", "sender_company"),
+                "sender_street",
+                ("sender_city", "sender_zip", "sender_country"),
+                ("sender_phone", "sender_email"),
+            ),
+            "description": "Ці дані підставляються автоматично при кожному відправленні."
+        }),
+    )
+
+    def carrier_type_badge(self, obj):
+        colors = {
+            "jumingo": "#e91e63", "dhl": "#ffcc00",
+            "ups": "#351c75", "fedex": "#4d148c", "other": "#607d8b",
+        }
+        color = colors.get(obj.carrier_type, "#607d8b")
+        text_color = "#000" if obj.carrier_type == "dhl" else "#fff"
+        return format_html(
+            '<span style="background:{};color:{};padding:2px 10px;'
+            'border-radius:10px;font-size:11px;font-weight:700">{}</span>',
+            color, text_color, obj.get_carrier_type_display()
+        )
+    carrier_type_badge.short_description = "Тип"
+
+    def has_credentials(self, obj):
+        if obj.api_key:
+            return format_html('<span style="color:#4caf50;font-weight:bold">✅ Так</span>')
+        return format_html('<span style="color:#f44336">❌ Немає</span>')
+    has_credentials.short_description = "API ключ"
+
+
+# ── Shipment Admin ────────────────────────────────────────────────────────────
+
+@admin.register(Shipment)
+class ShipmentAdmin(admin.ModelAdmin):
+    list_display  = (
+        "id_badge", "order_link", "carrier_badge", "status_badge",
+        "recipient_name", "recipient_country", "weight_kg",
+        "tracking_badge", "label_badge", "created_at_fmt",
+    )
+    list_filter   = ("status", "carrier", "carrier__carrier_type", "recipient_country")
+    search_fields = ("order__order_number", "recipient_name", "tracking_number",
+                     "carrier_shipment_id")
+    readonly_fields = (
+        "carrier_shipment_id", "tracking_number", "label_url",
+        "carrier_price", "carrier_currency", "carrier_service",
+        "selected_tariff_id", "jumingo_order_number",
+        "raw_request", "raw_response", "error_message",
+        "submitted_at", "created_at",
+        "order_detail_panel", "action_buttons",
+        "customs_articles_panel",
+    )
+    ordering = ["-created_at"]
+
+    fieldsets = (
+        ("📦 Замовлення", {
+            "fields": ("order", "carrier", "status", "order_detail_panel", "action_buttons")
+        }),
+        ("📬 Отримувач", {
+            "fields": (
+                ("recipient_company", "recipient_name"),
+                "recipient_street",
+                ("recipient_city", "recipient_zip", "recipient_state", "recipient_country"),
+                ("recipient_phone", "recipient_email"),
+            ),
+            "description": "<b>Компанія</b> — юридична назва (DRONISOS). "
+                           "<b>Контактна особа</b> — ім'я людини (FABIEN SANTOS).",
+        }),
+        ("📐 Параметри посилки", {
+            "fields": (
+                "weight_kg",
+                ("length_cm", "width_cm", "height_cm"),
+                "description",
+                "export_reason",
+                ("declared_value", "declared_currency"),
+                "reference",
+            )
+        }),
+        ("🚚 Результат від перевізника", {
+            "fields": (
+                "carrier_shipment_id", "tracking_number",
+                "label_url", "carrier_service",
+                ("carrier_price", "carrier_currency"),
+                ("selected_tariff_id", "jumingo_order_number"),
+                "error_message",
+            )
+        }),
+        ("🛃 Митна декларація", {
+            "fields": ("customs_articles_panel",),
+            "classes": ("collapse",),
+            "description": "Артикули що передаються до Jumingo для позаєвропейських відправлень.",
+        }),
+        ("📋 Технічні деталі", {
+            "fields": ("raw_request", "raw_response", "submitted_at", "created_at"),
+            "classes": ("collapse",),
+        }),
+    )
+
+    change_list_template = "admin/shipping/shipment_changelist.html"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "compare-rates/",
+                self.admin_site.admin_view(self.compare_rates_view),
+                name="shipping_compare_rates",
+            ),
+            path(
+                "create/<int:order_id>/",
+                self.admin_site.admin_view(self.create_from_order_view),
+                name="shipping_shipment_create",
+            ),
+            path(
+                "<int:shipment_id>/submit/",
+                self.admin_site.admin_view(self.submit_view),
+                name="shipping_shipment_submit",
+            ),
+            path(
+                "<int:shipment_id>/rates/",
+                self.admin_site.admin_view(self.rates_view),
+                name="shipping_shipment_rates",
+            ),
+            path(
+                "<int:shipment_id>/track/",
+                self.admin_site.admin_view(self.track_view),
+                name="shipping_shipment_track",
+            ),
+            path(
+                "<int:shipment_id>/select-tariff/",
+                self.admin_site.admin_view(self.select_tariff_view),
+                name="shipping_shipment_select_tariff",
+            ),
+            path(
+                "<int:shipment_id>/book/",
+                self.admin_site.admin_view(self.book_view),
+                name="shipping_shipment_book",
+            ),
+            path(
+                "<int:shipment_id>/dhl-rates/",
+                self.admin_site.admin_view(self.dhl_rates_view),
+                name="shipping_shipment_dhl_rates",
+            ),
+            path(
+                "<int:shipment_id>/dhl-track/",
+                self.admin_site.admin_view(self.dhl_track_view),
+                name="shipping_shipment_dhl_track",
+            ),
+            path(
+                "<int:shipment_id>/dhl-book/",
+                self.admin_site.admin_view(self.dhl_book_view),
+                name="shipping_shipment_dhl_book",
+            ),
+            path(
+                "<int:shipment_id>/edit-draft/",
+                self.admin_site.admin_view(self.edit_draft_view),
+                name="shipping_shipment_edit_draft",
+            ),
+            path(
+                "<int:shipment_id>/detail/",
+                self.admin_site.admin_view(self.shipment_detail_view),
+                name="shipping_shipment_detail",
+            ),
+            path(
+                "<int:shipment_id>/set-status/",
+                self.admin_site.admin_view(self.set_status_view),
+                name="shipping_shipment_set_status",
+            ),
+            path(
+                "dhl-track-lookup/",
+                self.admin_site.admin_view(self.dhl_track_lookup_view),
+                name="shipping_dhl_track_lookup",
+            ),
+            path(
+                "<int:shipment_id>/dhl-cancel/",
+                self.admin_site.admin_view(self.dhl_cancel_view),
+                name="shipping_shipment_dhl_cancel",
+            ),
+            path(
+                "order-tracking/",
+                self.admin_site.admin_view(self.order_tracking_view),
+                name="shipping_order_tracking",
+            ),
+            path(
+                "order-tracking/refresh/<int:order_id>/",
+                self.admin_site.admin_view(self.refresh_order_tracking_view),
+                name="shipping_order_tracking_refresh",
+            ),
+        ]
+        return custom + urls
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        """Route shipment change requests to custom views based on status."""
+        if request.method == 'GET':
+            try:
+                shipment = Shipment.objects.get(pk=object_id)
+                if shipment.status in (Shipment.Status.DRAFT, Shipment.Status.ERROR):
+                    return redirect(
+                        reverse("admin:shipping_shipment_edit_draft", args=[shipment.pk])
+                    )
+                return redirect(
+                    reverse("admin:shipping_shipment_detail", args=[shipment.pk])
+                )
+            except Shipment.DoesNotExist:
+                pass
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    # ── Форма створення ───────────────────────────────────────────────────────
+
+    def create_from_order_view(self, request, order_id):
+        from sales.models import SalesOrder
+        from .services.jumingo import build_customs_articles, JumingoService
+
+        order = get_object_or_404(SalesOrder, pk=order_id)
+
+        carrier = Carrier.objects.filter(is_active=True, is_default=True).first()
+        if not carrier:
+            carrier = Carrier.objects.filter(is_active=True).first()
+
+        shipment = Shipment(order=order, carrier=carrier)
+        shipment.copy_from_order()
+        packaging_hint = self._fill_packaging_from_order(shipment)
+        if not shipment.description:
+            shipment.description = self._build_description_from_order(order)
+        # Авто-заповнення задекларованої вартості з рядків замовлення
+        if not shipment.declared_value:
+            from decimal import Decimal, InvalidOperation
+            try:
+                total = order.order_total()
+                if total:
+                    shipment.declared_value    = Decimal(str(total)).quantize(Decimal("0.01"))
+                    shipment.declared_currency = (order.currency or "EUR").upper()[:3]
+            except (InvalidOperation, TypeError, ValueError):
+                pass
+
+        # Попереднє заповнення митної декларації
+        sender_country = carrier.sender_country if carrier else "DE"
+        default_currency = shipment.declared_currency or order.currency or "EUR"
+        customs_articles = build_customs_articles(order, sender_country, default_currency)
+
+        eu_countries = JumingoService._EU_COUNTRIES
+        needs_customs = bool(
+            shipment.recipient_country
+            and shipment.recipient_country.upper() not in eu_countries
+        )
+
+        carriers = Carrier.objects.filter(is_active=True)
+
+        if request.method == "POST":
+            return self._handle_create_post(request, order, carriers)
+
+        n_articles = len(customs_articles) or 1
+        default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 3)
+
+        return render(request, "admin/shipping/create_shipment.html", {
+            **self.admin_site.each_context(request),
+            "order":              order,
+            "shipment":           shipment,
+            "carriers":           carriers,
+            "packaging_hint":     packaging_hint,
+            "customs_articles":   customs_articles,
+            "needs_customs":      needs_customs,
+            "eu_countries_js":    ",".join(sorted(eu_countries)),
+            "default_ca_weight":  default_ca_weight,
+            "title":              f"Нове відправлення — {order.order_number}",
+        })
+
+    def _fill_packaging_from_order(self, shipment):
+        from decimal import Decimal
+
+        MIN_WEIGHT_KG = Decimal("0.1")
+        order = shipment.order
+
+        # ── Пріоритет 1: OrderPackaging (фактична упаковка вже вказана) ─────────
+        op = (
+            OrderPackaging.objects
+            .filter(order=order)
+            .select_related('packaging')
+            .order_by('-created_at')
+            .first()
+        )
+        if op and op.packaging:
+            raw_g     = op.actual_weight_g or 0
+            raw_kg    = Decimal(raw_g) / 1000 if raw_g else Decimal(0)
+            clamped   = raw_kg > 0 and raw_kg < MIN_WEIGHT_KG
+            weight_kg = max(MIN_WEIGHT_KG, round(raw_kg, 3)) if raw_kg > 0 else MIN_WEIGHT_KG
+            shipment.weight_kg = weight_kg
+            shipment.length_cm = op.packaging.length_cm
+            shipment.width_cm  = op.packaging.width_cm
+            shipment.height_cm = op.packaging.height_cm
+            return {
+                "box":            op.packaging,
+                "total_boxes":    op.qty_boxes,
+                "weight_g":       raw_g,
+                "weight_kg":      weight_kg,
+                "missing_weight": raw_g == 0,
+                "no_packaging":   False,
+                "clamped":        clamped,
+                "source":         "order_packaging",
+            }
+
+        # ── Пріоритет 2: ProductPackaging + net_weight_g (з інвентарю) ──────────
+        lines = list(order.lines.select_related('product').all())
+        if not lines:
+            return None
+
+        total_weight_g = 0
+        total_boxes    = 0
+        best_box       = None
+        missing_weight = False
+        no_packaging   = False
+
+        for line in lines:
+            product = line.product
+            if not product:
+                continue
+
+            rec = (
+                ProductPackaging.objects
+                .filter(product=product, is_default=True)
+                .select_related('packaging')
+                .first()
+            )
+
+            if rec:
+                boxes_needed = max(1, -(-line.qty // rec.qty_per_box))
+                total_boxes += boxes_needed
+                if rec.estimated_weight_g:
+                    total_weight_g += rec.estimated_weight_g * boxes_needed
+                elif getattr(product, 'net_weight_g', None):
+                    total_weight_g += (
+                        product.net_weight_g * line.qty
+                        + int(rec.packaging.tare_weight_kg * 1000) * boxes_needed
+                    )
+                else:
+                    missing_weight = True
+                if best_box is None:
+                    best_box = rec.packaging
+            else:
+                no_packaging = True
+                nw = getattr(product, 'net_weight_g', None)
+                if nw:
+                    total_weight_g += nw * line.qty
+                else:
+                    missing_weight = True
+
+        if total_weight_g > 0 or best_box:
+            raw_kg    = Decimal(total_weight_g) / 1000 if total_weight_g > 0 else Decimal(0)
+            clamped   = raw_kg > 0 and raw_kg < MIN_WEIGHT_KG
+            weight_kg = max(MIN_WEIGHT_KG, round(raw_kg, 3)) if raw_kg > 0 else None
+            if weight_kg:
+                shipment.weight_kg = weight_kg
+            if best_box:
+                shipment.length_cm = best_box.length_cm
+                shipment.width_cm  = best_box.width_cm
+                shipment.height_cm = best_box.height_cm
+
+            return {
+                "box":            best_box,
+                "total_boxes":    max(1, total_boxes) if total_boxes else 1,
+                "weight_g":       total_weight_g,
+                "weight_kg":      weight_kg,
+                "missing_weight": missing_weight,
+                "no_packaging":   no_packaging,
+                "clamped":        clamped,
+                "source":         "product_packaging",
+            }
+        return None
+
+    def _build_description_from_order(self, order):
+        from inventory.models import ProductCategory
+        slugs = set()
+        for line in order.lines.select_related('product').all():
+            if line.product and line.product.category:
+                slugs.add(line.product.category)
+        if not slugs:
+            return ""
+        cat_map = dict(ProductCategory.objects.filter(slug__in=slugs).values_list('slug', 'name'))
+        return ", ".join(cat_map.get(s, s) for s in sorted(slugs))
+
+    def _handle_create_post(self, request, order, carriers):
+        from decimal import Decimal, InvalidOperation
+
+        MIN_WEIGHT = Decimal("0.1")
+
+        carrier_id = request.POST.get("carrier")
+        carrier = get_object_or_404(Carrier, pk=carrier_id) if carrier_id else None
+
+        # Вага — мінімум 0.1 кг
+        try:
+            weight_kg = max(MIN_WEIGHT, Decimal(request.POST.get("weight_kg") or 1))
+        except (InvalidOperation, TypeError):
+            weight_kg = MIN_WEIGHT
+
+        shipment = Shipment(
+            order=order,
+            carrier=carrier,
+            status=Shipment.Status.DRAFT,
+            recipient_name    = request.POST.get("recipient_name", ""),
+            recipient_company = request.POST.get("recipient_company", ""),
+            recipient_street  = request.POST.get("recipient_street", ""),
+            recipient_city    = request.POST.get("recipient_city", ""),
+            recipient_zip     = request.POST.get("recipient_zip", ""),
+            recipient_state   = request.POST.get("recipient_state", ""),
+            recipient_country = request.POST.get("recipient_country", ""),
+            recipient_phone   = request.POST.get("recipient_phone", ""),
+            recipient_email   = request.POST.get("recipient_email", ""),
+            weight_kg         = weight_kg,
+            length_cm         = request.POST.get("length_cm") or None,
+            width_cm          = request.POST.get("width_cm") or None,
+            height_cm         = request.POST.get("height_cm") or None,
+            description       = request.POST.get("description", ""),
+            export_reason     = request.POST.get("export_reason", "Commercial"),
+            declared_value    = request.POST.get("declared_value") or None,
+            declared_currency = request.POST.get("declared_currency", "EUR"),
+            reference         = request.POST.get("reference", order.order_number),
+            created_by        = request.user,
+        )
+        # Парсимо митну декларацію з форми
+        ca_descs  = request.POST.getlist("ca_desc")
+        if ca_descs:
+            ca_qtys     = request.POST.getlist("ca_qty")
+            ca_hscodes  = request.POST.getlist("ca_hs")
+            ca_origins  = request.POST.getlist("ca_origin")
+            ca_weights  = request.POST.getlist("ca_weight")
+            ca_values   = request.POST.getlist("ca_value")
+            ca_curs     = request.POST.getlist("ca_currency")
+
+            customs_items = []
+            for i, desc in enumerate(ca_descs):
+                if not desc.strip():
+                    continue
+                def _get(lst, idx, default=""):
+                    return lst[idx] if idx < len(lst) else default
+                item = {
+                    "description":    desc.strip()[:35],
+                    "quantity":       max(1, int(float(_get(ca_qtys, i, "1") or 1))),
+                    "value":          round(float(_get(ca_values, i, "0") or 0), 2),
+                    "currency":       (_get(ca_curs, i, "EUR") or "EUR").upper()[:3],
+                    "origin_country": (_get(ca_origins, i, "DE") or "DE").upper()[:2],
+                    "customs_number": _get(ca_hscodes, i, "").strip(),
+                }
+                w = _get(ca_weights, i, "")
+                if w:
+                    try:
+                        item["weight"] = round(float(w), 3)
+                    except ValueError:
+                        pass
+                customs_items.append(item)
+
+            if customs_items:
+                shipment.customs_articles = {
+                    "type":               request.POST.get("customs_invoice_type", "commercial"),
+                    "customs_line_items": customs_items,
+                }
+
+        shipment.save()
+
+        action = request.POST.get("action_btn", "save")
+        if action == "submit" and carrier:
+            return redirect(reverse("admin:shipping_shipment_submit", args=[shipment.pk]))
+
+        if action == "jumingo_tariff" and carrier:
+            from urllib.parse import urlencode
+            preview_id   = request.POST.get("jumingo_preview_id", "").strip()
+            tariff_id    = request.POST.get("jumingo_tariff_id", "").strip()
+            tariff_name  = request.POST.get("jumingo_tariff_name", "").strip()
+            tariff_price = request.POST.get("jumingo_tariff_price", "0").strip()
+            shipper_name = request.POST.get("jumingo_shipper", "").strip()
+            if preview_id and tariff_id:
+                shipment.carrier_shipment_id = preview_id
+                shipment.status              = Shipment.Status.SUBMITTED
+                shipment.submitted_at        = timezone.now()
+                shipment.save(update_fields=[
+                    "carrier_shipment_id", "status", "submitted_at"
+                ])
+                qs = urlencode({"tariff_id": tariff_id, "name": tariff_name,
+                                "price": tariff_price, "shipper": shipper_name})
+                messages.success(request,
+                    f"✅ Відправлення #{shipment.pk} збережено (Jumingo ID: {preview_id[:12]}…)")
+                return redirect(
+                    reverse("admin:shipping_shipment_select_tariff", args=[shipment.pk])
+                    + f"?{qs}"
+                )
+
+        if action == "dhl_book" and carrier:
+            from urllib.parse import urlencode
+            dhl_code  = request.POST.get("dhl_product_code", "").strip()
+            dhl_name  = request.POST.get("dhl_product_name", dhl_code).strip()
+            dhl_price = request.POST.get("dhl_price", "0").strip()
+            if dhl_code:
+                qs = urlencode({"product_code": dhl_code,
+                                "product_name": dhl_name,
+                                "price":        dhl_price})
+                messages.success(request, f"✅ Відправлення #{shipment.pk} збережено. Оформлення DHL…")
+                return redirect(
+                    reverse("admin:shipping_shipment_dhl_book", args=[shipment.pk]) + f"?{qs}"
+                )
+
+        messages.success(request, f"✅ Відправлення #{shipment.pk} збережено як чернетку.")
+        return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+    # ── Редагування чернетки ─────────────────────────────────────────────────
+
+    def edit_draft_view(self, request, shipment_id):
+        from .services.jumingo import build_customs_articles, JumingoService
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order    = shipment.order
+        carriers = Carrier.objects.filter(is_active=True)
+
+        if request.method == "POST":
+            return self._handle_edit_post(request, shipment, carriers)
+
+        # Авто-заповнення задекларованої вартості якщо поле порожнє
+        if not shipment.declared_value:
+            from decimal import Decimal, InvalidOperation
+            try:
+                total = order.order_total()
+                if total:
+                    shipment.declared_value    = Decimal(str(total)).quantize(Decimal("0.01"))
+                    shipment.declared_currency = (order.currency or shipment.declared_currency or "EUR").upper()[:3]
+            except (InvalidOperation, TypeError, ValueError):
+                pass
+
+        # Митна декларація — з наявних даних або будуємо з замовлення
+        existing_ca   = (shipment.customs_articles or {}).get("customs_line_items") or []
+        inv_type      = (shipment.customs_articles or {}).get("type", "commercial")
+        if existing_ca:
+            customs_articles = existing_ca
+        else:
+            sender_country   = shipment.carrier.sender_country if shipment.carrier else "DE"
+            default_currency = shipment.declared_currency or getattr(order, "currency", None) or "EUR"
+            customs_articles = build_customs_articles(order, sender_country, default_currency)
+
+        eu_countries  = JumingoService._EU_COUNTRIES
+        needs_customs = bool(
+            shipment.recipient_country
+            and shipment.recipient_country.upper() not in eu_countries
+        )
+
+        is_error = shipment.status == Shipment.Status.ERROR
+
+        n_articles = len(customs_articles) or 1
+        default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 3)
+
+        return render(request, "admin/shipping/create_shipment.html", {
+            **self.admin_site.each_context(request),
+            "order":                order,
+            "shipment":             shipment,
+            "carriers":             carriers,
+            "packaging_hint":       None,
+            "customs_articles":     customs_articles,
+            "customs_invoice_type": inv_type,
+            "needs_customs":        needs_customs,
+            "eu_countries_js":      ",".join(sorted(eu_countries)),
+            "default_ca_weight":    default_ca_weight,
+            "is_edit":              True,
+            "is_error":             is_error,
+            "error_message":        shipment.error_message if is_error else "",
+            "form_action":          reverse("admin:shipping_shipment_edit_draft", args=[shipment.pk]),
+            "cancel_url":           reverse("admin:shipping_shipment_changelist"),
+            "title":                f"{'Виправити помилку' if is_error else 'Редагувати чернетку'} #{shipment.pk}",
+        })
+
+    def _handle_edit_post(self, request, shipment, carriers):
+        from decimal import Decimal, InvalidOperation
+
+        MIN_WEIGHT = Decimal("0.1")
+
+        carrier_id = request.POST.get("carrier")
+        carrier    = get_object_or_404(Carrier, pk=carrier_id) if carrier_id else None
+
+        try:
+            weight_kg = max(MIN_WEIGHT, Decimal(request.POST.get("weight_kg") or 1))
+        except (InvalidOperation, TypeError):
+            weight_kg = MIN_WEIGHT
+
+        # Скидаємо статус ERROR → DRAFT щоб дозволити повторне відправлення
+        if shipment.status == Shipment.Status.ERROR:
+            shipment.status        = Shipment.Status.DRAFT
+            shipment.error_message = ""
+
+        shipment.carrier           = carrier
+        shipment.recipient_name    = request.POST.get("recipient_name", "")
+        shipment.recipient_company = request.POST.get("recipient_company", "")
+        shipment.recipient_street  = request.POST.get("recipient_street", "")
+        shipment.recipient_city    = request.POST.get("recipient_city", "")
+        shipment.recipient_zip     = request.POST.get("recipient_zip", "")
+        shipment.recipient_state   = request.POST.get("recipient_state", "")
+        shipment.recipient_country = request.POST.get("recipient_country", "")
+        shipment.recipient_phone   = request.POST.get("recipient_phone", "")
+        shipment.recipient_email   = request.POST.get("recipient_email", "")
+        shipment.weight_kg         = weight_kg
+        shipment.length_cm         = request.POST.get("length_cm") or None
+        shipment.width_cm          = request.POST.get("width_cm") or None
+        shipment.height_cm         = request.POST.get("height_cm") or None
+        shipment.description       = request.POST.get("description", "")
+        shipment.export_reason     = request.POST.get("export_reason", "Commercial")
+        shipment.declared_value    = request.POST.get("declared_value") or None
+        shipment.declared_currency = request.POST.get("declared_currency", "EUR")
+        shipment.reference         = request.POST.get("reference", shipment.order.order_number)
+
+        ca_descs = request.POST.getlist("ca_desc")
+        if ca_descs:
+            ca_qtys    = request.POST.getlist("ca_qty")
+            ca_hscodes = request.POST.getlist("ca_hs")
+            ca_origins = request.POST.getlist("ca_origin")
+            ca_weights = request.POST.getlist("ca_weight")
+            ca_values  = request.POST.getlist("ca_value")
+            ca_curs    = request.POST.getlist("ca_currency")
+
+            customs_items = []
+            for i, desc in enumerate(ca_descs):
+                if not desc.strip():
+                    continue
+                def _get(lst, idx, default=""):
+                    return lst[idx] if idx < len(lst) else default
+                item = {
+                    "description":    desc.strip()[:35],
+                    "quantity":       max(1, int(float(_get(ca_qtys, i, "1") or 1))),
+                    "value":          round(float(_get(ca_values, i, "0") or 0), 2),
+                    "currency":       (_get(ca_curs, i, "EUR") or "EUR").upper()[:3],
+                    "origin_country": (_get(ca_origins, i, "DE") or "DE").upper()[:2],
+                    "customs_number": _get(ca_hscodes, i, "").strip(),
+                }
+                w = _get(ca_weights, i, "")
+                if w:
+                    try:
+                        item["weight"] = round(float(w), 3)
+                    except ValueError:
+                        pass
+                customs_items.append(item)
+
+            if customs_items:
+                shipment.customs_articles = {
+                    "type":               request.POST.get("customs_invoice_type", "commercial"),
+                    "customs_line_items": customs_items,
+                }
+
+        shipment.save()
+
+        action = request.POST.get("action_btn", "save")
+
+        if action == "submit" and carrier:
+            return redirect(reverse("admin:shipping_shipment_submit", args=[shipment.pk]))
+
+        if action == "jumingo_tariff" and carrier:
+            from urllib.parse import urlencode
+            preview_id   = request.POST.get("jumingo_preview_id", "").strip()
+            tariff_id    = request.POST.get("jumingo_tariff_id", "").strip()
+            tariff_name  = request.POST.get("jumingo_tariff_name", "").strip()
+            tariff_price = request.POST.get("jumingo_tariff_price", "0").strip()
+            shipper_name = request.POST.get("jumingo_shipper", "").strip()
+            if preview_id and tariff_id:
+                shipment.carrier_shipment_id = preview_id
+                shipment.status              = Shipment.Status.SUBMITTED
+                shipment.submitted_at        = timezone.now()
+                shipment.save(update_fields=["carrier_shipment_id", "status", "submitted_at"])
+                qs = urlencode({"tariff_id": tariff_id, "name": tariff_name,
+                                "price": tariff_price, "shipper": shipper_name})
+                messages.success(request,
+                    f"✅ Відправлення #{shipment.pk} оновлено (Jumingo ID: {preview_id[:12]}…)")
+                return redirect(
+                    reverse("admin:shipping_shipment_select_tariff", args=[shipment.pk])
+                    + f"?{qs}"
+                )
+
+        if action == "dhl_book" and carrier:
+            from urllib.parse import urlencode
+            dhl_code  = request.POST.get("dhl_product_code", "").strip()
+            dhl_name  = request.POST.get("dhl_product_name", dhl_code).strip()
+            dhl_price = request.POST.get("dhl_price", "0").strip()
+            if dhl_code:
+                qs = urlencode({"product_code": dhl_code,
+                                "product_name": dhl_name,
+                                "price":        dhl_price})
+                messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено. Оформлення DHL…")
+                return redirect(
+                    reverse("admin:shipping_shipment_dhl_book", args=[shipment.pk]) + f"?{qs}"
+                )
+
+        messages.success(request, f"✅ Відправлення #{shipment.pk} збережено.")
+        return redirect(
+            reverse("admin:shipping_shipment_edit_draft", args=[shipment.pk])
+        )
+
+    # ── Деталі відправлення (read-only) ──────────────────────────────────────
+
+    def shipment_detail_view(self, request, shipment_id):
+        import json as _json
+        from .services.jumingo import JUMINGO_APP_URL
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order    = shipment.order
+
+        # ── Таймлайн ──────────────────────────────────────────────────────────
+        STEPS = [
+            ("draft",       "Чернетка"),
+            ("submitted",   "Надіслано"),
+            ("label_ready", "Етикетка"),
+            ("in_transit",  "В дорозі"),
+            ("delivered",   "Доставлено"),
+        ]
+        idx_map     = {s: i for i, (s, _) in enumerate(STEPS)}
+        current_idx = idx_map.get(shipment.status, -1)
+        timeline    = []
+        for i, (st, lbl) in enumerate(STEPS):
+            if i < current_idx:
+                state = "done"
+            elif i == current_idx:
+                state = "active"
+            else:
+                state = "pending"
+            timeline.append({"label": lbl, "state": state, "is_last": i == len(STEPS) - 1})
+
+        show_timeline = shipment.status not in ("error", "cancelled")
+
+        # ── Кнопки дій залежно від статусу ────────────────────────────────────
+        has_dhl = Carrier.objects.filter(carrier_type="dhl", is_active=True).exists()
+        actions = []
+        st = shipment.status
+
+        if st == "submitted":
+            if shipment.carrier_shipment_id:
+                actions += [
+                    {"label": "💰 Тарифи Jumingo",
+                     "url": reverse("admin:shipping_shipment_rates", args=[shipment.pk]),
+                     "cls": "blue"},
+                    {"label": "🔄 Оновити статус",
+                     "url": reverse("admin:shipping_shipment_track", args=[shipment.pk]),
+                     "cls": "orange"},
+                    {"label": "🔗 Відкрити Jumingo",
+                     "url": f"{JUMINGO_APP_URL}/de-de/shipments/",
+                     "cls": "pink", "external": True},
+                ]
+            if has_dhl:
+                actions.append({"label": "🟡 DHL Тарифи",
+                                 "url": reverse("admin:shipping_shipment_dhl_rates", args=[shipment.pk]),
+                                 "cls": "yellow"})
+
+        elif st in ("label_ready", "in_transit"):
+            if shipment.carrier_shipment_id:
+                actions.append({"label": "🔄 Оновити трекінг",
+                                 "url": reverse("admin:shipping_shipment_track", args=[shipment.pk]),
+                                 "cls": "orange"})
+            if shipment.label_url:
+                actions.append({"label": "📄 Етикетка PDF",
+                                 "url": shipment.label_url,
+                                 "cls": "teal", "external": True})
+            if shipment.tracking_number and has_dhl:
+                actions.append({"label": "📡 DHL Трекінг",
+                                 "url": reverse("admin:shipping_shipment_dhl_track", args=[shipment.pk]),
+                                 "cls": "yellow"})
+
+        elif st == "delivered":
+            if shipment.label_url:
+                actions.append({"label": "📄 Етикетка PDF",
+                                 "url": shipment.label_url,
+                                 "cls": "teal", "external": True})
+            if shipment.tracking_number and has_dhl:
+                actions.append({"label": "📡 DHL Трекінг",
+                                 "url": reverse("admin:shipping_shipment_dhl_track", args=[shipment.pk]),
+                                 "cls": "yellow"})
+
+        # Завжди — назад до замовлення
+        actions.append({"label": "← Замовлення",
+                         "url": reverse("admin:sales_salesorder_change", args=[order.pk]),
+                         "cls": "ghost"})
+
+        # ── Статус від перевізника (з raw_response) ───────────────────────────
+        carrier_tracking = None
+        if shipment.raw_response and isinstance(shipment.raw_response, dict):
+            rv           = shipment.raw_response
+            tracking_obj = rv.get("tracking") or {}
+            progress     = tracking_obj.get("progress") or {}
+            prog_class   = progress.get("class", "")
+            prog_label   = (progress.get("label") or progress.get("text")
+                            or progress.get("description") or "")
+            jumingo_status = rv.get("status", "")
+
+            PROGRESS_DISPLAY = {
+                "in_system":   ("🏷️", "У системі",     "#00bcd4"),
+                "in_transit":  ("🚚", "В дорозі",       "#ff9800"),
+                "in_delivery": ("📦", "Доставляється",  "#ff9800"),
+                "completed":   ("✅", "Доставлено",      "#4caf50"),
+                "exception":   ("⚠️", "Виняток",         "#f44336"),
+                "undelivered": ("❌", "Не доставлено",   "#f44336"),
+            }
+            if prog_class or jumingo_status:
+                icon, display, color = PROGRESS_DISPLAY.get(
+                    prog_class, ("📦", prog_class or jumingo_status, "#607d8b")
+                )
+                carrier_tracking = {
+                    "class":          prog_class,
+                    "icon":           icon,
+                    "display":        display,
+                    "color":          color,
+                    "label":          prog_label,
+                    "jumingo_status": jumingo_status,
+                }
+
+        # ── Raw API data ───────────────────────────────────────────────────────
+        def _to_str(val, limit=4000):
+            if val is None:
+                return ""
+            if isinstance(val, (dict, list)):
+                return _json.dumps(val, ensure_ascii=False, indent=2)[:limit]
+            return str(val)[:limit]
+
+        # Статуси для ручної зміни (виключаємо DRAFT — для нього є окрема форма)
+        status_choices = [
+            (v, l) for v, l in Shipment.Status.choices
+            if v != Shipment.Status.DRAFT
+        ]
+
+        return render(request, "admin/shipping/shipment_detail.html", {
+            **self.admin_site.each_context(request),
+            "shipment":         shipment,
+            "order":            order,
+            "timeline":         timeline,
+            "show_timeline":    show_timeline,
+            "actions":          actions,
+            "status_choices":   status_choices,
+            "carrier_tracking": carrier_tracking,
+            "raw_request":      _to_str(shipment.raw_request),
+            "raw_response":     _to_str(shipment.raw_response),
+            "title":            f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
+        })
+
+    # ── Ручна зміна статусу ───────────────────────────────────────────────────
+
+    def set_status_view(self, request, shipment_id):
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        valid = {v for v, _ in Shipment.Status.choices if v != Shipment.Status.DRAFT}
+        new_status = request.POST.get("new_status", "").strip()
+
+        if new_status not in valid:
+            messages.error(request, "❌ Невірний статус.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        old_label = shipment.get_status_display()
+        shipment.status = new_status
+        shipment.save(update_fields=["status"])
+
+        # Синхронізуємо SalesOrder
+        order = shipment.order
+        order_fields = []
+        if new_status == "delivered" and order.status != "delivered":
+            order.status = "delivered"
+            order_fields.append("status")
+            if not order.delivered_at:
+                order.delivered_at = timezone.now()
+                order_fields.append("delivered_at")
+        elif new_status == "in_transit" and order.status in ("received", "processing"):
+            order.status = "shipped"
+            order_fields.append("status")
+            if not order.shipped_at:
+                order.shipped_at = timezone.now().date()
+                order_fields.append("shipped_at")
+        elif new_status == "label_ready" and order.status in ("received", "processing"):
+            order.status = "shipped"
+            order_fields.append("status")
+            if not order.shipped_at:
+                order.shipped_at = timezone.now().date()
+                order_fields.append("shipped_at")
+        if order_fields:
+            order.save(update_fields=order_fields)
+
+        new_label = shipment.get_status_display()
+        messages.success(
+            request,
+            f"✅ Статус змінено вручну: {old_label} → {new_label}"
+            + (f" · Замовлення {order.order_number} теж оновлено." if order_fields else ""),
+        )
+        return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+    # ── DHL Cancel ───────────────────────────────────────────────────────────
+
+    def dhl_cancel_view(self, request, shipment_id):
+        """DELETE /shipments/{trackingNumber} — скасування відправлення DHL."""
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment_id]))
+
+        from .services.dhl import cancel_shipment as dhl_cancel
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        if not shipment.tracking_number:
+            messages.error(request, "❌ Трекінг-номер відсутній — нічого скасовувати в DHL.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        dhl_carrier = (
+            Carrier.objects
+            .filter(carrier_type="dhl", is_active=True)
+            .exclude(api_key="")
+            .order_by("-is_default")
+            .first()
+        )
+        if not dhl_carrier:
+            messages.error(request, "❌ Немає активного DHL перевізника з API ключем.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        result = dhl_cancel(dhl_carrier, shipment.tracking_number)
+
+        if result["success"]:
+            shipment.status        = Shipment.Status.CANCELLED
+            shipment.error_message = f"Скасовано через DHL API. Трекінг: {shipment.tracking_number}"
+            shipment.save(update_fields=["status", "error_message"])
+            messages.success(request, f"✅ {result['message']} Відправлення #{shipment.pk} → Скасовано.")
+        else:
+            messages.error(request, f"❌ DHL API: {result['message']}")
+            if result.get("url"):
+                messages.info(request, f"URL запиту: {result['url']}")
+
+        return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+    # ── DHL Track Lookup (standalone) ────────────────────────────────────────
+
+    def dhl_track_lookup_view(self, request):
+        from .services.dhl import get_tracking as dhl_get_tracking
+
+        # Будь-який активний DHL carrier з api_key — той самий що й для тарифів
+        dhl_carrier = (
+            Carrier.objects
+            .filter(carrier_type="dhl", is_active=True)
+            .exclude(api_key="")
+            .order_by("-is_default", "pk")
+            .first()
+        )
+
+        tracking_number = request.GET.get("tn", "").strip()
+        result = None
+        error  = None
+        no_key = not dhl_carrier
+
+        if tracking_number and dhl_carrier:
+            result = dhl_get_tracking(dhl_carrier, tracking_number)
+            if result.get("error"):
+                error  = result["error"]
+                result = None
+
+        return render(request, "admin/shipping/dhl_track_lookup.html", {
+            **self.admin_site.each_context(request),
+            "title":           "🔍 DHL Трекінг",
+            "tracking_number": tracking_number,
+            "result":          result,
+            "error":           error,
+            "no_key":          no_key,
+            "dhl_carrier":     dhl_carrier,
+        })
+
+    # ── Compare rates (AJAX) ──────────────────────────────────────────────────
+
+    def compare_rates_view(self, request):
+        """AJAX POST — повертає тарифи усіх активних перевізників у JSON."""
+        import json
+
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+
+        try:
+            body = json.loads(request.body)
+        except Exception:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        try:
+            weight = float(body.get("weight_kg") or 1)
+            length = int(float(body.get("length_cm") or 20))
+            width  = int(float(body.get("width_cm")  or 15))
+            height = int(float(body.get("height_cm") or 10))
+        except (ValueError, TypeError):
+            weight, length, width, height = 1.0, 20, 15, 10
+
+        dest_country = (body.get("recipient_country") or "").upper().strip()
+        dest_postal  = (body.get("recipient_zip")     or "").strip()
+        dest_city    = (body.get("recipient_city")    or "").strip()
+
+        if not dest_country:
+            return JsonResponse({"error": "Вкажіть країну отримувача"}, status=400)
+
+        from .services.dhl import _EU_COUNTRIES
+        is_customs = dest_country not in _EU_COUNTRIES
+
+        carriers = Carrier.objects.filter(is_active=True).order_by("-is_default", "name")
+        results  = []
+
+        for carrier in carriers:
+            entry = {
+                "carrier_id":   carrier.pk,
+                "carrier_name": carrier.name,
+                "carrier_type": carrier.carrier_type,
+                "products":     [],
+                "error":        None,
+                "note":         None,
+            }
+
+            if carrier.carrier_type == "dhl":
+                if carrier.api_key and carrier.api_secret:
+                    from .services.dhl import get_rates as _dhl_rates
+                    r = _dhl_rates(carrier, dest_country, dest_postal, dest_city,
+                                   weight, length, width, height,
+                                   is_customs_declarable=is_customs)
+                    entry["products"] = r.get("products") or []
+                    entry["error"]    = r.get("error")
+                else:
+                    entry["error"] = "API ключ не налаштовано"
+
+            elif carrier.carrier_type == "jumingo":
+                if carrier.api_key:
+                    service = get_service(carrier)
+                    # Видаляємо попередній preview щоб не накопичувались orphan-відправки
+                    prev_key = f"jumingo_preview_{carrier.pk}"
+                    old_preview = request.session.get(prev_key)
+                    if old_preview:
+                        service.delete_shipment(old_preview)
+                        del request.session[prev_key]
+                    r = service.get_rates_preview(
+                        dest_country, dest_postal, dest_city,
+                        weight, length, width, height,
+                    )
+                    preview_id = r.get("preview_id", "")
+                    if preview_id:
+                        request.session[prev_key] = preview_id
+                    products = []
+                    for t in (r.get("tariffs") or []):
+                        shipper = (t.get("shipper") or {}).get("name", "")
+                        svc     = t.get("name", "")
+                        transit = None
+                        try:
+                            transit = ((t.get("dates") or {})
+                                       .get("transit_time_range", {})
+                                       .get("days"))
+                        except Exception:
+                            pass
+                        products.append({
+                            "name":         f"{shipper} {svc}".strip(),
+                            "code":         str(t.get("id", "")),
+                            "price":        float(t.get("price_brutto") or 0),
+                            "currency":     t.get("currency", "EUR"),
+                            "transit_days": transit,
+                            "delivery_date": "",
+                            "shipper":      shipper,
+                            "tariff_id":    str(t.get("id", "")),
+                        })
+                    entry["products"]   = products
+                    entry["preview_id"] = preview_id
+                    entry["error"]      = r.get("error")
+                else:
+                    entry["error"] = "API ключ не налаштовано"
+
+            else:
+                entry["note"] = "Rate shopping не підтримується"
+
+            results.append(entry)
+
+        return JsonResponse({
+            "results": results,
+            "weight":  weight,
+            "dims":    f"{length}×{width}×{height}",
+        })
+
+    # ── Submit → Jumingo API ──────────────────────────────────────────────────
+
+    def submit_view(self, request, shipment_id):
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        allowed = (Shipment.Status.DRAFT, Shipment.Status.ERROR, Shipment.Status.SUBMITTED)
+        if shipment.status not in allowed:
+            messages.warning(request, "Неможливо перенадіслати відправлення в поточному статусі.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        # DHL — автоматично відкриваємо тарифи
+        if shipment.carrier and shipment.carrier.carrier_type == "dhl":
+            return redirect(reverse("admin:shipping_shipment_dhl_rates", args=[shipment.pk]))
+
+        SUBMIT_SUPPORTED = ("jumingo",)
+        if shipment.carrier and shipment.carrier.carrier_type not in SUBMIT_SUPPORTED:
+            messages.error(
+                request,
+                f"❌ Перевізник «{shipment.carrier.name}» ({shipment.carrier.get_carrier_type_display()}) "
+                f"не підтримує створення відправлень через Minerva.",
+            )
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        service = get_service(shipment.carrier)
+        result  = service.create_shipment(shipment)
+
+        shipment.raw_request  = result.raw_request
+        shipment.raw_response = result.raw_response
+
+        if result.success:
+            shipment.status              = Shipment.Status.SUBMITTED
+            shipment.carrier_shipment_id = result.carrier_shipment_id
+            shipment.submitted_at        = timezone.now()
+            shipment.error_message       = ""
+            shipment.save()
+            messages.success(
+                request,
+                f"✅ Відправлення #{shipment.pk} створено в Jumingo! "
+                f"ID: {result.carrier_shipment_id}. Оберіть тариф і оплатіть на Jumingo."
+            )
+            # Перенаправляємо на сторінку тарифів
+            return redirect(reverse("admin:shipping_shipment_rates", args=[shipment.pk]))
+        else:
+            shipment.status        = Shipment.Status.ERROR
+            shipment.error_message = result.error_message
+            shipment.save()
+            messages.error(request, f"❌ Помилка Jumingo API: {result.error_message}")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+    # ── Тарифи ───────────────────────────────────────────────────────────────
+
+    def rates_view(self, request, shipment_id):
+        """Показує доступні тарифи для відправлення."""
+        import json
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        rates_data = {}
+        if shipment.carrier_shipment_id:
+            service    = get_service(shipment.carrier)
+            rates_data = service.get_rates(shipment.carrier_shipment_id)
+
+        from .services.jumingo import JUMINGO_APP_URL
+        return render(request, "admin/shipping/shipment_rates.html", {
+            **self.admin_site.each_context(request),
+            "shipment":      shipment,
+            "tariffs":       rates_data.get("tariffs", []),
+            "rates_error":   rates_data.get("error", ""),
+            "rates_raw":     json.dumps(rates_data, ensure_ascii=False, indent=2)[:8000],
+            "jumingo_url":   f"{JUMINGO_APP_URL}/de-de/shipments/",
+            "resubmit_url":  reverse("admin:shipping_shipment_submit", args=[shipment.pk]),
+            "title":         f"Тарифи — #{shipment.pk} → {shipment.recipient_name}",
+        })
+
+    # ── Оновлення трекінгу ────────────────────────────────────────────────────
+
+    def track_view(self, request, shipment_id):
+        """Вручну оновлює статус і трекінг через Jumingo API."""
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        if not shipment.carrier_shipment_id:
+            messages.warning(request, "Відправлення не має Jumingo ID — спочатку надішліть.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        service = get_service(shipment.carrier)
+        data    = service.track(shipment.carrier_shipment_id)
+
+        if not data:
+            messages.error(request, "❌ Не вдалося отримати дані від Jumingo API.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        # Зберігаємо raw_response від track
+        shipment.raw_response = data
+        shipment.save(update_fields=["raw_response"])
+
+        # Перезавантажуємо об'єкт з БД щоб мати актуальний стан
+        shipment.refresh_from_db()
+
+        changed = _apply_tracking_update(shipment, data)
+
+        # ── Діагностика митної декларації ─────────────────────────────────────
+        shipment.refresh_from_db()
+        customs_inv   = data.get("customs_invoice") or {}
+        line_items_in = customs_inv.get("lineItems") or []
+        customs_saved = (shipment.customs_articles or {}).get("customs_line_items") or []
+        if line_items_in and not customs_saved:
+            messages.warning(
+                request,
+                f"⚠️ DEBUG: customs_invoice має {len(line_items_in)} рядків у API-відповіді, "
+                f"але customs_articles в БД порожнє! "
+                f"exportReason={customs_inv.get('exportReason')!r}, "
+                f"першийLI={line_items_in[0] if line_items_in else 'N/A'!r}"
+            )
+        elif customs_saved:
+            messages.success(request, f"🛃 Митна декларація: {len(customs_saved)} рядків збережено.")
+
+        if changed:
+            messages.success(request, f"🔄 Оновлено: {shipment.get_status_display()}")
+        else:
+            messages.info(request, "ℹ️ Дані актуальні.")
+
+        return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+    # ── Вибір тарифу (Variant 2) ─────────────────────────────────────────────
+
+    def select_tariff_view(self, request, shipment_id):
+        """Зберігає обраний тариф в Minerva + PATCH до Jumingo → редірект на Jumingo."""
+        from datetime import date, timedelta
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        tariff_id    = request.GET.get("tariff_id", "")
+        tariff_name  = request.GET.get("name", "")
+        tariff_price = request.GET.get("price", "")
+        shipper_name = request.GET.get("shipper", "")
+
+        if not tariff_id:
+            messages.error(request, "❌ Не передано tariff_id.")
+            return redirect(reverse("admin:shipping_shipment_rates", args=[shipment.pk]))
+
+        # Зберегти тариф в Minerva
+        from decimal import Decimal, InvalidOperation
+        try:
+            shipment.carrier_price = Decimal(tariff_price)
+        except (InvalidOperation, TypeError):
+            pass
+        shipment.carrier_service    = f"{shipper_name} — {tariff_name}" if shipper_name else tariff_name
+        shipment.selected_tariff_id = tariff_id
+        shipment.carrier_currency   = "EUR"
+        shipment.save(update_fields=[
+            "carrier_price", "carrier_service", "selected_tariff_id", "carrier_currency"
+        ])
+
+        service = get_service(shipment.carrier)
+
+        # ── Замінити preview-shipment на повний ──────────────────────────────
+        # get_rates_preview() створює мінімальний Jumingo shipment (без customs,
+        # без реальних адрес) — через це він відображається червоним/неактивним.
+        # 1) Зберігаємо старий preview_id
+        # 2) Створюємо новий повний shipment
+        # 3) Видаляємо старий preview → на Jumingo залишається тільки один (зелений)
+        old_preview_id = shipment.carrier_shipment_id
+        full_result = service.create_shipment(shipment)
+        if full_result.success and full_result.carrier_shipment_id:
+            shipment.carrier_shipment_id = full_result.carrier_shipment_id
+            shipment.save(update_fields=["carrier_shipment_id"])
+            # Видаляємо стару preview-відправку щоб не було дублікату на Jumingo
+            if old_preview_id and old_preview_id != full_result.carrier_shipment_id:
+                service.delete_shipment(old_preview_id)
+            # Очищаємо сесійний preview_id — він більше не потрібен
+            if shipment.carrier:
+                prev_key = f"jumingo_preview_{shipment.carrier.pk}"
+                request.session.pop(prev_key, None)
+        else:
+            messages.warning(
+                request,
+                f"⚠️ Не вдалося створити повне відправлення на Jumingo: "
+                f"{full_result.error_message or '—'}. Використовується попередній ID."
+            )
+
+        # PATCH тариф — наступний робочий день
+        pickup_date = date.today() + timedelta(days=1)
+        while pickup_date.weekday() >= 5:
+            pickup_date += timedelta(days=1)
+        pickup_date = pickup_date.strftime("%Y-%m-%d")
+        result = service.patch_tariff(shipment.carrier_shipment_id, tariff_id, pickup_date)
+        if not result.get("success"):
+            messages.warning(
+                request,
+                f"⚠️ Тариф збережено в Minerva, але PATCH до Jumingo не вдався: "
+                f"{result.get('error', '')}. Оберіть тариф вручну на Jumingo."
+            )
+        else:
+            messages.success(request, f"✅ Тариф обрано: {shipment.carrier_service} — {tariff_price} EUR")
+
+        # Якщо ?book=1 — одразу бронювати через API
+        if request.GET.get("book") == "1":
+            return redirect(reverse("admin:shipping_shipment_book", args=[shipment.pk]))
+
+        # Повертаємось у Minerva — посилання на Jumingo у повідомленні
+        from .services.jumingo import JUMINGO_APP_URL
+        jumingo_link = f"{JUMINGO_APP_URL}/de-de/shipment/{shipment.carrier_shipment_id}"
+        messages.info(
+            request,
+            f'💰 Тариф збережено. Перейдіть на '
+            f'<a href="{JUMINGO_APP_URL}/de-de/" target="_blank" style="color:#2196f3">'
+            f'Jumingo</a> → Відправлення → знайдіть #{shipment.carrier_shipment_id[:12]}... → Оплатити.',
+        )
+        return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+    # ── Бронювання через API (Variant 3) ─────────────────────────────────────
+
+    def book_view(self, request, shipment_id):
+        """POST /v1/orders → отримує label → оновлює Shipment."""
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        if not shipment.selected_tariff_id:
+            messages.error(request, "❌ Спочатку оберіть тариф.")
+            return redirect(reverse("admin:shipping_shipment_rates", args=[shipment.pk]))
+
+        service = get_service(shipment.carrier)
+
+        # Отримати доступні методи оплати
+        cart = service.cart_total(shipment.carrier_shipment_id)
+
+        # Jumingo може повертати camelCase або snake_case
+        raw_methods = (
+            cart.get("paymentMethods")
+            or cart.get("payment_methods")
+            or []
+        )
+        # Елемент може бути рядком або dict
+        payment_methods = []
+        for m in raw_methods:
+            if isinstance(m, str):
+                payment_methods.append(m)
+            elif isinstance(m, dict):
+                payment_methods.append(m.get("name") or m.get("id") or "")
+
+        # Вибрати метод оплати (пріоритет: bill → invoice → prepayment → перший)
+        method = None
+        for preferred in ("bill", "invoice", "prepayment", "balance"):
+            if preferred in payment_methods:
+                method = preferred
+                break
+        if not method and payment_methods:
+            method = payment_methods[0]
+        if not method:
+            err_detail = cart.get("detail") or cart.get("message") or ""
+            if "payment" in err_detail.lower():
+                messages.error(
+                    request,
+                    "❌ На Jumingo акаунті не налаштовано метод оплати. "
+                    "Зайдіть на jumingo.com → Аккаунт → Zahlungsmethoden → "
+                    "додайте картку або SEPA. Поки що використовуйте «✅ Обрати» для ручної оплати.",
+                )
+            else:
+                import json as _json
+                messages.error(
+                    request,
+                    f"❌ Немає доступних методів оплати. Оплатіть вручну на Jumingo. "
+                    f"({err_detail or _json.dumps(cart, ensure_ascii=False)[:200]})",
+                )
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        # Оформити замовлення
+        order_data = service.book_order(shipment.carrier_shipment_id, method)
+
+        if not order_data.get("success", True) or order_data.get("error"):
+            messages.error(request, f"❌ Помилка бронювання: {order_data.get('error', order_data)}")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        order_number = order_data.get("orderNumber", "")
+        return_url   = order_data.get("returnUrl", "")
+
+        if order_number:
+            shipment.jumingo_order_number = order_number
+            shipment.status = Shipment.Status.LABEL_READY
+            shipment.save(update_fields=["jumingo_order_number", "status"])
+
+            # Спробувати отримати label
+            docs = service.get_order_documents(order_number)
+            labels = docs.get("labels", [])
+            if labels:
+                label_url = labels[0].get("url") or labels[0].get("link") or ""
+                if label_url:
+                    shipment.label_url = label_url
+                    shipment.save(update_fields=["label_url"])
+                    messages.success(
+                        request,
+                        f"✅ Замовлення оформлено! #{order_number}. Етикетка готова."
+                    )
+                else:
+                    messages.success(request, f"✅ Замовлення #{order_number} оформлено! Етикетка з'явиться незабаром.")
+            else:
+                messages.success(request, f"✅ Замовлення #{order_number} оформлено!")
+
+        elif return_url:
+            # Потрібна зовнішня оплата (PayPal тощо)
+            messages.info(request, f"ℹ️ Перейдіть за посиланням для оплати: {return_url}")
+
+        return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+    # ── DHL Rate Comparison ────────────────────────────────────────────────────
+
+    def dhl_rates_view(self, request, shipment_id):
+        """Показує тарифи DHL Express для даного відправлення."""
+        import json as _json
+        from .services.dhl import get_rates as dhl_get_rates
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order    = shipment.order
+
+        # Знаходимо DHL carrier
+        dhl_carrier = Carrier.objects.filter(carrier_type="dhl", is_active=True).first()
+        if not dhl_carrier:
+            messages.error(request, "❌ Немає активного DHL перевізника. Додайте Carrier з типом DHL.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        if not dhl_carrier.api_key or not dhl_carrier.api_secret:
+            messages.error(request, "❌ DHL Carrier не має API ключа/секрету. Заповніть поля.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        # Параметри відправлення
+        weight  = float(shipment.weight_kg or 1)
+        length  = int(shipment.length_cm  or 20)
+        width   = int(shipment.width_cm   or 15)
+        height  = int(shipment.height_cm  or 10)
+
+        dest_country = order.addr_country or ""
+        dest_postal  = order.addr_zip     or ""
+        dest_city    = order.addr_city    or ""
+
+        is_customs = dest_country not in getattr(__import__('shipping.services.jumingo', fromlist=['JumingoService']), 'JumingoService', type('', (), {'_EU_COUNTRIES': set()}))._EU_COUNTRIES
+
+        result = dhl_get_rates(
+            carrier=dhl_carrier,
+            destination_country=dest_country,
+            destination_postal=dest_postal,
+            destination_city=dest_city,
+            weight_kg=weight,
+            length_cm=length,
+            width_cm=width,
+            height_cm=height,
+            is_customs_declarable=is_customs,
+        )
+
+        return render(request, "admin/shipping/dhl_rates.html", {
+            **self.admin_site.each_context(request),
+            "shipment":  shipment,
+            "order":     order,
+            "products":  result.get("products", []),
+            "dhl_error": result.get("error"),
+            "weight":    weight,
+            "dims":      f"{length}×{width}×{height} см",
+            "title":     f"DHL Тарифи — #{shipment.pk} → {shipment.recipient_name}",
+        })
+
+    # ── DHL Tracking ──────────────────────────────────────────────────────────
+
+    def dhl_track_view(self, request, shipment_id):
+        """Трекінг посилки через DHL Express API."""
+        from .services.dhl import get_tracking as dhl_get_tracking
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        dhl_carrier = Carrier.objects.filter(carrier_type="dhl", is_active=True).first()
+        if not dhl_carrier:
+            messages.error(request, "❌ Немає активного DHL перевізника.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        tracking_number = (shipment.tracking_number or "").strip()
+        if not tracking_number:
+            messages.error(request, "❌ Трекінг-номер не вказано у відправленні.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        result = dhl_get_tracking(dhl_carrier, tracking_number)
+
+        return render(request, "admin/shipping/dhl_tracking.html", {
+            **self.admin_site.each_context(request),
+            "shipment":        shipment,
+            "tracking_number": tracking_number,
+            "result":          result,
+            "dhl_error":       result.get("error"),
+            "events":          result.get("events", []),
+            "title":           f"DHL Трекінг — {tracking_number}",
+        })
+
+    # ── DHL Book (POST /shipments) ────────────────────────────────────────────
+
+    def dhl_book_view(self, request, shipment_id):
+        """Оформлює відправлення через DHL POST /shipments → зберігає трекінг і label."""
+        import os
+        from django.conf import settings
+        from .services.dhl import create_shipment as dhl_create
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        dhl_carrier = Carrier.objects.filter(carrier_type="dhl", is_active=True).first()
+        if not dhl_carrier:
+            messages.error(request, "❌ Немає активного DHL перевізника.")
+            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+        product_code    = request.GET.get("product_code", "").strip()
+        product_name    = request.GET.get("product_name", product_code).strip()
+        price_str       = request.GET.get("price", "0")
+        request_pickup  = request.GET.get("pickup", "0") == "1"
+        pickup_close    = request.GET.get("pickup_close", "18:00").strip() or "18:00"
+        pickup_location = request.GET.get("pickup_location", "reception").strip() or "reception"
+        customs_param   = request.GET.get("customs")
+        include_customs = None if customs_param is None else (customs_param == "1")
+
+        if not product_code:
+            messages.error(request, "❌ Не передано product_code.")
+            return redirect(reverse("admin:shipping_shipment_dhl_rates", args=[shipment.pk]))
+
+        try:
+            price_f = float(price_str)
+        except (ValueError, TypeError):
+            price_f = 0.0
+
+        result = dhl_create(dhl_carrier, shipment, product_code, product_name, price_f,
+                            request_pickup=request_pickup,
+                            pickup_close_time=pickup_close,
+                            pickup_location=pickup_location,
+                            include_customs=include_customs)
+
+        shipment.raw_request  = result.get("raw_request")
+        shipment.raw_response = result.get("raw_response")
+
+        if not result.get("success"):
+            shipment.status        = Shipment.Status.ERROR
+            shipment.error_message = result.get("error", "")
+            shipment.save(update_fields=[
+                "raw_request", "raw_response", "status", "error_message"
+            ])
+            # Показуємо кожен рядок помилки окремим повідомленням
+            error_text = result.get("error", "")
+            for line in error_text.split("\n"):
+                if line.strip():
+                    messages.error(request, line.strip())
+            return redirect(reverse("admin:shipping_shipment_dhl_rates", args=[shipment.pk]))
+
+        tracking_number = result.get("tracking_number", "")
+        label_bytes     = result.get("label_bytes")
+
+        # Зберегти label PDF до media/labels/dhl/
+        label_url = ""
+        if label_bytes and tracking_number:
+            try:
+                labels_dir = os.path.join(settings.MEDIA_ROOT, "labels", "dhl")
+                os.makedirs(labels_dir, exist_ok=True)
+                label_filename = f"{tracking_number}.pdf"
+                with open(os.path.join(labels_dir, label_filename), "wb") as fh:
+                    fh.write(label_bytes)
+                label_url = f"{settings.MEDIA_URL}labels/dhl/{label_filename}"
+            except Exception as exc:
+                logger.warning("DHL label save failed: %s", exc)
+
+        # Оновлюємо Shipment
+        update_fields = [
+            "tracking_number", "carrier_service", "carrier_price",
+            "carrier_currency", "status", "submitted_at",
+            "error_message", "raw_request", "raw_response",
+        ]
+        shipment.tracking_number = tracking_number
+        shipment.carrier_service = result.get("carrier_service", product_code)
+        shipment.carrier_currency = "EUR"
+        shipment.status           = Shipment.Status.LABEL_READY
+        shipment.submitted_at     = timezone.now()
+        shipment.error_message    = ""
+        if result.get("carrier_price"):
+            from decimal import Decimal
+            shipment.carrier_price = Decimal(str(result["carrier_price"]))
+        if label_url:
+            shipment.label_url = label_url
+            update_fields.append("label_url")
+        shipment.save(update_fields=update_fields)
+
+        # Синхронізуємо SalesOrder
+        from datetime import date as _date
+        order         = shipment.order
+        order_fields  = []
+        if tracking_number and not order.tracking_number:
+            order.tracking_number = tracking_number
+            order_fields.append("tracking_number")
+        if not order.shipping_courier:
+            order.shipping_courier = "DHL"
+            order_fields.append("shipping_courier")
+        if order.status in ("received", "processing"):
+            order.status = "shipped"
+            order_fields.append("status")
+        if not order.shipped_at:
+            order.shipped_at = _date.today()
+            order_fields.append("shipped_at")
+        if order_fields:
+            order.save(update_fields=order_fields)
+
+        msg = f"✅ DHL відправлення створено! Трекінг: {tracking_number}."
+        if label_url:
+            msg += " Етикетка збережена."
+        messages.success(request, msg)
+        return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+
+    # ── Readonly panels ───────────────────────────────────────────────────────
+
+    def action_buttons(self, obj):
+        if not obj.pk:
+            return "—"
+        btns = []
+        carrier_type = obj.carrier.carrier_type if obj.carrier else ""
+        if obj.status in (Shipment.Status.DRAFT, Shipment.Status.ERROR) and carrier_type == "jumingo":
+            url = reverse("admin:shipping_shipment_submit", args=[obj.pk])
+            btns.append(
+                f'<a href="{url}" style="background:#4caf50;color:#fff;padding:8px 18px;'
+                f'border-radius:6px;text-decoration:none;font-weight:700;display:inline-block;margin-right:8px">'
+                f'🚀 Надіслати до Jumingo</a>'
+            )
+        if obj.carrier_shipment_id:
+            rates_url = reverse("admin:shipping_shipment_rates", args=[obj.pk])
+            track_url = reverse("admin:shipping_shipment_track", args=[obj.pk])
+            btns.append(
+                f'<a href="{rates_url}" style="background:#2196f3;color:#fff;padding:8px 14px;'
+                f'border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px">'
+                f'💰 Тарифи</a>'
+            )
+            if obj.selected_tariff_id and not obj.jumingo_order_number:
+                book_url = reverse("admin:shipping_shipment_book", args=[obj.pk])
+                btns.append(
+                    f'<a href="{book_url}" style="background:#9c27b0;color:#fff;padding:8px 14px;'
+                    f'border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px">'
+                    f'⚡ Замовити через API</a>'
+                )
+            btns.append(
+                f'<a href="{track_url}" style="background:#ff9800;color:#fff;padding:8px 14px;'
+                f'border-radius:6px;text-decoration:none;font-weight:600">'
+                f'🔄 Оновити трекінг</a>'
+            )
+        # DHL — показуємо якщо є DHL carrier
+        from .models import Carrier as _Carrier
+        if _Carrier.objects.filter(carrier_type="dhl", is_active=True).exists() and obj.pk:
+            dhl_rates_url = reverse("admin:shipping_shipment_dhl_rates", args=[obj.pk])
+            btns.append(
+                f'<a href="{dhl_rates_url}" style="background:#ffcc00;color:#000;padding:8px 14px;'
+                f'border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px">'
+                f'🟡 DHL Тарифи</a>'
+            )
+            if obj.tracking_number:
+                dhl_track_url = reverse("admin:shipping_shipment_dhl_track", args=[obj.pk])
+                btns.append(
+                    f'<a href="{dhl_track_url}" style="background:#f9a825;color:#000;padding:8px 14px;'
+                    f'border-radius:6px;text-decoration:none;font-weight:600;margin-right:8px">'
+                    f'📡 DHL Трекінг</a>'
+                )
+        return format_html("".join(btns) if btns else '<span style="color:#607d8b">—</span>')
+    action_buttons.short_description = "Дії"
+
+    def order_detail_panel(self, obj):
+        if not obj.order_id:
+            return "—"
+        o = obj.order
+        return format_html(
+            '<div style="background:#111c26;border:1px solid #2a3f52;'
+            'border-radius:6px;padding:12px 16px;font-size:12px">'
+            '<b>#{}</b> · {} · {} · {}<br>'
+            '<span style="color:#607d8b">{}</span>'
+            '</div>',
+            o.order_number, o.source, o.client or "—",
+            o.shipping_region or "—",
+            o.shipping_address or "немає адреси",
+        )
+    order_detail_panel.short_description = "Дані замовлення"
+
+    def customs_articles_panel(self, obj):
+        import json as _json
+        if not obj.customs_articles:
+            return format_html('<span style="color:#607d8b">—</span>')
+        data = obj.customs_articles
+        inv_type = data.get("type", "—")
+        items    = data.get("customs_line_items") or data.get("articles") or []
+        if not items:
+            return format_html('<span style="color:#607d8b">Порожньо</span>')
+        rows = ""
+        total = 0.0
+        for it in items:
+            val = it.get("value", 0) or 0
+            total += float(val)
+            rows += (
+                f'<tr style="border-bottom:1px solid #1e2d3e">'
+                f'<td style="padding:5px 8px;color:#c9d8e4">{it.get("description","")}</td>'
+                f'<td style="padding:5px 8px;color:#9aafbe;text-align:center">{it.get("quantity","")}</td>'
+                f'<td style="padding:5px 8px;color:#80cbc4;font-family:monospace">{it.get("customs_number","")}</td>'
+                f'<td style="padding:5px 8px;color:#9aafbe;text-align:center">{it.get("origin_country","")}</td>'
+                f'<td style="padding:5px 8px;color:#9aafbe;text-align:right">{it.get("weight","")}</td>'
+                f'<td style="padding:5px 8px;color:#4caf50;text-align:right;font-weight:700">'
+                f'{val} {it.get("currency","")}</td>'
+                f'</tr>'
+            )
+        return format_html(
+            '<div style="font-size:12px">'
+            '<div style="color:#607d8b;margin-bottom:6px">Тип: <b style="color:#c9d8e4">{}</b></div>'
+            '<table style="width:100%;border-collapse:collapse">'
+            '<thead><tr style="background:#162030">'
+            '<th style="padding:5px 8px;color:#9aafbe;text-align:left">Опис</th>'
+            '<th style="padding:5px 8px;color:#9aafbe">К-ть</th>'
+            '<th style="padding:5px 8px;color:#9aafbe;text-align:left">HS-код</th>'
+            '<th style="padding:5px 8px;color:#9aafbe">Країна</th>'
+            '<th style="padding:5px 8px;color:#9aafbe;text-align:right">Вага кг</th>'
+            '<th style="padding:5px 8px;color:#9aafbe;text-align:right">Вартість</th>'
+            '</tr></thead><tbody>{}</tbody></table>'
+            '<div style="text-align:right;color:#4caf50;font-weight:700;margin-top:6px">Всього: {:.2f}</div>'
+            '</div>',
+            inv_type, format_html(rows), total,
+        )
+    customs_articles_panel.short_description = "Митні артикули"
+
+    # ── List columns ──────────────────────────────────────────────────────────
+
+    def id_badge(self, obj):
+        return format_html('<b style="color:#9aafbe">#{}</b>', obj.pk)
+    id_badge.short_description = "#"
+
+    def order_link(self, obj):
+        url = reverse("admin:sales_salesorder_change", args=[obj.order_id])
+        return format_html('<a href="{}">{}</a>', url, obj.order)
+    order_link.short_description = "Замовлення"
+
+    def carrier_badge(self, obj):
+        colors = {
+            "jumingo": "#e91e63", "dhl": "#ffcc00",
+            "ups": "#351c75", "fedex": "#4d148c", "other": "#607d8b",
+        }
+        color = colors.get(obj.carrier.carrier_type, "#607d8b")
+        text_color = "#000" if obj.carrier.carrier_type == "dhl" else "#fff"
+        return format_html(
+            '<span style="background:{};color:{};padding:2px 8px;'
+            'border-radius:8px;font-size:11px;font-weight:700">{}</span>',
+            color, text_color, obj.carrier.name
+        )
+    carrier_badge.short_description = "Перевізник"
+
+    def status_badge(self, obj):
+        colors = {
+            "draft":       ("#607d8b", "⬜"), "submitted":   ("#2196f3", "📤"),
+            "label_ready": ("#00bcd4", "🏷️"), "in_transit":  ("#ff9800", "🚚"),
+            "delivered":   ("#4caf50", "✅"), "error":       ("#f44336", "❌"),
+            "cancelled":   ("#9e9e9e", "🚫"),
+        }
+        color, icon = colors.get(obj.status, ("#607d8b", "❓"))
+        return format_html(
+            '<span style="color:{};font-weight:600;white-space:nowrap">{} {}</span>',
+            color, icon, obj.get_status_display()
+        )
+    status_badge.short_description = "Статус"
+
+    def tracking_badge(self, obj):
+        if obj.tracking_number:
+            return format_html('<code style="font-size:11px">{}</code>', obj.tracking_number)
+        return format_html('<span style="color:#607d8b">—</span>')
+    tracking_badge.short_description = "Трекінг"
+
+    def label_badge(self, obj):
+        if obj.label_url:
+            return format_html(
+                '<a href="{}" target="_blank" style="background:#2196f3;color:#fff;'
+                'padding:3px 8px;border-radius:5px;font-size:11px;text-decoration:none">'
+                '📄 PDF</a>', obj.label_url
+            )
+        return format_html('<span style="color:#607d8b">—</span>')
+    label_badge.short_description = "Етикетка"
+
+    def created_at_fmt(self, obj):
+        return obj.created_at.strftime("%d.%m.%Y %H:%M")
+    created_at_fmt.short_description = "Створено"
+
+    # ── Order Tracking overview ───────────────────────────────────────────────
+
+    def order_tracking_view(self, request):
+        """Список замовлень з трекінгом — автовизначення перевізника."""
+        from sales.models import SalesOrder
+
+        rows = []
+        covered_order_ids = set()
+
+        # 1. Shipments created via Minerva that have a tracking number
+        minerva_shipments = (
+            Shipment.objects
+            .exclude(tracking_number="")
+            .filter(tracking_number__isnull=False)
+            .select_related("carrier", "order")
+            .order_by("-created_at")
+        )
+        for shipment in minerva_shipments:
+            tn = shipment.tracking_number or ""
+            # ERROR shipment: prefer manually-set TN on the SalesOrder
+            if shipment.status == Shipment.Status.ERROR:
+                order_tn = (shipment.order.tracking_number or "").strip()
+                if order_tn:
+                    tn = order_tn
+            info = _detect_carrier(tn)
+            # If carrier is known, override auto flag based on carrier type
+            if shipment.carrier:
+                ct = shipment.carrier.carrier_type
+                if ct == "dhl":
+                    info["auto"] = bool(tn)
+                elif ct == "jumingo":
+                    # Auto-track via Jumingo API when we have a shipment ID
+                    info["auto"] = bool(shipment.carrier_shipment_id)
+            rows.append({
+                "order":       shipment.order,
+                "tn":          tn,
+                "carrier":     info,
+                "via_minerva": True,
+                "shipment":    shipment,
+            })
+            covered_order_ids.add(shipment.order_id)
+
+        # 2. SalesOrders with manual tracking numbers not covered by a Shipment
+        manual_orders = (
+            SalesOrder.objects
+            .exclude(tracking_number="")
+            .filter(tracking_number__isnull=False)
+            .exclude(id__in=covered_order_ids)
+            .order_by("-order_date", "-id")
+        )
+        for order in manual_orders:
+            tn   = order.tracking_number or ""
+            info = _detect_carrier(tn)
+            rows.append({
+                "order":       order,
+                "tn":          tn,
+                "carrier":     info,
+                "via_minerva": False,
+                "shipment":    None,
+            })
+
+        return render(request, "admin/shipping/order_tracking.html", {
+            **self.admin_site.each_context(request),
+            "rows":  rows,
+            "title": "📡 Відслідковування замовлень",
+        })
+
+    def refresh_order_tracking_view(self, request, order_id):
+        """Оновлює статус трекінгу для одного замовлення (Jumingo або DHL API)."""
+        from sales.models import SalesOrder
+
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_order_tracking"))
+
+        order = get_object_or_404(SalesOrder, pk=order_id)
+
+        # Знаходимо пов'язаний Shipment (Minerva)
+        minerva_ship = (
+            Shipment.objects
+            .filter(order=order)
+            .select_related("carrier")
+            .order_by("-created_at")
+            .first()
+        )
+
+        # TN: з Shipment → з SalesOrder
+        # ERROR shipment: prefer manually-set TN on SalesOrder (user corrected it)
+        tn = ""
+        if minerva_ship and minerva_ship.status == Shipment.Status.ERROR:
+            tn = (order.tracking_number or "").strip()
+        if not tn and minerva_ship and minerva_ship.tracking_number:
+            tn = minerva_ship.tracking_number.strip()
+        if not tn:
+            tn = (order.tracking_number or "").strip()
+
+        carrier_type = (
+            minerva_ship.carrier.carrier_type
+            if minerva_ship and minerva_ship.carrier else ""
+        )
+
+        # ── Jumingo: трекінг через Jumingo API ───────────────────────────────
+        if carrier_type == "jumingo":
+            if not minerva_ship.carrier_shipment_id:
+                messages.error(
+                    request,
+                    f"❌ {order.order_number}: немає Jumingo Shipment ID для трекінгу."
+                )
+                return redirect(reverse("admin:shipping_order_tracking"))
+
+            from .services.jumingo import JumingoService
+            service = JumingoService(minerva_ship.carrier)
+            data = service.track(minerva_ship.carrier_shipment_id)
+
+            if not data:
+                messages.error(
+                    request,
+                    f"❌ {order.order_number}: Jumingo не повернув дані "
+                    f"(ID: {minerva_ship.carrier_shipment_id})."
+                )
+                return redirect(reverse("admin:shipping_order_tracking"))
+
+            changed = _apply_tracking_update(minerva_ship, data)
+
+            progress = (
+                (data.get("tracking") or {})
+                .get("progress", {})
+                .get("class", "")
+            )
+            new_tn = (
+                (data.get("tracking") or {})
+                .get("data", {})
+                .get("tracking_number", "")
+            ) or tn or minerva_ship.carrier_shipment_id
+
+            PROGRESS_LABEL = {
+                "in_system":   "📦 В системі",
+                "in_transit":  "🚚 В дорозі",
+                "in_delivery": "🚚 Доставляється",
+                "completed":   "✅ Доставлено",
+                "exception":   "⚠️ Виняток",
+                "undelivered": "↩️ Не доставлено",
+            }
+            label = PROGRESS_LABEL.get(progress, f"📦 {progress or 'ok'}")
+
+            if changed:
+                messages.success(
+                    request,
+                    f"✅ {order.order_number} [{new_tn}]: Jumingo — {label}"
+                )
+            else:
+                messages.info(
+                    request,
+                    f"📦 {order.order_number} [{new_tn}]: Jumingo — {label} (без змін)"
+                )
+            return redirect(reverse("admin:shipping_order_tracking"))
+
+        # ── DHL Express: трекінг через DHL API ───────────────────────────────
+        if not tn:
+            messages.error(request, "❌ Замовлення не має трекінг-номера.")
+            return redirect(reverse("admin:shipping_order_tracking"))
+
+        from .services.dhl import get_tracking as dhl_get_tracking
+        info = _detect_carrier(tn)
+
+        if info["carrier"] != "dhl_express" and carrier_type != "dhl":
+            messages.warning(
+                request,
+                f"⚠️ {order.order_number}: автоматичне відслідковування недоступне для {info['label']}. "
+                f"Перевір вручну: {info['url'] or '—'}"
+            )
+            return redirect(reverse("admin:shipping_order_tracking"))
+
+        dhl_carrier = (
+            Carrier.objects
+            .filter(carrier_type="dhl", is_active=True)
+            .exclude(api_key="")
+            .order_by("-is_default")
+            .first()
+        )
+        if not dhl_carrier:
+            messages.error(request, "❌ Немає активного DHL перевізника з API ключем.")
+            return redirect(reverse("admin:shipping_order_tracking"))
+
+        result = dhl_get_tracking(dhl_carrier, tn)
+
+        if result.get("error"):
+            messages.error(request, f"❌ {order.order_number}: {result['error']}")
+            return redirect(reverse("admin:shipping_order_tracking"))
+
+        # Оновлюємо SalesOrder на основі DHL статусу
+        status_str    = result.get("status", "")
+        description   = result.get("description", "")
+        update_fields = []
+
+        STATUS_MAP = {
+            "transit":   "shipped",
+            "delivered": "delivered",
+            "failure":   "shipped",
+            "unknown":   None,
+        }
+        new_order_status = STATUS_MAP.get(status_str)
+
+        if new_order_status == "delivered" and order.status != "delivered":
+            order.status = "delivered"
+            update_fields.append("status")
+            if not order.delivered_at:
+                order.delivered_at = timezone.now()
+                update_fields.append("delivered_at")
+        elif new_order_status == "shipped" and order.status in ("received", "processing"):
+            order.status = "shipped"
+            update_fields.append("status")
+            if not order.shipped_at:
+                order.shipped_at = timezone.now().date()
+                update_fields.append("shipped_at")
+
+        if update_fields:
+            order.save(update_fields=update_fields)
+            messages.success(
+                request,
+                f"✅ {order.order_number} [{tn}]: статус оновлено → {order.get_status_display()}"
+            )
+        else:
+            icon = {"transit": "🚚", "delivered": "✅"}.get(status_str, "📦")
+            messages.info(
+                request,
+                f"{icon} {order.order_number} [{tn}]: {description or status_str} (без змін)"
+            )
+
+        return redirect(reverse("admin:shipping_order_tracking"))
+
+
+# ── Utility: apply tracking update ───────────────────────────────────────────
+
+def _apply_tracking_update(shipment, data: dict) -> bool:
+    """Оновлює Shipment та SalesOrder з відповіді GET /v1/shipments/{id}.
+    Повертає True якщо були зміни.
+
+    Структура Jumingo API:
+      data["tracking"]["data"]["tracking_number"]  ← трекінг-номер UPS/DHL
+      data["tracking"]["progress"]["class"]         ← in_system / in_transit / completed
+      data["tracking"]["carrierTrackingPage"]       ← посилання на трекінг перевізника
+      data["order"]["number"]                       ← Jumingo order number
+    """
+    from .services.jumingo import SHIPMENT_STATUS_MAP
+
+    # Статуси Jumingo tracking.progress.class → Minerva
+    PROGRESS_CLASS_MAP = {
+        "in_system":   "label_ready",
+        "in_transit":  "in_transit",
+        "in_delivery": "in_transit",
+        "completed":   "delivered",
+        "exception":   "error",
+        "undelivered": "in_transit",
+    }
+
+    changed = False
+
+    # ── Трекінг-номер: tracking.data.tracking_number ─────────────────────────
+    tracking_obj  = data.get("tracking") or {}
+    tracking_data = tracking_obj.get("data") or {}
+    new_tn        = tracking_data.get("tracking_number", "")
+    carrier_page  = tracking_obj.get("carrierTrackingPage", "")
+
+    if new_tn and new_tn != shipment.tracking_number:
+        shipment.tracking_number = new_tn
+        changed = True
+    if carrier_page and not shipment.label_url:
+        shipment.label_url = carrier_page
+        changed = True
+
+    # ── Jumingo order number: order.number ────────────────────────────────────
+    order_num = (data.get("order") or {}).get("number", "")
+    if order_num and not shipment.jumingo_order_number:
+        shipment.jumingo_order_number = order_num
+        changed = True
+
+    # ── Вартість доставки: rate.price_total ───────────────────────────────────
+    rate = data.get("rate") or {}
+    price_total = rate.get("price_total") or rate.get("price_net")
+    if price_total and not shipment.carrier_price:
+        from decimal import Decimal, InvalidOperation
+        try:
+            shipment.carrier_price    = Decimal(str(price_total))
+            shipment.carrier_currency = rate.get("price_total_currency", "EUR")
+            changed = True
+        except InvalidOperation:
+            pass
+
+    # ── Назва сервісу: UPS EXPEDITED ® ────────────────────────────────────────
+    if not shipment.carrier_service:
+        carrier_name  = (rate.get("carrier") or {}).get("shipper_group_name", "")
+        service_name  = (rate.get("service") or {}).get("name", "")
+        service_str   = f"{carrier_name} {service_name}".strip()
+        if service_str:
+            shipment.carrier_service = service_str
+            changed = True
+
+    # ── Митна декларація: customs_invoice.lineItems → customs_articles ────────
+    customs_inv    = data.get("customs_invoice") or {}
+    line_items     = customs_inv.get("lineItems") or []
+    existing_items = ((shipment.customs_articles or {}).get("customs_line_items") or [])
+    if line_items:
+        inv_currency = customs_inv.get("currency", "EUR")
+        export_reason = customs_inv.get("exportReason", "Commercial")
+        type_map = {
+            "Commercial": "commercial", "Gift": "gift",
+            "Sample": "sample", "Return": "return", "Private": "private",
+        }
+        items = []
+        for li in line_items:
+            item = {
+                "description":    (li.get("content") or "")[:35],
+                "quantity":       li.get("quantity") or 1,
+                "value":          li.get("value") or 0.0,
+                "currency":       inv_currency,
+                "origin_country": li.get("manufacturingCountry") or "",
+                "customs_number": li.get("hsTariffNumber") or "",
+            }
+            nw = li.get("netWeight") or 0
+            if nw:
+                item["weight"] = round(float(nw), 3)
+            items.append(item)
+        if items:
+            shipment.customs_articles = {
+                "type":               type_map.get(export_reason, "commercial"),
+                "currency":           inv_currency,   # для _build_customs_invoice
+                "customs_line_items": items,
+            }
+            shipment.save(update_fields=["customs_articles"])
+            changed = True
+
+    # ── Статус: progress.class → Minerva статус ───────────────────────────────
+    progress_class  = (tracking_obj.get("progress") or {}).get("class", "")
+    shipment_status = data.get("status", "")
+    new_status_str  = (
+        PROGRESS_CLASS_MAP.get(progress_class)
+        or SHIPMENT_STATUS_MAP.get(shipment_status)
+    )
+    if new_status_str and new_status_str != shipment.status:
+        shipment.status = new_status_str
+        changed = True
+
+    if changed:
+        shipment.save()
+
+    # ── Синхронізація SalesOrder (незалежно від змін у відправленні) ──────────
+    order         = shipment.order
+    order_changed = False
+    update_fields = []
+
+    carrier_name = (rate.get("carrier") or {}).get("shipper_group_name", "")
+
+    # Трекінг-номер
+    if new_tn and not order.tracking_number:
+        order.tracking_number = new_tn
+        order_changed = True
+        update_fields.append("tracking_number")
+
+    # Перевізник (UPS / DHL тощо)
+    if carrier_name and not order.shipping_courier:
+        order.shipping_courier = carrier_name
+        order_changed = True
+        update_fields.append("shipping_courier")
+
+    # Вартість доставки на замовлення
+    if price_total and not order.shipping_cost:
+        from decimal import Decimal, InvalidOperation
+        try:
+            order.shipping_cost     = Decimal(str(price_total))
+            order.shipping_currency = rate.get("price_total_currency", "EUR")
+            order_changed = True
+            update_fields += ["shipping_cost", "shipping_currency"]
+        except InvalidOperation:
+            pass
+
+    # Статус замовлення + shipped_at
+    if shipment.status == "label_ready":
+        if order.status in ("received", "processing"):
+            order.status = "shipped"
+            order_changed = True
+            update_fields.append("status")
+        if not order.shipped_at:
+            order.shipped_at = timezone.now().date()
+            order_changed = True
+            update_fields.append("shipped_at")
+    elif shipment.status == "in_transit" and order.status != "shipped":
+        order.status = "shipped"
+        if not order.shipped_at:
+            order.shipped_at = timezone.now().date()
+            update_fields.append("shipped_at")
+        order_changed = True
+        update_fields.append("status")
+    elif shipment.status == "delivered" and order.status != "delivered":
+        order.status = "delivered"
+        order_changed = True
+        update_fields.append("status")
+        if not order.delivered_at:
+            order.delivered_at = timezone.now()
+            order_changed = True
+            update_fields.append("delivered_at")
+
+    if order_changed:
+        order.save(update_fields=update_fields)
+
+    return changed
+
+
+# ── Carrier detection by tracking number ─────────────────────────────────────
+
+def _detect_carrier(tn: str) -> dict:
+    """Визначає перевізника за форматом трекінг-номера."""
+    import re
+    tn = (tn or "").strip()
+    if re.match(r'^\d{10}$', tn):
+        return {"carrier": "dhl_express", "label": "DHL Express",
+                "color": "#ffcc00", "text": "#000", "auto": True,
+                "url": f"https://www.dhl.com/en/express/tracking.html?AWB={tn}&brand=DHL"}
+    if re.match(r'^1Z[0-9A-Z]{16}$', tn.upper()):
+        return {"carrier": "ups", "label": "UPS",
+                "color": "#351c75", "text": "#fff", "auto": False,
+                "url": f"https://www.ups.com/track?tracknum={tn}"}
+    if re.match(r'^\d{14}$', tn) and (tn.startswith("20") or tn.startswith("59")):
+        return {"carrier": "nova_poshta", "label": "Нова Пошта",
+                "color": "#e53935", "text": "#fff", "auto": False,
+                "url": f"https://novaposhta.ua/tracking/?cargo_number={tn}"}
+    if re.match(r'^\d{12,22}$', tn):
+        return {"carrier": "dhl_paket", "label": "DHL Paket",
+                "color": "#ffcc00", "text": "#000", "auto": False,
+                "url": f"https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?lang=de&idc={tn}"}
+    if re.match(r'^[A-Z]{2}\d{9}[A-Z]{2}$', tn.upper()):
+        return {"carrier": "post", "label": "Post",
+                "color": "#607d8b", "text": "#fff", "auto": False,
+                "url": f"https://track24.net/?lang=en&number={tn}"}
+    return {"carrier": "unknown", "label": "Невідомий",
+            "color": "#37474f", "text": "#fff", "auto": False, "url": ""}
+
+
+# ── Inject shipping stats into shipping app_index context ─────────────────────
+
+def _get_shipping_stats():
+    try:
+        from django.db.models import Count
+        from datetime import date
+        month_start = date.today().replace(day=1)
+
+        qs = Shipment.objects.values("status").annotate(n=Count("pk"))
+        by_status = {row["status"]: row["n"] for row in qs}
+
+        delivered_month = Shipment.objects.filter(
+            status="delivered",
+            created_at__date__gte=month_start,
+        ).count()
+
+        return {
+            "draft":           by_status.get("draft", 0),
+            "submitted":       by_status.get("submitted", 0),
+            "label_ready":     by_status.get("label_ready", 0),
+            "in_transit":      by_status.get("in_transit", 0),
+            "delivered":       by_status.get("delivered", 0),
+            "error":           by_status.get("error", 0),
+            "delivered_month": delivered_month,
+            "active":          (by_status.get("submitted", 0)
+                                + by_status.get("label_ready", 0)
+                                + by_status.get("in_transit", 0)),
+        }
+    except Exception:
+        empty = {"draft": "—", "submitted": "—", "label_ready": "—",
+                 "in_transit": "—", "delivered": "—", "error": "—",
+                 "delivered_month": "—", "active": "—"}
+        return empty
+
+
+@admin.register(ShippingSettings)
+class ShippingSettingsAdmin(admin.ModelAdmin):
+    """Singleton — налаштування доставки."""
+
+    readonly_fields = ("last_tracking_run", "tracking_actions")
+
+    fieldsets = [
+        ("🔄 Автоматичний трекінг", {
+            "fields": (
+                "auto_tracking_enabled",
+                "tracking_interval_minutes",
+                "last_tracking_run",
+                "tracking_actions",
+            ),
+            "description": (
+                "Додайте cron для автоматичного запуску (рекомендується кожні 5 хвилин — "
+                "команда сама пропустить запуск якщо інтервал ще не вийшов):<br>"
+                "<code>*/5 * * * * docker-compose exec -T web python manage.py track_shipments</code>"
+            ),
+        }),
+    ]
+
+    def tracking_actions(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="../run-tracking/" style="'
+            'display:inline-block;padding:8px 18px;'
+            'background:#1976d2;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '🔄 Запустити оновлення зараз</a>'
+        )
+    tracking_actions.short_description = "Дії"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "",
+                self.admin_site.admin_view(self._redirect_singleton),
+                name="shipping_shippingsettings_changelist",
+            ),
+            path(
+                "<int:pk>/run-tracking/",
+                self.admin_site.admin_view(self._run_tracking),
+                name="shipping_shippingsettings_run_tracking",
+            ),
+        ]
+        return custom + urls
+
+    def _redirect_singleton(self, request):
+        obj = ShippingSettings.get()
+        return redirect(reverse("admin:shipping_shippingsettings_change", args=[obj.pk]))
+
+    def _run_tracking(self, request, pk):
+        from django.core.management import call_command
+        import io
+        out = io.StringIO()
+        try:
+            call_command("track_shipments", "--force", stdout=out)
+            messages.success(request, f"✅ Трекінг оновлено. {out.getvalue().strip().splitlines()[-1]}")
+        except Exception as e:
+            messages.error(request, f"❌ Помилка: {e}")
+        return redirect(reverse("admin:shipping_shippingsettings_change", args=[1]))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+_orig_shipping_app_index = admin.site.app_index
+
+
+def _shipping_app_index(request, app_label, extra_context=None):
+    if app_label == "shipping":
+        extra_context = extra_context or {}
+        extra_context["shipping_stats"] = _get_shipping_stats()
+    return _orig_shipping_app_index(request, app_label, extra_context)
+
+
+admin.site.app_index = _shipping_app_index

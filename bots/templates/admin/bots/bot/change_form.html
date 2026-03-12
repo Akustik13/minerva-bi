@@ -1,0 +1,22 @@
+{% extends "admin/change_form.html" %}
+
+{% block submit_buttons_bottom %}
+{{ block.super }}
+
+{% if original.pk %}
+<div style="margin-top: 20px; padding: 15px; background: #2c2c2c; border-radius: 8px;">
+    <a href="{% url 'admin:bots_bot_run' original.pk %}" 
+       style="display: inline-block; background: #4caf50; color: white; 
+              padding: 12px 30px; border-radius: 6px; text-decoration: none; 
+              font-weight: bold; font-size: 14px;">
+        ▶️ Запустити бота зараз
+    </a>
+    <a href="{% url 'admin:bots_botlog_changelist' %}?bot__id__exact={{ original.pk }}"
+       style="display: inline-block; background: #1976d2; color: white;
+              padding: 12px 30px; border-radius: 6px; text-decoration: none;
+              font-weight: bold; font-size: 14px; margin-left: 10px;">
+        📋 Переглянути логи
+    </a>
+</div>
+{% endif %}
+{% endblock %}

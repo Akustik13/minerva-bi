@@ -1,0 +1,254 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{% block title %}🛒 Продажі | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; Продажі
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.sal-dash { padding: 20px 24px 60px; }
+
+.sal-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 28px; padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.sal-header-icon {
+  width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg,rgba(255,152,0,.25),rgba(255,87,34,.15));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.sal-header h1 { font-size: 22px; font-weight: 800; color: #e6edf3; margin: 0 0 3px; }
+.sal-header p  { font-size: 13px; color: #7d8590; margin: 0; }
+
+.sal-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding-bottom: 7px;
+  border-bottom: 2px solid rgba(255,255,255,.07);
+  font-size: 11px; font-weight: 700; color: #7d8590;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+
+.sal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.sal-tile {
+  position: relative;
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid var(--ta, #ff9800);
+  border-radius: 9px;
+  padding: 15px 14px 13px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column;
+  min-height: 100px;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.sal-tile:hover {
+  border-color: var(--ta, #ff9800);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px);
+  background: #1e2d40;
+}
+.sal-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
+.sal-tile-name {
+  font-size: 12.5px; font-weight: 600;
+  color: #c9d8e4; line-height: 1.35; flex: 1;
+}
+.sal-tile-sub { font-size: 10px; color: #4a6070; margin-top: 6px; }
+.sal-tile-badge {
+  position: absolute; top: 9px; right: 10px;
+  font-size: 10px; font-weight: 700;
+  background: var(--ta, #ff9800);
+  color: #fff; border-radius: 20px;
+  padding: 1px 7px; opacity: .85;
+}
+
+/* stat strip */
+.sal-stats {
+  display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.sal-stat {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 9px; padding: 12px 18px; min-width: 130px; flex: 1;
+  text-decoration: none !important;
+  transition: border-color .15s, background .15s;
+}
+.sal-stat:hover { border-color: #2a4060; background: #182233; }
+.sal-stat-val { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.sal-stat-lbl { font-size: 11px; color: #607d8b; margin-top: 3px; }
+
+/* import tile */
+.sal-tile-import {
+  border-top-color: #00bcd4 !important;
+  --ta: #00bcd4;
+  background: linear-gradient(160deg,#0d2535,#0a2030) !important;
+}
+.sal-tile-import:hover { background: linear-gradient(160deg,#112d3d,#0d2535) !important; }
+
+.sal-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.sal-recent-card {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 7px; padding: 9px 11px;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.sal-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+.sal-recent-body { min-width: 0; }
+.sal-recent-body a {
+  font-size: 12px; font-weight: 600;
+  color: #58a6ff; text-decoration: none;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sal-recent-body a:hover { text-decoration: underline; }
+.sal-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
+.sal-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+</style>
+
+<div class="sal-dash">
+
+  <!-- Header -->
+  <div class="sal-header">
+    <div class="sal-header-icon">🛒</div>
+    <div>
+      <h1>Продажі</h1>
+      <p>Замовлення · Статуси · Трекінг · DYMO-етикетки · Імпорт Excel</p>
+    </div>
+    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ Налаштувати плитки</button>
+  </div>
+
+  <!-- Stat strip -->
+  <div class="sal-stats">
+    <a href="/admin/sales/salesorder/?status=received" class="sal-stat">
+      <div class="sal-stat-val" style="color:#2196f3">{{ sales_stats.received }}</div>
+      <div class="sal-stat-lbl">🆕 Нових замовлень</div>
+    </a>
+    <a href="/admin/sales/salesorder/?status=processing" class="sal-stat">
+      <div class="sal-stat-val" style="color:#ff9800">{{ sales_stats.processing }}</div>
+      <div class="sal-stat-lbl">⚙️ В обробці</div>
+    </a>
+    <a href="/admin/sales/salesorder/?overdue=1" class="sal-stat">
+      <div class="sal-stat-val" style="color:#f44336">{{ sales_stats.overdue }}</div>
+      <div class="sal-stat-lbl">⚠️ Прострочені дедлайни</div>
+    </a>
+    <a href="/admin/sales/salesorder/?shipped_period=month" class="sal-stat">
+      <div class="sal-stat-val" style="color:#4caf50">{{ sales_stats.shipped_month }}</div>
+      <div class="sal-stat-lbl">🚚 Відправлено цього місяця</div>
+    </a>
+  </div>
+
+  <!-- Замовлення -->
+  <div class="sal-section-hdr"><span>📋</span> Замовлення</div>
+  <div class="sal-grid" data-grid-id="sal-orders">
+    <a href="/admin/sales/salesorder/" class="sal-tile" style="--ta:#ff9800" data-tile-id="all-orders">
+      <span class="sal-tile-icon">📋</span>
+      <span class="sal-tile-name">Всі замовлення</span>
+      <span class="sal-tile-sub">Список · фільтри · пошук</span>
+    </a>
+    <a href="/admin/sales/salesorder/add/" class="sal-tile" style="--ta:#4caf50" data-tile-id="add-order">
+      <span class="sal-tile-icon">➕</span>
+      <span class="sal-tile-name">Нове замовлення</span>
+      <span class="sal-tile-sub">Створити SalesOrder</span>
+    </a>
+    <a href="/admin/sales/salesorder/import-excel/" class="sal-tile sal-tile-import" data-tile-id="import-orders">
+      <span class="sal-tile-icon">📥</span>
+      <span class="sal-tile-name">Імпорт замовлень</span>
+      <span class="sal-tile-sub">Excel → Продажі (wizard)</span>
+      <span class="sal-tile-badge">Excel</span>
+    </a>
+    <a href="/admin/sales/salesorder/?status=received" class="sal-tile" style="--ta:#2196f3" data-tile-id="new-orders">
+      <span class="sal-tile-icon">🆕</span>
+      <span class="sal-tile-name">Нові</span>
+      <span class="sal-tile-sub">Очікують обробки</span>
+    </a>
+    <a href="/admin/sales/salesorder/?status=processing" class="sal-tile" style="--ta:#ff9800" data-tile-id="processing-orders">
+      <span class="sal-tile-icon">⚙️</span>
+      <span class="sal-tile-name">В обробці</span>
+      <span class="sal-tile-sub">Готуються до відправки</span>
+    </a>
+    <a href="/admin/sales/salesorder/?shipped_period=month" class="sal-tile" style="--ta:#4caf50" data-tile-id="shipped-orders">
+      <span class="sal-tile-icon">🚚</span>
+      <span class="sal-tile-name">Відправлені</span>
+      <span class="sal-tile-sub">Цього місяця</span>
+    </a>
+    <a href="/admin/sales/salesorder/?status=cancelled" class="sal-tile" style="--ta:#607d8b" data-tile-id="cancelled-orders">
+      <span class="sal-tile-icon">❌</span>
+      <span class="sal-tile-name">Скасовані</span>
+      <span class="sal-tile-sub">Cancelled orders</span>
+    </a>
+  </div>
+
+  <!-- Довідники -->
+  <div class="sal-section-hdr"><span>⚙️</span> Довідники</div>
+  <div class="sal-grid" data-grid-id="sal-ref">
+    <a href="/admin/sales/salessource/" class="sal-tile" style="--ta:#9c27b0" data-tile-id="sources">
+      <span class="sal-tile-icon">🔌</span>
+      <span class="sal-tile-name">Джерела продажів</span>
+      <span class="sal-tile-sub">DigiKey · Nova Poshta · Manual</span>
+    </a>
+    <a href="/admin/sales/salescategory/" class="sal-tile" style="--ta:#607d8b" data-tile-id="categories">
+      <span class="sal-tile-icon">🏷️</span>
+      <span class="sal-tile-name">Категорії</span>
+      <span class="sal-tile-sub">Типи замовлень</span>
+    </a>
+    <a href="/dashboard/import-template/sales/" class="sal-tile" style="--ta:#00bcd4" data-tile-id="excel-template">
+      <span class="sal-tile-icon">📄</span>
+      <span class="sal-tile-name">Шаблон Excel</span>
+      <span class="sal-tile-sub">Завантажити .xlsx для імпорту</span>
+    </a>
+    <a href="/dashboard/help/#sales" class="sal-tile" style="--ta:#607d8b" data-tile-id="help">
+      <span class="sal-tile-icon">📖</span>
+      <span class="sal-tile-name">Довідник</span>
+      <span class="sal-tile-sub">Документація модуля Продажі</span>
+    </a>
+  </div>
+
+  <!-- Недавні дії -->
+  <div class="sal-section-hdr" style="margin-top:8px"><span>🕐</span> Недавні дії</div>
+  {% get_admin_log 10 as admin_log for_user user %}
+  {% if admin_log %}
+  <div class="sal-recent-grid">
+    {% for entry in admin_log %}
+    {% if "sales" in entry.content_type.app_label %}
+    <div class="sal-recent-card">
+      <span class="sal-recent-ico">
+        {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
+      </span>
+      <div class="sal-recent-body">
+        {% if entry.get_admin_url %}
+        <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+        {% else %}
+        <span style="color:#8aa0b0;font-size:12px">{{ entry.object_repr }}</span>
+        {% endif %}
+        <span class="sal-recent-model">{{ entry.content_type }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="sal-empty">Дій ще не виконано.</p>
+  {% endif %}
+
+</div>
+{% include "admin/includes/tile_editor.html" %}
+<script>initTileEditor('sales');</script>
+{% endblock %}

@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sales Dashboard</title>
+  <style>
+    :root { --border:#2a2a2a; --muted:#7a7a7a; --bg:#0f0f10; --card:#161618; --text:#f2f2f2; }
+    body { font-family: Arial, sans-serif; margin: 0; background: var(--bg); color: var(--text); }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    h1 { font-size: 44px; margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 18px; }
+
+    .kpi { display: grid; grid-template-columns: repeat(4, minmax(180px, 1fr)); gap: 12px; margin: 18px 0 22px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+    .card .t { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .card .v { font-size: 30px; font-weight: 700; }
+
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .section { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; }
+    .section h2 { margin: 0 0 10px; font-size: 18px; }
+
+    table { width: 100%; border-collapse: collapse; overflow: hidden; border-radius: 12px; }
+    th, td { padding: 10px 10px; border-bottom: 1px solid #242427; font-size: 13px; vertical-align: top; }
+    th { text-align: left; color: #cfcfcf; font-weight: 600; background: #141416; position: sticky; top: 0; }
+    tr:hover td { background: #151519; }
+    .right { text-align:right; }
+    .badge { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#202024; border:1px solid #2b2b2f; color:#ddd; font-size:12px; }
+    .warn { background:#2b1e14; border-color:#6b3a18; color:#ffd9bf; }
+    .ok { background:#14251a; border-color:#1f6b35; color:#c7ffd8; }
+    .muted { color: var(--muted); }
+    .small { font-size: 12px; }
+
+    @media (max-width: 980px){
+      .kpi { grid-template-columns: repeat(2, 1fr); }
+      .grid2 { grid-template-columns: 1fr; }
+      h1 { font-size: 34px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <h1>Sales Dashboard</h1>
+    <p class="sub">Показує тільки замовлення з <b>affects_stock = true</b> (реальні продажі).</p>
+
+    <div class="kpi">
+      <div class="card">
+        <div class="t">Orders (60d)</div>
+        <div class="v">{{ kpi.orders_60d }}</div>
+      </div>
+      <div class="card">
+        <div class="t">Lines (60d)</div>
+        <div class="v">{{ kpi.lines_60d }}</div>
+      </div>
+      <div class="card">
+        <div class="t">Units (60d)</div>
+        <div class="v">{{ kpi.units_60d }}</div>
+      </div>
+      <div class="card">
+        <div class="t">Unshipped</div>
+        <div class="v">{{ kpi.unshipped_count }}</div>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="section">
+        <h2>Orders by day (last 60 days)</h2>
+        <table>
+          <thead><tr><th>Date</th><th class="right">Orders</th></tr></thead>
+          <tbody>
+            {% for r in orders_by_day %}
+              <tr><td>{{ r.day }}</td><td class="right">{{ r.orders }}</td></tr>
+            {% empty %}
+              <tr><td colspan="2" class="muted small">No data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h2>Orders by Shipping Region (last 60 days)</h2>
+        <table>
+          <thead><tr><th>Region</th><th class="right">Orders</th></tr></thead>
+          <tbody>
+            {% for r in by_region %}
+              <tr><td><span class="badge">{{ r.shipping_region }}</span></td><td class="right">{{ r.orders }}</td></tr>
+            {% empty %}
+              <tr><td colspan="2" class="muted small">No data</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section" style="margin-top:12px;">
+      <h2>Top SKU by quantity (last 60 days)</h2>
+      <table>
+        <thead><tr><th>SKU</th><th>Category</th><th class="right">Qty</th></tr></thead>
+        <tbody>
+          {% for r in top_skus %}
+            <tr>
+              <td><b>{{ r.product__sku }}</b></td>
+              <td><span class="badge">{{ r.product__category }}</span></td>
+              <td class="right">{{ r.qty }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="3" class="muted small">No data</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section" style="margin-top:12px;">
+      <h2>Unshipped orders (latest 50)</h2>
+      <p class="muted small" style="margin-top:-6px;">Замовлення, де <b>shipped_at</b> порожнє.</p>
+      <table>
+        <thead><tr><th>Source</th><th>Order #</th><th>Order date</th><th>Client</th><th>Region</th></tr></thead>
+        <tbody>
+          {% for o in unshipped %}
+            <tr>
+              <td><span class="badge {% if o.shipped_at %}ok{% else %}warn{% endif %}">{{ o.source }}</span></td>
+              <td>{{ o.order_number }}</td>
+              <td>{{ o.order_date }}</td>
+              <td>{{ o.client }}</td>
+              <td><span class="badge">{{ o.shipping_region }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="5" class="muted small">All shipped ✅</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</body>
+</html>

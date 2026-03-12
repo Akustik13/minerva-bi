@@ -1,0 +1,276 @@
+{% extends "admin/base_site.html" %}
+{% block title %}DigiKey Компоненти | Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}">DigiKey Config</a>
+  &rsaquo; Компоненти
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+#content { padding: 0 !important; }
+.dkp-wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 60px; }
+
+.dkp-search {
+  background: #1a2535; border: 1px solid #243347; border-radius: 12px;
+  padding: 24px 28px; margin-bottom: 24px;
+}
+.dkp-title { font-size: 20px; font-weight: 700; color: #c9d8e4; margin-bottom: 6px; }
+.dkp-sub   { font-size: 12px; color: #607d8b; margin-bottom: 16px; }
+.dkp-search form { display: flex; gap: 10px; }
+.dkp-input {
+  flex: 1; background: #111c26; border: 1px solid #2a3f52; color: #c9d8e4;
+  border-radius: 7px; padding: 10px 14px; font-size: 14px;
+  outline: none; transition: border-color .2s;
+}
+.dkp-input:focus { border-color: #4caf50; }
+.dkp-btn {
+  background: #2e7d32; color: #fff; border: none; border-radius: 7px;
+  padding: 10px 22px; font-size: 13px; font-weight: 700; cursor: pointer;
+}
+.dkp-btn:hover { background: #388e3c; }
+
+.dkp-meta { font-size: 12px; color: #607d8b; margin-bottom: 16px; }
+.dkp-meta b { color: #9aafbe; }
+
+.dkp-error {
+  background: rgba(244,67,54,.07); border-left: 4px solid #f44336;
+  border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;
+  font-size: 13px; color: #ef9a9a;
+}
+.dkp-warn {
+  background: rgba(255,152,0,.07); border-left: 4px solid #ff9800;
+  border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;
+  font-size: 13px; color: #ffb74d;
+}
+.dkp-warn a { color: #ffd54f; }
+.dkp-empty {
+  text-align: center; color: #607d8b; font-size: 13px; padding: 40px;
+}
+
+/* Table */
+.dkp-table-wrap {
+  background: #1a2535; border: 1px solid #243347; border-radius: 10px;
+  overflow: hidden; margin-bottom: 20px;
+}
+.dkp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dkp-table th {
+  padding: 10px 14px; text-align: left; font-size: 10px; font-weight: 700;
+  color: #607d8b; text-transform: uppercase; letter-spacing: .04em;
+  background: #162030; border-bottom: 1px solid #243347; white-space: nowrap;
+}
+.dkp-table td {
+  padding: 10px 14px; color: #c9d8e4;
+  border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: top;
+}
+.dkp-table tr:last-child td { border-bottom: none; }
+.dkp-table tr:hover td { background: rgba(255,255,255,.02); }
+
+.dkp-pn { font-family: monospace; font-size: 12px; }
+.dkp-pn a { color: #64b5f6; text-decoration: none; }
+.dkp-pn a:hover { color: #90caf9; text-decoration: underline; }
+.dkp-desc { font-size: 11px; color: #9aafbe; margin-top: 2px; max-width: 260px; }
+
+.dkp-stock-ok   { color: #4caf50; font-weight: 700; }
+.dkp-stock-low  { color: #ff9800; font-weight: 700; }
+.dkp-stock-zero { color: #607d8b; }
+
+.dkp-price { font-family: monospace; font-size: 13px; color: #c9d8e4; }
+.dkp-price-breaks { margin-top: 4px; }
+.dkp-pb-row { font-size: 10px; color: #607d8b; font-family: monospace; }
+.dkp-pb-row span { color: #9aafbe; }
+
+.dkp-lead { font-size: 12px; color: #9aafbe; }
+.dkp-lead-long { color: #ff9800; }
+
+.dkp-status { font-size: 10px; padding: 2px 7px; border-radius: 3px; font-weight: 700; }
+.dkp-active      { background: rgba(76,175,80,.15);  color: #81c784; }
+.dkp-inactive    { background: rgba(244,67,54,.1);   color: #ef9a9a; }
+.dkp-lastchance  { background: rgba(255,152,0,.15);  color: #ffb74d; }
+
+/* Pagination */
+.dkp-pages {
+  display: flex; gap: 10px; align-items: center;
+  font-size: 13px; color: #607d8b;
+}
+.dkp-page-btn {
+  background: #1a2535; border: 1px solid #243347; color: #c9d8e4;
+  border-radius: 6px; padding: 7px 16px; text-decoration: none;
+  font-size: 12px;
+}
+.dkp-page-btn:hover { border-color: #4caf50; color: #4caf50; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dkp-wrap">
+
+  <div class="dkp-search">
+    <div class="dkp-title">📦 DigiKey — Пошук компонентів</div>
+    <div class="dkp-sub">
+      Product Information V4
+      · {% if config.use_sandbox %}<span style="color:#ff9800">Sandbox</span>{% else %}<span style="color:#4caf50">Production</span>{% endif %}
+    </div>
+    <form method="get">
+      <input class="dkp-input" type="text" name="q"
+             value="{{ keywords }}"
+             placeholder="Назва виробника або артикул..."
+             autofocus autocomplete="off">
+      <button class="dkp-btn" type="submit">Знайти</button>
+    </form>
+  </div>
+
+  {% if no_credentials %}
+  <div class="dkp-warn">
+    ⚠️ DigiKey API не налаштовано.
+    <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}">DigiKey Config</a>
+    → заповни Client ID та Client Secret.
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="dkp-error">❌ {{ error }}</div>
+  {% endif %}
+
+  {% if products %}
+  <div class="dkp-meta">
+    Знайдено: <b>{{ total }}</b> компонентів за запитом «{{ keywords }}»
+    · сторінка {{ page }}
+  </div>
+
+  <div class="dkp-table-wrap">
+    <table class="dkp-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>DigiKey PN / Mfr PN</th>
+          <th>Опис</th>
+          <th>В наявності</th>
+          <th>Ціна (1 шт)</th>
+          <th>Цінові сходинки</th>
+          <th>Lead time</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        {% with num=forloop.counter|add:limit|add:"-50" %}
+        <tr>
+          <td style="color:#607d8b">{{ forloop.counter }}</td>
+
+          <td>
+            <div class="dkp-pn">
+              {% with var=p.ProductVariations.0 %}
+              {% if var.DigiKeyProductNumber %}
+                <a href="https://www.digikey.com/en/products/detail/-/-/{{ var.DigiKeyProductNumber }}"
+                   target="_blank">{{ var.DigiKeyProductNumber }}</a>
+              {% else %}—{% endif %}
+              {% endwith %}
+            </div>
+            <div class="dkp-pn" style="color:#9aafbe;margin-top:3px">
+              {{ p.ManufacturerProductNumber|default:"—" }}
+            </div>
+          </td>
+
+          <td>
+            <div style="font-size:12px;color:#c9d8e4;max-width:260px">
+              {{ p.Description.ProductDescription|default:p.Description|default:"—"|truncatechars:90 }}
+            </div>
+            <div style="font-size:10px;color:#607d8b;margin-top:2px">
+              {{ p.Manufacturer.Name|default:"" }}
+            </div>
+          </td>
+
+          <td>
+            {% with qty=p.QuantityAvailable %}
+            {% if qty > 100 %}
+              <span class="dkp-stock-ok">{{ qty }}</span>
+            {% elif qty > 0 %}
+              <span class="dkp-stock-low">{{ qty }}</span>
+            {% else %}
+              <span class="dkp-stock-zero">0</span>
+            {% endif %}
+            {% endwith %}
+          </td>
+
+          <td>
+            {% with var=p.ProductVariations.0 %}
+            {% if var.StandardPricing %}
+              <div class="dkp-price">
+                {{ var.StandardPricing.0.UnitPrice|floatformat:4 }}
+                {{ var.StandardPricing.0.Currency|default:"USD" }}
+              </div>
+            {% elif p.UnitPrice %}
+              <div class="dkp-price">{{ p.UnitPrice|floatformat:4 }}</div>
+            {% else %}
+              <span style="color:#607d8b">—</span>
+            {% endif %}
+            {% endwith %}
+          </td>
+
+          <td>
+            {% with var=p.ProductVariations.0 %}
+            {% if var.StandardPricing %}
+            <div class="dkp-price-breaks">
+              {% for pb in var.StandardPricing|slice:":5" %}
+              <div class="dkp-pb-row">
+                {{ pb.BreakQuantity }}+ →
+                <span>{{ pb.UnitPrice|floatformat:4 }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+
+          <td>
+            {% if p.ManufacturerLeadWeeks %}
+              {% with w=p.ManufacturerLeadWeeks|add:0 %}
+              <span class="dkp-lead {% if p.ManufacturerLeadWeeks > 12 %}dkp-lead-long{% endif %}">
+                {{ p.ManufacturerLeadWeeks }} тиж.
+              </span>
+              {% endwith %}
+            {% else %}
+              <span style="color:#607d8b">—</span>
+            {% endif %}
+          </td>
+
+          <td>
+            {% with s=p.ProductStatus.Status|default:p.ProductStatus|default:"" %}
+            {% if s == "Active" or s == "active" %}
+              <span class="dkp-status dkp-active">Active</span>
+            {% elif s == "Obsolete" or s == "Discontinued" %}
+              <span class="dkp-status dkp-inactive">{{ s }}</span>
+            {% elif s == "Last Time Buy" or s == "LastTimeBuy" %}
+              <span class="dkp-status dkp-lastchance">Last Buy</span>
+            {% elif s %}
+              <span class="dkp-status" style="color:#9aafbe">{{ s }}</span>
+            {% else %}—{% endif %}
+            {% endwith %}
+          </td>
+        </tr>
+        {% endwith %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="dkp-pages">
+    {% if has_prev %}
+    <a href="?q={{ keywords }}&page={{ page|add:"-1" }}" class="dkp-page-btn">← Назад</a>
+    {% endif %}
+    <span>Сторінка {{ page }} · показано {{ products|length }} з {{ total }}</span>
+    {% if has_next %}
+    <a href="?q={{ keywords }}&page={{ page|add:"1" }}" class="dkp-page-btn">Далі →</a>
+    {% endif %}
+  </div>
+
+  {% elif keywords and not error and not no_credentials and products is not None %}
+  <div class="dkp-empty">📭 Нічого не знайдено за запитом «{{ keywords }}»</div>
+  {% endif %}
+
+</div>
+{% endblock %}

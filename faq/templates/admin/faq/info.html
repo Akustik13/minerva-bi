@@ -1,0 +1,718 @@
+{% extends "admin/base_site.html" %}
+
+{% block extrastyle %}
+<style>
+body, #content { background: #1c1c1c !important; color: #e0e0e0 !important; }
+
+/* ── Layout ── */
+.faq-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+.faq-full  { margin-bottom: 20px; }
+
+/* ── Card ── */
+.fq-card {
+  background: #1e2a35;
+  border: 1px solid #2a3f52;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.fq-head {
+  background: #162030;
+  border-bottom: 1px solid #2a3f52;
+  padding: 14px 20px;
+  display: flex; align-items: center; gap: 10px;
+}
+.fq-head .ico { font-size: 20px; }
+.fq-head h3  { color: #7ab3cc !important; font-size: 14px; margin: 0; }
+.fq-body { padding: 18px 20px; }
+
+/* ── FAQ accordion ── */
+.faq-item { border-bottom: 1px solid #243344; }
+.faq-item:last-child { border-bottom: none; }
+.faq-q {
+  width: 100%; text-align: left; background: none; border: none;
+  color: #c9d8e4; font-size: 13px; font-weight: 600;
+  padding: 12px 0; cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.faq-q:hover { color: #7ab3cc; }
+.faq-q .arrow { font-size: 10px; color: #607d8b; transition: transform .2s; }
+.faq-q.open .arrow { transform: rotate(90deg); }
+.faq-a {
+  display: none; color: #9aafbe; font-size: 13px; line-height: 1.7;
+  padding: 0 0 14px;
+}
+.faq-a.open { display: block; }
+.faq-a a { color: #2196f3; text-decoration: none; }
+.faq-a a:hover { text-decoration: underline; }
+.faq-a code {
+  background: #111c26; border: 1px solid #2a3f52; color: #7ab3cc;
+  padding: 1px 6px; border-radius: 4px; font-size: 12px;
+}
+
+/* ── Notes textarea ── */
+.notes-area {
+  width: 100%; min-height: 180px;
+  background: #111c26; border: 1px solid #2a3f52; color: #c9d8e4;
+  border-radius: 6px; padding: 12px; font-size: 13px; line-height: 1.6;
+  resize: vertical; font-family: 'JetBrains Mono', monospace;
+  outline: none;
+}
+.notes-area:focus { border-color: #2196f3; }
+.notes-save {
+  margin-top: 10px;
+  background: #1b3a2b; border: 1px solid #4caf50; color: #4caf50;
+  padding: 7px 18px; border-radius: 6px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all .2s;
+}
+.notes-save:hover { background: #255035; }
+.notes-hint { font-size: 11px; color: #607d8b; margin-top: 8px; }
+
+/* ── Feedback form ── */
+.fb-row { margin-bottom: 14px; }
+.fb-row label { display: block; font-size: 11px; color: #607d8b;
+  font-weight: 600; letter-spacing: .6px; text-transform: uppercase; margin-bottom: 5px; }
+.fb-input, .fb-textarea, .fb-select {
+  width: 100%; background: #111c26; border: 1px solid #2a3f52; color: #c9d8e4;
+  border-radius: 6px; padding: 8px 12px; font-size: 13px; font-family: inherit;
+  outline: none; transition: border-color .2s;
+}
+.fb-select {
+  height: auto !important; min-height: 44px !important;
+  padding: 10px 12px !important; line-height: 1.5 !important;
+}
+.fb-textarea { min-height: 90px; resize: vertical; }
+.fb-input:focus, .fb-textarea:focus, .fb-select:focus { border-color: #2196f3; }
+.fb-btn {
+  background: linear-gradient(135deg, #1565c0, #1976d2);
+  border: none; color: #fff; padding: 8px 20px; border-radius: 6px;
+  font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity .2s;
+}
+.fb-btn:hover { opacity: .85; }
+.fb-success {
+  display: none; background: #1b3a2b; border: 1px solid #4caf50;
+  color: #4caf50; padding: 10px 14px; border-radius: 6px; font-size: 13px;
+  margin-top: 10px;
+}
+
+/* ── License ── */
+.lic-hero {
+  background: linear-gradient(135deg, #0d1b2a, #1a2a3a);
+  border: 1px solid #2a3f52; border-radius: 10px;
+  padding: 28px 32px; text-align: center; margin-bottom: 20px;
+}
+.lic-hero .author-name { font-size: 20px; font-weight: 700; color: #7ab3cc; }
+.lic-hero .author-email {
+  color: #2196f3; font-size: 13px; text-decoration: none;
+  display: inline-block; margin-top: 4px;
+}
+.lic-hero .author-email:hover { text-decoration: underline; }
+.lic-version {
+  display: inline-block; margin-top: 14px;
+  background: #1a2a3a; border: 1px solid #2196f3; color: #2196f3;
+  border-radius: 20px; padding: 4px 18px; font-size: 11px;
+  font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+}
+.lic-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.lic-tab {
+  padding: 6px 18px; border-radius: 6px; border: 1px solid #2a3f52;
+  background: transparent; color: #607d8b; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: all .2s;
+}
+.lic-tab.active { border-color: #2196f3; color: #2196f3; background: rgba(33,150,243,.1); }
+.lic-text {
+  display: none;
+  background: #111c26; border: 1px solid #2a3f52; border-radius: 8px;
+  padding: 20px; color: #9aafbe; font-size: 12px; line-height: 1.9;
+  white-space: pre-line;
+}
+.lic-text.active { display: block; }
+.lic-text strong { color: #c9d8e4; }
+
+/* ── Tag badges ── */
+.tag {
+  display: inline-block; padding: 2px 9px; border-radius: 10px;
+  font-size: 10px; font-weight: 700; letter-spacing: .4px; margin-right: 4px;
+}
+.tag-bug  { background: rgba(248,81,73,.12);  color: #f85149; border: 1px solid rgba(248,81,73,.3); }
+.tag-todo { background: rgba(227,179,65,.12); color: #e3b341; border: 1px solid rgba(227,179,65,.3); }
+.tag-idea { background: rgba(88,166,255,.12); color: #58a6ff; border: 1px solid rgba(88,166,255,.3); }
+
+@media(max-width: 900px) { .faq-wrap { grid-template-columns: 1fr; } }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a>
+  &rsaquo; ❓ FAQ та підтримка
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>❓ FAQ та підтримка</h1>
+
+<!-- ── Main 2-col grid ── -->
+<div class="faq-wrap">
+
+  <!-- LEFT: FAQ -->
+  <div class="fq-card">
+    <div class="fq-head"><span class="ico">💬</span><h3>Часті запитання (FAQ)</h3></div>
+    <div class="fq-body">
+
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Як імпортувати замовлення з Excel? <span class="arrow">▶</span>
+        </button>
+        <div class="faq-a">
+          Перейдіть до <a href="{% url 'admin:sales_salesorder_changelist' %}">Продажі → Замовлення</a>
+          та натисніть кнопку <strong>📥 Імпорт з Excel</strong>. Завантажте файл .xlsx,
+          виберіть аркуш, налаштуйте маппінг колонок та натисніть «Імпортувати».
+          Для перевірки без збереження використайте режим <strong>Dry-run</strong>.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Як імпортувати товари на склад? <span class="arrow">▶</span>
+        </button>
+        <div class="faq-a">
+          Перейдіть до <a href="{% url 'admin:inventory_product_changelist' %}">Склад → Товари</a>
+          та натисніть <strong>📥 Імпорт з Excel</strong>. Підтримується автовизначення
+          колонок SKU, назви, категорії, залишків та ін.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Що таке RFM-аналіз і де його знайти? <span class="arrow">▶</span>
+        </button>
+        <div class="faq-a">
+          RFM (Recency, Frequency, Monetary) — аналіз цінності клієнтів за трьома
+          критеріями. Доступний у <a href="{% url 'admin:crm_customer_changelist' %}">CRM → Клієнти</a>.
+          Скори оновлюються автоматично при зміні замовлень через Django signals.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Як переглянути аналітику і дашборд? <span class="arrow">▶</span>
+        </button>
+        <div class="faq-a">
+          Відкрийте <a href="/dashboard/">Dashboard</a>. Доступна фільтрація за
+          датою (вручну або пресети 30/60/90/365 днів), джерелом замовлень та
+          категорією товарів. Дані оновлюються в реальному часі.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Як додати новий товар на склад? <span class="arrow">▶</span>
+        </button>
+        <div class="faq-a">
+          <a href="{% url 'admin:inventory_product_add' %}">Склад → Товари → + Додати</a>.
+          Обов'язкові поля: <code>SKU</code> і <code>Назва</code>. Після збереження
+          додайте транзакцію (Прихід) для встановлення початкового залишку.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Як позначити замовлення як відправлене? <span class="arrow">▶</span>
+        </button>
+        <div class="faq-a">
+          Відкрийте замовлення в <a href="{% url 'admin:sales_salesorder_changelist' %}">Продажі → Замовлення</a>,
+          заповніть поле <strong>Дата відправки (shipped_at)</strong> та збережіть.
+          Замовлення зникне зі списку невідправлених у Dashboard.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Чому дані на Dashboard не оновились після імпорту? <span class="arrow">▶</span>
+        </button>
+        <div class="faq-a">
+          Перевірте, що поле <strong>affects_stock</strong> у замовленні увімкнено
+          (True). Дашборд фільтрує лише замовлення з <code>affects_stock=True</code>.
+          Також переконайтесь, що <strong>order_date</strong> заповнена і потрапляє
+          в обраний період фільтра.
+        </div>
+      </div>
+
+      <div class="faq-item">
+        <button class="faq-q" onclick="toggleFaq(this)">
+          Що робити якщо міграція конфліктує? <span class="arrow">▶</span>
+        </button>
+        <div class="faq-a">
+          Виконайте: <code>python manage.py migrate &lt;app&gt; &lt;номер&gt; --fake</code>,
+          потім <code>python manage.py migrate</code>.
+          Детально в <strong>CLAUDE.md → Відомі проблеми</strong>.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RIGHT: Feedback + Notes -->
+  <div style="display:flex; flex-direction:column; gap:20px;">
+
+    <!-- Feedback -->
+    <div class="fq-card">
+      <div class="fq-head"><span class="ico">📩</span><h3>Зворотній зв'язок</h3></div>
+      <div class="fq-body">
+        <form id="fb-form" onsubmit="submitFeedback(event)">
+          <div class="fb-row">
+            <label>Тема</label>
+            <select class="fb-select" name="type">
+              <option value="bug">🐛 Помилка / Баг</option>
+              <option value="feature">✨ Нова функція</option>
+              <option value="question">❓ Питання</option>
+              <option value="other">📌 Інше</option>
+            </select>
+          </div>
+          <div class="fb-row">
+            <label>Опис</label>
+            <textarea class="fb-textarea" name="message" placeholder="Опишіть проблему або пропозицію..." required></textarea>
+          </div>
+          <div class="fb-row">
+            <label>Контакт (необов'язково)</label>
+            <input class="fb-input" type="email" name="email" placeholder="email для відповіді">
+          </div>
+          <button type="submit" class="fb-btn">📤 Надіслати</button>
+          <div class="fb-success" id="fb-ok">
+            ✅ Дякуємо! Повідомлення надіслано на <strong>prym.via@gmail.com</strong>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="fq-card">
+      <div class="fq-head"><span class="ico">📋</span><h3>Нотатки / ToDo</h3></div>
+      <div class="fq-body">
+        <textarea class="notes-area" id="notes-area"
+          placeholder="Тут зберігайте нотатки про те, що не працює або потребує доопрацювання...&#10;&#10;Приклади:&#10;🐛 [Bug] ...&#10;📌 [ToDo] ...&#10;💡 [Ідея] ..."></textarea>
+        <button class="notes-save" onclick="saveNotes()">💾 Зберегти нотатки</button>
+        <div class="notes-hint">Нотатки зберігаються локально в браузері (localStorage)</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Issues tracker ── -->
+<style>
+.issues-toolbar {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; flex-wrap: wrap;
+}
+.issues-add-btn {
+  background: rgba(33,150,243,.15); border: 1px solid rgba(33,150,243,.4); color: #2196f3;
+  padding: 6px 16px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .2s;
+}
+.issues-add-btn:hover { background: rgba(33,150,243,.25); }
+.issues-hint { font-size: 11px; color: #607d8b; }
+
+/* Issue table */
+#issues-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#issues-table th {
+  padding: 8px 10px; text-align: left; color: #607d8b;
+  font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
+  border-bottom: 1px solid #2a3f52;
+}
+#issues-table td { padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.04); vertical-align: middle; }
+#issues-table tr:last-child td { border-bottom: none; }
+#issues-table tr:hover td { background: rgba(255,255,255,.02); }
+
+/* Editable cells */
+.iss-desc, .iss-module, .iss-status {
+  background: transparent; border: none; color: #c9d8e4; font-size: 13px;
+  font-family: inherit; width: 100%; outline: none; padding: 2px 4px;
+  border-radius: 4px; transition: background .2s;
+}
+.iss-desc:hover, .iss-module:hover, .iss-status:hover,
+.iss-desc:focus, .iss-module:focus, .iss-status:focus {
+  background: #111c26; border: 1px solid #2a3f52;
+}
+.iss-module, .iss-status { color: #9aafbe; width: auto; }
+
+/* Type select */
+.iss-type {
+  background: transparent; border: none; font-family: inherit; font-size: 12px;
+  font-weight: 700; cursor: pointer; outline: none; padding: 3px 6px;
+  border-radius: 10px; appearance: none; -webkit-appearance: none;
+}
+.iss-type:hover { opacity: .8; }
+.iss-type-bug  { background: rgba(248,81,73,.12);  color: #f85149; border: 1px solid rgba(248,81,73,.3); }
+.iss-type-todo { background: rgba(227,179,65,.12); color: #e3b341; border: 1px solid rgba(227,179,65,.3); }
+.iss-type-idea { background: rgba(88,166,255,.12); color: #58a6ff; border: 1px solid rgba(88,166,255,.3); }
+
+/* Delete btn */
+.iss-del {
+  background: none; border: none; color: #607d8b; cursor: pointer; font-size: 14px;
+  padding: 2px 6px; border-radius: 4px; transition: all .2s; line-height: 1;
+}
+.iss-del:hover { color: #f85149; background: rgba(248,81,73,.1); }
+</style>
+
+<div class="faq-full">
+  <div class="fq-card">
+    <div class="fq-head"><span class="ico">🗂️</span><h3>Відомі проблеми та план доробки</h3></div>
+    <div class="fq-body">
+      <div class="issues-toolbar">
+        <button class="issues-add-btn" onclick="issueAdd()">＋ Додати рядок</button>
+        <span class="issues-hint">Клікніть на будь-яке поле щоб редагувати · Зберігається автоматично</span>
+      </div>
+      <table id="issues-table">
+        <thead>
+          <tr>
+            <th style="width:70px;">Тип</th>
+            <th>Опис</th>
+            <th style="width:110px;">Модуль</th>
+            <th style="width:110px;">Статус</th>
+            <th style="width:32px;"></th>
+          </tr>
+        </thead>
+        <tbody id="issues-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── Services ── -->
+<style>
+.svc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+  margin-top: 4px;
+}
+.svc-card {
+  background: #111c26;
+  border: 1px solid #2a3f52;
+  border-radius: 8px;
+  padding: 16px 18px;
+  transition: border-color .2s;
+}
+.svc-card:hover { border-color: #2196f3; }
+.svc-card .svc-ico { font-size: 22px; margin-bottom: 8px; }
+.svc-card h4 { color: #7ab3cc; font-size: 13px; margin: 0 0 6px; }
+.svc-card p  { color: #9aafbe; font-size: 12px; line-height: 1.6; margin: 0; }
+.svc-contact {
+  margin-top: 18px;
+  background: linear-gradient(135deg, #0d1b2a, #1a2a3a);
+  border: 1px solid #2196f3;
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.svc-contact-text { color: #9aafbe; font-size: 13px; line-height: 1.7; }
+.svc-contact-text strong { color: #c9d8e4; }
+.svc-contact-btn {
+  display: inline-block;
+  background: linear-gradient(135deg, #1565c0, #1976d2);
+  color: #fff !important;
+  text-decoration: none !important;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: opacity .2s;
+}
+.svc-contact-btn:hover { opacity: .85; }
+</style>
+
+<div class="faq-full">
+  <div class="fq-card">
+    <div class="fq-head"><span class="ico">💼</span><h3>Послуги та підтримка</h3></div>
+    <div class="fq-body">
+      <div class="svc-grid">
+
+        <div class="svc-card">
+          <div class="svc-ico">🖥️</div>
+          <h4>Хостинг та розгортання</h4>
+          <p>Налаштування сервера, Docker, SSL, домен. Розгортання Minerva на вашому обладнанні або хмарі.</p>
+        </div>
+
+        <div class="svc-card">
+          <div class="svc-ico">⚙️</div>
+          <h4>Адаптація під бізнес</h4>
+          <p>Налаштування під ваші процеси: поля, статуси, звіти, нові модулі. Minerva підлаштовується під будь-який workflow.</p>
+        </div>
+
+        <div class="svc-card">
+          <div class="svc-ico">🤖</div>
+          <h4>Боти та автоматизація</h4>
+          <p>Telegram-боти, автоімпорт замовлень, синхронізація з маркетплейсами (Amazon, eBay, DigiKey, Nova Poshta).</p>
+        </div>
+
+        <div class="svc-card">
+          <div class="svc-ico">🔗</div>
+          <h4>API-інтеграції</h4>
+          <p>Підключення зовнішніх сервісів: ERP, CRM, платіжні системи, логістика (Jumingo, DHL, UPS, FedEx).</p>
+        </div>
+
+        <div class="svc-card">
+          <div class="svc-ico">🧠</div>
+          <h4>AI-функції</h4>
+          <p>Прогнозування попиту, автоматична сегментація клієнтів, розумні рекомендації reorder на базі ML.</p>
+        </div>
+
+        <div class="svc-card">
+          <div class="svc-ico">🛡️</div>
+          <h4>Підтримка та SLA</h4>
+          <p>Технічна підтримка, резервне копіювання, моніторинг, оновлення системи за підпискою.</p>
+        </div>
+
+      </div>
+
+      <div class="svc-contact">
+        <div class="svc-contact-text">
+          <strong>Зацікавлені в послугах?</strong><br>
+          Напишіть — обговоримо ваші задачі та підберемо оптимальне рішення.<br>
+          <span style="color:#607d8b; font-size:11px;">Відповідь протягом 24 годин · Перша консультація безкоштовно</span>
+        </div>
+        <a href="mailto:prym.via@gmail.com?subject=Minerva%20%E2%80%94%20%D0%97%D0%B0%D0%BF%D0%B8%D1%82%20%D0%BD%D0%B0%20%D0%BF%D0%BE%D1%81%D0%BB%D1%83%D0%B3%D0%B8" class="svc-contact-btn">
+          ✉️ prym.via@gmail.com
+        </a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── License ── -->
+<div class="faq-full">
+  <div class="lic-hero">
+    <div style="font-size:48px; margin-bottom:12px;">🏛️</div>
+    <div style="font-size:12px; color:#607d8b; letter-spacing:1px; text-transform:uppercase; margin-bottom:6px;">Minerva Business Intelligence System</div>
+    <div class="author-name">Viacheslav Pryimak</div>
+    <a class="author-email" href="mailto:prym.via@gmail.com">prym.via@gmail.com</a>
+    <br>
+    <span class="lic-version">© 2024–2026 · Proprietary Software</span>
+  </div>
+
+  <div class="fq-card">
+    <div class="fq-head" onclick="toggleLic()" style="cursor:pointer; user-select:none;">
+      <span class="ico">📜</span>
+      <h3 style="flex:1;">Ліцензійна угода</h3>
+      <span id="lic-arrow" style="font-size:11px; color:#607d8b; transition:transform .2s; display:inline-block;">▼</span>
+    </div>
+    <div class="fq-body" id="lic-body">
+      <div class="lic-tabs">
+        <button class="lic-tab active" onclick="showLic('uk', this)">🇺🇦 Українська</button>
+        <button class="lic-tab"        onclick="showLic('en', this)">🇬🇧 English</button>
+      </div>
+
+      <div id="lic-uk" class="lic-text active"><strong>ЛІЦЕНЗІЙНА УГОДА КІНЦЕВОГО КОРИСТУВАЧА
+Minerva Business Intelligence System</strong>
+
+Версія 1.0 | © 2024–2026 Viacheslav Pryimak
+
+<strong>1. ПРАВО ВЛАСНОСТІ</strong>
+Програмне забезпечення «Minerva Business Intelligence System» (далі — «ПЗ») є власністю
+Viacheslav Pryimak (prym.via@gmail.com) та захищене законами про авторське право.
+
+<strong>2. НАДАНА ЛІЦЕНЗІЯ</strong>
+Власнику надається невиключна, непередавана ліцензія на використання ПЗ виключно
+для власних внутрішніх ділових потреб. Кількість інсталяцій може бути обмежена
+умовами окремої угоди.
+
+<strong>3. ОБМЕЖЕННЯ</strong>
+Заборонено без письмового дозволу автора:
+  — копіювання або відтворення ПЗ повністю чи частково;
+  — продаж, передача або надання в оренду третім особам;
+  — декомпіляція, дизасемблювання або реверс-інжиніринг;
+  — видалення або зміна будь-яких повідомлень про авторські права.
+
+<strong>4. ВІДМОВА ВІД ГАРАНТІЙ</strong>
+ПЗ надається «ЯК Є» без будь-яких явних чи неявних гарантій. Автор не несе
+відповідальності за будь-які прямі, непрямі або випадкові збитки від використання ПЗ.
+
+<strong>5. ПІДТРИМКА ТА ОНОВЛЕННЯ</strong>
+Технічна підтримка та оновлення надаються на розсуд автора. Для зв'язку:
+prym.via@gmail.com
+
+<strong>6. РОЗІРВАННЯ ЛІЦЕНЗІЇ</strong>
+Ліцензія автоматично припиняється при порушенні будь-якого з її положень.</div>
+
+      <div id="lic-en" class="lic-text"><strong>END-USER LICENSE AGREEMENT
+Minerva Business Intelligence System</strong>
+
+Version 1.0 | © 2024–2026 Viacheslav Pryimak
+
+<strong>1. OWNERSHIP</strong>
+The software "Minerva Business Intelligence System" (hereinafter "Software") is the
+proprietary property of Viacheslav Pryimak (prym.via@gmail.com) and is protected
+by copyright law.
+
+<strong>2. GRANT OF LICENSE</strong>
+The owner is granted a non-exclusive, non-transferable license to use the Software
+solely for their own internal business purposes. The number of installations may be
+limited by a separate agreement.
+
+<strong>3. RESTRICTIONS</strong>
+Without prior written permission from the author, you may not:
+  — copy or reproduce the Software in whole or in part;
+  — sell, transfer, or sublicense the Software to third parties;
+  — decompile, disassemble, or reverse-engineer the Software;
+  — remove or alter any copyright notices or proprietary markings.
+
+<strong>4. DISCLAIMER OF WARRANTIES</strong>
+The Software is provided "AS IS" without any express or implied warranties. The author
+shall not be liable for any direct, indirect, or incidental damages arising from the
+use of the Software.
+
+<strong>5. SUPPORT AND UPDATES</strong>
+Technical support and updates are provided at the author's discretion. Contact:
+prym.via@gmail.com
+
+<strong>6. TERMINATION</strong>
+This license terminates automatically upon violation of any of its terms.</div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ── Scripts ── -->
+<script>
+/* ── FAQ accordion ── */
+function toggleFaq(btn) {
+  const ans = btn.nextElementSibling;
+  const isOpen = ans.classList.contains('open');
+  document.querySelectorAll('.faq-a').forEach(a => a.classList.remove('open'));
+  document.querySelectorAll('.faq-q').forEach(b => b.classList.remove('open'));
+  if (!isOpen) { ans.classList.add('open'); btn.classList.add('open'); }
+}
+
+/* ── License collapse ── */
+let licOpen = false;
+function toggleLic() {
+  const body  = document.getElementById('lic-body');
+  const arrow = document.getElementById('lic-arrow');
+  licOpen = !licOpen;
+  body.style.display  = licOpen ? 'block' : 'none';
+  arrow.style.transform = licOpen ? 'rotate(180deg)' : '';
+}
+// collapsed by default
+document.getElementById('lic-body').style.display = 'none';
+
+/* License tabs */
+function showLic(lang, btn) {
+  event.stopPropagation();
+  document.querySelectorAll('.lic-text').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.lic-tab').forEach(b  => b.classList.remove('active'));
+  document.getElementById('lic-' + lang).classList.add('active');
+  btn.classList.add('active');
+}
+
+/* ── Notes persistence ── */
+const NOTES_KEY = 'minerva_notes';
+const notesEl = document.getElementById('notes-area');
+notesEl.value = localStorage.getItem(NOTES_KEY) || '';
+function saveNotes() {
+  localStorage.setItem(NOTES_KEY, notesEl.value);
+  const btn = document.querySelector('.notes-save');
+  btn.textContent = '✅ Збережено!';
+  setTimeout(() => btn.textContent = '💾 Зберегти нотатки', 2000);
+}
+
+/* ── Feedback form ── */
+function submitFeedback(e) {
+  e.preventDefault();
+  const form = e.target;
+  const type = form.type.value;
+  const msg  = form.message.value;
+  const email = form.email.value;
+  const typeLabels = { bug:'🐛 Помилка', feature:'✨ Нова функція', question:'❓ Питання', other:'📌 Інше' };
+  const subject = encodeURIComponent('[Minerva] ' + (typeLabels[type] || type));
+  const body    = encodeURIComponent(msg + (email ? '\n\nВід: ' + email : ''));
+  window.open('mailto:prym.via@gmail.com?subject=' + subject + '&body=' + body);
+  document.getElementById('fb-ok').style.display = 'block';
+  form.reset();
+}
+
+/* ── Issues tracker (localStorage) ── */
+const ISSUES_KEY = 'minerva_issues';
+const TYPE_CFG = {
+  bug:  { label: '🐛 Bug',  cls: 'iss-type-bug'  },
+  todo: { label: '📌 ToDo', cls: 'iss-type-todo' },
+  idea: { label: '💡 Ідея', cls: 'iss-type-idea' },
+};
+const DEFAULT_ISSUES = [
+  { type:'todo', desc:'AI прогнозування попиту — ML-модель по SKU та сезонності',       module:'AI',        status:'Заплановано' },
+  { type:'todo', desc:'Автоматичні рекомендації reorder з урахуванням lead time',        module:'Inventory', status:'Заплановано' },
+  { type:'idea', desc:'ML-сегментація клієнтів RFM + поведінкові патерни',              module:'CRM',       status:'Дослідження' },
+  { type:'idea', desc:'Telegram бот для сповіщень про нові замовлення і критичний склад',module:'Bots',      status:'Дослідження' },
+  { type:'todo', desc:'PDF звіти по замовленнях та рахунки-фактури',                    module:'Sales',     status:'Заплановано' },
+];
+
+function issueLoad() {
+  const raw = localStorage.getItem(ISSUES_KEY);
+  return raw ? JSON.parse(raw) : DEFAULT_ISSUES.map((r,i) => ({...r, id: i+1}));
+}
+function issueSave(data) {
+  localStorage.setItem(ISSUES_KEY, JSON.stringify(data));
+}
+function issueRender() {
+  const data = issueLoad();
+  const tbody = document.getElementById('issues-body');
+  tbody.innerHTML = '';
+  data.forEach(row => {
+    const cfg = TYPE_CFG[row.type] || TYPE_CFG.todo;
+    const tr = document.createElement('tr');
+    tr.dataset.id = row.id;
+    tr.innerHTML = `
+      <td>
+        <select class="iss-type ${cfg.cls}" onchange="issueChangeType(this, ${row.id})">
+          <option value="bug"  ${row.type==='bug'  ? 'selected':''}>🐛 Bug</option>
+          <option value="todo" ${row.type==='todo' ? 'selected':''}>📌 ToDo</option>
+          <option value="idea" ${row.type==='idea' ? 'selected':''}>💡 Ідея</option>
+        </select>
+      </td>
+      <td><input class="iss-desc" value="${escHtml(row.desc)}"   onchange="issueChange(${row.id},'desc',this.value)"   style="width:100%;"></td>
+      <td><input class="iss-module" value="${escHtml(row.module)}" onchange="issueChange(${row.id},'module',this.value)" style="width:90px;"></td>
+      <td><input class="iss-status" value="${escHtml(row.status)}" onchange="issueChange(${row.id},'status',this.value)" style="width:95px;"></td>
+      <td><button class="iss-del" onclick="issueDel(${row.id})" title="Видалити">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function issueChange(id, field, val) {
+  const data = issueLoad();
+  const row = data.find(r => r.id === id);
+  if (row) { row[field] = val; issueSave(data); }
+}
+function issueChangeType(sel, id) {
+  const data = issueLoad();
+  const row = data.find(r => r.id === id);
+  if (!row) return;
+  row.type = sel.value;
+  issueSave(data);
+  // update select style
+  sel.className = 'iss-type ' + (TYPE_CFG[sel.value]||TYPE_CFG.todo).cls;
+}
+function issueDel(id) {
+  if (!confirm('Видалити рядок?')) return;
+  const data = issueLoad().filter(r => r.id !== id);
+  issueSave(data);
+  issueRender();
+}
+function issueAdd() {
+  const data = issueLoad();
+  const maxId = data.reduce((m,r) => Math.max(m, r.id||0), 0);
+  data.push({ id: maxId+1, type:'todo', desc:'Новий запис', module:'', status:'Заплановано' });
+  issueSave(data);
+  issueRender();
+  // focus last row desc
+  const inputs = document.querySelectorAll('.iss-desc');
+  if (inputs.length) { const last = inputs[inputs.length-1]; last.focus(); last.select(); }
+}
+
+issueRender();
+</script>
+{% endblock %}

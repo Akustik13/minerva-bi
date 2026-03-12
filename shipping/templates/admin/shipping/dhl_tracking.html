@@ -1,0 +1,177 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a> &rsaquo;
+  <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}">{{ shipment }}</a> &rsaquo;
+  DHL Трекінг
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+.dhl-wrap { padding: 20px; max-width: 780px; }
+.dhl-hdr {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px; padding-bottom: 12px;
+  border-bottom: 2px solid #ffcc00;
+}
+.dhl-hdr h2 { margin: 0; font-size: 18px; color: #c9d8e4; }
+.dhl-meta { font-size: 12px; color: #607d8b; margin-top: 4px; }
+.badge-dhl {
+  background: #ffcc00; color: #000; padding: 3px 10px;
+  border-radius: 12px; font-size: 12px; font-weight: 700;
+}
+
+/* Status banner */
+.dhl-status-banner {
+  display: flex; align-items: center; gap: 14px;
+  background: #111c26; border: 1px solid #2a3f52;
+  border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;
+}
+.dhl-status-icon { font-size: 32px; line-height: 1; }
+.dhl-status-label {
+  font-size: 15px; font-weight: 700; color: #c9d8e4; text-transform: capitalize;
+}
+.dhl-status-desc { font-size: 12px; color: #9aafbe; margin-top: 3px; }
+.dhl-status-meta { margin-left: auto; text-align: right; font-size: 11px; color: #607d8b; }
+.dhl-status-meta b { color: #9aafbe; display: block; font-size: 12px; }
+
+/* Timeline */
+.dhl-timeline { position: relative; padding-left: 28px; }
+.dhl-timeline::before {
+  content: ''; position: absolute; left: 7px; top: 8px;
+  bottom: 8px; width: 2px; background: #2a3f52;
+}
+.dhl-event {
+  position: relative; margin-bottom: 16px;
+  background: #111c26; border: 1px solid #1e2d3d;
+  border-radius: 7px; padding: 11px 14px;
+}
+.dhl-event::before {
+  content: ''; position: absolute; left: -24px; top: 14px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #2a3f52; border: 2px solid #1e2d3d;
+}
+.dhl-event:first-child::before { background: #4caf50; border-color: #2e6b3e; }
+.dhl-event-time { font-size: 10.5px; color: #607d8b; margin-bottom: 4px; }
+.dhl-event-desc { font-size: 13px; color: #c9d8e4; font-weight: 600; }
+.dhl-event-loc  { font-size: 11px; color: #9aafbe; margin-top: 3px; }
+
+.dhl-error {
+  background: #1a1010; border: 1px solid #c62828; border-radius: 8px;
+  padding: 16px 20px; color: #ef9a9a; margin-top: 12px;
+}
+.dhl-empty { color: #607d8b; font-size: 14px; padding: 20px 0; }
+.dhl-back {
+  display: inline-block; margin-top: 24px;
+  background: #1e2d40; color: #c9d8e4; padding: 8px 18px;
+  border-radius: 6px; text-decoration: none; font-size: 13px;
+}
+.dhl-back:hover { background: #2a3f52; }
+
+/* Status colors */
+.s-delivered  { color: #4caf50; }
+.s-intransit  { color: #2196f3; }
+.s-transit    { color: #2196f3; }
+.s-exception  { color: #ef5350; }
+.s-default    { color: #9aafbe; }
+</style>
+
+<div class="dhl-wrap">
+  <div class="dhl-hdr">
+    <span class="badge-dhl">DHL</span>
+    <div>
+      <h2>Трекінг відправлення</h2>
+      <div class="dhl-meta">
+        Відправлення #{{ shipment.pk }} → {{ shipment.recipient_name }}
+        &nbsp;|&nbsp; Трекінг: <strong style="color:#ffcc00;font-family:monospace">{{ tracking_number }}</strong>
+      </div>
+    </div>
+  </div>
+
+  {% if dhl_error %}
+  <div class="dhl-error">
+    <strong>❌ Помилка DHL API:</strong><br>{{ dhl_error }}
+    {% if "401" in dhl_error or "403" in dhl_error %}
+    <br><small style="color:#607d8b;margin-top:6px;display:block">
+      Перевірте API Key та Secret у налаштуваннях DHL Carrier.
+    </small>
+    {% endif %}
+    {% if "404" in dhl_error %}
+    <br><small style="color:#607d8b;margin-top:6px;display:block">
+      Трекінг-номер не знайдено. Перевірте номер або зачекайте — DHL оновлює дані з затримкою.
+    </small>
+    {% endif %}
+  </div>
+
+  {% else %}
+
+  <!-- Status banner -->
+  {% with status=result.status %}
+  <div class="dhl-status-banner">
+    <div class="dhl-status-icon">
+      {% if status == "delivered" %}✅
+      {% elif status == "transit" or status == "intransit" %}🚚
+      {% elif status == "exception" %}⚠️
+      {% elif status == "pickup" %}📦
+      {% else %}📡{% endif %}
+    </div>
+    <div>
+      <div class="dhl-status-label
+        {% if status == 'delivered' %}s-delivered
+        {% elif status == 'transit' or status == 'intransit' %}s-intransit
+        {% elif status == 'exception' %}s-exception
+        {% else %}s-default{% endif %}">
+        {{ result.status|default:"—" }}
+      </div>
+      <div class="dhl-status-desc">{{ result.description|default:"" }}</div>
+      {% if result.location %}
+      <div style="font-size:11px;color:#607d8b;margin-top:4px">📍 {{ result.location }}</div>
+      {% endif %}
+    </div>
+    <div class="dhl-status-meta">
+      {% if result.estimated_delivery %}
+      <b>Очікувана доставка</b>{{ result.estimated_delivery }}
+      {% endif %}
+      {% if result.proof_of_delivery %}
+      <b style="margin-top:6px">Підпис</b>{{ result.proof_of_delivery }}
+      {% endif %}
+      {% if result.timestamp %}
+      <span style="margin-top:6px;display:block">{{ result.timestamp|slice:":16"|default:"" }}</span>
+      {% endif %}
+    </div>
+  </div>
+  {% endwith %}
+
+  <!-- Timeline -->
+  {% if events %}
+  <h3 style="font-size:13px;color:#9aafbe;margin:0 0 14px;text-transform:uppercase;letter-spacing:.04em">
+    📋 Історія подій ({{ events|length }})
+  </h3>
+  <div class="dhl-timeline">
+    {% for ev in events %}
+    <div class="dhl-event">
+      <div class="dhl-event-time">{{ ev.timestamp|slice:":16" }}</div>
+      <div class="dhl-event-desc">{{ ev.description }}</div>
+      {% if ev.location %}
+      <div class="dhl-event-loc">📍 {{ ev.location }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="dhl-empty">⚠️ Подій трекінгу ще немає.</p>
+  {% endif %}
+
+  {% endif %}
+
+  <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}" class="dhl-back">
+    ← Назад до відправлення
+  </a>
+</div>
+{% endblock %}

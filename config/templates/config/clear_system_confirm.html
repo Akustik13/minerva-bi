@@ -1,0 +1,160 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Очистити систему | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="/dashboard/system/">Система</a>
+  &rsaquo; {% if full %}Повне очищення{% else %}Очистити транзакційні дані{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.cs-wrap { max-width: 620px; margin: 24px auto; }
+.cs-backup-warn {
+  background: #0d2137; border: 1px solid #1565c0;
+  border-left: 4px solid #2196f3; border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 20px;
+  display: flex; align-items: center; gap: 14px;
+}
+.cs-backup-warn-ico { font-size: 24px; flex-shrink: 0; }
+.cs-backup-warn-body { font-size: 13px; color: #9aafbe; flex: 1; }
+.cs-backup-warn-body b { color: #c9d8e4; }
+.cs-backup-btn {
+  padding: 7px 14px; background: #1565c0; color: #fff;
+  border-radius: 6px; font-size: 12px; font-weight: 600;
+  text-decoration: none; white-space: nowrap; flex-shrink: 0;
+}
+
+/* Mode tabs */
+.cs-modes { display: flex; gap: 10px; margin-bottom: 18px; }
+.cs-mode-btn {
+  flex: 1; padding: 10px; border-radius: 8px; text-align: center;
+  text-decoration: none; font-size: 13px; font-weight: 600;
+  border: 2px solid transparent; transition: all .15s;
+}
+.cs-mode-partial { background: #1a2535; color: #ff9800; border-color: {% if not full %}#ff9800{% else %}#243347{% endif %}; }
+.cs-mode-full    { background: #1a2535; color: #ef5350; border-color: {% if full %}#ef5350{% else %}#243347{% endif %}; }
+.cs-mode-btn:hover { opacity: .85; }
+
+.cs-card {
+  background: #1a2535; border: 1px solid #243347;
+  border-top: 4px solid {% if full %}#c62828{% else %}#bf360c{% endif %};
+  border-radius: 8px; padding: 24px 28px;
+}
+.cs-title { font-size: 17px; font-weight: 700; color: #ef9a9a; margin: 0 0 6px; }
+.cs-sub   { font-size: 12px; color: #607d8b; margin: 0 0 18px; }
+
+.cs-section { margin-bottom: 16px; }
+.cs-section-lbl { font-size: 11px; font-weight: 700; color: #607d8b; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.cs-counts { background: #111c26; border: 1px solid #1e2d3d; border-radius: 6px; overflow: hidden; }
+.cs-counts table { width: 100%; border-collapse: collapse; }
+.cs-counts td { padding: 5px 12px; font-size: 12px; border-bottom: 1px solid #1a2535; }
+.cs-counts td:first-child { color: #9aafbe; }
+.cs-counts td:last-child  { text-align: right; font-weight: 700; }
+.cs-count-del  { color: #ef5350; }
+.cs-count-keep { color: #4caf50; }
+.cs-count-zero { color: #455a64; }
+
+.cs-confirm-wrap { margin-top: 20px; }
+.cs-confirm-lbl { font-size: 12px; color: #ef9a9a; margin-bottom: 6px; }
+.cs-confirm-lbl b { font-family: monospace; background: #2a0a0a; padding: 2px 6px; border-radius: 4px; }
+.cs-confirm-input {
+  width: 100%; padding: 9px 12px; background: #0d1117;
+  border: 1px solid #4a1010; border-radius: 6px;
+  color: #ef9a9a; font-size: 14px; font-family: monospace;
+  outline: none; box-sizing: border-box;
+}
+.cs-confirm-input:focus { border-color: #ef5350; }
+
+.cs-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+.btn-cancel { padding: 9px 20px; background: #1e2d3d; color: #9aafbe; border: 1px solid #2a3f52; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
+.btn-clear  { padding: 9px 20px; background: {% if full %}#b71c1c{% else %}#bf360c{% endif %}; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-clear:hover { filter: brightness(1.15); }
+</style>
+
+<div class="cs-wrap">
+
+  <!-- Резервна копія -->
+  <div class="cs-backup-warn">
+    <span class="cs-backup-warn-ico">💾</span>
+    <div class="cs-backup-warn-body">
+      <b>Рекомендуємо зробити резервну копію перед очищенням.</b><br>
+      Ця операція незворотна. Дані не можна відновити без backup.
+    </div>
+    <a href="/admin/backup/backupplaceholder/" class="cs-backup-btn">💾 Backup</a>
+  </div>
+
+  <!-- Вибір режиму -->
+  <div class="cs-modes">
+    <a href="/onboarding/clear-system/?mode=partial" class="cs-mode-btn cs-mode-partial">
+      🗑️ Транзакційні дані<br>
+      <small style="font-weight:400; font-size:11px;">Замовлення, клієнти, рахунки</small>
+    </a>
+    <a href="/onboarding/clear-system/?mode=full" class="cs-mode-btn cs-mode-full">
+      💥 Factory Reset<br>
+      <small style="font-weight:400; font-size:11px;">+ товари, каталог, налаштування</small>
+    </a>
+  </div>
+
+  <div class="cs-card">
+    <div class="cs-title">{% if full %}💥 Повне очищення (Factory Reset){% else %}🗑️ Очищення транзакційних даних{% endif %}</div>
+    <div class="cs-sub">{% if full %}Видаляється ВСЕ. Залишиться лише обліковий запис суперкористувача. Система повернеться до стану після першого запуску.{% else %}Видаляються всі транзакційні дані. Товари, категорії, джерела, налаштування — залишаться.{% endif %}</div>
+
+    <!-- Що видаляється -->
+    <div class="cs-section">
+      <div class="cs-section-lbl">🗑️ Буде видалено</div>
+      <div class="cs-counts">
+        <table>
+          <tr><td>Замовлення</td><td class="{% if counts.orders %}cs-count-del{% else %}cs-count-zero{% endif %}">{{ counts.orders|default:"0" }}</td></tr>
+          <tr><td>Рядки замовлень</td><td class="{% if counts.order_lines %}cs-count-del{% else %}cs-count-zero{% endif %}">{{ counts.order_lines|default:"0" }}</td></tr>
+          <tr><td>Клієнти</td><td class="{% if counts.customers %}cs-count-del{% else %}cs-count-zero{% endif %}">{{ counts.customers|default:"0" }}</td></tr>
+          <tr><td>Транзакції складу</td><td class="{% if counts.transactions %}cs-count-del{% else %}cs-count-zero{% endif %}">{{ counts.transactions|default:"0" }}</td></tr>
+          {% if counts.invoices %}<tr><td>Рахунки</td><td class="cs-count-del">{{ counts.invoices }}</td></tr>{% endif %}
+          {% if counts.payments %}<tr><td>Платежі</td><td class="cs-count-del">{{ counts.payments }}</td></tr>{% endif %}
+          {% if counts.expenses %}<tr><td>Витрати</td><td class="cs-count-del">{{ counts.expenses }}</td></tr>{% endif %}
+          {% if counts.shipments %}<tr><td>Відправлення</td><td class="cs-count-del">{{ counts.shipments }}</td></tr>{% endif %}
+          {% if counts.tasks %}<tr><td>Задачі</td><td class="cs-count-del">{{ counts.tasks }}</td></tr>{% endif %}
+          {% if full %}
+          <tr><td>Товари</td><td class="{% if counts.products %}cs-count-del{% else %}cs-count-zero{% endif %}">{{ counts.products|default:"0" }}</td></tr>
+          <tr><td>Категорії</td><td class="{% if counts.categories %}cs-count-del{% else %}cs-count-zero{% endif %}">{{ counts.categories|default:"0" }}</td></tr>
+          <tr><td>Джерела продажів</td><td class="{% if counts.sources %}cs-count-del{% else %}cs-count-zero{% endif %}">{{ counts.sources|default:"0" }}</td></tr>
+          {% endif %}
+        </table>
+      </div>
+    </div>
+
+    {% if not full %}
+    <!-- Що залишається -->
+    <div class="cs-section">
+      <div class="cs-section-lbl">✅ Залишиться</div>
+      <div class="cs-counts">
+        <table>
+          <tr><td>Товари та категорії</td><td class="cs-count-keep">збережуться</td></tr>
+          <tr><td>Джерела, постачальники</td><td class="cs-count-keep">збережуться</td></tr>
+          <tr><td>Системні налаштування</td><td class="cs-count-keep">збережуться</td></tr>
+          <tr><td>Користувачі</td><td class="cs-count-keep">збережуться</td></tr>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Форма підтвердження -->
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="mode" value="{{ mode }}">
+      <div class="cs-confirm-wrap">
+        <div class="cs-confirm-lbl">Введіть <b>{{ confirm_word }}</b> для підтвердження:</div>
+        <input type="text" name="confirm" class="cs-confirm-input"
+               placeholder="{{ confirm_word }}" autocomplete="off">
+      </div>
+      <div class="cs-actions">
+        <a href="/dashboard/system/" class="btn-cancel">Скасувати</a>
+        <button type="submit" class="btn-clear">{% if full %}💥 Повне очищення{% else %}🗑️ Очистити{% endif %}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

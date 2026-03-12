@@ -1,0 +1,186 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>🔍 DigiKey — Звірка замовлень з базою даних</h1>
+
+{% if error %}
+<div style="background:#7f0000;border-radius:4px;padding:12px 16px;margin-bottom:16px;color:#ffcdd2">❌ {{ error }}</div>
+{% endif %}
+
+{% if not stats %}
+<div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:6px;padding:20px;max-width:520px">
+  <p style="color:#c9d8e4;margin-top:0">
+    Функція порівнює замовлення в DigiKey з базою Minerva і:<br>
+    — оновлює адресу, дати, статус, кур'єра, трекінг, ціни<br>
+    — додає замовлення яких не було в базі<br>
+    — показує детальний звіт змін
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <label style="color:#9aafbe;display:block;margin-bottom:4px">
+      Глибина перевірки (днів назад):
+      <input type="number" name="days_back" id="days_back" value="365" min="0" max="9999"
+             style="background:#111c26;border:1px solid #2a3f52;color:#c9d8e4;
+                    padding:6px 10px;border-radius:4px;margin-left:8px;width:80px">
+    </label>
+    <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">
+      <span style="color:#607d8b;font-size:12px;align-self:center">Швидко:</span>
+
+      <button type="button" onclick="document.getElementById('days_back').value=30"
+              style="background:#2a3f52;color:#9aafbe;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px">30 днів</button>
+      <button type="button" onclick="document.getElementById('days_back').value=90"
+              style="background:#2a3f52;color:#9aafbe;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px">90 днів</button>
+      <button type="button" onclick="document.getElementById('days_back').value=365"
+              style="background:#2a3f52;color:#9aafbe;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px">1 рік</button>
+      <button type="button" onclick="document.getElementById('days_back').value=730"
+              style="background:#2a3f52;color:#9aafbe;border:none;border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px">2 роки</button>
+      <button type="button" onclick="document.getElementById('days_back').value=0"
+              style="background:#1565c0;color:#fff;border:none;border-radius:3px;padding:3px 10px;cursor:pointer;font-size:12px;font-weight:bold">Всі замовлення</button>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button type="submit" name="dry_run" value="1"
+              style="background:#1565c0;color:#fff;padding:10px 20px;
+                     border:none;border-radius:4px;cursor:pointer;font-size:14px">
+        🔍 Перегляд (без змін)
+      </button>
+      <button type="submit" name="dry_run" value="0"
+              style="background:#f57c00;color:#fff;padding:10px 20px;
+                     border:none;border-radius:4px;cursor:pointer;font-size:14px">
+        ✅ Застосувати зміни
+      </button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
+{% if stats %}
+{% if stats.dry_run %}
+<div style="background:#0d2137;border:2px solid #1565c0;border-radius:6px;padding:12px 16px;margin-bottom:16px;color:#90caf9;font-weight:bold">
+  👁 ПЕРЕГЛЯД — зміни НЕ збережені. Натисніть "Застосувати зміни" щоб зберегти.
+</div>
+{% else %}
+<div style="background:#0d2a0d;border:2px solid #2e7d32;border-radius:6px;padding:12px 16px;margin-bottom:16px;color:#a5d6a7;font-weight:bold">
+  ✅ Зміни збережено в базі даних.
+</div>
+{% endif %}
+<!-- Підсумок -->
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px">
+  {% with tiles=stats %}
+  <div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:6px;padding:14px 20px;text-align:center;min-width:120px">
+    <div style="font-size:24px;color:#2196f3;font-weight:bold">{{ stats.checked }}</div>
+    <div style="color:#9aafbe;font-size:12px">Перевірено</div>
+  </div>
+  <div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:6px;padding:14px 20px;text-align:center;min-width:120px">
+    <div style="font-size:24px;color:#4caf50;font-weight:bold">{{ stats.updated }}</div>
+    <div style="color:#9aafbe;font-size:12px">Оновлено</div>
+  </div>
+  <div style="background:#1e2a35;border:1px solid {% if stats.added %}#ff9800{% else %}#2a3f52{% endif %};border-radius:6px;padding:14px 20px;text-align:center;min-width:120px">
+    <div style="font-size:24px;color:{% if stats.added %}#ff9800{% else %}#4caf50{% endif %};font-weight:bold">{{ stats.added|length }}</div>
+    <div style="color:#9aafbe;font-size:12px">Додано нових</div>
+  </div>
+  <div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:6px;padding:14px 20px;text-align:center;min-width:120px">
+    <div style="font-size:24px;color:#607d8b;font-weight:bold">{{ stats.unchanged }}</div>
+    <div style="color:#9aafbe;font-size:12px">Без змін</div>
+  </div>
+  <div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:6px;padding:14px 20px;text-align:center;min-width:120px">
+    <div style="font-size:24px;color:#4caf50;font-weight:bold">{{ stats.lines_updated }}</div>
+    <div style="color:#9aafbe;font-size:12px">Рядків оновлено</div>
+  </div>
+  {% if stats.errors %}
+  <div style="background:#1e2a35;border:1px solid #f44336;border-radius:6px;padding:14px 20px;text-align:center;min-width:120px">
+    <div style="font-size:24px;color:#f44336;font-weight:bold">{{ stats.errors|length }}</div>
+    <div style="color:#9aafbe;font-size:12px">Помилок</div>
+  </div>
+  {% endif %}
+  {% endwith %}
+</div>
+
+<!-- Нові замовлення -->
+{% if stats.added %}
+<div style="background:#1e2a35;border:1px solid #ff9800;border-radius:6px;padding:16px;margin-bottom:16px">
+  <h3 style="color:#ff9800;margin-top:0">➕ Додані нові замовлення ({{ stats.added|length }})</h3>
+  <p style="color:#9aafbe;font-size:13px">Ці замовлення були в DigiKey але відсутні в базі Minerva — їх щойно створено:</p>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+    {% for on in stats.added %}
+    <span style="background:#2a3f52;padding:4px 10px;border-radius:4px;font-family:monospace;color:#ff9800">{{ on }}</span>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Деталі змін -->
+{% if stats.changes %}
+<h3 style="color:#c9d8e4">📝 Оновлені поля ({{ stats.changes|length }} змін)</h3>
+<table style="width:100%;border-collapse:collapse;font-size:13px">
+  <thead>
+    <tr style="background:#162030;color:#9aafbe">
+      <th style="padding:8px 12px;text-align:left">Замовлення</th>
+      <th style="padding:8px 12px;text-align:left">Поле</th>
+      <th style="padding:8px 12px;text-align:left">Було</th>
+      <th style="padding:8px 12px;text-align:left">Стало</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ch in stats.changes %}
+    <tr style="border-bottom:1px solid #1a2a38;color:#c9d8e4">
+      <td style="padding:6px 12px;font-family:monospace;color:#2196f3">{{ ch.order }}</td>
+      <td style="padding:6px 12px;color:#9aafbe">{{ ch.field }}</td>
+      <td style="padding:6px 12px;color:#f44336;max-width:250px;word-break:break-word">{{ ch.old|default:"—" }}</td>
+      <td style="padding:6px 12px;color:#4caf50;max-width:250px;word-break:break-word">{{ ch.new|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% elif stats.updated == 0 and not stats.added %}
+<div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:6px;padding:16px;color:#4caf50">
+  ✅ База даних актуальна — всі замовлення збігаються з DigiKey.
+</div>
+{% endif %}
+
+<!-- Незнайдені SKU -->
+{% if stats.unmatched_skus %}
+<div style="background:#1e2a35;border:1px solid #ff9800;border-radius:6px;padding:16px;margin-top:16px">
+  <h4 style="color:#ff9800;margin-top:0">⚠️ SKU не знайдено в базі товарів ({{ stats.unmatched_skus|length }})</h4>
+  {% for sku in stats.unmatched_skus %}
+  <span style="background:#2a3f52;padding:3px 8px;border-radius:3px;font-family:monospace;color:#ff9800;margin:2px;display:inline-block">{{ sku }}</span>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Помилки -->
+{% if stats.errors %}
+<div style="background:#1e2a35;border:1px solid #f44336;border-radius:6px;padding:16px;margin-top:16px">
+  <h4 style="color:#f44336;margin-top:0">❌ Помилки ({{ stats.errors|length }})</h4>
+  {% for e in stats.errors %}
+  <div style="color:#ffcdd2;font-size:13px;margin-bottom:4px">• {{ e }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<!-- Ще раз -->
+<div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+  {% if stats.dry_run and stats.changes or stats.dry_run and stats.added %}
+  <form method="post" style="display:inline">
+    {% csrf_token %}
+    <input type="hidden" name="days_back" value="{{ stats.days_back }}">
+    <button type="submit" name="dry_run" value="0"
+            style="background:#f57c00;color:#fff;padding:8px 18px;
+                   border:none;border-radius:4px;cursor:pointer">
+      ✅ Застосувати зміни
+    </button>
+  </form>
+  {% endif %}
+  <form method="post" style="display:inline">
+    {% csrf_token %}
+    <input type="hidden" name="days_back" value="{{ stats.days_back }}">
+    <button type="submit" name="dry_run" value="1"
+            style="background:#1565c0;color:#fff;padding:8px 18px;
+                   border:none;border-radius:4px;cursor:pointer">
+      🔄 Перевірити знову
+    </button>
+  </form>
+  <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}" style="color:#9aafbe;text-decoration:none">&larr; Назад</a>
+</div>
+{% endif %}
+
+{% endblock %}

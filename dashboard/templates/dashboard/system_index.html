@@ -1,0 +1,245 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{% block title %}Система | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; Система
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.mv-dash { padding: 16px 20px 40px; }
+
+.mv-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 2px solid #607d8b;
+  font-size: 13px; font-weight: 700; color: #9aafbe;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.mv-section-hdr-icon { font-size: 16px; }
+
+.mv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 10px;
+}
+
+.mv-tile {
+  position: relative;
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid var(--tile-accent, #607d8b);
+  border-radius: 8px;
+  padding: 13px 12px 11px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column;
+  min-height: 95px;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.mv-tile:hover {
+  border-color: var(--tile-accent, #607d8b);
+  border-top-color: var(--tile-accent, #607d8b);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px);
+  background: #1e2d40;
+}
+.mv-tile-icon { font-size: 20px; line-height: 1; margin-bottom: 7px; }
+.mv-tile-name { font-size: 12.5px; font-weight: 600; color: #c9d8e4; line-height: 1.35; flex: 1; }
+.mv-tile-sub { font-size: 10px; color: #607d8b; margin-top: 5px; }
+
+.mv-recent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.mv-recent-card {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 7px; padding: 9px 11px;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.mv-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+.mv-recent-body { min-width: 0; }
+.mv-recent-body a {
+  font-size: 12px; font-weight: 600; color: #58a6ff; text-decoration: none;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mv-recent-body a:hover { text-decoration: underline; }
+.mv-recent-obj { font-size: 12px; color: #8aa0b0; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
+.mv-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+
+/* ── Document tiles: extra info lines ── */
+.mv-tile-detail {
+  font-size: 10px; color: #4a6070; margin-top: 3px;
+  line-height: 1.4; font-style: italic;
+}
+</style>
+
+<div class="mv-dash">
+  <section>
+    <h2 class="mv-section-hdr">
+      <span class="mv-section-hdr-icon">⚙️</span> Система
+      <button id="tile-edit-trigger" onclick="_tileEdit()" style="margin-left:auto">✏️ Налаштувати плитки</button>
+    </h2>
+    <div class="mv-grid" data-grid-id="system-main">
+      <a href="/admin/config/systemsettings/" class="mv-tile" style="--tile-accent:#9c27b0" data-tile-id="system-settings">
+        <span class="mv-tile-icon">⚙️</span>
+        <span class="mv-tile-name">Системні налаштування</span>
+        <span class="mv-tile-sub">Модулі, валюта, компанія</span>
+      </a>
+      <a href="/admin/accounting/companysettings/1/change/" class="mv-tile" style="--tile-accent:#e91e63" data-tile-id="company-settings">
+        <span class="mv-tile-icon">🏢</span>
+        <span class="mv-tile-name">Реквізити компанії</span>
+        <span class="mv-tile-sub">Назва, адреса, IBAN, VAT ID → PDF</span>
+      </a>
+      <a href="/admin/config/notificationsettings/" class="mv-tile" style="--tile-accent:#f44336" data-tile-id="notifications">
+        <span class="mv-tile-icon">📧</span>
+        <span class="mv-tile-name">Email сповіщення</span>
+        <span class="mv-tile-sub">Critical stock, дедлайни доставки</span>
+      </a>
+      <a href="/admin/backup/backupplaceholder/" class="mv-tile" style="--tile-accent:#795548" data-tile-id="backup">
+        <span class="mv-tile-icon">💾</span>
+        <span class="mv-tile-name">Резервне копіювання</span>
+        <span class="mv-tile-sub">Backup налаштування</span>
+      </a>
+      <a href="/admin/auth/" class="mv-tile" style="--tile-accent:#607d8b" data-tile-id="auth">
+        <span class="mv-tile-icon">🔐</span>
+        <span class="mv-tile-name">Аутентифікація та авторизація</span>
+        <span class="mv-tile-sub">Користувачі, групи</span>
+      </a>
+      <a href="/admin/api/apikey/" class="mv-tile" style="--tile-accent:#00bcd4" data-tile-id="api-tokens">
+        <span class="mv-tile-icon">🔑</span>
+        <span class="mv-tile-name">API Токени</span>
+        <span class="mv-tile-sub">Доступ для ботів та інтеграцій</span>
+      </a>
+      <a href="/dashboard/help/" class="mv-tile" style="--tile-accent:#2196f3" data-tile-id="help">
+        <span class="mv-tile-icon">📖</span>
+        <span class="mv-tile-name">Довідник</span>
+        <span class="mv-tile-sub">Документація системи</span>
+      </a>
+      <a href="/onboarding/demo/" class="mv-tile" style="--tile-accent:#ff9800" data-tile-id="demo-data">
+        <span class="mv-tile-icon">🧪</span>
+        <span class="mv-tile-name">Демо-дані</span>
+        <span class="mv-tile-sub">Тестові замовлення та клієнти</span>
+      </a>
+      <a href="/dashboard/import/" class="mv-tile" style="--tile-accent:#00bcd4" data-tile-id="import-hub">
+        <span class="mv-tile-icon">📥</span>
+        <span class="mv-tile-name">Імпорт даних</span>
+        <span class="mv-tile-sub">Excel → Замовлення, Товари</span>
+      </a>
+      <a href="/onboarding/delete-demo/" class="mv-tile" style="--tile-accent:#ff5722" data-tile-id="delete-demo">
+        <span class="mv-tile-icon">🗑️</span>
+        <span class="mv-tile-name">Видалити демо-дані</span>
+        <span class="mv-tile-sub">Тільки тестові записи</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Документи та звітність ── -->
+  <section style="margin-top: 28px;">
+    <h2 class="mv-section-hdr">
+      <span class="mv-section-hdr-icon">📄</span> Документи та звітність
+    </h2>
+    <div class="mv-grid">
+
+      <!-- Packing List -->
+      <a href="/admin/config/documentsettings/1/change/" class="mv-tile" style="--tile-accent:#2196f3" data-tile-id="doc-packing">
+        <span class="mv-tile-icon">📦</span>
+        <span class="mv-tile-name">Пакувальний лист</span>
+        {% if doc_settings %}
+        <span class="mv-tile-sub">
+          {{ doc_settings.get_doc_language_display }} ·
+          {% if doc_settings.packing_list_show_prices %}з цінами{% else %}без цін{% endif %}
+        </span>
+        {% if doc_settings.packing_list_footer_note %}
+        <span class="mv-tile-detail">📝 {{ doc_settings.packing_list_footer_note|truncatechars:38 }}</span>
+        {% endif %}
+        {% else %}
+        <span class="mv-tile-sub">Мова, ціни, нотатка</span>
+        {% endif %}
+      </a>
+
+      <!-- Proforma Invoice -->
+      <a href="/admin/config/documentsettings/1/change/" class="mv-tile" style="--tile-accent:#4caf50" data-tile-id="doc-proforma">
+        <span class="mv-tile-icon">📄</span>
+        <span class="mv-tile-name">Proforma Invoice</span>
+        {% if doc_settings %}
+        <span class="mv-tile-sub">{{ doc_settings.proforma_payment_terms|truncatechars:30 }}</span>
+        {% if doc_settings.proforma_notes %}
+        <span class="mv-tile-detail">📝 {{ doc_settings.proforma_notes|truncatechars:38 }}</span>
+        {% endif %}
+        {% else %}
+        <span class="mv-tile-sub">Умови оплати, примітки</span>
+        {% endif %}
+      </a>
+
+      <!-- CN23 Customs -->
+      <a href="/admin/config/documentsettings/1/change/" class="mv-tile" style="--tile-accent:#ff9800" data-tile-id="doc-cn23">
+        <span class="mv-tile-icon">🛃</span>
+        <span class="mv-tile-name">CN23 Митна декларація</span>
+        {% if doc_settings %}
+        <span class="mv-tile-sub">{{ doc_settings.get_customs_default_type_display|truncatechars:28 }}</span>
+        {% if doc_settings.customs_reason %}
+        <span class="mv-tile-detail">📝 {{ doc_settings.customs_reason|truncatechars:38 }}</span>
+        {% endif %}
+        {% else %}
+        <span class="mv-tile-sub">Тип, опис товару</span>
+        {% endif %}
+      </a>
+
+    </div>
+  </section>
+
+  <!-- ── Очищення системи ── -->
+  <section style="margin-top: 28px;">
+    <h2 class="mv-section-hdr" style="border-color:#c62828;">
+      <span class="mv-section-hdr-icon">⚠️</span> Небезпечна зона
+    </h2>
+    <div style="background:#120a0a; border:1px solid #4a1010; border-radius:8px; padding:16px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:220px;">
+        <div style="font-size:13px; font-weight:700; color:#ef9a9a; margin-bottom:4px;">🗑️ Очистити систему</div>
+        <div style="font-size:12px; color:#8d6e63;">Видалення транзакційних або всіх даних. Перед повним очищенням — зробіть резервну копію.</div>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <a href="/onboarding/clear-system/" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:#bf360c; color:#fff; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none;">🗑️ Транзакційні дані</a>
+        <a href="/onboarding/clear-system/?mode=full" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:#b71c1c; color:#fff; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none;">💥 Factory Reset</a>
+      </div>
+    </div>
+  </section>
+
+  <section style="margin-top: 28px;">
+    <h2 class="mv-section-hdr">
+      <span class="mv-section-hdr-icon">🕐</span> Недавні дії
+    </h2>
+    {% get_admin_log 12 as admin_log for_user user %}
+    {% if admin_log %}
+    <div class="mv-recent-grid">
+      {% for entry in admin_log %}
+      <div class="mv-recent-card">
+        <span class="mv-recent-ico">
+          {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
+        </span>
+        <div class="mv-recent-body">
+          {% if entry.get_admin_url %}
+          <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+          {% else %}
+          <span class="mv-recent-obj">{{ entry.object_repr }}</span>
+          {% endif %}
+          <span class="mv-recent-model">{{ entry.content_type }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="mv-empty">Дій ще не виконано.</p>
+    {% endif %}
+  </section>
+</div>
+{% include "admin/includes/tile_editor.html" %}
+<script>initTileEditor('system');</script>
+{% endblock %}

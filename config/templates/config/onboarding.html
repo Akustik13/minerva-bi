@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Налаштування Minerva</title>
+  <link rel="stylesheet" href="/static/admin/css/base.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      background: #0d1117;
+      color: #c9d8e4;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .ob-wrap {
+      width: 100%; max-width: 600px;
+      padding: 24px 16px;
+    }
+    /* ── Logo / Title ── */
+    .ob-logo {
+      text-align: center; margin-bottom: 32px;
+    }
+    .ob-logo-icon {
+      font-size: 48px; line-height: 1; display: block; margin-bottom: 8px;
+    }
+    .ob-logo h1 {
+      font-size: 24px; font-weight: 800; color: #e6edf3;
+      margin: 0 0 4px;
+    }
+    .ob-logo p {
+      font-size: 13px; color: #607d8b; margin: 0;
+    }
+    /* ── Progress ── */
+    .ob-progress {
+      display: flex; gap: 6px; margin-bottom: 28px; align-items: center;
+    }
+    .ob-step-dot {
+      flex: 1; height: 4px; border-radius: 2px;
+      background: #1e2d3d; transition: background .3s;
+    }
+    .ob-step-dot.active { background: #2196f3; }
+    .ob-step-dot.done   { background: #4caf50; }
+    .ob-step-label {
+      font-size: 11px; color: #607d8b; text-align: center; margin-bottom: 20px;
+    }
+    /* ── Card ── */
+    .ob-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 28px 28px 24px;
+    }
+    .ob-card-title {
+      font-size: 18px; font-weight: 700; color: #e6edf3;
+      margin: 0 0 6px; display: flex; align-items: center; gap: 10px;
+    }
+    .ob-card-sub {
+      font-size: 13px; color: #7d8590; margin: 0 0 24px;
+    }
+    /* ── Fields ── */
+    .ob-field { margin-bottom: 18px; }
+    .ob-label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: #8b949e; margin-bottom: 6px; letter-spacing: .03em;
+    }
+    .ob-input {
+      width: 100%; padding: 9px 12px;
+      background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+      color: #e6edf3; font-size: 14px;
+      transition: border-color .15s;
+      outline: none;
+    }
+    .ob-input:focus { border-color: #2196f3; }
+    select.ob-input { cursor: pointer; }
+    .ob-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    /* ── Checkboxes (modules) ── */
+    .ob-modules { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .ob-mod-card {
+      background: #0d1117; border: 1px solid #30363d; border-radius: 8px;
+      padding: 12px 14px; cursor: pointer;
+      transition: border-color .15s, background .15s;
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    .ob-mod-card:hover { border-color: #2196f3; background: #111820; }
+    .ob-mod-card.selected { border-color: #2196f3; background: #0c1929; }
+    .ob-mod-check {
+      width: 16px; height: 16px; border-radius: 4px;
+      border: 2px solid #30363d; background: #0d1117;
+      flex-shrink: 0; margin-top: 2px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; transition: all .15s;
+    }
+    .ob-mod-card.selected .ob-mod-check {
+      background: #2196f3; border-color: #2196f3; color: #fff;
+    }
+    .ob-mod-icon { font-size: 18px; flex-shrink: 0; }
+    .ob-mod-body {}
+    .ob-mod-name { font-size: 13px; font-weight: 600; color: #c9d8e4; }
+    .ob-mod-desc { font-size: 11px; color: #607d8b; margin-top: 2px; }
+    /* ── Accounting level ── */
+    .ob-level-group { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px; }
+    .ob-level-opt {
+      border: 1px solid #30363d; border-radius: 8px; padding: 10px 12px;
+      cursor: pointer; text-align: center;
+      transition: border-color .15s, background .15s;
+      background: #0d1117;
+    }
+    .ob-level-opt:hover { border-color: #2196f3; }
+    .ob-level-opt.selected { border-color: #2196f3; background: #0c1929; }
+    .ob-level-opt input[type=radio] { display: none; }
+    .ob-level-num { font-size: 20px; font-weight: 800; color: #2196f3; }
+    .ob-level-name { font-size: 11px; font-weight: 600; color: #c9d8e4; margin: 3px 0 2px; }
+    .ob-level-desc { font-size: 10px; color: #607d8b; }
+    /* ── Optional step hint ── */
+    .ob-optional-badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      background: #1e2d3d; color: #607d8b;
+      border-radius: 20px; padding: 2px 8px; margin-left: 8px;
+    }
+    /* ── Buttons ── */
+    .ob-actions {
+      display: flex; gap: 10px; justify-content: flex-end; margin-top: 24px;
+      padding-top: 20px; border-top: 1px solid #21262d;
+    }
+    .ob-btn {
+      padding: 9px 22px; border-radius: 6px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: none; transition: background .15s, opacity .15s;
+    }
+    .ob-btn-primary {
+      background: #2196f3; color: #fff;
+    }
+    .ob-btn-primary:hover { background: #1976d2; }
+    .ob-btn-secondary {
+      background: #21262d; color: #8b949e;
+      border: 1px solid #30363d;
+    }
+    .ob-btn-secondary:hover { background: #2d333b; color: #c9d8e4; }
+    .ob-btn-success {
+      background: #4caf50; color: #fff;
+    }
+    .ob-btn-success:hover { background: #388e3c; }
+    .ob-hint { font-size: 12px; color: #607d8b; margin-top: 6px; }
+  </style>
+</head>
+<body>
+<div class="ob-wrap">
+
+  <!-- Logo -->
+  <div class="ob-logo">
+    <span class="ob-logo-icon">🏛️</span>
+    <h1>Minerva Business Intelligence</h1>
+    <p>Налаштуйте систему за кілька кроків</p>
+  </div>
+
+  <!-- Progress bar -->
+  <div class="ob-progress">
+    <div class="ob-step-dot {% if step > 1 %}done{% elif step == 1 %}active{% endif %}"></div>
+    <div class="ob-step-dot {% if step > 2 %}done{% elif step == 2 %}active{% endif %}"></div>
+    <div class="ob-step-dot {% if step > 3 %}done{% elif step == 3 %}active{% endif %}"></div>
+    <div class="ob-step-dot {% if step > 4 %}done{% elif step == 4 %}active{% endif %}"></div>
+  </div>
+  <div class="ob-step-label">Крок {{ step }} з {{ total_steps }}</div>
+
+  <!-- ═══════════════ STEP 1 — Компанія ═══════════════ -->
+  {% if step == 1 %}
+  <div class="ob-card">
+    <div class="ob-card-title"><span>🏢</span> Ваша компанія</div>
+    <div class="ob-card-sub">Основна інформація — буде відображатися в рахунках та системі</div>
+
+    <form method="POST" action="/onboarding/?step=1" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="1">
+
+      <div class="ob-field">
+        <label class="ob-label">НАЗВА КОМПАНІЇ *</label>
+        <input class="ob-input" type="text" name="company_name"
+               value="{{ data.company_name|default:'' }}"
+               placeholder="Наприклад: ТОВ Акустик або John's Workshop" required>
+      </div>
+
+      <div class="ob-row">
+        <div class="ob-field">
+          <label class="ob-label">ВАЛЮТА ЗА ЗАМОВЧУВАННЯМ</label>
+          <select class="ob-input" name="default_currency">
+            {% for cur in currencies %}
+            <option value="{{ cur }}" {% if data.default_currency == cur %}selected{% elif not data.default_currency and cur == "EUR" %}selected{% endif %}>{{ cur }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="ob-field">
+          <label class="ob-label">ЧАСОВИЙ ПОЯ</label>
+          <select class="ob-input" name="timezone">
+            {% for tz in timezones %}
+            <option value="{{ tz }}" {% if data.timezone == tz %}selected{% elif not data.timezone and tz == "Europe/Kyiv" %}selected{% endif %}>{{ tz }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="ob-field">
+        <label class="ob-label">ЛОГОТИП <span class="ob-optional-badge">необов'язково</span></label>
+        <input class="ob-input" type="file" name="logo" accept="image/*">
+        <div class="ob-hint">PNG або SVG, рекомендований розмір 200×80px</div>
+      </div>
+
+      <div class="ob-actions">
+        <button type="submit" name="action" value="next" class="ob-btn ob-btn-primary">
+          Далі →
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ═══════════════ STEP 2 — Модулі ═══════════════ -->
+  {% elif step == 2 %}
+  <div class="ob-card">
+    <div class="ob-card-title"><span>📦</span> Активні модулі</div>
+    <div class="ob-card-sub">Оберіть модулі, які потрібні вашому бізнесу. Можна змінити пізніше.</div>
+
+    <form method="POST" action="/onboarding/?step=2" id="modulesForm">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="2">
+
+      <div class="ob-modules">
+        {% for key, label, desc in modules %}
+        {% with is_sel=data.enabled_modules %}
+        <div class="ob-mod-card {% if not is_sel or key in is_sel %}selected{% endif %}"
+             onclick="toggleMod(this, '{{ key }}')">
+          <div class="ob-mod-check">{% if not is_sel or key in is_sel %}✓{% endif %}</div>
+          <div>
+            <div class="ob-mod-icon">{{ label|slice:":2" }}</div>
+          </div>
+          <div class="ob-mod-body">
+            <div class="ob-mod-name">{{ label|slice:"3:" }}</div>
+            <div class="ob-mod-desc">{{ desc }}</div>
+          </div>
+          <input type="checkbox" name="modules" value="{{ key }}"
+                 {% if not is_sel or key in is_sel %}checked{% endif %}
+                 style="display:none" id="cb_{{ key }}">
+        </div>
+        {% endwith %}
+        {% endfor %}
+      </div>
+
+      <!-- Accounting level (shown when accounting selected) -->
+      <div id="acc-level-section" style="margin-top:20px; {% if data.enabled_modules and 'accounting' not in data.enabled_modules %}display:none{% endif %}">
+        <label class="ob-label">РІВЕНЬ БУХГАЛТЕРІЇ</label>
+        <div class="ob-level-group">
+          {% for lvl, lname in level_choices %}
+          <label class="ob-level-opt {% if data.accounting_level == lvl %}selected{% elif not data.accounting_level and lvl == 2 %}selected{% endif %}"
+                 onclick="selectLevel(this)">
+            <input type="radio" name="accounting_level" value="{{ lvl }}"
+                   {% if data.accounting_level == lvl %}checked{% elif not data.accounting_level and lvl == 2 %}checked{% endif %}>
+            <div class="ob-level-num">{{ lvl }}</div>
+            <div class="ob-level-name">{{ lname }}</div>
+            <div class="ob-level-desc">
+              {% if lvl == 1 %}Invoice · Payment{% elif lvl == 2 %}+ Витрати · VAT{% else %}+ Журнал{% endif %}
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="ob-actions">
+        <a href="/onboarding/?step=1" class="ob-btn ob-btn-secondary">← Назад</a>
+        <button type="submit" name="action" value="next" class="ob-btn ob-btn-primary">
+          Далі →
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ═══════════════ STEP 3 — Продажі ═══════════════ -->
+  {% elif step == 3 %}
+  <div class="ob-card">
+    <div class="ob-card-title">
+      <span>🛒</span> Перше джерело замовлень
+      <span class="ob-optional-badge">необов'язково</span>
+    </div>
+    <div class="ob-card-sub">Звідки ви отримуєте замовлення? (eBay, Amazon, сайт, телефон тощо)</div>
+
+    <form method="POST" action="/onboarding/?step=3">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="3">
+
+      <div class="ob-field">
+        <label class="ob-label">НАЗВА ДЖЕРЕЛА</label>
+        <input class="ob-input" type="text" name="source_name"
+               value="{{ data.source_name|default:'' }}"
+               placeholder="Наприклад: eBay, Amazon, Сайт, Телефон...">
+      </div>
+
+      <div class="ob-actions">
+        <a href="/onboarding/?step=2" class="ob-btn ob-btn-secondary">← Назад</a>
+        <button type="submit" name="action" value="skip" class="ob-btn ob-btn-secondary">
+          Пропустити
+        </button>
+        <button type="submit" name="action" value="next" class="ob-btn ob-btn-primary">
+          Далі →
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ═══════════════ STEP 4 — Перший товар ═══════════════ -->
+  {% elif step == 4 %}
+  <div class="ob-card">
+    <div class="ob-card-title">
+      <span>🔩</span> Перший товар
+      <span class="ob-optional-badge">необов'язково</span>
+    </div>
+    <div class="ob-card-sub">Додайте перший товар до каталогу, або пропустіть — додасте пізніше</div>
+
+    <form method="POST" action="/onboarding/?step=4">
+      {% csrf_token %}
+      <input type="hidden" name="step" value="4">
+
+      <div class="ob-row">
+        <div class="ob-field">
+          <label class="ob-label">SKU / АРТИКУЛ</label>
+          <input class="ob-input" type="text" name="product_sku"
+                 value="{{ data.product_sku|default:'' }}"
+                 placeholder="Наприклад: PROD-001">
+        </div>
+        <div class="ob-field">
+          <label class="ob-label">ОДИНИЦЯ ВИМІРУ</label>
+          <select class="ob-input" name="product_unit">
+            <option value="шт" {% if data.product_unit == "шт" or not data.product_unit %}selected{% endif %}>шт</option>
+            <option value="кг"  {% if data.product_unit == "кг"  %}selected{% endif %}>кг</option>
+            <option value="л"   {% if data.product_unit == "л"   %}selected{% endif %}>л</option>
+            <option value="м"   {% if data.product_unit == "м"   %}selected{% endif %}>м</option>
+            <option value="уп"  {% if data.product_unit == "уп"  %}selected{% endif %}>уп</option>
+            <option value="компл" {% if data.product_unit == "компл" %}selected{% endif %}>компл</option>
+            <option value="пара"  {% if data.product_unit == "пара"  %}selected{% endif %}>пара</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ob-field">
+        <label class="ob-label">НАЗВА ТОВАРУ</label>
+        <input class="ob-input" type="text" name="product_name"
+               value="{{ data.product_name|default:'' }}"
+               placeholder="Наприклад: Акустична панель 60×60см">
+      </div>
+
+      <div class="ob-actions">
+        <a href="/onboarding/?step=3" class="ob-btn ob-btn-secondary">← Назад</a>
+        <button type="submit" name="action" value="skip" class="ob-btn ob-btn-secondary">
+          Пропустити
+        </button>
+        <button type="submit" name="action" value="finish" class="ob-btn ob-btn-success">
+          ✓ Завершити налаштування
+        </button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+
+</div>
+
+<script>
+function toggleMod(card, key) {
+  card.classList.toggle('selected');
+  var cb = document.getElementById('cb_' + key);
+  cb.checked = card.classList.contains('selected');
+  var check = card.querySelector('.ob-mod-check');
+  check.textContent = cb.checked ? '✓' : '';
+
+  // Show/hide accounting level based on whether accounting is checked
+  if (key === 'accounting') {
+    var sec = document.getElementById('acc-level-section');
+    if (sec) sec.style.display = cb.checked ? '' : 'none';
+  }
+}
+
+function selectLevel(label) {
+  document.querySelectorAll('.ob-level-opt').forEach(function(l) {
+    l.classList.remove('selected');
+  });
+  label.classList.add('selected');
+  label.querySelector('input[type=radio]').checked = true;
+}
+</script>
+</body>
+</html>

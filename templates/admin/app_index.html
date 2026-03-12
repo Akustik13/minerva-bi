@@ -1,0 +1,225 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block crumbs %}
+&rsaquo; {{ app_list.0.name }}
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.mv-dash { padding: 16px 20px 40px; }
+
+.mv-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--sec-accent, #2a4a6a);
+  font-size: 13px; font-weight: 700; color: #9aafbe;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.mv-section-hdr-icon { font-size: 16px; }
+
+.mv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 10px;
+}
+
+.mv-tile {
+  position: relative;
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid var(--tile-accent, #2a4a6a);
+  border-radius: 8px;
+  padding: 13px 12px 11px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column;
+  min-height: 95px;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.mv-tile:hover {
+  border-color: var(--tile-accent, #2196f3);
+  border-top-color: var(--tile-accent, #2196f3);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px);
+  background: #1e2d40;
+}
+.mv-tile-icon { font-size: 20px; line-height: 1; margin-bottom: 7px; }
+.mv-tile-name {
+  font-size: 12.5px; font-weight: 600;
+  color: #c9d8e4; line-height: 1.35; flex: 1;
+}
+.mv-tile-sub { font-size: 10px; color: #607d8b; margin-top: 5px; }
+
+.mv-tile-plus {
+  position: absolute; top: 8px; right: 8px;
+  width: 19px; height: 19px;
+  background: rgba(255,255,255,.07); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,.25); font-size: 13px; line-height: 1;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.mv-tile-plus:hover {
+  background: var(--tile-accent, #2196f3);
+  color: #fff;
+}
+
+.mv-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 8px;
+}
+.mv-recent-card {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 7px; padding: 9px 11px;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.mv-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+.mv-recent-body { min-width: 0; }
+.mv-recent-body a {
+  font-size: 12px; font-weight: 600;
+  color: #58a6ff; text-decoration: none;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mv-recent-body a:hover { text-decoration: underline; }
+.mv-recent-obj {
+  font-size: 12px; color: #8aa0b0;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mv-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
+.mv-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+</style>
+
+<div class="mv-dash">
+  {% for app in app_list %}
+  <section class="mv-section" data-sec="{{ app.app_label }}">
+    <h2 class="mv-section-hdr">
+      <span class="mv-section-hdr-icon" data-sec-icon="{{ app.app_label }}">📄</span>
+      {{ app.name }}
+      <button id="tile-edit-trigger" onclick="_tileEdit()" style="margin-left:auto">✏️ Налаштувати плитки</button>
+    </h2>
+    <div class="mv-grid" data-grid-id="{{ app.app_label }}-main">
+
+      {% if app.app_label == 'bots' %}
+      <a href="/admin/bots/bot/ai-info/" class="mv-tile" style="--tile-accent:#00bcd4"
+         data-tile-id="bots-ai">
+        <span class="mv-tile-icon">🧠</span>
+        <span class="mv-tile-name">AI (Штучний інтелект)</span>
+        <span class="mv-tile-sub">Плани та майбутні функції</span>
+      </a>
+      {% endif %}
+
+      {% if app.app_label == 'faq' %}
+      <a href="/dashboard/help/" class="mv-tile" style="--tile-accent:#607d8b"
+         data-tile-id="faq-help">
+        <span class="mv-tile-icon">📖</span>
+        <span class="mv-tile-name">Довідник</span>
+        <span class="mv-tile-sub">Документація системи</span>
+      </a>
+      {% endif %}
+
+      {% for model in app.models %}
+      <a href="{% if model.admin_url %}{{ model.admin_url }}{% else %}#{% endif %}"
+         class="mv-tile"
+         data-app="{{ app.app_label }}"
+         data-mdl="{{ model.object_name|lower }}"
+         data-tile-id="{{ app.app_label }}-{{ model.object_name|lower }}">
+        <span class="mv-tile-icon" data-tile-icon="{{ app.app_label }}-{{ model.object_name|lower }}">📄</span>
+        <span class="mv-tile-name">{{ model.name }}</span>
+        {% if model.add_url %}
+        <span class="mv-tile-plus" data-add="{{ model.add_url }}" title="{% trans 'Add' %}">＋</span>
+        {% endif %}
+      </a>
+      {% endfor %}
+
+    </div>
+  </section>
+  {% endfor %}
+
+  <section style="margin-top: 28px;">
+    <h2 class="mv-section-hdr" style="border-bottom-color: #607d8b;">
+      <span class="mv-section-hdr-icon">🕐</span> Недавні дії
+    </h2>
+    {% get_admin_log 12 as admin_log for_user user %}
+    {% if admin_log %}
+    <div class="mv-recent-grid">
+      {% for entry in admin_log %}
+      <div class="mv-recent-card">
+        <span class="mv-recent-ico">
+          {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
+        </span>
+        <div class="mv-recent-body">
+          {% if entry.get_admin_url %}
+          <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+          {% else %}
+          <span class="mv-recent-obj">{{ entry.object_repr }}</span>
+          {% endif %}
+          <span class="mv-recent-model">{{ entry.content_type }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="mv-empty">Дій ще не виконано.</p>
+    {% endif %}
+  </section>
+</div>
+
+<script>
+var SEC_ICONS = {
+  crm:'👥', sales:'🛒', inventory:'📦',
+  bots:'🧠', auth:'🔐', backup:'💾', faq:'❓', shipping:'🚚'
+};
+var SEC_ACCENT = {
+  crm:'#9c27b0', sales:'#ff9800', inventory:'#2196f3',
+  bots:'#00bcd4', auth:'#607d8b', backup:'#795548', faq:'#607d8b', shipping:'#4caf50'
+};
+var TILE_ICONS = {
+  'crm-customer':'👤',
+  'sales-salesorder':'📋', 'sales-salesorderline':'📝',
+  'sales-salessource':'🏷️', 'sales-salescategory':'🗂️',
+  'inventory-product':'🔩', 'inventory-productcategory':'🗂️',
+  'inventory-productalias':'🏷️', 'inventory-location':'📍',
+  'inventory-inventorytransaction':'↕️', 'inventory-reorderproxy':'📉',
+  'inventory-supplier':'🏭', 'inventory-purchaseorder':'📋',
+  'inventory-purchaseorderline':'📝',
+  'auth-user':'👤', 'auth-group':'👥',
+  'backup-backupplaceholder':'💾', 'backup-backupsettings':'⚙️',
+  'bots-bot':'🤖', 'bots-novaposhtabot':'📮', 'bots-botlog':'📋',
+  'faq-faqplaceholder':'❓',
+  'shipping-carrier':'🚚', 'shipping-shipment':'📦',
+};
+
+document.querySelectorAll('.mv-section[data-sec]').forEach(function(sec){
+  var app = sec.dataset.sec;
+  var iconEl = sec.querySelector('[data-sec-icon]');
+  if (iconEl) iconEl.textContent = SEC_ICONS[app] || '📄';
+  var accent = SEC_ACCENT[app] || '#2a4a6a';
+  sec.style.setProperty('--sec-accent', accent);
+  sec.querySelectorAll('.mv-tile').forEach(function(tile){
+    tile.style.setProperty('--tile-accent', accent);
+  });
+});
+
+document.querySelectorAll('[data-tile-icon]').forEach(function(el){
+  var key = el.dataset.tileIcon;
+  var app = el.closest('[data-app]');
+  el.textContent = TILE_ICONS[key] || (app && SEC_ICONS[app.dataset.app]) || '📄';
+});
+
+document.querySelectorAll('.mv-tile-plus').forEach(function(btn){
+  btn.addEventListener('click', function(e){
+    e.preventDefault(); e.stopPropagation();
+    window.location.href = btn.dataset.add;
+  });
+});
+</script>
+{% include "admin/includes/tile_editor.html" %}
+<script>initTileEditor('{{ app_list.0.app_label|default:"default" }}');</script>
+{% endblock %}

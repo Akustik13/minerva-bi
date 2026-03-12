@@ -1,0 +1,129 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{% block title %}AI та APIs | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; AI та APIs
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.mv-dash { padding: 16px 20px 40px; }
+
+.mv-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 2px solid #bc8cff;
+  font-size: 13px; font-weight: 700; color: #9aafbe;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+.mv-section-hdr-icon { font-size: 16px; }
+
+.mv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 10px;
+}
+
+.mv-tile {
+  position: relative;
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid var(--tile-accent, #bc8cff);
+  border-radius: 8px;
+  padding: 13px 12px 11px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column;
+  min-height: 95px;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.mv-tile:hover {
+  border-color: var(--tile-accent, #bc8cff);
+  border-top-color: var(--tile-accent, #bc8cff);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px);
+  background: #1e2d40;
+}
+.mv-tile-icon { font-size: 20px; line-height: 1; margin-bottom: 7px; }
+.mv-tile-name { font-size: 12.5px; font-weight: 600; color: #c9d8e4; line-height: 1.35; flex: 1; }
+.mv-tile-sub { font-size: 10px; color: #607d8b; margin-top: 5px; }
+
+.mv-recent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+.mv-recent-card {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 7px; padding: 9px 11px;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.mv-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+.mv-recent-body { min-width: 0; }
+.mv-recent-body a {
+  font-size: 12px; font-weight: 600; color: #58a6ff; text-decoration: none;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mv-recent-body a:hover { text-decoration: underline; }
+.mv-recent-obj { font-size: 12px; color: #8aa0b0; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
+.mv-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+</style>
+
+<div class="mv-dash">
+  <section>
+    <h2 class="mv-section-hdr">
+      <span class="mv-section-hdr-icon">🧠</span> AI та APIs
+    </h2>
+    <div class="mv-grid">
+      <a href="/admin/bots/bot/" class="mv-tile" style="--tile-accent:#bc8cff" data-tile-id="bots-list">
+        <span class="mv-tile-icon">🤖</span>
+        <span class="mv-tile-name">Боти</span>
+        <span class="mv-tile-sub">Управління ботами та розкладом</span>
+      </a>
+      <a href="/admin/api/apikey/" class="mv-tile" style="--tile-accent:#00bcd4" data-tile-id="api-tokens">
+        <span class="mv-tile-icon">🔑</span>
+        <span class="mv-tile-name">API Токени</span>
+        <span class="mv-tile-sub">Ключі доступу для ботів та інтеграцій</span>
+      </a>
+      <a href="/dashboard/api/" class="mv-tile" style="--tile-accent:#4caf50" data-tile-id="api-overview">
+        <span class="mv-tile-icon">🔌</span>
+        <span class="mv-tile-name">API Інтеграції</span>
+        <span class="mv-tile-sub">Огляд всіх API та Developer Console</span>
+      </a>
+    </div>
+  </section>
+
+  <section style="margin-top: 28px;">
+    <h2 class="mv-section-hdr">
+      <span class="mv-section-hdr-icon">🕐</span> Недавні дії
+    </h2>
+    {% get_admin_log 12 as admin_log for_user user %}
+    {% if admin_log %}
+    <div class="mv-recent-grid">
+      {% for entry in admin_log %}
+      <div class="mv-recent-card">
+        <span class="mv-recent-ico">
+          {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
+        </span>
+        <div class="mv-recent-body">
+          {% if entry.get_admin_url %}
+          <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+          {% else %}
+          <span class="mv-recent-obj">{{ entry.object_repr }}</span>
+          {% endif %}
+          <span class="mv-recent-model">{{ entry.content_type }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="mv-empty">Дій ще не виконано.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

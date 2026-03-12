@@ -1,0 +1,343 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Демо-дані | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="/dashboard/system/">Система</a>
+  &rsaquo; Демо-дані
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+.demo-wrap {
+  max-width: 740px;
+  margin: 28px auto;
+}
+.demo-card {
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid #ff9800;
+  border-radius: 10px;
+  padding: 28px 32px;
+  margin-bottom: 16px;
+}
+.demo-card h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0 0 4px;
+}
+.demo-card .sub {
+  font-size: 12px;
+  color: #607d8b;
+  margin: 0 0 20px;
+}
+/* ── Scenario grid ── */
+.scenario-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.scenario-item {
+  position: relative;
+}
+.scenario-item input[type=checkbox] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.scenario-item label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #141f2b;
+  border: 1px solid #1e2d3d;
+  border-radius: 8px;
+  padding: 11px 14px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  user-select: none;
+}
+.scenario-item input:checked + label {
+  border-color: #2196f3;
+  background: #0d1e30;
+}
+.scenario-item label .s-ico {
+  font-size: 18px;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.scenario-item label .s-body {}
+.scenario-item label .s-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c9d8e4;
+  line-height: 1.2;
+}
+.scenario-item label .s-desc {
+  font-size: 11px;
+  color: #607d8b;
+  margin-top: 2px;
+}
+.scenario-item input:checked + label .s-title { color: #58a6ff; }
+.check-all-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.link-btn {
+  font-size: 12px;
+  color: #607d8b;
+  cursor: pointer;
+  text-decoration: underline;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.link-btn:hover { color: #9aafbe; }
+
+/* ── Bulk volumes ── */
+.bulk-card {
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid #4caf50;
+  border-radius: 10px;
+  padding: 22px 32px;
+  margin-bottom: 16px;
+}
+.bulk-card h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e6edf3;
+  margin: 0 0 4px;
+}
+.bulk-card .sub {
+  font-size: 12px;
+  color: #607d8b;
+  margin: 0 0 16px;
+}
+.bulk-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+}
+.bulk-field {
+  flex: 1;
+}
+.bulk-field label {
+  display: block;
+  font-size: 12px;
+  color: #9aafbe;
+  margin-bottom: 5px;
+}
+.bulk-field input[type=number] {
+  width: 100%;
+  background: #111c26;
+  border: 1px solid #1e2d3d;
+  border-radius: 6px;
+  color: #c9d8e4;
+  font-size: 14px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+.bulk-field input[type=number]:focus {
+  outline: none;
+  border-color: #2196f3;
+}
+.bulk-note {
+  font-size: 11px;
+  color: #607d8b;
+  margin-top: 10px;
+}
+
+/* ── Info block ── */
+.demo-info {
+  background: #162030;
+  border: 1px solid #1e2d3d;
+  border-radius: 7px;
+  padding: 11px 14px;
+  font-size: 12px;
+  color: #9aafbe;
+  margin-bottom: 20px;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+}
+.demo-info .wi { font-size: 15px; flex-shrink: 0; }
+
+/* ── Actions ── */
+.demo-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 4px;
+}
+.btn-confirm {
+  padding: 11px 28px;
+  background: linear-gradient(135deg, #e65100, #ff6d00);
+  border: none;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s;
+}
+.btn-confirm:hover { opacity: .85; }
+.btn-cancel {
+  padding: 10px 22px;
+  background: #1a2535;
+  border: 1px solid #2a4a6a;
+  border-radius: 8px;
+  color: #58a6ff;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background .15s;
+}
+.btn-cancel:hover { background: #1e2d40; }
+</style>
+
+<div class="demo-wrap">
+  <form method="post" id="demo-form">
+    {% csrf_token %}
+
+    <!-- Scenario selection -->
+    <div class="demo-card">
+      <h2>🧪 Завантажити демо-дані</h2>
+      <p class="sub">Оберіть сценарії для тестування. Усі дані позначені маркером [demo] і видаляються в один клік.</p>
+
+      <div class="check-all-row">
+        <button type="button" class="link-btn" onclick="setAll(true)">Обрати всі</button>
+        <button type="button" class="link-btn" onclick="setAll(false)">Зняти всі</button>
+      </div>
+
+      <div class="scenario-grid">
+
+        <div class="scenario-item">
+          <input type="checkbox" id="sc-products" name="scenarios" value="products" checked>
+          <label for="sc-products">
+            <span class="s-ico">📦</span>
+            <div class="s-body">
+              <div class="s-title">Товари та категорії</div>
+              <div class="s-desc">12 товарів, 3 категорії, 4 джерела продажів</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="scenario-item">
+          <input type="checkbox" id="sc-customers" name="scenarios" value="customers" checked>
+          <label for="sc-customers">
+            <span class="s-ico">👥</span>
+            <div class="s-body">
+              <div class="s-title">Клієнти CRM</div>
+              <div class="s-desc">10 клієнтів B2B/B2C з DE, AT, PL, CZ, NL</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="scenario-item">
+          <input type="checkbox" id="sc-inventory" name="scenarios" value="inventory" checked>
+          <label for="sc-inventory">
+            <span class="s-ico">🏭</span>
+            <div class="s-body">
+              <div class="s-title">Склад (транзакції)</div>
+              <div class="s-desc">Приходи + списання за відправленими замовленнями</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="scenario-item">
+          <input type="checkbox" id="sc-orders" name="scenarios" value="orders" checked>
+          <label for="sc-orders">
+            <span class="s-ico">🛒</span>
+            <div class="s-body">
+              <div class="s-title">Замовлення продажів</div>
+              <div class="s-desc">~30 замовлень за 90 днів, різні статуси</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="scenario-item">
+          <input type="checkbox" id="sc-accounting" name="scenarios" value="accounting" checked>
+          <label for="sc-accounting">
+            <span class="s-ico">💰</span>
+            <div class="s-body">
+              <div class="s-title">Бухгалтерія</div>
+              <div class="s-desc">Рахунки, платежі, витрати по категоріях</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="scenario-item">
+          <input type="checkbox" id="sc-shipping" name="scenarios" value="shipping" checked>
+          <label for="sc-shipping">
+            <span class="s-ico">🚚</span>
+            <div class="s-body">
+              <div class="s-title">Відправлення</div>
+              <div class="s-desc">Carrier DHL Demo + відправлення по замовленнях</div>
+            </div>
+          </label>
+        </div>
+
+        <div class="scenario-item">
+          <input type="checkbox" id="sc-tasks" name="scenarios" value="tasks" checked>
+          <label for="sc-tasks">
+            <span class="s-ico">✅</span>
+            <div class="s-body">
+              <div class="s-title">Задачі</div>
+              <div class="s-desc">5 задач: алерти складу, дедлайни, CRM</div>
+            </div>
+          </label>
+        </div>
+
+      </div>
+
+      <div class="demo-info">
+        <span class="wi">ℹ️</span>
+        <span>Безпечно — <code>get_or_create</code> не дублює існуючі записи. Усі демо-записи позначені маркером і видаляються через «Видалити демо-дані».</span>
+      </div>
+    </div>
+
+    <!-- Bulk volume -->
+    <div class="bulk-card">
+      <h2>⚡ Масова генерація (навантажувальне тестування)</h2>
+      <p class="sub">Додатково згенерувати N записів. Залишити 0 щоб пропустити.</p>
+      <div class="bulk-row">
+        <div class="bulk-field">
+          <label for="bulk-products">Кількість товарів (DEMO-P-xxxxx)</label>
+          <input type="number" id="bulk-products" name="bulk_products" value="0" min="0" max="10000" placeholder="0">
+        </div>
+        <div class="bulk-field">
+          <label for="bulk-orders">Кількість замовлень (DEMO-xxxxx)</label>
+          <input type="number" id="bulk-orders" name="bulk_orders" value="0" min="0" max="10000" placeholder="0">
+        </div>
+      </div>
+      <p class="bulk-note">Максимум 10 000 за раз. Дані генеруються детерміновано (seed=42) — повторний запуск не створює дублікатів.</p>
+    </div>
+
+    <!-- Actions -->
+    <div class="demo-actions">
+      <button type="submit" class="btn-confirm">▶ Завантажити</button>
+      <a href="/dashboard/system/" class="btn-cancel">Скасувати</a>
+    </div>
+
+  </form>
+</div>
+
+<script>
+function setAll(val) {
+  document.querySelectorAll('#demo-form input[name="scenarios"]').forEach(cb => {
+    cb.checked = val;
+  });
+}
+</script>
+{% endblock %}

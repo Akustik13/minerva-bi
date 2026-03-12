@@ -1,0 +1,205 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:shipping_shipment_changelist' %}">Доставка</a> &rsaquo;
+  Відслідковування
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+.ot-wrap { padding: 20px; }
+.ot-hdr { display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:20px; padding-bottom:12px; border-bottom:2px solid #2a3f52; }
+.ot-hdr h2 { margin:0; font-size:18px; color:#c9d8e4; }
+
+.ot-table { width:100%; border-collapse:collapse; margin-top:8px; font-size:13px; }
+.ot-table th {
+  background:#162030; color:#9aafbe; font-size:11px; text-transform:uppercase;
+  letter-spacing:.04em; padding:10px 12px; text-align:left;
+  border-bottom:2px solid #2a3f52; white-space:nowrap;
+}
+.ot-table td { padding:10px 12px; border-bottom:1px solid #1e2d3d; color:#c9d8e4; vertical-align:middle; }
+.ot-table tr:hover td { background:#1a2535; }
+
+.badge { padding:2px 9px; border-radius:10px; font-size:11px; font-weight:700; white-space:nowrap; }
+.via-badge { font-size:10px; padding:2px 7px; border-radius:8px; font-weight:600; white-space:nowrap; }
+
+.ot-tn { font-family:monospace; font-weight:700; font-size:13px; }
+.ot-tn a { color:#2196f3; text-decoration:none; }
+.ot-tn a:hover { text-decoration:underline; }
+
+.ot-status { font-weight:600; }
+.st-received   { color:#9aafbe; }
+.st-processing { color:#ff9800; }
+.st-shipped    { color:#2196f3; }
+.st-delivered  { color:#4caf50; }
+.st-cancelled  { color:#607d8b; }
+
+.btn-refresh {
+  background:#1e2d40; color:#9aafbe; border:1px solid #2a3f52;
+  border-radius:5px; padding:5px 11px; font-size:11px; font-weight:700;
+  cursor:pointer; white-space:nowrap;
+}
+.btn-refresh:hover { background:#263e55; color:#c9d8e4; }
+.btn-ext {
+  display:inline-block; background:transparent; color:#607d8b;
+  border:1px solid #2a3f52; border-radius:5px; padding:5px 11px;
+  font-size:11px; text-decoration:none; white-space:nowrap;
+}
+.btn-ext:hover { color:#9aafbe; }
+.note-manual {
+  font-size:11px; color:#607d8b; display:inline-flex; align-items:center; gap:4px;
+}
+
+.ot-empty { color:#607d8b; padding:32px 0; text-align:center; font-size:14px; }
+</style>
+
+<div class="ot-wrap">
+  <div class="ot-hdr">
+    <div>
+      <h2>📡 Відслідковування замовлень</h2>
+      <div style="font-size:12px;color:#607d8b;margin-top:4px">
+        Замовлення з трекінг-номерами — авто (DHL) та ручне відслідковування
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <span style="font-size:11px;color:#607d8b">{{ rows|length }} замовлень</span>
+    </div>
+  </div>
+
+  {% if rows %}
+  <table class="ot-table">
+    <thead>
+      <tr>
+        <th>Замовлення</th>
+        <th>Клієнт</th>
+        <th>Трекінг</th>
+        <th>Перевізник</th>
+        <th>Джерело</th>
+        <th>Статус замовлення</th>
+        <th>Дія</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+      <!-- Замовлення -->
+      <td>
+        <a href="{% url 'admin:sales_salesorder_change' row.order.pk %}"
+           style="color:#c9d8e4;font-weight:600;text-decoration:none">
+          {{ row.order.order_number }}
+        </a>
+        <div style="font-size:11px;color:#607d8b">{{ row.order.source }}</div>
+      </td>
+
+      <!-- Клієнт -->
+      <td style="color:#9aafbe">
+        {{ row.order.client|default:"—" }}
+        {% if row.order.addr_country %}
+          <span style="font-size:11px;color:#607d8b"> · {{ row.order.addr_country }}</span>
+        {% endif %}
+      </td>
+
+      <!-- Трекінг -->
+      <td class="ot-tn">
+        {% if row.carrier.url %}
+          <a href="{{ row.carrier.url }}" target="_blank">{{ row.tn }}</a>
+        {% else %}
+          {{ row.tn }}
+        {% endif %}
+      </td>
+
+      <!-- Перевізник -->
+      <td>
+        <span class="badge"
+          style="background:{{ row.carrier.color }};color:{{ row.carrier.text }}">
+          {{ row.carrier.label }}
+        </span>
+        {% if not row.carrier.auto %}
+          <div class="note-manual" style="margin-top:4px">
+            👁️ Ручне відслідковування
+          </div>
+        {% elif row.via_minerva %}
+          <div style="font-size:10px;color:#4caf50;margin-top:3px">✅ Minerva тречить</div>
+        {% endif %}
+      </td>
+
+      <!-- Джерело (Minerva API / зовнішнє) -->
+      <td>
+        {% if row.via_minerva %}
+          <a href="{% url 'admin:shipping_shipment_change' row.shipment.pk %}"
+             class="via-badge" style="background:#1a3a2a;color:#4caf50;border:1px solid #2e7d32;text-decoration:none">
+            🔗 Minerva API
+          </a>
+        {% else %}
+          <span class="via-badge" style="background:#1e2a35;color:#607d8b;border:1px solid #2a3f52">
+            📦 Зовнішнє
+          </span>
+        {% endif %}
+      </td>
+
+      <!-- Статус замовлення -->
+      <td>
+        <span class="ot-status st-{{ row.order.status }}">
+          {{ row.order.get_status_display }}
+        </span>
+        {% if row.order.delivered_at %}
+          <div style="font-size:11px;color:#607d8b">
+            {{ row.order.delivered_at|date:"d.m.Y H:i" }}
+          </div>
+        {% elif row.order.shipped_at %}
+          <div style="font-size:11px;color:#607d8b">
+            відправлено {{ row.order.shipped_at|date:"d.m.Y" }}
+          </div>
+        {% endif %}
+      </td>
+
+      <!-- Дії -->
+      <td style="white-space:nowrap">
+        {% if row.carrier.auto %}
+          <form method="post"
+                action="{% url 'admin:shipping_order_tracking_refresh' row.order.pk %}"
+                style="display:inline">
+            {% csrf_token %}
+            <button class="btn-refresh" type="submit">🔄 Оновити</button>
+          </form>
+          {% if row.carrier.url %}
+            <a href="{{ row.carrier.url }}" target="_blank" class="btn-ext" style="margin-left:4px">🔗</a>
+          {% endif %}
+        {% else %}
+          <!-- Ручне відслідковування → зовнішнє посилання -->
+          {% if row.carrier.url %}
+            <a href="{{ row.carrier.url }}" target="_blank" class="btn-ext">🔗 Перейти</a>
+          {% else %}
+            <span class="note-manual">⚠️ Невідомий — перевір вручну</span>
+          {% endif %}
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="margin-top:16px;font-size:11px;color:#3a5570;line-height:1.7">
+    <b style="color:#607d8b">Легенда:</b>
+    ✅ Minerva тречить = автооновлення через Jumingo або DHL API ·
+    👁️ Ручне = треба перевіряти самостійно ·
+    🔗 Minerva API = відправлення створено через Minerva ·
+    📦 Зовнішнє = трекінг вказаний вручну в замовленні
+  </div>
+
+  {% else %}
+  <div class="ot-empty">
+    📭 Немає замовлень з трекінг-номерами.<br>
+    <small>Трекінг-номер вказується у замовленні → поле «Трекінг-номер».</small>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

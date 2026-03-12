@@ -1,0 +1,94 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Змінити джерело | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:sales_salesorder_changelist' %}">Sales orders</a>
+  &rsaquo; Змінити джерело
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .mv-action-box {
+    max-width: 520px;
+    background: #1a2535; border: 1px solid #243347;
+    border-radius: 10px; padding: 28px 32px;
+    margin: 28px 0;
+  }
+  .mv-action-box h2 {
+    font-size: 16px; font-weight: 700; color: #c9d8e4;
+    margin: 0 0 6px;
+  }
+  .mv-action-box p { font-size: 13px; color: #607d8b; margin: 0 0 20px; }
+  .mv-action-box label {
+    display: block; font-size: 12px; color: #9aafbe;
+    font-weight: 600; margin-bottom: 6px;
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .mv-action-box select {
+    width: 100%; padding: 8px 12px;
+    background: #111c26; border: 1px solid #2a3f52;
+    color: #c9d8e4; border-radius: 6px;
+    font-size: 13px; margin-bottom: 20px;
+  }
+  .mv-action-box .mv-orders-list {
+    background: #111c26; border: 1px solid #2a3f52;
+    border-radius: 6px; padding: 10px 14px;
+    max-height: 160px; overflow-y: auto;
+    margin-bottom: 20px;
+  }
+  .mv-action-box .mv-orders-list div {
+    font-size: 12px; color: #7d8590; padding: 2px 0;
+  }
+  .btn-apply {
+    background: #2196f3; color: #fff; border: none;
+    padding: 9px 22px; border-radius: 6px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    transition: background .15s;
+  }
+  .btn-apply:hover { background: #1976d2; }
+  .btn-cancel {
+    background: transparent; color: #607d8b; border: 1px solid #2a3f52;
+    padding: 9px 22px; border-radius: 6px;
+    font-size: 13px; font-weight: 700; cursor: pointer;
+    margin-left: 10px; text-decoration: none;
+    display: inline-block;
+  }
+</style>
+
+<div class="mv-action-box">
+  <h2>📦 Змінити джерело замовлення</h2>
+  <p>Вибрано <strong style="color:#c9d8e4">{{ queryset.count }}</strong> замовлень</p>
+
+  <form method="post">
+    {% csrf_token %}
+
+    {% for order in queryset %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ order.pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="action_change_source">
+    <input type="hidden" name="apply" value="1">
+
+    <div class="mv-orders-list">
+      {% for order in queryset %}
+      <div>{{ order.source }}:{{ order.order_number }}</div>
+      {% endfor %}
+    </div>
+
+    <label for="id_source_slug">Нове джерело</label>
+    <select name="source_slug" id="id_source_slug">
+      {% for src in sources %}
+      <option value="{{ src.slug }}">{{ src.name }} ({{ src.slug }})</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit" class="btn-apply">✅ Застосувати</button>
+    <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-cancel">Скасувати</a>
+  </form>
+</div>
+{% endblock %}

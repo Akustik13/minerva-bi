@@ -1,0 +1,76 @@
+# ── Python ──────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ── Virtual environment ──────────────────────────────────
+venv/
+env/
+.venv/
+
+# ── Django ───────────────────────────────────────────────
+*.log
+local_settings.py
+staticfiles/
+media/
+
+# ── Database / Backups ───────────────────────────────────
+backups/
+*.sql
+*.sqlite3
+*.db
+
+# ── Secrets — НІКОЛИ не комітити! ────────────────────────
+.env
+.env.local
+.env.production
+
+# ── Dev/test scripts (тимчасові файли) ───────────────────
+test_*.py
+debug_*.py
+exports.py
+*.xlsx
+*.json
+jumingo_rates_raw.json
+redmei.txt
+
+# ── Старі/тимчасові папки ────────────────────────────────
+tabele_fixed/
+data/
+app/
+ai/
+
+# ── IDE / OS ─────────────────────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ── Claude Code ──────────────────────────────────────────
+.claude/
+
+# ── Windows path artifact ────────────────────────────────
+C/
+
+# ── Backup copies of source files ────────────────────────
+*.backup
+*.bak
+
+# ── Old/альтернативні версії файлів ─────────────────────
+inventory/alt/
+dashboard/templates/dashboard/Home Web Temp/
+templates/admin/base_site5.html
+README_v0.md
+redmei.txt
+python
+
+# ── Python файли що потрапили в templates/ ────────────────
+dashboard/templates/dashboard/views.py
+dashboard/templates/dashboard/views1.py
+C/
+python
+C:

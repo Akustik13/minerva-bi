@@ -1,0 +1,208 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{% block title %}👥 CRM | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; CRM
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.crm-dash { padding: 20px 24px 60px; }
+
+.crm-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 28px; padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.crm-header-icon {
+  width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg,rgba(156,39,176,.25),rgba(233,30,99,.15));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.crm-header h1 { font-size: 22px; font-weight: 800; color: #e6edf3; margin: 0 0 3px; }
+.crm-header p  { font-size: 13px; color: #7d8590; margin: 0; }
+
+.crm-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding-bottom: 7px;
+  border-bottom: 2px solid rgba(255,255,255,.07);
+  font-size: 11px; font-weight: 700; color: #7d8590;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+
+.crm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.crm-tile {
+  position: relative;
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid var(--ta, #9c27b0);
+  border-radius: 9px;
+  padding: 15px 14px 13px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column;
+  min-height: 100px;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.crm-tile:hover {
+  border-color: var(--ta, #9c27b0);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px);
+  background: #1e2d40;
+}
+.crm-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
+.crm-tile-name {
+  font-size: 12.5px; font-weight: 600;
+  color: #c9d8e4; line-height: 1.35; flex: 1;
+}
+.crm-tile-sub { font-size: 10px; color: #4a6070; margin-top: 6px; }
+
+/* stat strip */
+.crm-stats {
+  display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.crm-stat {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 9px; padding: 12px 18px; min-width: 130px; flex: 1;
+  text-decoration: none !important;
+  transition: border-color .15s, background .15s;
+}
+.crm-stat:hover { border-color: #2a4060; background: #182233; }
+.crm-stat-val { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.crm-stat-lbl { font-size: 11px; color: #607d8b; margin-top: 3px; }
+
+.crm-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.crm-recent-card {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 7px; padding: 9px 11px;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.crm-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+.crm-recent-body { min-width: 0; }
+.crm-recent-body a {
+  font-size: 12px; font-weight: 600;
+  color: #58a6ff; text-decoration: none;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.crm-recent-body a:hover { text-decoration: underline; }
+.crm-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
+.crm-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+</style>
+
+<div class="crm-dash">
+
+  <!-- Header -->
+  <div class="crm-header">
+    <div class="crm-header-icon">👥</div>
+    <div>
+      <h1>CRM</h1>
+      <p>Клієнти · RFM-аналіз · Сегменти · Нотатки</p>
+    </div>
+    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ Налаштувати плитки</button>
+  </div>
+
+  <!-- Stat strip -->
+  <div class="crm-stats">
+    <a href="/admin/crm/customer/" class="crm-stat">
+      <div class="crm-stat-val" style="color:#9c27b0">{{ crm_stats.total }}</div>
+      <div class="crm-stat-lbl">👥 Всього клієнтів</div>
+    </a>
+    <a href="/admin/crm/customer/?created_at__gte=month" class="crm-stat">
+      <div class="crm-stat-val" style="color:#2196f3">{{ crm_stats.new_month }}</div>
+      <div class="crm-stat-lbl">🆕 Нових за місяць</div>
+    </a>
+    <a href="/admin/crm/customer/?status=vip" class="crm-stat">
+      <div class="crm-stat-val" style="color:#ff9800">{{ crm_stats.vip }}</div>
+      <div class="crm-stat-lbl">⭐ VIP клієнтів</div>
+    </a>
+    <a href="/admin/crm/customer/" class="crm-stat">
+      <div class="crm-stat-val" style="color:#4caf50">{{ crm_stats.countries }}</div>
+      <div class="crm-stat-lbl">🌍 Країн</div>
+    </a>
+  </div>
+
+  <!-- Клієнти -->
+  <div class="crm-section-hdr"><span>👥</span> Клієнти</div>
+  <div class="crm-grid" data-grid-id="crm-main">
+    <a href="/admin/crm/customer/" class="crm-tile" style="--ta:#9c27b0" data-tile-id="all-customers">
+      <span class="crm-tile-icon">👥</span>
+      <span class="crm-tile-name">Всі клієнти</span>
+      <span class="crm-tile-sub">Список · пошук · фільтри</span>
+    </a>
+    <a href="/admin/crm/customer/add/" class="crm-tile" style="--ta:#4caf50" data-tile-id="add-customer">
+      <span class="crm-tile-icon">➕</span>
+      <span class="crm-tile-name">Новий клієнт</span>
+      <span class="crm-tile-sub">Додати Customer</span>
+    </a>
+    <a href="/admin/crm/customer/?status=vip" class="crm-tile" style="--ta:#ff9800" data-tile-id="vip-customers">
+      <span class="crm-tile-icon">⭐</span>
+      <span class="crm-tile-name">VIP клієнти</span>
+      <span class="crm-tile-sub">Пріоритетні клієнти</span>
+    </a>
+    <a href="/admin/crm/customer/?status=active" class="crm-tile" style="--ta:#2196f3" data-tile-id="active-customers">
+      <span class="crm-tile-icon">✅</span>
+      <span class="crm-tile-name">Активні</span>
+      <span class="crm-tile-sub">Статус: активний</span>
+    </a>
+    <a href="/admin/crm/customernote/" class="crm-tile" style="--ta:#607d8b" data-tile-id="notes">
+      <span class="crm-tile-icon">📝</span>
+      <span class="crm-tile-name">Нотатки</span>
+      <span class="crm-tile-sub">Коментарі до клієнтів</span>
+    </a>
+    <a href="/dashboard/help/#crm" class="crm-tile" style="--ta:#607d8b" data-tile-id="help">
+      <span class="crm-tile-icon">📖</span>
+      <span class="crm-tile-name">Довідник</span>
+      <span class="crm-tile-sub">Документація модуля CRM</span>
+    </a>
+  </div>
+
+  <!-- Недавні дії -->
+  <div class="crm-section-hdr" style="margin-top:8px"><span>🕐</span> Недавні дії</div>
+  {% get_admin_log 10 as admin_log for_user user %}
+  {% if admin_log %}
+  <div class="crm-recent-grid">
+    {% for entry in admin_log %}
+    {% if "crm" in entry.content_type.app_label %}
+    <div class="crm-recent-card">
+      <span class="crm-recent-ico">
+        {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
+      </span>
+      <div class="crm-recent-body">
+        {% if entry.get_admin_url %}
+        <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+        {% else %}
+        <span style="color:#8aa0b0;font-size:12px">{{ entry.object_repr }}</span>
+        {% endif %}
+        <span class="crm-recent-model">{{ entry.content_type }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="crm-empty">Дій ще не виконано.</p>
+  {% endif %}
+
+</div>
+{% include "admin/includes/tile_editor.html" %}
+<script>initTileEditor('crm');</script>
+{% endblock %}

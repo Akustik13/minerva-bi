@@ -1,0 +1,51 @@
+{% extends "admin/change_list.html" %}
+
+{% block extrahead %}{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var sel = document.querySelector('select[name="action"]');
+  if (!sel) return;
+
+  var GROUPS = [
+    { label: '🔄 Статус',   match: 'Статус →' },
+    { label: '🏷️ Сегмент',  match: 'Сегмент →' },
+  ];
+
+  var allOpts = Array.from(sel.options);
+  var placeholder = allOpts[0];
+  var remaining   = allOpts.slice(1);
+
+  sel.innerHTML = '';
+  sel.appendChild(placeholder);
+
+  GROUPS.forEach(function (g) {
+    var matched = remaining.filter(function (o) { return o.text.indexOf(g.match) !== -1; });
+    if (!matched.length) return;
+    var og = document.createElement('optgroup');
+    og.label = g.label;
+    matched.forEach(function (o) { og.appendChild(o); });
+    sel.appendChild(og);
+    remaining = remaining.filter(function (o) { return matched.indexOf(o) === -1; });
+  });
+
+  if (remaining.length) {
+    var og = document.createElement('optgroup');
+    og.label = '⚙️ Адмін';
+    remaining.forEach(function (o) { og.appendChild(o); });
+    sel.appendChild(og);
+  }
+});
+</script>
+{% endblock %}
+
+{% block object-tools-items %}
+    {{ block.super }}
+    <li>
+        <a href="{% url 'admin:crm_customer_sync' %}"
+           style="background:#2196f3;color:white;padding:8px 16px;border-radius:6px;
+                  text-decoration:none;font-weight:600;display:inline-block"
+           onclick="return confirm('Синхронізувати всіх клієнтів з замовлень? Це може зайняти кілька секунд.')">
+            🔄 Синхронізація CRM
+        </a>
+    </li>
+{% endblock %}

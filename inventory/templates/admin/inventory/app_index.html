@@ -1,0 +1,279 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{% block title %}📦 Склад | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; Склад
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.inv-dash { padding: 20px 24px 60px; }
+
+.inv-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 28px; padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.inv-header-icon {
+  width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg,rgba(33,150,243,.25),rgba(0,188,212,.15));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.inv-header h1 { font-size: 22px; font-weight: 800; color: #e6edf3; margin: 0 0 3px; }
+.inv-header p  { font-size: 13px; color: #7d8590; margin: 0; }
+
+.inv-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding-bottom: 7px;
+  border-bottom: 2px solid rgba(255,255,255,.07);
+  font-size: 11px; font-weight: 700; color: #7d8590;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+
+.inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.inv-tile {
+  position: relative;
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid var(--ta, #2196f3);
+  border-radius: 9px;
+  padding: 15px 14px 13px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column;
+  min-height: 100px;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.inv-tile:hover {
+  border-color: var(--ta, #2196f3);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px);
+  background: #1e2d40;
+}
+.inv-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
+.inv-tile-name {
+  font-size: 12.5px; font-weight: 600;
+  color: #c9d8e4; line-height: 1.35; flex: 1;
+}
+.inv-tile-sub { font-size: 10px; color: #4a6070; margin-top: 6px; }
+.inv-tile-badge {
+  position: absolute; top: 9px; right: 10px;
+  font-size: 10px; font-weight: 700;
+  background: var(--ta, #2196f3);
+  color: #fff; border-radius: 20px;
+  padding: 1px 7px; opacity: .85;
+}
+
+/* stat strip */
+.inv-stats {
+  display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.inv-stat {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 9px; padding: 12px 18px; min-width: 130px; flex: 1;
+  text-decoration: none !important;
+  transition: border-color .15s, background .15s;
+}
+.inv-stat:hover { border-color: #2a4060; background: #182233; }
+.inv-stat-val { font-size: 22px; font-weight: 800; line-height: 1.1; }
+.inv-stat-lbl { font-size: 11px; color: #607d8b; margin-top: 3px; }
+
+/* import tile */
+.inv-tile-import {
+  border-top-color: #00bcd4 !important;
+  --ta: #00bcd4;
+  background: linear-gradient(160deg,#0d2535,#0a2030) !important;
+}
+.inv-tile-import:hover { background: linear-gradient(160deg,#112d3d,#0d2535) !important; }
+
+.inv-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.inv-recent-card {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 7px; padding: 9px 11px;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.inv-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+.inv-recent-body { min-width: 0; }
+.inv-recent-body a {
+  font-size: 12px; font-weight: 600;
+  color: #58a6ff; text-decoration: none;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.inv-recent-body a:hover { text-decoration: underline; }
+.inv-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
+.inv-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+</style>
+
+<div class="inv-dash">
+
+  <!-- Header -->
+  <div class="inv-header">
+    <div class="inv-header-icon">📦</div>
+    <div>
+      <h1>Склад</h1>
+      <p>Товари · Залишки · Транзакції · Reorder · Постачальники · Імпорт Excel</p>
+    </div>
+    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ Налаштувати плитки</button>
+  </div>
+
+  <!-- Stat strip -->
+  <div class="inv-stats">
+    <a href="/admin/inventory/reorderproxy/" class="inv-stat">
+      <div class="inv-stat-val" style="color:#f44336">{{ inventory_stats.critical }}</div>
+      <div class="inv-stat-lbl">⚠️ Нижче reorder point</div>
+    </a>
+    <a href="/admin/inventory/purchaseorder/" class="inv-stat">
+      <div class="inv-stat-val" style="color:#ff9800">{{ inventory_stats.active_po }}</div>
+      <div class="inv-stat-lbl">📋 Активних PO</div>
+    </a>
+    <a href="/admin/inventory/inventorytransaction/" class="inv-stat">
+      <div class="inv-stat-val" style="color:#2196f3">{{ inventory_stats.tx_today }}</div>
+      <div class="inv-stat-lbl">🔄 Транзакцій сьогодні</div>
+    </a>
+    <a href="/admin/inventory/product/" class="inv-stat">
+      <div class="inv-stat-val" style="color:#4caf50">{{ inventory_stats.active_products }}</div>
+      <div class="inv-stat-lbl">📦 Активних товарів</div>
+    </a>
+  </div>
+
+  <!-- Товари -->
+  <div class="inv-section-hdr"><span>🗃️</span> Товари</div>
+  <div class="inv-grid" data-grid-id="inv-products">
+    <a href="/admin/inventory/product/" class="inv-tile" style="--ta:#2196f3" data-tile-id="all-products">
+      <span class="inv-tile-icon">📦</span>
+      <span class="inv-tile-name">Всі товари</span>
+      <span class="inv-tile-sub">Список · пошук · фільтри</span>
+    </a>
+    <a href="/admin/inventory/product/add/" class="inv-tile" style="--ta:#4caf50" data-tile-id="add-product">
+      <span class="inv-tile-icon">➕</span>
+      <span class="inv-tile-name">Новий товар</span>
+      <span class="inv-tile-sub">Додати Product</span>
+    </a>
+    <a href="/admin/inventory/product/import-excel/" class="inv-tile inv-tile-import" data-tile-id="import-products">
+      <span class="inv-tile-icon">📥</span>
+      <span class="inv-tile-name">Імпорт товарів</span>
+      <span class="inv-tile-sub">Excel → Склад (wizard)</span>
+      <span class="inv-tile-badge">Excel</span>
+    </a>
+    <a href="/admin/inventory/productcategory/" class="inv-tile" style="--ta:#607d8b" data-tile-id="categories">
+      <span class="inv-tile-icon">🗂️</span>
+      <span class="inv-tile-name">Категорії товарів</span>
+      <span class="inv-tile-sub">Довідник категорій</span>
+    </a>
+    <a href="/admin/inventory/reorderproxy/" class="inv-tile" style="--ta:#ff9800" data-tile-id="reorder">
+      <span class="inv-tile-icon">⚠️</span>
+      <span class="inv-tile-name">Reorder-аналіз</span>
+      <span class="inv-tile-sub">Критичні залишки</span>
+    </a>
+    <a href="/dashboard/import-template/inventory/" class="inv-tile" style="--ta:#00bcd4" data-tile-id="excel-template">
+      <span class="inv-tile-icon">📄</span>
+      <span class="inv-tile-name">Шаблон Excel</span>
+      <span class="inv-tile-sub">Завантажити .xlsx для імпорту</span>
+    </a>
+    <a href="/dashboard/help/#inventory" class="inv-tile" style="--ta:#607d8b" data-tile-id="help">
+      <span class="inv-tile-icon">📖</span>
+      <span class="inv-tile-name">Довідник</span>
+      <span class="inv-tile-sub">Документація модуля Склад</span>
+    </a>
+  </div>
+
+  <!-- Рух товару -->
+  <div class="inv-section-hdr"><span>🔄</span> Рух товару</div>
+  <div class="inv-grid" data-grid-id="inv-tx">
+    <a href="/admin/inventory/inventorytransaction/" class="inv-tile" style="--ta:#00bcd4" data-tile-id="all-transactions">
+      <span class="inv-tile-icon">🔄</span>
+      <span class="inv-tile-name">Всі транзакції</span>
+      <span class="inv-tile-sub">Прихід · витрата · коригування</span>
+    </a>
+    <a href="/admin/inventory/inventorytransaction/?tx_type=RECEIPT" class="inv-tile" style="--ta:#4caf50" data-tile-id="receipt">
+      <span class="inv-tile-icon">📥</span>
+      <span class="inv-tile-name">Прихід</span>
+      <span class="inv-tile-sub">Отримані товари</span>
+    </a>
+    <a href="/admin/inventory/inventorytransaction/?tx_type=SHIPMENT" class="inv-tile" style="--ta:#f44336" data-tile-id="shipment">
+      <span class="inv-tile-icon">📤</span>
+      <span class="inv-tile-name">Витрата</span>
+      <span class="inv-tile-sub">Відвантажені товари</span>
+    </a>
+    <a href="/admin/inventory/inventorytransaction/?tx_type=ADJUSTMENT" class="inv-tile" style="--ta:#9c27b0" data-tile-id="adjustment">
+      <span class="inv-tile-icon">⚖️</span>
+      <span class="inv-tile-name">Коригування</span>
+      <span class="inv-tile-sub">Ревізія · інвентаризація</span>
+    </a>
+  </div>
+
+  <!-- Закупівлі -->
+  <div class="inv-section-hdr"><span>🏭</span> Постачальники та закупівлі</div>
+  <div class="inv-grid" data-grid-id="inv-po">
+    <a href="/admin/inventory/supplier/" class="inv-tile" style="--ta:#ff9800" data-tile-id="suppliers">
+      <span class="inv-tile-icon">🏭</span>
+      <span class="inv-tile-name">Постачальники</span>
+      <span class="inv-tile-sub">Довідник постачальників</span>
+    </a>
+    <a href="/admin/inventory/supplier/add/" class="inv-tile" style="--ta:#ff9800" data-tile-id="add-supplier">
+      <span class="inv-tile-icon">➕</span>
+      <span class="inv-tile-name">Новий постачальник</span>
+      <span class="inv-tile-sub">Додати Supplier</span>
+    </a>
+    <a href="/admin/inventory/purchaseorder/" class="inv-tile" style="--ta:#795548" data-tile-id="purchase-orders">
+      <span class="inv-tile-icon">📋</span>
+      <span class="inv-tile-name">Замовлення закупівлі</span>
+      <span class="inv-tile-sub">Purchase Orders</span>
+    </a>
+    <a href="/admin/inventory/purchaseorder/add/" class="inv-tile" style="--ta:#795548" data-tile-id="add-po">
+      <span class="inv-tile-icon">➕</span>
+      <span class="inv-tile-name">Нове PO</span>
+      <span class="inv-tile-sub">Нове замовлення постачальнику</span>
+    </a>
+  </div>
+
+  <!-- Недавні дії -->
+  <div class="inv-section-hdr" style="margin-top:8px"><span>🕐</span> Недавні дії</div>
+  {% get_admin_log 10 as admin_log for_user user %}
+  {% if admin_log %}
+  <div class="inv-recent-grid">
+    {% for entry in admin_log %}
+    {% if "inventory" in entry.content_type.app_label %}
+    <div class="inv-recent-card">
+      <span class="inv-recent-ico">
+        {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
+      </span>
+      <div class="inv-recent-body">
+        {% if entry.get_admin_url %}
+        <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+        {% else %}
+        <span style="color:#8aa0b0;font-size:12px">{{ entry.object_repr }}</span>
+        {% endif %}
+        <span class="inv-recent-model">{{ entry.content_type }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="inv-empty">Дій ще не виконано.</p>
+  {% endif %}
+
+</div>
+{% include "admin/includes/tile_editor.html" %}
+<script>initTileEditor('inventory');</script>
+{% endblock %}

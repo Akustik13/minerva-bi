@@ -1,0 +1,281 @@
+{% extends "admin/base_site.html" %}
+{% load i18n log %}
+
+{% block title %}💰 Бухгалтерія | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; Бухгалтерія
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.acc-dash { padding: 20px 24px 60px; }
+
+/* ── Header ── */
+.acc-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 28px; padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.acc-header-icon {
+  width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg,rgba(76,175,80,.25),rgba(201,168,76,.15));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+}
+.acc-header h1 { font-size: 22px; font-weight: 800; color: #e6edf3; margin: 0 0 3px; }
+.acc-header p  { font-size: 13px; color: #7d8590; margin: 0; }
+
+/* ── Section label ── */
+.acc-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding-bottom: 7px;
+  border-bottom: 2px solid rgba(255,255,255,.07);
+  font-size: 11px; font-weight: 700; color: #7d8590;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+
+/* ── Tile grid ── */
+.acc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+/* ── Single tile ── */
+.acc-tile {
+  position: relative;
+  background: #1a2535;
+  border: 1px solid #243347;
+  border-top: 3px solid var(--ta, #4caf50);
+  border-radius: 9px;
+  padding: 15px 14px 13px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column;
+  min-height: 100px;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.acc-tile:hover {
+  border-color: var(--ta, #4caf50);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px);
+  background: #1e2d40;
+}
+.acc-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
+.acc-tile-name {
+  font-size: 12.5px; font-weight: 600;
+  color: #c9d8e4; line-height: 1.35; flex: 1;
+}
+.acc-tile-sub { font-size: 10px; color: #4a6070; margin-top: 6px; }
+.acc-tile-badge {
+  position: absolute; top: 9px; right: 10px;
+  font-size: 10px; font-weight: 700;
+  background: var(--ta, #4caf50);
+  color: #fff; border-radius: 20px;
+  padding: 1px 7px; opacity: .85;
+}
+
+/* ── Stat strip ── */
+.acc-stats {
+  display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.acc-stat {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 9px; padding: 12px 18px; min-width: 130px; flex: 1;
+}
+.acc-stat-val { font-size: 22px; font-weight: 800; color: #e6edf3; line-height: 1.1; }
+.acc-stat-lbl { font-size: 11px; color: #607d8b; margin-top: 3px; }
+a.acc-stat:hover { border-color: #2a4060; background: #182233; }
+
+/* ── Recent ── */
+.acc-recent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.acc-recent-card {
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 7px; padding: 9px 11px;
+  display: flex; gap: 9px; align-items: flex-start;
+}
+.acc-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+.acc-recent-body { min-width: 0; }
+.acc-recent-body a {
+  font-size: 12px; font-weight: 600;
+  color: #58a6ff; text-decoration: none;
+  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.acc-recent-body a:hover { text-decoration: underline; }
+.acc-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
+.acc-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+</style>
+
+<div class="acc-dash">
+
+  <!-- Header -->
+  <div class="acc-header">
+    <div class="acc-header-icon">💰</div>
+    <div>
+      <h1>Бухгалтерія</h1>
+      <p>Рахунки-фактури · Платежі · Витрати · PDF-генерація · VAT</p>
+    </div>
+    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ Налаштувати плитки</button>
+  </div>
+
+  <!-- Stat strip — дані з context (inject via admin.py monkey-patch) -->
+  <div class="acc-stats">
+    <a href="/admin/accounting/invoice/" class="acc-stat" style="text-decoration:none">
+      <div class="acc-stat-val" style="color:#4caf50">{{ invoice_stats.total }}</div>
+      <div class="acc-stat-lbl">Рахунків всього</div>
+    </a>
+    <a href="/admin/accounting/invoice/?status=sent" class="acc-stat" style="text-decoration:none">
+      <div class="acc-stat-val" style="color:#ff9800">{{ invoice_stats.sent }}</div>
+      <div class="acc-stat-lbl">Очікують оплати</div>
+    </a>
+    <a href="/admin/accounting/invoice/?status=overdue" class="acc-stat" style="text-decoration:none">
+      <div class="acc-stat-val" style="color:#f44336">{{ invoice_stats.overdue }}</div>
+      <div class="acc-stat-lbl">Прострочені</div>
+    </a>
+    <a href="/admin/accounting/invoice/?status=paid" class="acc-stat" style="text-decoration:none">
+      <div class="acc-stat-val" style="color:#4caf50">{{ invoice_stats.paid }}</div>
+      <div class="acc-stat-lbl">Оплачені</div>
+    </a>
+    <a href="/admin/accounting/invoice/?status=draft" class="acc-stat" style="text-decoration:none">
+      <div class="acc-stat-val" style="color:#607d8b">{{ invoice_stats.draft }}</div>
+      <div class="acc-stat-lbl">Чернеток</div>
+    </a>
+  </div>
+
+  <!-- Рахунки -->
+  <div class="acc-section-hdr"><span>📄</span> Рахунки-фактури</div>
+  <div class="acc-grid" data-grid-id="acc-invoices">
+    <a href="/admin/accounting/invoice/" class="acc-tile" style="--ta:#4caf50" data-tile-id="all-invoices">
+      <span class="acc-tile-icon">📋</span>
+      <span class="acc-tile-name">Всі рахунки</span>
+      <span class="acc-tile-sub">Список · фільтри · пошук</span>
+    </a>
+    <a href="/admin/accounting/invoice/add/" class="acc-tile" style="--ta:#2196f3" data-tile-id="add-invoice">
+      <span class="acc-tile-icon">➕</span>
+      <span class="acc-tile-name">Новий рахунок</span>
+      <span class="acc-tile-sub">Створити Invoice</span>
+    </a>
+    <a href="/admin/accounting/invoice/?status=sent" class="acc-tile" style="--ta:#ff9800" data-tile-id="sent-invoices">
+      <span class="acc-tile-icon">📤</span>
+      <span class="acc-tile-name">Надіслані</span>
+      <span class="acc-tile-sub">Очікують оплати</span>
+    </a>
+    <a href="/admin/accounting/invoice/?status=overdue" class="acc-tile" style="--ta:#f44336" data-tile-id="overdue-invoices">
+      <span class="acc-tile-icon">⚠️</span>
+      <span class="acc-tile-name">Прострочені</span>
+      <span class="acc-tile-sub">Потребують уваги</span>
+    </a>
+    <a href="/admin/accounting/invoice/?status=paid" class="acc-tile" style="--ta:#4caf50" data-tile-id="paid-invoices">
+      <span class="acc-tile-icon">✅</span>
+      <span class="acc-tile-name">Оплачені</span>
+      <span class="acc-tile-sub">Закриті рахунки</span>
+    </a>
+    <a href="/admin/accounting/invoice/?status=draft" class="acc-tile" style="--ta:#607d8b" data-tile-id="draft-invoices">
+      <span class="acc-tile-icon">📝</span>
+      <span class="acc-tile-name">Чернетки</span>
+      <span class="acc-tile-sub">Не надіслані</span>
+    </a>
+  </div>
+
+  <!-- Витрати (Level 2+) -->
+  {% if accounting_level >= 2 %}
+  <div class="acc-section-hdr"><span>💸</span> Витрати</div>
+  <div class="acc-grid" data-grid-id="acc-expenses">
+    <a href="/admin/accounting/expense/" class="acc-tile" style="--ta:#ff9800" data-tile-id="all-expenses">
+      <span class="acc-tile-icon">💸</span>
+      <span class="acc-tile-name">Всі витрати</span>
+      <span class="acc-tile-sub">Список · категорії · чеки</span>
+    </a>
+    <a href="/admin/accounting/expense/add/" class="acc-tile" style="--ta:#ff9800" data-tile-id="add-expense">
+      <span class="acc-tile-icon">➕</span>
+      <span class="acc-tile-name">Нова витрата</span>
+      <span class="acc-tile-sub">Додати Expense</span>
+    </a>
+    <a href="/admin/accounting/expensecategory/" class="acc-tile" style="--ta:#ff7043" data-tile-id="expense-categories">
+      <span class="acc-tile-icon">🗂️</span>
+      <span class="acc-tile-name">Категорії витрат</span>
+      <span class="acc-tile-sub">Ієрархія · довідник</span>
+    </a>
+    <a href="/admin/accounting/expense/?is_vat_deductible__exact=1" class="acc-tile" style="--ta:#9c27b0" data-tile-id="vat-expenses">
+      <span class="acc-tile-icon">🧾</span>
+      <span class="acc-tile-name">VAT-deductible</span>
+      <span class="acc-tile-sub">Для EU-звітності</span>
+    </a>
+  </div>
+  {% endif %}
+
+  <!-- Журнал проводок (Level 3+) -->
+  {% if accounting_level >= 3 %}
+  <div class="acc-section-hdr"><span>📒</span> Журнал проводок</div>
+  <div class="acc-grid" data-grid-id="acc-journal">
+    <div class="acc-tile" style="--ta:#607d8b; opacity:.55; cursor:default">
+      <span class="acc-tile-icon">📒</span>
+      <span class="acc-tile-name">Журнал проводок</span>
+      <span class="acc-tile-sub">В розробці</span>
+    </div>
+    <div class="acc-tile" style="--ta:#607d8b; opacity:.55; cursor:default">
+      <span class="acc-tile-icon">🏦</span>
+      <span class="acc-tile-name">Звірка з банком</span>
+      <span class="acc-tile-sub">В розробці</span>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Налаштування -->
+  <div class="acc-section-hdr"><span>⚙️</span> Налаштування</div>
+  <div class="acc-grid" data-grid-id="acc-settings">
+    <a href="/admin/accounting/companysettings/" class="acc-tile" style="--ta:#9c27b0" data-tile-id="company-settings">
+      <span class="acc-tile-icon">🏢</span>
+      <span class="acc-tile-name">Реквізити компанії</span>
+      <span class="acc-tile-sub">IBAN · VAT ID · логотип</span>
+    </a>
+    <a href="/dashboard/help/#accounting" class="acc-tile" style="--ta:#607d8b" data-tile-id="help">
+      <span class="acc-tile-icon">📖</span>
+      <span class="acc-tile-name">Довідник</span>
+      <span class="acc-tile-sub">Документація модуля</span>
+    </a>
+  </div>
+
+  <!-- Недавні дії -->
+  <div class="acc-section-hdr" style="margin-top:8px"><span>🕐</span> Недавні дії</div>
+  {% get_admin_log 10 as admin_log for_user user %}
+  {% if admin_log %}
+  <div class="acc-recent-grid">
+    {% for entry in admin_log %}
+    {% if "accounting" in entry.content_type.app_label %}
+    <div class="acc-recent-card">
+      <span class="acc-recent-ico">
+        {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
+      </span>
+      <div class="acc-recent-body">
+        {% if entry.get_admin_url %}
+        <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+        {% else %}
+        <span style="color:#8aa0b0;font-size:12px">{{ entry.object_repr }}</span>
+        {% endif %}
+        <span class="acc-recent-model">{{ entry.content_type }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="acc-empty">Дій ще не виконано.</p>
+  {% endif %}
+
+</div>
+{% include "admin/includes/tile_editor.html" %}
+<script>initTileEditor('accounting');</script>
+{% endblock %}

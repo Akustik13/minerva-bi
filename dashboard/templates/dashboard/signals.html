@@ -1,0 +1,243 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}🚨 Сигнали дій — Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="/dashboard/analytics/">Аналітика</a>
+  &rsaquo; Сигнали
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+  :root {
+    --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
+    --border: rgba(255,255,255,0.07);
+    --text: #e6edf3; --muted: #7d8590;
+    --critical: #f85149; --critical-bg: rgba(248,81,73,0.08); --critical-border: rgba(248,81,73,0.25);
+    --warning: #e3b341;  --warning-bg: rgba(227,179,65,0.08);  --warning-border: rgba(227,179,65,0.25);
+    --info: #58a6ff;     --info-bg: rgba(88,166,255,0.08);     --info-border: rgba(88,166,255,0.2);
+    --green: #3fb950;
+  }
+
+  #content { padding: 0 !important; }
+  #content-main { max-width: none !important; }
+
+  /* Summary bar */
+  .summary {
+    margin:28px 0 0; padding:0 32px;
+    display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
+  }
+  .summary-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:16px 20px;
+    display:flex; align-items:center; gap:14px;
+    transition:transform .2s;
+  }
+  .summary-card:hover { transform:translateY(-2px); }
+  .summary-num { font-size:32px; font-weight:800; line-height:1; }
+  .summary-label { font-size:12px; color:var(--muted); margin-top:3px; font-weight:500; }
+  .s-critical { border-left:3px solid var(--critical); }
+  .s-warning  { border-left:3px solid var(--warning); }
+  .s-info     { border-left:3px solid var(--info); }
+  .s-total    { border-left:3px solid rgba(255,255,255,.2); }
+  .s-critical .summary-num { color:var(--critical); }
+  .s-warning  .summary-num { color:var(--warning); }
+  .s-info     .summary-num { color:var(--info); }
+
+  /* Filters */
+  .filters {
+    margin:20px 0 0; padding:0 32px;
+    display:flex; gap:8px; flex-wrap:wrap;
+  }
+  .filter-btn {
+    padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600;
+    border:1px solid var(--border); background:var(--surface2);
+    color:var(--muted); cursor:pointer; transition:all .2s;
+  }
+  .filter-btn:hover, .filter-btn.active { color:var(--text); border-color:rgba(255,255,255,.2); background:var(--surface); }
+  .filter-btn.f-critical.active { border-color:var(--critical-border); color:var(--critical); background:var(--critical-bg); }
+  .filter-btn.f-warning.active  { border-color:var(--warning-border);  color:var(--warning);  background:var(--warning-bg); }
+  .filter-btn.f-info.active     { border-color:var(--info-border);     color:var(--info);     background:var(--info-bg); }
+
+  /* Main list */
+  .main { margin:20px 0 60px; padding:0 32px; }
+
+  /* Group header */
+  .group-title {
+    font-size:11px; font-weight:700; letter-spacing:1.2px;
+    text-transform:uppercase; color:var(--muted);
+    margin:24px 0 10px; padding-left:4px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .group-title::after {
+    content:''; flex:1; height:1px; background:var(--border);
+  }
+
+  /* Signal card */
+  .signal {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:12px; padding:16px 20px;
+    margin-bottom:8px; display:flex; gap:16px; align-items:flex-start;
+    transition:transform .15s, border-color .2s;
+    animation: slideIn .3s ease both;
+  }
+  @keyframes slideIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .signal:hover { transform:translateX(3px); }
+  .signal.type-critical { border-left:3px solid var(--critical); background:var(--critical-bg); border-color:var(--critical-border); }
+  .signal.type-warning  { border-left:3px solid var(--warning);  background:var(--warning-bg);  border-color:var(--warning-border); }
+  .signal.type-info     { border-left:3px solid var(--info);     background:var(--info-bg);     border-color:var(--info-border); }
+
+  .signal-icon { font-size:24px; line-height:1; flex-shrink:0; margin-top:2px; }
+  .signal-content { flex:1; min-width:0; }
+  .signal-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:5px; }
+  .signal-title { font-size:14px; font-weight:700; }
+  .signal-module {
+    font-size:10px; font-weight:700; letter-spacing:.8px;
+    padding:2px 8px; border-radius:10px; text-transform:uppercase;
+    background:rgba(255,255,255,.07); color:var(--muted);
+  }
+  .signal-age {
+    font-size:10px; color:var(--muted);
+    font-family:'JetBrains Mono',monospace; margin-left:auto;
+  }
+  .signal-body { font-size:13px; color:var(--muted); line-height:1.5; }
+  .signal-action {
+    margin-top:10px;
+    display:inline-flex; align-items:center; gap:6px;
+    padding:5px 14px; border-radius:7px; font-size:12px; font-weight:700;
+    text-decoration:none; transition:all .2s;
+  }
+  .type-critical .signal-action { background:rgba(248,81,73,.15); color:var(--critical); border:1px solid var(--critical-border); }
+  .type-warning  .signal-action { background:rgba(227,179,65,.15); color:var(--warning);  border:1px solid var(--warning-border); }
+  .type-info     .signal-action { background:rgba(88,166,255,.15); color:var(--info);     border:1px solid var(--info-border); }
+  .signal-action:hover { filter:brightness(1.2); transform:translateX(2px); }
+
+  /* Empty state */
+  .empty {
+    text-align:center; padding:80px 20px;
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+  }
+  .empty .e-icon { font-size:64px; margin-bottom:16px; }
+  .empty h2 { font-size:20px; font-weight:700; margin-bottom:8px; }
+  .empty p { color:var(--muted); font-size:14px; }
+
+  .hidden { display:none !important; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Summary -->
+<div class="summary">
+  <div class="summary-card s-critical">
+    <div>
+      <div class="summary-num">{{ counts.critical }}</div>
+      <div class="summary-label">🔥 Критичних</div>
+    </div>
+  </div>
+  <div class="summary-card s-warning">
+    <div>
+      <div class="summary-num">{{ counts.warning }}</div>
+      <div class="summary-label">⚠️ Попереджень</div>
+    </div>
+  </div>
+  <div class="summary-card s-info">
+    <div>
+      <div class="summary-num">{{ counts.info }}</div>
+      <div class="summary-label">💡 Інформаційних</div>
+    </div>
+  </div>
+  <div class="summary-card s-total">
+    <div>
+      <div class="summary-num">{{ counts.total }}</div>
+      <div class="summary-label">📋 Всього сигналів</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="filters">
+  <button class="filter-btn active" onclick="filterSignals('all', this)">Всі ({{ counts.total }})</button>
+  <button class="filter-btn f-critical" onclick="filterSignals('critical', this)">🔥 Критичні ({{ counts.critical }})</button>
+  <button class="filter-btn f-warning"  onclick="filterSignals('warning', this)">⚠️ Попередження ({{ counts.warning }})</button>
+  <button class="filter-btn f-info"     onclick="filterSignals('info', this)">💡 Інфо ({{ counts.info }})</button>
+  {% for module in modules %}<button class="filter-btn" onclick="filterModule('{{ module }}', this)">{{ module }}</button>{% endfor %}
+</div>
+
+<!-- Signals list -->
+<div class="main" id="signals-list">
+
+  {% if not signals %}
+  <div class="empty">
+    <div class="e-icon">✅</div>
+    <h2>Все чудово!</h2>
+    <p>Немає активних сигналів. Система працює нормально.</p>
+  </div>
+  {% else %}
+
+  {% regroup signals by type as grouped %}
+  {% for group in grouped %}
+    {% if group.grouper == 'critical' %}
+      <div class="group-title" data-group="critical">🔥 КРИТИЧНІ — потребують негайної дії</div>
+    {% elif group.grouper == 'warning' %}
+      <div class="group-title" data-group="warning">⚠️ ПОПЕРЕДЖЕННЯ — зверніть увагу найближчим часом</div>
+    {% else %}
+      <div class="group-title" data-group="info">💡 ІНФОРМАЦІЙНІ — корисно знати</div>
+    {% endif %}
+
+    {% for signal in group.list %}
+    <div class="signal type-{{ signal.type }}" data-type="{{ signal.type }}" data-module="{{ signal.module }}">
+      <div class="signal-icon">{{ signal.icon }}</div>
+      <div class="signal-content">
+        <div class="signal-head">
+          <span class="signal-title">{{ signal.title }}</span>
+          <span class="signal-module">{{ signal.module }}</span>
+          {% if signal.age_days > 0 %}
+          <span class="signal-age">{{ signal.age_days }} дн.</span>
+          {% endif %}
+        </div>
+        <div class="signal-body">{{ signal.body }}</div>
+        {% if signal.action and signal.action_url %}
+        <a href="{{ signal.action_url }}" class="signal-action" target="_blank">
+          {{ signal.action }} →
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  {% endfor %}
+
+  {% endif %}
+</div>
+
+<script>
+function filterSignals(type, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.signal').forEach(s => {
+    s.classList.toggle('hidden', type !== 'all' && s.dataset.type !== type);
+  });
+  document.querySelectorAll('[data-group]').forEach(g => {
+    g.classList.toggle('hidden', type !== 'all' && g.dataset.group !== type);
+  });
+}
+function filterModule(module, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.signal').forEach(s => {
+    s.classList.toggle('hidden', s.dataset.module !== module);
+  });
+  document.querySelectorAll('[data-group]').forEach(g => g.classList.remove('hidden'));
+}
+
+// Auto-refresh every 5 min
+setTimeout(() => location.reload(), 5 * 60 * 1000);
+</script>
+{% endblock %}

@@ -1,0 +1,198 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Імпорт даних | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="/dashboard/system/">Система</a>
+  &rsaquo; Імпорт даних
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+.imp-dash { padding: 16px 20px 48px; }
+
+.imp-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 16px; padding-bottom: 8px;
+  border-bottom: 2px solid #00bcd4;
+  font-size: 13px; font-weight: 700; color: #9aafbe;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+.imp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+
+.imp-card {
+  background: #1a2535; border: 1px solid #243347;
+  border-top: 3px solid var(--card-accent, #00bcd4);
+  border-radius: 8px; padding: 18px 20px;
+}
+.imp-card-title {
+  font-size: 15px; font-weight: 700; color: #c9d8e4;
+  margin: 0 0 6px; display: flex; align-items: center; gap: 8px;
+}
+.imp-card-desc { font-size: 12px; color: #607d8b; margin: 0 0 14px; }
+
+.imp-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 6px; font-size: 13px;
+  font-weight: 600; text-decoration: none; cursor: pointer;
+  border: none; transition: opacity .15s;
+}
+.imp-btn:hover { opacity: .85; }
+.imp-btn-primary { background: #1565c0; color: #fff; }
+.imp-btn-secondary { background: #1e3a4a; color: #80cbc4; border: 1px solid #2a5060; margin-left: 8px; }
+.imp-btn-danger  { background: #b71c1c; color: #fff; }
+.imp-btn-warning { background: #e65100; color: #fff; }
+
+.imp-fields { margin-top: 12px; }
+.imp-fields summary {
+  font-size: 11px; color: #2196f3; cursor: pointer;
+  user-select: none; margin-bottom: 6px;
+}
+.imp-fields-body {
+  background: #111c26; border: 1px solid #1e2d3d;
+  border-radius: 6px; padding: 10px 14px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 4px 16px;
+}
+.imp-field-item { font-size: 11px; color: #9aafbe; }
+.imp-field-req  { color: #f48fb1; font-weight: 700; }
+.imp-field-opt  { color: #607d8b; }
+
+.imp-note {
+  background: #0d2137; border-left: 3px solid #2196f3;
+  border-radius: 0 6px 6px 0; padding: 10px 14px;
+  font-size: 12px; color: #9aafbe; margin-top: 10px;
+}
+.imp-note b { color: #c9d8e4; }
+
+/* Danger zone */
+.danger-zone {
+  margin-top: 36px; border: 1px solid #4a1010;
+  border-radius: 8px; padding: 20px 24px;
+  background: #120a0a;
+}
+.danger-zone-hdr {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 700; color: #ef9a9a;
+  margin: 0 0 8px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.danger-zone-desc { font-size: 12px; color: #8d6e63; margin: 0 0 14px; }
+.danger-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+</style>
+
+<div class="imp-dash">
+
+  <!-- ── Замовлення ── -->
+  <h2 class="imp-hdr"><span>📥</span> Імпорт даних</h2>
+
+  <div class="imp-grid">
+
+    <div class="imp-card" style="--card-accent:#ff9800">
+      <div class="imp-card-title">🛒 Замовлення (Sales)</div>
+      <div class="imp-card-desc">Імпорт замовлень з Excel — 3-кроковий wizard з маппінгом колонок, dry-run та auto-прив'язкою клієнтів.</div>
+      <a href="/admin/sales/salesorder/import-excel/" class="imp-btn imp-btn-primary">⬆️ Відкрити wizard</a>
+      <a href="/dashboard/import-template/sales/" class="imp-btn imp-btn-secondary">📄 Шаблон .xlsx</a>
+      <details class="imp-fields">
+        <summary>▶ Колонки файлу (24 поля)</summary>
+        <div class="imp-fields-body">
+          <span class="imp-field-item imp-field-req">order_number ✱</span>
+          <span class="imp-field-item imp-field-req">source ✱</span>
+          <span class="imp-field-item">order_date</span>
+          <span class="imp-field-item">status</span>
+          <span class="imp-field-item">client</span>
+          <span class="imp-field-item">email</span>
+          <span class="imp-field-item">phone</span>
+          <span class="imp-field-item">addr_street</span>
+          <span class="imp-field-item">addr_city</span>
+          <span class="imp-field-item">addr_zip</span>
+          <span class="imp-field-item">addr_country</span>
+          <span class="imp-field-item">shipping_courier</span>
+          <span class="imp-field-item">tracking_number</span>
+          <span class="imp-field-item">shipping_deadline</span>
+          <span class="imp-field-item">shipped_at</span>
+          <span class="imp-field-item">currency</span>
+          <span class="imp-field-item">shipping_cost</span>
+          <span class="imp-field-item">document_type</span>
+          <span class="imp-field-item imp-field-opt">affects_stock</span>
+          <span class="imp-field-item imp-field-opt">sku_raw (рядки)</span>
+          <span class="imp-field-item imp-field-opt">qty (рядки)</span>
+          <span class="imp-field-item imp-field-opt">unit_price (рядки)</span>
+        </div>
+      </details>
+      <div class="imp-note">
+        <b>Конфлікти:</b> при збігу source + order_number — пропустити або оновити (вибір у wizard).<br>
+        <b>Dry-run:</b> перший запуск без запису в БД — побачиш результат без ризику.
+      </div>
+    </div>
+
+    <div class="imp-card" style="--card-accent:#4caf50">
+      <div class="imp-card-title">📦 Товари та склад (Inventory)</div>
+      <div class="imp-card-desc">Імпорт товарів і початкових залишків. Якщо SKU вже існує — оновлення полів за вибором.</div>
+      <a href="/admin/inventory/product/import-excel/" class="imp-btn imp-btn-primary">⬆️ Відкрити wizard</a>
+      <a href="/dashboard/import-template/inventory/" class="imp-btn imp-btn-secondary">📄 Шаблон .xlsx</a>
+      <details class="imp-fields">
+        <summary>▶ Колонки файлу (14 полів)</summary>
+        <div class="imp-fields-body">
+          <span class="imp-field-item imp-field-req">sku ✱</span>
+          <span class="imp-field-item">name</span>
+          <span class="imp-field-item">category</span>
+          <span class="imp-field-item">manufacturer</span>
+          <span class="imp-field-item">purchase_price</span>
+          <span class="imp-field-item">sale_price</span>
+          <span class="imp-field-item">reorder_point</span>
+          <span class="imp-field-item">lead_time_days</span>
+          <span class="imp-field-item">initial_stock</span>
+          <span class="imp-field-item">unit_type</span>
+          <span class="imp-field-item">hs_code</span>
+          <span class="imp-field-item">country_of_origin</span>
+          <span class="imp-field-item">net_weight_g</span>
+          <span class="imp-field-item imp-field-opt">is_active</span>
+        </div>
+      </details>
+      <div class="imp-note">
+        <b>initial_stock:</b> при вказанні → створює транзакцію ADJUSTMENT.<br>
+        <b>category:</b> slug категорії (acoustic-panels, accessories, raw-materials…).
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Загальні правила ── -->
+  <h2 class="imp-hdr" style="border-color:#607d8b; margin-top:8px;"><span>📋</span> Правила імпорту</h2>
+  <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-bottom: 28px;">
+    <div class="imp-note" style="margin:0">
+      <b>Формат файлу:</b> .xlsx (Excel 2007+). Перший рядок — заголовки. Wizard сам визначає листи і колонки.
+    </div>
+    <div class="imp-note" style="margin:0">
+      <b>Дати:</b> YYYY-MM-DD або DD.MM.YYYY. Числа — крапка або кома як роздільник.
+    </div>
+    <div class="imp-note" style="margin:0">
+      <b>Клієнти:</b> при імпорті замовлень — auto-створення Customer по email+name (SHA256 ключ).
+    </div>
+    <div class="imp-note" style="margin:0">
+      <b>Джерела:</b> поле source має відповідати slug в розділі Продажі → Джерела.
+    </div>
+  </div>
+
+  <!-- ── Danger zone ── -->
+  <div class="danger-zone">
+    <div class="danger-zone-hdr">⚠️ Щось пішло не так?</div>
+    <div class="danger-zone-desc">
+      Якщо імпорт дав невірні дані — скинь транзакційні дані і починай заново.
+      Товари, категорії, джерела і налаштування — залишаться.
+    </div>
+    <div class="danger-actions">
+      <a href="/onboarding/clear-system/" class="imp-btn imp-btn-warning">🗑️ Очистити транзакційні дані</a>
+      <a href="/onboarding/clear-system/?mode=full" class="imp-btn imp-btn-danger">💥 Повне очищення (factory reset)</a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

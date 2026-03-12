@@ -1,0 +1,87 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block extrastyle %}
+<style>
+/* Dark theme для Set Stock */
+body {
+    background: #1c1c1c !important;
+    color: #e0e0e0 !important;
+}
+.content {
+    background: #1c1c1c !important;
+}
+h1, h2, h3, label {
+    color: #e0e0e0 !important;
+}
+input[type="text"], input[type="number"], select, textarea {
+    background: #2d2d2d !important;
+    color: #e0e0e0 !important;
+    border: 1px solid #444 !important;
+    padding: 8px !important;
+}
+.warning, .alert-warning {
+    background: #3a2a1a !important;
+    color: #ffb74d !important;
+    padding: 12px !important;
+    border-radius: 6px !important;
+}
+.info-box {
+    background: #1a2332 !important;
+    color: #64b5f6 !important;
+    padding: 15px !important;
+    border-radius: 8px !important;
+    margin: 15px 0 !important;
+}
+.submit-row {
+    background: #2d2d2d !important;
+    border-top: 1px solid #444 !important;
+}
+.button, input[type="submit"] {
+    background: #2196f3 !important;
+    color: white !important;
+    border: none !important;
+}
+.button.default, input[type="submit"].default {
+    background: #4caf50 !important;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Set stock: {{ product.sku }}</h1>
+
+<div class="info-box">
+    <p><strong>SKU:</strong> {{ product.sku }}</p>
+    <p><strong>Назва:</strong> {{ product.name|default:"—" }}</p>
+</div>
+
+<h2>Поточний стан товару</h2>
+<div class="info-box" style="font-size: 24px; font-weight: bold;">
+    Поточний залишок: {{ current_stock }}
+</div>
+
+{% if form.errors %}
+<div class="warning">
+    ⚠️ Увага: {{ form.errors }}
+</div>
+{% endif %}
+
+<form method="post">
+    {% csrf_token %}
+    
+    <div style="margin: 20px 0;">
+        <label for="id_target_stock" style="display: block; margin-bottom: 8px;">
+            Target stock:
+        </label>
+        {{ form.target_stock }}
+    </div>
+    
+    <div class="submit-row">
+        <input type="submit" value="📦 Встановити залишок" class="default">
+        <a href="{% url 'admin:inventory_product_change' product.pk %}" class="button">
+            ✕ Скасувати
+        </a>
+    </div>
+</form>
+{% endblock %}

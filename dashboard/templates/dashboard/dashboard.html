@@ -1,0 +1,742 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}📊 Статистика — Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="/dashboard/analytics/">Аналітика</a>
+  &rsaquo; Статистика
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg: #0d1117; --s1: #161b22; --s2: #1c2128; --s3: #21262d;
+  --border: rgba(255,255,255,0.07); --border2: rgba(255,255,255,0.12);
+  --text: #e6edf3; --muted: #7d8590; --muted2: #9198a1;
+  --gold: #c9a84c; --gold-l: #e8d5a3;
+  --blue: #58a6ff; --green: #3fb950; --orange: #e3b341;
+  --red: #f85149; --purple: #bc8cff; --teal: #39d353;
+}
+
+/* Remove admin content padding so filter bar is full-width */
+#content { padding: 0 !important; }
+#content-main { max-width: none !important; }
+
+/* ── Filter bar ── */
+.filter-bar {
+  background:var(--s1); border-bottom:1px solid var(--border);
+  padding:10px 32px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.filter-label { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.8px;
+  text-transform:uppercase; white-space:nowrap; }
+.filter-sep { width:1px; height:24px; background:var(--border); flex-shrink:0; }
+.period-btns { display:flex; gap:4px; }
+.pb {
+  padding:5px 12px; border-radius:6px; font-size:11px; font-weight:700;
+  border:1px solid var(--border); background:transparent; color:var(--muted);
+  cursor:pointer; transition:all .2s;
+}
+.pb:hover { color:var(--text); border-color:var(--border2); }
+.pb.active { color:var(--gold-l); border-color:rgba(201,168,76,.4); background:rgba(201,168,76,.1); }
+.filter-input {
+  background:var(--s2); border:1px solid var(--border); color:var(--text);
+  border-radius:6px; padding:5px 10px; font-size:12px; font-family:'Manrope',sans-serif;
+  height:30px; outline:none; transition:border-color .2s;
+}
+.filter-input:focus { border-color:var(--border2); }
+.filter-select {
+  background:var(--s2); border:1px solid var(--border); color:var(--text);
+  border-radius:6px; padding:4px 8px; font-size:12px; font-family:'Manrope',sans-serif;
+  height:30px; outline:none; cursor:pointer; transition:border-color .2s;
+}
+.filter-select:focus { border-color:var(--border2); }
+.filter-btn {
+  padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700;
+  border:1px solid rgba(88,166,255,.4); background:rgba(88,166,255,.1); color:#58a6ff;
+  cursor:pointer; transition:all .2s; white-space:nowrap;
+}
+.filter-btn:hover { background:rgba(88,166,255,.2); }
+.filter-reset {
+  padding:5px 10px; border-radius:6px; font-size:12px;
+  border:1px solid var(--border); background:transparent; color:var(--muted);
+  cursor:pointer; transition:all .2s; text-decoration:none; white-space:nowrap;
+}
+.filter-reset:hover { color:var(--text); border-color:var(--border2); }
+.upd { margin-left:auto; font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; white-space:nowrap; }
+
+/* ── Main layout ── */
+.main { padding:24px 32px 80px; }
+
+/* ── KPI row ── */
+.kpi-row { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; margin-bottom:24px; }
+.kpi-card {
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:12px; padding:18px 20px;
+  position:relative; overflow:hidden; transition:border-color .2s, transform .2s;
+}
+.kpi-card:hover { border-color:var(--border2); transform:translateY(-2px); }
+.kpi-card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:var(--accent, var(--blue));
+}
+.kpi-label { font-size:11px; color:var(--muted); font-weight:600; letter-spacing:.6px;
+  text-transform:uppercase; margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+.kpi-val { font-size:28px; font-weight:800; letter-spacing:-.5px; line-height:1; margin-bottom:8px; }
+.kpi-change { font-size:12px; font-weight:600; display:flex; align-items:center; gap:4px; }
+.up   { color:var(--green); }
+.down { color:var(--red); }
+.neutral { color:var(--muted); }
+.kpi-sub { font-size:11px; color:var(--muted); margin-top:2px; }
+
+/* ── 2-col grid ── */
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:16px; }
+.grid32 { display:grid; grid-template-columns:2fr 1fr; gap:16px; margin-bottom:16px; }
+
+/* ── Card ── */
+.card {
+  background:var(--s1); border:1px solid var(--border);
+  border-radius:12px; overflow:hidden;
+}
+.card-head {
+  padding:14px 18px 10px; border-bottom:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+}
+.card-title { font-size:13px; font-weight:700; display:flex; align-items:center; gap:8px; }
+.card-title .ico { font-size:16px; }
+.card-sub { font-size:11px; color:var(--muted); }
+.card-body { padding:16px 18px; }
+
+/* ── Chart containers ── */
+.chart-wrap { position:relative; }
+.chart-wrap canvas { max-height:220px; }
+.chart-wrap-tall canvas { max-height:280px; }
+
+/* ── Table ── */
+.t { width:100%; border-collapse:collapse; font-size:12px; }
+.t th { padding:8px 10px; text-align:left; color:var(--muted);
+  font-size:10px; font-weight:700; letter-spacing:.7px; text-transform:uppercase;
+  border-bottom:1px solid var(--border); background:var(--s2); }
+.t td { padding:9px 10px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+.t tr:last-child td { border-bottom:none; }
+.t tr:hover td { background:rgba(255,255,255,.02); }
+.t .r { text-align:right; font-family:'JetBrains Mono',monospace; }
+.t .mono { font-family:'JetBrains Mono',monospace; font-size:11px; }
+
+/* ── Badges ── */
+.badge { display:inline-block; padding:2px 8px; border-radius:10px;
+  font-size:10px; font-weight:700; letter-spacing:.4px; }
+.b-blue   { background:rgba(88,166,255,.12); color:#58a6ff; }
+.b-green  { background:rgba(63,185,80,.12);  color:#3fb950; }
+.b-orange { background:rgba(227,179,65,.12); color:#e3b341; }
+.b-red    { background:rgba(248,81,73,.12);  color:#f85149; }
+.b-purple { background:rgba(188,140,255,.12);color:#bc8cff; }
+.b-gray   { background:rgba(125,133,144,.12);color:#9198a1; }
+.b-gold   { background:rgba(201,168,76,.12); color:#c9a84c; }
+
+/* ── Mini bar ── */
+.mini-bar { height:4px; border-radius:2px; background:var(--s3); position:relative; overflow:hidden; }
+.mini-bar-fill { height:100%; border-radius:2px; transition:width .6s ease; }
+
+/* ── Stock warning ── */
+.stock-row { display:flex; align-items:center; gap:10px; padding:8px 0;
+  border-bottom:1px solid rgba(255,255,255,.04); }
+.stock-row:last-child { border-bottom:none; }
+.stock-sku { font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:600; flex:1; }
+.stock-months { font-size:11px; font-weight:700; white-space:nowrap; }
+.stock-bar { flex:2; }
+
+/* ── Unshipped ── */
+.wait-badge {
+  display:inline-block; padding:2px 8px; border-radius:10px;
+  font-size:10px; font-weight:700; font-family:'JetBrains Mono',monospace;
+}
+
+/* ── Source dots ── */
+.src { display:flex; align-items:center; gap:6px; }
+.src-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+/* ── Responsive ── */
+@media(max-width:1100px) { .grid3 { grid-template-columns:1fr 1fr; } }
+@media(max-width:800px)  { .grid2,.grid3,.grid32,.kpi-row { grid-template-columns:1fr; } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filter bar -->
+<form method="get" id="filter-form" class="filter-bar">
+  <span class="filter-label">Період:</span>
+  <div class="period-btns">
+    <button type="button" class="pb" onclick="setPreset(30)">30 д</button>
+    <button type="button" class="pb" onclick="setPreset(60)">60 д</button>
+    <button type="button" class="pb" onclick="setPreset(90)">90 д</button>
+    <button type="button" class="pb" onclick="setPreset(365)">Рік</button>
+  </div>
+  <span class="filter-label">з</span>
+  <input type="date" name="date_from" id="inp-from" class="filter-input"
+         value="{{ date_from_str }}" style="width:140px;">
+  <span class="filter-label">по</span>
+  <input type="date" name="date_to" id="inp-to" class="filter-input"
+         value="{{ date_to_str }}" style="width:140px;">
+
+  <div class="filter-sep"></div>
+
+  <span class="filter-label">Джерело:</span>
+  <select name="source" class="filter-select">
+    <option value="">— всі —</option>
+    {% for src in all_sources %}
+      <option value="{{ src }}" {% if src == filter_source %}selected{% endif %}>{{ src }}</option>
+    {% endfor %}
+  </select>
+
+  <span class="filter-label">Категорія:</span>
+  <select name="category" class="filter-select">
+    <option value="">— всі —</option>
+    {% for cat in all_categories %}
+      <option value="{{ cat }}" {% if cat == filter_category %}selected{% endif %}>{{ cat }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="filter-btn">🔍 Застосувати</button>
+  <a href="/dashboard/" class="filter-reset">✕ Скинути</a>
+
+  <span class="upd">{{ period_label }} &nbsp;·&nbsp; {% now "d.m.Y H:i" %}</span>
+
+  <!-- Shipping quick-access tiles — pushed to far right -->
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center;flex-shrink:0">
+    <a href="{% url 'admin:shipping_order_tracking' %}"
+       style="display:flex;align-items:center;gap:6px;padding:6px 13px;
+              background:#1a2535;border:1px solid #2a3f52;border-radius:7px;
+              color:#c9d8e4;text-decoration:none;font-size:12px;font-weight:600;
+              white-space:nowrap;transition:background .15s"
+       onmouseover="this.style.background='#243347'" onmouseout="this.style.background='#1a2535'">
+      📡 Відслідковування
+    </a>
+    <a href="{% url 'admin:shipping_dhl_track_lookup' %}"
+       style="display:flex;align-items:center;gap:6px;padding:6px 13px;
+              background:#1a2022;border:1px solid #f9a825;border-radius:7px;
+              color:#f9a825;text-decoration:none;font-size:12px;font-weight:600;
+              white-space:nowrap;transition:background .15s"
+       onmouseover="this.style.background='#2a2810'" onmouseout="this.style.background='#1a2022'">
+      🔍 DHL Трекінг
+    </a>
+  </div>
+</form>
+
+<script>
+function setPreset(days) {
+  const today = new Date();
+  const from  = new Date(today);
+  from.setDate(from.getDate() - days);
+  const fmt = d => d.toISOString().split('T')[0];
+  document.getElementById('inp-from').value = fmt(from);
+  document.getElementById('inp-to').value   = fmt(today);
+  document.getElementById('filter-form').submit();
+}
+</script>
+
+<div class="main">
+
+  <!-- KPI -->
+  <div class="kpi-row">
+    <div class="kpi-card" style="--accent:#c9a84c">
+      <div class="kpi-label">💰 Виручка</div>
+      <div class="kpi-val" style="color:var(--gold-l)">{{ kpi.revenue.fmt }}</div>
+      {% if kpi.revenue.change is not None %}
+      <div class="kpi-change {% if kpi.revenue.change >= 0 %}up{% else %}down{% endif %}">
+        {% if kpi.revenue.change >= 0 %}▲{% else %}▼{% endif %}
+        {{ kpi.revenue.change }}% vs попередній
+      </div>
+      {% endif %}
+    </div>
+    <div class="kpi-card" style="--accent:#58a6ff">
+      <div class="kpi-label">📦 Замовлень</div>
+      <div class="kpi-val" style="color:var(--blue)">{{ kpi.orders.fmt }}</div>
+      {% if kpi.orders.change is not None %}
+      <div class="kpi-change {% if kpi.orders.change >= 0 %}up{% else %}down{% endif %}">
+        {% if kpi.orders.change >= 0 %}▲{% else %}▼{% endif %}
+        {{ kpi.orders.change }}% vs попередній
+      </div>
+      {% endif %}
+    </div>
+    <div class="kpi-card" style="--accent:#3fb950">
+      <div class="kpi-label">🔢 Одиниць</div>
+      <div class="kpi-val" style="color:var(--green)">{{ kpi.units.fmt }}</div>
+      {% if kpi.units.change is not None %}
+      <div class="kpi-change {% if kpi.units.change >= 0 %}up{% else %}down{% endif %}">
+        {% if kpi.units.change >= 0 %}▲{% else %}▼{% endif %}
+        {{ kpi.units.change }}% vs попередній
+      </div>
+      {% endif %}
+    </div>
+    <div class="kpi-card" style="--accent:#bc8cff">
+      <div class="kpi-label">🎯 Сер. замовлення</div>
+      <div class="kpi-val" style="color:var(--purple)">{{ kpi.avg_order.fmt }}</div>
+      {% if kpi.avg_order.change is not None %}
+      <div class="kpi-change {% if kpi.avg_order.change >= 0 %}up{% else %}down{% endif %}">
+        {% if kpi.avg_order.change >= 0 %}▲{% else %}▼{% endif %}
+        {{ kpi.avg_order.change }}% vs попередній
+      </div>
+      {% endif %}
+    </div>
+    <div class="kpi-card" style="--accent:{% if kpi.unshipped.val > 0 %}#f85149{% else %}#3fb950{% endif %}">
+      <div class="kpi-label">⏳ Не відправлено</div>
+      <div class="kpi-val" style="color:{% if kpi.unshipped.val > 0 %}var(--red){% else %}var(--green){% endif %}">
+        {{ kpi.unshipped.fmt }}
+      </div>
+      <div class="kpi-sub">{% if kpi.unshipped.val == 0 %}✅ Все відправлено{% else %}замовлень чекають{% endif %}</div>
+    </div>
+  </div>
+
+  <!-- Графіки: виручка по місяцях + по днях -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title"><span class="ico">📈</span> Виручка по місяцях (€)</span>
+        <span class="card-sub">вся історія</span>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap"><canvas id="chartRevMonth"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title"><span class="ico">📅</span> Замовлення по днях</span>
+        <span class="card-sub">за вибраний період</span>
+      </div>
+      <div class="card-body">
+        <div class="chart-wrap"><canvas id="chartDayOrd"></canvas></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Топ SKU + Географія -->
+  <div class="grid32">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title"><span class="ico">🏆</span> Топ SKU по виручці</span>
+        <span class="card-sub">за вибраний період</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table class="t">
+          <thead><tr>
+            <th>#</th><th>SKU</th><th>Категорія</th>
+            <th class="r">Виручка €</th><th class="r">Кількість</th><th class="r">Замовлень</th>
+          </tr></thead>
+          <tbody>
+          {% for r in top_skus %}
+          <tr>
+            <td style="color:var(--muted);width:30px">{{ forloop.counter }}</td>
+            <td><span class="mono">{{ r.product__sku }}</span></td>
+            <td><span class="badge b-blue">{{ r.product__category }}</span></td>
+            <td class="r mono" style="color:var(--gold-l)">
+              {% if r.revenue %}€{{ r.revenue|floatformat:0 }}{% else %}—{% endif %}
+            </td>
+            <td class="r mono">{{ r.qty_total|floatformat:0 }}</td>
+            <td class="r mono" style="color:var(--blue)">{{ r.orders_cnt }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:24px">Немає даних</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <!-- Географія donut -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title"><span class="ico">🌍</span> Географія</span>
+          <span class="card-sub">топ регіони</span>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap"><canvas id="chartGeo"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Категорії -->
+      <div class="card">
+        <div class="card-head">
+          <span class="card-title"><span class="ico">📦</span> По категоріях</span>
+        </div>
+        <div class="card-body">
+          <div class="chart-wrap"><canvas id="chartCat"></canvas></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Топ клієнти + Джерела + Критичний склад -->
+  <div class="grid3">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title"><span class="ico">👑</span> Топ клієнти</span>
+        <span class="card-sub">за виручкою</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table class="t">
+          <thead><tr>
+            <th>Клієнт</th><th>Рег.</th>
+            <th class="r">Виручка €</th><th class="r">Зам.</th><th class="r">Шт.</th>
+          </tr></thead>
+          <tbody>
+          {% for c in top_clients %}
+          <tr>
+            <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;font-weight:600">
+              {{ c.client|truncatechars:20 }}
+            </td>
+            <td><span class="badge b-gray">{{ c.shipping_region|default:"—" }}</span></td>
+            <td class="r mono" style="color:var(--gold-l)">
+              {% if c.revenue %}€{{ c.revenue|floatformat:0 }}{% else %}—{% endif %}
+            </td>
+            <td class="r mono">{{ c.orders }}</td>
+            <td class="r mono">{{ c.units|floatformat:0|default:"—" }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Немає даних</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title"><span class="ico">🔌</span> Джерела</span>
+        <span class="card-sub">за замовленнями</span>
+      </div>
+      <div class="card-body">
+        {% for s in by_source %}
+        <div style="margin-bottom:14px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:12px">
+            <span style="font-weight:600">
+              {% if s.source == 'digikey' %}🔵{% elif s.source == 'nova_post' %}🟠{% else %}⚪{% endif %}
+              {{ s.source|title }}
+            </span>
+            <span class="mono" style="color:var(--muted)">
+              {{ s.orders }} зам.
+            </span>
+          </div>
+          <div class="mini-bar">
+            <div class="mini-bar-fill" style="width:{{ s.orders|default:0 }}%;background:{% if s.source == 'digikey' %}var(--blue){% elif s.source == 'nova_post' %}var(--orange){% else %}var(--muted){% endif %}"></div>
+          </div>
+        </div>
+        {% empty %}
+        <p style="color:var(--muted);font-size:12px">Немає даних</p>
+        {% endfor %}
+
+        <div style="margin-top:20px;border-top:1px solid var(--border);padding-top:14px">
+          <div class="card-title" style="font-size:12px;margin-bottom:10px"><span class="ico">🌍</span> Всі регіони</div>
+          {% for r in by_region %}
+          <div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)">
+            <span class="mono">{{ r.shipping_region }}</span>
+            <span style="color:var(--muted)">{{ r.orders }} зам.</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title"><span class="ico">🔥</span> Критичний склад</span>
+        <span class="card-sub">&lt; 1.5 міс</span>
+      </div>
+      <div class="card-body">
+        {% for p in critical_stock %}
+        <div class="stock-row">
+          <a href="/admin/inventory/reorderproxy/" class="stock-sku" style="color:var(--blue);text-decoration:none">
+            {{ p.sku|truncatechars:18 }}
+          </a>
+          <div class="stock-bar">
+            <div class="mini-bar">
+              <div class="mini-bar-fill" style="
+                width:{% widthratio p.months 1.5 100 %}%;
+                background:{% if p.months < 0.5 %}var(--red){% elif p.months < 1 %}var(--orange){% else %}var(--gold){% endif %}">
+              </div>
+            </div>
+          </div>
+          <div class="stock-months" style="color:{% if p.months < 0.5 %}var(--red){% elif p.months < 1 %}var(--orange){% else %}var(--gold){% endif %}">
+            {{ p.months }}м
+          </div>
+        </div>
+        {% empty %}
+        <div style="text-align:center;padding:30px;color:var(--green)">
+          <div style="font-size:32px;margin-bottom:8px">✅</div>
+          <div style="font-size:13px;font-weight:600">Запасів достатньо</div>
+        </div>
+        {% endfor %}
+        {% if critical_stock %}
+        <a href="/admin/inventory/reorderproxy/?reorder_status=critical"
+           style="display:block;margin-top:14px;text-align:center;font-size:11px;
+                  color:var(--red);text-decoration:none;font-weight:700;
+                  padding:6px;border:1px solid rgba(248,81,73,.2);border-radius:6px">
+          → Переглянути всі критичні
+        </a>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Доставка: кур'єри + країни -->
+  <div class="grid2" style="margin-bottom:16px">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title"><span class="ico">🚚</span> Кур'єри</span>
+        <span class="card-sub">за вибраний період</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table class="t">
+          <thead><tr>
+            <th>Кур'єр</th>
+            <th class="r">Замовлень</th>
+            <th class="r">Сер. вартість €</th>
+            <th class="r">Всього €</th>
+          </tr></thead>
+          <tbody>
+          {% for c in by_courier %}
+          <tr>
+            <td style="font-weight:600">
+              {% if 'ups' in c.shipping_courier|lower %}🟤
+              {% elif 'dhl' in c.shipping_courier|lower %}🟡
+              {% elif 'fedex' in c.shipping_courier|lower %}🟣
+              {% elif 'post' in c.shipping_courier|lower %}🔵
+              {% elif 'tnt' in c.shipping_courier|lower %}🟠
+              {% else %}📦{% endif %}
+              {{ c.shipping_courier }}
+            </td>
+            <td class="r mono" style="color:var(--blue)">{{ c.orders }}</td>
+            <td class="r mono">{% if c.avg_cost %}€{{ c.avg_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="r mono" style="color:var(--gold-l)">{% if c.total_cost %}€{{ c.total_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px">Немає даних про кур'єрів</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title"><span class="ico">🌍</span> Вартість доставки по країнах</span>
+        <span class="card-sub">за вибраний період</span>
+      </div>
+      <div class="card-body" style="padding:0">
+        <table class="t">
+          <thead><tr>
+            <th>Країна</th>
+            <th>Кур'єри</th>
+            <th class="r">Зам.</th>
+            <th class="r">Сер. €</th>
+            <th class="r">Всього €</th>
+          </tr></thead>
+          <tbody>
+          {% for r in shipping_by_country %}
+          <tr>
+            <td style="font-weight:600;white-space:nowrap">{{ r.shipping_region }}</td>
+            <td style="font-size:11px;color:var(--muted)">{{ r.couriers|default:"—" }}</td>
+            <td class="r mono" style="color:var(--blue)">{{ r.orders }}</td>
+            <td class="r mono">{% if r.avg_cost %}€{{ r.avg_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+            <td class="r mono" style="color:var(--gold-l)">{% if r.total_cost %}€{{ r.total_cost|floatformat:2 }}{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Немає даних</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Топ попиту -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head">
+      <span class="card-title"><span class="ico">🔥</span> Найпопулярніші товари</span>
+      <span class="card-sub">за кількістю замовлень · {{ days }} днів</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table class="t">
+        <thead><tr>
+          <th>#</th><th>SKU</th><th>Категорія</th>
+          <th class="r">Замовлень</th><th class="r">Кількість</th>
+        </tr></thead>
+        <tbody>
+        {% for r in top_demand %}
+        <tr>
+          <td style="color:var(--muted);width:30px">{{ forloop.counter }}</td>
+          <td><span class="mono">{{ r.product__sku }}</span></td>
+          <td><span class="badge b-blue">{{ r.product__category }}</span></td>
+          <td class="r mono" style="color:var(--blue);font-weight:700">{{ r.orders_cnt }}</td>
+          <td class="r mono">{{ r.qty_total|floatformat:0 }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px">Немає даних</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Не відправлені -->
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title"><span class="ico">⏳</span> Не відправлені замовлення</span>
+      <span class="card-sub">{{ kpi.unshipped.val }} замовлень чекають відправки</span>
+    </div>
+    <div class="card-body" style="padding:0">
+      <table class="t">
+        <thead><tr>
+          <th>Джерело</th><th>№ замовлення</th><th>Дата</th>
+          <th>Клієнт</th><th>Регіон</th><th class="r">Чекає</th><th></th>
+        </tr></thead>
+        <tbody>
+        {% for o in unshipped_list %}
+        <tr>
+          <td>
+            <span class="badge {% if o.source == 'digikey' %}b-blue{% elif o.source == 'nova_post' %}b-orange{% else %}b-gray{% endif %}">
+              {{ o.source }}
+            </span>
+          </td>
+          <td class="mono">{{ o.order_number }}</td>
+          <td class="mono" style="color:var(--muted)">{{ o.order_date|default:"—" }}</td>
+          <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ o.client|default:"—"|truncatechars:24 }}
+          </td>
+          <td><span class="badge b-gray">{{ o.shipping_region|default:"—" }}</span></td>
+          <td class="r">
+            <span class="wait-badge" style="background:{% if o.days_waiting > 14 %}rgba(248,81,73,.15){% elif o.days_waiting > 7 %}rgba(227,179,65,.15){% else %}rgba(63,185,80,.15){% endif %};
+              color:{% if o.days_waiting > 14 %}var(--red){% elif o.days_waiting > 7 %}var(--orange){% else %}var(--green){% endif %}">
+              {{ o.days_waiting }}д
+            </span>
+          </td>
+          <td>
+            <a href="/admin/sales/salesorder/{{ o.id }}/change/"
+               style="font-size:11px;color:var(--blue);text-decoration:none;font-weight:600">→</a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" style="text-align:center;color:var(--green);padding:32px;font-weight:600">
+          ✅ Всі замовлення відправлені!
+        </td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+Chart.defaults.color = '#7d8590';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+Chart.defaults.font.family = "'Manrope', sans-serif";
+
+const GOLD   = '#c9a84c';
+const GOLDA  = 'rgba(201,168,76,0.15)';
+const BLUE   = '#58a6ff';
+const BLUEA  = 'rgba(88,166,255,0.12)';
+const GREEN  = '#3fb950';
+const ORANGE = '#e3b341';
+const RED    = '#f85149';
+const PURPLE = '#bc8cff';
+
+const chartMonths   = {{ chart_months|safe }};
+const chartRev      = {{ chart_rev|safe }};
+const chartOrdersM  = {{ chart_orders_m|safe }};
+const chartDays     = {{ chart_days|safe }};
+const chartDayOrd   = {{ chart_day_ord|safe }};
+const chartGeoLbls  = {{ chart_geo_labels|safe }};
+const chartGeoRev   = {{ chart_geo_orders|safe }};
+const chartCatLbls  = {{ chart_cat_labels|safe }};
+const chartCatRev   = {{ chart_cat_qty|safe }};
+
+new Chart(document.getElementById('chartRevMonth'), {
+  type: 'bar',
+  data: {
+    labels: chartMonths,
+    datasets: [{
+      label: 'Виручка €', data: chartRev,
+      backgroundColor: GOLDA, borderColor: GOLD, borderWidth: 2,
+      borderRadius: 4, yAxisID: 'y',
+    }, {
+      label: 'Замовлення', data: chartOrdersM, type: 'line',
+      borderColor: BLUE, backgroundColor: 'transparent', borderWidth: 2,
+      pointRadius: 3, pointBackgroundColor: BLUE, tension: 0.4, yAxisID: 'y2',
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true,
+    interaction: { mode: 'index', intersect: false },
+    plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { font: { size: 10 } } },
+      y:  { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { font: { size: 10 }, callback: v => '€'+v.toLocaleString() } },
+      y2: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 } } },
+    }
+  }
+});
+
+new Chart(document.getElementById('chartDayOrd'), {
+  type: 'line',
+  data: {
+    labels: chartDays,
+    datasets: [{
+      label: 'Замовлення', data: chartDayOrd,
+      borderColor: BLUE, backgroundColor: BLUEA, borderWidth: 2,
+      fill: true, tension: 0.4, pointRadius: 2,
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true, ticks: { font: { size: 10 } } },
+    }
+  }
+});
+
+const GEO_COLORS = [GOLD, BLUE, GREEN, ORANGE, PURPLE, RED, '#39d353', '#ff7b72'];
+new Chart(document.getElementById('chartGeo'), {
+  type: 'doughnut',
+  data: {
+    labels: chartGeoLbls,
+    datasets: [{ data: chartGeoRev, backgroundColor: GEO_COLORS, borderWidth: 2, borderColor: '#161b22' }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true, cutout: '65%',
+    plugins: {
+      legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 }, padding: 8 } },
+      tooltip: { callbacks: { label: ctx => ' €' + ctx.parsed.toLocaleString() } }
+    }
+  }
+});
+
+const CAT_COLORS = [BLUE, GOLD, GREEN, PURPLE, ORANGE];
+new Chart(document.getElementById('chartCat'), {
+  type: 'doughnut',
+  data: {
+    labels: chartCatLbls,
+    datasets: [{ data: chartCatRev, backgroundColor: CAT_COLORS, borderWidth: 2, borderColor: '#161b22' }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: true, cutout: '60%',
+    plugins: {
+      legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 }, padding: 8 } },
+      tooltip: { callbacks: { label: ctx => ' €' + ctx.parsed.toLocaleString() } }
+    }
+  }
+});
+</script>
+{% endblock %}

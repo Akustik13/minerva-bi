@@ -1,0 +1,17 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block object-tools-items %}
+  {% if original and original.pk %}
+    <li>
+      <a href="{% url 'accounting:invoice_pdf' original.pk %}"
+         class="historylink"
+         target="_blank"
+         style="background:#1976d2;color:#fff;padding:6px 14px;border-radius:6px;
+                text-decoration:none;font-weight:bold;display:inline-block">
+        📄 PDF
+      </a>
+    </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}

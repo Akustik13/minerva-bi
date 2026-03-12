@@ -1,0 +1,173 @@
+{# Shared tile editor: hide/show + drag-and-drop reorder.             #}
+{# Usage: {% include "admin/includes/tile_editor.html" %}              #}
+{#        <script>initTileEditor('module_name');</script>              #}
+{#                                                                      #}
+{# Requires on tiles:  data-tile-id="unique-id"                        #}
+{# Requires on grids:  data-grid-id="unique-id"                        #}
+{# Edit trigger:       <button id="tile-edit-trigger"                  #}
+{#                       onclick="_tileEdit()">✏️ Налаштувати плитки   #}
+{#                     </button>                                        #}
+<style>
+/* ── Tile Editor ─────────────────────────────────────────────────────── */
+#tile-edit-trigger {
+  margin-left: auto; font-size: 11px; color: #607d8b; white-space: nowrap;
+  background: #141f2b; border: 1px solid #1e2d3d;
+  border-radius: 6px; padding: 5px 12px; cursor: pointer;
+  transition: color .15s, border-color .15s; flex-shrink: 0;
+}
+#tile-edit-trigger:hover { color: #9aafbe; border-color: #2a4060; }
+body.tile-edit-mode #tile-edit-trigger { color: #4caf50; border-color: #2e5c30; }
+
+/* Hidden tiles */
+.tile-hidden { display: none !important; }
+body.tile-edit-mode .tile-hidden {
+  display: flex !important; opacity: 0.22;
+  filter: grayscale(1); border-style: dashed !important;
+}
+
+/* ×/+ toggle button */
+.tile-toggle-btn {
+  position: absolute; top: 6px; right: 6px;
+  width: 18px; height: 18px; border-radius: 50%; border: none;
+  font-size: 13px; font-weight: 700; line-height: 18px; text-align: center;
+  display: none; cursor: pointer; padding: 0; z-index: 11;
+  background: rgba(244,67,54,.9); color: #fff;
+}
+body.tile-edit-mode .tile-hidden .tile-toggle-btn { background: rgba(76,175,80,.9); }
+body.tile-edit-mode .tile-toggle-btn { display: block; }
+
+/* Drag-and-drop */
+body.tile-edit-mode [data-tile-id] { cursor: grab; }
+body.tile-edit-mode [data-tile-id]:active { cursor: grabbing; }
+.tile-dragging { opacity: 0.25 !important; transform: scale(.96) !important; }
+.tile-drag-over {
+  box-shadow: -3px 0 0 0 #2196f3, 0 6px 24px rgba(0,0,0,.5) !important;
+  transform: translateX(3px) translateY(-3px) !important;
+}
+</style>
+<script>
+function initTileEditor(mod) {
+  var HK = 'mv_th_' + mod;
+  var OK = 'mv_to_' + mod;
+
+  function lh() { try { return JSON.parse(localStorage.getItem(HK)) || []; } catch(e) { return []; } }
+  function sh(a) { localStorage.setItem(HK, JSON.stringify(a)); }
+  function lo() { try { return JSON.parse(localStorage.getItem(OK)) || {}; } catch(e) { return {}; } }
+  function so(o) { localStorage.setItem(OK, JSON.stringify(o)); }
+
+  /* Apply hidden */
+  function applyHidden() {
+    var h = lh();
+    document.querySelectorAll('[data-tile-id]').forEach(function(t) {
+      var hid = h.indexOf(t.dataset.tileId) !== -1;
+      t.classList.toggle('tile-hidden', hid);
+      var btn = t.querySelector('.tile-toggle-btn');
+      if (btn) { btn.innerHTML = hid ? '+' : '&times;'; btn.title = hid ? 'Показати' : 'Приховати'; }
+    });
+  }
+
+  /* Apply stored order (reappend tiles in order per grid) */
+  function applyOrder() {
+    var orders = lo();
+    document.querySelectorAll('[data-grid-id]').forEach(function(grid) {
+      var order = orders[grid.dataset.gridId];
+      if (!order || !order.length) return;
+      order.forEach(function(tid) {
+        var tile = grid.querySelector('[data-tile-id="' + tid + '"]');
+        if (tile) grid.appendChild(tile);
+      });
+    });
+  }
+
+  function saveGridOrder(grid) {
+    var orders = lo();
+    orders[grid.dataset.gridId] = Array.from(
+      grid.querySelectorAll('[data-tile-id]')
+    ).map(function(t) { return t.dataset.tileId; });
+    so(orders);
+  }
+
+  /* Add ×/+ toggle buttons */
+  function addToggleBtns() {
+    var h = lh();
+    document.querySelectorAll('[data-tile-id]').forEach(function(t) {
+      if (t.querySelector('.tile-toggle-btn')) return;
+      var btn = document.createElement('button');
+      btn.className = 'tile-toggle-btn';
+      var hid = h.indexOf(t.dataset.tileId) !== -1;
+      btn.innerHTML = hid ? '+' : '&times;';
+      btn.title = hid ? 'Показати' : 'Приховати';
+      btn.onclick = function(e) {
+        e.preventDefault(); e.stopPropagation();
+        var h2 = lh(), id = t.dataset.tileId, i = h2.indexOf(id);
+        if (i === -1) h2.push(id); else h2.splice(i, 1);
+        sh(h2); applyHidden();
+      };
+      t.appendChild(btn);
+    });
+  }
+
+  /* Drag-and-drop */
+  var dragSrc = null;
+  function addDnD() {
+    document.querySelectorAll('[data-tile-id]').forEach(function(t) {
+      if (t.dataset.dndOk) return;
+      t.dataset.dndOk = '1';
+      t.setAttribute('draggable', 'true');
+
+      t.addEventListener('dragstart', function(e) {
+        dragSrc = t;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', t.dataset.tileId);
+        setTimeout(function() { t.classList.add('tile-dragging'); }, 0);
+      });
+
+      t.addEventListener('dragend', function() {
+        t.classList.remove('tile-dragging');
+        document.querySelectorAll('.tile-drag-over').forEach(function(el) {
+          el.classList.remove('tile-drag-over');
+        });
+        dragSrc = null;
+      });
+
+      t.addEventListener('dragover', function(e) {
+        if (!dragSrc || dragSrc === t) return;
+        if (dragSrc.closest('[data-grid-id]') !== t.closest('[data-grid-id]')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.tile-drag-over').forEach(function(el) {
+          el.classList.remove('tile-drag-over');
+        });
+        t.classList.add('tile-drag-over');
+      });
+
+      t.addEventListener('drop', function(e) {
+        if (!dragSrc || dragSrc === t) return;
+        var grid = t.closest('[data-grid-id]');
+        if (!grid || dragSrc.closest('[data-grid-id]') !== grid) return;
+        e.preventDefault();
+        t.classList.remove('tile-drag-over');
+        var tiles = Array.from(grid.querySelectorAll('[data-tile-id]'));
+        if (tiles.indexOf(dragSrc) < tiles.indexOf(t)) t.after(dragSrc);
+        else t.before(dragSrc);
+        saveGridOrder(grid);
+      });
+    });
+  }
+
+  /* Toggle edit mode */
+  var editing = false;
+  window._tileEdit = function() {
+    editing = !editing;
+    document.body.classList.toggle('tile-edit-mode', editing);
+    var tr = document.getElementById('tile-edit-trigger');
+    if (tr) tr.textContent = editing ? '✓ Готово' : '✏️ Налаштувати плитки';
+    if (editing) { addToggleBtns(); addDnD(); }
+    applyHidden();
+  };
+
+  /* Init */
+  applyOrder();
+  applyHidden();
+}
+</script>

@@ -1,0 +1,1326 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Резервне копіювання — Minerva{% endblock %}
+
+{% block content %}
+<style>
+/* ── Variables ─────────────────────────────────────── */
+:root {
+  --bg:       #0f111a;
+  --surface:  #161b2e;
+  --card:     #1a2035;
+  --border:   #2a3558;
+  --accent:   #4f8ef7;
+  --accent2:  #6c63ff;
+  --green:    #22c55e;
+  --red:      #ef4444;
+  --yellow:   #f59e0b;
+  --muted:    #64748b;
+  --text:     #e2e8f0;
+  --text2:    #94a3b8;
+  --radius:   12px;
+}
+
+/* ── Layout ─────────────────────────────────────────── */
+.bk-wrap  { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+.bk-head  { display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 28px; }
+.bk-title { font-size: 1.8rem; font-weight: 700; color: var(--text); margin: 0; }
+
+/* ── Cards ──────────────────────────────────────────── */
+.bk-card  { background: var(--card); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+.bk-card h2 { font-size: 1.1rem; font-weight: 600; color: var(--text);
+              margin: 0 0 20px; display: flex; align-items: center; gap: 8px; }
+
+/* ── Manual backup grid ─────────────────────────────── */
+.bk-grid  { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+@media (max-width: 640px) { .bk-grid { grid-template-columns: 1fr; } }
+
+.bk-box   { background: var(--surface); border: 1px solid var(--border);
+            border-radius: 10px; padding: 20px; text-align: center;
+            display: flex; flex-direction: column; gap: 10px; }
+.bk-box .icon { font-size: 2.2rem; }
+.bk-box h3    { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; }
+.bk-box p     { font-size: .8rem; color: var(--text2); margin: 0; }
+
+.bk-btn   { background: var(--accent); color: #fff; border: none;
+            border-radius: 8px; padding: 10px 16px; font-size: .9rem;
+            font-weight: 600; cursor: pointer; transition: opacity .2s; }
+.bk-btn:hover:not(:disabled) { opacity: .85; }
+.bk-btn:disabled { opacity: .45; cursor: not-allowed; }
+.bk-btn.green { background: var(--green); }
+.bk-btn.red   { background: var(--red); }
+
+.bk-result { min-height: 36px; font-size: .82rem; border-radius: 6px;
+             padding: 6px 10px; text-align: left; line-height: 1.4; }
+.bk-result.idle    { color: var(--muted); }
+.bk-result.running { color: var(--yellow); background: rgba(245,158,11,.08); }
+.bk-result.ok      { color: var(--green);  background: rgba(34,197,94,.08);
+                      white-space: pre-wrap; }
+.bk-result.error   { color: var(--red);    background: rgba(239,68,68,.08);
+                      white-space: pre-wrap; font-family: monospace; font-size:.78rem; }
+
+/* ── Settings form ──────────────────────────────────── */
+.bk-form  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 600px) { .bk-form { grid-template-columns: 1fr; } }
+.bk-form .full { grid-column: 1 / -1; }
+
+.bk-label { display: block; font-size: .82rem; color: var(--text2); margin-bottom: 5px; }
+.bk-input { width: 100%; background: var(--surface); border: 1px solid var(--border);
+            color: var(--text); border-radius: 7px; padding: 9px 12px;
+            font-size: .9rem; box-sizing: border-box; }
+.bk-input:focus { outline: none; border-color: var(--accent); }
+.bk-select { appearance: none; background-image:
+             url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+             background-repeat: no-repeat; background-position: right 10px center; }
+
+.bk-toggle-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.bk-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+.bk-toggle input { opacity: 0; width: 0; height: 0; }
+.bk-toggle .slider {
+  position: absolute; inset: 0; background: var(--border);
+  border-radius: 24px; cursor: pointer; transition: background .2s;
+}
+.bk-toggle .slider:before {
+  content: ""; position: absolute; height: 18px; width: 18px;
+  left: 3px; bottom: 3px; background: #fff; border-radius: 50%;
+  transition: transform .2s;
+}
+.bk-toggle input:checked + .slider { background: var(--green); }
+.bk-toggle input:checked + .slider:before { transform: translateX(20px); }
+.bk-toggle-label { font-size: .9rem; color: var(--text); cursor: pointer; }
+
+.bk-note  { background: rgba(79,142,247,.07); border: 1px solid rgba(79,142,247,.2);
+            border-radius: 8px; padding: 12px 16px; font-size: .83rem; color: var(--text2);
+            line-height: 1.6; }
+.bk-note code { background: rgba(255,255,255,.07); border-radius: 4px;
+                padding: 1px 5px; font-family: monospace; color: var(--text); }
+
+/* ── History table ──────────────────────────────────── */
+.bk-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.bk-table th {
+  text-align: left; padding: 10px 12px; font-size: .78rem; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--border);
+}
+.bk-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,53,88,.5); }
+.bk-table tr:last-child td { border-bottom: none; }
+.bk-table tr:hover td { background: rgba(255,255,255,.02); }
+
+.badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: .75rem; font-weight: 600; }
+.badge.ok      { background: rgba(34,197,94,.15);  color: var(--green); }
+.badge.error   { background: rgba(239,68,68,.15);  color: var(--red); }
+.badge.running { background: rgba(245,158,11,.15); color: var(--yellow); }
+.badge.db      { background: rgba(79,142,247,.15); color: var(--accent); }
+.badge.media   { background: rgba(108,99,255,.15); color: var(--accent2); }
+.badge.full     { background: rgba(34,197,94,.10);  color: #4ade80; }
+.badge.settings { background: rgba(245,158,11,.12); color: var(--yellow); }
+
+.path-cell { font-family: monospace; font-size: .75rem; color: var(--text2);
+             max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.path-cell:hover { overflow: visible; white-space: normal; word-break: break-all; }
+
+.del-btn { background: transparent; border: 1px solid var(--border);
+           color: var(--muted); border-radius: 6px; padding: 3px 8px;
+           font-size: .75rem; cursor: pointer; }
+.del-btn:hover { border-color: var(--red); color: var(--red); }
+
+.empty-row td { text-align: center; color: var(--muted); padding: 32px; }
+
+/* ── Restore section ────────────────────────────────── */
+.restore-warn {
+  background: rgba(239,68,68,.08); border: 1px solid rgba(239,68,68,.25);
+  border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
+  font-size: .85rem; color: #fca5a5; line-height: 1.6;
+}
+.restore-warn strong { color: var(--red); }
+.restore-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+.restore-table th {
+  text-align: left; padding: 9px 12px; font-size: .78rem;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--muted); border-bottom: 1px solid var(--border);
+}
+.restore-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,53,88,.5); vertical-align: middle; }
+.restore-table tr:last-child td { border-bottom: none; }
+.restore-table tr:hover td { background: rgba(255,255,255,.02); }
+.restore-btn {
+  background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.4);
+  color: #fca5a5; border-radius: 7px; padding: 5px 14px;
+  font-size: .82rem; font-weight: 600; cursor: pointer;
+  transition: all .2s; white-space: nowrap;
+}
+.restore-btn:hover { background: rgba(239,68,68,.3); color: #fff; border-color: var(--red); }
+
+/* ── Modal (restore confirm) ────────────────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 99998;
+  background: rgba(0,0,0,.65); align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal-box {
+  background: #1a2035; border: 1px solid #3a4a6a;
+  border-radius: 14px; padding: 32px; max-width: 480px; width: 92%;
+  box-shadow: 0 20px 60px rgba(0,0,0,.7);
+}
+.modal-icon { font-size: 3rem; text-align: center; margin-bottom: 12px; }
+.modal-title { font-size: 1.2rem; font-weight: 700; color: var(--red); text-align: center; margin-bottom: 8px; }
+.modal-sub { font-size: .88rem; color: var(--text2); text-align: center; margin-bottom: 20px; line-height: 1.6; }
+.modal-file { background: rgba(255,255,255,.05); border: 1px solid var(--border);
+              border-radius: 7px; padding: 10px 14px; font-family: monospace;
+              font-size: .82rem; color: var(--text); margin-bottom: 20px;
+              word-break: break-all; line-height: 1.5; }
+.modal-actions { display: flex; gap: 12px; justify-content: center; }
+.modal-cancel { background: var(--surface); border: 1px solid var(--border);
+                color: var(--text2); border-radius: 8px; padding: 10px 24px;
+                font-size: .9rem; cursor: pointer; }
+.modal-cancel:hover { border-color: var(--muted); color: var(--text); }
+.modal-confirm { background: var(--red); border: none; color: #fff;
+                 border-radius: 8px; padding: 10px 24px; font-size: .9rem;
+                 font-weight: 700; cursor: pointer; transition: opacity .2s; }
+.modal-confirm:hover:not(:disabled) { opacity: .85; }
+.modal-confirm:disabled { opacity: .45; cursor: not-allowed; }
+.modal-result { margin-top: 16px; padding: 10px 14px; border-radius: 7px;
+                font-size: .85rem; line-height: 1.5; display: none; }
+.modal-result.ok    { background: rgba(34,197,94,.1); color: var(--green); }
+.modal-result.error { background: rgba(239,68,68,.1);  color: var(--red);
+                      white-space: pre-wrap; font-family: monospace; font-size: .78rem; }
+.modal-result.running { background: rgba(245,158,11,.08); color: var(--yellow); }
+
+/* ── Directory browser modal ────────────────────────── */
+#dirBrowserModal {
+  display: none; position: fixed; inset: 0; z-index: 100000;
+  background: rgba(0,0,0,.72);
+}
+#dirBrowserInner {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1e2a35; border: 1px solid #2a3f52; border-radius: 10px;
+  padding: 24px; width: 660px; max-width: 94vw;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.7);
+}
+#dirBrowserList {
+  overflow-y: auto; border: 1px solid #2a3f52; border-radius: 4px;
+  background: #0d1117; min-height: 160px; max-height: 340px;
+}
+.dir-item {
+  padding: 9px 16px; cursor: pointer;
+  border-bottom: 1px solid #0d1117;
+  color: #c9d8e4; display: flex; align-items: center; gap: 10px;
+  font-size: 13px;
+}
+.dir-item:hover  { background: #162030; }
+.dir-item.is-dir { color: #c9d8e4; }
+.dir-item.is-file { color: #9aafbe; font-family: monospace; font-size: 12px; }
+.dir-item.is-up  { color: #607d8b; }
+
+/* ── Local folder row (browse / pick PC folder) ─────── */
+.bk-pick-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: rgba(79,142,247,.05); border: 1px solid rgba(79,142,247,.15);
+  border-radius: 8px; padding: 12px 14px; margin-bottom: 18px;
+}
+.bk-pick-btn {
+  background: #37474f; color: #b0bec5; border: 1px solid #546e7a;
+  border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px;
+  white-space: nowrap;
+}
+.bk-pick-btn:hover { background: #455a64; }
+.bk-pick-label { font-size: .82rem; color: var(--text2); }
+.bk-pick-selected { font-size: .82rem; color: var(--green); display: none; }
+.bk-pick-hint { font-size: .78rem; color: var(--muted); display: none; }
+
+/* ── Input-with-button wrapper ──────────────────────── */
+.bk-input-row { display: flex; gap: 8px; align-items: center; }
+.bk-input-row .bk-input { flex: 1; }
+.bk-icon-btn {
+  background: #2a3f52; color: #9aafbe; border: 1px solid #3a5570;
+  border-radius: 7px; padding: 9px 13px; cursor: pointer; font-size: 14px;
+  white-space: nowrap; flex-shrink: 0;
+}
+.bk-icon-btn:hover { background: #37474f; color: #c9d8e4; }
+
+/* ── Breadcrumbs ────────────────────────────────────── */
+.breadcrumbs { background: transparent !important; padding: 0 0 16px !important;
+               font-size: .85rem !important; }
+
+/* ── Save bar ───────────────────────────────────────── */
+.save-bar { display: flex; align-items: center; gap: 12px; padding-top: 8px; }
+.save-msg { font-size: .82rem; color: var(--green); display: none; }
+</style>
+
+<!-- Breadcrumbs -->
+<div class="breadcrumbs">
+  <a href="/">Головна</a> › <a href="{% url 'admin:backup_backupplaceholder_changelist' %}">Резервне копіювання</a>
+</div>
+
+<div class="bk-wrap">
+  <div class="bk-head">
+    <h1 class="bk-title">💾 Резервне копіювання</h1>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECTION 0 — System Update (git)
+  ════════════════════════════════════════════════════════ -->
+  <div class="bk-card" id="update-card">
+    <h2>🔄 Оновлення системи</h2>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start;">
+
+      <!-- Status block -->
+      <div style="flex:1; min-width:220px; background:var(--surface); border:1px solid var(--border);
+                  border-radius:10px; padding:16px 18px; display:flex; flex-direction:column; gap:8px;">
+        <div style="font-size:.82rem; color:var(--text2);">Поточний стан:</div>
+        <div id="git-current" style="font-size:.85rem; color:var(--text); font-family:monospace;">—</div>
+        <div id="git-branch"  style="font-size:.78rem; color:var(--muted);">—</div>
+        <div id="git-remote"  style="font-size:.75rem; color:var(--muted); word-break:break-all;">—</div>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex; flex-direction:column; gap:10px; min-width:200px;">
+        <button id="btn-check-update" class="bk-btn" style="background:#2563eb;"
+                onclick="checkUpdate(this)">
+          🔍 Перевірити оновлення
+        </button>
+        <button id="btn-apply-update" class="bk-btn" style="background:#059669; display:none;"
+                onclick="applyUpdate(this)">
+          ⬇️ Оновити зараз
+        </button>
+      </div>
+
+    </div>
+
+    <!-- Result / commit list -->
+    <div id="git-result" class="bk-result idle" style="margin-top:14px; display:none;"></div>
+    <div id="git-commits" style="margin-top:10px; display:none;">
+      <div style="font-size:.8rem; color:var(--text2); margin-bottom:6px;">Нові коміти:</div>
+      <ul id="git-commits-list" style="margin:0; padding-left:20px; font-size:.82rem;
+          font-family:monospace; color:var(--text); line-height:1.7;"></ul>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECTION 1 — Manual Backup
+  ════════════════════════════════════════════════════════ -->
+  <div class="bk-card">
+    <h2>🔄 Швидкий бекап</h2>
+
+    <!-- ── Локальне збереження ── -->
+    <div class="bk-pick-row">
+      <span class="bk-pick-label">💾 Також зберегти на ПК:</span>
+      <button type="button" class="bk-pick-btn" id="bk-local-pick">📂 Вибрати папку</button>
+      <span class="bk-pick-selected" id="bk-local-selected">
+        ✅ <span id="bk-local-name"></span>
+      </span>
+      <span class="bk-pick-hint" id="bk-local-hint">
+        🕓 Остання: <span id="bk-local-hint-name"></span>
+      </span>
+      <span style="font-size:.75rem;color:var(--muted);margin-left:auto;">
+        Chrome/Edge — нативний діалог Windows &nbsp;·&nbsp; Firefox — вкажіть шлях у налаштуваннях
+      </span>
+    </div>
+
+    <div class="bk-grid">
+
+      <!-- DB -->
+      <div class="bk-box">
+        <div class="icon">🗄️</div>
+        <h3>База даних</h3>
+        <p>PostgreSQL pg_dump → .sql</p>
+        <button id="btn-db" class="bk-btn" onclick="runBackup('db', this)">
+          Зробити бекап
+        </button>
+        <div id="result-db" class="bk-result idle">Готово до запуску</div>
+      </div>
+
+      <!-- Media -->
+      <div class="bk-box">
+        <div class="icon">📁</div>
+        <h3>Медіа файли</h3>
+        <p>ZIP-архів папки media/</p>
+        <button id="btn-media" class="bk-btn green" onclick="runBackup('media', this)">
+          Зробити бекап
+        </button>
+        <div id="result-media" class="bk-result idle">Готово до запуску</div>
+      </div>
+
+      <!-- Full -->
+      <div class="bk-box">
+        <div class="icon">📦</div>
+        <h3>Повний бекап</h3>
+        <p>БД + медіа файли</p>
+        <button id="btn-full" class="bk-btn red" onclick="runBackup('full', this)">
+          Зробити бекап
+        </button>
+        <div id="result-full" class="bk-result idle">Готово до запуску</div>
+      </div>
+
+      <!-- Settings (encrypted) -->
+      <div class="bk-box">
+        <div class="icon">⚙️</div>
+        <h3>Налаштування</h3>
+        <p>Юзери, токени, конфіг — зашифровано</p>
+        <input type="password" id="settings-backup-pwd" class="bk-input"
+               placeholder="Пароль для шифрування" autocomplete="new-password"
+               style="text-align:left;">
+        <button id="btn-settings" class="bk-btn" style="background:#6c63ff;"
+                onclick="runSettingsBackup(this)">
+          Зробити бекап
+        </button>
+        <div id="result-settings" class="bk-result idle">Готово до запуску</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECTION 2 — Restore from Backup
+  ════════════════════════════════════════════════════════ -->
+  <div class="bk-card">
+    <h2>🔄 Відновлення з бекапу</h2>
+
+    <div class="restore-warn">
+      <strong>⚠️ УВАГА — незворотна операція!</strong><br>
+      Відновлення <strong>бази даних</strong> повністю замінить поточні дані даними з бекапу.
+      Всі зміни після дати бекапу будуть <strong>безповоротно втрачені</strong>.<br>
+      Відновлення <strong>медіа файлів</strong> перезапише поточні документи/зображення.<br>
+      Перед відновленням рекомендується зробити свіжий бекап поточного стану.
+    </div>
+
+    <!-- Manual path form -->
+    <details style="margin-bottom:20px;">
+      <summary style="cursor:pointer; font-size:.9rem; color:var(--accent);
+                      font-weight:600; user-select:none; padding:4px 0;">
+        📂 Вказати шлях вручну…
+      </summary>
+      <div style="margin-top:14px; background:var(--surface); border:1px solid var(--border);
+                  border-radius:10px; padding:18px 20px;">
+        <div style="display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end; margin-bottom:12px;">
+          <div>
+            <label class="bk-label">🗄️ Шлях до файлу БД (.sql)</label>
+            <div class="bk-input-row">
+              <input type="text" id="manual-db-path" class="bk-input"
+                     placeholder="C:\backups\db_20260225_120000.sql або /backups/db_*.sql">
+              <button type="button" class="bk-icon-btn"
+                      onclick="openBrowser('manual-db-path', true)"
+                      title="Відкрити браузер файлів">📂</button>
+            </div>
+          </div>
+          <div>
+            <label class="bk-label">Тип відновлення</label>
+            <select id="manual-restore-type" class="bk-input bk-select" onchange="toggleManualMediaField()">
+              <option value="db">База даних</option>
+              <option value="media">Медіа файли</option>
+              <option value="full">Повний (БД + медіа)</option>
+            </select>
+          </div>
+        </div>
+        <div id="manual-media-row" style="display:none; margin-bottom:12px;">
+          <label class="bk-label">📁 Шлях до архіву медіа (.zip) — для повного відновлення</label>
+          <div class="bk-input-row">
+            <input type="text" id="manual-media-path" class="bk-input"
+                   placeholder="C:\backups\media_20260225_120000.zip">
+            <button type="button" class="bk-icon-btn"
+                    onclick="openBrowser('manual-media-path', true)"
+                    title="Відкрити браузер файлів">📂</button>
+          </div>
+        </div>
+        <button class="restore-btn" style="width:100%; padding:10px;"
+                onclick="openManualRestoreModal()">
+          🔄 Відновити з вказаного шляху
+        </button>
+      </div>
+    </details>
+
+    <!-- Upload from PC -->
+    <details style="margin-bottom:20px;">
+      <summary style="cursor:pointer; font-size:.9rem; color:var(--accent);
+                      font-weight:600; user-select:none; padding:4px 0;">
+        📤 Завантажити файл бекапу з ПК…
+      </summary>
+      <div style="margin-top:14px; background:var(--surface); border:1px solid var(--border);
+                  border-radius:10px; padding:18px 20px; display:flex; flex-direction:column; gap:12px;">
+        <div style="display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end;">
+          <div>
+            <label class="bk-label">📎 Файл бекапу (.sql / .zip / .mbackup)</label>
+            <input type="file" id="upload-backup-file" class="bk-input"
+                   accept=".sql,.zip,.mbackup" style="padding:6px 12px; cursor:pointer;">
+          </div>
+          <div>
+            <label class="bk-label">Тип</label>
+            <select id="upload-restore-type" class="bk-input bk-select" onchange="toggleUploadSettingsPwd()">
+              <option value="db">База даних (.sql)</option>
+              <option value="media">Медіа файли (.zip)</option>
+              <option value="full">Повний (БД .sql)</option>
+              <option value="settings">Налаштування (.mbackup)</option>
+            </select>
+          </div>
+        </div>
+        <div id="upload-settings-pwd-row" style="display:none;">
+          <label class="bk-label">🔑 Пароль (для .mbackup)</label>
+          <input type="password" id="upload-settings-pwd" class="bk-input"
+                 placeholder="Пароль шифрування" autocomplete="current-password">
+        </div>
+        <button class="restore-btn" style="padding:10px;" onclick="openUploadRestoreModal()">
+          📤 Відновити з файлу
+        </button>
+        <div id="upload-restore-result" class="bk-result idle" style="display:none;"></div>
+      </div>
+    </details>
+
+    {% if available_backups %}
+    <table class="restore-table">
+      <thead>
+        <tr>
+          <th>Дата і час</th>
+          <th>Тип</th>
+          <th>Файл</th>
+          <th>Розмір</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in available_backups %}
+        <tr>
+          <td style="color:var(--text); white-space:nowrap;">{{ b.mtime_str }}</td>
+          <td>
+            <span class="badge {{ b.type }}">{{ b.label }}</span>
+          </td>
+          <td>
+            <div class="path-cell" title="{{ b.path }}">{{ b.name }}</div>
+          </td>
+          <td style="color:var(--text2); white-space:nowrap;">{{ b.size_display }}</td>
+          <td>
+            {% if b.type == 'settings' %}
+            <button class="restore-btn"
+              onclick="openSettingsRestoreModal(
+                '{{ b.path|escapejs }}',
+                '{{ b.name|escapejs }}',
+                '{{ b.mtime_str|escapejs }}'
+              )">
+              🔄 Відновити
+            </button>
+            {% else %}
+            <button class="restore-btn"
+              onclick="openRestoreModal(
+                '{{ b.path|escapejs }}',
+                '{{ b.type }}',
+                '{{ b.label|escapejs }}',
+                '{{ b.name|escapejs }}',
+                '{{ b.mtime_str|escapejs }}',
+                '{{ b.media_path|default:''|escapejs }}'
+              )">
+              🔄 Відновити
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center; color:var(--muted); padding:32px;">
+      Бекапів не знайдено в директорії бекапів.<br>
+      <small>Зробіть перший бекап за допомогою розділу вище.</small>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Confirmation Modal (DB / Media / Full) -->
+  <div class="modal-overlay" id="restoreModal">
+    <div class="modal-box">
+      <div class="modal-icon">⚠️</div>
+      <div class="modal-title">Підтвердіть відновлення</div>
+      <div class="modal-sub" id="modal-sub-text">
+        Ця дія <strong style="color:var(--red)">незворотна</strong>.<br>
+        Поточні дані будуть замінені даними з бекапу.
+      </div>
+      <div class="modal-file" id="modal-file-info"></div>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeRestoreModal()">Скасувати</button>
+        <button class="modal-confirm" id="modal-confirm-btn" onclick="doRestore()">
+          ✅ Так, відновити
+        </button>
+      </div>
+      <div class="modal-result" id="modal-result"></div>
+    </div>
+  </div>
+
+  <!-- Settings Restore Modal (encrypted .mbackup) -->
+  <div class="modal-overlay" id="settingsRestoreModal">
+    <div class="modal-box">
+      <div class="modal-icon">🔑</div>
+      <div class="modal-title">Відновлення налаштувань</div>
+      <div class="modal-sub">
+        Відновить: юзерів, групи, токени API, конфігурацію ботів і систему.<br>
+        Існуючі об'єкти будуть <strong style="color:var(--yellow)">перезаписані</strong>.
+      </div>
+      <div class="modal-file" id="srm-file-info"></div>
+      <div style="margin:14px 0 4px;">
+        <label class="bk-label" style="text-align:left;">🔑 Пароль шифрування</label>
+        <input type="password" id="srm-password" class="bk-input"
+               placeholder="Введіть пароль бекапу" autocomplete="current-password">
+      </div>
+      <div class="modal-actions">
+        <button class="modal-cancel" onclick="closeSettingsRestoreModal()">Скасувати</button>
+        <button class="modal-confirm" id="srm-confirm-btn" onclick="doSettingsRestore()">
+          🔑 Розшифрувати і відновити
+        </button>
+      </div>
+      <div class="modal-result" id="srm-result"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECTION 3 — Auto-backup Settings
+  ════════════════════════════════════════════════════════ -->
+  <div class="bk-card">
+    <h2>⚙️ Налаштування автобекапу</h2>
+
+    <form method="post" action="{% url 'admin:backup_settings' %}" id="settings-form">
+      {% csrf_token %}
+      <div class="bk-form">
+
+        <!-- Backup dir -->
+        <div class="full">
+          <label class="bk-label">📂 Шлях для збереження бекапів</label>
+          <div class="bk-input-row">
+            <input type="text" name="backup_dir" id="backup-dir-input" class="bk-input"
+                   placeholder="Порожнє → {{ settings_default_dir }}"
+                   value="{{ cfg.backup_dir }}">
+            <button type="button" class="bk-icon-btn"
+                    onclick="openBrowser('backup-dir-input', false)"
+                    title="Відкрити браузер директорій">📂</button>
+          </div>
+          <div style="font-size:.78rem; color:var(--muted); margin-top:5px;">
+            Поточний шлях: <code style="background:rgba(255,255,255,.05);padding:1px 5px;border-radius:3px;font-family:monospace;">
+              {% if cfg.backup_dir %}{{ cfg.backup_dir }}{% else %}{{ settings_default_dir }}{% endif %}
+            </code>
+          </div>
+        </div>
+
+        <!-- Include media toggle -->
+        <div>
+          <div class="bk-toggle-row">
+            <label class="bk-toggle">
+              <input type="checkbox" name="include_media"
+                     {% if cfg.include_media %}checked{% endif %}>
+              <span class="slider"></span>
+            </label>
+            <span class="bk-toggle-label">Включати медіа у повний бекап</span>
+          </div>
+        </div>
+
+        <!-- Auto-backup toggle -->
+        <div>
+          <div class="bk-toggle-row">
+            <label class="bk-toggle">
+              <input type="checkbox" name="auto_enabled" id="autoToggle"
+                     {% if cfg.auto_enabled %}checked{% endif %}
+                     onchange="toggleAutoSection()">
+              <span class="slider"></span>
+            </label>
+            <span class="bk-toggle-label">Автобекап увімкнено</span>
+          </div>
+        </div>
+
+        <!-- Schedule -->
+        <div id="auto-section" style="{% if not cfg.auto_enabled %}display:none{% endif %}">
+          <label class="bk-label">🕐 Розклад</label>
+          <select name="schedule" class="bk-input bk-select">
+            <option value="daily"  {% if cfg.schedule == 'daily'  %}selected{% endif %}>Щодня</option>
+            <option value="weekly" {% if cfg.schedule == 'weekly' %}selected{% endif %}>Щотижня</option>
+          </select>
+        </div>
+
+        <!-- Retention -->
+        <div>
+          <label class="bk-label">🗑️ Зберігати останніх N бекапів</label>
+          <input type="number" name="retention" class="bk-input"
+                 min="1" max="99" value="{{ cfg.retention }}">
+        </div>
+
+        <!-- Save -->
+        <div class="full save-bar">
+          <button type="submit" class="bk-btn">💾 Зберегти налаштування</button>
+          <span class="save-msg" id="save-msg">✅ Збережено</span>
+        </div>
+
+      </div>
+    </form>
+
+    <!-- Auto-backup note -->
+    <div class="bk-note" style="margin-top: 20px;">
+      <strong>ℹ️ Автоматичний запуск бекапу</strong><br>
+      Увімкнення цієї опції лише зберігає налаштування. Для реального автозапуску
+      додайте команду до планувальника:
+      <br><br>
+      <strong>Windows Task Scheduler:</strong><br>
+      <code>python C:\tabele_mvp\manage.py run_backup --type full</code><br><br>
+      <strong>Linux/Docker cron:</strong><br>
+      <code>0 3 * * * cd /app && python manage.py run_backup --type full</code>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SECTION 4 — Backup History
+  ════════════════════════════════════════════════════════ -->
+  <div class="bk-card">
+    <h2>📋 Історія бекапів
+      <span style="font-size:.8rem; color:var(--muted); font-weight:400; margin-left:8px;">
+        (останні 50)
+      </span>
+    </h2>
+
+    <table class="bk-table">
+      <thead>
+        <tr>
+          <th>Дата і час</th>
+          <th>Тип</th>
+          <th>Статус</th>
+          <th>Файл</th>
+          <th>Розмір</th>
+          <th>Час (с)</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if logs %}
+          {% for log in logs %}
+          <tr>
+            <td style="color:var(--text); white-space:nowrap;">
+              {{ log.created_at|date:"d.m.Y H:i:s" }}
+            </td>
+            <td>
+              <span class="badge {{ log.backup_type }}">
+                {{ log.get_backup_type_display }}
+              </span>
+            </td>
+            <td>
+              <span class="badge {{ log.status }}">
+                {{ log.get_status_display }}
+              </span>
+            </td>
+            <td>
+              <div class="path-cell" title="{{ log.file_path }}">
+                {% if log.file_path %}{{ log.file_path }}{% else %}—{% endif %}
+              </div>
+              {% if log.error_msg %}
+              <div style="font-size:.75rem; color:var(--red); margin-top:3px; font-family:monospace;">
+                {{ log.error_msg|truncatechars:120 }}
+              </div>
+              {% endif %}
+            </td>
+            <td style="white-space:nowrap; color:var(--text2);">
+              {{ log.size_display }}
+            </td>
+            <td style="color:var(--text2);">{{ log.duration }}s</td>
+            <td>
+              <form method="post" action="{% url 'admin:backup_delete_log' log.pk %}"
+                    onsubmit="return confirm('Видалити запис? Файл також буде видалено.')">
+                {% csrf_token %}
+                <button type="submit" class="del-btn">🗑</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr class="empty-row">
+            <td colspan="7">Бекапів ще не було. Зробіть перший бекап!</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+
+</div><!-- .bk-wrap -->
+
+<!-- ═══════════════════════════════════════════════════════
+     Directory Browser Modal
+════════════════════════════════════════════════════════ -->
+<div id="dirBrowserModal">
+  <div id="dirBrowserInner">
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <span style="color:#c9d8e4;font-weight:700;font-size:15px" id="dirBrowserTitle">📂 Вибрати папку</span>
+      <button type="button" id="dirBrowserCloseBtn"
+              style="background:none;border:none;color:#9aafbe;font-size:22px;cursor:pointer;line-height:1;padding:0">✕</button>
+    </div>
+    <!-- Path bar -->
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
+      <input type="text" id="dirBrowserPathInput"
+             placeholder="Введіть шлях або оберіть нижче…"
+             style="flex:1;background:#111c26;border:1px solid #2a3f52;border-radius:4px;
+                    padding:7px 10px;font-size:12px;font-family:monospace;color:#c9d8e4;outline:none;">
+      <button type="button" id="dirBrowserGoBtn"
+              style="background:#2a3f52;color:#9aafbe;border:1px solid #3a5570;
+                     border-radius:4px;padding:7px 14px;cursor:pointer;font-size:13px;white-space:nowrap;">
+        → Перейти
+      </button>
+    </div>
+    <!-- List -->
+    <div id="dirBrowserList"></div>
+    <!-- Footer -->
+    <div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end;">
+      <button type="button" id="dirBrowserCancelBtn"
+              style="background:#37474f;color:#b0bec5;border:1px solid #546e7a;
+                     padding:8px 18px;border-radius:6px;cursor:pointer;">Скасувати</button>
+      <button type="button" id="dirBrowserConfirm"
+              style="background:#4caf50;color:#fff;border:none;
+                     padding:8px 22px;border-radius:6px;cursor:pointer;font-weight:700;">✅ Вибрати</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   Constants & state
+════════════════════════════════════════════════════════════════════ */
+const CSRF = (function() {
+  const m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+})();
+
+const BROWSE_URL   = '{% url "admin:backup_browse_dir" %}';
+const DOWNLOAD_URL = '/admin/backup/backupplaceholder/download/';  /* + pk + / */
+
+const LS_LOCAL_NAME = 'bkLocalDirName';  /* localStorage: ім'я нативної папки */
+
+var _localHandle = null;   /* FileSystemDirectoryHandle для локального збереження */
+var _browseTarget = null;  /* id input-поля, яке заповнює браузер */
+var _browseFiles  = false; /* true = показувати .sql/.zip файли */
+var _browserCurPath = '';
+
+/* ── Показуємо підказку про останній вибір ── */
+(function() {
+  var name = localStorage.getItem(LS_LOCAL_NAME);
+  if (!name) return;
+  var hint = document.getElementById('bk-local-hint');
+  var hn   = document.getElementById('bk-local-hint-name');
+  if (hint && hn) { hn.textContent = name; hint.style.display = 'inline'; }
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   Local folder picker (Chrome/Edge)
+════════════════════════════════════════════════════════════════════ */
+document.getElementById('bk-local-pick').addEventListener('click', function() {
+  if (typeof window.showDirectoryPicker !== 'function') {
+    alert('showDirectoryPicker не підтримується у цьому браузері.\nВикористовуйте Chrome або Edge.');
+    return;
+  }
+  window.showDirectoryPicker({ mode: 'readwrite' })
+    .then(function(handle) {
+      _localHandle = handle;
+      localStorage.setItem(LS_LOCAL_NAME, handle.name);
+
+      document.getElementById('bk-local-name').textContent = handle.name;
+      document.getElementById('bk-local-selected').style.display = 'inline';
+      document.getElementById('bk-local-hint').style.display = 'none';
+    })
+    .catch(function(e) {
+      if (e.name !== 'AbortError') console.error('showDirectoryPicker:', e);
+    });
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   runBackup — основна функція
+════════════════════════════════════════════════════════════════════ */
+async function runBackup(type, btn) {
+  const resultEl = document.getElementById('result-' + type);
+  btn.disabled = true;
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ Виконується… це може зайняти кілька секунд';
+
+  try {
+    const resp = await fetch('{% url "admin:backup_run" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'type=' + encodeURIComponent(type),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    if (data.status === 'ok') {
+      const filename = (data.file || '').replace(/\\/g, '/').split('/').pop();
+      resultEl.className = 'bk-result ok';
+      resultEl.textContent = '✅ ' + data.size + ' · ' + data.duration + 'с\n📄 ' + filename;
+
+      /* ── Локальне збереження ── */
+      if (_localHandle && data.pk) {
+        resultEl.textContent += '\n💾 Завантажуємо на ПК…';
+        try {
+          const dlResp = await fetch(DOWNLOAD_URL + data.pk + '/', {
+            headers: { 'X-CSRFToken': CSRF },
+          });
+          if (!dlResp.ok) throw new Error('HTTP ' + dlResp.status);
+          const blob = await dlResp.blob();
+          const fh = await _localHandle.getFileHandle(filename, { create: true });
+          const w  = await fh.createWritable();
+          await w.write(blob);
+          await w.close();
+          resultEl.textContent += '\n💾 Збережено локально: ' + _localHandle.name + '\\' + filename;
+        } catch(e) {
+          resultEl.textContent += '\n⚠️ Локальне збереження: ' + e.message;
+        }
+      }
+
+      setTimeout(() => location.reload(), 2500);
+    } else {
+      resultEl.className = 'bk-result error';
+      resultEl.textContent = '❌ ' + (data.error || 'Невідома помилка');
+    }
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ Помилка з\'єднання: ' + e.message;
+  }
+
+  btn.disabled = false;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Git Update
+════════════════════════════════════════════════════════════════════ */
+const GIT_STATUS_URL = '{% url "admin:backup_git_status" %}';
+const GIT_UPDATE_URL = '{% url "admin:backup_git_update" %}';
+
+async function checkUpdate(btn) {
+  const resultEl  = document.getElementById('git-result');
+  const commitBox = document.getElementById('git-commits');
+  const applyBtn  = document.getElementById('btn-apply-update');
+  btn.disabled = true;
+  resultEl.style.display = 'block';
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ Перевірка оновлень… (git fetch origin)';
+  commitBox.style.display = 'none';
+  applyBtn.style.display = 'none';
+
+  try {
+    const resp = await fetch(GIT_STATUS_URL, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF },
+    });
+    const data = await resp.json();
+
+    if (!data.ok) {
+      resultEl.className = 'bk-result error';
+      resultEl.textContent = '❌ ' + data.error;
+      btn.disabled = false; return;
+    }
+
+    // Fill status block
+    document.getElementById('git-current').textContent =
+      data.current_hash ? (data.current_hash + ' — ' + data.current_subject) : '—';
+    document.getElementById('git-branch').textContent =
+      'Гілка: ' + (data.branch || '?');
+    document.getElementById('git-remote').textContent =
+      data.remote_url ? ('Remote: ' + data.remote_url) : '';
+
+    if (!data.fetch_ok && data.fetch_err) {
+      resultEl.className = 'bk-result error';
+      resultEl.textContent = '⚠️ git fetch помилка: ' + data.fetch_err;
+      btn.disabled = false; return;
+    }
+
+    if (data.behind === 0) {
+      resultEl.className = 'bk-result ok';
+      resultEl.textContent = '✅ Система актуальна — нових оновлень немає.';
+    } else {
+      resultEl.className = 'bk-result running';
+      resultEl.textContent = `⬆️ Доступно ${data.behind} нових комітів!`;
+      // Show commit list
+      const ul = document.getElementById('git-commits-list');
+      ul.innerHTML = data.commits.map(c =>
+        `<li><span style="color:var(--accent)">${c.hash}</span> ${c.subject}</li>`
+      ).join('');
+      commitBox.style.display = 'block';
+      applyBtn.style.display = 'block';
+    }
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+async function applyUpdate(btn) {
+  if (!confirm('Застосувати оновлення?\n\ngit pull + перезавантаження workers.\nСторінка може не відповідати ~5 секунд.')) return;
+  const resultEl = document.getElementById('git-result');
+  btn.disabled = true;
+  document.getElementById('btn-check-update').disabled = true;
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ git pull origin… не закривайте сторінку.';
+  try {
+    const resp = await fetch(GIT_UPDATE_URL, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF },
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      const reload = data.reloaded ? ' Workers перезавантажені.' : ' ⚠️ Перезавантаження вручну.';
+      resultEl.className = 'bk-result ok';
+      resultEl.textContent = `✅ Оновлено за ${data.duration}с.${reload}\n${data.output || ''}`;
+      document.getElementById('git-commits').style.display = 'none';
+      btn.style.display = 'none';
+      setTimeout(() => location.reload(), 4000);
+    } else {
+      resultEl.className = 'bk-result error';
+      resultEl.textContent = '❌ ' + data.error;
+      btn.disabled = false;
+      document.getElementById('btn-check-update').disabled = false;
+    }
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ ' + e.message;
+    btn.disabled = false;
+    document.getElementById('btn-check-update').disabled = false;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Settings Backup (encrypted)
+════════════════════════════════════════════════════════════════════ */
+async function runSettingsBackup(btn) {
+  const pwd = document.getElementById('settings-backup-pwd').value.trim();
+  if (!pwd) {
+    alert('Введіть пароль для шифрування бекапу.');
+    document.getElementById('settings-backup-pwd').focus();
+    return;
+  }
+  const resultEl = document.getElementById('result-settings');
+  btn.disabled = true;
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ Шифрування і збереження…';
+  try {
+    const resp = await fetch('{% url "admin:backup_settings_backup" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'password=' + encodeURIComponent(pwd),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.status === 'ok') {
+      resultEl.className = 'bk-result ok';
+      resultEl.textContent = '✅ ' + data.size + ' · ' + data.duration + 'с\n📄 ' + (data.file || '');
+      document.getElementById('settings-backup-pwd').value = '';
+      setTimeout(() => location.reload(), 2500);
+    } else {
+      resultEl.className = 'bk-result error';
+      resultEl.textContent = '❌ ' + (data.error || 'Невідома помилка');
+    }
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Upload from PC restore
+════════════════════════════════════════════════════════════════════ */
+function toggleUploadSettingsPwd() {
+  const type = document.getElementById('upload-restore-type').value;
+  document.getElementById('upload-settings-pwd-row').style.display =
+    type === 'settings' ? '' : 'none';
+}
+
+async function openUploadRestoreModal() {
+  const fileInput = document.getElementById('upload-backup-file');
+  const type      = document.getElementById('upload-restore-type').value;
+  const pwd       = document.getElementById('upload-settings-pwd').value.trim();
+  if (!fileInput.files.length) {
+    alert('Оберіть файл бекапу.'); return;
+  }
+  const file = fileInput.files[0];
+  if (type === 'settings') {
+    if (!pwd) {
+      alert('Введіть пароль для розшифрування.');
+      document.getElementById('upload-settings-pwd').focus(); return;
+    }
+    if (!confirm(`Відновити налаштування з "${file.name}"?\nЦе перезапише існуючі налаштування.`)) return;
+  } else {
+    if (!confirm(`Відновити з "${file.name}" (${type})?\nЦе незворотна операція.`)) return;
+  }
+  await _doUploadRestore(file, type, type === 'settings' ? pwd : null);
+}
+
+async function _doUploadRestore(file, type, password) {
+  const resultEl = document.getElementById('upload-restore-result');
+  resultEl.style.display = 'block';
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ Завантаження і відновлення…';
+  const form = new FormData();
+  form.append('backup_file', file);
+  let url;
+  if (type === 'settings') {
+    form.append('password', password);
+    url = '{% url "admin:backup_settings_restore" %}';
+  } else {
+    form.append('restore_type', type);
+    url = '{% url "admin:backup_restore" %}';
+  }
+  try {
+    const resp = await fetch(url, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF }, body: form,
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.ok) {
+      const extra = data.count ? ` · ${data.count} об'єктів` : '';
+      const warn  = data.warnings ? `\n⚠️ ${data.warnings}` : '';
+      resultEl.className = 'bk-result ok';
+      resultEl.textContent = `✅ Відновлено за ${data.duration || '?'}с${extra}.${warn}\nСторінка перезавантажиться…`;
+      setTimeout(() => location.reload(), 3000);
+    } else {
+      resultEl.className = 'bk-result error';
+      resultEl.textContent = '❌ ' + (data.error || JSON.stringify(data));
+    }
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ ' + e.message;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Settings Restore Modal (from NAS backup list)
+════════════════════════════════════════════════════════════════════ */
+let _srmFilepath = '';
+
+function openSettingsRestoreModal(filepath, name, mtime) {
+  _srmFilepath = filepath;
+  document.getElementById('srm-file-info').innerHTML =
+    '<b>Файл:</b> ' + name + '<br><b>Дата бекапу:</b> ' + mtime;
+  document.getElementById('srm-password').value = '';
+  const r = document.getElementById('srm-result');
+  r.className = 'modal-result'; r.style.display = 'none'; r.textContent = '';
+  document.getElementById('srm-confirm-btn').disabled = false;
+  document.getElementById('settingsRestoreModal').classList.add('open');
+}
+
+function closeSettingsRestoreModal() {
+  document.getElementById('settingsRestoreModal').classList.remove('open');
+}
+document.getElementById('settingsRestoreModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSettingsRestoreModal();
+});
+
+async function doSettingsRestore() {
+  const btn    = document.getElementById('srm-confirm-btn');
+  const result = document.getElementById('srm-result');
+  const pwd    = document.getElementById('srm-password').value.trim();
+  if (!pwd) {
+    alert('Введіть пароль.'); document.getElementById('srm-password').focus(); return;
+  }
+  btn.disabled = true;
+  result.className = 'modal-result running'; result.style.display = 'block';
+  result.textContent = '⏳ Розшифрування і відновлення…';
+  const body = new URLSearchParams({ filepath: _srmFilepath, password: pwd });
+  try {
+    const resp = await fetch('{% url "admin:backup_settings_restore" %}', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.ok) {
+      const extra = data.count ? ` · ${data.count} об'єктів` : '';
+      const warn  = data.warnings ? `\n⚠️ ${data.warnings}` : '';
+      result.className = 'modal-result ok';
+      result.textContent = `✅ Відновлено за ${data.duration || '?'}с${extra}.${warn}\nСторінка перезавантажиться…`;
+      setTimeout(() => location.reload(), 3000);
+    } else {
+      result.className = 'modal-result error';
+      result.textContent = '❌ ' + (data.error || JSON.stringify(data));
+      btn.disabled = false;
+    }
+  } catch(e) {
+    result.className = 'modal-result error';
+    result.textContent = '❌ ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Directory Browser
+════════════════════════════════════════════════════════════════════ */
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function openBrowser(targetInputId, showFiles) {
+  _browseTarget = targetInputId;
+  _browseFiles  = showFiles;
+  var startPath = (document.getElementById(targetInputId) || {}).value || '';
+  document.getElementById('dirBrowserTitle').textContent =
+    showFiles ? '📂 Вибрати файл бекапу' : '📂 Вибрати директорію';
+  document.getElementById('dirBrowserModal').style.display = 'block';
+  loadBrowserDir(startPath || '');
+}
+
+function closeBrowser() {
+  document.getElementById('dirBrowserModal').style.display = 'none';
+}
+
+function loadBrowserDir(path) {
+  var list = document.getElementById('dirBrowserList');
+  list.innerHTML = '<div class="dir-item" style="color:#607d8b;cursor:default">⏳ Завантаження…</div>';
+  var url = BROWSE_URL + '?path=' + encodeURIComponent(path) + '&files=' + (_browseFiles ? '1' : '0');
+  fetch(url)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      _browserCurPath = data.current;
+      document.getElementById('dirBrowserPathInput').value = data.current;
+      var h = '';
+      if (data.parent !== null && data.parent !== undefined) {
+        h += '<div class="dir-item is-up" data-path="' + esc(data.parent) + '" data-type="dir">'
+           + '<span>⬆️</span><span style="color:#607d8b;font-size:12px">..</span>'
+           + '<span style="font-size:11px;color:#455a64;font-family:monospace">' + esc(data.parent) + '</span></div>';
+      }
+      if (!data.dirs.length && !data.files.length) {
+        h += '<div class="dir-item" style="color:#607d8b;cursor:default;font-style:italic">'
+           + (_browseFiles ? 'Немає папок і файлів .sql/.zip' : 'Немає підпапок') + '</div>';
+      }
+      data.dirs.forEach(function(d) {
+        h += '<div class="dir-item is-dir" data-path="' + esc(d.path) + '" data-type="dir">'
+           + '<span>📁</span><span>' + esc(d.name) + '</span></div>';
+      });
+      data.files.forEach(function(f) {
+        h += '<div class="dir-item is-file" data-path="' + esc(f.path) + '" data-type="file">'
+           + '<span>' + (f.name.endsWith('.sql') ? '🗄️' : '📦') + '</span>'
+           + '<span>' + esc(f.name) + '</span></div>';
+      });
+      list.innerHTML = h;
+    })
+    .catch(function(err) {
+      document.getElementById('dirBrowserPathInput').value = path;
+      list.innerHTML = '<div class="dir-item" style="color:#f44336;cursor:default">⚠️ ' + esc(String(err)) + '</div>';
+    });
+}
+
+/* List click — navigate dirs, pick files */
+document.getElementById('dirBrowserList').addEventListener('click', function(e) {
+  var item = e.target.closest('[data-path]');
+  if (!item) return;
+  if (item.dataset.type === 'file') {
+    /* Вибрати файл → заповнити input і закрити */
+    var inp = document.getElementById(_browseTarget);
+    if (inp) inp.value = item.dataset.path;
+    closeBrowser();
+  } else {
+    loadBrowserDir(item.dataset.path);
+  }
+});
+
+/* Path input Enter */
+document.getElementById('dirBrowserPathInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); loadBrowserDir(this.value.trim()); }
+});
+document.getElementById('dirBrowserGoBtn').addEventListener('click', function() {
+  loadBrowserDir(document.getElementById('dirBrowserPathInput').value.trim());
+});
+
+/* Confirm — select current dir */
+document.getElementById('dirBrowserConfirm').addEventListener('click', function() {
+  var chosen = document.getElementById('dirBrowserPathInput').value.trim() || _browserCurPath;
+  if (!chosen) return;
+  var inp = document.getElementById(_browseTarget);
+  if (inp) inp.value = chosen;
+  closeBrowser();
+});
+
+/* Close buttons */
+['dirBrowserCloseBtn', 'dirBrowserCancelBtn'].forEach(function(id) {
+  document.getElementById(id).addEventListener('click', closeBrowser);
+});
+document.getElementById('dirBrowserModal').addEventListener('click', function(e) {
+  if (e.target === this) closeBrowser();
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   Settings / other helpers
+════════════════════════════════════════════════════════════════════ */
+function toggleAutoSection() {
+  const on = document.getElementById('autoToggle').checked;
+  document.getElementById('auto-section').style.display = on ? '' : 'none';
+}
+
+function toggleManualMediaField() {
+  const type = document.getElementById('manual-restore-type').value;
+  document.getElementById('manual-media-row').style.display = (type === 'full') ? '' : 'none';
+}
+
+function openManualRestoreModal() {
+  const type      = document.getElementById('manual-restore-type').value;
+  const dbPath    = document.getElementById('manual-db-path').value.trim();
+  const mediaPath = document.getElementById('manual-media-path').value.trim();
+  if (!dbPath) { alert('Вкажіть шлях до файлу бекапу.'); return; }
+  const labels    = { db: 'База даних', media: 'Медіа файли', full: 'Повний (БД + медіа)' };
+  const filename  = dbPath.split(/[\\/]/).pop();
+  const mfn       = mediaPath ? mediaPath.split(/[\\/]/).pop() : '';
+  openRestoreModal(dbPath, type, labels[type], filename, 'вручну вказаний файл', mediaPath);
+}
+
+/* ── Restore modal ───────────────────────────────────────────────── */
+let _restoreData = {};
+
+function openRestoreModal(filepath, type, label, name, mtime, mediaPath) {
+  _restoreData = { filepath, type, label, name, mtime, mediaPath };
+  const subMsgs = {
+    db:    'Поточна <strong style="color:var(--red)">база даних буде видалена</strong> та замінена даними з бекапу.',
+    media: 'Поточні <strong style="color:var(--red)">медіа файли будуть перезаписані</strong> з архіву.',
+    full:  'Поточна <strong style="color:var(--red)">база даних та медіа файли</strong> будуть замінені даними з бекапу.',
+  };
+  document.getElementById('modal-sub-text').innerHTML =
+    (subMsgs[type] || '') + '<br><br>Всі зміни після дати бекапу будуть <strong style="color:var(--red)">безповоротно втрачені</strong>.';
+  document.getElementById('modal-file-info').innerHTML =
+    `<b>Тип:</b> ${label}<br><b>Файл:</b> ${name}<br><b>Дата бекапу:</b> ${mtime}`;
+  const resultEl = document.getElementById('modal-result');
+  resultEl.className = 'modal-result';
+  resultEl.style.display = 'none';
+  resultEl.textContent = '';
+  document.getElementById('modal-confirm-btn').disabled = false;
+  document.getElementById('restoreModal').classList.add('open');
+}
+
+function closeRestoreModal() {
+  document.getElementById('restoreModal').classList.remove('open');
+}
+document.getElementById('restoreModal').addEventListener('click', function(e) {
+  if (e.target === this) closeRestoreModal();
+});
+
+async function doRestore() {
+  const btn    = document.getElementById('modal-confirm-btn');
+  const result = document.getElementById('modal-result');
+  btn.disabled = true;
+  result.className    = 'modal-result running';
+  result.style.display = 'block';
+  result.textContent  = '⏳ Відновлення… це може зайняти кілька хвилин. Не закривайте сторінку.';
+  const body = new URLSearchParams({
+    filepath:     _restoreData.filepath,
+    restore_type: _restoreData.type,
+    media_path:   _restoreData.mediaPath || '',
+  });
+  try {
+    const resp = await fetch('{% url "admin:backup_restore" %}', {
+      method:  'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body:    body.toString(),
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.ok) {
+      result.className  = 'modal-result ok';
+      result.textContent = `✅ Відновлення завершено за ${data.duration || '?'}с.\nСторінка перезавантажиться автоматично.`;
+      setTimeout(() => location.reload(), 3000);
+    } else {
+      result.className  = 'modal-result error';
+      result.textContent = '❌ Помилка відновлення:\n' + (data.error || JSON.stringify(data));
+      btn.disabled = false;
+    }
+  } catch(e) {
+    result.className  = 'modal-result error';
+    result.textContent = '❌ Помилка з\'єднання: ' + e.message;
+    btn.disabled = false;
+  }
+}
+</script>
+{% endblock %}

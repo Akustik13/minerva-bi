@@ -1,0 +1,1200 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}📖 Довідник — Minerva BI{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'system_index' %}">Система</a>
+  &rsaquo; <a href="{% url 'faq_index' %}">FAQ та підтримка</a>
+  &rsaquo; Довідник
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --bg:#0d1117; --s1:#161b22; --s2:#1c2128; --s3:#21262d;
+  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.14);
+  --text:#e6edf3; --muted:#7d8590; --muted2:#9198a1;
+  --gold:#c9a84c; --gold-l:#e8d5a3;
+  --blue:#58a6ff; --green:#3fb950; --orange:#e3b341;
+  --red:#f85149; --purple:#bc8cff;
+}
+
+#content { padding: 0 !important; }
+#content-main { max-width: none !important; }
+
+/* ── Tab nav ── */
+.tab-nav{
+  background:var(--s1);border-bottom:1px solid var(--border);
+  padding:0 40px;display:flex;gap:0;overflow-x:auto;
+}
+.tab-btn{
+  padding:14px 18px;font-size:13px;font-weight:600;color:var(--muted);
+  background:none;border:none;border-bottom:2px solid transparent;
+  cursor:pointer;white-space:nowrap;transition:all .2s;letter-spacing:.2px;
+}
+.tab-btn:hover{color:var(--text);}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue);}
+
+/* ── Main ── */
+.main{padding:36px 40px 80px;}
+
+/* ── Sections ── */
+.section{display:none;animation:fadeIn .3s ease;}
+.section.active{display:block;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+.section-header{
+  display:flex;align-items:center;gap:16px;
+  margin-bottom:28px;padding-bottom:18px;
+  border-bottom:1px solid var(--border);
+}
+.section-icon{
+  width:52px;height:52px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;flex-shrink:0;
+}
+.section-header h2{font-size:24px;font-weight:800;letter-spacing:-.5px;}
+.section-header p{color:var(--muted);font-size:14px;margin-top:3px;}
+
+/* ── Cards ── */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:28px;}
+.card{
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:12px;padding:18px 20px;
+  transition:border-color .2s,transform .2s;
+}
+.card:hover{border-color:rgba(88,166,255,.3);transform:translateY(-2px);}
+.card[onclick]:hover{border-color:rgba(88,166,255,.6);box-shadow:0 0 0 1px rgba(88,166,255,.2);}
+.card[onclick]:hover .card-head h3{color:var(--blue);}
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.card-head .icon{font-size:20px;}
+.card-head h3{font-size:14px;font-weight:700;}
+.card p{font-size:13px;color:var(--muted);line-height:1.65;}
+.card a{color:var(--blue);text-decoration:none;}
+.card a:hover{text-decoration:underline;}
+
+/* ── Steps ── */
+.steps{display:flex;flex-direction:column;gap:10px;margin-bottom:24px;}
+.step{
+  display:flex;gap:14px;align-items:flex-start;
+  background:var(--s1);border:1px solid var(--border);
+  border-radius:10px;padding:14px 16px;
+}
+.step-num{
+  width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:1px;
+  background:linear-gradient(135deg,var(--blue),var(--purple));
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;
+}
+.step-content h4{font-size:13px;font-weight:700;margin-bottom:3px;}
+.step-content p{font-size:13px;color:var(--muted);}
+
+/* ── Badges ── */
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;margin:2px;}
+.b-blue  {background:rgba(88,166,255,.15);color:#58a6ff;border:1px solid rgba(88,166,255,.3);}
+.b-green {background:rgba(63,185,80,.15);color:#3fb950;border:1px solid rgba(63,185,80,.3);}
+.b-orange{background:rgba(227,179,65,.15);color:#e3b341;border:1px solid rgba(227,179,65,.3);}
+.b-red   {background:rgba(248,81,73,.15);color:#f85149;border:1px solid rgba(248,81,73,.3);}
+.b-purple{background:rgba(188,140,255,.15);color:#bc8cff;border:1px solid rgba(188,140,255,.3);}
+.b-gray  {background:rgba(125,133,144,.15);color:#9198a1;border:1px solid rgba(125,133,144,.3);}
+.b-gold  {background:rgba(201,168,76,.15);color:#c9a84c;border:1px solid rgba(201,168,76,.3);}
+
+/* ── Table ── */
+.t-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:22px;}
+.ht{width:100%;border-collapse:collapse;font-size:13px;}
+.ht th{padding:10px 14px;background:var(--s2);color:var(--muted);
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
+  border-bottom:1px solid var(--border);text-align:left;}
+.ht td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;}
+.ht tr:last-child td{border-bottom:none;}
+.ht tr:hover td{background:rgba(255,255,255,.02);}
+
+/* ── Code ── */
+code{font-family:'JetBrains Mono',monospace;background:var(--s2);
+  padding:2px 6px;border-radius:4px;font-size:12px;color:#79c0ff;}
+.codeblock{
+  background:var(--s2);border:1px solid var(--border);
+  border-radius:10px;padding:14px 16px;
+  font-family:'JetBrains Mono',monospace;font-size:12px;
+  color:#e6edf3;margin:10px 0;overflow-x:auto;white-space:pre;
+}
+
+/* ── Alerts ── */
+.alert{padding:12px 16px;border-radius:10px;font-size:13px;
+  margin-bottom:16px;display:flex;gap:10px;align-items:flex-start;}
+.alert-blue  {background:rgba(88,166,255,.07);border:1px solid rgba(88,166,255,.2);}
+.alert-green {background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.2);}
+.alert-orange{background:rgba(227,179,65,.07);border:1px solid rgba(227,179,65,.2);}
+.alert-red   {background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.2);}
+
+h3.sub{font-size:15px;font-weight:700;margin:24px 0 12px;color:var(--text);}
+hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
+
+/* ── RFM grid ── */
+.rfm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px;}
+.rfm-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.rfm-card .emoji{font-size:20px;}
+.rfm-card h4{font-size:13px;font-weight:700;margin:5px 0 3px;}
+.rfm-card p{font-size:12px;color:var(--muted);}
+
+/* ── Feature row ── */
+.feature-row{display:flex;align-items:flex-start;gap:14px;
+  background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  padding:14px 16px;margin-bottom:10px;}
+.feature-icon{font-size:22px;flex-shrink:0;margin-top:2px;}
+.feature-content h4{font-size:13px;font-weight:700;margin-bottom:3px;}
+.feature-content p{font-size:13px;color:var(--muted);}
+
+@media(max-width:900px){.rfm-grid{grid-template-columns:1fr;} .cards{grid-template-columns:1fr;}}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Tab navigation -->
+<div class="tab-nav">
+  <button class="tab-btn active" data-tab="overview"   onclick="show('overview')">🏠 Огляд</button>
+  <button class="tab-btn"        data-tab="dashboard"  onclick="show('dashboard')">📊 Дашборд</button>
+  <button class="tab-btn"        data-tab="sales"      onclick="show('sales')">🛒 Продажі</button>
+  <button class="tab-btn"        data-tab="crm"        onclick="show('crm')">👥 CRM</button>
+  <button class="tab-btn"        data-tab="inventory"  onclick="show('inventory')">📦 Склад</button>
+  <button class="tab-btn"        data-tab="import"     onclick="show('import')">📥 Імпорт Excel</button>
+  <button class="tab-btn"        data-tab="labels"     onclick="show('labels')">🏷️ Етикетки</button>
+  <button class="tab-btn"        data-tab="bots"       onclick="show('bots')">🤖 Боти та API</button>
+  <button class="tab-btn"        data-tab="accounting" onclick="show('accounting')">💰 Бухгалтерія</button>
+  <button class="tab-btn"        data-tab="shipping"   onclick="show('shipping')">🚚 Доставка</button>
+  <button class="tab-btn"        data-tab="sistema"    onclick="show('sistema')">⚙️ Система</button>
+  <button class="tab-btn"        data-tab="shortcuts"  onclick="show('shortcuts')">⚡ Швидкий старт</button>
+</div>
+
+<div class="main">
+
+  <!-- ══ ОГЛЯД ══ -->
+  <div id="overview" class="section active">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(201,168,76,.2),rgba(232,213,163,.1))">🏛️</div>
+      <div>
+        <h2>Minerva Business Intelligence</h2>
+        <p>ERP/BI система для управління продажами, складом та клієнтами</p>
+      </div>
+    </div>
+
+    <div class="cards">
+      <div class="card" onclick="show('dashboard')" style="cursor:pointer" title="Перейти до розділу Дашборд">
+        <div class="card-head"><span class="icon">📊</span><h3>Дашборд</h3></div>
+        <p>Статистика продажів з фільтрами по даті, джерелу, категорії. KPI, графіки, топ SKU, клієнти, географія, доставка. <a href="/dashboard/" onclick="event.stopPropagation()">Відкрити →</a></p>
+      </div>
+      <div class="card" onclick="show('sales')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🛒</span><h3>Продажі</h3></div>
+        <p>Замовлення клієнтів. Імпорт з Excel через 3-кроковий wizard. Статуси, трекінг, дедлайни. DYMO-етикетки. <strong>PDF-документи: пакувальний лист, proforma, митна декларація CN23.</strong></p>
+      </div>
+      <div class="card" onclick="show('crm')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">👥</span><h3>CRM</h3></div>
+        <p>База клієнтів з автоматичним RFM-аналізом. Сегменти Champions/Loyal/At Risk. Синхронізація через signals при кожному замовленні.</p>
+      </div>
+      <div class="card" onclick="show('inventory')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">📦</span><h3>Склад</h3></div>
+        <p>Залишки товарів, транзакції. Аналіз reorder: скільки вистачить, скільки замовити. Purchase Orders постачальникам. Імпорт з Excel.</p>
+      </div>
+      <div class="card" onclick="show('labels')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🏷️</span><h3>Етикетки DYMO</h3></div>
+        <p>Друк .dymo файлів прямо з замовлення. Автопідстановка кількості. Підтримка форматів 30252 (адресна) та 30334 (товарна).</p>
+      </div>
+      <div class="card" onclick="show('accounting')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">💰</span><h3>Бухгалтерія</h3></div>
+        <p>Рахунки-фактури з VAT, PDF-генерація, відстеження платежів, облік витрат. Кнопка «Рахунок» прямо зі сторінки замовлення.</p>
+      </div>
+      <div class="card" onclick="show('shipping')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🚚</span><h3>Доставка</h3></div>
+        <p>Оформлення відправлень через Jumingo (агрегатор). Кнопка «Створити відправлення» зі сторінки замовлення. Пакувальні матеріали — заплановано.</p>
+      </div>
+      <div class="card" onclick="show('sistema')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">⚙️</span><h3>Система та налаштування</h3></div>
+        <p>Налаштування PDF-документів (мова, шаблони), email-сповіщення (critical stock, дедлайни), SMTP, cron. <a href="/dashboard/system/" onclick="event.stopPropagation()">Система →</a></p>
+      </div>
+      <div class="card" onclick="show('bots')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🤖</span><h3>Боти та API</h3></div>
+        <p>REST API Minerva (per-scope токени). DigiKey: пошук компонентів, ціни, наявність. DHL Express: тарифи та трекінг. Shopify / Telegram webhooks.</p>
+      </div>
+      <div class="card" onclick="window.location='/admin/bots/bot/ai-info/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🧠</span><h3>AI (в розробці)</h3></div>
+        <p>Прогнозування попиту, рекомендації reorder, ML-сегментація клієнтів. <a href="/admin/bots/bot/ai-info/" onclick="event.stopPropagation()">AI модуль</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/faq/faqplaceholder/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">❓</span><h3>FAQ та підтримка</h3></div>
+        <p>Часті запитання, нотатки, план доробки, ліцензія. <a href="/admin/faq/faqplaceholder/" onclick="event.stopPropagation()">Відкрити →</a></p>
+      </div>
+      <div class="card" onclick="window.location='mailto:prym.via@gmail.com?subject=Minerva — Запит на послуги'" style="cursor:pointer" style="border-color:#2196f3">
+        <div class="card-head"><span class="icon">💼</span><h3>Послуги</h3></div>
+        <p>Хостинг, адаптація, боти, API-інтеграції, AI, SLA-підтримка. <a href="mailto:prym.via@gmail.com" onclick="event.stopPropagation()">prym.via@gmail.com →</a></p>
+      </div>
+    </div>
+
+    <h3 class="sub">Структура навігації (бокова панель)</h3>
+    <div class="t-wrap">
+      <table class="ht">
+        <thead><tr><th>Група</th><th>Сторінка</th><th>URL</th></tr></thead>
+        <tbody>
+          <tr><td rowspan="2">👥 CRM</td><td>Клієнти — база, RFM, bulk-дії</td><td><code>/admin/crm/customer/</code></td></tr>
+          <tr><td>Нотатки до клієнтів</td><td><code>/admin/crm/customernote/</code></td></tr>
+          <tr><td rowspan="4">💰 Бухгалтерія</td><td>Рахунки-фактури — список, PDF, статуси</td><td><code>/admin/accounting/invoice/</code></td></tr>
+          <tr><td>Витрати — облік по категоріях</td><td><code>/admin/accounting/expense/</code></td></tr>
+          <tr><td>Категорії витрат</td><td><code>/admin/accounting/expensecategory/</code></td></tr>
+          <tr><td>Налаштування компанії (реквізити, IBAN)</td><td><code>/admin/accounting/companysettings/</code></td></tr>
+          <tr><td rowspan="2">🛒 Sales</td><td>Замовлення — статуси, bulk-дії, Excel-імпорт</td><td><code>/admin/sales/salesorder/</code></td></tr>
+          <tr><td>Джерела замовлень (словник)</td><td><code>/admin/sales/salessource/</code></td></tr>
+          <tr><td rowspan="5">📦 Склад</td><td>Товари — SKU, залишки, Excel-імпорт</td><td><code>/admin/inventory/product/</code></td></tr>
+          <tr><td>Транзакції — прихід/витрата</td><td><code>/admin/inventory/inventorytransaction/</code></td></tr>
+          <tr><td>Аналіз reorder — що замовити</td><td><code>/admin/inventory/reorderproxy/</code></td></tr>
+          <tr><td>Постачальники</td><td><code>/admin/inventory/supplier/</code></td></tr>
+          <tr><td>Purchase Orders</td><td><code>/admin/inventory/purchaseorder/</code></td></tr>
+          <tr><td rowspan="2">🚚 Доставка</td><td>Відправлення — список, статуси, трекінг</td><td><code>/admin/shipping/shipment/</code></td></tr>
+          <tr><td>Перевізники — налаштування API, дані відправника</td><td><code>/admin/shipping/carrier/</code></td></tr>
+          <tr><td rowspan="2">🤖 Боти</td><td>Управління ботами та API-ключами</td><td><code>/admin/bots/bot/</code></td></tr>
+          <tr><td>AI модуль (в розробці)</td><td><code>/admin/bots/bot/ai-info/</code></td></tr>
+          <tr><td rowspan="2">📊 Аналітика</td><td>Статистика — KPI, графіки, фільтри</td><td><code>/dashboard/</code></td></tr>
+          <tr><td>Сигнали — попередження системи</td><td><code>/dashboard/signals/</code></td></tr>
+          <tr><td rowspan="3">⚙️ Конфігурація</td><td>Системні налаштування (модулі, валюта, компанія)</td><td><code>/admin/config/systemsettings/</code></td></tr>
+          <tr><td>Налаштування документів (мова PDF, шаблони)</td><td><code>/admin/config/documentsettings/</code></td></tr>
+          <tr><td>Email сповіщення (SMTP, алерти критичного складу)</td><td><code>/admin/config/notificationsettings/</code></td></tr>
+          <tr><td rowspan="3">⚙️ Система</td><td>Резервне копіювання</td><td><code>/admin/backup/backupplaceholder/</code></td></tr>
+          <tr><td>Аутентифікація та авторизація</td><td><code>/admin/auth/</code></td></tr>
+          <tr><td>FAQ та підтримка → Довідник / FAQ</td><td><code>/dashboard/faq/</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ ДАШБОРД ══ -->
+  <div id="dashboard" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(201,168,76,.2),rgba(88,166,255,.1))">📊</div>
+      <div><h2>Дашборд — Статистика</h2><p>Аналітика продажів з інтерактивними фільтрами</p></div>
+    </div>
+    <h3 class="sub">Фільтри (панель зверху)</h3>
+    <div class="cards">
+      <div class="card"><div class="card-head"><span class="icon">📅</span><h3>Період</h3></div><p>Введіть дати вручну або натисніть пресет: <strong>30 д / 60 д / 90 д / Рік</strong>.</p></div>
+      <div class="card"><div class="card-head"><span class="icon">🔌</span><h3>Джерело</h3></div><p>Фільтрація по каналу: <code>digikey</code>, <code>nova_post</code>, <code>manual</code> або всі.</p></div>
+      <div class="card"><div class="card-head"><span class="icon">🗂️</span><h3>Категорія</h3></div><p>Фільтрація по категорії товарів. Вплив на KPI, топ SKU, категорійні графіки.</p></div>
+    </div>
+    <h3 class="sub">KPI картки</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Картка</th><th>Що показує</th><th>Порівняння</th></tr></thead><tbody>
+      <tr><td>💰 Виручка</td><td>Сума total_price всіх рядків за період</td><td>vs попередній аналогічний період</td></tr>
+      <tr><td>📋 Замовлень</td><td>Кількість замовлень з affects_stock=True</td><td>vs попередній період</td></tr>
+      <tr><td>📦 Одиниць</td><td>Сума qty всіх рядків замовлень</td><td>vs попередній період</td></tr>
+      <tr><td>💵 Середнє замовлення</td><td>Виручка ÷ кількість замовлень</td><td>vs попередній період</td></tr>
+      <tr><td>⏳ Не відправлено</td><td>Всі замовлення без shipped_at</td><td>Без порівняння</td></tr>
+    </tbody></table></div>
+    <div class="alert alert-blue"><span>💡</span><div><strong>Підказка:</strong> Кнопка <strong>✕ Скинути</strong> знімає всі фільтри і повертає до дефолтних 90 днів.</div></div>
+  </div>
+
+  <!-- ══ ПРОДАЖІ ══ -->
+  <div id="sales" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(227,179,65,.2),rgba(248,81,73,.1))">🛒</div>
+      <div><h2>Модуль Продажів</h2><p>Замовлення, статуси, дедлайни, відправка</p></div>
+    </div>
+    <h3 class="sub">Статуси замовлення</h3>
+    <div class="cards">
+      <div class="card"><div class="card-head"><span class="badge b-blue">Отримано</span></div><p>Замовлення надійшло, ще не опрацьоване.</p></div>
+      <div class="card"><div class="card-head"><span class="badge b-orange">В обробці</span></div><p>Готується до відправки.</p></div>
+      <div class="card"><div class="card-head"><span class="badge b-green">Відправлено</span></div><p>Заповнено <code>shipped_at</code> — встановлюється автоматично.</p></div>
+      <div class="card"><div class="card-head"><span class="badge b-red">Скасовано</span></div><p>Замовлення скасоване, не впливає на склад.</p></div>
+    </div>
+    <h3 class="sub">Дедлайн відправки — кольорова індикація</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Колір</th><th>Умова</th><th>Значення</th></tr></thead><tbody>
+      <tr><td><span class="badge b-red">🔴 Прострочено</span></td><td>deadline &lt; сьогодні</td><td>Терміново!</td></tr>
+      <tr><td><span class="badge b-orange">⚠️ Сьогодні–2 дні</span></td><td>deadline ≤ today+2</td><td>Відправити сьогодні</td></tr>
+      <tr><td><span class="badge b-blue">📅 3–5 днів</span></td><td>deadline ≤ today+5</td><td>Запланувати</td></tr>
+      <tr><td><span class="badge b-green">✅ &gt;5 днів</span></td><td>deadline &gt; today+5</td><td>Все добре</td></tr>
+    </tbody></table></div>
+    <h3 class="sub">Масове редагування (Bulk Actions)</h3>
+    <div class="alert alert-blue"><span>💡</span><div>Відмітьте чекбоксами кілька замовлень → меню <strong>"Дія:"</strong> → оберіть дію → <strong>Виконати</strong>.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Група</th><th>Доступні дії</th></tr></thead><tbody>
+      <tr><td>🔄 Статус</td><td>📥 Отримано · ⚙️ В обробці · 🚀 Відправлено · ❌ Скасовано</td></tr>
+      <tr><td>💱 Валюта продажу</td><td>💵 USD · 💶 EUR · 💷 GBP</td></tr>
+      <tr><td>🚚 Валюта доставки</td><td>💵 USD · 💶 EUR · 💷 GBP</td></tr>
+      <tr><td>📄 Тип документа</td><td>Sale · Sample · Transfer · Warranty · Other</td></tr>
+      <tr><td>📦 Склад</td><td>✅ Впливає на склад · ⬜ Не впливає</td></tr>
+      <tr><td>🏭 Джерело</td><td>📦 Змінити джерело... (відкриває форму вибору)</td></tr>
+      <tr><td>📊 Звіти</td><td>📥 Експортувати в Excel</td></tr>
+    </tbody></table></div>
+    <h3 class="sub">Колонка "Відправлено"</h3>
+    <div class="alert alert-orange"><span>⚠️</span><div>Колонка будується на полі <strong>shipped_at</strong> (дата відправки) — не на полі <em>status</em>. Вони незалежні. Щоб замовлення стало "✅ Відправлено" — заповніть <strong>Дата відправки</strong>.</div></div>
+    <h3 class="sub">📄 Автоматичні PDF-документи</h3>
+    <div class="alert alert-green"><span>✅</span><div>Три PDF-документи генеруються <strong>на льоту</strong> прямо з картки замовлення — жодних додаткових налаштувань. Кнопки в секції <strong>"📄 Автоматичні документи"</strong>.</div></div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">📋</span><h3>Пакувальний лист</h3></div>
+        <p>Адреса доставки + список позицій (SKU, назва, к-сть, одиниця). Трекінг-номер і кур'єр внизу. URL: <code>/{pk}/doc/packing-list/</code></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">📄</span><h3>Proforma Invoice</h3></div>
+        <p>Реквізити компанії (з бухгалтерії) ↔ Клієнт. Позиції з цінами, підсумки (subtotal + доставка + total). Банківські реквізити IBAN/SWIFT. URL: <code>/{pk}/doc/proforma/</code></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🛃</span><h3>Митна декларація CN23</h3></div>
+        <p>Стандарт CN23: відправник ↔ одержувач, тип відправлення (☒ Sale/Gift/Sample/Return), HS-коди, вага нетто, задекларована вартість, країна походження. URL: <code>/{pk}/doc/customs/</code></p>
+      </div>
+    </div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Документ</th><th>Джерело даних</th><th>Що потрібно заповнити заздалегідь</th></tr></thead><tbody>
+      <tr><td>📋 Пакувальний лист</td><td>SalesOrderLine (SKU, qty), addr_*, tracking_number</td><td>Адреса доставки в замовленні</td></tr>
+      <tr><td>📄 Proforma Invoice</td><td>SalesOrderLine (unit_price/total_price), CompanySettings</td><td><a href="/admin/accounting/companysettings/">Реквізити компанії</a> (назва, IBAN, адреса)</td></tr>
+      <tr><td>🛃 Митна декларація CN23</td><td>Product.hs_code, .net_weight_g, .country_of_origin</td><td><strong>HS-код, вага, країна</strong> у картці кожного товару (📦 Склад → Товари)</td></tr>
+    </tbody></table></div>
+    <div class="alert alert-orange"><span>⚠️</span><div>Для митної декларації обов'язково заповніть <strong>HS-код</strong>, <strong>вагу нетто (г/шт)</strong> та <strong>країну виробника</strong> в картці кожного товару. Без цих даних поля будуть показані як "—".</div></div>
+
+    <h3 class="sub">Всередині замовлення</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>📄 Автоматичні документи</h4><p>Секція вгорі — 3 кнопки: Пакувальний лист, Proforma, CN23. Відкриваються в новій вкладці → одразу завантажується PDF.</p><p style="margin-top:6px;font-size:12px;color:var(--muted)">⚙️ Кнопка <strong>«шестерня»</strong> поряд розгортає <strong>панель швидкого редагування</strong> — мова, ціни, нотатки тощо. Зміни діють лише для цього разу, без збереження.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>📦 Залишки на складі</h4><p>Таблиця по кожному товару. Зелений = є, Помаранчевий = мало, Червоний = немає.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>🏷️ Друк етикеток DYMO</h4><p>Кнопка "🖨️ Друкувати (N шт.)" — завантажує .dymo файл з правильною кількістю.</p></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>📁 Завантажені документи</h4><p>Прикріплені файли. Зберігаються в <code>media/orders/{source}/{order_number}/</code></p></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-content"><h4>✅ Позначити відправленим</h4><p>Заповніть поле <strong>Дата відправки (shipped_at)</strong> та збережіть.</p></div></div>
+    </div>
+  </div>
+
+  <!-- ══ CRM ══ -->
+  <div id="crm" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(63,185,80,.2),rgba(88,166,255,.1))">👥</div>
+      <div><h2>CRM — Клієнти</h2><p>Автоматична база клієнтів з RFM-аналізом та сегментацією</p></div>
+    </div>
+    <div class="alert alert-green"><span>✅</span><div>Клієнти створюються <strong>автоматично</strong> при збереженні замовлення через Django signals. Примусова синхронізація — кнопка <strong>"🔄 Синхронізація CRM"</strong>.</div></div>
+    <h3 class="sub">Масове редагування (Bulk Actions)</h3>
+    <div class="alert alert-blue"><span>💡</span><div>Відмітьте клієнтів → меню <strong>"Дія:"</strong> → оберіть дію → <strong>Виконати</strong>.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Група</th><th>Доступні дії</th></tr></thead><tbody>
+      <tr><td>🔄 Статус</td><td>🟢 Активний · ⚪ Неактивний · ⭐ VIP · 🚫 Заблокований</td></tr>
+      <tr><td>🏷️ Сегмент</td><td>🏢 B2B · 👤 B2C · 🔗 Дистриб'ютор · 🛒 Реселер · 📎 Інше</td></tr>
+    </tbody></table></div>
+    <h3 class="sub">RFM Аналіз</h3>
+    <div class="cards">
+      <div class="card"><div class="card-head"><span class="icon">📅</span><h3>R — Recency</h3></div><p>Скільки днів тому було останнє замовлення. <span class="badge b-green">5</span> ≤30 д <span class="badge b-red">1</span> &gt;365 д</p></div>
+      <div class="card"><div class="card-head"><span class="icon">🔄</span><h3>F — Frequency</h3></div><p>Загальна кількість замовлень. <span class="badge b-green">5</span> ≥10 <span class="badge b-red">1</span> 1 замовлення</p></div>
+      <div class="card"><div class="card-head"><span class="icon">💰</span><h3>M — Monetary</h3></div><p>Загальна виручка від клієнта. <span class="badge b-green">5</span> ≥€5000 <span class="badge b-red">1</span> &lt;€100</p></div>
+    </div>
+    <h3 class="sub">Сегменти клієнтів</h3>
+    <div class="rfm-grid">
+      <div class="rfm-card"><div class="emoji">🏆</div><h4>Champions</h4><p>R≥4, F≥4, M≥4 — Найкращі клієнти.</p></div>
+      <div class="rfm-card"><div class="emoji">💎</div><h4>Loyal</h4><p>R≥3, F≥3 — Постійні покупці.</p></div>
+      <div class="rfm-card"><div class="emoji">⭐</div><h4>Potential</h4><p>R≥4 — Нові активні, потенціал росту.</p></div>
+      <div class="rfm-card"><div class="emoji">🔄</div><h4>Regular</h4><p>F≥4 — Регулярні покупки.</p></div>
+      <div class="rfm-card"><div class="emoji">😴</div><h4>At Risk</h4><p>R≤2, F≥2 — Під ризиком втрати.</p></div>
+      <div class="rfm-card"><div class="emoji">💤</div><h4>Hibernating</h4><p>R≤2, F≤2 — Сплячі клієнти.</p></div>
+    </div>
+  </div>
+
+  <!-- ══ СКЛАД ══ -->
+  <div id="inventory" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(63,185,80,.2),rgba(88,166,255,.1))">📦</div>
+      <div><h2>Склад та Товари</h2><p>Залишки, транзакції, аналіз reorder, Purchase Orders</p></div>
+    </div>
+    <h3 class="sub">Розумний аналіз reorder</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Середні продажі за 3 місяці</h4><p>Наприклад: продано 30 шт за 3 міс = 10 шт/міс.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Скільки місяців вистачить</h4><p>Залишок 25 шт ÷ 10 шт/міс = 2.5 місяці.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Рекомендація замовлення</h4><p>Ціль: 3 міс + 20% буфер = 36 шт. Замовити: 36 − 25 = 11 шт.</p></div></div>
+    </div>
+    <h3 class="sub">Статуси запасів</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Статус</th><th>Умова</th><th>Рекомендація</th></tr></thead><tbody>
+      <tr><td><span class="badge b-red">🔥 Критично</span></td><td>&lt;2 тижнів</td><td>Замовляти ЗАРАЗ</td></tr>
+      <tr><td><span class="badge b-orange">⚠️ Мало</span></td><td>&lt;1.5 місяці</td><td>Замовити найближчим часом</td></tr>
+      <tr><td><span class="badge b-blue">📉 Низько</span></td><td>&lt;3 місяців</td><td>Планувати замовлення</td></tr>
+      <tr><td><span class="badge b-green">✅ OK</span></td><td>&gt;3 місяців</td><td>Нічого не потрібно</td></tr>
+    </tbody></table></div>
+
+    <hr class="div">
+    <h3 class="sub">🛃 Митне оформлення — нові поля товару</h3>
+    <div class="alert alert-blue"><span>ℹ️</span><div>Секція <strong>"🛃 Митне оформлення"</strong> в картці товару (collapse, схована за замовчуванням). Використовується для автоматичної генерації митної декларації CN23.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Поле</th><th>Формат</th><th>Опис</th><th>Приклад</th></tr></thead><tbody>
+      <tr><td><code>hs_code</code></td><td>До 20 символів</td><td>Гармонізована система — митний код товару (HS/ТН ЗЕД)</td><td><code>8517.62</code>, <code>8544.42</code></td></tr>
+      <tr><td><code>country_of_origin</code></td><td>ISO-2 (2 літери)</td><td>Країна виробника</td><td><code>DE</code>, <code>CN</code>, <code>US</code></td></tr>
+      <tr><td><code>net_weight_g</code></td><td>Ціле число (г)</td><td>Вага нетто одиниці товару в грамах</td><td><code>150</code> (г/шт)</td></tr>
+    </tbody></table></div>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Відкрийте картку товару</h4><p><a href="/admin/inventory/product/">Склад → Товари</a> → оберіть товар → розгорніть секцію <strong>"🛃 Митне оформлення"</strong>.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Знайдіть HS-код</h4><p>Використовуйте <a href="https://www.zolltarifnummern.de/" target="_blank" style="color:var(--blue)">zolltarifnummern.de</a> (DE) або <a href="https://customs.gov.ua/" target="_blank" style="color:var(--blue)">customs.gov.ua</a> (UA). HS-код: 8 цифр (DE/EU).</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Заповніть країну та вагу</h4><p>Країна виробника — ISO-2 код. Вага нетто — без упаковки, в грамах на одну штуку.</p></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>Збережіть і перевірте CN23</h4><p>Відкрийте будь-яке замовлення з цим товаром → <strong>"🛃 Митна декларація"</strong> → HS-код та вага відображаються автоматично.</p></div></div>
+    </div>
+  </div>
+
+  <!-- ══ ІМПОРТ EXCEL ══ -->
+  <div id="import" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(88,166,255,.2),rgba(63,185,80,.1))">📥</div>
+      <div><h2>Імпорт з Excel — 3-кроковий Wizard</h2><p>Шаблони, структура даних, маппінг колонок</p></div>
+    </div>
+
+    <!-- ── Download template buttons ─────────────────────────────────────── -->
+    <h3 class="sub">Шаблони для завантаження</h3>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:24px">
+      <a href="/dashboard/import-template/inventory/"
+         style="display:inline-flex;align-items:center;gap:8px;
+                padding:11px 20px;border-radius:8px;text-decoration:none;
+                background:linear-gradient(135deg,#2E7D32,#388E3C);
+                color:#fff;font-weight:700;font-size:13px;
+                box-shadow:0 2px 8px rgba(46,125,50,.4)">
+        📥&nbsp; Шаблон імпорту Складу (.xlsx)
+      </a>
+      <a href="/dashboard/import-template/sales/"
+         style="display:inline-flex;align-items:center;gap:8px;
+                padding:11px 20px;border-radius:8px;text-decoration:none;
+                background:linear-gradient(135deg,#1565C0,#1976D2);
+                color:#fff;font-weight:700;font-size:13px;
+                box-shadow:0 2px 8px rgba(21,101,192,.4)">
+        📥&nbsp; Шаблон імпорту Продажів (.xlsx)
+      </a>
+    </div>
+    <div class="alert alert-green"><span>✅</span><div>Кожен шаблон містить <strong>2 аркуші</strong>: <em>дані для заповнення</em> + <em>Довідник</em> із поясненням кожного поля. Рядок 2 — назви колонок, рядок 3 — підказки, рядки 4+ — ваші дані.</div></div>
+
+    <!-- ── СКЛАД columns ──────────────────────────────────────────────────── -->
+    <h3 class="sub" style="margin-top:20px">📦 Склад — поля імпорту (<code>/admin/inventory/product/</code>)</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr>
+      <th>Колонка</th><th>Обов'язкова</th><th>Формат / Допустимі значення</th><th>Приклад</th>
+    </tr></thead><tbody>
+      <tr><td><code>sku</code></td><td><span class="badge b-green">★ Так</span></td><td>Унікальний артикул. Регістр важливий.</td><td><code>RF-001</code></td></tr>
+      <tr><td><code>name</code></td><td>Ні</td><td>Назва товару</td><td><code>RF фільтр 433 МГц</code></td></tr>
+      <tr><td><code>category</code></td><td>Ні</td><td>Slug існуючої категорії</td><td><code>antenna</code>, <code>cable</code>, <code>rf_filter</code></td></tr>
+      <tr><td><code>kind</code></td><td>Ні</td><td><code>finished</code> або <code>component</code></td><td><code>finished</code></td></tr>
+      <tr><td><code>unit_type</code></td><td>Ні</td><td><code>piece</code> / <code>meter</code> / <code>kilogram</code> / <code>liter</code> / <code>set</code></td><td><code>piece</code></td></tr>
+      <tr><td><code>manufacturer</code></td><td>Ні</td><td>Виробник</td><td><code>Murata</code></td></tr>
+      <tr><td><code>purchase_price</code></td><td>Ні</td><td>Десяткове число, роздільник — крапка або кома</td><td><code>12.50</code></td></tr>
+      <tr><td><code>sale_price</code></td><td>Ні</td><td>Десяткове число</td><td><code>19.90</code></td></tr>
+      <tr><td><code>reorder_point</code></td><td>Ні</td><td>Ціле число ≥ 0. Мінімальний залишок.</td><td><code>5</code></td></tr>
+      <tr><td><code>lead_time_days</code></td><td>Ні</td><td>Кількість днів постачання</td><td><code>14</code></td></tr>
+      <tr><td><code>initial_stock</code></td><td>Ні</td><td>Початковий залишок → автоматично створює транзакцію ADJUSTMENT</td><td><code>50</code></td></tr>
+      <tr><td><code>is_active</code></td><td>Ні</td><td><code>1</code> / <code>0</code> або <code>true</code> / <code>false</code>. За замовч.: 1</td><td><code>1</code></td></tr>
+      <tr><td><code>notes</code></td><td>Ні</td><td>Довільний текст</td><td><code>Для зовнішнього монтажу</code></td></tr>
+    </tbody></table></div>
+
+    <!-- ── ПРОДАЖІ columns ─────────────────────────────────────────────────── -->
+    <h3 class="sub" style="margin-top:20px">🛒 Продажі — поля імпорту (<code>/admin/sales/salesorder/</code>)</h3>
+    <div class="alert alert-orange" style="margin-bottom:12px"><span>💡</span><div>Рядки з однаковим <code>order_number</code> об'єднуються в одне замовлення. Поля замовлення (клієнт, адреса…) достатньо вказати лише в <strong>першому рядку</strong>.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr>
+      <th>Колонка</th><th>Обов'язкова</th><th>Формат / Допустимі значення</th><th>Приклад</th>
+    </tr></thead><tbody>
+      <tr style="background:rgba(21,101,192,.08)"><td colspan="4" style="font-weight:700;color:#90CAF9;padding:6px 10px">Поля замовлення (вказати раз для кожного order_number)</td></tr>
+      <tr><td><code>order_number</code></td><td><span class="badge b-green">★ Так</span></td><td>Унікальний номер замовлення</td><td><code>ORD-2024-001</code></td></tr>
+      <tr><td><code>source</code></td><td>Ні</td><td><code>manual</code> / <code>digikey</code> / <code>nova_post</code> / …</td><td><code>manual</code></td></tr>
+      <tr><td><code>order_date</code></td><td>Ні</td><td><code>YYYY-MM-DD</code> або <code>DD.MM.YYYY</code></td><td><code>2024-03-15</code></td></tr>
+      <tr><td><code>shipped_at</code></td><td>Ні</td><td>Дата відправки (той самий формат)</td><td><code>2024-03-18</code></td></tr>
+      <tr><td><code>shipping_deadline</code></td><td>Ні</td><td>Дедлайн відправки</td><td><code>2024-03-17</code></td></tr>
+      <tr><td><code>shipping_courier</code></td><td>Ні</td><td>Назва кур'єра</td><td><code>DPD</code>, <code>GLS</code>, <code>Nova Poshta</code></td></tr>
+      <tr><td><code>tracking_number</code></td><td>Ні</td><td>Трекінг-номер кур'єра</td><td><code>1Z999AA10123456784</code></td></tr>
+      <tr><td><code>client</code></td><td>Ні</td><td>Назва компанії або ПІБ</td><td><code>Acme GmbH</code></td></tr>
+      <tr><td><code>contact_name</code></td><td>Ні</td><td>Контактна особа</td><td><code>Hans Müller</code></td></tr>
+      <tr><td><code>phone</code></td><td>Ні</td><td>Телефон (будь-який формат)</td><td><code>+49 30 12345678</code></td></tr>
+      <tr><td><code>email</code></td><td>Ні</td><td>Email клієнта</td><td><code>hans@acme.de</code></td></tr>
+      <tr><td><code>addr_street</code></td><td>Ні</td><td>Вулиця, будинок</td><td><code>Hauptstraße 42</code></td></tr>
+      <tr><td><code>addr_city</code></td><td>Ні</td><td>Місто</td><td><code>Berlin</code></td></tr>
+      <tr><td><code>addr_zip</code></td><td>Ні</td><td>Поштовий індекс</td><td><code>10115</code></td></tr>
+      <tr><td><code>addr_country</code></td><td>Ні</td><td>Код країни <strong>ISO-2</strong> (2 літери)</td><td><code>DE</code>, <code>UA</code>, <code>PL</code>, <code>US</code></td></tr>
+      <tr><td><code>currency</code></td><td>Ні</td><td>Код валюти ISO-4217. За замовч.: USD</td><td><code>EUR</code>, <code>USD</code></td></tr>
+      <tr><td><code>shipping_cost</code></td><td>Ні</td><td>Число або з символом ($8.50)</td><td><code>8.50</code></td></tr>
+      <tr><td><code>status</code></td><td>Ні</td><td><code>received</code> / <code>processing</code> / <code>shipped</code> / <code>cancelled</code></td><td><code>received</code></td></tr>
+      <tr style="background:rgba(21,101,192,.08)"><td colspan="4" style="font-weight:700;color:#90CAF9;padding:6px 10px">Поля товарного рядка (повторюються для кожного SKU)</td></tr>
+      <tr><td><code>sku_raw</code></td><td><span class="badge b-green">★ Так</span></td><td>SKU товару або alias. Якщо не знайдено — створиться placeholder.</td><td><code>RF-001</code></td></tr>
+      <tr><td><code>qty</code></td><td><span class="badge b-green">★ Так</span></td><td>Кількість &gt; 0. Крапка або кома.</td><td><code>2</code>, <code>5.5</code></td></tr>
+      <tr><td><code>unit_price</code></td><td>Ні</td><td>Ціна за одиницю. Допускається символ $€.</td><td><code>19.90</code>, <code>€19.90</code></td></tr>
+      <tr><td><code>total_price_line</code></td><td>Ні</td><td>Сума рядка. Якщо порожньо — qty × unit_price</td><td><code>39.80</code></td></tr>
+    </tbody></table></div>
+
+    <!-- ── 3-step wizard ──────────────────────────────────────────────────── -->
+    <h3 class="sub" style="margin-top:20px">Як запустити імпорт (3 кроки)</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">
+        <h4>Завантажте файл</h4>
+        <p>Продажі: <code>/admin/sales/salesorder/</code> → кнопка <strong>📥 Імпорт з Excel</strong><br>
+        Склад: <code>/admin/inventory/product/</code> → кнопка <strong>📥 Імпорт з Excel</strong></p>
+      </div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">
+        <h4>Зіставте колонки</h4>
+        <p>Оберіть аркуш. Система <strong>автоматично підбере</strong> відповідності по назвах колонок. Перевірте маппінг, оберіть режим: <strong>Skip</strong> (пропустити дублі) або <strong>Update</strong> (оновити).</p>
+      </div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">
+        <h4>Перевірте результат</h4>
+        <p>Сухий запуск (dry-run) — тест без змін. Реальний — створить/оновить записи. Буде показано: ✅ Створено · ✏️ Оновлено · ⏭️ Пропущено · ❌ Помилки.</p>
+      </div></div>
+    </div>
+
+    <!-- ── conflict modes ────────────────────────────────────────────────── -->
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Режим</th><th>Поведінка</th></tr></thead><tbody>
+      <tr><td>⏭️ <strong>Skip</strong></td><td>Якщо запис вже існує (по SKU або order_number+source) — пропустити. Безпечно для повторного імпорту.</td></tr>
+      <tr><td>✏️ <strong>Update</strong></td><td>Якщо запис існує — оновити всі заповнені поля. Для масового оновлення даних.</td></tr>
+      <tr><td>🧪 <strong>Dry-run</strong></td><td>Виконує всю логіку, але не зберігає в БД. Показує що буде зроблено — без ризику.</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <!-- ══ ЕТИКЕТКИ ══ -->
+  <div id="labels" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(88,166,255,.2),rgba(188,140,255,.1))">🏷️</div>
+      <div><h2>Система Етикеток DYMO</h2><p>Друк прямо з замовлення — один клік</p></div>
+    </div>
+    <h3 class="sub">Як друкувати</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Завантажте .dymo файл</h4><p>Відкрийте замовлення → блок "🏷️ Етикетки" → кнопка завантаження.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Натисніть "🖨️ Друкувати (N шт.)"</h4><p>Файл завантажиться з правильною кількістю (QTY з рядка замовлення).</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>DYMO Software відкриється автоматично</h4><p>Натисніть Ctrl+P для друку.</p></div></div>
+    </div>
+    <h3 class="sub">Формати етикеток</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Формат</th><th>Розміри</th><th>Використання</th></tr></thead><tbody>
+      <tr><td><code>30252</code></td><td>28 × 89 mm</td><td>Адресна етикетка з доставки</td></tr>
+      <tr><td><code>30334</code></td><td>32 × 57 mm</td><td>Товарна, багатоцільова</td></tr>
+    </tbody></table></div>
+  </div>
+
+  <!-- ══ БОТИ ══ -->
+  <div id="bots" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(188,140,255,.2),rgba(88,166,255,.1))">🤖</div>
+      <div><h2>Боти та API-інтеграції</h2><p>REST API Minerva · DigiKey · DHL Express — Token-авторизація та зовнішні сервіси</p></div>
+    </div>
+
+    <div class="alert alert-green"><span>✅</span><div><strong>REST API активний.</strong> Endpoints: замовлення, товари, клієнти. Авторизація — APIKey з per-scope правами.</div></div>
+
+    <!-- ── REST API ── -->
+    <h3 class="sub">Внутрішній REST API Minerva</h3>
+    <p style="color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:16px;">
+      Зовнішня програма (бот, Shopify, скрипт) надсилає HTTP-запит з заголовком <code>Authorization: Token …</code> і отримує дані у форматі JSON.<br>
+      <strong>Приклад:</strong> <code>GET /api/v1/orders/?status=received</code> → список невідправлених замовлень.
+    </p>
+
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Метод</th><th>URL</th><th>Що робить</th><th>Scope</th></tr></thead><tbody>
+      <tr><td><span class="badge b-green">GET</span></td><td><code>/api/v1/orders/</code></td><td>Список замовлень (по 50)</td><td><code>orders:read</code></td></tr>
+      <tr><td><span class="badge b-green">GET</span></td><td><code>/api/v1/orders/{id}/</code></td><td>Замовлення з рядками</td><td><code>orders:read</code></td></tr>
+      <tr><td><span class="badge b-blue">POST</span></td><td><code>/api/v1/orders/</code></td><td>Створити замовлення</td><td><code>orders:write</code></td></tr>
+      <tr><td><span class="badge" style="background:#e65100">PATCH</span></td><td><code>/api/v1/orders/{id}/</code></td><td>Оновити замовлення</td><td><code>orders:write</code></td></tr>
+      <tr><td><span class="badge b-green">GET</span></td><td><code>/api/v1/products/</code></td><td>Список товарів</td><td><code>products:read</code></td></tr>
+      <tr><td><span class="badge b-green">GET</span></td><td><code>/api/v1/customers/</code></td><td>Список клієнтів</td><td><code>customers:read</code></td></tr>
+      <tr><td><span class="badge b-red">DELETE</span></td><td><em>будь-який</em></td><td>❌ Заблоковано</td><td>—</td></tr>
+    </tbody></table></div>
+
+    <div class="feature-row" style="margin-top:16px"><span class="feature-icon">🔑</span><div class="feature-content">
+      <h4>Створити API токен</h4>
+      <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px;margin:0;">
+        <li>Відкрий <a href="/admin/api/apikey/" style="color:var(--blue)">Система → API Ключі</a> → <strong>+ Додати</strong></li>
+        <li>Вкажи назву (напр. <code>Telegram Bot</code>) та обери потрібні scopes (чекбокси)</li>
+        <li>Збережи — ключ згенерується автоматично, скопіюй одразу</li>
+      </ol>
+    </div></div>
+
+    <div class="feature-row"><span class="feature-icon">🖥️</span><div class="feature-content">
+      <h4>Тестування (Windows PowerShell)</h4>
+      <p style="color:#9aafbe;font-size:12px;margin:4px 0 8px;">⚠️ У PowerShell використовуй <strong><code>curl.exe</code></strong>, не <code>curl</code>.</p>
+      <pre style="background:#0d1117;border:1px solid #2a3f52;border-radius:6px;padding:14px;font-size:12px;color:#c9d8e4;overflow-x:auto;margin:8px 0 0;">
+<span style="color:#607d8b"># GET замовлення</span>
+curl.exe -H "Authorization: Token ВАШ_ТОКЕН" http://localhost:8000/api/v1/orders/
+
+<span style="color:#607d8b"># Фільтр по статусу</span>
+curl.exe -H "Authorization: Token ВАШ_ТОКЕН" "http://localhost:8000/api/v1/orders/?status=received"
+
+<span style="color:#607d8b"># POST — створити замовлення (потрібен orders:write)</span>
+curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: application/json" ^
+  -d "{\"order_number\":\"TEST-001\",\"source\":\"manual\",\"client\":\"Test GmbH\",\"order_date\":\"2026-03-05\",\"status\":\"received\",\"affects_stock\":true,\"currency\":\"EUR\"}" ^
+  http://localhost:8000/api/v1/orders/
+
+<span style="color:#607d8b"># Без токена → 401 | Scope відсутній → 403 | DELETE → 405</span></pre>
+    </div></div>
+
+    <div class="alert alert-blue" style="margin-top:16px"><span>💡</span><div>Browsable API (тільки читання): <a href="/api/v1/" style="color:var(--blue)">/api/v1/</a> — зручно для перегляду в браузері без curl.</div></div>
+
+    <!-- ── DigiKey ── -->
+    <h3 class="sub" style="margin-top:32px">🛒 DigiKey — Інтеграція</h3>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">📦</span><h3>Пошук компонентів</h3></div>
+        <p>Пошук будь-якого компонента або виробника через DigiKey Product Information V4 API. Показує наявність, ціни та цінові сходинки, lead time, статус. <a href="/admin/bots/digikeyconfig/products/?q=Sevskiy" style="color:var(--blue)">Відкрити →</a></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🔍</span><h3>Пошук за PO номером</h3></div>
+        <p>Пошук замовлення DigiKey за номером PO. Потребує підписки на <strong>Ordering API</strong> (запит на <code>api.contact@digikey.com</code>). <a href="/admin/bots/digikeyconfig/po-lookup/" style="color:var(--blue)">Відкрити →</a></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🔬</span><h3>Debug запитів</h3></div>
+        <p>Показує сирий HTTP запит і відповідь DigiKey API: URL, заголовки, параметри, статус, тіло відповіді. Для діагностики проблем. <a href="/admin/bots/digikeyconfig/debug/?endpoint=orders" style="color:var(--blue)">Відкрити →</a></p>
+      </div>
+    </div>
+
+    <div class="feature-row"><span class="feature-icon">🛒</span><div class="feature-content">
+      <h4>Налаштування DigiKey API</h4>
+      <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px;margin:8px 0 0;">
+        <li>Зареєструватись на <a href="https://developer.digikey.com" target="_blank" style="color:var(--blue)">developer.digikey.com</a> → My Apps → Create App</li>
+        <li>Підписатись на <strong>Product Information V4</strong> (безкоштовно, одразу активний)</li>
+        <li>Налаштувати: <a href="/admin/bots/digikeyconfig/" style="color:var(--blue)">Боти → DigiKey API</a> → Client ID, Client Secret, Account ID</li>
+        <li>Натиснути <strong>🔌 Тест з'єднання</strong></li>
+        <li>Перевірити компоненти: кнопка <strong>📦 Компоненти</strong> → ввести назву виробника</li>
+      </ol>
+    </div></div>
+
+    <div class="t-wrap" style="margin-top:12px"><table class="ht"><thead><tr><th>API продукт DigiKey</th><th>Статус</th><th>Що дає</th></tr></thead><tbody>
+      <tr><td>Product Information V4</td><td><span class="badge b-green">✅ Активний</span></td><td>Пошук компонентів, ціни, наявність, lead time</td></tr>
+      <tr><td>Order Status</td><td><span class="badge b-green">✅ Активний</span></td><td>Статус власних замовлень (як покупець)</td></tr>
+      <tr><td>Ordering (OrderManagement)</td><td><span class="badge" style="background:rgba(255,152,0,.15);color:#ffb74d">⏳ Запит</span></td><td>Вхідні замовлення від клієнтів — потребує <code>api.contact@digikey.com</code></td></tr>
+      <tr><td>Supply Chain</td><td><span class="badge" style="background:rgba(96,125,139,.15);color:#9aafbe">—</span></td><td>Моніторинг дефіциту по ринку — не потрібен</td></tr>
+    </tbody></table></div>
+
+    <h3 class="sub" style="margin-top:32px">🟡 DHL Express — Тарифи та Трекінг</h3>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">🟡</span><h3>DHL Тарифи</h3></div>
+        <p>На сторінці відправлення кнопка <strong>🟡 DHL Тарифи</strong> показує всі послуги DHL з цінами та часом доставки через MyDHL API.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🔍</span><h3>DHL Трекінг</h3></div>
+        <p>Ввести будь-який номер DHL Express → статус, місцезнаходження, історія подій. Тільки Express (10+ цифр). DHL Paket — не підтримується. <a href="/admin/shipping/shipment/dhl-track-lookup/" style="color:var(--blue)">Відкрити →</a></p>
+      </div>
+    </div>
+
+    <div class="feature-row"><span class="feature-icon">🟡</span><div class="feature-content">
+      <h4>Налаштування DHL Carrier</h4>
+      <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px;margin:8px 0 0;">
+        <li>Реєстрація: <a href="https://developer.dhl.com" target="_blank" style="color:var(--blue)">developer.dhl.com</a> → My Apps → <strong>DHL Express MyDHL API</strong></li>
+        <li><a href="/admin/shipping/carrier/add/" style="color:var(--blue)">Доставка → Перевізники → Додати</a> → тип <code>DHL</code></li>
+        <li><strong>API ключ</strong> = DHL Username · <strong>API секрет</strong> = DHL Password</li>
+        <li><strong>Connection UUID</strong> = Account Number · <strong>API URL</strong> = <code>test</code> для sandbox</li>
+        <li>Тарифи: Відправлення → <strong>🟡 DHL Тарифи</strong><br>
+            Трекінг: Sidebar → Доставка → <strong>🔍 DHL Трекінг</strong></li>
+      </ol>
+      <p style="color:var(--muted);font-size:12px;margin-top:8px;">⚠️ MyDHL API трекає лише <strong>DHL Express</strong>. Для DHL Paket потрібна активація "Shipment Tracking – Unified" на developer.dhl.com (окрема підписка).</p>
+    </div></div>
+
+    <h3 class="sub" style="margin-top:32px">Варіанти підключення ботів</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Бот / Сервіс</th><th>Що робить</th><th>Endpoint / Метод</th></tr></thead><tbody>
+      <tr><td>🔵 DigiKey sync</td><td>Авто-імпорт замовлень (після активації Ordering API)</td><td><code>manage.py sync_digikey_orders</code></td></tr>
+      <tr><td>📮 Nova Poshta</td><td>Оновлення статусів відправлень</td><td><code>PATCH /api/v1/orders/{id}/</code></td></tr>
+      <tr><td>💬 Telegram Bot</td><td>Сповіщення про нові замовлення, критичний склад</td><td><code>GET /api/v1/orders/?status=received</code></td></tr>
+      <tr><td>🛒 Shopify webhook</td><td>Новий order → автоматично в Minerva</td><td><code>POST /api/v1/orders/</code></td></tr>
+    </tbody></table></div>
+
+    <div class="alert alert-blue" style="margin-top:20px"><span>💡</span><div>API ключі керуються через <a href="/admin/api/apikey/" style="color:var(--blue)">Система → API Ключі</a>. Кожен ключ має окремі scopes (права). Термін дії — опціонально.</div></div>
+  </div>
+
+  <!-- ══ БУХГАЛТЕРІЯ ══ -->
+  <div id="accounting" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(63,185,80,.2),rgba(201,168,76,.1))">💰</div>
+      <div><h2>Модуль Бухгалтерії</h2><p>Рахунки-фактури, платежі, витрати, PDF — все в одному місці</p></div>
+    </div>
+
+    <div class="alert alert-green"><span>✅</span><div>Рівень <strong>Level 2</strong> — повноцінний операційний облік для малого та середнього бізнесу. Сумісний із вимогами ЄС (VAT, Leistungsdatum).</div></div>
+
+    <h3 class="sub">Що вміє модуль</h3>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">📄</span><h3>Рахунки-фактури (Invoice)</h3></div>
+        <p>Авто-нумерація <code>INV-2026-0001</code>. Підтримка VAT (0/7/19/20%). Leistungsdatum для Німеччини/Австрії. Знімок (snapshot) клієнта — незмінний після виставлення.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">📑</span><h3>PDF-генерація</h3></div>
+        <p>Кнопка <strong>📄 PDF</strong> в рахунку → завантаження A4-документу з реквізитами компанії, адресами, таблицею позицій, VAT та банківськими деталями (IBAN/SWIFT).</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">💳</span><h3>Платежі (Payment)</h3></div>
+        <p>Bank transfer, Card, Cash, Stripe, PayPal, Crypto. Статус рахунку оновлюється автоматично: <span class="badge b-green">Оплачено</span> або <span class="badge b-red">Прострочено</span>.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">💸</span><h3>Витрати (Expense)</h3></div>
+        <p>Облік витрат з категоріями (ієрархія), прив'язкою до постачальника, завантаженням чеків. Прапорець VAT-deductible для EU-звітності.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🏢</span><h3>Налаштування компанії</h3></div>
+        <p>Реквізити, логотип, IBAN, SWIFT, VAT ID. Встановлюється один раз — автоматично потрапляє в усі PDF-рахунки. <a href="/admin/accounting/companysettings/">Налаштувати →</a></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🔗</span><h3>Інтеграція з замовленнями</h3></div>
+        <p>Кнопка <strong>💰 Рахунок</strong> на кожному замовленні → рахунок створюється з автозаповненням клієнта, адреси та даних замовлення.</p>
+      </div>
+    </div>
+
+    <h3 class="sub">Статуси рахунку</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Статус</th><th>Значення</th><th>Коли виникає</th></tr></thead><tbody>
+      <tr><td><span class="badge b-gray">Чернетка</span></td><td>Рахунок створено, не надіслано</td><td>За замовчуванням</td></tr>
+      <tr><td><span class="badge b-blue">Надіслано</span></td><td>Рахунок надіслано клієнту</td><td>Зміна вручну</td></tr>
+      <tr><td><span class="badge b-green">Оплачено</span></td><td>Сума платежів ≥ суми рахунку</td><td>Автоматично при додаванні платежу</td></tr>
+      <tr><td><span class="badge b-red">Прострочено</span></td><td>Термін оплати минув, не оплачено</td><td>Автоматично через signal</td></tr>
+      <tr><td><span class="badge b-gray">Скасовано</span></td><td>Рахунок скасовано</td><td>Зміна вручну</td></tr>
+    </tbody></table></div>
+
+    <h3 class="sub">Як виставити рахунок</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Заповніть реквізити компанії</h4><p><a href="/admin/accounting/companysettings/">Бухгалтерія → Налаштування компанії</a> — назва, адреса, IBAN, VAT ID. Робиться один раз.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Варіант А — з замовлення</h4><p>Відкрийте замовлення → кнопка <strong>💰 Рахунок</strong> — дані клієнта та адреса заповнюються автоматично.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Варіант Б — вручну</h4><p><a href="/admin/accounting/invoice/add/">Бухгалтерія → Рахунки → Додати</a>. Оберіть клієнта → snapshot заповниться автоматично.</p></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>Додайте рядки рахунку</h4><p>В інлайн-таблиці внизу форми: опис, кількість, ціна за одиницю, знижка %, одиниця виміру.</p></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-content"><h4>Вкажіть VAT та термін оплати</h4><p>VAT % (0/7/19/20), дату послуги (Leistungsdatum для DE/AT), термін оплати (due_date).</p></div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-content"><h4>Збережіть та завантажте PDF</h4><p>Кнопка <strong>📄 PDF</strong> у верхньому правому куті форми → готовий A4-документ.</p></div></div>
+    </div>
+
+    <h3 class="sub">VAT — підтримка ЄС</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Ставка</th><th>Застосування</th></tr></thead><tbody>
+      <tr><td><span class="badge b-gray">0%</span></td><td>Міжнародні поставки, reverse-charge, звільнені послуги</td></tr>
+      <tr><td><span class="badge b-blue">7%</span></td><td>Знижена ставка DE (книги, їжа, медицина)</td></tr>
+      <tr><td><span class="badge b-orange">19%</span></td><td>Стандартна ставка DE / AT</td></tr>
+      <tr><td><span class="badge b-orange">20%</span></td><td>Стандартна ставка AT / UA</td></tr>
+    </tbody></table></div>
+
+    <h3 class="sub">Швидкий доступ</h3>
+    <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+      <div class="card" onclick="window.location='/admin/accounting/invoice/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">📄</span><h3>Рахунки</h3></div>
+        <p><a href="/admin/accounting/invoice/" onclick="event.stopPropagation()">Список рахунків →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/accounting/expense/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">💸</span><h3>Витрати</h3></div>
+        <p><a href="/admin/accounting/expense/" onclick="event.stopPropagation()">Список витрат →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/accounting/companysettings/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🏢</span><h3>Реквізити</h3></div>
+        <p><a href="/admin/accounting/companysettings/" onclick="event.stopPropagation()">Налаштування компанії →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/accounting/invoice/add/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">➕</span><h3>Новий рахунок</h3></div>
+        <p><a href="/admin/accounting/invoice/add/" onclick="event.stopPropagation()">Створити рахунок →</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ДОСТАВКА ══ -->
+  <div id="shipping" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(33,150,243,.2),rgba(100,181,246,.1))">🚚</div>
+      <div><h2>Модуль доставки</h2><p>Автоматизоване оформлення відправлень через зовнішніх перевізників</p></div>
+    </div>
+
+    <div class="alert alert-green"><span>✅</span><div><strong>Jumingo API активний.</strong> Порівняння тарифів, створення відправлень, трекінг, авто-оновлення статусів. DHL — тарифи та трекінг через MyDHL API.</div></div>
+
+    <h3 class="sub">Підтримувані перевізники</h3>
+    <div class="t-wrap">
+      <table class="ht">
+        <thead><tr><th>Перевізник</th><th>Тип</th><th>Статус</th><th>Опис</th></tr></thead>
+        <tbody>
+          <tr><td>🔀 <strong>Jumingo</strong></td><td>Агрегатор</td><td><span style="color:#4caf50">✅ Активний</span></td><td>Порівнює тарифи DHL/GLS/Hermes/DPD, авто-трекінг, митні декларації</td></tr>
+          <tr><td>📦 <strong>DHL Express</strong></td><td>MyDHL API</td><td><span style="color:#4caf50">✅ Тарифи + Трекінг</span></td><td>Ціни, час доставки, DHL Express трекінг</td></tr>
+          <tr><td>📦 UPS</td><td>Пряма інтеграція</td><td><span style="color:#ff9800">🔜 Заплановано</span></td><td>—</td></tr>
+          <tr><td>📦 FedEx</td><td>Пряма інтеграція</td><td><span style="color:#ff9800">🔜 Заплановано</span></td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub">Як оформити відправлення</h3>
+    <div class="t-wrap">
+      <table class="ht">
+        <thead><tr><th>Крок</th><th>Дія</th><th>Де</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Відкрийте замовлення покупця</td><td><code>/admin/sales/salesorder/{id}/change/</code></td></tr>
+          <tr><td>2</td><td>Натисніть кнопку <strong>«🚚 Створити відправлення»</strong> внизу форми</td><td>Блок кнопок замовлення</td></tr>
+          <tr><td>3</td><td>Поля одержувача автоматично заповнюються з адреси замовлення</td><td>Форма відправлення</td></tr>
+          <tr><td>4</td><td>Вкажіть вагу, розміри, тип вмісту, задекларовану вартість</td><td>Форма відправлення</td></tr>
+          <tr><td>5</td><td>Збережіть відправлення (статус: <em>Чернетка</em>)</td><td>—</td></tr>
+          <tr><td>6</td><td>Натисніть <strong>«Передати перевізнику»</strong> або відкрийте Jumingo вручну</td><td>Сторінка відправлення</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub">Статуси відправлення</h3>
+    <div class="t-wrap">
+      <table class="ht">
+        <thead><tr><th>Статус</th><th>Значення</th></tr></thead>
+        <tbody>
+          <tr><td>📝 <strong>Чернетка</strong></td><td>Відправлення створено, ще не передано перевізнику</td></tr>
+          <tr><td>📤 <strong>Передано перевізнику</strong></td><td>Запит надіслано до API перевізника</td></tr>
+          <tr><td>🏷️ <strong>Етикетка готова</strong></td><td>Отримано трекінг-номер та PDF-етикетку</td></tr>
+          <tr><td>🚛 <strong>В дорозі</strong></td><td>Посилка передана в службу доставки</td></tr>
+          <tr><td>✅ <strong>Доставлено</strong></td><td>Одержувач отримав посилку</td></tr>
+          <tr><td>❌ <strong>Помилка</strong></td><td>API повернув помилку — деталі в полі «Повідомлення про помилку»</td></tr>
+          <tr><td>🚫 <strong>Скасовано</strong></td><td>Відправлення скасовано</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="sub">Налаштування перевізника</h3>
+    <p>Перед першим використанням потрібно додати перевізника: <a href="/admin/shipping/carrier/add/">Доставка → Перевізники → Додати</a></p>
+    <div class="t-wrap">
+      <table class="ht">
+        <thead><tr><th>Поле</th><th>Опис</th></tr></thead>
+        <tbody>
+          <tr><td>Назва</td><td>Довільна назва (напр. «Jumingo Production»)</td></tr>
+          <tr><td>Тип</td><td>Вибрати Jumingo / DHL / UPS / FedEx / Інше</td></tr>
+          <tr><td>За замовчуванням</td><td>Цей перевізник буде підставлятися автоматично при створенні відправлення</td></tr>
+          <tr><td>API ключ / пароль</td><td>Credentials з особистого кабінету Jumingo</td></tr>
+          <tr><td>API URL</td><td>URL ендпоінту API (для Jumingo: <code>https://www.jumingo.com/api/v1/</code>)</td></tr>
+          <tr><td>Дані відправника</td><td>Ім'я, компанія, адреса, телефон, email — підставляються в кожне відправлення</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <hr class="div">
+    <h3 class="sub">🔄 Авто-трекінг відправлень</h3>
+    <div class="alert alert-green"><span>✅</span><div>Minerva автоматично оновлює статуси всіх активних відправлень через Jumingo та DHL API за розкладом.</div></div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">⏱️</span><h3>Інтервал оновлення</h3></div>
+        <p>За замовчуванням кожні <strong>30 хвилин</strong>. Налаштовується. Cron запускає команду кожні 5 хв, але вона сама перевіряє чи вже час.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🔔</span><h3>Сповіщення при змінах</h3></div>
+        <p>Якщо статус змінився — Minerva надсилає email / Telegram зі списком оновлень. Якщо змін не було — сповіщення не надсилається (налаштовується).</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🔘</span><h3>Ручний запуск</h3></div>
+        <p>Кнопка <strong>«🔄 Запустити оновлення зараз»</strong> на сторінці налаштувань. Ігнорує інтервал, але враховує галочку «не надсилати якщо змін не було».</p>
+      </div>
+    </div>
+    <div class="feature-row"><span class="feature-icon">⚙️</span><div class="feature-content">
+      <h4>Налаштування авто-трекінгу</h4>
+      <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px;margin:0;">
+        <li><a href="/admin/shipping/shippingsettings/1/change/" style="color:var(--blue)">Доставка → Авто-трекінг</a> → увімкнути галочку</li>
+        <li>Встановити інтервал (рекомендовано 30–60 хв)</li>
+        <li>Cron на Synology: <code>*/5 * * * * docker-compose exec -T web python manage.py track_shipments</code></li>
+        <li>Сповіщення про зміни — <a href="/admin/config/notificationsettings/" style="color:var(--blue)">Інтеграції → Сповіщення</a> → секція «⚙️ Оновлення системи»</li>
+      </ol>
+    </div></div>
+
+    <h3 class="sub">Швидкий доступ</h3>
+    <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));margin-top:12px">
+      <div class="card" onclick="window.location='/admin/shipping/shipment/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">📋</span><h3>Всі відправлення</h3></div>
+        <p><a href="/admin/shipping/shipment/" onclick="event.stopPropagation()">Список відправлень →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/shipping/carrier/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">⚙️</span><h3>Перевізники</h3></div>
+        <p><a href="/admin/shipping/carrier/" onclick="event.stopPropagation()">Налаштування перевізників →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/shipping/shippingsettings/1/change/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🔄</span><h3>Авто-трекінг</h3></div>
+        <p><a href="/admin/shipping/shippingsettings/1/change/" onclick="event.stopPropagation()">Налаштування + ручний запуск →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/shipping/shipment/order-tracking/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">📡</span><h3>Трекінг замовлень</h3></div>
+        <p><a href="/admin/shipping/shipment/order-tracking/" onclick="event.stopPropagation()">Всі відправлення з трекінгом →</a></p>
+      </div>
+    </div>
+
+    <div class="alert" style="background:rgba(33,150,243,.08);border-color:#2196f3;margin-top:20px"><span>🔑</span><div>Для отримання API-ключів Jumingo: <a href="https://www.jumingo.com/de-de/users/account-summary" target="_blank" style="color:var(--blue)">Jumingo → Account Summary</a>. Після отримання — заповніть поля API ключ та API секрет у картці перевізника.</div></div>
+
+    <hr class="div">
+    <h3 class="sub">📦 Пакувальні матеріали (в розробці)</h3>
+    <div class="alert alert-orange"><span>🚧</span><div>Модуль обліку упаковки — <strong>заплановано</strong>. Дозволить прив'язувати рекомендовані коробки до товарів та відстежувати фактичну упаковку замовлень.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Модель</th><th>Призначення</th></tr></thead><tbody>
+      <tr><td><strong>PackagingMaterial</strong></td><td>Коробки, конверти, тубуси: тип, розміри (L×W×H мм), tare_weight_g, max_weight_g, ціна</td></tr>
+      <tr><td><strong>ProductPackaging</strong></td><td>Рекомендована упаковка для товару: qty_per_box, estimated_weight_g (авто = net_weight_g × qty + tare)</td></tr>
+      <tr><td><strong>OrderPackaging</strong></td><td>Фактична упаковка замовлення — для статистики та звітів</td></tr>
+    </tbody></table></div>
+    <div class="alert alert-blue"><span>💡</span><div>Після впровадження: <strong>packaging_panel</strong> на картці замовлення показуватиме рекомендовану коробку та розраховану вагу посилки автоматично.</div></div>
+  </div>
+
+  <!-- ══ СИСТЕМА ══ -->
+  <div id="sistema" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(156,39,176,.2),rgba(33,150,243,.1))">⚙️</div>
+      <div><h2>Система та налаштування</h2><p>Конфігурація документів, email-сповіщення, системні параметри</p></div>
+    </div>
+
+    <h3 class="sub">📄 Налаштування документів (DocumentSettings)</h3>
+    <div class="alert alert-blue"><span>ℹ️</span><div>Глобальні значення за замовчуванням для PDF-документів. Налаштовуються один раз → підставляються автоматично. Можна перевизначити разово через ⚙️-панель прямо в картці замовлення.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Параметр</th><th>Де використовується</th><th>Значення</th></tr></thead><tbody>
+      <tr><td><strong>Мова документів</strong></td><td>Заголовки та службовий текст у всіх PDF</td><td>🇬🇧 Англійська / 🇩🇪 Deutsch (англ.+нім.) / 🇩🇪 Deutsch (тільки DE)</td></tr>
+      <tr><td><strong>Пакувальний лист — показувати ціни</strong></td><td>Packing List</td><td>✅ Так / ⬜ Ні</td></tr>
+      <tr><td><strong>Пакувальний лист — нотатка в підвалі</strong></td><td>Нижній рядок Packing List</td><td>Довільний текст (до 200 символів)</td></tr>
+      <tr><td><strong>Proforma — умови оплати</strong></td><td>Рядок під реквізитами Proforma</td><td>Напр.: "Payment in advance, 30 days net"</td></tr>
+      <tr><td><strong>Proforma — примітки</strong></td><td>Нотатка в кінці Proforma Invoice</td><td>Довільний текст</td></tr>
+      <tr><td><strong>CN23 — тип декларації (fallback)</strong></td><td>Якщо тип не вказано в замовленні</td><td>Sale / Gift / Sample / Return / Other</td></tr>
+      <tr><td><strong>CN23 — опис товару (fallback)</strong></td><td>Якщо у товару нема HS-коду</td><td>Напр.: "Electronic components"</td></tr>
+    </tbody></table></div>
+    <div class="alert alert-green"><span>💡</span><div>Налаштувати: <a href="/admin/config/documentsettings/">⚙️ Система → Документи та звітність</a> або через плитку на <a href="/dashboard/system/">сторінці Системи</a>.</div></div>
+
+    <hr class="div">
+    <h3 class="sub">🔌 Центр інтеграцій</h3>
+    <div class="alert alert-blue"><span>ℹ️</span><div>Всі підключення в одному місці: DigiKey, перевізники (Jumingo/DHL), email/Telegram, авто-трекінг. <a href="/admin/config/integrations/" style="color:var(--blue)">Інтеграції →</a></div></div>
+    <div class="cards">
+      <div class="card" onclick="window.location='/admin/config/integrations/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🔌</span><h3>Огляд інтеграцій</h3></div>
+        <p>Статус кожного сервісу + пряме посилання на налаштування. <a href="/admin/config/integrations/" onclick="event.stopPropagation()">Відкрити →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/config/notificationsettings/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🔔</span><h3>Всі сповіщення</h3></div>
+        <p>SMTP, Telegram, типи подій. <a href="/admin/config/notificationsettings/" onclick="event.stopPropagation()">Налаштувати →</a></p>
+      </div>
+    </div>
+
+    <hr class="div">
+    <h3 class="sub">📧 Сповіщення (NotificationSettings)</h3>
+    <div class="alert alert-orange"><span>⚠️</span><div>Сповіщення надсилаються лише якщо Email або Telegram увімкнено та заповнені реквізити. Налаштуйте один раз — система надсилатиме алерти автоматично.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Тип події</th><th>Email</th><th>Telegram</th><th>Примітка</th></tr></thead><tbody>
+      <tr><td>🆕 Нове замовлення</td><td>✅ налаштовується</td><td>✅ налаштовується</td><td>Одразу при збереженні</td></tr>
+      <tr><td>🔄 Зміна статусу замовлення</td><td>✅ налаштовується</td><td>✅ налаштовується</td><td>В обробці / Відправлено / Доставлено / Скасовано — окремо</td></tr>
+      <tr><td>🔄 Авто-трекінг / Sync звіт</td><td>✅ налаштовується</td><td>✅ налаштовується</td><td>Список змін з деталями по кожному замовленню</td></tr>
+      <tr><td>🔥 Критичний залишок</td><td>✅ увімкнути</td><td>—</td><td>Cron: <code>send_alerts</code></td></tr>
+      <tr><td>⏰ Прострочені дедлайни</td><td>✅ увімкнути</td><td>—</td><td>Cron: <code>send_alerts</code></td></tr>
+    </tbody></table></div>
+    <div class="cards" style="margin-top:12px">
+      <div class="card">
+        <div class="card-head"><span class="icon">🔇</span><h3>Антиспам</h3></div>
+        <p>Мінімальний інтервал між плановими надсиланнями (за замовч. 12 год.). Галочка <strong>"Не надсилати якщо змін не виявлено"</strong> для sync-звітів.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">⏱️</span><h3>Ручний запуск</h3></div>
+        <p>Кнопка <strong>"🔔 Перевірити та надіслати зараз"</strong> — планові алерти (склад, дедлайни). Кнопка <strong>"🔄 Запустити оновлення зараз"</strong> — трекінг відправлень.</p>
+      </div>
+    </div>
+
+    <h3 class="sub">IONOS — налаштування SMTP</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">
+        <h4>Заповніть SMTP в Minerva</h4>
+        <p><a href="/admin/config/notificationsettings/">Система → Email сповіщення</a> → заповніть:<br>
+        Host: <code>smtp.ionos.de</code> · Port: <code>465</code> · TLS (STARTTLS): ☐ зняти · SSL: ☑ поставити · User: ваш IONOS email · Password: пароль від поштової скриньки · From: ваш IONOS email</p>
+      </div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">
+        <h4>Натисніть "📧 Надіслати тест"</h4>
+        <p>Якщо OK — налаштування вірні. При помилці <code>535</code> — перевірте логін і пароль (використовується звичайний пароль поштової скриньки, не App Password).</p>
+      </div></div>
+    </div>
+
+    <h3 class="sub">Gmail — налаштування SMTP (покрокова інструкція)</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">
+        <h4>Увімкніть двофакторну аутентифікацію</h4>
+        <p>Google Account → Безпека → Двоетапна перевірка (потрібна для App Passwords).</p>
+      </div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">
+        <h4>Створіть App Password</h4>
+        <p>Google Account → Безпека → Двоетапна перевірка → <strong>Паролі застосунків</strong> → оберіть "Mail" + "Other (Custom name)" → скопіюйте 16-символьний пароль.</p>
+      </div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">
+        <h4>Заповніть SMTP в Minerva</h4>
+        <p><a href="/admin/config/notificationsettings/">Система → Email сповіщення</a> → заповніть:<br>
+        Host: <code>smtp.gmail.com</code> · Port: <code>587</code> · TLS: ✅ · User: ваш Gmail · Password: App Password</p>
+      </div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content">
+        <h4>Натисніть "📧 Надіслати тест"</h4>
+        <p>Кнопка перевірить SMTP та надішле порожній лист. Якщо OK — налаштування вірні.</p>
+      </div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-content">
+        <h4>Налаштуйте cron (автоматично кожні 12 год.)</h4>
+        <p>Docker / Synology Scheduler: <code>docker-compose exec -T web python manage.py send_alerts</code><br>
+        Або вручну з примусовим надсиланням: <code>python manage.py send_alerts --force</code></p>
+      </div></div>
+    </div>
+
+    <h3 class="sub">Типові помилки SMTP</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Помилка</th><th>Причина</th><th>Рішення</th></tr></thead><tbody>
+      <tr><td><code>535 5.7.8 Username and Password not accepted</code></td><td>Використовується звичайний пароль Gmail замість App Password</td><td>Google Account → Безпека → Паролі застосунків → створіть App Password (16 символів без пробілів)</td></tr>
+      <tr><td><code>Connection refused</code> / <code>WinError 10061</code></td><td>Неправильний host або port</td><td>Gmail: host <code>smtp.gmail.com</code>, port <code>587</code> (TLS) або <code>465</code> (SSL)</td></tr>
+      <tr><td><code>STARTTLS extension not supported</code></td><td>TLS увімкнено на порті 465 (SSL-порт)</td><td>Port 465 → вимкніть TLS, увімкніть SSL. Port 587 → навпаки</td></tr>
+      <tr><td><code>Немає отримувачів</code></td><td>Поле <em>Отримувачі (To)</em> порожнє</td><td>Заповніть email-адресу в полі "Отримувачі" та збережіть</td></tr>
+      <tr><td><code>Жоден канал не налаштований</code></td><td><em>Email увімкнено</em> = ✗ або обидва канали вимкнені</td><td>Поставте ✅ біля "Надсилати email-сповіщення" та збережіть</td></tr>
+    </tbody></table></div>
+
+    <hr class="div">
+    <h3 class="sub">📱 Telegram Bot — повне налаштування</h3>
+    <div class="alert alert-blue"><span>ℹ️</span><div>Telegram і Email — <strong>незалежні канали</strong>. Можна увімкнути один, обидва або жодного. Обидва надсилають ті самі дані: critical stock + прострочені дедлайни.</div></div>
+
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">🤖</span><h3>Що потрібно</h3></div>
+        <p>Два значення:<br>
+        1. <strong>Bot Token</strong> — отримати у @BotFather<br>
+        2. <strong>Chat ID</strong> — куди надсилати (особистий чат / група / канал)</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">📨</span><h3>Що надсилає бот</h3></div>
+        <p>HTML-повідомлення з таблицями:<br>
+        🔥 Критичний залишок (SKU, шт, місяців)<br>
+        ⏰ Прострочені дедлайни (номер, клієнт, днів)</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">⏱️</span><h3>Коли надсилає</h3></div>
+        <p>Разом з email при спрацюванні алерту. Вручну — кнопка <strong>"📱 Тест Telegram"</strong> або <strong>"🔔 Надіслати зараз"</strong> в адмін-панелі.</p>
+      </div>
+    </div>
+
+    <h3 class="sub" style="margin-top:4px">Крок 1 — Створити бота (@BotFather)</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">
+        <h4>Відкрийте Telegram → знайдіть <code>@BotFather</code></h4>
+        <p>Офіційний бот Telegram для керування ботами. Натисніть <strong>Start</strong>.</p>
+      </div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">
+        <h4>Надішліть <code>/newbot</code></h4>
+        <p>BotFather запитає: <em>"Alright, a new bot. How are we going to call it?"</em><br>
+        Вкажіть відображувану назву, наприклад: <strong>Minerva Alerts</strong></p>
+      </div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">
+        <h4>Вкажіть username бота</h4>
+        <p>Має закінчуватись на <code>bot</code>, наприклад: <code>minerva_alerts_bot</code><br>
+        BotFather підтвердить та надішле <strong>токен</strong>.</p>
+      </div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content">
+        <h4>Скопіюйте токен</h4>
+        <p>Токен має вигляд: <code>7123456789:AAFxxxxxxxx-yyyyyyyy</code><br>
+        Зберігайте токен в таємниці — він дає повний доступ до бота.</p>
+      </div></div>
+    </div>
+
+    <h3 class="sub">Крок 2 — Отримати Chat ID</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Тип чату</th><th>Як отримати Chat ID</th><th>Приклад Chat ID</th></tr></thead><tbody>
+      <tr>
+        <td>👤 <strong>Особистий чат</strong></td>
+        <td>1. Надішліть боту <code>/start</code><br>2. Відкрийте <code>@userinfobot</code> → команда <code>/start</code> → він покаже ваш ID</td>
+        <td><code>123456789</code></td>
+      </tr>
+      <tr>
+        <td>👥 <strong>Група</strong></td>
+        <td>1. Додайте бота в групу<br>2. Надішліть <code>/start</code> або будь-яке повідомлення<br>3. ID групи можна дізнатись через <code>@getidsbot</code> або <code>@userinfobot</code></td>
+        <td><code>-1001234567890</code></td>
+      </tr>
+      <tr>
+        <td>📢 <strong>Канал</strong></td>
+        <td>1. Додайте бота як <strong>адміністратора</strong> з правом публікації<br>2. Використовуйте <code>@username_каналу</code> або числовий ID</td>
+        <td><code>@mychannel</code><br><code>-1009876543210</code></td>
+      </tr>
+    </tbody></table></div>
+    <div class="alert alert-orange"><span>⚠️</span><div>Для <strong>каналу</strong>: бот має бути <strong>адміністратором</strong> з увімкненим правом "Post Messages". Без цього надсилання не спрацює.</div></div>
+
+    <h3 class="sub">Крок 3 — Заповнити в Minerva</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Поле в Minerva</th><th>Що вставити</th><th>Де знаходиться</th></tr></thead><tbody>
+      <tr><td><code>Bot Token</code></td><td>Токен від @BotFather<br><code>7123456789:AAFxxxx...</code></td><td rowspan="3"><a href="/admin/config/notificationsettings/">Система → Email сповіщення</a><br>→ секція <strong>"📱 Telegram"</strong> (collapse)<br>→ увімкніть перемикач</td></tr>
+      <tr><td><code>Chat ID</code></td><td>Числовий ID або <code>@username</code><br>Для каналу: <code>@mychannel</code><br>Для групи: <code>-1001234567890</code></td></tr>
+      <tr><td><code>Надсилати Telegram</code></td><td>✅ увімкнути</td></tr>
+    </tbody></table></div>
+
+    <h3 class="sub">Крок 4 — Перевірити</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">✓</div><div class="step-content">
+        <h4>Натисніть кнопку "📱 Тест Telegram"</h4>
+        <p>Знаходиться в секції <strong>"🚀 Дії"</strong> на сторінці <a href="/admin/config/notificationsettings/">Налаштування сповіщень</a>.<br>
+        Надішле тестове повідомлення: <em>"✅ Minerva — Тест Telegram (OK)"</em><br>
+        Якщо бот не пише — перевірте за таблицею нижче.</p>
+      </div></div>
+    </div>
+
+    <h3 class="sub">Усунення проблем</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Проблема</th><th>Причина</th><th>Рішення</th></tr></thead><tbody>
+      <tr><td>⚠️ Telegram вимкнено або не налаштований</td><td>Поля порожні або не увімкнено</td><td>Заповніть Bot Token + Chat ID + увімкніть перемикач</td></tr>
+      <tr><td>❌ <code>Forbidden: bot was blocked by the user</code></td><td>Ви заблокували бота в особистому чаті</td><td>Знайдіть бота → Unblock</td></tr>
+      <tr><td>❌ <code>Chat not found</code></td><td>Неправильний Chat ID або бота ще немає в чаті</td><td>Надішліть боту <code>/start</code> або додайте його в групу/канал</td></tr>
+      <tr><td>❌ <code>Bad Request: chat_id is empty</code></td><td>Поле Chat ID порожнє</td><td>Заповніть Chat ID і збережіть</td></tr>
+      <tr><td>❌ <code>Unauthorized</code></td><td>Невірний токен</td><td>Скопіюйте токен ще раз з @BotFather</td></tr>
+      <tr><td>❌ <code>have no rights to send a message</code></td><td>Бот не адміністратор каналу</td><td>Канал → Адміністратори → додати бота з правом "Post Messages"</td></tr>
+      <tr><td>Тест пройшов, але алерти не приходять</td><td>Немає активних алертів або не спрацював інтервал</td><td>Натисніть <strong>"🔔 Перевірити та надіслати зараз"</strong> — ігнорує інтервал</td></tr>
+    </tbody></table></div>
+
+    <hr class="div">
+    <h3 class="sub">Швидкий доступ — Конфігурація</h3>
+    <div class="cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+      <div class="card" onclick="window.location='/admin/config/systemsettings/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🏢</span><h3>Системні налаштування</h3></div>
+        <p><a href="/admin/config/systemsettings/" onclick="event.stopPropagation()">Модулі, валюта, компанія →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/config/documentsettings/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">📄</span><h3>Документи</h3></div>
+        <p><a href="/admin/config/documentsettings/" onclick="event.stopPropagation()">Мова PDF, packing list, proforma, CN23 →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/admin/config/notificationsettings/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🔔</span><h3>Email + Telegram сповіщення</h3></div>
+        <p><a href="/admin/config/notificationsettings/" onclick="event.stopPropagation()">SMTP, Bot Token, Chat ID, алерти →</a></p>
+      </div>
+      <div class="card" onclick="window.location='/dashboard/system/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🖥️</span><h3>Сторінка Системи</h3></div>
+        <p><a href="/dashboard/system/" onclick="event.stopPropagation()">Всі плитки системи →</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ШВИДКИЙ СТАРТ ══ -->
+  <div id="shortcuts" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(201,168,76,.2),rgba(227,179,65,.1))">⚡</div>
+      <div><h2>Швидкий старт</h2><p>Типові щоденні задачі — крок за кроком</p></div>
+    </div>
+    <h3 class="sub">📦 Нове замовлення прийшло</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Імпортуйте Excel через Wizard</h4><p>Продажі → Замовлення → "📥 Імпорт з Excel".</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Клієнти CRM оновились автоматично</h4><p>Django signals синхронізують CRM. Перевірте <code>/admin/crm/customer/</code></p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Перевірте наявність на складі</h4><p>Відкрийте замовлення → блок "📦 Залишки".</p></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>Надрукуйте етикетки</h4><p>В замовленні → блок "🏷️ Етикетки" → "🖨️ Друкувати".</p></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-content"><h4>Позначте відправленим</h4><p>Заповніть поле "Дата відправки" → зберегти.</p></div></div>
+    </div>
+    <h3 class="sub">💰 Виставити рахунок клієнту</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Перший раз — заповніть реквізити</h4><p><a href="/admin/accounting/companysettings/">Бухгалтерія → Налаштування компанії</a> — назва, IBAN, VAT ID, логотип.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Відкрийте замовлення → кнопка «💰 Рахунок»</h4><p>Дані клієнта та адреса заповняться автоматично.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Додайте рядки, вкажіть VAT і термін оплати</h4><p>Підсумки (subtotal/VAT/total) розраховуються автоматично.</p></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>Збережіть → кнопка «📄 PDF»</h4><p>Завантажте готовий рахунок-фактуру та надішліть клієнту.</p></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-content"><h4>Клієнт оплатив — додайте платіж</h4><p>В рахунку → інлайн «Платежі» → додати суму і метод. Статус зміниться на <span class="badge b-green">Оплачено</span> автоматично.</p></div></div>
+    </div>
+
+    <h3 class="sub">📦 Підготовка міжнародного відправлення (PDF-документи)</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Заповніть митні дані товарів (один раз)</h4><p><a href="/admin/inventory/product/">Склад → Товари</a> → відкрийте кожен товар → секція <strong>"🛃 Митне оформлення"</strong> → заповніть HS-код, країну виробника, вагу нетто (г/шт).</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Заповніть реквізити компанії (один раз)</h4><p><a href="/admin/accounting/companysettings/">Бухгалтерія → Налаштування компанії</a> — назва, адреса, IBAN/SWIFT — з'являться автоматично у Proforma Invoice.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Відкрийте замовлення → "📄 Автоматичні документи"</h4><p>Секція з 3 кнопками: натисніть потрібну — PDF завантажується одразу в нову вкладку.</p></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>📋 Пакувальний лист → вкладіть в посилку</h4><p>Список товарів, адреса доставки, трекінг-номер і кур'єр.</p></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-content"><h4>📄 Proforma Invoice → надішліть клієнту або митниці</h4><p>З цінами, реквізитами компанії та банківськими даними.</p></div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-content"><h4>🛃 Митна декларація CN23 → наклейте на посилку</h4><p>HS-коди, вага нетто, задекларована вартість, тип відправлення (☒ Sale/Gift тощо).</p></div></div>
+    </div>
+
+    <h3 class="sub">📱 Підключити Telegram-сповіщення</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">
+        <h4>Створіть бота</h4>
+        <p>Telegram → <strong>@BotFather</strong> → <code>/newbot</code> → назва (напр. <em>Minerva Alerts</em>) → username (напр. <code>minerva_alerts_bot</code>) → скопіюйте токен.</p>
+      </div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">
+        <h4>Отримайте Chat ID</h4>
+        <p><strong>Особистий:</strong> надішліть боту <code>/start</code> → свій ID через <code>@userinfobot</code>.<br>
+        <strong>Канал:</strong> зробіть бота адміністратором → використовуйте <code>@username_каналу</code>.<br>
+        <strong>Група:</strong> додайте бота → ID починається з <code>-100...</code>.</p>
+      </div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">
+        <h4>Заповніть у Minerva та протестуйте</h4>
+        <p><a href="/admin/config/notificationsettings/">Система → Email сповіщення</a> → секція <strong>"📱 Telegram"</strong> → Bot Token + Chat ID → увімкніть → збережіть → кнопка <strong>"📱 Тест Telegram"</strong>.</p>
+      </div></div>
+    </div>
+
+    <h3 class="sub">🔗 Корисні посилання</h3>
+    <div class="cards">
+      <div class="card"><div class="card-head"><span class="icon">📊</span><h3>Дашборд</h3></div><p><a href="/dashboard/">/dashboard/</a> — статистика, KPI, графіки</p></div>
+      <div class="card"><div class="card-head"><span class="icon">⏳</span><h3>Не відправлені</h3></div><p><a href="/admin/sales/salesorder/?shipped=no">/admin/sales/salesorder/?shipped=no</a></p></div>
+      <div class="card"><div class="card-head"><span class="icon">🔥</span><h3>Критичний склад</h3></div><p><a href="/admin/inventory/reorderproxy/?reorder_status=critical">/admin/inventory/reorderproxy/?reorder_status=critical</a></p></div>
+      <div class="card"><div class="card-head"><span class="icon">📄</span><h3>Непоплачені рахунки</h3></div><p><a href="/admin/accounting/invoice/?status=sent">/admin/accounting/invoice/?status=sent</a></p></div>
+      <div class="card"><div class="card-head"><span class="icon">😴</span><h3>At Risk клієнти</h3></div><p><a href="/admin/crm/customer/?rfm_segment=at_risk">/admin/crm/customer/?rfm_segment=at_risk</a></p></div>
+      <div class="card"><div class="card-head"><span class="icon">🛃</span><h3>Товари — митні поля</h3></div><p><a href="/admin/inventory/product/">Склад → Товари</a> — відкрийте товар → секція "🛃 Митне оформлення"</p></div>
+      <div class="card"><div class="card-head"><span class="icon">📱</span><h3>Telegram + Email алерти</h3></div><p><a href="/admin/config/notificationsettings/">Система → Email сповіщення</a> — SMTP, Bot Token, Chat ID, алерти</p></div>
+      <div class="card"><div class="card-head"><span class="icon">📄</span><h3>Налаштування документів</h3></div><p><a href="/admin/config/documentsettings/">Система → Документи</a> — мова PDF, packing list, proforma, CN23</p></div>
+      <div class="card"><div class="card-head"><span class="icon">✉️</span><h3>Автор системи</h3></div><p>Viacheslav Pryimak<br><a href="mailto:prym.via@gmail.com">prym.via@gmail.com</a></p></div>
+    </div>
+  </div>
+
+</div><!-- /main -->
+
+<script>
+function show(id) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === id);
+  });
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({top: 0, behavior: 'smooth'});
+  history.replaceState(null, '', '#' + id);
+}
+// open tab from URL hash on page load
+(function() {
+  var hash = location.hash.replace('#', '');
+  if (hash && document.getElementById(hash)) show(hash);
+})();
+</script>
+{% endblock %}

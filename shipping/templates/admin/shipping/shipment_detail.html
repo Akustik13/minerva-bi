@@ -1,0 +1,604 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; #{{ shipment.pk }} — {{ shipment.recipient_name }}
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+#content { padding: 0 !important; }
+#content-main { max-width: none !important; }
+
+.sd-wrap { padding: 24px 32px 60px; }
+
+/* ── Header ── */
+.sd-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
+}
+.sd-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 5px; }
+.sd-id   { font-size: 22px; font-weight: 700; color: #9aafbe; }
+.sd-name { font-size: 20px; font-weight: 700; color: #c9d8e4; }
+.sd-company { font-size: 13px; color: #607d8b; background: #162030;
+  padding: 2px 10px; border-radius: 10px; }
+.sd-meta { font-size: 12px; color: #607d8b; }
+.sd-meta a { color: #58a6ff; text-decoration: none; }
+.sd-meta a:hover { text-decoration: underline; }
+.sd-dot { margin: 0 6px; }
+
+/* ── Status badge ── */
+.sd-status-badge {
+  display: inline-block; padding: 7px 18px; border-radius: 20px;
+  font-size: 13px; font-weight: 700; white-space: nowrap; flex-shrink: 0;
+}
+.sd-status-draft       { background: #1e2d3d; color: #607d8b; }
+.sd-status-submitted   { background: rgba(33,150,243,.12); color: #2196f3; border: 1px solid rgba(33,150,243,.3); }
+.sd-status-label_ready { background: rgba(0,188,212,.12); color: #00bcd4; border: 1px solid rgba(0,188,212,.3); }
+.sd-status-in_transit  { background: rgba(255,152,0,.12); color: #ff9800; border: 1px solid rgba(255,152,0,.3); }
+.sd-status-delivered   { background: rgba(76,175,80,.12); color: #4caf50; border: 1px solid rgba(76,175,80,.3); }
+.sd-status-error       { background: rgba(244,67,54,.12); color: #f44336; border: 1px solid rgba(244,67,54,.3); }
+.sd-status-cancelled   { background: #1e2d3d; color: #607d8b; border: 1px solid #2a3f52; }
+
+/* ── Error block ── */
+.sd-error-block {
+  background: rgba(244,67,54,.06); border: 1px solid rgba(244,67,54,.25);
+  border-left: 4px solid #f44336; border-radius: 8px; padding: 16px 20px;
+  margin-bottom: 24px; display: flex; gap: 14px; align-items: flex-start;
+}
+.sd-error-title { font-weight: 700; color: #f44336; margin-bottom: 6px; font-size: 14px; }
+.sd-error-msg { font-size: 12px; color: #ef9a9a; font-family: monospace;
+  white-space: pre-wrap; word-break: break-all; }
+.sd-info-block {
+  background: #1a2535; border: 1px solid #2a3f52; border-left: 4px solid #607d8b;
+  border-radius: 8px; padding: 14px 18px; color: #607d8b;
+  margin-bottom: 24px; font-size: 13px;
+}
+
+/* ── Timeline ── */
+.sd-timeline-wrap {
+  background: #1a2535; border: 1px solid #243347; border-radius: 10px;
+  padding: 22px 32px; margin-bottom: 26px; overflow-x: auto;
+}
+.sd-timeline {
+  display: flex; align-items: center; min-width: 420px;
+}
+.sd-tl-item  { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+.sd-tl-dot   {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #111c26; border: 2px solid #2a3f52; transition: all .2s;
+}
+.sd-tl-done   .sd-tl-dot { background: #4caf50; border-color: #4caf50; }
+.sd-tl-active .sd-tl-dot {
+  background: #2196f3; border-color: #2196f3;
+  width: 18px; height: 18px; box-shadow: 0 0 0 4px rgba(33,150,243,.2);
+}
+.sd-tl-label { font-size: 11px; font-weight: 600; white-space: nowrap; color: #607d8b; }
+.sd-tl-done   .sd-tl-label { color: #4caf50; }
+.sd-tl-active .sd-tl-label { color: #2196f3; }
+.sd-tl-line { flex: 1; height: 2px; background: #2a3f52; min-width: 40px; margin-bottom: 19px; }
+.sd-tl-line-done { background: #4caf50; }
+
+/* ── Body layout ── */
+.sd-body { display: grid; grid-template-columns: 1fr 310px; gap: 24px; }
+@media(max-width:1100px){ .sd-body { grid-template-columns: 1fr; } }
+
+/* ── Card ── */
+.sd-card {
+  background: #1a2535; border: 1px solid #243347;
+  border-radius: 10px; padding: 18px 22px; margin-bottom: 18px;
+}
+.sd-card-title {
+  font-size: 11px; font-weight: 700; color: #9aafbe;
+  text-transform: uppercase; letter-spacing: .05em;
+  margin: 0 0 14px; padding-bottom: 10px;
+  border-bottom: 1px solid #243347;
+}
+details.sd-card summary { list-style: none; cursor: pointer; user-select: none; }
+details.sd-card summary::-webkit-details-marker { display: none; }
+details.sd-card summary.sd-card-title { margin-bottom: 0; }
+details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
+
+/* ── Info rows ── */
+.sd-info-grid { display: flex; flex-direction: column; }
+.sd-info-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.04); gap: 12px;
+}
+.sd-info-row:last-child { border-bottom: none; }
+.sd-info-key { font-size: 11px; color: #607d8b; flex-shrink: 0; min-width: 110px; }
+.sd-info-val { font-size: 13px; color: #c9d8e4; text-align: right; word-break: break-word; }
+.sd-mono     { font-family: monospace; }
+.sd-small    { font-size: 11px; }
+.sd-country  { font-weight: 700; font-family: monospace; font-size: 14px; }
+.sd-tracking { font-family: monospace; color: #2196f3; font-weight: 700; font-size: 14px; }
+.sd-price    { color: #4caf50; font-weight: 700; font-size: 15px; }
+.sd-label-link {
+  background: #162030; color: #2196f3; padding: 3px 10px;
+  border-radius: 5px; text-decoration: none; font-size: 12px;
+}
+.sd-label-link:hover { background: #1e2d3d; }
+
+/* ── Action buttons ── */
+.sd-actions { display: flex; flex-direction: column; gap: 8px; }
+.sd-btn {
+  display: block; padding: 10px 16px; border-radius: 6px;
+  text-decoration: none; font-size: 12px; font-weight: 700;
+  text-align: center; transition: opacity .15s; white-space: nowrap;
+}
+.sd-btn:hover { opacity: .82; }
+.sd-btn-blue   { background: #1565c0; color: #fff; }
+.sd-btn-orange { background: #e65100; color: #fff; }
+.sd-btn-teal   { background: #00695c; color: #fff; }
+.sd-btn-yellow { background: #f9a825; color: #000; }
+.sd-btn-pink   { background: #ad1457; color: #fff; }
+.sd-btn-green  { background: #2e7d32; color: #fff; }
+.sd-btn-ghost  { background: transparent; color: #607d8b; border: 1px solid #2a3f52; }
+
+/* ── Raw API pre ── */
+.sd-pre {
+  background: #0d1117; border: 1px solid #1e2d3d; border-radius: 6px;
+  padding: 12px; font-size: 11px; color: #9aafbe; overflow-x: auto;
+  white-space: pre-wrap; word-break: break-all;
+  max-height: 280px; overflow-y: auto; margin-top: 8px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sd-wrap">
+
+  <!-- ── Header ── -->
+  <div class="sd-header">
+    <div>
+      <div class="sd-title">
+        <span class="sd-id">#{{ shipment.pk }}</span>
+        <span class="sd-name">{{ shipment.recipient_name }}</span>
+        {% if shipment.recipient_company %}
+        <span class="sd-company">{{ shipment.recipient_company }}</span>
+        {% endif %}
+      </div>
+      <div class="sd-meta">
+        {{ shipment.carrier.name|default:"Без перевізника" }}
+        <span class="sd-dot">·</span>
+        <a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>
+        <span class="sd-dot">·</span>
+        Створено {{ shipment.created_at|date:"d.m.Y H:i" }}
+        {% if shipment.submitted_at %}
+        <span class="sd-dot">·</span>
+        Надіслано {{ shipment.submitted_at|date:"d.m.Y H:i" }}
+        {% endif %}
+      </div>
+    </div>
+    <span class="sd-status-badge sd-status-{{ shipment.status }}">
+      {% if shipment.status == "draft" %}⬜
+      {% elif shipment.status == "submitted" %}📤
+      {% elif shipment.status == "label_ready" %}🏷️
+      {% elif shipment.status == "in_transit" %}🚚
+      {% elif shipment.status == "delivered" %}✅
+      {% elif shipment.status == "error" %}❌
+      {% elif shipment.status == "cancelled" %}🚫
+      {% endif %}
+      {{ shipment.get_status_display }}
+    </span>
+  </div>
+
+  <!-- ── Error banner ── -->
+  {% if shipment.status == "error" %}
+  <div class="sd-error-block">
+    <span style="font-size:20px;flex-shrink:0">❌</span>
+    <div>
+      <div class="sd-error-title">Помилка при оформленні відправлення</div>
+      <div class="sd-error-msg">{{ shipment.error_message|default:"Невідома помилка" }}</div>
+      <div style="margin-top:12px">
+        <a href="{% url 'admin:shipping_shipment_edit_draft' shipment.pk %}" class="sd-btn sd-btn-green" style="display:inline-block;width:auto;padding:8px 18px">
+          ✏️ Виправити і повторити
+        </a>
+      </div>
+    </div>
+  </div>
+
+  {% elif shipment.status == "cancelled" %}
+  <div class="sd-info-block">🚫 Відправлення скасовано.</div>
+  {% endif %}
+
+  <!-- ── Timeline ── -->
+  {% if show_timeline %}
+  <div class="sd-timeline-wrap">
+    <div class="sd-timeline">
+      {% for step in timeline %}
+      <div class="sd-tl-item sd-tl-{{ step.state }}">
+        <div class="sd-tl-dot"></div>
+        <div class="sd-tl-label">{{ step.label }}</div>
+      </div>
+      {% if not step.is_last %}
+      <div class="sd-tl-line {% if step.state == 'done' %}sd-tl-line-done{% endif %}"></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Body ── -->
+  <div class="sd-body">
+
+    <!-- ── Ліва колонка ── -->
+    <div>
+
+      <!-- Отримувач -->
+      <div class="sd-card">
+        <div class="sd-card-title">📬 Отримувач</div>
+        <div class="sd-info-grid">
+          {% if shipment.recipient_company %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Компанія</span>
+            <span class="sd-info-val">{{ shipment.recipient_company }}</span>
+          </div>
+          {% endif %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Ім'я</span>
+            <span class="sd-info-val">{{ shipment.recipient_name }}</span>
+          </div>
+          <div class="sd-info-row">
+            <span class="sd-info-key">Адреса</span>
+            <span class="sd-info-val">{{ shipment.recipient_street }}</span>
+          </div>
+          <div class="sd-info-row">
+            <span class="sd-info-key">Місто / Індекс</span>
+            <span class="sd-info-val">
+              {{ shipment.recipient_city }}{% if shipment.recipient_state %} {{ shipment.recipient_state }}{% endif %}, {{ shipment.recipient_zip }}
+            </span>
+          </div>
+          <div class="sd-info-row">
+            <span class="sd-info-key">Країна</span>
+            <span class="sd-info-val sd-country">{{ shipment.recipient_country }}</span>
+          </div>
+          {% if shipment.recipient_phone %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Телефон</span>
+            <span class="sd-info-val">{{ shipment.recipient_phone }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.recipient_email %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Email</span>
+            <span class="sd-info-val">{{ shipment.recipient_email }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Параметри посилки -->
+      <div class="sd-card">
+        <div class="sd-card-title">📐 Параметри посилки</div>
+        <div class="sd-info-grid">
+          <div class="sd-info-row">
+            <span class="sd-info-key">Вага</span>
+            <span class="sd-info-val"><b>{{ shipment.weight_kg }} кг</b></span>
+          </div>
+          {% if shipment.length_cm or shipment.width_cm or shipment.height_cm %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Розміри (Д×Ш×В)</span>
+            <span class="sd-info-val sd-mono">{{ shipment.length_cm|default:"?" }}×{{ shipment.width_cm|default:"?" }}×{{ shipment.height_cm|default:"?" }} см</span>
+          </div>
+          {% endif %}
+          {% if shipment.description %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Опис вмісту</span>
+            <span class="sd-info-val">{{ shipment.description }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.declared_value %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Задекларована вартість</span>
+            <span class="sd-info-val">{{ shipment.declared_value }} {{ shipment.declared_currency }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.export_reason %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Підстава вивозу</span>
+            <span class="sd-info-val">{{ shipment.export_reason }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.reference %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Референс</span>
+            <span class="sd-info-val sd-mono">{{ shipment.reference }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Результат від перевізника -->
+      <div class="sd-card">
+        <div class="sd-card-title">🚚 Результат від перевізника</div>
+        <div class="sd-info-grid">
+          {% if carrier_tracking %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Статус посилки</span>
+            <span class="sd-info-val">
+              <span style="color:{{ carrier_tracking.color }};font-weight:700">
+                {{ carrier_tracking.icon }} {{ carrier_tracking.display }}
+              </span>
+              {% if carrier_tracking.label %}
+              <span style="display:block;font-size:11px;color:#607d8b;margin-top:2px">{{ carrier_tracking.label }}</span>
+              {% endif %}
+              {% if carrier_tracking.jumingo_status %}
+              <span style="display:block;font-size:10px;color:#3a5570;margin-top:1px;font-family:monospace">{{ carrier_tracking.jumingo_status }}</span>
+              {% endif %}
+            </span>
+          </div>
+          {% endif %}
+          {% if shipment.tracking_number %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Трекінг-номер</span>
+            <span class="sd-info-val sd-tracking">{{ shipment.tracking_number }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.carrier_service %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Сервіс</span>
+            <span class="sd-info-val">{{ shipment.carrier_service }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.carrier_price %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Вартість доставки</span>
+            <span class="sd-info-val sd-price">{{ shipment.carrier_price }} {{ shipment.carrier_currency }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.label_url %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Етикетка</span>
+            <span class="sd-info-val">
+              <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 Відкрити PDF</a>
+            </span>
+          </div>
+          {% endif %}
+          {% if shipment.carrier_shipment_id %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">ID відправлення</span>
+            <span class="sd-info-val sd-mono sd-small">{{ shipment.carrier_shipment_id|truncatechars:36 }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.selected_tariff_id %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Тариф ID</span>
+            <span class="sd-info-val sd-mono sd-small">{{ shipment.selected_tariff_id }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.jumingo_order_number %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Jumingo Order #</span>
+            <span class="sd-info-val sd-mono">{{ shipment.jumingo_order_number }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.error_message %}
+          <div class="sd-info-row" style="align-items:flex-start">
+            <span class="sd-info-key" style="color:#f44336">Помилка</span>
+            <span class="sd-info-val" style="color:#ef9a9a;font-family:monospace;font-size:11px;text-align:left">{{ shipment.error_message }}</span>
+          </div>
+          {% endif %}
+          {% if not shipment.tracking_number and not shipment.carrier_service and not shipment.carrier_price and not shipment.carrier_shipment_id %}
+          <div style="color:#607d8b;font-size:13px;padding:6px 0">Дані від перевізника ще не отримано.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Митна декларація (якщо є) -->
+      {% if shipment.customs_articles %}
+      <details class="sd-card">
+        <summary class="sd-card-title">🛃 Митна декларація</summary>
+        <div>
+          <div style="font-size:11px;color:#607d8b;margin-bottom:10px">
+            Тип: <b style="color:#c9d8e4">{{ shipment.customs_articles.type|default:"—" }}</b>
+          </div>
+          <div style="overflow-x:auto">
+            <table style="width:100%;border-collapse:collapse;font-size:12px">
+              <thead>
+                <tr style="background:#162030">
+                  <th style="padding:7px 8px;color:#9aafbe;text-align:left;border-bottom:1px solid #243347">Опис</th>
+                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;width:46px;text-align:center">К-ть</th>
+                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;text-align:left;width:90px">HS-код</th>
+                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;width:52px;text-align:center">Країна</th>
+                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;text-align:right;width:72px">Вага кг</th>
+                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;text-align:right;width:110px">Вартість</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in shipment.customs_articles.customs_line_items %}
+                <tr style="border-bottom:1px solid #1e2d3d">
+                  <td style="padding:7px 8px;color:#c9d8e4">{{ item.description }}</td>
+                  <td style="padding:7px 6px;color:#9aafbe;text-align:center">{{ item.quantity }}</td>
+                  <td style="padding:7px 6px;font-family:monospace;color:#80cbc4">{{ item.customs_number|default:"—" }}</td>
+                  <td style="padding:7px 6px;color:#9aafbe;text-align:center;font-weight:700">{{ item.origin_country }}</td>
+                  <td style="padding:7px 6px;color:#9aafbe;text-align:right">{{ item.weight|default:"—" }}</td>
+                  <td style="padding:7px 6px;color:#4caf50;text-align:right;font-weight:700">{{ item.value }} {{ item.currency }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </details>
+      {% endif %}
+
+      <!-- Технічні деталі API -->
+      {% if raw_request or raw_response %}
+      <details class="sd-card">
+        <summary class="sd-card-title">📋 Технічні деталі API</summary>
+        <div>
+          {% if raw_request %}
+          <div style="font-size:11px;color:#607d8b;margin-bottom:3px;margin-top:4px">➤ Request</div>
+          <pre class="sd-pre">{{ raw_request }}</pre>
+          {% endif %}
+          {% if raw_response %}
+          <div style="font-size:11px;color:#607d8b;margin:10px 0 3px">➤ Response</div>
+          <pre class="sd-pre">{{ raw_response }}</pre>
+          {% endif %}
+        </div>
+      </details>
+      {% endif %}
+
+    </div><!-- /left -->
+
+    <!-- ── Права колонка ── -->
+    <div>
+      <div style="position:sticky;top:80px">
+
+        <!-- Стан доставки -->
+        <div class="sd-card">
+          <div class="sd-card-title">🚚 Стан доставки</div>
+          <div class="sd-info-grid">
+            {% if shipment.tracking_number %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Трекінг</span>
+              <span class="sd-info-val sd-tracking">{{ shipment.tracking_number }}</span>
+            </div>
+            {% endif %}
+            {% if shipment.carrier_service %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Сервіс</span>
+              <span class="sd-info-val">{{ shipment.carrier_service }}</span>
+            </div>
+            {% endif %}
+            {% if shipment.carrier_price %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Вартість</span>
+              <span class="sd-info-val sd-price">{{ shipment.carrier_price }} {{ shipment.carrier_currency }}</span>
+            </div>
+            {% endif %}
+            {% if shipment.carrier_shipment_id %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">ID перевізника</span>
+              <span class="sd-info-val sd-mono sd-small">{{ shipment.carrier_shipment_id|truncatechars:28 }}</span>
+            </div>
+            {% endif %}
+            {% if shipment.jumingo_order_number %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Jumingo Order</span>
+              <span class="sd-info-val sd-mono">{{ shipment.jumingo_order_number }}</span>
+            </div>
+            {% endif %}
+            {% if shipment.label_url %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Етикетка</span>
+              <span class="sd-info-val">
+                <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 PDF</a>
+              </span>
+            </div>
+            {% endif %}
+            {% if not shipment.tracking_number and not shipment.carrier_service and not shipment.carrier_price %}
+            <div style="color:#607d8b;font-size:13px;padding:4px 0">Дані від перевізника ще не отримано.</div>
+            {% endif %}
+          </div>
+
+          <!-- Дії -->
+          {% if actions %}
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
+            <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;
+                        letter-spacing:.05em;margin-bottom:10px">⚡ Дії</div>
+            <div class="sd-actions">
+              {% for a in actions %}
+              <a href="{{ a.url }}"{% if a.external %} target="_blank"{% endif %}
+                 class="sd-btn sd-btn-{{ a.cls }}">{{ a.label }}</a>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- DHL Cancel -->
+          {% if shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
+            <div style="font-size:11px;color:#f44336;font-weight:700;text-transform:uppercase;
+                        letter-spacing:.05em;margin-bottom:10px">🗑️ Скасувати в DHL</div>
+            <form method="post" action="{% url 'admin:shipping_shipment_dhl_cancel' shipment.pk %}">
+              {% csrf_token %}
+              <button type="submit"
+                onclick="return confirm('Скасувати відправлення {{ shipment.tracking_number }} у DHL?\n\nЦе можливо тільки якщо кур\'єр ще не забрав посилку.\n\nПродовжити?')"
+                style="width:100%;background:#1a0a0a;color:#ef9a9a;border:1px solid #5c1a1a;
+                       border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
+                🗑️ Скасувати в DHL API ({{ shipment.tracking_number }})
+              </button>
+            </form>
+            <div style="font-size:10px;color:#455a64;margin-top:6px;line-height:1.5">
+              Викликає DELETE /shipments у DHL. Тільки до передачі кур'єру.
+            </div>
+          </div>
+          {% endif %}
+
+          <!-- Ручна зміна статусу -->
+          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
+            <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;
+                        letter-spacing:.05em;margin-bottom:10px">🔧 Статус вручну</div>
+            <form method="post" action="{% url 'admin:shipping_shipment_set_status' shipment.pk %}">
+              {% csrf_token %}
+              <select name="new_status"
+                style="width:100%;background:#111c26;border:1px solid #2a3f52;color:#c9d8e4;
+                       border-radius:6px;padding:8px 10px;font-size:12px;margin-bottom:8px;cursor:pointer">
+                {% for val, label in status_choices %}
+                <option value="{{ val }}" {% if val == shipment.status %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit"
+                onclick="return confirm('Змінити статус вручну?\n\nЦе лише локальний запис у Minerva.\nAPI перевізника не викликається.')"
+                style="width:100%;background:#1e2d3d;color:#9aafbe;border:1px solid #2a3f52;
+                       border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
+                Застосувати
+              </button>
+            </form>
+            <div style="font-size:10px;color:#455a64;margin-top:6px;line-height:1.5">
+              Використовуй якщо API перевізника показує застарілий статус.<br>
+              Синхронізує також SalesOrder.
+            </div>
+          </div>
+        </div>
+
+        <!-- Дані замовлення -->
+        <div class="sd-card">
+          <div class="sd-card-title">📋 Замовлення {{ order.order_number }}</div>
+          <div class="sd-info-grid">
+            <div class="sd-info-row">
+              <span class="sd-info-key">Джерело</span>
+              <span class="sd-info-val">{{ order.source }}</span>
+            </div>
+            <div class="sd-info-row">
+              <span class="sd-info-key">Статус</span>
+              <span class="sd-info-val">{{ order.get_status_display }}</span>
+            </div>
+            <div class="sd-info-row">
+              <span class="sd-info-key">Клієнт</span>
+              <span class="sd-info-val">{{ order.client|default:"—" }}</span>
+            </div>
+            {% if order.shipping_courier %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Кур'єр</span>
+              <span class="sd-info-val">{{ order.shipping_courier }}</span>
+            </div>
+            {% endif %}
+            {% if order.tracking_number %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Трекінг</span>
+              <span class="sd-info-val sd-mono sd-small">{{ order.tracking_number|truncatechars:24 }}</span>
+            </div>
+            {% endif %}
+            {% if order.shipping_cost %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Вартість дост.</span>
+              <span class="sd-info-val sd-price" style="font-size:13px">{{ order.shipping_cost }} {{ order.shipping_currency|default:"EUR" }}</span>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /right -->
+
+  </div><!-- /body -->
+</div>
+{% endblock %}

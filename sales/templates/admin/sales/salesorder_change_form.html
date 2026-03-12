@@ -1,0 +1,376 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+  {% if original and original.pk %}
+    <li>
+      <a href="/admin/accounting/invoice/add/?order={{ original.pk }}"
+         class="historylink"
+         style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
+                text-decoration:none;font-weight:bold;display:inline-block;white-space:nowrap">
+        💰 Рахунок
+      </a>
+    </li>
+  {% endif %}
+  {{ block.super }}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+/*
+  upload_widget JS — два режими збереження локально:
+  1. showDirectoryPicker (Chrome/Edge) — нативний діалог Windows на ПК
+  2. Резерв: текстове поле id_local_base_path + server-side copy (для Firefox / Docker з volume mount)
+
+  Логіка папок (режим 1, після вибору base-папки):
+    Якщо base-папка вже має назву = order_number → зберігати там
+    Інакше → створити: base / source / YYYY-MM-DD / order_number /
+
+  Пам'ять: localStorage зберігає останній текстовий шлях (режим 2)
+           та ім'я нативної папки (режим 1) як підказку.
+*/
+document.addEventListener('DOMContentLoaded', function() {
+    var root = document.getElementById('docWidgetRoot');
+    if (!root) return;
+
+    var _browseUrl   = root.getAttribute('data-browse-url');
+    var _uploadUrl   = root.getAttribute('data-upload-url');
+    var _orderNumber = root.getAttribute('data-order-number') || '';
+    var _source      = root.getAttribute('data-source') || 'manual';
+    var _dirHandle   = null;   /* FileSystemDirectoryHandle — нативний вибір папки */
+    var _curDir      = '';     /* шлях для server-side browser (резерв) */
+
+    var LS_PATH = 'docLocalBasePath';       /* localStorage: останній текстовий шлях */
+    var LS_NAME = 'docLocalBaseFolderName'; /* localStorage: ім'я нативної папки */
+
+    /* ── helpers ──────────────────────────────────────────────────────────── */
+    function esc(s) {
+        return String(s)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+            .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    /* Скорочує довгий шлях: C:\...\folder1\folder2 */
+    function shortPath(s) {
+        if (!s) return '';
+        var parts = s.replace(/\\/g, '/').split('/').filter(Boolean);
+        if (parts.length <= 3) return s.replace(/\//g, '\\');
+        return parts[0] + '\\…\\' + parts.slice(-2).join('\\');
+    }
+
+    /* ── відновити збережений шлях ─────────────────────────────────────── */
+    var inp = document.getElementById('id_local_base_path');
+    var savedPath = localStorage.getItem(LS_PATH) || '';
+    var savedName = localStorage.getItem(LS_NAME) || '';
+
+    /* Підставляємо збережений шлях, якщо поле порожнє */
+    if (inp && savedPath && !inp.value.trim()) {
+        inp.value = savedPath;
+    }
+
+    /* Показуємо підказку про останню нативну папку */
+    var hintEl   = document.getElementById('docPathHint');
+    var hintText = document.getElementById('docPathHintText');
+    if (savedName && hintEl && hintText) {
+        hintText.textContent = savedName;
+        hintEl.style.display = 'inline';
+    }
+
+    /* Зберігаємо шлях при зміні текстового поля */
+    if (inp) {
+        inp.addEventListener('change', function() {
+            var v = this.value.trim();
+            if (v) localStorage.setItem(LS_PATH, v);
+        });
+    }
+
+    /* ── browse button ─────────────────────────────────────────────────── */
+    var browseBtn = document.getElementById('docBrowseBtn');
+    if (browseBtn) browseBtn.addEventListener('click', function() {
+        if (typeof window.showDirectoryPicker === 'function') {
+            /* ── режим 1: нативний OS-діалог (Chrome/Edge) ── */
+            window.showDirectoryPicker({ mode: 'readwrite' })
+                .then(function(handle) {
+                    _dirHandle = handle;
+                    _curDir    = '';   /* скидаємо серверний шлях */
+
+                    var span = document.getElementById('docPathDisplay');
+                    var disp = document.getElementById('docSelectedPath');
+
+                    /* Показуємо назву папки (повний шлях браузер не дає з міркувань безпеки) */
+                    if (span) span.textContent = handle.name;
+                    if (disp) disp.style.display = 'inline';
+
+                    /* Ховаємо підказку — вже вибрано свіжу папку */
+                    if (hintEl) hintEl.style.display = 'none';
+
+                    /* Очищаємо server-side поле */
+                    if (inp) inp.value = '';
+
+                    /* Запам'ятовуємо ім'я для підказки на наступний сеанс */
+                    localStorage.setItem(LS_NAME, handle.name);
+                })
+                .catch(function(e) {
+                    if (e.name !== 'AbortError') console.error('showDirectoryPicker:', e);
+                });
+        } else {
+            /* ── режим 2: server-side browser (Firefox / старі браузери) ── */
+            var startPath = (inp ? inp.value.trim() : '') || savedPath || '';
+            dirOpen(startPath);
+        }
+    });
+
+    /* ── upload button ─────────────────────────────────────────────────── */
+    var uploadBtn = document.getElementById('docUploadBtn');
+    if (uploadBtn) uploadBtn.addEventListener('click', function() {
+        var input  = document.getElementById('docFiles');
+        var result = document.getElementById('docResult');
+        if (!input || !input.files.length) {
+            if (result) result.innerHTML = '<span style="color:#f44336">Оберіть файли!</span>';
+            return;
+        }
+
+        var files = Array.from(input.files);
+        var fd    = new FormData();
+        files.forEach(function(f) { fd.append('documents', f); });
+
+        /* server-side local copy (Firefox fallback) — якщо немає нативного handle */
+        if (!_dirHandle) {
+            var localPath = document.getElementById('id_local_base_path');
+            var pathVal   = localPath ? localPath.value.trim() : '';
+            if (localPath) fd.append('local_base_path', localPath.value);
+            if (pathVal)   localStorage.setItem(LS_PATH, pathVal);
+        }
+
+        var csrfEl = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (!csrfEl) return;
+        if (result) result.innerHTML = '⏳ Завантаження на сервер...';
+
+        fetch(_uploadUrl, { method: 'POST', headers: { 'X-CSRFToken': csrfEl.value }, body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                var html = buildServerResultHtml(data);
+
+                if (_dirHandle && data.results && !data.error) {
+                    /* ── Нативне збереження на ПК через File System Access API ── */
+                    html += '<div id="localSaveOut" style="margin-top:8px;font-size:12px;color:#9aafbe">'
+                          + '💾 Записуємо на локальний ПК…</div>';
+                    if (result) result.innerHTML = html;
+
+                    /* Визначаємо цільову папку */
+                    var today   = new Date();
+                    var dateStr = today.getFullYear() + '-'
+                        + String(today.getMonth() + 1).padStart(2, '0') + '-'
+                        + String(today.getDate()).padStart(2, '0');
+                    var handleNameLower  = _dirHandle.name.toLowerCase();
+                    var sourceLower      = (_source || 'manual').toLowerCase();
+                    var targetPromise;
+
+                    if (_dirHandle.name === _orderNumber) {
+                        /* Вже в папці замовлення — зберігаємо напряму */
+                        targetPromise = Promise.resolve(_dirHandle);
+                    } else if (handleNameLower === sourceLower) {
+                        /* Вже всередині папки source — шукаємо/створюємо date / order_number */
+                        targetPromise = _dirHandle
+                            .getDirectoryHandle(dateStr, { create: true })
+                            .then(function(dh) { return dh.getDirectoryHandle(_orderNumber, { create: true }); });
+                    } else {
+                        /* Базова папка — будуємо повну структуру: source / date / order_number */
+                        targetPromise = _dirHandle
+                            .getDirectoryHandle(_source || 'manual', { create: true })
+                            .then(function(dh) { return dh.getDirectoryHandle(dateStr, { create: true }); })
+                            .then(function(dh) { return dh.getDirectoryHandle(_orderNumber, { create: true }); });
+                    }
+
+                    targetPromise
+                        .then(function(targetDir) {
+                            var promises = files.map(function(file) {
+                                return targetDir.getFileHandle(file.name, { create: true })
+                                    .then(function(fh) { return fh.createWritable(); })
+                                    .then(function(w)  { return w.write(file).then(function() { return w; }); })
+                                    .then(function(w)  { return w.close().then(function() {
+                                        return { ok: true, name: file.name };
+                                    }); })
+                                    .catch(function(e) { return { ok: false, name: file.name, err: String(e) }; });
+                            });
+
+                            Promise.all(promises).then(function(localResults) {
+                                var lh = '<ul style="margin:3px 0;padding-left:20px">';
+                                localResults.forEach(function(r) {
+                                    lh += '<li style="color:' + (r.ok ? '#4caf50' : '#f44336') + '">'
+                                        + (r.ok ? '💾 ' : '⚠️ ') + esc(r.name)
+                                        + (r.err ? ' — ' + esc(r.err) : '') + '</li>';
+                                });
+                                lh += '</ul>';
+                                var out = document.getElementById('localSaveOut');
+                                if (out) out.innerHTML = '💾 <b>Збережено локально:</b><br>' + lh;
+                            });
+                        })
+                        .catch(function(err) {
+                            var out = document.getElementById('localSaveOut');
+                            if (out) out.innerHTML =
+                                '<span style="color:#f44336">⚠️ Помилка створення папок: '
+                                + esc(String(err)) + '</span>';
+                        });
+                } else {
+                    if (result) result.innerHTML = html;
+                }
+            })
+            .catch(function(err) {
+                if (result) result.innerHTML = '<span style="color:#f44336">Помилка: ' + err + '</span>';
+            });
+    });
+
+    /* ── helpers ───────────────────────────────────────────────────────── */
+    function buildServerResultHtml(data) {
+        if (data.error) return '<span style="color:#f44336">Помилка: ' + esc(data.error) + '</span>';
+        var html = '<ul style="margin:5px 0;padding-left:20px">';
+        (data.results || []).forEach(function(r) {
+            var icon  = r.status === 'error' ? '❌' : '✅';
+            var color = r.status === 'error' ? '#f44336' : '#4caf50';
+            html += '<li style="color:' + color + '">' + icon + ' ' + esc(r.name);
+            if (r.size) html += ' (' + (r.size / 1024).toFixed(1) + ' KB)';
+            if (r.local) {
+                if (r.local.ok) html += '<br><small style="color:#4caf50">💾 ' + esc(shortPath(r.local.msg)) + '</small>';
+                else            html += '<br><small style="color:#f44336">⚠️ ' + esc(r.local.msg) + '</small>';
+            }
+            html += '</li>';
+        });
+        html += '</ul>';
+        if (data.debug) {
+            var d = data.debug;
+            html += '<details style="margin-top:8px;font-size:11px;color:#888">'
+                  + '<summary style="cursor:pointer">🔍 Діагностика</summary>'
+                  + '<pre style="margin:4px 0;white-space:pre-wrap">'
+                  + 'local_base_path: ' + d.local_base_path_received + '\n'
+                  + 'local_path: '      + d.local_path_attempted     + '\n'
+                  + (d.local_mkdir_error ? '❌ ' + d.local_mkdir_error : '✅ mkdir OK')
+                  + '</pre></details>';
+        }
+        html += '<button type="button" onclick="location.reload()"'
+              + ' style="background:#417690;color:#fff;border:none;padding:6px 14px;'
+              + 'border-radius:4px;cursor:pointer;margin-top:6px">🔄 Оновити список</button>';
+        return html;
+    }
+
+    /* ══════════════════════════════════════════════════════════════════════
+       Резервний server-side folder browser (тільки для Firefox/fallback)
+       ══════════════════════════════════════════════════════════════════════ */
+    var modal     = document.getElementById('dirBrowserModal');
+    var dirList   = document.getElementById('dirBrowserList');
+    var pathInput = document.getElementById('dirBrowserPathInput');
+
+    function dirOpen(startPath) {
+        if (modal) modal.style.display = 'block';
+        dirLoad(startPath || '');
+    }
+    function dirClose() {
+        if (modal) modal.style.display = 'none';
+    }
+    function dirLoad(path) {
+        if (!dirList) return;
+        dirList.innerHTML = '<div style="padding:14px;color:#607d8b">⏳ Завантаження...</div>';
+        fetch(_browseUrl + '?path=' + encodeURIComponent(path))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                _curDir = data.current;
+                if (pathInput) pathInput.value = data.current;
+                var h = '';
+                if (data.parent !== null && data.parent !== undefined) {
+                    h += '<div data-dir="' + esc(data.parent) + '"'
+                       + ' style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #162030;'
+                       + 'color:#9aafbe;display:flex;align-items:center;gap:10px">'
+                       + '<span>⬆️</span><span style="color:#607d8b;font-size:12px">..</span>'
+                       + '<span style="font-size:11px;color:#455a64;font-family:monospace">'
+                       + esc(data.parent) + '</span></div>';
+                }
+                if (!data.dirs.length) {
+                    h += '<div style="padding:14px;color:#607d8b;font-style:italic">Немає підпапок</div>';
+                } else {
+                    data.dirs.forEach(function(d) {
+                        h += '<div data-dir="' + esc(d.path) + '"'
+                           + ' style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #0d1117;'
+                           + 'color:#c9d8e4;display:flex;align-items:center;gap:10px">'
+                           + '<span>📁</span><span>' + esc(d.name) + '</span></div>';
+                    });
+                }
+                dirList.innerHTML = h;
+            })
+            .catch(function(err) {
+                if (pathInput) pathInput.value = path;
+                dirList.innerHTML = '<div style="padding:14px;color:#f44336">⚠️ ' + esc(String(err)) + '</div>';
+            });
+    }
+
+    if (dirList) {
+        dirList.addEventListener('click', function(e) {
+            var item = e.target.closest('[data-dir]');
+            if (item) dirLoad(item.getAttribute('data-dir'));
+        });
+        dirList.addEventListener('mouseover', function(e) {
+            var item = e.target.closest('[data-dir]');
+            if (item) item.style.background = '#162030';
+        });
+        dirList.addEventListener('mouseout', function(e) {
+            var item = e.target.closest('[data-dir]');
+            if (item) item.style.background = '';
+        });
+    }
+    if (pathInput) pathInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); dirLoad(this.value.trim()); }
+    });
+    var goBtn = document.getElementById('dirBrowserGoBtn');
+    if (goBtn) goBtn.addEventListener('click', function() {
+        if (pathInput) dirLoad(pathInput.value.trim());
+    });
+    ['dirBrowserCloseBtn', 'dirBrowserCancelBtn'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('click', dirClose);
+    });
+    if (modal) modal.addEventListener('click', function(e) { if (e.target === this) dirClose(); });
+
+    var confirmBtn = document.getElementById('dirBrowserConfirm');
+    if (confirmBtn) confirmBtn.addEventListener('click', function() {
+        var chosen = (pathInput ? pathInput.value.trim() : '') || _curDir;
+        if (!chosen) return;
+        var span = document.getElementById('docPathDisplay');
+        var disp = document.getElementById('docSelectedPath');
+        if (inp)  inp.value = chosen;
+        if (span) span.textContent = shortPath(chosen);
+        if (disp) disp.style.display = 'inline';
+        /* Ховаємо підказку, зберігаємо шлях */
+        if (hintEl) hintEl.style.display = 'none';
+        localStorage.setItem(LS_PATH, chosen);
+        _dirHandle = null;  /* скидаємо нативний handle — використовуємо server-side path */
+        dirClose();
+    });
+});
+</script>
+{% endblock %}
+
+{% block submit_buttons_bottom %}
+{{ block.super }}
+{% if original and original.pk %}
+<div style="margin-top:16px;padding:14px 0 4px;border-top:1px solid #243347;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <a href="{% url 'admin:shipping_shipment_create' original.pk %}"
+     style="background:#e91e63;color:#fff;padding:9px 20px;border-radius:7px;
+            text-decoration:none;font-weight:700;font-size:13px;display:inline-block">
+    🚚 Створити відправлення
+  </a>
+  {% with shipments=original.shipments.all %}
+  {% if shipments %}
+  <span style="font-size:12px;color:#607d8b">
+    Відправлень: {{ shipments.count }} ·
+    {% for s in shipments|slice:":3" %}
+      <a href="{% url 'admin:shipping_shipment_change' s.pk %}"
+         style="color:#58a6ff">
+        {% if s.status == 'label_ready' or s.status == 'in_transit' or s.status == 'delivered' %}✅{% elif s.status == 'error' %}❌{% else %}⬜{% endif %}
+        #{{ s.pk }}
+      </a>{% if not forloop.last %}, {% endif %}
+    {% endfor %}
+  </span>
+  {% endif %}
+  {% endwith %}
+</div>
+{% endif %}
+{% endblock %}
