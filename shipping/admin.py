@@ -1972,15 +1972,7 @@ class ShipmentAdmin(admin.ModelAdmin):
                 if ct == "dhl":
                     info["auto"] = bool(tn)
                 elif ct == "jumingo":
-                    # Jumingo auto-track тільки якщо shipment ще активний (не delivered)
-                    # Після оплати/відправки — трекінг через TN напряму (UPS/DHL)
-                    info["auto"] = (
-                        bool(shipment.carrier_shipment_id)
-                        and shipment.status not in (
-                            Shipment.Status.DELIVERED,
-                            Shipment.Status.LABEL_READY,
-                        )
-                    )
+                    info["auto"] = bool(shipment.carrier_shipment_id)
             rows.append({
                 "order":       shipment.order,
                 "tn":          tn,
