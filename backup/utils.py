@@ -371,13 +371,12 @@ def backup_settings(password: str) -> dict:
 
     Returns a plain dict (not BackupLog) so it works even if the DB is unavailable.
     """
-    import json
-    from django.apps import apps as django_apps
-    from django.core import serializers as dj_serializers
-    from cryptography.fernet import Fernet
-
     start = time.time()
     try:
+        import json
+        from django.apps import apps as django_apps
+        from django.core import serializers as dj_serializers
+        from cryptography.fernet import Fernet
         backup_dir = get_backup_dir()
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filepath = backup_dir / f"settings_{timestamp}.mbackup"
