@@ -345,7 +345,7 @@ _SETTINGS_MODELS = [
     "bots.digikeyconfig",
     "config.notificationsettings",
     "config.systemsettings",
-    "config.companysettings",
+    "accounting.companysettings",
     "shipping.shippingsettings",
     "shipping.carrier",
     "backup.backupsettings",
