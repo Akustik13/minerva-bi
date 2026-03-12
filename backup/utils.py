@@ -572,15 +572,23 @@ def git_pull() -> dict:
         branch_r = _git("rev-parse", "--abbrev-ref", "HEAD")
         branch = branch_r.stdout.strip() or "main"
 
-        pull_r = _git("pull", "origin", branch, timeout=120)
-        if pull_r.returncode != 0:
+        fetch_r = _git("fetch", "origin", branch, timeout=60)
+        if fetch_r.returncode != 0:
             return {
                 "ok": False,
-                "error": (pull_r.stderr.strip() or pull_r.stdout.strip() or "git pull failed"),
+                "error": (fetch_r.stderr.strip() or fetch_r.stdout.strip() or "git fetch failed"),
                 "duration": round(time.time() - start, 1),
             }
 
-        output = pull_r.stdout.strip()
+        reset_r = _git("reset", "--hard", f"origin/{branch}", timeout=30)
+        if reset_r.returncode != 0:
+            return {
+                "ok": False,
+                "error": (reset_r.stderr.strip() or reset_r.stdout.strip() or "git reset failed"),
+                "duration": round(time.time() - start, 1),
+            }
+
+        output = reset_r.stdout.strip()
 
         # Graceful gunicorn reload — send SIGHUP to PID 1 (gunicorn master)
         reloaded = False
