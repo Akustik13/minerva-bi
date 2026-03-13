@@ -335,7 +335,7 @@ def restore_media(filepath: str) -> dict:
         return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
 
 
-# ── Settings backup (encrypted) ───────────────────────────────────────────────
+# ── Settings backup ───────────────────────────────────────────────────────────
 
 # Models to include in settings backup (app_label.model_name, all lowercase)
 _SETTINGS_MODELS = [
@@ -352,22 +352,9 @@ _SETTINGS_MODELS = [
 ]
 
 
-def _derive_key(password: str, salt: bytes) -> bytes:
-    """Derive a URL-safe base64 Fernet key from password + salt via PBKDF2HMAC."""
-    import base64
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100_000,
-    )
-    return base64.urlsafe_b64encode(kdf.derive(password.encode("utf-8")))
 
-
-def backup_settings(password: str) -> dict:
-    """Serialize selected config models to JSON and save encrypted as .mbackup file.
+def backup_settings() -> dict:
+    """Serialize selected config models to JSON and save as .mbackup file.
 
     Returns a plain dict (not BackupLog) so it works even if the DB is unavailable.
     """
@@ -376,7 +363,6 @@ def backup_settings(password: str) -> dict:
         import json, threading as _threading
         from django.apps import apps as django_apps
         from django.core import serializers as dj_serializers
-        from cryptography.fernet import Fernet
 
         # Серіалізацію моделей виконуємо у daemon-потоці з таймаутом
         # щоб не зависати при недоступній БД
@@ -422,13 +408,8 @@ def backup_settings(password: str) -> dict:
 
         payload = json.dumps(all_entries, ensure_ascii=False, indent=2).encode("utf-8")
 
-        salt = os.urandom(16)
-        key = _derive_key(password, salt)
-        ciphertext = Fernet(key).encrypt(payload)
-
         with open(filepath, "wb") as f:
-            f.write(salt)
-            f.write(ciphertext)
+            f.write(payload)
 
         size = filepath.stat().st_size
         duration = round(time.time() - start, 1)
@@ -467,13 +448,12 @@ def backup_settings(password: str) -> dict:
         return {"ok": False, "status": "error", "error": str(exc), "duration": duration}
 
 
-def restore_settings(source, password: str) -> dict:
-    """Decrypt and restore settings from a .mbackup file or raw bytes.
+def restore_settings(source) -> dict:
+    """Restore settings from a .mbackup file or raw bytes (plain JSON).
 
     *source* can be a file path (str/Path) or raw bytes (uploaded file content).
     """
     import json
-    from cryptography.fernet import Fernet, InvalidToken
     from django.core import serializers as dj_serializers
 
     start = time.time()
@@ -486,18 +466,10 @@ def restore_settings(source, password: str) -> dict:
         else:
             raw = bytes(source)
 
-        if len(raw) < 17:
+        if len(raw) < 2:
             return {"ok": False, "error": "Файл пошкоджений або невірний формат."}
 
-        salt = raw[:16]
-        ciphertext = raw[16:]
-
-        try:
-            payload = Fernet(_derive_key(password, salt)).decrypt(ciphertext)
-        except InvalidToken:
-            return {"ok": False, "error": "Невірний пароль або файл пошкоджений."}
-
-        all_entries = json.loads(payload.decode("utf-8"))
+        all_entries = json.loads(raw.decode("utf-8"))
         restored = 0
         warnings = []
         for entry in all_entries:

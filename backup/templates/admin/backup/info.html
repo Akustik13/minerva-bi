@@ -355,14 +355,11 @@
         <div id="result-full" class="bk-result idle">Готово до запуску</div>
       </div>
 
-      <!-- Settings (encrypted) -->
+      <!-- Settings -->
       <div class="bk-box">
         <div class="icon">⚙️</div>
         <h3>Налаштування</h3>
-        <p>Юзери, токени, конфіг — зашифровано</p>
-        <input type="password" id="settings-backup-pwd" class="bk-input"
-               placeholder="Пароль для шифрування" autocomplete="new-password"
-               style="text-align:left;">
+        <p>Юзери, токени, конфіг — JSON</p>
         <button id="btn-settings" class="bk-btn" style="background:#6c63ff;"
                 onclick="runSettingsBackup(this)">
           Зробити бекап
@@ -448,18 +445,13 @@
           </div>
           <div>
             <label class="bk-label">Тип</label>
-            <select id="upload-restore-type" class="bk-input bk-select" onchange="toggleUploadSettingsPwd()">
+            <select id="upload-restore-type" class="bk-input bk-select">
               <option value="db">База даних (.sql)</option>
               <option value="media">Медіа файли (.zip)</option>
               <option value="full">Повний (БД .sql)</option>
               <option value="settings">Налаштування (.mbackup)</option>
             </select>
           </div>
-        </div>
-        <div id="upload-settings-pwd-row" style="display:none;">
-          <label class="bk-label">🔑 Пароль (для .mbackup)</label>
-          <input type="password" id="upload-settings-pwd" class="bk-input"
-                 placeholder="Пароль шифрування" autocomplete="current-password">
         </div>
         <button class="restore-btn" style="padding:10px;" onclick="openUploadRestoreModal()">
           📤 Відновити з файлу
@@ -546,25 +538,20 @@
     </div>
   </div>
 
-  <!-- Settings Restore Modal (encrypted .mbackup) -->
+  <!-- Settings Restore Modal -->
   <div class="modal-overlay" id="settingsRestoreModal">
     <div class="modal-box">
-      <div class="modal-icon">🔑</div>
+      <div class="modal-icon">⚙️</div>
       <div class="modal-title">Відновлення налаштувань</div>
       <div class="modal-sub">
         Відновить: юзерів, групи, токени API, конфігурацію ботів і систему.<br>
         Існуючі об'єкти будуть <strong style="color:var(--yellow)">перезаписані</strong>.
       </div>
       <div class="modal-file" id="srm-file-info"></div>
-      <div style="margin:14px 0 4px;">
-        <label class="bk-label" style="text-align:left;">🔑 Пароль шифрування</label>
-        <input type="password" id="srm-password" class="bk-input"
-               placeholder="Введіть пароль бекапу" autocomplete="current-password">
-      </div>
       <div class="modal-actions">
         <button class="modal-cancel" onclick="closeSettingsRestoreModal()">Скасувати</button>
         <button class="modal-confirm" id="srm-confirm-btn" onclick="doSettingsRestore()">
-          🔑 Розшифрувати і відновити
+          ✅ Відновити налаштування
         </button>
       </div>
       <div class="modal-result" id="srm-result"></div>
@@ -783,10 +770,7 @@
 /* ══════════════════════════════════════════════════════════════════
    Constants & state
 ════════════════════════════════════════════════════════════════════ */
-const CSRF = (function() {
-  const m = document.cookie.match(/csrftoken=([^;]+)/);
-  return m ? m[1] : '';
-})();
+const CSRF = '{{ csrf_token }}';
 
 const BROWSE_URL   = '{% url "admin:backup_browse_dir" %}';
 const DOWNLOAD_URL = '/admin/backup/backupplaceholder/download/';  /* + pk + / */
@@ -985,28 +969,21 @@ async function applyUpdate(btn) {
    Settings Backup (encrypted)
 ════════════════════════════════════════════════════════════════════ */
 async function runSettingsBackup(btn) {
-  const pwd = document.getElementById('settings-backup-pwd').value.trim();
-  if (!pwd) {
-    alert('Введіть пароль для шифрування бекапу.');
-    document.getElementById('settings-backup-pwd').focus();
-    return;
-  }
   const resultEl = document.getElementById('result-settings');
   btn.disabled = true;
   resultEl.className = 'bk-result running';
-  resultEl.textContent = '⏳ Шифрування і збереження…';
+  resultEl.textContent = '⏳ Збереження…';
   try {
     const resp = await fetch('{% url "admin:backup_settings_backup" %}', {
       method: 'POST',
       headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'password=' + encodeURIComponent(pwd),
+      body: '',
     });
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const data = await resp.json();
     if (data.status === 'ok') {
       resultEl.className = 'bk-result ok';
       resultEl.textContent = '✅ ' + data.size + ' · ' + data.duration + 'с\n📄 ' + (data.file || '');
-      document.getElementById('settings-backup-pwd').value = '';
       setTimeout(() => location.reload(), 2500);
     } else {
       resultEl.className = 'bk-result error';
@@ -1022,33 +999,21 @@ async function runSettingsBackup(btn) {
 /* ══════════════════════════════════════════════════════════════════
    Upload from PC restore
 ════════════════════════════════════════════════════════════════════ */
-function toggleUploadSettingsPwd() {
-  const type = document.getElementById('upload-restore-type').value;
-  document.getElementById('upload-settings-pwd-row').style.display =
-    type === 'settings' ? '' : 'none';
-}
-
 async function openUploadRestoreModal() {
   const fileInput = document.getElementById('upload-backup-file');
   const type      = document.getElementById('upload-restore-type').value;
-  const pwd       = document.getElementById('upload-settings-pwd').value.trim();
   if (!fileInput.files.length) {
     alert('Оберіть файл бекапу.'); return;
   }
   const file = fileInput.files[0];
-  if (type === 'settings') {
-    if (!pwd) {
-      alert('Введіть пароль для розшифрування.');
-      document.getElementById('upload-settings-pwd').focus(); return;
-    }
-    if (!confirm(`Відновити налаштування з "${file.name}"?\nЦе перезапише існуючі налаштування.`)) return;
-  } else {
-    if (!confirm(`Відновити з "${file.name}" (${type})?\nЦе незворотна операція.`)) return;
-  }
-  await _doUploadRestore(file, type, type === 'settings' ? pwd : null);
+  const msg = type === 'settings'
+    ? `Відновити налаштування з "${file.name}"?\nЦе перезапише існуючі налаштування.`
+    : `Відновити з "${file.name}" (${type})?\nЦе незворотна операція.`;
+  if (!confirm(msg)) return;
+  await _doUploadRestore(file, type);
 }
 
-async function _doUploadRestore(file, type, password) {
+async function _doUploadRestore(file, type) {
   const resultEl = document.getElementById('upload-restore-result');
   resultEl.style.display = 'block';
   resultEl.className = 'bk-result running';
@@ -1057,7 +1022,6 @@ async function _doUploadRestore(file, type, password) {
   form.append('backup_file', file);
   let url;
   if (type === 'settings') {
-    form.append('password', password);
     url = '{% url "admin:backup_settings_restore" %}';
   } else {
     form.append('restore_type', type);
@@ -1111,14 +1075,10 @@ document.getElementById('settingsRestoreModal').addEventListener('click', functi
 async function doSettingsRestore() {
   const btn    = document.getElementById('srm-confirm-btn');
   const result = document.getElementById('srm-result');
-  const pwd    = document.getElementById('srm-password').value.trim();
-  if (!pwd) {
-    alert('Введіть пароль.'); document.getElementById('srm-password').focus(); return;
-  }
   btn.disabled = true;
   result.className = 'modal-result running'; result.style.display = 'block';
-  result.textContent = '⏳ Розшифрування і відновлення…';
-  const body = new URLSearchParams({ filepath: _srmFilepath, password: pwd });
+  result.textContent = '⏳ Відновлення…';
+  const body = new URLSearchParams({ filepath: _srmFilepath });
   try {
     const resp = await fetch('{% url "admin:backup_settings_restore" %}', {
       method: 'POST',

@@ -259,22 +259,16 @@ class BackupAdmin(admin.ModelAdmin):
             return HttpResponseNotFound("Backup log not found")
 
     def settings_backup_view(self, request):
-        """AJAX — create encrypted settings backup with password."""
+        """AJAX — create settings backup (plain JSON)."""
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
-        password = request.POST.get("password", "").strip()
-        if not password:
-            return JsonResponse({"error": "Пароль не може бути порожнім"}, status=400)
-        result = utils.backup_settings(password)
+        result = utils.backup_settings()
         return JsonResponse(result)
 
     def settings_restore_view(self, request):
-        """AJAX — decrypt and restore settings from .mbackup (file upload or NAS path)."""
+        """AJAX — restore settings from .mbackup (file upload or NAS path)."""
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
-        password = request.POST.get("password", "").strip()
-        if not password:
-            return JsonResponse({"error": "Пароль обов'язковий для відновлення"}, status=400)
 
         uploaded = request.FILES.get("backup_file")
         filepath = request.POST.get("filepath", "").strip()
@@ -291,7 +285,7 @@ class BackupAdmin(admin.ModelAdmin):
         else:
             return JsonResponse({"error": "Файл не вказано"}, status=400)
 
-        result = utils.restore_settings(source, password)
+        result = utils.restore_settings(source)
         return JsonResponse(result)
 
     def git_status_view(self, request):
