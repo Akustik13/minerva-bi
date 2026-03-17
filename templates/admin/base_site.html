@@ -569,13 +569,15 @@
 }
 .mv-cp-hex:focus { color: var(--accent, #58a6ff); }
 
-/* ── Light theme: force content area + common custom card classes ── */
+/* ── Light + Custom theme: force content area + common custom card classes ── */
 [data-theme="light"] #content,
-[data-theme="light"] #content-main {
+[data-theme="light"] #content-main,
+[data-theme="custom"] #content,
+[data-theme="custom"] #content-main {
   background: var(--bg-app);
   color: var(--text);
 }
-/* ── Light theme: all card/tile classes ── */
+/* ── Light + Custom theme: all card/tile classes ── */
 [data-theme="light"] .mv-tile,
 [data-theme="light"] .ie-card,
 [data-theme="light"] .imp-card,
@@ -585,63 +587,94 @@
 [data-theme="light"] .info-card,
 [data-theme="light"] .kpi-card,
 [data-theme="light"] .card,
-[data-theme="light"] .dash-card {
+[data-theme="light"] .dash-card,
+[data-theme="custom"] .mv-tile,
+[data-theme="custom"] .ie-card,
+[data-theme="custom"] .imp-card,
+[data-theme="custom"] .sys-tile,
+[data-theme="custom"] .ah-card,
+[data-theme="custom"] .bots-card,
+[data-theme="custom"] .info-card,
+[data-theme="custom"] .kpi-card,
+[data-theme="custom"] .card,
+[data-theme="custom"] .dash-card {
   background: var(--bg-card) !important;
   border-color: var(--border-strong) !important;
   color: var(--text) !important;
 }
-[data-theme="light"] .mv-tile:hover {
+[data-theme="light"] .mv-tile:hover,
+[data-theme="custom"] .mv-tile:hover {
   background: var(--bg-hover) !important;
   box-shadow: 0 4px 16px rgba(0,0,0,.1) !important;
 }
 /* Tile text elements */
-[data-theme="light"] .mv-tile-name  { color: var(--text) !important; }
-[data-theme="light"] .mv-tile-sub   { color: var(--text-muted) !important; }
-[data-theme="light"] .mv-tile-detail { color: var(--text-dim) !important; }
+[data-theme="light"] .mv-tile-name,  [data-theme="custom"] .mv-tile-name  { color: var(--text) !important; }
+[data-theme="light"] .mv-tile-sub,   [data-theme="custom"] .mv-tile-sub   { color: var(--text-muted) !important; }
+[data-theme="light"] .mv-tile-detail,[data-theme="custom"] .mv-tile-detail { color: var(--text-dim) !important; }
 /* Recent activity cards */
-[data-theme="light"] .mv-recent-card {
+[data-theme="light"] .mv-recent-card,
+[data-theme="custom"] .mv-recent-card {
   background: var(--bg-card-2) !important;
   border-color: var(--border-strong) !important;
 }
-[data-theme="light"] .mv-recent-body a  { color: var(--accent) !important; }
-[data-theme="light"] .mv-recent-obj     { color: var(--text-muted) !important; }
-[data-theme="light"] .mv-recent-model   { color: var(--text-dim) !important; }
-[data-theme="light"] .mv-empty          { color: var(--text-muted) !important; }
+[data-theme="light"] .mv-recent-body a,  [data-theme="custom"] .mv-recent-body a  { color: var(--accent) !important; }
+[data-theme="light"] .mv-recent-obj,     [data-theme="custom"] .mv-recent-obj     { color: var(--text-muted) !important; }
+[data-theme="light"] .mv-recent-model,   [data-theme="custom"] .mv-recent-model   { color: var(--text-dim) !important; }
+[data-theme="light"] .mv-empty,          [data-theme="custom"] .mv-empty          { color: var(--text-muted) !important; }
 /* Section headers */
-[data-theme="light"] .mv-section-hdr    { color: var(--text) !important; }
-[data-theme="light"] .mv-dash           { background: var(--bg-app) !important; }
+[data-theme="light"] .mv-section-hdr,    [data-theme="custom"] .mv-section-hdr    { color: var(--text) !important; }
+[data-theme="light"] .mv-dash,           [data-theme="custom"] .mv-dash           { background: var(--bg-app) !important; }
 /* Status bar chips */
-[data-theme="light"] .sys-status-bar    { background: var(--bg-card-2) !important; border-color: var(--border-strong) !important; }
-[data-theme="light"] .sys-status-item   { border-color: var(--border-strong) !important; color: var(--text) !important; }
+[data-theme="light"] .sys-status-bar,    [data-theme="custom"] .sys-status-bar    { background: var(--bg-card-2) !important; border-color: var(--border-strong) !important; }
+[data-theme="light"] .sys-status-item,   [data-theme="custom"] .sys-status-item   { border-color: var(--border-strong) !important; color: var(--text) !important; }
 /* Generic text fix */
 [data-theme="light"] .ie-card *,
 [data-theme="light"] .imp-card *,
 [data-theme="light"] .sys-tile *,
-[data-theme="light"] .card * { color: var(--text); }
+[data-theme="light"] .card *,
+[data-theme="custom"] .ie-card *,
+[data-theme="custom"] .imp-card *,
+[data-theme="custom"] .sys-tile *,
+[data-theme="custom"] .card * { color: var(--text); }
 
-/* ── Light theme: ensure content area text is readable ── */
+/* ── Light + Custom theme: ensure content area text is readable ── */
 [data-theme="light"] #content-main,
 [data-theme="light"] .results,
 [data-theme="light"] .results td,
-[data-theme="light"] .results th { color: var(--text); }
+[data-theme="light"] .results th,
+[data-theme="custom"] #content-main,
+[data-theme="custom"] .results,
+[data-theme="custom"] .results td,
+[data-theme="custom"] .results th { color: var(--text); }
 [data-theme="light"] #changelist-filter,
 [data-theme="light"] #changelist-filter h2,
 [data-theme="light"] #changelist-filter h3,
-[data-theme="light"] #changelist-filter li { color: var(--text); }
-[data-theme="light"] .help { color: var(--text-muted) !important; }
-[data-theme="light"] .help-tooltip { color: var(--text-muted) !important; }
+[data-theme="light"] #changelist-filter li,
+[data-theme="custom"] #changelist-filter,
+[data-theme="custom"] #changelist-filter h2,
+[data-theme="custom"] #changelist-filter h3,
+[data-theme="custom"] #changelist-filter li { color: var(--text); }
+[data-theme="light"] .help,   [data-theme="custom"] .help   { color: var(--text-muted) !important; }
+[data-theme="light"] .help-tooltip, [data-theme="custom"] .help-tooltip { color: var(--text-muted) !important; }
 /* Select dropdowns */
-[data-theme="light"] select option { background: var(--bg-input); color: var(--text); }
+[data-theme="light"] select option,
+[data-theme="custom"] select option { background: var(--bg-input); color: var(--text); }
 
-/* ── Light theme: import tiles (have !important gradient — need higher specificity) ── */
+/* ── Light + Custom theme: import tiles (have !important gradient) ── */
 [data-theme="light"] .sal-tile-import,
 [data-theme="light"] .inv-tile-import,
-[data-theme="light"] [class*="-tile-import"] {
+[data-theme="light"] [class*="-tile-import"],
+[data-theme="custom"] .sal-tile-import,
+[data-theme="custom"] .inv-tile-import,
+[data-theme="custom"] [class*="-tile-import"] {
   background: rgba(0,188,212,.07) !important;
 }
 [data-theme="light"] .sal-tile-import:hover,
 [data-theme="light"] .inv-tile-import:hover,
-[data-theme="light"] [class*="-tile-import"]:hover {
+[data-theme="light"] [class*="-tile-import"]:hover,
+[data-theme="custom"] .sal-tile-import:hover,
+[data-theme="custom"] .inv-tile-import:hover,
+[data-theme="custom"] [class*="-tile-import"]:hover {
   background: rgba(0,188,212,.14) !important;
 }
 
