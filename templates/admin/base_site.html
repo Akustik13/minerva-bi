@@ -77,7 +77,7 @@
   --primary:            #1e6fa8;
   --secondary:          #1a4a6a;
   --accent:             #1e6fa8;
-  --header-bg:          #0d1520;
+  --header-bg:          #1a3352;
   --header-color:       #c9d8e4;
   --header-link-color:  #9aafbe;
   --header-branding-link-color: #c9d8e4;
@@ -142,9 +142,65 @@
   --ok:   #1a7f37;
   --warn: #9a6700;
   --err:  #cf222e;
-  /* Sidebar — intentionally stays dark (like VS Code / GitHub) */
-  /* sb-* vars unchanged: inherited from :root */
-  /* Tooltip adapts to light */
+  /* ── Sidebar (light) ── */
+  --sb-bg:              #f3f6f9;
+  --sb-head-bg:         #e8ecf0;
+  --sb-head-text:       #24292f;
+  --sb-head-hover-text: #0969da;
+  --sb-text:            #24292f;
+  --sb-text-muted:      #57606a;
+  --sb-border:          rgba(0,0,0,.09);
+  --sb-border-accent:   rgba(9,105,218,.35);
+  --sb-arrow:           #8c959f;
+  --sb-handle:          rgba(0,0,0,.12);
+  --sb-handle-hover:    #0969da;
+  --sb-link:            #0550ae;
+  --sb-link-hover-text: #033d8b;
+  --sb-link-hover-bg:   rgba(9,105,218,.07);
+  --sb-pinned-bg:       #e8ecf0;
+  --sb-pinned-text:     #0969da;
+  /* ── Django admin vars (light theme) ── */
+  --header-bg:          #2980b9;
+  --header-color:       #ffffff;
+  --header-link-color:  rgba(255,255,255,.85);
+  --header-branding-link-color: #ffffff;
+  --breadcrumbs-bg:     #eef1f5;
+  --breadcrumbs-fg:     #57606a;
+  --breadcrumbs-link-fg: #0969da;
+  --body-bg:            #f0f4f8;
+  --body-fg:            #1c2128;
+  --module-bg:          #ffffff;
+  --module-header-color: #1c2128;
+  --module-header-table-link-color: #0969da;
+  --input-bg:           #ffffff;
+  --input-fg:           #1c2128;
+  --input-border:       #c8d0da;
+  --form-input-bg:      #ffffff;
+  --nav-sidebar-input-color: #24292f;
+  --nav-sidebar-input-border-color: #c8d0da;
+  --border-color:       #d0d7de;
+  --hairline-color:     rgba(0,0,0,.08);
+  --darkened-bg:        #eef1f5;
+  --selected-bg:        rgba(9,105,218,.08);
+  --selected-row:       rgba(9,105,218,.06);
+  --changelist-even-row-bg: #f7f9fb;
+  --changelist-selected-bg: rgba(9,105,218,.1);
+  --primary:            #0969da;
+  --secondary:          #0550ae;
+  --link-fg:            #0969da;
+  --link-hover-color:   #0550ae;
+  --link-selected-fg:   #0969da;
+  --object-tools-bg:    #0969da;
+  --object-tools-hover-bg: #0550ae;
+  --button-bg:          #eef1f5;
+  --button-hover-bg:    #dde3ea;
+  --default-button-bg:  #0969da;
+  --default-button-hover-bg: #0550ae;
+  --close-button-bg:    #eef1f5;
+  --close-button-hover-bg: #dde3ea;
+  --delete-button-bg:   #cf222e;
+  --delete-button-hover-bg: #a40e26;
+  /* ── Tooltip (light) ── */
   --tip-bg:     #f8fafc;
   --tip-border: #d0d7de;
   --tip-text:   #1c2128;
@@ -245,7 +301,7 @@
   --changelist-even-row-bg: #1a2445;
 }
 
-/* ── Light theme: force sidebar to stay dark ───── */
+/* ── Light theme: enforce sidebar vars (override Django admin defaults) ── */
 [data-theme="light"] #nav-sidebar,
 [data-theme="light"] #nav-sidebar .module,
 [data-theme="light"] #nav-sidebar .module > table,
@@ -261,7 +317,23 @@
   color: var(--sb-text) !important;
   border-color: var(--sb-border) !important;
 }
+[data-theme="light"] .mg-header {
+  border-left-color: var(--sb-border-accent) !important;
+}
 [data-theme="light"] #nav-sidebar a { color: var(--sb-link) !important; }
+[data-theme="light"] .mg-header { color: var(--sb-head-text) !important; }
+[data-theme="light"] .mg-header:hover {
+  background: var(--sb-head-bg) !important;
+  color: var(--sb-head-hover-text) !important;
+}
+[data-theme="light"] .mg-arrow { color: var(--sb-arrow) !important; }
+[data-theme="light"] .mg-pinned { background: var(--sb-pinned-bg) !important; }
+[data-theme="light"] .mg-pinned a { color: var(--sb-pinned-text) !important; }
+[data-theme="light"] #nav-sidebar input[type=text] {
+  background: var(--bg-input) !important;
+  color: var(--sb-text) !important;
+  border-color: var(--sb-border) !important;
+}
 
 /* ── Tooltip ─────────────────────────────────────── */
 .mtip {
@@ -503,7 +575,8 @@
   background: var(--bg-app);
   color: var(--text);
 }
-/* Common card/tile classes used in hub pages and custom templates */
+/* ── Light theme: all card/tile classes ── */
+[data-theme="light"] .mv-tile,
 [data-theme="light"] .ie-card,
 [data-theme="light"] .imp-card,
 [data-theme="light"] .sys-tile,
@@ -517,6 +590,30 @@
   border-color: var(--border-strong) !important;
   color: var(--text) !important;
 }
+[data-theme="light"] .mv-tile:hover {
+  background: var(--bg-hover) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,.1) !important;
+}
+/* Tile text elements */
+[data-theme="light"] .mv-tile-name  { color: var(--text) !important; }
+[data-theme="light"] .mv-tile-sub   { color: var(--text-muted) !important; }
+[data-theme="light"] .mv-tile-detail { color: var(--text-dim) !important; }
+/* Recent activity cards */
+[data-theme="light"] .mv-recent-card {
+  background: var(--bg-card-2) !important;
+  border-color: var(--border-strong) !important;
+}
+[data-theme="light"] .mv-recent-body a  { color: var(--accent) !important; }
+[data-theme="light"] .mv-recent-obj     { color: var(--text-muted) !important; }
+[data-theme="light"] .mv-recent-model   { color: var(--text-dim) !important; }
+[data-theme="light"] .mv-empty          { color: var(--text-muted) !important; }
+/* Section headers */
+[data-theme="light"] .mv-section-hdr    { color: var(--text) !important; }
+[data-theme="light"] .mv-dash           { background: var(--bg-app) !important; }
+/* Status bar chips */
+[data-theme="light"] .sys-status-bar    { background: var(--bg-card-2) !important; border-color: var(--border-strong) !important; }
+[data-theme="light"] .sys-status-item   { border-color: var(--border-strong) !important; color: var(--text) !important; }
+/* Generic text fix */
 [data-theme="light"] .ie-card *,
 [data-theme="light"] .imp-card *,
 [data-theme="light"] .sys-tile *,

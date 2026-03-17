@@ -21,7 +21,7 @@
 .sh-header {
   display: flex; align-items: center; gap: 16px;
   margin-bottom: 28px; padding-bottom: 18px;
-  border-bottom: 1px solid rgba(255,255,255,.08);
+  border-bottom: 1px solid var(--border);
 }
 .sh-header-icon {
   width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
@@ -29,14 +29,14 @@
   display: flex; align-items: center; justify-content: center;
   font-size: 28px;
 }
-.sh-header h1 { font-size: 22px; font-weight: 800; color: #e6edf3; margin: 0 0 3px; }
-.sh-header p  { font-size: 13px; color: #7d8590; margin: 0; }
+.sh-header h1 { font-size: 22px; font-weight: 800; color: var(--text); margin: 0 0 3px; }
+.sh-header p  { font-size: 13px; color: var(--text-muted); margin: 0; }
 
 .sh-section-hdr {
   display: flex; align-items: center; gap: 8px;
   margin: 0 0 12px; padding-bottom: 7px;
-  border-bottom: 2px solid rgba(255,255,255,.07);
-  font-size: 11px; font-weight: 700; color: #7d8590;
+  border-bottom: 2px solid var(--border);
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
   letter-spacing: .07em; text-transform: uppercase;
 }
 
@@ -45,14 +45,14 @@
   display: flex; gap: 10px; margin-bottom: 28px; flex-wrap: wrap;
 }
 .sh-stat {
-  background: #141f2b; border: 1px solid #1e2d3d;
+  background: var(--bg-card-2); border: 1px solid var(--border);
   border-radius: 9px; padding: 12px 18px; min-width: 130px; flex: 1;
   text-decoration: none !important;
   transition: border-color .15s, background .15s;
 }
-.sh-stat:hover { border-color: #2a4060; background: #182233; }
+.sh-stat:hover { border-color: var(--border-strong); background: var(--bg-hover); }
 .sh-stat-val { font-size: 22px; font-weight: 800; line-height: 1.1; }
-.sh-stat-lbl { font-size: 11px; color: #607d8b; margin-top: 3px; }
+.sh-stat-lbl { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
 
 /* ── Tiles ─────────────────────────────────────────────── */
 .sh-grid {
@@ -63,8 +63,8 @@
 }
 .sh-tile {
   position: relative;
-  background: #1a2535;
-  border: 1px solid #243347;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
   border-top: 3px solid var(--ta, #2196f3);
   border-radius: 9px;
   padding: 15px 14px 13px;
@@ -77,19 +77,19 @@
   border-color: var(--ta, #2196f3);
   box-shadow: 0 6px 24px rgba(0,0,0,.45);
   transform: translateY(-2px);
-  background: #1e2d40;
+  background: var(--bg-hover);
 }
 .sh-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
 .sh-tile-name {
   font-size: 12.5px; font-weight: 600;
-  color: #c9d8e4; line-height: 1.35; flex: 1;
+  color: var(--text); line-height: 1.35; flex: 1;
 }
-.sh-tile-sub { font-size: 10px; color: #4a6070; margin-top: 6px; }
+.sh-tile-sub { font-size: 10px; color: var(--text-dim); margin-top: 6px; }
 .sh-tile-count {
   display: inline-block; margin-top: 7px;
   font-size: 11px; font-weight: 700;
   background: rgba(255,255,255,.08);
-  color: #9aafbe; border-radius: 20px;
+  color: var(--text-muted); border-radius: 20px;
   padding: 2px 9px;
   align-self: flex-start;
 }
@@ -109,7 +109,7 @@
   gap: 8px;
 }
 .sh-recent-card {
-  background: #141f2b; border: 1px solid #1e2d3d;
+  background: var(--bg-card-2); border: 1px solid var(--border);
   border-radius: 7px; padding: 9px 11px;
   display: flex; gap: 9px; align-items: flex-start;
 }
@@ -117,12 +117,12 @@
 .sh-recent-body { min-width: 0; }
 .sh-recent-body a {
   font-size: 12px; font-weight: 600;
-  color: #58a6ff; text-decoration: none;
+  color: var(--accent); text-decoration: none;
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sh-recent-body a:hover { text-decoration: underline; }
-.sh-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
-.sh-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+.sh-recent-model { font-size: 10px; color: var(--text-dim); display: block; margin-top: 2px; }
+.sh-empty { color: var(--text-muted); font-size: 13px; padding: 10px 0; }
 </style>
 
 <div class="sh-dash">
