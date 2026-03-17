@@ -17,30 +17,24 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
-:root {
-  --bg:#0d1117; --s1:#161b22; --s2:#1c2128; --s3:#21262d;
-  --border:rgba(255,255,255,0.08); --border2:rgba(255,255,255,0.14);
-  --text:#e6edf3; --muted:#7d8590; --muted2:#9198a1;
-  --gold:#c9a84c; --gold-l:#e8d5a3;
-  --blue:#58a6ff; --green:#3fb950; --orange:#e3b341;
-  --red:#f85149; --purple:#bc8cff;
-}
-
 #content { padding: 0 !important; }
+
+/* Local vars not in theme system */
+:root { --purple: #bc8cff; }
 #content-main { max-width: none !important; }
 
 /* ── Tab nav ── */
 .tab-nav{
-  background:var(--s1);border-bottom:1px solid var(--border);
+  background:var(--bg-card);border-bottom:1px solid var(--border);
   padding:0 40px;display:flex;gap:0;overflow-x:auto;
 }
 .tab-btn{
-  padding:14px 18px;font-size:13px;font-weight:600;color:var(--muted);
+  padding:14px 18px;font-size:13px;font-weight:600;color:var(--text-muted);
   background:none;border:none;border-bottom:2px solid transparent;
   cursor:pointer;white-space:nowrap;transition:all .2s;letter-spacing:.2px;
 }
 .tab-btn:hover{color:var(--text);}
-.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue);}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
 
 /* ── Main ── */
 .main{padding:36px 40px 80px;}
@@ -61,40 +55,40 @@
   font-size:26px;flex-shrink:0;
 }
 .section-header h2{font-size:24px;font-weight:800;letter-spacing:-.5px;}
-.section-header p{color:var(--muted);font-size:14px;margin-top:3px;}
+.section-header p{color:var(--text-muted);font-size:14px;margin-top:3px;}
 
 /* ── Cards ── */
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;margin-bottom:28px;}
 .card{
-  background:var(--s1);border:1px solid var(--border);
+  background:var(--bg-card);border:1px solid var(--border);
   border-radius:12px;padding:18px 20px;
   transition:border-color .2s,transform .2s;
 }
 .card:hover{border-color:rgba(88,166,255,.3);transform:translateY(-2px);}
 .card[onclick]:hover{border-color:rgba(88,166,255,.6);box-shadow:0 0 0 1px rgba(88,166,255,.2);}
-.card[onclick]:hover .card-head h3{color:var(--blue);}
+.card[onclick]:hover .card-head h3{color:var(--accent);}
 .card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .card-head .icon{font-size:20px;}
 .card-head h3{font-size:14px;font-weight:700;}
-.card p{font-size:13px;color:var(--muted);line-height:1.65;}
-.card a{color:var(--blue);text-decoration:none;}
+.card p{font-size:13px;color:var(--text-muted);line-height:1.65;}
+.card a{color:var(--accent);text-decoration:none;}
 .card a:hover{text-decoration:underline;}
 
 /* ── Steps ── */
 .steps{display:flex;flex-direction:column;gap:10px;margin-bottom:24px;}
 .step{
   display:flex;gap:14px;align-items:flex-start;
-  background:var(--s1);border:1px solid var(--border);
+  background:var(--bg-card);border:1px solid var(--border);
   border-radius:10px;padding:14px 16px;
 }
 .step-num{
   width:26px;height:26px;border-radius:50%;flex-shrink:0;margin-top:1px;
-  background:linear-gradient(135deg,var(--blue),var(--purple));
+  background:linear-gradient(135deg,var(--accent),var(--purple));
   display:flex;align-items:center;justify-content:center;
   font-size:12px;font-weight:800;
 }
 .step-content h4{font-size:13px;font-weight:700;margin-bottom:3px;}
-.step-content p{font-size:13px;color:var(--muted);}
+.step-content p{font-size:13px;color:var(--text-muted);}
 
 /* ── Badges ── */
 .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700;margin:2px;}
@@ -109,21 +103,21 @@
 /* ── Table ── */
 .t-wrap{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:22px;}
 .ht{width:100%;border-collapse:collapse;font-size:13px;}
-.ht th{padding:10px 14px;background:var(--s2);color:var(--muted);
+.ht th{padding:10px 14px;background:var(--bg-card-2);color:var(--text-muted);
   font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
   border-bottom:1px solid var(--border);text-align:left;}
-.ht td{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top;}
+.ht td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top;}
 .ht tr:last-child td{border-bottom:none;}
-.ht tr:hover td{background:rgba(255,255,255,.02);}
+.ht tr:hover td{background:var(--bg-hover);}
 
 /* ── Code ── */
-code{font-family:'JetBrains Mono',monospace;background:var(--s2);
-  padding:2px 6px;border-radius:4px;font-size:12px;color:#79c0ff;}
+code{font-family:'JetBrains Mono',monospace;background:var(--bg-card-2);
+  padding:2px 6px;border-radius:4px;font-size:12px;color:var(--accent);}
 .codeblock{
-  background:var(--s2);border:1px solid var(--border);
+  background:var(--bg-card-2);border:1px solid var(--border);
   border-radius:10px;padding:14px 16px;
   font-family:'JetBrains Mono',monospace;font-size:12px;
-  color:#e6edf3;margin:10px 0;overflow-x:auto;white-space:pre;
+  color:var(--text);margin:10px 0;overflow-x:auto;white-space:pre;
 }
 
 /* ── Alerts ── */
@@ -139,18 +133,18 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
 
 /* ── RFM grid ── */
 .rfm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px;}
-.rfm-card{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.rfm-card{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
 .rfm-card .emoji{font-size:20px;}
 .rfm-card h4{font-size:13px;font-weight:700;margin:5px 0 3px;}
-.rfm-card p{font-size:12px;color:var(--muted);}
+.rfm-card p{font-size:12px;color:var(--text-muted);}
 
 /* ── Feature row ── */
 .feature-row{display:flex;align-items:flex-start;gap:14px;
-  background:var(--s1);border:1px solid var(--border);border-radius:10px;
+  background:var(--bg-card);border:1px solid var(--border);border-radius:10px;
   padding:14px 16px;margin-bottom:10px;}
 .feature-icon{font-size:22px;flex-shrink:0;margin-top:2px;}
 .feature-content h4{font-size:13px;font-weight:700;margin-bottom:3px;}
-.feature-content p{font-size:13px;color:var(--muted);}
+.feature-content p{font-size:13px;color:var(--text-muted);}
 
 @media(max-width:900px){.rfm-grid{grid-template-columns:1fr;} .cards{grid-template-columns:1fr;}}
 </style>
@@ -353,7 +347,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
 
     <h3 class="sub">Всередині замовлення</h3>
     <div class="steps">
-      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>📄 Автоматичні документи</h4><p>Секція вгорі — 3 кнопки: Пакувальний лист, Proforma, CN23. Відкриваються в новій вкладці → одразу завантажується PDF.</p><p style="margin-top:6px;font-size:12px;color:var(--muted)">⚙️ Кнопка <strong>«шестерня»</strong> поряд розгортає <strong>панель швидкого редагування</strong> — мова, ціни, нотатки тощо. Зміни діють лише для цього разу, без збереження.</p></div></div>
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>📄 Автоматичні документи</h4><p>Секція вгорі — 3 кнопки: Пакувальний лист, Proforma, CN23. Відкриваються в новій вкладці → одразу завантажується PDF.</p><p style="margin-top:6px;font-size:12px;color:var(--text-muted)">⚙️ Кнопка <strong>«шестерня»</strong> поряд розгортає <strong>панель швидкого редагування</strong> — мова, ціни, нотатки тощо. Зміни діють лише для цього разу, без збереження.</p></div></div>
       <div class="step"><div class="step-num">2</div><div class="step-content"><h4>📦 Залишки на складі</h4><p>Таблиця по кожному товару. Зелений = є, Помаранчевий = мало, Червоний = немає.</p></div></div>
       <div class="step"><div class="step-num">3</div><div class="step-content"><h4>🏷️ Друк етикеток DYMO</h4><p>Кнопка "🖨️ Друкувати (N шт.)" — завантажує .dymo файл з правильною кількістю.</p></div></div>
       <div class="step"><div class="step-num">4</div><div class="step-content"><h4>📁 Завантажені документи</h4><p>Прикріплені файли. Зберігаються в <code>media/orders/{source}/{order_number}/</code></p></div></div>
@@ -421,7 +415,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
     </tbody></table></div>
     <div class="steps">
       <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Відкрийте картку товару</h4><p><a href="/admin/inventory/product/">Склад → Товари</a> → оберіть товар → розгорніть секцію <strong>"🛃 Митне оформлення"</strong>.</p></div></div>
-      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Знайдіть HS-код</h4><p>Використовуйте <a href="https://www.zolltarifnummern.de/" target="_blank" style="color:var(--blue)">zolltarifnummern.de</a> (DE) або <a href="https://customs.gov.ua/" target="_blank" style="color:var(--blue)">customs.gov.ua</a> (UA). HS-код: 8 цифр (DE/EU).</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Знайдіть HS-код</h4><p>Використовуйте <a href="https://www.zolltarifnummern.de/" target="_blank" style="color:var(--accent)">zolltarifnummern.de</a> (DE) або <a href="https://customs.gov.ua/" target="_blank" style="color:var(--accent)">customs.gov.ua</a> (UA). HS-код: 8 цифр (DE/EU).</p></div></div>
       <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Заповніть країну та вагу</h4><p>Країна виробника — ISO-2 код. Вага нетто — без упаковки, в грамах на одну штуку.</p></div></div>
       <div class="step"><div class="step-num">4</div><div class="step-content"><h4>Збережіть і перевірте CN23</h4><p>Відкрийте будь-яке замовлення з цим товаром → <strong>"🛃 Митна декларація"</strong> → HS-код та вага відображаються автоматично.</p></div></div>
     </div>
@@ -482,7 +476,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
     <div class="t-wrap"><table class="ht"><thead><tr>
       <th>Колонка</th><th>Обов'язкова</th><th>Формат / Допустимі значення</th><th>Приклад</th>
     </tr></thead><tbody>
-      <tr style="background:rgba(21,101,192,.08)"><td colspan="4" style="font-weight:700;color:#90CAF9;padding:6px 10px">Поля замовлення (вказати раз для кожного order_number)</td></tr>
+      <tr style="background:rgba(21,101,192,.08)"><td colspan="4" style="font-weight:700;color:var(--accent);padding:6px 10px">Поля замовлення (вказати раз для кожного order_number)</td></tr>
       <tr><td><code>order_number</code></td><td><span class="badge b-green">★ Так</span></td><td>Унікальний номер замовлення</td><td><code>ORD-2024-001</code></td></tr>
       <tr><td><code>source</code></td><td>Ні</td><td><code>manual</code> / <code>digikey</code> / <code>nova_post</code> / …</td><td><code>manual</code></td></tr>
       <tr><td><code>order_date</code></td><td>Ні</td><td><code>YYYY-MM-DD</code> або <code>DD.MM.YYYY</code></td><td><code>2024-03-15</code></td></tr>
@@ -501,7 +495,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
       <tr><td><code>currency</code></td><td>Ні</td><td>Код валюти ISO-4217. За замовч.: USD</td><td><code>EUR</code>, <code>USD</code></td></tr>
       <tr><td><code>shipping_cost</code></td><td>Ні</td><td>Число або з символом ($8.50)</td><td><code>8.50</code></td></tr>
       <tr><td><code>status</code></td><td>Ні</td><td><code>received</code> / <code>processing</code> / <code>shipped</code> / <code>cancelled</code></td><td><code>received</code></td></tr>
-      <tr style="background:rgba(21,101,192,.08)"><td colspan="4" style="font-weight:700;color:#90CAF9;padding:6px 10px">Поля товарного рядка (повторюються для кожного SKU)</td></tr>
+      <tr style="background:rgba(21,101,192,.08)"><td colspan="4" style="font-weight:700;color:var(--accent);padding:6px 10px">Поля товарного рядка (повторюються для кожного SKU)</td></tr>
       <tr><td><code>sku_raw</code></td><td><span class="badge b-green">★ Так</span></td><td>SKU товару або alias. Якщо не знайдено — створиться placeholder.</td><td><code>RF-001</code></td></tr>
       <tr><td><code>qty</code></td><td><span class="badge b-green">★ Так</span></td><td>Кількість &gt; 0. Крапка або кома.</td><td><code>2</code>, <code>5.5</code></td></tr>
       <tr><td><code>unit_price</code></td><td>Ні</td><td>Ціна за одиницю. Допускається символ $€.</td><td><code>19.90</code>, <code>€19.90</code></td></tr>
@@ -564,7 +558,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
 
     <!-- ── REST API ── -->
     <h3 class="sub">Внутрішній REST API Minerva</h3>
-    <p style="color:var(--muted);font-size:13px;line-height:1.7;margin-bottom:16px;">
+    <p style="color:var(--text-muted);font-size:13px;line-height:1.7;margin-bottom:16px;">
       Зовнішня програма (бот, Shopify, скрипт) надсилає HTTP-запит з заголовком <code>Authorization: Token …</code> і отримує дані у форматі JSON.<br>
       <strong>Приклад:</strong> <code>GET /api/v1/orders/?status=received</code> → список невідправлених замовлень.
     </p>
@@ -581,8 +575,8 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
 
     <div class="feature-row" style="margin-top:16px"><span class="feature-icon">🔑</span><div class="feature-content">
       <h4>Створити API токен</h4>
-      <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px;margin:0;">
-        <li>Відкрий <a href="/admin/api/apikey/" style="color:var(--blue)">Система → API Ключі</a> → <strong>+ Додати</strong></li>
+      <ol style="color:var(--text-muted);font-size:13px;line-height:2;padding-left:18px;margin:0;">
+        <li>Відкрий <a href="/admin/api/apikey/" style="color:var(--accent)">Система → API Ключі</a> → <strong>+ Додати</strong></li>
         <li>Вкажи назву (напр. <code>Telegram Bot</code>) та обери потрібні scopes (чекбокси)</li>
         <li>Збережи — ключ згенерується автоматично, скопіюй одразу</li>
       </ol>
@@ -590,23 +584,23 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
 
     <div class="feature-row"><span class="feature-icon">🖥️</span><div class="feature-content">
       <h4>Тестування (Windows PowerShell)</h4>
-      <p style="color:#9aafbe;font-size:12px;margin:4px 0 8px;">⚠️ У PowerShell використовуй <strong><code>curl.exe</code></strong>, не <code>curl</code>.</p>
-      <pre style="background:#0d1117;border:1px solid #2a3f52;border-radius:6px;padding:14px;font-size:12px;color:#c9d8e4;overflow-x:auto;margin:8px 0 0;">
-<span style="color:#607d8b"># GET замовлення</span>
+      <p style="color:var(--text-muted);font-size:12px;margin:4px 0 8px;">⚠️ У PowerShell використовуй <strong><code>curl.exe</code></strong>, не <code>curl</code>.</p>
+      <pre style="background:var(--bg-app);border:1px solid #2a3f52;border-radius:6px;padding:14px;font-size:12px;color:var(--text);overflow-x:auto;margin:8px 0 0;">
+<span style="color:var(--text-dim)"># GET замовлення</span>
 curl.exe -H "Authorization: Token ВАШ_ТОКЕН" http://localhost:8000/api/v1/orders/
 
-<span style="color:#607d8b"># Фільтр по статусу</span>
+<span style="color:var(--text-dim)"># Фільтр по статусу</span>
 curl.exe -H "Authorization: Token ВАШ_ТОКЕН" "http://localhost:8000/api/v1/orders/?status=received"
 
-<span style="color:#607d8b"># POST — створити замовлення (потрібен orders:write)</span>
+<span style="color:var(--text-dim)"># POST — створити замовлення (потрібен orders:write)</span>
 curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: application/json" ^
   -d "{\"order_number\":\"TEST-001\",\"source\":\"manual\",\"client\":\"Test GmbH\",\"order_date\":\"2026-03-05\",\"status\":\"received\",\"affects_stock\":true,\"currency\":\"EUR\"}" ^
   http://localhost:8000/api/v1/orders/
 
-<span style="color:#607d8b"># Без токена → 401 | Scope відсутній → 403 | DELETE → 405</span></pre>
+<span style="color:var(--text-dim)"># Без токена → 401 | Scope відсутній → 403 | DELETE → 405</span></pre>
     </div></div>
 
-    <div class="alert alert-blue" style="margin-top:16px"><span>💡</span><div>Browsable API (тільки читання): <a href="/api/v1/" style="color:var(--blue)">/api/v1/</a> — зручно для перегляду в браузері без curl.</div></div>
+    <div class="alert alert-blue" style="margin-top:16px"><span>💡</span><div>Browsable API (тільки читання): <a href="/api/v1/" style="color:var(--accent)">/api/v1/</a> — зручно для перегляду в браузері без curl.</div></div>
 
     <!-- ── DigiKey ── -->
     <h3 class="sub" style="margin-top:32px">🛒 DigiKey — Інтеграція</h3>
@@ -614,24 +608,24 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
     <div class="cards">
       <div class="card">
         <div class="card-head"><span class="icon">📦</span><h3>Пошук компонентів</h3></div>
-        <p>Пошук будь-якого компонента або виробника через DigiKey Product Information V4 API. Показує наявність, ціни та цінові сходинки, lead time, статус. <a href="/admin/bots/digikeyconfig/products/?q=Sevskiy" style="color:var(--blue)">Відкрити →</a></p>
+        <p>Пошук будь-якого компонента або виробника через DigiKey Product Information V4 API. Показує наявність, ціни та цінові сходинки, lead time, статус. <a href="/admin/bots/digikeyconfig/products/?q=Sevskiy" style="color:var(--accent)">Відкрити →</a></p>
       </div>
       <div class="card">
         <div class="card-head"><span class="icon">🔍</span><h3>Пошук за PO номером</h3></div>
-        <p>Пошук замовлення DigiKey за номером PO. Потребує підписки на <strong>Ordering API</strong> (запит на <code>api.contact@digikey.com</code>). <a href="/admin/bots/digikeyconfig/po-lookup/" style="color:var(--blue)">Відкрити →</a></p>
+        <p>Пошук замовлення DigiKey за номером PO. Потребує підписки на <strong>Ordering API</strong> (запит на <code>api.contact@digikey.com</code>). <a href="/admin/bots/digikeyconfig/po-lookup/" style="color:var(--accent)">Відкрити →</a></p>
       </div>
       <div class="card">
         <div class="card-head"><span class="icon">🔬</span><h3>Debug запитів</h3></div>
-        <p>Показує сирий HTTP запит і відповідь DigiKey API: URL, заголовки, параметри, статус, тіло відповіді. Для діагностики проблем. <a href="/admin/bots/digikeyconfig/debug/?endpoint=orders" style="color:var(--blue)">Відкрити →</a></p>
+        <p>Показує сирий HTTP запит і відповідь DigiKey API: URL, заголовки, параметри, статус, тіло відповіді. Для діагностики проблем. <a href="/admin/bots/digikeyconfig/debug/?endpoint=orders" style="color:var(--accent)">Відкрити →</a></p>
       </div>
     </div>
 
     <div class="feature-row"><span class="feature-icon">🛒</span><div class="feature-content">
       <h4>Налаштування DigiKey API</h4>
-      <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px;margin:8px 0 0;">
-        <li>Зареєструватись на <a href="https://developer.digikey.com" target="_blank" style="color:var(--blue)">developer.digikey.com</a> → My Apps → Create App</li>
+      <ol style="color:var(--text-muted);font-size:13px;line-height:2;padding-left:18px;margin:8px 0 0;">
+        <li>Зареєструватись на <a href="https://developer.digikey.com" target="_blank" style="color:var(--accent)">developer.digikey.com</a> → My Apps → Create App</li>
         <li>Підписатись на <strong>Product Information V4</strong> (безкоштовно, одразу активний)</li>
-        <li>Налаштувати: <a href="/admin/bots/digikeyconfig/" style="color:var(--blue)">Боти → DigiKey API</a> → Client ID, Client Secret, Account ID</li>
+        <li>Налаштувати: <a href="/admin/bots/digikeyconfig/" style="color:var(--accent)">Боти → DigiKey API</a> → Client ID, Client Secret, Account ID</li>
         <li>Натиснути <strong>🔌 Тест з'єднання</strong></li>
         <li>Перевірити компоненти: кнопка <strong>📦 Компоненти</strong> → ввести назву виробника</li>
       </ol>
@@ -641,7 +635,7 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
       <tr><td>Product Information V4</td><td><span class="badge b-green">✅ Активний</span></td><td>Пошук компонентів, ціни, наявність, lead time</td></tr>
       <tr><td>Order Status</td><td><span class="badge b-green">✅ Активний</span></td><td>Статус власних замовлень (як покупець)</td></tr>
       <tr><td>Ordering (OrderManagement)</td><td><span class="badge" style="background:rgba(255,152,0,.15);color:#ffb74d">⏳ Запит</span></td><td>Вхідні замовлення від клієнтів — потребує <code>api.contact@digikey.com</code></td></tr>
-      <tr><td>Supply Chain</td><td><span class="badge" style="background:rgba(96,125,139,.15);color:#9aafbe">—</span></td><td>Моніторинг дефіциту по ринку — не потрібен</td></tr>
+      <tr><td>Supply Chain</td><td><span class="badge" style="background:rgba(96,125,139,.15);color:var(--text-muted)">—</span></td><td>Моніторинг дефіциту по ринку — не потрібен</td></tr>
     </tbody></table></div>
 
     <h3 class="sub" style="margin-top:32px">🟡 DHL Express — Тарифи та Трекінг</h3>
@@ -653,21 +647,21 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
       </div>
       <div class="card">
         <div class="card-head"><span class="icon">🔍</span><h3>DHL Трекінг</h3></div>
-        <p>Ввести будь-який номер DHL Express → статус, місцезнаходження, історія подій. Тільки Express (10+ цифр). DHL Paket — не підтримується. <a href="/admin/shipping/shipment/dhl-track-lookup/" style="color:var(--blue)">Відкрити →</a></p>
+        <p>Ввести будь-який номер DHL Express → статус, місцезнаходження, історія подій. Тільки Express (10+ цифр). DHL Paket — не підтримується. <a href="/admin/shipping/shipment/dhl-track-lookup/" style="color:var(--accent)">Відкрити →</a></p>
       </div>
     </div>
 
     <div class="feature-row"><span class="feature-icon">🟡</span><div class="feature-content">
       <h4>Налаштування DHL Carrier</h4>
-      <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px;margin:8px 0 0;">
-        <li>Реєстрація: <a href="https://developer.dhl.com" target="_blank" style="color:var(--blue)">developer.dhl.com</a> → My Apps → <strong>DHL Express MyDHL API</strong></li>
-        <li><a href="/admin/shipping/carrier/add/" style="color:var(--blue)">Доставка → Перевізники → Додати</a> → тип <code>DHL</code></li>
+      <ol style="color:var(--text-muted);font-size:13px;line-height:2;padding-left:18px;margin:8px 0 0;">
+        <li>Реєстрація: <a href="https://developer.dhl.com" target="_blank" style="color:var(--accent)">developer.dhl.com</a> → My Apps → <strong>DHL Express MyDHL API</strong></li>
+        <li><a href="/admin/shipping/carrier/add/" style="color:var(--accent)">Доставка → Перевізники → Додати</a> → тип <code>DHL</code></li>
         <li><strong>API ключ</strong> = DHL Username · <strong>API секрет</strong> = DHL Password</li>
         <li><strong>Connection UUID</strong> = Account Number · <strong>API URL</strong> = <code>test</code> для sandbox</li>
         <li>Тарифи: Відправлення → <strong>🟡 DHL Тарифи</strong><br>
             Трекінг: Sidebar → Доставка → <strong>🔍 DHL Трекінг</strong></li>
       </ol>
-      <p style="color:var(--muted);font-size:12px;margin-top:8px;">⚠️ MyDHL API трекає лише <strong>DHL Express</strong>. Для DHL Paket потрібна активація "Shipment Tracking – Unified" на developer.dhl.com (окрема підписка).</p>
+      <p style="color:var(--text-muted);font-size:12px;margin-top:8px;">⚠️ MyDHL API трекає лише <strong>DHL Express</strong>. Для DHL Paket потрібна активація "Shipment Tracking – Unified" на developer.dhl.com (окрема підписка).</p>
     </div></div>
 
     <h3 class="sub" style="margin-top:32px">Варіанти підключення ботів</h3>
@@ -678,7 +672,7 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
       <tr><td>🛒 Shopify webhook</td><td>Новий order → автоматично в Minerva</td><td><code>POST /api/v1/orders/</code></td></tr>
     </tbody></table></div>
 
-    <div class="alert alert-blue" style="margin-top:20px"><span>💡</span><div>API ключі керуються через <a href="/admin/api/apikey/" style="color:var(--blue)">Система → API Ключі</a>. Кожен ключ має окремі scopes (права). Термін дії — опціонально.</div></div>
+    <div class="alert alert-blue" style="margin-top:20px"><span>💡</span><div>API ключі керуються через <a href="/admin/api/apikey/" style="color:var(--accent)">Система → API Ключі</a>. Кожен ключ має окремі scopes (права). Термін дії — опціонально.</div></div>
   </div>
 
   <!-- ══ БУХГАЛТЕРІЯ ══ -->
@@ -854,11 +848,11 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
     </div>
     <div class="feature-row"><span class="feature-icon">⚙️</span><div class="feature-content">
       <h4>Налаштування авто-трекінгу</h4>
-      <ol style="color:var(--muted);font-size:13px;line-height:2;padding-left:18px;margin:0;">
-        <li><a href="/admin/shipping/shippingsettings/1/change/" style="color:var(--blue)">Доставка → Авто-трекінг</a> → увімкнути галочку</li>
+      <ol style="color:var(--text-muted);font-size:13px;line-height:2;padding-left:18px;margin:0;">
+        <li><a href="/admin/shipping/shippingsettings/1/change/" style="color:var(--accent)">Доставка → Авто-трекінг</a> → увімкнути галочку</li>
         <li>Встановити інтервал (рекомендовано 30–60 хв)</li>
         <li>Cron на Synology: <code>*/5 * * * * docker-compose exec -T web python manage.py track_shipments</code></li>
-        <li>Сповіщення про зміни — <a href="/admin/config/notificationsettings/" style="color:var(--blue)">Інтеграції → Сповіщення</a> → секція «⚙️ Оновлення системи»</li>
+        <li>Сповіщення про зміни — <a href="/admin/config/notificationsettings/" style="color:var(--accent)">Інтеграції → Сповіщення</a> → секція «⚙️ Оновлення системи»</li>
       </ol>
     </div></div>
 
@@ -882,7 +876,7 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
       </div>
     </div>
 
-    <div class="alert" style="background:rgba(33,150,243,.08);border-color:#2196f3;margin-top:20px"><span>🔑</span><div>Для отримання API-ключів Jumingo: <a href="https://www.jumingo.com/de-de/users/account-summary" target="_blank" style="color:var(--blue)">Jumingo → Account Summary</a>. Після отримання — заповніть поля API ключ та API секрет у картці перевізника.</div></div>
+    <div class="alert" style="background:rgba(33,150,243,.08);border-color:#2196f3;margin-top:20px"><span>🔑</span><div>Для отримання API-ключів Jumingo: <a href="https://www.jumingo.com/de-de/users/account-summary" target="_blank" style="color:var(--accent)">Jumingo → Account Summary</a>. Після отримання — заповніть поля API ключ та API секрет у картці перевізника.</div></div>
 
     <hr class="div">
     <h3 class="sub">📦 Пакувальні матеріали (в розробці)</h3>
@@ -917,7 +911,7 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
 
     <hr class="div">
     <h3 class="sub">🔌 Центр інтеграцій</h3>
-    <div class="alert alert-blue"><span>ℹ️</span><div>Всі підключення в одному місці: DigiKey, перевізники (Jumingo/DHL), email/Telegram, авто-трекінг. <a href="/admin/config/integrations/" style="color:var(--blue)">Інтеграції →</a></div></div>
+    <div class="alert alert-blue"><span>ℹ️</span><div>Всі підключення в одному місці: DigiKey, перевізники (Jumingo/DHL), email/Telegram, авто-трекінг. <a href="/admin/config/integrations/" style="color:var(--accent)">Інтеграції →</a></div></div>
     <div class="cards">
       <div class="card" onclick="window.location='/admin/config/integrations/'" style="cursor:pointer">
         <div class="card-head"><span class="icon">🔌</span><h3>Огляд інтеграцій</h3></div>

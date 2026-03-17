@@ -205,8 +205,13 @@
   --tip-border: #d0d7de;
   --tip-text:   #1c2128;
   --tip-accent: #0969da;
-  /* Footer — stays dark */
-  /* footer-* vars unchanged: inherited from :root */
+  /* Footer — light */
+  --footer-bg:          #eef1f5;
+  --footer-border:      rgba(0,0,0,.1);
+  --footer-text:        rgba(0,0,0,.38);
+  --footer-link:        #57606a;
+  --footer-link-hover:  #0969da;
+  --footer-strong:      #24292f;
 }
 
 /* ── Minerva (dark navy + gold) ─────────────────── */
@@ -611,7 +616,9 @@
 [data-theme="custom"] .info-card,
 [data-theme="custom"] .kpi-card,
 [data-theme="custom"] .card,
-[data-theme="custom"] .dash-card {
+[data-theme="custom"] .dash-card,
+[data-theme="custom"] .t-tile,
+[data-theme="light"] .t-tile {
   background: var(--bg-card) !important;
   border-color: var(--border-strong) !important;
   color: var(--text) !important;
@@ -674,14 +681,14 @@
 [data-theme="light"] select option,
 [data-theme="custom"] select option { background: var(--bg-input); color: var(--text); }
 
-/* ── Light + Custom theme: import tiles (have !important gradient) ── */
+/* ── Light + Custom theme: import tiles — same style as other tiles (no tint) ── */
 [data-theme="light"] .sal-tile-import,
 [data-theme="light"] .inv-tile-import,
 [data-theme="light"] [class*="-tile-import"],
 [data-theme="custom"] .sal-tile-import,
 [data-theme="custom"] .inv-tile-import,
 [data-theme="custom"] [class*="-tile-import"] {
-  background: rgba(0,188,212,.07) !important;
+  background: var(--bg-card) !important;
 }
 [data-theme="light"] .sal-tile-import:hover,
 [data-theme="light"] .inv-tile-import:hover,
@@ -689,7 +696,7 @@
 [data-theme="custom"] .sal-tile-import:hover,
 [data-theme="custom"] .inv-tile-import:hover,
 [data-theme="custom"] [class*="-tile-import"]:hover {
-  background: rgba(0,188,212,.14) !important;
+  background: var(--bg-hover) !important;
 }
 
 /* ── Fix select height: text not clipped ── */
@@ -803,7 +810,17 @@
   --sb-link-hover-text:  var(--text);
   --sb-link-hover-bg:    var(--bg-hover);
   --sb-pinned-bg:        var(--sb-bg);
-  --sb-pinned-text:      var(--accent);
+  --sb-pinned-text:      var(--sb-text);
+  /* Accent2 shades (not settable, derived from accent) */
+  --accent2-subtle:      rgba(88,166,255,.12);
+  --accent2-muted:       rgba(88,166,255,.3);
+  /* Footer */
+  --footer-bg:           var(--bg-app);
+  --footer-border:       var(--border);
+  --footer-text:         var(--text-dim);
+  --footer-link:         var(--text-muted);
+  --footer-link-hover:   var(--accent);
+  --footer-strong:       var(--text);
   /* Button hover states */
   --button-hover-bg:          var(--default-button-bg);
   --default-button-hover-bg:  var(--default-button-bg);
