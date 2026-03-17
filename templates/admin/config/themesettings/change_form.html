@@ -79,11 +79,19 @@
     <span id="mvp-list"></span>
   </div>
 
-  <!-- Row 3: Save -->
+  <!-- Row 3: Save to localStorage -->
   <div class="mvp-row">
     <span class="mvp-label">💾 Зберегти</span>
     <input type="text" id="mvp-name" placeholder="Назва профілю…" class="mvp-name-input">
     <button type="button" class="mvp-btn mvp-btn-save" onclick="mvSaveProfile()">Зберегти профіль</button>
+  </div>
+
+  <!-- Row 4: File export / import -->
+  <div class="mvp-row">
+    <span class="mvp-label">📁 Файл</span>
+    <button type="button" class="mvp-btn" onclick="mvExportFile()" title="Завантажити поточні значення як .json файл на ПК">💾 Зберегти на ПК</button>
+    <button type="button" class="mvp-btn" onclick="document.getElementById('mvp-file-in').click()" title="Завантажити тему з .json файлу">📤 Завантажити з ПК</button>
+    <input type="file" id="mvp-file-in" accept=".json" style="display:none" onchange="mvImportFile(event)">
   </div>
 
 </div>
@@ -220,6 +228,36 @@ function renderProfiles() {
     );
   }).join(' ');
 }
+
+/* ── Export current values to JSON file ─────────────────────── */
+window.mvExportFile = function() {
+  var vals = readCurrent();
+  var date = new Date().toISOString().slice(0,10);
+  var blob = new Blob([JSON.stringify(vals, null, 2)], {type: 'application/json'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'minerva-theme-' + date + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
+
+/* ── Import values from JSON file ───────────────────────────── */
+window.mvImportFile = function(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      var vals = JSON.parse(e.target.result);
+      if (typeof vals !== 'object' || Array.isArray(vals)) throw new Error('Bad format');
+      applyValues(vals);
+    } catch(err) {
+      alert('Помилка читання файлу: ' + err.message);
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+};
 
 /* Init */
 renderProfiles();
