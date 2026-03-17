@@ -16,63 +16,63 @@
 .dtl-wrap { max-width: 780px; margin: 0 auto; padding: 32px 24px 60px; }
 
 .dtl-search {
-  background: #1a2535; border: 1px solid #243347; border-radius: 12px;
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 12px;
   padding: 28px 32px 24px; margin-bottom: 28px;
 }
-.dtl-search-title { font-size: 20px; font-weight: 700; color: #c9d8e4; margin-bottom: 6px; }
-.dtl-search-sub   { font-size: 12px; color: #607d8b; margin-bottom: 20px; }
+.dtl-search-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.dtl-search-sub   { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; }
 .dtl-search form  { display: flex; gap: 10px; }
 .dtl-input {
-  flex: 1; background: #111c26; border: 1px solid #2a3f52; color: #c9d8e4;
+  flex: 1; background: var(--bg-input); border: 1px solid var(--border-strong); color: var(--text);
   border-radius: 7px; padding: 11px 14px; font-size: 14px; font-family: monospace;
   outline: none; transition: border-color .2s;
 }
-.dtl-input:focus { border-color: #ffcc00; }
-.dtl-input::placeholder { color: #3a5570; }
+.dtl-input:focus { border-color: var(--warn); }
+.dtl-input::placeholder { color: var(--text-dim); }
 .dtl-btn {
-  background: #f9a825; color: #000; border: none; border-radius: 7px;
+  background: var(--warn); color: #000; border: none; border-radius: 7px;
   padding: 11px 22px; font-size: 13px; font-weight: 700; cursor: pointer;
-  white-space: nowrap; transition: background .15s;
+  white-space: nowrap; transition: opacity .15s;
 }
-.dtl-btn:hover { background: #ffcc00; }
+.dtl-btn:hover { opacity: .85; }
 
 .dtl-warn {
   background: rgba(255,152,0,.07); border: 1px solid rgba(255,152,0,.3);
-  border-left: 4px solid #ff9800; border-radius: 8px;
-  padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: #ffb74d;
+  border-left: 4px solid var(--warn); border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: var(--warn);
 }
-.dtl-warn a { color: #ffd54f; }
+.dtl-warn a { color: var(--warn); text-decoration: underline; }
 .dtl-error {
-  background: rgba(244,67,54,.07); border: 1px solid rgba(244,67,54,.3);
-  border-left: 4px solid #f44336; border-radius: 8px;
-  padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: #ef9a9a;
+  background: rgba(207,34,46,.07); border: 1px solid rgba(207,34,46,.3);
+  border-left: 4px solid var(--err); border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: var(--err);
   white-space: pre-wrap;
 }
 
 .dtl-card {
-  background: #1a2535; border: 1px solid #243347; border-radius: 10px;
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px;
   padding: 22px 26px; margin-bottom: 20px;
 }
 .dtl-card-title {
-  font-size: 11px; font-weight: 700; color: #9aafbe;
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .05em;
-  margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1px solid #243347;
+  margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border-strong);
 }
 
 /* Status hero */
 .dtl-status { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
 .dtl-status-icon { font-size: 36px; flex-shrink: 0; }
 .dtl-status-label { font-size: 20px; font-weight: 700; }
-.dtl-status-desc  { font-size: 13px; color: #9aafbe; margin-top: 3px; }
-.dtl-status-meta  { font-size: 11px; color: #607d8b; margin-top: 4px; }
+.dtl-status-desc  { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+.dtl-status-meta  { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
 
 .dtl-info-row {
   display: flex; justify-content: space-between; align-items: baseline;
-  padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.04); gap: 12px;
+  padding: 7px 0; border-bottom: 1px solid var(--border); gap: 12px;
 }
 .dtl-info-row:last-child { border-bottom: none; }
-.dtl-info-key { font-size: 11px; color: #607d8b; flex-shrink: 0; min-width: 120px; }
-.dtl-info-val { font-size: 13px; color: #c9d8e4; text-align: right; }
+.dtl-info-key { font-size: 11px; color: var(--text-dim); flex-shrink: 0; min-width: 120px; }
+.dtl-info-val { font-size: 13px; color: var(--text); text-align: right; }
 .dtl-mono     { font-family: monospace; }
 
 /* Events */
@@ -80,21 +80,21 @@
 .dtl-event {
   display: grid; grid-template-columns: 120px 16px 1fr;
   gap: 0 12px; padding: 10px 0;
-  border-bottom: 1px solid rgba(255,255,255,.04);
+  border-bottom: 1px solid var(--border);
 }
 .dtl-event:last-child { border-bottom: none; }
-.dtl-ev-time { font-size: 11px; color: #607d8b; font-family: monospace;
+.dtl-ev-time { font-size: 11px; color: var(--text-dim); font-family: monospace;
   text-align: right; padding-top: 2px; line-height: 1.5; }
 .dtl-ev-dot-col { display: flex; flex-direction: column; align-items: center; }
 .dtl-ev-dot { width: 10px; height: 10px; border-radius: 50%;
-  background: #2a3f52; border: 2px solid #3a5570; margin-top: 3px; flex-shrink: 0; }
+  background: var(--border-strong); border: 2px solid var(--text-dim); margin-top: 3px; flex-shrink: 0; }
 .dtl-event:first-child .dtl-ev-dot {
-  background: #ffcc00; border-color: #ffcc00;
-  width: 13px; height: 13px; box-shadow: 0 0 0 3px rgba(249,168,37,.2); }
-.dtl-ev-line { flex: 1; width: 2px; background: #1e2d3d; margin-top: 3px; }
+  background: var(--warn); border-color: var(--warn);
+  width: 13px; height: 13px; box-shadow: 0 0 0 3px rgba(227,179,65,.2); }
+.dtl-ev-line { flex: 1; width: 2px; background: var(--border); margin-top: 3px; }
 .dtl-event:last-child .dtl-ev-line { display: none; }
-.dtl-ev-desc { font-size: 13px; color: #c9d8e4; line-height: 1.4; }
-.dtl-ev-loc  { font-size: 11px; color: #607d8b; margin-top: 2px; }
+.dtl-ev-desc { font-size: 13px; color: var(--text); line-height: 1.4; }
+.dtl-ev-loc  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 </style>
 {% endblock %}
 
@@ -142,10 +142,10 @@
       </div>
       <div>
         <div class="dtl-status-label" style="color:
-          {% if st == 'delivered' %}#4caf50
-          {% elif st == 'transit' or st == 'in-transit' %}#ff9800
-          {% elif st == 'exception' or st == 'failure' %}#f44336
-          {% else %}#9aafbe{% endif %}">
+          {% if st == 'delivered' %}var(--ok)
+          {% elif st == 'transit' or st == 'in-transit' %}var(--warn)
+          {% elif st == 'exception' or st == 'failure' %}var(--err)
+          {% else %}var(--text-muted){% endif %}">
           {% if st == "delivered" %}Доставлено
           {% elif st == "transit" or st == "in-transit" %}В дорозі
           {% elif st == "returned" %}Повернення
@@ -170,7 +170,7 @@
       {% if result.estimated_delivery %}
       <div class="dtl-info-row">
         <span class="dtl-info-key">Очікувана доставка</span>
-        <span class="dtl-info-val" style="color:#4caf50;font-weight:700">{{ result.estimated_delivery }}</span>
+        <span class="dtl-info-val" style="color:var(--ok);font-weight:700">{{ result.estimated_delivery }}</span>
       </div>
       {% endif %}
       {% if result.proof_of_delivery %}
@@ -191,7 +191,7 @@
       <div class="dtl-event">
         <div class="dtl-ev-time">
           {{ ev.timestamp|slice:":10" }}<br>
-          <span style="color:#3a5570">{{ ev.timestamp|slice:"11:16" }}</span>
+          <span style="color:var(--text-dim)">{{ ev.timestamp|slice:"11:16" }}</span>
         </div>
         <div class="dtl-ev-dot-col">
           <div class="dtl-ev-dot"></div>

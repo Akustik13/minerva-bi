@@ -1,0 +1,212 @@
+{% extends "admin/change_form.html" %}
+
+{% block content %}
+<style>
+/* ── Theme Profile Panel ─────────────────────────────────────── */
+#mv-profile-panel {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 18px 22px; margin-bottom: 22px;
+}
+.mvp-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 8px 0;
+}
+.mvp-row + .mvp-row { border-top: 1px solid var(--border); }
+.mvp-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-muted);
+  min-width: 120px; flex-shrink: 0;
+}
+.mvp-btn {
+  padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border-strong);
+  background: var(--bg-card-2); color: var(--text); font-size: 12px;
+  cursor: pointer; font-weight: 500; transition: background .15s, border-color .15s;
+}
+.mvp-btn:hover { background: var(--bg-hover); border-color: var(--accent); color: var(--accent); }
+.mvp-btn-dark    { border-left: 3px solid #1a3352; }
+.mvp-btn-light   { border-left: 3px solid #2980b9; }
+.mvp-btn-minerva { border-left: 3px solid #c9a84c; }
+.mvp-btn-save    { background: var(--accent); color: #fff; border-color: var(--accent); }
+.mvp-btn-save:hover { opacity: .88; color: #fff; }
+.mvp-btn-clear   { color: var(--err); border-color: var(--err); }
+.mvp-btn-clear:hover { background: rgba(207,34,46,.08); }
+.mvp-name-input {
+  background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 6px; padding: 6px 10px; font-size: 12px;
+  outline: none; width: 160px;
+}
+.mvp-name-input:focus { border-color: var(--accent); }
+.mvp-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--bg-card-2); border: 1px solid var(--border-strong);
+  border-radius: 20px; padding: 4px 10px; font-size: 12px; color: var(--text);
+}
+.mvp-chip button {
+  background: none; border: none; cursor: pointer; color: var(--text-muted);
+  font-size: 12px; padding: 0 2px; line-height: 1;
+}
+.mvp-chip button:hover { color: var(--err); }
+.mvp-empty { font-size: 12px; color: var(--text-dim); font-style: italic; }
+</style>
+
+<div id="mv-profile-panel">
+
+  <!-- Row 1: Presets -->
+  <div class="mvp-row">
+    <span class="mvp-label">📥 Пресети</span>
+    <button type="button" class="mvp-btn mvp-btn-dark"    onclick="mvLoadPreset('dark')">🌙 Темна</button>
+    <button type="button" class="mvp-btn mvp-btn-light"   onclick="mvLoadPreset('light')">☀️ Світла</button>
+    <button type="button" class="mvp-btn mvp-btn-minerva" onclick="mvLoadPreset('minerva')">⚜️ Minerva</button>
+    <button type="button" class="mvp-btn mvp-btn-clear"   onclick="mvClearAll()">🗑️ Очистити все</button>
+  </div>
+
+  <!-- Row 2: Saved profiles -->
+  <div class="mvp-row">
+    <span class="mvp-label">🗂️ Мої профілі</span>
+    <span id="mvp-list"></span>
+  </div>
+
+  <!-- Row 3: Save -->
+  <div class="mvp-row">
+    <span class="mvp-label">💾 Зберегти</span>
+    <input type="text" id="mvp-name" placeholder="Назва профілю…" class="mvp-name-input">
+    <button type="button" class="mvp-btn mvp-btn-save" onclick="mvSaveProfile()">Зберегти профіль</button>
+  </div>
+
+</div>
+
+{{ block.super }}
+
+<script>
+(function(){
+"use strict";
+var STORAGE_KEY = 'mv_theme_profiles';
+
+/* ── Preset definitions ─────────────────────────────────────── */
+var PRESETS = {
+  dark: {
+    bg_app:'#0d1520', bg_card:'#161b22', bg_card_2:'#1c2128',
+    bg_input:'#111c26', bg_hover:'#1e2a35',
+    text_primary:'#e6edf3', text_muted:'#9aafbe', text_dim:'#607d8b',
+    accent:'#58a6ff', gold:'#c9a84c', gold_l:'#e8d5a3',
+    ok:'#3fb950', warn:'#e3b341', err:'#f85149',
+    header_bg:'#1a3352', header_color:'#e6edf3',
+    sb_bg:'#0d1520', border_color:'#2a3f52',
+    btn_primary:'#1976d2', btn_danger:'#d32f2f'
+  },
+  light: {
+    bg_app:'#f0f4f8', bg_card:'#ffffff', bg_card_2:'#f7f9fb',
+    bg_input:'#ffffff', bg_hover:'#e8edf2',
+    text_primary:'#1c2128', text_muted:'#4b5563', text_dim:'#6b7280',
+    accent:'#0969da', gold:'#c9a84c', gold_l:'#7c5c00',
+    ok:'#1a7f37', warn:'#9a6700', err:'#cf222e',
+    header_bg:'#2980b9', header_color:'#ffffff',
+    sb_bg:'#0d1520', border_color:'#d0d7de',
+    btn_primary:'#0969da', btn_danger:'#cf222e'
+  },
+  minerva: {
+    bg_app:'#0a0e1a', bg_card:'#111827', bg_card_2:'#1a2240',
+    bg_input:'#0d1228', bg_hover:'#1e2a50',
+    text_primary:'#e8d5a3', text_muted:'#a89060', text_dim:'#705e3a',
+    accent:'#c9a84c', gold:'#c9a84c', gold_l:'#e8d5a3',
+    ok:'#4ade80', warn:'#facc15', err:'#f87171',
+    header_bg:'#0a0e1a', header_color:'#e8d5a3',
+    sb_bg:'#0d1228', border_color:'#4a3820',
+    btn_primary:'#c9a84c', btn_danger:'#f87171'
+  }
+};
+
+/* ── Apply values to form fields ────────────────────────────── */
+function applyValues(vals) {
+  for (var field in vals) {
+    var hex = document.getElementById('id_' + field);
+    var sw  = document.getElementById('id_' + field + '_sw');
+    if (hex) hex.value = vals[field];
+    if (sw)  sw.value  = vals[field];
+  }
+}
+
+/* ── Load preset ────────────────────────────────────────────── */
+window.mvLoadPreset = function(name) {
+  var p = PRESETS[name];
+  if (!p) return;
+  applyValues(p);
+};
+
+/* ── Clear all ──────────────────────────────────────────────── */
+window.mvClearAll = function() {
+  document.querySelectorAll('.mv-cp-hex').forEach(function(el) {
+    el.value = '';
+    var sw = document.getElementById(el.id + '_sw');
+    if (sw) sw.value = '#000000';
+  });
+};
+
+/* ── Read current field values ──────────────────────────────── */
+function readCurrent() {
+  var vals = {};
+  document.querySelectorAll('.mv-cp-hex').forEach(function(el) {
+    var fname = el.name;
+    if (fname) vals[fname] = el.value;
+  });
+  return vals;
+}
+
+/* ── Save custom profile ────────────────────────────────────── */
+window.mvSaveProfile = function() {
+  var nameEl = document.getElementById('mvp-name');
+  var name = (nameEl.value || '').trim();
+  if (!name) { nameEl.focus(); nameEl.style.borderColor = 'var(--err)'; return; }
+  nameEl.style.borderColor = '';
+  var profiles = loadProfiles();
+  profiles[name] = readCurrent();
+  saveProfiles(profiles);
+  nameEl.value = '';
+  renderProfiles();
+};
+
+/* ── Load profile by name ───────────────────────────────────── */
+window.mvLoadProfile = function(name) {
+  var profiles = loadProfiles();
+  if (profiles[name]) applyValues(profiles[name]);
+};
+
+/* ── Delete profile ─────────────────────────────────────────── */
+window.mvDeleteProfile = function(name) {
+  var profiles = loadProfiles();
+  delete profiles[name];
+  saveProfiles(profiles);
+  renderProfiles();
+};
+
+/* ── Storage helpers ────────────────────────────────────────── */
+function loadProfiles() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; } catch(e) { return {}; }
+}
+function saveProfiles(p) { localStorage.setItem(STORAGE_KEY, JSON.stringify(p)); }
+
+/* ── Render saved profiles list ─────────────────────────────── */
+function renderProfiles() {
+  var list = document.getElementById('mvp-list');
+  if (!list) return;
+  var profiles = loadProfiles();
+  var keys = Object.keys(profiles);
+  if (!keys.length) {
+    list.innerHTML = '<span class="mvp-empty">Немає збережених профілів</span>';
+    return;
+  }
+  list.innerHTML = keys.map(function(k) {
+    return (
+      '<span class="mvp-chip">' +
+      '<a href="#" onclick="mvLoadProfile(' + JSON.stringify(k) + ');return false">' + k + '</a>' +
+      '<button onclick="mvDeleteProfile(' + JSON.stringify(k) + ')" title="Видалити">✕</button>' +
+      '</span>'
+    );
+  }).join(' ');
+}
+
+/* Init */
+renderProfiles();
+})();
+</script>
+{% endblock %}
