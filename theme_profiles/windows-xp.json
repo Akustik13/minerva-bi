@@ -1,0 +1,31 @@
+{
+  "bg_app":    "#ece9d8",
+  "bg_card":   "#ffffff",
+  "bg_card_2": "#f0ede5",
+  "bg_input":  "#ffffff",
+  "bg_hover":  "#c1d2ee",
+
+  "text_primary": "#000000",
+  "text_muted":   "#444444",
+  "text_dim":     "#888888",
+
+  "accent": "#0054e3",
+  "gold":   "#e49a00",
+  "gold_l": "#7c5c00",
+
+  "ok":   "#008000",
+  "warn": "#e49a00",
+  "err":  "#cc0000",
+
+  "header_bg":    "#245edb",
+  "header_color": "#ffffff",
+
+  "sb_bg":           "#0a246a",
+  "sb_head_bg":      "#0831d9",
+  "sb_border":       "#3a6ae8",
+  "sb_border_accent":"#7ec9ff",
+
+  "border_color": "#aca899",
+  "btn_primary":  "#245edb",
+  "btn_danger":   "#cc0000"
+}
