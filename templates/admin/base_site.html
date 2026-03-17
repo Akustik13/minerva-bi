@@ -301,7 +301,7 @@
   --changelist-even-row-bg: #1a2445;
 }
 
-/* ── Light theme: enforce sidebar vars (override Django admin defaults) ── */
+/* ── Light + Custom theme: enforce sidebar vars (override Django admin defaults) ── */
 [data-theme="light"] #nav-sidebar,
 [data-theme="light"] #nav-sidebar .module,
 [data-theme="light"] #nav-sidebar .module > table,
@@ -312,24 +312,38 @@
 [data-theme="light"] .mg-header,
 [data-theme="light"] .mg-content,
 [data-theme="light"] .mg-content .module,
-[data-theme="light"] .mg-pinned {
+[data-theme="light"] .mg-pinned,
+[data-theme="custom"] #nav-sidebar,
+[data-theme="custom"] #nav-sidebar .module,
+[data-theme="custom"] #nav-sidebar .module > table,
+[data-theme="custom"] #nav-sidebar caption,
+[data-theme="custom"] #nav-sidebar td,
+[data-theme="custom"] #nav-sidebar th,
+[data-theme="custom"] .mg-group,
+[data-theme="custom"] .mg-header,
+[data-theme="custom"] .mg-content,
+[data-theme="custom"] .mg-content .module,
+[data-theme="custom"] .mg-pinned {
   background: var(--sb-bg) !important;
   color: var(--sb-text) !important;
   border-color: var(--sb-border) !important;
 }
-[data-theme="light"] .mg-header {
+[data-theme="light"] .mg-header,
+[data-theme="custom"] .mg-header {
   border-left-color: var(--sb-border-accent) !important;
 }
-[data-theme="light"] #nav-sidebar a { color: var(--sb-link) !important; }
-[data-theme="light"] .mg-header { color: var(--sb-head-text) !important; }
-[data-theme="light"] .mg-header:hover {
+[data-theme="light"] #nav-sidebar a,  [data-theme="custom"] #nav-sidebar a  { color: var(--sb-link) !important; }
+[data-theme="light"] .mg-header,      [data-theme="custom"] .mg-header      { color: var(--sb-head-text) !important; }
+[data-theme="light"] .mg-header:hover,
+[data-theme="custom"] .mg-header:hover {
   background: var(--sb-head-bg) !important;
   color: var(--sb-head-hover-text) !important;
 }
-[data-theme="light"] .mg-arrow { color: var(--sb-arrow) !important; }
-[data-theme="light"] .mg-pinned { background: var(--sb-pinned-bg) !important; }
-[data-theme="light"] .mg-pinned a { color: var(--sb-pinned-text) !important; }
-[data-theme="light"] #nav-sidebar input[type=text] {
+[data-theme="light"] .mg-arrow,    [data-theme="custom"] .mg-arrow    { color: var(--sb-arrow) !important; }
+[data-theme="light"] .mg-pinned,   [data-theme="custom"] .mg-pinned   { background: var(--sb-pinned-bg) !important; }
+[data-theme="light"] .mg-pinned a, [data-theme="custom"] .mg-pinned a { color: var(--sb-pinned-text) !important; }
+[data-theme="light"] #nav-sidebar input[type=text],
+[data-theme="custom"] #nav-sidebar input[type=text] {
   background: var(--bg-input) !important;
   color: var(--sb-text) !important;
   border-color: var(--sb-border) !important;
@@ -776,8 +790,22 @@
   --breadcrumbs-fg:             var(--header-color);
   --header-link-color:          var(--header-color);
   --header-branding-link-color: var(--header-color);
-  /* Sidebar derived */
-  --sb-head-bg: var(--sb-bg);
+  /* Sidebar derived — all --sb-* from main theme vars so they don't fall back to dark :root */
+  --sb-head-bg:          var(--sb-bg);
+  --sb-head-text:        var(--text);
+  --sb-head-hover-text:  var(--accent);
+  --sb-text:             var(--text);
+  --sb-text-muted:       var(--text-muted);
+  --sb-border:           var(--border);
+  --sb-border-accent:    var(--accent);
+  --sb-arrow:            var(--text-dim);
+  --sb-handle:           var(--border-strong);
+  --sb-handle-hover:     var(--accent);
+  --sb-link:             var(--text-muted);
+  --sb-link-hover-text:  var(--text);
+  --sb-link-hover-bg:    var(--bg-hover);
+  --sb-pinned-bg:        var(--sb-bg);
+  --sb-pinned-text:      var(--accent);
   /* Button hover states (same hue, no calc available) */
   --button-hover-bg:          var(--default-button-bg);
   --default-button-hover-bg:  var(--default-button-bg);
