@@ -1,9 +1,38 @@
 from django.contrib import admin
+from django.forms import widgets
 from django.shortcuts import redirect, render
 from django.urls import path, reverse
 from django.utils.html import format_html
 
-from config.models import SystemSettings, DocumentSettings, NotificationSettings
+from config.models import SystemSettings, DocumentSettings, NotificationSettings, ThemeSettings
+
+
+class ColorPickerWidget(widgets.TextInput):
+    """Color picker: native color swatch + hex text input, synced via JS."""
+
+    def render(self, name, value, attrs=None, renderer=None):
+        safe_val = value or '#000000'
+        # Ensure 6-digit hex for type="color"
+        if safe_val and len(safe_val) == 4:  # #rgb → #rrggbb
+            safe_val = '#' + safe_val[1]*2 + safe_val[2]*2 + safe_val[3]*2
+        uid = attrs.get('id', f'id_{name}') if attrs else f'id_{name}'
+        return format_html(
+            '<div class="mv-cp-wrap">'
+            '<input type="color" class="mv-cp-swatch" id="{uid}_sw" value="{sv}" '
+            '       oninput="mvCpSync(this,\'{uid}\')">'
+            '<input type="text"  class="mv-cp-hex"   id="{uid}" name="{name}" '
+            '       value="{v}" placeholder="#rrggbb" maxlength="7" '
+            '       oninput="mvCpSyncRev(this,\'{uid}_sw\')">'
+            '</div>',
+            uid=uid, uid_sw=uid + '_sw', name=name, v=value or '', sv=safe_val,
+        )
+
+    class Media:
+        css = {'all': ()}
+        js = ()
+
+    # Extra inline CSS/JS injected once per page via ThemeSettingsAdmin.Media
+    pass
 
 
 @admin.register(SystemSettings)
@@ -269,6 +298,79 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         else:
             messages.warning(request, "⚠️ Telegram вимкнено або не налаштований (Bot Token / Chat ID).")
         return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(ThemeSettings)
+class ThemeSettingsAdmin(admin.ModelAdmin):
+    """Singleton: custom color theme — palette swatch + hex input side by side."""
+
+    def changelist_view(self, request, extra_context=None):
+        obj = ThemeSettings.get()
+        return redirect(reverse("admin:config_themesettings_change", args=[obj.pk]))
+
+    fieldsets = [
+        ("🖼️ Фони", {
+            "fields": (("bg_app", "bg_card"), ("bg_card_2", "bg_input"), ("bg_hover",)),
+            "description": (
+                "Основні фони сторінки і карток. "
+                "Порожнє поле = значення активної пресетної теми."
+            ),
+        }),
+        ("✏️ Текст", {
+            "fields": (("text_primary", "text_muted", "text_dim"),),
+        }),
+        ("🎨 Акценти", {
+            "fields": (("accent", "gold", "gold_l"),),
+            "description": "accent — основний акцентний колір. gold — бренд Minerva.",
+        }),
+        ("🔴 Статуси", {
+            "fields": (("ok", "warn", "err"),),
+            "description": "ok=зелений, warn=помаранчевий, err=червоний.",
+        }),
+        ("🔝 Верхня панель", {
+            "fields": (("header_bg", "header_color"),),
+            "description": "Фон і колір тексту/посилань верхньої панелі (#header + breadcrumbs).",
+        }),
+        ("📌 Сайдбар", {
+            "fields": (("sb_bg",),),
+            "description": "Фон бокової панелі навігації.",
+        }),
+        ("📐 Бордюри", {
+            "fields": (("border_color",),),
+            "description": "Колір рамок таблиць, карток, розділювальних ліній (--border-strong).",
+        }),
+        ("🖱️ Кнопки", {
+            "fields": (("btn_primary", "btn_danger"),),
+            "description": "btn_primary = кнопка «Зберегти», btn_danger = кнопка «Видалити».",
+        }),
+    ]
+
+    class Media:
+        css = {'all': ()}
+        js = ()
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        for field_name, field in form.base_fields.items():
+            field.widget = ColorPickerWidget()
+            field.required = False
+        return form
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['cp_inline'] = True  # flag for template (not used, but signals intent)
+        return super().change_view(request, object_id, form_url, extra_context)
+
+    def render_change_form(self, request, context, *args, **kwargs):
+        # Inject color picker CSS+JS via extra_context media
+        context['cp_css_js'] = True
+        return super().render_change_form(request, context, *args, **kwargs)
 
     def has_add_permission(self, request):
         return False

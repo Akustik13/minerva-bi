@@ -1,13 +1,274 @@
 {% extends "admin/base.html" %}
 
 {% block extrahead %}{{ block.super }}
+<script>/* Anti-flash: apply saved theme before first paint.
+   Also sync Django's own 'theme' key so standard admin elements follow. */
+(function(){
+  var t = localStorage.getItem('mv-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  /* Sync Django admin: dark/minerva/custom → 'dark'; light → 'light' */
+  localStorage.setItem('theme', t === 'light' ? 'light' : 'dark');
+})();
+</script>
 <style>
-/* ── Minerva tooltip (?-кружок) ──────────────────────── */
+/* ════════════════════════════════════════════════════
+   MINERVA THEME SYSTEM — CSS Variables
+   3 preset themes: dark / light / minerva
+   Future: custom theme via ThemeSettings model (config/)
+   ════════════════════════════════════════════════════ */
+
+/* ── Dark (default) ─────────────────────────────── */
+:root, [data-theme="dark"] {
+  --bg-app:    #0d1520;
+  --bg-card:   #161b22;
+  --bg-card-2: #1c2128;
+  --bg-input:  #111c26;
+  --bg-hover:  #1e2a35;
+  --text:        #e6edf3;
+  --text-muted:  #9aafbe;
+  --text-dim:    #607d8b;
+  --border:        rgba(255,255,255,.07);
+  --border-2:      rgba(255,255,255,.12);
+  --border-strong: #2a3f52;
+  --accent:          #58a6ff;
+  --accent-2:        #2196f3;
+  --accent-subtle:   rgba(88,166,255,.15);
+  --accent-muted:    rgba(88,166,255,.35);
+  --accent2-hover:   rgba(33,150,243,.08);
+  --accent2-subtle:  rgba(33,150,243,.15);
+  --accent2-muted:   rgba(33,150,243,.35);
+  --gold:   #c9a84c;
+  --gold-l: #e8d5a3;
+  --ok:   #3fb950;
+  --warn: #e3b341;
+  --err:  #f85149;
+  /* Sidebar */
+  --sb-bg:              #0d1520;
+  --sb-head-bg:         #111d2b;
+  --sb-head-text:       #b0c8da;
+  --sb-head-hover-text: #ddeeff;
+  --sb-text:            #c9d8e4;
+  --sb-text-muted:      #7a9ab0;
+  --sb-border:          #1e2d3d;
+  --sb-border-accent:   #2a4a6a;
+  --sb-arrow:           #3a5570;
+  --sb-handle:          #2a3f52;
+  --sb-handle-hover:    #607d8b;
+  --sb-link:            #9aafbe;
+  --sb-link-hover-text: #c9d8e4;
+  --sb-link-hover-bg:   rgba(255,255,255,.04);
+  --sb-pinned-bg:       #0a1018;
+  --sb-pinned-text:     #7ab3cc;
+  /* Tooltip */
+  --tip-bg:     #1a2535;
+  --tip-border: #3a5570;
+  --tip-text:   #c9d8e4;
+  --tip-accent: #58a6ff;
+  /* Footer (stays dark in all themes) */
+  --footer-bg:         #1a1a1a;
+  --footer-border:     rgba(255,255,255,.08);
+  --footer-text:       rgba(255,255,255,.28);
+  --footer-link:       rgba(255,255,255,.35);
+  --footer-link-hover: rgba(255,255,255,.65);
+  --footer-strong:     rgba(255,255,255,.45);
+  /* ── Django admin CSS variable overrides for Dark theme ──
+     Removes the default Django teal/blue (#417690) from header,
+     breadcrumbs, buttons, links — replaced with our dark steel palette */
+  --primary:            #1e6fa8;
+  --secondary:          #1a4a6a;
+  --accent:             #1e6fa8;
+  --header-bg:          #0d1520;
+  --header-color:       #c9d8e4;
+  --header-link-color:  #9aafbe;
+  --header-branding-link-color: #c9d8e4;
+  --breadcrumbs-bg:     #111d2b;
+  --breadcrumbs-fg:     #9aafbe;
+  --breadcrumbs-link-fg: #7ab3cc;
+  --module-bg:          #161b22;
+  --module-header-color: #c9d8e4;
+  --module-header-table-link-color: #7ab3cc;
+  --darkened-bg:        #192535;
+  --selected-bg:        #1e2a35;
+  --selected-row:       rgba(88,166,255,.08);
+  --border-color:       #2a3f52;
+  --hairline-color:     #1e2d3d;
+  --link-fg:            #58a6ff;
+  --link-hover-color:   #90caff;
+  --link-selected-fg:   #58a6ff;
+  --button-bg:          #1e3a52;
+  --button-hover-bg:    #254b6a;
+  --default-button-bg:  #1565c0;
+  --default-button-hover-bg: #1976d2;
+  --close-button-bg:    #2a3f52;
+  --close-button-hover-bg:   #3a5570;
+  --delete-button-bg:   #6b1f1f;
+  --delete-button-hover-bg:  #8b2020;
+  --input-bg:           #111c26;
+  --input-fg:           #c9d8e4;
+  --input-border:       #3d5a78;
+  --form-input-bg:      #111c26;
+  --body-bg:            #0d1520;
+  --body-fg:            #c9d8e4;
+  --nav-sidebar-input-color:        #c9d8e4;
+  --nav-sidebar-input-border-color: #3d5a78;
+  --object-tools-bg:          #1e3a52;
+  --object-tools-hover-bg:    #254b6a;
+  --changelist-selected-bg:   rgba(88,166,255,.08);
+  --changelist-even-row-bg:   #192535;
+}
+
+/* ── Light ──────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-app:    #f0f4f8;
+  --bg-card:   #ffffff;
+  --bg-card-2: #f7f9fb;
+  --bg-input:  #ffffff;
+  --bg-hover:  #e8edf2;
+  --text:       #1c2128;
+  --text-muted: #57606a;
+  --text-dim:   #8c959f;
+  --border:        rgba(0,0,0,.08);
+  --border-2:      rgba(0,0,0,.12);
+  --border-strong: #d0d7de;
+  --accent:          #0969da;
+  --accent-2:        #0550ae;
+  --accent-subtle:   rgba(9,105,218,.12);
+  --accent-muted:    rgba(9,105,218,.3);
+  --accent2-hover:   rgba(5,80,174,.06);
+  --accent2-subtle:  rgba(5,80,174,.1);
+  --accent2-muted:   rgba(5,80,174,.25);
+  --gold:   #c9a84c;
+  --gold-l: #e8d5a3;
+  --ok:   #1a7f37;
+  --warn: #9a6700;
+  --err:  #cf222e;
+  /* Sidebar — intentionally stays dark (like VS Code / GitHub) */
+  /* sb-* vars unchanged: inherited from :root */
+  /* Tooltip adapts to light */
+  --tip-bg:     #f8fafc;
+  --tip-border: #d0d7de;
+  --tip-text:   #1c2128;
+  --tip-accent: #0969da;
+  /* Footer — stays dark */
+  /* footer-* vars unchanged: inherited from :root */
+}
+
+/* ── Minerva (dark navy + gold) ─────────────────── */
+[data-theme="minerva"] {
+  --bg-app:    #0a0e1a;
+  --bg-card:   #111827;
+  --bg-card-2: #1a2240;
+  --bg-input:  #0d1228;
+  --bg-hover:  #1e2a50;
+  --text:       #e8d5a3;
+  --text-muted: #a89060;
+  --text-dim:   #705e3a;
+  --border:        rgba(201,168,76,.12);
+  --border-2:      rgba(201,168,76,.2);
+  --border-strong: rgba(201,168,76,.3);
+  --accent:          #c9a84c;
+  --accent-2:        #a07830;
+  --accent-subtle:   rgba(201,168,76,.15);
+  --accent-muted:    rgba(201,168,76,.35);
+  --accent2-hover:   rgba(160,120,48,.08);
+  --accent2-subtle:  rgba(160,120,48,.15);
+  --accent2-muted:   rgba(160,120,48,.35);
+  --gold:   #c9a84c;
+  --gold-l: #e8d5a3;
+  --ok:   #4ade80;
+  --warn: #facc15;
+  --err:  #f87171;
+  /* Sidebar — golden tint */
+  --sb-bg:              #0d1228;
+  --sb-head-bg:         #0a0e1a;
+  --sb-head-text:       #c9a84c;
+  --sb-head-hover-text: #e8d5a3;
+  --sb-text:            #e8d5a3;
+  --sb-text-muted:      #a89060;
+  --sb-border:          rgba(201,168,76,.2);
+  --sb-border-accent:   rgba(201,168,76,.4);
+  --sb-arrow:           rgba(201,168,76,.35);
+  --sb-handle:          rgba(201,168,76,.2);
+  --sb-handle-hover:    #c9a84c;
+  --sb-link:            #a89060;
+  --sb-link-hover-text: #e8d5a3;
+  --sb-link-hover-bg:   rgba(201,168,76,.06);
+  --sb-pinned-bg:       #0a0e1a;
+  --sb-pinned-text:     #c9a84c;
+  /* Tooltip */
+  --tip-bg:     #0d1228;
+  --tip-border: rgba(201,168,76,.4);
+  --tip-text:   #e8d5a3;
+  --tip-accent: #c9a84c;
+  /* Footer */
+  --footer-bg:         #0a0e1a;
+  --footer-border:     rgba(201,168,76,.12);
+  --footer-text:       rgba(232,213,163,.4);
+  --footer-link:       rgba(232,213,163,.5);
+  --footer-link-hover: rgba(232,213,163,.85);
+  --footer-strong:     rgba(232,213,163,.65);
+  /* ── Django admin CSS variable overrides for Minerva ── */
+  --body-bg: #0a0e1a;
+  --body-fg: #e8d5a3;
+  --header-bg: #0d1228;
+  --header-color: #e8d5a3;
+  --header-link-color: #c9a84c;
+  --header-branding-link-color: #e8d5a3;
+  --breadcrumbs-bg: #111827;
+  --breadcrumbs-fg: #a89060;
+  --breadcrumbs-link-fg: #c9a84c;
+  --module-bg: #111827;
+  --module-header-color: #e8d5a3;
+  --module-header-table-link-color: #c9a84c;
+  --darkened-bg: #1a2445;
+  --selected-bg: #1a2240;
+  --selected-row: rgba(201,168,76,.1);
+  --border-color: rgba(201,168,76,.2);
+  --hairline-color: rgba(201,168,76,.12);
+  --link-fg: #c9a84c;
+  --link-hover-color: #e8d5a3;
+  --link-selected-fg: #c9a84c;
+  --button-bg: rgba(201,168,76,.15);
+  --button-hover-bg: rgba(201,168,76,.25);
+  --default-button-bg: #7a5c28;
+  --default-button-hover-bg: #9a7830;
+  --close-button-bg: #111827;
+  --close-button-hover-bg: #1a2240;
+  --delete-button-bg: #4a1c1c;
+  --delete-button-hover-bg: #6b2020;
+  --input-bg: #0d1228;
+  --input-fg: #e8d5a3;
+  --input-border: rgba(201,168,76,.5);
+  --form-input-bg: #0d1228;
+  --nav-sidebar-input-color: #e8d5a3;
+  --nav-sidebar-input-border-color: rgba(201,168,76,.5);
+  --changelist-even-row-bg: #1a2445;
+}
+
+/* ── Light theme: force sidebar to stay dark ───── */
+[data-theme="light"] #nav-sidebar,
+[data-theme="light"] #nav-sidebar .module,
+[data-theme="light"] #nav-sidebar .module > table,
+[data-theme="light"] #nav-sidebar caption,
+[data-theme="light"] #nav-sidebar td,
+[data-theme="light"] #nav-sidebar th,
+[data-theme="light"] .mg-group,
+[data-theme="light"] .mg-header,
+[data-theme="light"] .mg-content,
+[data-theme="light"] .mg-content .module,
+[data-theme="light"] .mg-pinned {
+  background: var(--sb-bg) !important;
+  color: var(--sb-text) !important;
+  border-color: var(--sb-border) !important;
+}
+[data-theme="light"] #nav-sidebar a { color: var(--sb-link) !important; }
+
+/* ── Tooltip ─────────────────────────────────────── */
 .mtip {
   display: inline-flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; border-radius: 50%;
-  background: rgba(88,166,255,.15); border: 1px solid rgba(88,166,255,.35);
-  color: #58a6ff; font-size: 10px; font-weight: 700; font-style: normal;
+  background: var(--accent-subtle); border: 1px solid var(--accent-muted);
+  color: var(--accent); font-size: 10px; font-weight: 700; font-style: normal;
   cursor: help; position: relative; margin-left: 5px; vertical-align: middle;
   flex-shrink: 0; line-height: 1; user-select: none;
 }
@@ -15,152 +276,163 @@
 #mtip-float {
   position: fixed; z-index: 999999;
   min-width: 320px; max-width: 420px;
-  background: #1a2535; border: 1px solid #3a5570;
-  color: #c9d8e4; padding: 13px 17px; border-radius: 9px;
+  background: var(--tip-bg); border: 1px solid var(--tip-border);
+  color: var(--tip-text); padding: 13px 17px; border-radius: 9px;
   font-size: 12.5px; line-height: 1.75;
   white-space: pre-wrap; box-shadow: 0 6px 28px rgba(0,0,0,.6);
   pointer-events: none; display: none;
 }
-#mtip-float b { color: #58a6ff; font-size: 13px; display: block; margin-bottom: 6px; }
+#mtip-float b { color: var(--tip-accent); font-size: 13px; display: block; margin-bottom: 6px; }
 #mtip-float::after {
   content: ''; position: absolute; top: 100%; left: 24px;
-  border: 7px solid transparent; border-top-color: #3a5570;
+  border: 7px solid transparent; border-top-color: var(--tip-border);
 }
 
 /* ════════════════════════════════════════════════════
-   SIDEBAR — уніфікована кольорова гамма
+   SIDEBAR — unified color scheme using CSS vars
    ════════════════════════════════════════════════════ */
 
-/* Перевизначаємо Django teal (#417690) для всіх caption у сайдбарі */
+/* Override Django teal for sidebar captions */
 #nav-sidebar .module > table > caption {
-  background: #111d2b !important;
-  color: #7a9ab0 !important;
-  border-bottom: 1px solid #1e2d3d !important;
+  background: var(--sb-head-bg) !important;
+  color: var(--sb-text-muted) !important;
+  border-bottom: 1px solid var(--sb-border) !important;
   padding: 7px 10px 7px 14px !important;
   font-size: 11px !important;
   font-weight: 600 !important;
   letter-spacing: 0.05em !important;
   text-transform: none !important;
-  /* flex layout для посилання + стрілки */
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
 }
 #nav-sidebar .module > table > caption > a {
-  color: #7a9ab0 !important;
+  color: var(--sb-text-muted) !important;
   text-decoration: none !important;
   flex: 1;
 }
-#nav-sidebar .module > table > caption > a:hover { color: #c9d8e4 !important; }
+#nav-sidebar .module > table > caption > a:hover { color: var(--sb-text) !important; }
 
-/* ── Головні групи-заголовки ── */
+/* ── Group headers ── */
 .mg-group { margin: 0; }
 .mg-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: 11px 14px 10px 14px;
   cursor: pointer; user-select: none;
-  background: #0d1520;
-  border-top: 2px solid #1e2d3d;
-  border-bottom: 1px solid #1e2d3d;
-  border-left: 3px solid #2a4a6a;
-  color: #b0c8da;
+  background: var(--sb-bg);
+  border-top: 2px solid var(--sb-border);
+  border-bottom: 1px solid var(--sb-border);
+  border-left: 3px solid var(--sb-border-accent);
+  color: var(--sb-head-text);
   font-size: 12.5px; font-weight: 700;
   transition: color .15s, background .15s, border-left-color .15s;
 }
-.mg-header:hover { color: #ddeeff; background: #111d2b; border-left-color: #2196f3; }
+.mg-header:hover { color: var(--sb-head-hover-text); background: var(--sb-head-bg); border-left-color: var(--accent-2); }
 .mg-group:first-child .mg-header { border-top: none; }
 
 .mg-arrow {
-  font-size: 9px; color: #3a5570; flex-shrink: 0;
+  font-size: 9px; color: var(--sb-arrow); flex-shrink: 0;
   transition: transform .2s ease; display: inline-block;
 }
 .mg-group.collapsed .mg-arrow   { transform: rotate(-90deg); }
 .mg-group.collapsed .mg-content { display: none; }
 
-/* ── Заголовок-посилання (для груп з одним app) ── */
+/* ── Group header link (for groups with single href) ── */
 .mg-header-link {
   color: inherit !important; text-decoration: none !important; flex: 1;
 }
-.mg-header-link:hover { color: #ddeeff !important; }
+.mg-header-link:hover { color: var(--sb-head-hover-text) !important; }
 
-/* ── Посилання в Аналітиці ── */
+/* ── Analytics sub-links ── */
 .mg-link {
   display: flex; align-items: center;
   padding: 7px 16px 7px 20px;
-  color: #9aafbe; text-decoration: none !important;
-  font-size: 13px; border-bottom: 1px solid rgba(255,255,255,.04);
+  color: var(--sb-link); text-decoration: none !important;
+  font-size: 13px; border-bottom: 1px solid var(--sb-link-hover-bg);
   transition: color .15s, background .15s;
 }
-.mg-link:hover { color: #c9d8e4; background: rgba(255,255,255,.04); }
+.mg-link:hover { color: var(--sb-link-hover-text); background: var(--sb-link-hover-bg); }
 .mg-link.mg-red  { color: #ff9492; } .mg-link.mg-red:hover  { color: #ffb3b1; }
-.mg-link.mg-gold { color: #e8d5a3; } .mg-link.mg-gold:hover { color: #f5e9c0; }
+.mg-link.mg-gold { color: var(--gold-l); } .mg-link.mg-gold:hover { color: #f5e9c0; }
 
-/* ── Стрілка всередині caption (collapse sub-module) ── */
+/* ── Sub-module collapse arrow ── */
 .mg-mod-arrow {
-  font-size: 8px; color: #3a5570; cursor: pointer;
+  font-size: 8px; color: var(--sb-arrow); cursor: pointer;
   padding: 2px 5px; border-radius: 3px; flex-shrink: 0;
   transition: color .15s, transform .2s;
   user-select: none; line-height: 1;
 }
-.mg-mod-arrow:hover { color: #9aafbe; }
+.mg-mod-arrow:hover { color: var(--sb-text-muted); }
 .mg-mod-collapsed .mg-mod-arrow { transform: rotate(-90deg); }
 .mg-mod-collapsed tbody { display: none; }
 
-/* Modules всередині груп — прибираємо зайві border-radius */
+/* Modules inside groups — remove extra border-radius */
 .mg-content .module { margin: 0; border-radius: 0; border: none; }
 
-/* ── Закріплений пункт FAQ ── */
+/* ── Pinned FAQ ── */
 .mg-pinned {
-  position: sticky;
-  bottom: 0;
-  z-index: 10;
-  border-top: 2px solid #1e2d3d;
-  background: #0a1018;
+  position: sticky; bottom: 0; z-index: 10;
+  border-top: 2px solid var(--sb-border);
+  background: var(--sb-pinned-bg);
 }
 .mg-pinned a {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  display: flex; align-items: center; gap: 8px;
   padding: 11px 16px;
-  color: #7ab3cc !important;
+  color: var(--sb-pinned-text) !important;
   text-decoration: none !important;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 13px; font-weight: 600;
   transition: color .15s, background .15s;
 }
 .mg-pinned a:hover {
-  color: #ddeeff !important;
-  background: rgba(33,150,243,.08);
+  color: var(--sb-head-hover-text) !important;
+  background: var(--accent2-hover);
 }
 .mg-pinned a .mp-badge {
-  margin-left: auto;
-  font-size: 10px;
-  background: rgba(33,150,243,.15);
-  border: 1px solid rgba(33,150,243,.35);
-  color: #58a6ff;
-  border-radius: 10px;
-  padding: 1px 7px;
-  font-weight: 700;
-  letter-spacing: .4px;
+  margin-left: auto; font-size: 10px;
+  background: var(--accent2-subtle);
+  border: 1px solid var(--accent2-muted);
+  color: var(--accent); border-radius: 10px;
+  padding: 1px 7px; font-weight: 700; letter-spacing: .4px;
 }
 
-/* ── Drag & Drop sort handles ── */
+/* ── Drag & Drop handles ── */
 .mg-handle {
-  font-size: 14px; color: #2a3f52; cursor: grab;
+  font-size: 14px; color: var(--sb-handle); cursor: grab;
   padding: 0 5px 0 0; flex-shrink: 0; opacity: 0;
   transition: opacity .15s, color .15s;
   line-height: 1; user-select: none;
 }
-.mg-header:hover .mg-handle { opacity: 1; color: #607d8b; }
-.mg-handle:active { cursor: grabbing; color: #9aafbe; }
+.mg-header:hover .mg-handle { opacity: 1; color: var(--sb-handle-hover); }
+.mg-handle:active { cursor: grabbing; color: var(--sb-text-muted); }
 .mg-label { flex: 1; }
 .mg-group.mg-dragging { opacity: .3; }
-.mg-group.mg-drag-over-top { box-shadow: inset 0 2px 0 #2196f3; }
-.mg-group.mg-drag-over-bot { box-shadow: inset 0 -2px 0 #2196f3; }
+.mg-group.mg-drag-over-top { box-shadow: inset 0 2px 0 var(--accent-2); }
+.mg-group.mg-drag-over-bot { box-shadow: inset 0 -2px 0 var(--accent-2); }
 
-/* ═══════════════════════════════════════════════════════
+/* ── Theme switcher widget ── */
+#mv-theme-sw {
+  display: flex; gap: 4px; padding: 8px 12px 6px;
+  background: var(--sb-pinned-bg);
+  border-top: 1px solid var(--sb-border);
+}
+#mv-theme-sw button {
+  flex: 1; padding: 5px 4px;
+  border: 1px solid var(--sb-border);
+  background: var(--sb-head-bg); border-radius: 5px;
+  color: var(--sb-text-muted); font-size: 14px;
+  cursor: pointer; line-height: 1;
+  transition: background .15s, border-color .15s, color .15s;
+}
+#mv-theme-sw button:hover { background: var(--sb-bg); color: var(--sb-text); }
+#mv-theme-sw button.mv-active {
+  background: var(--accent-subtle);
+  border-color: var(--accent-muted);
+  color: var(--accent);
+}
+
+/* ════════════════════════════════════════════════════
    Minerva — Header Motto
-   ═══════════════════════════════════════════════════════ */
+   ════════════════════════════════════════════════════ */
 #header {
   display: grid !important;
   grid-template-columns: auto 1fr auto !important;
@@ -178,9 +450,7 @@
   padding: 4px 8px;
 }
 .mv-m-rule {
-  height: 1px;
-  margin: 0 auto;
-  width: 88%;
+  height: 1px; margin: 0 auto; width: 88%;
   background: linear-gradient(
     90deg,
     transparent 0%,
@@ -191,36 +461,68 @@
   );
 }
 .mv-m-text {
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
+  display: inline-flex; align-items: center; gap: 0;
   padding: 4px 0 3px;
-  font-size: 19px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
+  font-size: 19px; font-weight: 800;
+  letter-spacing: 0.18em; text-transform: uppercase;
   font-family: 'Georgia', 'Times New Roman', serif;
-  background: linear-gradient(
-    180deg,
-    #f5ecd4 0%,
-    #e8d5a3 30%,
-    #c9a84c 65%,
-    #a07830 100%
-  );
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  background: linear-gradient(180deg, #f5ecd4 0%, #e8d5a3 30%, #c9a84c 65%, #a07830 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
   white-space: nowrap;
 }
 .mv-m-sep {
-  margin: 0 11px;
-  font-size: 22px;
-  font-weight: 300;
-  opacity: 0.55;
-  -webkit-text-fill-color: rgba(201,168,76,.7);
-  letter-spacing: 0;
+  margin: 0 11px; font-size: 22px; font-weight: 300;
+  opacity: 0.55; -webkit-text-fill-color: rgba(201,168,76,.7); letter-spacing: 0;
 }
-/* ── Fix select height: текст не обрізається ──────────────── */
+
+/* ── Hide Django's built-in theme toggle button (we use sidebar switcher) ── */
+.theme-toggle { display: none !important; }
+
+/* ── Color Picker Widget (ThemeSettings admin) ── */
+.mv-cp-wrap {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--bg-input, #111c26);
+  border: 1px solid var(--border-strong, #2a3f52);
+  border-radius: 6px; padding: 4px 10px 4px 6px;
+}
+.mv-cp-swatch {
+  width: 40px; height: 32px; border: none; border-radius: 4px;
+  padding: 0; cursor: pointer; background: none;
+  outline: none; flex-shrink: 0;
+}
+.mv-cp-hex {
+  background: transparent; border: none; outline: none;
+  font-size: 13px; font-family: 'JetBrains Mono', monospace;
+  color: var(--text, #e6edf3); width: 86px; letter-spacing: .04em;
+}
+.mv-cp-hex:focus { color: var(--accent, #58a6ff); }
+
+/* ── Light theme: force content area + common custom card classes ── */
+[data-theme="light"] #content,
+[data-theme="light"] #content-main {
+  background: var(--bg-app);
+  color: var(--text);
+}
+/* Common card/tile classes used in hub pages and custom templates */
+[data-theme="light"] .ie-card,
+[data-theme="light"] .imp-card,
+[data-theme="light"] .sys-tile,
+[data-theme="light"] .ah-card,
+[data-theme="light"] .bots-card,
+[data-theme="light"] .info-card,
+[data-theme="light"] .kpi-card,
+[data-theme="light"] .card,
+[data-theme="light"] .dash-card {
+  background: var(--bg-card) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--text) !important;
+}
+[data-theme="light"] .ie-card *,
+[data-theme="light"] .imp-card *,
+[data-theme="light"] .sys-tile *,
+[data-theme="light"] .card * { color: var(--text); }
+
+/* ── Fix select height: text not clipped ── */
 #content select,
 .field-box select,
 .form-row select,
@@ -232,9 +534,107 @@
   padding-bottom: 5px !important;
   line-height: 1.4 !important;
 }
+
+/* ════════════════════════════════════════════════════
+   MOBILE RESPONSIVE
+   ════════════════════════════════════════════════════ */
+#mob-menu-btn {
+  display: none;
+  position: fixed; top: 10px; left: 10px; z-index: 1001;
+  background: var(--sb-head-bg); border: 1px solid var(--sb-border);
+  border-radius: 6px; padding: 7px 11px;
+  color: var(--sb-text); font-size: 18px; cursor: pointer;
+  line-height: 1; transition: background .15s;
+}
+#mob-menu-btn:hover { background: var(--sb-bg); }
+
+#sidebar-overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,.5); z-index: 1000;
+}
+
+@media (max-width: 768px) {
+  #mob-menu-btn { display: flex; align-items: center; justify-content: center; }
+
+  #nav-sidebar {
+    position: fixed !important;
+    top: 0 !important; left: -290px !important;
+    width: 280px !important; height: 100vh !important;
+    z-index: 1002 !important;
+    transition: left .25s ease !important;
+    overflow-y: auto !important;
+    box-shadow: none !important;
+  }
+  #nav-sidebar.mob-open {
+    left: 0 !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,.5) !important;
+  }
+  #sidebar-overlay.mob-open { display: block; }
+
+  #main { margin-left: 0 !important; padding-left: 0 !important; }
+  #content { padding: 10px !important; }
+  #content-main { max-width: 100% !important; overflow-x: auto; }
+
+  /* Tables: horizontal scroll */
+  .results { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .results table { min-width: 540px; }
+
+  /* Hide motto on narrow screens */
+  #minerva-motto { display: none; }
+  /* Space for hamburger button */
+  #branding { padding-left: 44px; }
+}
+
+@media (min-width: 769px) {
+  #mob-menu-btn { display: none !important; }
+}
 </style>
 
+{% if theme_custom %}
+<style>
+/* ── Custom theme (🎨 Власна — values from ThemeSettings DB) ──
+   Based on dark preset. Non-empty fields override the var.
+   Django admin vars are bridged from our semantic vars so
+   standard admin elements (body, modules, inputs) also update. */
+[data-theme="custom"] {
+  {% for var, val in theme_custom.items %}{{ var }}: {{ val }};
+  {% endfor %}
+  /* ── Bridge: map our vars → Django admin built-in vars ── */
+  --body-bg:              var(--bg-app);
+  --body-fg:              var(--text);
+  --module-bg:            var(--bg-card);
+  --module-header-color:  var(--text);
+  --input-bg:             var(--bg-input);
+  --input-fg:             var(--text);
+  --form-input-bg:        var(--bg-input);
+  --darkened-bg:          var(--bg-card-2, #192535);
+  --changelist-even-row-bg: var(--bg-card-2, #192535);
+  --primary:              var(--accent);
+  --link-fg:              var(--accent);
+  --link-hover-color:     var(--text-muted);
+  --link-selected-fg:     var(--accent);
+  --border-color:         var(--border-strong, #3d5a78);
+  --hairline-color:       var(--border, rgba(255,255,255,.07));
+  /* Header derived */
+  --breadcrumbs-bg:             var(--header-bg);
+  --breadcrumbs-fg:             var(--header-color);
+  --header-link-color:          var(--header-color);
+  --header-branding-link-color: var(--header-color);
+  /* Sidebar derived */
+  --sb-head-bg: var(--sb-bg);
+  /* Button hover states (same hue, no calc available) */
+  --button-hover-bg:          var(--default-button-bg);
+  --default-button-hover-bg:  var(--default-button-bg);
+  --delete-button-hover-bg:   var(--delete-button-bg);
+}
+</style>
+<script>window.MV_HAS_CUSTOM_THEME = true;</script>
+{% endif %}
+
+<button id="mob-menu-btn" aria-label="Меню">☰</button>
+<div id="sidebar-overlay"></div>
 <div id="mtip-float"></div>
+
 <script>
 /* ── Tooltip ── */
 (function(){
@@ -263,10 +663,25 @@
   }
 })();
 
+/* ── Mobile hamburger ── */
+(function(){
+  var btn     = document.getElementById('mob-menu-btn');
+  var sidebar = document.getElementById('nav-sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  if (!btn || !sidebar || !overlay) return;
+  btn.addEventListener('click', function(){
+    sidebar.classList.toggle('mob-open');
+    overlay.classList.toggle('mob-open');
+  });
+  overlay.addEventListener('click', function(){
+    sidebar.classList.remove('mob-open');
+    overlay.classList.remove('mob-open');
+  });
+})();
+
 /* ── Sidebar groups ── */
 document.addEventListener('DOMContentLoaded', function(){
-  /* Django 5.x: #nav-sidebar IS the container.
-     App modules: class="app-{label} module", no id attribute. */
+  /* Django 5.x: #nav-sidebar IS the container. */
   var sidebar = document.getElementById('nav-sidebar');
   if (!sidebar) return;
 
@@ -317,7 +732,7 @@ document.addEventListener('DOMContentLoaded', function(){
     },
   ];
 
-  /* Сортуємо GROUPS за збереженим порядком */
+  /* Sort GROUPS by saved order */
   var _savedOrder = _loadOrder();
   if (_savedOrder.length) {
     GROUPS.sort(function(a, b){
@@ -329,14 +744,14 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 
-  /* Збираємо app-модулі */
+  /* Collect app modules */
   var mods = {};
   sidebar.querySelectorAll('.module').forEach(function(el){
     var m = el.className.match(/\bapp-(\S+)/);
     if (m) { mods[m[1]] = el; el.remove(); }
   });
 
-  /* Додаємо 🧠 AI як рядок у bots-модуль */
+  /* Add 🧠 AI row to bots module */
   if (mods['bots']) {
     var botsTbody = mods['bots'].querySelector('tbody');
     if (botsTbody) {
@@ -346,7 +761,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }
 
-  /* ── Доставка: Відслідковування + DHL Трекінг перед Перевізниками ── */
+  /* ── Доставка: insert Відслідковування + DHL Трекінг before Перевізники ── */
   if (mods['shipping']) {
     var shTbody = mods['shipping'].querySelector('tbody');
     if (shTbody) {
@@ -364,11 +779,9 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }
 
-  /* ── Авто-розкриття активного розділу ── */
-  /* Увага: широкі (short) prefix-и — СПОЧАТКУ; конкретніші — ПІСЛЯ.
-     Ітерація forEach: остання збіжна запис перемагає. */
+  /* ── Auto-expand active group ── */
+  /* Broad prefixes FIRST; specific AFTER (last match wins) */
   var _URL_GROUP = {
-    /* broad prefixes first */
     '/dashboard/':       'analytics',
     '/admin/crm/':       'crm',
     '/admin/sales/':     'sales',
@@ -384,7 +797,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/admin/backup/':    'system',
     '/admin/auth/':      'system',
     '/onboarding/':      'system',
-    /* more specific — after, so they overwrite broad matches */
+    /* specific — overwrite broad */
     '/dashboard/analytics/': 'analytics',
     '/dashboard/signals/':   'analytics',
     '/dashboard/bots/':      'bots',
@@ -401,7 +814,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if (_curPath.startsWith(prefix)) _activeGroup = _URL_GROUP[prefix];
   });
 
-  /* Робить caption кожного модуля клікабельним (тогл tbody) */
+  /* Make module captions collapsible */
   function makeModCollapsible(mod) {
     var caption = mod.querySelector('caption');
     var tbody   = mod.querySelector('tbody');
@@ -420,7 +833,7 @@ document.addEventListener('DOMContentLoaded', function(){
     });
   }
 
-  /* Будуємо групи */
+  /* Build groups */
   GROUPS.forEach(function(grp){
     var hasLinks = grp.links && grp.links.length;
     var appsFound = (grp.apps || []).filter(function(a){ return mods[a]; });
@@ -438,7 +851,7 @@ document.addEventListener('DOMContentLoaded', function(){
     group.dataset.groupId = grp.id;
     group.draggable = true;
 
-    /* ── Заголовок групи ── */
+    /* Group header */
     var hdr = document.createElement('div');
     hdr.className = 'mg-header';
 
@@ -467,7 +880,7 @@ document.addEventListener('DOMContentLoaded', function(){
     });
     group.appendChild(hdr);
 
-    /* ── Вміст ── */
+    /* Content */
     var content = document.createElement('div');
     content.className = 'mg-content';
 
@@ -579,7 +992,43 @@ document.addEventListener('DOMContentLoaded', function(){
     })
     .catch(function(){});
 
-  /* ── Закріплений пункт FAQ — завжди видимий ── */
+  /* ── Theme switcher widget ── */
+  var themeSw = document.createElement('div');
+  themeSw.id = 'mv-theme-sw';
+  var swHtml =
+    '<button data-t="dark"    title="Темна">🌙</button>' +
+    '<button data-t="light"   title="Світла">☀️</button>' +
+    '<button data-t="minerva" title="Minerva">⚜️</button>';
+  if (window.MV_HAS_CUSTOM_THEME) {
+    swHtml += '<button data-t="custom" title="Власна 🎨">🎨</button>';
+  }
+  themeSw.innerHTML = swHtml;
+
+  /* Auto-activate custom theme when viewing ThemeSettings page */
+  if (window.MV_HAS_CUSTOM_THEME &&
+      window.location.pathname.indexOf('/config/themesettings/') !== -1) {
+    document.documentElement.setAttribute('data-theme', 'custom');
+    localStorage.setItem('mv-theme', 'custom');
+    localStorage.setItem('theme', 'dark');
+  }
+  sidebar.appendChild(themeSw);
+
+  var _curTheme = localStorage.getItem('mv-theme') || 'dark';
+  themeSw.querySelectorAll('button').forEach(function(btn){
+    if (btn.dataset.t === _curTheme) btn.classList.add('mv-active');
+    btn.addEventListener('click', function(){
+      var t = btn.dataset.t;
+      document.documentElement.setAttribute('data-theme', t);
+      localStorage.setItem('mv-theme', t);
+      /* Sync Django admin's own theme key so standard elements follow */
+      localStorage.setItem('theme', t === 'light' ? 'light' : 'dark');
+      themeSw.querySelectorAll('button').forEach(function(b){
+        b.classList.toggle('mv-active', b.dataset.t === t);
+      });
+    });
+  });
+
+  /* ── Pinned FAQ — always visible ── */
   var pinned = document.createElement('div');
   pinned.className = 'mg-pinned';
   pinned.innerHTML =
@@ -592,7 +1041,27 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 
 <script>
-/* ── Motto: вставляємо між логотипом і user-tools ── */
+/* ── Color Picker Widget sync functions ── */
+function mvCpSync(swatchEl, hexId) {
+  /* color swatch changed → update hex text */
+  var hexEl = document.getElementById(hexId);
+  if (hexEl) hexEl.value = swatchEl.value;
+}
+function mvCpSyncRev(hexEl, swatchId) {
+  /* hex text changed → update swatch if valid */
+  var sw = document.getElementById(swatchId);
+  if (!sw) return;
+  var v = hexEl.value.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(v) || /^#[0-9a-fA-F]{3}$/.test(v)) {
+    sw.value = v.length === 4
+      ? '#' + v[1]+v[1] + v[2]+v[2] + v[3]+v[3]
+      : v;
+  }
+}
+</script>
+
+<script>
+/* ── Motto: insert between logo and user-tools ── */
 document.addEventListener('DOMContentLoaded', function(){
   var branding = document.getElementById('branding');
   if (!branding) return;
@@ -648,17 +1117,19 @@ document.addEventListener('DOMContentLoaded', function(){
 {% block footer %}
 <style>
 #minerva-footer {
-  border-top: 1px solid rgba(255,255,255,.08); padding: 12px 24px;
+  border-top: 1px solid var(--footer-border);
+  padding: 12px 24px;
   display: flex; align-items: center; justify-content: space-between;
-  font-size: 11px; color: rgba(255,255,255,.28); background: #1a1a1a;
+  font-size: 11px; color: var(--footer-text);
+  background: var(--footer-bg);
 }
-#minerva-footer a { color: rgba(255,255,255,.35); text-decoration: none; transition: color .2s; }
-#minerva-footer a:hover { color: rgba(255,255,255,.65); }
+#minerva-footer a { color: var(--footer-link); text-decoration: none; transition: color .2s; }
+#minerva-footer a:hover { color: var(--footer-link-hover); }
 #minerva-footer .mf-sep { margin: 0 8px; opacity: .3; }
 </style>
 <div id="minerva-footer">
   <span>
-    🏛️ <strong style="color:rgba(255,255,255,.45)">Minerva Business Intelligence System</strong>
+    🏛️ <strong style="color:var(--footer-strong)">Minerva Business Intelligence System</strong>
     <span class="mf-sep">·</span>
     © 2024–2026 <a href="mailto:prym.via@gmail.com">Viacheslav Pryimak</a>
   </span>

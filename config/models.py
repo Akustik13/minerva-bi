@@ -1,4 +1,12 @@
+import re
+from django.core.exceptions import ValidationError
 from django.db import models
+
+
+def _validate_hex(value):
+    """Accept empty string or CSS hex color like #1a2535 or #fff."""
+    if value and not re.match(r'^#[0-9a-fA-F]{3,6}$', value):
+        raise ValidationError(f'"{value}" — не є коректним CSS hex кольором (#rrggbb або #rgb)')
 
 
 LEVEL_CHOICES = [
@@ -156,6 +164,88 @@ class DocumentSettings(models.Model):
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# ── ThemeSettings ──────────────────────────────────────────────────────────────
+
+_HEX_KWARGS = dict(max_length=20, blank=True, default='', validators=[_validate_hex])
+
+
+class ThemeSettings(models.Model):
+    """Singleton pk=1. Custom «🎨 Власна» theme CSS variables.
+    Empty field = inherit from the active preset (dark/light/minerva).
+    All values must be valid CSS hex colors: #rrggbb or #rgb.
+    """
+    # Backgrounds
+    bg_app    = models.CharField("Фон сторінки (--bg-app)",    **_HEX_KWARGS)
+    bg_card   = models.CharField("Фон картки (--bg-card)",     **_HEX_KWARGS)
+    bg_card_2 = models.CharField("Фон картки-2 (--bg-card-2)", **_HEX_KWARGS)
+    bg_input  = models.CharField("Фон інпуту (--bg-input)",    **_HEX_KWARGS)
+    bg_hover  = models.CharField("Hover фон (--bg-hover)",     **_HEX_KWARGS)
+    # Text
+    text_primary = models.CharField("Основний текст (--text)",        **_HEX_KWARGS)
+    text_muted   = models.CharField("Другорядний текст (--text-muted)", **_HEX_KWARGS)
+    text_dim     = models.CharField("Приглушений текст (--text-dim)",  **_HEX_KWARGS)
+    # Accents
+    accent   = models.CharField("Акцент/синій (--accent)",    **_HEX_KWARGS)
+    gold     = models.CharField("Золотий акцент (--gold)",    **_HEX_KWARGS)
+    gold_l   = models.CharField("Золотий світлий (--gold-l)", **_HEX_KWARGS)
+    # Status
+    ok   = models.CharField("Успіх/зелений (--ok)",   **_HEX_KWARGS)
+    warn = models.CharField("Увага/помаранч (--warn)", **_HEX_KWARGS)
+    err  = models.CharField("Помилка/червоний (--err)", **_HEX_KWARGS)
+    # Header (top bar)
+    header_bg    = models.CharField("Верхня панель фон (--header-bg)",   **_HEX_KWARGS)
+    header_color = models.CharField("Верхня панель текст (--header-color)", **_HEX_KWARGS)
+    # Sidebar
+    sb_bg = models.CharField("Сайдбар фон (--sb-bg)", **_HEX_KWARGS)
+    # Borders
+    border_color = models.CharField("Бордюри/лінії (--border-strong)", **_HEX_KWARGS)
+    # Buttons
+    btn_primary = models.CharField("Кнопка основна / Save (--default-button-bg)", **_HEX_KWARGS)
+    btn_danger  = models.CharField("Кнопка видалення (--delete-button-bg)",        **_HEX_KWARGS)
+
+    class Meta:
+        verbose_name = "Тема кольорів (Custom)"
+        verbose_name_plural = "Тема кольорів (Custom)"
+
+    def __str__(self):
+        return "Кастомна тема"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def as_css_dict(self):
+        """Return {css-var-name: hex-value} for all non-empty fields."""
+        mapping = [
+            ('--bg-app',    self.bg_app),
+            ('--bg-card',   self.bg_card),
+            ('--bg-card-2', self.bg_card_2),
+            ('--bg-input',  self.bg_input),
+            ('--bg-hover',  self.bg_hover),
+            ('--text',      self.text_primary),
+            ('--text-muted', self.text_muted),
+            ('--text-dim',  self.text_dim),
+            ('--accent',    self.accent),
+            ('--gold',      self.gold),
+            ('--gold-l',    self.gold_l),
+            ('--ok',        self.ok),
+            ('--warn',      self.warn),
+            ('--err',       self.err),
+            ('--header-bg',          self.header_bg),
+            ('--header-color',       self.header_color),
+            ('--sb-bg',              self.sb_bg),
+            ('--border-strong',      self.border_color),
+            ('--default-button-bg',  self.btn_primary),
+            ('--delete-button-bg',   self.btn_danger),
+        ]
+        return {k: v for k, v in mapping if v}
 
 
 # ── NotificationSettings ──────────────────────────────────────────────────────

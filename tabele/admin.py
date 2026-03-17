@@ -39,7 +39,7 @@ def _get_app_list(self, request, app_label=None):
                       'inventorytransaction', 'reorderproxy', 'supplier',
                       'purchaseorder', 'purchaseorderline'],
         'shipping': ['carrier', 'shippingsettings', 'packagingmaterial', 'shipment', 'orderpackaging'],
-        'config':   ['systemsettings', 'documentsettings', 'notificationsettings'],
+        'config':   ['systemsettings', 'documentsettings', 'notificationsettings', 'themesettings'],
         'api':      ['apikey'],
         'bots':     ['digikeyconfig', 'bot', 'botlog'],
     }
@@ -88,8 +88,22 @@ def _admin_index(self, request, extra_context=None):
     return HttpResponseRedirect('/dashboard/')
 
 
+def _each_context(self, request):
+    """Inject theme_custom (ThemeSettings CSS vars) into every admin template context."""
+    from django.contrib.admin import AdminSite
+    ctx = AdminSite.each_context(self, request)
+    try:
+        from config.models import ThemeSettings
+        ts = ThemeSettings.get()
+        ctx['theme_custom'] = ts.as_css_dict()
+    except Exception:
+        ctx['theme_custom'] = {}
+    return ctx
+
+
 admin.site.get_app_list = types.MethodType(_get_app_list, admin.site)
 admin.site.index = types.MethodType(_admin_index, admin.site)
+admin.site.each_context = types.MethodType(_each_context, admin.site)
 admin.site.site_header = '🏛️ Minerva Business Intelligence'
 admin.site.site_title = 'Minerva Admin'
 admin.site.index_title = 'Панель управління'
