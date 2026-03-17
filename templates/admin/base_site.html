@@ -314,7 +314,6 @@
 [data-theme="light"] #nav-sidebar td,
 [data-theme="light"] #nav-sidebar th,
 [data-theme="light"] .mg-group,
-[data-theme="light"] .mg-header,
 [data-theme="light"] .mg-content,
 [data-theme="light"] .mg-content .module,
 [data-theme="light"] .mg-pinned,
@@ -325,7 +324,6 @@
 [data-theme="custom"] #nav-sidebar td,
 [data-theme="custom"] #nav-sidebar th,
 [data-theme="custom"] .mg-group,
-[data-theme="custom"] .mg-header,
 [data-theme="custom"] .mg-content,
 [data-theme="custom"] .mg-content .module,
 [data-theme="custom"] .mg-pinned {
@@ -333,15 +331,18 @@
   color: var(--sb-text) !important;
   border-color: var(--sb-border) !important;
 }
+/* .mg-header (sidebar group buttons) use --sb-head-bg independently */
 [data-theme="light"] .mg-header,
 [data-theme="custom"] .mg-header {
+  background: var(--sb-head-bg) !important;
   border-left-color: var(--sb-border-accent) !important;
+  color: var(--sb-head-text) !important;
+  border-color: var(--sb-border) !important;
 }
 [data-theme="light"] #nav-sidebar a,  [data-theme="custom"] #nav-sidebar a  { color: var(--sb-link) !important; }
-[data-theme="light"] .mg-header,      [data-theme="custom"] .mg-header      { color: var(--sb-head-text) !important; }
 [data-theme="light"] .mg-header:hover,
 [data-theme="custom"] .mg-header:hover {
-  background: var(--sb-head-bg) !important;
+  filter: brightness(1.08);
   color: var(--sb-head-hover-text) !important;
 }
 [data-theme="light"] .mg-arrow,    [data-theme="custom"] .mg-arrow    { color: var(--sb-arrow) !important; }

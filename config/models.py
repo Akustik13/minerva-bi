@@ -198,9 +198,10 @@ class ThemeSettings(models.Model):
     header_bg    = models.CharField("Верхня панель фон (--header-bg)",   **_HEX_KWARGS)
     header_color = models.CharField("Верхня панель текст (--header-color)", **_HEX_KWARGS)
     # Sidebar
-    sb_bg            = models.CharField("Сайдбар фон (--sb-bg)",                   **_HEX_KWARGS)
-    sb_border        = models.CharField("Сайдбар розділювачі (--sb-border)",        **_HEX_KWARGS)
-    sb_border_accent = models.CharField("Сайдбар акцент-лінія (--sb-border-accent)", **_HEX_KWARGS)
+    sb_bg            = models.CharField("Сайдбар фон (--sb-bg)",                      **_HEX_KWARGS)
+    sb_head_bg       = models.CharField("Сайдбар кнопки груп (--sb-head-bg)",         **_HEX_KWARGS)
+    sb_border        = models.CharField("Сайдбар розділювачі (--sb-border)",          **_HEX_KWARGS)
+    sb_border_accent = models.CharField("Сайдбар акцент-лінія (--sb-border-accent)",  **_HEX_KWARGS)
     # Borders
     border_color = models.CharField("Бордюри/лінії (--border-strong)", **_HEX_KWARGS)
     # Buttons
@@ -243,6 +244,7 @@ class ThemeSettings(models.Model):
             ('--header-bg',          self.header_bg),
             ('--header-color',       self.header_color),
             ('--sb-bg',              self.sb_bg),
+            ('--sb-head-bg',         self.sb_head_bg),
             ('--sb-border',          self.sb_border),
             ('--sb-border-accent',   self.sb_border_accent),
             ('--border-strong',      self.border_color),

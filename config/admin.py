@@ -338,9 +338,10 @@ class ThemeSettingsAdmin(admin.ModelAdmin):
             "description": "Фон і колір тексту/посилань верхньої панелі (#header + breadcrumbs).",
         }),
         ("📌 Сайдбар", {
-            "fields": (("sb_bg",), ("sb_border", "sb_border_accent"),),
+            "fields": (("sb_bg", "sb_head_bg"), ("sb_border", "sb_border_accent"),),
             "description": (
                 "sb_bg — фон панелі. "
+                "sb_head_bg — фон кнопок-заголовків груп (--mg-header). "
                 "sb_border — лінії між секціями. "
                 "sb_border_accent — кольорова вертикальна смужка зліва від заголовка групи."
             ),
