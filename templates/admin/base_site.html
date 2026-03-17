@@ -633,6 +633,18 @@
 /* Select dropdowns */
 [data-theme="light"] select option { background: var(--bg-input); color: var(--text); }
 
+/* ── Light theme: import tiles (have !important gradient — need higher specificity) ── */
+[data-theme="light"] .sal-tile-import,
+[data-theme="light"] .inv-tile-import,
+[data-theme="light"] [class*="-tile-import"] {
+  background: rgba(0,188,212,.07) !important;
+}
+[data-theme="light"] .sal-tile-import:hover,
+[data-theme="light"] .inv-tile-import:hover,
+[data-theme="light"] [class*="-tile-import"]:hover {
+  background: rgba(0,188,212,.14) !important;
+}
+
 /* ── Fix select height: text not clipped ── */
 #content select,
 .field-box select,

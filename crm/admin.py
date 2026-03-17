@@ -397,11 +397,11 @@ class CustomerAdmin(admin.ModelAdmin):
     def display_name(self, obj):
         if obj.company:
             return format_html(
-                '<span style="font-weight:600;color:#e3f2fd">{}</span>'
-                '<br><span style="font-size:11px;color:#607d8b">{}</span>',
+                '<span style="font-weight:600">{}</span>'
+                '<br><span style="font-size:11px;opacity:.65">{}</span>',
                 obj.company, obj.name,
             )
-        return format_html('<span style="color:#c9d8e4">{}</span>', obj.name)
+        return format_html('{}', obj.name)
     display_name.short_description = "Компанія / Контакт"
     display_name.admin_order_field = "company"
 
@@ -528,7 +528,7 @@ class CustomerAdmin(admin.ModelAdmin):
         d = last.date() if hasattr(last, "date") else last
         return format_html(
             '<span style="color:{};white-space:nowrap"><b>{}</b></span>'
-            '<br><small style="color:#999">({} дн. тому)</small>',
+            '<br><small style="opacity:.55">({} дн. тому)</small>',
             color, d.strftime("%d.%m.%Y"), days or "?"
         )
     last_order_display.short_description = "Останнє замовлення"

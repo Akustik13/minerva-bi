@@ -10,13 +10,13 @@
 <style>
 /* ── Tile Editor ─────────────────────────────────────────────────────── */
 #tile-edit-trigger {
-  margin-left: auto; font-size: 11px; color: #607d8b; white-space: nowrap;
-  background: #141f2b; border: 1px solid #1e2d3d;
+  margin-left: auto; font-size: 11px; color: var(--text-muted); white-space: nowrap;
+  background: var(--bg-card-2); border: 1px solid var(--border);
   border-radius: 6px; padding: 5px 12px; cursor: pointer;
   transition: color .15s, border-color .15s; flex-shrink: 0;
 }
-#tile-edit-trigger:hover { color: #9aafbe; border-color: #2a4060; }
-body.tile-edit-mode #tile-edit-trigger { color: #4caf50; border-color: #2e5c30; }
+#tile-edit-trigger:hover { color: var(--text); border-color: var(--border-strong); }
+body.tile-edit-mode #tile-edit-trigger { color: var(--ok); border-color: var(--ok); }
 
 /* Hidden tiles */
 .tile-hidden { display: none !important; }
