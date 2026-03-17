@@ -767,9 +767,7 @@
    Django admin vars are bridged from our semantic vars so
    standard admin elements (body, modules, inputs) also update. */
 [data-theme="custom"] {
-  {% for var, val in theme_custom.items %}{{ var }}: {{ val }};
-  {% endfor %}
-  /* ── Bridge: map our vars → Django admin built-in vars ── */
+  /* ── Bridge defaults (user vars below override these) ── */
   --body-bg:              var(--bg-app);
   --body-fg:              var(--text);
   --module-bg:            var(--bg-card);
@@ -790,7 +788,7 @@
   --breadcrumbs-fg:             var(--header-color);
   --header-link-color:          var(--header-color);
   --header-branding-link-color: var(--header-color);
-  /* Sidebar derived — all --sb-* from main theme vars so they don't fall back to dark :root */
+  /* Sidebar derived — all --sb-* from main theme vars */
   --sb-head-bg:          var(--sb-bg);
   --sb-head-text:        var(--text);
   --sb-head-hover-text:  var(--accent);
@@ -806,10 +804,13 @@
   --sb-link-hover-bg:    var(--bg-hover);
   --sb-pinned-bg:        var(--sb-bg);
   --sb-pinned-text:      var(--accent);
-  /* Button hover states (same hue, no calc available) */
+  /* Button hover states */
   --button-hover-bg:          var(--default-button-bg);
   --default-button-hover-bg:  var(--default-button-bg);
   --delete-button-hover-bg:   var(--delete-button-bg);
+  /* ── User custom vars (override bridge defaults above) ── */
+  {% for var, val in theme_custom.items %}{{ var }}: {{ val }};
+  {% endfor %}
 }
 </style>
 <script>window.MV_HAS_CUSTOM_THEME = true;</script>
