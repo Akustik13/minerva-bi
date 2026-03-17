@@ -21,8 +21,8 @@
 .mv-section-hdr {
   display: flex; align-items: center; gap: 8px;
   margin: 0 0 14px; padding-bottom: 8px;
-  border-bottom: 2px solid #607d8b;
-  font-size: 13px; font-weight: 700; color: #9aafbe;
+  border-bottom: 2px solid var(--border-strong);
+  font-size: 13px; font-weight: 700; color: var(--text-muted);
   letter-spacing: 0.04em; text-transform: uppercase;
 }
 .mv-section-hdr-icon { font-size: 16px; }
@@ -35,8 +35,8 @@
 
 .mv-tile {
   position: relative;
-  background: #1a2535;
-  border: 1px solid #243347;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
   border-top: 3px solid var(--tile-accent, #607d8b);
   border-radius: 8px;
   padding: 13px 12px 11px;
@@ -50,46 +50,46 @@
   border-top-color: var(--tile-accent, #607d8b);
   box-shadow: 0 6px 24px rgba(0,0,0,.45);
   transform: translateY(-2px);
-  background: #1e2d40;
+  background: var(--bg-hover);
 }
 .mv-tile-icon { font-size: 20px; line-height: 1; margin-bottom: 7px; }
-.mv-tile-name { font-size: 12.5px; font-weight: 600; color: #c9d8e4; line-height: 1.35; flex: 1; }
-.mv-tile-sub { font-size: 10px; color: #607d8b; margin-top: 5px; }
+.mv-tile-name { font-size: 12.5px; font-weight: 600; color: var(--text); line-height: 1.35; flex: 1; }
+.mv-tile-sub { font-size: 10px; color: var(--text-muted); margin-top: 5px; }
 
 .mv-recent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
 .mv-recent-card {
-  background: #141f2b; border: 1px solid #1e2d3d;
+  background: var(--bg-card-2); border: 1px solid var(--border);
   border-radius: 7px; padding: 9px 11px;
   display: flex; gap: 9px; align-items: flex-start;
 }
 .mv-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
 .mv-recent-body { min-width: 0; }
 .mv-recent-body a {
-  font-size: 12px; font-weight: 600; color: #58a6ff; text-decoration: none;
+  font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none;
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .mv-recent-body a:hover { text-decoration: underline; }
-.mv-recent-obj { font-size: 12px; color: #8aa0b0; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mv-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
-.mv-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+.mv-recent-obj { font-size: 12px; color: var(--text-dim); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-recent-model { font-size: 10px; color: var(--text-dim); display: block; margin-top: 2px; }
+.mv-empty { color: var(--text-muted); font-size: 13px; padding: 10px 0; }
 
 /* ── Document tiles: extra info lines ── */
 .mv-tile-detail {
-  font-size: 10px; color: #4a6070; margin-top: 3px;
+  font-size: 10px; color: var(--text-dim); margin-top: 3px;
   line-height: 1.4; font-style: italic;
 }
 
 /* ── System status bar ── */
 .sys-status-bar {
   display: flex; gap: 0; flex-wrap: wrap;
-  background: #0d1520; border-bottom: 1px solid #1e2d3d;
+  background: var(--bg-app); border-bottom: 1px solid var(--border);
   padding: 0 20px;
 }
 .sys-status-item {
   display: flex; align-items: center; gap: 6px;
   padding: 8px 16px 8px 0; margin-right: 16px;
   font-size: 11px; font-weight: 600;
-  border-right: 1px solid #1e2d3d;
+  border-right: 1px solid var(--border);
 }
 .sys-status-item:last-child { border-right: none; }
 .sys-status-item a { text-decoration: none; color: inherit; }
@@ -97,8 +97,8 @@
 .ss-ok     { color: #4caf50; }
 .ss-warn   { color: #ff9800; }
 .ss-danger { color: #f44336; }
-.ss-muted  { color: #607d8b; }
-.ss-blue   { color: #58a6ff; }
+.ss-muted  { color: var(--text-muted); }
+.ss-blue   { color: var(--accent); }
 </style>
 
 <div class="sys-status-bar">
@@ -276,10 +276,10 @@
     <h2 class="mv-section-hdr" style="border-color:#c62828;">
       <span class="mv-section-hdr-icon">⚠️</span> Небезпечна зона
     </h2>
-    <div style="background:#120a0a; border:1px solid #4a1010; border-radius:8px; padding:16px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+    <div style="background:rgba(207,34,46,.08); border:1px solid rgba(207,34,46,.3); border-radius:8px; padding:16px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
       <div style="flex:1; min-width:220px;">
-        <div style="font-size:13px; font-weight:700; color:#ef9a9a; margin-bottom:4px;">🗑️ Очистити систему</div>
-        <div style="font-size:12px; color:#8d6e63;">Видалення транзакційних або всіх даних. Перед повним очищенням — зробіть резервну копію.</div>
+        <div style="font-size:13px; font-weight:700; color:var(--err); margin-bottom:4px;">🗑️ Очистити систему</div>
+        <div style="font-size:12px; color:var(--text-muted);">Видалення транзакційних або всіх даних. Перед повним очищенням — зробіть резервну копію.</div>
       </div>
       <div style="display:flex; gap:10px; flex-wrap:wrap;">
         <a href="/onboarding/clear-system/" style="display:inline-flex; align-items:center; gap:6px; padding:8px 16px; background:#bf360c; color:#fff; border-radius:6px; font-size:13px; font-weight:600; text-decoration:none;">🗑️ Транзакційні дані</a>

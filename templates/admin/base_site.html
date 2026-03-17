@@ -125,8 +125,8 @@
   --bg-input:  #ffffff;
   --bg-hover:  #e8edf2;
   --text:       #1c2128;
-  --text-muted: #57606a;
-  --text-dim:   #8c959f;
+  --text-muted: #4b5563;
+  --text-dim:   #6b7280;
   --border:        rgba(0,0,0,.08);
   --border-2:      rgba(0,0,0,.12);
   --border-strong: #d0d7de;
@@ -618,6 +618,20 @@
 [data-theme="light"] .imp-card *,
 [data-theme="light"] .sys-tile *,
 [data-theme="light"] .card * { color: var(--text); }
+
+/* ── Light theme: ensure content area text is readable ── */
+[data-theme="light"] #content-main,
+[data-theme="light"] .results,
+[data-theme="light"] .results td,
+[data-theme="light"] .results th { color: var(--text); }
+[data-theme="light"] #changelist-filter,
+[data-theme="light"] #changelist-filter h2,
+[data-theme="light"] #changelist-filter h3,
+[data-theme="light"] #changelist-filter li { color: var(--text); }
+[data-theme="light"] .help { color: var(--text-muted) !important; }
+[data-theme="light"] .help-tooltip { color: var(--text-muted) !important; }
+/* Select dropdowns */
+[data-theme="light"] select option { background: var(--bg-input); color: var(--text); }
 
 /* ── Fix select height: text not clipped ── */
 #content select,
