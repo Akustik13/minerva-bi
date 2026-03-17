@@ -80,6 +80,11 @@
       <span class="mv-section-hdr-icon">🧠</span> AI та APIs
     </h2>
     <div class="mv-grid">
+      <a href="/admin/bots/digikeyconfig/1/change/" class="mv-tile" style="--tile-accent:#f9a825" data-tile-id="digikey">
+        <span class="mv-tile-icon">🛒</span>
+        <span class="mv-tile-name">DigiKey</span>
+        <span class="mv-tile-sub">Sync замовлень, токен OAuth2</span>
+      </a>
       <a href="/admin/bots/bot/" class="mv-tile" style="--tile-accent:#bc8cff" data-tile-id="bots-list">
         <span class="mv-tile-icon">🤖</span>
         <span class="mv-tile-name">Боти</span>
@@ -92,38 +97,11 @@
       </a>
       <a href="/dashboard/api/" class="mv-tile" style="--tile-accent:#4caf50" data-tile-id="api-overview">
         <span class="mv-tile-icon">🔌</span>
-        <span class="mv-tile-name">API Інтеграції</span>
-        <span class="mv-tile-sub">Огляд всіх API та Developer Console</span>
+        <span class="mv-tile-name">API Документація</span>
+        <span class="mv-tile-sub">Огляд ендпоінтів та Developer Console</span>
       </a>
     </div>
   </section>
 
-  <section style="margin-top: 28px;">
-    <h2 class="mv-section-hdr">
-      <span class="mv-section-hdr-icon">🕐</span> Недавні дії
-    </h2>
-    {% get_admin_log 12 as admin_log for_user user %}
-    {% if admin_log %}
-    <div class="mv-recent-grid">
-      {% for entry in admin_log %}
-      <div class="mv-recent-card">
-        <span class="mv-recent-ico">
-          {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
-        </span>
-        <div class="mv-recent-body">
-          {% if entry.get_admin_url %}
-          <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
-          {% else %}
-          <span class="mv-recent-obj">{{ entry.object_repr }}</span>
-          {% endif %}
-          <span class="mv-recent-model">{{ entry.content_type }}</span>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p class="mv-empty">Дій ще не виконано.</p>
-    {% endif %}
-  </section>
 </div>
 {% endblock %}

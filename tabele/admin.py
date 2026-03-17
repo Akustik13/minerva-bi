@@ -1,5 +1,6 @@
 import types
 from django.contrib import admin
+from django.http import HttpResponseRedirect
 
 
 ALLOWED_HOSTS = ['*']
@@ -16,11 +17,12 @@ def _get_app_list(self, request, app_label=None):
 
     app_order = [
         'crm',        # 👥 CRM
+        'sales',      # 🛒 Продажі
         'accounting', # 💰 Бухгалтерія
-        'sales',      # 🛒 Sales
         'shipping',   # 🚚 Доставка
         'inventory',  # 📦 Управління складом
         'tasks',      # 📋 Задачі та нагадування
+        'autoimport', # 🔄 Авто-імпорт
         'bots',       # 🤖 Боти та AI
         'api',        # 🔑 API Ключі
         'config',     # ⚙️ Конфігурація
@@ -81,7 +83,13 @@ def _get_app_list(self, request, app_label=None):
     return app_list
 
 
+def _admin_index(self, request, extra_context=None):
+    """Redirect admin homepage → dashboard."""
+    return HttpResponseRedirect('/dashboard/')
+
+
 admin.site.get_app_list = types.MethodType(_get_app_list, admin.site)
+admin.site.index = types.MethodType(_admin_index, admin.site)
 admin.site.site_header = '🏛️ Minerva Business Intelligence'
 admin.site.site_title = 'Minerva Admin'
 admin.site.index_title = 'Панель управління'

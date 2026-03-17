@@ -9,6 +9,7 @@ dashboard/signals_views.py  — Модуль сигналів дій Minerva
     path("dashboard/", include("dashboard.urls")),
 """
 from django.shortcuts import render
+from django.http import JsonResponse
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import admin
 from django.utils import timezone
@@ -220,6 +221,22 @@ def _collect_signals():
     signals.sort(key=lambda s: (priority.get(s['type'], 9), -s.get('age_days', 0)))
 
     return signals
+
+
+@staff_member_required
+def signals_count(request):
+    """JSON endpoint for sidebar badge: {total, critical, warning}."""
+    from django.core.cache import cache
+    cached = cache.get('signals_count')
+    if cached is None:
+        signals = _collect_signals()
+        cached = {
+            'total':    len(signals),
+            'critical': sum(1 for s in signals if s['type'] == 'critical'),
+            'warning':  sum(1 for s in signals if s['type'] == 'warning'),
+        }
+        cache.set('signals_count', cached, 120)  # cache 2 minutes
+    return JsonResponse(cached)
 
 
 @staff_member_required

@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import dashboard
-from .signals_views import signals_page
+from .signals_views import signals_page, signals_count
 from django.shortcuts import render
 from django.http import Http404, HttpResponse
 from django.contrib.admin.views.decorators import staff_member_required
@@ -30,12 +30,57 @@ def bots_index(request):
 bots_index = staff_member_required(bots_index)
 
 def system_index(request):
+    from django.utils import timezone
     context = admin.site.each_context(request)
     try:
         from config.models import DocumentSettings
         context['doc_settings'] = DocumentSettings.get()
     except Exception:
         context['doc_settings'] = None
+
+    # ── System status data ──
+    try:
+        from backup.models import BackupLog
+        last_bk = BackupLog.objects.filter(status='ok').order_by('-created_at').first()
+        if last_bk:
+            delta = timezone.now() - last_bk.created_at
+            days = delta.days
+            if days == 0:
+                label = 'сьогодні'
+            elif days == 1:
+                label = 'вчора'
+            else:
+                label = f'{days} дн. тому'
+            context['last_backup_label'] = label
+            context['last_backup_days'] = days
+        else:
+            context['last_backup_label'] = 'ніколи'
+            context['last_backup_days'] = 9999
+    except Exception:
+        context['last_backup_label'] = '?'
+        context['last_backup_days'] = 9999
+
+    try:
+        from shipping.models import ShippingSettings
+        sh = ShippingSettings.objects.filter(pk=1).first()
+        context['auto_tracking'] = sh.auto_tracking_enabled if sh else False
+    except Exception:
+        context['auto_tracking'] = False
+
+    try:
+        from api.models import APIKey
+        context['api_key_count'] = APIKey.objects.filter(is_active=True).count()
+    except Exception:
+        context['api_key_count'] = 0
+
+    try:
+        from sales.models import SalesOrder
+        context['unshipped_count'] = SalesOrder.objects.filter(
+            affects_stock=True, shipped_at__isnull=True
+        ).count()
+    except Exception:
+        context['unshipped_count'] = 0
+
     return render(request, 'dashboard/system_index.html', context)
 system_index = staff_member_required(system_index)
 
@@ -72,7 +117,8 @@ urlpatterns = [
     path("system/",    system_index,    name="system_index"),
     path("faq/",       faq_index,       name="faq_index"),
     path("help/",      help_page,       name="help"),
-    path("signals/",   signals_page,    name="signals"),
+    path("signals/",       signals_page,  name="signals"),
+    path("signals-count/", signals_count, name="signals_count"),
     path("import-template/<str:name>/", download_import_template, name="import_template"),
     path("import/", import_hub, name="import_hub"),
     path("api/",         api_index,   name="api_index"),

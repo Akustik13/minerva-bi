@@ -164,6 +164,27 @@
 .src { display:flex; align-items:center; gap:6px; }
 .src-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 
+/* ── Quick actions bar ── */
+.qa-bar {
+  padding: 7px 32px;
+  background: var(--s2);
+  border-bottom: 1px solid var(--border);
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
+}
+.qa-label { font-size: 10px; color: var(--muted); font-weight: 600;
+  letter-spacing: .8px; text-transform: uppercase; white-space: nowrap; margin-right: 2px; }
+.qa-btn {
+  padding: 4px 11px; border-radius: 6px; font-size: 11px; font-weight: 700;
+  border: 1px solid var(--border); background: var(--s3); color: var(--muted2);
+  text-decoration: none !important; transition: all .15s; white-space: nowrap;
+}
+.qa-btn:hover { color: var(--text); background: rgba(255,255,255,.07); border-color: var(--border2); }
+.qa-btn-green { border-color: rgba(63,185,80,.35); color: #3fb950; background: rgba(63,185,80,.07); }
+.qa-btn-green:hover { background: rgba(63,185,80,.14); }
+.qa-btn-blue  { border-color: rgba(88,166,255,.35); color: #58a6ff; background: rgba(88,166,255,.07); }
+.qa-btn-blue:hover  { background: rgba(88,166,255,.14); }
+.qa-sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; margin: 0 2px; }
+
 /* ── Responsive ── */
 @media(max-width:1100px) { .grid3 { grid-template-columns:1fr 1fr; } }
 @media(max-width:800px)  { .grid2,.grid3,.grid32,.kpi-row { grid-template-columns:1fr; } }
@@ -243,6 +264,19 @@ function setPreset(days) {
   document.getElementById('filter-form').submit();
 }
 </script>
+
+<!-- Quick actions -->
+<div class="qa-bar">
+  <span class="qa-label">Швидкі дії:</span>
+  <a href="/admin/sales/salesorder/add/" class="qa-btn qa-btn-green">＋ Замовлення</a>
+  <a href="/admin/inventory/product/add/" class="qa-btn">＋ Товар</a>
+  <a href="/admin/crm/customer/add/" class="qa-btn">＋ Клієнт</a>
+  <a href="/admin/inventory/purchaseorder/add/" class="qa-btn">＋ Закупівля</a>
+  <div class="qa-sep"></div>
+  <a href="/dashboard/import/" class="qa-btn qa-btn-blue">📥 Імпорт</a>
+  <a href="/admin/backup/backupplaceholder/" class="qa-btn">💾 Backup</a>
+  <a href="/dashboard/signals/" class="qa-btn" id="qa-signals-btn">🚨 Сигнали</a>
+</div>
 
 <div class="main">
 

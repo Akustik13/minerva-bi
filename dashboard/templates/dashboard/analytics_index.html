@@ -94,33 +94,6 @@
     </div>
   </section>
 
-  <section style="margin-top: 28px;">
-    <h2 class="mv-section-hdr">
-      <span class="mv-section-hdr-icon">🕐</span> Недавні дії
-    </h2>
-    {% get_admin_log 12 as admin_log for_user user %}
-    {% if admin_log %}
-    <div class="mv-recent-grid">
-      {% for entry in admin_log %}
-      <div class="mv-recent-card">
-        <span class="mv-recent-ico">
-          {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
-        </span>
-        <div class="mv-recent-body">
-          {% if entry.get_admin_url %}
-          <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
-          {% else %}
-          <span class="mv-recent-obj">{{ entry.object_repr }}</span>
-          {% endif %}
-          <span class="mv-recent-model">{{ entry.content_type }}</span>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p class="mv-empty">Дій ще не виконано.</p>
-    {% endif %}
-  </section>
 </div>
 {% include "admin/includes/tile_editor.html" %}
 <script>initTileEditor('analytics');</script>

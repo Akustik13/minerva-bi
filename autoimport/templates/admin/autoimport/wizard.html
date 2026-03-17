@@ -1,0 +1,518 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrastyle %}
+<style>
+body, #content, .content-wrapper { background: #1c1c1c !important; color: #e0e0e0 !important; }
+h1, h2, h3, label { color: #e0e0e0 !important; }
+
+.ie-card {
+  background: #1e2a35;
+  border: 1px solid #2a3f52;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.ie-card h2 {
+  margin: 0 0 16px;
+  font-size: 16px;
+  color: #7ab3cc !important;
+  border-bottom: 1px solid #2a3f52;
+  padding-bottom: 10px;
+}
+
+input[type="file"] {
+  background: #2d2d2d !important; color: #e0e0e0 !important;
+  border: 1px solid #444 !important; padding: 8px 12px !important;
+  border-radius: 4px !important; width: 100%; box-sizing: border-box;
+}
+input[type="text"], input[type="number"], select, textarea {
+  background: #2d2d2d !important; color: #e0e0e0 !important;
+  border: 1px solid #444 !important; padding: 7px 10px !important;
+  border-radius: 4px !important;
+}
+select option { background: #2d2d2d; color: #e0e0e0; }
+select {
+  height: auto !important; min-height: 34px !important;
+  line-height: 1.5 !important; padding: 6px 8px !important;
+  box-sizing: border-box !important;
+}
+input[type="checkbox"] { width: 16px; height: 16px; accent-color: #2196f3; }
+
+.btn-primary {
+  background: #2196f3; color: #fff; border: none;
+  padding: 9px 22px; border-radius: 5px; font-size: 14px;
+  font-weight: bold; cursor: pointer; text-decoration: none;
+  display: inline-block;
+}
+.btn-primary:hover { background: #1976d2; }
+.btn-secondary {
+  background: #424242; color: #e0e0e0; border: none;
+  padding: 9px 18px; border-radius: 5px; font-size: 14px;
+  cursor: pointer; text-decoration: none; display: inline-block;
+}
+.btn-secondary:hover { background: #555; color: #fff; }
+
+.map-table { width: 100%; border-collapse: collapse; }
+.map-table th {
+  background: #162330; color: #7ab3cc;
+  padding: 8px 12px; text-align: left; font-size: 12px;
+  font-weight: bold; border-bottom: 2px solid #2a3f52;
+}
+.map-table td {
+  padding: 7px 12px; border-bottom: 1px solid #1a2535;
+  font-size: 13px; vertical-align: middle;
+}
+.map-table tr:hover td { background: rgba(33,150,243,.06); }
+.map-table select { width: 100%; min-width: 200px; font-size: 13px; }
+.sample-val {
+  color: #9aafbe; font-size: 11px; font-style: italic;
+  max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.ie-steps { display: flex; gap: 8px; margin-bottom: 20px; align-items: center; }
+.ie-step {
+  padding: 4px 14px; border-radius: 12px; font-size: 12px; font-weight: bold;
+  background: #1e2a35; color: #555; border: 1px solid #2a3f52;
+}
+.ie-step.active { background: #2196f3; color: #fff; border-color: #2196f3; }
+.ie-step.done   { background: #1b3a2b; color: #4caf50; border-color: #4caf50; }
+.ie-sep { color: #444; }
+
+.stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
+.stat-box { padding: 14px 22px; border-radius: 8px; text-align: center; min-width: 100px; }
+.stat-box .num { font-size: 28px; font-weight: bold; display: block; }
+.stat-box .lbl { font-size: 12px; opacity: .7; }
+.stat-created { background: #1b3a2b; color: #4caf50; border: 1px solid #4caf50; }
+.stat-updated { background: #1a2f4a; color: #2196f3; border: 1px solid #2196f3; }
+.stat-skipped { background: #2a2a1a; color: #ffb300; border: 1px solid #ffb300; }
+.stat-errors  { background: #3a1a1a; color: #f44336; border: 1px solid #f44336; }
+
+.dry-run-badge {
+  background: #3a2a10; color: #ff9800; border: 1px solid #ff9800;
+  border-radius: 6px; padding: 10px 18px; font-weight: bold;
+  margin-bottom: 16px; display: inline-block;
+}
+.alert-err {
+  background: #3a1a1a; color: #f44336; border: 1px solid #f44336;
+  border-radius: 6px; padding: 10px 16px; margin-bottom: 12px;
+}
+.alert-ok {
+  background: #1b3a2b; color: #81c784; border: 1px solid #4caf50;
+  border-radius: 6px; padding: 10px 16px; margin-bottom: 12px;
+}
+.ie-hint { font-size: 11px; color: #607d8b; margin-top: 4px; }
+.field-row { margin-bottom: 14px; }
+.field-row label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 13px; }
+
+/* Source type selector */
+.src-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+.src-tab {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px;
+  border: 1px solid #2a3f52; background: #162030; color: #9aafbe; font-weight: 600;
+}
+.src-tab input[type=radio] { display: none; }
+.src-tab.selected { border-color: #2196f3; background: rgba(33,150,243,.15); color: #58a6ff; }
+
+/* Section divider */
+.ie-section { border-top: 1px solid #2a3f52; margin: 20px 0 16px; padding-top: 14px; }
+.ie-section-title { font-size: 13px; color: #7ab3cc; font-weight: 700; margin-bottom: 12px; }
+
+/* Options row */
+.ie-options { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+.ie-options label { display: flex; align-items: center; gap: 7px; cursor: pointer; font-size: 13px; }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a>
+  &rsaquo; <a href="{% url 'admin:autoimport_autoimportprofile_changelist' %}">Авто-імпорт</a>
+  &rsaquo; {% if profile %}{{ profile.name }}{% else %}Новий імпорт{% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<h1>📥 Авто-імпорт</h1>
+
+<div class="ie-steps">
+  <span class="ie-step {% if step == 1 %}active{% elif step > 1 %}done{% endif %}">1. Джерело</span>
+  <span class="ie-sep">›</span>
+  <span class="ie-step {% if step == 2 %}active{% elif step > 2 %}done{% endif %}">2. Маппінг</span>
+  <span class="ie-sep">›</span>
+  <span class="ie-step {% if step == 3 %}active{% endif %}">3. Результат</span>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}<div class="alert-err">{{ msg }}</div>{% endfor %}
+{% endif %}
+
+{# ═══════════════════════════════════════════════════ STEP 1 ══ #}
+{% if step == 1 %}
+<div class="ie-card">
+  <h2>📂 Джерело даних</h2>
+  <form method="post" enctype="multipart/form-data" id="step1form">
+    {% csrf_token %}
+    <input type="hidden" name="step" value="1">
+
+    <!-- Import type -->
+    <div class="field-row">
+      <label>Тип імпорту:</label>
+      <select name="import_type" style="max-width:340px">
+        {% for val, lbl in import_types %}
+        <option value="{{ val }}" {% if profile.import_type == val %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Source type -->
+    <div class="field-row">
+      <label>Джерело файлу:</label>
+      <div class="src-tabs" id="srcTabs">
+        <label class="src-tab selected" id="tab-upload">
+          <input type="radio" name="source_type" value="upload" checked> 📤 Файл з ПК
+        </label>
+        <label class="src-tab" id="tab-url">
+          <input type="radio" name="source_type" value="url"> 🌐 URL / Google Sheets
+        </label>
+        <label class="src-tab" id="tab-folder">
+          <input type="radio" name="source_type" value="folder"> 📁 Папка на сервері
+        </label>
+      </div>
+    </div>
+
+    <!-- Upload -->
+    <div id="src-upload" class="field-row">
+      <input type="file" name="upload_file" accept=".xlsx,.xls,.csv">
+      <div class="ie-hint">Формати: .xlsx, .xls, .csv</div>
+    </div>
+
+    <!-- URL -->
+    <div id="src-url" class="field-row" style="display:none">
+      <input type="text" name="url_source" placeholder="https://docs.google.com/spreadsheets/d/…/export?format=csv"
+             style="width:100%" value="{{ profile.source_path|default:'' }}">
+      <div class="ie-hint">
+        Google Sheets: Файл → Опублікувати → CSV-посилання.<br>
+        Або будь-який публічний HTTP-URL, що повертає .csv або .xlsx.
+      </div>
+    </div>
+
+    <!-- Folder -->
+    <div id="src-folder" class="field-row" style="display:none">
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:2;min-width:200px">
+          <label style="font-size:11px;color:#607d8b">Шлях до папки на сервері:</label>
+          <input type="text" name="folder_path"
+                 placeholder="/volume1/imports/   або   C:\imports\"
+                 value="{{ profile.source_path|default:'' }}" style="width:100%">
+        </div>
+        <div style="flex:1;min-width:120px">
+          <label style="font-size:11px;color:#607d8b">Маска файлів:</label>
+          <input type="text" name="file_mask"
+                 value="{{ profile.file_mask|default:'*.xlsx;*.csv' }}" style="width:100%">
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile & Schedule settings -->
+    <div class="ie-section">
+      <div class="ie-section-title">💾 Профіль (опційно — для планового запуску)</div>
+
+      <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px">
+        <div class="field-row" style="flex:2;min-width:180px;margin-bottom:0">
+          <label>Назва профілю:</label>
+          <input type="text" name="profile_name"
+                 placeholder="Залиш порожнім — одноразовий імпорт"
+                 value="{{ profile.name|default:'' }}" style="width:100%">
+        </div>
+        <div class="field-row" style="min-width:120px;margin-bottom:0">
+          <label>Інтервал (хв):</label>
+          <input type="number" name="interval_minutes" min="5"
+                 value="{{ profile.interval_minutes|default:60 }}" style="width:100%">
+        </div>
+        <div class="field-row" style="min-width:180px;margin-bottom:0">
+          <label>Конфлікти (SKU/замовлення вже є):</label>
+          <select name="conflict_strategy">
+            {% for val, lbl in conflict_choices %}
+            <option value="{{ val }}" {% if profile.conflict_strategy == val %}selected{% endif %}>{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="ie-options">
+        <label><input type="checkbox" name="dry_run"> 🧪 Тестовий запуск (без збереження в БД)</label>
+        <label><input type="checkbox" name="notify"
+          {% if profile.notify or not profile %}checked{% endif %}> 📩 Сповіщення після запуску</label>
+        <label><input type="checkbox" name="archive_processed"
+          {% if profile.archive_processed or not profile %}checked{% endif %}> 📁 Архівувати оброблені файли</label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:20px;align-items:center">
+      <button type="submit" class="btn-primary">🔍 Аналізувати →</button>
+      <a href="{% url 'admin:autoimport_autoimportprofile_changelist' %}" class="btn-secondary">✕ Скасувати</a>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+  var tabs  = document.querySelectorAll('.src-tab');
+  var areas = {upload: 'src-upload', url: 'src-url', folder: 'src-folder'};
+
+  // Pre-select source_type from profile if editing
+  {% if profile %}
+  var preType = '{{ profile.source_type }}';
+  {% else %}
+  var preType = 'upload';
+  {% endif %}
+
+  function selectTab(val) {
+    tabs.forEach(function(t) {
+      var r = t.querySelector('input[type=radio]');
+      t.classList.toggle('selected', r.value === val);
+    });
+    Object.entries(areas).forEach(function(pair) {
+      document.getElementById(pair[1]).style.display = pair[0] === val ? '' : 'none';
+    });
+  }
+
+  tabs.forEach(function(t) {
+    t.addEventListener('click', function() {
+      var r = t.querySelector('input[type=radio]');
+      r.checked = true;
+      selectTab(r.value);
+    });
+  });
+
+  selectTab(preType);
+})();
+</script>
+
+{# ═══════════════════════════════════════════════════ STEP 2 ══ #}
+{% elif step == 2 %}
+<div class="ie-card">
+  <h2>📋 Маппінг колонок: <span style="color:#c9d8e4;font-weight:normal">{{ source_name }}</span></h2>
+
+  <form method="post" id="mappingForm">
+    {% csrf_token %}
+    <input type="hidden" name="step" value="2">
+
+    {% if dry_run_checked %}
+    <input type="hidden" name="dry_run" value="1">
+    <div class="dry-run-badge" style="margin-bottom:14px">🧪 Тестовий режим — дані не збережуться</div>
+    {% endif %}
+
+    <!-- Sheet selector -->
+    {% if sheets|length > 1 %}
+    <div class="field-row">
+      <label>Лист Excel:</label>
+      <select name="sheet_name" id="sheetSelect" onchange="onSheetChange(this.value)" style="max-width:360px">
+        {% for s in sheets %}
+        <option value="{{ s }}" {% if s == used_sheet %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% else %}
+    <input type="hidden" name="sheet_name" value="{{ used_sheet }}">
+    {% endif %}
+
+    <!-- Column mapping table -->
+    <div class="field-row">
+      <label>Відповідність полів системи ↔ колонок файлу:</label>
+      <div class="ie-hint" style="margin-bottom:10px">
+        Колонки з позначкою <span style="color:#f44336">✱</span> обов'язкові.
+        Решта — за потребою.
+      </div>
+      <div style="overflow-x:auto">
+        <table class="map-table" id="mappingTable">
+          <thead>
+            <tr>
+              <th style="width:24px">✱</th>
+              <th>Поле системи</th>
+              <th>Колонка у файлі</th>
+              <th>Приклад значення</th>
+            </tr>
+          </thead>
+          <tbody id="mappingBody">
+            <!-- Rendered by JS via renderRows() -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:12px;margin-top:20px;align-items:center">
+      <button type="submit" class="btn-primary">✅ Імпортувати →</button>
+      <a href="{% url 'admin:autoimport_run' %}" class="btn-secondary">← Назад</a>
+    </div>
+  </form>
+</div>
+
+<script>
+const ALL_SHEETS = {{ all_sheets_data_json|safe }};
+const AUTO_HINTS = {{ auto_hints_json|safe }};
+const PRESELECTED = {{ preselected_json|safe }};
+const USED_SHEET = "{{ used_sheet|escapejs }}";
+const DB_FIELDS = [
+  {% for fkey, flabel, freq in db_fields %}
+  {key: "{{ fkey|escapejs }}", label: "{{ flabel|escapejs }}", required: {% if freq %}true{% else %}false{% endif %}},
+  {% endfor %}
+];
+
+function guessCol(fieldKey, columns) {
+  var hints = AUTO_HINTS[fieldKey] || [];
+  for (var i = 0; i < columns.length; i++) {
+    var cn = columns[i].toLowerCase().trim();
+    for (var j = 0; j < hints.length; j++) {
+      if (cn.includes(hints[j]) || hints[j].includes(cn)) return columns[i];
+    }
+  }
+  return '--';
+}
+
+function renderRows(sheetKey) {
+  var sheetData = ALL_SHEETS[sheetKey] || ALL_SHEETS[Object.keys(ALL_SHEETS)[0]] || {};
+  var columns   = sheetData.columns || [];
+  var sample    = sheetData.sample  || {};
+  var tbody     = document.getElementById('mappingBody');
+  tbody.innerHTML = '';
+
+  DB_FIELDS.forEach(function(f) {
+    var presel  = PRESELECTED[f.key] || '--';
+    var guessed = (presel !== '--' && columns.indexOf(presel) >= 0) ? presel : guessCol(f.key, columns);
+
+    var opts = '<option value="--">— не використовувати —</option>';
+    columns.forEach(function(col) {
+      var sel = (col === guessed) ? ' selected' : '';
+      opts += '<option value="' + escH(col) + '"' + sel + '>' + escH(col) + '</option>';
+    });
+
+    var sampleVal = guessed !== '--' ? (sample[guessed] || '') : '';
+    var reqBadge  = f.required
+      ? '<span style="color:#f44336;font-size:14px">✱</span>'
+      : '';
+    var labelColor = f.required ? '#81c784' : '#c9d8e4';
+
+    tbody.innerHTML +=
+      '<tr>' +
+        '<td>' + reqBadge + '</td>' +
+        '<td style="font-weight:600;color:' + labelColor + '">' + escH(f.label) + '</td>' +
+        '<td><select name="map_' + f.key + '" id="sel_' + f.key + '"' +
+             ' onchange="updSample(\'' + f.key + '\',this.value,\'' + sheetKey + '\')">' +
+             opts + '</select></td>' +
+        '<td class="sample-val" id="smpl_' + f.key + '">' + escH(sampleVal) + '</td>' +
+      '</tr>';
+  });
+}
+
+function updSample(fieldKey, col, sheetKey) {
+  var sheetData = ALL_SHEETS[sheetKey] || {};
+  var smp = (sheetData.sample || {})[col] || '';
+  var el = document.getElementById('smpl_' + fieldKey);
+  if (el) el.textContent = smp || '—';
+}
+
+function onSheetChange(val) {
+  var sheetInput = document.querySelector('input[name=sheet_name]');
+  if (sheetInput) sheetInput.value = val;
+  renderRows(val);
+}
+
+function escH(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var key = USED_SHEET || Object.keys(ALL_SHEETS)[0] || '';
+  renderRows(key);
+});
+</script>
+
+{# ═══════════════════════════════════════════════════ STEP 3 ══ #}
+{% elif step == 3 %}
+
+{% if dry_run %}
+<div class="dry-run-badge">🧪 ТЕСТОВИЙ РЕЖИМ — дані НЕ збережено в базу</div>
+{% endif %}
+
+<div class="stat-row">
+  <div class="stat-box stat-created">
+    <span class="num">{{ stats.created }}</span>
+    <span class="lbl">Створено</span>
+  </div>
+  <div class="stat-box stat-updated">
+    <span class="num">{{ stats.updated }}</span>
+    <span class="lbl">Оновлено</span>
+  </div>
+  <div class="stat-box stat-skipped">
+    <span class="num">{{ stats.skipped }}</span>
+    <span class="lbl">Пропущено</span>
+  </div>
+  <div class="stat-box stat-errors">
+    <span class="num">{{ stats.errors|length }}</span>
+    <span class="lbl">Помилок</span>
+  </div>
+</div>
+
+{% if stats.errors %}
+<div class="ie-card">
+  <h2>⚠ Деталі помилок</h2>
+  {% for err in stats.errors %}
+  <div style="font-size:12px;padding:3px 0;color:#ef9a9a;border-bottom:1px solid #2a1a1a">{{ err }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if saved_profile %}
+<div class="ie-card" style="border-color:#4caf50">
+  <h2 style="color:#81c784 !important">💾 Профіль збережено</h2>
+  <p style="margin:0 0 8px">
+    <strong>{{ saved_profile.name }}</strong>
+    — тип: {{ saved_profile.get_import_type_display }}
+    — кожні {{ saved_profile.interval_minutes }} хв
+  </p>
+  {% if saved_profile.source_path %}
+  <p style="font-size:12px;color:#607d8b;margin:0 0 12px">
+    Джерело: {{ saved_profile.source_path|truncatechars:80 }}
+  </p>
+  {% endif %}
+  <div style="display:flex;gap:10px">
+    <a href="{% url 'admin:autoimport_profile_run_now' saved_profile.pk %}"
+       class="btn-primary" style="background:#4caf50;font-size:13px;padding:7px 16px">
+      ▶ Запустити зараз
+    </a>
+    <a href="{% url 'admin:autoimport_profile_run_now' saved_profile.pk %}?dry=1"
+       class="btn-secondary" style="font-size:13px;padding:7px 16px">
+      🧪 Dry-run
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% if not stats.created and not stats.updated and not stats.skipped and not stats.errors %}
+<div class="ie-card" style="border-color:#ff9800">
+  <h2 style="color:#ffb74d !important">ℹ Нульовий результат</h2>
+  <p style="font-size:13px;color:#9aafbe">
+    Імпорт завершився без результату.<br>
+    Можливі причини:
+  </p>
+  <ul style="font-size:12px;color:#9aafbe;line-height:1.8">
+    <li>Обов'язкові колонки (✱) не замаплені або порожні у файлі</li>
+    <li>Всі записи вже існують (конфлікт = «Пропустити»)</li>
+    <li>Файл містить лише заголовки без даних</li>
+  </ul>
+  <a href="{% url 'admin:autoimport_run' %}" class="btn-primary" style="font-size:13px;padding:7px 16px">
+    ← Перевірити маппінг
+  </a>
+</div>
+{% endif %}
+
+<div style="display:flex;gap:12px;margin-top:16px">
+  <a href="{% url 'admin:autoimport_run' %}" class="btn-secondary">← Новий імпорт</a>
+  <a href="{% url 'admin:autoimport_autoimportprofile_changelist' %}" class="btn-secondary">📋 Профілі</a>
+</div>
+
+{% endif %}
+{% endblock %}

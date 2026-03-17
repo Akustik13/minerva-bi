@@ -132,6 +132,17 @@
       </div>
     </div>
 
+    <div class="imp-card" style="--card-accent:#9c27b0">
+      <div class="imp-card-title">🔄 Авто-імпорт по розкладу</div>
+      <div class="imp-card-desc">Профілі імпорту з папки або URL (Google Sheets). Cron запускає автоматично — замовлення, товари, прихід, коригування.</div>
+      <a href="/admin/autoimport/autoimportprofile/run/" class="imp-btn imp-btn-primary" style="background:#6a1b9a">📥 Імпортувати</a>
+      <a href="/admin/autoimport/autoimportprofile/" class="imp-btn imp-btn-secondary">📋 Профілі</a>
+      <div class="imp-note" style="margin-top:10px">
+        <b>Google Sheets:</b> вкажіть URL <code style="color:#a5d6a7">...export?format=csv</code> як джерело.<br>
+        <b>Дедуплікація:</b> SHA256 файлу — один і той самий файл не буде імпортовано двічі.
+      </div>
+    </div>
+
     <div class="imp-card" style="--card-accent:#4caf50">
       <div class="imp-card-title">📦 Товари та склад (Inventory)</div>
       <div class="imp-card-desc">Імпорт товарів і початкових залишків. Якщо SKU вже існує — оновлення полів за вибором.</div>

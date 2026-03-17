@@ -78,7 +78,51 @@
   font-size: 10px; color: #4a6070; margin-top: 3px;
   line-height: 1.4; font-style: italic;
 }
+
+/* ── System status bar ── */
+.sys-status-bar {
+  display: flex; gap: 0; flex-wrap: wrap;
+  background: #0d1520; border-bottom: 1px solid #1e2d3d;
+  padding: 0 20px;
+}
+.sys-status-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 16px 8px 0; margin-right: 16px;
+  font-size: 11px; font-weight: 600;
+  border-right: 1px solid #1e2d3d;
+}
+.sys-status-item:last-child { border-right: none; }
+.sys-status-item a { text-decoration: none; color: inherit; }
+.sys-status-item a:hover { text-decoration: underline; }
+.ss-ok     { color: #4caf50; }
+.ss-warn   { color: #ff9800; }
+.ss-danger { color: #f44336; }
+.ss-muted  { color: #607d8b; }
+.ss-blue   { color: #58a6ff; }
 </style>
+
+<div class="sys-status-bar">
+  <div class="sys-status-item {% if last_backup_days <= 1 %}ss-ok{% elif last_backup_days <= 7 %}ss-warn{% else %}ss-danger{% endif %}">
+    💾 Backup:
+    <a href="/admin/backup/backupplaceholder/">{{ last_backup_label }}</a>
+  </div>
+  <div class="sys-status-item {% if auto_tracking %}ss-ok{% else %}ss-muted{% endif %}">
+    📡 Авто-трекінг:
+    <a href="/admin/shipping/shippingsettings/1/change/">{% if auto_tracking %}увімкнено{% else %}вимкнено{% endif %}</a>
+  </div>
+  <div class="sys-status-item {% if api_key_count > 0 %}ss-blue{% else %}ss-muted{% endif %}">
+    🔑 API ключів: <a href="/admin/api/apikey/">{{ api_key_count }}</a>
+  </div>
+  {% if unshipped_count > 0 %}
+  <div class="sys-status-item ss-warn">
+    ⏳ Не відправлено: <a href="/admin/sales/salesorder/?o=-4">{{ unshipped_count }}</a>
+  </div>
+  {% else %}
+  <div class="sys-status-item ss-ok">
+    ✅ Всі відправлено
+  </div>
+  {% endif %}
+</div>
 
 <div class="mv-dash">
   <section>
@@ -117,20 +161,42 @@
         <span class="mv-tile-name">API Токени</span>
         <span class="mv-tile-sub">Доступ для ботів та інтеграцій</span>
       </a>
+      <a href="/admin/config/integrations/" class="mv-tile" style="--tile-accent:#4caf50" data-tile-id="integrations">
+        <span class="mv-tile-icon">🔌</span>
+        <span class="mv-tile-name">Інтеграції</span>
+        <span class="mv-tile-sub">DigiKey, DHL, Email, Telegram</span>
+      </a>
       <a href="/dashboard/help/" class="mv-tile" style="--tile-accent:#2196f3" data-tile-id="help">
         <span class="mv-tile-icon">📖</span>
         <span class="mv-tile-name">Довідник</span>
         <span class="mv-tile-sub">Документація системи</span>
       </a>
-      <a href="/onboarding/demo/" class="mv-tile" style="--tile-accent:#ff9800" data-tile-id="demo-data">
-        <span class="mv-tile-icon">🧪</span>
-        <span class="mv-tile-name">Демо-дані</span>
-        <span class="mv-tile-sub">Тестові замовлення та клієнти</span>
-      </a>
       <a href="/dashboard/import/" class="mv-tile" style="--tile-accent:#00bcd4" data-tile-id="import-hub">
         <span class="mv-tile-icon">📥</span>
         <span class="mv-tile-name">Імпорт даних</span>
         <span class="mv-tile-sub">Excel → Замовлення, Товари</span>
+      </a>
+      <a href="/admin/autoimport/autoimportprofile/" class="mv-tile" style="--tile-accent:#9c27b0" data-tile-id="autoimport">
+        <span class="mv-tile-icon">🔄</span>
+        <span class="mv-tile-name">Авто-імпорт</span>
+        <span class="mv-tile-sub">Профілі імпорту по розкладу</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ── Онбординг та тестові дані ── -->
+  <section style="margin-top: 28px;">
+    <h2 class="mv-section-hdr" style="border-color:#ff9800;">
+      <span class="mv-section-hdr-icon">🧪</span> Онбординг та тестові дані
+    </h2>
+    <p style="font-size:12px; color:#607d8b; margin: 0 0 12px;">
+      Для початкового налаштування системи або тестування. Демо-дані можна безпечно видалити після ознайомлення.
+    </p>
+    <div class="mv-grid" data-grid-id="system-onboarding">
+      <a href="/onboarding/demo/" class="mv-tile" style="--tile-accent:#ff9800" data-tile-id="demo-data">
+        <span class="mv-tile-icon">🧪</span>
+        <span class="mv-tile-name">Створити демо-дані</span>
+        <span class="mv-tile-sub">Тестові замовлення та клієнти</span>
       </a>
       <a href="/onboarding/delete-demo/" class="mv-tile" style="--tile-accent:#ff5722" data-tile-id="delete-demo">
         <span class="mv-tile-icon">🗑️</span>

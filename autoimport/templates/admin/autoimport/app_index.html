@@ -1,0 +1,206 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}📥 Авто-імпорт | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="/dashboard/system/">Система</a>
+  &rsaquo; Авто-імпорт
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.ai-dash { padding: 16px 20px 48px; }
+
+.ai-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 2px solid #9c27b0;
+  font-size: 13px; font-weight: 700; color: #9aafbe;
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px; margin-bottom: 28px;
+}
+
+.ai-tile {
+  position: relative;
+  background: #1a2535; border: 1px solid #243347;
+  border-top: 3px solid var(--ta, #9c27b0);
+  border-radius: 9px; padding: 14px 13px 12px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column; min-height: 100px;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.ai-tile:hover {
+  border-color: var(--ta, #9c27b0);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px); background: #1e2d40;
+}
+.ai-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
+.ai-tile-name { font-size: 13px; font-weight: 700; color: #c9d8e4; line-height: 1.3; flex: 1; }
+.ai-tile-sub  { font-size: 10px; color: #4a6070; margin-top: 5px; }
+.ai-tile-status { font-size: 10px; margin-top: 4px; }
+.s-ok     { color: #4caf50; }
+.s-warn   { color: #ff9800; }
+.s-err    { color: #f44336; }
+.s-muted  { color: #607d8b; }
+
+/* Log table */
+.ai-log-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ai-log-table th {
+  background: #0d1520; color: #607d8b; font-size: 10px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  padding: 7px 10px; text-align: left; border-bottom: 1px solid #1e2d3d;
+}
+.ai-log-table td {
+  padding: 7px 10px; border-bottom: 1px solid #1a2535; color: #9aafbe;
+  white-space: nowrap;
+}
+.ai-log-table tr:hover td { background: #141f2b; }
+.ai-log-table .td-file { max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+</style>
+
+<div class="ai-dash">
+
+  <!-- Header -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.07);">
+    <div style="width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,rgba(156,39,176,.25),rgba(33,150,243,.15));display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0">🔄</div>
+    <div>
+      <h1 style="font-size:20px;font-weight:800;color:#e6edf3;margin:0 0 3px">Авто-імпорт</h1>
+      <p style="font-size:12px;color:#7d8590;margin:0">Scheduled import від CSV/Excel з папки або URL (Google Sheets)</p>
+    </div>
+    <a href="/admin/autoimport/autoimportprofile/add/"
+       style="margin-left:auto;padding:8px 18px;background:rgba(156,39,176,.15);
+              border:1px solid rgba(156,39,176,.4);border-radius:7px;
+              color:#ce93d8;font-size:13px;font-weight:700;text-decoration:none">
+      ＋ Новий профіль
+    </a>
+  </div>
+
+  <!-- Active profiles -->
+  {% if profile_data %}
+  <h2 class="ai-hdr"><span>📋</span> Профілі імпорту</h2>
+  <div class="ai-grid">
+    {% for pd in profile_data %}
+    {% with p=pd.profile log=pd.last_log %}
+    <a href="/admin/autoimport/autoimportprofile/{{ p.pk }}/change/" class="ai-tile"
+       style="--ta:{% if p.import_type == 'sales' %}#ff9800{% elif p.import_type == 'products' %}#4caf50{% elif p.import_type == 'receipt' %}#2196f3{% else %}#9c27b0{% endif %}">
+      <span class="ai-tile-icon">{% if p.import_type == 'sales' %}🛒{% elif p.import_type == 'products' %}📦{% elif p.import_type == 'receipt' %}📥{% else %}🔧{% endif %}</span>
+      <span class="ai-tile-name">{{ p.name }}</span>
+      <span class="ai-tile-sub">{{ p.get_import_type_display }} · {{ p.get_source_type_display }}</span>
+      {% if not p.enabled %}
+      <span class="ai-tile-status s-muted">⏸ Вимкнено</span>
+      {% elif log %}
+        {% if log.status == 'ok' %}<span class="ai-tile-status s-ok">✅ {{ log.ran_at|date:"d.m H:i" }} · +{{ log.records_created }}</span>
+        {% elif log.status == 'dry_run' %}<span class="ai-tile-status s-warn">🧪 {{ log.ran_at|date:"d.m H:i" }}</span>
+        {% elif log.status == 'error' %}<span class="ai-tile-status s-err">❌ Помилка {{ log.ran_at|date:"d.m H:i" }}</span>
+        {% else %}<span class="ai-tile-status s-muted">⏭ {{ log.ran_at|date:"d.m H:i" }}</span>
+        {% endif %}
+      {% else %}
+      <span class="ai-tile-status s-muted">— ще не запускався</span>
+      {% endif %}
+    </a>
+    {% endwith %}
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Quick create -->
+  <h2 class="ai-hdr"><span>＋</span> Створити профіль</h2>
+  <div class="ai-grid">
+    <a href="/admin/autoimport/autoimportprofile/add/?import_type=sales" class="ai-tile" style="--ta:#ff9800">
+      <span class="ai-tile-icon">🛒</span>
+      <span class="ai-tile-name">Імпорт замовлень</span>
+      <span class="ai-tile-sub">SalesOrder + рядки</span>
+    </a>
+    <a href="/admin/autoimport/autoimportprofile/add/?import_type=products" class="ai-tile" style="--ta:#4caf50">
+      <span class="ai-tile-icon">📦</span>
+      <span class="ai-tile-name">Каталог товарів</span>
+      <span class="ai-tile-sub">Оновлення Product</span>
+    </a>
+    <a href="/admin/autoimport/autoimportprofile/add/?import_type=receipt" class="ai-tile" style="--ta:#2196f3">
+      <span class="ai-tile-icon">📥</span>
+      <span class="ai-tile-name">Прихід на склад</span>
+      <span class="ai-tile-sub">Incoming transactions</span>
+    </a>
+    <a href="/admin/autoimport/autoimportprofile/add/?import_type=adjust" class="ai-tile" style="--ta:#9c27b0">
+      <span class="ai-tile-icon">🔧</span>
+      <span class="ai-tile-name">Коригування залишків</span>
+      <span class="ai-tile-sub">Adjustment transactions</span>
+    </a>
+  </div>
+
+  <!-- All profiles link -->
+  <div style="margin-bottom:28px">
+    <a href="/admin/autoimport/autoimportprofile/" style="font-size:12px;color:#58a6ff">
+      📋 Всі профілі →
+    </a>
+    &nbsp;&nbsp;
+    <a href="/admin/autoimport/autoimportlog/" style="font-size:12px;color:#58a6ff">
+      📋 Всі логи →
+    </a>
+  </div>
+
+  <!-- Recent logs -->
+  {% if recent_logs %}
+  <h2 class="ai-hdr"><span>🕐</span> Останні запуски</h2>
+  <table class="ai-log-table">
+    <thead>
+      <tr>
+        <th>Час</th>
+        <th>Профіль</th>
+        <th>Файл</th>
+        <th>Статус</th>
+        <th>+Створено</th>
+        <th>Оновлено</th>
+        <th>Пропущено</th>
+        <th>Помилок</th>
+        <th>мс</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for log in recent_logs %}
+      <tr>
+        <td>{{ log.ran_at|date:"d.m H:i" }}</td>
+        <td>{% if log.profile %}<a href="/admin/autoimport/autoimportprofile/{{ log.profile.pk }}/change/" style="color:#58a6ff;text-decoration:none">{{ log.profile.name }}</a>{% else %}—{% endif %}</td>
+        <td class="td-file" title="{{ log.source_name }}">{{ log.source_name }}</td>
+        <td>
+          {% if log.status == 'ok' %}<span class="s-ok">✅ Успішно</span>
+          {% elif log.status == 'dry_run' %}<span class="s-warn">🧪 Dry-run</span>
+          {% elif log.status == 'error' %}<span class="s-err">❌ Помилка</span>
+          {% else %}<span class="s-muted">⏭ Дублікат</span>
+          {% endif %}
+        </td>
+        <td style="color:#4caf50;font-weight:700">{{ log.records_created }}</td>
+        <td>{{ log.records_updated }}</td>
+        <td style="color:#607d8b">{{ log.records_skipped }}</td>
+        <td style="color:{% if log.errors_count > 0 %}#f44336{% else %}#607d8b{% endif %}">{{ log.errors_count }}</td>
+        <td style="color:#607d8b">{{ log.duration_ms }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#607d8b;font-size:13px">Ще не було запусків. Створіть профіль і натисніть ▶ Запустити зараз.</p>
+  {% endif %}
+
+  <!-- Google Sheets tip -->
+  <div style="margin-top:28px;background:#0d1520;border:1px solid #1e2d3d;border-left:3px solid #4caf50;border-radius:0 7px 7px 0;padding:12px 16px">
+    <p style="font-size:12px;color:#9aafbe;margin:0 0 6px"><strong style="color:#c9d8e4">💡 Google Sheets:</strong> для підключення публічної таблиці відкрийте лист → File → Share → Anyone with the link (Viewer), потім скопіюйте ID таблиці:</p>
+    <code style="font-size:11px;color:#a5d6a7;background:#111c26;padding:4px 8px;border-radius:4px;display:block;word-break:break-all">https://docs.google.com/spreadsheets/d/<strong>{SHEET_ID}</strong>/export?format=csv</code>
+    <p style="font-size:11px;color:#607d8b;margin:6px 0 0">Для конкретного листа додайте &amp;gid={SHEET_GID} (знайти в URL листа).</p>
+  </div>
+
+</div>
+{% endblock %}

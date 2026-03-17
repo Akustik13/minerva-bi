@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'inventory',        # 📦 Управління складом
     'dashboard',        # 📊 Dashboard
     'tasks',            # 📋 Задачі та нагадування
+    'autoimport',       # 🔄 Авто-імпорт по розкладу
     'bots',             # 🤖 Боти та AI
     'faq',              # ❓ FAQ та підтримка
     'labels_app',       # 🏷️ Етикетки

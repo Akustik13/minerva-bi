@@ -157,13 +157,6 @@
 .mg-group.mg-dragging { opacity: .3; }
 .mg-group.mg-drag-over-top { box-shadow: inset 0 2px 0 #2196f3; }
 .mg-group.mg-drag-over-bot { box-shadow: inset 0 -2px 0 #2196f3; }
-.mg-sort-reset {
-  display: block; text-align: center; padding: 8px 14px;
-  font-size: 11px; color: #3a5570; cursor: pointer;
-  border-top: 1px solid #1e2d3d;
-  transition: color .15s, background .15s; user-select: none;
-}
-.mg-sort-reset:hover { color: #9aafbe; background: rgba(255,255,255,.03); }
 
 /* ═══════════════════════════════════════════════════════
    Minerva — Header Motto
@@ -298,38 +291,29 @@ document.addEventListener('DOMContentLoaded', function(){
   var GROUPS = [
     {
       id: 'analytics', label: '📊 Аналітика',
-      href: '/dashboard/analytics/',
+      href: '/dashboard/',
       links: [
-        { href: '/dashboard/',         label: '📊 Статистика', cls: 'mg-gold' },
-        { href: '/dashboard/signals/', label: '🚨 Сигнали',    cls: 'mg-red'  },
+        { href: '/dashboard/signals/', label: '🚨 Сигнали', id: 'signals-link' },
       ],
       apps: []
     },
-    { id: 'crm',        label: '👥 CRM',            apps: ['crm'] },
-    { id: 'accounting', label: '💰 Бухгалтерія',   apps: ['accounting'] },
-    { id: 'sales',      label: '🛒 Продажі',       apps: ['sales'] },
-    { id: 'shipping', label: '🚚 Доставка', apps: ['shipping'] },
-    { id: 'inventory', label: '📦 Склад',       apps: ['inventory'] },
-    { id: 'tasks',     label: '📋 Задачі',      apps: ['tasks'] },
-    { id: 'bots',      label: '🧠 AI та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
-    {
-      id: 'integrations', label: '🔌 Інтеграції',
-      href: '/admin/config/integrations/',
-      links: [
-        { href: '/admin/bots/digikeyconfig/1/change/',             label: '🛒 DigiKey' },
-        { href: '/admin/shipping/carrier/',                        label: '🚚 Перевізники (DHL/Jumingo)' },
-        { href: '/admin/config/notificationsettings/1/change/',    label: '🔔 Сповіщення (Email/Telegram)' },
-      ],
-      apps: []
-    },
+    { id: 'crm',        label: '👥 CRM',           apps: ['crm'] },
+    { id: 'sales',      label: '🛒 Продажі',      apps: ['sales'] },
+    { id: 'accounting', label: '💰 Бухгалтерія',  apps: ['accounting'] },
+    { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'] },
+    { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'] },
+    { id: 'tasks',      label: '📋 Задачі',       apps: ['tasks'] },
+    { id: 'bots',       label: '🧠 AI та APIs',   href: '/dashboard/bots/', apps: ['bots', 'api'] },
     {
       id: 'system', label: '⚙️ Система',
       href: '/dashboard/system/',
       links: [
-        { href: '/dashboard/import/', label: '📥 Імпорт даних' },
-        { href: '/dashboard/help/',   label: '📖 Довідник' },
+        { href: '/admin/config/integrations/',           label: '🔌 Інтеграції' },
+        { href: '/admin/autoimport/autoimportprofile/',  label: '🔄 Авто-імпорт' },
+        { href: '/dashboard/import/',                    label: '📥 Імпорт даних' },
+        { href: '/dashboard/help/',                      label: '📖 Довідник' },
       ],
-      apps: ['backup', 'auth']
+      apps: ['autoimport', 'config', 'backup', 'auth']
     },
   ];
 
@@ -381,31 +365,35 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   /* ── Авто-розкриття активного розділу ── */
+  /* Увага: широкі (short) prefix-и — СПОЧАТКУ; конкретніші — ПІСЛЯ.
+     Ітерація forEach: остання збіжна запис перемагає. */
   var _URL_GROUP = {
-    '/admin/crm/':         'crm',
-    '/admin/accounting/':  'accounting',
-    '/admin/sales/':       'sales',
+    /* broad prefixes first */
+    '/dashboard/':       'analytics',
+    '/admin/crm/':       'crm',
+    '/admin/sales/':     'sales',
+    '/admin/accounting/':'accounting',
     '/admin/shipping/':  'shipping',
-    '/admin/shipping/shipment/dhl-track-lookup/': 'shipping',
-    '/admin/shipping/shipment/order-tracking/':   'shipping',
     '/admin/inventory/': 'inventory',
     '/admin/tasks/':     'tasks',
     '/admin/bots/':      'bots',
-    '/admin/config/integrations/':            'integrations',
-    '/admin/config/notificationsettings/':    'integrations',
-    '/admin/shipping/carrier/':               'integrations',
+    '/admin/api/':       'bots',
+    '/api/v1/':          'bots',
+    '/admin/autoimport/':'system',
+    '/admin/config/':    'system',
     '/admin/backup/':    'system',
     '/admin/auth/':      'system',
-    '/dashboard/import/':       'system',
-    '/onboarding/clear-system/':'system',
-    '/onboarding/delete-demo/': 'system',
-    '/dashboard/':            'analytics',
+    '/onboarding/':      'system',
+    /* more specific — after, so they overwrite broad matches */
     '/dashboard/analytics/': 'analytics',
+    '/dashboard/signals/':   'analytics',
     '/dashboard/bots/':      'bots',
     '/dashboard/api/':       'bots',
     '/dashboard/system/':    'system',
-    '/admin/api/':           'bots',
-    '/api/v1/':              'bots',
+    '/dashboard/import/':    'system',
+    '/admin/shipping/shipment/dhl-track-lookup/': 'shipping',
+    '/admin/shipping/shipment/order-tracking/':   'shipping',
+    '/admin/shipping/carrier/':                   'shipping',
   };
   var _curPath = window.location.pathname;
   var _activeGroup = null;
@@ -488,6 +476,7 @@ document.addEventListener('DOMContentLoaded', function(){
         var a = document.createElement('a');
         a.href = lnk.href;
         a.className = 'mg-link' + (lnk.cls ? ' ' + lnk.cls : '');
+        if (lnk.id) a.id = lnk.id;
         a.textContent = lnk.label;
         content.appendChild(a);
       });
@@ -556,16 +545,39 @@ document.addEventListener('DOMContentLoaded', function(){
     _saveOrder();
   });
 
-  /* ── Кнопка скидання порядку ── */
-  var resetBtn = document.createElement('div');
-  resetBtn.className = 'mg-sort-reset';
-  resetBtn.id = 'mg-reset-btn';
-  resetBtn.textContent = '↺ Скинути порядок';
-  resetBtn.addEventListener('click', function(){
-    localStorage.removeItem(_ORDER_KEY);
-    location.reload();
-  });
-  sidebar.appendChild(resetBtn);
+  /* ── Signals badge — live count ── */
+  fetch('/dashboard/signals-count/')
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(data){
+      if (!data) return;
+      var link = document.getElementById('signals-link');
+      if (!link) return;
+      link.style.display = 'flex';
+      link.style.justifyContent = 'space-between';
+      link.style.alignItems = 'center';
+      var badge = document.createElement('span');
+      badge.style.cssText = 'font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;flex-shrink:0;margin-left:6px;';
+      if (data.critical > 0) {
+        badge.style.background = 'rgba(248,81,73,.2)';
+        badge.style.color = '#f85149';
+        badge.style.border = '1px solid rgba(248,81,73,.4)';
+        badge.textContent = data.critical + ' ❗';
+        link.style.color = '#f85149';
+      } else if (data.warning > 0) {
+        badge.style.background = 'rgba(227,179,65,.15)';
+        badge.style.color = '#e3b341';
+        badge.style.border = '1px solid rgba(227,179,65,.35)';
+        badge.textContent = data.warning + ' ⚠';
+        link.style.color = '#e3b341';
+      } else if (data.total === 0) {
+        badge.style.background = 'rgba(63,185,80,.12)';
+        badge.style.color = '#3fb950';
+        badge.style.border = '1px solid rgba(63,185,80,.3)';
+        badge.textContent = '✓';
+      }
+      if (data.total > 0 || data.total === 0) link.appendChild(badge);
+    })
+    .catch(function(){});
 
   /* ── Закріплений пункт FAQ — завжди видимий ── */
   var pinned = document.createElement('div');

@@ -1,0 +1,140 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}📋 Задачі | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; Задачі
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.t-dash { padding: 20px 24px 60px; }
+
+.t-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 28px; padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.t-header-icon {
+  width: 56px; height: 56px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg,rgba(33,150,243,.25),rgba(0,188,212,.15));
+  display: flex; align-items: center; justify-content: center; font-size: 28px;
+}
+.t-header h1 { font-size: 22px; font-weight: 800; color: #e6edf3; margin: 0 0 3px; }
+.t-header p  { font-size: 13px; color: #7d8590; margin: 0; }
+
+.t-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding-bottom: 7px;
+  border-bottom: 2px solid rgba(255,255,255,.07);
+  font-size: 11px; font-weight: 700; color: #7d8590;
+  letter-spacing: .07em; text-transform: uppercase;
+}
+
+.t-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 32px;
+}
+
+.t-tile {
+  position: relative;
+  background: #1a2535; border: 1px solid #243347;
+  border-top: 3px solid var(--ta, #2196f3);
+  border-radius: 9px; padding: 15px 14px 13px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column; min-height: 100px;
+  transition: border-color .15s, box-shadow .15s, transform .15s;
+}
+.t-tile:hover {
+  border-color: var(--ta, #2196f3);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px); background: #1e2d40;
+}
+.t-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
+.t-tile-name { font-size: 12.5px; font-weight: 600; color: #c9d8e4; line-height: 1.35; flex: 1; }
+.t-tile-sub  { font-size: 10px; color: #4a6070; margin-top: 6px; }
+</style>
+
+<div class="t-dash">
+
+  <div class="t-header">
+    <div class="t-header-icon">📋</div>
+    <div>
+      <h1>Задачі та нагадування</h1>
+      <p>Ручні задачі, алерти складу, дедлайни доставки, нагадування по клієнтах</p>
+    </div>
+    <a href="/admin/tasks/task/add/"
+       style="margin-left:auto;padding:8px 18px;background:rgba(33,150,243,.15);
+              border:1px solid rgba(33,150,243,.4);border-radius:7px;
+              color:#58a6ff;font-size:13px;font-weight:700;text-decoration:none;">
+      ＋ Нова задача
+    </a>
+  </div>
+
+  <!-- Фільтри по статусу -->
+  <div class="t-section-hdr">За статусом</div>
+  <div class="t-grid">
+    <a href="/admin/tasks/task/?status=pending" class="t-tile" style="--ta:#ff9800">
+      <span class="t-tile-icon">⏳</span>
+      <span class="t-tile-name">Очікують</span>
+      <span class="t-tile-sub">Нові невиконані задачі</span>
+    </a>
+    <a href="/admin/tasks/task/?status=in_progress" class="t-tile" style="--ta:#2196f3">
+      <span class="t-tile-icon">🔄</span>
+      <span class="t-tile-name">В роботі</span>
+      <span class="t-tile-sub">Активні задачі</span>
+    </a>
+    <a href="/admin/tasks/task/?status=done" class="t-tile" style="--ta:#4caf50">
+      <span class="t-tile-icon">✅</span>
+      <span class="t-tile-name">Виконані</span>
+      <span class="t-tile-sub">Завершені задачі</span>
+    </a>
+    <a href="/admin/tasks/task/" class="t-tile" style="--ta:#607d8b">
+      <span class="t-tile-icon">📋</span>
+      <span class="t-tile-name">Всі задачі</span>
+      <span class="t-tile-sub">Повний список</span>
+    </a>
+  </div>
+
+  <!-- Фільтри по пріоритету -->
+  <div class="t-section-hdr">За пріоритетом</div>
+  <div class="t-grid">
+    <a href="/admin/tasks/task/?priority=critical" class="t-tile" style="--ta:#f44336">
+      <span class="t-tile-icon">🚨</span>
+      <span class="t-tile-name">Критичні</span>
+      <span class="t-tile-sub">Потребують негайної уваги</span>
+    </a>
+    <a href="/admin/tasks/task/?priority=high" class="t-tile" style="--ta:#ff5722">
+      <span class="t-tile-icon">🔴</span>
+      <span class="t-tile-name">Високий пріоритет</span>
+      <span class="t-tile-sub">Важливі задачі</span>
+    </a>
+    <a href="/admin/tasks/task/?priority=medium" class="t-tile" style="--ta:#ff9800">
+      <span class="t-tile-icon">🟡</span>
+      <span class="t-tile-name">Середній пріоритет</span>
+      <span class="t-tile-sub">Планові задачі</span>
+    </a>
+    <a href="/admin/tasks/task/?task_type=stock_alert" class="t-tile" style="--ta:#9c27b0">
+      <span class="t-tile-icon">📦</span>
+      <span class="t-tile-name">Алерти складу</span>
+      <span class="t-tile-sub">Авто-задачі по запасах</span>
+    </a>
+    <a href="/admin/tasks/task/?task_type=deadline_alert" class="t-tile" style="--ta:#e91e63">
+      <span class="t-tile-icon">🚚</span>
+      <span class="t-tile-name">Дедлайни</span>
+      <span class="t-tile-sub">Прострочені відправлення</span>
+    </a>
+  </div>
+
+</div>
+{% endblock %}
