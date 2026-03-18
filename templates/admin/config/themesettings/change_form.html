@@ -240,7 +240,7 @@ function renderProfiles() {
 
 /* ── Server profiles (theme_profiles/ folder on server) ─────── */
 function loadServerProfiles() {
-  fetch('/admin/config/themesettings/server-profiles/')
+  fetch('/theme-profiles/')
     .then(function(r) { return r.json(); })
     .then(function(data) {
       var sel = document.getElementById('mvp-server-select');
@@ -267,7 +267,7 @@ window.mvApplyServerProfile = function() {
   var sel = document.getElementById('mvp-server-select');
   var name = sel && sel.value;
   if (!name) { if (sel) sel.focus(); return; }
-  fetch('/admin/config/themesettings/server-profiles/' + encodeURIComponent(name) + '/')
+  fetch('/theme-profiles/' + encodeURIComponent(name) + '/')
     .then(function(r) {
       if (!r.ok) throw new Error(r.status);
       return r.json();
