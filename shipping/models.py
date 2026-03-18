@@ -135,6 +135,21 @@ class Shipment(models.Model):
     declared_value   = models.DecimalField("Задекларована вартість", max_digits=10,
                                            decimal_places=2, null=True, blank=True)
     declared_currency = models.CharField("Валюта", max_length=3, default="EUR")
+
+    INSURANCE_NONE     = "none"
+    INSURANCE_STANDARD = "standard"
+    INSURANCE_PREMIUM  = "premium"
+    INSURANCE_CHOICES  = [
+        ("none",     "Ohne Versicherung — базова відповідальність перевізника (безкоштовно)"),
+        ("standard", "Standard — стандартне страхування до задекларованої вартості"),
+        ("premium",  "Premium — підвищене страхування (повне покриття)"),
+    ]
+    insurance_type   = models.CharField(
+        "Страхування", max_length=20,
+        choices=INSURANCE_CHOICES, default="none",
+        help_text="Тип страхування посилки у Jumingo. 'Ohne' = тільки базова відповідальність.",
+    )
+
     reference        = models.CharField("Референс/номер замовлення", max_length=100,
                                         blank=True, default="",
                                         help_text="Буде надруковано на етикетці")

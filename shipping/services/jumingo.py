@@ -241,21 +241,25 @@ class JumingoService(BaseCarrierService):
 
         declared_value = max(1, int(float(shipment.declared_value or 0)))
 
+        ins_type = getattr(shipment, "insurance_type", "none") or "none"
+
         details = {
-            "value_amount":          declared_value,
+            "value_amount":        declared_value,
             # value_currency DEPRECATED — currency тепер в customs_invoice.currency
-            "content_description":   (shipment.description or "Goods")[:35],
-            "reference_number":      (shipment.reference or "")[:35],
-            "email":                 shipment.recipient_email or c.sender_email or "",
-            "export_license":        False,
-            "packaging_type":        "parcel",
-            # Страхування: передаємо задекларовану вартість як страховий номінал
-            "extra_insurance_value": declared_value,
-            "extra_insurance_type":  "standard",
+            "content_description": (shipment.description or "Goods")[:35],
+            "reference_number":    (shipment.reference or "")[:35],
+            "email":               shipment.recipient_email or c.sender_email or "",
+            "export_license":      False,
+            "packaging_type":      "parcel",
             "settings": {
                 "export_reason": shipment.export_reason or "Commercial",
             },
         }
+        # Страхування: none → без extra_insurance (базова відповідальність перевізника)
+        #              standard / premium → передаємо тип + задекларована вартість
+        if ins_type in ("standard", "premium"):
+            details["extra_insurance_type"]  = ins_type
+            details["extra_insurance_value"] = declared_value
 
         # customs_invoice — переноситься на верхній рівень payload (не в details)
         customs_invoice = self._build_customs_invoice(shipment)

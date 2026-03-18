@@ -537,6 +537,7 @@ class ShipmentAdmin(admin.ModelAdmin):
             export_reason     = request.POST.get("export_reason", "Commercial"),
             declared_value    = request.POST.get("declared_value") or None,
             declared_currency = request.POST.get("declared_currency", "EUR"),
+            insurance_type    = request.POST.get("insurance_type", "none"),
             reference         = request.POST.get("reference", order.order_number),
             created_by        = request.user,
         )
@@ -723,6 +724,7 @@ class ShipmentAdmin(admin.ModelAdmin):
         shipment.export_reason     = request.POST.get("export_reason", "Commercial")
         shipment.declared_value    = request.POST.get("declared_value") or None
         shipment.declared_currency = request.POST.get("declared_currency", "EUR")
+        shipment.insurance_type    = request.POST.get("insurance_type", "none")
         shipment.reference         = request.POST.get("reference", shipment.order.order_number)
 
         ca_descs = request.POST.getlist("ca_desc")
@@ -1180,6 +1182,7 @@ class ShipmentAdmin(admin.ModelAdmin):
             export_reason     = orig.export_reason,
             declared_value    = orig.declared_value,
             declared_currency = orig.declared_currency,
+            insurance_type    = orig.insurance_type,
             reference         = orig.reference,
             # Митна декларація
             customs_articles  = orig.customs_articles,

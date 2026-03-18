@@ -163,7 +163,15 @@
         <div class="jc-row"><span class="jc-lbl">Оголошена вартість</span>
           <span class="jc-val accent">{{ details.value_amount|default:"—" }} EUR</span></div>
         <div class="jc-row"><span class="jc-lbl">Страхування</span>
-          <span class="jc-val">{{ details.extra_insurance_value|default:"—" }} EUR</span></div>
+          <span class="jc-val">
+            {% if details.extra_insurance_type == "premium" %}
+              🟣 Premium — {{ details.extra_insurance_value }} EUR
+            {% elif details.extra_insurance_type == "standard" %}
+              🔵 Standard — {{ details.extra_insurance_value }} EUR
+            {% else %}
+              🟢 Ohne Versicherung (базова)
+            {% endif %}
+          </span></div>
         <div class="jc-row"><span class="jc-lbl">Опис вмісту</span>
           <span class="jc-val">{{ details.content_description|default:"—" }}</span></div>
         {% if details.reference_number %}

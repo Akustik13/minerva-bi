@@ -756,6 +756,25 @@ document.addEventListener('DOMContentLoaded', function() {
           </select>
         </div>
         <div class="sh-field full">
+          <label class="sh-label">🛡️ Страхування (Jumingo)</label>
+          <select class="sh-input" name="insurance_type" id="insurance_type">
+            {% with ins=shipment.insurance_type %}
+            <option value="none"     {% if not ins or ins == 'none' %}selected{% endif %}>
+              🟢 Ohne Versicherung — базова відповідальність перевізника (безкоштовно)
+            </option>
+            <option value="standard" {% if ins == 'standard' %}selected{% endif %}>
+              🔵 Standard — стандартне страхування до задекларованої вартості
+            </option>
+            <option value="premium"  {% if ins == 'premium' %}selected{% endif %}>
+              🟣 Premium — підвищене страхування (повне покриття)
+            </option>
+            {% endwith %}
+          </select>
+          <div style="font-size:11px;color:var(--text-dim);margin-top:3px">
+            За замовчуванням — базова відповідальність (Ohne). Standard/Premium передають суму страхування рівну задекларованій вартості.
+          </div>
+        </div>
+        <div class="sh-field full">
           <label class="sh-label">Опис вмісту (для митниці)</label>
           <input class="sh-input" type="text" name="description"
             value="{{ shipment.description }}"
