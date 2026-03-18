@@ -22,67 +22,66 @@
   display: flex; align-items: flex-start; justify-content: space-between;
   flex-wrap: wrap; gap: 12px; margin-bottom: 24px;
 }
-.sd-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 5px; }
-.sd-id   { font-size: 22px; font-weight: 700; color: #9aafbe; }
-.sd-name { font-size: 20px; font-weight: 700; color: #c9d8e4; }
-.sd-company { font-size: 13px; color: #607d8b; background: #162030;
-  padding: 2px 10px; border-radius: 10px; }
-.sd-meta { font-size: 12px; color: #607d8b; }
-.sd-meta a { color: #58a6ff; text-decoration: none; }
+.sd-title   { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 5px; }
+.sd-id      { font-size: 22px; font-weight: 700; color: var(--text-muted); }
+.sd-name    { font-size: 20px; font-weight: 700; color: var(--text); }
+.sd-company { font-size: 13px; color: var(--text-dim); background: var(--bg-card-2);
+              padding: 2px 10px; border-radius: 10px; }
+.sd-meta    { font-size: 12px; color: var(--text-dim); }
+.sd-meta a  { color: var(--accent); text-decoration: none; }
 .sd-meta a:hover { text-decoration: underline; }
-.sd-dot { margin: 0 6px; }
+.sd-dot     { margin: 0 6px; }
 
 /* ── Status badge ── */
 .sd-status-badge {
   display: inline-block; padding: 7px 18px; border-radius: 20px;
   font-size: 13px; font-weight: 700; white-space: nowrap; flex-shrink: 0;
 }
-.sd-status-draft       { background: #1e2d3d; color: #607d8b; }
+.sd-status-draft       { background: var(--bg-card-2); color: var(--text-dim); }
 .sd-status-submitted   { background: rgba(33,150,243,.12); color: #2196f3; border: 1px solid rgba(33,150,243,.3); }
 .sd-status-label_ready { background: rgba(0,188,212,.12); color: #00bcd4; border: 1px solid rgba(0,188,212,.3); }
-.sd-status-in_transit  { background: rgba(255,152,0,.12); color: #ff9800; border: 1px solid rgba(255,152,0,.3); }
-.sd-status-delivered   { background: rgba(76,175,80,.12); color: #4caf50; border: 1px solid rgba(76,175,80,.3); }
-.sd-status-error       { background: rgba(244,67,54,.12); color: #f44336; border: 1px solid rgba(244,67,54,.3); }
-.sd-status-cancelled   { background: #1e2d3d; color: #607d8b; border: 1px solid #2a3f52; }
+.sd-status-in_transit  { background: rgba(255,152,0,.12);  color: #ff9800; border: 1px solid rgba(255,152,0,.3); }
+.sd-status-delivered   { background: rgba(76,175,80,.12);  color: var(--ok); border: 1px solid rgba(76,175,80,.3); }
+.sd-status-error       { background: rgba(244,67,54,.12);  color: var(--err); border: 1px solid rgba(244,67,54,.3); }
+.sd-status-cancelled   { background: var(--bg-card-2); color: var(--text-dim); border: 1px solid var(--border-strong); }
 
-/* ── Error block ── */
+/* ── Error / Info blocks ── */
 .sd-error-block {
   background: rgba(244,67,54,.06); border: 1px solid rgba(244,67,54,.25);
-  border-left: 4px solid #f44336; border-radius: 8px; padding: 16px 20px;
+  border-left: 4px solid var(--err); border-radius: 8px; padding: 16px 20px;
   margin-bottom: 24px; display: flex; gap: 14px; align-items: flex-start;
 }
-.sd-error-title { font-weight: 700; color: #f44336; margin-bottom: 6px; font-size: 14px; }
-.sd-error-msg { font-size: 12px; color: #ef9a9a; font-family: monospace;
-  white-space: pre-wrap; word-break: break-all; }
-.sd-info-block {
-  background: #1a2535; border: 1px solid #2a3f52; border-left: 4px solid #607d8b;
-  border-radius: 8px; padding: 14px 18px; color: #607d8b;
+.sd-error-title { font-weight: 700; color: var(--err); margin-bottom: 6px; font-size: 14px; }
+.sd-error-msg   { font-size: 12px; color: var(--err); opacity: .8; font-family: monospace;
+                  white-space: pre-wrap; word-break: break-all; }
+.sd-info-block  {
+  background: var(--bg-card-2); border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--text-dim); border-radius: 8px;
+  padding: 14px 18px; color: var(--text-muted);
   margin-bottom: 24px; font-size: 13px;
 }
 
 /* ── Timeline ── */
 .sd-timeline-wrap {
-  background: #1a2535; border: 1px solid #243347; border-radius: 10px;
-  padding: 22px 32px; margin-bottom: 26px; overflow-x: auto;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 22px 32px; margin-bottom: 26px; overflow-x: auto;
 }
-.sd-timeline {
-  display: flex; align-items: center; min-width: 420px;
-}
+.sd-timeline { display: flex; align-items: center; min-width: 420px; }
 .sd-tl-item  { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
 .sd-tl-dot   {
   width: 14px; height: 14px; border-radius: 50%;
-  background: #111c26; border: 2px solid #2a3f52; transition: all .2s;
+  background: var(--bg-input); border: 2px solid var(--border-strong); transition: all .2s;
 }
-.sd-tl-done   .sd-tl-dot { background: #4caf50; border-color: #4caf50; }
+.sd-tl-done   .sd-tl-dot { background: var(--ok); border-color: var(--ok); }
 .sd-tl-active .sd-tl-dot {
-  background: #2196f3; border-color: #2196f3;
-  width: 18px; height: 18px; box-shadow: 0 0 0 4px rgba(33,150,243,.2);
+  background: var(--accent); border-color: var(--accent);
+  width: 18px; height: 18px; box-shadow: 0 0 0 4px rgba(88,166,255,.2);
 }
-.sd-tl-label { font-size: 11px; font-weight: 600; white-space: nowrap; color: #607d8b; }
-.sd-tl-done   .sd-tl-label { color: #4caf50; }
-.sd-tl-active .sd-tl-label { color: #2196f3; }
-.sd-tl-line { flex: 1; height: 2px; background: #2a3f52; min-width: 40px; margin-bottom: 19px; }
-.sd-tl-line-done { background: #4caf50; }
+.sd-tl-label        { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--text-dim); }
+.sd-tl-done   .sd-tl-label { color: var(--ok); }
+.sd-tl-active .sd-tl-label { color: var(--accent); }
+.sd-tl-line           { flex: 1; height: 2px; background: var(--border-strong); min-width: 40px; margin-bottom: 19px; }
+.sd-tl-line-done      { background: var(--ok); }
 
 /* ── Body layout ── */
 .sd-body { display: grid; grid-template-columns: 1fr 310px; gap: 24px; }
@@ -90,39 +89,39 @@
 
 /* ── Card ── */
 .sd-card {
-  background: #1a2535; border: 1px solid #243347;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
   border-radius: 10px; padding: 18px 22px; margin-bottom: 18px;
 }
 .sd-card-title {
-  font-size: 11px; font-weight: 700; color: #9aafbe;
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .05em;
   margin: 0 0 14px; padding-bottom: 10px;
-  border-bottom: 1px solid #243347;
+  border-bottom: 1px solid var(--border-strong);
 }
-details.sd-card summary { list-style: none; cursor: pointer; user-select: none; }
+details.sd-card summary                   { list-style: none; cursor: pointer; user-select: none; }
 details.sd-card summary::-webkit-details-marker { display: none; }
-details.sd-card summary.sd-card-title { margin-bottom: 0; }
-details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
+details.sd-card summary.sd-card-title        { margin-bottom: 0; }
+details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
 /* ── Info rows ── */
 .sd-info-grid { display: flex; flex-direction: column; }
-.sd-info-row {
+.sd-info-row  {
   display: flex; justify-content: space-between; align-items: baseline;
-  padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.04); gap: 12px;
+  padding: 7px 0; border-bottom: 1px solid var(--border); gap: 12px;
 }
 .sd-info-row:last-child { border-bottom: none; }
-.sd-info-key { font-size: 11px; color: #607d8b; flex-shrink: 0; min-width: 110px; }
-.sd-info-val { font-size: 13px; color: #c9d8e4; text-align: right; word-break: break-word; }
-.sd-mono     { font-family: monospace; }
-.sd-small    { font-size: 11px; }
-.sd-country  { font-weight: 700; font-family: monospace; font-size: 14px; }
-.sd-tracking { font-family: monospace; color: #2196f3; font-weight: 700; font-size: 14px; }
-.sd-price    { color: #4caf50; font-weight: 700; font-size: 15px; }
+.sd-info-key  { font-size: 11px; color: var(--text-dim); flex-shrink: 0; min-width: 110px; }
+.sd-info-val  { font-size: 13px; color: var(--text); text-align: right; word-break: break-word; }
+.sd-mono      { font-family: monospace; }
+.sd-small     { font-size: 11px; }
+.sd-country   { font-weight: 700; font-family: monospace; font-size: 14px; }
+.sd-tracking  { font-family: monospace; color: var(--accent); font-weight: 700; font-size: 14px; }
+.sd-price     { color: var(--ok); font-weight: 700; font-size: 15px; }
 .sd-label-link {
-  background: #162030; color: #2196f3; padding: 3px 10px;
-  border-radius: 5px; text-decoration: none; font-size: 12px;
+  background: var(--bg-card-2); color: var(--accent);
+  padding: 3px 10px; border-radius: 5px; text-decoration: none; font-size: 12px;
 }
-.sd-label-link:hover { background: #1e2d3d; }
+.sd-label-link:hover { background: var(--bg-hover); }
 
 /* ── Action buttons ── */
 .sd-actions { display: flex; flex-direction: column; gap: 8px; }
@@ -131,24 +130,69 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
   text-decoration: none; font-size: 12px; font-weight: 700;
   text-align: center; transition: opacity .15s; white-space: nowrap;
 }
-.sd-btn:hover { opacity: .82; }
+.sd-btn:hover  { opacity: .82; }
 .sd-btn-blue   { background: #1565c0; color: #fff; }
 .sd-btn-orange { background: #e65100; color: #fff; }
 .sd-btn-teal   { background: #00695c; color: #fff; }
 .sd-btn-yellow { background: #f9a825; color: #000; }
 .sd-btn-red    { background: #b71c1c; color: #fff; }
-.sd-btn-pink   { background: #880e4f; color: #fff; }
 .sd-btn-pink   { background: #ad1457; color: #fff; }
 .sd-btn-green  { background: #2e7d32; color: #fff; }
-.sd-btn-ghost  { background: transparent; color: #607d8b; border: 1px solid #2a3f52; }
+.sd-btn-ghost  { background: transparent; color: var(--text-dim); border: 1px solid var(--border-strong); }
 
 /* ── Raw API pre ── */
 .sd-pre {
-  background: #0d1117; border: 1px solid #1e2d3d; border-radius: 6px;
-  padding: 12px; font-size: 11px; color: #9aafbe; overflow-x: auto;
-  white-space: pre-wrap; word-break: break-all;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 6px; padding: 12px; font-size: 11px; color: var(--text-muted);
+  overflow-x: auto; white-space: pre-wrap; word-break: break-all;
   max-height: 280px; overflow-y: auto; margin-top: 8px;
 }
+
+/* ── Inline helper classes ── */
+.sd-divider        { border-top: 1px solid var(--border-strong); margin-top: 18px; padding-top: 14px; }
+.sd-section-label  { font-size: 11px; color: var(--text-dim); font-weight: 700;
+                     text-transform: uppercase; letter-spacing: .05em; margin-bottom: 10px; }
+.sd-section-note   { font-size: 10px; color: var(--text-dim); margin-top: 6px; line-height: 1.5; }
+.sd-field-input    {
+  flex: 1; background: var(--bg-input); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: 4px;
+  padding: 7px 10px; font-size: 13px; outline: none;
+}
+.sd-field-input:focus { border-color: var(--accent); }
+.sd-btn-save-sm    {
+  background: var(--accent); color: #fff; border: none; border-radius: 4px;
+  padding: 7px 14px; font-size: 12px; font-weight: 700;
+  cursor: pointer; white-space: nowrap;
+}
+.sd-btn-status-apply {
+  width: 100%; background: var(--bg-card-2); color: var(--text-muted);
+  border: 1px solid var(--border-strong); border-radius: 6px;
+  padding: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.sd-btn-dhl-cancel {
+  width: 100%; background: rgba(244,67,54,.08); color: var(--err);
+  border: 1px solid rgba(244,67,54,.3); border-radius: 6px;
+  padding: 8px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+.sd-select {
+  width: 100%; background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 6px; padding: 8px 10px;
+  font-size: 12px; margin-bottom: 8px; cursor: pointer;
+}
+
+/* ── Customs table ── */
+.sd-customs-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sd-customs-table thead tr { background: var(--bg-card-2); }
+.sd-customs-table th {
+  padding: 7px 8px; color: var(--text-muted); text-align: left;
+  border-bottom: 1px solid var(--border-strong);
+}
+.sd-customs-table td { padding: 7px 8px; border-bottom: 1px solid var(--border); color: var(--text); }
+.sd-customs-table td.num  { text-align: center; color: var(--text-muted); }
+.sd-customs-table td.hs   { font-family: monospace; color: var(--ok); }
+.sd-customs-table td.val  { text-align: right; color: var(--ok); font-weight: 700; }
+.sd-customs-table td.cnt  { text-align: center; font-weight: 700; }
+.sd-customs-table td.wgt  { text-align: right; color: var(--text-muted); }
 </style>
 {% endblock %}
 
@@ -338,10 +382,10 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
                 {{ carrier_tracking.icon }} {{ carrier_tracking.display }}
               </span>
               {% if carrier_tracking.label %}
-              <span style="display:block;font-size:11px;color:#607d8b;margin-top:2px">{{ carrier_tracking.label }}</span>
+              <span style="display:block;font-size:11px;color:var(--text-dim);margin-top:2px">{{ carrier_tracking.label }}</span>
               {% endif %}
               {% if carrier_tracking.jumingo_status %}
-              <span style="display:block;font-size:10px;color:#3a5570;margin-top:1px;font-family:monospace">{{ carrier_tracking.jumingo_status }}</span>
+              <span style="display:block;font-size:10px;color:var(--text-dim);margin-top:1px;font-family:monospace">{{ carrier_tracking.jumingo_status }}</span>
               {% endif %}
             </span>
           </div>
@@ -392,12 +436,12 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
           {% endif %}
           {% if shipment.error_message %}
           <div class="sd-info-row" style="align-items:flex-start">
-            <span class="sd-info-key" style="color:#f44336">Помилка</span>
-            <span class="sd-info-val" style="color:#ef9a9a;font-family:monospace;font-size:11px;text-align:left">{{ shipment.error_message }}</span>
+            <span class="sd-info-key" style="color:var(--err)">Помилка</span>
+            <span class="sd-info-val" style="color:var(--err);opacity:.8;font-family:monospace;font-size:11px;text-align:left">{{ shipment.error_message }}</span>
           </div>
           {% endif %}
           {% if not shipment.tracking_number and not shipment.carrier_service and not shipment.carrier_price and not shipment.carrier_shipment_id %}
-          <div style="color:#607d8b;font-size:13px;padding:6px 0">Дані від перевізника ще не отримано.</div>
+          <div style="color:var(--text-dim);font-size:13px;padding:6px 0">Дані від перевізника ще не отримано.</div>
           {% endif %}
         </div>
       </div>
@@ -407,30 +451,30 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
       <details class="sd-card">
         <summary class="sd-card-title">🛃 Митна декларація</summary>
         <div>
-          <div style="font-size:11px;color:#607d8b;margin-bottom:10px">
-            Тип: <b style="color:#c9d8e4">{{ shipment.customs_articles.type|default:"—" }}</b>
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px">
+            Тип: <b style="color:var(--text)">{{ shipment.customs_articles.type|default:"—" }}</b>
           </div>
           <div style="overflow-x:auto">
-            <table style="width:100%;border-collapse:collapse;font-size:12px">
+            <table class="sd-customs-table">
               <thead>
-                <tr style="background:#162030">
-                  <th style="padding:7px 8px;color:#9aafbe;text-align:left;border-bottom:1px solid #243347">Опис</th>
-                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;width:46px;text-align:center">К-ть</th>
-                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;text-align:left;width:90px">HS-код</th>
-                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;width:52px;text-align:center">Країна</th>
-                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;text-align:right;width:72px">Вага кг</th>
-                  <th style="padding:7px 6px;color:#9aafbe;border-bottom:1px solid #243347;text-align:right;width:110px">Вартість</th>
+                <tr>
+                  <th>Опис</th>
+                  <th style="width:46px;text-align:center">К-ть</th>
+                  <th style="width:90px">HS-код</th>
+                  <th style="width:52px;text-align:center">Країна</th>
+                  <th style="width:72px;text-align:right">Вага кг</th>
+                  <th style="width:110px;text-align:right">Вартість</th>
                 </tr>
               </thead>
               <tbody>
                 {% for item in shipment.customs_articles.customs_line_items %}
-                <tr style="border-bottom:1px solid #1e2d3d">
-                  <td style="padding:7px 8px;color:#c9d8e4">{{ item.description }}</td>
-                  <td style="padding:7px 6px;color:#9aafbe;text-align:center">{{ item.quantity }}</td>
-                  <td style="padding:7px 6px;font-family:monospace;color:#80cbc4">{{ item.customs_number|default:"—" }}</td>
-                  <td style="padding:7px 6px;color:#9aafbe;text-align:center;font-weight:700">{{ item.origin_country }}</td>
-                  <td style="padding:7px 6px;color:#9aafbe;text-align:right">{{ item.weight|default:"—" }}</td>
-                  <td style="padding:7px 6px;color:#4caf50;text-align:right;font-weight:700">{{ item.value }} {{ item.currency }}</td>
+                <tr>
+                  <td>{{ item.description }}</td>
+                  <td class="num">{{ item.quantity }}</td>
+                  <td class="hs">{{ item.customs_number|default:"—" }}</td>
+                  <td class="cnt">{{ item.origin_country }}</td>
+                  <td class="wgt">{{ item.weight|default:"—" }}</td>
+                  <td class="val">{{ item.value }} {{ item.currency }}</td>
                 </tr>
                 {% endfor %}
               </tbody>
@@ -446,11 +490,11 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
         <summary class="sd-card-title">📋 Технічні деталі API</summary>
         <div>
           {% if raw_request %}
-          <div style="font-size:11px;color:#607d8b;margin-bottom:3px;margin-top:4px">➤ Request</div>
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:3px;margin-top:4px">➤ Request</div>
           <pre class="sd-pre">{{ raw_request }}</pre>
           {% endif %}
           {% if raw_response %}
-          <div style="font-size:11px;color:#607d8b;margin:10px 0 3px">➤ Response</div>
+          <div style="font-size:11px;color:var(--text-dim);margin:10px 0 3px">➤ Response</div>
           <pre class="sd-pre">{{ raw_response }}</pre>
           {% endif %}
         </div>
@@ -506,15 +550,14 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
             </div>
             {% endif %}
             {% if not shipment.tracking_number and not shipment.carrier_service and not shipment.carrier_price %}
-            <div style="color:#607d8b;font-size:13px;padding:4px 0">Дані від перевізника ще не отримано.</div>
+            <div style="color:var(--text-dim);font-size:13px;padding:4px 0">Дані від перевізника ще не отримано.</div>
             {% endif %}
           </div>
 
           <!-- Дії -->
           {% if actions %}
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
-            <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;
-                        letter-spacing:.05em;margin-bottom:10px">⚡ Дії</div>
+          <div class="sd-divider">
+            <div class="sd-section-label">⚡ Дії</div>
             <div class="sd-actions">
               {% for a in actions %}
               {% if a.confirm %}
@@ -537,21 +580,15 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
 
           <!-- Manual tracking number -->
           {% if not shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
-            <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;
-                        letter-spacing:.05em;margin-bottom:10px">📝 Трекінг-номер</div>
+          <div class="sd-divider">
+            <div class="sd-section-label">📝 Трекінг-номер</div>
             <form method="post" action="{% url 'admin:shipping_shipment_set_tracking' shipment.pk %}">
               {% csrf_token %}
               <div style="display:flex;gap:8px">
-                <input type="text" name="tracking_number" placeholder="Введіть трекінг-номер..."
-                  style="flex:1;background:#111c26;color:#c9d8e4;border:1px solid #2a3f52;
-                         border-radius:4px;padding:7px 10px;font-size:13px;outline:none">
-                <button type="submit"
-                  style="background:#1565c0;color:#fff;border:none;border-radius:4px;
-                         padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;
-                         white-space:nowrap">
-                  💾 Зберегти
-                </button>
+                <input type="text" name="tracking_number"
+                  placeholder="Введіть трекінг-номер..."
+                  class="sd-field-input">
+                <button type="submit" class="sd-btn-save-sm">💾 Зберегти</button>
               </div>
             </form>
           </div>
@@ -559,13 +596,11 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
 
           <!-- Manual Jumingo ID -->
           {% if shipment.carrier.carrier_type == "jumingo" and shipment.status not in "cancelled,delivered" %}
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
-            <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;
-                        letter-spacing:.05em;margin-bottom:6px">🔗 Jumingo Shipment ID</div>
+          <div class="sd-divider">
+            <div class="sd-section-label">🔗 Jumingo Shipment ID</div>
             {% if shipment.carrier_shipment_id %}
-            <div style="font-size:11px;color:#455a64;margin-bottom:6px;font-family:monospace;
-                        word-break:break-all">
-              Поточний: <span style="color:#64b5f6">{{ shipment.carrier_shipment_id }}</span>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;font-family:monospace;word-break:break-all">
+              Поточний: <span style="color:var(--accent)">{{ shipment.carrier_shipment_id }}</span>
             </div>
             {% endif %}
             <form method="post" action="{% url 'admin:shipping_shipment_set_jumingo_id' shipment.pk %}">
@@ -574,15 +609,8 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
                 <input type="text" name="carrier_shipment_id"
                   value="{{ shipment.carrier_shipment_id }}"
                   placeholder="s_xxxxxxxxxxxxxxxx..."
-                  style="flex:1;background:#111c26;color:#c9d8e4;border:1px solid #2a3f52;
-                         border-radius:4px;padding:7px 10px;font-size:13px;outline:none;
-                         font-family:monospace">
-                <button type="submit"
-                  style="background:#1565c0;color:#fff;border:none;border-radius:4px;
-                         padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;
-                         white-space:nowrap">
-                  💾 Зберегти
-                </button>
+                  class="sd-field-input sd-mono">
+                <button type="submit" class="sd-btn-save-sm">💾 Зберегти</button>
               </div>
             </form>
           </div>
@@ -590,45 +618,39 @@ details.sd-card[open] summary.sd-card-title { margin-bottom: 14px; }
 
           <!-- DHL Cancel -->
           {% if shipment.carrier.carrier_type == "dhl" and shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
-            <div style="font-size:11px;color:#f44336;font-weight:700;text-transform:uppercase;
-                        letter-spacing:.05em;margin-bottom:10px">🗑️ Скасувати в DHL</div>
+          <div class="sd-divider">
+            <div class="sd-section-label" style="color:var(--err)">🗑️ Скасувати в DHL</div>
             <form method="post" action="{% url 'admin:shipping_shipment_dhl_cancel' shipment.pk %}">
               {% csrf_token %}
               <button type="submit"
                 onclick="return confirm('Скасувати відправлення {{ shipment.tracking_number }} у DHL?\n\nЦе можливо тільки якщо кур\'єр ще не забрав посилку.\n\nПродовжити?')"
-                style="width:100%;background:#1a0a0a;color:#ef9a9a;border:1px solid #5c1a1a;
-                       border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
+                class="sd-btn-dhl-cancel">
                 🗑️ Скасувати в DHL API ({{ shipment.tracking_number }})
               </button>
             </form>
-            <div style="font-size:10px;color:#455a64;margin-top:6px;line-height:1.5">
+            <div class="sd-section-note">
               Викликає DELETE /shipments у DHL. Тільки до передачі кур'єру.
             </div>
           </div>
           {% endif %}
 
           <!-- Ручна зміна статусу -->
-          <div style="margin-top:18px;padding-top:14px;border-top:1px solid #243347">
-            <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;
-                        letter-spacing:.05em;margin-bottom:10px">🔧 Статус вручну</div>
+          <div class="sd-divider">
+            <div class="sd-section-label">🔧 Статус вручну</div>
             <form method="post" action="{% url 'admin:shipping_shipment_set_status' shipment.pk %}">
               {% csrf_token %}
-              <select name="new_status"
-                style="width:100%;background:#111c26;border:1px solid #2a3f52;color:#c9d8e4;
-                       border-radius:6px;padding:8px 10px;font-size:12px;margin-bottom:8px;cursor:pointer">
+              <select name="new_status" class="sd-select">
                 {% for val, label in status_choices %}
                 <option value="{{ val }}" {% if val == shipment.status %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
               </select>
               <button type="submit"
                 onclick="return confirm('Змінити статус вручну?\n\nЦе лише локальний запис у Minerva.\nAPI перевізника не викликається.')"
-                style="width:100%;background:#1e2d3d;color:#9aafbe;border:1px solid #2a3f52;
-                       border-radius:6px;padding:8px;font-size:12px;font-weight:700;cursor:pointer">
+                class="sd-btn-status-apply">
                 Застосувати
               </button>
             </form>
-            <div style="font-size:10px;color:#455a64;margin-top:6px;line-height:1.5">
+            <div class="sd-section-note">
               Використовуй якщо API перевізника показує застарілий статус.<br>
               Синхронізує також SalesOrder.
             </div>
