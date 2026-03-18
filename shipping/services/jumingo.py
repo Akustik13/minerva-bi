@@ -525,25 +525,52 @@ class JumingoService(BaseCarrierService):
 
     # ── Вибір тарифу ─────────────────────────────────────────────────────────
 
+    @staticmethod
+    def _norm_time(t: str) -> str:
+        """Нормалізує рядок часу до HH:MM:SS.
+        '09:00' → '09:00:00', '09:00:00' → '09:00:00', '' → '00:00:00'
+        """
+        if not t:
+            return "00:00:00"
+        parts = t.strip().split(":")
+        if len(parts) == 2:
+            return f"{parts[0]:0>2}:{parts[1]:0>2}:00"
+        if len(parts) == 3:
+            return f"{parts[0]:0>2}:{parts[1]:0>2}:{parts[2]:0>2}"
+        return "00:00:00"
+
     def patch_tariff(self, carrier_shipment_id: str, tariff_id: str, pickup_date: str,
                      pickup_min_time: str = "09:00:00", pickup_max_time: str = "18:00:00") -> dict:
         """PATCH /v1/shipments/{id} — призначає тариф на відправлення.
 
         Shop tariffs (id starts with 's-') use shipping_type='shop' and times '00:00:00'.
         Pickup tariffs use shipping_type='pickup' with the given time window.
+
+        pickup_date: 'YYYY-MM-DD' — конвертується в ISO 8601 UTC datetime
+        pickup_min/max_time: 'HH:MM' або 'HH:MM:SS' — нормалізується до HH:MM:SS
         """
         import requests as req
 
         is_shop = str(tariff_id).startswith("s-")
+
+        # Pickup_date: API вимагає повний ISO 8601 datetime UTC
+        if "T" not in str(pickup_date):
+            pickup_date_iso = f"{pickup_date}T00:00:00Z"
+        else:
+            pickup_date_iso = str(pickup_date)
+
+        min_t = "00:00:00" if is_shop else self._norm_time(pickup_min_time)
+        max_t = "00:00:00" if is_shop else self._norm_time(pickup_max_time)
+
         headers = self._headers()
         headers["Content-Type"] = "application/merge-patch+json"
         payload = {
             "rate": {
                 "shipper_tariff_id": tariff_id,
                 "shipping_type":     "shop" if is_shop else "pickup",
-                "pickup_date":       pickup_date,
-                "pickup_min_time":   "00:00:00" if is_shop else pickup_min_time,
-                "pickup_max_time":   "00:00:00" if is_shop else pickup_max_time,
+                "pickup_date":       pickup_date_iso,
+                "pickup_min_time":   min_t,
+                "pickup_max_time":   max_t,
             }
         }
         try:
