@@ -903,9 +903,9 @@ document.addEventListener('DOMContentLoaded', function() {
       <div id="rates-params" style="display:none;background:var(--bg-card-2);border:1px solid var(--border-strong);border-radius:6px;padding:9px 14px;margin-bottom:14px;font-size:11px;line-height:1.7"></div>
       <div id="rates-type-filter" style="display:none;margin-bottom:12px">
         <span style="font-size:11px;color:var(--text-dim);margin-right:8px">Показати:</span>
-        <button onclick="setRatesFilter('all')"    id="rf-all"    class="rf-btn rf-active">Всі</button>
-        <button onclick="setRatesFilter('pickup')" id="rf-pickup" class="rf-btn">🚐 Кур'єр</button>
-        <button onclick="setRatesFilter('shop')"   id="rf-shop"   class="rf-btn">🏪 Поштомат</button>
+        <button type="button" onclick="setRatesFilter('all')"    id="rf-all"    class="rf-btn rf-active">Всі</button>
+        <button type="button" onclick="setRatesFilter('pickup')" id="rf-pickup" class="rf-btn">🚐 Кур'єр</button>
+        <button type="button" onclick="setRatesFilter('shop')"   id="rf-shop"   class="rf-btn">🏪 Поштомат</button>
       </div>
       <div id="rates-loading" style="display:none;color:var(--text-dim);padding:16px 0;font-size:13px">
         ⏳ Запитую тарифи…
