@@ -390,6 +390,36 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             </span>
           </div>
           {% endif %}
+          {% if shipment.carrier_delayed %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Затримка</span>
+            <span class="sd-info-val">
+              <span style="background:var(--err);color:#fff;font-weight:700;font-size:12px;padding:2px 10px;border-radius:12px">
+                🚨 Вспізнення підтверджено
+              </span>
+            </span>
+          </div>
+          {% endif %}
+          {% if shipment.carrier_status_label %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Статус перевізника</span>
+            <span class="sd-info-val" style="color:var(--text-muted)">{{ shipment.carrier_status_label }}</span>
+          </div>
+          {% endif %}
+          {% if shipment.eta_from or shipment.eta_to %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Очікувана доставка</span>
+            <span class="sd-info-val" style="{% if shipment.carrier_delayed %}color:var(--warn);font-weight:600{% endif %}">
+              {% if shipment.eta_from and shipment.eta_to %}
+                {{ shipment.eta_from|date:"d.m.y" }} – {{ shipment.eta_to|date:"d.m.y" }}
+              {% elif shipment.eta_from %}
+                від {{ shipment.eta_from|date:"d.m.y" }}
+              {% else %}
+                до {{ shipment.eta_to|date:"d.m.y" }}
+              {% endif %}
+            </span>
+          </div>
+          {% endif %}
           {% if shipment.tracking_number %}
           <div class="sd-info-row">
             <span class="sd-info-key">Трекінг-номер</span>

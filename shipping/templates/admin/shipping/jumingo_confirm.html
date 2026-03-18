@@ -6,37 +6,46 @@
 {% block content %}
 <style>
   .jc-wrap   { max-width: 860px; margin: 0 auto; padding: 0 0 40px; }
-  .jc-card   { background: #1e2a35; border: 1px solid #2a3f52; border-radius: 8px;
-               margin-bottom: 16px; overflow: hidden; }
-  .jc-head   { background: #162030; padding: 10px 16px; font-size: 12px;
+  .jc-card   { background: var(--bg-card); border: 1px solid var(--border-strong);
+               border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .jc-head   { background: var(--bg-card-2); padding: 10px 16px; font-size: 12px;
                font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
-               color: #9aafbe; display: flex; align-items: center; gap: 8px; }
+               color: var(--text-muted); display: flex; align-items: center; gap: 8px;
+               border-bottom: 1px solid var(--border-strong); }
   .jc-body   { padding: 14px 16px; }
   .jc-row    { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
-  .jc-lbl    { color: #607d8b; min-width: 140px; flex-shrink: 0; }
-  .jc-val    { color: #c9d8e4; font-weight: 500; }
-  .jc-val.accent { color: #64b5f6; }
+  .jc-lbl    { color: var(--text-dim); min-width: 140px; flex-shrink: 0; }
+  .jc-val    { color: var(--text); font-weight: 500; }
+  .jc-val.accent { color: var(--accent); }
   .jc-2col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:700px){ .jc-2col { grid-template-columns: 1fr; } }
   .jc-table  { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .jc-table th { background: #1a3347; color: #9aafbe; padding: 8px 10px;
-                 text-align: left; font-weight: 600; }
-  .jc-table td { padding: 8px 10px; color: #c9d8e4; border-bottom: 1px solid #1a2a38; }
+  .jc-table th { background: var(--bg-card-2); color: var(--text-muted); padding: 8px 10px;
+                 text-align: left; font-weight: 600; border-bottom: 1px solid var(--border-strong); }
+  .jc-table td { padding: 8px 10px; color: var(--text); border-bottom: 1px solid var(--border); }
   .jc-table tr:last-child td { border-bottom: none; }
-  .jc-actions { display: flex; gap: 12px; margin-top: 24px; }
+  .jc-actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
   .btn-confirm { background: #2e7d32; color: #fff; border: none; padding: 12px 28px;
                  border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer;
-                 transition: background .15s; }
-  .btn-confirm:hover { background: #1b5e20; }
-  .btn-back   { background: #1e2a35; color: #9aafbe; border: 1px solid #2a3f52;
+                 transition: opacity .15s; }
+  .btn-confirm:hover { opacity: .85; }
+  .btn-back   { background: var(--bg-card-2); color: var(--text-muted);
+                border: 1px solid var(--border-strong);
                 padding: 12px 20px; border-radius: 6px; font-size: 13px;
                 font-weight: 600; text-decoration: none; transition: background .15s; }
-  .btn-back:hover { background: #243347; color: #c9d8e4; }
-  .warn-banner { background: #2d1f00; border: 1px solid #ff9800; border-radius: 6px;
-                 padding: 12px 16px; color: #ffcc02; font-size: 13px; margin-bottom: 16px; }
+  .btn-back:hover { background: var(--bg-hover); color: var(--text); }
+  .warn-banner { background: var(--bg-card-2); border: 1px solid var(--warn);
+                 border-left: 4px solid var(--warn); border-radius: 6px;
+                 padding: 12px 16px; color: var(--warn); font-size: 13px; margin-bottom: 16px; }
+  .weight-warn { background: var(--bg-card-2); border: 1px solid var(--warn);
+                 border-left: 4px solid var(--warn); border-radius: 6px;
+                 padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+  .weight-warn-title { font-weight: 700; color: var(--warn); margin-bottom: 6px; }
+  .weight-warn-detail { color: var(--text-muted); }
 </style>
 
 <div class="jc-wrap">
-  <h1 style="color:#e3f2fd;font-size:20px;margin-bottom:20px">
+  <h1 style="color:var(--text);font-size:20px;margin-bottom:20px">
     📦 Перевірте дані перед відправкою на Jumingo
   </h1>
 
@@ -44,6 +53,18 @@
     {% for msg in messages %}
     <div class="warn-banner">{{ msg }}</div>
     {% endfor %}
+  {% endif %}
+
+  {% if weight_warn %}
+  <div class="weight-warn">
+    <div class="weight-warn-title">⚖️ Увага: розбіжність у вазі</div>
+    <div class="weight-warn-detail">
+      Вага посилки: <b>{{ weight_warn.shipment_kg }} кг</b> ·
+      Сума ваг митних артикулів: <b>{{ weight_warn.articles_kg }} кг</b> ·
+      Різниця: <b>{{ weight_warn.diff_kg }} кг ({{ weight_warn.diff_pct }}%)</b><br>
+      Перевірте правильність вказаної ваги перед відправкою.
+    </div>
+  </div>
   {% endif %}
 
   <!-- Тариф -->
@@ -164,6 +185,8 @@
             <th>Опис</th>
             <th style="text-align:center">К-сть</th>
             <th style="text-align:right">Вартість</th>
+            <th>Походження</th>
+            <th>Вага нетто</th>
             {% if customs.lineItems.0.hsTariffNumber %}
             <th>HS код</th>
             {% endif %}
@@ -174,10 +197,13 @@
           <tr>
             <td>{{ item.content }}</td>
             <td style="text-align:center">{{ item.quantity }} {{ item.unitOfMeasurement }}</td>
-            <td style="text-align:right;color:#4caf50;font-weight:700">
+            <td style="text-align:right;color:var(--ok);font-weight:700">
               {{ item.value }} {{ customs.currency }}</td>
+            <td style="color:var(--text-muted)">{{ item.manufacturingCountry|default:"—" }}</td>
+            <td style="text-align:right;color:var(--text-muted)">
+              {% if item.netWeight %}{{ item.netWeight }} кг{% else %}—{% endif %}</td>
             {% if customs.lineItems.0.hsTariffNumber %}
-            <td style="color:#607d8b">{{ item.hsTariffNumber|default:"—" }}</td>
+            <td style="color:var(--text-dim)">{{ item.hsTariffNumber|default:"—" }}</td>
             {% endif %}
           </tr>
           {% endfor %}

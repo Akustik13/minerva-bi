@@ -1251,6 +1251,22 @@ class ShipmentAdmin(admin.ModelAdmin):
         payload = service._build_payload(shipment)
         customs = payload.get("customs_invoice")
 
+        # ── Перевірка відповідності ваги ─────────────────────────────────────
+        weight_warn = None
+        articles = (shipment.customs_articles or {}).get("customs_line_items") or []
+        articles_weight = sum(float(a.get("weight") or 0) for a in articles)
+        ship_kg = float(shipment.weight_kg or 0)
+        if articles_weight > 0 and ship_kg > 0:
+            diff_abs = abs(ship_kg - articles_weight)
+            diff_pct = diff_abs / ship_kg * 100
+            if diff_abs >= 0.5 or diff_pct >= 20:
+                weight_warn = {
+                    "shipment_kg":  ship_kg,
+                    "articles_kg":  round(articles_weight, 3),
+                    "diff_kg":      round(diff_abs, 3),
+                    "diff_pct":     round(diff_pct, 1),
+                }
+
         return render(request, "admin/shipping/jumingo_confirm.html", {
             **self.admin_site.each_context(request),
             "title":    f"Підтвердити відправлення #{shipment.pk}",
@@ -1261,6 +1277,7 @@ class ShipmentAdmin(admin.ModelAdmin):
             "packages":     payload.get("packages", []),
             "details":      payload.get("details", {}),
             "customs":      customs,
+            "weight_warn":  weight_warn,
             "confirm_url":  reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]),
             "back_url":     reverse("admin:shipping_shipment_rates", args=[shipment.pk]),
         })
@@ -1404,10 +1421,21 @@ class ShipmentAdmin(admin.ModelAdmin):
 
             results.append(entry)
 
+        # Use sender address from first active carrier for display
+        from_address = {}
+        first_carrier = carriers.first()
+        if first_carrier:
+            from_address = {
+                "country": first_carrier.sender_country,
+                "zip":     first_carrier.sender_zip,
+                "city":    first_carrier.sender_city,
+            }
+
         return JsonResponse({
-            "results": results,
-            "weight":  weight,
-            "dims":    f"{length}×{width}×{height}",
+            "results":      results,
+            "weight":       weight,
+            "dims":         f"{length}×{width}×{height}",
+            "from_address": from_address,
         })
 
     # ── Submit → Jumingo API ──────────────────────────────────────────────────
@@ -2362,8 +2390,76 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
             shipment.save(update_fields=["customs_articles"])
             changed = True
 
+    # ── Carrier status label та delayed flag ──────────────────────────────────
+    progress     = tracking_obj.get("progress") or {}
+    prog_label   = (
+        progress.get("label") or
+        progress.get("status_label") or
+        progress.get("statusLabel") or
+        progress.get("description") or
+        ""
+    )
+    prog_delayed = bool(
+        progress.get("delayed") or
+        progress.get("isDelayed") or
+        progress.get("is_delayed") or
+        False
+    )
+
+    if prog_label and prog_label != shipment.carrier_status_label:
+        shipment.carrier_status_label = prog_label[:200]
+        changed = True
+
+    old_delayed = shipment.carrier_delayed
+    if prog_delayed != shipment.carrier_delayed:
+        shipment.carrier_delayed = prog_delayed
+        changed = True
+
+    # ── ETA дати (очікувана доставка) ─────────────────────────────────────────
+    from datetime import date as _date
+
+    def _parse_date(s):
+        if not s:
+            return None
+        try:
+            if isinstance(s, str):
+                return _date.fromisoformat(s[:10])
+        except ValueError:
+            pass
+        return None
+
+    # Пробуємо кілька можливих шляхів у відповіді Jumingo
+    tracking_dates = tracking_obj.get("dates") or {}
+    eta_f = (
+        _parse_date(tracking_data.get("estimated_delivery_from"))
+        or _parse_date(tracking_data.get("estimatedDeliveryFrom"))
+        or _parse_date(tracking_data.get("delivery_date_from"))
+        or _parse_date(tracking_dates.get("eta_from"))
+        or _parse_date(tracking_dates.get("deliveryDateFrom"))
+        or _parse_date(progress.get("delivery_date_from"))
+    )
+    eta_t = (
+        _parse_date(tracking_data.get("estimated_delivery_to"))
+        or _parse_date(tracking_data.get("estimatedDeliveryTo"))
+        or _parse_date(tracking_data.get("delivery_date_to"))
+        or _parse_date(tracking_dates.get("eta_to"))
+        or _parse_date(tracking_dates.get("deliveryDateTo"))
+        or _parse_date(progress.get("delivery_date_to"))
+        # fallback: single date → use as eta_to
+        or _parse_date(tracking_data.get("estimated_delivery"))
+        or _parse_date(tracking_data.get("estimatedDelivery"))
+        or _parse_date(tracking_data.get("promised_delivery"))
+    )
+
+    if eta_f and eta_f != shipment.eta_from:
+        shipment.eta_from = eta_f
+        changed = True
+    if eta_t and eta_t != shipment.eta_to:
+        shipment.eta_to = eta_t
+        changed = True
+
     # ── Статус: progress.class → Minerva статус ───────────────────────────────
-    progress_class  = (tracking_obj.get("progress") or {}).get("class", "")
+    progress_class  = progress.get("class", "")
     shipment_status = data.get("status", "")
     new_status_str  = (
         PROGRESS_CLASS_MAP.get(progress_class)
@@ -2375,6 +2471,33 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
 
     if changed:
         shipment.save()
+
+    # ── Нотифікація при появі затримки ────────────────────────────────────────
+    if not old_delayed and prog_delayed:
+        try:
+            from config.models import NotificationSettings
+            ns = NotificationSettings.get()
+            order_num = shipment.order.order_number if shipment.order else f"#{shipment.pk}"
+            tn = shipment.tracking_number or shipment.carrier_shipment_id or "—"
+            eta_str = ""
+            if eta_f or eta_t:
+                parts = []
+                if eta_f:
+                    parts.append(eta_f.strftime("%d.%m.%y"))
+                if eta_t and eta_t != eta_f:
+                    parts.append(eta_t.strftime("%d.%m.%y"))
+                eta_str = f" · Доставка: {' – '.join(parts)}"
+            msg = (
+                f"🚨 <b>Затримка відправлення</b>\n"
+                f"Замовлення: <b>{order_num}</b>\n"
+                f"Трекінг: <code>{tn}</code>\n"
+                f"Статус: {prog_label or 'Verspätet'}{eta_str}"
+            )
+            if ns.telegram_enabled and ns.telegram_bot_token and ns.telegram_chat_id:
+                from dashboard.notifications import _send_telegram
+                _send_telegram(ns, msg)
+        except Exception:
+            pass
 
     # ── Синхронізація SalesOrder (незалежно від змін у відправленні) ──────────
     order         = shipment.order

@@ -160,6 +160,24 @@ class Shipment(models.Model):
     customs_articles    = models.JSONField("Митна декларація (артикули)", null=True, blank=True,
                                            help_text="Заповнюється автоматично при створенні відправлення")
 
+    # ── Розширені поля статусу від перевізника ────────────────────────────────
+    carrier_status_label = models.CharField(
+        "Статус перевізника", max_length=200, blank=True, default="",
+        help_text="Текстовий статус від API перевізника (напр. «Unterwegs»)"
+    )
+    carrier_delayed = models.BooleanField(
+        "Затримка доставки", default=False,
+        help_text="Перевізник підтвердив затримку посилки"
+    )
+    eta_from = models.DateField(
+        "Очікувана доставка від", null=True, blank=True,
+        help_text="Початок вікна очікуваної доставки"
+    )
+    eta_to = models.DateField(
+        "Очікувана доставка до", null=True, blank=True,
+        help_text="Кінець вікна очікуваної доставки"
+    )
+
     # ── Технічні поля ─────────────────────────────────────────────────────────
     raw_request  = models.JSONField("Запит (JSON)", null=True, blank=True)
     raw_response = models.JSONField("Відповідь (JSON)", null=True, blank=True)

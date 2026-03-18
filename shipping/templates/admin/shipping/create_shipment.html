@@ -196,10 +196,12 @@ function compareRates(){
   const results= document.getElementById('rates-results');
   const meta   = document.getElementById('rates-meta');
 
+  const paramsEl = document.getElementById('rates-params');
   panel.style.display='';
   loading.style.display='';
   results.innerHTML='';
   meta.textContent='';
+  paramsEl.style.display='none';
   panel.scrollIntoView({behavior:'smooth',block:'start'});
 
   const get = n => (form.querySelector(`[name="${n}"]`)?.value||'').trim();
@@ -231,7 +233,18 @@ function compareRates(){
       results.innerHTML=`<div style="color:#ef9a9a;padding:8px 0">❌ ${esc(data.error)}</div>`;
       return;
     }
-    meta.textContent = `${body.weight_kg} кг · ${data.dims} см`;
+    const destStr = [body.recipient_country, body.recipient_zip, body.recipient_city].filter(Boolean).join(' ');
+    meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${esc(body.weight_kg)} кг · ${esc(data.dims||'')} см</span>`
+      + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
+    // Params block — show exactly what was sent to the API
+    const fromAddr = data.from_address || {};
+    paramsEl.style.display = '';
+    paramsEl.innerHTML =
+      `<span style="color:#607d8b;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Параметри запиту до API:</span><br>`
+      + `<span style="color:#9aafbe">📤 Відправник:</span> <b style="color:#c9d8e4">${esc(fromAddr.country||'?')} ${esc(fromAddr.zip||'')} ${esc(fromAddr.city||'')}</b>`
+      + ` &nbsp;·&nbsp; <span style="color:#9aafbe">📥 Одержувач:</span> <b style="color:#c9d8e4">${esc(body.recipient_country)} ${esc(body.recipient_zip)} ${esc(body.recipient_city)}</b><br>`
+      + `<span style="color:#9aafbe">⚖️ Вага:</span> <b style="color:#c9d8e4">${esc(body.weight_kg)} кг</b>`
+      + ` &nbsp;·&nbsp; <span style="color:#9aafbe">📐 Розміри:</span> <b style="color:#c9d8e4">${esc(data.dims||'')} см (Д×Ш×В)</b>`;
     results.innerHTML = renderComparison(data.results);
   })
   .catch(err=>{
@@ -812,6 +825,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <span>📊 Порівняння тарифів</span>
         <span id="rates-meta" style="font-weight:400;color:#607d8b;font-size:11px;text-transform:none;letter-spacing:0"></span>
       </div>
+      <div id="rates-params" style="display:none;background:#1c2128;border:1px solid #2a3f52;border-radius:6px;padding:9px 14px;margin-bottom:14px;font-size:11px;line-height:1.7"></div>
       <div id="rates-loading" style="display:none;color:#607d8b;padding:16px 0;font-size:13px">
         ⏳ Запитую тарифи…
       </div>

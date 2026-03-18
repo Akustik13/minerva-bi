@@ -183,6 +183,10 @@ class JumingoService(BaseCarrierService):
         }
         if item.get("customs_number"):
             mapped["hsTariffNumber"] = item["customs_number"]
+        if item.get("origin_country"):
+            mapped["manufacturingCountry"] = item["origin_country"]
+        if item.get("weight"):
+            mapped["netWeight"] = round(float(item["weight"]), 3)
         return mapped
 
     def _build_customs_invoice(self, shipment) -> dict | None:
