@@ -377,6 +377,53 @@ class ThemeSettingsAdmin(admin.ModelAdmin):
         context['cp_css_js'] = True
         return super().render_change_form(request, context, *args, **kwargs)
 
+    def get_urls(self):
+        from django.urls import path as url_path
+        urls = super().get_urls()
+        custom = [
+            url_path(
+                'server-profiles/',
+                self.admin_site.admin_view(self._server_profiles_list),
+                name='config_themesettings_server_profiles',
+            ),
+            url_path(
+                'server-profiles/<str:name>/',
+                self.admin_site.admin_view(self._server_profiles_load),
+                name='config_themesettings_server_profiles_load',
+            ),
+        ]
+        return custom + urls
+
+    def _server_profiles_list(self, request):
+        import os
+        from django.conf import settings
+        from django.http import JsonResponse
+        folder = os.path.join(settings.BASE_DIR, 'theme_profiles')
+        profiles = []
+        if os.path.isdir(folder):
+            profiles = sorted(
+                os.path.splitext(f)[0]
+                for f in os.listdir(folder)
+                if f.endswith('.json')
+            )
+        return JsonResponse({'profiles': profiles})
+
+    def _server_profiles_load(self, request, name):
+        import json
+        import os
+        import re
+        from django.conf import settings
+        from django.http import JsonResponse
+        if not re.match(r'^[\w-]+$', name):
+            return JsonResponse({'error': 'Invalid name'}, status=400)
+        folder = os.path.join(settings.BASE_DIR, 'theme_profiles')
+        path = os.path.join(folder, name + '.json')
+        if not os.path.isfile(path):
+            return JsonResponse({'error': 'Not found'}, status=404)
+        with open(path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return JsonResponse(data)
+
     def has_add_permission(self, request):
         return False
 
