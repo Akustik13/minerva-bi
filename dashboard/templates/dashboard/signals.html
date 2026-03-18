@@ -16,14 +16,11 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&family=Manrope:wght@400;500;600;700;800&display=swap');
 
+  /* Scoped severity colors — don't collide with global theme vars */
   :root {
-    --bg: #0d1117; --surface: #161b22; --surface2: #1c2128;
-    --border: rgba(255,255,255,0.07);
-    --text: #e6edf3; --muted: #7d8590;
-    --critical: #f85149; --critical-bg: rgba(248,81,73,0.08); --critical-border: rgba(248,81,73,0.25);
-    --warning: #e3b341;  --warning-bg: rgba(227,179,65,0.08);  --warning-border: rgba(227,179,65,0.25);
-    --info: #58a6ff;     --info-bg: rgba(88,166,255,0.08);     --info-border: rgba(88,166,255,0.2);
-    --green: #3fb950;
+    --sig-crit-bg:  rgba(248,81,73,.08);  --sig-crit-brd:  rgba(248,81,73,.25);
+    --sig-warn-bg:  rgba(227,179,65,.08); --sig-warn-brd:  rgba(227,179,65,.25);
+    --sig-info-bg:  rgba(88,166,255,.08); --sig-info-brd:  rgba(88,166,255,.2);
   }
 
   #content { padding: 0 !important; }
@@ -35,21 +32,21 @@
     display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
   }
   .summary-card {
-    background:var(--surface); border:1px solid var(--border);
+    background:var(--bg-card-2); border:1px solid var(--border);
     border-radius:12px; padding:16px 20px;
     display:flex; align-items:center; gap:14px;
     transition:transform .2s;
   }
   .summary-card:hover { transform:translateY(-2px); }
-  .summary-num { font-size:32px; font-weight:800; line-height:1; }
-  .summary-label { font-size:12px; color:var(--muted); margin-top:3px; font-weight:500; }
-  .s-critical { border-left:3px solid var(--critical); }
-  .s-warning  { border-left:3px solid var(--warning); }
-  .s-info     { border-left:3px solid var(--info); }
-  .s-total    { border-left:3px solid rgba(255,255,255,.2); }
-  .s-critical .summary-num { color:var(--critical); }
-  .s-warning  .summary-num { color:var(--warning); }
-  .s-info     .summary-num { color:var(--info); }
+  .summary-num { font-size:32px; font-weight:800; line-height:1; color:var(--text); }
+  .summary-label { font-size:12px; color:var(--text-dim); margin-top:3px; font-weight:500; }
+  .s-critical { border-left:3px solid var(--err); }
+  .s-warning  { border-left:3px solid var(--warn); }
+  .s-info     { border-left:3px solid var(--accent); }
+  .s-total    { border-left:3px solid var(--border-2); }
+  .s-critical .summary-num { color:var(--err); }
+  .s-warning  .summary-num { color:var(--warn); }
+  .s-info     .summary-num { color:var(--accent); }
 
   /* Filters */
   .filters {
@@ -58,13 +55,13 @@
   }
   .filter-btn {
     padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600;
-    border:1px solid var(--border); background:var(--surface2);
-    color:var(--muted); cursor:pointer; transition:all .2s;
+    border:1px solid var(--border); background:var(--bg-card-2);
+    color:var(--text-dim); cursor:pointer; transition:all .2s;
   }
-  .filter-btn:hover, .filter-btn.active { color:var(--text); border-color:rgba(255,255,255,.2); background:var(--surface); }
-  .filter-btn.f-critical.active { border-color:var(--critical-border); color:var(--critical); background:var(--critical-bg); }
-  .filter-btn.f-warning.active  { border-color:var(--warning-border);  color:var(--warning);  background:var(--warning-bg); }
-  .filter-btn.f-info.active     { border-color:var(--info-border);     color:var(--info);     background:var(--info-bg); }
+  .filter-btn:hover, .filter-btn.active { color:var(--text); border-color:var(--border-2); background:var(--bg-card); }
+  .filter-btn.f-critical.active { border-color:var(--sig-crit-brd); color:var(--err);    background:var(--sig-crit-bg); }
+  .filter-btn.f-warning.active  { border-color:var(--sig-warn-brd); color:var(--warn);   background:var(--sig-warn-bg); }
+  .filter-btn.f-info.active     { border-color:var(--sig-info-brd); color:var(--accent); background:var(--sig-info-bg); }
 
   /* Main list */
   .main { margin:20px 0 60px; padding:0 32px; }
@@ -72,7 +69,7 @@
   /* Group header */
   .group-title {
     font-size:11px; font-weight:700; letter-spacing:1.2px;
-    text-transform:uppercase; color:var(--muted);
+    text-transform:uppercase; color:var(--text-dim);
     margin:24px 0 10px; padding-left:4px;
     display:flex; align-items:center; gap:8px;
   }
@@ -82,7 +79,7 @@
 
   /* Signal card */
   .signal {
-    background:var(--surface); border:1px solid var(--border);
+    background:var(--bg-card-2); border:1px solid var(--border);
     border-radius:12px; padding:16px 20px;
     margin-bottom:8px; display:flex; gap:16px; align-items:flex-start;
     transition:transform .15s, border-color .2s;
@@ -90,43 +87,43 @@
   }
   @keyframes slideIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
   .signal:hover { transform:translateX(3px); }
-  .signal.type-critical { border-left:3px solid var(--critical); background:var(--critical-bg); border-color:var(--critical-border); }
-  .signal.type-warning  { border-left:3px solid var(--warning);  background:var(--warning-bg);  border-color:var(--warning-border); }
-  .signal.type-info     { border-left:3px solid var(--info);     background:var(--info-bg);     border-color:var(--info-border); }
+  .signal.type-critical { border-left:3px solid var(--err);    background:var(--sig-crit-bg); border-color:var(--sig-crit-brd); }
+  .signal.type-warning  { border-left:3px solid var(--warn);   background:var(--sig-warn-bg); border-color:var(--sig-warn-brd); }
+  .signal.type-info     { border-left:3px solid var(--accent); background:var(--sig-info-bg); border-color:var(--sig-info-brd); }
 
   .signal-icon { font-size:24px; line-height:1; flex-shrink:0; margin-top:2px; }
   .signal-content { flex:1; min-width:0; }
   .signal-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:5px; }
-  .signal-title { font-size:14px; font-weight:700; }
+  .signal-title { font-size:14px; font-weight:700; color:var(--text); }
   .signal-module {
     font-size:10px; font-weight:700; letter-spacing:.8px;
     padding:2px 8px; border-radius:10px; text-transform:uppercase;
-    background:rgba(255,255,255,.07); color:var(--muted);
+    background:var(--border); color:var(--text-dim);
   }
   .signal-age {
-    font-size:10px; color:var(--muted);
+    font-size:10px; color:var(--text-dim);
     font-family:'JetBrains Mono',monospace; margin-left:auto;
   }
-  .signal-body { font-size:13px; color:var(--muted); line-height:1.5; }
+  .signal-body { font-size:13px; color:var(--text-muted); line-height:1.5; }
   .signal-action {
     margin-top:10px;
     display:inline-flex; align-items:center; gap:6px;
     padding:5px 14px; border-radius:7px; font-size:12px; font-weight:700;
     text-decoration:none; transition:all .2s;
   }
-  .type-critical .signal-action { background:rgba(248,81,73,.15); color:var(--critical); border:1px solid var(--critical-border); }
-  .type-warning  .signal-action { background:rgba(227,179,65,.15); color:var(--warning);  border:1px solid var(--warning-border); }
-  .type-info     .signal-action { background:rgba(88,166,255,.15); color:var(--info);     border:1px solid var(--info-border); }
+  .type-critical .signal-action { background:rgba(248,81,73,.15);  color:var(--err);    border:1px solid var(--sig-crit-brd); }
+  .type-warning  .signal-action { background:rgba(227,179,65,.15); color:var(--warn);   border:1px solid var(--sig-warn-brd); }
+  .type-info     .signal-action { background:rgba(88,166,255,.15); color:var(--accent); border:1px solid var(--sig-info-brd); }
   .signal-action:hover { filter:brightness(1.2); transform:translateX(2px); }
 
   /* Empty state */
   .empty {
     text-align:center; padding:80px 20px;
-    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    background:var(--bg-card-2); border:1px solid var(--border); border-radius:16px;
   }
   .empty .e-icon { font-size:64px; margin-bottom:16px; }
-  .empty h2 { font-size:20px; font-weight:700; margin-bottom:8px; }
-  .empty p { color:var(--muted); font-size:14px; }
+  .empty h2 { font-size:20px; font-weight:700; margin-bottom:8px; color:var(--text); }
+  .empty p { color:var(--text-muted); font-size:14px; }
 
   .hidden { display:none !important; }
 </style>

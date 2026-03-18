@@ -59,7 +59,7 @@
 .filter-select:focus { border-color:var(--border-2); }
 .filter-btn {
   padding:5px 14px; border-radius:6px; font-size:12px; font-weight:700;
-  border:1px solid rgba(88,166,255,.4); background:rgba(88,166,255,.1); color:#58a6ff;
+  border:1px solid rgba(88,166,255,.4); background:rgba(88,166,255,.1); color:var(--accent);
   cursor:pointer; transition:all .2s; white-space:nowrap;
 }
 .filter-btn:hover { background:rgba(88,166,255,.2); }
@@ -679,9 +679,13 @@ function setPreset(days) {
 </div><!-- /main -->
 
 <script>
-Chart.defaults.color = '#7d8590';
-Chart.defaults.borderColor = 'rgba(255,255,255,0.07)';
+const _cs = getComputedStyle(document.documentElement);
+const _cv = k => _cs.getPropertyValue(k).trim();
+Chart.defaults.color = _cv('--text-dim') || '#7d8590';
+Chart.defaults.borderColor = _cv('--border') || 'rgba(255,255,255,0.07)';
 Chart.defaults.font.family = "'Manrope', sans-serif";
+const _chartBg = _cv('--bg-card') || '#161b22';
+const _gridColor = _cv('--border') || 'rgba(255,255,255,0.04)';
 
 const GOLD   = '#c9a84c';
 const GOLDA  = 'rgba(201,168,76,0.15)';
@@ -721,8 +725,8 @@ new Chart(document.getElementById('chartRevMonth'), {
     interaction: { mode: 'index', intersect: false },
     plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
     scales: {
-      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { font: { size: 10 } } },
-      y:  { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { font: { size: 10 }, callback: v => '€'+v.toLocaleString() } },
+      x: { grid: { color: _gridColor }, ticks: { font: { size: 10 } } },
+      y:  { grid: { color: _gridColor }, ticks: { font: { size: 10 }, callback: v => '€'+v.toLocaleString() } },
       y2: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 } } },
     }
   }
@@ -742,8 +746,8 @@ new Chart(document.getElementById('chartDayOrd'), {
     responsive: true, maintainAspectRatio: true,
     plugins: { legend: { display: false } },
     scales: {
-      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
-      y: { grid: { color: 'rgba(255,255,255,0.04)' }, beginAtZero: true, ticks: { font: { size: 10 } } },
+      x: { grid: { color: _gridColor }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
+      y: { grid: { color: _gridColor }, beginAtZero: true, ticks: { font: { size: 10 } } },
     }
   }
 });
@@ -753,7 +757,7 @@ new Chart(document.getElementById('chartGeo'), {
   type: 'doughnut',
   data: {
     labels: chartGeoLbls,
-    datasets: [{ data: chartGeoRev, backgroundColor: GEO_COLORS, borderWidth: 2, borderColor: '#161b22' }]
+    datasets: [{ data: chartGeoRev, backgroundColor: GEO_COLORS, borderWidth: 2, borderColor: _chartBg }]
   },
   options: {
     responsive: true, maintainAspectRatio: true, cutout: '65%',
@@ -769,7 +773,7 @@ new Chart(document.getElementById('chartCat'), {
   type: 'doughnut',
   data: {
     labels: chartCatLbls,
-    datasets: [{ data: chartCatRev, backgroundColor: CAT_COLORS, borderWidth: 2, borderColor: '#161b22' }]
+    datasets: [{ data: chartCatRev, backgroundColor: CAT_COLORS, borderWidth: 2, borderColor: _chartBg }]
   },
   options: {
     responsive: true, maintainAspectRatio: true, cutout: '60%',

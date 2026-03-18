@@ -5,23 +5,6 @@
 
 {% block content %}
 <style>
-/* ── Variables ─────────────────────────────────────── */
-:root {
-  --bg:       #0f111a;
-  --surface:  #161b2e;
-  --card:     #1a2035;
-  --border:   #2a3558;
-  --accent:   #4f8ef7;
-  --accent2:  #6c63ff;
-  --green:    #22c55e;
-  --red:      #ef4444;
-  --yellow:   #f59e0b;
-  --muted:    #64748b;
-  --text:     #e2e8f0;
-  --text2:    #94a3b8;
-  --radius:   12px;
-}
-
 /* ── Layout ─────────────────────────────────────────── */
 .bk-wrap  { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
 .bk-head  { display: flex; align-items: center; justify-content: space-between;
@@ -29,8 +12,8 @@
 .bk-title { font-size: 1.8rem; font-weight: 700; color: var(--text); margin: 0; }
 
 /* ── Cards ──────────────────────────────────────────── */
-.bk-card  { background: var(--card); border: 1px solid var(--border);
-            border-radius: var(--radius); padding: 24px; margin-bottom: 24px; }
+.bk-card  { background: var(--bg-card); border: 1px solid var(--border-strong);
+            border-radius: 12px; padding: 24px; margin-bottom: 24px; }
 .bk-card h2 { font-size: 1.1rem; font-weight: 600; color: var(--text);
               margin: 0 0 20px; display: flex; align-items: center; gap: 8px; }
 
@@ -38,28 +21,28 @@
 .bk-grid  { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 @media (max-width: 640px) { .bk-grid { grid-template-columns: 1fr; } }
 
-.bk-box   { background: var(--surface); border: 1px solid var(--border);
+.bk-box   { background: var(--bg-card-2); border: 1px solid var(--border-strong);
             border-radius: 10px; padding: 20px; text-align: center;
             display: flex; flex-direction: column; gap: 10px; }
 .bk-box .icon { font-size: 2.2rem; }
 .bk-box h3    { font-size: 1rem; font-weight: 600; color: var(--text); margin: 0; }
-.bk-box p     { font-size: .8rem; color: var(--text2); margin: 0; }
+.bk-box p     { font-size: .8rem; color: var(--text-muted); margin: 0; }
 
 .bk-btn   { background: var(--accent); color: #fff; border: none;
             border-radius: 8px; padding: 10px 16px; font-size: .9rem;
             font-weight: 600; cursor: pointer; transition: opacity .2s; }
 .bk-btn:hover:not(:disabled) { opacity: .85; }
 .bk-btn:disabled { opacity: .45; cursor: not-allowed; }
-.bk-btn.green { background: var(--green); }
-.bk-btn.red   { background: var(--red); }
+.bk-btn.green { background: var(--ok); }
+.bk-btn.red   { background: var(--err); }
 
 .bk-result { min-height: 36px; font-size: .82rem; border-radius: 6px;
              padding: 6px 10px; text-align: left; line-height: 1.4; }
-.bk-result.idle    { color: var(--muted); }
-.bk-result.running { color: var(--yellow); background: rgba(245,158,11,.08); }
-.bk-result.ok      { color: var(--green);  background: rgba(34,197,94,.08);
+.bk-result.idle    { color: var(--text-dim); }
+.bk-result.running { color: var(--warn); background: rgba(245,158,11,.08); }
+.bk-result.ok      { color: var(--ok);   background: rgba(34,197,94,.08);
                       white-space: pre-wrap; }
-.bk-result.error   { color: var(--red);    background: rgba(239,68,68,.08);
+.bk-result.error   { color: var(--err);  background: rgba(239,68,68,.08);
                       white-space: pre-wrap; font-family: monospace; font-size:.78rem; }
 
 /* ── Settings form ──────────────────────────────────── */
@@ -67,8 +50,8 @@
 @media (max-width: 600px) { .bk-form { grid-template-columns: 1fr; } }
 .bk-form .full { grid-column: 1 / -1; }
 
-.bk-label { display: block; font-size: .82rem; color: var(--text2); margin-bottom: 5px; }
-.bk-input { width: 100%; background: var(--surface); border: 1px solid var(--border);
+.bk-label { display: block; font-size: .82rem; color: var(--text-muted); margin-bottom: 5px; }
+.bk-input { width: 100%; background: var(--bg-card-2); border: 1px solid var(--border-strong);
             color: var(--text); border-radius: 7px; padding: 9px 12px;
             font-size: .9rem; box-sizing: border-box; }
 .bk-input:focus { outline: none; border-color: var(--accent); }
@@ -80,7 +63,7 @@
 .bk-toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
 .bk-toggle input { opacity: 0; width: 0; height: 0; }
 .bk-toggle .slider {
-  position: absolute; inset: 0; background: var(--border);
+  position: absolute; inset: 0; background: var(--border-strong);
   border-radius: 24px; cursor: pointer; transition: background .2s;
 }
 .bk-toggle .slider:before {
@@ -88,12 +71,12 @@
   left: 3px; bottom: 3px; background: #fff; border-radius: 50%;
   transition: transform .2s;
 }
-.bk-toggle input:checked + .slider { background: var(--green); }
+.bk-toggle input:checked + .slider { background: var(--ok); }
 .bk-toggle input:checked + .slider:before { transform: translateX(20px); }
 .bk-toggle-label { font-size: .9rem; color: var(--text); cursor: pointer; }
 
 .bk-note  { background: rgba(79,142,247,.07); border: 1px solid rgba(79,142,247,.2);
-            border-radius: 8px; padding: 12px 16px; font-size: .83rem; color: var(--text2);
+            border-radius: 8px; padding: 12px 16px; font-size: .83rem; color: var(--text-muted);
             line-height: 1.6; }
 .bk-note code { background: rgba(255,255,255,.07); border-radius: 4px;
                 padding: 1px 5px; font-family: monospace; color: var(--text); }
@@ -102,31 +85,31 @@
 .bk-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
 .bk-table th {
   text-align: left; padding: 10px 12px; font-size: .78rem; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--muted); border-bottom: 1px solid var(--border);
+  letter-spacing: .05em; color: var(--text-dim); border-bottom: 1px solid var(--border-strong);
 }
-.bk-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,53,88,.5); }
+.bk-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
 .bk-table tr:last-child td { border-bottom: none; }
-.bk-table tr:hover td { background: rgba(255,255,255,.02); }
+.bk-table tr:hover td { background: var(--bg-hover); }
 
 .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: .75rem; font-weight: 600; }
-.badge.ok      { background: rgba(34,197,94,.15);  color: var(--green); }
-.badge.error   { background: rgba(239,68,68,.15);  color: var(--red); }
-.badge.running { background: rgba(245,158,11,.15); color: var(--yellow); }
+.badge.ok      { background: rgba(34,197,94,.15);  color: var(--ok); }
+.badge.error   { background: rgba(239,68,68,.15);  color: var(--err); }
+.badge.running { background: rgba(245,158,11,.15); color: var(--warn); }
 .badge.db      { background: rgba(79,142,247,.15); color: var(--accent); }
-.badge.media   { background: rgba(108,99,255,.15); color: var(--accent2); }
-.badge.full     { background: rgba(34,197,94,.10);  color: #4ade80; }
-.badge.settings { background: rgba(245,158,11,.12); color: var(--yellow); }
+.badge.media   { background: rgba(108,99,255,.15); color: var(--accent-2); }
+.badge.full    { background: rgba(34,197,94,.10);  color: #4ade80; }
+.badge.settings { background: rgba(245,158,11,.12); color: var(--warn); }
 
-.path-cell { font-family: monospace; font-size: .75rem; color: var(--text2);
+.path-cell { font-family: monospace; font-size: .75rem; color: var(--text-muted);
              max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .path-cell:hover { overflow: visible; white-space: normal; word-break: break-all; }
 
-.del-btn { background: transparent; border: 1px solid var(--border);
-           color: var(--muted); border-radius: 6px; padding: 3px 8px;
+.del-btn { background: transparent; border: 1px solid var(--border-strong);
+           color: var(--text-dim); border-radius: 6px; padding: 3px 8px;
            font-size: .75rem; cursor: pointer; }
-.del-btn:hover { border-color: var(--red); color: var(--red); }
+.del-btn:hover { border-color: var(--err); color: var(--err); }
 
-.empty-row td { text-align: center; color: var(--muted); padding: 32px; }
+.empty-row td { text-align: center; color: var(--text-dim); padding: 32px; }
 
 /* ── Restore section ────────────────────────────────── */
 .restore-warn {
@@ -134,23 +117,23 @@
   border-radius: 10px; padding: 14px 18px; margin-bottom: 20px;
   font-size: .85rem; color: #fca5a5; line-height: 1.6;
 }
-.restore-warn strong { color: var(--red); }
+.restore-warn strong { color: var(--err); }
 .restore-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
 .restore-table th {
   text-align: left; padding: 9px 12px; font-size: .78rem;
   text-transform: uppercase; letter-spacing: .05em;
-  color: var(--muted); border-bottom: 1px solid var(--border);
+  color: var(--text-dim); border-bottom: 1px solid var(--border-strong);
 }
-.restore-table td { padding: 10px 12px; border-bottom: 1px solid rgba(42,53,88,.5); vertical-align: middle; }
+.restore-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 .restore-table tr:last-child td { border-bottom: none; }
-.restore-table tr:hover td { background: rgba(255,255,255,.02); }
+.restore-table tr:hover td { background: var(--bg-hover); }
 .restore-btn {
   background: rgba(239,68,68,.15); border: 1px solid rgba(239,68,68,.4);
   color: #fca5a5; border-radius: 7px; padding: 5px 14px;
   font-size: .82rem; font-weight: 600; cursor: pointer;
   transition: all .2s; white-space: nowrap;
 }
-.restore-btn:hover { background: rgba(239,68,68,.3); color: #fff; border-color: var(--red); }
+.restore-btn:hover { background: rgba(239,68,68,.3); color: #fff; border-color: var(--err); }
 
 /* ── Modal (restore confirm) ────────────────────────── */
 .modal-overlay {
@@ -159,33 +142,33 @@
 }
 .modal-overlay.open { display: flex; }
 .modal-box {
-  background: #1a2035; border: 1px solid #3a4a6a;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
   border-radius: 14px; padding: 32px; max-width: 480px; width: 92%;
   box-shadow: 0 20px 60px rgba(0,0,0,.7);
 }
 .modal-icon { font-size: 3rem; text-align: center; margin-bottom: 12px; }
-.modal-title { font-size: 1.2rem; font-weight: 700; color: var(--red); text-align: center; margin-bottom: 8px; }
-.modal-sub { font-size: .88rem; color: var(--text2); text-align: center; margin-bottom: 20px; line-height: 1.6; }
-.modal-file { background: rgba(255,255,255,.05); border: 1px solid var(--border);
+.modal-title { font-size: 1.2rem; font-weight: 700; color: var(--err); text-align: center; margin-bottom: 8px; }
+.modal-sub { font-size: .88rem; color: var(--text-muted); text-align: center; margin-bottom: 20px; line-height: 1.6; }
+.modal-file { background: rgba(255,255,255,.05); border: 1px solid var(--border-strong);
               border-radius: 7px; padding: 10px 14px; font-family: monospace;
               font-size: .82rem; color: var(--text); margin-bottom: 20px;
               word-break: break-all; line-height: 1.5; }
 .modal-actions { display: flex; gap: 12px; justify-content: center; }
-.modal-cancel { background: var(--surface); border: 1px solid var(--border);
-                color: var(--text2); border-radius: 8px; padding: 10px 24px;
+.modal-cancel { background: var(--bg-card-2); border: 1px solid var(--border-strong);
+                color: var(--text-muted); border-radius: 8px; padding: 10px 24px;
                 font-size: .9rem; cursor: pointer; }
-.modal-cancel:hover { border-color: var(--muted); color: var(--text); }
-.modal-confirm { background: var(--red); border: none; color: #fff;
+.modal-cancel:hover { border-color: var(--text-dim); color: var(--text); }
+.modal-confirm { background: var(--err); border: none; color: #fff;
                  border-radius: 8px; padding: 10px 24px; font-size: .9rem;
                  font-weight: 700; cursor: pointer; transition: opacity .2s; }
 .modal-confirm:hover:not(:disabled) { opacity: .85; }
 .modal-confirm:disabled { opacity: .45; cursor: not-allowed; }
 .modal-result { margin-top: 16px; padding: 10px 14px; border-radius: 7px;
                 font-size: .85rem; line-height: 1.5; display: none; }
-.modal-result.ok    { background: rgba(34,197,94,.1); color: var(--green); }
-.modal-result.error { background: rgba(239,68,68,.1);  color: var(--red);
+.modal-result.ok    { background: rgba(34,197,94,.1); color: var(--ok); }
+.modal-result.error { background: rgba(239,68,68,.1);  color: var(--err);
                       white-space: pre-wrap; font-family: monospace; font-size: .78rem; }
-.modal-result.running { background: rgba(245,158,11,.08); color: var(--yellow); }
+.modal-result.running { background: rgba(245,158,11,.08); color: var(--warn); }
 
 /* ── Directory browser modal ────────────────────────── */
 #dirBrowserModal {
@@ -195,25 +178,25 @@
 #dirBrowserInner {
   position: absolute; top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  background: #1e2a35; border: 1px solid #2a3f52; border-radius: 10px;
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px;
   padding: 24px; width: 660px; max-width: 94vw;
   display: flex; flex-direction: column;
   box-shadow: 0 8px 40px rgba(0,0,0,.7);
 }
 #dirBrowserList {
-  overflow-y: auto; border: 1px solid #2a3f52; border-radius: 4px;
-  background: #0d1117; min-height: 160px; max-height: 340px;
+  overflow-y: auto; border: 1px solid var(--border-strong); border-radius: 4px;
+  background: var(--bg-app); min-height: 160px; max-height: 340px;
 }
 .dir-item {
   padding: 9px 16px; cursor: pointer;
-  border-bottom: 1px solid #0d1117;
-  color: #c9d8e4; display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text); display: flex; align-items: center; gap: 10px;
   font-size: 13px;
 }
-.dir-item:hover  { background: #162030; }
-.dir-item.is-dir { color: #c9d8e4; }
-.dir-item.is-file { color: #9aafbe; font-family: monospace; font-size: 12px; }
-.dir-item.is-up  { color: #607d8b; }
+.dir-item:hover  { background: var(--bg-hover); }
+.dir-item.is-dir { color: var(--text); }
+.dir-item.is-file { color: var(--text-muted); font-family: monospace; font-size: 12px; }
+.dir-item.is-up  { color: var(--text-dim); }
 
 /* ── Local folder row (browse / pick PC folder) ─────── */
 .bk-pick-row {
@@ -222,24 +205,24 @@
   border-radius: 8px; padding: 12px 14px; margin-bottom: 18px;
 }
 .bk-pick-btn {
-  background: #37474f; color: #b0bec5; border: 1px solid #546e7a;
+  background: var(--bg-card-2); color: var(--text-muted); border: 1px solid var(--border-strong);
   border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px;
   white-space: nowrap;
 }
-.bk-pick-btn:hover { background: #455a64; }
-.bk-pick-label { font-size: .82rem; color: var(--text2); }
-.bk-pick-selected { font-size: .82rem; color: var(--green); display: none; }
-.bk-pick-hint { font-size: .78rem; color: var(--muted); display: none; }
+.bk-pick-btn:hover { background: var(--bg-hover); }
+.bk-pick-label { font-size: .82rem; color: var(--text-muted); }
+.bk-pick-selected { font-size: .82rem; color: var(--ok); display: none; }
+.bk-pick-hint { font-size: .78rem; color: var(--text-dim); display: none; }
 
 /* ── Input-with-button wrapper ──────────────────────── */
 .bk-input-row { display: flex; gap: 8px; align-items: center; }
 .bk-input-row .bk-input { flex: 1; }
 .bk-icon-btn {
-  background: #2a3f52; color: #9aafbe; border: 1px solid #3a5570;
+  background: var(--bg-card-2); color: var(--text-muted); border: 1px solid var(--border-strong);
   border-radius: 7px; padding: 9px 13px; cursor: pointer; font-size: 14px;
   white-space: nowrap; flex-shrink: 0;
 }
-.bk-icon-btn:hover { background: #37474f; color: #c9d8e4; }
+.bk-icon-btn:hover { background: var(--bg-hover); color: var(--text); }
 
 /* ── Breadcrumbs ────────────────────────────────────── */
 .breadcrumbs { background: transparent !important; padding: 0 0 16px !important;
@@ -247,7 +230,7 @@
 
 /* ── Save bar ───────────────────────────────────────── */
 .save-bar { display: flex; align-items: center; gap: 12px; padding-top: 8px; }
-.save-msg { font-size: .82rem; color: var(--green); display: none; }
+.save-msg { font-size: .82rem; color: var(--ok); display: none; }
 </style>
 
 <!-- Breadcrumbs -->
@@ -268,12 +251,12 @@
     <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-start;">
 
       <!-- Status block -->
-      <div style="flex:1; min-width:220px; background:var(--surface); border:1px solid var(--border);
+      <div style="flex:1; min-width:220px; background:var(--bg-card-2); border:1px solid var(--border-strong);
                   border-radius:10px; padding:16px 18px; display:flex; flex-direction:column; gap:8px;">
-        <div style="font-size:.82rem; color:var(--text2);">Поточний стан:</div>
+        <div style="font-size:.82rem; color:var(--text-muted);">Поточний стан:</div>
         <div id="git-current" style="font-size:.85rem; color:var(--text); font-family:monospace;">—</div>
-        <div id="git-branch"  style="font-size:.78rem; color:var(--muted);">—</div>
-        <div id="git-remote"  style="font-size:.75rem; color:var(--muted); word-break:break-all;">—</div>
+        <div id="git-branch"  style="font-size:.78rem; color:var(--text-dim);">—</div>
+        <div id="git-remote"  style="font-size:.75rem; color:var(--text-dim); word-break:break-all;">—</div>
       </div>
 
       <!-- Actions -->
@@ -297,7 +280,7 @@
     <!-- Result / commit list -->
     <div id="git-result" class="bk-result idle" style="margin-top:14px; display:none;"></div>
     <div id="git-commits" style="margin-top:10px; display:none;">
-      <div style="font-size:.8rem; color:var(--text2); margin-bottom:6px;">Нові коміти:</div>
+      <div style="font-size:.8rem; color:var(--text-muted); margin-bottom:6px;">Нові коміти:</div>
       <ul id="git-commits-list" style="margin:0; padding-left:20px; font-size:.82rem;
           font-family:monospace; color:var(--text); line-height:1.7;"></ul>
     </div>
@@ -319,7 +302,7 @@
       <span class="bk-pick-hint" id="bk-local-hint">
         🕓 Остання: <span id="bk-local-hint-name"></span>
       </span>
-      <span style="font-size:.75rem;color:var(--muted);margin-left:auto;">
+      <span style="font-size:.75rem;color:var(--text-dim);margin-left:auto;">
         Chrome/Edge — нативний діалог Windows &nbsp;·&nbsp; Firefox — вкажіть шлях у налаштуваннях
       </span>
     </div>
@@ -394,7 +377,7 @@
                       font-weight:600; user-select:none; padding:4px 0;">
         📂 Вказати шлях вручну…
       </summary>
-      <div style="margin-top:14px; background:var(--surface); border:1px solid var(--border);
+      <div style="margin-top:14px; background:var(--bg-card-2); border:1px solid var(--border-strong);
                   border-radius:10px; padding:18px 20px;">
         <div style="display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end; margin-bottom:12px;">
           <div>
@@ -439,7 +422,7 @@
                       font-weight:600; user-select:none; padding:4px 0;">
         📤 Завантажити файл бекапу з ПК…
       </summary>
-      <div style="margin-top:14px; background:var(--surface); border:1px solid var(--border);
+      <div style="margin-top:14px; background:var(--bg-card-2); border:1px solid var(--border-strong);
                   border-radius:10px; padding:18px 20px; display:flex; flex-direction:column; gap:12px;">
         <div style="display:grid; grid-template-columns:1fr auto; gap:10px; align-items:end;">
           <div>
@@ -485,7 +468,7 @@
           <td>
             <div class="path-cell" title="{{ b.path }}">{{ b.name }}</div>
           </td>
-          <td style="color:var(--text2); white-space:nowrap;">{{ b.size_display }}</td>
+          <td style="color:var(--text-muted); white-space:nowrap;">{{ b.size_display }}</td>
           <td>
             {% if b.type == 'settings' %}
             <button class="restore-btn"
@@ -515,7 +498,7 @@
       </tbody>
     </table>
     {% else %}
-    <div style="text-align:center; color:var(--muted); padding:32px;">
+    <div style="text-align:center; color:var(--text-dim); padding:32px;">
       Бекапів не знайдено в директорії бекапів.<br>
       <small>Зробіть перший бекап за допомогою розділу вище.</small>
     </div>
@@ -528,7 +511,7 @@
       <div class="modal-icon">⚠️</div>
       <div class="modal-title">Підтвердіть відновлення</div>
       <div class="modal-sub" id="modal-sub-text">
-        Ця дія <strong style="color:var(--red)">незворотна</strong>.<br>
+        Ця дія <strong style="color:var(--err)">незворотна</strong>.<br>
         Поточні дані будуть замінені даними з бекапу.
       </div>
       <div class="modal-file" id="modal-file-info"></div>
@@ -549,7 +532,7 @@
       <div class="modal-title">Відновлення налаштувань</div>
       <div class="modal-sub">
         Відновить: юзерів, групи, токени API, конфігурацію ботів і систему.<br>
-        Існуючі об'єкти будуть <strong style="color:var(--yellow)">перезаписані</strong>.
+        Існуючі об'єкти будуть <strong style="color:var(--warn)">перезаписані</strong>.
       </div>
       <div class="modal-file" id="srm-file-info"></div>
       <div class="modal-actions">
@@ -583,7 +566,7 @@
                     onclick="openBrowser('backup-dir-input', false)"
                     title="Відкрити браузер директорій">📂</button>
           </div>
-          <div style="font-size:.78rem; color:var(--muted); margin-top:5px;">
+          <div style="font-size:.78rem; color:var(--text-dim); margin-top:5px;">
             Поточний шлях: <code style="background:rgba(255,255,255,.05);padding:1px 5px;border-radius:3px;font-family:monospace;">
               {% if cfg.backup_dir %}{{ cfg.backup_dir }}{% else %}{{ settings_default_dir }}{% endif %}
             </code>
@@ -658,7 +641,7 @@
   ════════════════════════════════════════════════════════ -->
   <div class="bk-card">
     <h2>📋 Історія бекапів
-      <span style="font-size:.8rem; color:var(--muted); font-weight:400; margin-left:8px;">
+      <span style="font-size:.8rem; color:var(--text-dim); font-weight:400; margin-left:8px;">
         (останні 50)
       </span>
     </h2>
@@ -697,19 +680,19 @@
                 {% if log.file_path %}{{ log.file_path }}{% else %}—{% endif %}
               </div>
               {% if log.error_msg %}
-              <div style="font-size:.75rem; color:var(--red); margin-top:3px; font-family:monospace;">
+              <div style="font-size:.75rem; color:var(--err); margin-top:3px; font-family:monospace;">
                 {{ log.error_msg|truncatechars:120 }}
               </div>
               {% endif %}
             </td>
-            <td style="white-space:nowrap; color:var(--text2);">
+            <td style="white-space:nowrap; color:var(--text-muted);">
               {{ log.size_display }}
             </td>
-            <td style="color:var(--text2);">{{ log.duration }}s</td>
+            <td style="color:var(--text-muted);">{{ log.duration }}s</td>
             <td style="white-space:nowrap; display:flex; gap:6px; align-items:center;">
               {% if log.status == 'ok' and log.file_path and log.backup_type != 'full' %}
               <a href="{% url 'admin:backup_download_file' log.pk %}"
-                 style="background:#1e5c1e;color:#4caf50;border:1px solid #2e7d32;
+                 style="background:rgba(34,197,94,.15);color:var(--ok);border:1px solid rgba(34,197,94,.4);
                         border-radius:5px;padding:4px 10px;font-size:12px;
                         text-decoration:none;white-space:nowrap;"
                  title="Завантажити на ПК">⬇️ ПК</a>
@@ -740,18 +723,18 @@
   <div id="dirBrowserInner">
     <!-- Header -->
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-      <span style="color:#c9d8e4;font-weight:700;font-size:15px" id="dirBrowserTitle">📂 Вибрати папку</span>
+      <span style="color:var(--text);font-weight:700;font-size:15px" id="dirBrowserTitle">📂 Вибрати папку</span>
       <button type="button" id="dirBrowserCloseBtn"
-              style="background:none;border:none;color:#9aafbe;font-size:22px;cursor:pointer;line-height:1;padding:0">✕</button>
+              style="background:none;border:none;color:var(--text-muted);font-size:22px;cursor:pointer;line-height:1;padding:0">✕</button>
     </div>
     <!-- Path bar -->
     <div style="display:flex;gap:6px;margin-bottom:8px;">
       <input type="text" id="dirBrowserPathInput"
              placeholder="Введіть шлях або оберіть нижче…"
-             style="flex:1;background:#111c26;border:1px solid #2a3f52;border-radius:4px;
-                    padding:7px 10px;font-size:12px;font-family:monospace;color:#c9d8e4;outline:none;">
+             style="flex:1;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:4px;
+                    padding:7px 10px;font-size:12px;font-family:monospace;color:var(--text);outline:none;">
       <button type="button" id="dirBrowserGoBtn"
-              style="background:#2a3f52;color:#9aafbe;border:1px solid #3a5570;
+              style="background:var(--bg-card-2);color:var(--text-muted);border:1px solid var(--border-strong);
                      border-radius:4px;padding:7px 14px;cursor:pointer;font-size:13px;white-space:nowrap;">
         → Перейти
       </button>
@@ -761,10 +744,10 @@
     <!-- Footer -->
     <div style="margin-top:14px;display:flex;gap:10px;justify-content:flex-end;">
       <button type="button" id="dirBrowserCancelBtn"
-              style="background:#37474f;color:#b0bec5;border:1px solid #546e7a;
+              style="background:var(--bg-card-2);color:var(--text-muted);border:1px solid var(--border-strong);
                      padding:8px 18px;border-radius:6px;cursor:pointer;">Скасувати</button>
       <button type="button" id="dirBrowserConfirm"
-              style="background:#4caf50;color:#fff;border:none;
+              style="background:var(--ok);color:#fff;border:none;
                      padding:8px 22px;border-radius:6px;cursor:pointer;font-weight:700;">✅ Вибрати</button>
     </div>
   </div>
@@ -1159,7 +1142,7 @@ function closeBrowser() {
 
 function loadBrowserDir(path) {
   var list = document.getElementById('dirBrowserList');
-  list.innerHTML = '<div class="dir-item" style="color:#607d8b;cursor:default">⏳ Завантаження…</div>';
+  list.innerHTML = '<div class="dir-item" style="color:var(--text-dim);cursor:default">⏳ Завантаження…</div>';
   var url = BROWSE_URL + '?path=' + encodeURIComponent(path) + '&files=' + (_browseFiles ? '1' : '0');
   fetch(url)
     .then(function(r) { return r.json(); })
@@ -1169,11 +1152,11 @@ function loadBrowserDir(path) {
       var h = '';
       if (data.parent !== null && data.parent !== undefined) {
         h += '<div class="dir-item is-up" data-path="' + esc(data.parent) + '" data-type="dir">'
-           + '<span>⬆️</span><span style="color:#607d8b;font-size:12px">..</span>'
-           + '<span style="font-size:11px;color:#455a64;font-family:monospace">' + esc(data.parent) + '</span></div>';
+           + '<span>⬆️</span><span style="color:var(--text-dim);font-size:12px">..</span>'
+           + '<span style="font-size:11px;color:var(--text-dim);font-family:monospace">' + esc(data.parent) + '</span></div>';
       }
       if (!data.dirs.length && !data.files.length) {
-        h += '<div class="dir-item" style="color:#607d8b;cursor:default;font-style:italic">'
+        h += '<div class="dir-item" style="color:var(--text-dim);cursor:default;font-style:italic">'
            + (_browseFiles ? 'Немає папок і файлів .sql/.zip' : 'Немає підпапок') + '</div>';
       }
       data.dirs.forEach(function(d) {
@@ -1189,7 +1172,7 @@ function loadBrowserDir(path) {
     })
     .catch(function(err) {
       document.getElementById('dirBrowserPathInput').value = path;
-      list.innerHTML = '<div class="dir-item" style="color:#f44336;cursor:default">⚠️ ' + esc(String(err)) + '</div>';
+      list.innerHTML = '<div class="dir-item" style="color:var(--err);cursor:default">⚠️ ' + esc(String(err)) + '</div>';
     });
 }
 
@@ -1262,12 +1245,12 @@ let _restoreData = {};
 function openRestoreModal(filepath, type, label, name, mtime, mediaPath) {
   _restoreData = { filepath, type, label, name, mtime, mediaPath };
   const subMsgs = {
-    db:    'Поточна <strong style="color:var(--red)">база даних буде видалена</strong> та замінена даними з бекапу.',
-    media: 'Поточні <strong style="color:var(--red)">медіа файли будуть перезаписані</strong> з архіву.',
-    full:  'Поточна <strong style="color:var(--red)">база даних та медіа файли</strong> будуть замінені даними з бекапу.',
+    db:    'Поточна <strong style="color:var(--err)">база даних буде видалена</strong> та замінена даними з бекапу.',
+    media: 'Поточні <strong style="color:var(--err)">медіа файли будуть перезаписані</strong> з архіву.',
+    full:  'Поточна <strong style="color:var(--err)">база даних та медіа файли</strong> будуть замінені даними з бекапу.',
   };
   document.getElementById('modal-sub-text').innerHTML =
-    (subMsgs[type] || '') + '<br><br>Всі зміни після дати бекапу будуть <strong style="color:var(--red)">безповоротно втрачені</strong>.';
+    (subMsgs[type] || '') + '<br><br>Всі зміни після дати бекапу будуть <strong style="color:var(--err)">безповоротно втрачені</strong>.';
   document.getElementById('modal-file-info').innerHTML =
     `<b>Тип:</b> ${label}<br><b>Файл:</b> ${name}<br><b>Дата бекапу:</b> ${mtime}`;
   const resultEl = document.getElementById('modal-result');
