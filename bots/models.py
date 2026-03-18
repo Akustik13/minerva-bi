@@ -56,6 +56,27 @@ class DigiKeyConfig(models.Model):
         "Marketplace Token дійсний до", null=True, blank=True
     )
 
+    # ── Авто-підтвердження (Marketplace) ─────────────────────────────────────
+    AUTO_CONFIRM_NEVER    = "never"
+    AUTO_CONFIRM_ALWAYS   = "always"
+    AUTO_CONFIRM_IN_STOCK = "in_stock"
+    AUTO_CONFIRM_CHOICES  = [
+        ("never",    "Мануально — не підтверджувати автоматично"),
+        ("always",   "Завжди — підтверджувати одразу при надходженні"),
+        ("in_stock", "Якщо є на складі — підтверджувати тільки якщо всі товари є"),
+    ]
+    auto_confirm_mode = models.CharField(
+        "Авто-підтвердження на DigiKey",
+        max_length=20,
+        choices=AUTO_CONFIRM_CHOICES,
+        default="never",
+        help_text=(
+            "Що робити коли нове Marketplace замовлення надходить: "
+            "підтвердити одразу на DigiKey, перевірити залишки на складі, "
+            "або залишити для ручного підтвердження."
+        ),
+    )
+
     # ── Phase 2: Webhook ──────────────────────────────────────────────────────
     webhook_enabled = models.BooleanField("Webhook увімкнений (Phase 2)", default=False)
     webhook_secret  = models.CharField(

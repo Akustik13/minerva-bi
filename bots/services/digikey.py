@@ -683,7 +683,7 @@ def sync_marketplace_orders(config) -> dict:
 
         for order in orders:
             try:
-                _process_marketplace_order(order, stats)
+                _process_marketplace_order(order, stats, config)
             except Exception as e:
                 logger.exception("Marketplace sync error order=%s", order.get("businessId"))
                 stats["errors"].append(f"order {order.get('businessId')}: {e}")
@@ -703,7 +703,7 @@ def sync_marketplace_orders(config) -> dict:
     return stats
 
 
-def _process_marketplace_order(order: dict, stats: dict):
+def _process_marketplace_order(order: dict, stats: dict, config=None):
     """Обробляє одне Marketplace замовлення — get_or_create + рядки."""
     from sales.models import SalesOrder, SalesOrderLine
     from inventory.models import Product
@@ -782,6 +782,8 @@ def _process_marketplace_order(order: dict, stats: dict):
             "new_status": minerva_status,
         })
         _create_marketplace_lines(sale, order, currency, stats)
+        if config:
+            _maybe_auto_confirm(config, order_number, sale)
     else:
         # Оновлюємо статус якщо змінився
         if sale.status != minerva_status:
@@ -1091,6 +1093,96 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
             if not dry_run:
                 existing_line.save(update_fields=line_changed)
             stats["lines_updated"] += 1
+
+
+# ── Marketplace: авто-підтвердження ──────────────────────────────────────────
+
+def _check_stock_for_order(sale) -> bool:
+    """Повертає True якщо всі рядки замовлення є на складі в достатній кількості."""
+    from django.db.models import Sum
+    from inventory.models import InventoryTransaction
+
+    for line in sale.lines.select_related("product"):
+        if not line.product:
+            return False  # невідомий товар — не підтверджувати
+        stock = (
+            InventoryTransaction.objects
+            .filter(product=line.product)
+            .aggregate(total=Sum("quantity"))["total"] or 0
+        )
+        if stock < line.qty:
+            return False
+    return True
+
+
+def _maybe_auto_confirm(config, order_id: str, sale) -> None:
+    """
+    Перевіряє auto_confirm_mode і при потребі підтверджує замовлення на DigiKey.
+    Викликається одразу після створення нового Marketplace замовлення.
+
+    Режими:
+      never    — нічого не робити (мануально)
+      always   — підтвердити одразу
+      in_stock — підтвердити тільки якщо всі товари є на складі
+    """
+    mode = getattr(config, "auto_confirm_mode", "never")
+    if mode == "never":
+        return
+
+    if mode == "in_stock":
+        if not _check_stock_for_order(sale):
+            logger.info(
+                "DigiKey auto-confirm skipped (insufficient stock) order=%s", order_id
+            )
+            return
+
+    result = confirm_marketplace_order(config, order_id)
+    if result["ok"]:
+        logger.info("DigiKey auto-confirmed order=%s mode=%s", order_id, mode)
+    else:
+        logger.warning(
+            "DigiKey auto-confirm FAILED order=%s mode=%s: %s",
+            order_id, mode, result["message"],
+        )
+
+
+# ── Marketplace: підтвердження замовлення ────────────────────────────────────
+
+# ⚠️ Ендпоінт потрібно перевірити в Swagger на developer.digikey.com
+# Marketplace2 → Orders → PATCH або POST /accept
+MARKETPLACE_CONFIRM_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/accept"
+
+def confirm_marketplace_order(config, order_id: str) -> dict:
+    """Підтверджує (accepts) вхідне Marketplace замовлення через DigiKey API.
+
+    Змінює orderState: PendingAcceptance/New → Accepted на боці DigiKey.
+    Повертає {'ok': bool, 'message': str, 'raw': dict}.
+
+    ⚠️ Перевір точний ендпоінт у Swagger DigiKey developer portal.
+    """
+    import requests as req
+
+    token = get_marketplace_token(config)
+    url   = f"{_base_url(config)}{MARKETPLACE_CONFIRM_PATH.format(order_id=order_id)}"
+
+    resp = req.post(
+        url,
+        headers=_headers(config, token),
+        json={},   # тіло може бути порожнім або {"orderState": "Accepted"} — уточни в Swagger
+        timeout=20,
+    )
+    raw = {}
+    try:
+        raw = resp.json()
+    except Exception:
+        raw = {"text": resp.text[:500]}
+
+    if resp.status_code in (200, 201, 204):
+        return {"ok": True,  "message": "✅ Замовлення підтверджено на DigiKey", "raw": raw}
+    else:
+        detail = raw.get("detail") or raw.get("message") or raw.get("error") or resp.text[:200]
+        logger.error("DigiKey confirm order %s: %s %s", order_id, resp.status_code, detail)
+        return {"ok": False, "message": f"❌ {resp.status_code}: {detail}", "raw": raw}
 
 
 # ── Test connection helper ────────────────────────────────────────────────────

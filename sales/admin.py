@@ -913,6 +913,17 @@ class SalesOrderAdmin(admin.ModelAdmin):
     def change_view(self, request, object_id, form_url='', extra_context=None):
         """Зберігаємо request для доступу в методах"""
         self.request = request
+        extra_context = extra_context or {}
+        try:
+            obj = self.get_object(request, object_id)
+            if obj and obj.source == "digikey" and obj.status in ("received", "processing"):
+                from django.urls import reverse as _rev
+                extra_context["digikey_confirm_url"] = _rev(
+                    "admin:bots_digikeyconfig_confirm_order",
+                    args=[obj.order_number],
+                )
+        except Exception:
+            pass
         return super().change_view(request, object_id, form_url, extra_context)
     
     def save_model(self, request, obj, form, change):

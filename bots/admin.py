@@ -117,6 +117,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         ("⏰ Синхронізація", {
             "fields": (
                 "sync_enabled", "sync_interval_minutes", "use_sandbox",
+                "auto_confirm_mode",
                 "last_synced_at",
             ),
         }),
@@ -188,6 +189,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "reconcile/",
                 self.admin_site.admin_view(self.reconcile_view),
                 name="bots_digikeyconfig_reconcile",
+            ),
+            path(
+                "confirm-order/<str:order_number>/",
+                self.admin_site.admin_view(self.confirm_order_view),
+                name="bots_digikeyconfig_confirm_order",
             ),
         ]
         return custom + urls
@@ -530,6 +536,27 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             no_credentials=no_credentials,
         )
         return render(request, "admin/bots/digikey_po_lookup.html", ctx)
+
+    def confirm_order_view(self, request, order_number):
+        """Підтверджує Marketplace замовлення на DigiKey і повертає на форму замовлення."""
+        from bots.services.digikey import confirm_marketplace_order, DigiKeyAPIError
+        config = DigiKeyConfig.get()
+        try:
+            result = confirm_marketplace_order(config, order_number)
+            if result["ok"]:
+                messages.success(request, result["message"])
+            else:
+                messages.error(request, result["message"])
+        except Exception as e:
+            messages.error(request, f"❌ {type(e).__name__}: {e}")
+
+        # Redirect back to SalesOrder if it exists
+        try:
+            from sales.models import SalesOrder
+            sale = SalesOrder.objects.get(source="digikey", order_number=order_number)
+            return redirect(reverse("admin:sales_salesorder_change", args=[sale.pk]))
+        except Exception:
+            return redirect(reverse("admin:bots_digikeyconfig_change", args=[1]))
 
     # ── Readonly display fields ───────────────────────────────────────────────
 

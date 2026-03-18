@@ -11,6 +11,17 @@
       </a>
     </li>
   {% endif %}
+  {% if digikey_confirm_url %}
+    <li>
+      <a href="{{ digikey_confirm_url }}"
+         class="historylink"
+         style="background:#2e7d32;color:#fff;padding:6px 14px;border-radius:6px;
+                text-decoration:none;font-weight:bold;display:inline-block;white-space:nowrap"
+         onclick="return confirm('Підтвердити замовлення на DigiKey?\n\nЦя дія надішле підтвердження через DigiKey Marketplace API.')">
+        ✅ Підтвердити на DigiKey
+      </a>
+    </li>
+  {% endif %}
   {{ block.super }}
 {% endblock %}
 
