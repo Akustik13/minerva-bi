@@ -331,9 +331,11 @@ class ShipmentAdmin(admin.ModelAdmin):
 
         order = get_object_or_404(SalesOrder, pk=order_id)
 
-        carrier = Carrier.objects.filter(is_active=True, is_default=True).first()
-        if not carrier:
-            carrier = Carrier.objects.filter(is_active=True).first()
+        carrier = (
+            Carrier.objects.filter(is_active=True, carrier_type="jumingo").first()
+            or Carrier.objects.filter(is_active=True, is_default=True).first()
+            or Carrier.objects.filter(is_active=True).first()
+        )
 
         shipment = Shipment(order=order, carrier=carrier)
         shipment.copy_from_order()
@@ -362,7 +364,11 @@ class ShipmentAdmin(admin.ModelAdmin):
             and shipment.recipient_country.upper() not in eu_countries
         )
 
-        carriers = Carrier.objects.filter(is_active=True)
+        from django.db.models import Case, When, IntegerField
+        carriers = Carrier.objects.filter(is_active=True).order_by(
+            Case(When(carrier_type="jumingo", then=0), default=1, output_field=IntegerField()),
+            "-is_default", "name",
+        )
 
         if request.method == "POST":
             return self._handle_create_post(request, order, carriers)
