@@ -1148,27 +1148,53 @@ def _maybe_auto_confirm(config, order_id: str, sale) -> None:
 
 # ── Marketplace: підтвердження замовлення ────────────────────────────────────
 
-# ⚠️ Ендпоінт потрібно перевірити в Swagger на developer.digikey.com
-# Marketplace2 → Orders → PATCH або POST /accept
+# PUT api.digikey.com/Sales/Marketplace2/Orders/v1/orders/{orderId}/accept
+# Body: {"acceptOrderDetails": [{"orderDetailId": "...", "accepted": true}, ...]}
 MARKETPLACE_CONFIRM_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/accept"
+
+
+def _fetch_marketplace_order(config, order_id: str, token: str) -> dict:
+    """GET /Sales/Marketplace2/Orders/v1/orders/{orderId} — для отримання orderDetailId."""
+    import requests as req
+    resp = req.get(
+        f"{_base_url(config)}{MARKETPLACE_PATH}/{order_id}",
+        headers=_headers(config, token),
+        timeout=15,
+    )
+    if resp.ok:
+        return resp.json()
+    return {}
+
 
 def confirm_marketplace_order(config, order_id: str) -> dict:
     """Підтверджує (accepts) вхідне Marketplace замовлення через DigiKey API.
 
-    Змінює orderState: PendingAcceptance/New → Accepted на боці DigiKey.
-    Повертає {'ok': bool, 'message': str, 'raw': dict}.
+    PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/accept
+    Body: {"acceptOrderDetails": [{"orderDetailId": "...", "accepted": true}]}
 
-    ⚠️ Перевір точний ендпоінт у Swagger DigiKey developer portal.
+    Спочатку отримує деталі замовлення (GET) щоб дістати orderDetailId кожного рядка,
+    потім відправляє PUT з підтвердженням усіх рядків.
+    Повертає {'ok': bool, 'message': str, 'raw': dict}.
     """
     import requests as req
 
     token = get_marketplace_token(config)
-    url   = f"{_base_url(config)}{MARKETPLACE_CONFIRM_PATH.format(order_id=order_id)}"
 
-    resp = req.post(
+    # Отримуємо деталі замовлення — потрібні orderDetailId для кожного рядка
+    order_data = _fetch_marketplace_order(config, order_id, token)
+    accept_details = []
+    for line in order_data.get("orderDetails") or []:
+        detail_id = line.get("orderDetailId")
+        if detail_id:
+            accept_details.append({"orderDetailId": detail_id, "accepted": True})
+
+    payload = {"acceptOrderDetails": accept_details}
+    url = f"{_base_url(config)}{MARKETPLACE_CONFIRM_PATH.format(order_id=order_id)}"
+
+    resp = req.put(
         url,
         headers=_headers(config, token),
-        json={},   # тіло може бути порожнім або {"orderState": "Accepted"} — уточни в Swagger
+        json=payload,
         timeout=20,
     )
     raw = {}
@@ -1177,12 +1203,21 @@ def confirm_marketplace_order(config, order_id: str) -> dict:
     except Exception:
         raw = {"text": resp.text[:500]}
 
-    if resp.status_code in (200, 201, 204):
-        return {"ok": True,  "message": "✅ Замовлення підтверджено на DigiKey", "raw": raw}
-    else:
-        detail = raw.get("detail") or raw.get("message") or raw.get("error") or resp.text[:200]
-        logger.error("DigiKey confirm order %s: %s %s", order_id, resp.status_code, detail)
-        return {"ok": False, "message": f"❌ {resp.status_code}: {detail}", "raw": raw}
+    # Success: 200 з порожнім errors або errorCount=0
+    if resp.status_code == 200:
+        err_count = raw.get("errorCount", 0)
+        if err_count == 0:
+            return {"ok": True, "message": "✅ Замовлення підтверджено на DigiKey", "raw": raw}
+        # Часткова помилка (окремі рядки відхилено)
+        errs = raw.get("errors") or []
+        msgs = [e.get("errorMessage", "") for e in errs if e.get("errorMessage")]
+        detail = "; ".join(msgs) or "часткова помилка"
+        logger.warning("DigiKey confirm order %s partial errors: %s", order_id, detail)
+        return {"ok": False, "message": f"⚠️ Часткова помилка: {detail}", "raw": raw}
+
+    detail = (raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:200])
+    logger.error("DigiKey confirm order %s: %s %s", order_id, resp.status_code, detail)
+    return {"ok": False, "message": f"❌ {resp.status_code}: {detail}", "raw": raw}
 
 
 # ── Test connection helper ────────────────────────────────────────────────────
