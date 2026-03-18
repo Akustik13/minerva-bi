@@ -79,6 +79,16 @@
         <span class="jc-lbl">Вартість</span>
         <span class="jc-val accent">{{ shipment.carrier_price|default:"—" }} {{ shipment.carrier_currency|default:"EUR" }}</span>
       </div>
+      <div class="jc-row">
+        <span class="jc-lbl">Тип доставки</span>
+        <span class="jc-val">
+          {% if is_shop_tariff %}
+            <span style="background:var(--bg-card-2);border:1px solid var(--border-strong);color:var(--text-muted);padding:2px 10px;border-radius:12px;font-size:12px">🏪 До поштомату — ти везеш самостійно</span>
+          {% else %}
+            <span style="background:var(--bg-card-2);border:1px solid var(--border-strong);color:var(--accent);padding:2px 10px;border-radius:12px;font-size:12px">🚐 Кур'єр приїжджає забирати</span>
+          {% endif %}
+        </span>
+      </div>
     </div>
   </div>
 
@@ -213,15 +223,58 @@
   </div>
   {% endif %}
 
+  <!-- Дата/час забору -->
+  <div class="jc-card">
+    <div class="jc-head">📅 Дата та час
+      {% if is_shop_tariff %}здачі посилки{% else %}забору кур'єром{% endif %}
+    </div>
+    <div class="jc-body">
+      {% if is_shop_tariff %}
+      <div class="jc-row" style="color:var(--text-muted);font-size:12px;margin-bottom:10px">
+        Тариф «до поштомату» — вкажи дату коли здаси посилку.
+      </div>
+      {% else %}
+      <div class="jc-row" style="color:var(--text-muted);font-size:12px;margin-bottom:10px">
+        Вкажи дату та часове вікно коли кур'єр може приїхати забрати посилку.
+      </div>
+      {% endif %}
+      <form id="confirm-form" method="post" action="{{ confirm_url }}">
+        {% csrf_token %}
+        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+          <div>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">
+              {% if is_shop_tariff %}Дата здачі{% else %}Дата забору{% endif %}
+            </div>
+            <input type="date" name="pickup_date" value="{{ default_pickup }}"
+                   min="{{ default_pickup }}"
+                   style="background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text);
+                          border-radius:5px;padding:7px 10px;font-size:13px;outline:none">
+          </div>
+          {% if not is_shop_tariff %}
+          <div>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">З котрої</div>
+            <input type="time" name="pickup_min_time" value="09:00" step="1800"
+                   style="background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text);
+                          border-radius:5px;padding:7px 10px;font-size:13px;outline:none">
+          </div>
+          <div>
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">До котрої</div>
+            <input type="time" name="pickup_max_time" value="18:00" step="1800"
+                   style="background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text);
+                          border-radius:5px;padding:7px 10px;font-size:13px;outline:none">
+          </div>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Кнопки -->
   <div class="jc-actions">
-    <form method="post" action="{{ confirm_url }}">
-      {% csrf_token %}
-      <button type="submit" class="btn-confirm"
-        onclick="return confirm('Відправити дані на Jumingo API?\n\nПісля підтвердження відправлення буде створено на Jumingo.')">
-        ✅ Підтвердити і відправити на Jumingo
-      </button>
-    </form>
+    <button type="submit" form="confirm-form" class="btn-confirm"
+      onclick="return confirm('Відправити дані на Jumingo API?\n\nПісля підтвердження відправлення буде створено на Jumingo.')">
+      ✅ Підтвердити і відправити на Jumingo
+    </button>
     <a href="{{ back_url }}" class="btn-back">← Назад до тарифів</a>
   </div>
 

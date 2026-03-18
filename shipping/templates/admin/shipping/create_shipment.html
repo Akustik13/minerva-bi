@@ -384,8 +384,11 @@ function buildSummary(carriers){
         return;
       }
       const nameShort = p.name.length>32 ? p.name.slice(0,30)+'…' : p.name;
+      const isShopS = String(p.code||'').startsWith('s-');
+      const typeBadgeS = c.carrier_type==='jumingo'
+        ? ` <span style="font-size:10px;opacity:.7">${isShopS?'🏪':'🚐'}</span>` : '';
       h += `<td style="padding:10px 14px;border-left:1px solid #1a2535;vertical-align:middle">
-        <div style="color:#c9d8e4;font-size:12px;font-weight:600;margin-bottom:4px">${esc(nameShort)}</div>
+        <div style="color:#c9d8e4;font-size:12px;font-weight:600;margin-bottom:4px">${esc(nameShort)}${typeBadgeS}</div>
         <div style="margin-bottom:6px">
           <span style="color:#4caf50;font-weight:700;font-size:13px">${p.price.toFixed(2)}</span>
           <span style="color:#607d8b;font-size:10px"> ${esc(p.currency)}</span>
@@ -422,8 +425,12 @@ function buildTable(c){
     const priceHtml = p.price!=null
       ? `<span style="color:#4caf50;font-weight:700">${p.price.toFixed(2)}</span> <span style="color:#607d8b;font-size:10px">${esc(p.currency)}</span>`
       : '<span style="color:#607d8b">—</span>';
+    const isShop = String(p.code||'').startsWith('s-');
+    const typeBadge = isJumingo
+      ? `<span style="font-size:10px;margin-left:5px;opacity:.8">${isShop?'🏪':'🚐'}</span>`
+      : '';
     h += `<tr style="border-bottom:1px solid #1e2d3d">
-      <td style="padding:8px 10px;color:#c9d8e4;font-weight:600">${esc(p.name)}</td>
+      <td style="padding:8px 10px;color:#c9d8e4;font-weight:600">${esc(p.name)}${typeBadge}</td>
       ${isDHL?`<td style="padding:8px 8px;color:#607d8b;font-family:monospace">${esc(p.code)}</td>`:''}
       <td style="padding:8px 10px;text-align:right">${priceHtml}</td>
       <td style="padding:8px 10px;color:#2196f3;text-align:center">${p.transit_days!=null?p.transit_days+' дн.':'—'}</td>

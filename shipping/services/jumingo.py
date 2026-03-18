@@ -531,19 +531,25 @@ class JumingoService(BaseCarrierService):
 
     # ── Вибір тарифу ─────────────────────────────────────────────────────────
 
-    def patch_tariff(self, carrier_shipment_id: str, tariff_id: str, pickup_date: str) -> dict:
-        """PATCH /v1/shipments/{id} — призначає тариф на відправлення."""
+    def patch_tariff(self, carrier_shipment_id: str, tariff_id: str, pickup_date: str,
+                     pickup_min_time: str = "09:00:00", pickup_max_time: str = "18:00:00") -> dict:
+        """PATCH /v1/shipments/{id} — призначає тариф на відправлення.
+
+        Shop tariffs (id starts with 's-') use shipping_type='shop' and times '00:00:00'.
+        Pickup tariffs use shipping_type='pickup' with the given time window.
+        """
         import requests as req
 
+        is_shop = str(tariff_id).startswith("s-")
         headers = self._headers()
         headers["Content-Type"] = "application/merge-patch+json"
         payload = {
             "rate": {
                 "shipper_tariff_id": tariff_id,
-                "shipping_type":     "pickup",
+                "shipping_type":     "shop" if is_shop else "pickup",
                 "pickup_date":       pickup_date,
-                "pickup_min_time":   "09:00:00",
-                "pickup_max_time":   "18:00:00",
+                "pickup_min_time":   "00:00:00" if is_shop else pickup_min_time,
+                "pickup_max_time":   "00:00:00" if is_shop else pickup_max_time,
             }
         }
         try:

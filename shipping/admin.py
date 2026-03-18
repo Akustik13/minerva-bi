@@ -1224,14 +1224,25 @@ class ShipmentAdmin(admin.ModelAdmin):
                 )
                 return redirect(reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]))
 
-            # PATCH тариф — наступний робочий день
-            pickup_date = date.today() + timedelta(days=1)
-            while pickup_date.weekday() >= 5:
-                pickup_date += timedelta(days=1)
+            # PATCH тариф — дата/час з форми або наступний робочий день
+            pickup_date_str = request.POST.get("pickup_date", "").strip()
+            pickup_min_time = request.POST.get("pickup_min_time", "09:00:00").strip() or "09:00:00"
+            pickup_max_time = request.POST.get("pickup_max_time", "18:00:00").strip() or "18:00:00"
+            # Validate/fallback pickup_date
+            try:
+                pickup_date = date.fromisoformat(pickup_date_str)
+                if pickup_date < date.today():
+                    raise ValueError("past date")
+            except (ValueError, TypeError):
+                pickup_date = date.today() + timedelta(days=1)
+                while pickup_date.weekday() >= 5:
+                    pickup_date += timedelta(days=1)
             result = service.patch_tariff(
                 shipment.carrier_shipment_id,
                 shipment.selected_tariff_id,
                 pickup_date.strftime("%Y-%m-%d"),
+                pickup_min_time=pickup_min_time,
+                pickup_max_time=pickup_max_time,
             )
             if not result.get("success"):
                 messages.warning(
@@ -1267,19 +1278,27 @@ class ShipmentAdmin(admin.ModelAdmin):
                     "diff_pct":     round(diff_pct, 1),
                 }
 
+        # ── Тип тарифу: shop (везеш сам) vs pickup (кур'єр забирає) ─────────────
+        is_shop_tariff = str(shipment.selected_tariff_id or "").startswith("s-")
+        default_pickup = date.today() + timedelta(days=1)
+        while default_pickup.weekday() >= 5:
+            default_pickup += timedelta(days=1)
+
         return render(request, "admin/shipping/jumingo_confirm.html", {
             **self.admin_site.each_context(request),
             "title":    f"Підтвердити відправлення #{shipment.pk}",
             "shipment": shipment,
             "payload":  payload,
-            "from_address": payload.get("from_address", {}),
-            "to_address":   payload.get("to_address", {}),
-            "packages":     payload.get("packages", []),
-            "details":      payload.get("details", {}),
-            "customs":      customs,
-            "weight_warn":  weight_warn,
-            "confirm_url":  reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]),
-            "back_url":     reverse("admin:shipping_shipment_rates", args=[shipment.pk]),
+            "from_address":    payload.get("from_address", {}),
+            "to_address":      payload.get("to_address", {}),
+            "packages":        payload.get("packages", []),
+            "details":         payload.get("details", {}),
+            "customs":         customs,
+            "weight_warn":     weight_warn,
+            "is_shop_tariff":  is_shop_tariff,
+            "default_pickup":  default_pickup.strftime("%Y-%m-%d"),
+            "confirm_url":     reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]),
+            "back_url":        reverse("admin:shipping_shipment_rates", args=[shipment.pk]),
         })
 
     # ── DHL Track Lookup (standalone) ────────────────────────────────────────
