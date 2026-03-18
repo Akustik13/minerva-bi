@@ -14,23 +14,23 @@
 <style>
 .dd-wrap { max-width: 560px; margin: 32px auto; }
 .dd-card {
-  background: #1a2535; border: 1px solid #243347;
-  border-top: 4px solid #ff5722; border-radius: 8px; padding: 28px 32px;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-top: 4px solid var(--err); border-radius: 8px; padding: 28px 32px;
 }
-.dd-title { font-size: 18px; font-weight: 700; color: #c9d8e4; margin: 0 0 6px; }
-.dd-sub   { font-size: 13px; color: #607d8b; margin: 0 0 20px; }
+.dd-title { font-size: 18px; font-weight: 700; color: var(--text); margin: 0 0 6px; }
+.dd-sub   { font-size: 13px; color: var(--text-dim); margin: 0 0 20px; }
 .dd-counts { margin: 0 0 20px; }
 .dd-counts table { width: 100%; border-collapse: collapse; }
-.dd-counts td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid #1e2d3d; }
-.dd-counts td:first-child { color: #9aafbe; }
-.dd-counts td:last-child  { color: #ff9800; font-weight: 700; text-align: right; }
-.dd-zero { color: #4caf50 !important; }
-.dd-section { font-size: 11px; color: #607d8b; font-weight: 600; letter-spacing: .5px;
+.dd-counts td { padding: 6px 8px; font-size: 13px; border-bottom: 1px solid var(--border); }
+.dd-counts td:first-child { color: var(--text-muted); }
+.dd-counts td:last-child  { color: var(--warn); font-weight: 700; text-align: right; }
+.dd-zero { color: var(--ok) !important; }
+.dd-section { font-size: 11px; color: var(--text-dim); font-weight: 600; letter-spacing: .5px;
               text-transform: uppercase; padding: 10px 8px 4px !important; border-bottom: none !important; }
 .dd-actions { display: flex; gap: 10px; margin-top: 20px; }
-.btn-cancel { padding: 9px 20px; background: #1e2d3d; color: #9aafbe; border: 1px solid #2a3f52; border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
+.btn-cancel { padding: 9px 20px; background: var(--bg-card-2); color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: 6px; text-decoration: none; font-size: 13px; font-weight: 600; }
 .btn-danger { padding: 9px 20px; background: #bf360c; color: #fff; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
-.btn-danger:hover { background: #d84315; }
+.btn-danger:hover { opacity: .85; }
 </style>
 
 <div class="dd-wrap">
@@ -88,7 +88,7 @@
 
     {% with total=counts.orders|add:counts.customers|add:counts.transactions %}
     {% if total == 0 and not counts.bulk_products and not counts.invoices and not counts.shipments and not counts.tasks %}
-    <p style="color:#4caf50; font-size:13px;">✅ Демо-даних не знайдено — система вже чиста.</p>
+    <p style="color:var(--ok); font-size:13px;">✅ Демо-даних не знайдено — система вже чиста.</p>
     <a href="/dashboard/system/" class="btn-cancel">← Назад</a>
     {% else %}
     <form method="post">

@@ -19,9 +19,9 @@
   margin: 28px auto;
 }
 .demo-card {
-  background: #1a2535;
-  border: 1px solid #243347;
-  border-top: 3px solid #ff9800;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-top: 3px solid var(--warn);
   border-radius: 10px;
   padding: 28px 32px;
   margin-bottom: 16px;
@@ -29,12 +29,12 @@
 .demo-card h2 {
   font-size: 18px;
   font-weight: 700;
-  color: #e6edf3;
+  color: var(--text);
   margin: 0 0 4px;
 }
 .demo-card .sub {
   font-size: 12px;
-  color: #607d8b;
+  color: var(--text-dim);
   margin: 0 0 20px;
 }
 /* ── Scenario grid ── */
@@ -57,8 +57,8 @@
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: #141f2b;
-  border: 1px solid #1e2d3d;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 11px 14px;
   cursor: pointer;
@@ -66,8 +66,8 @@
   user-select: none;
 }
 .scenario-item input:checked + label {
-  border-color: #2196f3;
-  background: #0d1e30;
+  border-color: var(--accent);
+  background: var(--bg-hover);
 }
 .scenario-item label .s-ico {
   font-size: 18px;
@@ -79,15 +79,15 @@
 .scenario-item label .s-title {
   font-size: 13px;
   font-weight: 600;
-  color: #c9d8e4;
+  color: var(--text);
   line-height: 1.2;
 }
 .scenario-item label .s-desc {
   font-size: 11px;
-  color: #607d8b;
+  color: var(--text-dim);
   margin-top: 2px;
 }
-.scenario-item input:checked + label .s-title { color: #58a6ff; }
+.scenario-item input:checked + label .s-title { color: var(--accent); }
 .check-all-row {
   display: flex;
   gap: 10px;
@@ -95,20 +95,20 @@
 }
 .link-btn {
   font-size: 12px;
-  color: #607d8b;
+  color: var(--text-dim);
   cursor: pointer;
   text-decoration: underline;
   background: none;
   border: none;
   padding: 0;
 }
-.link-btn:hover { color: #9aafbe; }
+.link-btn:hover { color: var(--text-muted); }
 
 /* ── Bulk volumes ── */
 .bulk-card {
-  background: #1a2535;
-  border: 1px solid #243347;
-  border-top: 3px solid #4caf50;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-top: 3px solid var(--ok);
   border-radius: 10px;
   padding: 22px 32px;
   margin-bottom: 16px;
@@ -116,12 +116,12 @@
 .bulk-card h2 {
   font-size: 16px;
   font-weight: 700;
-  color: #e6edf3;
+  color: var(--text);
   margin: 0 0 4px;
 }
 .bulk-card .sub {
   font-size: 12px;
-  color: #607d8b;
+  color: var(--text-dim);
   margin: 0 0 16px;
 }
 .bulk-row {
@@ -135,37 +135,37 @@
 .bulk-field label {
   display: block;
   font-size: 12px;
-  color: #9aafbe;
+  color: var(--text-muted);
   margin-bottom: 5px;
 }
 .bulk-field input[type=number] {
   width: 100%;
-  background: #111c26;
-  border: 1px solid #1e2d3d;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #c9d8e4;
+  color: var(--text);
   font-size: 14px;
   padding: 8px 12px;
   box-sizing: border-box;
 }
 .bulk-field input[type=number]:focus {
   outline: none;
-  border-color: #2196f3;
+  border-color: var(--accent);
 }
 .bulk-note {
   font-size: 11px;
-  color: #607d8b;
+  color: var(--text-dim);
   margin-top: 10px;
 }
 
 /* ── Info block ── */
 .demo-info {
-  background: #162030;
-  border: 1px solid #1e2d3d;
+  background: var(--bg-card-2);
+  border: 1px solid var(--border);
   border-radius: 7px;
   padding: 11px 14px;
   font-size: 12px;
-  color: #9aafbe;
+  color: var(--text-muted);
   margin-bottom: 20px;
   display: flex;
   gap: 9px;
@@ -194,16 +194,16 @@
 .btn-confirm:hover { opacity: .85; }
 .btn-cancel {
   padding: 10px 22px;
-  background: #1a2535;
-  border: 1px solid #2a4a6a;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  color: #58a6ff;
+  color: var(--accent);
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
   transition: background .15s;
 }
-.btn-cancel:hover { background: #1e2d40; }
+.btn-cancel:hover { background: var(--bg-hover); }
 </style>
 
 <div class="demo-wrap">
