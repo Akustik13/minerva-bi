@@ -51,7 +51,7 @@ def build_customs_articles(order, sender_country="DE", default_currency="EUR") -
         lines = list(
             SalesOrderLine.objects
             .filter(order=order)
-            .select_related("product", "product__productcategory")
+            .select_related("product")
             .order_by("pk")
         )
     except Exception:
