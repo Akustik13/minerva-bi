@@ -166,6 +166,7 @@ class ShipmentAdmin(admin.ModelAdmin):
                 "description",
                 "export_reason",
                 ("declared_value", "declared_currency"),
+                "insurance_type",
                 "reference",
             )
         }),
