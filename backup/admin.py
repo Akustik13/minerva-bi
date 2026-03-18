@@ -81,6 +81,11 @@ class BackupAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.git_update_view),
                 name="backup_git_update",
             ),
+            path(
+                "migrate/",
+                self.admin_site.admin_view(self.migrate_view),
+                name="backup_migrate",
+            ),
         ]
 
     def _ctx(self, request, **extra):
@@ -299,6 +304,12 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
         return JsonResponse(utils.git_pull())
+
+    def migrate_view(self, request):
+        """AJAX — run manage.py migrate."""
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        return JsonResponse(utils.run_migrate())
 
     def has_add_permission(self, request):              return False
     def has_change_permission(self, request, obj=None): return False

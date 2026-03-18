@@ -606,3 +606,31 @@ def git_pull() -> dict:
         return {"ok": False, "error": "git не знайдено.", "duration": round(time.time() - start, 1)}
     except Exception as exc:
         return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
+
+
+def run_migrate() -> dict:
+    """Run manage.py migrate and return output.
+
+    Returns:
+      {ok, output, duration, error (if not ok)}
+    """
+    start = time.time()
+    try:
+        import sys
+        result = subprocess.run(
+            [sys.executable, "manage.py", "migrate", "--no-input"],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(settings.BASE_DIR),
+        )
+        output = (result.stdout + result.stderr).strip()
+        ok = result.returncode == 0
+        return {
+            "ok": ok,
+            "output": output,
+            "duration": round(time.time() - start, 1),
+            **({"error": output} if not ok else {}),
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "migrate timeout (>120с)", "duration": round(time.time() - start, 1)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}

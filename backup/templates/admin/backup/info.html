@@ -286,6 +286,10 @@
                 onclick="applyUpdate(this)">
           ⬇️ Оновити зараз
         </button>
+        <button id="btn-migrate" class="bk-btn" style="background:#7c3aed;"
+                onclick="runMigrate(this)">
+          🗄️ Застосувати міграції
+        </button>
       </div>
 
     </div>
@@ -963,6 +967,33 @@ async function applyUpdate(btn) {
     btn.disabled = false;
     document.getElementById('btn-check-update').disabled = false;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Migrate
+════════════════════════════════════════════════════════════════════ */
+const MIGRATE_URL = '{% url "admin:backup_migrate" %}';
+
+async function runMigrate(btn) {
+  const resultEl = document.getElementById('git-result');
+  btn.disabled = true;
+  resultEl.style.display = 'block';
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ manage.py migrate… не закривайте сторінку.';
+  try {
+    const resp = await fetch(MIGRATE_URL, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF },
+    });
+    const data = await resp.json();
+    resultEl.className = data.ok ? 'bk-result ok' : 'bk-result error';
+    const icon = data.ok ? '✅' : '❌';
+    const dur  = data.duration ? ` (${data.duration}с)` : '';
+    resultEl.textContent = `${icon} migrate${dur}\n${data.output || data.error || ''}`;
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ ' + e.message;
+  }
+  btn.disabled = false;
 }
 
 /* ══════════════════════════════════════════════════════════════════
