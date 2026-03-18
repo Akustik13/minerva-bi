@@ -38,19 +38,21 @@ SHIPMENT_STATUS_MAP = {
 
 
 def build_customs_articles(order, sender_country="DE", default_currency="EUR") -> list:
-    """Будує список митних артикулів з ліній замовлення, згрупованих за категорією.
-    Опис береться з ProductCategory.customs_description_de (напр. "Coaxial Cables (RF)").
-    Використовується як для попереднього заповнення форми, так і для API payload.
+    """Будує список митних артикулів з ліній замовлення.
+    1 рядок замовлення = 1 рядок митної декларації.
+
+    Пріоритет опису: product.name_export > category.customs_description_de > product.name > sku
+    Пріоритет HS-коду: product.hs_code > category.customs_hs_code
+    Пріоритет країни: product.country_of_origin > category.customs_country_of_origin > sender_country
     """
     try:
-        from collections import defaultdict
         from sales.models import SalesOrderLine
         from inventory.models import ProductCategory
         lines = list(
             SalesOrderLine.objects
             .filter(order=order)
-            .select_related("product")
-            .all()
+            .select_related("product", "product__productcategory")
+            .order_by("pk")
         )
     except Exception:
         return []
@@ -58,75 +60,67 @@ def build_customs_articles(order, sender_country="DE", default_currency="EUR") -
     if not lines:
         return []
 
+    # Підвантажити всі категорії одним запитом
     cat_slugs = {l.product.category for l in lines if l.product and l.product.category}
     cat_map   = {
         c.slug: c for c in ProductCategory.objects.filter(slug__in=cat_slugs)
     } if cat_slugs else {}
 
-    # Групувати рядки замовлення по категорії
-    groups = defaultdict(list)
-    for line in lines:
-        if line.product:
-            groups[line.product.category or ""].append(line)
-
     articles = []
-    for cat_slug, cat_lines in groups.items():
-        cat = cat_map.get(cat_slug)
+    for line in lines:
+        p   = line.product
+        cat = cat_map.get(p.category) if p and p.category else None
 
-        # Опис: customs_description_de > category.name > slug > product name
-        if cat and cat.customs_description_de:
+        qty_int = max(1, int(float(line.qty or 1)))
+
+        # Опис: name_export > customs_description_de > name > sku
+        if p and p.name_export:
+            desc = p.name_export[:35]
+        elif cat and cat.customs_description_de:
             desc = cat.customs_description_de[:35]
-        elif cat:
-            desc = cat.name[:35]
-        elif cat_slug:
-            desc = cat_slug[:35]
+        elif p and p.name:
+            desc = p.name[:35]
+        elif p:
+            desc = (p.sku or "Goods")[:35]
         else:
-            p = cat_lines[0].product
-            desc = (p.name_export or p.name or p.sku)[:35] if p else "Goods"
+            desc = "Goods"
 
-        # HS-код і країна походження — спочатку з категорії, потім з товару
-        hs     = (cat.customs_hs_code if cat else "") or ""
-        origin = (cat.customs_country_of_origin if cat else "") or ""
-        if not hs or not origin:
-            for line in cat_lines:
-                p = line.product
-                if p:
-                    if not hs and p.hs_code:
-                        hs = p.hs_code
-                    if not origin and p.country_of_origin:
-                        origin = p.country_of_origin
-                if hs and origin:
-                    break
-        origin = origin or sender_country or "DE"
+        # HS-код: product > category
+        hs = (p.hs_code if p else "") or (cat.customs_hs_code if cat else "") or ""
 
-        # Сумарна кількість, вартість і вага по всіх рядках категорії
-        total_qty    = 0
-        total_value  = 0.0
-        total_weight = 0.0
-        currency     = default_currency
-        for line in cat_lines:
-            qty_int = max(1, int(float(line.qty)))
-            total_qty += qty_int
-            if line.total_price:
-                total_value += float(line.total_price)
-            elif line.unit_price:
-                total_value += float(line.unit_price) * qty_int
-            if line.currency:
-                currency = line.currency
-            p = line.product
-            if p and p.net_weight_g:
-                total_weight += (float(p.net_weight_g) / 1000.0) * qty_int
+        # Країна: product > category > sender
+        origin = (
+            (p.country_of_origin if p else "")
+            or (cat.customs_country_of_origin if cat else "")
+            or sender_country
+            or "DE"
+        )
+
+        # Вартість
+        if line.total_price:
+            value = float(line.total_price)
+        elif line.unit_price:
+            value = float(line.unit_price) * qty_int
+        else:
+            value = 0.0
+
+        currency = (line.currency if line.currency else default_currency) or default_currency
+
+        # Вага (сумарна на рядок)
+        weight = None
+        if p and p.net_weight_g:
+            weight = round((float(p.net_weight_g) / 1000.0) * qty_int, 3)
 
         item = {
             "description":    desc,
-            "quantity":       total_qty,
-            "value":          round(total_value, 2),
-            "currency":       currency or default_currency,
+            "quantity":       qty_int,
+            "value":          round(value, 2),
+            "currency":       currency,
             "origin_country": origin,
             "customs_number": hs,
         }
-        if total_weight:
-            item["weight"] = round(total_weight, 3)
+        if weight:
+            item["weight"] = weight
         articles.append(item)
 
     return articles
