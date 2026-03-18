@@ -389,7 +389,9 @@ class JumingoService(BaseCarrierService):
 
     def get_rates_preview(self, dest_country: str, dest_postal: str, dest_city: str,
                           weight_kg: float, length_cm: int, width_cm: int, height_cm: int,
-                          dest_name: str = "Recipient") -> dict:
+                          dest_name: str = "Recipient",
+                          insurance_type: str = "none",
+                          declared_value: float = 1.0) -> dict:
         """
         Тимчасово створює відправлення на Jumingo (без збереження в Minerva DB),
         отримує тарифи і повертає їх.
@@ -432,7 +434,7 @@ class JumingoService(BaseCarrierService):
                 "height": int(height_cm) if height_cm else 10,
             }],
             "details": {
-                "value_amount":        1,
+                "value_amount":        max(1, int(declared_value or 1)),
                 "value_currency":      "EUR",
                 "content_description": "Goods",
                 "reference_number":    "PREVIEW",
@@ -440,6 +442,10 @@ class JumingoService(BaseCarrierService):
                 "export_license":      False,
                 "packaging_type":      "parcel",
                 "settings":            {"export_reason": "Commercial"},
+                **({
+                    "extra_insurance_type":  insurance_type,
+                    "extra_insurance_value": max(1, int(declared_value or 1)),
+                } if insurance_type in ("standard", "premium") else {}),
             },
         }
         if c.connection_uuid:

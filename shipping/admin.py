@@ -1368,9 +1368,14 @@ class ShipmentAdmin(admin.ModelAdmin):
         except (ValueError, TypeError):
             weight, length, width, height = 1.0, 20, 15, 10
 
-        dest_country = (body.get("recipient_country") or "").upper().strip()
-        dest_postal  = (body.get("recipient_zip")     or "").strip()
-        dest_city    = (body.get("recipient_city")    or "").strip()
+        dest_country   = (body.get("recipient_country") or "").upper().strip()
+        dest_postal    = (body.get("recipient_zip")     or "").strip()
+        dest_city      = (body.get("recipient_city")    or "").strip()
+        insurance_type = (body.get("insurance_type")   or "none").strip()
+        try:
+            declared_value = float(body.get("declared_value") or 1)
+        except (ValueError, TypeError):
+            declared_value = 1.0
 
         if not dest_country:
             return JsonResponse({"error": "Вкажіть країну отримувача"}, status=400)
@@ -1414,6 +1419,8 @@ class ShipmentAdmin(admin.ModelAdmin):
                     r = service.get_rates_preview(
                         dest_country, dest_postal, dest_city,
                         weight, length, width, height,
+                        insurance_type=insurance_type,
+                        declared_value=declared_value,
                     )
                     preview_id = r.get("preview_id", "")
                     if preview_id:
