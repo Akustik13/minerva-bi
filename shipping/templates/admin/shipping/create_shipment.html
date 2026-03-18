@@ -27,28 +27,28 @@
 @media(max-width:1100px){ .sh-wrap { grid-template-columns: 1fr; } }
 
 .sh-card {
-  background: #1a2535; border: 1px solid #243347;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
   border-radius: 10px; padding: 20px 24px; margin-bottom: 20px;
 }
 .sh-card-title {
-  font-size: 12px; font-weight: 700; color: #9aafbe;
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
   text-transform: uppercase; letter-spacing: .05em;
   margin: 0 0 16px; padding-bottom: 10px;
-  border-bottom: 1px solid #243347;
+  border-bottom: 1px solid var(--border-strong);
   display: flex; align-items: center; gap: 8px;
 }
 .sh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .sh-grid.g3 { grid-template-columns: 1fr 1fr 1fr; }
 .sh-field { display: flex; flex-direction: column; gap: 5px; }
 .sh-field.full { grid-column: 1 / -1; }
-.sh-label { font-size: 11px; color: #607d8b; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.sh-label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
 .sh-input {
-  background: #111c26; border: 1px solid #2a3f52;
-  color: #c9d8e4; border-radius: 6px; padding: 8px 11px;
+  background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 6px; padding: 8px 11px;
   font-size: 13px; outline: none; transition: border-color .15s;
   font-family: inherit;
 }
-.sh-input:focus { border-color: #2196f3; }
+.sh-input:focus { border-color: var(--accent-2, #2196f3); }
 select.sh-input {
   cursor: pointer;
   height: auto;
@@ -59,26 +59,26 @@ select.sh-input {
 }
 
 .sh-order-box {
-  background: #111c26; border: 1px solid #2a3f52;
+  background: var(--bg-input); border: 1px solid var(--border-strong);
   border-radius: 8px; padding: 14px 16px; font-size: 12px;
 }
 .sh-order-box .row { display: flex; justify-content: space-between;
-  padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+  padding: 4px 0; border-bottom: 1px solid var(--border); }
 .sh-order-box .row:last-child { border-bottom: none; }
-.sh-order-box .key { color: #607d8b; }
-.sh-order-box .val { color: #c9d8e4; font-weight: 600; }
-.sh-order-box .addr { color: #c9d8e4; margin-top: 8px; font-size: 11px; line-height: 1.6; }
+.sh-order-box .key { color: var(--text-dim); }
+.sh-order-box .val { color: var(--text); font-weight: 600; }
+.sh-order-box .addr { color: var(--text); margin-top: 8px; font-size: 11px; line-height: 1.6; }
 
 .carrier-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
 .carrier-opt {
-  border: 2px solid #2a3f52; border-radius: 8px; padding: 12px;
+  border: 2px solid var(--border-strong); border-radius: 8px; padding: 12px;
   cursor: pointer; transition: all .15s; text-align: center;
 }
 .carrier-opt input[type=radio] { display: none; }
-.carrier-opt:has(input:checked) { border-color: #2196f3; background: rgba(33,150,243,.08); }
+.carrier-opt:has(input:checked) { border-color: var(--accent-2, #2196f3); background: rgba(33,150,243,.08); }
 .carrier-opt .c-icon { font-size: 22px; margin-bottom: 4px; }
-.carrier-opt .c-name { font-size: 12px; font-weight: 700; color: #c9d8e4; }
-.carrier-opt .c-type { font-size: 10px; color: #607d8b; }
+.carrier-opt .c-name { font-size: 12px; font-weight: 700; color: var(--text); }
+.carrier-opt .c-type { font-size: 10px; color: var(--text-dim); }
 
 .sh-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
 .btn-submit { background: #4caf50; color: #fff; border: none; padding: 11px 24px;
@@ -92,13 +92,13 @@ select.sh-input {
   border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer;
 }
 .btn-compare:hover { background: #1565c0; }
-.btn-compare:disabled { background: #162030; color: #607d8b; cursor: default; }
-.btn-cancel { background: transparent; color: #607d8b; border: 1px solid #2a3f52;
+.btn-compare:disabled { background: var(--bg-app); color: var(--text-dim); cursor: default; }
+.btn-cancel { background: transparent; color: var(--text-dim); border: 1px solid var(--border-strong);
   padding: 10px 20px; border-radius: 7px; font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
 
 .alert-info {
   background: rgba(33,150,243,.08); border: 1px solid rgba(33,150,243,.25);
-  border-radius: 8px; padding: 12px 16px; font-size: 12px; color: #9aafbe;
+  border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--text-muted);
   margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start;
 }
 </style>
@@ -108,7 +108,7 @@ const _EU = new Set('{{ eu_countries_js }}'.split(','));
 
 function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
   if(weight==='' || weight===null || weight===undefined) weight = _DEFAULT_CA_WEIGHT;
-  return `<tr class="ca-row" style="border-bottom:1px solid #1a2535">
+  return `<tr class="ca-row" style="border-bottom:1px solid var(--border)">
     <td style="padding:4px 8px"><input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="${desc}" placeholder="Electronic component"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px" type="number" name="ca_qty" min="1" step="1" value="${qty}"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;font-size:12px;font-family:monospace" type="text" name="ca_hs" value="${hs}" placeholder="8517.62"></td>
@@ -116,7 +116,7 @@ function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="${weight}"></td>
     <td style="padding:4px 5px"><input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="${value}"></td>
     <td style="padding:4px 5px"><input class="sh-input ca-currency" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_currency" maxlength="3" value="${currency}"></td>
-    <td style="padding:4px;text-align:center"><button type="button" onclick="removeCaRow(this)" title="Видалити" style="background:#1e0a0a;border:1px solid #5c1a1a;color:#ef9a9a;border-radius:4px;padding:3px 7px;cursor:pointer;font-size:11px;line-height:1">✕</button></td>
+    <td style="padding:4px;text-align:center"><button type="button" onclick="removeCaRow(this)" title="Видалити" style="background:var(--bg-card);border:1px solid var(--border-strong);color:var(--err);border-radius:4px;padding:3px 7px;cursor:pointer;font-size:11px;line-height:1">✕</button></td>
   </tr>`;
 }
 
@@ -230,7 +230,7 @@ function compareRates(){
     loading.style.display='none';
     btn.disabled=false; btn.textContent='📊 Порівняти тарифи';
     if(data.error){
-      results.innerHTML=`<div style="color:#ef9a9a;padding:8px 0">❌ ${esc(data.error)}</div>`;
+      results.innerHTML=`<div style="color:var(--err);padding:8px 0">❌ ${esc(data.error)}</div>`;
       return;
     }
     const destStr = [body.recipient_country, body.recipient_zip, body.recipient_city].filter(Boolean).join(' ');
@@ -240,17 +240,17 @@ function compareRates(){
     const fromAddr = data.from_address || {};
     paramsEl.style.display = '';
     paramsEl.innerHTML =
-      `<span style="color:#607d8b;font-weight:700;text-transform:uppercase;letter-spacing:.04em">Параметри запиту до API:</span><br>`
-      + `<span style="color:#9aafbe">📤 Відправник:</span> <b style="color:#c9d8e4">${esc(fromAddr.country||'?')} ${esc(fromAddr.zip||'')} ${esc(fromAddr.city||'')}</b>`
-      + ` &nbsp;·&nbsp; <span style="color:#9aafbe">📥 Одержувач:</span> <b style="color:#c9d8e4">${esc(body.recipient_country)} ${esc(body.recipient_zip)} ${esc(body.recipient_city)}</b><br>`
-      + `<span style="color:#9aafbe">⚖️ Вага:</span> <b style="color:#c9d8e4">${esc(body.weight_kg)} кг</b>`
-      + ` &nbsp;·&nbsp; <span style="color:#9aafbe">📐 Розміри:</span> <b style="color:#c9d8e4">${esc(data.dims||'')} см (Д×Ш×В)</b>`;
+      `<span style="color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.04em">Параметри запиту до API:</span><br>`
+      + `<span style="color:var(--text-muted)">📤 Відправник:</span> <b style="color:var(--text)">${esc(fromAddr.country||'?')} ${esc(fromAddr.zip||'')} ${esc(fromAddr.city||'')}</b>`
+      + ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">📥 Одержувач:</span> <b style="color:var(--text)">${esc(body.recipient_country)} ${esc(body.recipient_zip)} ${esc(body.recipient_city)}</b><br>`
+      + `<span style="color:var(--text-muted)">⚖️ Вага:</span> <b style="color:var(--text)">${esc(body.weight_kg)} кг</b>`
+      + ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">📐 Розміри:</span> <b style="color:var(--text)">${esc(data.dims||'')} см (Д×Ш×В)</b>`;
     results.innerHTML = renderComparison(data.results);
   })
   .catch(err=>{
     loading.style.display='none';
     btn.disabled=false; btn.textContent='📊 Порівняти тарифи';
-    results.innerHTML=`<div style="color:#ef9a9a;padding:8px 0">❌ ${esc(err.message)}</div>`;
+    results.innerHTML=`<div style="color:var(--err);padding:8px 0">❌ ${esc(err.message)}</div>`;
   });
 }
 
@@ -331,15 +331,15 @@ function buildSummary(carriers){
   /* Банер "переможець" (тільки якщо 2+ перевізники) */
   if(active.length>=2 && globalBest){
     h += `<div style="background:rgba(76,175,80,.1);border:1px solid rgba(76,175,80,.3);
-            border-left:4px solid #4caf50;border-radius:8px;padding:12px 16px;
+            border-left:4px solid var(--ok);border-radius:8px;padding:12px 16px;
             margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
       <div>
-        <div style="font-size:11px;color:#4caf50;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🏆 Найкраща ціна</div>
-        <div style="font-size:13px;color:#c9d8e4">
+        <div style="font-size:11px;color:var(--ok);font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">🏆 Найкраща ціна</div>
+        <div style="font-size:13px;color:var(--text)">
           ${cicon(globalCarrier.carrier_type)} <b>${esc(globalCarrier.carrier_name)}</b>
           — ${esc(globalBest.name)}
-          — <span style="color:#4caf50;font-weight:700">${globalBest.price.toFixed(2)} ${esc(globalBest.currency)}</span>
-          ${globalBest.transit_days!=null?`<span style="color:#607d8b;font-size:11px">(${globalBest.transit_days} дн.)</span>`:''}
+          — <span style="color:var(--ok);font-weight:700">${globalBest.price.toFixed(2)} ${esc(globalBest.currency)}</span>
+          ${globalBest.transit_days!=null?`<span style="color:var(--text-dim);font-size:11px">(${globalBest.transit_days} дн.)</span>`:''}
         </div>
       </div>
       <div>${makeBookBtn(globalCarrier,globalBest,false)}</div>
@@ -347,16 +347,16 @@ function buildSummary(carriers){
   }
 
   /* Таблиця порівняння */
-  h += `<div style="background:#111c26;border:1px solid #2a3f52;border-radius:8px;
+  h += `<div style="background:var(--bg-input);border:1px solid var(--border-strong);border-radius:8px;
           overflow:hidden;margin-bottom:20px">
     <table style="width:100%;border-collapse:collapse;font-size:12px">
-    <thead><tr style="background:#0d1a28">
-      <th style="padding:10px 14px;color:#607d8b;font-size:11px;text-transform:uppercase;
-          letter-spacing:.04em;text-align:left;width:130px;border-bottom:2px solid #243347">Критерій</th>`;
+    <thead><tr style="background:var(--bg-app)">
+      <th style="padding:10px 14px;color:var(--text-dim);font-size:11px;text-transform:uppercase;
+          letter-spacing:.04em;text-align:left;width:130px;border-bottom:2px solid var(--border-strong)">Критерій</th>`;
 
   active.forEach(c=>{
-    h += `<th style="padding:10px 14px;color:#9aafbe;border-bottom:2px solid #243347;
-              text-align:left;border-left:1px solid #1e2d3d">
+    h += `<th style="padding:10px 14px;color:var(--text-muted);border-bottom:2px solid var(--border-strong);
+              text-align:left;border-left:1px solid var(--border)">
               ${cicon(c.carrier_type)} ${esc(c.carrier_name)}</th>`;
   });
   h += '</tr></thead><tbody>';
@@ -372,28 +372,31 @@ function buildSummary(carriers){
       if(allSame) return; // skip дублікат
     }
 
-    h += `<tr style="border-bottom:1px solid #1a2535">
-      <td style="padding:10px 14px;font-size:11px;font-weight:700;color:#607d8b;
+    h += `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-dim);
           text-transform:uppercase;white-space:nowrap;vertical-align:middle">
           ${row.icon} ${row.label}</td>`;
 
     active.forEach(c=>{
       const p = row.fn(c.products);
       if(!p){
-        h += '<td style="padding:10px 14px;color:#607d8b;border-left:1px solid #1a2535">—</td>';
+        h += '<td style="padding:10px 14px;color:var(--text-dim);border-left:1px solid var(--border)">—</td>';
         return;
       }
       const nameShort = p.name.length>32 ? p.name.slice(0,30)+'…' : p.name;
       const isShopS = String(p.code||'').startsWith('s-');
       const typeBadgeS = c.carrier_type==='jumingo'
-        ? ` <span style="font-size:10px;opacity:.7">${isShopS?'🏪':'🚐'}</span>` : '';
-      h += `<td style="padding:10px 14px;border-left:1px solid #1a2535;vertical-align:middle">
-        <div style="color:#c9d8e4;font-size:12px;font-weight:600;margin-bottom:4px">${esc(nameShort)}${typeBadgeS}</div>
+        ? (isShopS
+          ? `<span style="display:inline-block;font-size:10px;background:rgba(158,158,158,.15);color:var(--text-muted);border:1px solid var(--border-strong);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🏪 Поштомат</span>`
+          : `<span style="display:inline-block;font-size:10px;background:rgba(33,150,243,.12);color:var(--accent-2,#2196f3);border:1px solid rgba(33,150,243,.3);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🚐 Кур'єр</span>`)
+        : '';
+      h += `<td style="padding:10px 14px;border-left:1px solid var(--border);vertical-align:middle">
+        <div style="color:var(--text);font-size:12px;font-weight:600;margin-bottom:4px">${esc(nameShort)}${typeBadgeS}</div>
         <div style="margin-bottom:6px">
-          <span style="color:#4caf50;font-weight:700;font-size:13px">${p.price.toFixed(2)}</span>
-          <span style="color:#607d8b;font-size:10px"> ${esc(p.currency)}</span>
-          ${p.transit_days!=null?`<span style="color:#2196f3;font-size:11px;margin-left:6px">${p.transit_days} дн.</span>`:''}
-          ${p.delivery_date?`<span style="color:#607d8b;font-size:10px;margin-left:4px">${esc(p.delivery_date)}</span>`:''}
+          <span style="color:var(--ok);font-weight:700;font-size:13px">${p.price.toFixed(2)}</span>
+          <span style="color:var(--text-dim);font-size:10px"> ${esc(p.currency)}</span>
+          ${p.transit_days!=null?`<span style="color:var(--accent-2,#2196f3);font-size:11px;margin-left:6px">${p.transit_days} дн.</span>`:''}
+          ${p.delivery_date?`<span style="color:var(--text-dim);font-size:10px;margin-left:4px">${esc(p.delivery_date)}</span>`:''}
         </div>
         ${makeBookBtn(c,p,true)}
       </td>`;
@@ -412,29 +415,31 @@ function buildTable(c){
   const hasAction = isDHL||isJumingo;
 
   let h = `<table style="width:100%;border-collapse:collapse;font-size:12px">
-    <thead><tr style="background:#162030">
-      <th style="padding:7px 10px;color:#9aafbe;text-align:left">Послуга</th>
-      ${isDHL?'<th style="padding:7px 8px;color:#9aafbe;font-family:monospace">Код</th>':''}
-      <th style="padding:7px 10px;color:#9aafbe;text-align:right">Ціна</th>
-      <th style="padding:7px 10px;color:#9aafbe;text-align:center">Транзит</th>
-      ${isDHL?'<th style="padding:7px 10px;color:#9aafbe;text-align:center">Дата</th>':''}
+    <thead><tr style="background:var(--bg-app)">
+      <th style="padding:7px 10px;color:var(--text-muted);text-align:left">Послуга</th>
+      ${isDHL?'<th style="padding:7px 8px;color:var(--text-muted);font-family:monospace">Код</th>':''}
+      <th style="padding:7px 10px;color:var(--text-muted);text-align:right">Ціна</th>
+      <th style="padding:7px 10px;color:var(--text-muted);text-align:center">Транзит</th>
+      ${isDHL?'<th style="padding:7px 10px;color:var(--text-muted);text-align:center">Дата</th>':''}
       ${hasAction?'<th style="padding:7px 8px"></th>':''}
     </tr></thead><tbody>`;
 
   c.products.forEach(p=>{
     const priceHtml = p.price!=null
-      ? `<span style="color:#4caf50;font-weight:700">${p.price.toFixed(2)}</span> <span style="color:#607d8b;font-size:10px">${esc(p.currency)}</span>`
-      : '<span style="color:#607d8b">—</span>';
+      ? `<span style="color:var(--ok);font-weight:700">${p.price.toFixed(2)}</span> <span style="color:var(--text-dim);font-size:10px">${esc(p.currency)}</span>`
+      : '<span style="color:var(--text-dim)">—</span>';
     const isShop = String(p.code||'').startsWith('s-');
     const typeBadge = isJumingo
-      ? `<span style="font-size:10px;margin-left:5px;opacity:.8">${isShop?'🏪':'🚐'}</span>`
+      ? (isShop
+        ? `<span style="display:inline-block;font-size:10px;background:rgba(158,158,158,.15);color:var(--text-muted);border:1px solid var(--border-strong);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🏪 Поштомат</span>`
+        : `<span style="display:inline-block;font-size:10px;background:rgba(33,150,243,.12);color:var(--accent-2,#2196f3);border:1px solid rgba(33,150,243,.3);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🚐 Кур'єр</span>`)
       : '';
-    h += `<tr style="border-bottom:1px solid #1e2d3d">
-      <td style="padding:8px 10px;color:#c9d8e4;font-weight:600">${esc(p.name)}${typeBadge}</td>
-      ${isDHL?`<td style="padding:8px 8px;color:#607d8b;font-family:monospace">${esc(p.code)}</td>`:''}
+    h += `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 10px;color:var(--text);font-weight:600">${esc(p.name)}${typeBadge}</td>
+      ${isDHL?`<td style="padding:8px 8px;color:var(--text-dim);font-family:monospace">${esc(p.code)}</td>`:''}
       <td style="padding:8px 10px;text-align:right">${priceHtml}</td>
-      <td style="padding:8px 10px;color:#2196f3;text-align:center">${p.transit_days!=null?p.transit_days+' дн.':'—'}</td>
-      ${isDHL?`<td style="padding:8px 10px;color:#9aafbe;text-align:center;font-size:11px">${esc(p.delivery_date||'—')}</td>`:''}
+      <td style="padding:8px 10px;color:var(--accent-2,#2196f3);text-align:center">${p.transit_days!=null?p.transit_days+' дн.':'—'}</td>
+      ${isDHL?`<td style="padding:8px 10px;color:var(--text-muted);text-align:center;font-size:11px">${esc(p.delivery_date||'—')}</td>`:''}
       ${hasAction?`<td style="padding:8px 8px;text-align:center">${makeBookBtn(c,p,false)}</td>`:''}
     </tr>`;
   });
@@ -444,35 +449,35 @@ function buildTable(c){
 /* ── Головна функція рендерингу ────────────────────────────────── */
 function renderComparison(carriers){
   if(!carriers||!carriers.length)
-    return '<div style="color:#607d8b;font-size:13px">Немає активних перевізників.</div>';
+    return '<div style="color:var(--text-dim);font-size:13px">Немає активних перевізників.</div>';
 
   let html = buildSummary(carriers);
 
   /* Роздільник перед деталями */
   const hasDetails = carriers.some(c=>c.products&&c.products.length||c.error||c.note);
   if(html && hasDetails)
-    html += `<div style="font-size:11px;font-weight:700;color:#607d8b;text-transform:uppercase;
+    html += `<div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;
                letter-spacing:.05em;margin-bottom:12px;padding-top:4px;
-               border-top:1px solid #1e2d3d;padding-top:14px">
+               border-top:1px solid var(--border);padding-top:14px">
                📋 Детальні тарифи</div>`;
 
   carriers.forEach(c=>{
     const icon = cicon(c.carrier_type);
     let body='';
     if(c.error)
-      body=`<div style="color:#ef9a9a;font-size:12px">❌ ${esc(c.error)}</div>`;
+      body=`<div style="color:var(--err);font-size:12px">❌ ${esc(c.error)}</div>`;
     else if(c.note)
-      body=`<div style="color:#607d8b;font-size:12px;padding:6px 0">💬 ${esc(c.note)}</div>`;
+      body=`<div style="color:var(--text-dim);font-size:12px;padding:6px 0">💬 ${esc(c.note)}</div>`;
     else if(c.products&&c.products.length)
       body=buildTable(c);
     else
-      body='<div style="color:#607d8b;font-size:12px;padding:6px 0">Немає тарифів</div>';
+      body='<div style="color:var(--text-dim);font-size:12px;padding:6px 0">Немає тарифів</div>';
 
     html += `<div style="margin-bottom:22px">
-      <div style="font-size:12px;font-weight:700;color:#9aafbe;margin-bottom:8px;
+      <div style="font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:8px;
           display:flex;align-items:center;gap:6px">
         ${icon} ${esc(c.carrier_name)}
-        ${c.products&&c.products.length?`<span style="color:#607d8b;font-weight:400">(${c.products.length} тарифів)</span>`:''}
+        ${c.products&&c.products.length?`<span style="color:var(--text-dim);font-weight:400">(${c.products.length} тарифів)</span>`:''}
       </div>${body}</div>`;
   });
   return html;
@@ -486,18 +491,18 @@ function _checkExportWarning(val, elId) {
   if (v >= 1000) {
     el.style.display = '';
     el.innerHTML =
-      '<div style="background:#3b1a1a;border:1px solid #f44336;border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.6">' +
-      '<b style="color:#f44336">🚨 Ausfuhrdokumente erforderlich!</b><br>' +
-      '<span style="color:#ef9a9a">Вартість ≥ 1000 €: відповідно до законодавства ЄС потрібна ' +
+      '<div style="background:var(--bg-card);border:1px solid var(--err);border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.6">' +
+      '<b style="color:var(--err)">🚨 Ausfuhrdokumente erforderlich!</b><br>' +
+      '<span style="color:var(--err)">Вартість ≥ 1000 €: відповідно до законодавства ЄС потрібна ' +
       '<b>Ausfuhranmeldung</b> (митна декларація вивозу). ' +
       'Без цього документу відправлення може бути затримано або конфісковано митницею.</span>' +
       '</div>';
   } else if (v > 900) {
     el.style.display = '';
     el.innerHTML =
-      '<div style="background:#2d2200;border:1px solid #ff9800;border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.6">' +
-      '<b style="color:#ff9800">⚠️ Можливо потрібні Ausfuhrdokumente</b><br>' +
-      '<span style="color:#ffcc80">Вартість > 900 €: при наближенні до 1000 € може знадобитись ' +
+      '<div style="background:var(--bg-card);border:1px solid var(--warn);border-radius:6px;padding:8px 12px;font-size:12px;line-height:1.6">' +
+      '<b style="color:var(--warn)">⚠️ Можливо потрібні Ausfuhrdokumente</b><br>' +
+      '<span style="color:var(--warn)">Вартість > 900 €: при наближенні до 1000 € може знадобитись ' +
       '<b>Ausfuhranmeldung</b>. Уточніть у митного брокера або перевірте поріг для країни призначення.</span>' +
       '</div>';
   } else {
@@ -519,13 +524,13 @@ document.addEventListener('DOMContentLoaded', function() {
 {% csrf_token %}
 
 {% if is_error %}
-<div style="background:rgba(244,67,54,.06);border:1px solid rgba(244,67,54,.25);border-left:4px solid #f44336;
+<div style="background:rgba(244,67,54,.06);border:1px solid rgba(244,67,54,.25);border-left:4px solid var(--err);
             border-radius:8px;padding:16px 20px;margin:24px 32px 0;display:flex;gap:14px;align-items:flex-start">
   <span style="font-size:18px;flex-shrink:0">❌</span>
   <div>
-    <div style="font-weight:700;color:#f44336;margin-bottom:4px">Помилка при попередньому оформленні</div>
-    <div style="font-size:12px;color:#ef9a9a;font-family:monospace;white-space:pre-wrap;word-break:break-all">{{ error_message }}</div>
-    <div style="margin-top:8px;font-size:12px;color:#9aafbe">Виправте дані та натисніть «🚀 Надіслати до перевізника» повторно.</div>
+    <div style="font-weight:700;color:var(--err);margin-bottom:4px">Помилка при попередньому оформленні</div>
+    <div style="font-size:12px;color:var(--err);font-family:monospace;white-space:pre-wrap;word-break:break-all">{{ error_message }}</div>
+    <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">Виправте дані та натисніть «🚀 Надіслати до перевізника» повторно.</div>
   </div>
 </div>
 {% endif %}
@@ -541,7 +546,7 @@ document.addEventListener('DOMContentLoaded', function() {
       {% if not carriers %}
       <div class="alert-info">
         <span>⚠️</span>
-        <div>Перевізників не налаштовано. <a href="{% url 'admin:shipping_carrier_add' %}" style="color:#58a6ff">Додати перевізника →</a></div>
+        <div>Перевізників не налаштовано. <a href="{% url 'admin:shipping_carrier_add' %}" style="color:var(--accent)">Додати перевізника →</a></div>
       </div>
       {% else %}
       <div class="carrier-grid">
@@ -635,21 +640,21 @@ document.addEventListener('DOMContentLoaded', function() {
             <b>Коробка:</b> {{ packaging_hint.box }}
             {% if packaging_hint.weight_g %} · <b>Вага:</b> {{ packaging_hint.weight_g }} г{% endif %}
             {% if packaging_hint.total_boxes > 1 %} · <b>{{ packaging_hint.total_boxes }} коробки</b>{% endif %}
-            {% if packaging_hint.no_packaging %} · <span style="color:#ff9800">деякі товари без налаштованої упаковки</span>{% endif %}
+            {% if packaging_hint.no_packaging %} · <span style="color:var(--warn)">деякі товари без налаштованої упаковки</span>{% endif %}
           {% else %}
             Вагу заповнено з <b>net_weight_g</b> товарів ({{ packaging_hint.weight_g }} г).
-            Розміри не визначено — <a href="{% url 'admin:shipping_packagingmaterial_changelist' %}" target="_blank" style="color:#58a6ff">налаштуй упаковку →</a>
+            Розміри не визначено — <a href="{% url 'admin:shipping_packagingmaterial_changelist' %}" target="_blank" style="color:var(--accent)">налаштуй упаковку →</a>
           {% endif %}
-          {% if packaging_hint.clamped %}<br><span style="color:#ff9800">⚠️ Розрахована вага менша за 0.1 кг — встановлено мінімум 0.100 кг</span>{% endif %}
-          {% if packaging_hint.missing_weight %}<br><span style="color:#ff9800">⚠️ є товари без вказаної ваги — результат неточний</span>{% endif %}
+          {% if packaging_hint.clamped %}<br><span style="color:var(--warn)">⚠️ Розрахована вага менша за 0.1 кг — встановлено мінімум 0.100 кг</span>{% endif %}
+          {% if packaging_hint.missing_weight %}<br><span style="color:var(--warn)">⚠️ є товари без вказаної ваги — результат неточний</span>{% endif %}
         </div>
       </div>
       {% else %}
       <div class="alert-info" style="margin-bottom:14px;border-color:rgba(255,152,0,.3)">
         <span>⚠️</span>
-        <div style="color:#ff9800">
+        <div style="color:var(--warn)">
           Вагу та розміри не вдалося визначити автоматично.
-          Заповни вручну або <a href="{% url 'admin:inventory_product_changelist' %}" target="_blank" style="color:#58a6ff">додай net_weight_g до товарів</a>.
+          Заповни вручну або <a href="{% url 'admin:inventory_product_changelist' %}" target="_blank" style="color:var(--accent)">додай net_weight_g до товарів</a>.
         </div>
       </div>
       {% endif %}
@@ -677,16 +682,16 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="sh-field">
           <label class="sh-label">
-            Задекларована вартість <span style="color:#f44336">*</span>
-            {% if shipment.declared_value %}<span style="color:#607d8b;font-size:11px;font-weight:400;margin-left:6px">(з замовлення)</span>{% endif %}
+            Задекларована вартість <span style="color:var(--err)">*</span>
+            {% if shipment.declared_value %}<span style="color:var(--text-dim);font-size:11px;font-weight:400;margin-left:6px">(з замовлення)</span>{% endif %}
           </label>
           <input class="sh-input" type="number" name="declared_value" id="declared_value"
             step="0.01" min="0" required
             value="{{ shipment.declared_value|default:'' }}"
-            style="{% if not shipment.declared_value %}border-color:#f44336;{% endif %}"
-            oninput="this.style.borderColor=this.value?'#2a3f52':'#f44336'; _checkExportWarning(this.value)">
+            style="{% if not shipment.declared_value %}border-color:var(--err);{% endif %}"
+            oninput="this.style.borderColor=this.value?'var(--border-strong)':'var(--err)'; _checkExportWarning(this.value)">
           {% if not shipment.declared_value %}
-            <div style="color:#f44336;font-size:11px;margin-top:3px">⚠️ Вкажіть вартість товарів для митниці</div>
+            <div style="color:var(--err);font-size:11px;margin-top:3px">⚠️ Вкажіть вартість товарів для митниці</div>
           {% endif %}
           <div id="export-warn" style="margin-top:5px;display:none"></div>
         </div>
@@ -737,7 +742,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <option value="private" {% if customs_invoice_type == 'private' %}selected{% endif %}>Privat / Private (особисте)</option>
           </select>
         </div>
-        <div style="font-size:11px;color:#607d8b;padding-top:16px">
+        <div style="font-size:11px;color:var(--text-dim);padding-top:16px">
           Відправляється разом із посилкою до Jumingo.<br>
           Вартість — загальна по рядку. Вага — нетто (кг).
         </div>
@@ -746,20 +751,20 @@ document.addEventListener('DOMContentLoaded', function() {
       <div style="overflow-x:auto;margin-bottom:10px">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
           <thead>
-            <tr style="background:#162030">
-              <th style="padding:7px 8px;color:#9aafbe;font-weight:600;text-align:left;border-bottom:1px solid #243347">Опис (EN/DE, макс. 35 символів)</th>
-              <th style="padding:7px 5px;color:#9aafbe;font-weight:600;text-align:center;border-bottom:1px solid #243347;width:52px">К-ть</th>
-              <th style="padding:7px 5px;color:#9aafbe;font-weight:600;text-align:left;border-bottom:1px solid #243347;width:90px">HS-код</th>
-              <th style="padding:7px 5px;color:#9aafbe;font-weight:600;text-align:center;border-bottom:1px solid #243347;width:52px">Країна</th>
-              <th style="padding:7px 5px;color:#9aafbe;font-weight:600;text-align:right;border-bottom:1px solid #243347;width:80px">Вага(кг)</th>
-              <th style="padding:7px 5px;color:#9aafbe;font-weight:600;text-align:right;border-bottom:1px solid #243347;width:90px">Вартість</th>
-              <th style="padding:7px 5px;color:#9aafbe;font-weight:600;text-align:center;border-bottom:1px solid #243347;width:48px">Вал.</th>
-              <th style="border-bottom:1px solid #243347;width:28px"></th>
+            <tr style="background:var(--bg-app)">
+              <th style="padding:7px 8px;color:var(--text-muted);font-weight:600;text-align:left;border-bottom:1px solid var(--border-strong)">Опис (EN/DE, макс. 35 символів)</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:52px">К-ть</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:left;border-bottom:1px solid var(--border-strong);width:90px">HS-код</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:52px">Країна</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:80px">Вага(кг)</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:90px">Вартість</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:48px">Вал.</th>
+              <th style="border-bottom:1px solid var(--border-strong);width:28px"></th>
             </tr>
           </thead>
           <tbody id="customs-rows">
             {% for a in customs_articles %}
-            <tr class="ca-row" style="border-bottom:1px solid #1a2535">
+            <tr class="ca-row" style="border-bottom:1px solid var(--border)">
               <td style="padding:4px 8px">
                 <input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="{{ a.description }}" placeholder="Electronic component">
               </td>
@@ -783,7 +788,7 @@ document.addEventListener('DOMContentLoaded', function() {
               </td>
               <td style="padding:4px;text-align:center">
                 <button type="button" onclick="removeCaRow(this)" title="Видалити рядок"
-                  style="background:#1e0a0a;border:1px solid #5c1a1a;color:#ef9a9a;border-radius:4px;padding:3px 7px;cursor:pointer;font-size:11px;line-height:1">✕</button>
+                  style="background:var(--bg-card);border:1px solid var(--border-strong);color:var(--err);border-radius:4px;padding:3px 7px;cursor:pointer;font-size:11px;line-height:1">✕</button>
               </td>
             </tr>
             {% endfor %}
@@ -793,10 +798,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
       <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
         <button type="button" onclick="addCaRow()"
-          style="background:#162030;border:1px solid #2a3f52;color:#9aafbe;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px">
+          style="background:var(--bg-card-2);border:1px solid var(--border-strong);color:var(--text-muted);border-radius:6px;padding:6px 14px;cursor:pointer;font-size:12px">
           + Рядок
         </button>
-        <span id="ca-total" style="font-size:12px;color:#4caf50;font-weight:700"></span>
+        <span id="ca-total" style="font-size:12px;color:var(--ok);font-weight:700"></span>
       </div>
       <div id="ca-export-warn" style="margin-top:8px;display:none"></div>
     </div>
@@ -830,10 +835,10 @@ document.addEventListener('DOMContentLoaded', function() {
     <div id="rates-panel" class="sh-card" style="display:none;margin-top:20px">
       <div class="sh-card-title" style="justify-content:space-between">
         <span>📊 Порівняння тарифів</span>
-        <span id="rates-meta" style="font-weight:400;color:#607d8b;font-size:11px;text-transform:none;letter-spacing:0"></span>
+        <span id="rates-meta" style="font-weight:400;color:var(--text-dim);font-size:11px;text-transform:none;letter-spacing:0"></span>
       </div>
-      <div id="rates-params" style="display:none;background:#1c2128;border:1px solid #2a3f52;border-radius:6px;padding:9px 14px;margin-bottom:14px;font-size:11px;line-height:1.7"></div>
-      <div id="rates-loading" style="display:none;color:#607d8b;padding:16px 0;font-size:13px">
+      <div id="rates-params" style="display:none;background:var(--bg-card-2);border:1px solid var(--border-strong);border-radius:6px;padding:9px 14px;margin-bottom:14px;font-size:11px;line-height:1.7"></div>
+      <div id="rates-loading" style="display:none;color:var(--text-dim);padding:16px 0;font-size:13px">
         ⏳ Запитую тарифи…
       </div>
       <div id="rates-results"></div>
@@ -854,18 +859,18 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="row"><span class="key">Регіон</span><span class="val">{{ order.shipping_region|default:"—" }}</span></div>
         <div class="row"><span class="key">Дедлайн</span><span class="val">{{ order.shipping_deadline|default:"—" }}</span></div>
         {% if order.shipping_address %}
-        <div class="addr"><b style="color:#607d8b">Адреса:</b><br>{{ order.shipping_address }}</div>
+        <div class="addr"><b style="color:var(--text-dim)">Адреса:</b><br>{{ order.shipping_address }}</div>
         {% endif %}
       </div>
 
       {% with lines=order.lines.all %}
       {% if lines %}
       <div style="margin-top:14px">
-        <div style="font-size:11px;color:#607d8b;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Рядки замовлення</div>
+        <div style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Рядки замовлення</div>
         {% for line in lines %}
-        <div style="font-size:12px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);display:flex;justify-content:space-between">
-          <span style="color:#58a6ff">{{ line.sku_raw|default:line.product.sku }}</span>
-          <span style="color:#9aafbe">{{ line.qty }} шт.</span>
+        <div style="font-size:12px;padding:5px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between">
+          <span style="color:var(--accent)">{{ line.sku_raw|default:line.product.sku }}</span>
+          <span style="color:var(--text-muted)">{{ line.qty }} шт.</span>
         </div>
         {% endfor %}
       </div>
