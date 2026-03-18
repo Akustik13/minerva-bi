@@ -101,6 +101,14 @@ select.sh-input {
   border-radius: 8px; padding: 12px 16px; font-size: 12px; color: var(--text-muted);
   margin-bottom: 16px; display: flex; gap: 10px; align-items: flex-start;
 }
+.rf-btn {
+  background: var(--bg-card-2); border: 1px solid var(--border-strong);
+  color: var(--text-muted); border-radius: 16px; padding: 4px 13px;
+  font-size: 11px; font-weight: 600; cursor: pointer; margin-right: 6px;
+  transition: all .15s;
+}
+.rf-btn:hover { border-color: var(--accent-2, #2196f3); color: var(--text); }
+.rf-btn.rf-active { background: var(--accent-2, #2196f3); border-color: var(--accent-2, #2196f3); color: #fff; }
 </style>
 <script>
 const _EU = new Set('{{ eu_countries_js }}'.split(','));
@@ -188,6 +196,33 @@ document.addEventListener('DOMContentLoaded',function(){
   });
 });
 
+/* ── Фільтр типу тарифів (кур'єр / поштомат / всі) ─────────────── */
+let _lastRatesData = null;
+let _ratesFilter   = 'all'; // 'all' | 'pickup' | 'shop'
+
+function setRatesFilter(f){
+  _ratesFilter = f;
+  ['all','pickup','shop'].forEach(k=>{
+    const b = document.getElementById('rf-'+k);
+    if(b) b.classList.toggle('rf-active', k===f);
+  });
+  if(_lastRatesData) _applyRatesFilter();
+}
+
+function _applyRatesFilter(){
+  if(!_lastRatesData) return;
+  // Deep-filter: clone data, remove products that don't match
+  const filtered = _lastRatesData.map(c=>{
+    if(_ratesFilter === 'all') return c;
+    const products = (c.products||[]).filter(p=>{
+      const isShop = String(p.code||'').startsWith('s-');
+      return _ratesFilter === 'shop' ? isShop : !isShop;
+    });
+    return {...c, products};
+  });
+  document.getElementById('rates-results').innerHTML = renderComparison(filtered);
+}
+
 /* ── Порівняння тарифів ─────────────────────────────────────────── */
 function compareRates(){
   const form   = document.getElementById('shipment-form');
@@ -245,7 +280,14 @@ function compareRates(){
       + ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">📥 Одержувач:</span> <b style="color:var(--text)">${esc(body.recipient_country)} ${esc(body.recipient_zip)} ${esc(body.recipient_city)}</b><br>`
       + `<span style="color:var(--text-muted)">⚖️ Вага:</span> <b style="color:var(--text)">${esc(body.weight_kg)} кг</b>`
       + ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">📐 Розміри:</span> <b style="color:var(--text)">${esc(data.dims||'')} см (Д×Ш×В)</b>`;
-    results.innerHTML = renderComparison(data.results);
+    _lastRatesData = data.results;
+    // Show filter only if there are Jumingo tariffs (shop/pickup distinction applies only to Jumingo)
+    const hasJumingo = (data.results||[]).some(c=>c.carrier_type==='jumingo'&&c.products&&c.products.length);
+    const filterEl = document.getElementById('rates-type-filter');
+    filterEl.style.display = hasJumingo ? '' : 'none';
+    // Reset filter to 'all' on new request
+    setRatesFilter('all');
+    _applyRatesFilter();
   })
   .catch(err=>{
     loading.style.display='none';
@@ -838,6 +880,12 @@ document.addEventListener('DOMContentLoaded', function() {
         <span id="rates-meta" style="font-weight:400;color:var(--text-dim);font-size:11px;text-transform:none;letter-spacing:0"></span>
       </div>
       <div id="rates-params" style="display:none;background:var(--bg-card-2);border:1px solid var(--border-strong);border-radius:6px;padding:9px 14px;margin-bottom:14px;font-size:11px;line-height:1.7"></div>
+      <div id="rates-type-filter" style="display:none;margin-bottom:12px">
+        <span style="font-size:11px;color:var(--text-dim);margin-right:8px">Показати:</span>
+        <button onclick="setRatesFilter('all')"    id="rf-all"    class="rf-btn rf-active">Всі</button>
+        <button onclick="setRatesFilter('pickup')" id="rf-pickup" class="rf-btn">🚐 Кур'єр</button>
+        <button onclick="setRatesFilter('shop')"   id="rf-shop"   class="rf-btn">🏪 Поштомат</button>
+      </div>
       <div id="rates-loading" style="display:none;color:var(--text-dim);padding:16px 0;font-size:13px">
         ⏳ Запитую тарифи…
       </div>
