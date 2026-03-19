@@ -68,13 +68,13 @@ def dashboard(request):
     qs_period = qs_all.filter(
         order_date__isnull=False,
         order_date__gte=date_from,
-        order_date__lte=date_to,
+        order_date__lt=date_to + timedelta(days=1),  # exclusive end → symmetric with prev
     )
     qs_lines = SalesOrderLine.objects.filter(order__in=qs_period)
     if filter_category:
         qs_lines = qs_lines.filter(product__category=filter_category)
 
-    # Попередній період
+    # Попередній аналогічний період (однакова довжина)
     qs_prev = qs_all.filter(
         order_date__gte=prev_date_from,
         order_date__lt=prev_date_to,
