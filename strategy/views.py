@@ -15,7 +15,7 @@ def canvas_view(request, pk):
         CustomerStrategy.objects.select_related("customer", "template", "current_step"),
         pk=pk,
     )
-    steps = list(strategy.steps.select_related("template_step", "logs").order_by("scheduled_at"))
+    steps = list(strategy.steps.select_related("template_step").order_by("scheduled_at"))
 
     context = {
         "title": f"Canvas — {strategy}",
