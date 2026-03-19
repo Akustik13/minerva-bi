@@ -463,66 +463,90 @@
     },
   });
 
+  /* ── Helper: show "no data" message when chart has nothing to display ── */
+  function noData(id, msg) {
+    const el  = document.getElementById(id);
+    const box = el ? el.closest('.tr-chart-box') : null;
+    if (!box) return;
+    el.style.display = 'none';
+    const p = document.createElement('p');
+    p.style.cssText = 'text-align:center;color:var(--text-dim);font-size:12px;padding:40px 0;margin:0';
+    p.textContent = msg;
+    box.appendChild(p);
+  }
+
   /* ── Shipping data ── */
   const couriers    = {{ top_couriers }};
   const courierData = {{ courier_by_year }};
   const ontimeLabels = {{ ontime_labels }};
   const ontimePct   = {{ ontime_pct }};
 
-  new Chart(document.getElementById('courierChart'), {
-    type: 'bar',
-    data: {
-      labels: years.map(String),
-      datasets: couriers.map((c, i) => ({
-        label:           c,
-        data:            years.map(y => (courierData[y] || {})[c] || 0),
-        backgroundColor: palette[i % palette.length] + 'cc',
-        borderColor:     palette[i % palette.length],
-        borderWidth:     1,
-      })),
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { color: muted, font: { size: 11 } } } },
-      scales: {
-        x: { stacked: true, grid: gridCfg, ticks: tickCfg },
-        y: { stacked: true, grid: gridCfg, ticks: tickCfg, beginAtZero: true },
+  if (couriers.length === 0) {
+    noData('courierChart', 'Немає даних про кур\'єрів — заповніть поле «Кур\'єр» у замовленнях');
+  } else {
+    new Chart(document.getElementById('courierChart'), {
+      type: 'bar',
+      data: {
+        labels: years.map(String),
+        datasets: couriers.map((c, i) => ({
+          label:           c,
+          data:            years.map(y => (courierData[y] || {})[c] || 0),
+          backgroundColor: palette[i % palette.length] + 'cc',
+          borderColor:     palette[i % palette.length],
+          borderWidth:     1,
+        })),
       },
-    },
-  });
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: muted, font: { size: 11 } } } },
+        scales: {
+          x: { stacked: true, grid: gridCfg, ticks: tickCfg },
+          y: { stacked: true, grid: gridCfg, ticks: tickCfg, beginAtZero: true },
+        },
+      },
+    });
+  }
 
-  const ontimeColors = ontimePct.map(v =>
-    v == null ? dim + '88' : v >= 90 ? ok + 'cc' : v >= 70 ? warn + 'cc' : err + 'cc'
-  );
-  new Chart(document.getElementById('ontimeChart'), {
-    type: 'bar',
-    data: {
-      labels: ontimeLabels,
-      datasets: [{
-        label:           'Вчасно (%)',
-        data:            ontimePct,
-        backgroundColor: ontimeColors,
-        borderColor:     ontimeColors.map(c => c.slice(0, -2)),
-        borderWidth:     1,
-      }],
-    },
-    options: {
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ctx.raw == null ? ' немає даних' : ` ${ctx.raw}%` } },
+  const hasOntime = ontimePct.some(v => v !== null);
+  if (!hasOntime) {
+    noData('ontimeChart', 'Немає даних про дедлайни доставки — заповніть поле «Дедлайн відправки» у замовленнях');
+  } else {
+    const ontimeColors = ontimePct.map(v =>
+      v == null ? dim + '88' : v >= 90 ? ok + 'cc' : v >= 70 ? warn + 'cc' : err + 'cc'
+    );
+    new Chart(document.getElementById('ontimeChart'), {
+      type: 'bar',
+      data: {
+        labels: ontimeLabels,
+        datasets: [{
+          label:           'Вчасно (%)',
+          data:            ontimePct,
+          backgroundColor: ontimeColors,
+          borderColor:     ontimeColors.map(c => c.slice(0, -2)),
+          borderWidth:     1,
+        }],
       },
-      scales: {
-        x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 45 } },
-        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => v + '%' }, min: 0, max: 100 },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ctx.raw == null ? ' немає даних' : ` ${ctx.raw}%` } },
+        },
+        scales: {
+          x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 45 } },
+          y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => v + '%' }, min: 0, max: 100 },
+        },
       },
-    },
-  });
+    });
+  }
 
   /* ── Category revenue grouped bar ── */
   const cats    = {{ all_cats }};
   const catData = {{ cat_by_year }};
 
+  if (cats.length === 0) {
+    noData('catChart', 'Немає категорій товарів — заповніть поле «Категорія» у товарах');
+  } else {
   new Chart(document.getElementById('catChart'), {
     type: 'bar',
     data: {
@@ -552,6 +576,7 @@
       },
     },
   });
+  } /* end if (cats.length > 0) */
 
   /* ── SKU table ── */
   const skus    = {{ top_skus_raw }};
