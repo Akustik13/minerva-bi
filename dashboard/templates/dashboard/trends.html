@@ -171,9 +171,9 @@
     </div>
 
     <div class="tr-kpi">
-      <div class="tr-kpi-label">{{ current_year }} рік</div>
+      <div class="tr-kpi-label">{{ year_to }} рік</div>
       <div class="tr-kpi-val">€{{ curr_year_total|floatformat:0 }}</div>
-      <div class="tr-kpi-sub">{{ current_year }}, усього виручки</div>
+      <div class="tr-kpi-sub">{{ year_to }}, усього виручки</div>
     </div>
 
     <div class="tr-kpi ok">
@@ -339,14 +339,14 @@
   const gridCfg = { color: border, drawTicks: false };
   const tickCfg = { color: muted, font: { size: 10 } };
 
-  /* ── Data from Django ── */
-  const months      = {{ months_labels }};
-  const yoyDs       = {{ yoy_datasets }};     /* [{year, rev:[12], ord:[12]}, ...] */
-  const currSmooth  = {{ curr_rev_smooth }};  /* MA line for most recent year */
+  /* ── Data from Django (|safe prevents Django HTML-escaping JSON quotes) ── */
+  const months      = {{ months_labels|safe }};
+  const yoyDs       = {{ yoy_datasets|safe }};
+  const currSmooth  = {{ curr_rev_smooth|safe }};
   const smoothYear  = {{ smooth_year }};
-  const momLabels   = {{ mom_labels }};
-  const momGrowth   = {{ mom_growth }};
-  const years       = {{ years_json }};        /* [2021, 2022, ...] */
+  const momLabels   = {{ mom_labels|safe }};
+  const momGrowth   = {{ mom_growth|safe }};
+  const years       = {{ years_json|safe }};
 
   /* ── YoY Revenue chart ── */
   const revDatasets = yoyDs.map((d, i) => ({
@@ -476,10 +476,10 @@
   }
 
   /* ── Shipping data ── */
-  const couriers    = {{ top_couriers }};
-  const courierData = {{ courier_by_year }};
-  const ontimeLabels = {{ ontime_labels }};
-  const ontimePct   = {{ ontime_pct }};
+  const couriers    = {{ top_couriers|safe }};
+  const courierData = {{ courier_by_year|safe }};
+  const ontimeLabels = {{ ontime_labels|safe }};
+  const ontimePct   = {{ ontime_pct|safe }};
 
   if (couriers.length === 0) {
     noData('courierChart', 'Немає даних про кур\'єрів — заповніть поле «Кур\'єр» у замовленнях');
@@ -541,8 +541,8 @@
   }
 
   /* ── Category revenue grouped bar ── */
-  const cats    = {{ all_cats }};
-  const catData = {{ cat_by_year }};
+  const cats    = {{ all_cats|safe }};
+  const catData = {{ cat_by_year|safe }};
 
   if (cats.length === 0) {
     noData('catChart', 'Немає категорій товарів — заповніть поле «Категорія» у товарах');
@@ -579,8 +579,8 @@
   } /* end if (cats.length > 0) */
 
   /* ── SKU table ── */
-  const skus    = {{ top_skus_raw }};
-  const skuData = {{ sku_year_rev }};
+  const skus    = {{ top_skus_raw|safe }};
+  const skuData = {{ sku_year_rev|safe }};
   const tbody   = document.getElementById('sku-tbody');
 
   skus.forEach(sku => {

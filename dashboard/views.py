@@ -604,20 +604,15 @@ def trends_view(request):
     worst_month = min(non_zero, key=lambda x: x[1]) if non_zero else None
     avg_monthly = round(sum(r for _, r in non_zero) / len(non_zero)) if non_zero else 0
 
-    # "Current year" total (always actual current year, even if out of range)
-    curr_yr_data   = all_years_data.get(current_year, monthly_rev_for_year(current_year)
-                                        if current_year not in all_years_data else {})
-    curr_year_total = sum(
-        all_years_data.get(current_year, {}).get(m, {}).get('revenue', 0)
-        for m in range(1, 13)
-    )
+    # KPI: use year_to (most recent selected year), not always current_year
+    # This way selecting 2021–2024 shows 2024 data, not 2026
+    latest_yr_data  = all_years_data[year_to]
+    curr_year_total = sum(latest_yr_data.get(m, {}).get('revenue', 0) for m in range(1, 13))
 
-    # YoY KPI: compare YTD (Jan–current_month) current year vs previous year
-    ytd_month = today.month
-    curr_ytd  = sum(
-        all_years_data.get(current_year, {}).get(m, {}).get('revenue', 0)
-        for m in range(1, ytd_month + 1)
-    )
+    # YoY KPI: compare year_to YTD vs year_to-1 YTD
+    # If year_to == current_year, limit to months already elapsed; else compare full year
+    ytd_month = today.month if year_to == current_year else 12
+    curr_ytd  = sum(latest_yr_data.get(m, {}).get('revenue', 0) for m in range(1, ytd_month + 1))
     if len(years_to_show) >= 2:
         yoy_vs_year = years_to_show[-2]
         prev_ytd    = sum(
@@ -628,7 +623,7 @@ def trends_view(request):
     else:
         yoy_vs_year = year_to - 1
         yoy_growth  = None
-    yoy_ytd_label = months_labels[ytd_month - 1]
+    yoy_ytd_label = months_labels[ytd_month - 1] if year_to == current_year else 'Гру'
 
     # ── Shipping analytics ─────────────────────────────────────────────────────
     top_couriers = list(
