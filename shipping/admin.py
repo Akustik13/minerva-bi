@@ -2133,6 +2133,8 @@ class ShipmentAdmin(admin.ModelAdmin):
                 "carrier":     info,
                 "via_minerva": True,
                 "shipment":    shipment,
+                "part_label":  "",
+                "total_parts": 1,
             })
             covered_order_ids.add(shipment.order_id)
 
@@ -2145,15 +2147,20 @@ class ShipmentAdmin(admin.ModelAdmin):
             .order_by("-order_date", "-id")
         )
         for order in manual_orders:
-            tn   = order.tracking_number or ""
-            info = _detect_carrier(tn)
-            rows.append({
-                "order":       order,
-                "tn":          tn,
-                "carrier":     info,
-                "via_minerva": False,
-                "shipment":    None,
-            })
+            tns = _parse_tracking_numbers(order.tracking_number or "")
+            if not tns:
+                tns = [order.tracking_number or ""]
+            for idx, tn in enumerate(tns):
+                info = _detect_carrier(tn)
+                rows.append({
+                    "order":       order,
+                    "tn":          tn,
+                    "carrier":     info,
+                    "via_minerva": False,
+                    "shipment":    None,
+                    "part_label":  f"Part {idx + 1}" if len(tns) > 1 else "",
+                    "total_parts": len(tns),
+                })
 
         return render(request, "admin/shipping/order_tracking.html", {
             **self.admin_site.each_context(request),
@@ -2595,6 +2602,25 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         order.save(update_fields=update_fields)
 
     return changed
+
+
+# ── Parse multiple tracking numbers from a single field ───────────────────────
+
+def _parse_tracking_numbers(tn_str: str) -> list:
+    """Extract individual TNs from a field that may contain multiple numbers.
+
+    Handles:
+      'JD123, JD456'
+      'JD123\nJD456'
+      'Part1: JD123 Part2: JD456'   ← DigiKey multi-package format
+      'JD123 JD456'
+    """
+    import re
+    if not tn_str:
+        return []
+    s = re.sub(r'\bPart\s*\d+\s*:', ' ', tn_str, flags=re.IGNORECASE)
+    parts = re.split(r'[,;\s]+', s)
+    return [p.strip() for p in parts if p.strip()]
 
 
 # ── Carrier detection by tracking number ─────────────────────────────────────

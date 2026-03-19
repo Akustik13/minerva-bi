@@ -88,7 +88,7 @@
     </thead>
     <tbody>
     {% for row in rows %}
-    <tr>
+    <tr{% if row.part_label %} style="border-left:3px solid var(--accent)"{% endif %}>
       <!-- Замовлення -->
       <td>
         <a href="{% url 'admin:sales_salesorder_change' row.order.pk %}"
@@ -96,6 +96,11 @@
           {{ row.order.order_number }}
         </a>
         <div style="font-size:11px;color:var(--text-dim)">{{ row.order.source }}</div>
+        {% if row.part_label %}
+          <div style="font-size:10px;color:var(--accent);margin-top:2px;font-weight:700">
+            📦 {{ row.part_label }} / {{ row.total_parts }}
+          </div>
+        {% endif %}
       </td>
 
       <!-- Клієнт -->
