@@ -245,6 +245,41 @@
     </table>
   </div>
 
+  {# ── Shipping analytics ─────────────────────────────────────────────────── #}
+  <h2 class="tr-hdr" style="margin-top:24px"><span>🚚</span> Доставка</h2>
+  <div class="tr-charts-2col">
+    <div class="tr-chart-box">
+      <h3>Кількість відправлень по кур'єрах (по роках)</h3>
+      <canvas id="courierChart"></canvas>
+    </div>
+    <div class="tr-chart-box">
+      <h3>Вчасне відправлення (%) — останні 12 місяців</h3>
+      <canvas id="ontimeChart"></canvas>
+    </div>
+  </div>
+
+  {# ── Stock / product analytics ─────────────────────────────────────────── #}
+  <h2 class="tr-hdr" style="margin-top:4px"><span>📦</span> Товари і склад</h2>
+  <div class="tr-charts-2col">
+    <div class="tr-chart-box">
+      <h3>Виручка по категоріях (€) — по роках</h3>
+      <canvas id="catChart"></canvas>
+    </div>
+    <div class="tr-chart-box" style="overflow:auto;padding:0">
+      <table class="tr-q-table">
+        <thead>
+          <tr>
+            <th>SKU</th>
+            <th class="num">{{ prev2_year }}</th>
+            <th class="num">{{ prev_year }}</th>
+            <th class="num">{{ current_year }}</th>
+          </tr>
+        </thead>
+        <tbody id="sku-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
 
 <script>
@@ -435,6 +470,122 @@
         },
       },
     },
+  });
+
+  /* ── Shipping data ── */
+  const couriers    = {{ top_couriers }};
+  const courierData = {{ courier_by_year }};
+  const years       = {{ years_list }};
+  const ontimeLabels = {{ ontime_labels }};
+  const ontimePct   = {{ ontime_pct }};
+
+  /* Palette for couriers */
+  const palette = [accent, gold, ok, warn, err, dim + 'cc'];
+
+  /* ── Courier stacked bar ── */
+  new Chart(document.getElementById('courierChart'), {
+    type: 'bar',
+    data: {
+      labels: years.map(String),
+      datasets: couriers.map((c, i) => ({
+        label: c,
+        data: years.map(y => (courierData[y] || {})[c] || 0),
+        backgroundColor: palette[i % palette.length] + 'cc',
+        borderColor: palette[i % palette.length],
+        borderWidth: 1,
+      })),
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: muted, font: { size: 11 } } },
+      },
+      scales: {
+        x: { stacked: true, grid: gridCfg, ticks: tickCfg },
+        y: { stacked: true, grid: gridCfg, ticks: tickCfg, beginAtZero: true },
+      },
+    },
+  });
+
+  /* ── On-time % line ── */
+  const ontimeColors = ontimePct.map(v =>
+    v == null ? dim + '88' : v >= 90 ? ok + 'cc' : v >= 70 ? warn + 'cc' : err + 'cc'
+  );
+  new Chart(document.getElementById('ontimeChart'), {
+    type: 'bar',
+    data: {
+      labels: ontimeLabels,
+      datasets: [{
+        label: 'Вчасно (%)',
+        data: ontimePct,
+        backgroundColor: ontimeColors,
+        borderColor: ontimeColors.map(c => c.slice(0, -2)),
+        borderWidth: 1,
+      }],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.raw == null ? ' немає даних' : ` ${ctx.raw}%`,
+          },
+        },
+      },
+      scales: {
+        x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 45 } },
+        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => v + '%' },
+             min: 0, max: 100 },
+      },
+    },
+  });
+
+  /* ── Category revenue grouped bar ── */
+  const cats     = {{ all_cats }};
+  const catData  = {{ cat_by_year }};
+
+  new Chart(document.getElementById('catChart'), {
+    type: 'bar',
+    data: {
+      labels: cats,
+      datasets: years.map((y, i) => ({
+        label: String(y),
+        data: cats.map(c => (catData[y] || {})[c] || 0),
+        backgroundColor: [accent, gold, ok][i] + 'cc',
+        borderColor:     [accent, gold, ok][i],
+        borderWidth: 1,
+      })),
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: muted, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: €${(ctx.raw || 0).toLocaleString('de-DE', {maximumFractionDigits: 0})}`,
+          },
+        },
+      },
+      scales: {
+        x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 30 } },
+        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => '€' + v.toLocaleString('de-DE', {notation:'compact'}) }, beginAtZero: true },
+      },
+    },
+  });
+
+  /* ── SKU table ── */
+  const skus     = {{ top_skus_raw }};
+  const skuData  = {{ sku_year_rev }};
+  const tbody    = document.getElementById('sku-tbody');
+
+  skus.forEach(sku => {
+    const vals = years.map(y => (skuData[sku] || {})[y] || 0);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="font-family:monospace;font-size:11px">${sku || '—'}</td>`
+      + vals.map(v => `<td class="num" style="font-size:11px">${v > 0 ? '€' + v.toLocaleString('de-DE', {maximumFractionDigits:0}) : '—'}</td>`).join('');
+    tbody.appendChild(tr);
   });
 
 })();

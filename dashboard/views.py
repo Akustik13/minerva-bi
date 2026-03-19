@@ -3,10 +3,11 @@ dashboard/views.py — Minerva Dashboard v2
 Виручка = SalesOrderLine.unit_price × qty (або total_price рядка якщо є)
 """
 from datetime import timedelta
+from decimal import Decimal
 from django.db.models import (
-    Sum, Count, F, Q, ExpressionWrapper, DecimalField, FloatField, Avg
+    Sum, Count, F, Q, ExpressionWrapper, DecimalField, FloatField, Avg, Value
 )
-from django.db.models.functions import TruncMonth, TruncDate
+from django.db.models.functions import TruncMonth, TruncDate, Coalesce
 from django.shortcuts import render
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib import admin
@@ -15,10 +16,25 @@ from django.utils.dateparse import parse_date
 import json
 
 
+_ZERO_DEC = Value(Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2))
+
+def _line_rev_expr():
+    """Per-line revenue: total_price if set, else unit_price × qty, else 0.
+    Handles old DigiKey-synced lines where total_price is NULL."""
+    return Coalesce(
+        'total_price',
+        ExpressionWrapper(
+            F('unit_price') * F('qty'),
+            output_field=DecimalField(max_digits=18, decimal_places=2),
+        ),
+        _ZERO_DEC,
+    )
+
+
 # Revenue helpers — graceful fallback якщо поля ще не існують
 def _safe_rev(qs, field='total_price'):
     try:
-        r = qs.aggregate(t=Sum(field))['t']
+        r = qs.aggregate(t=Sum(_line_rev_expr()))['t']
         return float(r or 0)
     except Exception:
         return 0.0
@@ -126,7 +142,7 @@ def dashboard(request):
             .filter(order__in=qs_period)
             .annotate(month=TruncMonth('order__order_date'))
             .values('month')
-            .annotate(revenue=Sum('total_price'), orders=Count('order', distinct=True))
+            .annotate(revenue=Sum(_line_rev_expr()), orders=Count('order', distinct=True))
             .order_by('month')
         )
     except Exception:
@@ -397,11 +413,9 @@ def dashboard(request):
 
 @staff_member_required
 def trends_view(request):
-    """Trend analytics: YoY bar/line overlay, MoM growth rate, quarterly table."""
+    """Trend analytics: YoY, MoM growth, quarterly, shipping + stock sections."""
     import calendar
     from datetime import date
-    from django.db.models import Sum, Count
-    from django.db.models.functions import TruncMonth
     from sales.models import SalesOrder, SalesOrderLine
 
     today = date.today()
@@ -418,38 +432,33 @@ def trends_view(request):
     all_sources = list(
         SalesOrder.objects.values_list('source', flat=True).distinct().order_by('source'))
 
-    # ── Helpers ────────────────────────────────────────────────────────────────
+    rex = _line_rev_expr()  # Coalesce(total_price, unit_price*qty, 0)
+
+    # ── Helper ────────────────────────────────────────────────────────────────
     def month_start_end(y, m):
-        """Returns (first_of_month, first_of_next_month) as date objects."""
-        last_day = calendar.monthrange(y, m)[1]
         start = date(y, m, 1)
-        if m == 12:
-            end = date(y + 1, 1, 1)
-        else:
-            end = date(y, m + 1, 1)
+        end   = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
         return start, end
 
     def monthly_rev_for_year(year):
-        """Returns {month_number: {revenue, orders}} for a full calendar year."""
         qs_y = qs_all.filter(order_date__year=year)
         rows = list(
             SalesOrderLine.objects
             .filter(order__in=qs_y)
             .annotate(month=TruncMonth('order__order_date'))
             .values('month')
-            .annotate(revenue=Sum('total_price'), orders=Count('order', distinct=True))
+            .annotate(revenue=Sum(rex), orders=Count('order', distinct=True))
             .order_by('month')
         )
         result = {}
         for r in rows:
-            m = r['month'].month
-            result[m] = {
+            result[r['month'].month] = {
                 'revenue': float(r['revenue'] or 0),
                 'orders':  int(r['orders'] or 0),
             }
         return result
 
-    # ── YoY data (12 months × 3 years) ────────────────────────────────────────
+    # ── YoY data ──────────────────────────────────────────────────────────────
     curr_data  = monthly_rev_for_year(current_year)
     prev_data  = monthly_rev_for_year(prev_year)
     prev2_data = monthly_rev_for_year(prev2_year)
@@ -463,7 +472,7 @@ def trends_view(request):
     curr_ord   = [curr_data.get(m, {}).get('orders', 0) for m in range(1, 13)]
     prev_ord   = [prev_data.get(m, {}).get('orders', 0) for m in range(1, 13)]
 
-    # 3-month moving average (smoothed line for current year)
+    # 3-month moving average for current year
     curr_rev_smooth = []
     for i in range(12):
         window = [curr_rev[j] for j in range(max(0, i - 2), i + 1) if curr_rev[j] > 0]
@@ -483,7 +492,7 @@ def trends_view(request):
             .filter(order__in=qs_all,
                     order__order_date__gte=start,
                     order__order_date__lt=end)
-            .aggregate(t=Sum('total_price'))['t'] or 0
+            .aggregate(t=Sum(rex))['t'] or 0
         )
         rolling_months.append({'label': start.strftime('%b %Y'), 'rev': rev_val})
 
@@ -492,28 +501,25 @@ def trends_view(request):
     for i in range(1, 13):
         prev_val = rolling_months[i - 1]['rev']
         curr_val = rolling_months[i]['rev']
-        if prev_val:
-            mom_growth.append(round((curr_val - prev_val) / prev_val * 100, 1))
-        else:
-            mom_growth.append(None)
+        mom_growth.append(
+            round((curr_val - prev_val) / prev_val * 100, 1) if prev_val else None
+        )
 
     # ── Quarterly table ────────────────────────────────────────────────────────
     quarters = []
     for year in [prev2_year, prev_year, current_year]:
         for q in range(1, 5):
-            month_start_q = (q - 1) * 3 + 1
-            month_end_q   = q * 3
             qs_q = qs_all.filter(
                 order_date__year=year,
-                order_date__month__gte=month_start_q,
-                order_date__month__lte=month_end_q,
+                order_date__month__gte=(q - 1) * 3 + 1,
+                order_date__month__lte=q * 3,
             )
             revenue = float(
                 SalesOrderLine.objects.filter(order__in=qs_q)
-                .aggregate(t=Sum('total_price'))['t'] or 0
+                .aggregate(t=Sum(rex))['t'] or 0
             )
-            orders = qs_q.count()
-            quarters.append({'year': year, 'q': q, 'revenue': revenue, 'orders': orders})
+            quarters.append({'year': year, 'q': q,
+                              'revenue': revenue, 'orders': qs_q.count()})
 
     q_by_key = {(r['year'], r['q']): r for r in quarters}
     for r in quarters:
@@ -535,8 +541,100 @@ def trends_view(request):
     yoy_growth = round((curr_year_total - prev_year_total) / prev_year_total * 100, 1) \
         if prev_year_total else None
 
+    # ── Shipping analytics ─────────────────────────────────────────────────────
+    # Courier breakdown per year (for stacked bar: top-5 couriers)
+    top_couriers = list(
+        qs_all.exclude(shipping_courier='')
+        .values('shipping_courier')
+        .annotate(cnt=Count('id'))
+        .order_by('-cnt')[:5]
+        .values_list('shipping_courier', flat=True)
+    )
+    courier_by_year = {}
+    for year in [prev2_year, prev_year, current_year]:
+        row = {}
+        for c in top_couriers:
+            row[c] = qs_all.filter(order_date__year=year, shipping_courier=c).count()
+        courier_by_year[year] = row
+
+    # On-time % by month (last 12 months)
+    ontime_labels = []
+    ontime_pct    = []
+    for i in range(11, -1, -1):
+        m = today.month - i
+        y = today.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        start, end = month_start_end(y, m)
+        qs_m = qs_all.filter(
+            order_date__gte=start, order_date__lt=end,
+            shipped_at__isnull=False, shipping_deadline__isnull=False,
+        )
+        total = qs_m.count()
+        on_time = qs_m.filter(shipped_at__lte=F('shipping_deadline')).count()
+        ontime_labels.append(start.strftime('%b %Y'))
+        ontime_pct.append(round(on_time / total * 100) if total else None)
+
+    # ── Stock / product analytics ─────────────────────────────────────────────
+    # Top-8 SKUs by revenue (all time, for this source filter)
+    top_skus_raw = list(
+        SalesOrderLine.objects
+        .filter(order__in=qs_all)
+        .values('product__sku')
+        .annotate(revenue=Sum(rex))
+        .order_by('-revenue')[:8]
+        .values_list('product__sku', flat=True)
+    )
+
+    # Revenue per SKU per year (for grouped table)
+    sku_year_rev = {}
+    for sku in top_skus_raw:
+        sku_year_rev[sku] = {}
+        for year in [prev2_year, prev_year, current_year]:
+            val = float(
+                SalesOrderLine.objects
+                .filter(order__in=qs_all.filter(order_date__year=year),
+                        product__sku=sku)
+                .aggregate(t=Sum(rex))['t'] or 0
+            )
+            sku_year_rev[sku][year] = val
+
+    # Revenue by category per year
+    cat_rows_raw = {}
+    for year in [prev2_year, prev_year, current_year]:
+        rows = list(
+            SalesOrderLine.objects
+            .filter(order__in=qs_all.filter(order_date__year=year))
+            .values('product__category')
+            .annotate(revenue=Sum(rex), orders=Count('order', distinct=True))
+            .order_by('-revenue')[:6]
+        )
+        cat_rows_raw[year] = rows
+
+    # Flatten top categories across years
+    all_cats = []
+    seen = set()
+    for year in [prev2_year, prev_year, current_year]:
+        for r in cat_rows_raw.get(year, []):
+            c = r['product__category'] or 'Other'
+            if c not in seen:
+                all_cats.append(c)
+                seen.add(c)
+    all_cats = all_cats[:6]
+
+    cat_by_year = {}
+    for year in [prev2_year, prev_year, current_year]:
+        row = {c: 0.0 for c in all_cats}
+        for r in cat_rows_raw.get(year, []):
+            c = r['product__category'] or 'Other'
+            if c in row:
+                row[c] = float(r['revenue'] or 0)
+        cat_by_year[year] = row
+
     ctx = admin.site.each_context(request)
     ctx.update({
+        # Revenue
         'filter_source':    filter_source,
         'all_sources':      all_sources,
         'current_year':     current_year,
@@ -558,5 +656,16 @@ def trends_view(request):
         'best_month':       best_month,
         'worst_month':      worst_month,
         'avg_monthly':      avg_monthly,
+        # Shipping
+        'top_couriers':         json.dumps(top_couriers),
+        'courier_by_year':      json.dumps(courier_by_year),
+        'ontime_labels':        json.dumps(ontime_labels),
+        'ontime_pct':           json.dumps(ontime_pct),
+        # Stock / products
+        'top_skus_raw':         json.dumps(top_skus_raw),
+        'sku_year_rev':         json.dumps(sku_year_rev),
+        'all_cats':             json.dumps(all_cats),
+        'cat_by_year':          json.dumps(cat_by_year),
+        'years_list':           json.dumps([prev2_year, prev_year, current_year]),
     })
     return render(request, 'dashboard/trends.html', ctx)
