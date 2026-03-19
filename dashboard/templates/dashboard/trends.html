@@ -228,8 +228,16 @@
           <tr>
             <td></td>
             <td>Q{{ r.q }}</td>
-            <td class="num">€{{ r.revenue|floatformat:0 }}</td>
-            <td class="num">{{ r.orders }}</td>
+            <td class="num">
+              {% if r.revenue > 0 %}
+                €{{ r.revenue|floatformat:0 }}
+              {% elif r.orders > 0 %}
+                <span class="tr-delta-nil" title="Ціни відсутні в БД">—</span>
+              {% else %}
+                <span class="tr-delta-nil">—</span>
+              {% endif %}
+            </td>
+            <td class="num">{{ r.orders|default:"—" }}</td>
             <td class="num">
               {% if r.delta_pct is not None %}
                 <span class="{% if r.delta_pct > 0 %}tr-delta-pos{% elif r.delta_pct < 0 %}tr-delta-neg{% else %}tr-delta-nil{% endif %}">
@@ -244,6 +252,15 @@
       </tbody>
     </table>
   </div>
+
+  {# ── Missing data note ────────────────────────────────────────────────── #}
+  {% for r in quarters %}{% if r.orders > 0 and r.revenue == 0 %}
+  <div style="margin:8px 0 20px;padding:8px 12px;background:var(--bg-card);border-left:3px solid var(--warn);border-radius:4px;font-size:12px;color:var(--text-muted)">
+    ⚠️ Деякі квартали показують <strong>—</strong> (немає ціни): замовлення синхронізовані через старий DigiKey API без цін.
+    Ціни зберігались лише для нових замовлень або імпортованих через Excel.
+    Запустіть <code>python manage.py normalize_couriers</code> або повторно імпортуйте дані для заповнення.
+  </div>
+  {% endif %}{% endfor %}
 
   {# ── Shipping analytics ─────────────────────────────────────────────────── #}
   <h2 class="tr-hdr" style="margin-top:24px"><span>🚚</span> Доставка</h2>

@@ -135,16 +135,41 @@ def dashboard(request):
         'unshipped': {'val': unshipped_cnt, 'fmt': str(unshipped_cnt), 'change': None},
     }
 
-    # ── Виручка по місяцях через SalesOrderLine (узгоджено з KPI) ─────────────
+    # ── Виручка по місяцях (two-query merge for reliability) ─────────────────
+    # Q1: line-level revenue per month (works for Excel-imported orders)
+    # Q2: order-level total_price per month (fallback for DigiKey-synced orders
+    #     whose SalesOrderLine prices are NULL)
     try:
-        rev_by_month = list(
-            SalesOrderLine.objects
-            .filter(order__in=qs_period)
-            .annotate(month=TruncMonth('order__order_date'))
-            .values('month')
-            .annotate(revenue=Sum(_line_rev_expr()), orders=Count('order', distinct=True))
-            .order_by('month')
-        )
+        _line_m = {
+            r['month']: float(r['rev'] or 0)
+            for r in (
+                SalesOrderLine.objects
+                .filter(order__in=qs_period)
+                .annotate(month=TruncMonth('order__order_date'))
+                .values('month')
+                .annotate(rev=Sum('total_price'))
+                .order_by('month')
+            )
+        }
+        _ord_m = {
+            r['month']: {'rev': float(r['rev'] or 0), 'cnt': int(r['cnt'])}
+            for r in (
+                qs_period
+                .annotate(month=TruncMonth('order_date'))
+                .values('month')
+                .annotate(rev=Sum('total_price'), cnt=Count('id'))
+                .order_by('month')
+            )
+        }
+        rev_by_month = []
+        for m in sorted(set(list(_line_m) + list(_ord_m))):
+            line_rev = _line_m.get(m, 0)
+            ord_data = _ord_m.get(m, {'rev': 0, 'cnt': 0})
+            rev_by_month.append({
+                'month':   m,
+                'revenue': line_rev if line_rev > 0 else ord_data['rev'],
+                'orders':  ord_data['cnt'],
+            })
     except Exception:
         rev_by_month = []
 
@@ -570,8 +595,8 @@ def trends_view(request):
         qs_all.exclude(shipping_courier='')
         .values('shipping_courier')
         .annotate(cnt=Count('id'))
-        .order_by('-cnt')[:5]
-        .values_list('shipping_courier', flat=True)
+        .order_by('-cnt')
+        .values_list('shipping_courier', flat=True)[:5]
     )
     courier_by_year = {}
     for year in [prev2_year, prev_year, current_year]:
