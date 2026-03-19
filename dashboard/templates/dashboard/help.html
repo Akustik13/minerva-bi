@@ -394,41 +394,126 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
   <div id="strategy" class="section">
     <div class="section-header">
       <div class="section-icon" style="background:linear-gradient(135deg,rgba(201,168,76,.2),rgba(88,166,255,.1))">🎯</div>
-      <div><h2>Стратегії CRM — Workflow Builder</h2><p>Автоматизовані серії контактів по кожному клієнту</p></div>
+      <div><h2>Стратегії CRM — Workflow Builder</h2><p>Серії контактів з клієнтами: коли писати, дзвонити, чекати — і що робити залежно від реакції</p></div>
     </div>
-    <div class="alert alert-blue"><span>💡</span><div>Стратегія — це послідовність кроків (email, дзвінок, пауза, рішення), прив'язана до конкретного клієнта. Minerva відстежує прогрес і підказує, що робити далі.</div></div>
+    <div class="alert alert-blue"><span>💡</span><div>Стратегія — це <strong>план роботи з конкретним клієнтом</strong>: послідовність кроків (email → пауза → дзвінок → рішення). Minerva веде лог кожного контакту і автоматично переходить до наступного кроку після фіксації результату.</div></div>
 
-    <h3 class="sub">Як запустити стратегію</h3>
+    <hr class="div">
+    <h3 class="sub">Крок 1 — Визначте який шаблон підходить клієнту</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Сегмент клієнта</th><th>Шаблон</th><th>Мета</th></tr></thead><tbody>
+      <tr><td>😴 At Risk · 💤 Hibernating</td><td>🔄 Реактивація</td><td>Відновити контакт, запропонувати знижку або бонус</td></tr>
+      <tr><td>⭐ Potential · 🔄 Regular</td><td>📈 Нарощування (Promising)</td><td>Утеплити, показати цінність продукту, перевести у Loyal/Champion</td></tr>
+      <tr><td>🏆 Champions · 💎 Loyal</td><td>👑 Утримання VIP</td><td>Подяка, зворотній зв'язок, утримання лояльності</td></tr>
+      <tr><td>Новий клієнт (перше замовлення)</td><td>🚀 Онбординг</td><td>Вітання, FAQ, перевірка чи є питання</td></tr>
+    </tbody></table></div>
+    <div class="alert alert-green"><span>✅</span><div>Сегмент клієнта дивіться в <a href="/admin/crm/customer/">CRM → Клієнти</a> — колонка <strong>Сегмент</strong> та <strong>R/F/M</strong> значення.</div></div>
+
+    <hr class="div">
+    <h3 class="sub">Крок 2 — Запустіть стратегію</h3>
     <div class="steps">
-      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Оберіть шаблон</h4><p><a href="/admin/strategy/strategytemplate/">CRM → Шаблони стратегій</a> — 4 вбудованих: Реактивація, Нарощування, Утримання VIP, Онбординг.</p></div></div>
-      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Призначте клієнту</h4><p><a href="/admin/strategy/customerstrategy/add/">CRM → Стратегії → Додати</a> — оберіть клієнта і шаблон. Перший крок створюється автоматично.</p></div></div>
-      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Відкрийте Canvas</h4><p>На сторінці стратегії натисніть <strong>"🗺 Відкрити canvas"</strong> — список кроків і SVG-схема зі станом кожного кроку.</p></div></div>
-      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>Фіксуйте результати</h4><p>Для кожного активного кроку — вкажіть результат (✅/⚠️/🔇/⏭) і нотатки. Стратегія автоматично переходить до наступного кроку.</p></div></div>
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Відкрийте <a href="/admin/strategy/customerstrategy/add/">CRM → Стратегії → + Додати</a></h4><p>Оберіть клієнта (пошук за ім'ям або компанією) і шаблон зі списку.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Збережіть — перший крок з'явиться автоматично</h4><p>Minerva відразу створює перший крок із шаблону (наприклад, "Email — повернення"). Нічого більше заповнювати не потрібно.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Натисніть "🗺 Відкрити canvas"</h4><p>Відкриється сторінка з переліком кроків та SVG-схемою. Перший крок виділений синьою рамкою — це <strong>поточний крок</strong>.</p></div></div>
     </div>
 
-    <h3 class="sub">Типи шаблонів</h3>
+    <hr class="div">
+    <h3 class="sub">Крок 3 — Щоденна робота: фіксуйте результати</h3>
+    <div class="alert alert-blue"><span>📋</span><div>Щодня відкривайте <a href="/admin/strategy/customerstrategy/?status=active">Стратегії → фільтр "Активна"</a> і обробляйте клієнтів, у яких настав час наступного кроку.</div></div>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Відкрийте canvas стратегії</h4><p>На сторінці стратегії → кнопка <strong>"🗺 Відкрити canvas"</strong>. Або натисніть іконку в списку стратегій.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Знайдіть поточний крок (синя рамка)</h4><p>У режимі <strong>☰ Список</strong> — поточний крок має форму для заповнення результату. У режимі <strong>⬡ Canvas</strong> — синя крапка в правому куті вузла.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Виконайте дію і зафіксуйте результат</h4><p>Наприклад, надіслали email → оберіть <strong>✅ Виконано (+)</strong> і напишіть нотатку. Натисніть <strong>"Зберегти"</strong>.</p></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>Minerva переходить до наступного кроку автоматично</h4><p>Сторінка оновлюється. Наступний крок стає активним — або стратегія завершується, якщо кроків більше немає.</p></div></div>
+    </div>
+
+    <hr class="div">
+    <h3 class="sub">Як працює крок-рішення (🔀)</h3>
+    <div class="alert alert-blue"><span>🔀</span><div>Крок типу <strong>Рішення</strong> — це розгалуження. Minerva дивиться на ваш результат і веде по різних гілках.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Ваш результат</th><th>Гілка</th><th>Що відбувається</th></tr></thead><tbody>
+      <tr><td>✅ Виконано (+) або ⚠️ Виконано (−)</td><td>Гілка <span style="color:var(--ok)">ТАК</span></td><td>Перехід до кроку "Так" (зелена стрілка на canvas)</td></tr>
+      <tr><td>🔇 Без відповіді або ⏭ Пропущено</td><td>Гілка <span style="color:var(--err)">НІ</span></td><td>Перехід до кроку "Ні" (червона стрілка на canvas)</td></tr>
+    </tbody></table></div>
+    <p style="font-size:13px;color:var(--text-muted);margin-top:8px">Приклад: "Відповідь на email?" → ТАК → Дзвінок; НІ → Пауза 90 днів.</p>
+
+    <hr class="div">
+    <h3 class="sub">Практичний приклад: Реактивація клієнта</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">📧</div><div class="step-content"><h4>День 0 — Email повернення</h4><p>Надсилаєте email з персональною пропозицією. Фіксуєте: <strong>✅ Виконано (+)</strong>, нотатка "Надіслано email зі знижкою 10%".</p></div></div>
+      <div class="step"><div class="step-num">🔀</div><div class="step-content"><h4>День 5 — Рішення: відповідь на email?</h4><p>Якщо клієнт відповів → <strong>✅ Виконано (+)</strong> → переходимо на Дзвінок.<br>Якщо не відповів → <strong>🔇 Без відповіді</strong> → переходимо на Паузу 90 днів.</p></div></div>
+      <div class="step"><div class="step-num">📞</div><div class="step-content"><h4>День 8 — Дзвінок (якщо відповів)</h4><p>Телефонуєте, уточнюєте потреби. Фіксуєте деталі в нотатках.</p></div></div>
+      <div class="step"><div class="step-num">🔀</div><div class="step-content"><h4>День 9 — Рішення: зацікавлений?</h4><p>ТАК → стратегія завершується успішно ✅.<br>НІ → Пауза 90 днів → повернетесь пізніше.</p></div></div>
+    </div>
+
+    <hr class="div">
+    <h3 class="sub">Canvas — два режими перегляду</h3>
     <div class="cards">
-      <div class="card"><div class="card-head"><span class="icon">🔄</span><h3>Реактивація</h3></div><p>Для At Risk / Lost клієнтів. Email → рішення → дзвінок → пауза 90 дн.</p></div>
-      <div class="card"><div class="card-head"><span class="icon">📈</span><h3>Нарощування</h3></div><p>Для Promising. Утеплюючі email-серії для переведення у Champion.</p></div>
-      <div class="card"><div class="card-head"><span class="icon">👑</span><h3>Утримання VIP</h3></div><p>Для Champion. Подяка + дзвінок зворотнього зв'язку + пауза 60 дн.</p></div>
-      <div class="card"><div class="card-head"><span class="icon">🚀</span><h3>Онбординг</h3></div><p>Для нових клієнтів. Вітання → ресурси → рішення → фіксація завершення.</p></div>
+      <div class="card">
+        <div class="card-head"><span class="icon">☰</span><h3>Список</h3></div>
+        <p>Усі кроки вертикально. Поточний крок відображає <strong>форму для введення результату</strong>. Зручно для щоденної роботи на телефоні.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">⬡</span><h3>Canvas (SVG)</h3></div>
+        <p>Візуальна схема з вузлами і стрілками. Зелена стрілка = гілка "Так", червона пунктирна = "Ні". Клік по вузлу → деталі + форма результату.</p>
+      </div>
     </div>
-
-    <h3 class="sub">Типи кроків</h3>
-    <div class="t-wrap"><table class="ht"><thead><tr><th>Іконка</th><th>Тип</th><th>Призначення</th></tr></thead><tbody>
-      <tr><td>📧</td><td>Email</td><td>Надіслати лист клієнту</td></tr>
-      <tr><td>📞</td><td>Дзвінок</td><td>Зателефонувати, зафіксувати результат</td></tr>
-      <tr><td>⏸</td><td>Пауза</td><td>Очікування N днів перед наступним кроком</td></tr>
-      <tr><td>🔀</td><td>Рішення</td><td>Розгалуження: Так (позитив) → одна гілка, Ні (негатив) → інша</td></tr>
+    <div class="t-wrap" style="margin-top:12px"><table class="ht"><thead><tr><th>Колір рамки вузла</th><th>Значення</th></tr></thead><tbody>
+      <tr><td><span style="color:var(--accent)">■ Синя рамка</span></td><td>Поточний активний крок (з пульсацією)</td></tr>
+      <tr><td><span style="color:var(--ok)">■ Зелена рамка</span></td><td>Виконано позитивно</td></tr>
+      <tr><td><span style="color:var(--err)">■ Червона рамка</span></td><td>Виконано негативно</td></tr>
+      <tr><td><span style="color:var(--text-dim)">■ Сіра рамка</span></td><td>Очікує або пропущено</td></tr>
+      <tr><td><span style="color:var(--warn)">■ Жовта рамка</span></td><td>Без відповіді</td></tr>
     </tbody></table></div>
 
-    <h3 class="sub">Результати кроку</h3>
-    <div class="t-wrap"><table class="ht"><thead><tr><th>Результат</th><th>Значення</th></tr></thead><tbody>
-      <tr><td>✅ Виконано (+)</td><td>Позитивна взаємодія — клієнт відповів / погодився</td></tr>
-      <tr><td>⚠️ Виконано (−)</td><td>Виконано, але результат негативний</td></tr>
-      <tr><td>🔇 Без відповіді</td><td>Клієнт не відреагував</td></tr>
-      <tr><td>⏭ Пропущено</td><td>Крок пропущено вручну</td></tr>
+    <hr class="div">
+    <h3 class="sub">Типи шаблонів — детально</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Шаблон</th><th>Кроки</th><th>Логіка</th></tr></thead><tbody>
+      <tr>
+        <td>🔄 Реактивація</td>
+        <td>Email → Рішення → Дзвінок → Рішення → Пауза 90 дн.</td>
+        <td>Email відкрито → Дзвінок; не відкрито → Пауза 90 дн. Після дзвінка: зацікавлений → кінець; ні → Пауза 90 дн.</td>
+      </tr>
+      <tr>
+        <td>📈 Нарощування</td>
+        <td>Email → Пауза 14 дн. → Email → Рішення → Пауза 60 дн.</td>
+        <td>Два утеплюючих email. Реакція є → завершення (клієнт готовий); немає → Пауза 60 дн. і новий цикл.</td>
+      </tr>
+      <tr>
+        <td>👑 Утримання VIP</td>
+        <td>Email подяки → Пауза 30 дн. → Дзвінок → Лог → Пауза 60 дн.</td>
+        <td>Лінійний цикл без розгалужень. Регулярна турбота про VIP-клієнта кожні 3 місяці.</td>
+      </tr>
+      <tr>
+        <td>🚀 Онбординг</td>
+        <td>Вітання → Пауза 3 дн. → Ресурси → Рішення → Фіксація</td>
+        <td>Питання є → Фіксація завершення онбордингу; немає питань → теж завершення.</td>
+      </tr>
     </tbody></table></div>
+
+    <hr class="div">
+    <h3 class="sub">Довідка по полях та результатах</h3>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">📊</span><h3>Типи кроків</h3></div>
+        <p>📧 <strong>Email</strong> — надіслати лист<br>
+           📞 <strong>Дзвінок</strong> — зателефонувати<br>
+           ⏸ <strong>Пауза</strong> — очікувати N днів<br>
+           🔀 <strong>Рішення</strong> — розгалуження (Так/Ні)</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">📝</span><h3>Результати кроку</h3></div>
+        <p>✅ <strong>Виконано (+)</strong> — позитивна взаємодія<br>
+           ⚠️ <strong>Виконано (−)</strong> — виконано, результат негативний<br>
+           🔇 <strong>Без відповіді</strong> — клієнт не відреагував<br>
+           ⏭ <strong>Пропущено</strong> — крок пропущено вручну</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">⚡</span><h3>Статуси стратегії</h3></div>
+        <p>⚡ <strong>Активна</strong> — в процесі, є поточний крок<br>
+           ⏸ <strong>Призупинена</strong> — пауза без дедлайну<br>
+           ✅ <strong>Завершена</strong> — всі кроки пройдено<br>
+           ❌ <strong>Провалена</strong> — закрита вручну без результату</p>
+      </div>
+    </div>
   </div>
 
   <!-- ══ СКЛАД ══ -->
