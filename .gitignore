@@ -55,6 +55,7 @@ Thumbs.db
 
 # ── Windows path artifact ────────────────────────────────
 C/
+gunicorn.ctl
 
 # ── Backup copies of source files ────────────────────────
 *.backup
