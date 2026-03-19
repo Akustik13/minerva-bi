@@ -78,12 +78,12 @@ optgroup { font-weight: bold; color: var(--accent); }
 .ie-step {
   padding: 4px 14px; border-radius: 12px;
   font-size: 12px; font-weight: bold;
-  background: var(--bg-card-2); color: var(--text-dim);
+  background: var(--bg-card-2); color: var(--text-muted);
   border: 1px solid var(--border-strong);
 }
 .ie-step.active { background: var(--accent-2); color: #fff; border-color: var(--accent-2); }
-.ie-step.done   { background: rgba(63,185,80,.15); color: var(--ok); border-color: var(--ok); }
-.ie-sep { color: var(--text-dim); }
+.ie-step.done   { background: rgba(63,185,80,.18); color: var(--ok); border-color: var(--ok); }
+.ie-sep { color: var(--text-muted); }
 
 /* options */
 .ie-options { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
@@ -95,11 +95,11 @@ optgroup { font-weight: bold; color: var(--accent); }
 .stat-box { padding: 14px 22px; border-radius: 8px; text-align: center; min-width: 100px; }
 .stat-box .num { font-size: 28px; font-weight: bold; display: block; }
 .stat-box .lbl { font-size: 12px; opacity: .7; }
-.stat-created { background: rgba(63,185,80,.12);  color: var(--ok);   border: 1px solid var(--ok); }
-.stat-updated { background: rgba(33,150,243,.12); color: var(--accent-2); border: 1px solid var(--accent-2); }
-.stat-skipped { background: rgba(227,179,65,.12); color: var(--warn); border: 1px solid var(--warn); }
-.stat-lines   { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid var(--accent); }
-.stat-errors  { background: rgba(248,81,73,.12);  color: var(--err);  border: 1px solid var(--err); }
+.stat-created { background: var(--bg-card-2); color: var(--ok);      border: 2px solid var(--ok); }
+.stat-updated { background: var(--bg-card-2); color: var(--accent-2); border: 2px solid var(--accent-2); }
+.stat-skipped { background: var(--bg-card-2); color: var(--warn);     border: 2px solid var(--warn); }
+.stat-lines   { background: var(--bg-card-2); color: var(--accent);   border: 2px solid var(--accent); }
+.stat-errors  { background: var(--bg-card-2); color: var(--err);      border: 2px solid var(--err); }
 
 .err-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
 .err-table th { background: rgba(248,81,73,.1); color: var(--err); padding: 6px 10px; text-align: left; font-size: 12px; }
@@ -116,7 +116,7 @@ optgroup { font-weight: bold; color: var(--accent); }
   border: 1px solid var(--err); border-radius: 6px;
   padding: 10px 16px; margin-bottom: 12px;
 }
-.ie-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+.ie-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
 </style>
 {% endblock %}
 
@@ -167,7 +167,7 @@ optgroup { font-weight: bold; color: var(--accent); }
   </form>
 </div>
 
-<div class="ie-card" style="opacity:.75">
+<div class="ie-card">
   <h2>ℹ️ Структура файлу</h2>
   <p style="font-size:13px;margin:0 0 12px;color:var(--text-muted)">
     Файл Excel повинен містити рядок заголовків (перший непустий рядок).
@@ -175,20 +175,20 @@ optgroup { font-weight: bold; color: var(--accent); }
   </p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div>
-      <div style="color:var(--accent);font-size:12px;font-weight:bold;margin-bottom:8px">📋 Поля ЗАМОВЛЕННЯ</div>
+      <div style="color:var(--text-muted);font-size:12px;font-weight:bold;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">📋 Поля ЗАМОВЛЕННЯ</div>
       {% for field, label in order_fields %}
       <div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="font-family:monospace;color:var(--text-muted)">{{ field }}</span>
-        <span style="color:var(--text-dim);margin-left:8px">{{ label }}</span>
+        <span style="color:var(--text-muted);margin-left:8px">{{ label }}</span>
       </div>
       {% endfor %}
     </div>
     <div>
-      <div style="color:var(--accent);font-size:12px;font-weight:bold;margin-bottom:8px">📦 Поля РЯДКУ ТОВАРУ</div>
+      <div style="color:var(--text-muted);font-size:12px;font-weight:bold;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">📦 Поля РЯДКУ ТОВАРУ</div>
       {% for field, label in line_fields %}
       <div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="font-family:monospace;color:var(--text-muted)">{{ field }}</span>
-        <span style="color:var(--text-dim);margin-left:8px">{{ label }}</span>
+        <span style="color:var(--text-muted);margin-left:8px">{{ label }}</span>
       </div>
       {% endfor %}
     </div>
