@@ -42,6 +42,7 @@
   cursor: pointer; font-weight: 600;
 }
 .tr-filter button:hover { opacity: .85; }
+.tr-filter .sep { border-left: 1px solid var(--border-strong); height: 20px; margin: 0 4px; }
 
 /* ── Section header ───────────────────────────────────────────── */
 .tr-hdr {
@@ -110,6 +111,7 @@
 .tr-delta-neg { color: var(--err); font-weight: 600; }
 .tr-delta-nil { color: var(--text-dim); }
 .tr-q-total td { border-top: 2px solid var(--border-strong); font-weight: 700; background: var(--bg-card); }
+.tr-future td { opacity: 0.4; font-style: italic; }
 
 /* ── Responsive ───────────────────────────────────────────────── */
 @media (max-width: 900px) {
@@ -132,9 +134,26 @@
         <option value="{{ s }}" {% if s == filter_source %}selected{% endif %}>{{ s }}</option>
       {% endfor %}
     </select>
+
+    <span class="sep"></span>
+
+    <label for="yf-sel">Від року:</label>
+    <select id="yf-sel" name="year_from">
+      {% for y in available_years %}
+        <option value="{{ y }}" {% if y == year_from %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="yt-sel">До року:</label>
+    <select id="yt-sel" name="year_to">
+      {% for y in available_years %}
+        <option value="{{ y }}" {% if y == year_to %}selected{% endif %}>{{ y }}</option>
+      {% endfor %}
+    </select>
+
     <button type="submit">🔍 Застосувати</button>
-    {% if filter_source %}<a href="?" style="font-size:12px;color:var(--err)">✕ Скинути</a>{% endif %}
-    <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">Дані за останні 3 роки</span>
+    {% if filter_source or year_from != current_year|add:"-2" %}<a href="?" style="font-size:12px;color:var(--err)">✕ Скинути</a>{% endif %}
+    <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">{{ year_from }}–{{ year_to }}</span>
   </form>
 
   {# ── Summary KPIs ──────────────────────────────────────────────────────── #}
@@ -148,11 +167,11 @@
           {% if yoy_growth > 0 %}▲{% elif yoy_growth < 0 %}▼{% endif %}{{ yoy_growth|floatformat:1 }}%
         {% else %}—{% endif %}
       </div>
-      <div class="tr-kpi-sub">{{ current_year }} vs {{ prev_year }}</div>
+      <div class="tr-kpi-sub">{{ current_year }} vs {{ yoy_vs_year }} (YTD до {{ yoy_ytd_label }})</div>
     </div>
 
     <div class="tr-kpi">
-      <div class="tr-kpi-label">Поточний рік</div>
+      <div class="tr-kpi-label">{{ current_year }} рік</div>
       <div class="tr-kpi-val">€{{ curr_year_total|floatformat:0 }}</div>
       <div class="tr-kpi-sub">{{ current_year }}, усього виручки</div>
     </div>
@@ -189,11 +208,11 @@
   <h2 class="tr-hdr"><span>📊</span> Виручка рік до року</h2>
   <div class="tr-charts-2col">
     <div class="tr-chart-box">
-      <h3>Виручка по місяцях (€) — {{ current_year }} vs {{ prev_year }} vs {{ prev2_year }}</h3>
+      <h3>Виручка по місяцях (€) — {{ year_from }}–{{ year_to }}</h3>
       <canvas id="yoyChart"></canvas>
     </div>
     <div class="tr-chart-box">
-      <h3>Кількість замовлень — {{ current_year }} vs {{ prev_year }}</h3>
+      <h3>Кількість замовлень — {{ year_from }}–{{ year_to }}</h3>
       <canvas id="ordChart"></canvas>
     </div>
   </div>
@@ -225,11 +244,13 @@
             <td colspan="5">{{ r.year }}</td>
           </tr>
           {% endifchanged %}
-          <tr>
+          <tr {% if r.is_future %}class="tr-future"{% endif %}>
             <td></td>
-            <td>Q{{ r.q }}</td>
+            <td>Q{{ r.q }}{% if r.is_future %} <span class="tr-delta-nil" style="font-size:10px">(майбутнє)</span>{% endif %}</td>
             <td class="num">
-              {% if r.revenue > 0 %}
+              {% if r.is_future %}
+                <span class="tr-delta-nil">—</span>
+              {% elif r.revenue > 0 %}
                 €{{ r.revenue|floatformat:0 }}
               {% elif r.orders > 0 %}
                 <span class="tr-delta-nil" title="Ціни відсутні в БД">—</span>
@@ -237,7 +258,7 @@
                 <span class="tr-delta-nil">—</span>
               {% endif %}
             </td>
-            <td class="num">{{ r.orders|default:"—" }}</td>
+            <td class="num">{% if r.is_future %}<span class="tr-delta-nil">—</span>{% else %}{{ r.orders|default:"—" }}{% endif %}</td>
             <td class="num">
               {% if r.delta_pct is not None %}
                 <span class="{% if r.delta_pct > 0 %}tr-delta-pos{% elif r.delta_pct < 0 %}tr-delta-neg{% else %}tr-delta-nil{% endif %}">
@@ -254,11 +275,10 @@
   </div>
 
   {# ── Missing data note ────────────────────────────────────────────────── #}
-  {% for r in quarters %}{% if r.orders > 0 and r.revenue == 0 %}
+  {% for r in quarters %}{% if not r.is_future and r.orders > 0 and r.revenue == 0 %}
   <div style="margin:8px 0 20px;padding:8px 12px;background:var(--bg-card);border-left:3px solid var(--warn);border-radius:4px;font-size:12px;color:var(--text-muted)">
     ⚠️ Деякі квартали показують <strong>—</strong> (немає ціни): замовлення синхронізовані через старий DigiKey API без цін.
-    Ціни зберігались лише для нових замовлень або імпортованих через Excel.
-    Запустіть <code>python manage.py normalize_couriers</code> або повторно імпортуйте дані для заповнення.
+    Повторно синхронізуйте через DigiKey API для оновлення цін.
   </div>
   {% endif %}{% endfor %}
 
@@ -287,9 +307,7 @@
         <thead>
           <tr>
             <th>SKU</th>
-            <th class="num">{{ prev2_year }}</th>
-            <th class="num">{{ prev_year }}</th>
-            <th class="num">{{ current_year }}</th>
+            {% for y in years_to_show %}<th class="num">{{ y }}</th>{% endfor %}
           </tr>
         </thead>
         <tbody id="sku-tbody"></tbody>
@@ -301,88 +319,62 @@
 
 <script>
 (function () {
-  /* ── Theme-aware colors from CSS vars ── */
-  const cs  = getComputedStyle(document.documentElement);
-  const cv  = (v) => cs.getPropertyValue(v).trim();
-  const text     = cv('--text');
-  const muted    = cv('--text-muted');
-  const dim      = cv('--text-dim');
-  const border   = cv('--border');
-  const accent   = cv('--accent');
-  const gold     = cv('--gold');
-  const goldL    = cv('--gold-l');
-  const ok       = cv('--ok');
-  const warn     = cv('--warn');
-  const err      = cv('--err');
-  const bgCard   = cv('--bg-card');
-  const bgCard2  = cv('--bg-card-2');
+  /* ── Theme colors from CSS vars ── */
+  const cs     = getComputedStyle(document.documentElement);
+  const cv     = (v) => cs.getPropertyValue(v).trim();
+  const text   = cv('--text');
+  const muted  = cv('--text-muted');
+  const dim    = cv('--text-dim');
+  const border = cv('--border');
+  const accent = cv('--accent');
+  const gold   = cv('--gold');
+  const ok     = cv('--ok');
+  const warn   = cv('--warn');
+  const err    = cv('--err');
 
-  /* ── Shared grid config ── */
-  const gridCfg = {
-    color: border,
-    drawTicks: false,
-  };
+  /* Palette — enough for up to 6 years */
+  const palette = [accent, gold, ok, warn, err, dim];
+
+  /* ── Shared chart config ── */
+  const gridCfg = { color: border, drawTicks: false };
   const tickCfg = { color: muted, font: { size: 10 } };
 
   /* ── Data from Django ── */
-  const months    = {{ months_labels }};
-  const currRev   = {{ curr_rev }};
-  const prevRev   = {{ prev_rev }};
-  const prev2Rev  = {{ prev2_rev }};
-  const currSmooth = {{ curr_rev_smooth }};
-  const currOrd   = {{ curr_ord }};
-  const prevOrd   = {{ prev_ord }};
-  const momLabels = {{ mom_labels }};
-  const momGrowth = {{ mom_growth }};
-  const CY        = {{ current_year }};
-  const PY        = {{ prev_year }};
-  const P2Y       = {{ prev2_year }};
+  const months      = {{ months_labels }};
+  const yoyDs       = {{ yoy_datasets }};     /* [{year, rev:[12], ord:[12]}, ...] */
+  const currSmooth  = {{ curr_rev_smooth }};  /* MA line for most recent year */
+  const smoothYear  = {{ smooth_year }};
+  const momLabels   = {{ mom_labels }};
+  const momGrowth   = {{ mom_growth }};
+  const years       = {{ years_json }};        /* [2021, 2022, ...] */
 
   /* ── YoY Revenue chart ── */
+  const revDatasets = yoyDs.map((d, i) => ({
+    label:           String(d.year),
+    data:            d.rev,
+    backgroundColor: palette[i % palette.length] + '88',
+    borderColor:     palette[i % palette.length],
+    borderWidth:     1,
+    order:           i + 2,
+  }));
+  /* Add 3-month MA line for most recent year */
+  revDatasets.push({
+    label:              String(smoothYear) + ' (ковзне сер.)',
+    data:               currSmooth,
+    type:               'line',
+    borderColor:        ok,
+    borderWidth:        2,
+    pointRadius:        3,
+    pointBackgroundColor: ok,
+    fill:               false,
+    tension:            0.4,
+    order:              1,
+    yAxisID:            'y',
+  });
+
   new Chart(document.getElementById('yoyChart'), {
     type: 'bar',
-    data: {
-      labels: months,
-      datasets: [
-        {
-          label: String(CY),
-          data: currRev,
-          backgroundColor: accent + '99',
-          borderColor: accent,
-          borderWidth: 1,
-          order: 2,
-        },
-        {
-          label: String(PY),
-          data: prevRev,
-          backgroundColor: gold + '66',
-          borderColor: gold,
-          borderWidth: 1,
-          order: 3,
-        },
-        {
-          label: String(P2Y),
-          data: prev2Rev,
-          backgroundColor: dim + '44',
-          borderColor: dim,
-          borderWidth: 1,
-          order: 4,
-        },
-        {
-          label: String(CY) + ' (ковзне сер.)',
-          data: currSmooth,
-          type: 'line',
-          borderColor: ok,
-          borderWidth: 2,
-          pointRadius: 3,
-          pointBackgroundColor: ok,
-          fill: false,
-          tension: 0.4,
-          order: 1,
-          yAxisID: 'y',
-        },
-      ],
-    },
+    data: { labels: months, datasets: revDatasets },
     options: {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
@@ -401,8 +393,8 @@
       scales: {
         x: { grid: gridCfg, ticks: tickCfg },
         y: {
-          grid: gridCfg, ticks: { ...tickCfg,
-            callback: (v) => '€' + v.toLocaleString('de-DE', { notation: 'compact' }) },
+          grid: gridCfg,
+          ticks: { ...tickCfg, callback: (v) => '€' + v.toLocaleString('de-DE', { notation: 'compact' }) },
           beginAtZero: true,
         },
       },
@@ -410,33 +402,21 @@
   });
 
   /* ── Orders YoY chart ── */
+  const ordDatasets = yoyDs.map((d, i) => ({
+    label:           String(d.year),
+    data:            d.ord,
+    backgroundColor: palette[i % palette.length] + '88',
+    borderColor:     palette[i % palette.length],
+    borderWidth:     1,
+  }));
+
   new Chart(document.getElementById('ordChart'), {
     type: 'bar',
-    data: {
-      labels: months,
-      datasets: [
-        {
-          label: String(CY),
-          data: currOrd,
-          backgroundColor: accent + '99',
-          borderColor: accent,
-          borderWidth: 1,
-        },
-        {
-          label: String(PY),
-          data: prevOrd,
-          backgroundColor: gold + '66',
-          borderColor: gold,
-          borderWidth: 1,
-        },
-      ],
-    },
+    data: { labels: months, datasets: ordDatasets },
     options: {
       responsive: true,
       interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { labels: { color: muted, font: { size: 11 } } },
-      },
+      plugins: { legend: { labels: { color: muted, font: { size: 11 } } } },
       scales: {
         x: { grid: gridCfg, ticks: tickCfg },
         y: { grid: gridCfg, ticks: tickCfg, beginAtZero: true },
@@ -448,23 +428,19 @@
   const momColors = momGrowth.map(v =>
     v == null ? dim + '88' : v >= 0 ? ok + 'cc' : err + 'cc'
   );
-  const momBorder = momGrowth.map(v =>
-    v == null ? dim : v >= 0 ? ok : err
-  );
+  const momBorder = momGrowth.map(v => v == null ? dim : v >= 0 ? ok : err);
 
   new Chart(document.getElementById('momChart'), {
     type: 'bar',
     data: {
       labels: momLabels,
-      datasets: [
-        {
-          label: 'MoM (%)',
-          data: momGrowth,
-          backgroundColor: momColors,
-          borderColor: momBorder,
-          borderWidth: 1,
-        },
-      ],
+      datasets: [{
+        label: 'MoM (%)',
+        data: momGrowth,
+        backgroundColor: momColors,
+        borderColor: momBorder,
+        borderWidth: 1,
+      }],
     },
     options: {
       responsive: true,
@@ -482,9 +458,7 @@
       },
       scales: {
         x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 45 } },
-        y: {
-          grid: gridCfg, ticks: { ...tickCfg, callback: (v) => v + '%' },
-        },
+        y: { grid: gridCfg, ticks: { ...tickCfg, callback: (v) => v + '%' } },
       },
     },
   });
@@ -492,31 +466,24 @@
   /* ── Shipping data ── */
   const couriers    = {{ top_couriers }};
   const courierData = {{ courier_by_year }};
-  const years       = {{ years_list }};
   const ontimeLabels = {{ ontime_labels }};
   const ontimePct   = {{ ontime_pct }};
 
-  /* Palette for couriers */
-  const palette = [accent, gold, ok, warn, err, dim + 'cc'];
-
-  /* ── Courier stacked bar ── */
   new Chart(document.getElementById('courierChart'), {
     type: 'bar',
     data: {
       labels: years.map(String),
       datasets: couriers.map((c, i) => ({
-        label: c,
-        data: years.map(y => (courierData[y] || {})[c] || 0),
+        label:           c,
+        data:            years.map(y => (courierData[y] || {})[c] || 0),
         backgroundColor: palette[i % palette.length] + 'cc',
-        borderColor: palette[i % palette.length],
-        borderWidth: 1,
+        borderColor:     palette[i % palette.length],
+        borderWidth:     1,
       })),
     },
     options: {
       responsive: true,
-      plugins: {
-        legend: { labels: { color: muted, font: { size: 11 } } },
-      },
+      plugins: { legend: { labels: { color: muted, font: { size: 11 } } } },
       scales: {
         x: { stacked: true, grid: gridCfg, ticks: tickCfg },
         y: { stacked: true, grid: gridCfg, ticks: tickCfg, beginAtZero: true },
@@ -524,7 +491,6 @@
     },
   });
 
-  /* ── On-time % line ── */
   const ontimeColors = ontimePct.map(v =>
     v == null ? dim + '88' : v >= 90 ? ok + 'cc' : v >= 70 ? warn + 'cc' : err + 'cc'
   );
@@ -533,45 +499,40 @@
     data: {
       labels: ontimeLabels,
       datasets: [{
-        label: 'Вчасно (%)',
-        data: ontimePct,
+        label:           'Вчасно (%)',
+        data:            ontimePct,
         backgroundColor: ontimeColors,
-        borderColor: ontimeColors.map(c => c.slice(0, -2)),
-        borderWidth: 1,
+        borderColor:     ontimeColors.map(c => c.slice(0, -2)),
+        borderWidth:     1,
       }],
     },
     options: {
       responsive: true,
       plugins: {
         legend: { display: false },
-        tooltip: {
-          callbacks: {
-            label: ctx => ctx.raw == null ? ' немає даних' : ` ${ctx.raw}%`,
-          },
-        },
+        tooltip: { callbacks: { label: ctx => ctx.raw == null ? ' немає даних' : ` ${ctx.raw}%` } },
       },
       scales: {
         x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 45 } },
-        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => v + '%' },
-             min: 0, max: 100 },
+        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => v + '%' }, min: 0, max: 100 },
       },
     },
   });
 
   /* ── Category revenue grouped bar ── */
-  const cats     = {{ all_cats }};
-  const catData  = {{ cat_by_year }};
+  const cats    = {{ all_cats }};
+  const catData = {{ cat_by_year }};
 
   new Chart(document.getElementById('catChart'), {
     type: 'bar',
     data: {
       labels: cats,
       datasets: years.map((y, i) => ({
-        label: String(y),
-        data: cats.map(c => (catData[y] || {})[c] || 0),
-        backgroundColor: [accent, gold, ok][i] + 'cc',
-        borderColor:     [accent, gold, ok][i],
-        borderWidth: 1,
+        label:           String(y),
+        data:            cats.map(c => (catData[y] || {})[c] || 0),
+        backgroundColor: palette[i % palette.length] + 'cc',
+        borderColor:     palette[i % palette.length],
+        borderWidth:     1,
       })),
     },
     options: {
@@ -581,27 +542,27 @@
         legend: { labels: { color: muted, font: { size: 11 } } },
         tooltip: {
           callbacks: {
-            label: ctx => ` ${ctx.dataset.label}: €${(ctx.raw || 0).toLocaleString('de-DE', {maximumFractionDigits: 0})}`,
+            label: ctx => ` ${ctx.dataset.label}: €${(ctx.raw || 0).toLocaleString('de-DE', { maximumFractionDigits: 0 })}`,
           },
         },
       },
       scales: {
         x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 30 } },
-        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => '€' + v.toLocaleString('de-DE', {notation:'compact'}) }, beginAtZero: true },
+        y: { grid: gridCfg, ticks: { ...tickCfg, callback: v => '€' + v.toLocaleString('de-DE', { notation: 'compact' }) }, beginAtZero: true },
       },
     },
   });
 
   /* ── SKU table ── */
-  const skus     = {{ top_skus_raw }};
-  const skuData  = {{ sku_year_rev }};
-  const tbody    = document.getElementById('sku-tbody');
+  const skus    = {{ top_skus_raw }};
+  const skuData = {{ sku_year_rev }};
+  const tbody   = document.getElementById('sku-tbody');
 
   skus.forEach(sku => {
     const vals = years.map(y => (skuData[sku] || {})[y] || 0);
     const tr = document.createElement('tr');
     tr.innerHTML = `<td style="font-family:monospace;font-size:11px">${sku || '—'}</td>`
-      + vals.map(v => `<td class="num" style="font-size:11px">${v > 0 ? '€' + v.toLocaleString('de-DE', {maximumFractionDigits:0}) : '—'}</td>`).join('');
+      + vals.map(v => `<td class="num" style="font-size:11px">${v > 0 ? '€' + v.toLocaleString('de-DE', { maximumFractionDigits: 0 }) : '—'}</td>`).join('');
     tbody.appendChild(tr);
   });
 
