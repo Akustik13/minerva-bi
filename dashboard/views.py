@@ -434,27 +434,59 @@ def trends_view(request):
 
     rex = _line_rev_expr()  # Coalesce(total_price, unit_price*qty, 0)
 
-    # ── Helper ────────────────────────────────────────────────────────────────
+    # ── Helpers ────────────────────────────────────────────────────────────────
     def month_start_end(y, m):
         start = date(y, m, 1)
         end   = date(y + 1, 1, 1) if m == 12 else date(y, m + 1, 1)
         return start, end
 
+    def _qs_rev(qs_orders):
+        """Revenue for a SalesOrder queryset.
+        Tries SalesOrderLine prices first (Coalesce total_price/unit_price*qty).
+        Falls back to SalesOrder.total_price when lines have no prices stored
+        (old DigiKey orderstatus/v4 sync only stores order-level prices)."""
+        line_rev = float(
+            SalesOrderLine.objects.filter(order__in=qs_orders)
+            .aggregate(t=Sum(rex))['t'] or 0
+        )
+        if line_rev > 0:
+            return line_rev
+        return float(qs_orders.aggregate(t=Sum('total_price'))['t'] or 0)
+
     def monthly_rev_for_year(year):
+        """Returns {month_number: {revenue, orders}} with order-level price fallback."""
         qs_y = qs_all.filter(order_date__year=year)
-        rows = list(
+
+        # Line-level: {month: revenue}
+        line_rows = list(
             SalesOrderLine.objects
             .filter(order__in=qs_y)
             .annotate(month=TruncMonth('order__order_date'))
             .values('month')
-            .annotate(revenue=Sum(rex), orders=Count('order', distinct=True))
+            .annotate(rev=Sum(rex))
             .order_by('month')
         )
+        line_by_m = {r['month'].month: float(r['rev'] or 0) for r in line_rows}
+
+        # Order-level: {month: {revenue, orders}} — authoritative for order count
+        order_rows = list(
+            qs_y.annotate(month=TruncMonth('order_date'))
+            .values('month')
+            .annotate(order_rev=Sum('total_price'), orders=Count('id'))
+            .order_by('month')
+        )
+        order_by_m = {r['month'].month: {'rev': float(r['order_rev'] or 0),
+                                          'orders': int(r['orders'])}
+                      for r in order_rows}
+
         result = {}
-        for r in rows:
-            result[r['month'].month] = {
-                'revenue': float(r['revenue'] or 0),
-                'orders':  int(r['orders'] or 0),
+        all_months = set(list(line_by_m) + list(order_by_m))
+        for m in all_months:
+            line_rev  = line_by_m.get(m, 0)
+            ord_data  = order_by_m.get(m, {'rev': 0, 'orders': 0})
+            result[m] = {
+                'revenue': line_rev if line_rev > 0 else ord_data['rev'],
+                'orders':  ord_data['orders'],
             }
         return result
 
@@ -487,13 +519,8 @@ def trends_view(request):
             m += 12
             y -= 1
         start, end = month_start_end(y, m)
-        rev_val = float(
-            SalesOrderLine.objects
-            .filter(order__in=qs_all,
-                    order__order_date__gte=start,
-                    order__order_date__lt=end)
-            .aggregate(t=Sum(rex))['t'] or 0
-        )
+        qs_m = qs_all.filter(order_date__gte=start, order_date__lt=end)
+        rev_val = _qs_rev(qs_m)
         rolling_months.append({'label': start.strftime('%b %Y'), 'rev': rev_val})
 
     mom_labels = [rolling_months[i]['label'] for i in range(1, 13)]
@@ -514,12 +541,8 @@ def trends_view(request):
                 order_date__month__gte=(q - 1) * 3 + 1,
                 order_date__month__lte=q * 3,
             )
-            revenue = float(
-                SalesOrderLine.objects.filter(order__in=qs_q)
-                .aggregate(t=Sum(rex))['t'] or 0
-            )
             quarters.append({'year': year, 'q': q,
-                              'revenue': revenue, 'orders': qs_q.count()})
+                              'revenue': _qs_rev(qs_q), 'orders': qs_q.count()})
 
     q_by_key = {(r['year'], r['q']): r for r in quarters}
     for r in quarters:
