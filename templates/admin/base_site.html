@@ -916,7 +916,15 @@ document.addEventListener('DOMContentLoaded', function(){
       ],
       apps: []
     },
-    { id: 'crm',        label: '👥 CRM',           apps: ['crm'] },
+    {
+      id: 'crm', label: '👥 CRM',
+      apps: ['crm', 'strategy'],
+      links: [
+        { href: '/admin/crm/customer/',                     label: '👤 Клієнти' },
+        { href: '/admin/strategy/customerstrategy/',        label: '🎯 Стратегії' },
+        { href: '/admin/strategy/strategytemplate/',        label: '📋 Шаблони' },
+      ],
+    },
     { id: 'sales',      label: '🛒 Продажі',      apps: ['sales'] },
     { id: 'accounting', label: '💰 Бухгалтерія',  apps: ['accounting'] },
     { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'] },
@@ -988,6 +996,8 @@ document.addEventListener('DOMContentLoaded', function(){
   var _URL_GROUP = {
     '/dashboard/':       'analytics',
     '/admin/crm/':       'crm',
+    '/admin/strategy/':  'crm',
+    '/strategy/':        'crm',
     '/admin/sales/':     'sales',
     '/admin/accounting/':'accounting',
     '/admin/shipping/':  'shipping',

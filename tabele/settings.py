@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     # ── Ваші додатки (порядок = порядок у sidebar) ──
     'config',           # ⚙️ Конфігурація системи
     'crm',              # 👥 CRM
+    'strategy',         # 🎯 Стратегії CRM
     'accounting',       # 💰 Бухгалтерія
     'sales',            # 🛒 Sales
     'shipping',         # 🚚 Доставка

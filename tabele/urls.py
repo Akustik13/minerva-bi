@@ -53,6 +53,7 @@ urlpatterns = [
     path("admin/config/integrations/", integrations_view, name="integrations_hub"),
     path("admin/", admin.site.urls),
     path("onboarding/", include("config.urls")),
+    path("strategy/", include("strategy.urls")),
     path("dashboard/", include("dashboard.urls")),
     path("labels/", include("labels_app.urls")),
     path("accounting/", include("accounting.urls")),

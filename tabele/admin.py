@@ -17,6 +17,7 @@ def _get_app_list(self, request, app_label=None):
 
     app_order = [
         'crm',        # 👥 CRM
+        'strategy',   # 🎯 Стратегії CRM
         'sales',      # 🛒 Продажі
         'accounting', # 💰 Бухгалтерія
         'shipping',   # 🚚 Доставка
@@ -34,6 +35,7 @@ def _get_app_list(self, request, app_label=None):
 
     # Явний порядок моделей всередині аппів (object_name.lower())
     model_order = {
+        'strategy': ['strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',

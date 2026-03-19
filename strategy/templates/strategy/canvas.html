@@ -1,0 +1,293 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | Minerva{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+/* ── Strategy Canvas — Phase 0 ── */
+.sv-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  padding: 20px;
+  min-height: calc(100vh - 120px);
+}
+.sv-sidebar {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 16px;
+}
+.sv-sidebar h3 {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.sv-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.sv-info-row strong { color: var(--text); }
+.sv-status-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.sv-status-active  { background: rgba(63,185,80,.15);  color: var(--ok);   }
+.sv-status-paused  { background: rgba(227,179,65,.15); color: var(--warn); }
+.sv-status-done    { background: rgba(88,166,255,.15); color: var(--accent); }
+.sv-status-failed  { background: rgba(248,81,73,.15);  color: var(--err);  }
+
+.sv-main { display: flex; flex-direction: column; gap: 16px; }
+.sv-step-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 16px;
+}
+.sv-step-card.is-current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-subtle);
+}
+.sv-step-card.is-done    { border-color: var(--ok);   opacity: .75; }
+.sv-step-card.is-skipped { border-color: var(--text-dim); opacity: .6; }
+.sv-step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.sv-step-icon {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+}
+.sv-icon-email    { background: rgba(88,166,255,.15); }
+.sv-icon-call     { background: rgba(255,165,0,.15);  }
+.sv-icon-pause    { background: rgba(96,125,139,.15); }
+.sv-icon-decision { background: rgba(227,179,65,.15); }
+
+.sv-step-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.sv-step-meta  { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+.sv-step-desc  { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+.sv-outcome-badge {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 4px; font-size: 12px; font-weight: 600;
+}
+.sv-out-pending     { background: rgba(96,125,139,.2); color: var(--text-muted); }
+.sv-out-done_pos    { background: rgba(63,185,80,.15); color: var(--ok); }
+.sv-out-done_neg    { background: rgba(248,81,73,.1);  color: var(--err); }
+.sv-out-skipped     { background: rgba(96,125,139,.15); color: var(--text-dim); }
+.sv-out-no_response { background: rgba(227,179,65,.1); color: var(--warn); }
+
+/* Log form */
+.sv-log-form {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.sv-log-form h4 { font-size: 13px; color: var(--text-muted); margin: 0 0 8px; }
+.sv-log-form select,
+.sv-log-form textarea {
+  width: 100%;
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-size: 13px;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+.sv-log-form textarea { min-height: 60px; resize: vertical; }
+.sv-log-btn {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.sv-log-btn:hover { opacity: .88; }
+
+.sv-back-link {
+  display: inline-block;
+  margin: 12px 20px 0;
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+.sv-back-link:hover { text-decoration: underline; }
+.sv-empty { color: var(--text-muted); font-size: 14px; padding: 20px; }
+
+@media (max-width: 768px) {
+  .sv-layout { grid-template-columns: 1fr; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'admin:strategy_customerstrategy_change' strategy.pk %}" class="sv-back-link">
+  ← До адміністрування стратегії
+</a>
+
+<div class="sv-layout">
+
+  {# ─── Left sidebar: customer info ─── #}
+  <aside class="sv-sidebar">
+    <h3>👤 {{ strategy.customer.company|default:strategy.customer.name }}</h3>
+
+    <div class="sv-info-row">
+      <span>Контакт</span>
+      <strong>{{ strategy.customer.name }}</strong>
+    </div>
+    {% if strategy.customer.email %}
+    <div class="sv-info-row">
+      <span>Email</span>
+      <strong>{{ strategy.customer.email }}</strong>
+    </div>
+    {% endif %}
+    {% if strategy.customer.phone %}
+    <div class="sv-info-row">
+      <span>Телефон</span>
+      <strong>{{ strategy.customer.phone }}</strong>
+    </div>
+    {% endif %}
+    <div class="sv-info-row">
+      <span>Сегмент</span>
+      <strong>{{ strategy.customer.get_segment_display }}</strong>
+    </div>
+    <div class="sv-info-row">
+      <span>Статус CRM</span>
+      <strong>{{ strategy.customer.get_status_display }}</strong>
+    </div>
+    {% with rfm=strategy.customer.rfm_score %}
+    <div class="sv-info-row">
+      <span>RFM</span>
+      <strong>R{{ rfm.R }} F{{ rfm.F }} M{{ rfm.M }}</strong>
+    </div>
+    <div class="sv-info-row">
+      <span>Сегмент</span>
+      <strong style="font-size:12px">{{ rfm.segment }}</strong>
+    </div>
+    {% endwith %}
+
+    <h3 style="margin-top:20px">📋 Стратегія</h3>
+    <div class="sv-info-row">
+      <span>Шаблон</span>
+      <strong>{{ strategy.template.name }}</strong>
+    </div>
+    <div class="sv-info-row">
+      <span>Тип</span>
+      <strong>{{ strategy.template.get_behavior_type_display }}</strong>
+    </div>
+    <div class="sv-info-row">
+      <span>Статус</span>
+      <span class="sv-status-badge sv-status-{{ strategy.status }}">
+        {{ strategy.get_status_display }}
+      </span>
+    </div>
+    {% if strategy.next_action_at %}
+    <div class="sv-info-row">
+      <span>Наступна дія</span>
+      <strong>{{ strategy.next_action_at|date:"d.m.Y" }}</strong>
+    </div>
+    {% endif %}
+    {% if strategy.notes %}
+    <div style="margin-top:10px; font-size:13px; color:var(--text-muted)">
+      <em>{{ strategy.notes }}</em>
+    </div>
+    {% endif %}
+  </aside>
+
+  {# ─── Main area: steps list ─── #}
+  <main class="sv-main">
+    {% if not steps %}
+      <p class="sv-empty">Кроки ще не створені. Почніть стратегію через адміністрування.</p>
+    {% endif %}
+
+    {% for step in steps %}
+    {% with is_current=step.pk|stringformat:"s" == strategy.current_step_id|stringformat:"s" %}
+    <div class="sv-step-card
+      {% if is_current %}is-current
+      {% elif step.outcome == 'done_pos' or step.outcome == 'done_neg' %}is-done
+      {% elif step.outcome == 'skipped' or step.outcome == 'no_response' %}is-skipped
+      {% endif %}">
+
+      <div class="sv-step-header">
+        <div class="sv-step-icon sv-icon-{{ step.step_type }}">
+          {% if step.step_type == "email" %}📧
+          {% elif step.step_type == "call" %}📞
+          {% elif step.step_type == "pause" %}⏸
+          {% elif step.step_type == "decision" %}🔀
+          {% endif %}
+        </div>
+        <div>
+          <div class="sv-step-title">{{ step.title }}</div>
+          <div class="sv-step-meta">
+            {% if step.scheduled_at %}Заплановано: {{ step.scheduled_at|date:"d.m.Y" }}{% endif %}
+            {% if step.completed_at %} · Виконано: {{ step.completed_at|date:"d.m.Y" }}{% endif %}
+          </div>
+        </div>
+        <span class="sv-outcome-badge sv-out-{{ step.outcome }}">
+          {{ step.get_outcome_display }}
+        </span>
+      </div>
+
+      {% if step.description %}
+      <div class="sv-step-desc">{{ step.description }}</div>
+      {% endif %}
+
+      {# Log form — only for pending/current steps in active strategies #}
+      {% if step.outcome == "pending" and strategy.status == "active" %}
+      <div class="sv-log-form">
+        <h4>📝 Зафіксувати результат</h4>
+        <form method="post" action="{% url 'strategy:log_step' strategy.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="step_id" value="{{ step.pk }}">
+          <select name="outcome">
+            {% for val, label in outcome_choices %}
+              {% if val != "pending" %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+          <textarea name="notes" placeholder="Примітки (необов'язково)"></textarea>
+          <button type="submit" class="sv-log-btn">✅ Зберегти</button>
+        </form>
+      </div>
+      {% endif %}
+
+      {# Show logs if any #}
+      {% if step.logs.exists %}
+      <div style="margin-top:10px; font-size:12px; color:var(--text-dim)">
+        {% for log in step.logs.all %}
+        <div style="padding:4px 0; border-top:1px solid var(--border)">
+          {{ log.logged_at|date:"d.m.Y H:i" }}
+          {% if log.logged_by %}<strong>{{ log.logged_by.username }}</strong>{% endif %}
+          → {{ log.get_outcome_display }}
+          {% if log.notes %}: <em>{{ log.notes }}</em>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </main>
+
+</div>
+{% endblock %}
