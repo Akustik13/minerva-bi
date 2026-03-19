@@ -77,17 +77,21 @@
   display: grid; grid-template-columns: 2fr 1fr; gap: 14px;
   margin-bottom: 20px;
 }
+/* min-width:0 prevents grid cells from overflowing their column */
+.tr-charts-2col > * { min-width: 0; }
 .tr-chart-box {
   background: var(--bg-card); border: 1px solid var(--border);
   border-radius: 8px; padding: 16px;
+  overflow: hidden;
 }
 .tr-chart-box h3 {
   font-size: 12px; font-weight: 700; color: var(--text-muted);
   margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em;
 }
-.tr-chart-box canvas { max-height: 260px; }
+.tr-chart-box .chart-wrap { position: relative; width: 100%; }
+.tr-chart-box canvas { max-height: 260px; width: 100% !important; }
 .tr-chart-full { margin-bottom: 20px; }
-.tr-chart-full canvas { max-height: 200px; }
+.tr-chart-full canvas { max-height: 200px; width: 100% !important; }
 
 /* ── Quarterly table ──────────────────────────────────────────── */
 .tr-q-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -167,7 +171,7 @@
           {% if yoy_growth > 0 %}▲{% elif yoy_growth < 0 %}▼{% endif %}{{ yoy_growth|floatformat:1 }}%
         {% else %}—{% endif %}
       </div>
-      <div class="tr-kpi-sub">{{ current_year }} vs {{ yoy_vs_year }} (YTD до {{ yoy_ytd_label }})</div>
+      <div class="tr-kpi-sub">{{ year_to }} vs {{ yoy_vs_year }} (YTD до {{ yoy_ytd_label }})</div>
     </div>
 
     <div class="tr-kpi">
@@ -197,9 +201,9 @@
     </div>
 
     <div class="tr-kpi">
-      <div class="tr-kpi-label">Сер. місяць (12м)</div>
+      <div class="tr-kpi-label">Сер. місяць</div>
       <div class="tr-kpi-val">€{{ avg_monthly|floatformat:0 }}</div>
-      <div class="tr-kpi-sub">останні 12 місяців</div>
+      <div class="tr-kpi-sub">в обраному діапазоні {{ year_from }}–{{ year_to }}</div>
     </div>
 
   </div>
@@ -274,6 +278,13 @@
     </table>
   </div>
 
+  {# ── Quarterly table legend ──────────────────────────────────────────── #}
+  <div style="margin:6px 0 4px;font-size:11px;color:var(--text-dim);display:flex;gap:16px;flex-wrap:wrap">
+    <span><span class="tr-delta-nil">—</span> у «Виручка» = немає замовлень або відсутні ціни</span>
+    <span><span class="tr-delta-nil">—</span> у «Δ%» = немає даних попереднього року для порівняння</span>
+    <span><em style="opacity:.5">курсив</em> = майбутній квартал</span>
+  </div>
+
   {# ── Missing data note ────────────────────────────────────────────────── #}
   {% for r in quarters %}{% if not r.is_future and r.orders > 0 and r.revenue == 0 %}
   <div style="margin:8px 0 20px;padding:8px 12px;background:var(--bg-card);border-left:3px solid var(--warn);border-radius:4px;font-size:12px;color:var(--text-muted)">
@@ -303,6 +314,12 @@
       <canvas id="catChart"></canvas>
     </div>
     <div class="tr-chart-box" style="overflow:auto;padding:0">
+      <div style="padding:10px 12px 4px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">
+        Топ-8 SKU за виручкою (всього)
+      </div>
+      <div style="padding:0 12px 8px;font-size:11px;color:var(--text-dim)">
+        Найприбутковіші позиції за весь час (не тільки обраний діапазон). Виручка = сума по рядках замовлень.
+      </div>
       <table class="tr-q-table">
         <thead>
           <tr>

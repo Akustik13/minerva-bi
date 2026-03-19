@@ -597,12 +597,17 @@ def trends_view(request):
             else:
                 r['delta_pct'] = None
 
-    # ── Summary KPIs ───────────────────────────────────────────────────────────
-    last_12  = [(rolling_months[i]['label'], rolling_months[i]['rev']) for i in range(1, 13)]
-    non_zero = [(l, r) for l, r in last_12 if r > 0]
-    best_month  = max(non_zero, key=lambda x: x[1]) if non_zero else None
-    worst_month = min(non_zero, key=lambda x: x[1]) if non_zero else None
-    avg_monthly = round(sum(r for _, r in non_zero) / len(non_zero)) if non_zero else 0
+    # ── Summary KPIs — from selected year range ───────────────────────────────
+    range_month_revs = []
+    for yr in years_to_show:
+        for m in range(1, 13):
+            r = all_years_data[yr].get(m, {})
+            rev = r.get('revenue', 0)
+            if rev > 0:
+                range_month_revs.append((f"{months_labels[m - 1]} {yr}", rev))
+    best_month  = max(range_month_revs, key=lambda x: x[1]) if range_month_revs else None
+    worst_month = min(range_month_revs, key=lambda x: x[1]) if range_month_revs else None
+    avg_monthly = round(sum(r for _, r in range_month_revs) / len(range_month_revs)) if range_month_revs else 0
 
     # KPI: use year_to (most recent selected year), not always current_year
     # This way selecting 2021–2024 shows 2024 data, not 2026
@@ -626,17 +631,28 @@ def trends_view(request):
     yoy_ytd_label = months_labels[ytd_month - 1] if year_to == current_year else 'Гру'
 
     # ── Shipping analytics ─────────────────────────────────────────────────────
-    top_couriers = list(
+    # Normalize courier names in Python to merge "dhl"/"DHL"/"DHL Express" → "DHL"
+    from sales.utils import normalize_courier as _nc
+    raw_courier_rows = list(
         qs_all.exclude(shipping_courier='')
-        .values('shipping_courier').annotate(cnt=Count('id')).order_by('-cnt')
-        .values_list('shipping_courier', flat=True)[:5]
+        .filter(order_date__year__in=years_to_show)
+        .values('order_date__year', 'shipping_courier')
+        .annotate(cnt=Count('id'))
     )
-    courier_by_year = {}
-    for year in years_to_show:
-        courier_by_year[year] = {
-            c: qs_all.filter(order_date__year=year, shipping_courier=c).count()
-            for c in top_couriers
-        }
+    total_courier_counts = {}
+    year_courier_counts  = {}
+    for row in raw_courier_rows:
+        yr  = row['order_date__year']
+        nc  = _nc(row['shipping_courier'])
+        cnt = row['cnt']
+        total_courier_counts[nc] = total_courier_counts.get(nc, 0) + cnt
+        year_courier_counts.setdefault(yr, {})
+        year_courier_counts[yr][nc] = year_courier_counts[yr].get(nc, 0) + cnt
+    top_couriers = sorted(total_courier_counts, key=total_courier_counts.get, reverse=True)[:5]
+    courier_by_year = {
+        year: {c: year_courier_counts.get(year, {}).get(c, 0) for c in top_couriers}
+        for year in years_to_show
+    }
 
     ontime_labels, ontime_pct = [], []
     for i in range(11, -1, -1):
