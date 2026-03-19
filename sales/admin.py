@@ -1720,8 +1720,25 @@ class SalesOrderAdmin(admin.ModelAdmin):
             if not value:
                 return None, None
             s = str(value).strip()
-            currency = 'USD' if '$' in s else 'EUR' if '€' in s else None
-            price_str = re.sub(r'[^\d\.,]', '', s).replace(',', '.')
+            su = s.upper()
+            currency = 'USD' if ('$' in s or 'USD' in su) else ('EUR' if ('€' in s or 'EUR' in su) else None)
+            price_str = re.sub(r'[^\d\.,]', '', s)
+            if not price_str:
+                return None, currency
+            # Determine decimal separator: if both comma and dot present,
+            # the last one is the decimal separator
+            has_comma = ',' in price_str
+            has_dot   = '.' in price_str
+            if has_comma and has_dot:
+                if price_str.rfind(',') > price_str.rfind('.'):
+                    # European: 1.234,56 → remove dot thousands, comma→dot
+                    price_str = price_str.replace('.', '').replace(',', '.')
+                else:
+                    # US: 1,234.56 → remove comma thousands
+                    price_str = price_str.replace(',', '')
+            else:
+                # Only comma (European decimal) or only dot — normalise comma
+                price_str = price_str.replace(',', '.')
             try:
                 return (Decimal(price_str) if price_str else None), currency
             except InvalidOperation:

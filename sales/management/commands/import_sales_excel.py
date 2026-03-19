@@ -125,6 +125,7 @@ class Command(BaseCommand):
                     'name': self._clean(row[COL['name'] - 1]),
                     'phone': self._clean(row[COL['phone'] - 1]),
                     'source': self._clean(row[COL['source'] - 1]) or 'other',
+                    'shipping_cost': row[COL['shipping_cost'] - 1],
                     'lines': []
                 }
 
@@ -182,6 +183,7 @@ class Command(BaseCommand):
                         phone=data['phone'] or '',
                         document_type='SALE',
                         affects_stock=True,
+                        shipping_cost=self._parse_price(data.get('shipping_cost')),
                     )
 
                     # Додаємо позиції
@@ -237,13 +239,29 @@ class Command(BaseCommand):
             return None
 
     def _parse_price(self, value):
-        """Парсить ціну."""
+        """Парсить ціну. Підтримує European (37,82) і US (1,234.56) формати."""
         if not value:
             return Decimal('0')
-        # Видаляємо $, €, пробіли
-        cleaned = str(value).replace('$', '').replace('€', '').replace(',', '').strip()
+        s = str(value).strip()
+        # Strip non-numeric except comma and period
+        import re as _re
+        price_str = _re.sub(r'[^\d\.,]', '', s)
+        if not price_str:
+            return Decimal('0')
+        # Determine decimal separator: if both present, last one wins
+        has_comma = ',' in price_str
+        has_dot   = '.' in price_str
+        if has_comma and has_dot:
+            if price_str.rfind(',') > price_str.rfind('.'):
+                # European: 1.234,56
+                price_str = price_str.replace('.', '').replace(',', '.')
+            else:
+                # US: 1,234.56
+                price_str = price_str.replace(',', '')
+        else:
+            price_str = price_str.replace(',', '.')
         try:
-            return Decimal(cleaned)
+            return Decimal(price_str) if price_str else Decimal('0')
         except Exception:
             return Decimal('0')
 
