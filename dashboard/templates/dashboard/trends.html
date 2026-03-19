@@ -171,7 +171,7 @@
           {% if yoy_growth > 0 %}▲{% elif yoy_growth < 0 %}▼{% endif %}{{ yoy_growth|floatformat:1 }}%
         {% else %}—{% endif %}
       </div>
-      <div class="tr-kpi-sub">{{ year_to }} vs {{ yoy_vs_year }} (YTD до {{ yoy_ytd_label }})</div>
+      <div class="tr-kpi-sub" title="Порівняння Січень–{{ yoy_ytd_label }} обох років (YTD)">{{ year_to }} vs {{ yoy_vs_year }} (Січ–{{ yoy_ytd_label }})</div>
     </div>
 
     <div class="tr-kpi">
