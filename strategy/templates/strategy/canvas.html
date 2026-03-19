@@ -317,9 +317,8 @@
     {# ── LIST MODE ── #}
     <div id="cv-list-mode">
       {% for step in steps %}
-      {% with is_cur=step.pk == strategy.current_step_id %}
       <div class="cv-step-card
-        {% if is_cur %}s-current
+        {% if step.pk == strategy.current_step_id %}s-current
         {% elif step.outcome == 'done_pos' %}s-done
         {% elif step.outcome == 'done_neg' %}s-neg
         {% elif step.outcome == 'skipped' or step.outcome == 'no_response' %}s-skip
@@ -365,7 +364,6 @@
         {% endif %}
 
       </div>
-      {% endwith %}
       {% empty %}
       <p style="color:var(--text-muted);padding:20px">Кроки ще не створені.</p>
       {% endfor %}
