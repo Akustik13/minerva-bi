@@ -229,7 +229,15 @@ optgroup { font-weight: bold; color: var(--accent); }
 
     <!-- Column mapping table -->
     <div style="margin-bottom:20px">
-      <label style="font-weight:bold;display:block;margin-bottom:8px">Маппінг колонок Excel → поля БД:</label>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+        <label style="font-weight:bold">Маппінг колонок Excel → поля БД:</label>
+        <div style="display:flex;gap:6px">
+          <button type="button" class="btn-secondary" style="font-size:12px;padding:5px 12px"
+                  onclick="applyAutoMap()">🤖 Авто-маппінг</button>
+          <button type="button" class="btn-secondary" style="font-size:12px;padding:5px 12px"
+                  onclick="clearAllMap()">🚫 Всі — не імпортувати</button>
+        </div>
+      </div>
       <div class="ie-hint" style="margin-bottom:10px">
         Рядки з однаковим <b>Номером замовлення</b> групуються в одне замовлення.
         Кожен рядок може мати товар (SKU + Кількість).
@@ -356,6 +364,19 @@ function renderMappingRows(sheetName) {
 }
 
 function onSheetChange(name) { renderMappingRows(name); }
+
+function clearAllMap() {
+  document.querySelectorAll('#mappingBody select').forEach(s => s.value = '--');
+}
+
+function applyAutoMap() {
+  const sheetName = document.getElementById('sheetSelect').value;
+  const cols = SHEET_DATA[sheetName] || [];
+  document.querySelectorAll('#mappingBody select').forEach((sel, idx) => {
+    const col = cols[idx];
+    sel.value = col ? guessField(String(col)) : '--';
+  });
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   renderMappingRows(document.getElementById("sheetSelect").value);
