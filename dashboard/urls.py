@@ -109,10 +109,12 @@ download_import_template = staff_member_required(download_import_template)
 
 
 from .api_views import api_index, api_console, api_proxy
+from .views import trends_view
 
 urlpatterns = [
     path("",           dashboard,       name="dashboard"),
     path("analytics/", analytics_index, name="analytics_index"),
+    path("trends/",    trends_view,     name="trends"),
     path("bots/",      bots_index,      name="bots_index"),
     path("system/",    system_index,    name="system_index"),
     path("faq/",       faq_index,       name="faq_index"),

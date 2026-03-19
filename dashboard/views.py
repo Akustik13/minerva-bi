@@ -393,3 +393,170 @@ def dashboard(request):
         'chart_courier_orders': json.dumps(chart_courier_orders),
     })
     return render(request, 'dashboard/dashboard.html', ctx)
+
+
+@staff_member_required
+def trends_view(request):
+    """Trend analytics: YoY bar/line overlay, MoM growth rate, quarterly table."""
+    import calendar
+    from datetime import date
+    from django.db.models import Sum, Count
+    from django.db.models.functions import TruncMonth
+    from sales.models import SalesOrder, SalesOrderLine
+
+    today = date.today()
+    current_year = today.year
+    prev_year    = current_year - 1
+    prev2_year   = current_year - 2
+
+    filter_source = request.GET.get('source', '').strip()
+
+    qs_all = SalesOrder.objects.filter(affects_stock=True)
+    if filter_source:
+        qs_all = qs_all.filter(source=filter_source)
+
+    all_sources = list(
+        SalesOrder.objects.values_list('source', flat=True).distinct().order_by('source'))
+
+    # ── Helpers ────────────────────────────────────────────────────────────────
+    def month_start_end(y, m):
+        """Returns (first_of_month, first_of_next_month) as date objects."""
+        last_day = calendar.monthrange(y, m)[1]
+        start = date(y, m, 1)
+        if m == 12:
+            end = date(y + 1, 1, 1)
+        else:
+            end = date(y, m + 1, 1)
+        return start, end
+
+    def monthly_rev_for_year(year):
+        """Returns {month_number: {revenue, orders}} for a full calendar year."""
+        qs_y = qs_all.filter(order_date__year=year)
+        rows = list(
+            SalesOrderLine.objects
+            .filter(order__in=qs_y)
+            .annotate(month=TruncMonth('order__order_date'))
+            .values('month')
+            .annotate(revenue=Sum('total_price'), orders=Count('order', distinct=True))
+            .order_by('month')
+        )
+        result = {}
+        for r in rows:
+            m = r['month'].month
+            result[m] = {
+                'revenue': float(r['revenue'] or 0),
+                'orders':  int(r['orders'] or 0),
+            }
+        return result
+
+    # ── YoY data (12 months × 3 years) ────────────────────────────────────────
+    curr_data  = monthly_rev_for_year(current_year)
+    prev_data  = monthly_rev_for_year(prev_year)
+    prev2_data = monthly_rev_for_year(prev2_year)
+
+    months_labels = ['Січ', 'Лют', 'Бер', 'Кві', 'Тра', 'Чер',
+                     'Лип', 'Сер', 'Вер', 'Жов', 'Лис', 'Гру']
+
+    curr_rev   = [curr_data.get(m, {}).get('revenue', 0) for m in range(1, 13)]
+    prev_rev   = [prev_data.get(m, {}).get('revenue', 0) for m in range(1, 13)]
+    prev2_rev  = [prev2_data.get(m, {}).get('revenue', 0) for m in range(1, 13)]
+    curr_ord   = [curr_data.get(m, {}).get('orders', 0) for m in range(1, 13)]
+    prev_ord   = [prev_data.get(m, {}).get('orders', 0) for m in range(1, 13)]
+
+    # 3-month moving average (smoothed line for current year)
+    curr_rev_smooth = []
+    for i in range(12):
+        window = [curr_rev[j] for j in range(max(0, i - 2), i + 1) if curr_rev[j] > 0]
+        curr_rev_smooth.append(round(sum(window) / len(window), 1) if window else 0)
+
+    # ── Rolling last 13 months → 12 MoM growth rates ─────────────────────────
+    rolling_months = []
+    for i in range(12, -1, -1):
+        m = today.month - i
+        y = today.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        start, end = month_start_end(y, m)
+        rev_val = float(
+            SalesOrderLine.objects
+            .filter(order__in=qs_all,
+                    order__order_date__gte=start,
+                    order__order_date__lt=end)
+            .aggregate(t=Sum('total_price'))['t'] or 0
+        )
+        rolling_months.append({'label': start.strftime('%b %Y'), 'rev': rev_val})
+
+    mom_labels = [rolling_months[i]['label'] for i in range(1, 13)]
+    mom_growth = []
+    for i in range(1, 13):
+        prev_val = rolling_months[i - 1]['rev']
+        curr_val = rolling_months[i]['rev']
+        if prev_val:
+            mom_growth.append(round((curr_val - prev_val) / prev_val * 100, 1))
+        else:
+            mom_growth.append(None)
+
+    # ── Quarterly table ────────────────────────────────────────────────────────
+    quarters = []
+    for year in [prev2_year, prev_year, current_year]:
+        for q in range(1, 5):
+            month_start_q = (q - 1) * 3 + 1
+            month_end_q   = q * 3
+            qs_q = qs_all.filter(
+                order_date__year=year,
+                order_date__month__gte=month_start_q,
+                order_date__month__lte=month_end_q,
+            )
+            revenue = float(
+                SalesOrderLine.objects.filter(order__in=qs_q)
+                .aggregate(t=Sum('total_price'))['t'] or 0
+            )
+            orders = qs_q.count()
+            quarters.append({'year': year, 'q': q, 'revenue': revenue, 'orders': orders})
+
+    q_by_key = {(r['year'], r['q']): r for r in quarters}
+    for r in quarters:
+        prev_r = q_by_key.get((r['year'] - 1, r['q']))
+        if prev_r and prev_r['revenue']:
+            r['delta_pct'] = round((r['revenue'] - prev_r['revenue']) / prev_r['revenue'] * 100, 1)
+        else:
+            r['delta_pct'] = None
+
+    # ── Summary KPIs ───────────────────────────────────────────────────────────
+    last_12 = [(rolling_months[i]['label'], rolling_months[i]['rev']) for i in range(1, 13)]
+    non_zero = [(l, r) for l, r in last_12 if r > 0]
+    best_month  = max(non_zero, key=lambda x: x[1]) if non_zero else None
+    worst_month = min(non_zero, key=lambda x: x[1]) if non_zero else None
+    avg_monthly = round(sum(r for _, r in non_zero) / len(non_zero)) if non_zero else 0
+
+    curr_year_total = sum(curr_rev)
+    prev_year_total = sum(prev_rev)
+    yoy_growth = round((curr_year_total - prev_year_total) / prev_year_total * 100, 1) \
+        if prev_year_total else None
+
+    ctx = admin.site.each_context(request)
+    ctx.update({
+        'filter_source':    filter_source,
+        'all_sources':      all_sources,
+        'current_year':     current_year,
+        'prev_year':        prev_year,
+        'prev2_year':       prev2_year,
+        'months_labels':    json.dumps(months_labels),
+        'curr_rev':         json.dumps(curr_rev),
+        'prev_rev':         json.dumps(prev_rev),
+        'prev2_rev':        json.dumps(prev2_rev),
+        'curr_rev_smooth':  json.dumps(curr_rev_smooth),
+        'curr_ord':         json.dumps(curr_ord),
+        'prev_ord':         json.dumps(prev_ord),
+        'mom_labels':       json.dumps(mom_labels),
+        'mom_growth':       json.dumps(mom_growth),
+        'quarters':         quarters,
+        'curr_year_total':  curr_year_total,
+        'prev_year_total':  prev_year_total,
+        'yoy_growth':       yoy_growth,
+        'best_month':       best_month,
+        'worst_month':      worst_month,
+        'avg_monthly':      avg_monthly,
+    })
+    return render(request, 'dashboard/trends.html', ctx)

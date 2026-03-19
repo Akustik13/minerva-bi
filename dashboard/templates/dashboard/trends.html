@@ -1,0 +1,442 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Тенденції | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="/dashboard/analytics/">Аналітика</a>
+  &rsaquo; Тенденції
+</div>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.tr-page { padding: 14px 20px 40px; }
+
+/* ── Filter bar ───────────────────────────────────────────────── */
+.tr-filter {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 18px;
+}
+.tr-filter label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.tr-filter select {
+  background: var(--bg-input); color: var(--text);
+  border: 1px solid var(--border-strong); border-radius: 5px;
+  padding: 4px 8px; font-size: 12px;
+}
+.tr-filter button {
+  background: var(--accent); color: #fff; border: none;
+  border-radius: 5px; padding: 5px 12px; font-size: 12px;
+  cursor: pointer; font-weight: 600;
+}
+.tr-filter button:hover { opacity: .85; }
+
+/* ── Section header ───────────────────────────────────────────── */
+.tr-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 12px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--gold);
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: .04em; text-transform: uppercase;
+}
+
+/* ── KPI summary cards ────────────────────────────────────────── */
+.tr-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px; margin-bottom: 22px;
+}
+.tr-kpi {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-top: 3px solid var(--accent); border-radius: 8px;
+  padding: 12px 14px;
+}
+.tr-kpi.gold  { border-top-color: var(--gold); }
+.tr-kpi.ok    { border-top-color: var(--ok); }
+.tr-kpi.warn  { border-top-color: var(--warn); }
+.tr-kpi.err   { border-top-color: var(--err); }
+.tr-kpi-label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.tr-kpi-val   { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1.2; }
+.tr-kpi-sub   { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+
+/* ── Charts layout ────────────────────────────────────────────── */
+.tr-charts-2col {
+  display: grid; grid-template-columns: 2fr 1fr; gap: 14px;
+  margin-bottom: 20px;
+}
+.tr-chart-box {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; padding: 16px;
+}
+.tr-chart-box h3 {
+  font-size: 12px; font-weight: 700; color: var(--text-muted);
+  margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em;
+}
+.tr-chart-box canvas { max-height: 260px; }
+.tr-chart-full { margin-bottom: 20px; }
+.tr-chart-full canvas { max-height: 200px; }
+
+/* ── Quarterly table ──────────────────────────────────────────── */
+.tr-q-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.tr-q-table th {
+  background: var(--bg-card-2); color: var(--text-muted);
+  font-weight: 700; padding: 7px 10px; text-align: left;
+  border-bottom: 2px solid var(--border-strong);
+  white-space: nowrap;
+}
+.tr-q-table td {
+  padding: 7px 10px; border-bottom: 1px solid var(--border);
+  color: var(--text); vertical-align: middle;
+}
+.tr-q-table tr:hover td { background: var(--bg-hover); }
+.tr-q-table .yr-sep td {
+  background: var(--bg-card-2); font-weight: 700; color: var(--gold);
+  font-size: 11px; letter-spacing: .04em;
+}
+.tr-q-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.tr-delta-pos { color: var(--ok); font-weight: 600; }
+.tr-delta-neg { color: var(--err); font-weight: 600; }
+.tr-delta-nil { color: var(--text-dim); }
+.tr-q-total td { border-top: 2px solid var(--border-strong); font-weight: 700; background: var(--bg-card); }
+
+/* ── Responsive ───────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .tr-charts-2col { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .tr-kpi-row { grid-template-columns: 1fr 1fr; }
+  .tr-chart-box canvas { max-height: 180px; }
+}
+</style>
+
+<div class="tr-page">
+
+  {# ── Filter bar ─────────────────────────────────────────────────────────── #}
+  <form method="get" class="tr-filter">
+    <label for="src-sel">Джерело:</label>
+    <select id="src-sel" name="source">
+      <option value="">— Всі —</option>
+      {% for s in all_sources %}
+        <option value="{{ s }}" {% if s == filter_source %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">🔍 Застосувати</button>
+    {% if filter_source %}<a href="?" style="font-size:12px;color:var(--err)">✕ Скинути</a>{% endif %}
+    <span style="margin-left:auto;font-size:11px;color:var(--text-dim)">Дані за останні 3 роки</span>
+  </form>
+
+  {# ── Summary KPIs ──────────────────────────────────────────────────────── #}
+  <h2 class="tr-hdr"><span>📈</span> Підсумок тенденцій</h2>
+  <div class="tr-kpi-row">
+
+    <div class="tr-kpi gold">
+      <div class="tr-kpi-label">YoY зростання</div>
+      <div class="tr-kpi-val">
+        {% if yoy_growth is not None %}
+          {% if yoy_growth > 0 %}▲{% elif yoy_growth < 0 %}▼{% endif %}{{ yoy_growth|floatformat:1 }}%
+        {% else %}—{% endif %}
+      </div>
+      <div class="tr-kpi-sub">{{ current_year }} vs {{ prev_year }}</div>
+    </div>
+
+    <div class="tr-kpi">
+      <div class="tr-kpi-label">Поточний рік</div>
+      <div class="tr-kpi-val">€{{ curr_year_total|floatformat:0 }}</div>
+      <div class="tr-kpi-sub">{{ current_year }}, усього виручки</div>
+    </div>
+
+    <div class="tr-kpi ok">
+      <div class="tr-kpi-label">Кращий місяць</div>
+      <div class="tr-kpi-val">
+        {% if best_month %}€{{ best_month.1|floatformat:0 }}{% else %}—{% endif %}
+      </div>
+      <div class="tr-kpi-sub">
+        {% if best_month %}{{ best_month.0 }}{% endif %}
+      </div>
+    </div>
+
+    <div class="tr-kpi warn">
+      <div class="tr-kpi-label">Гірший місяць</div>
+      <div class="tr-kpi-val">
+        {% if worst_month %}€{{ worst_month.1|floatformat:0 }}{% else %}—{% endif %}
+      </div>
+      <div class="tr-kpi-sub">
+        {% if worst_month %}{{ worst_month.0 }}{% endif %}
+      </div>
+    </div>
+
+    <div class="tr-kpi">
+      <div class="tr-kpi-label">Сер. місяць (12м)</div>
+      <div class="tr-kpi-val">€{{ avg_monthly|floatformat:0 }}</div>
+      <div class="tr-kpi-sub">останні 12 місяців</div>
+    </div>
+
+  </div>
+
+  {# ── YoY chart + Orders chart ──────────────────────────────────────────── #}
+  <h2 class="tr-hdr"><span>📊</span> Виручка рік до року</h2>
+  <div class="tr-charts-2col">
+    <div class="tr-chart-box">
+      <h3>Виручка по місяцях (€) — {{ current_year }} vs {{ prev_year }} vs {{ prev2_year }}</h3>
+      <canvas id="yoyChart"></canvas>
+    </div>
+    <div class="tr-chart-box">
+      <h3>Кількість замовлень — {{ current_year }} vs {{ prev_year }}</h3>
+      <canvas id="ordChart"></canvas>
+    </div>
+  </div>
+
+  {# ── MoM growth rate ───────────────────────────────────────────────────── #}
+  <h2 class="tr-hdr"><span>📉</span> Темп зростання MoM (%)</h2>
+  <div class="tr-chart-box tr-chart-full">
+    <h3>Місяць до місяця — останні 12 місяців</h3>
+    <canvas id="momChart"></canvas>
+  </div>
+
+  {# ── Quarterly table ───────────────────────────────────────────────────── #}
+  <h2 class="tr-hdr" style="margin-top:20px"><span>🗓</span> Квартальне порівняння</h2>
+  <div class="tr-chart-box" style="padding:0;overflow:auto">
+    <table class="tr-q-table">
+      <thead>
+        <tr>
+          <th>Рік</th>
+          <th>Квартал</th>
+          <th class="num">Виручка (€)</th>
+          <th class="num">Замовлень</th>
+          <th class="num">Δ% до пр. року</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in quarters %}
+          {% ifchanged r.year %}
+          <tr class="yr-sep">
+            <td colspan="5">{{ r.year }}</td>
+          </tr>
+          {% endifchanged %}
+          <tr>
+            <td></td>
+            <td>Q{{ r.q }}</td>
+            <td class="num">€{{ r.revenue|floatformat:0 }}</td>
+            <td class="num">{{ r.orders }}</td>
+            <td class="num">
+              {% if r.delta_pct is not None %}
+                <span class="{% if r.delta_pct > 0 %}tr-delta-pos{% elif r.delta_pct < 0 %}tr-delta-neg{% else %}tr-delta-nil{% endif %}">
+                  {% if r.delta_pct > 0 %}▲{% elif r.delta_pct < 0 %}▼{% endif %}{{ r.delta_pct|floatformat:1 }}%
+                </span>
+              {% else %}
+                <span class="tr-delta-nil">—</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  /* ── Theme-aware colors from CSS vars ── */
+  const cs  = getComputedStyle(document.documentElement);
+  const cv  = (v) => cs.getPropertyValue(v).trim();
+  const text     = cv('--text');
+  const muted    = cv('--text-muted');
+  const dim      = cv('--text-dim');
+  const border   = cv('--border');
+  const accent   = cv('--accent');
+  const gold     = cv('--gold');
+  const goldL    = cv('--gold-l');
+  const ok       = cv('--ok');
+  const warn     = cv('--warn');
+  const err      = cv('--err');
+  const bgCard   = cv('--bg-card');
+  const bgCard2  = cv('--bg-card-2');
+
+  /* ── Shared grid config ── */
+  const gridCfg = {
+    color: border,
+    drawTicks: false,
+  };
+  const tickCfg = { color: muted, font: { size: 10 } };
+
+  /* ── Data from Django ── */
+  const months    = {{ months_labels }};
+  const currRev   = {{ curr_rev }};
+  const prevRev   = {{ prev_rev }};
+  const prev2Rev  = {{ prev2_rev }};
+  const currSmooth = {{ curr_rev_smooth }};
+  const currOrd   = {{ curr_ord }};
+  const prevOrd   = {{ prev_ord }};
+  const momLabels = {{ mom_labels }};
+  const momGrowth = {{ mom_growth }};
+  const CY        = {{ current_year }};
+  const PY        = {{ prev_year }};
+  const P2Y       = {{ prev2_year }};
+
+  /* ── YoY Revenue chart ── */
+  new Chart(document.getElementById('yoyChart'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: String(CY),
+          data: currRev,
+          backgroundColor: accent + '99',
+          borderColor: accent,
+          borderWidth: 1,
+          order: 2,
+        },
+        {
+          label: String(PY),
+          data: prevRev,
+          backgroundColor: gold + '66',
+          borderColor: gold,
+          borderWidth: 1,
+          order: 3,
+        },
+        {
+          label: String(P2Y),
+          data: prev2Rev,
+          backgroundColor: dim + '44',
+          borderColor: dim,
+          borderWidth: 1,
+          order: 4,
+        },
+        {
+          label: String(CY) + ' (ковзне сер.)',
+          data: currSmooth,
+          type: 'line',
+          borderColor: ok,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: ok,
+          fill: false,
+          tension: 0.4,
+          order: 1,
+          yAxisID: 'y',
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: muted, font: { size: 11 } } },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.raw;
+              if (v == null) return null;
+              return ` ${ctx.dataset.label}: €${v.toLocaleString('de-DE', { maximumFractionDigits: 0 })}`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { grid: gridCfg, ticks: tickCfg },
+        y: {
+          grid: gridCfg, ticks: { ...tickCfg,
+            callback: (v) => '€' + v.toLocaleString('de-DE', { notation: 'compact' }) },
+          beginAtZero: true,
+        },
+      },
+    },
+  });
+
+  /* ── Orders YoY chart ── */
+  new Chart(document.getElementById('ordChart'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: String(CY),
+          data: currOrd,
+          backgroundColor: accent + '99',
+          borderColor: accent,
+          borderWidth: 1,
+        },
+        {
+          label: String(PY),
+          data: prevOrd,
+          backgroundColor: gold + '66',
+          borderColor: gold,
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: muted, font: { size: 11 } } },
+      },
+      scales: {
+        x: { grid: gridCfg, ticks: tickCfg },
+        y: { grid: gridCfg, ticks: tickCfg, beginAtZero: true },
+      },
+    },
+  });
+
+  /* ── MoM growth rate chart ── */
+  const momColors = momGrowth.map(v =>
+    v == null ? dim + '88' : v >= 0 ? ok + 'cc' : err + 'cc'
+  );
+  const momBorder = momGrowth.map(v =>
+    v == null ? dim : v >= 0 ? ok : err
+  );
+
+  new Chart(document.getElementById('momChart'), {
+    type: 'bar',
+    data: {
+      labels: momLabels,
+      datasets: [
+        {
+          label: 'MoM (%)',
+          data: momGrowth,
+          backgroundColor: momColors,
+          borderColor: momBorder,
+          borderWidth: 1,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (ctx) => {
+              const v = ctx.raw;
+              if (v == null) return ' немає даних';
+              return ` ${v > 0 ? '+' : ''}${v}%`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: { grid: gridCfg, ticks: { ...tickCfg, maxRotation: 45 } },
+        y: {
+          grid: gridCfg, ticks: { ...tickCfg, callback: (v) => v + '%' },
+        },
+      },
+    },
+  });
+
+})();
+</script>
+{% endblock %}

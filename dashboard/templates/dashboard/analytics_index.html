@@ -21,8 +21,8 @@
 .mv-section-hdr {
   display: flex; align-items: center; gap: 8px;
   margin: 0 0 14px; padding-bottom: 8px;
-  border-bottom: 2px solid #c9a84c;
-  font-size: 13px; font-weight: 700; color: #9aafbe;
+  border-bottom: 2px solid var(--gold);
+  font-size: 13px; font-weight: 700; color: var(--text-muted);
   letter-spacing: 0.04em; text-transform: uppercase;
 }
 .mv-section-hdr-icon { font-size: 16px; }
@@ -35,9 +35,9 @@
 
 .mv-tile {
   position: relative;
-  background: #1a2535;
-  border: 1px solid #243347;
-  border-top: 3px solid var(--tile-accent, #c9a84c);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--tile-accent, var(--gold));
   border-radius: 8px;
   padding: 13px 12px 11px;
   text-decoration: none !important;
@@ -46,32 +46,32 @@
   transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
 }
 .mv-tile:hover {
-  border-color: var(--tile-accent, #c9a84c);
-  border-top-color: var(--tile-accent, #c9a84c);
-  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  border-color: var(--tile-accent, var(--gold));
+  border-top-color: var(--tile-accent, var(--gold));
+  box-shadow: 0 6px 24px rgba(0,0,0,.35);
   transform: translateY(-2px);
-  background: #1e2d40;
+  background: var(--bg-hover);
 }
 .mv-tile-icon { font-size: 20px; line-height: 1; margin-bottom: 7px; }
-.mv-tile-name { font-size: 12.5px; font-weight: 600; color: #c9d8e4; line-height: 1.35; flex: 1; }
-.mv-tile-sub { font-size: 10px; color: #607d8b; margin-top: 5px; }
+.mv-tile-name { font-size: 12.5px; font-weight: 600; color: var(--text); line-height: 1.35; flex: 1; }
+.mv-tile-sub { font-size: 10px; color: var(--text-dim); margin-top: 5px; }
 
 .mv-recent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
 .mv-recent-card {
-  background: #141f2b; border: 1px solid #1e2d3d;
+  background: var(--bg-input); border: 1px solid var(--border);
   border-radius: 7px; padding: 9px 11px;
   display: flex; gap: 9px; align-items: flex-start;
 }
 .mv-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
 .mv-recent-body { min-width: 0; }
 .mv-recent-body a {
-  font-size: 12px; font-weight: 600; color: #58a6ff; text-decoration: none;
+  font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none;
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .mv-recent-body a:hover { text-decoration: underline; }
-.mv-recent-obj { font-size: 12px; color: #8aa0b0; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.mv-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
-.mv-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+.mv-recent-obj { font-size: 12px; color: var(--text-muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mv-recent-model { font-size: 10px; color: var(--text-dim); display: block; margin-top: 2px; }
+.mv-empty { color: var(--text-dim); font-size: 13px; padding: 10px 0; }
 </style>
 
 <div class="mv-dash">
@@ -90,6 +90,11 @@
         <span class="mv-tile-icon">🚨</span>
         <span class="mv-tile-name">Сигнали</span>
         <span class="mv-tile-sub">Попередження системи</span>
+      </a>
+      <a href="/dashboard/trends/" class="mv-tile" style="--tile-accent:#4caf50" data-tile-id="trends">
+        <span class="mv-tile-icon">📈</span>
+        <span class="mv-tile-name">Тенденції</span>
+        <span class="mv-tile-sub">YoY, MoM, квартальний аналіз</span>
       </a>
     </div>
   </section>
