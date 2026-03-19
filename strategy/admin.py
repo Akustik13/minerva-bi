@@ -51,14 +51,25 @@ class CustomerStrategyAdmin(admin.ModelAdmin):
     list_filter   = ("status", "template")
     search_fields = ("customer__name", "customer__company", "template__name")
     autocomplete_fields = ("customer",)
-    readonly_fields = ("started_at", "canvas_link")
+    readonly_fields = ("started_at", "current_step", "canvas_link")
     inlines       = [CustomerStepInline]
 
-    fieldsets = (
+    # Add form: no current_step (doesn't exist yet) and no canvas link
+    add_fieldsets = (
+        (None, {"fields": ("customer", "template", "name", "status")}),
+        ("Деталі", {"fields": ("next_action_at", "notes")}),
+    )
+    # Change form: current_step readonly (managed by engine)
+    change_fieldsets = (
         (None, {"fields": ("customer", "template", "name", "status")}),
         ("Прогрес", {"fields": ("current_step", "started_at", "next_action_at", "notes")}),
         ("Дії", {"fields": ("canvas_link",)}),
     )
+
+    def get_fieldsets(self, request, obj=None):
+        if obj is None:
+            return self.add_fieldsets
+        return self.change_fieldsets
 
     @admin.display(description="Поточний крок")
     def current_step_display(self, obj):
