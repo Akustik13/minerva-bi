@@ -158,6 +158,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
   <button class="tab-btn"        data-tab="dashboard"  onclick="show('dashboard')">📊 Дашборд</button>
   <button class="tab-btn"        data-tab="sales"      onclick="show('sales')">🛒 Продажі</button>
   <button class="tab-btn"        data-tab="crm"        onclick="show('crm')">👥 CRM</button>
+  <button class="tab-btn"        data-tab="strategy"   onclick="show('strategy')">🎯 Стратегії</button>
   <button class="tab-btn"        data-tab="inventory"  onclick="show('inventory')">📦 Склад</button>
   <button class="tab-btn"        data-tab="import"     onclick="show('import')">📥 Імпорт Excel</button>
   <button class="tab-btn"        data-tab="labels"     onclick="show('labels')">🏷️ Етикетки</button>
@@ -192,6 +193,10 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
       <div class="card" onclick="show('crm')" style="cursor:pointer">
         <div class="card-head"><span class="icon">👥</span><h3>CRM</h3></div>
         <p>База клієнтів з автоматичним RFM-аналізом. Сегменти Champions/Loyal/At Risk. Синхронізація через signals при кожному замовленні.</p>
+      </div>
+      <div class="card" onclick="show('strategy')" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🎯</span><h3>Стратегії CRM</h3></div>
+        <p>Workflow Builder — серії контактів (email, дзвінок, пауза, рішення). 4 шаблони: Реактивація, Нарощування, VIP, Онбординг. Canvas-схема прогресу.</p>
       </div>
       <div class="card" onclick="show('inventory')" style="cursor:pointer">
         <div class="card-head"><span class="icon">📦</span><h3>Склад</h3></div>
@@ -383,6 +388,47 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
       <div class="rfm-card"><div class="emoji">😴</div><h4>At Risk</h4><p>R≤2, F≥2 — Під ризиком втрати.</p></div>
       <div class="rfm-card"><div class="emoji">💤</div><h4>Hibernating</h4><p>R≤2, F≤2 — Сплячі клієнти.</p></div>
     </div>
+  </div>
+
+  <!-- ══ СТРАТЕГІЇ CRM ══ -->
+  <div id="strategy" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(201,168,76,.2),rgba(88,166,255,.1))">🎯</div>
+      <div><h2>Стратегії CRM — Workflow Builder</h2><p>Автоматизовані серії контактів по кожному клієнту</p></div>
+    </div>
+    <div class="alert alert-blue"><span>💡</span><div>Стратегія — це послідовність кроків (email, дзвінок, пауза, рішення), прив'язана до конкретного клієнта. Minerva відстежує прогрес і підказує, що робити далі.</div></div>
+
+    <h3 class="sub">Як запустити стратегію</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content"><h4>Оберіть шаблон</h4><p><a href="/admin/strategy/strategytemplate/">CRM → Шаблони стратегій</a> — 4 вбудованих: Реактивація, Нарощування, Утримання VIP, Онбординг.</p></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content"><h4>Призначте клієнту</h4><p><a href="/admin/strategy/customerstrategy/add/">CRM → Стратегії → Додати</a> — оберіть клієнта і шаблон. Перший крок створюється автоматично.</p></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content"><h4>Відкрийте Canvas</h4><p>На сторінці стратегії натисніть <strong>"🗺 Відкрити canvas"</strong> — список кроків і SVG-схема зі станом кожного кроку.</p></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-content"><h4>Фіксуйте результати</h4><p>Для кожного активного кроку — вкажіть результат (✅/⚠️/🔇/⏭) і нотатки. Стратегія автоматично переходить до наступного кроку.</p></div></div>
+    </div>
+
+    <h3 class="sub">Типи шаблонів</h3>
+    <div class="cards">
+      <div class="card"><div class="card-head"><span class="icon">🔄</span><h3>Реактивація</h3></div><p>Для At Risk / Lost клієнтів. Email → рішення → дзвінок → пауза 90 дн.</p></div>
+      <div class="card"><div class="card-head"><span class="icon">📈</span><h3>Нарощування</h3></div><p>Для Promising. Утеплюючі email-серії для переведення у Champion.</p></div>
+      <div class="card"><div class="card-head"><span class="icon">👑</span><h3>Утримання VIP</h3></div><p>Для Champion. Подяка + дзвінок зворотнього зв'язку + пауза 60 дн.</p></div>
+      <div class="card"><div class="card-head"><span class="icon">🚀</span><h3>Онбординг</h3></div><p>Для нових клієнтів. Вітання → ресурси → рішення → фіксація завершення.</p></div>
+    </div>
+
+    <h3 class="sub">Типи кроків</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Іконка</th><th>Тип</th><th>Призначення</th></tr></thead><tbody>
+      <tr><td>📧</td><td>Email</td><td>Надіслати лист клієнту</td></tr>
+      <tr><td>📞</td><td>Дзвінок</td><td>Зателефонувати, зафіксувати результат</td></tr>
+      <tr><td>⏸</td><td>Пауза</td><td>Очікування N днів перед наступним кроком</td></tr>
+      <tr><td>🔀</td><td>Рішення</td><td>Розгалуження: Так (позитив) → одна гілка, Ні (негатив) → інша</td></tr>
+    </tbody></table></div>
+
+    <h3 class="sub">Результати кроку</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Результат</th><th>Значення</th></tr></thead><tbody>
+      <tr><td>✅ Виконано (+)</td><td>Позитивна взаємодія — клієнт відповів / погодився</td></tr>
+      <tr><td>⚠️ Виконано (−)</td><td>Виконано, але результат негативний</td></tr>
+      <tr><td>🔇 Без відповіді</td><td>Клієнт не відреагував</td></tr>
+      <tr><td>⏭ Пропущено</td><td>Крок пропущено вручну</td></tr>
+    </tbody></table></div>
   </div>
 
   <!-- ══ СКЛАД ══ -->
