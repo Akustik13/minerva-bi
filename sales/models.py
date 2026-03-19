@@ -85,6 +85,12 @@ class SalesOrder(models.Model):
             models.Index(fields=["addr_country"]),
         ]
 
+    def save(self, *args, **kwargs):
+        if self.shipping_courier:
+            from sales.utils import normalize_courier
+            self.shipping_courier = normalize_courier(self.shipping_courier)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.source}:{self.order_number}"
 

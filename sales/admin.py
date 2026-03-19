@@ -1897,6 +1897,9 @@ class SalesOrderAdmin(admin.ModelAdmin):
                                 hdr["shipping_currency"] = curr or "EUR"
                         elif field == "source":
                             hdr["source"] = str(raw).strip() or default_source
+                        elif field == "shipping_courier":
+                            from sales.utils import normalize_courier
+                            hdr["shipping_courier"] = normalize_courier(str(raw).strip())
                         else:
                             hdr[field] = str(raw).strip() if raw is not None else ""
                     entry["header"] = hdr

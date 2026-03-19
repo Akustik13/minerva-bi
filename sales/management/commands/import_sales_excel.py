@@ -113,7 +113,7 @@ class Command(BaseCommand):
                 orders_data[order_number] = {
                     'order_date': row[COL['order_date'] - 1],
                     'shipped_at': row[COL['shipped_at'] - 1],
-                    'courier': self._clean(row[COL['courier'] - 1]),
+                    'courier': self._normalize_courier(self._clean(row[COL['courier'] - 1])),
                     'tracking': self._clean(row[COL['tracking'] - 1]),
                     'lieferschein': self._clean(row[COL['lieferschein'] - 1]),
                     'region': self._clean(row[COL['region'] - 1]),
@@ -264,6 +264,10 @@ class Command(BaseCommand):
             return Decimal(price_str) if price_str else Decimal('0')
         except Exception:
             return Decimal('0')
+
+    def _normalize_courier(self, value):
+        from sales.utils import normalize_courier
+        return normalize_courier(value)
 
     def _find_product(self, sku):
         """Знаходить товар по SKU або alias."""
