@@ -2615,6 +2615,10 @@ def _detect_carrier(tn: str) -> dict:
         return {"carrier": "nova_poshta", "label": "Нова Пошта",
                 "color": "#e53935", "text": "#fff", "auto": False,
                 "url": f"https://novaposhta.ua/tracking/?cargo_number={tn}"}
+    if re.match(r'^JD\d{8,}$', tn.upper()):
+        return {"carrier": "dhl_paket", "label": "DHL Paket",
+                "color": "#ffcc00", "text": "#000", "auto": False,
+                "url": f"https://www.dhl.de/de/privatkunden/pakete-empfangen/verfolgen.html?lang=de&idc={tn}"}
     if re.match(r'^\d{12,22}$', tn):
         return {"carrier": "dhl_paket", "label": "DHL Paket",
                 "color": "#ffcc00", "text": "#000", "auto": False,
