@@ -123,7 +123,7 @@ def dashboard(request):
     try:
         rev_by_month = list(
             SalesOrderLine.objects
-            .filter(order__in=qs_all, order__order_date__isnull=False)
+            .filter(order__in=qs_period)
             .annotate(month=TruncMonth('order__order_date'))
             .values('month')
             .annotate(revenue=Sum('total_price'), orders=Count('order', distinct=True))
