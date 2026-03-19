@@ -3,13 +3,9 @@
 
 {% block extrastyle %}
 <style>
-/* ── Dark theme ─────────────────────────────────────────────────── */
-body, #content, .content-wrapper { background: #1c1c1c !important; color: #e0e0e0 !important; }
-h1, h2, h3, label { color: #e0e0e0 !important; }
-
 .ie-card {
-  background: #1e2a35;
-  border: 1px solid #2a3f52;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 20px 24px;
   margin-bottom: 20px;
@@ -17,27 +13,27 @@ h1, h2, h3, label { color: #e0e0e0 !important; }
 .ie-card h2 {
   margin: 0 0 16px;
   font-size: 16px;
-  color: #7ab3cc !important;
-  border-bottom: 1px solid #2a3f52;
+  color: var(--accent) !important;
+  border-bottom: 1px solid var(--border-strong);
   padding-bottom: 10px;
 }
 input[type="file"] {
-  background: #2d2d2d !important;
-  color: #e0e0e0 !important;
-  border: 1px solid #444 !important;
+  background: var(--bg-input) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-strong) !important;
   padding: 8px 12px !important;
   border-radius: 4px !important;
   width: 100%;
   box-sizing: border-box;
 }
 input[type="text"], input[type="number"], select, textarea {
-  background: #2d2d2d !important;
-  color: #e0e0e0 !important;
-  border: 1px solid #444 !important;
+  background: var(--bg-input) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border-strong) !important;
   padding: 7px 10px !important;
   border-radius: 4px !important;
 }
-select option { background: #2d2d2d; color: #e0e0e0; }
+select option { background: var(--bg-input); color: var(--text); }
 /* всі select — фіксуємо висоту щоб текст не обрізався */
 select {
   height: auto !important;
@@ -47,79 +43,80 @@ select {
   box-sizing: border-box !important;
 }
 .btn-primary {
-  background: #2196f3; color: #fff; border: none;
+  background: var(--accent-2); color: #fff; border: none;
   padding: 9px 22px; border-radius: 5px;
   font-size: 14px; font-weight: bold; cursor: pointer;
 }
-.btn-primary:hover { background: #1976d2; }
+.btn-primary:hover { filter: brightness(1.15); }
 .btn-secondary {
-  background: #424242; color: #e0e0e0; border: none;
+  background: var(--bg-card-2); color: var(--text-muted); border: 1px solid var(--border-strong);
   padding: 9px 18px; border-radius: 5px; font-size: 14px;
   cursor: pointer; text-decoration: none; display: inline-block;
 }
-.btn-secondary:hover { background: #555; color: #fff; }
+.btn-secondary:hover { color: var(--text); }
 
 /* mapping table */
 .map-table { width: 100%; border-collapse: collapse; }
 .map-table th {
-  background: #162330; color: #7ab3cc;
+  background: var(--bg-card-2); color: var(--text-muted);
   padding: 8px 12px; text-align: left;
   font-size: 12px; font-weight: bold;
-  border-bottom: 2px solid #2a3f52;
+  border-bottom: 2px solid var(--border-strong);
 }
 .map-table td {
   padding: 7px 12px;
-  border-bottom: 1px solid #1e2a35;
+  border-bottom: 1px solid var(--border);
   font-size: 13px; vertical-align: middle;
+  color: var(--text);
 }
-.map-table tr:hover td { background: rgba(33,150,243,.06); }
+.map-table tr:hover td { background: var(--bg-hover); }
 .map-table select { width: 100%; min-width: 260px; font-size: 13px; }
-optgroup { font-weight: bold; color: #7ab3cc; }
+optgroup { font-weight: bold; color: var(--accent); }
 
 /* step indicator */
 .ie-steps { display: flex; gap: 8px; margin-bottom: 20px; align-items: center; }
 .ie-step {
   padding: 4px 14px; border-radius: 12px;
   font-size: 12px; font-weight: bold;
-  background: #1e2a35; color: #555;
-  border: 1px solid #2a3f52;
+  background: var(--bg-card-2); color: var(--text-dim);
+  border: 1px solid var(--border-strong);
 }
-.ie-step.active { background: #2196f3; color: #fff; border-color: #2196f3; }
-.ie-step.done   { background: #1b3a2b; color: #4caf50; border-color: #4caf50; }
-.ie-sep { color: #444; }
+.ie-step.active { background: var(--accent-2); color: #fff; border-color: var(--accent-2); }
+.ie-step.done   { background: rgba(63,185,80,.15); color: var(--ok); border-color: var(--ok); }
+.ie-sep { color: var(--text-dim); }
 
 /* options */
 .ie-options { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; margin-top: 16px; }
-.ie-options label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.ie-options input[type="checkbox"] { width: 16px; height: 16px; accent-color: #2196f3; }
+.ie-options label { display: flex; align-items: center; gap: 8px; cursor: pointer; color: var(--text); }
+.ie-options input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent-2); }
 
 /* results */
 .stat-row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .stat-box { padding: 14px 22px; border-radius: 8px; text-align: center; min-width: 100px; }
 .stat-box .num { font-size: 28px; font-weight: bold; display: block; }
 .stat-box .lbl { font-size: 12px; opacity: .7; }
-.stat-created { background: #1b3a2b; color: #4caf50; border: 1px solid #4caf50; }
-.stat-updated { background: #1a2f4a; color: #2196f3; border: 1px solid #2196f3; }
-.stat-skipped { background: #2a2a1a; color: #ffb300; border: 1px solid #ffb300; }
-.stat-lines  { background: #1a2835; color: #7ab3cc; border: 1px solid #7ab3cc; }
-.stat-errors  { background: #3a1a1a; color: #f44336; border: 1px solid #f44336; }
+.stat-created { background: rgba(63,185,80,.12);  color: var(--ok);   border: 1px solid var(--ok); }
+.stat-updated { background: rgba(33,150,243,.12); color: var(--accent-2); border: 1px solid var(--accent-2); }
+.stat-skipped { background: rgba(227,179,65,.12); color: var(--warn); border: 1px solid var(--warn); }
+.stat-lines   { background: rgba(88,166,255,.12); color: var(--accent); border: 1px solid var(--accent); }
+.stat-errors  { background: rgba(248,81,73,.12);  color: var(--err);  border: 1px solid var(--err); }
 
 .err-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-.err-table th { background: #2a1a1a; color: #f44336; padding: 6px 10px; text-align: left; font-size: 12px; }
-.err-table td { padding: 6px 10px; border-bottom: 1px solid #2d2d2d; font-size: 12px; }
+.err-table th { background: rgba(248,81,73,.1); color: var(--err); padding: 6px 10px; text-align: left; font-size: 12px; }
+.err-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--text); }
 
 .dry-run-badge {
-  background: #3a2a10; color: #ff9800;
-  border: 1px solid #ff9800; border-radius: 6px;
+  background: rgba(255,152,0,.12); color: var(--warn);
+  border: 1px solid var(--warn); border-radius: 6px;
   padding: 10px 18px; font-weight: bold;
   margin-bottom: 16px; display: inline-block;
 }
 .alert-err {
-  background: #3a1a1a; color: #f44336;
-  border: 1px solid #f44336; border-radius: 6px;
+  background: rgba(248,81,73,.1); color: var(--err);
+  border: 1px solid var(--err); border-radius: 6px;
   padding: 10px 16px; margin-bottom: 12px;
 }
-.ie-hint { font-size: 11px; color: #666; margin-top: 4px; }
+.ie-hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
 </style>
 {% endblock %}
 
@@ -172,26 +169,26 @@ optgroup { font-weight: bold; color: #7ab3cc; }
 
 <div class="ie-card" style="opacity:.75">
   <h2>ℹ️ Структура файлу</h2>
-  <p style="font-size:13px;margin:0 0 12px;color:#9aafbe">
+  <p style="font-size:13px;margin:0 0 12px;color:var(--text-muted)">
     Файл Excel повинен містити рядок заголовків (перший непустий рядок).
     Після завантаження ви зможете вказати яка колонка відповідає якому полю бази даних.
   </p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div>
-      <div style="color:#7ab3cc;font-size:12px;font-weight:bold;margin-bottom:8px">📋 Поля ЗАМОВЛЕННЯ</div>
+      <div style="color:var(--accent);font-size:12px;font-weight:bold;margin-bottom:8px">📋 Поля ЗАМОВЛЕННЯ</div>
       {% for field, label in order_fields %}
-      <div style="font-size:11px;padding:3px 0;border-bottom:1px solid #1e2a35">
-        <span style="font-family:monospace;color:#9aafbe">{{ field }}</span>
-        <span style="color:#666;margin-left:8px">{{ label }}</span>
+      <div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">
+        <span style="font-family:monospace;color:var(--text-muted)">{{ field }}</span>
+        <span style="color:var(--text-dim);margin-left:8px">{{ label }}</span>
       </div>
       {% endfor %}
     </div>
     <div>
-      <div style="color:#7ab3cc;font-size:12px;font-weight:bold;margin-bottom:8px">📦 Поля РЯДКУ ТОВАРУ</div>
+      <div style="color:var(--accent);font-size:12px;font-weight:bold;margin-bottom:8px">📦 Поля РЯДКУ ТОВАРУ</div>
       {% for field, label in line_fields %}
-      <div style="font-size:11px;padding:3px 0;border-bottom:1px solid #1e2a35">
-        <span style="font-family:monospace;color:#9aafbe">{{ field }}</span>
-        <span style="color:#666;margin-left:8px">{{ label }}</span>
+      <div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">
+        <span style="font-family:monospace;color:var(--text-muted)">{{ field }}</span>
+        <span style="color:var(--text-dim);margin-left:8px">{{ label }}</span>
       </div>
       {% endfor %}
     </div>
@@ -346,10 +343,13 @@ function renderMappingRows(sheetName) {
   cols.forEach((col, idx) => {
     if (col === "" && idx > cols.findLastIndex(c => c !== "")) return;
     const guessed = col ? guessField(String(col)) : "--";
+    const cs = getComputedStyle(document.documentElement);
+    const cDim = cs.getPropertyValue('--text-dim').trim();
+    const cText = cs.getPropertyValue('--text').trim();
     tbody.innerHTML += `
       <tr>
-        <td style="color:#555;font-size:11px">${String.fromCharCode(65 + idx)}</td>
-        <td style="font-weight:bold;color:${col ? "#e0e0e0" : "#444"}">${col || "<em style='color:#444'>пуста</em>"}</td>
+        <td style="color:${cDim};font-size:11px">${String.fromCharCode(65 + idx)}</td>
+        <td style="font-weight:bold;color:${col ? cText : cDim}">${col || "<em>пуста</em>"}</td>
         <td><select name="col_${idx}">${buildOptions(guessed)}</select></td>
       </tr>`;
   });
@@ -416,7 +416,7 @@ document.addEventListener("DOMContentLoaded", () => {
     </a>
   {% endif %}
   <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-primary"
-     style="background:#4caf50">
+     style="background:var(--ok)">
     📋 До списку замовлень
   </a>
   <a href="{% url 'admin:sales_salesorder_import' %}" class="btn-secondary">
