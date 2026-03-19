@@ -119,25 +119,18 @@ def dashboard(request):
         'unshipped': {'val': unshipped_cnt, 'fmt': str(unshipped_cnt), 'change': None},
     }
 
-    # ── Замовлення по місяцях (вся історія) ──────────────────────────────────
+    # ── Виручка по місяцях через SalesOrderLine (узгоджено з KPI) ─────────────
     try:
         rev_by_month = list(
-            qs_all.filter(order_date__isnull=False)
-            .annotate(month=TruncMonth('order_date'))
+            SalesOrderLine.objects
+            .filter(order__in=qs_all, order__order_date__isnull=False)
+            .annotate(month=TruncMonth('order__order_date'))
             .values('month')
-            .annotate(orders=Count('id'), revenue=Sum('total_price'))
+            .annotate(revenue=Sum('total_price'), orders=Count('order', distinct=True))
             .order_by('month')
         )
     except Exception:
-        rev_by_month = list(
-            qs_all.filter(order_date__isnull=False)
-            .annotate(month=TruncMonth('order_date'))
-            .values('month')
-            .annotate(orders=Count('id'))
-            .order_by('month')
-        )
-        for r in rev_by_month:
-            r['revenue'] = 0
+        rev_by_month = []
 
     chart_months   = [str(r['month'])[:7] for r in rev_by_month]
     chart_rev      = [float(r['revenue'] or 0) for r in rev_by_month]
@@ -304,6 +297,54 @@ def dashboard(request):
     except Exception:
         pass
 
+    # ── Shipping performance KPI ──────────────────────────────────────────────
+    try:
+        qs_with_dl = qs_period.filter(
+            shipped_at__isnull=False, shipping_deadline__isnull=False)
+        total_with_deadline = qs_with_dl.count()
+        on_time_cnt         = qs_with_dl.filter(shipped_at__lte=F('shipping_deadline')).count()
+        overdue_shipped_cnt = qs_with_dl.filter(shipped_at__gt=F('shipping_deadline')).count()
+        overdue_pending_cnt = qs_all.filter(
+            shipped_at__isnull=True,
+            shipping_deadline__isnull=False,
+            shipping_deadline__lt=today,
+        ).count()
+        on_time_pct = round(on_time_cnt / total_with_deadline * 100) if total_with_deadline else None
+
+        ship_pairs = list(
+            qs_period.filter(shipped_at__isnull=False, order_date__isnull=False)
+            .values_list('order_date', 'shipped_at')
+        )
+        ship_days = [(s - o).days for o, s in ship_pairs if s and o and s >= o]
+        avg_ship_days = round(sum(ship_days) / len(ship_days), 1) if ship_days else None
+
+        del_pairs = list(
+            qs_period.filter(delivered_at__isnull=False, shipped_at__isnull=False)
+            .values_list('shipped_at', 'delivered_at')
+        )
+        del_days = []
+        for s, d in del_pairs:
+            if s and d:
+                d_date = d.date() if hasattr(d, 'date') else d
+                s_date = s.date() if hasattr(s, 'date') else s
+                if d_date >= s_date:
+                    del_days.append((d_date - s_date).days)
+        avg_del_days = round(sum(del_days) / len(del_days), 1) if del_days else None
+    except Exception:
+        total_with_deadline = 0
+        on_time_cnt = overdue_shipped_cnt = overdue_pending_cnt = 0
+        on_time_pct = avg_ship_days = avg_del_days = None
+
+    shipping_kpi = {
+        'on_time_pct':        on_time_pct,
+        'on_time_cnt':        on_time_cnt,
+        'overdue_shipped':    overdue_shipped_cnt,
+        'overdue_pending':    overdue_pending_cnt,
+        'avg_ship_days':      avg_ship_days,
+        'avg_del_days':       avg_del_days,
+        'total_with_deadline': total_with_deadline,
+    }
+
     # ── Топ товари по попиту (кількість) ─────────────────────────────────────
     top_demand = list(
         qs_lines
@@ -344,6 +385,7 @@ def dashboard(request):
         'by_source':            by_source,
         'unshipped_list':       unshipped_list,
         'critical_stock':       critical_stock,
+        'shipping_kpi':         shipping_kpi,
         # Доставка
         'by_courier':           by_courier,
         'shipping_by_country':  shipping_by_country,

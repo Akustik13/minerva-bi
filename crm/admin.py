@@ -642,9 +642,19 @@ class CustomerNoteAdmin(admin.ModelAdmin):
 def _get_crm_stats():
     try:
         from datetime import date, timedelta
-        month_ago = date.today() - timedelta(days=30)
+        from django.db.models import Min
+        from sales.models import SalesOrder
+        month_ago = date.today().replace(day=1)  # початок поточного місяця
         total      = Customer.objects.count()
-        new_month  = Customer.objects.filter(created_at__date__gte=month_ago).count()
+        # Нові = клієнти, чиє ПЕРШЕ замовлення було в поточному місяці
+        new_keys = (SalesOrder.objects
+                    .filter(customer_key__isnull=False)
+                    .exclude(customer_key='')
+                    .values('customer_key')
+                    .annotate(first_order=Min('order_date'))
+                    .filter(first_order__gte=month_ago)
+                    .values_list('customer_key', flat=True))
+        new_month  = Customer.objects.filter(external_key__in=new_keys).count()
         vip        = Customer.objects.filter(status="vip").count()
         countries  = (Customer.objects.exclude(country="")
                       .values("country").distinct().count())

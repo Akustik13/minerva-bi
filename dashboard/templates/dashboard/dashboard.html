@@ -338,6 +338,45 @@ function setPreset(days) {
     </div>
   </div>
 
+  <!-- Shipping KPI row -->
+  <div class="kpi-row" style="margin-top:10px">
+    <div class="kpi-card" style="--accent:{% if shipping_kpi.on_time_pct >= 90 %}#3fb950{% elif shipping_kpi.on_time_pct %}#e3b341{% else %}#607d8b{% endif %}">
+      <div class="kpi-label">✅ Вчасно відправлено</div>
+      <div class="kpi-val" style="color:{% if shipping_kpi.on_time_pct >= 90 %}var(--ok){% elif shipping_kpi.on_time_pct %}var(--warn){% else %}var(--text-dim){% endif %}">
+        {% if shipping_kpi.on_time_pct is not None %}{{ shipping_kpi.on_time_pct }}%{% else %}—{% endif %}
+      </div>
+      <div class="kpi-sub">{{ shipping_kpi.on_time_cnt }} з {{ shipping_kpi.total_with_deadline }} з дедлайном</div>
+    </div>
+    <div class="kpi-card" style="--accent:{% if shipping_kpi.overdue_pending > 0 %}#f85149{% else %}#3fb950{% endif %}">
+      <div class="kpi-label">🔴 Прострочено (не відпр.)</div>
+      <div class="kpi-val" style="color:{% if shipping_kpi.overdue_pending > 0 %}var(--err){% else %}var(--ok){% endif %}">
+        {{ shipping_kpi.overdue_pending }}
+      </div>
+      <div class="kpi-sub">дедлайн минув, не відправлено</div>
+    </div>
+    <div class="kpi-card" style="--accent:{% if shipping_kpi.overdue_shipped > 0 %}#e3b341{% else %}#3fb950{% endif %}">
+      <div class="kpi-label">📮 Відправлено пізно</div>
+      <div class="kpi-val" style="color:{% if shipping_kpi.overdue_shipped > 0 %}var(--warn){% else %}var(--ok){% endif %}">
+        {{ shipping_kpi.overdue_shipped }}
+      </div>
+      <div class="kpi-sub">після дедлайну</div>
+    </div>
+    <div class="kpi-card" style="--accent:#58a6ff">
+      <div class="kpi-label">⚡ Сер. час відправки</div>
+      <div class="kpi-val" style="color:var(--accent)">
+        {% if shipping_kpi.avg_ship_days is not None %}{{ shipping_kpi.avg_ship_days }} дн{% else %}—{% endif %}
+      </div>
+      <div class="kpi-sub">від замовлення до відправки</div>
+    </div>
+    <div class="kpi-card" style="--accent:#58a6ff">
+      <div class="kpi-label">🚚 Сер. доставка</div>
+      <div class="kpi-val" style="color:var(--accent)">
+        {% if shipping_kpi.avg_del_days is not None %}{{ shipping_kpi.avg_del_days }} дн{% else %}—{% endif %}
+      </div>
+      <div class="kpi-sub">від відправки до отримання</div>
+    </div>
+  </div>
+
   <!-- Графіки: виручка по місяцях + по днях -->
   <div class="grid2">
     <div class="card">
