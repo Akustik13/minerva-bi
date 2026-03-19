@@ -396,15 +396,17 @@ def dashboard(request):
     ctx = admin.site.each_context(request)
     ctx.update({
         # Фільтри
-        'period':          period,
-        'period_days':     period_days,
-        'period_label':    period_label,
-        'date_from_str':   date_from_str,
-        'date_to_str':     date_to_str,
-        'filter_source':   filter_source,
-        'filter_category': filter_category,
-        'all_sources':     all_sources,
-        'all_categories':  all_categories,
+        'period':               period,
+        'period_days':          period_days,
+        'period_label':         period_label,
+        'date_from_str':        date_from_str,
+        'date_to_str':          date_to_str,
+        'prev_date_from_str':   str(prev_date_from),
+        'prev_date_to_str':     str(prev_date_to),
+        'filter_source':        filter_source,
+        'filter_category':      filter_category,
+        'all_sources':          all_sources,
+        'all_categories':       all_categories,
         # KPI
         'kpi': kpi,
         # Графіки

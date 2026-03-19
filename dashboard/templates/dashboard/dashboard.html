@@ -295,7 +295,7 @@ function setPreset(days) {
       {% if kpi.revenue.change is not None %}
       <div class="kpi-change {% if kpi.revenue.change >= 0 %}up{% else %}down{% endif %}">
         {% if kpi.revenue.change >= 0 %}▲{% else %}▼{% endif %}
-        {{ kpi.revenue.change }}% vs попередній
+        {{ kpi.revenue.change }}% <span title="Попередній: {{ prev_date_from_str }} – {{ prev_date_to_str }}" style="cursor:help;border-bottom:1px dotted currentColor">vs попередній</span>
       </div>
       {% endif %}
     </div>
@@ -305,7 +305,7 @@ function setPreset(days) {
       {% if kpi.orders.change is not None %}
       <div class="kpi-change {% if kpi.orders.change >= 0 %}up{% else %}down{% endif %}">
         {% if kpi.orders.change >= 0 %}▲{% else %}▼{% endif %}
-        {{ kpi.orders.change }}% vs попередній
+        {{ kpi.orders.change }}% <span title="Попередній: {{ prev_date_from_str }} – {{ prev_date_to_str }}" style="cursor:help;border-bottom:1px dotted currentColor">vs попередній</span>
       </div>
       {% endif %}
     </div>
@@ -315,7 +315,7 @@ function setPreset(days) {
       {% if kpi.units.change is not None %}
       <div class="kpi-change {% if kpi.units.change >= 0 %}up{% else %}down{% endif %}">
         {% if kpi.units.change >= 0 %}▲{% else %}▼{% endif %}
-        {{ kpi.units.change }}% vs попередній
+        {{ kpi.units.change }}% <span title="Попередній: {{ prev_date_from_str }} – {{ prev_date_to_str }}" style="cursor:help;border-bottom:1px dotted currentColor">vs попередній</span>
       </div>
       {% endif %}
     </div>
@@ -325,7 +325,7 @@ function setPreset(days) {
       {% if kpi.avg_order.change is not None %}
       <div class="kpi-change {% if kpi.avg_order.change >= 0 %}up{% else %}down{% endif %}">
         {% if kpi.avg_order.change >= 0 %}▲{% else %}▼{% endif %}
-        {{ kpi.avg_order.change }}% vs попередній
+        {{ kpi.avg_order.change }}% <span title="Попередній: {{ prev_date_from_str }} – {{ prev_date_to_str }}" style="cursor:help;border-bottom:1px dotted currentColor">vs попередній</span>
       </div>
       {% endif %}
     </div>
