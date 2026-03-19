@@ -117,6 +117,10 @@ optgroup { font-weight: bold; color: var(--accent); }
   padding: 10px 16px; margin-bottom: 12px;
 }
 .ie-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+.req-badge {
+  padding: 2px 9px; border-radius: 10px; font-size: 11px; font-weight: 700;
+  border: 1px solid; white-space: nowrap;
+}
 </style>
 {% endblock %}
 
@@ -254,6 +258,8 @@ optgroup { font-weight: bold; color: var(--accent); }
           <tbody id="mappingBody"></tbody>
         </table>
       </div>
+      <!-- Required fields status bar -->
+      <div id="req-status" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px;padding:8px 10px;background:var(--bg-card-2);border-radius:6px;border:1px solid var(--border)"></div>
     </div>
 
     <!-- Options -->
@@ -329,44 +335,79 @@ function guessField(colName) {
   return "--";
 }
 
+// Required / recommended fields
+const REQUIRED_FIELDS     = { "order_number": "Номер замовлення" };
+const RECOMMENDED_FIELDS  = { "sku_raw": "SKU товару", "qty": "Кількість" };
+
 function buildOptions(guessed) {
   let opts = `<option value="--">— не імпортувати —</option>`;
   opts += `<optgroup label="📋 Замовлення">`;
   ORDER_FIELDS.forEach(([val, lbl]) => {
-    opts += `<option value="${val}" ${val === guessed ? "selected" : ""}>${lbl}</option>`;
+    const mark = REQUIRED_FIELDS[val] ? " ★" : (RECOMMENDED_FIELDS[val] ? " ·" : "");
+    opts += `<option value="${val}" ${val === guessed ? "selected" : ""}>${lbl}${mark}</option>`;
   });
   opts += `</optgroup>`;
   opts += `<optgroup label="📦 Рядок товару">`;
   LINE_FIELDS.forEach(([val, lbl]) => {
-    opts += `<option value="${val}" ${val === guessed ? "selected" : ""}>${lbl}</option>`;
+    const mark = REQUIRED_FIELDS[val] ? " ★" : (RECOMMENDED_FIELDS[val] ? " ·" : "");
+    opts += `<option value="${val}" ${val === guessed ? "selected" : ""}>${lbl}${mark}</option>`;
   });
   opts += `</optgroup>`;
   return opts;
+}
+
+function updateReqStatus() {
+  const mapped = new Set();
+  document.querySelectorAll('#mappingBody select').forEach(s => {
+    if (s.value !== '--') mapped.add(s.value);
+    // Highlight select border: required→err, recommended→warn, else clear
+    if (REQUIRED_FIELDS[s.value])    s.style.borderColor = 'var(--err)';
+    else if (RECOMMENDED_FIELDS[s.value]) s.style.borderColor = 'var(--warn)';
+    else s.style.borderColor = '';
+  });
+
+  const el = document.getElementById('req-status');
+  if (!el) return;
+  let html = '<span style="font-size:11px;font-weight:700;color:var(--text-muted);margin-right:8px">Обов\'язкові:</span>';
+  for (const [field, label] of Object.entries(REQUIRED_FIELDS)) {
+    const ok = mapped.has(field);
+    html += `<span class="req-badge" style="background:${ok ? 'rgba(63,185,80,.15)' : 'rgba(248,81,73,.15)'};color:${ok ? 'var(--ok)' : 'var(--err)'};border-color:${ok ? 'var(--ok)' : 'var(--err)'}">
+      ${ok ? '✓' : '✗'} ${label}</span>`;
+  }
+  html += '<span style="font-size:11px;font-weight:700;color:var(--text-muted);margin:0 8px">Рекомендовані:</span>';
+  for (const [field, label] of Object.entries(RECOMMENDED_FIELDS)) {
+    const ok = mapped.has(field);
+    html += `<span class="req-badge" style="background:${ok ? 'rgba(63,185,80,.1)' : 'rgba(227,179,65,.12)'};color:${ok ? 'var(--ok)' : 'var(--warn)'};border-color:${ok ? 'var(--ok)' : 'var(--warn)'}">
+      ${ok ? '✓' : '·'} ${label}</span>`;
+  }
+  el.innerHTML = html;
 }
 
 function renderMappingRows(sheetName) {
   const cols = SHEET_DATA[sheetName] || [];
   const tbody = document.getElementById("mappingBody");
   tbody.innerHTML = "";
+  const cs = getComputedStyle(document.documentElement);
+  const cDim = cs.getPropertyValue('--text-dim').trim();
+  const cText = cs.getPropertyValue('--text').trim();
   cols.forEach((col, idx) => {
     if (col === "" && idx > cols.findLastIndex(c => c !== "")) return;
     const guessed = col ? guessField(String(col)) : "--";
-    const cs = getComputedStyle(document.documentElement);
-    const cDim = cs.getPropertyValue('--text-dim').trim();
-    const cText = cs.getPropertyValue('--text').trim();
     tbody.innerHTML += `
       <tr>
         <td style="color:${cDim};font-size:11px">${String.fromCharCode(65 + idx)}</td>
         <td style="font-weight:bold;color:${col ? cText : cDim}">${col || "<em>пуста</em>"}</td>
-        <td><select name="col_${idx}">${buildOptions(guessed)}</select></td>
+        <td><select name="col_${idx}" onchange="updateReqStatus()">${buildOptions(guessed)}</select></td>
       </tr>`;
   });
+  updateReqStatus();
 }
 
 function onSheetChange(name) { renderMappingRows(name); }
 
 function clearAllMap() {
   document.querySelectorAll('#mappingBody select').forEach(s => s.value = '--');
+  updateReqStatus();
 }
 
 function applyAutoMap() {
@@ -376,10 +417,20 @@ function applyAutoMap() {
     const col = cols[idx];
     sel.value = col ? guessField(String(col)) : '--';
   });
+  updateReqStatus();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   renderMappingRows(document.getElementById("sheetSelect").value);
+  // Block submit if required fields not mapped
+  document.getElementById('mappingForm').addEventListener('submit', e => {
+    const mapped = new Set([...document.querySelectorAll('#mappingBody select')].map(s => s.value));
+    const missing = Object.entries(REQUIRED_FIELDS).filter(([f]) => !mapped.has(f)).map(([,l]) => l);
+    if (missing.length) {
+      e.preventDefault();
+      alert('⚠️ Обов\'язкові поля не замаплені:\n' + missing.join('\n'));
+    }
+  });
 });
 </script>
 
