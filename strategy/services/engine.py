@@ -7,6 +7,36 @@ from __future__ import annotations
 from django.utils import timezone
 
 
+def recommend_template_behavior(customer) -> str | None:
+    """
+    Returns the recommended StrategyTemplate.behavior_type for a customer
+    based on their RFM scores, or None if no recommendation.
+
+    Rules (in priority order):
+      R > 3 and F == 1          → onboarding   (recent first-time buyer)
+      R < 2 and lost/inactive   → reactivation  (At Risk / Hibernating)
+      Promising / growing       → nurturing     (Potential / Regular / New)
+      Champion / Loyal          → retention     (VIP)
+    """
+    try:
+        rfm = customer.rfm_score()
+    except Exception:
+        return None
+
+    r, f    = rfm["R"], rfm["F"]
+    segment = rfm["segment"]   # e.g. "🏆 Champions", "💤 Hibernating"
+
+    if r > 3 and f == 1:
+        return "onboarding"
+    if r < 2 and ("At Risk" in segment or "Hibernating" in segment):
+        return "reactivation"
+    if "Potential" in segment or "Regular" in segment or "New" in segment:
+        return "nurturing"
+    if "Champion" in segment or "Loyal" in segment:
+        return "retention"
+    return None
+
+
 def start_strategy(customer, template) -> "CustomerStrategy":
     """
     Create a new CustomerStrategy for a customer based on a template.

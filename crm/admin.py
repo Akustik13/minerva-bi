@@ -205,7 +205,7 @@ class CustomerAdmin(admin.ModelAdmin):
         "display_name", "country_flag", "segment_badge",
         "status_badge", "orders_count", "revenue_display",
         "avg_order_display", "last_order_display",
-        "repeat_badge", "rfm_display",
+        "repeat_badge", "rfm_display", "strategy_btn",
     )
     list_filter = ("segment", "status", "country", RepeatCustomerFilter, RFMSegmentFilter)
     search_fields = ("name", "email", "company", "phone", "addr_city", "addr_street")
@@ -216,6 +216,7 @@ class CustomerAdmin(admin.ModelAdmin):
         "orders_count", "revenue_display", "avg_order_display",
         "last_order_display", "repeat_badge",
         "top_products_display", "order_history_display",
+        "strategy_btn",
     )
     inlines = [CustomerNoteInline]
 
@@ -232,8 +233,55 @@ class CustomerAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.new_order_view),
                 name="crm_customer_new_order",
             ),
+            path(
+                "<int:pk>/assign-strategy/",
+                self.admin_site.admin_view(self.assign_strategy_view),
+                name="crm_customer_assign_strategy",
+            ),
         ]
         return custom + urls
+
+    def assign_strategy_view(self, request, pk):
+        """One-click: рекомендує шаблон → створює CustomerStrategy → відкриває canvas."""
+        from strategy.models import StrategyTemplate, CustomerStrategy
+        from strategy.services.engine import recommend_template_behavior, start_strategy
+
+        customer = get_object_or_404(Customer, pk=pk)
+
+        # Якщо вже є активна стратегія — редиректимо на неї
+        existing = CustomerStrategy.objects.filter(
+            customer=customer, status="active"
+        ).first()
+        if existing:
+            messages.warning(
+                request,
+                f"⚠️ Клієнт вже має активну стратегію «{existing.template.name}». "
+                f"Завершіть або призупиніть її перед призначенням нової.",
+            )
+            return redirect(f"/strategy/{existing.pk}/canvas/")
+
+        behavior = recommend_template_behavior(customer)
+        if not behavior:
+            messages.error(request, "Не вдалося визначити рекомендовану стратегію.")
+            return redirect("admin:crm_customer_change", pk)
+
+        template = StrategyTemplate.objects.filter(
+            behavior_type=behavior, is_active=True
+        ).first()
+        if not template:
+            messages.error(
+                request,
+                f"Шаблон «{behavior}» не знайдено. "
+                f"Запустіть: python manage.py create_strategy_templates",
+            )
+            return redirect("admin:crm_customer_change", pk)
+
+        strategy = start_strategy(customer, template)
+        messages.success(
+            request,
+            f"✅ Стратегія «{template.name}» призначена клієнту {customer.company or customer.name}.",
+        )
+        return redirect(f"/strategy/{strategy.pk}/canvas/")
 
     def new_order_view(self, request, pk):
         """Редирект на форму нового замовлення з pre-filled даними клієнта."""
@@ -372,6 +420,11 @@ class CustomerAdmin(admin.ModelAdmin):
         }),
         ("🎯 Сегментація", {
             "fields": ("segment", "status", "source", "notes")
+        }),
+        ("🎯 Стратегія CRM", {
+            "fields": ("strategy_btn",),
+            "description": "Рекомендована стратегія на основі RFM-аналізу. "
+                           "Один клік — і стратегія призначена.",
         }),
         ("📊 Аналітика", {
             "fields": (
@@ -562,6 +615,48 @@ class CustomerAdmin(admin.ModelAdmin):
             **rfm, color=color
         )
     rfm_display.short_description = "RFM Аналіз"
+
+    def strategy_btn(self, obj):
+        """Рекомендація стратегії + кнопка одного кліку."""
+        from strategy.models import CustomerStrategy
+        from strategy.services.engine import recommend_template_behavior
+
+        LABELS = {
+            "onboarding":   ("🚀", "Онбординг",       "#1976d2"),
+            "reactivation": ("🔄", "Реактивація",      "#e53935"),
+            "nurturing":    ("📈", "Нарощування",      "#f57c00"),
+            "retention":    ("👑", "Утримання VIP",    "#7b1fa2"),
+        }
+
+        # Якщо вже є активна стратегія — показуємо посилання на canvas
+        active = CustomerStrategy.objects.filter(
+            customer=obj, status="active"
+        ).select_related("template").first()
+        if active:
+            return format_html(
+                '<a href="/strategy/{}/canvas/" '
+                'style="background:#2e7d32;color:#fff;padding:3px 10px;'
+                'border-radius:5px;font-size:11px;text-decoration:none;white-space:nowrap">'
+                '⚡ {}</a>',
+                active.pk,
+                (active.template.name[:22] + "…") if len(active.template.name) > 22
+                else active.template.name,
+            )
+
+        behavior = recommend_template_behavior(obj)
+        if not behavior:
+            return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
+
+        icon, label, color = LABELS.get(behavior, ("🎯", behavior, "#607d8b"))
+        assign_url = f"/admin/crm/customer/{obj.pk}/assign-strategy/"
+        return format_html(
+            '<a href="{}" '
+            'style="background:{};color:#fff;padding:3px 10px;'
+            'border-radius:5px;font-size:11px;text-decoration:none;white-space:nowrap">'
+            '{} {}</a>',
+            assign_url, color, icon, label,
+        )
+    strategy_btn.short_description = "🎯 Стратегія"
 
     def top_products_display(self, obj):
         from sales.models import SalesOrderLine
