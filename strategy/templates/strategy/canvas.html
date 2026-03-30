@@ -254,6 +254,47 @@
   .cv-body { grid-template-columns: 1fr; }
   .cv-info { display: none; }
 }
+
+/* ── Drag cursor ── */
+.cv-node { cursor: grab; }
+#cv-canvas-mode.dragging .cv-node { cursor: grabbing; }
+#cv-canvas-mode.dragging { cursor: grabbing; user-select: none; }
+
+/* ── Quick outcome popup ── */
+#cv-quick-popup {
+  position: absolute;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 8px;
+  z-index: 20;
+  min-width: 180px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+}
+.cvq-title {
+  font-size: 11px; font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .06em;
+  margin-bottom: 6px; padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.cvq-opt {
+  display: block; width: 100%;
+  background: transparent; border: none;
+  border-radius: 5px; padding: 6px 10px;
+  text-align: left; font-size: 12px; font-weight: 600;
+  color: var(--text); cursor: pointer;
+}
+.cvq-opt:hover { background: var(--bg-hover); }
+.cvq-cancel {
+  display: block; width: 100%;
+  background: transparent; border: none;
+  border-top: 1px solid var(--border);
+  padding: 6px 10px; text-align: left;
+  font-size: 11px; color: var(--text-muted); cursor: pointer;
+  margin-top: 4px;
+}
+.cvq-cancel:hover { color: var(--err); }
 </style>
 {% endblock %}
 
@@ -389,6 +430,11 @@ var STRATEGY_PK = {{ strategy_pk }};
 var CSRF = '{{ csrf_token }}';
 var _canvasLoaded = false;
 
+/* ── Module-level canvas state ── */
+var _NS = 'http://www.w3.org/2000/svg';
+var _steps = [], _idMap = {}, _strategy = {}, _svg = null;
+var _drag = null, _dragMoved = false;
+
 /* ── Mode toggle ── */
 function setMode(m) {
   var listEl   = document.getElementById('cv-list-mode');
@@ -443,6 +489,7 @@ function loadCanvas() {
 
 function reloadCanvas() {
   _canvasLoaded = false;
+  _drag = null; _dragMoved = false;
   document.getElementById('cv-svg-wrap').innerHTML =
     '<div id="cv-loading" style="padding:40px;color:var(--text-muted)">Завантаження canvas…</div>';
   // re-append panel
@@ -577,6 +624,10 @@ function renderCanvas(data) {
 
   wrap.appendChild(svg);
 
+  /* Store module-level refs + init drag */
+  _svg = svg; _steps = steps; _idMap = idMap; _strategy = data.strategy;
+  initDrag(svg);
+
   /* Save auto-positions to DB (fire & forget) */
   if (!steps.some(function(s){ return s.canvas_x && s.canvas_y; })) {
     steps.forEach(function(s){
@@ -630,7 +681,12 @@ function drawNode(NS, s, strategy) {
   g.setAttribute('transform', 'translate('+s.canvas_x+','+s.canvas_y+')');
   g.setAttribute('class', 'cv-node' + (isCur ? ' cv-node-current' : ''));
   g.setAttribute('data-id', s.id);
-  g.addEventListener('click', function(){ openPanel(s, strategy); });
+  g.addEventListener('mousedown', function(e){
+    var pt = svgPt(_svg, e);
+    _drag = { el: g, step: s, strategy: strategy, offX: pt.x - s.canvas_x, offY: pt.y - s.canvas_y };
+    _dragMoved = false;
+    e.preventDefault();
+  });
 
   var rect = document.createElementNS(NS, 'rect');
   rect.setAttribute('width',  NODE_W);
@@ -661,6 +717,30 @@ function drawNode(NS, s, strategy) {
     dot.setAttribute('cx', NODE_W - 10); dot.setAttribute('cy', 10);
     dot.setAttribute('r', '5'); dot.setAttribute('fill', '#58a6ff');
     g.appendChild(dot);
+  }
+
+  /* Quick complete button (✓) — pending steps in active strategy only */
+  if (s.outcome === 'pending' && strategy && strategy.status === 'active') {
+    var qg = document.createElementNS(NS, 'g');
+    var qr = document.createElementNS(NS, 'rect');
+    qr.setAttribute('x', NODE_W - 26); qr.setAttribute('y', NODE_H - 24);
+    qr.setAttribute('width', '22');    qr.setAttribute('height', '20');
+    qr.setAttribute('rx', '4');
+    qr.setAttribute('fill', 'rgba(63,185,80,.25)');
+    qr.setAttribute('stroke', '#3fb950'); qr.setAttribute('stroke-width', '1.5');
+    qg.appendChild(qr);
+    var qt = document.createElementNS(NS, 'text');
+    qt.setAttribute('x', NODE_W - 15); qt.setAttribute('y', NODE_H - 10);
+    qt.setAttribute('fill', '#3fb950');
+    qt.setAttribute('font-size', '13'); qt.setAttribute('font-weight', '700');
+    qt.setAttribute('text-anchor', 'middle');
+    qt.setAttribute('font-family', 'system-ui,sans-serif');
+    qt.textContent = '✓';
+    qg.appendChild(qt);
+    /* Stop drag from starting when clicking quick button */
+    qg.addEventListener('mousedown', function(e){ e.stopPropagation(); });
+    qg.addEventListener('click', function(e){ e.stopPropagation(); showQuickOutcome(s.id, e); });
+    g.appendChild(qg);
   }
 
   return g;
@@ -755,6 +835,117 @@ function closePanel() {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── SVG coordinate helper ── */
+function svgPt(svg, e) {
+  var pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+/* ── Drag init (called once after SVG appended to DOM) ── */
+function initDrag(svg) {
+  var canEl = document.getElementById('cv-canvas-mode');
+
+  svg.addEventListener('mousemove', function(e){
+    if (!_drag) return;
+    _dragMoved = true;
+    canEl.classList.add('dragging');
+    var pt = svgPt(svg, e);
+    var nx = Math.max(0, pt.x - _drag.offX);
+    var ny = Math.max(0, pt.y - _drag.offY);
+    _drag.step.canvas_x = nx;
+    _drag.step.canvas_y = ny;
+    _drag.el.setAttribute('transform', 'translate(' + nx + ',' + ny + ')');
+    redrawEdges(svg);
+  });
+
+  function savePos(s) {
+    fetch('/strategy/step/' + s.id + '/position/', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+      body: JSON.stringify({ x: Math.round(s.canvas_x), y: Math.round(s.canvas_y) }),
+    });
+  }
+
+  function endDrag() {
+    if (!_drag) return;
+    canEl.classList.remove('dragging');
+    if (!_dragMoved) {
+      openPanel(_drag.step, _drag.strategy);
+    } else {
+      savePos(_drag.step);
+    }
+    _drag = null; _dragMoved = false;
+  }
+
+  svg.addEventListener('mouseup', endDrag);
+  svg.addEventListener('mouseleave', function(){
+    if (_drag && _dragMoved) savePos(_drag.step);
+    canEl.classList.remove('dragging');
+    _drag = null; _dragMoved = false;
+  });
+}
+
+/* ── Redraw edges after node drag ── */
+function redrawEdges(svg) {
+  var eg = svg.querySelector('#cv-edges');
+  if (!eg) return;
+  while (eg.firstChild) eg.removeChild(eg.firstChild);
+  _steps.forEach(function(s){
+    if (s.next_yes_id && _idMap[s.next_yes_id])
+      drawEdge(eg, _NS, s, _idMap[s.next_yes_id], true,  'ar-yes', '#3fb950');
+    if (s.next_no_id && _idMap[s.next_no_id])
+      drawEdge(eg, _NS, s, _idMap[s.next_no_id],  false, 'ar-no',  '#f85149');
+    if (!s.next_yes_id && !s.next_no_id) {
+      var idx = _steps.indexOf(s);
+      if (idx < _steps.length - 1)
+        drawEdge(eg, _NS, s, _steps[idx + 1], null, 'ar-def', '#607d8b');
+    }
+  });
+}
+
+/* ── Quick outcome popup ── */
+function showQuickOutcome(stepPk, e) {
+  removeQuickPopup();
+  var pop = document.createElement('div');
+  pop.id = 'cv-quick-popup';
+  pop.innerHTML =
+    '<div class="cvq-title">Результат кроку</div>' +
+    '<button class="cvq-opt" data-v="done_pos">✅ Виконано (+)</button>' +
+    '<button class="cvq-opt" data-v="done_neg">⚠️ Виконано (−)</button>' +
+    '<button class="cvq-opt" data-v="no_response">🔇 Без відповіді</button>' +
+    '<button class="cvq-opt" data-v="skipped">⏭ Пропущено</button>' +
+    '<button class="cvq-cancel" onclick="removeQuickPopup()">✕ Скасувати</button>';
+  var canEl = document.getElementById('cv-canvas-mode');
+  var cr = canEl.getBoundingClientRect();
+  pop.style.left = (e.clientX - cr.left + 12) + 'px';
+  pop.style.top  = (e.clientY - cr.top  - 10) + 'px';
+  canEl.appendChild(pop);
+  pop.querySelectorAll('.cvq-opt').forEach(function(btn){
+    btn.addEventListener('click', function(){ quickSubmit(stepPk, btn.dataset.v); });
+  });
+  /* Close on next outside click */
+  setTimeout(function(){
+    document.addEventListener('click', removeQuickPopup, { once: true });
+  }, 50);
+}
+
+function removeQuickPopup() {
+  var p = document.getElementById('cv-quick-popup');
+  if (p) p.remove();
+}
+
+function quickSubmit(stepPk, outcome) {
+  removeQuickPopup();
+  fetch('/strategy/step/' + stepPk + '/complete/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+    body: JSON.stringify({ outcome: outcome, notes: '' }),
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){ if (d.success) reloadCanvas(); else alert(d.error || 'Помилка'); });
 }
 </script>
 {% endblock %}
