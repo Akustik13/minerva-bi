@@ -9,6 +9,7 @@ from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
 from .models import Customer, CustomerNote
 from sales.models import SalesOrder, SalesOrderLine
+from core.mixins import AuditableMixin
 
 
 class CustomerNoteInline(admin.TabularInline):
@@ -133,7 +134,7 @@ class RFMSegmentFilter(admin.SimpleListFilter):
             }
 
 @admin.register(Customer)
-class CustomerAdmin(admin.ModelAdmin):
+class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     change_list_template = "admin/crm/customer_changelist.html"
     change_form_template = "admin/crm/customer/change_form.html"
 

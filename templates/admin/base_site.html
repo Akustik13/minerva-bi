@@ -942,6 +942,15 @@ document.addEventListener('DOMContentLoaded', function(){
       ],
       apps: ['autoimport', 'config', 'backup', 'auth']
     },
+    {
+      id: 'security', label: '🔐 Безпека',
+      links: [
+        { href: '/admin/core/auditlog/',       label: '📋 Журнал аудиту' },
+        { href: '/admin/core/userprofile/',    label: '👤 Ролі користувачів' },
+        { href: '/admin/core/moduleregistry/', label: '🧩 Реєстр модулів' },
+      ],
+      apps: ['core']
+    },
   ];
 
   /* Sort GROUPS by saved order */
@@ -1010,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/admin/config/':    'system',
     '/admin/backup/':    'system',
     '/admin/auth/':      'system',
+    '/admin/core/':      'security',
     '/onboarding/':      'system',
     /* specific — overwrite broad */
     '/dashboard/analytics/': 'analytics',

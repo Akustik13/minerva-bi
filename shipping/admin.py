@@ -4,6 +4,7 @@ shipping/admin.py — Адмін-панель модуля доставки
 import logging
 
 from django.contrib import admin, messages
+from core.mixins import AuditableMixin
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path, reverse
@@ -125,7 +126,7 @@ class CarrierAdmin(admin.ModelAdmin):
 # ── Shipment Admin ────────────────────────────────────────────────────────────
 
 @admin.register(Shipment)
-class ShipmentAdmin(admin.ModelAdmin):
+class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     list_display  = (
         "id_badge", "order_link", "carrier_badge", "status_badge",
         "recipient_name", "recipient_country", "weight_kg",

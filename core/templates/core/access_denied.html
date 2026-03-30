@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Доступ заборонено — Minerva{% endblock %}
+{% block content %}
+<div style="text-align:center;padding:80px 20px">
+  <div style="font-size:64px;margin-bottom:16px">🔒</div>
+  <h1 style="color:var(--text);margin-bottom:8px">Модуль недоступний</h1>
+  <p style="color:var(--text-muted);margin-bottom:32px">
+    Цей модуль вимкнено в налаштуваннях системи або у вас немає доступу до нього.
+  </p>
+  <a href="/admin/" class="button default" style="padding:10px 24px">← Повернутися до головної</a>
+</div>
+{% endblock %}

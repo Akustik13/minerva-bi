@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
+from core.mixins import AuditableMixin
 
 from .models import (
     StrategyTemplate, TemplateStep,
@@ -45,7 +46,7 @@ class CustomerStepInline(admin.TabularInline):
 
 
 @admin.register(CustomerStrategy)
-class CustomerStrategyAdmin(admin.ModelAdmin):
+class CustomerStrategyAdmin(AuditableMixin, admin.ModelAdmin):
     list_display  = ("customer", "template", "status", "next_action_at",
                      "current_step_display", "canvas_link")
     list_filter   = ("status", "template")

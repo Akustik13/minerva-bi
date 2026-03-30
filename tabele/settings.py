@@ -31,7 +31,10 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    
+
+    # ── Ядро системи ────────────────────────────────
+    'core',             # 🔐 AuditLog + Ролі + Модулі
+
     # ── Ваші додатки (порядок = порядок у sidebar) ──
     'config',           # ⚙️ Конфігурація системи
     'crm',              # 👥 CRM
@@ -60,6 +63,8 @@ _MIDDLEWARE_BASE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.AuditMiddleware",
+    "core.middleware.ModuleAccessMiddleware",
     "config.middleware.OnboardingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
@@ -81,6 +86,7 @@ TEMPLATES = [
             "django.template.context_processors.request",
             "django.contrib.auth.context_processors.auth",
             "django.contrib.messages.context_processors.messages",
+            "core.context_processors.user_modules",
         ]},
     }
 ]

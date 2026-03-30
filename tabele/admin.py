@@ -16,6 +16,7 @@ def _get_app_list(self, request, app_label=None):
     app_dict = self._build_app_dict(request, app_label)
 
     app_order = [
+        'core',       # 🔐 Ядро системи
         'crm',        # 👥 CRM
         'strategy',   # 🎯 Стратегії CRM
         'sales',      # 🛒 Продажі
@@ -35,6 +36,7 @@ def _get_app_list(self, request, app_label=None):
 
     # Явний порядок моделей всередині аппів (object_name.lower())
     model_order = {
+        'core':     ['auditlog', 'userprofile', 'moduleregistry'],
         'strategy': ['strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
@@ -69,16 +71,15 @@ def _get_app_list(self, request, app_label=None):
                 )
             )
 
-    # Фільтрація по enabled_modules (SystemSettings)
+    # Фільтрація по ModuleRegistry (core app)
     try:
-        from config.models import SystemSettings
-        enabled = SystemSettings.get().enabled_modules
-        if enabled:
-            always_show = {"auth", "config", "tasks", "api"}
-            app_list = [
-                a for a in app_list
-                if a["app_label"] in always_show or a["app_label"] in enabled
-            ]
+        from core.models import ModuleRegistry
+        always_show = {"auth", "config", "core"}
+        app_list = [
+            a for a in app_list
+            if a["app_label"] in always_show
+            or ModuleRegistry.check_active(a["app_label"])
+        ]
     except Exception:
         pass  # БД не мігрована або помилка — показати все
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from core.mixins import AuditableMixin
 from decimal import Decimal, InvalidOperation
 import uuid
 import json
@@ -351,7 +352,7 @@ class LocationAdmin(admin.ModelAdmin):
 
 
 @admin.register(InventoryTransaction)
-class InventoryTransactionAdmin(admin.ModelAdmin):
+class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
     list_display  = ("tx_type", "signed_qty", "product", "location",
                      "ref_doc", "tx_date", "created_at")
     search_fields = ("product__sku", "ref_doc", "external_key")
@@ -390,7 +391,7 @@ class ProductPackagingInline(admin.TabularInline):
 
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     change_list_template = "admin/inventory/product/change_list.html"
     list_display = (
         "sku", "sku_short", "category", "kind", "bom_type", "is_active",

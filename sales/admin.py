@@ -1,4 +1,5 @@
 from django.contrib import admin
+from core.mixins import AuditableMixin
 from crm.utils import sync_customer_from_order
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
@@ -205,7 +206,7 @@ class SalesOrderDocumentsForm(forms.ModelForm):
         fields = '__all__'
 
 @admin.register(SalesOrder)
-class SalesOrderAdmin(admin.ModelAdmin):
+class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     form = SalesOrderDocumentsForm
     # ── Прибрано: phone, tracking_number, customer_link (без лінку) ───────────
     list_display = (
