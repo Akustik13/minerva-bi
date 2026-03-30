@@ -143,6 +143,7 @@
 .cv-step-card.s-done    { opacity: .7; border-color: var(--ok); }
 .cv-step-card.s-neg     { opacity: .7; border-color: var(--err); }
 .cv-step-card.s-skip    { opacity: .55; }
+.cv-step-card.s-ghost   { opacity: .5; border-style: dashed; }
 .cv-sh {
   display: flex;
   align-items: center;
@@ -358,9 +359,35 @@
 
     {# ── LIST MODE ── #}
     <div id="cv-list-mode">
-      {% for step in steps %}
+      {% for item in list_items %}
+
+      {% if item.is_ghost %}
+      {# Ghost step — planned but not yet activated #}
+      <div class="cv-step-card s-ghost">
+        <div class="cv-sh">
+          <div class="cv-icon ci-{{ item.ts.step_type }}">
+            {% if item.ts.step_type == 'email' %}📧
+            {% elif item.ts.step_type == 'call' %}📞
+            {% elif item.ts.step_type == 'pause' %}⏸
+            {% elif item.ts.step_type == 'decision' %}🔀
+            {% endif %}
+          </div>
+          <div>
+            <div class="cv-step-title">{{ item.ts.title }}</div>
+            <div class="cv-step-meta">○ Ще не розпочато</div>
+          </div>
+          <span class="cv-outcome-pill op-pending">⏳ Очікує</span>
+        </div>
+        {% if item.ts.description %}
+        <div class="cv-step-desc">{{ item.ts.description }}</div>
+        {% endif %}
+      </div>
+
+      {% else %}
+      {# Real customer step #}
+      {% with step=item.step %}
       <div class="cv-step-card
-        {% if step.pk == strategy.current_step_id %}s-current
+        {% if item.is_current %}s-current
         {% elif step.outcome == 'done_pos' %}s-done
         {% elif step.outcome == 'done_neg' %}s-neg
         {% elif step.outcome == 'skipped' or step.outcome == 'no_response' %}s-skip
@@ -406,8 +433,11 @@
         {% endif %}
 
       </div>
+      {% endwith %}
+      {% endif %}
+
       {% empty %}
-      <p style="color:var(--text-muted);padding:20px">Кроки ще не створені.</p>
+      <p style="color:var(--text-muted);padding:20px">Шаблон не містить кроків.</p>
       {% endfor %}
     </div>
 

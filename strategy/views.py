@@ -35,10 +35,25 @@ def canvas_view(request, pk):
             strategy.save(update_fields=["current_step", "next_action_at"])
             steps = [first_step]
 
+    # Build merged list for list view:
+    # all template steps in order, each paired with its CustomerStep (if activated)
+    template_steps_all = list(strategy.template.steps.order_by("order"))
+    cs_by_ts = {s.template_step_id: s for s in steps if s.template_step_id}
+    list_items = []
+    for ts in template_steps_all:
+        cs = cs_by_ts.get(ts.pk)
+        list_items.append({
+            "step":       cs,
+            "ts":         ts,
+            "is_ghost":   cs is None,
+            "is_current": cs is not None and strategy.current_step_id == cs.pk,
+        })
+
     context = {
         "title": f"Canvas — {strategy}",
         "strategy": strategy,
         "steps": steps,
+        "list_items": list_items,
         "outcome_choices": CustomerStep.Outcome.choices,
         "has_permission": True,
         "strategy_pk": pk,
