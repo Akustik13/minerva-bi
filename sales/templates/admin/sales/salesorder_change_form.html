@@ -357,15 +357,111 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<style>
+/* ── Ship-before-leave dialog ── */
+#mv-ship-overlay {
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.6);
+  display:flex;align-items:center;justify-content:center;
+}
+#mv-ship-dialog {
+  background:var(--bg-card);
+  border:1px solid var(--border-strong);
+  border-radius:10px;padding:24px 28px;
+  max-width:400px;width:90%;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+#mv-ship-dialog h3 {
+  margin:0 0 6px;font-size:16px;color:var(--text);
+}
+#mv-ship-dialog p {
+  margin:0 0 18px;font-size:13px;color:var(--text-muted);
+}
+.mv-sd-btns { display:flex;flex-direction:column;gap:8px; }
+.mv-sd-btns button {
+  padding:9px 16px;border-radius:7px;font-size:13px;font-weight:600;
+  cursor:pointer;border:none;text-align:left;
+}
+#mv-sd-save   { background:var(--accent);color:#fff; }
+#mv-sd-skip   { background:var(--bg-card-2);color:var(--text-muted);border:1px solid var(--border-strong)!important; }
+#mv-sd-cancel { background:transparent;color:var(--text-dim); }
+#mv-sd-save:hover  { opacity:.88; }
+#mv-sd-skip:hover  { color:var(--text); }
+#mv-sd-cancel:hover{ color:var(--text-muted); }
+</style>
+
+<script>
+(function(){
+  var _dirty = false;
+
+  document.addEventListener('DOMContentLoaded', function(){
+    /* Track unsaved changes */
+    var form = document.querySelector('#content-main form');
+    if (form) {
+      form.addEventListener('change', function(){ _dirty = true; }, true);
+      form.addEventListener('input',  function(){ _dirty = true; }, true);
+    }
+    /* After save-and-continue: redirect to ship URL if pending */
+    var pending = sessionStorage.getItem('mv_ship_redirect');
+    if (pending) {
+      sessionStorage.removeItem('mv_ship_redirect');
+      window.location.href = pending;
+    }
+  });
+
+  window.mvShipClick = function(e) {
+    e.preventDefault();
+    var shipUrl = document.getElementById('mv-ship-btn').dataset.href;
+
+    if (!_dirty) {
+      window.location.href = shipUrl;
+      return;
+    }
+
+    /* Build dialog */
+    var ov = document.createElement('div');
+    ov.id = 'mv-ship-overlay';
+    ov.innerHTML =
+      '<div id="mv-ship-dialog">' +
+        '<h3>⚠️ Є незбережені зміни</h3>' +
+        '<p>Що зробити перед переходом до створення відправки?</p>' +
+        '<div class="mv-sd-btns">' +
+          '<button id="mv-sd-save">💾 Зберегти зміни і продовжити</button>' +
+          '<button id="mv-sd-skip">→ Продовжити без збереження</button>' +
+          '<button id="mv-sd-cancel">✕ Скасувати — залишитись на сторінці</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(ov);
+
+    document.getElementById('mv-sd-save').onclick = function(){
+      /* Save via _continue, then redirect after reload */
+      sessionStorage.setItem('mv_ship_redirect', shipUrl);
+      var cont = document.querySelector('[name="_continue"]');
+      if (cont) { cont.click(); }
+      else       { document.querySelector('#content-main form').submit(); }
+      ov.remove();
+    };
+    document.getElementById('mv-sd-skip').onclick = function(){
+      ov.remove();
+      window.location.href = shipUrl;
+    };
+    document.getElementById('mv-sd-cancel').onclick = function(){ ov.remove(); };
+    ov.addEventListener('click', function(ev){ if (ev.target === ov) ov.remove(); });
+  };
+})();
+</script>
 {% endblock %}
 
 {% block submit_buttons_bottom %}
 {{ block.super }}
 {% if original and original.pk %}
 <div style="margin-top:16px;padding:14px 0 4px;border-top:1px solid #243347;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-  <a href="{% url 'admin:shipping_shipment_create' original.pk %}"
+  <a id="mv-ship-btn"
+     data-href="{% url 'admin:shipping_shipment_create' original.pk %}"
+     href="#" onclick="mvShipClick(event)"
      style="background:#e91e63;color:#fff;padding:9px 20px;border-radius:7px;
-            text-decoration:none;font-weight:700;font-size:13px;display:inline-block">
+            text-decoration:none;font-weight:700;font-size:13px;display:inline-block;cursor:pointer">
     🚚 Створити відправлення
   </a>
   {% with shipments=original.shipments.all %}
