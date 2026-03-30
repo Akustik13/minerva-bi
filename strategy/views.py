@@ -17,6 +17,24 @@ def canvas_view(request, pk):
     )
     steps = list(strategy.steps.select_related("template_step").order_by("scheduled_at"))
 
+    # Auto-initialize: if an active strategy was created via admin (no start_strategy()
+    # call), create the first CustomerStep so list + canvas are immediately actionable.
+    if not steps and strategy.status == CustomerStrategy.Status.ACTIVE:
+        first_ts = strategy.template.steps.order_by("order").first()
+        if first_ts:
+            first_step = CustomerStep.objects.create(
+                strategy=strategy,
+                template_step=first_ts,
+                step_type=first_ts.step_type,
+                title=first_ts.title,
+                description=first_ts.description,
+                scheduled_at=timezone.now() + timezone.timedelta(days=first_ts.delay_days),
+            )
+            strategy.current_step = first_step
+            strategy.next_action_at = first_step.scheduled_at
+            strategy.save(update_fields=["current_step", "next_action_at"])
+            steps = [first_step]
+
     context = {
         "title": f"Canvas — {strategy}",
         "strategy": strategy,

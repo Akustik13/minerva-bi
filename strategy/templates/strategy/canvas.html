@@ -554,7 +554,12 @@ function renderCanvas(data) {
   if (loadDiv) loadDiv.remove();
 
   if (!steps || steps.length === 0) {
-    wrap.innerHTML = '<p style="padding:40px;color:var(--text-muted)">Кроки відсутні.</p>';
+    wrap.innerHTML =
+      '<div style="padding:40px;color:var(--text-muted);font-size:13px">' +
+      '<p>⚠️ Шаблон не містить кроків.</p>' +
+      '<p>Додайте кроки до шаблону: ' +
+      '<a href="/admin/strategy/strategytemplate/" style="color:var(--accent)">Шаблони стратегій → Edit</a></p>' +
+      '</div>';
     return;
   }
 
