@@ -257,6 +257,7 @@
 
 /* ── Drag cursor ── */
 .cv-node { cursor: grab; }
+.cv-node-ghost { cursor: pointer; }
 #cv-canvas-mode.dragging .cv-node { cursor: grabbing; }
 #cv-canvas-mode.dragging { cursor: grabbing; user-select: none; }
 
@@ -523,23 +524,25 @@ var OUTCOME_STROKE = {
 };
 
 function autoLayout(steps) {
-  /* Check if any step has non-zero coords */
   var anyPos = steps.some(function(s){ return s.canvas_x !== 0 || s.canvas_y !== 0; });
-  if (anyPos) return;
-
-  /* Build id→step map */
-  var idMap = {};
-  steps.forEach(function(s){ idMap[s.id] = s; });
-
-  /* Assign positions top-to-bottom; decision branches go right */
-  var x = PAD_X, y = PAD_Y;
-  steps.forEach(function(s, i){
-    if (s.canvas_x === 0 && s.canvas_y === 0) {
-      s.canvas_x = x;
-      s.canvas_y = y;
-    }
-    y += NODE_H + GAP_Y;
-  });
+  if (!anyPos) {
+    /* No positions at all — full sequential layout */
+    var x = PAD_X, y = PAD_Y;
+    steps.forEach(function(s){
+      s.canvas_x = x; s.canvas_y = y;
+      y += NODE_H + GAP_Y;
+    });
+  } else {
+    /* Some positions exist — stack un-positioned nodes below the rest */
+    var maxY = Math.max.apply(null, steps.map(function(s){ return s.canvas_y; }));
+    var y = maxY + NODE_H + GAP_Y;
+    steps.forEach(function(s){
+      if (s.canvas_x === 0 && s.canvas_y === 0) {
+        s.canvas_x = PAD_X; s.canvas_y = y;
+        y += NODE_H + GAP_Y;
+      }
+    });
+  }
 }
 
 function renderCanvas(data) {
@@ -552,6 +555,10 @@ function renderCanvas(data) {
     wrap.innerHTML = '<p style="padding:40px;color:var(--text-muted)">Кроки відсутні.</p>';
     return;
   }
+
+  /* Record which steps already had positions (before auto-layout) */
+  var _hadPos = {};
+  steps.forEach(function(s){ _hadPos[s.id] = (s.canvas_x !== 0 || s.canvas_y !== 0); });
 
   autoLayout(steps);
 
@@ -628,16 +635,16 @@ function renderCanvas(data) {
   _svg = svg; _steps = steps; _idMap = idMap; _strategy = data.strategy;
   initDrag(svg);
 
-  /* Save auto-positions to DB (fire & forget) */
-  if (!steps.some(function(s){ return s.canvas_x && s.canvas_y; })) {
-    steps.forEach(function(s){
+  /* Save newly auto-positioned real steps to DB (fire & forget) */
+  steps.forEach(function(s){
+    if (!s.is_ghost && !_hadPos[s.id]) {
       fetch('/strategy/step/' + s.id + '/position/', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
         body: JSON.stringify({ x: s.canvas_x, y: s.canvas_y }),
       });
-    });
-  }
+    }
+  });
 }
 
 function drawEdge(group, NS, from, to, isYes, markerId, color) {
@@ -673,45 +680,60 @@ function drawEdge(group, NS, from, to, isYes, markerId, color) {
 }
 
 function drawNode(NS, s, strategy) {
-  var tc   = TYPE_COLOR[s.step_type] || TYPE_COLOR.email;
-  var stroke = OUTCOME_STROKE[s.outcome] || tc.stroke;
-  var isCur  = s.is_current;
+  var isGhost = s.is_ghost;
+  var tc      = TYPE_COLOR[s.step_type] || TYPE_COLOR.email;
+  var stroke  = isGhost ? '#607d8b' : (OUTCOME_STROKE[s.outcome] || tc.stroke);
+  var isCur   = s.is_current;
 
   var g = document.createElementNS(NS, 'g');
   g.setAttribute('transform', 'translate('+s.canvas_x+','+s.canvas_y+')');
-  g.setAttribute('class', 'cv-node' + (isCur ? ' cv-node-current' : ''));
+  g.setAttribute('class', 'cv-node' + (isCur ? ' cv-node-current' : '') + (isGhost ? ' cv-node-ghost' : ''));
   g.setAttribute('data-id', s.id);
-  g.addEventListener('mousedown', function(e){
-    var pt = svgPt(_svg, e);
-    _drag = { el: g, step: s, strategy: strategy, offX: pt.x - s.canvas_x, offY: pt.y - s.canvas_y };
-    _dragMoved = false;
-    e.preventDefault();
-  });
+
+  if (!isGhost) {
+    /* Real node: drag to move, click (no move) opens panel */
+    g.addEventListener('mousedown', function(e){
+      var pt = svgPt(_svg, e);
+      _drag = { el: g, step: s, strategy: strategy, offX: pt.x - s.canvas_x, offY: pt.y - s.canvas_y };
+      _dragMoved = false;
+      e.preventDefault();
+    });
+  } else {
+    /* Ghost node: click opens info panel */
+    g.setAttribute('opacity', '0.5');
+    g.addEventListener('click', function(){ openPanel(s, strategy); });
+  }
 
   var rect = document.createElementNS(NS, 'rect');
   rect.setAttribute('width',  NODE_W);
   rect.setAttribute('height', NODE_H);
   rect.setAttribute('rx',     '8');
-  rect.setAttribute('fill',   tc.fill);
+  rect.setAttribute('fill',   isGhost ? 'rgba(96,125,139,.06)' : tc.fill);
   rect.setAttribute('stroke', stroke);
-  rect.setAttribute('stroke-width', isCur ? '3' : '2');
+  rect.setAttribute('stroke-width', isCur ? '3' : (isGhost ? '1.5' : '2'));
+  if (isGhost) rect.setAttribute('stroke-dasharray', '5 4');
   g.appendChild(rect);
 
   /* Icon + title */
   var icons = { email:'📧', call:'📞', pause:'⏸', decision:'🔀' };
-  var t1 = svgTxt(NS, (icons[s.step_type]||'•') + ' ' + clip(s.title, 15), 10, 22, 13, '#e6edf3', 600);
+  var titleCol = isGhost ? '#607d8b' : '#e6edf3';
+  var t1 = svgTxt(NS, (icons[s.step_type]||'•') + ' ' + clip(s.title, 15), 10, 22, 13, titleCol, 600);
   g.appendChild(t1);
 
-  /* Outcome / date */
-  var sub = s.outcome !== 'pending'
-    ? outcomeLabel(s.outcome)
-    : (s.scheduled_at ? '📅 ' + s.scheduled_at : '');
-  if (sub) {
-    var col = OUTCOME_STROKE[s.outcome] || '#9aafbe';
-    g.appendChild(svgTxt(NS, sub, 10, 40, 11, col, 400));
+  /* Outcome / date — real nodes only; ghost shows placeholder */
+  if (!isGhost) {
+    var sub = s.outcome !== 'pending'
+      ? outcomeLabel(s.outcome)
+      : (s.scheduled_at ? '📅 ' + s.scheduled_at : '');
+    if (sub) {
+      var col = OUTCOME_STROKE[s.outcome] || '#9aafbe';
+      g.appendChild(svgTxt(NS, sub, 10, 42, 11, col, 400));
+    }
+  } else {
+    g.appendChild(svgTxt(NS, '○ Ще не розпочато', 10, 42, 10, '#607d8b', 400));
   }
 
-  /* Current indicator */
+  /* Current indicator (blue dot) */
   if (isCur) {
     var dot = document.createElementNS(NS, 'circle');
     dot.setAttribute('cx', NODE_W - 10); dot.setAttribute('cy', 10);
@@ -719,8 +741,8 @@ function drawNode(NS, s, strategy) {
     g.appendChild(dot);
   }
 
-  /* Quick complete button (✓) — pending steps in active strategy only */
-  if (s.outcome === 'pending' && strategy && strategy.status === 'active') {
+  /* Quick complete button (✓) — real pending steps in active strategy only */
+  if (!isGhost && s.outcome === 'pending' && strategy && strategy.status === 'active') {
     var qg = document.createElementNS(NS, 'g');
     var qr = document.createElementNS(NS, 'rect');
     qr.setAttribute('x', NODE_W - 26); qr.setAttribute('y', NODE_H - 24);
@@ -737,7 +759,6 @@ function drawNode(NS, s, strategy) {
     qt.setAttribute('font-family', 'system-ui,sans-serif');
     qt.textContent = '✓';
     qg.appendChild(qt);
-    /* Stop drag from starting when clicking quick button */
     qg.addEventListener('mousedown', function(e){ e.stopPropagation(); });
     qg.addEventListener('click', function(e){ e.stopPropagation(); showQuickOutcome(s.id, e); });
     g.appendChild(qg);
@@ -773,6 +794,17 @@ function openPanel(step, strategy) {
 
   var icons = { email:'📧', call:'📞', pause:'⏸', decision:'🔀' };
   title.textContent = (icons[step.step_type]||'') + ' ' + step.title;
+
+  /* Ghost step: show template info only — no action form */
+  if (step.is_ghost) {
+    body.innerHTML =
+      '<div style="margin:4px 0 12px;padding:10px;background:var(--bg-card-2);border-radius:6px;' +
+      'color:var(--text-muted);font-size:12px;line-height:1.5">' +
+      '🔒 Крок ще не розпочато.<br>З\'явиться після завершення попереднього.</div>' +
+      '<div class="cv-row"><span>Тип</span><strong>' + step.step_type + '</strong></div>';
+    panel.classList.add('open');
+    return;
+  }
 
   var html = '<div class="cv-row"><span>Тип</span><strong>' + step.step_type + '</strong></div>';
   if (step.scheduled_at) {

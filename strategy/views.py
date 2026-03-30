@@ -30,38 +30,71 @@ def canvas_view(request, pk):
 
 @staff_member_required
 def canvas_data(request, pk):
-    """JSON: full strategy + steps data for the canvas."""
+    """JSON: full strategy + steps data for the canvas.
+
+    Returns ALL TemplateStep nodes — activated ones as real nodes,
+    un-activated ones as ghost nodes (dimmed, dashed border).
+    """
     strategy = get_object_or_404(
         CustomerStrategy.objects.select_related("customer", "template"),
         pk=pk,
     )
-    steps = list(strategy.steps.select_related("template_step").order_by("scheduled_at"))
 
     rfm = strategy.customer.rfm_score()
 
-    # Build TemplateStep order→CustomerStep map for next_*_id resolution
-    # next_yes_id / next_no_id are TemplateStep PKs; we need CustomerStep PKs
-    ts_to_cs = {}
-    for s in steps:
+    # All template steps define the full plan (ordered by template order)
+    template_steps = list(
+        strategy.template.steps.order_by("order")
+    )
+
+    # Map template_step_id → CustomerStep (only for activated steps)
+    customer_steps = list(strategy.steps.select_related("template_step").all())
+    cs_by_ts_id = {}
+    for s in customer_steps:
         if s.template_step_id:
-            ts_to_cs[s.template_step_id] = s.pk
+            cs_by_ts_id[s.template_step_id] = s
+
+    # template_step.pk → node id:
+    #   real CustomerStep  →  CustomerStep.pk  (positive int)
+    #   ghost (not yet)    → -TemplateStep.pk  (negative int)
+    ts_to_node = {}
+    for ts in template_steps:
+        cs = cs_by_ts_id.get(ts.pk)
+        ts_to_node[ts.pk] = cs.pk if cs else -(ts.pk)
 
     nodes = []
-    for s in steps:
-        ts = s.template_step
-        sched = s.scheduled_at.strftime("%d.%m.%Y") if s.scheduled_at else None
+    for ts in template_steps:
+        cs = cs_by_ts_id.get(ts.pk)
+        is_ghost = cs is None
+
+        if is_ghost:
+            node_id      = -(ts.pk)
+            title        = ts.title
+            outcome      = "pending"
+            outcome_notes = ""
+            scheduled_at = None
+            is_current   = False
+        else:
+            node_id       = cs.pk
+            title         = cs.title or ts.title
+            scheduled_at  = cs.scheduled_at.strftime("%d.%m.%Y") if cs.scheduled_at else None
+            outcome       = cs.outcome
+            outcome_notes = cs.outcome_notes or ""
+            is_current    = (strategy.current_step_id == cs.pk)
+
         nodes.append({
-            "id": s.pk,
-            "title": s.title,
-            "step_type": s.step_type,
-            "outcome": s.outcome,
-            "outcome_notes": s.outcome_notes,
-            "scheduled_at": sched,
-            "canvas_x": ts.canvas_x if ts else 0.0,
-            "canvas_y": ts.canvas_y if ts else 0.0,
-            "next_yes_id": ts_to_cs.get(ts.next_step_yes_id) if ts and ts.next_step_yes_id else None,
-            "next_no_id":  ts_to_cs.get(ts.next_step_no_id)  if ts and ts.next_step_no_id  else None,
-            "is_current": (strategy.current_step_id == s.pk),
+            "id":           node_id,
+            "title":        title,
+            "step_type":    ts.step_type,
+            "outcome":      outcome,
+            "outcome_notes": outcome_notes,
+            "scheduled_at": scheduled_at,
+            "canvas_x":     ts.canvas_x,
+            "canvas_y":     ts.canvas_y,
+            "next_yes_id":  ts_to_node.get(ts.next_step_yes_id) if ts.next_step_yes_id else None,
+            "next_no_id":   ts_to_node.get(ts.next_step_no_id)  if ts.next_step_no_id  else None,
+            "is_current":   is_current,
+            "is_ghost":     is_ghost,
         })
 
     return JsonResponse({
