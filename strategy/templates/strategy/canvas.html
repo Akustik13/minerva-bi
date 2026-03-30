@@ -435,6 +435,8 @@ var _canvasLoaded = false;
 var _NS = 'http://www.w3.org/2000/svg';
 var _steps = [], _idMap = {}, _strategy = {}, _svg = null;
 var _drag = null, _dragMoved = false;
+/* Theme-aware text colors (updated from CSS vars on each render) */
+var _tc = { text: '#e6edf3', muted: '#9aafbe', dim: '#607d8b' };
 
 /* ── Mode toggle ── */
 function setMode(m) {
@@ -555,6 +557,17 @@ function renderCanvas(data) {
     wrap.innerHTML = '<p style="padding:40px;color:var(--text-muted)">Кроки відсутні.</p>';
     return;
   }
+
+  /* Read CSS variable colors so SVG text matches current theme */
+  (function(){
+    var cs = getComputedStyle(document.documentElement);
+    var t = cs.getPropertyValue('--text').trim();
+    var m = cs.getPropertyValue('--text-muted').trim();
+    var d = cs.getPropertyValue('--text-dim').trim();
+    if (t) _tc.text  = t;
+    if (m) _tc.muted = m;
+    if (d) _tc.dim   = d;
+  })();
 
   /* Record which steps already had positions (before auto-layout) */
   var _hadPos = {};
@@ -716,7 +729,7 @@ function drawNode(NS, s, strategy) {
 
   /* Icon + title */
   var icons = { email:'📧', call:'📞', pause:'⏸', decision:'🔀' };
-  var titleCol = isGhost ? '#607d8b' : '#e6edf3';
+  var titleCol = isGhost ? _tc.dim : _tc.text;
   var t1 = svgTxt(NS, (icons[s.step_type]||'•') + ' ' + clip(s.title, 15), 10, 22, 13, titleCol, 600);
   g.appendChild(t1);
 
@@ -726,11 +739,11 @@ function drawNode(NS, s, strategy) {
       ? outcomeLabel(s.outcome)
       : (s.scheduled_at ? '📅 ' + s.scheduled_at : '');
     if (sub) {
-      var col = OUTCOME_STROKE[s.outcome] || '#9aafbe';
+      var col = OUTCOME_STROKE[s.outcome] || _tc.muted;
       g.appendChild(svgTxt(NS, sub, 10, 42, 11, col, 400));
     }
   } else {
-    g.appendChild(svgTxt(NS, '○ Ще не розпочато', 10, 42, 10, '#607d8b', 400));
+    g.appendChild(svgTxt(NS, '○ Ще не розпочато', 10, 42, 10, _tc.dim, 400));
   }
 
   /* Current indicator (blue dot) */
