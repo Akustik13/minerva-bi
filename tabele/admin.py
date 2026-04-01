@@ -36,7 +36,7 @@ def _get_app_list(self, request, app_label=None):
 
     # Явний порядок моделей всередині аппів (object_name.lower())
     model_order = {
-        'core':     ['auditlog', 'userprofile', 'moduleregistry'],
+        'core':     ['auditlog', 'userprofile', 'modulebundle', 'moduleregistry'],
         'strategy': ['strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',

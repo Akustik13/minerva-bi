@@ -82,11 +82,17 @@ class UserProfile(models.Model):
     ai_system_prompt = models.TextField(blank=True, verbose_name='Системний промпт')
     ai_temperature   = models.FloatField(default=0.7, verbose_name='Температура AI')
 
-    # Override per-user module access (empty list = use role defaults)
+    # Пакет модулів (пріоритет над роллю, але нижче ніж allowed_modules)
+    bundle           = models.ForeignKey(
+        'ModuleBundle', null=True, blank=True, on_delete=models.SET_NULL,
+        verbose_name='Пакет модулів',
+        help_text='Якщо вказано — використовується замість дефолтів ролі',
+    )
+    # Повне ручне перевизначення (найвищий пріоритет; порожній = авто)
     allowed_modules  = models.JSONField(
         default=list, blank=True,
-        verbose_name='Дозволені модулі',
-        help_text='Залиште порожнім щоб використовувати дефолти ролі',
+        verbose_name='Ручний список модулів',
+        help_text='Заповнюйте лише якщо пакет не підходить. Порожній = авто',
     )
 
     class Meta:
@@ -97,13 +103,69 @@ class UserProfile(models.Model):
         return f"{self.user.username} ({self.get_role_display()})"
 
     def get_allowed_modules(self):
-        """Return list of allowed app_labels, or '__all__' for superadmin."""
+        """
+        Priority (highest → lowest):
+          1. allowed_modules (manual JSON list) — explicit override
+          2. bundle — assigned package
+          3. role defaults (ROLE_PERMISSIONS)
+        Always returns '__all__' for superadmin regardless.
+        Core modules are always included.
+        """
+        if self.role == self.Role.SUPERADMIN:
+            return '__all__'
+        # 1. Manual override
         if self.allowed_modules:
             return self.allowed_modules
+        # 2. Bundle
+        if self.bundle_id:
+            try:
+                return self.bundle.get_module_labels()
+            except Exception:
+                pass
+        # 3. Role defaults
         from core.utils import ROLE_PERMISSIONS
         perms = ROLE_PERMISSIONS.get(self.role, {})
-        modules = perms.get('modules', '__all__')
-        return modules
+        return perms.get('modules', '__all__')
+
+
+class ModuleBundle(models.Model):
+    """
+    Named bundle of modules — custom package that can be assigned to users.
+    Core modules are ALWAYS included regardless of bundle contents.
+    """
+
+    name        = models.CharField(max_length=100, unique=True, verbose_name='Назва пакету')
+    description = models.TextField(blank=True, verbose_name='Опис')
+    color       = models.CharField(
+        max_length=7, default='#58a6ff', blank=True,
+        verbose_name='Колір', help_text='HEX, напр. #58a6ff',
+    )
+    is_system   = models.BooleanField(
+        default=False, verbose_name='Системний',
+        help_text='Системні пакети не можна видалити',
+    )
+    modules     = models.ManyToManyField(
+        'ModuleRegistry', blank=True,
+        verbose_name='Модулі',
+        help_text='Core-модулі додаються автоматично незалежно від вибору',
+    )
+
+    class Meta:
+        verbose_name        = 'Пакет модулів'
+        verbose_name_plural = 'Пакети модулів'
+        ordering            = ['name']
+
+    def __str__(self):
+        return self.name
+
+    def get_module_labels(self) -> list:
+        """Return list of app_labels in this bundle + all core modules."""
+        bundle_labels = list(self.modules.values_list('app_label', flat=True))
+        core_labels   = list(
+            ModuleRegistry.objects.filter(tier=ModuleRegistry.Tier.CORE)
+            .values_list('app_label', flat=True)
+        )
+        return list(set(bundle_labels + core_labels))
 
 
 class ModuleRegistry(models.Model):

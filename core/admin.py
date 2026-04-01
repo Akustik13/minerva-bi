@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import AuditLog, UserProfile, ModuleRegistry
+from .models import AuditLog, UserProfile, ModuleBundle, ModuleRegistry
 
 
 @admin.register(AuditLog)
@@ -40,22 +40,59 @@ class AuditLogAdmin(admin.ModelAdmin):
         )
 
 
+@admin.register(ModuleBundle)
+class ModuleBundleAdmin(admin.ModelAdmin):
+    list_display    = ('name_badge', 'modules_count', 'is_system', 'description')
+    list_filter     = ('is_system',)
+    search_fields   = ('name', 'description')
+    filter_horizontal = ('modules',)
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'color', 'description', 'is_system'),
+        }),
+        ('Модулі пакету', {
+            'fields': ('modules',),
+            'description': '🔒 Core-модулі (core, config, auth) додаються автоматично',
+        }),
+    )
+
+    def has_delete_permission(self, request, obj=None):
+        if obj and obj.is_system:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    @admin.display(description='Назва')
+    def name_badge(self, obj):
+        return format_html(
+            '<span style="background:{};color:#fff;padding:3px 10px;'
+            'border-radius:4px;font-weight:600">{}</span>',
+            obj.color or '#58a6ff', obj.name,
+        )
+
+    @admin.display(description='Модулів')
+    def modules_count(self, obj):
+        return obj.modules.count()
+
+
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display  = ('user', 'role', 'ai_enabled', 'ai_model')
-    list_filter   = ('role', 'ai_enabled')
+    list_display  = ('user', 'role', 'bundle', 'ai_enabled', 'ai_model')
+    list_filter   = ('role', 'bundle', 'ai_enabled')
     search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
     fieldsets = (
         ('Користувач', {
             'fields': ('user', 'role', 'notes'),
         }),
+        ('Доступ до модулів', {
+            'fields': ('bundle', 'allowed_modules'),
+            'description': (
+                'Пріоритет: Ручний список → Пакет → Роль. '
+                'Залиште порожніми для автоматичного вибору за роллю.'
+            ),
+        }),
         ('AI-асистент', {
             'fields': ('ai_enabled', 'ai_model', 'ai_temperature', 'ai_system_prompt'),
             'classes': ('collapse',),
-        }),
-        ('Доступ до модулів', {
-            'fields': ('allowed_modules',),
-            'description': 'Залиште порожнім [], щоб використовувати дефолти ролі',
         }),
     )
 

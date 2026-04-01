@@ -24,11 +24,27 @@ MODULES = [
 ]
 
 
+DEFAULT_BUNDLES = [
+    {
+        'name': '📦 Стандарт',
+        'color': '#58a6ff',
+        'description': 'CRM, Продажі, Склад, Доставка, Задачі',
+        'tiers': ('core', 'standard'),
+    },
+    {
+        'name': '⭐ Преміум',
+        'color': '#c9a84c',
+        'description': 'Всі модулі включно з AI, API та авто-імпортом',
+        'tiers': ('core', 'standard', 'premium'),
+    },
+]
+
+
 class Command(BaseCommand):
-    help = 'Create/update ModuleRegistry entries for all Minerva modules'
+    help = 'Create/update ModuleRegistry entries and default bundles'
 
     def handle(self, *args, **options):
-        from core.models import ModuleRegistry
+        from core.models import ModuleRegistry, ModuleBundle
         created = updated = 0
 
         for m in MODULES:
@@ -56,5 +72,19 @@ class Command(BaseCommand):
                     self.stdout.write(f"  🔄 Оновлено: {m['name']}")
 
         self.stdout.write(self.style.SUCCESS(
-            f'\n✅ Готово: {created} створено, {updated} оновлено\n'
+            f'\n✅ Модулі: {created} створено, {updated} оновлено'
         ))
+
+        # ── Default bundles ────────────────────────────────────────────────────
+        self.stdout.write('\nПакети:')
+        for b in DEFAULT_BUNDLES:
+            bundle, b_created = ModuleBundle.objects.get_or_create(
+                name=b['name'],
+                defaults={'color': b['color'], 'description': b['description'], 'is_system': True},
+            )
+            mods = ModuleRegistry.objects.filter(tier__in=b['tiers'])
+            bundle.modules.set(mods)
+            status = '✅ Створено' if b_created else '🔄 Оновлено'
+            self.stdout.write(f"  {status}: {b['name']} ({mods.count()} модулів)")
+
+        self.stdout.write(self.style.SUCCESS('\n✅ Готово\n'))
