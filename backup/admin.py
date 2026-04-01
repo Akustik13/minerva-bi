@@ -86,6 +86,11 @@ class BackupAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.migrate_view),
                 name="backup_migrate",
             ),
+            path(
+                "setup-modules/",
+                self.admin_site.admin_view(self.setup_modules_view),
+                name="backup_setup_modules",
+            ),
         ]
 
     def _ctx(self, request, **extra):
@@ -310,6 +315,12 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
         return JsonResponse(utils.run_migrate())
+
+    def setup_modules_view(self, request):
+        """AJAX — run manage.py setup_modules."""
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        return JsonResponse(utils.run_setup_modules())
 
     def has_add_permission(self, request):              return False
     def has_change_permission(self, request, obj=None): return False

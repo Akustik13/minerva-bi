@@ -72,3 +72,23 @@ class AuditableMixin:
         except Exception:
             pass
         super().delete_queryset(request, queryset)
+
+
+class MinervaAdminMixin(AuditableMixin):
+    """
+    Extends AuditableMixin with role-based delete permission.
+    Checks UserProfile.can_delete (or role default) via user_can().
+
+    Usage:
+        class MyAdmin(MinervaAdminMixin, admin.ModelAdmin):
+            ...
+    """
+
+    def has_delete_permission(self, request, obj=None):
+        if not super().has_delete_permission(request, obj):
+            return False
+        try:
+            from core.utils import user_can
+            return user_can(request.user, 'delete')
+        except Exception:
+            return super().has_delete_permission(request, obj)

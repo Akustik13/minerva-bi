@@ -3,7 +3,7 @@ from django import forms
 from django.contrib import admin
 from django.utils.html import format_html, mark_safe
 
-from .models import AuditLog, UserProfile, ModuleBundle, ModuleRegistry
+from .models import AuditLog, UserProfile, ModuleBundle, ModuleRegistry, TenantAccount
 
 
 # ── UserProfile custom form ───────────────────────────────────────────────────
@@ -189,6 +189,14 @@ class UserProfileAdmin(admin.ModelAdmin):
                 '3️⃣ <strong>Роль</strong> — автоматично за роллю користувача'
             ),
         }),
+        ('🔒 Дозволи (перевизначення)', {
+            'fields': ('can_delete', 'can_export', 'can_import', 'can_view_audit'),
+            'classes': ('collapse',),
+            'description': (
+                'Порожньо = використовуються дефолти ролі. '
+                'Явне Так/Ні — перевизначає роль.'
+            ),
+        }),
         ('🤖 AI-асистент', {
             'fields': ('ai_enabled', 'ai_model', 'ai_temperature', 'ai_system_prompt'),
             'classes': ('collapse',),
@@ -304,4 +312,39 @@ class ModuleRegistryAdmin(admin.ModelAdmin):
             '<span style="background:{};color:#fff;padding:2px 8px;'
             'border-radius:4px;font-size:11px">{}</span>',
             color, obj.get_tier_display(),
+        )
+
+
+# ── TenantAccount ──────────────────────────────────────────────────────────────
+
+@admin.register(TenantAccount)
+class TenantAccountAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'slug', 'plan_badge', 'is_active', 'owner', 'created_at')
+    list_filter   = ('plan', 'is_active')
+    search_fields = ('name', 'slug', 'owner__username')
+    readonly_fields = ('created_at',)
+
+    fieldsets = (
+        ('🏢 Акаунт', {
+            'fields': ('name', 'slug', 'plan', 'is_active', 'owner'),
+        }),
+        ('📅 Дати', {
+            'fields': ('created_at',),
+            'classes': ('collapse',),
+        }),
+    )
+
+    @admin.display(description='Тариф')
+    def plan_badge(self, obj):
+        colors = {
+            'trial':   '#607d8b',
+            'starter': '#58a6ff',
+            'pro':     '#3fb950',
+            'custom':  '#c9a84c',
+        }
+        color = colors.get(obj.plan, '#9aafbe')
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 8px;'
+            'border-radius:4px;font-size:11px">{}</span>',
+            color, obj.get_plan_display(),
         )

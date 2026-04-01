@@ -273,6 +273,10 @@
                 onclick="runMigrate(this)">
           🗄️ Застосувати міграції
         </button>
+        <button id="btn-setup-modules" class="bk-btn" style="background:#0e7490;"
+                onclick="runSetupModules(this)">
+          🧩 Оновити модулі
+        </button>
       </div>
 
     </div>
@@ -972,6 +976,33 @@ async function runMigrate(btn) {
     const icon = data.ok ? '✅' : '❌';
     const dur  = data.duration ? ` (${data.duration}с)` : '';
     resultEl.textContent = `${icon} migrate${dur}\n${data.output || data.error || ''}`;
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Setup Modules
+════════════════════════════════════════════════════════════════════ */
+const SETUP_MODULES_URL = '{% url "admin:backup_setup_modules" %}';
+
+async function runSetupModules(btn) {
+  const resultEl = document.getElementById('git-result');
+  btn.disabled = true;
+  resultEl.style.display = 'block';
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ setup_modules… зачекайте.';
+  try {
+    const resp = await fetch(SETUP_MODULES_URL, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF },
+    });
+    const data = await resp.json();
+    resultEl.className = data.ok ? 'bk-result ok' : 'bk-result error';
+    const icon = data.ok ? '✅' : '❌';
+    const dur  = data.duration ? ` (${data.duration}с)` : '';
+    resultEl.textContent = `${icon} setup_modules${dur}\n${data.output || data.error || ''}`;
   } catch(e) {
     resultEl.className = 'bk-result error';
     resultEl.textContent = '❌ ' + e.message;

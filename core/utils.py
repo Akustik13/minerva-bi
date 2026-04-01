@@ -1,10 +1,12 @@
 """core/utils.py — Role permissions + AI prompt builder."""
 
-ROLE_PERMISSIONS = {
+ROLE_DEFAULTS = {
     'superadmin': {
         'modules': '__all__',
         'can_delete': True,
         'can_export': True,
+        'can_import': True,
+        'can_view_audit': True,
     },
     'admin': {
         'modules': [
@@ -13,28 +15,72 @@ ROLE_PERMISSIONS = {
         ],
         'can_delete': True,
         'can_export': True,
+        'can_import': True,
+        'can_view_audit': True,
     },
     'manager': {
         'modules': ['crm', 'strategy', 'sales', 'shipping'],
         'can_delete': False,
         'can_export': True,
+        'can_import': False,
+        'can_view_audit': False,
     },
     'warehouse': {
         'modules': ['inventory', 'shipping'],
         'can_delete': False,
         'can_export': False,
+        'can_import': True,
+        'can_view_audit': False,
     },
     'accountant': {
         'modules': ['sales', 'accounting', 'inventory'],
         'can_delete': False,
         'can_export': True,
+        'can_import': False,
+        'can_view_audit': False,
     },
     'ai': {
         'modules': ['crm', 'strategy'],
         'can_delete': False,
         'can_export': False,
+        'can_import': False,
+        'can_view_audit': False,
     },
 }
+
+# Backward-compatibility alias
+ROLE_PERMISSIONS = ROLE_DEFAULTS
+
+
+def user_can(user, permission: str) -> bool:
+    """
+    Check if user has a given permission.
+
+    Permission names match ROLE_DEFAULTS keys without 'can_' prefix
+    (e.g. 'delete', 'export', 'import', 'view_audit').
+
+    Priority:
+      1. Superuser / superadmin role → always True
+      2. UserProfile.can_<permission> field if not None
+      3. ROLE_DEFAULTS fallback for the user's role
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    try:
+        profile = user.profile
+        if profile.role == 'superadmin':
+            return True
+        field_name = f'can_{permission}'
+        if hasattr(profile, field_name):
+            val = getattr(profile, field_name)
+            if val is not None:
+                return bool(val)
+        defaults = ROLE_DEFAULTS.get(profile.role, {})
+        return bool(defaults.get(field_name, False))
+    except Exception:
+        return False
 
 
 def apply_role_defaults(profile):

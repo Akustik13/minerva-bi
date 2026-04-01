@@ -1,4 +1,5 @@
 """core/middleware.py — Audit + Module access middleware."""
+# Future: TenantMiddleware will be enabled after multi-tenant migration
 
 
 class AuditMiddleware:
@@ -55,3 +56,19 @@ class ModuleAccessMiddleware:
             return not ModuleRegistry.check_active(app_label)
         except Exception:
             return False  # fail open
+
+
+class TenantMiddleware:
+    """
+    Stub: future multi-tenant middleware.
+    Will attach request.tenant based on subdomain or session.
+    Currently a no-op pass-through.
+    """
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        # Stub — tenant resolution will be added here
+        request.tenant = None
+        return self.get_response(request)

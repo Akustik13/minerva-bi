@@ -95,6 +95,28 @@ class UserProfile(models.Model):
         help_text='Заповнюйте лише якщо пакет не підходить. Порожній = авто',
     )
 
+    # Per-user permission overrides (None = use role default)
+    can_delete     = models.BooleanField(
+        null=True, blank=True, default=None,
+        verbose_name='Може видаляти',
+        help_text='Порожньо = за роллю',
+    )
+    can_export     = models.BooleanField(
+        null=True, blank=True, default=None,
+        verbose_name='Може експортувати',
+        help_text='Порожньо = за роллю',
+    )
+    can_import     = models.BooleanField(
+        null=True, blank=True, default=None,
+        verbose_name='Може імпортувати',
+        help_text='Порожньо = за роллю',
+    )
+    can_view_audit = models.BooleanField(
+        null=True, blank=True, default=None,
+        verbose_name='Бачить журнал аудиту',
+        help_text='Порожньо = за роллю',
+    )
+
     class Meta:
         verbose_name        = 'Профіль користувача'
         verbose_name_plural = 'Профілі користувачів'
@@ -209,3 +231,35 @@ class ModuleRegistry(models.Model):
             return True
         except Exception:
             return True
+
+
+class TenantAccount(models.Model):
+    """
+    Stub: future multi-tenant support.
+    Each TenantAccount represents one client installation of Minerva.
+    """
+
+    class Plan(models.TextChoices):
+        TRIAL   = 'trial',   '⏳ Пробний'
+        STARTER = 'starter', '📦 Стартер'
+        PRO     = 'pro',     '🚀 Pro'
+        CUSTOM  = 'custom',  '🎛️ Custom'
+
+    name       = models.CharField(max_length=200, verbose_name='Назва компанії')
+    slug       = models.SlugField(max_length=80, unique=True, verbose_name='Slug')
+    plan       = models.CharField(
+        max_length=20, choices=Plan.choices, default=Plan.TRIAL, verbose_name='Тариф',
+    )
+    is_active  = models.BooleanField(default=True, verbose_name='Активний')
+    owner      = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='owned_tenants', verbose_name='Власник',
+    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Створено')
+
+    class Meta:
+        verbose_name        = 'Акаунт'
+        verbose_name_plural = 'Акаунти (тенанти)'
+
+    def __str__(self):
+        return f"{self.name} ({self.plan})"

@@ -170,6 +170,14 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
 
     readonly_fields = ("alert_actions", "last_alert_sent")
 
+    def get_form(self, request, obj=None, **kwargs):
+        from django.forms import PasswordInput
+        form = super().get_form(request, obj, **kwargs)
+        for field_name in ('email_host_password', 'telegram_bot_token'):
+            if field_name in form.base_fields:
+                form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        return form
+
     fieldsets = [
         ("📧 Email (SMTP)", {
             "fields": (

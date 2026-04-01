@@ -634,3 +634,27 @@ def run_migrate() -> dict:
         return {"ok": False, "error": "migrate timeout (>120с)", "duration": round(time.time() - start, 1)}
     except Exception as exc:
         return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
+
+
+def run_setup_modules() -> dict:
+    """Run manage.py setup_modules and return output."""
+    start = time.time()
+    try:
+        import sys
+        result = subprocess.run(
+            [sys.executable, "manage.py", "setup_modules"],
+            capture_output=True, text=True, timeout=60,
+            cwd=str(settings.BASE_DIR),
+        )
+        output = (result.stdout + result.stderr).strip()
+        ok = result.returncode == 0
+        return {
+            "ok": ok,
+            "output": output,
+            "duration": round(time.time() - start, 1),
+            **({"error": output} if not ok else {}),
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "setup_modules timeout (>60с)", "duration": round(time.time() - start, 1)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}

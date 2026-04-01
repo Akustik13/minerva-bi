@@ -8,13 +8,25 @@ User = get_user_model()
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
-    """Auto-create UserProfile for new users."""
+    """Auto-create UserProfile for new users and ensure is_staff=True."""
     if not created:
         return
     try:
         from core.models import UserProfile
         role = UserProfile.Role.SUPERADMIN if instance.is_superuser else UserProfile.Role.ADMIN
         UserProfile.objects.get_or_create(user=instance, defaults={'role': role})
+        if not instance.is_staff:
+            User.objects.filter(pk=instance.pk).update(is_staff=True)
+    except Exception:
+        pass
+
+
+@receiver(post_save, sender='core.UserProfile')
+def sync_user_staff_flag(sender, instance, **kwargs):
+    """Ensure user.is_staff=True whenever a UserProfile exists."""
+    try:
+        if not instance.user.is_staff:
+            User.objects.filter(pk=instance.user_id).update(is_staff=True)
     except Exception:
         pass
 

@@ -40,6 +40,14 @@ class BotAdmin(admin.ModelAdmin):
         }),
     )
     
+    def get_form(self, request, obj=None, **kwargs):
+        from django.forms import PasswordInput
+        form = super().get_form(request, obj, **kwargs)
+        for field_name in ('password', 'api_key'):
+            if field_name in form.base_fields:
+                form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        return form
+
     def get_urls(self):
         from django.shortcuts import render as _render
         urls = super().get_urls()
@@ -141,6 +149,14 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "classes": ("collapse",),
         }),
     )
+
+    def get_form(self, request, obj=None, **kwargs):
+        from django.forms import PasswordInput
+        form = super().get_form(request, obj, **kwargs)
+        for field_name in ('client_secret', 'webhook_secret'):
+            if field_name in form.base_fields:
+                form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        return form
 
     def get_urls(self):
         urls = super().get_urls()

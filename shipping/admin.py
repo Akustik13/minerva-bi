@@ -102,6 +102,14 @@ class CarrierAdmin(admin.ModelAdmin):
         }),
     )
 
+    def get_form(self, request, obj=None, **kwargs):
+        from django.forms import PasswordInput
+        form = super().get_form(request, obj, **kwargs)
+        for field_name in ('api_key', 'api_secret', 'track_api_key'):
+            if field_name in form.base_fields:
+                form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        return form
+
     def carrier_type_badge(self, obj):
         colors = {
             "jumingo": "#e91e63", "dhl": "#ffcc00",
