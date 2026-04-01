@@ -1,8 +1,49 @@
+from django import forms
 from django.contrib import admin
 from django.utils.html import format_html
 
 from .models import AuditLog, UserProfile, ModuleBundle, ModuleRegistry
 
+
+# ── UserProfile custom form ───────────────────────────────────────────────────
+
+class UserProfileForm(forms.ModelForm):
+    """Replace raw JSON allowed_modules with friendly checkboxes."""
+
+    modules_override = forms.ModelMultipleChoiceField(
+        queryset=ModuleRegistry.objects.order_by('order', 'name'),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label='Ручне перевизначення модулів',
+        help_text=(
+            'Заповнюйте лише якщо пакет не підходить. '
+            'Порожньо = використовується пакет або роль.'
+        ),
+    )
+
+    class Meta:
+        model = UserProfile
+        fields = '__all__'
+        exclude = ['allowed_modules']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.allowed_modules:
+            self.fields['modules_override'].initial = (
+                ModuleRegistry.objects.filter(app_label__in=self.instance.allowed_modules)
+            )
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        selected = self.cleaned_data.get('modules_override', [])
+        instance.allowed_modules = [m.app_label for m in selected]
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
+
+
+# ── AuditLog ──────────────────────────────────────────────────────────────────
 
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
@@ -40,11 +81,13 @@ class AuditLogAdmin(admin.ModelAdmin):
         )
 
 
+# ── ModuleBundle ──────────────────────────────────────────────────────────────
+
 @admin.register(ModuleBundle)
 class ModuleBundleAdmin(admin.ModelAdmin):
-    list_display    = ('name_badge', 'modules_count', 'is_system', 'description')
-    list_filter     = ('is_system',)
-    search_fields   = ('name', 'description')
+    list_display      = ('name_badge', 'modules_summary', 'is_system', 'description')
+    list_filter       = ('is_system',)
+    search_fields     = ('name', 'description')
     filter_horizontal = ('modules',)
     fieldsets = (
         (None, {
@@ -52,7 +95,7 @@ class ModuleBundleAdmin(admin.ModelAdmin):
         }),
         ('Модулі пакету', {
             'fields': ('modules',),
-            'description': '🔒 Core-модулі (core, config, auth) додаються автоматично',
+            'description': '🔒 Core-модулі (core, config, auth) завжди додаються автоматично',
         }),
     )
 
@@ -64,38 +107,138 @@ class ModuleBundleAdmin(admin.ModelAdmin):
     @admin.display(description='Назва')
     def name_badge(self, obj):
         return format_html(
-            '<span style="background:{};color:#fff;padding:3px 10px;'
+            '<span style="background:{};color:#fff;padding:3px 12px;'
             'border-radius:4px;font-weight:600">{}</span>',
             obj.color or '#58a6ff', obj.name,
         )
 
-    @admin.display(description='Модулів')
-    def modules_count(self, obj):
-        return obj.modules.count()
+    @admin.display(description='Склад пакету')
+    def modules_summary(self, obj):
+        mods = obj.modules.order_by('order').values_list('name', 'tier')
+        tier_colors = {'core': '#f85149', 'standard': '#58a6ff', 'premium': '#c9a84c'}
+        badges = ''.join(
+            format_html(
+                '<span style="background:{};color:#fff;padding:1px 6px;'
+                'border-radius:3px;font-size:11px;margin:1px 2px;display:inline-block">{}</span>',
+                tier_colors.get(tier, '#9aafbe'), name,
+            )
+            for name, tier in mods
+        )
+        return format_html('{}', badges) if badges else '—'
 
+
+# ── UserProfile ───────────────────────────────────────────────────────────────
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display  = ('user', 'role', 'bundle', 'ai_enabled', 'ai_model')
+    form          = UserProfileForm
+    list_display  = ('user', 'role_badge', 'effective_access', 'ai_enabled')
     list_filter   = ('role', 'bundle', 'ai_enabled')
     search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
+    readonly_fields = ('effective_access_detail',)
+
     fieldsets = (
-        ('Користувач', {
+        ('👤 Користувач', {
             'fields': ('user', 'role', 'notes'),
         }),
-        ('Доступ до модулів', {
-            'fields': ('bundle', 'allowed_modules'),
+        ('🧩 Доступ до модулів', {
+            'fields': ('effective_access_detail', 'bundle', 'modules_override'),
             'description': (
-                'Пріоритет: Ручний список → Пакет → Роль. '
-                'Залиште порожніми для автоматичного вибору за роллю.'
+                '<strong>Як визначається доступ (за пріоритетом):</strong><br>'
+                '1️⃣ <strong>Ручне перевизначення</strong> — якщо відмічено нижче<br>'
+                '2️⃣ <strong>Пакет</strong> — якщо вибрано пакет<br>'
+                '3️⃣ <strong>Роль</strong> — автоматично за роллю користувача'
             ),
         }),
-        ('AI-асистент', {
+        ('🤖 AI-асистент', {
             'fields': ('ai_enabled', 'ai_model', 'ai_temperature', 'ai_system_prompt'),
             'classes': ('collapse',),
         }),
     )
 
+    @admin.display(description='Роль')
+    def role_badge(self, obj):
+        colors = {
+            'superadmin': '#f85149', 'admin': '#c9a84c',
+            'manager': '#58a6ff',    'warehouse': '#3fb950',
+            'accountant': '#2196f3', 'ai': '#9c27b0',
+        }
+        color = colors.get(obj.role, '#9aafbe')
+        return format_html(
+            '<span style="background:{};color:#fff;padding:2px 8px;'
+            'border-radius:4px;font-size:11px;font-weight:600">{}</span>',
+            color, obj.get_role_display(),
+        )
+
+    @admin.display(description='Активний доступ')
+    def effective_access(self, obj):
+        modules = obj.get_allowed_modules()
+        if modules == '__all__':
+            return format_html(
+                '<span style="color:#3fb950;font-weight:600">✅ Всі модулі</span>'
+            )
+        source = '📋' if obj.allowed_modules else ('🧩' if obj.bundle_id else '👤')
+        return format_html(
+            '{} <span style="color:var(--text-muted,#9aafbe)">{} модулів</span>',
+            source, len(modules),
+        )
+
+    @admin.display(description='Ефективний доступ (що бачить користувач)')
+    def effective_access_detail(self, obj):
+        if not obj.pk:
+            return '— збережіть профіль щоб побачити —'
+
+        modules = obj.get_allowed_modules()
+
+        # Determine source
+        if obj.allowed_modules:
+            source_html = format_html(
+                '<span style="background:#e3b341;color:#000;padding:2px 8px;'
+                'border-radius:4px;font-size:11px">1️⃣ Ручне перевизначення</span>'
+            )
+        elif obj.bundle_id:
+            source_html = format_html(
+                '<span style="background:{};color:#fff;padding:2px 8px;'
+                'border-radius:4px;font-size:11px">2️⃣ Пакет: {}</span>',
+                obj.bundle.color or '#58a6ff', obj.bundle.name,
+            )
+        else:
+            source_html = format_html(
+                '<span style="background:#607d8b;color:#fff;padding:2px 8px;'
+                'border-radius:4px;font-size:11px">3️⃣ Роль: {}</span>',
+                obj.get_role_display(),
+            )
+
+        if modules == '__all__':
+            return format_html(
+                '{}&nbsp; <strong style="color:#3fb950">Доступ до всіх модулів</strong>',
+                source_html,
+            )
+
+        tier_colors = {'core': '#f85149', 'standard': '#58a6ff', 'premium': '#c9a84c'}
+        try:
+            reg = {
+                r.app_label: r
+                for r in ModuleRegistry.objects.filter(app_label__in=modules)
+            }
+        except Exception:
+            reg = {}
+
+        badges = ''
+        for app_label in sorted(modules):
+            r = reg.get(app_label)
+            name  = r.name if r else app_label
+            color = tier_colors.get(r.tier if r else '', '#9aafbe')
+            badges += format_html(
+                '<span style="background:{};color:#fff;padding:2px 8px;'
+                'border-radius:3px;font-size:11px;margin:2px 3px;display:inline-block">{}</span>',
+                color, name,
+            )
+
+        return format_html('{}&nbsp; {}', source_html, badges)
+
+
+# ── ModuleRegistry ────────────────────────────────────────────────────────────
 
 @admin.register(ModuleRegistry)
 class ModuleRegistryAdmin(admin.ModelAdmin):
@@ -113,9 +256,9 @@ class ModuleRegistryAdmin(admin.ModelAdmin):
     @admin.display(description='Тир')
     def tier_badge(self, obj):
         colors = {
-            'core': '#f85149',
+            'core':     '#f85149',
             'standard': '#58a6ff',
-            'premium': '#c9a84c',
+            'premium':  '#c9a84c',
         }
         color = colors.get(obj.tier, '#9aafbe')
         return format_html(
