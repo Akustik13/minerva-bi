@@ -93,16 +93,26 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "tabele.wsgi.application"
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME", "tabele"),
-        "USER": os.getenv("DB_USER", "tabele"),
-        "PASSWORD": os.getenv("DB_PASSWORD", "tabele"),
-        "HOST": os.getenv("DB_HOST", "localhost"),
-        "PORT": os.getenv("DB_PORT", "5432"),
+if os.getenv("DB_HOST"):
+    # Production (Docker / Synology) — PostgreSQL
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.getenv("DB_NAME", "tabele"),
+            "USER": os.getenv("DB_USER", "tabele"),
+            "PASSWORD": os.getenv("DB_PASSWORD", "tabele"),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
+        }
     }
-}
+else:
+    # Local dev без PostgreSQL — SQLite
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

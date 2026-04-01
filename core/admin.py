@@ -1,6 +1,7 @@
+import json
 from django import forms
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
 
 from .models import AuditLog, UserProfile, ModuleBundle, ModuleRegistry
 
@@ -11,7 +12,7 @@ class UserProfileForm(forms.ModelForm):
     """Replace raw JSON allowed_modules with friendly checkboxes."""
 
     modules_override = forms.ModelMultipleChoiceField(
-        queryset=ModuleRegistry.objects.order_by('order', 'name'),
+        queryset=ModuleRegistry.objects.none(),
         required=False,
         widget=forms.CheckboxSelectMultiple,
         label='Ручне перевизначення модулів',
@@ -28,6 +29,10 @@ class UserProfileForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Set querysets at request time (not at class definition / import time)
+        self.fields['bundle'].queryset = ModuleBundle.objects.all().order_by('name')
+        self.fields['bundle'].empty_label = '— без пакету (використовувати роль) —'
+        self.fields['modules_override'].queryset = ModuleRegistry.objects.order_by('order', 'name')
         if self.instance.pk and self.instance.allowed_modules:
             self.fields['modules_override'].initial = (
                 ModuleRegistry.objects.filter(app_label__in=self.instance.allowed_modules)
@@ -116,7 +121,7 @@ class ModuleBundleAdmin(admin.ModelAdmin):
     def modules_summary(self, obj):
         mods = obj.modules.order_by('order').values_list('name', 'tier')
         tier_colors = {'core': '#f85149', 'standard': '#58a6ff', 'premium': '#c9a84c'}
-        badges = ''.join(
+        badges = mark_safe('').join(
             format_html(
                 '<span style="background:{};color:#fff;padding:1px 6px;'
                 'border-radius:3px;font-size:11px;margin:1px 2px;display:inline-block">{}</span>',
@@ -124,7 +129,7 @@ class ModuleBundleAdmin(admin.ModelAdmin):
             )
             for name, tier in mods
         )
-        return format_html('{}', badges) if badges else '—'
+        return badges if badges else '—'
 
 
 # ── UserProfile ───────────────────────────────────────────────────────────────
@@ -136,6 +141,40 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_filter   = ('role', 'bundle', 'ai_enabled')
     search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
     readonly_fields = ('effective_access_detail',)
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == 'bundle':
+            kwargs['queryset']    = ModuleBundle.objects.all().order_by('name')
+            kwargs['empty_label'] = '— без пакету (використовувати роль) —'
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        from core.utils import ROLE_PERMISSIONS
+        extra = extra_context or {}
+
+        # app_label → pk (string) — needed because checkbox values are PKs
+        module_pk_map = {
+            m.app_label: str(m.pk)
+            for m in ModuleRegistry.objects.all()
+        }
+
+        # role → [app_labels] or '__all__'
+        role_modules = {
+            role: (perms['modules'] if isinstance(perms.get('modules'), list) else '__all__')
+            for role, perms in ROLE_PERMISSIONS.items()
+        }
+
+        # bundle pk → [app_labels]
+        bundle_modules = {
+            str(b.pk): b.get_module_labels()
+            for b in ModuleBundle.objects.prefetch_related('modules')
+        }
+
+        extra['mv_module_pk_map']  = json.dumps(module_pk_map,  ensure_ascii=False)
+        extra['mv_role_modules']   = json.dumps(role_modules,   ensure_ascii=False)
+        extra['mv_bundle_modules'] = json.dumps(bundle_modules, ensure_ascii=False)
+        extra['mv_changelist_url'] = '../'
+        return super().changeform_view(request, object_id, form_url, extra)
 
     fieldsets = (
         ('👤 Користувач', {
@@ -224,7 +263,7 @@ class UserProfileAdmin(admin.ModelAdmin):
         except Exception:
             reg = {}
 
-        badges = ''
+        badges = mark_safe('')
         for app_label in sorted(modules):
             r = reg.get(app_label)
             name  = r.name if r else app_label

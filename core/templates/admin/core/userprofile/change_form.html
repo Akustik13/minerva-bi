@@ -1,0 +1,65 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block extrahead %}
+{{ block.super }}
+<script>
+(function () {
+  var MODULE_PK_MAP  = {{ mv_module_pk_map|safe }};   // {app_label: "pk"}
+  var ROLE_MODULES   = {{ mv_role_modules|safe }};     // {role: [app_label,...] | "__all__"}
+  var BUNDLE_MODULES = {{ mv_bundle_modules|safe }};   // {bundle_pk: [app_label,...]}
+
+  function toPks(appLabels) {
+    if (appLabels === '__all__') return '__all__';
+    return appLabels.map(function (l) { return MODULE_PK_MAP[l]; }).filter(Boolean);
+  }
+
+  function setCheckboxes(pks) {
+    document.querySelectorAll('input[name="modules_override"]').forEach(function (cb) {
+      cb.checked = (pks === '__all__') ? true : pks.indexOf(cb.value) !== -1;
+    });
+  }
+
+  function syncFromForm() {
+    var bundleSel = document.querySelector('select[name="bundle"]');
+    var roleSel   = document.querySelector('select[name="role"]');
+    var bundleVal = bundleSel ? bundleSel.value : '';
+
+    if (bundleVal && BUNDLE_MODULES[bundleVal]) {
+      setCheckboxes(toPks(BUNDLE_MODULES[bundleVal]));
+    } else if (roleSel) {
+      setCheckboxes(toPks(ROLE_MODULES[roleSel.value] || []));
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    var bundleSel = document.querySelector('select[name="bundle"]');
+    var roleSel   = document.querySelector('select[name="role"]');
+
+    if (bundleSel) bundleSel.addEventListener('change', syncFromForm);
+    if (roleSel)   roleSel.addEventListener('change', syncFromForm);
+
+    // ── Cancel button ──────────────────────────────────────────────
+    var submitRow = document.querySelector('.submit-row');
+    if (submitRow) {
+      var btn = document.createElement('a');
+      btn.href = '{{ mv_changelist_url }}';
+      btn.textContent = 'Скасувати';
+      btn.style.cssText = 'float:left;margin:5px 0 0 0;padding:8px 16px;'
+        + 'background:transparent;border:1px solid var(--border-strong,#2a3f52);'
+        + 'border-radius:4px;color:var(--text-muted,#9aafbe);'
+        + 'text-decoration:none;font-size:13px;cursor:pointer;';
+      btn.onmouseenter = function () {
+        btn.style.color = 'var(--text,#e6edf3)';
+        btn.style.borderColor = 'var(--text-muted,#9aafbe)';
+      };
+      btn.onmouseleave = function () {
+        btn.style.color = 'var(--text-muted,#9aafbe)';
+        btn.style.borderColor = 'var(--border-strong,#2a3f52)';
+      };
+      submitRow.appendChild(btn);
+    }
+  });
+})();
+</script>
+{% endblock %}
