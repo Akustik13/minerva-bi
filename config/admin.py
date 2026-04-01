@@ -1,10 +1,55 @@
+from django import forms
 from django.contrib import admin
 from django.forms import widgets
 from django.shortcuts import redirect, render
 from django.urls import path, reverse
 from django.utils.html import format_html
 
-from config.models import SystemSettings, DocumentSettings, NotificationSettings, ThemeSettings
+from config.models import (
+    ALL_MODULES, SystemSettings, DocumentSettings, NotificationSettings, ThemeSettings,
+)
+
+
+# ── SystemSettings form — checkboxes for enabled_modules ─────────────────────
+
+class SystemSettingsForm(forms.ModelForm):
+
+    enabled_modules_choice = forms.MultipleChoiceField(
+        choices=[],   # populated in __init__ from ModuleRegistry or ALL_MODULES
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label='Активні модулі',
+        help_text='Відмічені модулі відображаються у бічному меню та доступні для роботи',
+    )
+
+    class Meta:
+        model = SystemSettings
+        exclude = ['enabled_modules']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Build choices from ModuleRegistry (non-core), fallback to ALL_MODULES
+        try:
+            from core.models import ModuleRegistry
+            qs = ModuleRegistry.objects.exclude(tier='core').order_by('order', 'name')
+            choices = [(m.app_label, m.name) for m in qs]
+        except Exception:
+            choices = [(m, m) for m in ALL_MODULES]
+
+        self.fields['enabled_modules_choice'].choices = choices
+
+        # Pre-select currently enabled modules
+        current = []
+        if self.instance and self.instance.pk:
+            current = self.instance.enabled_modules or []
+        self.fields['enabled_modules_choice'].initial = current
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.enabled_modules = list(self.cleaned_data.get('enabled_modules_choice', []))
+        if commit:
+            instance.save()
+        return instance
 
 
 class ColorPickerWidget(widgets.TextInput):
@@ -37,7 +82,8 @@ class ColorPickerWidget(widgets.TextInput):
 
 @admin.register(SystemSettings)
 class SystemSettingsAdmin(admin.ModelAdmin):
-    # Singleton: redirect changelist → change view for pk=1
+    form = SystemSettingsForm
+
     def changelist_view(self, request, extra_context=None):
         obj, _ = SystemSettings.objects.get_or_create(pk=1, defaults={
             "company_name": "Моя компанія",
@@ -49,10 +95,10 @@ class SystemSettingsAdmin(admin.ModelAdmin):
             "fields": ("company_name", "logo", "default_currency", "timezone"),
         }),
         ("📦 Активні модулі", {
-            "fields": ("enabled_modules", "accounting_level"),
+            "fields": ("enabled_modules_choice", "accounting_level"),
             "description": (
-                "enabled_modules — список app labels через кому або JSON-масив. "
-                "Доступні: crm, accounting, sales, shipping, inventory, bots"
+                "Оберіть модулі які активні у системі. "
+                "Базові модулі (Ядро, Налаштування, Авторизація) завжди увімкнені."
             ),
         }),
         ("💰 Фінанси", {
@@ -63,7 +109,7 @@ class SystemSettingsAdmin(admin.ModelAdmin):
             "fields": ("weight_unit", "dimension_unit", "country_code_format"),
             "description": (
                 "Одиниці відображення у відправленнях та пакувальних матеріалах. "
-                "Формат країни — ISO-2 (DE) або ISO-3 (DEU) — впливає на адмін-інтерфейс."
+                "Формат країни — ISO-2 (DE) або ISO-3 (DEU)."
             ),
         }),
         ("⚙️ Система", {

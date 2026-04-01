@@ -25,17 +25,63 @@ MODULES = [
 
 
 DEFAULT_BUNDLES = [
+    # ── Tier-based (автоматично підхоплюють нові модулі при setup_modules) ──
+    {
+        'name': '⭐ Повний доступ',
+        'color': '#c9a84c',
+        'description': 'Всі модулі — для адміністраторів системи',
+        'tiers': ('core', 'standard', 'premium'),
+        'is_system': True,
+    },
     {
         'name': '📦 Стандарт',
         'color': '#58a6ff',
-        'description': 'CRM, Продажі, Склад, Доставка, Задачі',
+        'description': 'CRM, Продажі, Склад, Доставка, Задачі — базовий пакет',
         'tiers': ('core', 'standard'),
+        'is_system': True,
+    },
+    # ── Рольові пакети ──────────────────────────────────────────────────────
+    {
+        'name': '💼 Менеджер',
+        'color': '#2196f3',
+        'description': 'CRM, стратегії, продажі, доставка — для менеджерів з продажів',
+        'app_labels': ['crm', 'strategy', 'sales', 'shipping'],
+        'is_system': True,
     },
     {
-        'name': '⭐ Преміум',
-        'color': '#c9a84c',
-        'description': 'Всі модулі включно з AI, API та авто-імпортом',
-        'tiers': ('core', 'standard', 'premium'),
+        'name': '📦 Складник',
+        'color': '#4caf50',
+        'description': 'Склад та доставка — для складських працівників',
+        'app_labels': ['inventory', 'shipping'],
+        'is_system': True,
+    },
+    {
+        'name': '💰 Бухгалтер',
+        'color': '#ff9800',
+        'description': 'Продажі, бухгалтерія, склад — для фінансового відділу',
+        'app_labels': ['sales', 'accounting', 'inventory'],
+        'is_system': True,
+    },
+    {
+        'name': '🎯 CRM-фокус',
+        'color': '#9c27b0',
+        'description': 'Тільки CRM та стратегії — для аналітиків клієнтської бази',
+        'app_labels': ['crm', 'strategy'],
+        'is_system': True,
+    },
+    {
+        'name': '🛒 Інтернет-магазин',
+        'color': '#e91e63',
+        'description': 'Продажі + CRM + Склад + Доставка — для e-commerce',
+        'app_labels': ['crm', 'sales', 'inventory', 'shipping'],
+        'is_system': True,
+    },
+    {
+        'name': '🔒 Тільки ядро',
+        'color': '#607d8b',
+        'description': 'Мінімальний доступ — тільки базові системні модулі',
+        'app_labels': [],
+        'is_system': True,
     },
 ]
 
@@ -59,7 +105,7 @@ class Command(BaseCommand):
             )
             if was_created:
                 created += 1
-                self.stdout.write(f"  ✅ Створено: {m['name']} ({m['app_label']})")
+                self.stdout.write(f"  [+] {m['name']} ({m['app_label']})")
             else:
                 changed = False
                 for field in ('name', 'tier', 'order'):
@@ -69,22 +115,32 @@ class Command(BaseCommand):
                 if changed:
                     obj.save(update_fields=['name', 'tier', 'order'])
                     updated += 1
-                    self.stdout.write(f"  🔄 Оновлено: {m['name']}")
+                    self.stdout.write(f"  [~] {m['name']}")
 
         self.stdout.write(self.style.SUCCESS(
-            f'\n✅ Модулі: {created} створено, {updated} оновлено'
+            f'\nModules: {created} created, {updated} updated'
         ))
 
         # ── Default bundles ────────────────────────────────────────────────────
-        self.stdout.write('\nПакети:')
+        self.stdout.write('\nBundles:')
         for b in DEFAULT_BUNDLES:
             bundle, b_created = ModuleBundle.objects.get_or_create(
                 name=b['name'],
-                defaults={'color': b['color'], 'description': b['description'], 'is_system': True},
+                defaults={
+                    'color': b['color'],
+                    'description': b['description'],
+                    'is_system': b.get('is_system', False),
+                },
             )
-            mods = ModuleRegistry.objects.filter(tier__in=b['tiers'])
+            # Resolve modules: by tier OR by explicit app_labels list
+            if 'tiers' in b:
+                mods = ModuleRegistry.objects.filter(tier__in=b['tiers'])
+            else:
+                labels = b.get('app_labels', [])
+                mods = ModuleRegistry.objects.filter(app_label__in=labels) if labels else ModuleRegistry.objects.none()
             bundle.modules.set(mods)
-            status = '✅ Створено' if b_created else '🔄 Оновлено'
-            self.stdout.write(f"  {status}: {b['name']} ({mods.count()} модулів)")
+            status = '[+]' if b_created else '[~]'
+            safe_name = b['name'].encode('ascii', 'replace').decode()
+            self.stdout.write(f"  {status} {safe_name} ({mods.count()} modules)")
 
-        self.stdout.write(self.style.SUCCESS('\n✅ Готово\n'))
+        self.stdout.write(self.style.SUCCESS('\nDone.\n'))
