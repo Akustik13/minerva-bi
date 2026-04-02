@@ -104,6 +104,13 @@ class ModuleBundleAdmin(admin.ModelAdmin):
         }),
     )
 
+    def get_form(self, request, obj=None, **kwargs):
+        from config.admin import ColorPickerWidget
+        form = super().get_form(request, obj, **kwargs)
+        if 'color' in form.base_fields:
+            form.base_fields['color'].widget = ColorPickerWidget()
+        return form
+
     def has_delete_permission(self, request, obj=None):
         if obj and obj.is_system:
             return False
