@@ -1,6 +1,7 @@
 import json
 from django import forms
 from django.contrib import admin
+from django.contrib.auth.models import User
 from django.utils.html import format_html, mark_safe
 
 from .models import AuditLog, UserProfile, ModuleBundle, ModuleRegistry, TenantAccount
@@ -325,32 +326,159 @@ class ModuleRegistryAdmin(admin.ModelAdmin):
 
 @admin.register(TenantAccount)
 class TenantAccountAdmin(admin.ModelAdmin):
-    list_display  = ('name', 'slug', 'plan_badge', 'is_active', 'owner', 'created_at')
-    list_filter   = ('plan', 'is_active')
-    search_fields = ('name', 'slug', 'owner__username')
-    readonly_fields = ('created_at',)
+    """Vendor dashboard — visible to superadmin only."""
+
+    list_display  = (
+        'company_name', 'owner_email', 'package_badge',
+        'status_badge', 'days_badge', 'modules_count',
+        'registered_at', 'actions_col',
+    )
+    list_filter   = ('status', 'package', 'company_country', 'email_verified')
+    search_fields = ('company_name', 'owner_email', 'owner_name')
+    readonly_fields = (
+        'registered_at', 'activated_at', 'last_login_at',
+        'verification_token', 'verification_sent_at',
+        'active_modules', 'vendor_summary',
+    )
+    ordering = ['-registered_at']
 
     fieldsets = (
-        ('🏢 Акаунт', {
-            'fields': ('name', 'slug', 'plan', 'is_active', 'owner'),
+        ('🏢 Клієнт', {
+            'fields': (
+                'company_name', 'company_country', 'contact_phone',
+                'owner_name', 'owner_email', 'owner_user',
+            ),
         }),
-        ('📅 Дати', {
-            'fields': ('created_at',),
+        ('📦 Пакет і статус', {
+            'fields': ('package', 'status', 'email_verified', 'trial_ends_at', 'paid_until'),
+            'description': (
+                'Після оплати: змінити status → active, '
+                'встановити paid_until на дату закінчення.'
+            ),
+        }),
+        ('🧩 Активні модулі', {
+            'fields': ('active_modules',),
+            'description': 'Оновлюється автоматично при зміні пакету.',
+            'classes': ('collapse',),
+        }),
+        ('📊 Статистика', {
+            'fields': ('vendor_summary',),
+        }),
+        ('🗒️ Нотатки', {
+            'fields': ('notes',),
+        }),
+        ('📋 Службові', {
+            'fields': ('registered_at', 'activated_at', 'last_login_at', 'verification_sent_at'),
             'classes': ('collapse',),
         }),
     )
 
-    @admin.display(description='Тариф')
-    def plan_badge(self, obj):
-        colors = {
-            'trial':   '#607d8b',
-            'starter': '#58a6ff',
-            'pro':     '#3fb950',
-            'custom':  '#c9a84c',
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def save_model(self, request, obj, form, change):
+        if change and 'package' in (form.changed_data or []):
+            super().save_model(request, obj, form, change)
+            obj.activate_modules()
+        else:
+            super().save_model(request, obj, form, change)
+        if change and 'status' in (form.changed_data or []):
+            AuditLog.log(
+                action='settings',
+                user=request.user,
+                module='core',
+                model_name='TenantAccount',
+                object_id=obj.pk,
+                object_repr=str(obj),
+                extra={'event': 'status_changed', 'company': obj.company_name, 'new_status': obj.status},
+                request=request,
+            )
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        qs = TenantAccount.objects.all()
+        extra_context.update({
+            'active_count':  qs.filter(status='active').count(),
+            'trial_count':   qs.filter(status='trial').count(),
+            'expired_count': qs.filter(status='expired').count(),
+            'pending_count': qs.filter(status='pending').count(),
+            'total_count':   qs.count(),
+        })
+        return super().changelist_view(request, extra_context)
+
+    # ── List display columns ───────────────────────────────
+
+    @admin.display(description='Пакет')
+    def package_badge(self, obj):
+        COLORS = {
+            'free':     '#6c757d', 'starter':  '#007bff',
+            'business': '#fd7e14', 'custom':   '#6610f2',
         }
-        color = colors.get(obj.plan, '#9aafbe')
+        c = COLORS.get(obj.package, '#333')
+        label = obj.get_package_display().split(' —')[0]
         return format_html(
-            '<span style="background:{};color:#fff;padding:2px 8px;'
-            'border-radius:4px;font-size:11px">{}</span>',
-            color, obj.get_plan_display(),
-        )
+            '<span style="padding:2px 8px;border-radius:10px;'
+            'font-size:11px;background:{};color:#fff">{}</span>',
+            c, label)
+
+    @admin.display(description='Статус')
+    def status_badge(self, obj):
+        COLORS = {
+            'pending':   ('#ffc107', '#000'),
+            'trial':     ('#17a2b8', '#fff'),
+            'active':    ('#28a745', '#fff'),
+            'suspended': ('#fd7e14', '#fff'),
+            'expired':   ('#dc3545', '#fff'),
+            'cancelled': ('#6c757d', '#fff'),
+        }
+        bg, fg = COLORS.get(obj.status, ('#333', '#fff'))
+        return format_html(
+            '<span style="padding:2px 8px;border-radius:10px;'
+            'font-size:11px;background:{};color:{}">{}</span>',
+            bg, fg, obj.get_status_display())
+
+    @admin.display(description='Залишилось')
+    def days_badge(self, obj):
+        days = obj.days_until_expiry
+        if days is None:
+            return '—'
+        if days < 0:
+            return format_html('<span style="color:#dc3545">Прострочено {}д</span>', abs(days))
+        if days <= 7:
+            return format_html('<span style="color:#fd7e14">{}д</span>', days)
+        return format_html('<span style="color:#28a745">{}д</span>', days)
+
+    @admin.display(description='Модулі')
+    def modules_count(self, obj):
+        n = len(obj.active_modules or [])
+        return format_html('<span style="color:#999;font-size:12px">{} модулів</span>', n)
+
+    @admin.display(description='Дії')
+    def actions_col(self, obj):
+        if obj.status == 'pending':
+            return format_html(
+                '<a href="{}/change/" style="color:#ffc107;font-size:12px">Активувати →</a>',
+                obj.pk)
+        if obj.status in ('expired', 'trial'):
+            return format_html(
+                '<a href="{}/change/" style="color:#007bff;font-size:12px">Продовжити →</a>',
+                obj.pk)
+        return '—'
+
+    @admin.display(description='Зведення')
+    def vendor_summary(self, obj):
+        if not obj.pk:
+            return '—'
+        lines = [
+            f'Email підтверджено: {"✅ Так" if obj.email_verified else "❌ Ні"}',
+            f'Модулів активних: {len(obj.active_modules or [])}',
+            f'Реєстрація: {obj.registered_at.strftime("%d.%m.%Y %H:%M") if obj.registered_at else "—"}',
+            f'Активація: {obj.activated_at.strftime("%d.%m.%Y %H:%M") if obj.activated_at else "—"}',
+            f'Trial до: {obj.trial_ends_at.strftime("%d.%m.%Y") if obj.trial_ends_at else "—"}',
+        ]
+        return format_html(
+            '<div style="font-size:13px;line-height:1.8">{}</div>',
+            format_html('<br>'.join(lines)))

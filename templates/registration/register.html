@@ -1,0 +1,105 @@
+{% extends "registration/base_public.html" %}
+{% block title %}Реєстрація — {{ company_name }}{% endblock %}
+{% block body %}
+<div class="card">
+  <a href="/" class="logo">
+    <div class="logo-icon">⬡</div>{{ company_name }}
+  </a>
+  <h2>Створити акаунт</h2>
+  <p class="sub">Пробний доступ 30 днів — безкоштовно, без прив'язки картки</p>
+
+  {% if form.non_field_errors %}
+  <div class="err" style="margin-bottom:12px">
+    {% for e in form.non_field_errors %}{{ e }}{% endfor %}
+  </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <label>Назва компанії *</label>
+    <input type="text" name="company_name" required
+           value="{{ form.company_name.value|default:'' }}"
+           placeholder="Müller GmbH">
+    {% if form.company_name.errors %}<div class="err">{{ form.company_name.errors.0 }}</div>{% endif %}
+
+    <label>Країна</label>
+    <select name="company_country">
+      {% for val, label in form.fields.company_country.choices %}
+      <option value="{{ val }}"{% if form.company_country.value == val %} selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Телефон</label>
+    <input type="tel" name="contact_phone"
+           value="{{ form.contact_phone.value|default:'' }}"
+           placeholder="+49 123 456789">
+
+    <label>Ваше ім'я *</label>
+    <input type="text" name="owner_name" required
+           value="{{ form.owner_name.value|default:'' }}"
+           placeholder="Hans Müller">
+    {% if form.owner_name.errors %}<div class="err">{{ form.owner_name.errors.0 }}</div>{% endif %}
+
+    <label>Email *</label>
+    <input type="email" name="email" required
+           value="{{ form.email.value|default:'' }}"
+           placeholder="hans@firma.de">
+    {% if form.email.errors %}<div class="err">{{ form.email.errors.0 }}</div>{% endif %}
+
+    <label>Пароль *</label>
+    <input type="password" name="password1" required placeholder="Мінімум 8 символів">
+    {% if form.password1.errors %}<div class="err">{{ form.password1.errors.0 }}</div>{% endif %}
+
+    <label>Підтвердіть пароль *</label>
+    <input type="password" name="password2" required>
+    {% if form.password2.errors %}<div class="err">{{ form.password2.errors.0 }}</div>{% endif %}
+
+    <hr class="divider">
+
+    <label>Оберіть пакет</label>
+    <div class="pkg-grid" id="pkg-grid">
+      {% for val, lbl in form.fields.package.choices %}
+      <label class="pkg {% if form.package.value == val or forloop.counter == 2 and not form.package.value %}selected{% endif %}"
+             style="cursor:pointer">
+        <input type="radio" name="package" value="{{ val }}"
+               style="display:none"
+               {% if form.package.value == val %}checked
+               {% elif forloop.counter == 2 and not form.package.value %}checked{% endif %}>
+        <div class="pkg-name">{% if val == 'free' %}Free{% elif val == 'starter' %}Starter{% elif val == 'business' %}Business{% else %}Custom{% endif %}</div>
+        <div class="pkg-price">
+          {% if val == 'free' %}Безкоштовно
+          {% elif val == 'starter' %}€30/міс
+          {% elif val == 'business' %}€60/міс
+          {% else %}Від €300{% endif %}
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="check-row" style="margin-top:20px">
+      <input type="checkbox" name="agree_terms" id="terms" required>
+      <label for="terms">
+        Я погоджуюсь з <a href="#" class="link">умовами використання</a>
+        та обробкою персональних даних
+      </label>
+    </div>
+    {% if form.agree_terms.errors %}<div class="err">{{ form.agree_terms.errors.0 }}</div>{% endif %}
+
+    <button type="submit" class="btn">Зареєструватись →</button>
+  </form>
+
+  <div style="text-align:center;margin-top:20px;font-size:13px;color:var(--muted)">
+    Вже є акаунт? <a href="/admin/login/" class="link">Увійти</a>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.pkg input[type=radio]').forEach(function(r){
+  r.addEventListener('change', function(){
+    document.querySelectorAll('.pkg').forEach(function(p){ p.classList.remove('selected'); });
+    r.closest('.pkg').classList.add('selected');
+  });
+});
+</script>
+{% endblock %}

@@ -10,14 +10,15 @@ class AuditLog(models.Model):
     """Immutable audit trail for all significant actions."""
 
     class Action(models.TextChoices):
-        LOGIN   = 'login',   'Вхід'
-        LOGOUT  = 'logout',  'Вихід'
-        CREATE  = 'create',  'Створення'
-        UPDATE  = 'update',  'Зміна'
-        DELETE  = 'delete',  'Видалення'
-        VIEW    = 'view',    'Перегляд'
-        EXPORT  = 'export',  'Експорт'
-        IMPORT  = 'import',  'Імпорт'
+        LOGIN    = 'login',    'Вхід'
+        LOGOUT   = 'logout',   'Вихід'
+        CREATE   = 'create',   'Створення'
+        UPDATE   = 'update',   'Зміна'
+        DELETE   = 'delete',   'Видалення'
+        VIEW     = 'view',     'Перегляд'
+        EXPORT   = 'export',   'Експорт'
+        IMPORT   = 'import',   'Імпорт'
+        SETTINGS = 'settings', 'Налаштування'
 
     user         = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL,
@@ -53,6 +54,29 @@ class AuditLog(models.Model):
 
     def delete(self, *args, **kwargs):
         pass  # immutable — do not allow deletes from ORM
+
+    @classmethod
+    def log(cls, action, module=None, model_name=None, object_id=None,
+            object_repr='', extra=None, user=None, request=None):
+        """Convenience factory for creating audit log entries."""
+        ip = None
+        if request:
+            ip = request.META.get('REMOTE_ADDR')
+            if not user and hasattr(request, 'user') and request.user.is_authenticated:
+                user = request.user
+        entry_extra = dict(extra or {})
+        if module:
+            entry_extra.setdefault('module', module)
+        if model_name:
+            entry_extra.setdefault('model_name', model_name)
+        cls.objects.create(
+            user=user,
+            action=action,
+            object_id=str(object_id) if object_id is not None else '',
+            object_repr=str(object_repr),
+            ip_address=ip,
+            extra=entry_extra,
+        )
 
 
 class UserProfile(models.Model):
@@ -232,34 +256,132 @@ class ModuleRegistry(models.Model):
         except Exception:
             return True
 
+    @classmethod
+    def get_active_apps(cls) -> list:
+        """Return list of active app_labels."""
+        try:
+            return list(cls.objects.filter(is_active=True).values_list('app_label', flat=True))
+        except Exception:
+            return []
+
 
 class TenantAccount(models.Model):
     """
-    Stub: future multi-tenant support.
-    Each TenantAccount represents one client installation of Minerva.
+    Client account — each represents one Minerva installation / tenant.
+    Vendor (superadmin) manages statuses and packages here.
     """
 
-    class Plan(models.TextChoices):
-        TRIAL   = 'trial',   '⏳ Пробний'
-        STARTER = 'starter', '📦 Стартер'
-        PRO     = 'pro',     '🚀 Pro'
-        CUSTOM  = 'custom',  '🎛️ Custom'
+    STATUS_CHOICES = [
+        ('pending',   'Очікує підтвердження email'),
+        ('trial',     'Пробний період'),
+        ('active',    'Активний'),
+        ('suspended', 'Призупинений'),
+        ('expired',   'Термін вийшов'),
+        ('cancelled', 'Скасований'),
+    ]
 
-    name       = models.CharField(max_length=200, verbose_name='Назва компанії')
-    slug       = models.SlugField(max_length=80, unique=True, verbose_name='Slug')
-    plan       = models.CharField(
-        max_length=20, choices=Plan.choices, default=Plan.TRIAL, verbose_name='Тариф',
-    )
-    is_active  = models.BooleanField(default=True, verbose_name='Активний')
-    owner      = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.SET_NULL,
-        related_name='owned_tenants', verbose_name='Власник',
-    )
-    created_at = models.DateTimeField(auto_now_add=True, verbose_name='Створено')
+    PACKAGE_CHOICES = [
+        ('free',     'Free — базові модулі'),
+        ('starter',  'Starter — €30/міс'),
+        ('business', 'Business — €60/міс'),
+        ('custom',   'Custom — від €300'),
+    ]
+
+    # ── Статус і пакет ──────────────────────────────────────
+    status  = models.CharField(
+        max_length=20, choices=STATUS_CHOICES,
+        default='pending', verbose_name='Статус', db_index=True)
+    package = models.CharField(
+        max_length=20, choices=PACKAGE_CHOICES,
+        default='starter', verbose_name='Пакет')
+
+    # ── Дати ────────────────────────────────────────────────
+    trial_ends_at   = models.DateField(null=True, blank=True, verbose_name='Trial до')
+    paid_until      = models.DateField(null=True, blank=True, verbose_name='Оплачено до')
+    registered_at   = models.DateTimeField(auto_now_add=True, verbose_name='Дата реєстрації')
+    activated_at    = models.DateTimeField(null=True, blank=True, verbose_name='Дата активації')
+    last_login_at   = models.DateTimeField(null=True, blank=True, verbose_name='Остання активність')
+
+    # ── Компанія ────────────────────────────────────────────
+    company_name    = models.CharField(max_length=200, default='', verbose_name='Назва компанії')
+    company_country = models.CharField(max_length=100, blank=True, default='DE', verbose_name='Країна')
+    contact_phone   = models.CharField(max_length=50, blank=True, verbose_name='Телефон')
+
+    # ── Власник ─────────────────────────────────────────────
+    owner_email = models.EmailField(default='', verbose_name='Email власника')
+    owner_name  = models.CharField(max_length=200, blank=True, verbose_name="Ім'я власника")
+    owner_user  = models.OneToOneField(
+        User, null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name='tenant_owner',
+        verbose_name='Акаунт власника')
+
+    # ── Активні модулі ───────────────────────────────────────
+    active_modules = models.JSONField(default=list, blank=True, verbose_name='Активні модулі')
+
+    # ── Email підтвердження ──────────────────────────────────
+    email_verified       = models.BooleanField(default=False, verbose_name='Email підтверджено')
+    verification_token   = models.CharField(max_length=64, blank=True, verbose_name='Токен підтвердження')
+    verification_sent_at = models.DateTimeField(null=True, blank=True)
+
+    # ── Нотатки вендора ──────────────────────────────────────
+    notes = models.TextField(blank=True, verbose_name='Нотатки (тільки вендор бачить)')
 
     class Meta:
-        verbose_name        = 'Акаунт'
-        verbose_name_plural = 'Акаунти (тенанти)'
+        verbose_name        = 'Акаунт клієнта'
+        verbose_name_plural = 'Акаунти клієнтів'
+        ordering            = ['-registered_at']
 
     def __str__(self):
-        return f"{self.name} ({self.plan})"
+        return f'{self.company_name} [{self.get_status_display()}]'
+
+    # ── Business logic ───────────────────────────────────────
+
+    def get_package_modules(self):
+        """Modules included in the package."""
+        PACKAGES = {
+            'free':     ['crm', 'sales', 'inventory', 'dashboard', 'faq'],
+            'starter':  ['crm', 'sales', 'inventory', 'shipping',
+                         'labels_app', 'tasks', 'backup', 'dashboard', 'faq'],
+            'business': ['crm', 'sales', 'inventory', 'shipping',
+                         'labels_app', 'tasks', 'backup', 'dashboard', 'faq',
+                         'strategy', 'accounting', 'autoimport'],
+            'custom':   '__all__',
+            'trial':    ['crm', 'sales', 'inventory', 'shipping', 'dashboard', 'faq'],
+        }
+        return PACKAGES.get(self.package, PACKAGES['starter'])
+
+    def activate_modules(self):
+        """Set active_modules from package definition."""
+        modules = self.get_package_modules()
+        if modules == '__all__':
+            self.active_modules = ModuleRegistry.get_active_apps()
+        else:
+            active = set(ModuleRegistry.get_active_apps())
+            self.active_modules = [m for m in modules if m in active]
+        self.save(update_fields=['active_modules'])
+
+    def is_trial_expired(self):
+        if not self.trial_ends_at:
+            return False
+        return timezone.now().date() > self.trial_ends_at
+
+    def is_paid_expired(self):
+        if not self.paid_until:
+            return True
+        return timezone.now().date() > self.paid_until
+
+    @property
+    def is_access_allowed(self):
+        if self.status == 'active':
+            return not self.is_paid_expired()
+        if self.status == 'trial':
+            return not self.is_trial_expired()
+        return False
+
+    @property
+    def days_until_expiry(self):
+        end = self.paid_until or self.trial_ends_at
+        if not end:
+            return None
+        return (end - timezone.now().date()).days

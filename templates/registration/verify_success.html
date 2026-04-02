@@ -1,0 +1,16 @@
+{% extends "registration/base_public.html" %}
+{% block title %}Email підтверджено — {{ company_name }}{% endblock %}
+{% block body %}
+<div class="card" style="text-align:center">
+  <div style="font-size:56px;margin-bottom:20px">🎉</div>
+  <h2>Акаунт активовано!</h2>
+  <p class="sub" style="margin-bottom:24px">
+    Пробний доступ на 30 днів активовано.<br>
+    Ви можете зайти в систему прямо зараз.
+  </p>
+  <a href="/admin/" class="btn" style="display:inline-block;
+     text-decoration:none;padding:13px 28px;width:auto;margin-top:0">
+    Увійти в {{ company_name }} →
+  </a>
+</div>
+{% endblock %}

@@ -129,6 +129,12 @@ section { padding:80px 24px; }
                      display:flex; align-items:center; gap:8px; color:var(--muted); }
 .plan-features li:last-child { border:none; }
 .plan-features li::before { content:'✓'; color:var(--ok); font-weight:700; font-size:12px; }
+.plan-cta { display:block; margin-top:20px; padding:10px 20px; border-radius:8px;
+            text-align:center; font-size:13px; font-weight:600; text-decoration:none;
+            border:1px solid var(--border); color:var(--accent); transition:.2s; }
+.plan-cta:hover { border-color:var(--accent); background:rgba(201,168,76,.06); }
+.plan-cta-featured { background:var(--accent); color:#0a0e1a; border-color:var(--accent); }
+.plan-cta-featured:hover { background:var(--accent2); border-color:var(--accent2); }
 
 /* ── CONTACT ── */
 .cf-wrap { max-width:540px; margin:0 auto; }
@@ -191,10 +197,10 @@ footer { background:var(--bg2); border-top:1px solid var(--border);
       <button onclick="setLang('de')" data-lang="de">DE</button>
       <button onclick="setLang('en')" data-lang="en">EN</button>
     </div>
-    <a href="/admin/login/" class="btn-nav">
-      <span data-li="uk">Увійти</span>
-      <span data-li="de">Anmelden</span>
-      <span data-li="en">Login</span>
+    <a href="/register/" class="btn-nav">
+      <span data-li="uk">Спробувати</span>
+      <span data-li="de">Testen</span>
+      <span data-li="en">Try free</span>
     </a>
   </div>
 </nav>
@@ -217,15 +223,15 @@ footer { background:var(--bg2); border-top:1px solid var(--border);
     <span data-li="en">{{ company_tagline }}. CRM, sales, inventory, shipping — all in one system.</span>
   </p>
   <div class="hero-btns">
-    <a href="/admin/login/" class="btn-primary">
-      <span data-li="uk">Відкрити систему</span>
-      <span data-li="de">System öffnen</span>
-      <span data-li="en">Open system</span>
+    <a href="/register/" class="btn-primary">
+      <span data-li="uk">Спробувати безкоштовно →</span>
+      <span data-li="de">Kostenlos testen →</span>
+      <span data-li="en">Start free trial →</span>
     </a>
-    <a href="#contact" class="btn-outline">
-      <span data-li="uk">Зв'язатись</span>
-      <span data-li="de">Kontakt</span>
-      <span data-li="en">Contact us</span>
+    <a href="/admin/login/" class="btn-outline">
+      <span data-li="uk">Увійти</span>
+      <span data-li="de">Anmelden</span>
+      <span data-li="en">Login</span>
     </a>
   </div>
   <div class="hero-stats">
@@ -349,6 +355,11 @@ footer { background:var(--bg2); border-top:1px solid var(--border);
           <li><span data-li="uk">1 користувач</span><span data-li="de">1 Benutzer</span><span data-li="en">1 user</span></li>
           <li><span data-li="uk">Без обмежень даних</span><span data-li="de">Keine Datenbegrenzung</span><span data-li="en">No data limits</span></li>
         </ul>
+        <a href="/register/?package=free" class="plan-cta">
+          <span data-li="uk">Почати безкоштовно</span>
+          <span data-li="de">Kostenlos starten</span>
+          <span data-li="en">Start free</span>
+        </a>
       </div>
       <div class="plan featured">
         <div class="plan-badge">⭐ Popular</div>
@@ -368,6 +379,11 @@ footer { background:var(--bg2); border-top:1px solid var(--border);
           <li><span data-li="uk">AI-асистент</span><span data-li="de">KI-Assistent</span><span data-li="en">AI assistant</span></li>
           <li><span data-li="uk">Підтримка</span><span data-li="de">Support</span><span data-li="en">Support</span></li>
         </ul>
+        <a href="/register/?package=business" class="plan-cta plan-cta-featured">
+          <span data-li="uk">Почати →</span>
+          <span data-li="de">Jetzt starten →</span>
+          <span data-li="en">Get started →</span>
+        </a>
       </div>
       <div class="plan">
         <div class="plan-name">🎛️ Custom</div>
@@ -387,6 +403,11 @@ footer { background:var(--bg2); border-top:1px solid var(--border);
           <li><span data-li="uk">Кастомізація</span><span data-li="de">Anpassung</span><span data-li="en">Customization</span></li>
           <li><span data-li="uk">Docker Compose</span><span data-li="de">Docker Compose</span><span data-li="en">Docker Compose</span></li>
         </ul>
+        <a href="#contact" class="plan-cta">
+          <span data-li="uk">Зв'язатись</span>
+          <span data-li="de">Kontaktieren</span>
+          <span data-li="en">Contact us</span>
+        </a>
       </div>
     </div>
   </div>

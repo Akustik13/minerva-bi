@@ -906,6 +906,8 @@ document.addEventListener('DOMContentLoaded', function(){
     catch(e) { return []; }
   }
 
+  var USER_ROLE = '{{ user_role|default:"" }}';
+
   var GROUPS = [
     {
       id: 'analytics', label: '📊 Аналітика',
@@ -950,6 +952,15 @@ document.addEventListener('DOMContentLoaded', function(){
         { href: '/admin/core/moduleregistry/', label: '🧩 Реєстр модулів' },
       ],
       apps: ['core']
+    },
+    {
+      id: 'vendor', label: '🏢 Вендор',
+      adminOnly: true,
+      links: [
+        { href: '/admin/core/tenantaccount/', label: '👥 Клієнти системи' },
+        { href: '/admin/core/auditlog/',      label: '📋 Журнал аудиту' },
+      ],
+      apps: []
     },
   ];
 
@@ -1059,6 +1070,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
   /* Build groups */
   GROUPS.forEach(function(grp){
+    if (grp.adminOnly && USER_ROLE !== 'superadmin') return;
     var hasLinks = grp.links && grp.links.length;
     var appsFound = (grp.apps || []).filter(function(a){ return mods[a]; });
     if (!hasLinks && !appsFound.length) return;

@@ -53,6 +53,10 @@ urlpatterns = [
     path("contact/", root_views.contact_view, name="contact"),
     path("theme-profiles/", theme_profiles_list, name="theme_profiles_list"),
     path("theme-profiles/<str:name>/", theme_profiles_load, name="theme_profiles_load"),
+    path("register/",         root_views.register_view,         name="register"),
+    path("register/pending/", root_views.register_pending_view, name="register_pending"),
+    path("verify/<str:token>/", root_views.verify_email_view,   name="verify_email"),
+    path("verify/success/",   root_views.verify_success_view,   name="verify_success"),
     path("admin/config/integrations/", integrations_view, name="integrations_hub"),
     # ── Password reset (must be BEFORE admin/ to avoid 404 from AdminSite) ──
     path(
