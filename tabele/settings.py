@@ -140,9 +140,12 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Для реального SMTP — налаштуй NotificationSettings в адмін-панелі,
 # або встанови EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 # та EMAIL_HOST / EMAIL_PORT / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD через env.
+# Використовує SMTP налаштування з Налаштування → Сповіщення (NotificationSettings).
+# Якщо email_enabled=False або поля порожні — лист виводиться в консоль.
+# Можна перевизначити через змінну середовища EMAIL_BACKEND.
 EMAIL_BACKEND = os.getenv(
     "EMAIL_BACKEND",
-    "django.core.mail.backends.console.EmailBackend",
+    "config.email_backend.NotificationSettingsEmailBackend",
 )
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Minerva BI <noreply@minerva-bi.local>")
 PASSWORD_RESET_TIMEOUT = 259200  # 3 дні в секундах
