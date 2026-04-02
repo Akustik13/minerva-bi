@@ -1,0 +1,12 @@
+{% extends "admin/login.html" %}
+{% load i18n %}
+
+{% block content %}
+{{ block.super }}
+<p style="text-align:center;margin-top:12px;font-size:13px;">
+  <a href="{% url 'password_reset' %}"
+     style="color:var(--body-quiet-color,#9aafbe);text-decoration:none;">
+    {% trans "Забули пароль?" %}
+  </a>
+</p>
+{% endblock %}

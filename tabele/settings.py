@@ -135,6 +135,18 @@ MEDIA_ROOT  = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+# ── Email ─────────────────────────────────────────────────────────────────────
+# Console backend: лист з'явиться в docker logs, не на реальний email.
+# Для реального SMTP — налаштуй NotificationSettings в адмін-панелі,
+# або встанови EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+# та EMAIL_HOST / EMAIL_PORT / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD через env.
+EMAIL_BACKEND = os.getenv(
+    "EMAIL_BACKEND",
+    "django.core.mail.backends.console.EmailBackend",
+)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Minerva BI <noreply@minerva-bi.local>")
+PASSWORD_RESET_TIMEOUT = 259200  # 3 дні в секундах
+
 # ── Локальний шлях для збереження документів замовлень ──────────────────────
 # Файли зберігаються: LOCAL_DOCS_BASE_PATH / {source} / {DD.MM.YYYY} / {order_number} /
 LOCAL_DOCS_BASE_PATH = os.getenv(

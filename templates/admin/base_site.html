@@ -1286,25 +1286,6 @@ function mvCpSyncRev(hexEl, swatchId) {
 
 <script>
 /* ── Motto: insert between logo and user-tools ── */
-/* ── "Forgot password?" link on login page ── */
-(function(){
-  if (!document.body.classList.contains('login')) return;
-  document.addEventListener('DOMContentLoaded', function(){
-    var submitRow = document.querySelector('.submit-row, #content-main .submit-row, form .submit-row');
-    var loginForm = document.querySelector('#login-form, form[action*="login"]');
-    if (!loginForm) return;
-    var link = document.createElement('p');
-    link.style.cssText = 'margin:8px 0 0; text-align:right; font-size:12px;';
-    link.innerHTML = '<a href="/admin/password_reset/" style="color:var(--text-muted,#9aafbe);">Забули пароль?</a>';
-    var pwField = loginForm.querySelector('[name="password"]');
-    if (pwField) {
-      pwField.closest('div, p, .form-row') && pwField.closest('div, p, .form-row').insertAdjacentElement('afterend', link);
-    } else {
-      loginForm.insertAdjacentElement('beforeend', link);
-    }
-  });
-})();
-
 document.addEventListener('DOMContentLoaded', function(){
   var branding = document.getElementById('branding');
   if (!branding) return;

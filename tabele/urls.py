@@ -3,6 +3,7 @@ import os
 import re
 
 from django.contrib import admin
+from django.contrib.auth import views as auth_views
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.urls import path, include
@@ -51,6 +52,39 @@ urlpatterns = [
     path("theme-profiles/", theme_profiles_list, name="theme_profiles_list"),
     path("theme-profiles/<str:name>/", theme_profiles_load, name="theme_profiles_load"),
     path("admin/config/integrations/", integrations_view, name="integrations_hub"),
+    # ── Password reset (must be BEFORE admin/ to avoid 404 from AdminSite) ──
+    path(
+        "admin/password_reset/",
+        auth_views.PasswordResetView.as_view(
+            template_name="registration/password_reset_form.html",
+            email_template_name="registration/password_reset_email.html",
+            subject_template_name="registration/password_reset_subject.txt",
+            success_url="/admin/password_reset/done/",
+        ),
+        name="password_reset",
+    ),
+    path(
+        "admin/password_reset/done/",
+        auth_views.PasswordResetDoneView.as_view(
+            template_name="registration/password_reset_done.html",
+        ),
+        name="password_reset_done",
+    ),
+    path(
+        "admin/reset/<uidb64>/<token>/",
+        auth_views.PasswordResetConfirmView.as_view(
+            template_name="registration/password_reset_confirm.html",
+            success_url="/admin/reset/done/",
+        ),
+        name="password_reset_confirm",
+    ),
+    path(
+        "admin/reset/done/",
+        auth_views.PasswordResetCompleteView.as_view(
+            template_name="registration/password_reset_complete.html",
+        ),
+        name="password_reset_complete",
+    ),
     path("admin/", admin.site.urls),
     path("onboarding/", include("config.urls")),
     path("strategy/", include("strategy.urls")),
