@@ -121,15 +121,14 @@ class ModuleBundleAdmin(admin.ModelAdmin):
     def modules_summary(self, obj):
         mods = obj.modules.order_by('order').values_list('name', 'tier')
         tier_colors = {'core': '#f85149', 'standard': '#58a6ff', 'premium': '#c9a84c'}
-        badges = mark_safe('').join(
-            format_html(
+        badges = mark_safe('')
+        for name, tier in mods:
+            badges += format_html(
                 '<span style="background:{};color:#fff;padding:1px 6px;'
                 'border-radius:3px;font-size:11px;margin:1px 2px;display:inline-block">{}</span>',
                 tier_colors.get(tier, '#9aafbe'), name,
             )
-            for name, tier in mods
-        )
-        return badges if badges else '—'
+        return badges or '—'
 
 
 # ── UserProfile ───────────────────────────────────────────────────────────────
