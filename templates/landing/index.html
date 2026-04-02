@@ -1,0 +1,522 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ company_name }} — Business Intelligence System</title>
+<meta name="description" content="{{ company_tagline }}">
+<style>
+:root {
+  --accent:  #c9a84c;
+  --accent2: #e8d5a3;
+  --bg:      #0a0e1a;
+  --bg2:     #111827;
+  --bg3:     #1a2240;
+  --text:    #e8d5a3;
+  --muted:   #a89060;
+  --dim:     #705e3a;
+  --border:  rgba(201,168,76,.18);
+  --ok:      #4ade80;
+  --err:     #f87171;
+  --r:       10px;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html { scroll-behavior:smooth; }
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif;
+       font-size:15px; line-height:1.6; }
+
+/* ── NAV ── */
+nav { position:fixed; top:0; left:0; right:0; z-index:100;
+      background:rgba(10,14,26,.92); backdrop-filter:blur(12px);
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+      padding:0 32px; height:60px; }
+.logo { display:flex; align-items:center; gap:10px; text-decoration:none; }
+.logo-icon { width:34px; height:34px; background:linear-gradient(135deg,#c9a84c,#e8d5a3);
+             border-radius:8px; display:flex; align-items:center; justify-content:center;
+             font-size:18px; box-shadow:0 2px 10px rgba(201,168,76,.4); }
+.logo-text { font-size:17px; font-weight:800; letter-spacing:-.3px;
+             background:linear-gradient(90deg,#e8d5a3,#c9a84c);
+             -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+             background-clip:text; }
+.nav-right { display:flex; align-items:center; gap:20px; }
+.li-btns { display:flex; gap:6px; }
+.li-btns button { background:transparent; border:1px solid var(--border);
+                  color:var(--muted); padding:3px 10px; border-radius:5px;
+                  font-size:12px; cursor:pointer; transition:.2s; }
+.li-btns button.active,.li-btns button:hover { border-color:var(--accent); color:var(--accent); }
+.btn-nav { background:var(--accent); color:#0a0e1a; padding:7px 20px;
+           border-radius:6px; font-weight:700; font-size:13px;
+           text-decoration:none; transition:.2s; }
+.btn-nav:hover { background:var(--accent2); }
+
+/* ── HERO ── */
+.hero { min-height:100vh; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; text-align:center;
+        padding:80px 24px 60px; }
+.hero-badge { display:inline-flex; align-items:center; gap:6px;
+              background:rgba(201,168,76,.12); border:1px solid var(--border);
+              color:var(--accent); font-size:12px; font-weight:600;
+              padding:5px 14px; border-radius:20px; margin-bottom:24px;
+              letter-spacing:.5px; }
+.hero h1 { font-size:clamp(32px,6vw,68px); font-weight:900; line-height:1.1;
+           letter-spacing:-1.5px; margin-bottom:20px; }
+.hero h1 span { background:linear-gradient(90deg,#e8d5a3,#c9a84c,#f0e6c0);
+                -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+                background-clip:text; }
+.hero-sub { font-size:clamp(15px,2vw,19px); color:var(--muted); max-width:600px;
+            margin:0 auto 36px; line-height:1.7; }
+.hero-btns { display:flex; gap:14px; flex-wrap:wrap; justify-content:center; }
+.btn-primary { background:var(--accent); color:#0a0e1a; padding:13px 32px;
+               border-radius:8px; font-weight:700; font-size:15px;
+               text-decoration:none; transition:.2s; border:none; cursor:pointer; }
+.btn-primary:hover { background:var(--accent2); transform:translateY(-1px); }
+.btn-outline { background:transparent; color:var(--text); padding:13px 32px;
+               border-radius:8px; font-weight:600; font-size:15px;
+               text-decoration:none; border:1px solid var(--border); transition:.2s; }
+.btn-outline:hover { border-color:var(--accent); color:var(--accent); }
+.hero-stats { display:flex; gap:40px; flex-wrap:wrap; justify-content:center;
+              margin-top:60px; padding-top:40px; border-top:1px solid var(--border); }
+.stat { text-align:center; }
+.stat-val { font-size:32px; font-weight:800; color:var(--accent); }
+.stat-lbl { font-size:12px; color:var(--muted); margin-top:2px; }
+
+/* ── SECTIONS ── */
+section { padding:80px 24px; }
+.container { max-width:1100px; margin:0 auto; }
+.section-tag { font-size:12px; font-weight:700; color:var(--accent); letter-spacing:1.5px;
+               text-transform:uppercase; margin-bottom:12px; }
+.section-title { font-size:clamp(24px,4vw,40px); font-weight:800; line-height:1.2;
+                 margin-bottom:14px; }
+.section-sub { font-size:16px; color:var(--muted); max-width:560px; line-height:1.7; }
+
+/* ── FEATURES ── */
+.features-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+                 gap:20px; margin-top:50px; }
+.feat { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r);
+        padding:28px 24px; transition:.2s; }
+.feat:hover { border-color:var(--accent); transform:translateY(-2px); }
+.feat-icon { font-size:28px; margin-bottom:14px; }
+.feat h3 { font-size:17px; font-weight:700; margin-bottom:8px; }
+.feat p { font-size:13px; color:var(--muted); line-height:1.7; }
+
+/* ── MODULES ── */
+.modules-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+                gap:12px; margin-top:40px; }
+.mod { background:var(--bg2); border:1px solid var(--border); border-radius:8px;
+       padding:16px 18px; display:flex; align-items:center; gap:12px; }
+.mod-icon { font-size:22px; }
+.mod-name { font-size:14px; font-weight:600; color:var(--text); }
+.mod-tier { font-size:11px; color:var(--muted); margin-top:2px; }
+
+/* ── PRICING ── */
+.pricing-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+                gap:20px; margin-top:50px; }
+.plan { background:var(--bg2); border:1px solid var(--border); border-radius:var(--r);
+        padding:32px 28px; position:relative; }
+.plan.featured { border-color:var(--accent);
+                 background:linear-gradient(135deg,rgba(201,168,76,.08),var(--bg2)); }
+.plan-badge { position:absolute; top:-12px; left:50%; transform:translateX(-50%);
+              background:var(--accent); color:#0a0e1a; font-size:11px; font-weight:800;
+              padding:3px 14px; border-radius:20px; white-space:nowrap; }
+.plan-name { font-size:16px; font-weight:700; margin-bottom:8px; }
+.plan-price { font-size:36px; font-weight:900; color:var(--accent); line-height:1; }
+.plan-price span { font-size:14px; color:var(--muted); font-weight:400; }
+.plan-desc { font-size:13px; color:var(--muted); margin:12px 0 20px; }
+.plan-features { list-style:none; }
+.plan-features li { font-size:13px; padding:5px 0; border-bottom:1px solid var(--border);
+                     display:flex; align-items:center; gap:8px; color:var(--muted); }
+.plan-features li:last-child { border:none; }
+.plan-features li::before { content:'✓'; color:var(--ok); font-weight:700; font-size:12px; }
+
+/* ── CONTACT ── */
+.cf-wrap { max-width:540px; margin:0 auto; }
+.cf { display:flex; flex-direction:column; gap:12px; margin-top:36px; }
+.cf input,.cf textarea {
+  background:var(--bg2); border:1px solid var(--border); border-radius:8px;
+  color:var(--text); padding:11px 14px; font-size:14px; font-family:inherit;
+  transition:.2s; width:100%; }
+.cf input:focus,.cf textarea:focus {
+  outline:none; border-color:var(--accent); }
+.cf textarea { min-height:120px; resize:vertical; }
+.cf button { background:var(--accent); color:#0a0e1a; border:none;
+             padding:13px; border-radius:8px; font-weight:700; font-size:15px;
+             cursor:pointer; transition:.2s; }
+.cf button:hover { background:var(--accent2); }
+.cf-msg { margin-top:14px; font-size:14px; text-align:center; padding:10px;
+          border-radius:6px; }
+.cf-msg.ok  { background:rgba(74,222,128,.12); color:var(--ok); border:1px solid rgba(74,222,128,.3); }
+.cf-msg.err { background:rgba(248,113,113,.12); color:var(--err); border:1px solid rgba(248,113,113,.3); }
+
+/* ── FOOTER ── */
+footer { background:var(--bg2); border-top:1px solid var(--border);
+         padding:40px 24px 24px; }
+.footer-inner { max-width:1100px; margin:0 auto; }
+.footer-top { display:flex; flex-wrap:wrap; gap:32px; justify-content:space-between;
+              margin-bottom:32px; }
+.footer-brand .logo-text { font-size:20px; }
+.footer-tagline { font-size:13px; color:var(--muted); margin-top:6px; }
+.footer-links { display:flex; flex-direction:column; gap:8px; }
+.footer-links a { font-size:13px; color:var(--muted); text-decoration:none; transition:.2s; }
+.footer-links a:hover { color:var(--accent); }
+.footer-bottom { border-top:1px solid var(--border); padding-top:20px;
+                 display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between;
+                 font-size:12px; color:var(--dim); }
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  nav { padding:0 16px; }
+  .li-btns { display:none; }
+  .hero h1 { font-size:32px; }
+  .hero-stats { gap:24px; }
+  footer .footer-top { flex-direction:column; }
+}
+
+/* ── LANGUAGE ── */
+[data-li] { display:none; }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="/" class="logo">
+    <span class="logo-icon">🏛️</span>
+    <span class="logo-text">{{ company_name }}</span>
+  </a>
+  <div class="nav-right">
+    <div class="li-btns">
+      <button onclick="setLang('uk')" data-lang="uk">УКР</button>
+      <button onclick="setLang('de')" data-lang="de">DE</button>
+      <button onclick="setLang('en')" data-lang="en">EN</button>
+    </div>
+    <a href="/admin/login/" class="btn-nav">
+      <span data-li="uk">Увійти</span>
+      <span data-li="de">Anmelden</span>
+      <span data-li="en">Login</span>
+    </a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">🏛️
+    <span data-li="uk">Business Intelligence</span>
+    <span data-li="de">Business Intelligence</span>
+    <span data-li="en">Business Intelligence</span>
+  </div>
+  <h1>
+    <span data-li="uk">Управляй бізнесом<br><span>розумно.</span></span>
+    <span data-li="de">Geschäft intelligent<br><span>verwalten.</span></span>
+    <span data-li="en">Run your business<br><span>intelligently.</span></span>
+  </h1>
+  <p class="hero-sub">
+    <span data-li="uk">{{ company_tagline }}. CRM, продажі, склад, доставка — все в одній системі.</span>
+    <span data-li="de">{{ company_tagline }}. CRM, Verkauf, Lager, Versand — alles in einem System.</span>
+    <span data-li="en">{{ company_tagline }}. CRM, sales, inventory, shipping — all in one system.</span>
+  </p>
+  <div class="hero-btns">
+    <a href="/admin/login/" class="btn-primary">
+      <span data-li="uk">Відкрити систему</span>
+      <span data-li="de">System öffnen</span>
+      <span data-li="en">Open system</span>
+    </a>
+    <a href="#contact" class="btn-outline">
+      <span data-li="uk">Зв'язатись</span>
+      <span data-li="de">Kontakt</span>
+      <span data-li="en">Contact us</span>
+    </a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-val">7+</div><div class="stat-lbl">
+      <span data-li="uk">модулів</span><span data-li="de">Module</span><span data-li="en">modules</span>
+    </div></div>
+    <div class="stat"><div class="stat-val">100%</div><div class="stat-lbl">
+      <span data-li="uk">у вашій мережі</span><span data-li="de">Ihr Netzwerk</span><span data-li="en">your network</span>
+    </div></div>
+    <div class="stat"><div class="stat-val">∞</div><div class="stat-lbl">
+      <span data-li="uk">замовлень</span><span data-li="de">Bestellungen</span><span data-li="en">orders</span>
+    </div></div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" style="background:var(--bg2);">
+  <div class="container">
+    <p class="section-tag">
+      <span data-li="uk">Можливості</span>
+      <span data-li="de">Funktionen</span>
+      <span data-li="en">Features</span>
+    </p>
+    <h2 class="section-title">
+      <span data-li="uk">Всі інструменти в одному місці</span>
+      <span data-li="de">Alle Werkzeuge an einem Ort</span>
+      <span data-li="en">All tools in one place</span>
+    </h2>
+    <p class="section-sub">
+      <span data-li="uk">Minerva — повна ERP/BI система для малого бізнесу без зайвої складності.</span>
+      <span data-li="de">Minerva — vollständiges ERP/BI-System für kleine Unternehmen, ohne unnötige Komplexität.</span>
+      <span data-li="en">Minerva — complete ERP/BI system for small business without unnecessary complexity.</span>
+    </p>
+    <div class="features-grid">
+      <div class="feat">
+        <div class="feat-icon">👥</div>
+        <h3><span data-li="uk">CRM та RFM-аналіз</span><span data-li="de">CRM &amp; RFM-Analyse</span><span data-li="en">CRM &amp; RFM analysis</span></h3>
+        <p><span data-li="uk">Клієнтська база з автоматичним RFM-скорингом та стратегіями утримання.</span><span data-li="de">Kundendatenbank mit automatischem RFM-Scoring und Bindungsstrategien.</span><span data-li="en">Customer database with automatic RFM scoring and retention strategies.</span></p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">🛒</div>
+        <h3><span data-li="uk">Продажі та замовлення</span><span data-li="de">Verkauf &amp; Bestellungen</span><span data-li="en">Sales &amp; Orders</span></h3>
+        <p><span data-li="uk">Замовлення, рахунки-фактури, Excel-імпорт, статуси, дедлайни доставки.</span><span data-li="de">Bestellungen, Rechnungen, Excel-Import, Status, Lieferfristen.</span><span data-li="en">Orders, invoices, Excel import, statuses, delivery deadlines.</span></p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">📦</div>
+        <h3><span data-li="uk">Склад і товари</span><span data-li="de">Lager &amp; Produkte</span><span data-li="en">Inventory &amp; Products</span></h3>
+        <p><span data-li="uk">Управління запасами, точки повторного замовлення, постачальники, закупівлі.</span><span data-li="de">Bestandsverwaltung, Nachbestellpunkte, Lieferanten, Einkäufe.</span><span data-li="en">Inventory management, reorder points, suppliers, purchase orders.</span></p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">🚚</div>
+        <h3><span data-li="uk">Доставка і DHL</span><span data-li="de">Versand &amp; DHL</span><span data-li="en">Shipping &amp; DHL</span></h3>
+        <p><span data-li="uk">Відправлення, трекінг, DYMO-етикетки, DHL API, митні декларації CN23.</span><span data-li="de">Sendungen, Tracking, DYMO-Labels, DHL API, Zollerklärungen CN23.</span><span data-li="en">Shipments, tracking, DYMO labels, DHL API, customs declarations CN23.</span></p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">📊</div>
+        <h3><span data-li="uk">Аналітика і дашборд</span><span data-li="de">Analytik &amp; Dashboard</span><span data-li="en">Analytics &amp; Dashboard</span></h3>
+        <p><span data-li="uk">Графіки продажів, Revenue, ABC-аналіз, KPI, фільтри по джерелах і категоріях.</span><span data-li="de">Umsatzdiagramme, Revenue, ABC-Analyse, KPI, Filter nach Quellen.</span><span data-li="en">Sales charts, revenue, ABC analysis, KPIs, source &amp; category filters.</span></p>
+      </div>
+      <div class="feat">
+        <div class="feat-icon">🤖</div>
+        <h3><span data-li="uk">AI-асистент</span><span data-li="de">KI-Assistent</span><span data-li="en">AI assistant</span></h3>
+        <p><span data-li="uk">Claude AI для аналізу клієнтів, підказок по стратегіях і відповідей на питання.</span><span data-li="de">Claude KI für Kundenanalyse, Strategiehinweise und Fragen.</span><span data-li="en">Claude AI for customer analysis, strategy hints and Q&amp;A.</span></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MODULES -->
+<section id="modules">
+  <div class="container">
+    <p class="section-tag">
+      <span data-li="uk">Модулі</span><span data-li="de">Module</span><span data-li="en">Modules</span>
+    </p>
+    <h2 class="section-title">
+      <span data-li="uk">Підключайте тільки потрібне</span>
+      <span data-li="de">Nur das Nötige aktivieren</span>
+      <span data-li="en">Enable only what you need</span>
+    </h2>
+    <div class="modules-grid">
+      <div class="mod"><span class="mod-icon">👥</span><div><div class="mod-name">CRM</div><div class="mod-tier">standard</div></div></div>
+      <div class="mod"><span class="mod-icon">🎯</span><div><div class="mod-name">Стратегії CRM</div><div class="mod-tier">standard</div></div></div>
+      <div class="mod"><span class="mod-icon">🛒</span><div><div class="mod-name">Продажі</div><div class="mod-tier">standard</div></div></div>
+      <div class="mod"><span class="mod-icon">💰</span><div><div class="mod-name">Бухгалтерія</div><div class="mod-tier">standard</div></div></div>
+      <div class="mod"><span class="mod-icon">🚚</span><div><div class="mod-name">Доставка</div><div class="mod-tier">standard</div></div></div>
+      <div class="mod"><span class="mod-icon">📦</span><div><div class="mod-name">Склад</div><div class="mod-tier">standard</div></div></div>
+      <div class="mod"><span class="mod-icon">📋</span><div><div class="mod-name">Задачі</div><div class="mod-tier">standard</div></div></div>
+      <div class="mod"><span class="mod-icon">🤖</span><div><div class="mod-name">AI та Боти</div><div class="mod-tier">premium</div></div></div>
+      <div class="mod"><span class="mod-icon">🔄</span><div><div class="mod-name">Авто-імпорт</div><div class="mod-tier">premium</div></div></div>
+      <div class="mod"><span class="mod-icon">🔑</span><div><div class="mod-name">REST API</div><div class="mod-tier">premium</div></div></div>
+      <div class="mod"><span class="mod-icon">💾</span><div><div class="mod-name">Бекапи</div><div class="mod-tier">standard</div></div></div>
+      <div class="mod"><span class="mod-icon">⚙️</span><div><div class="mod-name">Конфігурація</div><div class="mod-tier">core</div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" style="background:var(--bg2);">
+  <div class="container">
+    <p class="section-tag">
+      <span data-li="uk">Ціни</span><span data-li="de">Preise</span><span data-li="en">Pricing</span>
+    </p>
+    <h2 class="section-title">
+      <span data-li="uk">Прозорі тарифи</span>
+      <span data-li="de">Transparente Tarife</span>
+      <span data-li="en">Transparent pricing</span>
+    </h2>
+    <div class="pricing-grid">
+      <div class="plan">
+        <div class="plan-name">⏳ Trial</div>
+        <div class="plan-price">0<span> / 30
+          <span data-li="uk">днів</span><span data-li="de">Tage</span><span data-li="en">days</span>
+        </span></div>
+        <p class="plan-desc">
+          <span data-li="uk">Спробуйте всі функції безкоштовно.</span>
+          <span data-li="de">Alle Funktionen kostenlos testen.</span>
+          <span data-li="en">Try all features for free.</span>
+        </p>
+        <ul class="plan-features">
+          <li><span data-li="uk">Всі модулі</span><span data-li="de">Alle Module</span><span data-li="en">All modules</span></li>
+          <li><span data-li="uk">1 користувач</span><span data-li="de">1 Benutzer</span><span data-li="en">1 user</span></li>
+          <li><span data-li="uk">Без обмежень даних</span><span data-li="de">Keine Datenbegrenzung</span><span data-li="en">No data limits</span></li>
+        </ul>
+      </div>
+      <div class="plan featured">
+        <div class="plan-badge">⭐ Popular</div>
+        <div class="plan-name">🚀 Business</div>
+        <div class="plan-price">49<span>€ /
+          <span data-li="uk">міс</span><span data-li="de">Mon</span><span data-li="en">mo</span>
+        </span></div>
+        <p class="plan-desc">
+          <span data-li="uk">Для активного бізнесу.</span>
+          <span data-li="de">Für aktive Unternehmen.</span>
+          <span data-li="en">For active business.</span>
+        </p>
+        <ul class="plan-features">
+          <li><span data-li="uk">Всі модулі</span><span data-li="de">Alle Module</span><span data-li="en">All modules</span></li>
+          <li><span data-li="uk">До 10 користувачів</span><span data-li="de">Bis 10 Benutzer</span><span data-li="en">Up to 10 users</span></li>
+          <li><span data-li="uk">DHL + API інтеграції</span><span data-li="de">DHL + API-Integrationen</span><span data-li="en">DHL + API integrations</span></li>
+          <li><span data-li="uk">AI-асистент</span><span data-li="de">KI-Assistent</span><span data-li="en">AI assistant</span></li>
+          <li><span data-li="uk">Підтримка</span><span data-li="de">Support</span><span data-li="en">Support</span></li>
+        </ul>
+      </div>
+      <div class="plan">
+        <div class="plan-name">🎛️ Custom</div>
+        <div class="plan-price" style="font-size:24px;padding-top:6px;">
+          <span data-li="uk">За запитом</span>
+          <span data-li="de">Auf Anfrage</span>
+          <span data-li="en">On request</span>
+        </div>
+        <p class="plan-desc">
+          <span data-li="uk">Self-hosted, необмежено користувачів.</span>
+          <span data-li="de">Self-hosted, unbegrenzte Benutzer.</span>
+          <span data-li="en">Self-hosted, unlimited users.</span>
+        </p>
+        <ul class="plan-features">
+          <li><span data-li="uk">Власний сервер</span><span data-li="de">Eigener Server</span><span data-li="en">Own server</span></li>
+          <li><span data-li="uk">Необмежено</span><span data-li="de">Unbegrenzt</span><span data-li="en">Unlimited</span></li>
+          <li><span data-li="uk">Кастомізація</span><span data-li="de">Anpassung</span><span data-li="en">Customization</span></li>
+          <li><span data-li="uk">Docker Compose</span><span data-li="de">Docker Compose</span><span data-li="en">Docker Compose</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact">
+  <div class="container">
+    <div class="cf-wrap" style="text-align:center;">
+      <p class="section-tag">
+        <span data-li="uk">Контакт</span><span data-li="de">Kontakt</span><span data-li="en">Contact</span>
+      </p>
+      <h2 class="section-title">
+        <span data-li="uk">Зв'яжіться з нами</span>
+        <span data-li="de">Kontaktieren Sie uns</span>
+        <span data-li="en">Get in touch</span>
+      </h2>
+      <p class="section-sub" style="margin:0 auto;">
+        <span data-li="uk">Демо, запитання, індивідуальні умови — пишіть.</span>
+        <span data-li="de">Demo, Fragen, individuelle Konditionen — schreiben Sie uns.</span>
+        <span data-li="en">Demo, questions, custom terms — write to us.</span>
+      </p>
+
+      {% if contact_success %}
+      <div class="cf-msg ok">
+        <span data-li="uk">✓ Дякуємо! Зв'яжемось найближчим часом.</span>
+        <span data-li="de">✓ Danke! Wir melden uns in Kürze.</span>
+        <span data-li="en">✓ Thank you! We'll be in touch soon.</span>
+      </div>
+      {% endif %}
+      {% if contact_error %}
+      <div class="cf-msg err">
+        ✗
+        <span data-li="uk">Помилка надсилання. Напишіть напряму:
+          {% if company_email %}<a href="mailto:{{ company_email }}" style="color:var(--err)">{{ company_email }}</a>{% endif %}
+        </span>
+        <span data-li="de">Fehler beim Senden. Schreiben Sie direkt: {{ company_email }}</span>
+        <span data-li="en">Send error. Contact us directly: {{ company_email }}</span>
+      </div>
+      {% endif %}
+
+      <form class="cf" method="post" action="/contact/">
+        {% csrf_token %}
+        <input type="text" name="name" placeholder="Name / Ім'я" required>
+        <input type="email" name="email" placeholder="E-Mail" required>
+        <input type="text" name="company" placeholder="Company / Firma / Компанія">
+        <textarea name="message" placeholder="Message / Nachricht / Повідомлення"></textarea>
+        <button type="submit">
+          <span data-li="uk">Надіслати</span>
+          <span data-li="de">Senden</span>
+          <span data-li="en">Send</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div class="footer-brand">
+        <div class="logo">
+          <span class="logo-icon">🏛️</span>
+          <span class="logo-text">{{ company_name }}</span>
+        </div>
+        <div class="footer-tagline">{{ company_tagline }}</div>
+      </div>
+      <div class="footer-links">
+        <strong style="font-size:12px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;">
+          <span data-li="uk">Система</span><span data-li="de">System</span><span data-li="en">System</span>
+        </strong>
+        <a href="/admin/login/">
+          <span data-li="uk">Увійти</span><span data-li="de">Anmelden</span><span data-li="en">Login</span>
+        </a>
+        <a href="#features">
+          <span data-li="uk">Можливості</span><span data-li="de">Funktionen</span><span data-li="en">Features</span>
+        </a>
+        <a href="#pricing">
+          <span data-li="uk">Ціни</span><span data-li="de">Preise</span><span data-li="en">Pricing</span>
+        </a>
+      </div>
+      <div class="footer-links">
+        <strong style="font-size:12px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;">
+          <span data-li="uk">Контакт</span><span data-li="de">Kontakt</span><span data-li="en">Contact</span>
+        </strong>
+        {% if company_email %}
+        <a href="mailto:{{ company_email }}">{{ company_email }}</a>
+        {% endif %}
+        {% if company_phone %}
+        <a href="tel:{{ company_phone }}">{{ company_phone }}</a>
+        {% endif %}
+        {% if company_telegram %}
+        <a href="https://t.me/{{ company_telegram|cut:'@' }}" target="_blank">Telegram: {{ company_telegram }}</a>
+        {% endif %}
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>© 2026 {{ company_name }}</span>
+      <span>Minerva Business Intelligence System</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+// ── Language switcher ──────────────────────────────────────────────────────
+var _LANG = localStorage.getItem('mv-lang') || 'uk';
+
+function setLang(l) {
+  _LANG = l;
+  localStorage.setItem('mv-lang', l);
+  applyLang();
+}
+
+function applyLang() {
+  document.querySelectorAll('[data-li]').forEach(function(el) {
+    el.style.display = (el.dataset.li === _LANG) ? '' : 'none';
+  });
+  document.querySelectorAll('.li-btns button').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.lang === _LANG);
+  });
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  applyLang();
+  {% if contact_success %}
+  document.getElementById('contact') && document.getElementById('contact').scrollIntoView();
+  {% endif %}
+});
+</script>
+</body>
+</html>

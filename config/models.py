@@ -71,12 +71,75 @@ class SystemSettings(models.Model):
         help_text="Використовується для габаритів коробок та посилок",
     )
 
+    # ── Публічна інформація (лендінг і листи) ────────────────────────────────
+    company_tagline = models.CharField(
+        "Слоган", max_length=300, blank=True,
+        default="Business Intelligence для малого бізнесу",
+        help_text="Показується на лендінгу",
+    )
+    company_email = models.EmailField(
+        "Контактний email", blank=True,
+        help_text="Показується на лендінгу, отримує форми контакту",
+    )
+    company_phone = models.CharField(
+        "Телефон підтримки", max_length=50, blank=True,
+    )
+    company_telegram = models.CharField(
+        "Telegram підтримки", max_length=100, blank=True,
+        help_text="Наприклад: @minerva_support",
+    )
+
+    # ── Домен для посилань в email листах ────────────────────────────────────
+    site_domain = models.CharField(
+        "Домен системи", max_length=200,
+        default="localhost:8000",
+        help_text=(
+            "Використовується в посиланнях email листів (password reset). "
+            "Приклади: akustik.synology.me:81 | minerva-bi.com | localhost:8000"
+        ),
+    )
+    site_protocol = models.CharField(
+        "Протокол", max_length=5,
+        choices=[("http", "HTTP"), ("https", "HTTPS")],
+        default="http",
+        help_text="HTTPS для production, HTTP для локальної мережі",
+    )
+
+    # ── Ліцензія ──────────────────────────────────────────────────────────────
+    license_package = models.CharField(
+        "Пакет ліцензії", max_length=20,
+        choices=[
+            ("trial",    "Пробна версія (30 днів)"),
+            ("starter",  "Starter"),
+            ("business", "Business"),
+            ("custom",   "Custom / Self-hosted"),
+        ],
+        default="trial",
+    )
+    license_key = models.CharField(
+        "Ліцензійний ключ", max_length=500, blank=True,
+        help_text="Отримайте на minerva-bi.com після придбання",
+    )
+    license_expires_at = models.DateField(
+        "Ліцензія діє до", null=True, blank=True,
+    )
+
     class Meta:
         verbose_name = "Системні налаштування"
         verbose_name_plural = "Системні налаштування"
 
     def __str__(self):
         return self.company_name
+
+    @property
+    def site_url(self):
+        return f"{self.site_protocol}://{self.site_domain}"
+
+    @property
+    def from_email(self):
+        name  = self.company_name or "Minerva BI"
+        email = self.company_email or "noreply@minerva.local"
+        return f"{name} <{email}>"
 
     def save(self, *args, **kwargs):
         self.pk = 1  # Singleton — завжди pk=1

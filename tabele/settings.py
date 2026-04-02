@@ -55,7 +55,11 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'django_filters',
     'api',
+    # ── Sites ──
+    'django.contrib.sites',
 ]
+
+SITE_ID = 1
 
 _MIDDLEWARE_BASE = [
     "django.middleware.security.SecurityMiddleware",
@@ -144,15 +148,9 @@ AUTHENTICATION_BACKENDS = [
 # Для реального SMTP — налаштуй NotificationSettings в адмін-панелі,
 # або встанови EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
 # та EMAIL_HOST / EMAIL_PORT / EMAIL_HOST_USER / EMAIL_HOST_PASSWORD через env.
-# Використовує SMTP налаштування з Налаштування → Сповіщення (NotificationSettings).
-# Якщо email_enabled=False або поля порожні — лист виводиться в консоль.
-# Можна перевизначити через змінну середовища EMAIL_BACKEND.
-EMAIL_BACKEND = os.getenv(
-    "EMAIL_BACKEND",
-    "config.email_backend.NotificationSettingsEmailBackend",
-)
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Minerva BI <noreply@minerva-bi.local>")
-PASSWORD_RESET_TIMEOUT = 259200  # 3 дні в секундах
+EMAIL_BACKEND = 'config.email_backend.NotificationSettingsEmailBackend'
+DEFAULT_FROM_EMAIL = 'Minerva BI <noreply@minerva-bi.local>'
+PASSWORD_RESET_TIMEOUT = 259200  # 3 дні
 
 # ── Локальний шлях для збереження документів замовлень ──────────────────────
 # Файли зберігаються: LOCAL_DOCS_BASE_PATH / {source} / {DD.MM.YYYY} / {order_number} /

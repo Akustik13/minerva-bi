@@ -116,7 +116,36 @@ class SystemSettingsAdmin(admin.ModelAdmin):
             "fields": ("is_onboarding_complete",),
             "description": "Скидайте is_onboarding_complete для повторного запуску wizard.",
         }),
+        ("🌐 Публічна інформація", {
+            "fields": (
+                "company_tagline",
+                "company_email",
+                "company_phone",
+                "company_telegram",
+            ),
+            "description": "Відображається на лендінгу і в листах клієнтам.",
+        }),
+        ("🔗 Домен системи", {
+            "fields": ("site_protocol", "site_domain"),
+            "description": (
+                "Домен підставляється в посилання email листів (password reset). "
+                "Вкажіть точну адресу за якою система доступна ззовні. "
+                "Після збереження — перевірте password reset лист."
+            ),
+        }),
+        ("🔑 Ліцензія", {
+            "fields": ("license_package", "license_key", "license_expires_at"),
+            "description": "Ліцензійний ключ отримується після придбання на minerva-bi.com",
+            "classes": ("collapse",),
+        }),
     ]
+
+    def get_form(self, request, obj=None, **kwargs):
+        from django.forms import PasswordInput
+        form = super().get_form(request, obj, **kwargs)
+        if 'license_key' in form.base_fields:
+            form.base_fields['license_key'].widget = PasswordInput(render_value=True)
+        return form
 
     def has_add_permission(self, request):
         return False

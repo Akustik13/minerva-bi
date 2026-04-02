@@ -10,6 +10,7 @@ from django.urls import path, include
 from django.shortcuts import render
 from django.conf import settings
 from django.conf.urls.static import static
+from tabele import views as root_views
 import tabele.admin  # noqa: F401 — застосовує кастомний порядок сайдбару
 
 _THEME_PROFILES_DIR = os.path.join(settings.BASE_DIR, 'theme_profiles')
@@ -48,7 +49,8 @@ def theme_profiles_load(request, name):
 
 
 urlpatterns = [
-    path("", home_page, name="home"),
+    path("", root_views.landing_view, name="landing"),
+    path("contact/", root_views.contact_view, name="contact"),
     path("theme-profiles/", theme_profiles_list, name="theme_profiles_list"),
     path("theme-profiles/<str:name>/", theme_profiles_load, name="theme_profiles_load"),
     path("admin/config/integrations/", integrations_view, name="integrations_hub"),
