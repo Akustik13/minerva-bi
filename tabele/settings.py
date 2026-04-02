@@ -135,6 +135,10 @@ MEDIA_ROOT  = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+AUTHENTICATION_BACKENDS = [
+    "core.auth_backend.EmailOrUsernameBackend",
+]
+
 # ── Email ─────────────────────────────────────────────────────────────────────
 # Console backend: лист з'явиться в docker logs, не на реальний email.
 # Для реального SMTP — налаштуй NotificationSettings в адмін-панелі,
