@@ -682,33 +682,154 @@ def notify_new_order(order):
     if not send_email and not send_tg:
         return
 
-    client = order.client or order.email or '—'
+    client  = order.client or order.email or '—'
     subject = f'🆕 Minerva: Нове замовлення {order.order_number}'
+
+    # ── Enriched data ───────────────────────────────────────────────────────
+    lines_data = []
+    try:
+        from django.db.models import Sum
+        from inventory.models import InventoryTransaction
+        for line in order.lines.select_related('product').all():
+            if not line.product:
+                lines_data.append({
+                    'sku': line.sku_raw or '—', 'name': '—',
+                    'qty': line.qty, 'in_stock': None, 'stock': 0,
+                })
+                continue
+            stock = (
+                InventoryTransaction.objects.filter(product=line.product)
+                .aggregate(t=Sum('qty'))['t'] or 0
+            )
+            lines_data.append({
+                'sku':      line.product.sku,
+                'name':     line.product.name,
+                'qty':      line.qty,
+                'stock':    int(stock),
+                'in_stock': stock >= line.qty,
+            })
+    except Exception:
+        pass
+
+    # Deadline countdown
+    deadline_str  = ''
+    days_left_str = ''
+    days_left     = None
+    if order.shipping_deadline:
+        deadline_str = order.shipping_deadline.strftime('%d.%m.%Y')
+        days_left    = (order.shipping_deadline - timezone.now().date()).days
+        if days_left > 1:
+            days_left_str = f'{days_left} дн.'
+        elif days_left == 1:
+            days_left_str = 'Завтра ⚠️'
+        elif days_left == 0:
+            days_left_str = 'Сьогодні! ⚠️'
+        else:
+            days_left_str = f'Прострочено ({-days_left} дн.) 🔴'
+
+    # Destination
+    dest_parts  = [p for p in [order.addr_city, order.addr_country] if p]
+    destination = ', '.join(dest_parts) if dest_parts else ''
+
+    # Total
+    total_str = ''
+    try:
+        from django.db.models import Sum as _Sum
+        t = order.lines.aggregate(s=_Sum('total_price'))['s']
+        if t:
+            currency  = getattr(order, 'currency', '') or ''
+            total_str = f'{t} {currency}'.strip()
+    except Exception:
+        pass
 
     if send_email:
         try:
-            html = _order_email_html(
-                order, f'🆕 Нове замовлення', '#1565c0',
-            )
+            # Products table
+            lines_html = ''
+            if lines_data:
+                rows = ''
+                for ld in lines_data:
+                    if ld['in_stock'] is True:
+                        stock_cell = f'<span style="color:#2e7d32">✅ {ld["stock"]} шт</span>'
+                    elif ld['in_stock'] is False:
+                        stock_cell = (
+                            f'<span style="color:#c62828">❌ є: {ld["stock"]} шт, '
+                            f'потрібно: {ld["qty"]}</span>'
+                        )
+                    else:
+                        stock_cell = '—'
+                    rows += (
+                        f'<tr style="border-bottom:1px solid #eee">'
+                        f'<td style="padding:5px 8px;font-family:monospace;font-size:12px;'
+                        f'color:#1565c0">{ld["sku"]}</td>'
+                        f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
+                        f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
+                        f'<td style="padding:5px 8px;text-align:right;font-size:12px">{stock_cell}</td>'
+                        f'</tr>'
+                    )
+                lines_html = (
+                    '<div style="margin-top:12px">'
+                    '<b style="font-size:13px">📋 Товари:</b>'
+                    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">'
+                    '<tr style="background:#f0f4f8;color:#555;font-size:11px">'
+                    '<th style="padding:5px 8px;text-align:left">SKU</th>'
+                    '<th style="padding:5px 8px;text-align:left">Назва</th>'
+                    '<th style="padding:5px 8px;text-align:center">Кіл-ть</th>'
+                    '<th style="padding:5px 8px;text-align:right">Склад</th>'
+                    '</tr>'
+                    + rows +
+                    '</table></div>'
+                )
+
+            extra = ''
+            if total_str:
+                extra += f'<br><b>Сума:</b> {total_str}'
+            if destination:
+                extra += f'<br><b>📍 Куди:</b> {destination}'
+            if order.contact_name and order.contact_name != client:
+                extra += f'<br><b>Контакт:</b> {order.contact_name}'
+            if deadline_str:
+                dl_color = '#c62828' if days_left is not None and days_left <= 2 else '#333'
+                extra += (
+                    f'<br><b>📦 Дедлайн відправки:</b> {deadline_str}'
+                    + (f' <span style="color:{dl_color}">({days_left_str})</span>'
+                       if days_left_str else '')
+                )
+            if lines_html:
+                extra += f'<br>{lines_html}'
+
+            html = _order_email_html(order, '🆕 Нове замовлення', '#1565c0', extra)
             _send_event_email(ns, subject, html)
         except Exception:
             pass
 
     if send_tg:
         try:
-            lines = [
+            tg = [
                 f'🆕 <b>Нове замовлення</b>',
-                f'<code>{order.order_number}</code> · {order.source}',
-                f'Клієнт: {client}',
+                f'<i>Minerva · {timezone.now().strftime("%d.%m.%Y %H:%M")}</i>',
+                '',
+                f'Замовлення: <code>{order.order_number}</code>',
+                f'Клієнт: <b>{client}</b>',
+                f'Джерело: {order.source}',
             ]
-            try:
-                from django.db.models import Sum
-                t = order.lines.aggregate(s=Sum('total_price'))['s']
-                if t:
-                    lines.append(f'Сума: <b>{t}</b>')
-            except Exception:
-                pass
-            _send_telegram(ns, '\n'.join(lines))
+            if destination:
+                tg.append(f'📍 Куди: {destination}')
+            if order.contact_name and order.contact_name != client:
+                tg.append(f'Контакт: {order.contact_name}')
+            if deadline_str:
+                tg.append(f'📦 Відправити до: <b>{deadline_str}</b> ({days_left_str})')
+            if total_str:
+                tg.append(f'💰 Сума: <b>{total_str}</b>')
+            if lines_data:
+                tg.append('')
+                tg.append('📋 <b>Товари:</b>')
+                for ld in lines_data:
+                    icon = '✅' if ld['in_stock'] is True else ('❌' if ld['in_stock'] is False else '•')
+                    name_part  = f' {ld["name"]}' if ld['name'] != '—' else ''
+                    stock_part = f' | склад: {ld["stock"]} шт' if ld['in_stock'] is not None else ''
+                    tg.append(f'{icon} <code>{ld["sku"]}</code>{name_part} × {ld["qty"]}{stock_part}')
+            _send_telegram(ns, '\n'.join(tg))
         except Exception:
             pass
 
