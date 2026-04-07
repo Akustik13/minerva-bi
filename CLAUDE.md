@@ -1,6 +1,6 @@
 # CLAUDE.md — Minerva Business Intelligence System
 
-> Останнє оновлення: 2026-03-02
+> Останнє оновлення: 2026-04-07
 
 ---
 
@@ -198,14 +198,14 @@ docker-compose exec web python manage.py migrate
 - [ ] Email/Telegram алерти (critical stock, дедлайни)
 
 **Фаза 2 — Автоматизація (квітень–травень 2026):**
-- [ ] Django REST Framework + API-ключі
+- [x] Django REST Framework + API-ключі
 - [ ] Jumingo реальна API інтеграція
 - [ ] Webhook вхідні (Shopify/WooCommerce)
-- [ ] Звіти PDF (рахунок-фактура, пакувальний лист)
+- [x] Звіти PDF (рахунок-фактура, пакувальний лист, CN23, Proforma)
 
 **Фаза 3 — Продаж (червень 2026):**
-- [ ] Мобільна адаптація Dashboard
-- [ ] Права доступу по ролях
+- [x] Мобільна адаптація (PWA + mobile.css + hamburger + safe area)
+- [ ] Права доступу по ролях (частково: ROLE_PERMISSIONS + UserProfile roles)
 - [ ] Лендінг minerva-bi.com
 - [ ] install.sh автодеплой скрипт
 

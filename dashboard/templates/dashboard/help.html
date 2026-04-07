@@ -167,6 +167,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
   <button class="tab-btn"        data-tab="shipping"   onclick="show('shipping')">🚚 Доставка</button>
   <button class="tab-btn"        data-tab="sistema"    onclick="show('sistema')">⚙️ Система</button>
   <button class="tab-btn"        data-tab="shortcuts"  onclick="show('shortcuts')">⚡ Швидкий старт</button>
+  <button class="tab-btn"        data-tab="mobile"     onclick="show('mobile')">📱 Мобільний / PWA</button>
 </div>
 
 <div class="main">
@@ -1302,6 +1303,116 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
       <div class="card"><div class="card-head"><span class="icon">📄</span><h3>Налаштування документів</h3></div><p><a href="/admin/config/documentsettings/">Система → Документи</a> — мова PDF, packing list, proforma, CN23</p></div>
       <div class="card"><div class="card-head"><span class="icon">✉️</span><h3>Автор системи</h3></div><p>Viacheslav Pryimak<br><a href="mailto:prym.via@gmail.com">prym.via@gmail.com</a></p></div>
     </div>
+  </div>
+
+
+  <!-- ══ МОБІЛЬНИЙ / PWA ══ -->
+  <div id="mobile" class="section">
+    <div class="section-header">
+      <div class="section-icon" style="background:linear-gradient(135deg,rgba(0,212,170,.2),rgba(79,143,255,.1))">📱</div>
+      <div><h2>Мобільний режим та PWA</h2><p>Minerva як нативний додаток на телефоні — без App Store і Google Play</p></div>
+    </div>
+
+    <div class="alert alert-blue"><span>ℹ️</span><div><strong>PWA (Progressive Web App)</strong> — технологія що перетворює веб-сайт на нативний додаток: власна іконка, повноекранний режим без адресного рядка, кешування статики, офлайн-заглушка.</div></div>
+
+    <h3 class="sub">📲 Встановити Minerva на телефон</h3>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">🤖</span><h3>Android (Chrome)</h3></div>
+        <p>1. Відкрийте Minerva в Chrome<br>
+        2. З'явиться банер <strong>"Встановити Minerva"</strong> внизу екрану — натисніть<br>
+        або: меню ⋮ → <strong>"Додати на головний екран"</strong><br><br>
+        Minerva відкриватиметься як окремий додаток без адресного рядка.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">🍎</span><h3>iPhone / iPad (Safari)</h3></div>
+        <p>1. Відкрийте Minerva в <strong>Safari</strong> (тільки Safari на iOS)<br>
+        2. Кнопка "Поділитись" (□↑) внизу екрану<br>
+        3. Прокрутіть список → <strong>"На початковий екран"</strong><br>
+        4. Підтвердіть назву → <strong>"Додати"</strong></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">💻</span><h3>Desktop (Chrome / Edge)</h3></div>
+        <p>1. Відкрийте Minerva в Chrome або Edge<br>
+        2. Іконка ⊞ в адресному рядку праворуч або банер в нижньому правому куті<br>
+        3. Натисніть <strong>"Встановити"</strong></p>
+      </div>
+    </div>
+
+    <hr class="div">
+    <h3 class="sub">☰ Мобільна навігація</h3>
+    <div class="steps">
+      <div class="step"><div class="step-num">☰</div><div class="step-content">
+        <h4>Кнопка-бургер</h4>
+        <p>На екранах вужче 768px з'являється кнопка <strong>☰</strong> у верхньому лівому куті. Натисніть — розкривається бокова панель навігації.</p>
+      </div></div>
+      <div class="step"><div class="step-num">👆</div><div class="step-content">
+        <h4>Свайп</h4>
+        <p>Проведіть пальцем <strong>вправо від лівого краю</strong> — відкриє меню.<br>Свайп вліво або торкніть затемнену область — закриє.</p>
+      </div></div>
+      <div class="step"><div class="step-num">🎨</div><div class="step-content">
+        <h4>Тема</h4>
+        <p>Перемикач 🌙 ☀️ ⚜️ у нижній частині бокової панелі. Вибір зберігається між сесіями в localStorage.</p>
+      </div></div>
+    </div>
+
+    <hr class="div">
+    <h3 class="sub">📐 Адаптація UI на мобільному</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Елемент</th><th>Поведінка на мобільному</th></tr></thead><tbody>
+      <tr><td>📋 Таблиці</td><td>Горизонтальний скрол — всі колонки доступні</td></tr>
+      <tr><td>📝 Поля введення</td><td>font-size 16px — iOS не зумить при фокусі на input</td></tr>
+      <tr><td>💾 Кнопки збереження</td><td>Sticky внизу екрану — завжди в зоні досяжності великого пальця</td></tr>
+      <tr><td>📱 Safe area (iPhone)</td><td>Відступи від "чубчика" та Home-індикатора — через <code>env(safe-area-inset-*)</code></td></tr>
+      <tr><td>🗂 Фільтри списку</td><td>Повна ширина, відображаються над таблицею</td></tr>
+      <tr><td>📊 KPI картки</td><td>2 колонки на телефоні, 1 колонка на дуже маленьких екранах</td></tr>
+    </tbody></table></div>
+
+    <hr class="div">
+    <h3 class="sub">🌐 Офлайн-режим</h3>
+    <div class="alert alert-orange"><span>⚠️</span><div>Minerva працює з живими даними, тому повноцінна робота потребує з'єднання. Офлайн Service Worker лише відображає заглушку і повертає кешовані сторінки де можливо.</div></div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">✅</span><h3>Доступно без інтернету</h3></div>
+        <p>Статичні файли (CSS, JS, іконки) — Cache First, завжди зі кешу.<br>
+        Сторінки що відкривались нещодавно — можуть бути доступні в режимі читання.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">❌</span><h3>Потребує інтернету</h3></div>
+        <p>Збереження змін, нові дані, синхронізація, API-запити.<br>
+        При відсутності мережі — сторінка "🏛️ Minerva недоступна" з кнопкою "Спробувати знову".</p>
+      </div>
+    </div>
+
+    <hr class="div">
+    <h3 class="sub">🔄 Оновлення після git pull</h3>
+    <div class="alert alert-orange"><span>⚠️</span><div>Якщо оновлення містить зміни в <code>static/</code> (CSS, JS, іконки) — необхідно запустити <code>collectstatic</code>, інакше нові файли не з'являться у production через WhiteNoise.</div></div>
+    <div class="steps">
+      <div class="step"><div class="step-num">1</div><div class="step-content">
+        <h4>Оновити через Minerva (рекомендовано)</h4>
+        <p><a href="/admin/backup/backupplaceholder/">Система → Резервне копіювання</a> → блок <strong>"🔄 Оновлення системи"</strong> → кнопки <strong>"🔄 Перевірити"</strong> → <strong>"⬇️ Оновити"</strong> → <strong>"🔁 Перезапустити веб"</strong></p>
+      </div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-content">
+        <h4>Або вручну через SSH</h4>
+        <p><code>git pull</code><br>
+        <code>docker-compose exec web python manage.py collectstatic --noinput</code><br>
+        <code>docker-compose restart web</code></p>
+      </div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-content">
+        <h4>Скинути кеш Service Worker (якщо щось злипло)</h4>
+        <p>Chrome DevTools → Application → Service Workers → <strong>"Unregister"</strong> → перезавантажити сторінку.<br>
+        Або відкрити в режимі інкогніто.</p>
+      </div></div>
+    </div>
+
+    <hr class="div">
+    <h3 class="sub">🔗 Технічні деталі</h3>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Файл / URL</th><th>Призначення</th></tr></thead><tbody>
+      <tr><td><code>/manifest.json</code></td><td>Web App Manifest — динамічний, підставляє назву з Системних налаштувань</td></tr>
+      <tr><td><code>/sw.js</code></td><td>Service Worker — Cache First для /static/, Network First для /admin/</td></tr>
+      <tr><td><code>/static/icons/icon-192.png</code></td><td>Іконка PWA для Android та Chrome</td></tr>
+      <tr><td><code>/static/icons/icon-512.png</code></td><td>Іконка PWA для splash screen</td></tr>
+      <tr><td><code>/static/admin/css/mobile.css</code></td><td>Мобільна адаптація — форми, sticky submit, safe area</td></tr>
+    </tbody></table></div>
   </div>
 
 </div><!-- /main -->
