@@ -46,7 +46,7 @@ services:
       TZ: "Europe/Berlin"
 
       # DigiKey OAuth redirect (потрібен для 3-legged auth, якщо активується)
-      DIGIKEY_OAUTH_REDIRECT_URI: ""
+      DIGIKEY_OAUTH_REDIRECT_URI: "https://akustik.synology.me:81/bots/digikey/oauth-callback/"
     entrypoint: ["sh", "/app/entrypoint.sh"]
     volumes: &app_volumes
       - ./:/app                          # Код (дозволяє оновлювати без rebuild)
