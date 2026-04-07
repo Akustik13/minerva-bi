@@ -49,7 +49,7 @@
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div>
           <span style="font-family:monospace;color:var(--text-muted);font-size:12px">
-            🔖 {{ order.businessId|default:order.id }}
+            🔖 {% firstof order.orderId order.businessId order.id %}
           </span>
           <span style="font-family:monospace;color:var(--text-dim);font-size:11px;margin-left:8px">
             id: {{ order.id }}
@@ -119,6 +119,18 @@
       {% for f in order.additionalFields %}{% if f.code == 'customer-purchase-order-number' %}
       <div style="margin-top:8px;font-size:12px;color:var(--text-dim)">PO: <span style="color:var(--text-muted)">{{ f.value }}</span></div>
       {% endif %}{% endfor %}
+
+      <!-- Confirm button for unconfirmed orders -->
+      {% if order.orderState != 'Accepted' and order.orderState != 'Cancelled' %}
+      <div style="margin-top:12px">
+        <a href="{% url 'admin:bots_digikeyconfig_confirm_order' order.id %}"
+           onclick="return confirm('Підтвердити замовлення {% firstof order.orderId order.businessId order.id %}?')"
+           style="display:inline-block;padding:7px 16px;background:var(--ok);color:#fff;
+                  border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold">
+          ✅ Підтвердити замовлення
+        </a>
+      </div>
+      {% endif %}
 
     </div>
     {% endwith %}

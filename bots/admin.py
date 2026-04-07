@@ -579,13 +579,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         except Exception as e:
             messages.error(request, f"❌ {type(e).__name__}: {e}")
 
-        # Redirect back to SalesOrder if it exists
-        try:
-            from sales.models import SalesOrder
-            sale = SalesOrder.objects.get(source="digikey", order_number=order_number)
-            return redirect(reverse("admin:sales_salesorder_change", args=[sale.pk]))
-        except Exception:
-            return redirect(reverse("admin:bots_digikeyconfig_change", args=[1]))
+        return redirect(reverse("admin:bots_digikeyconfig_marketplace_orders"))
 
     # ── Readonly display fields ───────────────────────────────────────────────
 
