@@ -102,7 +102,7 @@ class SalesSourceAdmin(admin.ModelAdmin):
 
 class OrderPackagingInline(admin.TabularInline):
     model = None  # встановлюється нижче після імпорту
-    extra = 1
+    extra = 0
     fields = ('packaging', 'qty_boxes', 'actual_weight_g', 'notes')
     verbose_name        = 'Тип коробки'
     verbose_name_plural = '📦 Фактична упаковка (статистика)'
