@@ -1444,13 +1444,30 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception:
             return JsonResponse({"error": "Invalid JSON"}, status=400)
 
-        try:
-            weight = float(body.get("weight_kg") or 1)
-            length = int(float(body.get("length_cm") or 20))
-            width  = int(float(body.get("width_cm")  or 15))
-            height = int(float(body.get("height_cm") or 10))
-        except (ValueError, TypeError):
-            weight, length, width, height = 1.0, 20, 15, 10
+        # Multi-package: якщо є масив коробок — агрегуємо
+        packages_raw = body.get("packages") or []
+        if packages_raw:
+            try:
+                total_weight = 0.0
+                first = packages_raw[0]
+                length = int(float(first.get("length_cm") or 20))
+                width  = int(float(first.get("width_cm")  or 15))
+                height = int(float(first.get("height_cm") or 10))
+                for p in packages_raw:
+                    qty = max(1, int(p.get("quantity") or 1))
+                    total_weight += float(p.get("weight_kg") or 1) * qty
+                weight = round(max(0.1, total_weight), 3)
+            except (ValueError, TypeError, IndexError):
+                weight, length, width, height = 1.0, 20, 15, 10
+                packages_raw = []
+        else:
+            try:
+                weight = float(body.get("weight_kg") or 1)
+                length = int(float(body.get("length_cm") or 20))
+                width  = int(float(body.get("width_cm")  or 15))
+                height = int(float(body.get("height_cm") or 10))
+            except (ValueError, TypeError):
+                weight, length, width, height = 1.0, 20, 15, 10
 
         dest_country   = (body.get("recipient_country") or "").upper().strip()
         dest_postal    = (body.get("recipient_zip")     or "").strip()
@@ -1551,11 +1568,25 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "city":    first_carrier.sender_city,
             }
 
+        # Normalize packages for display
+        display_packages = []
+        if packages_raw:
+            for p in packages_raw:
+                display_packages.append({
+                    "weight_kg": round(float(p.get("weight_kg") or 1), 3),
+                    "length_cm": int(float(p.get("length_cm") or 20)),
+                    "width_cm":  int(float(p.get("width_cm")  or 15)),
+                    "height_cm": int(float(p.get("height_cm") or 10)),
+                    "quantity":  max(1, int(p.get("quantity") or 1)),
+                })
+
         return JsonResponse({
-            "results":      results,
-            "weight":       weight,
-            "dims":         f"{length}×{width}×{height}",
-            "from_address": from_address,
+            "results":          results,
+            "weight":           weight,
+            "total_weight_kg":  round(weight, 3),
+            "dims":             f"{length}×{width}×{height}",
+            "packages":         display_packages,
+            "from_address":     from_address,
         })
 
     # ── Submit → Jumingo API ──────────────────────────────────────────────────

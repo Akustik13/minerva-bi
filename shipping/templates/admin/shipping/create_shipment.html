@@ -240,6 +240,26 @@ function compareRates(){
   panel.scrollIntoView({behavior:'smooth',block:'start'});
 
   const get = n => (form.querySelector(`[name="${n}"]`)?.value||'').trim();
+
+  // Collect packages: multi-package table if active, else single package fields
+  const pkgToggle = document.getElementById('pkg-toggle');
+  const multiActive = pkgToggle && pkgToggle.checked;
+  let packages = null;
+  if (multiActive) {
+    packages = [];
+    document.querySelectorAll('#pkg-tbody tr').forEach(tr => {
+      const inp = name => tr.querySelector(`[name="${name}"]`)?.value || '';
+      const qty = Math.max(1, parseInt(inp('pkg_qty[]')) || 1);
+      packages.push({
+        weight_kg: parseFloat(inp('pkg_weight[]')) || 1,
+        length_cm: parseFloat(inp('pkg_length[]')) || 20,
+        width_cm:  parseFloat(inp('pkg_width[]'))  || 15,
+        height_cm: parseFloat(inp('pkg_height[]')) || 10,
+        quantity:  qty,
+      });
+    });
+  }
+
   const body = {
     weight_kg: get('weight_kg'),
     length_cm: get('length_cm'),
@@ -250,6 +270,7 @@ function compareRates(){
     recipient_city:    get('recipient_city'),
     insurance_type:    get('insurance_type'),
     declared_value:    get('declared_value'),
+    ...(packages ? { packages } : {}),
   };
   const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
 
@@ -271,17 +292,33 @@ function compareRates(){
       return;
     }
     const destStr = [body.recipient_country, body.recipient_zip, body.recipient_city].filter(Boolean).join(' ');
-    meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${esc(body.weight_kg)} кг · ${esc(data.dims||'')} см</span>`
-      + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
+    // Summary line above results
+    if (data.packages && data.packages.length > 1) {
+      meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${data.packages.length} типів коробок · ${esc(data.total_weight_kg)} кг заг. &nbsp;→&nbsp; ${esc(destStr)}</span>`;
+    } else {
+      meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${esc(data.total_weight_kg||body.weight_kg)} кг · ${esc(data.dims||'')} см</span>`
+        + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
+    }
     // Params block — show exactly what was sent to the API
     const fromAddr = data.from_address || {};
     paramsEl.style.display = '';
+    let pkgHtml = '';
+    if (data.packages && data.packages.length) {
+      pkgHtml = '<br><span style="color:var(--text-muted)">📦 Коробки:</span> '
+        + data.packages.map((p, i) =>
+            `<b style="color:var(--text)">#${i+1}: ${p.weight_kg} кг · ${p.length_cm}×${p.width_cm}×${p.height_cm} см`
+            + (p.quantity > 1 ? ` ×${p.quantity}` : '') + `</b>`
+          ).join(' &nbsp;|&nbsp; ')
+        + ` &nbsp;&nbsp;<span style="color:var(--text-dim)">загалом ${esc(data.total_weight_kg)} кг</span>`;
+    } else {
+      pkgHtml = `<span style="color:var(--text-muted)">⚖️ Вага:</span> <b style="color:var(--text)">${esc(data.total_weight_kg||body.weight_kg)} кг</b>`
+              + ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">📐 Розміри:</span> <b style="color:var(--text)">${esc(data.dims||'')} см (Д×Ш×В)</b>`;
+    }
     paramsEl.innerHTML =
       `<span style="color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.04em">Параметри запиту до API:</span><br>`
       + `<span style="color:var(--text-muted)">📤 Відправник:</span> <b style="color:var(--text)">${esc(fromAddr.country||'?')} ${esc(fromAddr.zip||'')} ${esc(fromAddr.city||'')}</b>`
       + ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">📥 Одержувач:</span> <b style="color:var(--text)">${esc(body.recipient_country)} ${esc(body.recipient_zip)} ${esc(body.recipient_city)}</b><br>`
-      + `<span style="color:var(--text-muted)">⚖️ Вага:</span> <b style="color:var(--text)">${esc(body.weight_kg)} кг</b>`
-      + ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">📐 Розміри:</span> <b style="color:var(--text)">${esc(data.dims||'')} см (Д×Ш×В)</b>`;
+      + pkgHtml;
     _lastRatesData = data.results;
     // Show filter only if there are Jumingo tariffs (shop/pickup distinction applies only to Jumingo)
     const hasJumingo = (data.results||[]).some(c=>c.carrier_type==='jumingo'&&c.products&&c.products.length);
