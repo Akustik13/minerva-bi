@@ -102,10 +102,16 @@ class SalesSourceAdmin(admin.ModelAdmin):
 
 class OrderPackagingInline(admin.TabularInline):
     model = None  # встановлюється нижче після імпорту
-    extra = 0
+    extra = 1
     fields = ('packaging', 'qty_boxes', 'actual_weight_g', 'notes')
-    verbose_name        = 'Упаковка'
+    verbose_name        = 'Тип коробки'
     verbose_name_plural = '📦 Фактична упаковка (статистика)'
+
+    def get_formset(self, request, obj=None, **kwargs):
+        fs = super().get_formset(request, obj, **kwargs)
+        fs.form.base_fields['qty_boxes'].label = 'К-сть шт (однакових)'
+        fs.form.base_fields['qty_boxes'].help_text = 'Скільки однакових коробок цього розміру (наприклад 5 = п\'ять однакових коробок)'
+        return fs
 
 try:
     from shipping.models import OrderPackaging as _OP

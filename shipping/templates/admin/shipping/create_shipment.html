@@ -293,24 +293,22 @@ function compareRates(){
     }
     const destStr = [body.recipient_country, body.recipient_zip, body.recipient_city].filter(Boolean).join(' ');
     // Summary line above results
-    if (data.packages && data.packages.length > 1) {
-      meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${data.packages.length} типів коробок · ${esc(data.total_weight_kg)} кг заг. &nbsp;→&nbsp; ${esc(destStr)}</span>`;
-    } else {
-      meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${esc(data.total_weight_kg||body.weight_kg)} кг · ${esc(data.dims||'')} см</span>`
-        + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
-    }
-    // Params block — show exactly what was sent to the API
     const fromAddr = data.from_address || {};
     paramsEl.style.display = '';
     let pkgHtml = '';
     if (data.packages && data.packages.length) {
+      const totalBoxes = data.packages.reduce((s, p) => s + (p.quantity || 1), 0);
+      meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${totalBoxes} коробок · ${esc(data.total_weight_kg)} кг заг.</span>`
+        + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
       pkgHtml = '<br><span style="color:var(--text-muted)">📦 Коробки:</span> '
         + data.packages.map((p, i) =>
             `<b style="color:var(--text)">#${i+1}: ${p.weight_kg} кг · ${p.length_cm}×${p.width_cm}×${p.height_cm} см`
-            + (p.quantity > 1 ? ` ×${p.quantity}` : '') + `</b>`
+            + (p.quantity > 1 ? ` <span style="color:var(--warn)">×${p.quantity} шт</span>` : '') + `</b>`
           ).join(' &nbsp;|&nbsp; ')
-        + ` &nbsp;&nbsp;<span style="color:var(--text-dim)">загалом ${esc(data.total_weight_kg)} кг</span>`;
+        + ` &nbsp;&nbsp;<span style="color:var(--text-dim)">= ${totalBoxes} коробок, ${esc(data.total_weight_kg)} кг заг.</span>`;
     } else {
+      meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${esc(data.total_weight_kg||body.weight_kg)} кг · ${esc(data.dims||'')} см</span>`
+        + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
       pkgHtml = `<span style="color:var(--text-muted)">⚖️ Вага:</span> <b style="color:var(--text)">${esc(data.total_weight_kg||body.weight_kg)} кг</b>`
               + ` &nbsp;·&nbsp; <span style="color:var(--text-muted)">📐 Розміри:</span> <b style="color:var(--text)">${esc(data.dims||'')} см (Д×Ш×В)</b>`;
     }
@@ -774,7 +772,8 @@ document.addEventListener('DOMContentLoaded', function() {
               <th style="padding:6px 10px;text-align:left;font-weight:500">Довж. (см)</th>
               <th style="padding:6px 10px;text-align:left;font-weight:500">Шир. (см)</th>
               <th style="padding:6px 10px;text-align:left;font-weight:500">Вис. (см)</th>
-              <th style="padding:6px 10px;text-align:left;font-weight:500">К-сть</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:500;cursor:help"
+                  title="Кількість однакових коробок цього розміру (наприклад, 5 = п'ять однакових коробок)">К-сть шт</th>
               <th style="padding:6px 10px"></th>
             </tr>
           </thead>
