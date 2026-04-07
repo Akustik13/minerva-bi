@@ -121,7 +121,7 @@
       {% endif %}{% endfor %}
 
       <!-- Confirm button for unconfirmed orders -->
-      {% if order.orderState != 'Accepted' and order.orderState != 'Cancelled' %}
+      {% if order.orderState == 'New' or order.orderState == 'PendingAcceptance' or order.orderState == 'AwaitingAcceptance' %}
       <div style="margin-top:12px">
         <a href="{% url 'admin:bots_digikeyconfig_confirm_order' order.id %}"
            onclick="return confirm('Підтвердити замовлення {% firstof order.orderId order.businessId order.id %}?')"
