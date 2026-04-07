@@ -764,7 +764,7 @@ document.addEventListener('DOMContentLoaded', function() {
       (function(){
         var _pkgIdx = 0;
         // Pre-filled rows from OrderPackaging
-        var _PKG_PRESET = {{ pkg_rows|default:"[]" }};
+        var _PKG_PRESET = {{ pkg_rows_json|default:"[]"|safe }};
         var _PKG_AUTO   = {% if pkg_auto %}true{% else %}false{% endif %};
 
         window.addPkgRow = function(w, l, wd, h, q) {

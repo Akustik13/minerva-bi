@@ -399,6 +399,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         n_articles = len(customs_articles) or 1
         default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 3)
 
+        import json as _json
         pkg_rows = (packaging_hint or {}).get("pkg_rows") or []
         # Авто-активувати multi-package: якщо є кілька типів коробок АБО qty > 1
         pkg_auto = len(pkg_rows) > 1 or (len(pkg_rows) == 1 and pkg_rows[0]["quantity"] > 1)
@@ -414,7 +415,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "eu_countries_js":    ",".join(sorted(eu_countries)),
             "default_ca_weight":  default_ca_weight,
             "title":              f"Нове відправлення — {order.order_number}",
-            "pkg_rows":           pkg_rows,
+            "pkg_rows_json":      _json.dumps(pkg_rows),
             "pkg_auto":           pkg_auto,
         })
 
