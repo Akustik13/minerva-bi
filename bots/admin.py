@@ -652,11 +652,12 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
     access_token_preview.short_description = "Access Token"
 
     def webhook_url_display(self, obj):
-        from django.urls import reverse as _rev
-        try:
-            url = "https://akustik.synology.me:81/bots/digikey/webhook/"
-        except Exception:
-            url = "/bots/digikey/webhook/"
+        from django.conf import settings
+        oauth_uri = getattr(settings, "DIGIKEY_OAUTH_REDIRECT_URI", "")
+        if oauth_uri:
+            url = oauth_uri.replace("oauth-callback/", "webhook/")
+        else:
+            url = "/bots/digikey/webhook/  ← встанови DIGIKEY_OAUTH_REDIRECT_URI в docker-compose"
         status_color = "#4caf50" if (obj and obj.webhook_enabled) else "#607d8b"
         status_label = "✅ увімкнено" if (obj and obj.webhook_enabled) else "⭕ вимкнено"
         return format_html(
