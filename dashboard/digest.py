@@ -389,8 +389,8 @@ def send_digest(force: bool = False) -> dict:
             }
 
     try:
-        from accounting.models import CompanySettings
-        company_name = CompanySettings.get().name or "Minerva"
+        from config.models import SystemSettings
+        company_name = SystemSettings.get().company_name or "Minerva"
     except Exception:
         company_name = "Minerva"
 
