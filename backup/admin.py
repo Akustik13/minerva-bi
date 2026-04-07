@@ -91,6 +91,11 @@ class BackupAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.setup_modules_view),
                 name="backup_setup_modules",
             ),
+            path(
+                "restart-web/",
+                self.admin_site.admin_view(self.restart_web_view),
+                name="backup_restart_web",
+            ),
         ]
 
     def _ctx(self, request, **extra):
@@ -321,6 +326,12 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
         return JsonResponse(utils.run_setup_modules())
+
+    def restart_web_view(self, request):
+        """AJAX — graceful gunicorn reload via SIGHUP to PID 1."""
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        return JsonResponse(utils.restart_web())
 
     def has_add_permission(self, request):              return False
     def has_change_permission(self, request, obj=None): return False

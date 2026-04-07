@@ -277,6 +277,10 @@
                 onclick="runSetupModules(this)">
           🧩 Оновити модулі
         </button>
+        <button id="btn-restart-web" class="bk-btn" style="background:#b45309;"
+                onclick="restartWeb(this)">
+          🔁 Перезапустити веб
+        </button>
       </div>
 
     </div>
@@ -987,6 +991,7 @@ async function runMigrate(btn) {
    Setup Modules
 ════════════════════════════════════════════════════════════════════ */
 const SETUP_MODULES_URL = '{% url "admin:backup_setup_modules" %}';
+const RESTART_WEB_URL   = '{% url "admin:backup_restart_web" %}';
 
 async function runSetupModules(btn) {
   const resultEl = document.getElementById('git-result');
@@ -1003,6 +1008,31 @@ async function runSetupModules(btn) {
     const icon = data.ok ? '✅' : '❌';
     const dur  = data.duration ? ` (${data.duration}с)` : '';
     resultEl.textContent = `${icon} setup_modules${dur}\n${data.output || data.error || ''}`;
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+async function restartWeb(btn) {
+  const resultEl = document.getElementById('git-result');
+  btn.disabled = true;
+  resultEl.style.display = 'block';
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ Надсилаю SIGHUP до gunicorn…';
+  try {
+    const resp = await fetch(RESTART_WEB_URL, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF },
+    });
+    const data = await resp.json();
+    resultEl.className = data.ok ? 'bk-result ok' : 'bk-result error';
+    resultEl.textContent = data.ok
+      ? '✅ ' + (data.message || 'Перезапуск ініційовано. Сторінка оновиться через ~10 с.')
+      : '❌ ' + (data.error || 'Помилка');
+    if (data.ok) {
+      setTimeout(() => location.reload(), 10000);
+    }
   } catch(e) {
     resultEl.className = 'bk-result error';
     resultEl.textContent = '❌ ' + e.message;

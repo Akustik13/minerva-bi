@@ -658,3 +658,19 @@ def run_setup_modules() -> dict:
         return {"ok": False, "error": "setup_modules timeout (>60с)", "duration": round(time.time() - start, 1)}
     except Exception as exc:
         return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
+
+
+def restart_web() -> dict:
+    """Graceful gunicorn worker reload — надсилає SIGHUP до PID 1.
+
+    Gunicorn master (PID 1 в Docker) перезапускає воркери без downtime.
+    Повертає {ok, message}.
+    """
+    import os, signal as _signal
+    try:
+        os.kill(1, _signal.SIGHUP)
+        return {"ok": True, "message": "SIGHUP надіслано до PID 1. Voркери перезавантажуються (~5–10 с)."}
+    except (ProcessLookupError, PermissionError) as exc:
+        return {"ok": False, "error": f"Не вдалося надіслати SIGHUP до PID 1: {exc}"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
