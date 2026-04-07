@@ -77,15 +77,18 @@ class DigiKeyConfig(models.Model):
         ),
     )
 
-    # ── Phase 2: Webhook ──────────────────────────────────────────────────────
-    webhook_enabled = models.BooleanField("Webhook увімкнений (Phase 2)", default=False)
+    # ── Публічний URL сайту ───────────────────────────────────────────────────
+    public_base_url = models.CharField(
+        "Публічний URL сайту", max_length=200, blank=True, default="",
+        help_text="Базовий URL без слеша на кінці. Приклад: https://akustik.synology.me:81 — "
+                  "використовується для OAuth Callback та Webhook URL."
+    )
+
+    # ── Webhook ───────────────────────────────────────────────────────────────
+    webhook_enabled = models.BooleanField("Webhook увімкнений", default=False)
     webhook_secret  = models.CharField(
         "Webhook Secret", max_length=200, blank=True, default="",
-        help_text="HMAC-підпис вхідних webhook-запитів від DigiKey"
-    )
-    webhook_url_note = models.CharField(
-        "Webhook URL (нотатка)", max_length=300, blank=True, default="",
-        help_text="Публічний URL куди DigiKey надсилатиме POST. Приклад: https://akustik.synology.me:81/bots/digikey/webhook/"
+        help_text="Довільний рядок — вкажи той самий і в DigiKey dev portal → Webhooks"
     )
 
     class Meta:

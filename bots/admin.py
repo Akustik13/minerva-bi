@@ -108,10 +108,19 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         "token_expires_at",
         "marketplace_auth_status",
         "action_buttons",
+        "oauth_url_display",
         "webhook_url_display",
     )
 
     fieldsets = (
+        ("🌐 Публічний URL", {
+            "fields": ("public_base_url", "oauth_url_display", "webhook_url_display"),
+            "description": (
+                "Вкажи публічний URL сайту — решта URL генеруються автоматично. "
+                "Скопіюй <b>OAuth Callback URL</b> в DigiKey dev portal → My Apps → OAuth Callback. "
+                "Скопіюй <b>Webhook URL</b> в DigiKey dev portal → My Apps → Webhooks."
+            ),
+        }),
         ("🔑 DigiKey API Credentials", {
             "fields": ("client_id", "client_secret", "account_id"),
             "description": (
@@ -134,11 +143,9 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "fields": ("action_buttons",),
         }),
         ("🔮 Webhook", {
-            "fields": ("webhook_enabled", "webhook_secret", "webhook_url_display"),
+            "fields": ("webhook_enabled", "webhook_secret"),
             "description": (
-                "Скопіюй <b>Webhook URL</b> і вкажи його в "
-                "<a href='https://developer.digikey.com/' target='_blank'>developer.digikey.com</a> "
-                "→ My Apps → Webhooks. Webhook Secret — довільний рядок, вкажи той самий і на DigiKey."
+                "Webhook Secret — довільний рядок, вкажи той самий і в DigiKey dev portal → Webhooks."
             ),
         }),
         ("🛒 Marketplace API (3-legged OAuth)", {
@@ -272,8 +279,10 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             return redirect(reverse("admin:bots_digikeyconfig_change", args=[1]))
 
         from django.conf import settings as dj_settings
+        base = (config.public_base_url or "").rstrip("/")
         redirect_uri = (
-            dj_settings.DIGIKEY_OAUTH_REDIRECT_URI
+            f"{base}/bots/digikey/oauth-callback/" if base
+            else dj_settings.DIGIKEY_OAUTH_REDIRECT_URI
             or request.build_absolute_uri("/bots/digikey/oauth-callback/")
         )
         request.session["digikey_oauth_redirect_uri"] = redirect_uri
@@ -651,19 +660,40 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#607d8b">—</span>')
     access_token_preview.short_description = "Access Token"
 
-    def webhook_url_display(self, obj):
+    def _public_base(self, obj):
+        """Повертає базовий URL без слеша: з поля моделі або з settings."""
+        if obj and obj.public_base_url:
+            return obj.public_base_url.rstrip("/")
         from django.conf import settings
-        oauth_uri = getattr(settings, "DIGIKEY_OAUTH_REDIRECT_URI", "")
-        if oauth_uri:
-            url = oauth_uri.replace("oauth-callback/", "webhook/")
-        else:
-            url = "/bots/digikey/webhook/  ← встанови DIGIKEY_OAUTH_REDIRECT_URI в docker-compose"
+        uri = getattr(settings, "DIGIKEY_OAUTH_REDIRECT_URI", "")
+        if uri:
+            # Витягуємо base з повного URL oauth-callback
+            return uri.replace("/bots/digikey/oauth-callback/", "").rstrip("/")
+        return ""
+
+    def oauth_url_display(self, obj):
+        base = self._public_base(obj)
+        if not base:
+            return format_html('<span style="color:#e3b341">⚠️ Вкажи Публічний URL сайту вище</span>')
+        url = f"{base}/bots/digikey/oauth-callback/"
+        return format_html(
+            '<code style="user-select:all;font-size:13px">{}</code>'
+            '<br><small style="color:var(--text-muted,#9aafbe)">Вкажи в DigiKey dev portal → My Apps → OAuth Callback</small>',
+            url,
+        )
+    oauth_url_display.short_description = "OAuth Callback URL"
+
+    def webhook_url_display(self, obj):
+        base = self._public_base(obj)
+        if not base:
+            return format_html('<span style="color:#e3b341">⚠️ Вкажи Публічний URL сайту вище</span>')
+        url = f"{base}/bots/digikey/webhook/"
         status_color = "#4caf50" if (obj and obj.webhook_enabled) else "#607d8b"
         status_label = "✅ увімкнено" if (obj and obj.webhook_enabled) else "⭕ вимкнено"
         return format_html(
             '<code style="user-select:all;font-size:13px">{}</code>'
             '&nbsp;&nbsp;<span style="color:{}">{}</span>'
-            '<br><small style="color:var(--text-muted,#9aafbe)">Вкажи цей URL в DigiKey dev portal → My Apps → Webhooks</small>',
+            '<br><small style="color:var(--text-muted,#9aafbe)">Вкажи в DigiKey dev portal → My Apps → Webhooks</small>',
             url, status_color, status_label,
         )
     webhook_url_display.short_description = "Webhook URL"
