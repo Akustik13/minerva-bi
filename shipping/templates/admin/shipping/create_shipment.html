@@ -443,15 +443,6 @@ function buildSummary(carriers){
   h += '</tr></thead><tbody>';
 
   ROWS.forEach((row,ri)=>{
-    /* Перевіряємо чи цей рядок унікальний відносно попереднього для всіх перевізників */
-    if(ri>0){
-      const allSame = active.every(c=>{
-        const prev = ROWS[ri-1].fn(c.products);
-        const curr = row.fn(c.products);
-        return (!prev&&!curr) || (prev&&curr&&prev.code===curr.code);
-      });
-      if(allSame) return; // skip дублікат
-    }
 
     h += `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:10px 14px;font-size:11px;font-weight:700;color:var(--text-dim);
