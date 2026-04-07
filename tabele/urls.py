@@ -10,6 +10,7 @@ from django.urls import path, include
 from django.shortcuts import render
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.static import serve as _static_serve
 from tabele import views as root_views
 import tabele.admin  # noqa: F401 — застосовує кастомний порядок сайдбару
 
@@ -49,6 +50,13 @@ def theme_profiles_load(request, name):
 
 
 urlpatterns = [
+    # ── PWA ──────────────────────────────────────────────────────────────────
+    path("manifest.json", root_views.manifest_view, name="manifest"),
+    path("sw.js", _static_serve, {
+        "path": "sw.js",
+        "document_root": os.path.join(settings.BASE_DIR, "static"),
+    }),
+    # ─────────────────────────────────────────────────────────────────────────
     path("", root_views.landing_view, name="landing"),
     path("contact/", root_views.contact_view, name="contact"),
     path("theme-profiles/", theme_profiles_list, name="theme_profiles_list"),

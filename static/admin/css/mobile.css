@@ -1,0 +1,165 @@
+/* ═══════════════════════════════════════════════════
+   Minerva BI — Mobile CSS (доповнення до base_site)
+   768px = tablet/phone breakpoint
+   ═══════════════════════════════════════════════════ */
+
+/* ── Inputs: font-size 16px щоб iOS не зумив ─────── */
+@media (max-width: 768px) {
+
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="url"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="date"],
+  input[type="datetime-local"],
+  textarea,
+  select {
+    font-size: 16px !important;
+    padding: 9px 11px !important;
+    border-radius: 6px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── Форми ─────────────────────────────────────── */
+  .form-row {
+    flex-direction: column !important;
+  }
+  .form-row .field-box,
+  .form-row > div {
+    width: 100% !important;
+    margin-bottom: 10px;
+  }
+
+  /* ── Submit row — липкий знизу ─────────────────── */
+  .submit-row {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-card);
+    border-top: 1px solid var(--border-strong);
+    padding: 10px 12px !important;
+    margin: 0 !important;
+    z-index: 100;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .submit-row input[type="submit"],
+  .submit-row button[type="submit"],
+  .submit-row a.deletelink {
+    flex: 1;
+    min-width: 110px;
+    padding: 11px 14px !important;
+    font-size: 14px !important;
+    border-radius: 6px !important;
+    text-align: center;
+    touch-action: manipulation;
+  }
+
+  /* ── Пошук ─────────────────────────────────────── */
+  #toolbar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+  #searchbar {
+    width: 100% !important;
+    font-size: 16px !important;
+    padding: 9px 13px !important;
+    border-radius: 6px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* ── Фільтр sidebar ─────────────────────────────── */
+  #changelist-filter {
+    width: 100% !important;
+    float: none !important;
+    border-radius: 8px !important;
+    margin-bottom: 14px;
+    padding: 10px 12px !important;
+  }
+
+  /* ── Action bar ─────────────────────────────────── */
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 0;
+  }
+  .actions select {
+    font-size: 14px !important;
+    flex: 1;
+  }
+
+  /* ── Object tools ───────────────────────────────── */
+  .object-tools {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 6px;
+    float: none !important;
+    margin-bottom: 12px;
+  }
+  .object-tools a,
+  .object-tools li {
+    border-radius: 6px;
+    padding: 7px 13px;
+    font-size: 13px;
+  }
+
+  /* ── Inline formsets ─────────────────────────────── */
+  .inline-group .tabular thead th {
+    font-size: 11px;
+    padding: 5px 6px !important;
+    white-space: nowrap;
+  }
+  .inline-group .tabular td {
+    padding: 5px 6px !important;
+  }
+
+  /* ── Пагінація ──────────────────────────────────── */
+  .paginator {
+    font-size: 13px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  /* ── Dashboard KPI ──────────────────────────────── */
+  .kpi-row,
+  .kpi-grid {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+  }
+
+  /* ── Charts ─────────────────────────────────────── */
+  canvas {
+    max-width: 100% !important;
+  }
+
+  /* ── Delete confirmation ─────────────────────────── */
+  .delete-confirmation {
+    padding: 12px !important;
+  }
+}
+
+/* ── Дуже маленький екран ────────────────────────── */
+@media (max-width: 400px) {
+  .kpi-row,
+  .kpi-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* ── Safe area для iPhone з "чубчиком" ──────────── */
+@supports (padding: max(0px)) {
+  @media (max-width: 768px) {
+    .submit-row {
+      padding-bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    }
+  }
+}

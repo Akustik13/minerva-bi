@@ -2,6 +2,7 @@ import secrets
 
 from django.contrib.auth import login
 from django.contrib.auth.models import User
+from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
@@ -268,6 +269,37 @@ def _send_welcome_email(tenant, settings_obj):
         )
     except Exception:
         pass
+
+
+def manifest_view(request):
+    """Динамічний manifest.json — підставляє назву компанії з SystemSettings."""
+    from config.models import SystemSettings
+    s = SystemSettings.get()
+    name = s.company_name or "Minerva BI"
+    return JsonResponse({
+        "name": name,
+        "short_name": name[:12],
+        "description": s.company_tagline or "Business Intelligence система",
+        "start_url": "/admin/",
+        "scope": "/",
+        "display": "standalone",
+        "orientation": "portrait-primary",
+        "theme_color": "#0e1018",
+        "background_color": "#080a0f",
+        "lang": "uk",
+        "icons": [
+            {"src": "/static/icons/icon-72.png",  "sizes": "72x72",   "type": "image/png", "purpose": "any"},
+            {"src": "/static/icons/icon-96.png",  "sizes": "96x96",   "type": "image/png", "purpose": "any"},
+            {"src": "/static/icons/icon-128.png", "sizes": "128x128", "type": "image/png", "purpose": "any"},
+            {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+            {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"},
+        ],
+        "shortcuts": [
+            {"name": "Dashboard",  "url": "/admin/"},
+            {"name": "Замовлення", "url": "/admin/sales/salesorder/"},
+        ],
+        "categories": ["business", "productivity"],
+    }, content_type='application/manifest+json')
 
 
 def _notify_vendor_new_client(tenant, settings_obj):

@@ -33,6 +33,8 @@ debug_*.py
 exports.py
 *.xlsx
 *.json
+# PWA — дозволити
+!static/manifest.json
 jumingo_rates_raw.json
 redmei.txt
 
