@@ -241,36 +241,32 @@ function compareRates(){
 
   const get = n => (form.querySelector(`[name="${n}"]`)?.value||'').trim();
 
-  // Collect packages: multi-package table if active, else single package fields
-  const pkgToggle = document.getElementById('pkg-toggle');
-  const multiActive = pkgToggle && pkgToggle.checked;
-  let packages = null;
-  if (multiActive) {
-    packages = [];
-    document.querySelectorAll('#pkg-tbody tr').forEach(tr => {
-      const inp = name => tr.querySelector(`[name="${name}"]`)?.value || '';
-      const qty = Math.max(1, parseInt(inp('pkg_qty[]')) || 1);
-      packages.push({
-        weight_kg: parseFloat(inp('pkg_weight[]')) || 1,
-        length_cm: parseFloat(inp('pkg_length[]')) || 20,
-        width_cm:  parseFloat(inp('pkg_width[]'))  || 15,
-        height_cm: parseFloat(inp('pkg_height[]')) || 10,
-        quantity:  qty,
-      });
+  // Collect packages from table (always)
+  const packages = [];
+  document.querySelectorAll('#pkg-tbody tr').forEach(tr => {
+    const inp = name => tr.querySelector(`[name="${name}"]`)?.value || '';
+    const qty = Math.max(1, parseInt(inp('pkg_qty[]')) || 1);
+    packages.push({
+      weight_kg: parseFloat(inp('pkg_weight[]')) || 1,
+      length_cm: parseFloat(inp('pkg_length[]')) || 20,
+      width_cm:  parseFloat(inp('pkg_width[]'))  || 15,
+      height_cm: parseFloat(inp('pkg_height[]')) || 10,
+      quantity:  qty,
     });
-  }
+  });
 
+  const firstPkg = packages[0] || {};
   const body = {
-    weight_kg: get('weight_kg'),
-    length_cm: get('length_cm'),
-    width_cm:  get('width_cm'),
-    height_cm: get('height_cm'),
+    weight_kg: String(firstPkg.weight_kg || ''),
+    length_cm: String(firstPkg.length_cm || ''),
+    width_cm:  String(firstPkg.width_cm  || ''),
+    height_cm: String(firstPkg.height_cm || ''),
     recipient_country: get('recipient_country'),
     recipient_zip:     get('recipient_zip'),
     recipient_city:    get('recipient_city'),
     insurance_type:    get('insurance_type'),
     declared_value:    get('declared_value'),
-    ...(packages ? { packages } : {}),
+    packages,
   };
   const csrf = form.querySelector('[name=csrfmiddlewaretoken]').value;
 
@@ -729,42 +725,14 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       {% endif %}
       {% localize off %}
-      <div class="sh-grid g3">
-        <div class="sh-field">
-          <label class="sh-label">Вага (кг) *</label>
-          <input class="sh-input" type="number" name="weight_kg" step="0.001" min="0.1"
-            value="{{ shipment.weight_kg }}" required>
-        </div>
-        <div class="sh-field">
-          <label class="sh-label">Довжина (см)</label>
-          <input class="sh-input" type="number" name="length_cm" step="0.1" min="0"
-            value="{{ shipment.length_cm|default:'' }}">
-        </div>
-        <div class="sh-field">
-          <label class="sh-label">Ширина (см)</label>
-          <input class="sh-input" type="number" name="width_cm" step="0.1" min="0"
-            value="{{ shipment.width_cm|default:'' }}">
-        </div>
-        <div class="sh-field">
-          <label class="sh-label">Висота (см)</label>
-          <input class="sh-input" type="number" name="height_cm" step="0.1" min="0"
-            value="{{ shipment.height_cm|default:'' }}">
-        </div>
-      </div>{# end sh-grid g3 #}
+      {# Hidden fallback fields — synced from first package row before submit #}
+      <input type="hidden" name="weight_kg" id="id_weight_kg" value="{{ shipment.weight_kg }}">
+      <input type="hidden" name="length_cm" id="id_length_cm" value="{{ shipment.length_cm|default:'' }}">
+      <input type="hidden" name="width_cm"  id="id_width_cm"  value="{{ shipment.width_cm|default:'' }}">
+      <input type="hidden" name="height_cm" id="id_height_cm" value="{{ shipment.height_cm|default:'' }}">
 
-      {# ── Multi-package section ──────────────────────────────────────────── #}
-      <div style="margin-top:12px;margin-bottom:4px">
-        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text-muted);font-size:13px">
-          <input type="checkbox" id="pkg-toggle" onchange="togglePkg(this.checked)"
-                 style="width:16px;height:16px;accent-color:var(--accent)">
-          <span>Декілька коробок (multi-package)</span>
-        </label>
-        <div style="color:var(--text-dim);font-size:11px;margin-left:24px;margin-top:2px">
-          Якщо увімкнено — поля Вага/Розміри вище ігноруються; використовуються тільки рядки нижче
-        </div>
-      </div>
-
-      <div id="pkg-table-wrap" style="display:none;margin-top:8px;margin-bottom:12px">
+      {# ── Package rows (always visible) ──────────────────────────────────── #}
+      <div id="pkg-table-wrap" style="margin-top:4px;margin-bottom:12px">
         <table style="width:100%;border-collapse:collapse;font-size:13px" id="pkg-table">
           <thead>
             <tr style="background:var(--bg-input);color:var(--text-muted)">
@@ -789,13 +757,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
       <script>
       (function(){
-        var _pkgIdx = 0;
-        // Pre-filled rows from OrderPackaging
         var _PKG_PRESET = {{ pkg_rows_json|default:"[]"|safe }};
-        var _PKG_AUTO   = {% if pkg_auto %}true{% else %}false{% endif %};
 
         window.addPkgRow = function(w, l, wd, h, q) {
-          var i = _pkgIdx++;
           var tr = document.createElement('tr');
           tr.style.cssText = 'border-bottom:1px solid var(--border)';
           var inp = function(name, val, step, min) {
@@ -820,30 +784,33 @@ document.addEventListener('DOMContentLoaded', function() {
           +   '✕</button></td>';
           document.getElementById('pkg-tbody').appendChild(tr);
         };
-        window.togglePkg = function(on) {
-          document.getElementById('pkg-table-wrap').style.display = on ? '' : 'none';
-          if (on && document.getElementById('pkg-tbody').rows.length === 0) {
-            if (_PKG_PRESET.length) {
-              _PKG_PRESET.forEach(function(r) {
-                addPkgRow(r.weight_kg, r.length_cm, r.width_cm, r.height_cm, r.quantity);
-              });
-            } else {
-              var w = document.querySelector('[name=weight_kg]').value;
-              var l = document.querySelector('[name=length_cm]').value;
-              var wd= document.querySelector('[name=width_cm]').value;
-              var h = document.querySelector('[name=height_cm]').value;
-              addPkgRow(w, l, wd, h, 1);
-            }
-          }
-        };
 
-        // Auto-activate if OrderPackaging has multi-box data
-        if (_PKG_AUTO) {
-          document.addEventListener('DOMContentLoaded', function() {
-            var cb = document.getElementById('pkg-toggle');
-            if (cb) { cb.checked = true; togglePkg(true); }
+        document.addEventListener('DOMContentLoaded', function() {
+          // Populate rows from OrderPackaging preset or one default row
+          if (_PKG_PRESET.length) {
+            _PKG_PRESET.forEach(function(r) {
+              addPkgRow(r.weight_kg, r.length_cm, r.width_cm, r.height_cm, r.quantity);
+            });
+          } else {
+            var w = document.getElementById('id_weight_kg').value || '1';
+            var l = document.getElementById('id_length_cm').value || '30';
+            var wd= document.getElementById('id_width_cm').value  || '20';
+            var h = document.getElementById('id_height_cm').value || '15';
+            addPkgRow(w, l, wd, h, 1);
+          }
+
+          // Sync first row → hidden fields before submit (backend uses these for Shipment model)
+          document.getElementById('shipment-form').addEventListener('submit', function() {
+            var firstRow = document.querySelector('#pkg-tbody tr');
+            if (firstRow) {
+              var g = function(n) { return firstRow.querySelector('[name="' + n + '"]')?.value || ''; };
+              document.getElementById('id_weight_kg').value = g('pkg_weight[]');
+              document.getElementById('id_length_cm').value = g('pkg_length[]');
+              document.getElementById('id_width_cm').value  = g('pkg_width[]');
+              document.getElementById('id_height_cm').value = g('pkg_height[]');
+            }
           });
-        }
+        });
       })();
       </script>
 
