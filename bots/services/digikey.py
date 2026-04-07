@@ -656,9 +656,9 @@ def sync_marketplace_orders(config) -> dict:
         "changes":        [],
     }
 
-    # Date range: last sync - 1 day … today
+    # Date range: last sync - 7 days (broad overlap to avoid missing orders) … today
     if config.last_synced_at:
-        from_dt = (config.last_synced_at - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        from_dt = (config.last_synced_at - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
     else:
         from_dt = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -693,8 +693,10 @@ def sync_marketplace_orders(config) -> dict:
         if offset >= total:
             break
 
-    DigiKeyConfig.objects.filter(pk=1).update(last_synced_at=timezone.now())
-    config.last_synced_at = timezone.now()
+    # Оновлюємо last_synced_at тільки якщо не було критичних помилок
+    if not stats["errors"] or stats["created"] > 0 or stats["updated"] > 0:
+        DigiKeyConfig.objects.filter(pk=1).update(last_synced_at=timezone.now())
+        config.last_synced_at = timezone.now()
 
     logger.info(
         "Marketplace sync done: created=%d updated=%d skipped=%d errors=%d",

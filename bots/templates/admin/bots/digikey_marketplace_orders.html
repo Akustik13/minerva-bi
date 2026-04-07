@@ -6,21 +6,21 @@
 {% if messages %}
   {% for msg in messages %}
     <div style="padding:10px 16px;border-radius:4px;margin-bottom:12px;
-      background:{% if 'success' in msg.tags %}#1b5e20{% elif 'error' in msg.tags %}#7f0000{% else %}#1e2a35{% endif %};
-      color:#e0e0e0;border:1px solid #2a3f52">{{ msg }}</div>
+      background:{% if 'success' in msg.tags %}var(--ok){% elif 'error' in msg.tags %}var(--err){% else %}var(--bg-card){% endif %};
+      color:#fff;border:1px solid var(--border-strong)">{{ msg }}</div>
   {% endfor %}
 {% endif %}
 
 {% if not_authorized %}
-<div style="background:#1e2a35;border:1px solid #e65100;border-radius:6px;padding:20px;margin-bottom:20px">
-  <h3 style="color:#ff9800;margin-top:0">🔑 Потрібна авторизація</h3>
-  <p style="color:#c9d8e4">Marketplace API потребує 3-legged OAuth авторизації.</p>
-  <ol style="color:#c9d8e4">
-    <li>Переконайся що в DigiKey App налаштований Redirect URI: <code style="color:#4caf50">{{ request.scheme }}://{{ request.get_host }}/bots/digikey/oauth-callback/</code></li>
+<div style="background:var(--bg-card);border:1px solid var(--warn);border-radius:6px;padding:20px;margin-bottom:20px">
+  <h3 style="color:var(--warn);margin-top:0">🔑 Потрібна авторизація</h3>
+  <p style="color:var(--text)">Marketplace API потребує 3-legged OAuth авторизації.</p>
+  <ol style="color:var(--text)">
+    <li>Переконайся що в DigiKey App налаштований Redirect URI: <code style="color:var(--ok)">{{ request.scheme }}://{{ request.get_host }}/bots/digikey/oauth-callback/</code></li>
     <li>Натисни кнопку нижче — тебе перенаправить на DigiKey для входу</li>
     <li>Після підтвердження токени збережуться автоматично</li>
   </ol>
-  <a href="{{ oauth_start_url }}" style="display:inline-block;padding:10px 20px;background:#e65100;color:#fff;
+  <a href="{{ oauth_start_url }}" style="display:inline-block;padding:10px 20px;background:var(--warn);color:#fff;
     border-radius:4px;text-decoration:none;font-weight:bold;margin-top:8px">
     🔑 Авторизувати DigiKey Marketplace
   </a>
@@ -28,40 +28,47 @@
 {% endif %}
 
 {% if error %}
-<div style="background:#7f0000;border-radius:4px;padding:12px 16px;margin-bottom:16px;color:#ffcdd2">
+<div style="background:var(--bg-card);border:1px solid var(--err);border-radius:4px;padding:12px 16px;margin-bottom:16px;color:var(--err)">
   ❌ {{ error }}
 </div>
 {% endif %}
 
 {% if orders_data %}
   {% with orders=orders_data.orders %}
-  <div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:6px;padding:12px 16px;margin-bottom:16px;display:flex;gap:24px">
-    <span style="color:#9aafbe">Всього замовлень: <strong style="color:#4caf50">{{ orders_data.totalCount|default:"?" }}</strong></span>
-    <span style="color:#9aafbe">Offset: <strong style="color:#c9d8e4">{{ offset }}</strong></span>
+  <div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:12px 16px;margin-bottom:16px;display:flex;gap:24px">
+    <span style="color:var(--text-muted)">Всього замовлень: <strong style="color:var(--ok)">{{ orders_data.totalCount|default:"?" }}</strong></span>
+    <span style="color:var(--text-muted)">Offset: <strong style="color:var(--text)">{{ offset }}</strong></span>
   </div>
 
   {% if orders %}
     {% for order in orders %}
     {% with customer=order.customer addr=order.customer.shippingAddress %}
-    <div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:6px;padding:16px;margin-bottom:12px">
+    <div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:16px;margin-bottom:12px">
+
       <!-- Header -->
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap;gap:8px">
         <div>
-          <span style="font-family:monospace;color:#9aafbe;font-size:12px">{{ order.id }}</span><br>
-          <strong style="color:#c9d8e4;font-size:15px">
+          <span style="font-family:monospace;color:var(--text-muted);font-size:12px">
+            🔖 {{ order.businessId|default:order.id }}
+          </span>
+          <span style="font-family:monospace;color:var(--text-dim);font-size:11px;margin-left:8px">
+            id: {{ order.id }}
+          </span><br>
+          <strong style="color:var(--text);font-size:15px">
             {{ addr.companyName|default:customer.firstName }} {{ addr.lastName|default:customer.lastName }}
           </strong>
-          {% if addr.companyName %}<span style="color:#9aafbe;font-size:13px"> · {{ customer.firstName }} {{ customer.lastName }}</span>{% endif %}
+          {% if addr.companyName %}<span style="color:var(--text-muted);font-size:13px"> · {{ customer.firstName }} {{ customer.lastName }}</span>{% endif %}
         </div>
         <div style="text-align:right">
-          <span style="padding:4px 10px;border-radius:12px;font-size:12px;font-weight:bold;
-            background:{% if order.orderState == 'ShippingInProgress' %}#1565c0{% elif order.orderState == 'Accepted' %}#2e7d32{% elif order.orderState == 'Cancelled' %}#7f0000{% else %}#37474f{% endif %};
-            color:#fff">{{ order.orderState }}</span>
+          <span style="padding:4px 10px;border-radius:12px;font-size:12px;font-weight:bold;color:#fff;
+            background:{% if order.orderState == 'ShippingInProgress' %}var(--accent-2){% elif order.orderState == 'Accepted' %}var(--ok){% elif order.orderState == 'Cancelled' %}var(--err){% else %}var(--text-dim){% endif %}">
+            {{ order.orderState }}
+          </span>
         </div>
       </div>
 
       <!-- Meta -->
-      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;color:#9aafbe">
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px;font-size:13px;color:var(--text-muted)">
         <span>📅 {{ order.createDateUtc|slice:":10" }}</span>
         <span>📦 Deadline: {{ order.shippingDeadlineUtc|slice:":10" }}</span>
         <span>📧 {{ customer.customerEmail }}</span>
@@ -71,7 +78,7 @@
       <!-- Order lines -->
       <table style="width:100%;border-collapse:collapse;font-size:13px">
         <thead>
-          <tr style="color:#607d8b;border-bottom:1px solid #2a3f52">
+          <tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong)">
             <th style="padding:6px 8px;text-align:left">SKU / Опис</th>
             <th style="padding:6px 8px;text-align:center">Кіл-ть</th>
             <th style="padding:6px 8px;text-align:right">Ціна од.</th>
@@ -81,27 +88,28 @@
         </thead>
         <tbody>
           {% for line in order.orderDetails %}
-          <tr style="border-bottom:1px solid #162030;color:#c9d8e4">
+          <tr style="border-bottom:1px solid var(--border);color:var(--text)">
             <td style="padding:6px 8px">
               <strong>{{ line.supplierSku }}</strong>
-              <span style="color:#607d8b"> / {{ line.manufacturerPartNumber }}</span><br>
-              <span style="color:#9aafbe;font-size:12px">{{ line.productDescription }}</span>
+              <span style="color:var(--text-dim)"> / {{ line.manufacturerPartNumber }}</span><br>
+              <span style="color:var(--text-muted);font-size:12px">{{ line.productDescription }}</span>
             </td>
             <td style="padding:6px 8px;text-align:center">{{ line.quantity }}</td>
             <td style="padding:6px 8px;text-align:right">{{ line.unitPrice }}</td>
-            <td style="padding:6px 8px;text-align:right;color:#4caf50">{{ line.totalPrice }}</td>
+            <td style="padding:6px 8px;text-align:right;color:var(--ok)">{{ line.totalPrice }}</td>
             <td style="padding:6px 8px;text-align:center">
-              <span style="font-size:11px;padding:2px 6px;border-radius:8px;
-                background:{% if line.orderDetailState == 'Accepted' %}#1b5e20{% elif line.orderDetailState == 'Cancelled' %}#7f0000{% else %}#37474f{% endif %};
-                color:#fff">{{ line.orderDetailState }}</span>
+              <span style="font-size:11px;padding:2px 6px;border-radius:8px;color:#fff;
+                background:{% if line.orderDetailState == 'Accepted' %}var(--ok){% elif line.orderDetailState == 'Cancelled' %}var(--err){% else %}var(--text-dim){% endif %}">
+                {{ line.orderDetailState }}
+              </span>
             </td>
           </tr>
           {% endfor %}
         </tbody>
         <tfoot>
-          <tr style="color:#c9d8e4;font-weight:bold">
-            <td colspan="3" style="padding:8px;text-align:right;color:#9aafbe">Разом:</td>
-            <td style="padding:8px;text-align:right;color:#4caf50">{{ order.totalPrice }}</td>
+          <tr style="color:var(--text);font-weight:bold">
+            <td colspan="3" style="padding:8px;text-align:right;color:var(--text-muted)">Разом:</td>
+            <td style="padding:8px;text-align:right;color:var(--ok)">{{ order.totalPrice }}</td>
             <td></td>
           </tr>
         </tfoot>
@@ -109,37 +117,38 @@
 
       <!-- PO Number -->
       {% for f in order.additionalFields %}{% if f.code == 'customer-purchase-order-number' %}
-      <div style="margin-top:8px;font-size:12px;color:#607d8b">PO: <span style="color:#9aafbe">{{ f.value }}</span></div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text-dim)">PO: <span style="color:var(--text-muted)">{{ f.value }}</span></div>
       {% endif %}{% endfor %}
+
     </div>
     {% endwith %}
     {% endfor %}
   {% else %}
-    <p style="color:#9aafbe">Замовлень не знайдено.</p>
+    <p style="color:var(--text-muted)">Замовлень не знайдено.</p>
   {% endif %}
   {% endwith %}
 {% endif %}
 
 {% if orders_data %}
 <details style="margin-top:20px">
-  <summary style="cursor:pointer;color:#9aafbe;padding:8px">🔍 Raw JSON відповідь</summary>
-  <pre style="background:#111c26;border:1px solid #2a3f52;border-radius:4px;padding:16px;
-    color:#c9d8e4;font-size:12px;overflow:auto;max-height:500px">{{ raw_json }}</pre>
+  <summary style="cursor:pointer;color:var(--text-muted);padding:8px">🔍 Raw JSON відповідь</summary>
+  <pre style="background:var(--bg-input);border:1px solid var(--border-strong);border-radius:4px;padding:16px;
+    color:var(--text);font-size:12px;overflow:auto;max-height:500px">{{ raw_json }}</pre>
 </details>
 {% endif %}
 
 <div style="margin-top:20px;display:flex;gap:12px;align-items:center">
   <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}"
-     style="color:#9aafbe;text-decoration:none">&larr; Назад</a>
+     style="color:var(--text-muted);text-decoration:none">&larr; Назад</a>
   {% if offset > 0 %}
     <a href="?offset={{ offset|add:-20 }}"
-       style="padding:6px 14px;background:#37474f;color:#fff;border-radius:4px;text-decoration:none">
+       style="padding:6px 14px;background:var(--bg-hover);color:var(--text);border-radius:4px;text-decoration:none;border:1px solid var(--border-strong)">
       &larr; Попередні
     </a>
   {% endif %}
   {% if orders_data.orders %}
     <a href="?offset={{ offset|add:20 }}"
-       style="padding:6px 14px;background:#1565c0;color:#fff;border-radius:4px;text-decoration:none">
+       style="padding:6px 14px;background:var(--accent);color:#fff;border-radius:4px;text-decoration:none">
       Наступні &rarr;
     </a>
   {% endif %}
