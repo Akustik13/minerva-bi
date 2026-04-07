@@ -724,6 +724,85 @@ document.addEventListener('DOMContentLoaded', function() {
           <input class="sh-input" type="number" name="height_cm" step="0.1" min="0"
             value="{{ shipment.height_cm|default:'' }}">
         </div>
+      </div>{# end sh-grid g3 #}
+
+      {# ── Multi-package section ──────────────────────────────────────────── #}
+      <div style="margin-top:12px;margin-bottom:4px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text-muted);font-size:13px">
+          <input type="checkbox" id="pkg-toggle" onchange="togglePkg(this.checked)"
+                 style="width:16px;height:16px;accent-color:var(--accent)">
+          <span>Декілька коробок (multi-package)</span>
+        </label>
+        <div style="color:var(--text-dim);font-size:11px;margin-left:24px;margin-top:2px">
+          Якщо увімкнено — поля Вага/Розміри вище ігноруються; використовуються тільки рядки нижче
+        </div>
+      </div>
+
+      <div id="pkg-table-wrap" style="display:none;margin-top:8px;margin-bottom:12px">
+        <table style="width:100%;border-collapse:collapse;font-size:13px" id="pkg-table">
+          <thead>
+            <tr style="background:var(--bg-input);color:var(--text-muted)">
+              <th style="padding:6px 10px;text-align:left;font-weight:500">Вага (кг)</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:500">Довж. (см)</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:500">Шир. (см)</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:500">Вис. (см)</th>
+              <th style="padding:6px 10px;text-align:left;font-weight:500">К-сть</th>
+              <th style="padding:6px 10px"></th>
+            </tr>
+          </thead>
+          <tbody id="pkg-tbody"></tbody>
+        </table>
+        <button type="button" onclick="addPkgRow()"
+                style="margin-top:8px;background:var(--bg-hover);color:var(--accent);
+                       border:1px solid var(--accent);border-radius:4px;padding:5px 14px;
+                       cursor:pointer;font-size:12px">
+          ＋ Додати коробку
+        </button>
+      </div>
+
+      <script>
+      (function(){
+        var _pkgIdx = 0;
+        window.addPkgRow = function(w, l, wd, h, q) {
+          var i = _pkgIdx++;
+          var tr = document.createElement('tr');
+          tr.style.cssText = 'border-bottom:1px solid var(--border)';
+          var inp = function(name, val, step, min) {
+            return '<input type="number" name="' + name + '" value="' + (val||'') + '"'
+                 + ' step="' + (step||'0.001') + '" min="' + (min||'0') + '"'
+                 + ' style="width:100%;background:var(--bg-input);border:1px solid var(--border-strong);'
+                 + 'color:var(--text);border-radius:3px;padding:4px 6px;font-size:13px"'
+                 + ' required>';
+          };
+          tr.innerHTML =
+            '<td style="padding:4px 6px">' + inp('pkg_weight[]', w||'1', '0.001', '0.1') + '</td>'
+          + '<td style="padding:4px 6px">' + inp('pkg_length[]', l||'30', '0.1', '1') + '</td>'
+          + '<td style="padding:4px 6px">' + inp('pkg_width[]', wd||'20', '0.1', '1') + '</td>'
+          + '<td style="padding:4px 6px">' + inp('pkg_height[]', h||'15', '0.1', '1') + '</td>'
+          + '<td style="padding:4px 6px"><input type="number" name="pkg_qty[]" value="' + (q||'1') + '"'
+          +   ' min="1" max="99" step="1"'
+          +   ' style="width:60px;background:var(--bg-input);border:1px solid var(--border-strong);'
+          +   'color:var(--text);border-radius:3px;padding:4px 6px;font-size:13px"></td>'
+          + '<td style="padding:4px 6px">'
+          +   '<button type="button" onclick="this.closest(\'tr\').remove()"'
+          +   ' style="color:var(--err);background:none;border:none;cursor:pointer;font-size:16px;padding:0 4px">'
+          +   '✕</button></td>';
+          document.getElementById('pkg-tbody').appendChild(tr);
+        };
+        window.togglePkg = function(on) {
+          document.getElementById('pkg-table-wrap').style.display = on ? '' : 'none';
+          if (on && document.getElementById('pkg-tbody').rows.length === 0) {
+            var w = document.querySelector('[name=weight_kg]').value;
+            var l = document.querySelector('[name=length_cm]').value;
+            var wd= document.querySelector('[name=width_cm]').value;
+            var h = document.querySelector('[name=height_cm]').value;
+            addPkgRow(w, l, wd, h, 1);
+          }
+        };
+      })();
+      </script>
+
+      <div class="sh-grid g3">
         <div class="sh-field">
           <label class="sh-label">
             Задекларована вартість <span style="color:var(--err)">*</span>

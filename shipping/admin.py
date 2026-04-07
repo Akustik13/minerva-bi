@@ -604,6 +604,38 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         shipment.save()
 
+        # ── Multi-package: зберігаємо ShipmentPackage рядки якщо є ──────────
+        pkg_weights = request.POST.getlist("pkg_weight[]")
+        if pkg_weights:
+            from decimal import Decimal as _D, InvalidOperation as _IE
+            pkg_lengths = request.POST.getlist("pkg_length[]")
+            pkg_widths  = request.POST.getlist("pkg_width[]")
+            pkg_heights = request.POST.getlist("pkg_height[]")
+            pkg_qtys    = request.POST.getlist("pkg_qty[]")
+            def _dec(lst, i, default):
+                try:
+                    return max(_D(default), _D(str(lst[i]).strip()))
+                except (IndexError, _IE, ValueError):
+                    return _D(default)
+            def _int(lst, i):
+                try:
+                    return max(1, int(lst[i]))
+                except (IndexError, ValueError, TypeError):
+                    return 1
+            for i, w_raw in enumerate(pkg_weights):
+                try:
+                    w = max(_D("0.1"), _D(str(w_raw).strip()))
+                except (_IE, ValueError):
+                    continue
+                ShipmentPackage.objects.create(
+                    shipment  = shipment,
+                    weight_kg = w,
+                    length_cm = _dec(pkg_lengths, i, "30"),
+                    width_cm  = _dec(pkg_widths,  i, "20"),
+                    height_cm = _dec(pkg_heights, i, "15"),
+                    quantity  = _int(pkg_qtys, i),
+                )
+
         action = request.POST.get("action_btn", "save")
         if action == "submit" and carrier:
             return redirect(reverse("admin:shipping_shipment_submit", args=[shipment.pk]))
