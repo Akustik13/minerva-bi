@@ -763,6 +763,10 @@ document.addEventListener('DOMContentLoaded', function() {
       <script>
       (function(){
         var _pkgIdx = 0;
+        // Pre-filled rows from OrderPackaging
+        var _PKG_PRESET = {{ pkg_rows|default:"[]" }};
+        var _PKG_AUTO   = {% if pkg_auto %}true{% else %}false{% endif %};
+
         window.addPkgRow = function(w, l, wd, h, q) {
           var i = _pkgIdx++;
           var tr = document.createElement('tr');
@@ -792,13 +796,27 @@ document.addEventListener('DOMContentLoaded', function() {
         window.togglePkg = function(on) {
           document.getElementById('pkg-table-wrap').style.display = on ? '' : 'none';
           if (on && document.getElementById('pkg-tbody').rows.length === 0) {
-            var w = document.querySelector('[name=weight_kg]').value;
-            var l = document.querySelector('[name=length_cm]').value;
-            var wd= document.querySelector('[name=width_cm]').value;
-            var h = document.querySelector('[name=height_cm]').value;
-            addPkgRow(w, l, wd, h, 1);
+            if (_PKG_PRESET.length) {
+              _PKG_PRESET.forEach(function(r) {
+                addPkgRow(r.weight_kg, r.length_cm, r.width_cm, r.height_cm, r.quantity);
+              });
+            } else {
+              var w = document.querySelector('[name=weight_kg]').value;
+              var l = document.querySelector('[name=length_cm]').value;
+              var wd= document.querySelector('[name=width_cm]').value;
+              var h = document.querySelector('[name=height_cm]').value;
+              addPkgRow(w, l, wd, h, 1);
+            }
           }
         };
+
+        // Auto-activate if OrderPackaging has multi-box data
+        if (_PKG_AUTO) {
+          document.addEventListener('DOMContentLoaded', function() {
+            var cb = document.getElementById('pkg-toggle');
+            if (cb) { cb.checked = true; togglePkg(true); }
+          });
+        }
       })();
       </script>
 

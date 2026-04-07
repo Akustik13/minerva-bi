@@ -399,6 +399,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         n_articles = len(customs_articles) or 1
         default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 3)
 
+        pkg_rows = (packaging_hint or {}).get("pkg_rows") or []
+        # Авто-активувати multi-package: якщо є кілька типів коробок АБО qty > 1
+        pkg_auto = len(pkg_rows) > 1 or (len(pkg_rows) == 1 and pkg_rows[0]["quantity"] > 1)
+
         return render(request, "admin/shipping/create_shipment.html", {
             **self.admin_site.each_context(request),
             "order":              order,
@@ -410,6 +414,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "eu_countries_js":    ",".join(sorted(eu_countries)),
             "default_ca_weight":  default_ca_weight,
             "title":              f"Нове відправлення — {order.order_number}",
+            "pkg_rows":           pkg_rows,
+            "pkg_auto":           pkg_auto,
         })
 
     def _fill_packaging_from_order(self, shipment):
@@ -419,14 +425,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         order = shipment.order
 
         # ── Пріоритет 1: OrderPackaging (фактична упаковка вже вказана) ─────────
-        op = (
+        ops = list(
             OrderPackaging.objects
             .filter(order=order)
             .select_related('packaging')
-            .order_by('-created_at')
-            .first()
+            .order_by('created_at')
         )
-        if op and op.packaging:
+        if ops and ops[0].packaging:
+            op = ops[0]
             raw_g     = op.actual_weight_g or 0
             raw_kg    = Decimal(raw_g) / 1000 if raw_g else Decimal(0)
             clamped   = raw_kg > 0 and raw_kg < MIN_WEIGHT_KG
@@ -435,6 +441,28 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.length_cm = op.packaging.length_cm
             shipment.width_cm  = op.packaging.width_cm
             shipment.height_cm = op.packaging.height_cm
+
+            # Будуємо список рядків для multi-package
+            pkg_rows = []
+            for o in ops:
+                if not o.packaging:
+                    continue
+                qty = max(1, o.qty_boxes or 1)
+                # Вага на коробку: actual_weight_g / qty_boxes або tare
+                if o.actual_weight_g and qty:
+                    per_box_kg = max(MIN_WEIGHT_KG,
+                                     Decimal(str(round(o.actual_weight_g / qty / 1000, 3))))
+                else:
+                    tare = Decimal(str(o.packaging.tare_weight_kg or 0))
+                    per_box_kg = max(MIN_WEIGHT_KG, tare) if tare > 0 else MIN_WEIGHT_KG
+                pkg_rows.append({
+                    "weight_kg": float(per_box_kg),
+                    "length_cm": float(o.packaging.length_cm),
+                    "width_cm":  float(o.packaging.width_cm),
+                    "height_cm": float(o.packaging.height_cm),
+                    "quantity":  qty,
+                })
+
             return {
                 "box":            op.packaging,
                 "total_boxes":    op.qty_boxes,
@@ -444,6 +472,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "no_packaging":   False,
                 "clamped":        clamped,
                 "source":         "order_packaging",
+                "pkg_rows":       pkg_rows,
             }
 
         # ── Пріоритет 2: ProductPackaging + net_weight_g (з інвентарю) ──────────
