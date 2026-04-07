@@ -197,7 +197,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         obj = NotificationSettings.get()
         return redirect(reverse("admin:config_notificationsettings_change", args=[obj.pk]))
 
-    readonly_fields = ("alert_actions", "last_alert_sent")
+    readonly_fields = ("alert_actions", "last_alert_sent", "digest_actions", "digest_last_sent")
 
     def get_form(self, request, obj=None, **kwargs):
         from django.forms import PasswordInput
@@ -277,6 +277,23 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "3. Chat ID: для каналу @username або числовий ID (дізнатись через @userinfobot)."
             ),
         }),
+        ("📊 Щоденний / Щотижневий звіт", {
+            "fields": (
+                "digest_enabled",
+                ("digest_email", "digest_telegram"),
+                ("digest_frequency", "digest_send_time"),
+                ("digest_include_pending", "digest_include_overdue"),
+                ("digest_include_new_orders", "digest_include_delivered"),
+                "digest_include_stock",
+                "digest_last_sent",
+                "digest_actions",
+            ),
+            "description": (
+                "Зведений звіт: очікують відправки, прострочені, нові замовлення, "
+                "доставлені, критичний залишок. "
+                "Cron: <code>0 8 * * * docker-compose exec -T web python manage.py send_digest</code>"
+            ),
+        }),
         ("🚀 Дії", {
             "fields": ("alert_actions",),
             "description": (
@@ -331,6 +348,11 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self._test_telegram),
                 name="config_notificationsettings_test_telegram",
             ),
+            path(
+                "<int:pk>/send-digest/",
+                self.admin_site.admin_view(self._send_digest),
+                name="config_notificationsettings_send_digest",
+            ),
         ]
         return custom + urls
 
@@ -381,6 +403,43 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         else:
             messages.warning(request, "⚠️ Telegram вимкнено або не налаштований (Bot Token / Chat ID).")
         return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def _send_digest(self, request, pk):
+        from django.contrib import messages
+        from dashboard.digest import send_digest
+        result = send_digest(force=True)
+        if result.get("sent"):
+            parts = []
+            if result.get("email", {}).get("sent"):
+                parts.append("Email ✓")
+            if result.get("telegram", {}).get("sent"):
+                parts.append("Telegram ✓")
+            for ch, info in result.items():
+                if isinstance(info, dict) and info.get("error"):
+                    parts.append(f"{ch}: {info['error']}")
+            messages.success(request, f"✅ Звіт надіслано: {', '.join(parts)}")
+        else:
+            err = result.get("reason") or result.get("error") or "?"
+            messages.error(request, f"❌ Помилка: {err}")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def digest_actions(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        last = ""
+        if obj.digest_last_sent:
+            last = (
+                f' <span style="color:var(--text-dim);font-size:11px;margin-left:12px">'
+                f'Останній: {obj.digest_last_sent.strftime("%d.%m.%Y %H:%M")}</span>'
+            )
+        return format_html(
+            '<a href="../send-digest/" style="display:inline-block;padding:8px 18px;'
+            'background:#37474f;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '📊 Надіслати звіт зараз</a>{}',
+            format_html(last),
+        )
+    digest_actions.short_description = "Тест звіту"
 
     def has_add_permission(self, request):
         return False

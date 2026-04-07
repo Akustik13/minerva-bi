@@ -439,6 +439,47 @@ class NotificationSettings(models.Model):
         ),
     )
 
+    # ── Periodic digest report ────────────────────────────────────────────────
+    digest_enabled = models.BooleanField(
+        "Увімкнути звіт", default=False,
+        help_text="Надсилати зведений звіт за розкладом.",
+    )
+    digest_email = models.BooleanField("Email звіт", default=True)
+    digest_telegram = models.BooleanField("Telegram звіт", default=True)
+    digest_frequency = models.CharField(
+        "Частота", max_length=10,
+        choices=[("daily", "Щодня"), ("weekly", "Щотижня")],
+        default="daily",
+    )
+    digest_send_time = models.TimeField(
+        "Час надсилання", default="08:00",
+        help_text="Час по серверному часовому поясу (Europe/Berlin).",
+    )
+    digest_last_sent = models.DateTimeField(
+        "Останній звіт надіслано", null=True, blank=True,
+    )
+    # Sections
+    digest_include_pending = models.BooleanField(
+        "📦 Очікують відправки", default=True,
+        help_text="Замовлення з дедлайном, ще не відправлені.",
+    )
+    digest_include_overdue = models.BooleanField(
+        "⏰ Прострочені дедлайни", default=True,
+        help_text="Замовлення де дедлайн уже минув.",
+    )
+    digest_include_new_orders = models.BooleanField(
+        "🆕 Нові замовлення", default=True,
+        help_text="Замовлення що надійшли з моменту попереднього звіту.",
+    )
+    digest_include_delivered = models.BooleanField(
+        "✅ Доставлені", default=True,
+        help_text="Замовлення зі статусом «Доставлено» за звітний період.",
+    )
+    digest_include_stock = models.BooleanField(
+        "🔥 Критичний залишок", default=True,
+        help_text="Товари з запасом менше 1.5 місяців.",
+    )
+
     class Meta:
         verbose_name = "Налаштування сповіщень"
         verbose_name_plural = "Налаштування сповіщень"
