@@ -13,7 +13,7 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-from .models import Carrier, Shipment, PackagingMaterial, OrderPackaging, ProductPackaging, ShippingSettings
+from .models import Carrier, Shipment, ShipmentPackage, PackagingMaterial, OrderPackaging, ProductPackaging, ShippingSettings
 from .services.registry import get_service
 
 
@@ -131,10 +131,23 @@ class CarrierAdmin(admin.ModelAdmin):
     has_credentials.short_description = "API ключ"
 
 
+# ── ShipmentPackage Inline ────────────────────────────────────────────────────
+
+class ShipmentPackageInline(admin.TabularInline):
+    model               = ShipmentPackage
+    extra               = 0
+    min_num             = 0
+    can_delete          = True
+    verbose_name        = "Коробка"
+    verbose_name_plural = "📦 Коробки (multi-package)"
+    fields              = ("weight_kg", "length_cm", "width_cm", "height_cm", "quantity")
+
+
 # ── Shipment Admin ────────────────────────────────────────────────────────────
 
 @admin.register(Shipment)
 class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
+    inlines = [ShipmentPackageInline]
     list_display  = (
         "id_badge", "order_link", "carrier_badge", "status_badge",
         "recipient_name", "recipient_country", "weight_kg",

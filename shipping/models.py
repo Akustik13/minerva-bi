@@ -255,6 +255,39 @@ class Shipment(models.Model):
             self.recipient_country = normalize_to_iso2(o.shipping_region or "")
 
 
+class ShipmentPackage(models.Model):
+    """Окрема коробка у відправленні — для multi-package відправлень.
+
+    Якщо коробок немає — сервіси беруть розміри безпосередньо з Shipment.
+    Якщо є хоча б одна коробка — використовуються ТІЛЬКИ вони.
+    """
+
+    shipment  = models.ForeignKey(
+        Shipment, on_delete=models.CASCADE,
+        related_name="packages", verbose_name="Відправлення",
+    )
+    weight_kg = models.DecimalField("Вага (кг)",    max_digits=8, decimal_places=3, default=1)
+    length_cm = models.DecimalField("Довжина (см)", max_digits=6, decimal_places=1, default=30)
+    width_cm  = models.DecimalField("Ширина (см)",  max_digits=6, decimal_places=1, default=20)
+    height_cm = models.DecimalField("Висота (см)",  max_digits=6, decimal_places=1, default=15)
+    quantity  = models.PositiveSmallIntegerField(
+        "Однакових коробок", default=1,
+        help_text="Кількість коробок з однаковими розмірами та вагою",
+    )
+
+    class Meta:
+        verbose_name        = "Коробка"
+        verbose_name_plural = "Коробки"
+        ordering            = ["pk"]
+
+    def __str__(self):
+        return (
+            f"{self.length_cm}×{self.width_cm}×{self.height_cm} см, "
+            f"{self.weight_kg} кг"
+            + (f" ×{self.quantity}" if self.quantity and self.quantity > 1 else "")
+        )
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # PACKAGING MATERIALS
 # ─────────────────────────────────────────────────────────────────────────────

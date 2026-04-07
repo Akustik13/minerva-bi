@@ -369,6 +369,31 @@ def create_shipment(carrier, shipment, product_code: str,
     recv_phone     = shipment.recipient_phone or "+4900000000"
     send_phone     = carrier.sender_phone or "+4900000000"
 
+    # ── Пакети: multi-package якщо є ShipmentPackage, інакше — один з полів Shipment ──
+    pkg_qs = list(shipment.packages.order_by("pk")) if hasattr(shipment, "packages") else []
+    if pkg_qs:
+        dhl_packages = []
+        for pkg in pkg_qs:
+            box = {
+                "weight": round(float(pkg.weight_kg or 1), 3),
+                "dimensions": {
+                    "length": int(pkg.length_cm or 20),
+                    "width":  int(pkg.width_cm  or 15),
+                    "height": int(pkg.height_cm or 10),
+                },
+            }
+            for _ in range(max(1, int(pkg.quantity or 1))):
+                dhl_packages.append(box.copy())
+    else:
+        dhl_packages = [{
+            "weight": round(float(shipment.weight_kg or 1), 3),
+            "dimensions": {
+                "length": int(shipment.length_cm or 20),
+                "width":  int(shipment.width_cm  or 15),
+                "height": int(shipment.height_cm or 10),
+            },
+        }]
+
     payload: dict = {
         "plannedShippingDateAndTime": planned_dt,
         "pickup": {
@@ -409,16 +434,7 @@ def create_shipment(carrier, shipment, product_code: str,
             },
         },
         "content": {
-            "packages": [
-                {
-                    "weight": round(float(shipment.weight_kg or 1), 3),
-                    "dimensions": {
-                        "length": int(shipment.length_cm or 20),
-                        "width":  int(shipment.width_cm  or 15),
-                        "height": int(shipment.height_cm or 10),
-                    },
-                }
-            ],
+            "packages": dhl_packages,
             "isCustomsDeclarable":   is_customs,
             "description":           (shipment.description or "Goods")[:35],
             "incoterm":              "DAP",

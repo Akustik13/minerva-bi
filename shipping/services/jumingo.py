@@ -292,16 +292,32 @@ class JumingoService(BaseCarrierService):
         if sender_country in self._STATE_REQUIRED and getattr(c, "sender_state", ""):
             from_address["state"] = c.sender_state[:10]
 
-        payload = {
-            "from_address": from_address,
-            "to_address":   to_address,
-            "packages": [{
+        # ── Пакети: multi-package якщо є ShipmentPackage, інакше — один з полів Shipment ──
+        pkg_qs = list(shipment.packages.order_by("pk")) if hasattr(shipment, "packages") else []
+        if pkg_qs:
+            packages_list = []
+            for pkg in pkg_qs:
+                box = {
+                    "weight": max(0.1, float(pkg.weight_kg or 0.1)),
+                    "length": int(pkg.length_cm) if pkg.length_cm else 10,
+                    "width":  int(pkg.width_cm)  if pkg.width_cm  else 10,
+                    "height": int(pkg.height_cm) if pkg.height_cm else 10,
+                }
+                for _ in range(max(1, int(pkg.quantity or 1))):
+                    packages_list.append(box.copy())
+        else:
+            packages_list = [{
                 "weight": max(0.1, float(shipment.weight_kg or 0.1)),
                 "length": int(shipment.length_cm) if shipment.length_cm else 10,
                 "width":  int(shipment.width_cm)  if shipment.width_cm  else 10,
                 "height": int(shipment.height_cm) if shipment.height_cm else 10,
-            }],
-            "details": details,
+            }]
+
+        payload = {
+            "from_address": from_address,
+            "to_address":   to_address,
+            "packages":     packages_list,
+            "details":      details,
         }
         if customs_invoice:
             payload["customs_invoice"] = customs_invoice
