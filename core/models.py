@@ -119,6 +119,36 @@ class UserProfile(models.Model):
         help_text='Заповнюйте лише якщо пакет не підходить. Порожній = авто',
     )
 
+    # ── AI Асистент — Telegram ───────────────────────────────
+    telegram_id       = models.BigIntegerField(
+        null=True, blank=True, unique=True,
+        verbose_name='Telegram ID',
+        help_text='Дізнатись через /myid в боті')
+    telegram_username = models.CharField(
+        max_length=100, blank=True,
+        verbose_name='Telegram username')
+
+    # ── AI Асистент — роль ────────────────────────────────────
+    AI_ROLE_CHOICES = [
+        ('viewer',  'Viewer — тільки загальні дані'),
+        ('staff',   'Staff — продажі, склад, клієнти'),
+        ('manager', 'Manager — + аналітика, звіти'),
+        ('admin',   'Admin — повний доступ'),
+    ]
+    ai_assistant_role = models.CharField(
+        max_length=20, choices=AI_ROLE_CHOICES, default='viewer',
+        verbose_name='Роль в AI асистенті',
+        help_text='Визначає які дані доступні через AI чат')
+
+    # ── AI Асистент — статистика ──────────────────────────────
+    ai_total_requests  = models.PositiveIntegerField(
+        default=0, verbose_name='AI запитів всього')
+    ai_total_spent_usd = models.DecimalField(
+        max_digits=10, decimal_places=6, default=0,
+        verbose_name='AI витрачено ($)')
+    ai_last_active     = models.DateTimeField(
+        null=True, blank=True, verbose_name='Остання AI активність')
+
     # Per-user permission overrides (None = use role default)
     can_delete     = models.BooleanField(
         null=True, blank=True, default=None,

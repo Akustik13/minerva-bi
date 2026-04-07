@@ -1,6 +1,91 @@
 from __future__ import annotations
+from decimal import Decimal
 from django.db import models
 from django.utils import timezone
+
+
+class AISettings(models.Model):
+    """
+    Singleton — глобальні налаштування AI асистента.
+    Керується через /admin/strategy/aisettings/1/change/
+    """
+
+    # ── API ──────────────────────────────────────────────────
+    anthropic_api_key = models.CharField(
+        max_length=200, blank=True,
+        verbose_name='Anthropic API Key',
+        help_text='sk-ant-... з console.anthropic.com')
+    telegram_bot_token = models.CharField(
+        max_length=100, blank=True,
+        verbose_name='Telegram Bot Token',
+        help_text='Отримати у @BotFather')
+
+    # ── Бюджет ───────────────────────────────────────────────
+    monthly_budget_usd = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal('10.00'),
+        verbose_name='Місячний бюджет ($)')
+    alert_threshold_usd = models.DecimalField(
+        max_digits=8, decimal_places=2, default=Decimal('2.00'),
+        verbose_name='Поріг сповіщення ($)',
+        help_text='Надіслати алерт коли витрачено більше цієї суми')
+    budget_alert_telegram_id = models.CharField(
+        max_length=50, blank=True,
+        verbose_name='Telegram ID для бюджетних алертів',
+        help_text='Твій особистий Telegram ID (дізнатись через /myid в боті)')
+    per_user_daily_limit_usd = models.DecimalField(
+        max_digits=6, decimal_places=2, default=Decimal('0.50'),
+        verbose_name='Денний ліміт на юзера ($)')
+
+    # ── Персонаж ─────────────────────────────────────────────
+    persona_name = models.CharField(
+        max_length=50, default='Minerva',
+        verbose_name="Ім'я персонажа")
+    persona_base_prompt = models.TextField(
+        verbose_name='Базовий промпт персонажа',
+        default=(
+            'Ти — Мінерва, богиня мудрості, що живе в серці системи Minerva ERP.\n'
+            'Ти говориш від імені жінки — мудрої, трохи величної, але з почуттям гумору.\n'
+            'Ти НІКОЛИ не кажеш що ти Claude або AI від Anthropic.\n'
+            'Ти НІКОЛИ не вигадуєш дані — завжди використовуєш інструменти.'
+        ))
+
+    # ── Глобальні дозволи ────────────────────────────────────
+    ai_allow_email_sending = models.BooleanField(
+        default=True,
+        verbose_name='Дозволити AI відправляти email')
+    ai_allow_order_creation = models.BooleanField(
+        default=False,
+        verbose_name='Дозволити AI створювати замовлення')
+    ai_allow_inventory_edit = models.BooleanField(
+        default=False,
+        verbose_name='Дозволити AI редагувати склад')
+    ai_allow_financial_data = models.BooleanField(
+        default=True,
+        verbose_name='Дозволити AI бачити фінансові дані')
+
+    class Meta:
+        verbose_name = 'Налаштування AI'
+        verbose_name_plural = 'Налаштування AI'
+
+    def __str__(self):
+        return 'Налаштування AI'
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    @property
+    def from_email(self):
+        try:
+            from config.models import SystemSettings
+            return SystemSettings.get().from_email
+        except Exception:
+            return None
 
 
 class StrategyTemplate(models.Model):

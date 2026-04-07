@@ -108,6 +108,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         "token_expires_at",
         "marketplace_auth_status",
         "action_buttons",
+        "webhook_url_display",
     )
 
     fieldsets = (
@@ -132,10 +133,13 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         ("🔌 Дії", {
             "fields": ("action_buttons",),
         }),
-        ("🔮 Phase 2 — Webhook (майбутнє)", {
-            "fields": ("webhook_enabled", "webhook_secret", "webhook_url_note"),
-            "classes": ("collapse",),
-            "description": "Потребує публічного URL (Synology з HTTPS). Зараз не активно.",
+        ("🔮 Webhook", {
+            "fields": ("webhook_enabled", "webhook_secret", "webhook_url_display"),
+            "description": (
+                "Скопіюй <b>Webhook URL</b> і вкажи його в "
+                "<a href='https://developer.digikey.com/' target='_blank'>developer.digikey.com</a> "
+                "→ My Apps → Webhooks. Webhook Secret — довільний рядок, вкажи той самий і на DigiKey."
+            ),
         }),
         ("🛒 Marketplace API (3-legged OAuth)", {
             "fields": ("marketplace_auth_status",),
@@ -646,6 +650,22 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             )
         return format_html('<span style="color:#607d8b">—</span>')
     access_token_preview.short_description = "Access Token"
+
+    def webhook_url_display(self, obj):
+        from django.urls import reverse as _rev
+        try:
+            url = "https://akustik.synology.me:81/bots/digikey/webhook/"
+        except Exception:
+            url = "/bots/digikey/webhook/"
+        status_color = "#4caf50" if (obj and obj.webhook_enabled) else "#607d8b"
+        status_label = "✅ увімкнено" if (obj and obj.webhook_enabled) else "⭕ вимкнено"
+        return format_html(
+            '<code style="user-select:all;font-size:13px">{}</code>'
+            '&nbsp;&nbsp;<span style="color:{}">{}</span>'
+            '<br><small style="color:var(--text-muted,#9aafbe)">Вкажи цей URL в DigiKey dev portal → My Apps → Webhooks</small>',
+            url, status_color, status_label,
+        )
+    webhook_url_display.short_description = "Webhook URL"
 
 
 @admin.register(BotLog)

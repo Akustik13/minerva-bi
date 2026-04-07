@@ -932,7 +932,15 @@ document.addEventListener('DOMContentLoaded', function(){
     { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'] },
     { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'] },
     { id: 'tasks',      label: '📋 Задачі',       apps: ['tasks'] },
-    { id: 'bots',       label: '🧠 AI та APIs',   href: '/dashboard/bots/', apps: ['bots', 'api'] },
+    { id: 'ai',         label: '🏛️ Minerva AI',   href: '/ai/',             apps: ['ai_assistant'],
+      links: [
+        { href: '/ai/',                                    label: '💬 WebChat' },
+        { href: '/admin/ai_assistant/aiconversation/',     label: '📜 Розмови' },
+        { href: '/admin/ai_assistant/aibudgetlog/',        label: '💰 Бюджет' },
+        { href: '/admin/strategy/aisettings/1/change/',    label: '⚙️ Налаштування AI' },
+      ]
+    },
+    { id: 'bots',       label: '🧠 Боти та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
     {
       id: 'system', label: '⚙️ Система',
       href: '/dashboard/system/',
@@ -1015,9 +1023,11 @@ document.addEventListener('DOMContentLoaded', function(){
   /* Broad prefixes FIRST; specific AFTER (last match wins) */
   var _URL_GROUP = {
     '/dashboard/':       'analytics',
-    '/admin/crm/':       'crm',
-    '/admin/strategy/':  'crm',
-    '/strategy/':        'crm',
+    '/admin/crm/':            'crm',
+    '/admin/strategy/':       'crm',
+    '/strategy/':             'crm',
+    '/ai/':                   'ai',
+    '/admin/ai_assistant/':   'ai',
     '/admin/sales/':     'sales',
     '/admin/accounting/':'accounting',
     '/admin/shipping/':  'shipping',
@@ -1032,6 +1042,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/admin/auth/':      'system',
     '/admin/core/':      'security',
     '/onboarding/':      'system',
+    '/admin/strategy/aisettings/': 'ai',
     /* specific — overwrite broad */
     '/dashboard/analytics/': 'analytics',
     '/dashboard/signals/':   'analytics',

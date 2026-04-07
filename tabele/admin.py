@@ -24,8 +24,9 @@ def _get_app_list(self, request, app_label=None):
         'shipping',   # 🚚 Доставка
         'inventory',  # 📦 Управління складом
         'tasks',      # 📋 Задачі та нагадування
-        'autoimport', # 🔄 Авто-імпорт
-        'bots',       # 🤖 Боти та AI
+        'autoimport',    # 🔄 Авто-імпорт
+        'ai_assistant',  # 🏛️ Minerva AI
+        'bots',          # 🤖 Боти та AI
         'api',        # 🔑 API Ключі
         'config',     # ⚙️ Конфігурація
         'auth',       # 🔐 Аутентифікація та авторизація
@@ -37,7 +38,8 @@ def _get_app_list(self, request, app_label=None):
     # Явний порядок моделей всередині аппів (object_name.lower())
     model_order = {
         'core':     ['auditlog', 'userprofile', 'modulebundle', 'moduleregistry'],
-        'strategy': ['strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
+        'strategy': ['aisettings', 'strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
+        'ai_assistant': ['aiconversation', 'aibudgetlog'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',

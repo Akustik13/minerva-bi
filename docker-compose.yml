@@ -61,6 +61,18 @@ services:
       db:
         condition: service_healthy
 
+  # ── Minerva AI Telegram Bot ──────────────────────────────
+  telegram-bot:
+    build: .
+    restart: unless-stopped
+    environment:
+      <<: *django_env
+    entrypoint: ["python", "manage.py", "run_telegram_bot"]
+    volumes: *app_volumes
+    depends_on:
+      db:
+        condition: service_healthy
+
   # ── Cron (авто-трекінг + DigiKey sync) ──────────────────
   cron:
     build: .

@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'dashboard',        # 📊 Dashboard
     'tasks',            # 📋 Задачі та нагадування
     'autoimport',       # 🔄 Авто-імпорт по розкладу
+    'ai_assistant',     # 🏛️ Minerva AI
     'bots',             # 🤖 Боти та AI
     'faq',              # ❓ FAQ та підтримка
     'labels_app',       # 🏷️ Етикетки

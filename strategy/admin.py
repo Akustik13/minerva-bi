@@ -1,12 +1,50 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
+from django.forms import PasswordInput
 from core.mixins import AuditableMixin
 
 from .models import (
+    AISettings,
     StrategyTemplate, TemplateStep,
     CustomerStrategy, CustomerStep, StepLog,
 )
+
+
+@admin.register(AISettings)
+class AISettingsAdmin(admin.ModelAdmin):
+    """Singleton — один рядок, без add/delete."""
+
+    fieldsets = (
+        ('🔑 API Ключі', {'fields': ('anthropic_api_key', 'telegram_bot_token', 'budget_alert_telegram_id')}),
+        ('💰 Бюджет', {'fields': ('monthly_budget_usd', 'alert_threshold_usd', 'per_user_daily_limit_usd')}),
+        ('🏛️ Персонаж', {'fields': ('persona_name', 'persona_base_prompt')}),
+        ('🔒 Дозволи', {'fields': (
+            'ai_allow_email_sending', 'ai_allow_order_creation',
+            'ai_allow_inventory_edit', 'ai_allow_financial_data',
+        )}),
+    )
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        for field_name in ('anthropic_api_key', 'telegram_bot_token'):
+            if field_name in form.base_fields:
+                form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        return form
+
+    def has_add_permission(self, request):
+        return not AISettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        obj, _ = AISettings.objects.get_or_create(pk=1)
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse as _reverse
+        return HttpResponseRedirect(
+            _reverse('admin:strategy_aisettings_change', args=[obj.pk])
+        )
 
 
 class TemplateStepInline(admin.TabularInline):
