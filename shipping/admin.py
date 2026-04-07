@@ -2482,6 +2482,10 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
 
     # Пробуємо кілька можливих шляхів у відповіді Jumingo
     tracking_dates = tracking_obj.get("dates") or {}
+    # dates.delivery.* from Jumingo detail response
+    dates_block    = data.get("dates") or {}
+    delivery_block = dates_block.get("delivery") or {}
+
     eta_f = (
         _parse_date(tracking_data.get("estimated_delivery_from"))
         or _parse_date(tracking_data.get("estimatedDeliveryFrom"))
@@ -2489,6 +2493,9 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         or _parse_date(tracking_dates.get("eta_from"))
         or _parse_date(tracking_dates.get("deliveryDateFrom"))
         or _parse_date(progress.get("delivery_date_from"))
+        # Jumingo detail: rate.delivery_date_min / dates.delivery.min_delivery_date
+        or _parse_date(rate.get("delivery_date_min"))
+        or _parse_date(delivery_block.get("min_delivery_date"))
     )
     eta_t = (
         _parse_date(tracking_data.get("estimated_delivery_to"))
@@ -2501,6 +2508,9 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         or _parse_date(tracking_data.get("estimated_delivery"))
         or _parse_date(tracking_data.get("estimatedDelivery"))
         or _parse_date(tracking_data.get("promised_delivery"))
+        # Jumingo detail: rate.delivery_date_max / dates.delivery.max_delivery_date
+        or _parse_date(rate.get("delivery_date_max"))
+        or _parse_date(delivery_block.get("max_delivery_date"))
     )
 
     if eta_f and eta_f != shipment.eta_from:

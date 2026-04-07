@@ -130,6 +130,72 @@ class Command(BaseCommand):
                        lambda s=shipment: dhl_get_tracking(s.carrier, s.tracking_number),
                        f"#{shipment.pk} DHL({shipment.tracking_number})")
 
+    def _check_overdue_eta(self, changes: list):
+        """
+        Позначає посилки як затримані якщо eta_to < сьогодні і статус IN_TRANSIT.
+        Перевізник міг не надіслати явного сигналу затримки — виявляємо самостійно.
+        """
+        from shipping.models import Shipment
+        from dashboard.notifications import _send_telegram, _get_ns
+
+        today = timezone.now().date()
+        overdue_qs = Shipment.objects.filter(
+            status=Shipment.Status.IN_TRANSIT,
+            carrier_delayed=False,
+            eta_to__lt=today,
+            eta_to__isnull=False,
+        ).select_related("carrier", "order")
+
+        if not overdue_qs.exists():
+            return
+
+        ns = _get_ns()
+        tg_enabled = (
+            ns and ns.telegram_enabled
+            and ns.telegram_bot_token and ns.telegram_chat_id
+        )
+
+        for shipment in overdue_qs:
+            shipment.carrier_delayed = True
+            shipment.save(update_fields=["carrier_delayed"])
+
+            order_num = shipment.order.order_number if shipment.order else f"#{shipment.pk}"
+            client    = (shipment.order.client or "") if shipment.order else ""
+            tn        = shipment.tracking_number or shipment.carrier_shipment_id or "—"
+            days_late = (today - shipment.eta_to).days
+
+            self.stdout.write(self.style.WARNING(
+                f"  ⚠️ Затримка #{shipment.pk} {order_num} — ETA {shipment.eta_to} (+{days_late} дн.)"
+            ))
+
+            changes.append({
+                "order":      order_num,
+                "client":     client,
+                "old_status": "in_transit",
+                "new_status": "in_transit",
+                "extra":      f"⚠️ Затримка +{days_late} дн.",
+            })
+
+            # Telegram-сповіщення
+            if tg_enabled:
+                try:
+                    eta_str = shipment.eta_to.strftime("%d.%m.%Y")
+                    msg = (
+                        f"🚨 <b>Посилка затримується</b>\n"
+                        f"Замовлення: <b>{order_num}</b>"
+                        + (f" | {client}" if client else "") +
+                        f"\nТрекінг: <code>{tn}</code>\n"
+                        f"Очікувалось до: <b>{eta_str}</b> (+{days_late} дн.)\n"
+                        f"Перевір статус у перевізника"
+                    )
+                    _send_telegram(ns, msg)
+                except Exception:
+                    pass
+
+        # ── Перевірка прострочених ETA (незалежно від API) ───────────────────
+        if not dry_run:
+            self._check_overdue_eta(changes)
+
         # ── Оновлюємо час останнього запуску ─────────────────────────────────
         if not dry_run:
             ShippingSettings.objects.filter(pk=1).update(last_tracking_run=timezone.now())
