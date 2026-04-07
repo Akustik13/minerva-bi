@@ -26,8 +26,7 @@
     </label>
     <div style="margin-bottom:12px;display:flex;gap:6px;flex-wrap:wrap">
       <span style="color:var(--text-dim);font-size:12px;align-self:center">Швидко:</span>
-      {% for label, val in "30 днів,30|90 днів,90|1 рік,365|2 роки,730"|split_by:"|" %}{% endfor %}
-      <button type="button" onclick="document.getElementById('days_back').value=30"
+<button type="button" onclick="document.getElementById('days_back').value=30"
               style="background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--border);border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px">30 днів</button>
       <button type="button" onclick="document.getElementById('days_back').value=90"
               style="background:var(--bg-hover);color:var(--text-muted);border:1px solid var(--border);border-radius:3px;padding:3px 8px;cursor:pointer;font-size:12px">90 днів</button>
