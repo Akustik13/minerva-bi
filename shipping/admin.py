@@ -624,6 +624,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_ups_book",
             ),
             path(
+                "<int:shipment_id>/ups-confirm/",
+                self.admin_site.admin_view(self.ups_confirm_view),
+                name="shipping_shipment_ups_confirm",
+            ),
+            path(
                 "<int:shipment_id>/ups-track/",
                 self.admin_site.admin_view(self.ups_track_view),
                 name="shipping_shipment_ups_track",
@@ -1014,11 +1019,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 )
 
         if action == "ups_book" and carrier:
-            from urllib.parse import urlencode
-            ups_code  = request.POST.get("ups_service_code", "11").strip() or "11"
-            messages.success(request, f"✅ Відправлення #{shipment.pk} збережено. Оформлення UPS…")
+            ups_code = request.POST.get("ups_service_code", "11").strip() or "11"
+            messages.success(request, f"✅ Відправлення #{shipment.pk} збережено. Перевірте дані перед відправкою…")
             return redirect(
-                reverse("admin:shipping_shipment_ups_book", args=[shipment.pk])
+                reverse("admin:shipping_shipment_ups_confirm", args=[shipment.pk])
                 + f"?service_code={ups_code}"
             )
 
@@ -1208,9 +1212,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         if action == "ups_book" and carrier:
             ups_code = request.POST.get("ups_service_code", "11").strip() or "11"
-            messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено. Оформлення UPS…")
+            messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено. Перевірте дані перед відправкою…")
             return redirect(
-                reverse("admin:shipping_shipment_ups_book", args=[shipment.pk])
+                reverse("admin:shipping_shipment_ups_confirm", args=[shipment.pk])
                 + f"?service_code={ups_code}"
             )
 
@@ -1744,6 +1748,76 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'rates':    rates,
             'weight':   weight,
             'title':    f'UPS Тарифи — #{shipment.pk} → {shipment.recipient_name}',
+        })
+
+    def ups_confirm_view(self, request, shipment_id):
+        """GET — Preview даних перед відправкою через UPS API.
+           POST — redirect to ups_book_view (actual API call)."""
+        from .ups_client import UPSClient, UPSError, UPS_SERVICES
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        service_code = (
+            request.POST.get('service_code') or
+            request.GET.get('service_code', '11')
+        ).strip() or '11'
+        service_name = UPS_SERVICES.get(service_code, f'UPS {service_code}')
+
+        # POST — підтверджено, передаємо на ups_book_view
+        if request.method == 'POST':
+            return redirect(
+                reverse('admin:shipping_shipment_ups_book', args=[shipment.pk])
+                + f'?service_code={service_code}'
+            )
+
+        # GET — будуємо превью
+        try:
+            client  = UPSClient()
+            to_addr = self._ups_extract_address(shipment)
+            packages = self._ups_extract_packages(shipment)
+            customs  = self._ups_extract_customs(shipment)
+            shipper  = client._default_shipper()
+        except UPSError as e:
+            messages.error(request, f'❌ UPS налаштування: {e}')
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+        # Перевірка розбіжності ваги (митниця vs посилка)
+        weight_warn = None
+        if customs and customs.get('items'):
+            customs_kg = sum(float(i.get('weight_kg', 0)) for i in customs['items'])
+            ship_kg    = float(shipment.weight_kg or 0)
+            if customs_kg > 0 and ship_kg > 0:
+                diff = abs(ship_kg - customs_kg)
+                pct  = diff / ship_kg * 100
+                if diff >= 0.5 or pct >= 20:
+                    weight_warn = {
+                        'shipment_kg': ship_kg,
+                        'customs_kg':  round(customs_kg, 3),
+                        'diff_kg':     round(diff, 3),
+                        'diff_pct':    round(pct, 1),
+                    }
+
+        back_url = (
+            reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk])
+            if shipment.status == 'draft'
+            else reverse('admin:shipping_shipment_change', args=[shipment.pk])
+        )
+
+        return render(request, 'admin/shipping/ups_confirm.html', {
+            **self.admin_site.each_context(request),
+            'title':        f'Підтвердити UPS відправлення #{shipment.pk}',
+            'shipment':     shipment,
+            'service_code': service_code,
+            'service_name': service_name,
+            'to_addr':      to_addr,
+            'shipper':      shipper,
+            'packages':     packages,
+            'customs':      customs,
+            'weight_warn':  weight_warn,
+            'is_intl':      (to_addr.get('country', 'DE').upper() !=
+                             (shipper.get('country') or 'DE').upper()),
+            'confirm_url':  reverse('admin:shipping_shipment_ups_confirm', args=[shipment.pk]),
+            'back_url':     back_url,
         })
 
     def ups_book_view(self, request, shipment_id):

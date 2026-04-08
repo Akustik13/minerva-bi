@@ -238,10 +238,13 @@ class UPSClient:
         from datetime import date as _date
         shipper   = from_address or self._default_shipper()
         shipment  = self._build_rate_shipment(to_address, packages, shipper)
-        # PickupDate is mandatory for Shoptimeintransit — without it TimeInTransit is absent
+        # DeliveryTimeInformation with Pickup.Date+Time is required for TimeInTransit data
         shipment['DeliveryTimeInformation'] = {
             'PackageBillType': '02',  # 02 = Non-Documents
-            'Pickup': {'Date': _date.today().strftime('%Y%m%d')},
+            'Pickup': {
+                'Date': _date.today().strftime('%Y%m%d'),
+                'Time': '1000',
+            },
         }
         payload = {'RateRequest': {
             'Request': {
@@ -252,8 +255,8 @@ class UPSClient:
         }}
         try:
             data = self._post(f'/api/rating/{_API_VERSION}/Shoptimeintransit', payload)
-        except UPSError:
-            # Some accounts don't support Shoptimeintransit — fall back to plain Shop
+        except UPSError as e:
+            logger.warning('UPS Shoptimeintransit failed (%s) — falling back to Shop (no transit data)', e)
             del shipment['DeliveryTimeInformation']
             payload['RateRequest']['Request']['RequestOption'] = 'Shop'
             data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)

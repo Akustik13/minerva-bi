@@ -1,0 +1,263 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}{{ title }} | Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; <a href="{{ back_url }}">Чернетка #{{ shipment.pk }}</a>
+  &rsaquo; Підтвердити UPS
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .uc-wrap  { max-width: 860px; margin: 0 auto; padding: 0 0 48px; }
+  .uc-card  { background: var(--bg-card); border: 1px solid var(--border-strong);
+              border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .uc-head  { background: var(--bg-card-2); padding: 10px 16px; font-size: 12px;
+              font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+              color: var(--text-muted); display: flex; align-items: center; gap: 8px;
+              border-bottom: 1px solid var(--border-strong); }
+  .uc-body  { padding: 14px 16px; }
+  .uc-row   { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .uc-row:last-child { margin-bottom: 0; }
+  .uc-lbl   { color: var(--text-dim); min-width: 140px; flex-shrink: 0; }
+  .uc-val   { color: var(--text); font-weight: 500; }
+  .uc-val.ok     { color: var(--ok);     font-weight: 700; }
+  .uc-val.accent { color: var(--accent); font-weight: 700; }
+  .uc-2col  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:700px){ .uc-2col { grid-template-columns: 1fr; } }
+  .uc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .uc-table th { background: var(--bg-card-2); color: var(--text-muted); padding: 8px 10px;
+                 text-align: left; font-weight: 600; border-bottom: 1px solid var(--border-strong); }
+  .uc-table td { padding: 8px 10px; color: var(--text); border-bottom: 1px solid var(--border); }
+  .uc-table tr:last-child td { border-bottom: none; }
+  .uc-actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+  .btn-confirm { background: #5d4037; color: #fff; border: none; padding: 12px 28px;
+                 border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer;
+                 transition: opacity .15s; }
+  .btn-confirm:hover { opacity: .85; }
+  .btn-back   { background: var(--bg-card-2); color: var(--text-muted);
+                border: 1px solid var(--border-strong); padding: 12px 20px;
+                border-radius: 6px; font-size: 13px; font-weight: 600;
+                text-decoration: none; transition: background .15s; display: inline-block; }
+  .btn-back:hover { background: var(--bg-hover); color: var(--text); }
+  .warn-banner { background: var(--bg-card-2); border: 1px solid var(--warn);
+                 border-left: 4px solid var(--warn); border-radius: 6px;
+                 padding: 12px 16px; color: var(--warn); font-size: 13px; margin-bottom: 16px; }
+</style>
+
+<div class="uc-wrap">
+  <h1 style="color:var(--text);font-size:20px;margin-bottom:20px">
+    🟤 Перевірте дані перед відправкою через UPS API
+  </h1>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="warn-banner">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if weight_warn %}
+  <div class="warn-banner">
+    <b>⚖️ Розбіжність у вазі:</b>
+    Посилка: <b>{{ weight_warn.shipment_kg }} кг</b> ·
+    Митні артикули: <b>{{ weight_warn.customs_kg }} кг</b> ·
+    Різниця: <b>{{ weight_warn.diff_kg }} кг ({{ weight_warn.diff_pct }}%)</b><br>
+    Перевірте правильність вказаної ваги перед відправкою.
+  </div>
+  {% endif %}
+
+  <!-- Сервіс -->
+  <div class="uc-card">
+    <div class="uc-head">🚚 Обраний сервіс UPS</div>
+    <div class="uc-body">
+      <div class="uc-row">
+        <span class="uc-lbl">Сервіс</span>
+        <span class="uc-val accent">{{ service_name }}</span>
+      </div>
+      <div class="uc-row">
+        <span class="uc-lbl">Код</span>
+        <span class="uc-val" style="font-family:monospace">{{ service_code }}</span>
+      </div>
+      {% if shipment.carrier %}
+      <div class="uc-row">
+        <span class="uc-lbl">Акаунт UPS</span>
+        <span class="uc-val">{{ shipment.carrier.name }}</span>
+      </div>
+      {% endif %}
+      {% if shipment.carrier_price %}
+      <div class="uc-row">
+        <span class="uc-lbl">Орієнтовна вартість</span>
+        <span class="uc-val ok">{{ shipment.carrier_price }} {{ shipment.carrier_currency|default:"EUR" }}</span>
+      </div>
+      {% endif %}
+      <div class="uc-row">
+        <span class="uc-lbl">Reference</span>
+        <span class="uc-val" style="font-family:monospace">{{ shipment.reference|default:shipment.pk }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Відправник / Отримувач -->
+  <div class="uc-2col">
+
+    <div class="uc-card">
+      <div class="uc-head">📤 Відправник</div>
+      <div class="uc-body">
+        <div class="uc-row"><span class="uc-lbl">Ім'я / Компанія</span>
+          <span class="uc-val">{{ shipper.name|default:"—" }}</span></div>
+        <div class="uc-row"><span class="uc-lbl">Вулиця</span>
+          <span class="uc-val">{{ shipper.address_line|default:"—" }}</span></div>
+        <div class="uc-row"><span class="uc-lbl">Місто / ZIP</span>
+          <span class="uc-val">{{ shipper.city|default:"—" }}, {{ shipper.postal|default:"" }}</span></div>
+        <div class="uc-row"><span class="uc-lbl">Країна</span>
+          <span class="uc-val">{{ shipper.country|default:"DE" }}</span></div>
+        {% if shipper.phone %}
+        <div class="uc-row"><span class="uc-lbl">Телефон</span>
+          <span class="uc-val">{{ shipper.phone }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="uc-card">
+      <div class="uc-head">📥 Отримувач</div>
+      <div class="uc-body">
+        <div class="uc-row"><span class="uc-lbl">Ім'я / Компанія</span>
+          <span class="uc-val">{{ to_addr.name|default:"—" }}</span></div>
+        <div class="uc-row"><span class="uc-lbl">Вулиця</span>
+          <span class="uc-val">{{ to_addr.address_line|default:"—" }}</span></div>
+        <div class="uc-row"><span class="uc-lbl">Місто / ZIP</span>
+          <span class="uc-val">{{ to_addr.city|default:"—" }}, {{ to_addr.postal|default:"" }}</span></div>
+        {% if to_addr.state %}
+        <div class="uc-row"><span class="uc-lbl">Штат / Регіон</span>
+          <span class="uc-val">{{ to_addr.state }}</span></div>
+        {% endif %}
+        <div class="uc-row"><span class="uc-lbl">Країна</span>
+          <span class="uc-val{% if is_intl %} accent{% endif %}">{{ to_addr.country|default:"—" }}
+            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> (міжнародне)</span>{% endif %}
+          </span></div>
+        {% if to_addr.phone %}
+        <div class="uc-row"><span class="uc-lbl">Телефон</span>
+          <span class="uc-val">{{ to_addr.phone }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Коробки -->
+  <div class="uc-card">
+    <div class="uc-head">📦 Коробки ({{ packages|length }} шт.)</div>
+    <div class="uc-body" style="padding:0">
+      <table class="uc-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Вага (кг)</th>
+            <th>Довжина (см)</th>
+            <th>Ширина (см)</th>
+            <th>Висота (см)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in packages %}
+          <tr>
+            <td style="color:var(--text-dim)">{{ forloop.counter }}</td>
+            <td style="color:var(--ok);font-weight:700">{{ p.weight_kg }}</td>
+            <td>{{ p.length_cm }}</td>
+            <td>{{ p.width_cm }}</td>
+            <td>{{ p.height_cm }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Митна декларація -->
+  {% if customs and is_intl %}
+  <div class="uc-card">
+    <div class="uc-head">🛃 Митна декларація</div>
+    <div class="uc-body">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
+        <span><span class="uc-lbl" style="display:inline">Валюта: </span>
+          <b>{{ customs.currency|default:"EUR" }}</b></span>
+        <span><span class="uc-lbl" style="display:inline">Тип: </span>
+          <b>{{ customs.contents_type|default:"SALE" }}</b></span>
+        {% if customs.description %}
+        <span><span class="uc-lbl" style="display:inline">Опис: </span>
+          <b>{{ customs.description }}</b></span>
+        {% endif %}
+      </div>
+      {% if customs.items %}
+      <table class="uc-table">
+        <thead>
+          <tr>
+            <th>Опис</th>
+            <th style="text-align:center">К-сть</th>
+            <th style="text-align:right">Вартість</th>
+            <th>Вага нетто</th>
+            <th>Походження</th>
+            <th>HS код</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in customs.items %}
+          <tr>
+            <td>{{ item.description|default:"—" }}</td>
+            <td style="text-align:center">{{ item.quantity }}</td>
+            <td style="text-align:right;color:var(--ok);font-weight:700">
+              {{ item.value }} {{ customs.currency|default:"EUR" }}</td>
+            <td style="color:var(--text-muted)">{{ item.weight_kg }} кг</td>
+            <td style="color:var(--text-muted)">{{ item.country|default:"—" }}</td>
+            <td style="color:var(--text-dim);font-family:monospace">{{ item.hs_code|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="uc-row">
+        <span class="uc-lbl">Загальна вартість</span>
+        <span class="uc-val ok">{{ customs.value_usd|default:"—" }} {{ customs.currency|default:"EUR" }}</span>
+      </div>
+      <div class="uc-row">
+        <span class="uc-lbl">Опис</span>
+        <span class="uc-val">{{ customs.description|default:"—" }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Підтвердження -->
+  <div class="uc-card">
+    <div class="uc-head">⚠️ Підтвердження</div>
+    <div class="uc-body">
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
+        Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
+        Minerva викличе <b style="color:var(--text)">UPS REST API</b> і
+        <b style="color:var(--text)">створить реальне відправлення</b> у системі UPS.
+        Буде списано кошти з акаунту <b>{{ shipment.carrier.connection_uuid|default:"UPS" }}</b>.
+        Скасувати можна через кнопку «Void» на сторінці відправлення.
+      </p>
+      <form method="post" action="{{ confirm_url }}" id="ups-confirm-form">
+        {% csrf_token %}
+        <input type="hidden" name="service_code" value="{{ service_code }}">
+      </form>
+    </div>
+  </div>
+
+  <!-- Кнопки -->
+  <div class="uc-actions">
+    <button type="submit" form="ups-confirm-form" class="btn-confirm"
+      onclick="return confirm('Відправити через UPS API?\n\nСервіс: {{ service_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі UPS і списано кошти з акаунту.')">
+      🟤 Підтвердити і відправити через UPS
+    </button>
+    <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
+  </div>
+
+</div>
+{% endblock %}
