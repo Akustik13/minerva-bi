@@ -63,7 +63,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from ai_assistant.permissions import get_profile_for_telegram
     from ai_assistant.service import chat
 
+    if not update.message or not update.message.text:
+        return
+
     tg_user = update.effective_user
+    chat_type = update.effective_chat.type  # 'private' | 'group' | 'supergroup'
+    is_group = chat_type in ('group', 'supergroup')
+
+    # In groups: respond only if bot is mentioned or message is a reply to bot
+    if is_group:
+        bot_username = context.bot.username
+        text = update.message.text
+        is_mentioned = f'@{bot_username}' in text
+        is_reply_to_bot = (
+            update.message.reply_to_message and
+            update.message.reply_to_message.from_user and
+            update.message.reply_to_message.from_user.username == bot_username
+        )
+        if not is_mentioned and not is_reply_to_bot:
+            return  # ignore messages not addressed to bot
+        # Strip the @mention from the text before sending to AI
+        text = text.replace(f'@{bot_username}', '').strip()
+        if not text:
+            return
+    else:
+        text = update.message.text
+
     profile = get_profile_for_telegram(tg_user.id)
 
     if not profile:
@@ -78,21 +103,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text('🔒 AI-асистент для тебе вимкнений.')
         return
 
-    # Typing indicator
     await update.message.reply_chat_action('typing')
 
+    channel = 'telegram_group' if is_group else 'telegram_private'
     try:
         reply = chat(
-            user_text=update.message.text,
+            user_text=text,
             profile=profile,
-            channel='telegram_private',
+            channel=channel,
             telegram_chat_id=str(update.effective_chat.id),
         )
-    except Exception as e:
+    except Exception:
         logger.exception("chat() error")
         reply = 'Щось пішло не так. Спробуй пізніше. 🏛️'
 
-    # Telegram message limit
     if len(reply) > 4096:
         reply = reply[:4090] + '…'
 
