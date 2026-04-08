@@ -362,7 +362,7 @@
               } else {
                 el.style.color = 'var(--ok)';
                 var lines = (d.rates || []).map(r => r.name + ': ' + r.price + ' ' + r.currency).join('\n');
-                el.textContent = '✅ Тарифи (' + (d.rates||[]).length + '):\n' + (lines || '—');
+                el.textContent = '✅ ' + (d.route || '') + '\n' + (lines || '— тарифів немає');
                 el.style.whiteSpace = 'pre';
               }
             } else {

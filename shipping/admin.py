@@ -160,20 +160,36 @@ class CarrierAdmin(admin.ModelAdmin):
     def test_ups_rates_view(self, request, pk):
         from .ups_client import UPSClient, UPSError
         carrier = get_object_or_404(Carrier, pk=pk)
+        # Use sender country to pick a domestic/nearby test destination
+        origin = (carrier.sender_country or 'DE').upper()
+        _test_dest = {
+            'DE': {'name': 'Test', 'address_line': 'Marienplatz 1',   'city': 'Munich',   'postal': '80331',   'country': 'DE'},
+            'AT': {'name': 'Test', 'address_line': 'Stephansplatz 1', 'city': 'Vienna',   'postal': '1010',    'country': 'AT'},
+            'CH': {'name': 'Test', 'address_line': 'Bahnhofstr. 1',   'city': 'Zurich',   'postal': '8001',    'country': 'CH'},
+            'PL': {'name': 'Test', 'address_line': 'Rynek 1',         'city': 'Warsaw',   'postal': '00-272',  'country': 'PL'},
+            'GB': {'name': 'Test', 'address_line': '1 The Strand',    'city': 'London',   'postal': 'WC2N 5HR','country': 'GB'},
+            'US': {'name': 'Test', 'address_line': '100 Main St',     'city': 'New York', 'postal': '10001',   'country': 'US', 'state': 'NY'},
+        }
+        to_addr = _test_dest.get(origin, {
+            'name': 'Test', 'address_line': 'Test Street 1',
+            'city': carrier.sender_city or 'Berlin',
+            'postal': carrier.sender_zip or '10115',
+            'country': origin,
+        })
         try:
             client = UPSClient(carrier=carrier)
             rates = client.get_rates(
-                to_address={
-                    'name': 'Test Recipient', 'address_line': '100 Main St',
-                    'city': 'New York', 'state': 'NY',
-                    'postal': '10001', 'country': 'US',
-                },
+                to_address=to_addr,
                 packages=[{'weight_kg': 1.0, 'length_cm': 20, 'width_cm': 15, 'height_cm': 10}],
             )
-            return JsonResponse({'ok': True, 'rates': [
-                {'name': r['name'], 'price': str(r['price']), 'currency': r['currency']}
-                for r in rates[:8]
-            ]})
+            return JsonResponse({
+                'ok': True,
+                'route': f"{origin} → {to_addr['country']} ({to_addr['city']})",
+                'rates': [
+                    {'name': r['name'], 'price': str(r['price']), 'currency': r['currency']}
+                    for r in rates[:8]
+                ],
+            })
         except Exception as e:
             return JsonResponse({'ok': False, 'error': str(e)})
 
