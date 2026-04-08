@@ -327,6 +327,27 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.refresh_order_tracking_view),
                 name="shipping_order_tracking_refresh",
             ),
+            # UPS
+            path(
+                "<int:shipment_id>/ups-rates/",
+                self.admin_site.admin_view(self.ups_rates_view),
+                name="shipping_shipment_ups_rates",
+            ),
+            path(
+                "<int:shipment_id>/ups-book/",
+                self.admin_site.admin_view(self.ups_book_view),
+                name="shipping_shipment_ups_book",
+            ),
+            path(
+                "<int:shipment_id>/ups-track/",
+                self.admin_site.admin_view(self.ups_track_view),
+                name="shipping_shipment_ups_track",
+            ),
+            path(
+                "<int:shipment_id>/ups-void/",
+                self.admin_site.admin_view(self.ups_void_view),
+                name="shipping_shipment_ups_void",
+            ),
         ]
         return custom + urls
 
@@ -1394,6 +1415,235 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "confirm_url":     reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]),
             "back_url":        reverse("admin:shipping_shipment_rates", args=[shipment.pk]),
         })
+
+    # ── UPS Views ─────────────────────────────────────────────────────────────
+
+    def ups_rates_view(self, request, shipment_id):
+        """Тарифи UPS для конкретного відправлення."""
+        from .ups_client import UPSClient, UPSError
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order    = shipment.order
+
+        try:
+            client   = UPSClient()
+            to_addr  = self._ups_extract_address(shipment)
+            packages = self._ups_extract_packages(shipment)
+            rates    = client.get_rates(to_addr, packages)
+        except UPSError as e:
+            messages.error(request, f'❌ UPS: {e}')
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+        weight = float(shipment.weight_kg or 1)
+        return render(request, 'admin/shipping/ups_rates.html', {
+            **self.admin_site.each_context(request),
+            'shipment': shipment,
+            'order':    order,
+            'rates':    rates,
+            'weight':   weight,
+            'title':    f'UPS Тарифи — #{shipment.pk} → {shipment.recipient_name}',
+        })
+
+    def ups_book_view(self, request, shipment_id):
+        """Оформити відправлення через UPS."""
+        import base64 as _b64
+        import os
+        from django.conf import settings as django_settings
+        from .ups_client import UPSClient, UPSError
+
+        shipment     = get_object_or_404(Shipment, pk=shipment_id)
+        service_code = request.GET.get('service_code', '11')
+
+        try:
+            client   = UPSClient()
+            to_addr  = self._ups_extract_address(shipment)
+            packages = self._ups_extract_packages(shipment)
+            customs  = self._ups_extract_customs(shipment)
+
+            result = client.create_shipment(
+                to_address=to_addr,
+                packages=packages,
+                service_code=service_code,
+                customs_info=customs or None,
+                reference=shipment.reference or str(shipment.pk),
+            )
+        except UPSError as e:
+            messages.error(request, f'❌ UPS: {e}')
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+        # Зберегти трекінг + сервіс
+        update_fields = []
+        if result['tracking_number']:
+            shipment.tracking_number = result['tracking_number']
+            update_fields.append('tracking_number')
+        if result['service_name']:
+            shipment.carrier_service = result['service_name']
+            update_fields.append('carrier_service')
+        if result['total_charge']:
+            shipment.carrier_price    = result['total_charge']
+            shipment.carrier_currency = result['currency']
+            update_fields += ['carrier_price', 'carrier_currency']
+        if result.get('shipment_id'):
+            shipment.carrier_shipment_id = result['shipment_id']
+            update_fields.append('carrier_shipment_id')
+        shipment.status = Shipment.Status.LABEL_READY
+        update_fields.append('status')
+        shipment.save(update_fields=update_fields)
+
+        # Зберегти мітку
+        if result.get('label_base64'):
+            label_fmt = result['label_format'].lower()
+            label_dir = os.path.join(django_settings.MEDIA_ROOT, 'shipping', 'labels')
+            os.makedirs(label_dir, exist_ok=True)
+            fname    = f'ups_{shipment.pk}_{result["tracking_number"]}.{label_fmt}'
+            fpath    = os.path.join(label_dir, fname)
+            with open(fpath, 'wb') as f:
+                f.write(_b64.b64decode(result['label_base64']))
+            rel = f'shipping/labels/{fname}'
+            shipment.label_url = f'/media/{rel}'
+            shipment.save(update_fields=['label_url'])
+            logger.info('UPS label saved: %s', fpath)
+
+        messages.success(
+            request,
+            f'✅ UPS відправлення створено! Трекінг: {result["tracking_number"]} | '
+            f'{result["service_name"]} | {result["total_charge"]} {result["currency"]}',
+        )
+        return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+    def ups_track_view(self, request, shipment_id):
+        """Трекінг UPS для відправлення."""
+        from .ups_client import UPSClient, UPSError
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        tracking = (shipment.tracking_number or '').strip()
+
+        if not tracking:
+            messages.error(request, '❌ Трекінг-номер не вказано.')
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+        try:
+            client = UPSClient()
+            result = client.track(tracking)
+        except UPSError as e:
+            messages.error(request, f'❌ UPS: {e}')
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+        # Оновити статус відправлення
+        if result.get('delivered'):
+            shipment.status = Shipment.Status.DELIVERED
+            shipment.save(update_fields=['status'])
+        elif result.get('status') not in ('', 'UNKNOWN'):
+            if shipment.status not in (Shipment.Status.DELIVERED, Shipment.Status.CANCELLED):
+                shipment.carrier_status_label = result.get('status_description', '')
+                shipment.status = Shipment.Status.IN_TRANSIT
+                shipment.save(update_fields=['status', 'carrier_status_label'])
+
+        return render(request, 'admin/shipping/ups_tracking.html', {
+            **self.admin_site.each_context(request),
+            'shipment':        shipment,
+            'tracking_number': tracking,
+            'result':          result,
+            'events':          result.get('events', []),
+            'title':           f'UPS Трекінг — {tracking}',
+        })
+
+    def ups_void_view(self, request, shipment_id):
+        """Анулювати відправлення UPS."""
+        from .ups_client import UPSClient, UPSError
+
+        if request.method != 'POST':
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment_id]))
+
+        shipment    = get_object_or_404(Shipment, pk=shipment_id)
+        shipment_id_ups = shipment.carrier_shipment_id or shipment.tracking_number
+
+        if not shipment_id_ups:
+            messages.error(request, '❌ Carrier Shipment ID не вказано.')
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+        try:
+            client = UPSClient()
+            client.void_shipment(shipment_id_ups)
+            shipment.status = Shipment.Status.CANCELLED
+            shipment.save(update_fields=['status'])
+            messages.success(request, f'✅ UPS відправлення анульовано. #{shipment.pk} → Скасовано.')
+        except UPSError as e:
+            messages.error(request, f'❌ UPS Void: {e}')
+
+        return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+    def _ups_extract_address(self, shipment) -> dict:
+        return {
+            'name':         shipment.recipient_name or shipment.recipient_company or 'Recipient',
+            'address_line': shipment.recipient_street or '',
+            'city':         shipment.recipient_city or '',
+            'state':        shipment.recipient_state or '',
+            'postal':       shipment.recipient_zip or '',
+            'country':      shipment.recipient_country or 'DE',
+            'phone':        shipment.recipient_phone or '',
+        }
+
+    def _ups_extract_packages(self, shipment) -> list:
+        # Якщо є окремі ShipmentPackage — використати їх
+        pkgs = list(shipment.packages.all())
+        if pkgs:
+            result = []
+            for p in pkgs:
+                for _ in range(p.quantity or 1):
+                    result.append({
+                        'weight_kg': float(p.weight_kg or 1),
+                        'length_cm': float(p.length_cm or 20),
+                        'width_cm':  float(p.width_cm or 15),
+                        'height_cm': float(p.height_cm or 10),
+                    })
+            return result
+        return [{
+            'weight_kg': float(shipment.weight_kg or 1),
+            'length_cm': float(shipment.length_cm or 20),
+            'width_cm':  float(shipment.width_cm or 15),
+            'height_cm': float(shipment.height_cm or 10),
+        }]
+
+    def _ups_extract_customs(self, shipment) -> dict:
+        order = shipment.order
+        # Пропустити якщо внутрішнє відправлення
+        dest = (shipment.recipient_country or '').upper()
+        from_c = UPSConfig.get().shipper_country.upper()
+        if dest == from_c:
+            return None
+
+        items = []
+        for line in order.lines.select_related('product').all():
+            product = getattr(line, 'product', None)
+            items.append({
+                'description': str(product)[:35] if product else (shipment.description or 'Goods'),
+                'quantity':    int(getattr(line, 'quantity', 1) or 1),
+                'value':       float(getattr(line, 'total_price', 0) or 0),
+                'weight_kg':   float(getattr(product, 'weight', 0.1) or 0.1) if product else 0.1,
+                'hs_code':     getattr(product, 'hs_code', '') or '',
+                'country':     from_c,
+            })
+
+        if not items:
+            return {
+                'description': shipment.description or f'Order #{order.order_number}',
+                'value_usd':   float(shipment.declared_value or 0),
+                'currency':    shipment.declared_currency or 'EUR',
+                'contents_type': 'SALE',
+            }
+
+        reason_map = {
+            'Commercial': 'SALE', 'Gift': 'GIFT', 'Personal': 'GIFT',
+            'Return': 'RETURN', 'Claim': 'OTHER',
+        }
+        return {
+            'description':   f'Order #{order.order_number}',
+            'value_usd':     sum(i['value'] for i in items),
+            'currency':      shipment.declared_currency or 'EUR',
+            'contents_type': reason_map.get(shipment.export_reason, 'SALE'),
+            'items':         items,
+        }
 
     # ── DHL Track Lookup (standalone) ────────────────────────────────────────
 
@@ -2900,3 +3150,125 @@ def _shipping_app_index(request, app_label, extra_context=None):
 
 
 admin.site.app_index = _shipping_app_index
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# UPS Config Admin
+# ══════════════════════════════════════════════════════════════════════════════
+
+from .models import UPSConfig  # noqa: E402
+
+
+@admin.register(UPSConfig)
+class UPSConfigAdmin(admin.ModelAdmin):
+    """Singleton — UPS API налаштування."""
+
+    change_form_template = 'shipping/admin/upsconfig_change_form.html'
+
+    fieldsets = (
+        ('🔑 Credentials', {
+            'description': (
+                'Credentials з UPS Developer Portal → Apps → Credentials. '
+                'Збережи — потім натисни "Перевірити підключення".'
+            ),
+            'fields': ('is_enabled', 'use_sandbox', 'client_id', 'client_secret', 'account_number'),
+        }),
+        ('📦 Адреса відправника', {
+            'description': 'Адреса з якої відправляються посилки.',
+            'fields': (
+                'shipper_name', 'shipper_address',
+                ('shipper_city', 'shipper_postal'),
+                ('shipper_state', 'shipper_country'),
+                'shipper_phone',
+            ),
+        }),
+        ('🏷️ Мітки', {
+            'fields': ('label_format',),
+        }),
+        ('🛃 Митна декларація', {
+            'fields': ('paperless_trade', 'eori_number', 'vat_number'),
+            'description': 'Для міжнародних відправлень. Paperless Trade потребує активації в UPS акаунті.',
+        }),
+        ('📊 Статистика', {
+            'fields': ('total_shipments', 'last_sync_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    readonly_fields = ('total_shipments', 'last_sync_at')
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if 'client_secret' in form.base_fields:
+            from django.forms import PasswordInput
+            form.base_fields['client_secret'].widget = PasswordInput(render_value=True)
+        return form
+
+    def has_add_permission(self, request):
+        try:
+            return not UPSConfig.objects.exists()
+        except Exception:
+            return True
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        try:
+            obj, _ = UPSConfig.objects.get_or_create(pk=1)
+        except Exception:
+            messages.error(request, '⚠️ Таблиця UPSConfig не знайдена. Запусти migrate.')
+            return redirect('/admin/')
+        return redirect(f'/admin/shipping/upsconfig/{obj.pk}/change/')
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path('test-connection/',
+                 self.admin_site.admin_view(self.test_connection_view),
+                 name='ups_test_connection'),
+            path('test-rates/',
+                 self.admin_site.admin_view(self.test_rates_view),
+                 name='ups_test_rates'),
+        ]
+        return custom + urls
+
+    def test_connection_view(self, request):
+        from .ups_client import UPSClient, UPSError
+        try:
+            client = UPSClient()
+            token  = client.get_token()
+            return JsonResponse({
+                'ok': True,
+                'message': f'Підключення успішне. Токен отримано ({len(token)} симв.).',
+                'mode': 'Sandbox' if client.config.use_sandbox else 'Production',
+            })
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+
+    def test_rates_view(self, request):
+        from .ups_client import UPSClient, UPSError
+        try:
+            client = UPSClient()
+            rates  = client.get_rates(
+                to_address={'name': 'Test', 'address_line': '1 Test St',
+                             'city': 'New York', 'state': 'NY',
+                             'postal': '10001', 'country': 'US'},
+                packages=[{'weight_kg': 1, 'length_cm': 20, 'width_cm': 15, 'height_cm': 10}],
+            )
+            return JsonResponse({'ok': True, 'rates': [
+                {'name': r['name'], 'price': str(r['price']), 'currency': r['currency']}
+                for r in rates[:6]
+            ]})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+
+    def save_model(self, request, obj, form, change):
+        # Якщо secret не змінювався — залишити старий
+        if change and not form.cleaned_data.get('client_secret'):
+            try:
+                old = UPSConfig.objects.get(pk=obj.pk)
+                obj.client_secret = old.client_secret
+            except UPSConfig.DoesNotExist:
+                pass
+        super().save_model(request, obj, form, change)

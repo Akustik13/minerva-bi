@@ -1,0 +1,72 @@
+{% extends "admin/change_form.html" %}
+{% block submit_buttons_bottom %}
+{{ block.super }}
+<div style="margin:20px 0;padding:20px;border:1px solid var(--border-strong);
+            border-radius:8px;background:var(--bg-card-2)">
+  <h3 style="margin:0 0 14px;font-size:14px;color:var(--text)">🔧 Тест підключення</h3>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+
+    <div>
+      <button type="button" onclick="upsTestConn()"
+              style="padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;
+                     border:1px solid var(--gold);background:transparent;
+                     color:var(--gold);cursor:pointer">
+        🔑 Перевірити OAuth підключення
+      </button>
+      <div id="ups-conn-result" style="margin-top:8px;font-size:12px"></div>
+    </div>
+
+    <div>
+      <button type="button" onclick="upsTestRates()"
+              style="padding:8px 18px;border-radius:6px;font-size:13px;font-weight:600;
+                     border:1px solid var(--accent);background:transparent;
+                     color:var(--accent);cursor:pointer">
+        💰 Тест тарифів (NY→DE, 1кг)
+      </button>
+      <div id="ups-rates-result" style="margin-top:8px;font-size:12px;max-width:420px;
+           line-height:1.6"></div>
+    </div>
+
+  </div>
+  <p style="margin:14px 0 0;font-size:11px;color:var(--text-dim)">
+    ⚠ Спочатку збережи налаштування (Client ID, Secret, Account Number) — потім тестуй підключення
+  </p>
+</div>
+
+<script>
+async function upsTestConn() {
+  const el = document.getElementById('ups-conn-result');
+  el.style.color = 'var(--text-muted)';
+  el.textContent = '⏳ Перевіряю…';
+  try {
+    const r = await fetch('/admin/shipping/upsconfig/test-connection/');
+    const d = await r.json();
+    el.textContent = d.ok ? `✅ ${d.message} (${d.mode})` : `❌ ${d.error}`;
+    el.style.color  = d.ok ? 'var(--ok)' : 'var(--err)';
+  } catch(e) {
+    el.textContent = '❌ Помилка запиту';
+    el.style.color = 'var(--err)';
+  }
+}
+async function upsTestRates() {
+  const el = document.getElementById('ups-rates-result');
+  el.style.color = 'var(--text-muted)';
+  el.textContent = '⏳ Запит тарифів…';
+  try {
+    const r = await fetch('/admin/shipping/upsconfig/test-rates/');
+    const d = await r.json();
+    if (d.ok && d.rates.length) {
+      el.innerHTML = '✅ Тарифи:<br>' +
+        d.rates.map(r => `<span style="color:var(--text)">${r.name}: <b style="color:var(--ok)">${r.price} ${r.currency}</b></span>`).join('<br>');
+      el.style.color = '';
+    } else {
+      el.textContent = '❌ ' + (d.error || 'Тарифи не знайдено');
+      el.style.color = 'var(--err)';
+    }
+  } catch(e) {
+    el.textContent = '❌ Помилка запиту';
+    el.style.color = 'var(--err)';
+  }
+}
+</script>
+{% endblock %}

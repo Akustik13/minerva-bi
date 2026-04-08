@@ -1,0 +1,101 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a> &rsaquo;
+  <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}">{{ shipment }}</a> &rsaquo;
+  UPS Тарифи
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+.ups-wrap { padding: 20px; max-width: 860px; }
+.ups-hdr {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 20px; padding-bottom: 12px;
+  border-bottom: 2px solid var(--gold);
+}
+.ups-hdr h2 { margin: 0; font-size: 18px; color: var(--text); }
+.ups-meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+.ups-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+.ups-table th {
+  background: var(--bg-card-2); color: var(--text-muted); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 10px 14px; text-align: left; border-bottom: 2px solid var(--border-strong);
+}
+.ups-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; }
+.ups-table tr:hover td { background: var(--bg-hover); }
+.ups-price { font-size: 16px; font-weight: 700; color: var(--ok); }
+.ups-service { font-weight: 600; }
+.ups-code { font-family: monospace; font-size: 11px; color: var(--text-dim); }
+.ups-transit { color: var(--accent); font-size: 12px; }
+.ups-btn {
+  display: inline-block; padding: 7px 16px; border-radius: 6px; font-size: 13px;
+  font-weight: 600; text-decoration: none; border: none; cursor: pointer;
+  background: var(--gold); color: #000;
+}
+.ups-btn:hover { opacity: .85; }
+.ups-back {
+  display: inline-block; margin-top: 20px; color: var(--text-muted);
+  font-size: 12px; text-decoration: none;
+}
+.ups-back:hover { color: var(--text); }
+</style>
+
+<div class="ups-wrap">
+  <div class="ups-hdr">
+    <span style="font-size:28px">📦</span>
+    <div>
+      <h2>{{ title }}</h2>
+      <div class="ups-meta">
+        Вага: {{ weight }} кг &nbsp;·&nbsp;
+        {{ shipment.recipient_city }}, {{ shipment.recipient_country }}
+        {% if shipment.carrier.use_sandbox %}&nbsp;·&nbsp;<span style="color:var(--warn)">Sandbox</span>{% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if rates %}
+  <table class="ups-table">
+    <thead>
+      <tr>
+        <th>Послуга</th>
+        <th>Ціна</th>
+        <th>Транзит</th>
+        <th>Код</th>
+        <th>Дія</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for rate in rates %}
+      <tr>
+        <td class="ups-service">{{ rate.name }}</td>
+        <td class="ups-price">{{ rate.price }} {{ rate.currency }}</td>
+        <td class="ups-transit">
+          {% if rate.transit_days %}{{ rate.transit_days }} дн.{% else %}—{% endif %}
+          {% if rate.guaranteed %}<span style="color:var(--ok)">✓</span>{% endif %}
+        </td>
+        <td class="ups-code">{{ rate.code }}</td>
+        <td>
+          <a href="{% url 'admin:shipping_shipment_ups_book' shipment.pk %}?service_code={{ rate.code }}"
+             class="ups-btn"
+             onclick="return confirm('Оформити відправлення: {{ rate.name }} за {{ rate.price }} {{ rate.currency }}?')">
+            Оформити
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:var(--text-muted)">Тарифи не знайдено. Перевір адресу та налаштування UPS.</p>
+  {% endif %}
+
+  <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}" class="ups-back">← Назад до відправлення</a>
+</div>
+{% endblock %}
