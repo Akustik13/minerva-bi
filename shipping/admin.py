@@ -295,17 +295,26 @@ class CarrierAdmin(admin.ModelAdmin):
             'transactionSrc': 'minerva-bi-debug',
         }
 
-        # Test destination: same country as sender
         origin = (carrier.sender_country or 'DE').upper()
-        _test_dest = {
-            'DE': {'name': 'Test', 'address_line': 'Marienplatz 1', 'city': 'Munich',   'postal': '80331', 'country': 'DE'},
-            'AT': {'name': 'Test', 'address_line': 'Prater 1',      'city': 'Vienna',   'postal': '1010',  'country': 'AT'},
-            'US': {'name': 'Test', 'address_line': '100 Main St',   'city': 'New York', 'postal': '10001', 'country': 'US', 'state': 'NY'},
-            'GB': {'name': 'Test', 'address_line': 'The Strand 1',  'city': 'London',   'postal': 'WC2N 5HR', 'country': 'GB'},
+
+        shipper_addr = {
+            'name': carrier.sender_name or carrier.sender_company or 'Sender',
+            'address_line': carrier.sender_street or '', 'city': carrier.sender_city or '',
+            'postal': carrier.sender_zip or '', 'country': origin,
         }
-        to_addr = _test_dest.get(origin, {'name': 'Test', 'address_line': 'Test St 1',
-                                          'city': carrier.sender_city or 'Berlin',
-                                          'postal': carrier.sender_zip or '10115', 'country': origin})
+
+        # International test destinations (probe all 3 to find which routes are enabled)
+        INTL_DESTS = [
+            {'label': f'{origin}→NL', 'name': 'Test NL',
+             'address_line': 'Dam 1', 'city': 'Amsterdam', 'postal': '1012 JS', 'country': 'NL'},
+            {'label': f'{origin}→CN', 'name': 'Test CN',
+             'address_line': 'Shilong Industry Zone', 'city': 'Dongguan', 'postal': '523000', 'country': 'CN'},
+            {'label': f'{origin}→US', 'name': 'Test US',
+             'address_line': '100 Main St', 'city': 'Los Angeles', 'postal': '90001', 'country': 'US', 'state': 'CA'},
+        ]
+
+        rate_url        = f'{base_url}/api/rating/v2409/Shop'
+        rate_url_single = f'{base_url}/api/rating/v2409/Rate'
 
         def fmt_addr(a):
             r = {'AddressLine': [a.get('address_line', '')], 'City': a.get('city', ''),
@@ -314,28 +323,15 @@ class CarrierAdmin(admin.ModelAdmin):
                 r['StateProvinceCode'] = a['state'].upper()
             return r
 
-        shipper_addr = {
-            'name': carrier.sender_name or carrier.sender_company or 'Sender',
-            'address_line': carrier.sender_street or '', 'city': carrier.sender_city or '',
-            'postal': carrier.sender_zip or '', 'country': carrier.sender_country or 'DE',
-        }
+        def pkg(code, weight='1'):
+            return {'Packaging': {'Code': code},
+                    'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': weight}}
 
-        rate_url       = f'{base_url}/api/rating/v2409/Shop'
-        rate_url_single = f'{base_url}/api/rating/v2409/Rate'
-
-        def pkg(code, weight='1', with_dims=False):
-            p = {'Packaging': {'Code': code},
-                 'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': weight}}
-            if with_dims:
-                p['Dimensions'] = {'UnitOfMeasurement': {'Code': 'CM'},
-                                   'Length': '20', 'Width': '15', 'Height': '10'}
-            return p
-
-        def shipment(pkg_obj, svc=None):
+        def shipment_obj(dest, pkg_obj, svc=None):
             s = {
                 'Shipper':  {'Name': shipper_addr['name'], 'ShipperNumber': carrier.connection_uuid,
                              'Address': fmt_addr(shipper_addr)},
-                'ShipTo':   {'Name': to_addr['name'], 'Address': fmt_addr(to_addr)},
+                'ShipTo':   {'Name': dest['name'], 'Address': fmt_addr(dest)},
                 'ShipFrom': {'Name': shipper_addr['name'], 'Address': fmt_addr(shipper_addr)},
                 'Package':  [pkg_obj],
             }
@@ -343,59 +339,66 @@ class CarrierAdmin(admin.ModelAdmin):
                 s['Service'] = {'Code': svc}
             return s
 
-        def rate_payload(option, pkg_obj, svc=None):
+        def rate_payload(option, dest, pkg_obj, svc=None):
             return {'RateRequest': {
                 'Request': {'RequestOption': option, 'TransactionReference': {'CustomerContext': 'debug'}},
-                'Shipment': shipment(pkg_obj, svc),
+                'Shipment': shipment_obj(dest, pkg_obj, svc),
             }}
 
-        # Packaging codes to probe
-        PKG_LABELS = {
-            '02': 'My Packaging',
-            '00': 'Unknown',
-            '21': 'UPS Express Box',
-            '2a': 'Small Express Box',
-            '2b': 'Medium Express Box',
-            '2c': 'Large Express Box',
-        }
+        def _err_msg(s):
+            resp = s.get('response') or {}
+            errs = resp.get('response', {}).get('errors') or []
+            return errs[0].get('message', '?') if errs else str(resp)[:120]
 
-        # ── Step 2: Shop per packaging code ─────────────────────────────────
-        first_ok_pkg = None
-        for pkg_code, pkg_label in PKG_LABELS.items():
-            s = _step(f'2. Shop pkg={pkg_code} ({pkg_label})',
+        # ── Step 2: Shop each international destination with pkg=00 ─────────
+        first_ok_dest = None
+        for i, dest in enumerate(INTL_DESTS, start=2):
+            s = _step(f'{i}. Shop {dest["label"]} pkg=00',
                       'POST', rate_url, auth_headers,
-                      rate_payload('Shop', pkg(pkg_code)))
+                      rate_payload('Shop', dest, pkg('00')))
             steps.append(s)
+            if s.get('ok') and first_ok_dest is None:
+                first_ok_dest = dest
+
+        if first_ok_dest is None:
+            fail_steps = [f"{s['step']}: {_err_msg(s)}" for s in steps[1:] if not s.get('ok')]
+            return JsonResponse({
+                'steps': steps,
+                'summary': f'❌ Жоден маршрут не відповів. Можливо акаунт не активований. FAIL: {fail_steps}',
+            })
+
+        dest = first_ok_dest
+        # ── Step 5: Probe all packaging codes for working destination ────────
+        PKG_LABELS = {'02': 'My Packaging', '00': 'Unknown', '21': 'Express Box',
+                      '2a': 'Small Exp Box', '2b': 'Med Exp Box', '2c': 'Large Exp Box'}
+        first_ok_pkg = None
+        step_n = len(INTL_DESTS) + 2
+        for pkg_code, pkg_label in PKG_LABELS.items():
+            s = _step(f'{step_n}. Shop {dest["label"]} pkg={pkg_code} ({pkg_label})',
+                      'POST', rate_url, auth_headers,
+                      rate_payload('Shop', dest, pkg(pkg_code)))
+            steps.append(s)
+            step_n += 1
             if s.get('ok') and first_ok_pkg is None:
                 first_ok_pkg = pkg_code
 
-        # ── Step 3: Rate svc=11 with working pkg (or 00) ────────────────────
+        # ── Final steps: Rate individual services ────────────────────────────
         test_pkg = first_ok_pkg or '00'
-        s3 = _step(f'3. Rate svc=11 (Standard) pkg={test_pkg}',
-                   'POST', rate_url_single, auth_headers,
-                   rate_payload('Rate', pkg(test_pkg), svc='11'))
-        steps.append(s3)
+        for svc_code, svc_label in [('07', 'Worldwide Express'), ('65', 'Worldwide Saver'), ('11', 'Standard')]:
+            s = _step(f'{step_n}. Rate svc={svc_code} ({svc_label}) {dest["label"]} pkg={test_pkg}',
+                      'POST', rate_url_single, auth_headers,
+                      rate_payload('Rate', dest, pkg(test_pkg), svc=svc_code))
+            steps.append(s)
+            step_n += 1
 
-        # ── Step 4: Rate svc=07 (Worldwide Express) ─────────────────────────
-        s4 = _step(f'4. Rate svc=07 (Worldwide Express) pkg={test_pkg}',
-                   'POST', rate_url_single, auth_headers,
-                   rate_payload('Rate', pkg(test_pkg), svc='07'))
-        steps.append(s4)
-
-        # ── Step 5: Rate svc=65 (Saver) ─────────────────────────────────────
-        s5 = _step(f'5. Rate svc=65 (Saver) pkg={test_pkg}',
-                   'POST', rate_url_single, auth_headers,
-                   rate_payload('Rate', pkg(test_pkg), svc='65'))
-        steps.append(s5)
-
-        ok_steps  = [s['step'] for s in steps if s.get('ok')]
-        fail_steps = [f"{s['step']}: {(s.get('response') or {}).get('response', {}).get('errors', [{}])[0].get('message','?')}"
-                      for s in steps if not s.get('ok')]
-        working_pkg = f'✅ Working packaging code: {first_ok_pkg}' if first_ok_pkg else '❌ No packaging code worked'
+        ok_steps   = [s['step'] for s in steps if s.get('ok')]
+        fail_steps = [f"{s['step']}: {_err_msg(s)}" for s in steps if not s.get('ok')]
+        working_pkg = f'✅ Working pkg: {first_ok_pkg}' if first_ok_pkg else '⚠️ pkg=00 used as fallback'
         return JsonResponse({
             'steps': steps,
+            'working_route': dest['label'],
             'working_packaging_code': first_ok_pkg,
-            'summary': f'{working_pkg} | OK: {ok_steps} | FAIL: {fail_steps}',
+            'summary': f'{working_pkg} | Route: {dest["label"]} | OK: {ok_steps} | FAIL: {fail_steps}',
         })
 
 
