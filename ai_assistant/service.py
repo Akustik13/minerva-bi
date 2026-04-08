@@ -38,23 +38,18 @@ def _get_or_create_conversation(profile, channel: str, telegram_chat_id: str = '
 
 
 def _build_history(conversation: AIConversation) -> list:
-    """Convert stored messages to Anthropic format (last 20 pairs max)."""
+    """Convert stored messages to Anthropic format (last 20 pairs max).
+    Tool messages are skipped — we only store final text replies, not the
+    intermediate tool_use blocks, so tool_result blocks would be orphaned
+    and cause API 400 errors.
+    """
     messages = []
     for msg in conversation.messages.order_by('created_at').select_related()[:40]:
         if msg.role == 'user':
             messages.append({'role': 'user', 'content': msg.content})
         elif msg.role == 'assistant':
             messages.append({'role': 'assistant', 'content': msg.content})
-        elif msg.role == 'tool':
-            # Tool result — append to last assistant message content list or as user turn
-            messages.append({
-                'role': 'user',
-                'content': [{
-                    'type': 'tool_result',
-                    'tool_use_id': msg.tool_input.get('tool_use_id', ''),
-                    'content': str(msg.tool_result),
-                }]
-            })
+        # 'tool' role skipped intentionally — see docstring
     return messages
 
 
@@ -100,15 +95,7 @@ def chat(
             messages.append({'role': 'user', 'content': msg.content})
         elif msg.role == 'assistant':
             messages.append({'role': 'assistant', 'content': msg.content})
-        elif msg.role == 'tool':
-            messages.append({
-                'role': 'user',
-                'content': [{
-                    'type': 'tool_result',
-                    'tool_use_id': (msg.tool_input or {}).get('tool_use_id', ''),
-                    'content': str(msg.tool_result),
-                }]
-            })
+        # 'tool' role skipped — orphaned tool_result blocks cause API 400
     messages.append({'role': 'user', 'content': user_text})
 
     client = _get_client()
