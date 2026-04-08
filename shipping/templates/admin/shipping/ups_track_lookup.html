@@ -1,0 +1,206 @@
+{% extends "admin/base_site.html" %}
+{% block title %}UPS Трекінг | Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; UPS Трекінг
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+#content { padding: 0 !important; }
+
+.utl-wrap { max-width: 780px; margin: 0 auto; padding: 32px 24px 60px; }
+
+.utl-search {
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 12px;
+  padding: 28px 32px 24px; margin-bottom: 28px;
+}
+.utl-search-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.utl-search-sub   { font-size: 12px; color: var(--text-muted); margin-bottom: 20px; }
+.utl-search form  { display: flex; gap: 10px; }
+.utl-input {
+  flex: 1; background: var(--bg-input); border: 1px solid var(--border-strong); color: var(--text);
+  border-radius: 7px; padding: 11px 14px; font-size: 14px; font-family: monospace;
+  outline: none; transition: border-color .2s;
+}
+.utl-input:focus { border-color: var(--accent); }
+.utl-input::placeholder { color: var(--text-dim); }
+.utl-btn {
+  background: var(--accent); color: #fff; border: none; border-radius: 7px;
+  padding: 11px 22px; font-size: 13px; font-weight: 700; cursor: pointer;
+  white-space: nowrap; transition: opacity .15s;
+}
+.utl-btn:hover { opacity: .85; }
+
+.utl-warn {
+  background: rgba(255,152,0,.07); border: 1px solid rgba(255,152,0,.3);
+  border-left: 4px solid var(--warn); border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: var(--warn);
+}
+.utl-warn a { color: var(--warn); text-decoration: underline; }
+.utl-error {
+  background: rgba(207,34,46,.07); border: 1px solid rgba(207,34,46,.3);
+  border-left: 4px solid var(--err); border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 24px; font-size: 13px; color: var(--err);
+  white-space: pre-wrap;
+}
+
+.utl-card {
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 22px 26px; margin-bottom: 20px;
+}
+.utl-card-title {
+  font-size: 11px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .05em;
+  margin: 0 0 16px; padding-bottom: 10px; border-bottom: 1px solid var(--border-strong);
+}
+
+/* Status hero */
+.utl-status { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; }
+.utl-status-icon { font-size: 36px; flex-shrink: 0; }
+.utl-status-label { font-size: 20px; font-weight: 700; }
+.utl-status-desc  { font-size: 13px; color: var(--text-muted); margin-top: 3px; }
+.utl-status-meta  { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+.utl-info-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 7px 0; border-bottom: 1px solid var(--border); gap: 12px;
+}
+.utl-info-row:last-child { border-bottom: none; }
+.utl-info-key { font-size: 11px; color: var(--text-dim); flex-shrink: 0; min-width: 140px; }
+.utl-info-val { font-size: 13px; color: var(--text); text-align: right; }
+.utl-mono     { font-family: monospace; }
+
+/* Timeline events */
+.utl-events { display: flex; flex-direction: column; }
+.utl-event {
+  display: grid; grid-template-columns: 110px 16px 1fr;
+  gap: 0 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.utl-event:last-child { border-bottom: none; }
+.utl-ev-time { font-size: 11px; color: var(--text-dim); font-family: monospace;
+  text-align: right; padding-top: 2px; line-height: 1.5; }
+.utl-ev-dot-col { display: flex; flex-direction: column; align-items: center; }
+.utl-ev-dot { width: 10px; height: 10px; border-radius: 50%;
+  background: var(--border-strong); border: 2px solid var(--text-dim); margin-top: 3px; flex-shrink: 0; }
+.utl-event:first-child .utl-ev-dot {
+  background: var(--accent); border-color: var(--accent);
+  width: 13px; height: 13px; box-shadow: 0 0 0 3px rgba(88,166,255,.2); }
+.utl-ev-line { flex: 1; width: 2px; background: var(--border); margin-top: 3px; }
+.utl-event:last-child .utl-ev-line { display: none; }
+.utl-ev-desc { font-size: 13px; color: var(--text); line-height: 1.4; }
+.utl-ev-loc  { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="utl-wrap">
+
+  <div class="utl-search">
+    <div class="utl-search-title">🔍 UPS Трекінг</div>
+    <div class="utl-search-sub">
+      UPS REST API · OAuth 2.0
+      {% if ups_carrier %} · {{ ups_carrier.name }}{% if ups_carrier.api_url == "sandbox" %} (Sandbox){% endif %}{% endif %}
+    </div>
+    <form method="get">
+      <input class="utl-input" type="text" name="tn"
+             value="{{ tracking_number }}"
+             placeholder="1Z999AA10123456784"
+             autofocus autocomplete="off" spellcheck="false">
+      <button class="utl-btn" type="submit">Знайти</button>
+    </form>
+  </div>
+
+  {% if no_key %}
+  <div class="utl-warn">
+    ⚠️ <b>UPS carrier не налаштовано.</b><br>
+    Перейди до <a href="{% url 'admin:shipping_carrier_changelist' %}">Перевізники</a>
+    → UPS → заповни <b>Client ID</b> (API Key), <b>Client Secret</b> та <b>Account Number</b> (Connection UUID).
+  </div>
+  {% endif %}
+
+  {% if error %}
+  <div class="utl-error">❌ {{ error }}</div>
+  {% endif %}
+
+  {% if result %}
+
+  <div class="utl-card">
+    <div class="utl-status">
+      <div class="utl-status-icon">
+        {% if result.delivered %}✅
+        {% elif result.status == "I" or result.status == "P" %}🚚
+        {% elif result.status == "X" or result.status == "RS" %}❌
+        {% elif result.status == "M" %}📬
+        {% else %}📦{% endif %}
+      </div>
+      <div>
+        <div class="utl-status-label" style="color:
+          {% if result.delivered %}var(--ok)
+          {% elif result.status == 'I' or result.status == 'P' %}var(--accent)
+          {% elif result.status == 'X' or result.status == 'RS' %}var(--err)
+          {% else %}var(--text-muted){% endif %}">
+          {% if result.delivered %}Доставлено
+          {% elif result.status == "I" %}В дорозі
+          {% elif result.status == "P" %}Прийнято
+          {% elif result.status == "M" %}Відправлено
+          {% elif result.status == "X" %}Виняток
+          {% elif result.status == "RS" %}Повернення
+          {% else %}{{ result.status_description|default:"—" }}{% endif %}
+        </div>
+        {% if result.status_description %}
+        <div class="utl-status-desc">{{ result.status_description }}</div>
+        {% endif %}
+        {% if result.location %}
+        <div class="utl-status-meta">📍 {{ result.location }}</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div>
+      <div class="utl-info-row">
+        <span class="utl-info-key">Трекінг-номер</span>
+        <span class="utl-info-val utl-mono">{{ tracking_number }}</span>
+      </div>
+      {% if result.estimated_delivery %}
+      <div class="utl-info-row">
+        <span class="utl-info-key">Очікувана доставка</span>
+        <span class="utl-info-val" style="color:var(--ok);font-weight:700">{{ result.estimated_delivery }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if result.events %}
+  <div class="utl-card">
+    <div class="utl-card-title">📍 Історія ({{ result.events|length }})</div>
+    <div class="utl-events">
+      {% for ev in result.events %}
+      <div class="utl-event">
+        <div class="utl-ev-time">
+          {{ ev.date }}<br>
+          <span style="color:var(--text-dim)">{{ ev.time }}</span>
+        </div>
+        <div class="utl-ev-dot-col">
+          <div class="utl-ev-dot"></div>
+          <div class="utl-ev-line"></div>
+        </div>
+        <div>
+          <div class="utl-ev-desc">{{ ev.description }}</div>
+          {% if ev.location %}<div class="utl-ev-loc">📍 {{ ev.location }}</div>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% endif %}
+
+</div>
+{% endblock %}

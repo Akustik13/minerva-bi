@@ -559,6 +559,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_dhl_track_lookup",
             ),
             path(
+                "ups-track-lookup/",
+                self.admin_site.admin_view(self.ups_track_lookup_view),
+                name="shipping_ups_track_lookup",
+            ),
+            path(
                 "<int:shipment_id>/dhl-cancel/",
                 self.admin_site.admin_view(self.dhl_cancel_view),
                 name="shipping_shipment_dhl_cancel",
@@ -1954,6 +1959,46 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "error":           error,
             "no_key":          no_key,
             "dhl_carrier":     dhl_carrier,
+        })
+
+    # ── UPS Track Lookup (standalone) ────────────────────────────────────────
+
+    def ups_track_lookup_view(self, request):
+        from .ups_client import UPSClient, UPSError
+
+        ups_carrier = (
+            Carrier.objects
+            .filter(carrier_type="ups", is_active=True)
+            .exclude(api_key="")
+            .order_by("-is_default", "pk")
+            .first()
+        )
+
+        tracking_number = request.GET.get("tn", "").strip()
+        result = None
+        error  = None
+        no_key = not ups_carrier
+
+        if tracking_number and ups_carrier:
+            try:
+                client = UPSClient(ups_carrier)
+                result = client.track(tracking_number)
+                if result.get("status") == "UNKNOWN" and not result.get("events"):
+                    error  = result.get("status_description") or "Не вдалося отримати статус"
+                    result = None
+            except UPSError as e:
+                error = str(e)
+            except Exception as e:
+                error = f"{type(e).__name__}: {e}"
+
+        return render(request, "admin/shipping/ups_track_lookup.html", {
+            **self.admin_site.each_context(request),
+            "title":       "🔍 UPS Трекінг",
+            "tracking_number": tracking_number,
+            "result":      result,
+            "error":       error,
+            "no_key":      no_key,
+            "ups_carrier": ups_carrier,
         })
 
     # ── Compare rates (AJAX) ──────────────────────────────────────────────────
