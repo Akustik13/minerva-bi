@@ -232,20 +232,29 @@ class UPSClient:
     def _rate_shop(self, to_address, packages, from_address):
         """
         POST /api/rating/v2409/Shoptimeintransit — rates + transit days for all services.
+        PickupDate (today, YYYYMMDD) is required for TimeInTransit data to be returned.
         Falls back to plain Shop if Shoptimeintransit returns an error.
         """
-        shipper = from_address or self._default_shipper()
+        from datetime import date as _date
+        shipper   = from_address or self._default_shipper()
+        shipment  = self._build_rate_shipment(to_address, packages, shipper)
+        # PickupDate is mandatory for Shoptimeintransit — without it TimeInTransit is absent
+        shipment['DeliveryTimeInformation'] = {
+            'PackageBillType': '02',  # 02 = Non-Documents
+            'Pickup': {'Date': _date.today().strftime('%Y%m%d')},
+        }
         payload = {'RateRequest': {
             'Request': {
                 'RequestOption': 'Shoptimeintransit',
                 'TransactionReference': {'CustomerContext': 'minerva-bi'},
             },
-            'Shipment': self._build_rate_shipment(to_address, packages, shipper),
+            'Shipment': shipment,
         }}
         try:
             data = self._post(f'/api/rating/{_API_VERSION}/Shoptimeintransit', payload)
         except UPSError:
             # Some accounts don't support Shoptimeintransit — fall back to plain Shop
+            del shipment['DeliveryTimeInformation']
             payload['RateRequest']['Request']['RequestOption'] = 'Shop'
             data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
         return self._parse_rated_shipments(data)
