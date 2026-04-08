@@ -1,9 +1,12 @@
 """
 Telegram bot via python-telegram-bot (PTB v21+).
 Run via: python manage.py run_telegram_bot
+
+All Django ORM/service calls are wrapped with sync_to_async because
+PTB v21+ uses asyncio and Django ORM is synchronous.
 """
 import logging
-import django
+from asgiref.sync import sync_to_async
 from telegram import Update
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -16,7 +19,7 @@ logger = logging.getLogger(__name__)
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from ai_assistant.permissions import get_profile_for_telegram
     tg_user = update.effective_user
-    profile = get_profile_for_telegram(tg_user.id)
+    profile = await sync_to_async(get_profile_for_telegram)(tg_user.id)
 
     if not profile:
         await update.message.reply_text(
@@ -28,8 +31,9 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
+    name = await sync_to_async(lambda: profile.user.get_full_name() or profile.user.username)()
     await update.message.reply_text(
-        f"🏛️ Слава, {profile.user.get_full_name() or profile.user.username}!\n"
+        f"🏛️ Слава, {name}!\n"
         "Я Minerva — твій AI-помічник. Чим можу допомогти?\n\n"
         "Команди: /reset — нова розмова, /help — довідка"
     )
@@ -38,10 +42,12 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cmd_reset(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from ai_assistant.permissions import get_profile_for_telegram
     from ai_assistant.service import reset_conversation
-    profile = get_profile_for_telegram(update.effective_user.id)
-    reset_conversation(
+    profile = await sync_to_async(get_profile_for_telegram)(update.effective_user.id)
+    chat_type = update.effective_chat.type
+    channel = 'telegram_group' if chat_type in ('group', 'supergroup') else 'telegram_private'
+    await sync_to_async(reset_conversation)(
         profile,
-        channel='telegram_private',
+        channel=channel,
         telegram_chat_id=str(update.effective_chat.id),
     )
     await update.message.reply_text('🔄 Розмову скинуто. Починаємо з чистого аркуша.')
@@ -70,7 +76,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_type = update.effective_chat.type  # 'private' | 'group' | 'supergroup'
     is_group = chat_type in ('group', 'supergroup')
 
-    # In groups: respond only if bot is mentioned or message is a reply to bot
     if is_group:
         bot_username = context.bot.username
         text = update.message.text
@@ -81,15 +86,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             update.message.reply_to_message.from_user.username == bot_username
         )
         if not is_mentioned and not is_reply_to_bot:
-            return  # ignore messages not addressed to bot
-        # Strip the @mention from the text before sending to AI
+            return
         text = text.replace(f'@{bot_username}', '').strip()
         if not text:
             return
     else:
         text = update.message.text
 
-    profile = get_profile_for_telegram(tg_user.id)
+    profile = await sync_to_async(get_profile_for_telegram)(tg_user.id)
 
     if not profile:
         await update.message.reply_text(
@@ -99,7 +103,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return
 
-    if not profile.ai_enabled:
+    ai_enabled = await sync_to_async(lambda: profile.ai_enabled)()
+    if not ai_enabled:
         await update.message.reply_text('🔒 AI-асистент для тебе вимкнений.')
         return
 
@@ -107,7 +112,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     channel = 'telegram_group' if is_group else 'telegram_private'
     try:
-        reply = chat(
+        reply = await sync_to_async(chat)(
             user_text=text,
             profile=profile,
             channel=channel,
