@@ -140,6 +140,9 @@ class CarrierAdmin(admin.ModelAdmin):
             path('<int:pk>/test-ups-rates/',
                  self.admin_site.admin_view(self.test_ups_rates_view),
                  name='carrier_test_ups_rates'),
+            path('<int:pk>/ups-debug/',
+                 self.admin_site.admin_view(self.ups_debug_view),
+                 name='carrier_ups_debug'),
         ]
         return custom + urls
 
@@ -192,6 +195,187 @@ class CarrierAdmin(admin.ModelAdmin):
             })
         except Exception as e:
             return JsonResponse({'ok': False, 'error': str(e)})
+
+    def ups_debug_view(self, request, pk):
+        """Покроковий debug UPS API — показує точний запит і відповідь кожного кроку."""
+        import base64, uuid, time
+        import requests as req_lib
+        from django.core.cache import cache
+
+        carrier = get_object_or_404(Carrier, pk=pk)
+        steps = []
+
+        def _mask(s):
+            s = str(s or '')
+            return s[:4] + '****' + s[-4:] if len(s) > 8 else '****'
+
+        def _step(name, method, url, headers, body=None, params=None):
+            t0 = time.time()
+            display_headers = {k: (_mask(v) if k.lower() in ('authorization', 'x-merchant-id') else v)
+                               for k, v in headers.items()}
+            step = {
+                'step': name, 'method': method, 'url': url,
+                'request_headers': display_headers,
+                'request_body': body,
+                'request_params': params,
+            }
+            try:
+                if method == 'POST':
+                    r = req_lib.post(url, headers=headers, json=body, timeout=30)
+                else:
+                    r = req_lib.get(url, headers=headers, params=params, timeout=30)
+                step['status'] = r.status_code
+                step['ok'] = r.ok
+                try:
+                    step['response'] = r.json()
+                except Exception:
+                    step['response'] = r.text[:1000]
+                step['ms'] = int((time.time() - t0) * 1000)
+            except Exception as e:
+                step['status'] = None
+                step['ok'] = False
+                step['response'] = str(e)
+                step['ms'] = int((time.time() - t0) * 1000)
+            return step
+
+        # ── Step 1: OAuth Token ──────────────────────────────────────────────
+        is_sandbox = (carrier.api_url or '').lower() in ('sandbox', 'test', 'staging')
+        base_url = 'https://wwwcie.ups.com' if is_sandbox else 'https://onlinetools.ups.com'
+        creds_b64 = base64.b64encode(f'{carrier.api_key}:{carrier.api_secret}'.encode()).decode()
+
+        s1 = _step(
+            '1. OAuth Token',
+            'POST',
+            f'{base_url}/security/v1/oauth/token',
+            headers={
+                'Authorization': f'Basic {creds_b64}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'x-merchant-id': carrier.connection_uuid,
+            },
+            body='grant_type=client_credentials',
+        )
+        # Override: POST with data= not json=
+        t0 = time.time()
+        try:
+            r1 = req_lib.post(
+                f'{base_url}/security/v1/oauth/token',
+                headers={
+                    'Authorization': f'Basic {creds_b64}',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'x-merchant-id': carrier.connection_uuid,
+                },
+                data='grant_type=client_credentials',
+                timeout=30,
+            )
+            s1['status'] = r1.status_code
+            s1['ok'] = r1.ok
+            try:
+                rj = r1.json()
+                token = rj.get('access_token', '')
+                s1['response'] = {**rj, 'access_token': _mask(token)} if token else rj
+                s1['token_len'] = len(token)
+                s1['expires_in'] = rj.get('expires_in')
+            except Exception:
+                s1['response'] = r1.text[:500]
+                token = ''
+        except Exception as e:
+            s1['ok'] = False
+            s1['response'] = str(e)
+            token = ''
+        s1['ms'] = int((time.time() - t0) * 1000)
+        steps.append(s1)
+
+        if not token:
+            return JsonResponse({'steps': steps, 'summary': '❌ Зупинено: токен не отримано'})
+
+        auth_headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json',
+            'transId': str(uuid.uuid4())[:32],
+            'transactionSrc': 'minerva-bi-debug',
+        }
+
+        # Test destination: same country as sender
+        origin = (carrier.sender_country or 'DE').upper()
+        _test_dest = {
+            'DE': {'name': 'Test', 'address_line': 'Marienplatz 1', 'city': 'Munich',   'postal': '80331', 'country': 'DE'},
+            'AT': {'name': 'Test', 'address_line': 'Prater 1',      'city': 'Vienna',   'postal': '1010',  'country': 'AT'},
+            'US': {'name': 'Test', 'address_line': '100 Main St',   'city': 'New York', 'postal': '10001', 'country': 'US', 'state': 'NY'},
+            'GB': {'name': 'Test', 'address_line': 'The Strand 1',  'city': 'London',   'postal': 'WC2N 5HR', 'country': 'GB'},
+        }
+        to_addr = _test_dest.get(origin, {'name': 'Test', 'address_line': 'Test St 1',
+                                          'city': carrier.sender_city or 'Berlin',
+                                          'postal': carrier.sender_zip or '10115', 'country': origin})
+
+        def fmt_addr(a):
+            r = {'AddressLine': [a.get('address_line', '')], 'City': a.get('city', ''),
+                 'PostalCode': a.get('postal', ''), 'CountryCode': (a.get('country') or 'DE').upper()}
+            if a.get('state'):
+                r['StateProvinceCode'] = a['state'].upper()
+            return r
+
+        shipper_addr = {
+            'name': carrier.sender_name or carrier.sender_company or 'Sender',
+            'address_line': carrier.sender_street or '', 'city': carrier.sender_city or '',
+            'postal': carrier.sender_zip or '', 'country': carrier.sender_country or 'DE',
+        }
+
+        # ── Step 2a: Rates — Shop (no packaging, no dimensions) ─────────────
+        rate_url = f'{base_url}/api/rating/v2409/Shop'
+        shipment_base = {
+            'Shipper': {'Name': shipper_addr['name'], 'ShipperNumber': carrier.connection_uuid,
+                        'Address': fmt_addr(shipper_addr)},
+            'ShipTo':   {'Name': to_addr['name'], 'Address': fmt_addr(to_addr)},
+            'ShipFrom': {'Name': shipper_addr['name'], 'Address': fmt_addr(shipper_addr)},
+            'Package':  [{'Packaging': {'Code': '02'},
+                          'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': '1'}}],
+        }
+        payload_shop = {'RateRequest': {
+            'Request': {'RequestOption': 'Shop', 'TransactionReference': {'CustomerContext': 'debug'}},
+            'Shipment': shipment_base,
+        }}
+        s2 = _step('2a. Rating/Shop (no dims)', 'POST', rate_url, auth_headers, payload_shop)
+        steps.append(s2)
+
+        # ── Step 2b: Rates — Shop WITH dimensions ────────────────────────────
+        shipment_dims = {**shipment_base,
+            'Package': [{'Packaging': {'Code': '02'},
+                         'Dimensions': {'UnitOfMeasurement': {'Code': 'CM'}, 'Length': '20', 'Width': '15', 'Height': '10'},
+                         'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': '1'}}]}
+        payload_shop_dims = {'RateRequest': {
+            'Request': {'RequestOption': 'Shop', 'TransactionReference': {'CustomerContext': 'debug'}},
+            'Shipment': shipment_dims,
+        }}
+        s2b = _step('2b. Rating/Shop (with dims)', 'POST', rate_url, auth_headers, payload_shop_dims)
+        steps.append(s2b)
+
+        # ── Step 3: Rate — service 11 (Standard) ────────────────────────────
+        rate_url_single = f'{base_url}/api/rating/v2409/Rate'
+        shipment_svc11 = {**shipment_base, 'Service': {'Code': '11'},
+            'Package': [{'Packaging': {'Code': '02'},
+                         'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': '1'}}]}
+        payload_11 = {'RateRequest': {
+            'Request': {'RequestOption': 'Rate', 'TransactionReference': {'CustomerContext': 'debug'}},
+            'Shipment': shipment_svc11,
+        }}
+        s3 = _step('3. Rating/Rate svc=11 (Standard)', 'POST', rate_url_single, auth_headers, payload_11)
+        steps.append(s3)
+
+        # ── Step 4: Rate — service 07 (Worldwide Express) ───────────────────
+        shipment_svc07 = {**shipment_svc11, 'Service': {'Code': '07'}}
+        payload_07 = {'RateRequest': {
+            'Request': {'RequestOption': 'Rate', 'TransactionReference': {'CustomerContext': 'debug'}},
+            'Shipment': shipment_svc07,
+        }}
+        s4 = _step('4. Rating/Rate svc=07 (Worldwide Express)', 'POST', rate_url_single, auth_headers, payload_07)
+        steps.append(s4)
+
+        ok_steps = [s['step'] for s in steps if s.get('ok')]
+        fail_steps = [f"{s['step']}: {s.get('response', {})}" for s in steps if not s.get('ok')]
+        return JsonResponse({
+            'steps': steps,
+            'summary': f"✅ OK: {ok_steps} | ❌ FAIL: {fail_steps}" if fail_steps else f"✅ Всі кроки успішні: {ok_steps}",
+        })
 
 
 # ── ShipmentPackage Inline ────────────────────────────────────────────────────

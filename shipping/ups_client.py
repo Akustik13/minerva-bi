@@ -259,7 +259,12 @@ class UPSClient:
             try:
                 results.extend(self._rate_single(to_address, packages, from_address, code))
             except UPSError:
-                pass
+                # retry with packaging=00 (Unknown) — some services reject 02
+                try:
+                    pkgs_alt = [{**p, '_pkg_override': '00'} for p in packages]
+                    results.extend(self._rate_single(to_address, pkgs_alt, from_address, code))
+                except UPSError:
+                    pass
         return sorted(results, key=lambda x: x['price'])
 
     def _parse_rated_shipments(self, data) -> list:
@@ -465,8 +470,9 @@ class UPSClient:
         return result
 
     def _pkg_dict(self, pkg: dict) -> dict:
+        pkg_code = pkg.get('_pkg_override', PACKAGING_CUSTOMER)
         p = {
-            'Packaging':    {'Code': PACKAGING_CUSTOMER},
+            'Packaging':    {'Code': pkg_code},
             'Dimensions': {
                 'UnitOfMeasurement': {'Code': 'CM'},
                 'Length': str(round(float(pkg.get('length_cm', 10)))),
