@@ -40,8 +40,9 @@ UPS_SERVICES = {
     '96': 'UPS Worldwide Express Freight',
 }
 
-# Customer packaging code
-PACKAGING_CUSTOMER = '02'
+# Packaging code: '00'=Unknown (most permissive), '02'=My Packaging
+# Use '00' as default — some UPS accounts reject '02' for certain routes
+PACKAGING_CUSTOMER = '00'
 
 # API version
 _API_VERSION = 'v2409'

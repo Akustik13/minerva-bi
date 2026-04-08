@@ -320,61 +320,82 @@ class CarrierAdmin(admin.ModelAdmin):
             'postal': carrier.sender_zip or '', 'country': carrier.sender_country or 'DE',
         }
 
-        # ── Step 2a: Rates — Shop (no packaging, no dimensions) ─────────────
-        rate_url = f'{base_url}/api/rating/v2409/Shop'
-        shipment_base = {
-            'Shipper': {'Name': shipper_addr['name'], 'ShipperNumber': carrier.connection_uuid,
-                        'Address': fmt_addr(shipper_addr)},
-            'ShipTo':   {'Name': to_addr['name'], 'Address': fmt_addr(to_addr)},
-            'ShipFrom': {'Name': shipper_addr['name'], 'Address': fmt_addr(shipper_addr)},
-            'Package':  [{'Packaging': {'Code': '02'},
-                          'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': '1'}}],
-        }
-        payload_shop = {'RateRequest': {
-            'Request': {'RequestOption': 'Shop', 'TransactionReference': {'CustomerContext': 'debug'}},
-            'Shipment': shipment_base,
-        }}
-        s2 = _step('2a. Rating/Shop (no dims)', 'POST', rate_url, auth_headers, payload_shop)
-        steps.append(s2)
-
-        # ── Step 2b: Rates — Shop WITH dimensions ────────────────────────────
-        shipment_dims = {**shipment_base,
-            'Package': [{'Packaging': {'Code': '02'},
-                         'Dimensions': {'UnitOfMeasurement': {'Code': 'CM'}, 'Length': '20', 'Width': '15', 'Height': '10'},
-                         'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': '1'}}]}
-        payload_shop_dims = {'RateRequest': {
-            'Request': {'RequestOption': 'Shop', 'TransactionReference': {'CustomerContext': 'debug'}},
-            'Shipment': shipment_dims,
-        }}
-        s2b = _step('2b. Rating/Shop (with dims)', 'POST', rate_url, auth_headers, payload_shop_dims)
-        steps.append(s2b)
-
-        # ── Step 3: Rate — service 11 (Standard) ────────────────────────────
+        rate_url       = f'{base_url}/api/rating/v2409/Shop'
         rate_url_single = f'{base_url}/api/rating/v2409/Rate'
-        shipment_svc11 = {**shipment_base, 'Service': {'Code': '11'},
-            'Package': [{'Packaging': {'Code': '02'},
-                         'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': '1'}}]}
-        payload_11 = {'RateRequest': {
-            'Request': {'RequestOption': 'Rate', 'TransactionReference': {'CustomerContext': 'debug'}},
-            'Shipment': shipment_svc11,
-        }}
-        s3 = _step('3. Rating/Rate svc=11 (Standard)', 'POST', rate_url_single, auth_headers, payload_11)
+
+        def pkg(code, weight='1', with_dims=False):
+            p = {'Packaging': {'Code': code},
+                 'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': weight}}
+            if with_dims:
+                p['Dimensions'] = {'UnitOfMeasurement': {'Code': 'CM'},
+                                   'Length': '20', 'Width': '15', 'Height': '10'}
+            return p
+
+        def shipment(pkg_obj, svc=None):
+            s = {
+                'Shipper':  {'Name': shipper_addr['name'], 'ShipperNumber': carrier.connection_uuid,
+                             'Address': fmt_addr(shipper_addr)},
+                'ShipTo':   {'Name': to_addr['name'], 'Address': fmt_addr(to_addr)},
+                'ShipFrom': {'Name': shipper_addr['name'], 'Address': fmt_addr(shipper_addr)},
+                'Package':  [pkg_obj],
+            }
+            if svc:
+                s['Service'] = {'Code': svc}
+            return s
+
+        def rate_payload(option, pkg_obj, svc=None):
+            return {'RateRequest': {
+                'Request': {'RequestOption': option, 'TransactionReference': {'CustomerContext': 'debug'}},
+                'Shipment': shipment(pkg_obj, svc),
+            }}
+
+        # Packaging codes to probe
+        PKG_LABELS = {
+            '02': 'My Packaging',
+            '00': 'Unknown',
+            '21': 'UPS Express Box',
+            '2a': 'Small Express Box',
+            '2b': 'Medium Express Box',
+            '2c': 'Large Express Box',
+        }
+
+        # ── Step 2: Shop per packaging code ─────────────────────────────────
+        first_ok_pkg = None
+        for pkg_code, pkg_label in PKG_LABELS.items():
+            s = _step(f'2. Shop pkg={pkg_code} ({pkg_label})',
+                      'POST', rate_url, auth_headers,
+                      rate_payload('Shop', pkg(pkg_code)))
+            steps.append(s)
+            if s.get('ok') and first_ok_pkg is None:
+                first_ok_pkg = pkg_code
+
+        # ── Step 3: Rate svc=11 with working pkg (or 00) ────────────────────
+        test_pkg = first_ok_pkg or '00'
+        s3 = _step(f'3. Rate svc=11 (Standard) pkg={test_pkg}',
+                   'POST', rate_url_single, auth_headers,
+                   rate_payload('Rate', pkg(test_pkg), svc='11'))
         steps.append(s3)
 
-        # ── Step 4: Rate — service 07 (Worldwide Express) ───────────────────
-        shipment_svc07 = {**shipment_svc11, 'Service': {'Code': '07'}}
-        payload_07 = {'RateRequest': {
-            'Request': {'RequestOption': 'Rate', 'TransactionReference': {'CustomerContext': 'debug'}},
-            'Shipment': shipment_svc07,
-        }}
-        s4 = _step('4. Rating/Rate svc=07 (Worldwide Express)', 'POST', rate_url_single, auth_headers, payload_07)
+        # ── Step 4: Rate svc=07 (Worldwide Express) ─────────────────────────
+        s4 = _step(f'4. Rate svc=07 (Worldwide Express) pkg={test_pkg}',
+                   'POST', rate_url_single, auth_headers,
+                   rate_payload('Rate', pkg(test_pkg), svc='07'))
         steps.append(s4)
 
-        ok_steps = [s['step'] for s in steps if s.get('ok')]
-        fail_steps = [f"{s['step']}: {s.get('response', {})}" for s in steps if not s.get('ok')]
+        # ── Step 5: Rate svc=65 (Saver) ─────────────────────────────────────
+        s5 = _step(f'5. Rate svc=65 (Saver) pkg={test_pkg}',
+                   'POST', rate_url_single, auth_headers,
+                   rate_payload('Rate', pkg(test_pkg), svc='65'))
+        steps.append(s5)
+
+        ok_steps  = [s['step'] for s in steps if s.get('ok')]
+        fail_steps = [f"{s['step']}: {(s.get('response') or {}).get('response', {}).get('errors', [{}])[0].get('message','?')}"
+                      for s in steps if not s.get('ok')]
+        working_pkg = f'✅ Working packaging code: {first_ok_pkg}' if first_ok_pkg else '❌ No packaging code worked'
         return JsonResponse({
             'steps': steps,
-            'summary': f"✅ OK: {ok_steps} | ❌ FAIL: {fail_steps}" if fail_steps else f"✅ Всі кроки успішні: {ok_steps}",
+            'working_packaging_code': first_ok_pkg,
+            'summary': f'{working_pkg} | OK: {ok_steps} | FAIL: {fail_steps}',
         })
 
 
