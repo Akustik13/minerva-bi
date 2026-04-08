@@ -205,7 +205,11 @@ class UserProfileAdmin(admin.ModelAdmin):
             ),
         }),
         ('🤖 AI-асистент', {
-            'fields': ('ai_enabled', 'ai_model', 'ai_temperature', 'ai_system_prompt'),
+            'fields': (
+                'ai_enabled', 'ai_assistant_role',
+                'telegram_id', 'telegram_username',
+                'ai_model', 'ai_temperature', 'ai_system_prompt',
+            ),
             'classes': ('collapse',),
         }),
     )
