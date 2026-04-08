@@ -33,7 +33,7 @@ class Carrier(models.Model):
                                   help_text="DHL: API Secret | UPS/FedEx: Client Secret | Jumingo: не використовується")
     api_url    = models.CharField("API URL / режим", max_length=300,
                                   blank=True, default="",
-                                  help_text="DHL: введи «test» для sandbox. Для інших залишити порожнім.")
+                                  help_text="DHL: «test» для sandbox | UPS: «sandbox» для sandbox | решта: порожньо = production")
     track_api_key = models.CharField(
         "Tracking API Key", max_length=200, blank=True, default="",
         help_text="DHL Shipment Tracking – Unified API ключ (developer.dhl.com → My Apps). "
@@ -41,7 +41,7 @@ class Carrier(models.Model):
     )
     connection_uuid = models.CharField(
         "Connection UUID / Account №", max_length=100, blank=True, default="",
-        help_text="Jumingo: UUID інтеграції | DHL: Account Number (9 цифр) | інші: не використовується",
+        help_text="Jumingo: UUID інтеграції | DHL: Account Number (9 цифр) | UPS: Account Number (6 символів)",
     )
 
     # ── Дані відправника (звідси беруться при кожному відправленні) ──────────
