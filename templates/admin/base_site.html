@@ -1547,12 +1547,14 @@ window.addEventListener('appinstalled', function() {
   font-size: 13px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
 }
 .mv-cp-msg.user .mv-cp-bubble {
-  background: var(--accent); color: var(--accent-text, #fff);
+  /* dark/minerva: accent is light → dark text; light theme overrides below */
+  background: var(--accent); color: #0d1117;
   border-radius: 12px 3px 12px 12px;
 }
-[data-theme="light"] .mv-cp-msg.user .mv-cp-bubble { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
-[data-theme="dark"]    .mv-cp-msg.user .mv-cp-bubble { color: #fff; }
-[data-theme="minerva"] .mv-cp-msg.user .mv-cp-bubble { color: #0a0e1a; }
+[data-theme="light"] .mv-cp-msg.user .mv-cp-bubble {
+  /* light accent = #0969da (dark blue) → white text OK */
+  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35);
+}
 .mv-cp-msg.bot .mv-cp-bubble {
   background: var(--bg-hover); color: var(--text);
   border: 1px solid var(--border); border-radius: 3px 12px 12px 12px;
