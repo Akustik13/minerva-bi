@@ -85,10 +85,11 @@ class CarrierAdmin(admin.ModelAdmin):
         ("🔑 API налаштування", {
             "fields": ("api_key", "api_secret", "api_url", "connection_uuid", "track_api_key"),
             "description": (
-                "<b>Jumingo:</b> api_key = X-AUTH-TOKEN (Settings → API), connection_uuid = UUID інтеграції (Integrations).<br>"
-                "<b>DHL:</b> api_key = API Key, api_secret = API Secret (developer.dhl.com → MyDHL API), connection_uuid = Account Number, api_url = <code>test</code> для sandbox.<br>"
-                "<b>DHL Tracking:</b> track_api_key = окремий ключ з developer.dhl.com → Shipment Tracking – Unified API.<br>"
-                "<b>UPS / FedEx:</b> api_key = Client ID, api_secret = Client Secret."
+                "<b>Jumingo:</b> api_key = X-AUTH-TOKEN, connection_uuid = UUID інтеграції.<br>"
+                "<b>DHL:</b> api_key = API Key, api_secret = API Secret, connection_uuid = Account Number, api_url = <code>test</code> для sandbox.<br>"
+                "<b>UPS:</b> api_key = Client ID, api_secret = Client Secret, connection_uuid = Account Number, "
+                "api_url = <code>sandbox</code> для тестів (порожньо = production).<br>"
+                "<b>DHL Tracking:</b> track_api_key = окремий Tracking API ключ."
             ),
         }),
         ("📤 Дані відправника", {
@@ -1609,7 +1610,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         order = shipment.order
         # Пропустити якщо внутрішнє відправлення
         dest = (shipment.recipient_country or '').upper()
-        from_c = UPSConfig.get().shipper_country.upper()
+        from .ups_client import UPSClient
+        try:
+            from_c = UPSClient().carrier.sender_country or 'DE'
+        except Exception:
+            from_c = 'DE'
+        from_c = from_c.upper()
         if dest == from_c:
             return None
 
@@ -3150,125 +3156,3 @@ def _shipping_app_index(request, app_label, extra_context=None):
 
 
 admin.site.app_index = _shipping_app_index
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# UPS Config Admin
-# ══════════════════════════════════════════════════════════════════════════════
-
-from .models import UPSConfig  # noqa: E402
-
-
-@admin.register(UPSConfig)
-class UPSConfigAdmin(admin.ModelAdmin):
-    """Singleton — UPS API налаштування."""
-
-    change_form_template = 'shipping/admin/upsconfig_change_form.html'
-
-    fieldsets = (
-        ('🔑 Credentials', {
-            'description': (
-                'Credentials з UPS Developer Portal → Apps → Credentials. '
-                'Збережи — потім натисни "Перевірити підключення".'
-            ),
-            'fields': ('is_enabled', 'use_sandbox', 'client_id', 'client_secret', 'account_number'),
-        }),
-        ('📦 Адреса відправника', {
-            'description': 'Адреса з якої відправляються посилки.',
-            'fields': (
-                'shipper_name', 'shipper_address',
-                ('shipper_city', 'shipper_postal'),
-                ('shipper_state', 'shipper_country'),
-                'shipper_phone',
-            ),
-        }),
-        ('🏷️ Мітки', {
-            'fields': ('label_format',),
-        }),
-        ('🛃 Митна декларація', {
-            'fields': ('paperless_trade', 'eori_number', 'vat_number'),
-            'description': 'Для міжнародних відправлень. Paperless Trade потребує активації в UPS акаунті.',
-        }),
-        ('📊 Статистика', {
-            'fields': ('total_shipments', 'last_sync_at'),
-            'classes': ('collapse',),
-        }),
-    )
-
-    readonly_fields = ('total_shipments', 'last_sync_at')
-
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        if 'client_secret' in form.base_fields:
-            from django.forms import PasswordInput
-            form.base_fields['client_secret'].widget = PasswordInput(render_value=True)
-        return form
-
-    def has_add_permission(self, request):
-        try:
-            return not UPSConfig.objects.exists()
-        except Exception:
-            return True
-
-    def has_delete_permission(self, request, obj=None):
-        return False
-
-    def changelist_view(self, request, extra_context=None):
-        try:
-            obj, _ = UPSConfig.objects.get_or_create(pk=1)
-        except Exception:
-            messages.error(request, '⚠️ Таблиця UPSConfig не знайдена. Запусти migrate.')
-            return redirect('/admin/')
-        return redirect(f'/admin/shipping/upsconfig/{obj.pk}/change/')
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom = [
-            path('test-connection/',
-                 self.admin_site.admin_view(self.test_connection_view),
-                 name='ups_test_connection'),
-            path('test-rates/',
-                 self.admin_site.admin_view(self.test_rates_view),
-                 name='ups_test_rates'),
-        ]
-        return custom + urls
-
-    def test_connection_view(self, request):
-        from .ups_client import UPSClient, UPSError
-        try:
-            client = UPSClient()
-            token  = client.get_token()
-            return JsonResponse({
-                'ok': True,
-                'message': f'Підключення успішне. Токен отримано ({len(token)} симв.).',
-                'mode': 'Sandbox' if client.config.use_sandbox else 'Production',
-            })
-        except Exception as e:
-            return JsonResponse({'ok': False, 'error': str(e)})
-
-    def test_rates_view(self, request):
-        from .ups_client import UPSClient, UPSError
-        try:
-            client = UPSClient()
-            rates  = client.get_rates(
-                to_address={'name': 'Test', 'address_line': '1 Test St',
-                             'city': 'New York', 'state': 'NY',
-                             'postal': '10001', 'country': 'US'},
-                packages=[{'weight_kg': 1, 'length_cm': 20, 'width_cm': 15, 'height_cm': 10}],
-            )
-            return JsonResponse({'ok': True, 'rates': [
-                {'name': r['name'], 'price': str(r['price']), 'currency': r['currency']}
-                for r in rates[:6]
-            ]})
-        except Exception as e:
-            return JsonResponse({'ok': False, 'error': str(e)})
-
-    def save_model(self, request, obj, form, change):
-        # Якщо secret не змінювався — залишити старий
-        if change and not form.cleaned_data.get('client_secret'):
-            try:
-                old = UPSConfig.objects.get(pk=obj.pk)
-                obj.client_secret = old.client_secret
-            except UPSConfig.DoesNotExist:
-                pass
-        super().save_model(request, obj, form, change)

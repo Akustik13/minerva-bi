@@ -44,7 +44,7 @@ def _get_app_list(self, request, app_label=None):
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',
                       'purchaseorder', 'purchaseorderline'],
-        'shipping': ['carrier', 'upsconfig', 'shippingsettings', 'packagingmaterial', 'shipment', 'orderpackaging'],
+        'shipping': ['carrier', 'shippingsettings', 'packagingmaterial', 'shipment', 'orderpackaging'],
         'config':   ['systemsettings', 'documentsettings', 'notificationsettings', 'themesettings'],
         'api':      ['apikey'],
         'bots':     ['digikeyconfig', 'bot', 'botlog'],
