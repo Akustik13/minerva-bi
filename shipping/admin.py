@@ -2133,6 +2133,40 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 else:
                     entry["error"] = "API ключ не налаштовано"
 
+            elif carrier.carrier_type == "ups":
+                if carrier.api_key and carrier.api_secret and carrier.connection_uuid:
+                    from .ups_client import UPSClient, UPSError
+                    try:
+                        client = UPSClient(carrier)
+                        to_addr = {
+                            'name':         'Recipient',
+                            'address_line': '',
+                            'city':         dest_city,
+                            'postal':       dest_postal,
+                            'country':      dest_country,
+                        }
+                        pkgs = [{'weight_kg': weight, 'length_cm': length,
+                                 'width_cm': width, 'height_cm': height}]
+                        rates = client.get_rates(to_addr, pkgs)
+                        entry["products"] = [
+                            {
+                                "name":          r['name'],
+                                "code":          r['code'],
+                                "price":         float(r['price']),
+                                "currency":      r['currency'],
+                                "transit_days":  r.get('transit_days') or '',
+                                "delivery_date": '',
+                                "guaranteed":    r.get('guaranteed', False),
+                            }
+                            for r in rates
+                        ]
+                    except UPSError as e:
+                        entry["error"] = str(e)
+                    except Exception as e:
+                        entry["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+                else:
+                    entry["error"] = "UPS: заповніть Client ID, Client Secret і Account Number"
+
             else:
                 entry["note"] = "Rate shopping не підтримується"
 
