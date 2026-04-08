@@ -181,7 +181,7 @@ def _days_label(days_left: int) -> str:
 # ── Telegram builder ───────────────────────────────────────────────────────────
 
 def build_digest_telegram(data: dict, company_name: str = "Minerva") -> str:
-    now_str = timezone.now().strftime("%d.%m.%Y %H:%M")
+    now_str = timezone.localtime().strftime("%d.%m.%Y %H:%M")
     lines = [
         "📊 <b>Minerva — Щоденний звіт</b>",
         f"<i>{company_name} · {now_str}</i>",
@@ -244,7 +244,7 @@ def build_digest_telegram(data: dict, company_name: str = "Minerva") -> str:
 # ── Email HTML builder ─────────────────────────────────────────────────────────
 
 def build_digest_email_html(data: dict, company_name: str = "Minerva") -> str:
-    now_str = timezone.now().strftime("%d.%m.%Y %H:%M")
+    now_str = timezone.localtime().strftime("%d.%m.%Y %H:%M")
     sections = ""
 
     # ── Pending shipments ────────────────────────────────────────────────────
@@ -462,7 +462,7 @@ def send_digest(force: bool = False) -> dict:
         try:
             from dashboard.notifications import _send_event_email
             freq_label = "Щоденний" if ns.digest_frequency == "daily" else "Щотижневий"
-            subject    = f"📊 Minerva — {freq_label} звіт · {timezone.now().strftime('%d.%m.%Y')}"
+            subject    = f"📊 Minerva — {freq_label} звіт · {timezone.localtime().strftime('%d.%m.%Y')}"
             html       = build_digest_email_html(data, company_name)
             _send_event_email(ns, subject, html)
             results["email"] = {"sent": True}
