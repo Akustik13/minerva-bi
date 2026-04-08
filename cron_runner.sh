@@ -8,8 +8,6 @@
 #   TRACK_INTERVAL  — авто-трекінг відправлень (default: 300 = 5 хв)
 #   sync_digikey_orders — інтервал читається з DigiKeyConfig.sync_interval_minutes в БД
 
-set -e
-
 TRACK_INTERVAL="${TRACK_INTERVAL:-300}"
 
 echo "⏳ Waiting for PostgreSQL..."

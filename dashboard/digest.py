@@ -401,46 +401,53 @@ def send_digest(force: bool = False) -> dict:
 
     # Schedule check (unless forced)
     if not force:
-        import zoneinfo
-        from django.conf import settings as _settings
-        now       = timezone.now()
-        tz        = zoneinfo.ZoneInfo(getattr(_settings, "TIME_ZONE", "UTC"))
-        local_now = now.astimezone(tz)
-        send_time = ns.digest_send_time  # TimeField value
+        try:
+            import zoneinfo
+            from django.conf import settings as _settings
+            now       = timezone.now()
+            tz        = zoneinfo.ZoneInfo(getattr(_settings, "TIME_ZONE", "UTC"))
+            local_now = now.astimezone(tz)
+            send_time = ns.digest_send_time  # TimeField value
 
-        # Has today's send time been reached?
-        today_send = local_now.replace(
-            hour=send_time.hour, minute=send_time.minute, second=0, microsecond=0,
-        )
-        if local_now < today_send:
-            return {
-                "sent": False,
-                "reason": f"Ще не час (налаштовано {send_time.strftime('%H:%M')})",
-            }
-
-        # Skip weekends?
-        if ns.digest_skip_weekends and local_now.weekday() >= 5:  # 5=Sat, 6=Sun
-            day_name = "суботу" if local_now.weekday() == 5 else "неділю"
-            return {"sent": False, "reason": f"Вихідний день ({day_name}) — надсилання пропущено"}
-
-        # Skip public holidays?
-        if ns.digest_skip_holidays:
-            holiday_reason = _check_holiday(local_now.date(), ns.digest_holiday_country)
-            if holiday_reason:
-                return {"sent": False, "reason": holiday_reason}
-
-        # Already sent recently?
-        if ns.digest_last_sent:
-            min_interval = (
-                timedelta(hours=23) if ns.digest_frequency == "daily"
-                else timedelta(days=6, hours=23)
+            # Has today's send time been reached?
+            today_send = local_now.replace(
+                hour=send_time.hour, minute=send_time.minute, second=0, microsecond=0,
             )
-            next_send = ns.digest_last_sent + min_interval
-            if now < next_send:
+            if local_now < today_send:
                 return {
                     "sent": False,
-                    "reason": f"Вже надіслано — наступний: {next_send.astimezone(tz).strftime('%d.%m.%Y %H:%M')}",
+                    "reason": f"Ще не час (налаштовано {send_time.strftime('%H:%M')})",
                 }
+
+            # Skip weekends?
+            skip_wknd = getattr(ns, "digest_skip_weekends", False)
+            if skip_wknd and local_now.weekday() >= 5:  # 5=Sat, 6=Sun
+                day_name = "суботу" if local_now.weekday() == 5 else "неділю"
+                return {"sent": False, "reason": f"Вихідний день ({day_name}) — надсилання пропущено"}
+
+            # Skip public holidays?
+            skip_hol = getattr(ns, "digest_skip_holidays", False)
+            if skip_hol:
+                country = getattr(ns, "digest_holiday_country", "UA")
+                holiday_reason = _check_holiday(local_now.date(), country)
+                if holiday_reason:
+                    return {"sent": False, "reason": holiday_reason}
+
+            # Already sent recently?
+            if ns.digest_last_sent:
+                min_interval = (
+                    timedelta(hours=23) if ns.digest_frequency == "daily"
+                    else timedelta(days=6, hours=23)
+                )
+                next_send = ns.digest_last_sent + min_interval
+                if now < next_send:
+                    return {
+                        "sent": False,
+                        "reason": f"Вже надіслано — наступний: {next_send.astimezone(tz).strftime('%d.%m.%Y %H:%M')}",
+                    }
+        except Exception as exc:
+            logger.error("send_digest schedule check failed: %s", exc, exc_info=True)
+            return {"sent": False, "reason": f"Помилка перевірки розкладу: {exc}"}
 
     try:
         from config.models import SystemSettings
