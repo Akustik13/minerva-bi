@@ -282,9 +282,16 @@ class UPSClient:
         results = []
         for s in shipments:
             code     = s.get('Service', {}).get('Code', '')
-            price    = s.get('TotalCharges', {}).get('MonetaryValue', '0')
-            currency = s.get('TotalCharges', {}).get('CurrencyCode', 'EUR')
-            transit  = s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', '')
+            retail   = s.get('TotalCharges', {})
+            neg      = s.get('NegotiatedRateCharges', {})
+            # Prefer negotiated (account) rates; fall back to retail
+            if neg.get('TotalCharge', {}).get('MonetaryValue'):
+                price    = neg['TotalCharge']['MonetaryValue']
+                currency = neg['TotalCharge'].get('CurrencyCode') or retail.get('CurrencyCode', 'EUR')
+            else:
+                price    = retail.get('MonetaryValue', '0')
+                currency = retail.get('CurrencyCode', 'EUR')
+            transit = s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', '')
             results.append({
                 'code':         code,
                 'name':         UPS_SERVICES.get(code, f'UPS {code}'),
