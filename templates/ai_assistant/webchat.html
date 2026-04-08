@@ -20,11 +20,17 @@
 .mv-msg { display: flex; gap: 10px; align-items: flex-start; }
 .mv-msg.user { flex-direction: row-reverse; }
 .mv-bubble {
-  max-width: 75%; padding: 10px 14px; border-radius: 14px;
+  padding: 10px 14px; border-radius: 14px;
   line-height: 1.5; font-size: 14px; white-space: pre-wrap; word-break: break-word;
 }
+.mv-msg .mv-sender {
+  font-size: 11px; font-weight: 600; margin-bottom: 3px; padding: 0 4px;
+}
+.mv-msg.user .mv-sender { color: var(--text-muted); text-align: right; }
+.mv-msg.bot  .mv-sender { color: var(--gold); }
 .mv-msg.user .mv-bubble {
   background: var(--accent); color: #fff; border-radius: 14px 4px 14px 14px;
+  text-shadow: 0 1px 2px rgba(0,0,0,.3);
 }
 .mv-msg.bot .mv-bubble {
   background: var(--bg-card-2, var(--bg-hover)); color: var(--text);
@@ -75,9 +81,12 @@
   <div id="mv-chat-msgs">
     <div class="mv-msg bot">
       <div class="mv-avatar">🏛️</div>
-      <div class="mv-bubble">
-        Вітаю{% if profile %}, {{ profile.user.get_full_name|default:profile.user.username }}{% endif %}!
-        Я — Minerva, ваш AI-помічник. Запитуйте про продажі, склад, клієнтів чи аналітику.
+      <div style="display:flex;flex-direction:column;max-width:75%">
+        <div class="mv-sender">Minerva</div>
+        <div class="mv-bubble">
+          Вітаю{% if profile %}, {{ profile.user.get_full_name|default:profile.user.username }}{% endif %}!
+          Я — Minerva, ваш AI-помічник. Запитуйте про продажі, склад, клієнтів чи аналітику.
+        </div>
       </div>
     </div>
     <div class="mv-typing" id="mv-typing">
@@ -103,18 +112,39 @@ const msgs  = document.getElementById('mv-chat-msgs');
 const input = document.getElementById('mv-chat-input');
 const sendBtn = document.getElementById('mv-send-btn');
 const typing = document.getElementById('mv-typing');
+const ME = '{{ profile.user.get_full_name|default:profile.user.username }}';
 
 function addMsg(role, text) {
   const wrap = document.createElement('div');
   wrap.className = 'mv-msg ' + role;
+
   const avatar = document.createElement('div');
   avatar.className = 'mv-avatar';
   avatar.textContent = role === 'user' ? '👤' : '🏛️';
+
+  const col = document.createElement('div');
+  col.style.cssText = 'display:flex;flex-direction:column;max-width:75%';
+
+  const sender = document.createElement('div');
+  sender.className = 'mv-sender';
+  sender.textContent = role === 'user' ? ME : 'Minerva';
+
   const bubble = document.createElement('div');
   bubble.className = 'mv-bubble';
+  bubble.style.maxWidth = '100%';
   bubble.textContent = text;
-  wrap.appendChild(avatar);
-  wrap.appendChild(bubble);
+
+  col.appendChild(sender);
+  col.appendChild(bubble);
+
+  if (role === 'user') {
+    wrap.appendChild(col);
+    wrap.appendChild(avatar);
+  } else {
+    wrap.appendChild(avatar);
+    wrap.appendChild(col);
+  }
+
   msgs.insertBefore(wrap, typing);
   msgs.scrollTop = msgs.scrollHeight;
 }
