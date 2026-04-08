@@ -1013,6 +1013,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     reverse("admin:shipping_shipment_dhl_book", args=[shipment.pk]) + f"?{qs}"
                 )
 
+        if action == "ups_book" and carrier:
+            from urllib.parse import urlencode
+            ups_code  = request.POST.get("ups_service_code", "11").strip() or "11"
+            messages.success(request, f"✅ Відправлення #{shipment.pk} збережено. Оформлення UPS…")
+            return redirect(
+                reverse("admin:shipping_shipment_ups_book", args=[shipment.pk])
+                + f"?service_code={ups_code}"
+            )
+
         messages.success(request, f"✅ Відправлення #{shipment.pk} збережено як чернетку.")
         return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
 
@@ -1196,6 +1205,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 return redirect(
                     reverse("admin:shipping_shipment_dhl_book", args=[shipment.pk]) + f"?{qs}"
                 )
+
+        if action == "ups_book" and carrier:
+            ups_code = request.POST.get("ups_service_code", "11").strip() or "11"
+            messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено. Оформлення UPS…")
+            return redirect(
+                reverse("admin:shipping_shipment_ups_book", args=[shipment.pk])
+                + f"?service_code={ups_code}"
+            )
 
         messages.success(request, f"✅ Відправлення #{shipment.pk} збережено.")
         return redirect(
@@ -1789,6 +1806,25 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.save(update_fields=['label_url'])
             logger.info('UPS label saved: %s', fpath)
 
+        # Синхронізуємо SalesOrder
+        from datetime import date as _date
+        order        = shipment.order
+        order_fields = []
+        if result['tracking_number'] and not order.tracking_number:
+            order.tracking_number = result['tracking_number']
+            order_fields.append('tracking_number')
+        if not order.shipping_courier:
+            order.shipping_courier = 'UPS'
+            order_fields.append('shipping_courier')
+        if order.status in ('received', 'processing'):
+            order.status = 'shipped'
+            order_fields.append('status')
+        if not order.shipped_at:
+            order.shipped_at = _date.today()
+            order_fields.append('shipped_at')
+        if order_fields:
+            order.save(update_fields=order_fields)
+
         messages.success(
             request,
             f'✅ UPS відправлення створено! Трекінг: {result["tracking_number"]} | '
@@ -2154,8 +2190,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                 "code":          r['code'],
                                 "price":         float(r['price']),
                                 "currency":      r['currency'],
-                                "transit_days":  r.get('transit_days') or '',
-                                "delivery_date": '',
+                                "transit_days":  r.get('transit_days'),
+                                "delivery_date": r.get('delivery_date') or '',
                                 "guaranteed":    r.get('guaranteed', False),
                             }
                             for r in rates

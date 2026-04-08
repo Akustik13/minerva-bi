@@ -192,6 +192,17 @@ document.addEventListener('DOMContentLoaded',function(){
       const h = document.createElement('input');
       h.type='hidden'; h.name='action_btn'; h.value='jumingo_tariff';
       form.appendChild(h); form.submit();
+
+    } else if(d.carrierType === 'ups'){
+      if(!confirm(`Зберегти і оформити UPS "${d.name}" за ${priceF.toFixed(2)} ${d.currency||'EUR'}?`)) return;
+      const radio = document.querySelector(`[name="carrier"][value="${d.carrierId}"]`);
+      if(radio) radio.checked = true;
+      document.getElementById('id_ups_service_code').value = d.code;
+      document.getElementById('id_ups_service_name').value = d.name;
+      document.getElementById('id_ups_price').value        = d.price;
+      const h = document.createElement('input');
+      h.type='hidden'; h.name='action_btn'; h.value='ups_book';
+      form.appendChild(h); form.submit();
     }
   });
 });
@@ -369,6 +380,13 @@ function makeBookBtn(c, p, small){
       data-shipper="${escAttr(p.shipper||'')}" data-price="${p.price}"
       style="background:#e91e63;color:#fff;border:none;${pad};cursor:pointer;font-weight:700;white-space:nowrap">
       ✅ Jumingo</button>`;
+  if(c.carrier_type==='ups')
+    return `<button type="button" class="cmp-book-btn"
+      data-carrier-type="ups" data-carrier-id="${c.carrier_id}"
+      data-code="${escAttr(p.code)}" data-name="${escAttr(p.name)}"
+      data-price="${p.price}" data-currency="${escAttr(p.currency||'EUR')}"
+      style="background:#5d4037;color:#fff;border:none;${pad};cursor:pointer;font-weight:700;white-space:nowrap">
+      🟤 UPS</button>`;
   return '';
 }
 
@@ -478,7 +496,9 @@ function buildSummary(carriers){
 function buildTable(c){
   const isDHL     = c.carrier_type==='dhl';
   const isJumingo = c.carrier_type==='jumingo';
-  const hasAction = isDHL||isJumingo;
+  const isUPS     = c.carrier_type==='ups';
+  const hasAction = isDHL||isJumingo||isUPS;
+  const showDate  = isDHL||isUPS;
 
   let h = `<table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead><tr style="background:var(--bg-app)">
@@ -486,7 +506,7 @@ function buildTable(c){
       ${isDHL?'<th style="padding:7px 8px;color:var(--text-muted);font-family:monospace">Код</th>':''}
       <th style="padding:7px 10px;color:var(--text-muted);text-align:right">Ціна</th>
       <th style="padding:7px 10px;color:var(--text-muted);text-align:center">Транзит</th>
-      ${isDHL?'<th style="padding:7px 10px;color:var(--text-muted);text-align:center">Дата</th>':''}
+      ${showDate?'<th style="padding:7px 10px;color:var(--text-muted);text-align:center">Дата</th>':''}
       ${hasAction?'<th style="padding:7px 8px"></th>':''}
     </tr></thead><tbody>`;
 
@@ -505,7 +525,7 @@ function buildTable(c){
       ${isDHL?`<td style="padding:8px 8px;color:var(--text-dim);font-family:monospace">${esc(p.code)}</td>`:''}
       <td style="padding:8px 10px;text-align:right">${priceHtml}</td>
       <td style="padding:8px 10px;color:var(--accent-2,#2196f3);text-align:center">${p.transit_days!=null?p.transit_days+' дн.':'—'}</td>
-      ${isDHL?`<td style="padding:8px 10px;color:var(--text-muted);text-align:center;font-size:11px">${esc(p.delivery_date||'—')}</td>`:''}
+      ${showDate?`<td style="padding:8px 10px;color:var(--text-muted);text-align:center;font-size:11px">${esc(p.delivery_date||'—')}</td>`:''}
       ${hasAction?`<td style="padding:8px 8px;text-align:center">${makeBookBtn(c,p,false)}</td>`:''}
     </tr>`;
   });
@@ -969,6 +989,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <input type="hidden" name="jumingo_tariff_name" id="id_jumingo_tariff_name" value="">
     <input type="hidden" name="jumingo_tariff_price" id="id_jumingo_tariff_price" value="">
     <input type="hidden" name="jumingo_shipper"     id="id_jumingo_shipper"     value="">
+    <input type="hidden" name="ups_service_code"   id="id_ups_service_code"   value="">
+    <input type="hidden" name="ups_service_name"   id="id_ups_service_name"   value="">
+    <input type="hidden" name="ups_price"          id="id_ups_price"          value="">
 
     <div class="sh-actions">
       <button type="submit" name="action_btn" value="submit" class="btn-submit">

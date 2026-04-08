@@ -231,18 +231,23 @@ class UPSClient:
 
     def _rate_shop(self, to_address, packages, from_address):
         """
-        POST /api/rating/v2409/Shop — requestoption is IN THE URL PATH.
-        Returns rates for all available services.
+        POST /api/rating/v2409/Shoptimeintransit — rates + transit days for all services.
+        Falls back to plain Shop if Shoptimeintransit returns an error.
         """
         shipper = from_address or self._default_shipper()
         payload = {'RateRequest': {
             'Request': {
-                'RequestOption': 'Shop',
+                'RequestOption': 'Shoptimeintransit',
                 'TransactionReference': {'CustomerContext': 'minerva-bi'},
             },
             'Shipment': self._build_rate_shipment(to_address, packages, shipper),
         }}
-        data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
+        try:
+            data = self._post(f'/api/rating/{_API_VERSION}/Shoptimeintransit', payload)
+        except UPSError:
+            # Some accounts don't support Shoptimeintransit — fall back to plain Shop
+            payload['RateRequest']['Request']['RequestOption'] = 'Shop'
+            data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
         return self._parse_rated_shipments(data)
 
     def _rate_single(self, to_address, packages, from_address, service_code):
@@ -281,9 +286,9 @@ class UPSClient:
             shipments = [shipments]
         results = []
         for s in shipments:
-            code     = s.get('Service', {}).get('Code', '')
-            retail   = s.get('TotalCharges', {})
-            neg      = s.get('NegotiatedRateCharges', {})
+            code   = s.get('Service', {}).get('Code', '')
+            retail = s.get('TotalCharges', {})
+            neg    = s.get('NegotiatedRateCharges', {})
             # Prefer negotiated (account) rates; fall back to retail
             if neg.get('TotalCharge', {}).get('MonetaryValue'):
                 price    = neg['TotalCharge']['MonetaryValue']
@@ -291,14 +296,27 @@ class UPSClient:
             else:
                 price    = retail.get('MonetaryValue', '0')
                 currency = retail.get('CurrencyCode', 'EUR')
-            transit = s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', '')
+
+            # Transit days: prefer Shoptimeintransit response, fall back to GuaranteedDelivery
+            tti           = s.get('TimeInTransit', {})
+            est_arrival   = tti.get('EstimatedArrival', {})
+            transit_days  = est_arrival.get('BusinessDaysInTransit', '') \
+                            or s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', '')
+
+            # Delivery date from Shoptimeintransit (YYYYMMDD → YYYY-MM-DD)
+            raw_date      = est_arrival.get('Arrival', {}).get('Date', '')
+            delivery_date = (f'{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}' if len(raw_date) == 8 else raw_date)
+
+            transit_int = int(transit_days) if str(transit_days).isdigit() else None
+
             results.append({
-                'code':         code,
-                'name':         UPS_SERVICES.get(code, f'UPS {code}'),
-                'price':        Decimal(price),
-                'currency':     currency,
-                'transit_days': transit,
-                'guaranteed':   bool(s.get('GuaranteedDelivery')),
+                'code':          code,
+                'name':          UPS_SERVICES.get(code, f'UPS {code}'),
+                'price':         Decimal(price),
+                'currency':      currency,
+                'transit_days':  transit_int,
+                'delivery_date': delivery_date,
+                'guaranteed':    bool(s.get('GuaranteedDelivery') or transit_days),
             })
         return sorted(results, key=lambda x: x['price'])
 
