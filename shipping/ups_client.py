@@ -197,14 +197,14 @@ class UPSClient:
 
         # Try Shop (all services at once)
         try:
-            return self._rate_shop(to_address, packages, from_address)
+            rates = self._rate_shop(to_address, packages, from_address)
+            if rates:
+                return rates
+            # Empty response — try per-service
+            return self._rate_fallback(to_address, packages, from_address)
         except UPSError as e:
-            msg = str(e).lower()
-            # Fall back to per-service queries if Shop is restricted
-            if any(kw in msg for kw in ('shop', 'not available', 'not permitted', 'invalid', 'not support')):
-                logger.info('UPS Shop unavailable, switching to per-service fallback')
-                return self._rate_fallback(to_address, packages, from_address)
-            raise
+            logger.info('UPS Shop failed (%s), switching to per-service fallback', e)
+            return self._rate_fallback(to_address, packages, from_address)
 
     def _build_rate_shipment(self, to_address, packages, from_address, service_code=None):
         shipper = from_address or self._default_shipper()
@@ -216,6 +216,13 @@ class UPSClient:
             },
             'ShipTo':   {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address)},
             'ShipFrom': {'Name': shipper.get('name', 'Shipper'),       'Address': self._fmt_addr(shipper)},
+            'PaymentDetails': {
+                'ShipmentCharge': {
+                    'Type': '01',
+                    'BillShipper': {'AccountNumber': self.carrier.connection_uuid},
+                },
+            },
+            'ShipmentRatingOptions': {'NegotiatedRatesIndicator': ''},
             'Package':  [self._pkg_dict(p) for p in packages],
         }
         if service_code:
@@ -473,7 +480,7 @@ class UPSClient:
     def _pkg_dict(self, pkg: dict) -> dict:
         pkg_code = pkg.get('_pkg_override', PACKAGING_CUSTOMER)
         p = {
-            'Packaging':    {'Code': pkg_code},
+            'PackagingType': {'Code': pkg_code},
             'Dimensions': {
                 'UnitOfMeasurement': {'Code': 'CM'},
                 'Length': str(round(float(pkg.get('length_cm', 10)))),

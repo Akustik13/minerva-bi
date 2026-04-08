@@ -324,7 +324,9 @@ class CarrierAdmin(admin.ModelAdmin):
             return r
 
         def pkg(code, weight='1'):
-            return {'Packaging': {'Code': code},
+            return {'PackagingType': {'Code': code},
+                    'Dimensions': {'UnitOfMeasurement': {'Code': 'CM'},
+                                   'Length': '20', 'Width': '15', 'Height': '10'},
                     'PackageWeight': {'UnitOfMeasurement': {'Code': 'KGS'}, 'Weight': weight}}
 
         def shipment_obj(dest, pkg_obj, svc=None):
@@ -333,6 +335,13 @@ class CarrierAdmin(admin.ModelAdmin):
                              'Address': fmt_addr(shipper_addr)},
                 'ShipTo':   {'Name': dest['name'], 'Address': fmt_addr(dest)},
                 'ShipFrom': {'Name': shipper_addr['name'], 'Address': fmt_addr(shipper_addr)},
+                'PaymentDetails': {
+                    'ShipmentCharge': {
+                        'Type': '01',
+                        'BillShipper': {'AccountNumber': carrier.connection_uuid},
+                    },
+                },
+                'ShipmentRatingOptions': {'NegotiatedRatesIndicator': ''},
                 'Package':  [pkg_obj],
             }
             if svc:
