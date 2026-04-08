@@ -942,12 +942,13 @@ document.addEventListener('DOMContentLoaded', function(){
     { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'] },
     { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'] },
     { id: 'tasks',      label: '📋 Задачі',       apps: ['tasks'] },
-    { id: 'ai',         label: '🏛️ Minerva AI',   href: '/ai/',             apps: ['ai_assistant'],
+    { id: 'ai',         label: '🏛️ Minerva AI',   href: '/dashboard/ai/',   apps: ['ai_assistant'],
       links: [
+        { href: '/dashboard/ai/',                          label: '🏛️ Огляд AI' },
         { href: '/ai/',                                    label: '💬 WebChat' },
         { href: '/admin/ai_assistant/aiconversation/',     label: '📜 Розмови' },
         { href: '/admin/ai_assistant/aibudgetlog/',        label: '💰 Бюджет' },
-        { href: '/admin/strategy/aisettings/1/change/',    label: '⚙️ Налаштування AI' },
+        { href: '/admin/strategy/aisettings/',             label: '⚙️ Налаштування AI' },
       ]
     },
     { id: 'bots',       label: '🧠 Боти та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
@@ -1038,6 +1039,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/strategy/':             'crm',
     '/ai/':                   'ai',
     '/admin/ai_assistant/':   'ai',
+    '/dashboard/ai/':         'ai',
     '/admin/sales/':     'sales',
     '/admin/accounting/':'accounting',
     '/admin/shipping/':  'shipping',

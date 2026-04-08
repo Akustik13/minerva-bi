@@ -29,6 +29,26 @@ def bots_index(request):
     return render(request, 'dashboard/bots_index.html', context)
 bots_index = staff_member_required(bots_index)
 
+def ai_index(request):
+    context = admin.site.each_context(request)
+    try:
+        from strategy.models import AISettings
+        context['ai_key_ok'] = bool(AISettings.get().anthropic_api_key)
+    except Exception:
+        context['ai_key_ok'] = False
+    try:
+        from ai_assistant.models import AIBudgetLog, AIConversation
+        budget = AIBudgetLog.current()
+        context['ai_budget_used'] = float(budget.total_cost_usd)
+        context['ai_budget_limit'] = float(AISettings.get().monthly_budget_usd)
+        context['ai_conv_count'] = AIConversation.objects.filter(is_active=True).count()
+    except Exception:
+        context['ai_budget_used'] = None
+        context['ai_budget_limit'] = None
+        context['ai_conv_count'] = None
+    return render(request, 'dashboard/ai_index.html', context)
+ai_index = staff_member_required(ai_index)
+
 def system_index(request):
     from django.utils import timezone
     context = admin.site.each_context(request)
@@ -116,6 +136,7 @@ urlpatterns = [
     path("analytics/", analytics_index, name="analytics_index"),
     path("trends/",    trends_view,     name="trends"),
     path("bots/",      bots_index,      name="bots_index"),
+    path("ai/",        ai_index,        name="ai_index"),
     path("system/",    system_index,    name="system_index"),
     path("faq/",       faq_index,       name="faq_index"),
     path("help/",      help_page,       name="help"),

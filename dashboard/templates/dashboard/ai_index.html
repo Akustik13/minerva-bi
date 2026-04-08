@@ -1,0 +1,145 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Minerva AI | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; Minerva AI
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+.mv-dash { padding: 16px 20px 40px; }
+
+.mv-section-hdr {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 14px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--gold, #c9a84c);
+  font-size: 13px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+
+.mv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  gap: 10px;
+}
+
+.mv-tile {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-top: 3px solid var(--tile-accent, #c9a84c);
+  border-radius: 8px;
+  padding: 13px 12px 11px;
+  text-decoration: none !important;
+  display: flex; flex-direction: column;
+  min-height: 95px;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+.mv-tile:hover {
+  border-color: var(--tile-accent, #c9a84c);
+  border-top-color: var(--tile-accent, #c9a84c);
+  box-shadow: 0 6px 24px rgba(0,0,0,.45);
+  transform: translateY(-2px);
+  background: var(--bg-hover);
+}
+.mv-tile-icon { font-size: 20px; line-height: 1; margin-bottom: 7px; }
+.mv-tile-name { font-size: 12.5px; font-weight: 600; color: var(--text); line-height: 1.35; flex: 1; }
+.mv-tile-sub  { font-size: 10px; color: var(--text-dim); margin-top: 5px; }
+.mv-tile-badge {
+  position: absolute; top: 7px; right: 8px;
+  font-size: 9px; font-weight: 700; padding: 2px 5px;
+  border-radius: 10px; line-height: 1.4;
+}
+.mv-badge-ok  { background: rgba(63,185,80,.18); color: var(--ok, #3fb950); }
+.mv-badge-err { background: rgba(248,81,73,.18); color: var(--err, #f85149); }
+
+.mv-status-bar {
+  display: flex; gap: 16px; flex-wrap: wrap;
+  margin-bottom: 20px; padding: 12px 16px;
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 8px; font-size: 12px; color: var(--text-muted);
+}
+.mv-status-item strong { color: var(--text); font-size: 14px; }
+.mv-status-sep { color: var(--border-strong); }
+</style>
+
+<div class="mv-dash">
+
+  {# ── Status bar ── #}
+  <div class="mv-status-bar">
+    <span>
+      API ключ:
+      {% if ai_key_ok %}
+        <strong style="color:var(--ok)">✓ Налаштовано</strong>
+      {% else %}
+        <strong style="color:var(--err)">✗ Не встановлено</strong>
+      {% endif %}
+    </span>
+    <span class="mv-status-sep">|</span>
+    {% if ai_budget_used is not None %}
+      <span>Бюджет цього місяця: <strong>${{ ai_budget_used|floatformat:4 }}</strong>
+        {% if ai_budget_limit %} / ${{ ai_budget_limit }}{% endif %}
+      </span>
+      <span class="mv-status-sep">|</span>
+      <span>Активних розмов: <strong>{{ ai_conv_count }}</strong></span>
+    {% else %}
+      <span>Дані недоступні — <a href="/admin/strategy/aisettings/">налаштуйте API ключ</a></span>
+    {% endif %}
+  </div>
+
+  {# ── Tiles ── #}
+  <section>
+    <h2 class="mv-section-hdr">
+      <span>🏛️</span> Minerva AI
+    </h2>
+    <div class="mv-grid">
+
+      <a href="/ai/" class="mv-tile" style="--tile-accent:#c9a84c">
+        {% if not ai_key_ok %}
+          <span class="mv-tile-badge mv-badge-err">!&nbsp;Ключ</span>
+        {% endif %}
+        <span class="mv-tile-icon">💬</span>
+        <span class="mv-tile-name">WebChat</span>
+        <span class="mv-tile-sub">Чат з AI асистентом</span>
+      </a>
+
+      <a href="/admin/strategy/aisettings/" class="mv-tile" style="--tile-accent:#9c27b0">
+        <span class="mv-tile-icon">⚙️</span>
+        <span class="mv-tile-name">Налаштування AI</span>
+        <span class="mv-tile-sub">API ключ, бюджет, персонаж</span>
+      </a>
+
+      <a href="/admin/ai_assistant/aiconversation/" class="mv-tile" style="--tile-accent:#2196f3">
+        <span class="mv-tile-icon">📜</span>
+        <span class="mv-tile-name">Розмови</span>
+        <span class="mv-tile-sub">Історія чатів та повідомлень</span>
+      </a>
+
+      <a href="/admin/ai_assistant/aibudgetlog/" class="mv-tile" style="--tile-accent:#4caf50">
+        <span class="mv-tile-icon">💰</span>
+        <span class="mv-tile-name">Бюджет AI</span>
+        <span class="mv-tile-sub">Витрати токенів за місяцями</span>
+      </a>
+
+    </div>
+  </section>
+
+  {% if not ai_key_ok %}
+  <div style="margin-top:20px;padding:14px 18px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:8px;font-size:13px;color:var(--text-muted)">
+    ⚠️ <strong style="color:var(--err)">API ключ не встановлено.</strong>
+    Перейди в <a href="/admin/strategy/aisettings/" style="color:var(--accent)">⚙️ Налаштування AI</a>
+    та вкажи <strong>Anthropic API Key</strong> (формат: <code>sk-ant-...</code>).
+    Отримати ключ: <a href="https://console.anthropic.com/" target="_blank" style="color:var(--accent)">console.anthropic.com</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

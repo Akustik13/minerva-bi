@@ -33,15 +33,27 @@ class AISettingsAdmin(admin.ModelAdmin):
         return form
 
     def has_add_permission(self, request):
-        return not AISettings.objects.exists()
+        try:
+            return not AISettings.objects.exists()
+        except Exception:
+            return True
 
     def has_delete_permission(self, request, obj=None):
         return False
 
     def changelist_view(self, request, extra_context=None):
-        obj, _ = AISettings.objects.get_or_create(pk=1)
         from django.http import HttpResponseRedirect
         from django.urls import reverse as _reverse
+        from django.contrib import messages
+        try:
+            obj, _ = AISettings.objects.get_or_create(pk=1)
+        except Exception:
+            messages.error(
+                request,
+                "⚠️ Таблиця AISettings не знайдена. Запусти: "
+                "docker-compose exec web python manage.py migrate"
+            )
+            return HttpResponseRedirect(_reverse('admin:index'))
         return HttpResponseRedirect(
             _reverse('admin:strategy_aisettings_change', args=[obj.pk])
         )
