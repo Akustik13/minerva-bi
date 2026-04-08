@@ -1,11 +1,13 @@
 import json
+import logging
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_exempt
 
 from core.models import UserProfile
+
+logger = logging.getLogger(__name__)
 
 
 def _get_profile(user):
@@ -38,15 +40,16 @@ def chat_api(request):
     if profile and not profile.ai_enabled:
         return JsonResponse({'reply': '🔒 AI-асистент для вас вимкнений.'})
 
-    from .service import chat
     try:
+        from .service import chat
         reply = chat(
             user_text=user_text,
             profile=profile,
             channel='webchat',
         )
     except Exception as e:
-        return JsonResponse({'reply': 'Помилка сервісу. Спробуй пізніше.'})
+        logger.exception("AI chat error for user %s: %s", request.user, e)
+        return JsonResponse({'reply': f'⚠️ Помилка: {type(e).__name__}: {e}'})
 
     return JsonResponse({'reply': reply})
 
