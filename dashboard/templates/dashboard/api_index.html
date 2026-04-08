@@ -299,6 +299,49 @@
       </div>
     </div>
 
+    <!-- UPS -->
+    <div class="api-card" style="--card-accent:#c9a84c">
+      <div class="api-card-head">
+        <span class="api-card-icon" style="background:#c9a84c;border-radius:4px;padding:2px 6px;font-size:14px;font-weight:800;color:#000">UPS</span>
+        <div style="margin-left:4px">
+          <div class="api-card-title">UPS</div>
+          <div class="api-card-sub">Rates, Shipments, Tracking, Void</div>
+        </div>
+      </div>
+      {% if ups_carrier and ups_carrier.api_key %}
+      <div class="api-status ok">🟢 Налаштовано</div>
+      <div class="api-meta">
+        <b>Акаунт:</b> {{ ups_carrier.name }}<br>
+        <b>Account №:</b> {{ ups_carrier.connection_uuid|default:"—" }}<br>
+        <b>Mode:</b> {% if ups_carrier.api_url == "sandbox" %}Sandbox{% else %}Production{% endif %}
+      </div>
+      {% elif ups_carrier %}
+      <div class="api-status warn">⚠️ Client ID не вказано</div>
+      <div class="api-meta">
+        Заповни API ключ (Client ID) у налаштуваннях перевізника.
+      </div>
+      {% else %}
+      <div class="api-status off">⚪ Не налаштовано</div>
+      <div class="api-meta">
+        Додай Carrier типу UPS.<br>
+        Ключі: <code style="color:var(--accent)">developer.ups.com</code> → Apps → Credentials
+      </div>
+      {% endif %}
+      <ul class="api-endpoint-list">
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/rating/rates</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/api/shipments/ship</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/track/v1/details</span></li>
+      </ul>
+      <div class="api-actions">
+        <a href="/admin/shipping/carrier/{% if ups_carrier %}{{ ups_carrier.pk }}/change/{% else %}add/{% endif %}" class="api-btn api-btn-prim">
+          {% if ups_carrier %}Налаштування{% else %}+ Додати{% endif %}
+        </a>
+        {% if ups_carrier %}
+        <a href="/admin/shipping/shipment/order-tracking/" class="api-btn api-btn-sec">📡 Трекінг</a>
+        {% endif %}
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Section 3: Marketplace APIs ── -->
