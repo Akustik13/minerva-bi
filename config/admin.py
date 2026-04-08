@@ -430,9 +430,11 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
             return "—"
         last = ""
         if obj.digest_last_sent:
+            from django.utils import timezone as _tz
+            local_dt = _tz.localtime(obj.digest_last_sent)
             last = (
                 f' <span style="color:var(--text-dim);font-size:11px;margin-left:12px">'
-                f'Останній: {obj.digest_last_sent.strftime("%d.%m.%Y %H:%M")}</span>'
+                f'Останній: {local_dt.strftime("%d.%m.%Y %H:%M")}</span>'
             )
         return format_html(
             '<a href="../send-digest/" style="display:inline-block;padding:8px 18px;'

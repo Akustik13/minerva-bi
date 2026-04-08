@@ -435,16 +435,16 @@ def send_digest(force: bool = False) -> dict:
 
             # Already sent recently?
             if ns.digest_last_sent:
-                min_interval = (
-                    timedelta(hours=23) if ns.digest_frequency == "daily"
-                    else timedelta(days=6, hours=23)
-                )
-                next_send = ns.digest_last_sent + min_interval
-                if now < next_send:
-                    return {
-                        "sent": False,
-                        "reason": f"Вже надіслано — наступний: {next_send.astimezone(tz).strftime('%d.%m.%Y %H:%M')}",
-                    }
+                last_local = ns.digest_last_sent.astimezone(tz)
+                if ns.digest_frequency == "daily":
+                    # Don't send twice on the same local calendar day
+                    if last_local.date() >= local_now.date():
+                        return {"sent": False, "reason": "Вже надіслано сьогодні"}
+                else:
+                    days_since = (local_now.date() - last_local.date()).days
+                    if days_since < 7:
+                        next_dt = (last_local + timedelta(days=7)).strftime("%d.%m.%Y")
+                        return {"sent": False, "reason": f"Вже надіслано — наступний: {next_dt}"}
         except Exception as exc:
             logger.error("send_digest schedule check failed: %s", exc, exc_info=True)
             return {"sent": False, "reason": f"Помилка перевірки розкладу: {exc}"}
