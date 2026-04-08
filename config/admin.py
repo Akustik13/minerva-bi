@@ -282,6 +282,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "digest_enabled",
                 ("digest_email", "digest_telegram"),
                 ("digest_frequency", "digest_send_time"),
+                ("digest_skip_weekends", "digest_skip_holidays"),
+                ("digest_holiday_country",),
                 ("digest_include_pending", "digest_include_overdue"),
                 ("digest_include_new_orders", "digest_include_delivered"),
                 "digest_include_stock",

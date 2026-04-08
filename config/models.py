@@ -458,6 +458,24 @@ class NotificationSettings(models.Model):
     digest_last_sent = models.DateTimeField(
         "Останній звіт надіслано", null=True, blank=True,
     )
+    digest_skip_weekends = models.BooleanField(
+        "Не надсилати у вихідні", default=False,
+        help_text="Субота та неділя — звіт пропускається.",
+    )
+    digest_skip_holidays = models.BooleanField(
+        "Не надсилати у свята", default=False,
+        help_text="Перевіряє через Nager.Date API. Якщо API недоступний — надсилає.",
+    )
+    HOLIDAY_COUNTRY_CHOICES = [
+        ("UA", "Україна"),
+        ("DE", "Німеччина"),
+        ("PL", "Польща"),
+        ("US", "США"),
+    ]
+    digest_holiday_country = models.CharField(
+        "Країна свят", max_length=2,
+        choices=HOLIDAY_COUNTRY_CHOICES, default="UA",
+    )
     # Sections
     digest_include_pending = models.BooleanField(
         "📦 Очікують відправки", default=True,

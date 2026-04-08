@@ -11,8 +11,32 @@ Sections (each toggleable in NotificationSettings):
 Triggered by: `python manage.py send_digest [--force]`
 """
 from __future__ import annotations
-from datetime import timedelta
+from datetime import timedelta, date as _date
+import logging
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
+
+
+def _check_holiday(today: _date, country_code: str) -> str | None:
+    """
+    Check via Nager.Date API if `today` is a public holiday in `country_code`.
+    Returns a human-readable reason string if it IS a holiday, else None.
+    On network error / timeout — returns None (fail-open: do not skip sending).
+    """
+    try:
+        import urllib.request
+        url = f"https://date.nager.at/api/v3/IsTodayPublicHoliday/{country_code}"
+        req = urllib.request.Request(url, headers={"User-Agent": "MinervaBI/1.0"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            if resp.status == 200:
+                # 200 = today is a public holiday; 204 = not a holiday
+                country_names = {"UA": "Україна", "DE": "Німеччина", "PL": "Польща", "US": "США"}
+                name = country_names.get(country_code, country_code)
+                return f"Державне свято ({name}) — надсилання пропущено"
+    except Exception as exc:
+        logger.warning("digest holiday check failed (%s): %s", country_code, exc)
+    return None
 
 
 # ── Data collectors ────────────────────────────────────────────────────────────
@@ -393,6 +417,17 @@ def send_digest(force: bool = False) -> dict:
                 "sent": False,
                 "reason": f"Ще не час (налаштовано {send_time.strftime('%H:%M')})",
             }
+
+        # Skip weekends?
+        if ns.digest_skip_weekends and local_now.weekday() >= 5:  # 5=Sat, 6=Sun
+            day_name = "суботу" if local_now.weekday() == 5 else "неділю"
+            return {"sent": False, "reason": f"Вихідний день ({day_name}) — надсилання пропущено"}
+
+        # Skip public holidays?
+        if ns.digest_skip_holidays:
+            holiday_reason = _check_holiday(local_now.date(), ns.digest_holiday_country)
+            if holiday_reason:
+                return {"sent": False, "reason": holiday_reason}
 
         # Already sent recently?
         if ns.digest_last_sent:
