@@ -169,6 +169,9 @@ class UPSClient:
 
     # ── Rates ─────────────────────────────────────────────────────────────────
 
+    # Service codes tried when Shop mode is unavailable
+    _FALLBACK_SERVICES = ['11', '07', '08', '65', '54', '03', '02', '01', '12', '59']
+
     def get_rates(self, to_address: dict, packages: list,
                   from_address: dict = None, service_code: str = None) -> list:
         """
@@ -176,32 +179,70 @@ class UPSClient:
         to_address/from_address: {name, address_line, city, state, postal, country, phone}
         packages: [{weight_kg, length_cm, width_cm, height_cm}]
         Повертає: [{code, name, price, currency, transit_days, guaranteed}]
+        Якщо акаунт не підтримує Shop — автоматично перебирає сервіси по одному.
         """
+        if service_code:
+            return self._rate_single(to_address, packages, from_address, service_code)
+
+        # Try Shop first
+        try:
+            return self._rate_shop(to_address, packages, from_address)
+        except UPSError as e:
+            msg = str(e).lower()
+            if 'shop' in msg or 'not available' in msg or 'invalid' in msg or '400' in str(e.code or ''):
+                logger.info('UPS Shop not supported, falling back to per-service rate queries')
+                return self._rate_fallback(to_address, packages, from_address)
+            raise
+
+    def _rate_shop(self, to_address, packages, from_address):
+        """RequestOption=Shop — всі тарифи одним запитом."""
         shipper = from_address or self._default_shipper()
-        ups_packages = [self._pkg_dict(p) for p in packages]
-
-        payload = {
-            'RateRequest': {
-                'Request': {'RequestOption': 'Shop' if not service_code else 'Rate', 'SubVersion': '2403'},
-                'Shipment': {
-                    'Shipper': {
-                        'Name': shipper.get('name', 'Shipper'),
-                        'ShipperNumber': self.carrier.connection_uuid,
-                        'Address': self._fmt_addr(shipper),
-                    },
-                    'ShipTo': {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address)},
-                    'ShipFrom': {'Name': shipper.get('name', 'Shipper'), 'Address': self._fmt_addr(shipper)},
-                    'Package': ups_packages,
-                    **(({'Service': {'Code': service_code}}) if service_code else {}),
-                },
+        payload = {'RateRequest': {
+            'Request': {'RequestOption': 'Shop', 'SubVersion': '2403'},
+            'Shipment': {
+                'Shipper': {'Name': shipper.get('name', 'Shipper'),
+                            'ShipperNumber': self.carrier.connection_uuid,
+                            'Address': self._fmt_addr(shipper)},
+                'ShipTo':  {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address)},
+                'ShipFrom':{'Name': shipper.get('name', 'Shipper'), 'Address': self._fmt_addr(shipper)},
+                'Package': [self._pkg_dict(p) for p in packages],
             },
-        }
-
+        }}
         data = self._post('/api/rating/v2403/rate', payload)
+        return self._parse_rated_shipments(data)
+
+    def _rate_single(self, to_address, packages, from_address, service_code):
+        """RequestOption=Rate для конкретного сервісу."""
+        shipper = from_address or self._default_shipper()
+        payload = {'RateRequest': {
+            'Request': {'RequestOption': 'Rate', 'SubVersion': '2403'},
+            'Shipment': {
+                'Shipper': {'Name': shipper.get('name', 'Shipper'),
+                            'ShipperNumber': self.carrier.connection_uuid,
+                            'Address': self._fmt_addr(shipper)},
+                'ShipTo':  {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address)},
+                'ShipFrom':{'Name': shipper.get('name', 'Shipper'), 'Address': self._fmt_addr(shipper)},
+                'Package': [self._pkg_dict(p) for p in packages],
+                'Service': {'Code': service_code},
+            },
+        }}
+        data = self._post('/api/rating/v2403/rate', payload)
+        return self._parse_rated_shipments(data)
+
+    def _rate_fallback(self, to_address, packages, from_address):
+        """Перебирає сервіс-коди по одному, повертає ті що відповіли успішно."""
+        results = []
+        for code in self._FALLBACK_SERVICES:
+            try:
+                results.extend(self._rate_single(to_address, packages, from_address, code))
+            except UPSError:
+                pass
+        return sorted(results, key=lambda x: x['price'])
+
+    def _parse_rated_shipments(self, data) -> list:
         shipments = data.get('RateResponse', {}).get('RatedShipment', [])
         if isinstance(shipments, dict):
             shipments = [shipments]
-
         results = []
         for s in shipments:
             code     = s.get('Service', {}).get('Code', '')
