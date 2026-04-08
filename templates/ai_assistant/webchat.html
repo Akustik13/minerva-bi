@@ -184,8 +184,22 @@ document.getElementById('mv-reset-btn').onclick = async () => {
   await fetch('{% url "ai_assistant:reset_chat" %}', {
     method: 'POST', headers: {'X-CSRFToken': CSRF},
   });
-  msgs.querySelectorAll('.mv-msg.user, .mv-msg.bot:not(:first-child)').forEach(el => el.remove());
+  msgs.querySelectorAll('.mv-msg').forEach(el => el.remove());
   addMsg('bot', '🔄 Розмову скинуто. Починаємо з чистого аркуша.');
 };
+
+// Load history on page open
+(async () => {
+  try {
+    const r = await fetch('{% url "ai_assistant:history_api" %}');
+    const data = await r.json();
+    if (data.messages && data.messages.length) {
+      // Hide welcome message — we have real history
+      const welcome = msgs.querySelector('.mv-msg.bot');
+      if (welcome) welcome.remove();
+      data.messages.forEach(m => addMsg(m.role === 'assistant' ? 'bot' : 'user', m.content));
+    }
+  } catch(e) { /* history load failed — silent, welcome stays */ }
+})();
 </script>
 {% endblock %}

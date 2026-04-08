@@ -61,3 +61,23 @@ def reset_chat(request):
     from .service import reset_conversation
     reset_conversation(profile, channel='webchat')
     return JsonResponse({'ok': True})
+
+
+@login_required
+def history_api(request):
+    """Return active webchat conversation messages (user + assistant only)."""
+    profile = _get_profile(request.user)
+    if not profile:
+        return JsonResponse({'messages': []})
+
+    from .models import AIConversation
+    conv = AIConversation.objects.filter(
+        user_profile=profile, channel='webchat', is_active=True,
+    ).first()
+    if not conv:
+        return JsonResponse({'messages': []})
+
+    msgs = []
+    for m in conv.messages.filter(role__in=('user', 'assistant')).order_by('created_at'):
+        msgs.append({'role': m.role, 'content': m.content})
+    return JsonResponse({'messages': msgs})

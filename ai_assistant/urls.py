@@ -7,4 +7,5 @@ urlpatterns = [
     path('', views.webchat_view, name='webchat'),
     path('chat/', views.chat_api, name='chat_api'),
     path('reset/', views.reset_chat, name='reset_chat'),
+    path('history/', views.history_api, name='history_api'),
 ]
