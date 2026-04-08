@@ -376,17 +376,36 @@ def send_digest(force: bool = False) -> dict:
         return {"sent": False, "reason": "Жоден канал не налаштований (email / Telegram)"}
 
     # Schedule check (unless forced)
-    if not force and ns.digest_last_sent:
-        now = timezone.now()
-        if ns.digest_frequency == "daily":
-            next_send = ns.digest_last_sent + timedelta(days=1)
-        else:
-            next_send = ns.digest_last_sent + timedelta(weeks=1)
-        if now < next_send:
+    if not force:
+        import zoneinfo
+        from django.conf import settings as _settings
+        now       = timezone.now()
+        tz        = zoneinfo.ZoneInfo(getattr(_settings, "TIME_ZONE", "UTC"))
+        local_now = now.astimezone(tz)
+        send_time = ns.digest_send_time  # TimeField value
+
+        # Has today's send time been reached?
+        today_send = local_now.replace(
+            hour=send_time.hour, minute=send_time.minute, second=0, microsecond=0,
+        )
+        if local_now < today_send:
             return {
                 "sent": False,
-                "reason": f"Ще не час — наступний звіт: {next_send.strftime('%d.%m.%Y %H:%M')}",
+                "reason": f"Ще не час (налаштовано {send_time.strftime('%H:%M')})",
             }
+
+        # Already sent recently?
+        if ns.digest_last_sent:
+            min_interval = (
+                timedelta(hours=23) if ns.digest_frequency == "daily"
+                else timedelta(days=6, hours=23)
+            )
+            next_send = ns.digest_last_sent + min_interval
+            if now < next_send:
+                return {
+                    "sent": False,
+                    "reason": f"Вже надіслано — наступний: {next_send.astimezone(tz).strftime('%d.%m.%Y %H:%M')}",
+                }
 
     try:
         from config.models import SystemSettings
