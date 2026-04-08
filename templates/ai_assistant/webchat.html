@@ -29,9 +29,11 @@
 .mv-msg.user .mv-sender { color: var(--text-muted); text-align: right; }
 .mv-msg.bot  .mv-sender { color: var(--gold); }
 .mv-msg.user .mv-bubble {
-  background: var(--accent); color: #fff; border-radius: 14px 4px 14px 14px;
-  text-shadow: 0 1px 2px rgba(0,0,0,.3);
+  background: var(--accent); color: #fff;
+  border-radius: 14px 4px 14px 14px;
 }
+[data-theme="light"]   .mv-msg.user .mv-bubble { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+[data-theme="minerva"] .mv-msg.user .mv-bubble { color: #0a0e1a; }
 .mv-msg.bot .mv-bubble {
   background: var(--bg-card-2, var(--bg-hover)); color: var(--text);
   border: 1px solid var(--border); border-radius: 4px 14px 14px 14px;

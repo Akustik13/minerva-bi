@@ -1469,4 +1469,279 @@ window.addEventListener('appinstalled', function() {
   to   { transform: translateY(0);    opacity: 1; }
 }
 </style>
+
+{% if user.is_authenticated %}
+<!-- ══ Minerva Floating Chat Widget ══ -->
+<style>
+#mv-fab {
+  position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--gold); color: #000;
+  border: none; cursor: pointer; font-size: 22px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  display: flex; align-items: center; justify-content: center;
+  transition: transform .2s, box-shadow .2s;
+}
+#mv-fab:hover { transform: scale(1.08); box-shadow: 0 6px 20px rgba(0,0,0,.5); }
+#mv-fab .mv-fab-badge {
+  position: absolute; top: 2px; right: 2px;
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--err); display: none;
+}
+
+#mv-chat-panel {
+  position: fixed; bottom: 88px; right: 24px; z-index: 9999;
+  width: 380px; height: 520px;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 14px; overflow: hidden;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0,0,0,.5);
+  transform: translateY(20px) scale(.97); opacity: 0;
+  pointer-events: none;
+  transition: transform .22s ease, opacity .22s ease;
+}
+#mv-chat-panel.open {
+  transform: translateY(0) scale(1); opacity: 1;
+  pointer-events: all;
+}
+#mv-cpanel-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  background: var(--bg-card-2, var(--bg-hover));
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#mv-cpanel-head .mv-cp-title {
+  flex: 1; font-weight: 600; font-size: 14px; color: var(--gold);
+}
+#mv-cp-reset, #mv-cp-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 15px; padding: 2px 6px;
+  border-radius: 4px;
+}
+#mv-cp-reset:hover { color: var(--warn); }
+#mv-cp-close:hover { color: var(--err); }
+
+#mv-cpanel-msgs {
+  flex: 1; overflow-y: auto; padding: 12px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.mv-cp-msg { display: flex; gap: 8px; align-items: flex-start; }
+.mv-cp-msg.user { flex-direction: row-reverse; }
+.mv-cp-msg .mv-cp-col {
+  display: flex; flex-direction: column; max-width: 80%;
+}
+.mv-cp-sender {
+  font-size: 10px; font-weight: 600; margin-bottom: 2px; padding: 0 3px;
+}
+.mv-cp-msg.user .mv-cp-sender { color: var(--text-muted); text-align: right; }
+.mv-cp-msg.bot  .mv-cp-sender { color: var(--gold); }
+.mv-cp-avatar {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: var(--gold); color: #000;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.mv-cp-msg.user .mv-cp-avatar { background: var(--accent); }
+.mv-cp-bubble {
+  padding: 8px 12px; border-radius: 12px;
+  font-size: 13px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
+}
+.mv-cp-msg.user .mv-cp-bubble {
+  background: var(--accent); color: var(--accent-text, #fff);
+  border-radius: 12px 3px 12px 12px;
+}
+[data-theme="light"] .mv-cp-msg.user .mv-cp-bubble { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.4); }
+[data-theme="dark"]    .mv-cp-msg.user .mv-cp-bubble { color: #fff; }
+[data-theme="minerva"] .mv-cp-msg.user .mv-cp-bubble { color: #0a0e1a; }
+.mv-cp-msg.bot .mv-cp-bubble {
+  background: var(--bg-hover); color: var(--text);
+  border: 1px solid var(--border); border-radius: 3px 12px 12px 12px;
+}
+.mv-cp-typing { display: none; align-items: center; gap: 6px; }
+.mv-cp-typing.show { display: flex; }
+.mv-cp-dots span {
+  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--gold); animation: mv-bounce .8s infinite;
+}
+.mv-cp-dots span:nth-child(2) { animation-delay: .15s; }
+.mv-cp-dots span:nth-child(3) { animation-delay: .3s; }
+
+#mv-cpanel-input-row {
+  display: flex; gap: 6px; padding: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-input); flex-shrink: 0;
+}
+#mv-cp-input {
+  flex: 1; padding: 8px 12px; border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card); color: var(--text); font-size: 13px;
+  resize: none; font-family: inherit;
+}
+#mv-cp-input:focus { outline: none; border-color: var(--accent); }
+#mv-cp-send {
+  padding: 8px 14px; background: var(--accent); color: #fff;
+  border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 700;
+}
+#mv-cp-send:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 480px) {
+  #mv-chat-panel { width: calc(100vw - 16px); right: 8px; bottom: 80px; }
+}
+</style>
+
+<div id="mv-fab" title="Minerva AI">🏛️<span class="mv-fab-badge"></span></div>
+
+<div id="mv-chat-panel">
+  <div id="mv-cpanel-head">
+    <span class="mv-cp-title">🏛️ Minerva AI</span>
+    <button id="mv-cp-reset" title="Нова розмова">🔄</button>
+    <button id="mv-cp-close" title="Згорнути">✕</button>
+  </div>
+  <div id="mv-cpanel-msgs">
+    <div class="mv-cp-typing" id="mv-cp-typing">
+      <div class="mv-cp-avatar">🏛️</div>
+      <div class="mv-cp-bubble">
+        <span class="mv-cp-dots"><span></span><span></span><span></span></span>
+      </div>
+    </div>
+  </div>
+  <div id="mv-cpanel-input-row">
+    <textarea id="mv-cp-input" rows="1" placeholder="Запитати Minerva…"></textarea>
+    <button id="mv-cp-send">↑</button>
+  </div>
+</div>
+
+<script>
+(function(){
+  var panel  = document.getElementById('mv-chat-panel');
+  var fab    = document.getElementById('mv-fab');
+  var cpMsgs = document.getElementById('mv-cpanel-msgs');
+  var cpTyping = document.getElementById('mv-cp-typing');
+  var cpInput = document.getElementById('mv-cp-input');
+  var cpSend  = document.getElementById('mv-cp-send');
+  var histLoaded = false;
+
+  // Don't show FAB on the full-page /ai/ — it already has chat
+  if (window.location.pathname === '/ai/') { fab.style.display = 'none'; return; }
+
+  function getCsrf() {
+    var c = document.cookie.split(';').find(function(s){ return s.trim().startsWith('csrftoken='); });
+    return c ? c.trim().split('=')[1] : '';
+  }
+
+  var ME = '{{ user.get_full_name|default:user.username }}';
+
+  function cpAddMsg(role, text) {
+    var wrap = document.createElement('div');
+    wrap.className = 'mv-cp-msg ' + role;
+
+    var avatar = document.createElement('div');
+    avatar.className = 'mv-cp-avatar';
+    avatar.textContent = role === 'user' ? '👤' : '🏛️';
+
+    var col = document.createElement('div');
+    col.className = 'mv-cp-col';
+
+    var sender = document.createElement('div');
+    sender.className = 'mv-cp-sender';
+    sender.textContent = role === 'user' ? ME : 'Minerva';
+
+    var bubble = document.createElement('div');
+    bubble.className = 'mv-cp-bubble';
+    bubble.textContent = text;
+
+    col.appendChild(sender);
+    col.appendChild(bubble);
+
+    if (role === 'user') { wrap.appendChild(col); wrap.appendChild(avatar); }
+    else                  { wrap.appendChild(avatar); wrap.appendChild(col); }
+
+    cpMsgs.insertBefore(wrap, cpTyping);
+    cpMsgs.scrollTop = cpMsgs.scrollHeight;
+  }
+
+  function cpLoadHistory() {
+    if (histLoaded) return;
+    histLoaded = true;
+    fetch('/ai/history/').then(function(r){ return r.json(); }).then(function(data){
+      if (data.messages && data.messages.length) {
+        data.messages.forEach(function(m){
+          cpAddMsg(m.role === 'assistant' ? 'bot' : 'user', m.content);
+        });
+      } else {
+        cpAddMsg('bot', 'Вітаю! Я Minerva — ваш AI-помічник. Чим можу допомогти?');
+      }
+    }).catch(function(){ histLoaded = false; });
+  }
+
+  function openPanel() {
+    panel.classList.add('open');
+    localStorage.setItem('mv-chat-open', '1');
+    cpLoadHistory();
+    setTimeout(function(){ cpInput.focus(); }, 220);
+    fab.querySelector('.mv-fab-badge').style.display = 'none';
+  }
+
+  function closePanel() {
+    panel.classList.remove('open');
+    localStorage.setItem('mv-chat-open', '0');
+  }
+
+  fab.onclick = function(){
+    panel.classList.contains('open') ? closePanel() : openPanel();
+  };
+  document.getElementById('mv-cp-close').onclick = closePanel;
+
+  document.getElementById('mv-cp-reset').onclick = function(){
+    fetch('/ai/reset/', { method: 'POST', headers: {'X-CSRFToken': getCsrf()} })
+      .then(function(){
+        cpMsgs.querySelectorAll('.mv-cp-msg').forEach(function(el){ el.remove(); });
+        histLoaded = false;
+        cpAddMsg('bot', '🔄 Розмову скинуто. Починаємо з чистого аркуша.');
+      });
+  };
+
+  async function cpSendMsg() {
+    var text = cpInput.value.trim();
+    if (!text) return;
+    cpInput.value = '';
+    cpInput.style.height = '';
+    cpAddMsg('user', text);
+    cpSend.disabled = true;
+    cpTyping.classList.add('show');
+    cpMsgs.scrollTop = cpMsgs.scrollHeight;
+
+    try {
+      var r = await fetch('/ai/chat/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrf()},
+        body: JSON.stringify({message: text}),
+      });
+      var data = await r.json();
+      cpTyping.classList.remove('show');
+      cpAddMsg('bot', data.reply || 'Помилка відповіді.');
+    } catch(e) {
+      cpTyping.classList.remove('show');
+      cpAddMsg('bot', 'Помилка зв\'язку. Спробуй ще раз.');
+    } finally {
+      cpSend.disabled = false;
+      cpInput.focus();
+    }
+  }
+
+  cpSend.onclick = cpSendMsg;
+  cpInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); cpSendMsg(); }
+  });
+  // Auto-resize textarea
+  cpInput.addEventListener('input', function(){
+    this.style.height = '';
+    this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+  });
+
+  // Restore open state
+  if (localStorage.getItem('mv-chat-open') === '1') openPanel();
+})();
+</script>
+{% endif %}
 {% endblock footer %}
