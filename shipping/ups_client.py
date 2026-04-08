@@ -5,19 +5,25 @@ Credentials зберігаються в моделі Carrier (api_key=Client ID,
 api_secret=Client Secret, connection_uuid=Account Number,
 api_url='sandbox'|'' for production).
 Токен кешується через Django cache framework.
+
+Перевірені ендпоінти (docs: developer.ups.com):
+  Auth:     POST /security/v1/oauth/token
+  Rates:    POST /api/rating/v2409/{Rate|Shop}          ← requestoption у ШЛЯХУ
+  Ship:     POST /api/shipments/v2409/ship
+  Track:    GET  /api/track/v1/details/{trackingNumber}
+  Void:     DELETE /api/shipments/v2409/void/cancel/{shipmentId}
 """
 import base64
 import logging
 import uuid
-from datetime import timedelta
 from decimal import Decimal
 
 import requests
 from django.core.cache import cache
-from django.utils import timezone
 
 logger = logging.getLogger('shipping.ups')
 
+# ── Service code → human name ─────────────────────────────────────────────────
 UPS_SERVICES = {
     '01': 'UPS Next Day Air',
     '02': 'UPS 2nd Day Air',
@@ -30,14 +36,15 @@ UPS_SERVICES = {
     '14': 'UPS Next Day Air Early AM',
     '54': 'UPS Worldwide Express Plus',
     '59': 'UPS 2nd Day Air AM',
-    '65': 'UPS Saver',
+    '65': 'UPS Worldwide Saver',
     '96': 'UPS Worldwide Express Freight',
 }
 
+# Customer packaging code
 PACKAGING_CUSTOMER = '02'
 
-# Token TTL in cache: 4h minus 10 min buffer
-_TOKEN_CACHE_SECONDS = 14399 - 600
+# API version
+_API_VERSION = 'v2409'
 
 
 class UPSError(Exception):
@@ -86,6 +93,7 @@ class UPSClient:
 
     @property
     def base_url(self) -> str:
+        # CIE = sandbox/test environment
         return 'https://wwwcie.ups.com' if self._is_sandbox else 'https://onlinetools.ups.com'
 
     # ── Auth ──────────────────────────────────────────────────────────────────
@@ -105,6 +113,7 @@ class UPSClient:
             headers={
                 'Authorization': f'Basic {credentials}',
                 'Content-Type': 'application/x-www-form-urlencoded',
+                'x-merchant-id': self.carrier.connection_uuid,
             },
             data='grant_type=client_credentials',
             timeout=30,
@@ -117,16 +126,17 @@ class UPSClient:
 
         data = r.json()
         token = data['access_token']
-        expires_in = max(int(data.get('expires_in', 14399)) - 600, 60)
+        # expires_in from API (typically 3600s = 1h); cache with 60s buffer
+        expires_in = max(int(data.get('expires_in', 3600)) - 60, 60)
         cache.set(cache_key, token, expires_in)
-        logger.info('UPS OAuth token оновлено для carrier=%s (ttl=%ss)', self.carrier.pk, expires_in)
+        logger.info('UPS OAuth token оновлено carrier=%s (ttl=%ss)', self.carrier.pk, expires_in)
         return token
 
     def _headers(self) -> dict:
         return {
             'Authorization': f'Bearer {self.get_token()}',
-            'Content-Type': 'application/json',
-            'transId': str(uuid.uuid4())[:8],
+            'Content-Type':  'application/json',
+            'transId':        str(uuid.uuid4())[:32],
             'transactionSrc': 'minerva-bi',
         }
 
@@ -135,7 +145,7 @@ class UPSClient:
         try:
             r = requests.post(url, headers=self._headers(), json=payload, timeout=60)
             if r.status_code == 401:
-                # скинути токен і повторити
+                # Token expired mid-session — refresh and retry once
                 cache.delete(f'ups_token_{self.carrier.pk}')
                 r = requests.post(url, headers=self._headers(), json=payload, timeout=60)
             if not r.ok:
@@ -169,8 +179,8 @@ class UPSClient:
 
     # ── Rates ─────────────────────────────────────────────────────────────────
 
-    # Service codes tried when Shop mode is unavailable
-    _FALLBACK_SERVICES = ['11', '07', '08', '65', '54', '03', '02', '01', '12', '59']
+    # Service codes tried in fallback (Shop not available)
+    _FALLBACK_SERVICES = ['11', '07', '08', '65', '54', '03', '02', '01', '12', '59', '96']
 
     def get_rates(self, to_address: dict, packages: list,
                   from_address: dict = None, service_code: str = None) -> list:
@@ -184,53 +194,66 @@ class UPSClient:
         if service_code:
             return self._rate_single(to_address, packages, from_address, service_code)
 
-        # Try Shop first
+        # Try Shop (all services at once)
         try:
             return self._rate_shop(to_address, packages, from_address)
         except UPSError as e:
             msg = str(e).lower()
-            if 'shop' in msg or 'not available' in msg or 'invalid' in msg or '400' in str(e.code or ''):
-                logger.info('UPS Shop not supported, falling back to per-service rate queries')
+            # Fall back to per-service queries if Shop is restricted
+            if any(kw in msg for kw in ('shop', 'not available', 'not permitted', 'invalid', 'not support')):
+                logger.info('UPS Shop unavailable, switching to per-service fallback')
                 return self._rate_fallback(to_address, packages, from_address)
             raise
 
+    def _build_rate_shipment(self, to_address, packages, from_address, service_code=None):
+        shipper = from_address or self._default_shipper()
+        shipment = {
+            'Shipper': {
+                'Name':          shipper.get('name', 'Shipper'),
+                'ShipperNumber': self.carrier.connection_uuid,
+                'Address':       self._fmt_addr(shipper),
+            },
+            'ShipTo':   {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address)},
+            'ShipFrom': {'Name': shipper.get('name', 'Shipper'),       'Address': self._fmt_addr(shipper)},
+            'Package':  [self._pkg_dict(p) for p in packages],
+        }
+        if service_code:
+            shipment['Service'] = {'Code': service_code}
+        return shipment
+
     def _rate_shop(self, to_address, packages, from_address):
-        """RequestOption=Shop — всі тарифи одним запитом."""
+        """
+        POST /api/rating/v2409/Shop — requestoption is IN THE URL PATH.
+        Returns rates for all available services.
+        """
         shipper = from_address or self._default_shipper()
         payload = {'RateRequest': {
-            'Request': {'RequestOption': 'Shop', 'SubVersion': '2403'},
-            'Shipment': {
-                'Shipper': {'Name': shipper.get('name', 'Shipper'),
-                            'ShipperNumber': self.carrier.connection_uuid,
-                            'Address': self._fmt_addr(shipper)},
-                'ShipTo':  {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address)},
-                'ShipFrom':{'Name': shipper.get('name', 'Shipper'), 'Address': self._fmt_addr(shipper)},
-                'Package': [self._pkg_dict(p) for p in packages],
+            'Request': {
+                'RequestOption': 'Shop',
+                'TransactionReference': {'CustomerContext': 'minerva-bi'},
             },
+            'Shipment': self._build_rate_shipment(to_address, packages, shipper),
         }}
-        data = self._post('/api/rating/v2403/rate', payload)
+        data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
         return self._parse_rated_shipments(data)
 
     def _rate_single(self, to_address, packages, from_address, service_code):
-        """RequestOption=Rate для конкретного сервісу."""
+        """
+        POST /api/rating/v2409/Rate — single service.
+        """
         shipper = from_address or self._default_shipper()
         payload = {'RateRequest': {
-            'Request': {'RequestOption': 'Rate', 'SubVersion': '2403'},
-            'Shipment': {
-                'Shipper': {'Name': shipper.get('name', 'Shipper'),
-                            'ShipperNumber': self.carrier.connection_uuid,
-                            'Address': self._fmt_addr(shipper)},
-                'ShipTo':  {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address)},
-                'ShipFrom':{'Name': shipper.get('name', 'Shipper'), 'Address': self._fmt_addr(shipper)},
-                'Package': [self._pkg_dict(p) for p in packages],
-                'Service': {'Code': service_code},
+            'Request': {
+                'RequestOption': 'Rate',
+                'TransactionReference': {'CustomerContext': 'minerva-bi'},
             },
+            'Shipment': self._build_rate_shipment(to_address, packages, shipper, service_code),
         }}
-        data = self._post('/api/rating/v2403/rate', payload)
+        data = self._post(f'/api/rating/{_API_VERSION}/Rate', payload)
         return self._parse_rated_shipments(data)
 
     def _rate_fallback(self, to_address, packages, from_address):
-        """Перебирає сервіс-коди по одному, повертає ті що відповіли успішно."""
+        """Перебирає service codes по одному, повертає ті що відповіли успішно."""
         results = []
         for code in self._FALLBACK_SERVICES:
             try:
@@ -247,12 +270,15 @@ class UPSClient:
         for s in shipments:
             code     = s.get('Service', {}).get('Code', '')
             price    = s.get('TotalCharges', {}).get('MonetaryValue', '0')
-            currency = s.get('TotalCharges', {}).get('CurrencyCode', 'USD')
+            currency = s.get('TotalCharges', {}).get('CurrencyCode', 'EUR')
             transit  = s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', '')
             results.append({
-                'code': code, 'name': UPS_SERVICES.get(code, f'UPS {code}'),
-                'price': Decimal(price), 'currency': currency,
-                'transit_days': transit, 'guaranteed': bool(s.get('GuaranteedDelivery')),
+                'code':         code,
+                'name':         UPS_SERVICES.get(code, f'UPS {code}'),
+                'price':        Decimal(price),
+                'currency':     currency,
+                'transit_days': transit,
+                'guaranteed':   bool(s.get('GuaranteedDelivery')),
             })
         return sorted(results, key=lambda x: x['price'])
 
@@ -262,7 +288,7 @@ class UPSClient:
                         service_code: str = '11', from_address: dict = None,
                         customs_info: dict = None, reference: str = '') -> dict:
         """
-        Створити відправлення і отримати мітку.
+        POST /api/shipments/v2409/ship
         Повертає: {tracking_number, shipment_id, label_base64, label_format, total_charge, currency}
         """
         shipper = from_address or self._default_shipper()
@@ -270,15 +296,21 @@ class UPSClient:
 
         shipment = {
             'Shipper': {
-                'Name': shipper.get('name', ''), 'AttentionName': shipper.get('name', ''),
+                'Name':          shipper.get('name', ''),
+                'AttentionName': shipper.get('name', ''),
                 'ShipperNumber': self.carrier.connection_uuid,
-                'Phone': {'Number': (shipper.get('phone', '') or '').replace(' ', '')},
-                'Address': self._fmt_addr(shipper),
+                'Phone':         {'Number': (shipper.get('phone', '') or '').replace(' ', '')},
+                'Address':       self._fmt_addr(shipper),
             },
             'ShipTo': {
-                'Name': to_address.get('name', ''), 'AttentionName': to_address.get('name', ''),
-                'Phone': {'Number': (to_address.get('phone', '') or '').replace(' ', '')},
-                'Address': self._fmt_addr(to_address),
+                'Name':          to_address.get('name', ''),
+                'AttentionName': to_address.get('name', ''),
+                'Phone':         {'Number': (to_address.get('phone', '') or '').replace(' ', '')},
+                'Address':       self._fmt_addr(to_address),
+            },
+            'ShipFrom': {
+                'Name':    shipper.get('name', ''),
+                'Address': self._fmt_addr(shipper),
             },
             'PaymentInformation': {
                 'ShipmentCharge': [{'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}}],
@@ -301,19 +333,23 @@ class UPSClient:
 
         payload = {
             'ShipmentRequest': {
-                'Request': {'SubVersion': '2409', 'TransactionReference': {'CustomerContext': reference or 'minerva'}},
+                'Request': {
+                    'SubVersion':         _API_VERSION,
+                    'RequestOption':      'nonvalidate',
+                    'TransactionReference': {'CustomerContext': reference or 'minerva-bi'},
+                },
                 'Shipment': shipment,
                 'LabelSpecification': {
                     'LabelImageFormat': {'Code': label_format},
-                    'LabelStockSize': {'Height': '6', 'Width': '4'},
+                    'LabelStockSize':   {'Height': '6', 'Width': '4'},
                 },
             },
         }
 
-        data = self._post('/api/shipments/v2409/ship', payload)
-        resp = data.get('ShipmentResponse', {})
+        data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
+        resp         = data.get('ShipmentResponse', {})
         results_data = resp.get('ShipmentResults', {})
-        pkg_results = results_data.get('PackageResults', {})
+        pkg_results  = results_data.get('PackageResults', {})
         if isinstance(pkg_results, list):
             pkg_results = pkg_results[0] if pkg_results else {}
 
@@ -327,7 +363,7 @@ class UPSClient:
             'label_base64':    label_b64,
             'label_format':    label_format,
             'total_charge':    Decimal(charges.get('MonetaryValue', '0')),
-            'currency':        charges.get('CurrencyCode', 'USD'),
+            'currency':        charges.get('CurrencyCode', 'EUR'),
             'service_code':    service_code,
             'service_name':    UPS_SERVICES.get(service_code, ''),
         }
@@ -335,19 +371,19 @@ class UPSClient:
     # ── Tracking ──────────────────────────────────────────────────────────────
 
     def track(self, tracking_number: str) -> dict:
-        try:
-            data = self._get(
-                f'/api/track/v1/details/{tracking_number}',
-                params={'locale': 'en_US', 'returnMilestones': 'false'},
-            )
-        except UPSError:
-            raise
+        """GET /api/track/v1/details/{trackingNumber}"""
+        data = self._get(
+            f'/api/track/v1/details/{tracking_number}',
+            params={'locale': 'en_US', 'returnMilestones': 'false'},
+        )
 
         try:
             shipment = data['trackResponse']['shipment'][0]
-            package  = shipment.get('package', [{}])[0]
-            status   = package.get('currentStatus', {})
+            package  = shipment.get('package', [{}])
+            if isinstance(package, list):
+                package = package[0] if package else {}
 
+            status = package.get('currentStatus', {})
             events = []
             for act in package.get('activity', []):
                 loc  = act.get('location', {}).get('address', {})
@@ -381,14 +417,18 @@ class UPSClient:
         except (KeyError, IndexError) as e:
             logger.error('UPS tracking parse error: %s', e)
             return {
-                'tracking_number': tracking_number, 'status': 'UNKNOWN',
-                'status_description': 'Не вдалося отримати статус', 'events': [], 'delivered': False,
+                'tracking_number':    tracking_number,
+                'status':             'UNKNOWN',
+                'status_description': 'Не вдалося отримати статус',
+                'events':             [],
+                'delivered':          False,
             }
 
     # ── Void ──────────────────────────────────────────────────────────────────
 
     def void_shipment(self, shipment_id: str) -> dict:
-        url = f'{self.base_url}/api/shipments/v2409/void/cancel/{shipment_id}'
+        """DELETE /api/shipments/v2409/void/cancel/{shipmentId}"""
+        url = f'{self.base_url}/api/shipments/{_API_VERSION}/void/cancel/{shipment_id}'
         try:
             r = requests.delete(url, headers=self._headers(), timeout=30)
             if not r.ok:
@@ -426,7 +466,7 @@ class UPSClient:
 
     def _pkg_dict(self, pkg: dict) -> dict:
         p = {
-            'Packaging': {'Code': PACKAGING_CUSTOMER},
+            'Packaging':    {'Code': PACKAGING_CUSTOMER},
             'Dimensions': {
                 'UnitOfMeasurement': {'Code': 'CM'},
                 'Length': str(round(float(pkg.get('length_cm', 10)))),
@@ -443,11 +483,14 @@ class UPSClient:
         return p
 
     def _build_customs(self, info: dict) -> dict:
-        items_list = info.get('items', []) or [{
+        """Build InternationalForms payload for UPS Ship API."""
+        items_list = info.get('items') or [{
             'description': info.get('description', 'Goods'),
-            'quantity': 1, 'value': float(info.get('value_usd', 0)),
-            'weight_kg': 0.5, 'hs_code': '',
-            'country': self.carrier.sender_country or 'DE',
+            'quantity':    1,
+            'value':       float(info.get('value_usd', 0)),
+            'weight_kg':   0.5,
+            'hs_code':     '',
+            'country':     self.carrier.sender_country or 'DE',
         }]
 
         products = []
@@ -455,10 +498,10 @@ class UPSClient:
             prod = {
                 'Description': item.get('description', 'Goods')[:35],
                 'Unit': {
-                    'Number': str(item.get('quantity', 1)),
-                    'UnitOfMeasurement': {'Code': 'PCS'},
-                    'EstimatedValue': str(round(float(item.get('value', 0)), 2)),
-                    'CurrencyCode': info.get('currency', 'EUR'),
+                    'Number':             str(item.get('quantity', 1)),
+                    'UnitOfMeasurement':  {'Code': 'PCS'},
+                    'EstimatedValue':     str(round(float(item.get('value', 0)), 2)),
+                    'CurrencyCode':       info.get('currency', 'EUR'),
                 },
                 'OriginCountryCode': item.get('country', self.carrier.sender_country or 'DE'),
                 'NetWeight': {
@@ -470,11 +513,14 @@ class UPSClient:
                 prod['CommodityCode'] = item['hs_code']
             products.append(prod)
 
+        # ReasonForExport: 01=Sale, 02=Gift, 03=Sample, 04=Return, 05=Other
         contents_map = {'SALE': '01', 'GIFT': '02', 'SAMPLE': '03', 'RETURN': '04', 'OTHER': '05'}
         reason = contents_map.get(info.get('contents_type', 'SALE').upper(), '01')
 
         return {
-            'FormType': '01', 'Product': products,
-            'ReasonForExport': reason, 'CurrencyCode': info.get('currency', 'EUR'),
-            'DeclarationStatement': 'I hereby certify that the information is true and correct.',
+            'FormType':            '01',
+            'Product':             products,
+            'ReasonForExport':     reason,
+            'CurrencyCode':        info.get('currency', 'EUR'),
+            'DeclarationStatement': 'I hereby certify that the information on this invoice is true and correct.',
         }
