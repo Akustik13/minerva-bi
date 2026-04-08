@@ -29,11 +29,17 @@
 .mv-msg.user .mv-sender { color: var(--text-muted); text-align: right; }
 .mv-msg.bot  .mv-sender { color: var(--gold); }
 .mv-msg.user .mv-bubble {
-  background: var(--accent); color: #0d1117;
   border-radius: 14px 4px 14px 14px;
 }
+:root .mv-msg.user .mv-bubble,
+[data-theme="dark"] .mv-msg.user .mv-bubble {
+  background: #1f6feb; color: #ffffff;
+}
 [data-theme="light"] .mv-msg.user .mv-bubble {
-  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  background: #dbeafe; color: #1c2128;
+}
+[data-theme="minerva"] .mv-msg.user .mv-bubble {
+  background: #c9a84c; color: #0a0e1a;
 }
 .mv-msg.bot .mv-bubble {
   background: var(--bg-card-2, var(--bg-hover)); color: var(--text);

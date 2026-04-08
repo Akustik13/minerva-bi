@@ -1547,13 +1547,20 @@ window.addEventListener('appinstalled', function() {
   font-size: 13px; line-height: 1.45; white-space: pre-wrap; word-break: break-word;
 }
 .mv-cp-msg.user .mv-cp-bubble {
-  /* dark/minerva: accent is light → dark text; light theme overrides below */
-  background: var(--accent); color: #0d1117;
   border-radius: 12px 3px 12px 12px;
 }
+/* Dark: medium-dark blue bg → white text */
+:root .mv-cp-msg.user .mv-cp-bubble,
+[data-theme="dark"] .mv-cp-msg.user .mv-cp-bubble {
+  background: #1f6feb; color: #ffffff;
+}
+/* Light: pale blue bg → dark text */
 [data-theme="light"] .mv-cp-msg.user .mv-cp-bubble {
-  /* light accent = #0969da (dark blue) → white text OK */
-  color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.35);
+  background: #dbeafe; color: #1c2128;
+}
+/* Minerva: gold bg → dark text */
+[data-theme="minerva"] .mv-cp-msg.user .mv-cp-bubble {
+  background: #c9a84c; color: #0a0e1a;
 }
 .mv-cp-msg.bot .mv-cp-bubble {
   background: var(--bg-hover); color: var(--text);
