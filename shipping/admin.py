@@ -131,6 +131,52 @@ class CarrierAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#f44336">❌ Немає</span>')
     has_credentials.short_description = "API ключ"
 
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path('<int:pk>/test-ups-token/',
+                 self.admin_site.admin_view(self.test_ups_token_view),
+                 name='carrier_test_ups_token'),
+            path('<int:pk>/test-ups-rates/',
+                 self.admin_site.admin_view(self.test_ups_rates_view),
+                 name='carrier_test_ups_rates'),
+        ]
+        return custom + urls
+
+    def test_ups_token_view(self, request, pk):
+        from .ups_client import UPSClient, UPSError
+        carrier = get_object_or_404(Carrier, pk=pk)
+        try:
+            client = UPSClient(carrier=carrier)
+            token = client.get_token()
+            return JsonResponse({
+                'ok': True,
+                'message': f'Токен отримано ({len(token)} симв.)',
+                'mode': 'Sandbox' if (carrier.api_url or '').lower() == 'sandbox' else 'Production',
+            })
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+
+    def test_ups_rates_view(self, request, pk):
+        from .ups_client import UPSClient, UPSError
+        carrier = get_object_or_404(Carrier, pk=pk)
+        try:
+            client = UPSClient(carrier=carrier)
+            rates = client.get_rates(
+                to_address={
+                    'name': 'Test Recipient', 'address_line': '100 Main St',
+                    'city': 'New York', 'state': 'NY',
+                    'postal': '10001', 'country': 'US',
+                },
+                packages=[{'weight_kg': 1.0, 'length_cm': 20, 'width_cm': 15, 'height_cm': 10}],
+            )
+            return JsonResponse({'ok': True, 'rates': [
+                {'name': r['name'], 'price': str(r['price']), 'currency': r['currency']}
+                for r in rates[:8]
+            ]})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+
 
 # ── ShipmentPackage Inline ────────────────────────────────────────────────────
 

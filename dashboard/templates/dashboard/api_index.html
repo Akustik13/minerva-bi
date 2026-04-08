@@ -336,10 +336,44 @@
         <a href="/admin/shipping/carrier/{% if ups_carrier %}{{ ups_carrier.pk }}/change/{% else %}add/{% endif %}" class="api-btn api-btn-prim">
           {% if ups_carrier %}Налаштування{% else %}+ Додати{% endif %}
         </a>
-        {% if ups_carrier %}
+        {% if ups_carrier and ups_carrier.api_key %}
+        <button class="api-btn api-btn-sec" onclick="upsTest('token')">🔌 Токен</button>
+        <button class="api-btn api-btn-sec" onclick="upsTest('rates')">💰 Тарифи</button>
         <a href="/admin/shipping/shipment/order-tracking/" class="api-btn api-btn-sec">📡 Трекінг</a>
         {% endif %}
       </div>
+      {% if ups_carrier and ups_carrier.api_key %}
+      <div id="ups-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
+           font-size:12px;border:1px solid var(--border-strong);background:var(--bg-input)"></div>
+      <script>
+      function upsTest(mode) {
+        var el = document.getElementById('ups-test-result');
+        el.style.display = 'block';
+        el.style.color = 'var(--text-muted)';
+        el.textContent = '⏳ Тестуємо...';
+        var url = '/admin/shipping/carrier/{{ ups_carrier.pk }}/' + (mode === 'token' ? 'test-ups-token/' : 'test-ups-rates/');
+        fetch(url, {headers: {'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''}})
+          .then(r => r.json())
+          .then(d => {
+            if (d.ok) {
+              if (mode === 'token') {
+                el.style.color = 'var(--ok)';
+                el.textContent = '✅ ' + d.message + ' · Режим: ' + d.mode;
+              } else {
+                el.style.color = 'var(--ok)';
+                var lines = (d.rates || []).map(r => r.name + ': ' + r.price + ' ' + r.currency).join('\n');
+                el.textContent = '✅ Тарифи (' + (d.rates||[]).length + '):\n' + (lines || '—');
+                el.style.whiteSpace = 'pre';
+              }
+            } else {
+              el.style.color = 'var(--err)';
+              el.textContent = '❌ ' + (d.error || 'Помилка');
+            }
+          })
+          .catch(e => { el.style.color = 'var(--err)'; el.textContent = '❌ ' + e; });
+      }
+      </script>
+      {% endif %}
     </div>
 
   </div>
