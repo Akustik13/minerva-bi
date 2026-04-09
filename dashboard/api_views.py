@@ -30,7 +30,8 @@ def api_index(request):
                          .filter(carrier_type='dhl', is_active=True)
                          .exclude(api_key='')
                          .first())
-    ups_carrier     = Carrier.objects.filter(carrier_type='ups', is_active=True).first()
+    ups_carrier     = Carrier.objects.filter(carrier_type='ups',   is_active=True).first()
+    fedex_carrier   = Carrier.objects.filter(carrier_type='fedex', is_active=True).first()
 
     # DigiKey
     try:
@@ -50,6 +51,7 @@ def api_index(request):
         'dhl_carrier':     dhl_carrier,
         'dhl_track_ok':    dhl_track_ok,
         'ups_carrier':     ups_carrier,
+        'fedex_carrier':   fedex_carrier,
         'digikey':         digikey,
         'digikey_ok':      digikey_ok,
     })

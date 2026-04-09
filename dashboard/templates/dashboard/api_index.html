@@ -377,6 +377,45 @@
       {% endif %}
     </div>
 
+    <!-- FedEx -->
+    <div class="api-card" style="--card-accent:#4d148c">
+      <div class="api-card-head">
+        <span class="api-card-icon" style="background:#4d148c;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:800;color:#ff6200;letter-spacing:-.5px">FedEx</span>
+        <div style="margin-left:4px">
+          <div class="api-card-title">FedEx</div>
+          <div class="api-card-sub">Rates, Shipments, Tracking, Cancel</div>
+        </div>
+      </div>
+      {% if fedex_carrier and fedex_carrier.api_key %}
+      <div class="api-status ok">🟢 Налаштовано</div>
+      <div class="api-meta">
+        <b>Акаунт:</b> {{ fedex_carrier.name }}<br>
+        <b>Account №:</b> {{ fedex_carrier.connection_uuid|default:"—" }}<br>
+        <b>Mode:</b> {% if fedex_carrier.api_url == "sandbox" %}Sandbox{% else %}Production{% endif %}
+      </div>
+      {% elif fedex_carrier %}
+      <div class="api-status warn">⚠️ Client ID не вказано</div>
+      <div class="api-meta">Заповни API ключ (Client ID) у налаштуваннях перевізника.</div>
+      {% else %}
+      <div class="api-status off">⚪ Не налаштовано</div>
+      <div class="api-meta">
+        Додай Carrier типу FedEx.<br>
+        Ключі: <code style="color:var(--accent)">developer.fedex.com</code> → My Projects → Credentials
+      </div>
+      {% endif %}
+      <ul class="api-endpoint-list">
+        <li><span class="api-method m-post">POST</span><span class="api-path">/rate/v1/rates/quotes</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/ship/v1/shipments</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/track/v1/trackingnumbers</span></li>
+        <li><span class="api-method m-put">PUT</span><span class="api-path">/ship/v1/shipments/cancel</span></li>
+      </ul>
+      <div class="api-actions">
+        <a href="/admin/shipping/carrier/{% if fedex_carrier %}{{ fedex_carrier.pk }}/change/{% else %}add/{% endif %}" class="api-btn api-btn-prim">
+          {% if fedex_carrier %}Налаштування{% else %}+ Додати{% endif %}
+        </a>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Section 3: Marketplace APIs ── -->
