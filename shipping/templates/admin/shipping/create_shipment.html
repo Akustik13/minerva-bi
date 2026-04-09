@@ -130,6 +130,7 @@ function _fillSenderFromCarrier(){
   set('sender_zip',     d.zip     || '');
   set('sender_country', d.country || '');
   set('sender_phone',   d.phone   || '');
+  set('sender_email',   d.email   || '');
 }
 // Mark field as manually edited so carrier switch won't overwrite it
 function _markEdited(el){ el.dataset.edited = '1'; }
@@ -144,6 +145,8 @@ function swapAddresses(){
     ['sender_zip',     'recipient_zip'],
     ['sender_country', 'recipient_country'],
     ['sender_phone',   'recipient_phone'],
+    ['sender_email',   'recipient_email'],
+    ['sender_state',   'recipient_state'],
   ];
   const g = n => document.querySelector(`[name="${n}"]`);
   pairs.forEach(([s, r]) => {
@@ -726,43 +729,64 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="sh-field">
           <label class="sh-label">Ім'я</label>
           <input class="sh-input" type="text" name="sender_name"
-            value="{{ shipment.carrier.sender_name|default:'' }}"
-            oninput="_markEdited(this)" placeholder="Назва компанії або ім'я">
+            value="{{ shipment.sender_name|default:shipment.carrier.sender_name|default:'' }}"
+            {% if shipment.sender_name %}data-edited="1"{% endif %}
+            oninput="_markEdited(this)">
         </div>
         <div class="sh-field">
           <label class="sh-label">Компанія</label>
           <input class="sh-input" type="text" name="sender_company"
-            value="{{ shipment.carrier.sender_company|default:'' }}"
+            value="{{ shipment.sender_company|default:shipment.carrier.sender_company|default:'' }}"
+            {% if shipment.sender_company %}data-edited="1"{% endif %}
             oninput="_markEdited(this)">
         </div>
         <div class="sh-field full">
           <label class="sh-label">Вулиця, будинок</label>
           <input class="sh-input" type="text" name="sender_street"
-            value="{{ shipment.carrier.sender_street|default:'' }}"
+            value="{{ shipment.sender_street|default:shipment.carrier.sender_street|default:'' }}"
+            {% if shipment.sender_street %}data-edited="1"{% endif %}
             oninput="_markEdited(this)">
         </div>
         <div class="sh-field">
           <label class="sh-label">Місто</label>
           <input class="sh-input" type="text" name="sender_city"
-            value="{{ shipment.carrier.sender_city|default:'' }}"
+            value="{{ shipment.sender_city|default:shipment.carrier.sender_city|default:'' }}"
+            {% if shipment.sender_city %}data-edited="1"{% endif %}
             oninput="_markEdited(this)">
         </div>
         <div class="sh-field">
           <label class="sh-label">Поштовий індекс</label>
           <input class="sh-input" type="text" name="sender_zip"
-            value="{{ shipment.carrier.sender_zip|default:'' }}"
+            value="{{ shipment.sender_zip|default:shipment.carrier.sender_zip|default:'' }}"
+            {% if shipment.sender_zip %}data-edited="1"{% endif %}
             oninput="_markEdited(this)">
+        </div>
+        <div class="sh-field">
+          <label class="sh-label">Штат / провінція</label>
+          <input class="sh-input" type="text" name="sender_state"
+            value="{{ shipment.sender_state|default:'' }}"
+            {% if shipment.sender_state %}data-edited="1"{% endif %}
+            oninput="_markEdited(this)" placeholder="CA, NY…">
         </div>
         <div class="sh-field">
           <label class="sh-label">Країна (ISO 2)</label>
           <input class="sh-input" type="text" name="sender_country"
-            value="{{ shipment.carrier.sender_country|default:'DE' }}"
+            value="{{ shipment.sender_country|default:shipment.carrier.sender_country|default:'DE' }}"
+            {% if shipment.sender_country %}data-edited="1"{% endif %}
             maxlength="2" oninput="_markEdited(this)" placeholder="DE">
         </div>
         <div class="sh-field">
           <label class="sh-label">Телефон</label>
           <input class="sh-input" type="text" name="sender_phone"
-            value="{{ shipment.carrier.sender_phone|default:'' }}"
+            value="{{ shipment.sender_phone|default:shipment.carrier.sender_phone|default:'' }}"
+            {% if shipment.sender_phone %}data-edited="1"{% endif %}
+            oninput="_markEdited(this)">
+        </div>
+        <div class="sh-field">
+          <label class="sh-label">Email</label>
+          <input class="sh-input" type="email" name="sender_email"
+            value="{{ shipment.sender_email|default:shipment.carrier.sender_email|default:'' }}"
+            {% if shipment.sender_email %}data-edited="1"{% endif %}
             oninput="_markEdited(this)">
         </div>
       </div>

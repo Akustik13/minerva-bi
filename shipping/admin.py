@@ -906,6 +906,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             sender_zip     = request.POST.get("sender_zip", ""),
             sender_country = request.POST.get("sender_country", "").upper()[:2],
             sender_phone   = request.POST.get("sender_phone", ""),
+            sender_state   = request.POST.get("sender_state", ""),
+            sender_email   = request.POST.get("sender_email", ""),
             recipient_name    = request.POST.get("recipient_name", ""),
             recipient_company = request.POST.get("recipient_company", ""),
             recipient_street  = request.POST.get("recipient_street", ""),
@@ -1156,6 +1158,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         shipment.sender_zip     = request.POST.get("sender_zip", "")
         shipment.sender_country = request.POST.get("sender_country", "").upper()[:2]
         shipment.sender_phone   = request.POST.get("sender_phone", "")
+        shipment.sender_state   = request.POST.get("sender_state", "")
+        shipment.sender_email   = request.POST.get("sender_email", "")
         shipment.recipient_name    = request.POST.get("recipient_name", "")
         shipment.recipient_company = request.POST.get("recipient_company", "")
         shipment.recipient_street  = request.POST.get("recipient_street", "")
@@ -2023,6 +2027,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'company':      shipment.sender_company or c.sender_company or '',
             'address_line': shipment.sender_street  or c.sender_street or '',
             'city':         shipment.sender_city    or c.sender_city   or '',
+            'state':        shipment.sender_state   or '',
             'postal':       shipment.sender_zip     or c.sender_zip    or '',
             'country':      shipment.sender_country or c.sender_country or 'DE',
             'phone':        shipment.sender_phone   or c.sender_phone  or '',

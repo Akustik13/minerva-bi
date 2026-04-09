@@ -104,6 +104,8 @@ class Shipment(models.Model):
     sender_zip     = models.CharField("ZIP відправника", max_length=20, blank=True, default="")
     sender_country = models.CharField("Країна відправника (ISO 2)", max_length=2, blank=True, default="")
     sender_phone   = models.CharField("Телефон відправника", max_length=50, blank=True, default="")
+    sender_state   = models.CharField("Штат / провінція відправника", max_length=100, blank=True, default="")
+    sender_email   = models.EmailField("Email відправника", blank=True, default="")
 
     # ── Дані отримувача (копіюються з замовлення при створенні) ───────────────
     recipient_name    = models.CharField("Контактна особа", max_length=255, blank=True, default="")
