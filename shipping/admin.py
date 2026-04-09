@@ -698,6 +698,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.ups_void_view),
                 name="shipping_shipment_ups_void",
             ),
+            path(
+                "<int:shipment_id>/fedex-confirm/",
+                self.admin_site.admin_view(self.fedex_confirm_view),
+                name="shipping_shipment_fedex_confirm",
+            ),
+            path(
+                "<int:shipment_id>/fedex-book/",
+                self.admin_site.admin_view(self.fedex_book_view),
+                name="shipping_shipment_fedex_book",
+            ),
         ]
         return custom + urls
 
@@ -1110,6 +1120,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 + f"?service_code={ups_code}"
             )
 
+        if action == "fedex_book" and carrier:
+            fedex_code = request.POST.get("fedex_service_code", "FEDEX_PRIORITY").strip() or "FEDEX_PRIORITY"
+            messages.success(request, f"✅ Відправлення #{shipment.pk} збережено. Перевірте дані перед відправкою…")
+            return redirect(
+                reverse("admin:shipping_shipment_fedex_confirm", args=[shipment.pk])
+                + f"?service_code={fedex_code}"
+            )
+
         messages.success(request, f"✅ Відправлення #{shipment.pk} збережено як чернетку.")
         return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
 
@@ -1325,6 +1343,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return redirect(
                 reverse("admin:shipping_shipment_ups_confirm", args=[shipment.pk])
                 + f"?service_code={ups_code}"
+            )
+
+        if action == "fedex_book" and carrier:
+            fedex_code = request.POST.get("fedex_service_code", "FEDEX_PRIORITY").strip() or "FEDEX_PRIORITY"
+            messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено. Перевірте дані перед відправкою…")
+            return redirect(
+                reverse("admin:shipping_shipment_fedex_confirm", args=[shipment.pk])
+                + f"?service_code={fedex_code}"
             )
 
         messages.success(request, f"✅ Відправлення #{shipment.pk} збережено.")
@@ -2079,6 +2105,118 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
 
+    # ── FedEx Confirm / Book ──────────────────────────────────────────────────
+
+    def fedex_confirm_view(self, request, shipment_id):
+        """GET — Preview даних перед відправкою через FedEx API.
+           POST — redirect to fedex_book_view."""
+        from .fedex_client import FedExClient, FedExError, FEDEX_SERVICES
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        service_code = (
+            request.POST.get('service_code') or request.GET.get('service_code', 'FEDEX_PRIORITY')
+        ).strip() or 'FEDEX_PRIORITY'
+        service_name = FEDEX_SERVICES.get(service_code, service_code)
+
+        if request.method == 'POST':
+            return redirect(
+                reverse('admin:shipping_shipment_fedex_book', args=[shipment.pk])
+                + f'?service_code={service_code}'
+            )
+
+        shipper  = self._ups_extract_shipper(shipment)
+        to_addr  = self._ups_extract_address(shipment)
+        packages = self._ups_extract_packages(shipment)
+        customs  = self._ups_extract_customs(shipment)
+        is_intl  = (to_addr.get('country', 'DE').upper() != (shipper.get('country') or 'DE').upper())
+        back_url = reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk])
+
+        price = None
+        if shipment.carrier_price:
+            price = shipment.carrier_price
+
+        context = admin.site.each_context(request)
+        context.update({
+            'title':        f'Підтвердити FedEx #{shipment.pk}',
+            'shipment':     shipment,
+            'service_code': service_code,
+            'service_name': service_name,
+            'shipper':      shipper,
+            'to_addr':      to_addr,
+            'packages':     packages,
+            'customs':      customs,
+            'is_intl':      is_intl,
+            'price':        price,
+            'confirm_url':  reverse('admin:shipping_shipment_fedex_confirm', args=[shipment.pk]),
+            'back_url':     back_url,
+        })
+        return render(request, 'admin/shipping/fedex_confirm.html', context)
+
+    def fedex_book_view(self, request, shipment_id):
+        """Оформлює відправлення через FedEx API → зберігає трекінг і label."""
+        import base64 as _b64
+        import os
+        from .fedex_client import FedExClient, FedExError, FEDEX_SERVICES
+
+        shipment     = get_object_or_404(Shipment, pk=shipment_id)
+        service_code = (request.GET.get('service_code') or 'FEDEX_PRIORITY').strip() or 'FEDEX_PRIORITY'
+
+        shipper  = self._ups_extract_shipper(shipment)
+        to_addr  = self._ups_extract_address(shipment)
+        packages = self._ups_extract_packages(shipment)
+        customs  = self._ups_extract_customs(shipment)
+        is_intl  = (to_addr.get('country', 'DE').upper() != (shipper.get('country') or 'DE').upper())
+
+        try:
+            client = FedExClient(carrier=shipment.carrier)
+            result = client.create_shipment(
+                to_address   = to_addr,
+                packages     = packages,
+                service_code = service_code,
+                from_address = shipper,
+                customs_info = customs if is_intl else None,
+                reference    = str(shipment.reference or shipment.pk),
+            )
+        except FedExError as e:
+            messages.error(request, f'❌ FedEx API: {e}')
+            return redirect(reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk]))
+        except Exception as e:
+            messages.error(request, f'❌ Помилка: {type(e).__name__}: {e}')
+            return redirect(reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk]))
+
+        # Зберігаємо результат
+        shipment.tracking_number     = result.get('tracking_number') or result.get('master_tracking') or ''
+        shipment.carrier_shipment_id = result.get('master_tracking') or result.get('tracking_number') or ''
+        shipment.carrier_price       = result.get('total_charge') or shipment.carrier_price
+        shipment.carrier_currency    = result.get('currency', 'EUR')
+        shipment.status              = Shipment.Status.LABEL_CREATED
+
+        # Зберігаємо PDF-етикетку
+        label_b64 = result.get('label_base64', '')
+        if label_b64:
+            try:
+                label_dir  = os.path.join('media', 'labels', 'fedex')
+                os.makedirs(label_dir, exist_ok=True)
+                label_path = os.path.join(label_dir, f'fedex_{shipment.pk}.pdf')
+                with open(label_path, 'wb') as f:
+                    f.write(_b64.b64decode(label_b64))
+                shipment.label_pdf = label_path
+            except Exception:
+                pass
+
+        shipment.save(update_fields=[
+            'tracking_number', 'carrier_shipment_id',
+            'carrier_price', 'carrier_currency', 'status', 'label_pdf',
+        ])
+
+        svc_name = FEDEX_SERVICES.get(service_code, service_code)
+        messages.success(
+            request,
+            f'✅ FedEx відправлення створено! Трекінг: {shipment.tracking_number} '
+            f'| Сервіс: {svc_name} | Вартість: {result.get("total_charge", "—")} {result.get("currency", "EUR")}'
+        )
+        return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
     def _ups_extract_shipper(self, shipment) -> dict:
         """Адреса відправника: shipment.sender_* → fallback carrier.*"""
         c = shipment.carrier
@@ -2450,6 +2588,47 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                         entry["error"] = f"{type(e).__name__}: {str(e)[:200]}"
                 else:
                     entry["error"] = "UPS: заповніть Client ID, Client Secret і Account Number"
+
+            elif carrier.carrier_type == "fedex":
+                if carrier.api_key and carrier.api_secret and carrier.connection_uuid:
+                    from .fedex_client import FedExClient, FedExError
+                    try:
+                        client = FedExClient(carrier)
+                        to_addr = {
+                            'name':         'Recipient',
+                            'address_line': '',
+                            'city':         dest_city,
+                            'postal':       dest_postal,
+                            'country':      dest_country,
+                        }
+                        from_addr_fedex = {
+                            'name':         sender_override.get('name') or carrier.sender_name or carrier.sender_company or '',
+                            'address_line': sender_override.get('address_line') or carrier.sender_street or '',
+                            'city':         sender_override.get('city') or carrier.sender_city or '',
+                            'postal':       sender_override.get('postal') or carrier.sender_zip or '',
+                            'country':      sender_override.get('country') or carrier.sender_country or 'DE',
+                        }
+                        pkgs = [{'weight_kg': weight, 'length_cm': length,
+                                 'width_cm': width, 'height_cm': height}]
+                        rates = client.get_rates(to_addr, pkgs, from_address=from_addr_fedex)
+                        entry["products"] = [
+                            {
+                                "name":          r['name'],
+                                "code":          r['code'],
+                                "price":         float(r['price']),
+                                "currency":      r['currency'],
+                                "transit_days":  r.get('transit_days'),
+                                "delivery_date": r.get('delivery_date') or '',
+                                "guaranteed":    r.get('guaranteed', False),
+                            }
+                            for r in rates
+                        ]
+                    except FedExError as e:
+                        entry["error"] = str(e)
+                    except Exception as e:
+                        entry["error"] = f"{type(e).__name__}: {str(e)[:200]}"
+                else:
+                    entry["error"] = "FedEx: заповніть Client ID, Client Secret і Account Number"
 
             else:
                 entry["note"] = "Rate shopping не підтримується"

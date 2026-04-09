@@ -1,0 +1,259 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}{{ title }} | Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; <a href="{{ back_url }}">Чернетка #{{ shipment.pk }}</a>
+  &rsaquo; Підтвердити FedEx
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .fc-wrap  { max-width: 860px; margin: 0 auto; padding: 0 0 48px; }
+  .fc-card  { background: var(--bg-card); border: 1px solid var(--border-strong);
+              border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .fc-head  { background: var(--bg-card-2); padding: 10px 16px; font-size: 12px;
+              font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+              color: var(--text-muted); display: flex; align-items: center; gap: 8px;
+              border-bottom: 1px solid var(--border-strong); }
+  .fc-body  { padding: 14px 16px; }
+  .fc-row   { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .fc-row:last-child { margin-bottom: 0; }
+  .fc-lbl   { color: var(--text-dim); min-width: 140px; flex-shrink: 0; }
+  .fc-val   { color: var(--text); font-weight: 500; }
+  .fc-val.ok     { color: var(--ok);     font-weight: 700; }
+  .fc-val.accent { color: var(--accent); font-weight: 700; }
+  .fc-2col  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:700px){ .fc-2col { grid-template-columns: 1fr; } }
+  .fc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .fc-table th { background: var(--bg-card-2); color: var(--text-muted); padding: 8px 10px;
+                 text-align: left; font-weight: 600; border-bottom: 1px solid var(--border-strong); }
+  .fc-table td { padding: 8px 10px; color: var(--text); border-bottom: 1px solid var(--border); }
+  .fc-table tr:last-child td { border-bottom: none; }
+  .fc-actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+  .btn-confirm { background: #4d148c; color: #fff; border: none; padding: 12px 28px;
+                 border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer;
+                 transition: opacity .15s; }
+  .btn-confirm:hover { opacity: .85; }
+  .btn-back   { background: var(--bg-card-2); color: var(--text-muted);
+                border: 1px solid var(--border-strong); padding: 12px 20px;
+                border-radius: 6px; font-size: 13px; font-weight: 600;
+                text-decoration: none; transition: background .15s; display: inline-block; }
+  .btn-back:hover { background: var(--bg-hover); color: var(--text); }
+  .warn-banner { background: var(--bg-card-2); border: 1px solid var(--warn);
+                 border-left: 4px solid var(--warn); border-radius: 6px;
+                 padding: 12px 16px; color: var(--warn); font-size: 13px; margin-bottom: 16px; }
+</style>
+
+<div class="fc-wrap">
+  <h1 style="color:var(--text);font-size:20px;margin-bottom:20px">
+    🟣 Перевірте дані перед відправкою через FedEx API
+  </h1>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="warn-banner">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Сервіс -->
+  <div class="fc-card">
+    <div class="fc-head">🚚 Обраний сервіс FedEx</div>
+    <div class="fc-body">
+      <div class="fc-row">
+        <span class="fc-lbl">Сервіс</span>
+        <span class="fc-val accent">{{ service_name }}</span>
+      </div>
+      <div class="fc-row">
+        <span class="fc-lbl">Код</span>
+        <span class="fc-val" style="font-family:monospace">{{ service_code }}</span>
+      </div>
+      {% if shipment.carrier %}
+      <div class="fc-row">
+        <span class="fc-lbl">Акаунт FedEx</span>
+        <span class="fc-val">{{ shipment.carrier.name }}</span>
+      </div>
+      {% endif %}
+      {% if price %}
+      <div class="fc-row">
+        <span class="fc-lbl">Орієнтовна вартість</span>
+        <span class="fc-val ok">{{ price }} EUR</span>
+      </div>
+      {% endif %}
+      <div class="fc-row">
+        <span class="fc-lbl">Reference</span>
+        <span class="fc-val" style="font-family:monospace">{{ shipment.reference|default:shipment.pk }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Відправник / Отримувач -->
+  <div class="fc-2col">
+
+    <div class="fc-card">
+      <div class="fc-head">📤 Відправник</div>
+      <div class="fc-body">
+        {% if shipper.company %}
+        <div class="fc-row"><span class="fc-lbl">Компанія</span>
+          <span class="fc-val">{{ shipper.company }}</span></div>
+        {% endif %}
+        <div class="fc-row"><span class="fc-lbl">Ім'я</span>
+          <span class="fc-val">{{ shipper.name|default:"—" }}</span></div>
+        <div class="fc-row"><span class="fc-lbl">Вулиця</span>
+          <span class="fc-val">{{ shipper.address_line|default:"—" }}</span></div>
+        <div class="fc-row"><span class="fc-lbl">Місто / ZIP</span>
+          <span class="fc-val">{{ shipper.city|default:"—" }}, {{ shipper.postal|default:"" }}</span></div>
+        {% if shipper.state %}
+        <div class="fc-row"><span class="fc-lbl">Штат</span>
+          <span class="fc-val">{{ shipper.state }}</span></div>
+        {% endif %}
+        <div class="fc-row"><span class="fc-lbl">Країна</span>
+          <span class="fc-val">{{ shipper.country|default:"DE" }}</span></div>
+        {% if shipper.phone %}
+        <div class="fc-row"><span class="fc-lbl">Телефон</span>
+          <span class="fc-val">{{ shipper.phone }}</span></div>
+        {% endif %}
+        {% if shipper.email %}
+        <div class="fc-row"><span class="fc-lbl">Email</span>
+          <span class="fc-val">{{ shipper.email }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="fc-card">
+      <div class="fc-head">📥 Отримувач</div>
+      <div class="fc-body">
+        {% if to_addr.company %}
+        <div class="fc-row"><span class="fc-lbl">Компанія</span>
+          <span class="fc-val">{{ to_addr.company }}</span></div>
+        {% endif %}
+        <div class="fc-row"><span class="fc-lbl">Ім'я</span>
+          <span class="fc-val">{{ to_addr.name|default:"—" }}</span></div>
+        <div class="fc-row"><span class="fc-lbl">Вулиця</span>
+          <span class="fc-val">{{ to_addr.address_line|default:"—" }}</span></div>
+        <div class="fc-row"><span class="fc-lbl">Місто / ZIP</span>
+          <span class="fc-val">{{ to_addr.city|default:"—" }}, {{ to_addr.postal|default:"" }}</span></div>
+        {% if to_addr.state %}
+        <div class="fc-row"><span class="fc-lbl">Штат / Регіон</span>
+          <span class="fc-val">{{ to_addr.state }}</span></div>
+        {% endif %}
+        <div class="fc-row"><span class="fc-lbl">Країна</span>
+          <span class="fc-val{% if is_intl %} accent{% endif %}">{{ to_addr.country|default:"—" }}
+            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> (міжнародне)</span>{% endif %}
+          </span></div>
+        {% if to_addr.phone %}
+        <div class="fc-row"><span class="fc-lbl">Телефон</span>
+          <span class="fc-val">{{ to_addr.phone }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Коробки -->
+  <div class="fc-card">
+    <div class="fc-head">📦 Коробки ({{ packages|length }} шт.)</div>
+    <div class="fc-body" style="padding:0">
+      <table class="fc-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Вага (кг)</th>
+            <th>Довжина (см)</th>
+            <th>Ширина (см)</th>
+            <th>Висота (см)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in packages %}
+          <tr>
+            <td style="color:var(--text-dim)">{{ forloop.counter }}</td>
+            <td style="color:var(--ok);font-weight:700">{{ p.weight_kg }}</td>
+            <td>{{ p.length_cm }}</td>
+            <td>{{ p.width_cm }}</td>
+            <td>{{ p.height_cm }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Митна декларація -->
+  {% if customs and is_intl %}
+  <div class="fc-card">
+    <div class="fc-head">🛃 Митна декларація</div>
+    <div class="fc-body">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
+        <span><span class="fc-lbl" style="display:inline">Валюта: </span>
+          <b>{{ customs.currency|default:"EUR" }}</b></span>
+        <span><span class="fc-lbl" style="display:inline">Тип: </span>
+          <b>{{ customs.contents_type|default:"SALE" }}</b></span>
+        {% if customs.description %}
+        <span><span class="fc-lbl" style="display:inline">Опис: </span>
+          <b>{{ customs.description }}</b></span>
+        {% endif %}
+      </div>
+      {% if customs.items %}
+      <table class="fc-table">
+        <thead>
+          <tr>
+            <th>Опис</th>
+            <th style="text-align:center">К-сть</th>
+            <th style="text-align:right">Вартість</th>
+            <th>Вага нетто</th>
+            <th>Походження</th>
+            <th>HS код</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in customs.items %}
+          <tr>
+            <td>{{ item.description|default:"—" }}</td>
+            <td style="text-align:center">{{ item.quantity }}</td>
+            <td style="text-align:right;color:var(--ok);font-weight:700">
+              {{ item.value }} {{ customs.currency|default:"EUR" }}</td>
+            <td style="color:var(--text-muted)">{{ item.weight_kg }} кг</td>
+            <td style="color:var(--text-muted)">{{ item.country|default:"—" }}</td>
+            <td style="color:var(--text-dim);font-family:monospace">{{ item.hs_code|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Підтвердження -->
+  <div class="fc-card">
+    <div class="fc-head">⚠️ Підтвердження</div>
+    <div class="fc-body">
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
+        Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
+        Minerva викличе <b style="color:var(--text)">FedEx REST API</b> і
+        <b style="color:var(--text)">створить реальне відправлення</b> у системі FedEx.
+        Буде списано кошти з акаунту <b>{{ shipment.carrier.connection_uuid|default:"FedEx" }}</b>.
+      </p>
+      <form method="post" action="{{ confirm_url }}" id="fedex-confirm-form">
+        {% csrf_token %}
+        <input type="hidden" name="service_code" value="{{ service_code }}">
+      </form>
+    </div>
+  </div>
+
+  <!-- Кнопки -->
+  <div class="fc-actions">
+    <button type="submit" form="fedex-confirm-form" class="btn-confirm"
+      onclick="return confirm('Відправити через FedEx API?\n\nСервіс: {{ service_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі FedEx і списано кошти з акаунту.')">
+      🟣 Підтвердити і відправити через FedEx
+    </button>
+    <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
+  </div>
+
+</div>
+{% endblock %}

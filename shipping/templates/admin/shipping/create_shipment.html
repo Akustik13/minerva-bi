@@ -251,6 +251,17 @@ document.addEventListener('DOMContentLoaded',function(){
       const h = document.createElement('input');
       h.type='hidden'; h.name='action_btn'; h.value='ups_book';
       form.appendChild(h); form.submit();
+
+    } else if(d.carrierType === 'fedex'){
+      if(!confirm(`Зберегти і оформити FedEx "${d.name}" за ${priceF.toFixed(2)} ${d.currency||'EUR'}?`)) return;
+      const radio = document.querySelector(`[name="carrier"][value="${d.carrierId}"]`);
+      if(radio) radio.checked = true;
+      document.getElementById('id_fedex_service_code').value = d.code;
+      document.getElementById('id_fedex_service_name').value = d.name;
+      document.getElementById('id_fedex_price').value        = d.price;
+      const h = document.createElement('input');
+      h.type='hidden'; h.name='action_btn'; h.value='fedex_book';
+      form.appendChild(h); form.submit();
     }
   });
 });
@@ -449,6 +460,13 @@ function makeBookBtn(c, p, small){
       data-price="${p.price}" data-currency="${escAttr(p.currency||'EUR')}"
       style="background:#5d4037;color:#fff;border:none;${pad};cursor:pointer;font-weight:700;white-space:nowrap">
       🟤 UPS</button>`;
+  if(c.carrier_type==='fedex')
+    return `<button type="button" class="cmp-book-btn"
+      data-carrier-type="fedex" data-carrier-id="${c.carrier_id}"
+      data-code="${escAttr(p.code)}" data-name="${escAttr(p.name)}"
+      data-price="${p.price}" data-currency="${escAttr(p.currency||'EUR')}"
+      style="background:#4d148c;color:#fff;border:none;${pad};cursor:pointer;font-weight:700;white-space:nowrap">
+      🟣 FedEx</button>`;
   return '';
 }
 
@@ -1140,6 +1158,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <input type="hidden" name="ups_service_code"   id="id_ups_service_code"   value="">
     <input type="hidden" name="ups_service_name"   id="id_ups_service_name"   value="">
     <input type="hidden" name="ups_price"          id="id_ups_price"          value="">
+    <input type="hidden" name="fedex_service_code" id="id_fedex_service_code" value="">
+    <input type="hidden" name="fedex_service_name" id="id_fedex_service_name" value="">
+    <input type="hidden" name="fedex_price"        id="id_fedex_price"        value="">
 
     <div class="sh-actions">
       <button type="submit" name="action_btn" value="submit" class="btn-submit">
