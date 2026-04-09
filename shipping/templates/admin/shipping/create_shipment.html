@@ -134,6 +134,27 @@ function _fillSenderFromCarrier(){
 // Mark field as manually edited so carrier switch won't overwrite it
 function _markEdited(el){ el.dataset.edited = '1'; }
 
+function swapAddresses(){
+  const pairs = [
+    ['sender_name',    'recipient_name'],
+    ['sender_company', 'recipient_company'],
+    ['sender_street',  'recipient_street'],
+    ['sender_city',    'recipient_city'],
+    ['sender_zip',     'recipient_zip'],
+    ['sender_country', 'recipient_country'],
+    ['sender_phone',   'recipient_phone'],
+  ];
+  const g = n => document.querySelector(`[name="${n}"]`);
+  pairs.forEach(([s, r]) => {
+    const se = g(s), re = g(r);
+    if(!se || !re) return;
+    const tmp = se.value;
+    se.value = re.value;
+    re.value = tmp;
+    se.dataset.edited = '1';
+  });
+}
+
 function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
   if(weight==='' || weight===null || weight===undefined) weight = _DEFAULT_CA_WEIGHT;
   return `<tr class="ca-row" style="border-bottom:1px solid var(--border)">
@@ -744,6 +765,17 @@ document.addEventListener('DOMContentLoaded', function() {
             oninput="_markEdited(this)">
         </div>
       </div>
+    </div>
+
+    <!-- Swap кнопка -->
+    <div style="text-align:center;margin:-8px 0 4px">
+      <button type="button" onclick="swapAddresses()" title="Поміняти відправника і отримувача місцями"
+        style="background:var(--bg-card-2);border:1px solid var(--border-strong);color:var(--text-muted);
+               border-radius:20px;padding:5px 16px;font-size:12px;cursor:pointer;transition:all .15s"
+        onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--accent-2,#2196f3)'"
+        onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border-strong)'">
+        ⇅ Поміняти відправника і отримувача
+      </button>
     </div>
 
     <!-- Отримувач -->
