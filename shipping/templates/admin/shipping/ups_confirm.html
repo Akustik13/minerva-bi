@@ -107,7 +107,11 @@
     <div class="uc-card">
       <div class="uc-head">📤 Відправник</div>
       <div class="uc-body">
-        <div class="uc-row"><span class="uc-lbl">Ім'я / Компанія</span>
+        {% if shipper.company %}
+        <div class="uc-row"><span class="uc-lbl">Компанія</span>
+          <span class="uc-val">{{ shipper.company }}</span></div>
+        {% endif %}
+        <div class="uc-row"><span class="uc-lbl">Ім'я</span>
           <span class="uc-val">{{ shipper.name|default:"—" }}</span></div>
         <div class="uc-row"><span class="uc-lbl">Вулиця</span>
           <span class="uc-val">{{ shipper.address_line|default:"—" }}</span></div>
@@ -125,7 +129,11 @@
     <div class="uc-card">
       <div class="uc-head">📥 Отримувач</div>
       <div class="uc-body">
-        <div class="uc-row"><span class="uc-lbl">Ім'я / Компанія</span>
+        {% if to_addr.company %}
+        <div class="uc-row"><span class="uc-lbl">Компанія</span>
+          <span class="uc-val">{{ to_addr.company }}</span></div>
+        {% endif %}
+        <div class="uc-row"><span class="uc-lbl">Ім'я</span>
           <span class="uc-val">{{ to_addr.name|default:"—" }}</span></div>
         <div class="uc-row"><span class="uc-lbl">Вулиця</span>
           <span class="uc-val">{{ to_addr.address_line|default:"—" }}</span></div>

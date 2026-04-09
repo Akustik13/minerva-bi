@@ -2031,6 +2031,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     def _ups_extract_address(self, shipment) -> dict:
         return {
             'name':         shipment.recipient_name or shipment.recipient_company or 'Recipient',
+            'company':      shipment.recipient_company or '',
             'address_line': shipment.recipient_street or '',
             'city':         shipment.recipient_city or '',
             'state':        shipment.recipient_state or '',
@@ -2064,15 +2065,50 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         order = shipment.order
         # Пропустити якщо внутрішнє відправлення
         dest = (shipment.recipient_country or '').upper()
-        from .ups_client import UPSClient
-        try:
-            from_c = UPSClient().carrier.sender_country or 'DE'
-        except Exception:
-            from_c = 'DE'
-        from_c = from_c.upper()
-        if dest == from_c:
+        shipper_country = (shipment.sender_country or '').upper()
+        if not shipper_country:
+            from .ups_client import UPSClient
+            try:
+                shipper_country = UPSClient().carrier.sender_country or 'DE'
+            except Exception:
+                shipper_country = 'DE'
+        shipper_country = shipper_country.upper()
+        if dest == shipper_country:
             return None
 
+        reason_map = {
+            'Commercial': 'SALE', 'Gift': 'GIFT', 'Personal': 'GIFT',
+            'Return': 'RETURN', 'Claim': 'OTHER',
+        }
+        currency = shipment.declared_currency or 'EUR'
+        contents_type = reason_map.get(shipment.export_reason, 'SALE')
+
+        # ── Пріоритет: customs_articles збережені з форми ──────────────────
+        saved = shipment.customs_articles or {}
+        saved_lines = saved.get('customs_line_items') or []
+        if saved_lines:
+            items = []
+            for li in saved_lines:
+                if not li.get('description', '').strip():
+                    continue
+                items.append({
+                    'description': li.get('description', '')[:35],
+                    'quantity':    int(li.get('quantity') or 1),
+                    'value':       float(li.get('value') or 0),
+                    'weight_kg':   float(li.get('weight') or 0.1),
+                    'hs_code':     li.get('customs_number', '') or '',
+                    'country':     (li.get('origin_country') or shipper_country).upper(),
+                })
+            if items:
+                return {
+                    'description':   f'Order #{order.order_number}',
+                    'value_usd':     sum(i['value'] for i in items),
+                    'currency':      (saved_lines[0].get('currency') or currency).upper(),
+                    'contents_type': contents_type,
+                    'items':         items,
+                }
+
+        # ── Fallback: будуємо з рядків замовлення ──────────────────────────
         items = []
         for line in order.lines.select_related('product').all():
             product = getattr(line, 'product', None)
@@ -2082,26 +2118,22 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 'value':       float(getattr(line, 'total_price', 0) or 0),
                 'weight_kg':   float(getattr(product, 'weight', 0.1) or 0.1) if product else 0.1,
                 'hs_code':     getattr(product, 'hs_code', '') or '',
-                'country':     from_c,
+                'country':     shipper_country,
             })
 
         if not items:
             return {
-                'description': shipment.description or f'Order #{order.order_number}',
-                'value_usd':   float(shipment.declared_value or 0),
-                'currency':    shipment.declared_currency or 'EUR',
-                'contents_type': 'SALE',
+                'description':   shipment.description or f'Order #{order.order_number}',
+                'value_usd':     float(shipment.declared_value or 0),
+                'currency':      currency,
+                'contents_type': contents_type,
             }
 
-        reason_map = {
-            'Commercial': 'SALE', 'Gift': 'GIFT', 'Personal': 'GIFT',
-            'Return': 'RETURN', 'Claim': 'OTHER',
-        }
         return {
             'description':   f'Order #{order.order_number}',
             'value_usd':     sum(i['value'] for i in items),
-            'currency':      shipment.declared_currency or 'EUR',
-            'contents_type': reason_map.get(shipment.export_reason, 'SALE'),
+            'currency':      currency,
+            'contents_type': contents_type,
             'items':         items,
         }
 
