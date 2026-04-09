@@ -413,7 +413,43 @@
         <a href="/admin/shipping/carrier/{% if fedex_carrier %}{{ fedex_carrier.pk }}/change/{% else %}add/{% endif %}" class="api-btn api-btn-prim">
           {% if fedex_carrier %}Налаштування{% else %}+ Додати{% endif %}
         </a>
+        {% if fedex_carrier and fedex_carrier.api_key %}
+        <button class="api-btn api-btn-sec" onclick="fedexTest('token')">🔌 Токен</button>
+        <button class="api-btn api-btn-sec" onclick="fedexTest('rates')">💰 Тарифи</button>
+        {% endif %}
       </div>
+      {% if fedex_carrier and fedex_carrier.api_key %}
+      <div id="fedex-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
+           font-size:12px;border:1px solid var(--border-strong);background:var(--bg-input)"></div>
+      <script>
+      function fedexTest(mode) {
+        var el = document.getElementById('fedex-test-result');
+        el.style.display = 'block';
+        el.style.color = 'var(--text-muted)';
+        el.textContent = '⏳ Тестуємо...';
+        var url = '/admin/shipping/carrier/{{ fedex_carrier.pk }}/' + (mode === 'token' ? 'test-fedex-token/' : 'test-fedex-rates/');
+        fetch(url, {headers: {'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''}})
+          .then(r => r.json())
+          .then(d => {
+            if (d.ok) {
+              if (mode === 'token') {
+                el.style.color = 'var(--ok)';
+                el.textContent = '✅ ' + d.message + ' · Режим: ' + d.mode;
+              } else {
+                el.style.color = 'var(--ok)';
+                var lines = (d.rates || []).map(r => r.name + ': ' + r.price + ' ' + r.currency).join('\n');
+                el.textContent = '✅ ' + (d.route || '') + '\n' + (lines || '— тарифів немає');
+                el.style.whiteSpace = 'pre';
+              }
+            } else {
+              el.style.color = 'var(--err)';
+              el.textContent = '❌ ' + (d.error || 'Помилка');
+            }
+          })
+          .catch(e => { el.style.color = 'var(--err)'; el.textContent = '❌ ' + e; });
+      }
+      </script>
+      {% endif %}
     </div>
 
   </div>
