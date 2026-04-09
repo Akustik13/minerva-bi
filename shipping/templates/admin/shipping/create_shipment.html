@@ -113,7 +113,7 @@ select.sh-input {
 <script>
 const _EU = new Set('{{ eu_countries_js }}'.split(','));
 {% localize off %}const _DEFAULT_CA_WEIGHT = {{ default_ca_weight|default:'1' }};{% endlocalize %}
-const _CARRIERS_SENDER = {{ carriers_sender_json|default:'{}' }};
+const _CARRIERS_SENDER = {{ carriers_sender_json|default:'{}'|safe }};
 
 function _fillSenderFromCarrier(){
   const radio = document.querySelector('[name="carrier"]:checked');
