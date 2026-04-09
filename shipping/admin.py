@@ -1773,7 +1773,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "is_shop_tariff":  is_shop_tariff,
             "default_pickup":  default_pickup.strftime("%Y-%m-%d"),
             "confirm_url":     reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]),
-            "back_url":        reverse("admin:shipping_shipment_rates", args=[shipment.pk]),
+            "back_url":        reverse("admin:shipping_shipment_edit_draft", args=[shipment.pk]),
         })
 
     # ── UPS Views ─────────────────────────────────────────────────────────────
