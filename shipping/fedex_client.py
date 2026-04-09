@@ -258,10 +258,11 @@ class FedExClient:
                 currency = total.get('currency', currency)
                 total = total.get('amount', 0)
 
-            # Transit days
-            commit = entry.get('operationalDetail', {})
-            transit_days  = commit.get('transitTime', '') or ''
-            delivery_date = commit.get('deliveryDate', '') or ''  # 'YYYY-MM-DD'
+            # Transit days — FedEx returns data in 'commit' OR 'operationalDetail'
+            commit        = entry.get('commit', {})
+            op_detail     = entry.get('operationalDetail', {})
+            transit_days  = (commit.get('transitTime') or op_detail.get('transitTime') or '')
+            delivery_date = (commit.get('deliveryDate') or op_detail.get('deliveryDate') or '')  # 'YYYY-MM-DD'
 
             # Map 'ONE_DAY' / 'TWO_DAYS' etc. → integer
             transit_int = _parse_transit_days(transit_days)

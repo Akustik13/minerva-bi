@@ -577,8 +577,9 @@ function buildTable(c){
   const isDHL     = c.carrier_type==='dhl';
   const isJumingo = c.carrier_type==='jumingo';
   const isUPS     = c.carrier_type==='ups';
-  const hasAction = isDHL||isJumingo||isUPS;
-  const showDate  = isDHL||isUPS;
+  const isFedEx   = c.carrier_type==='fedex';
+  const hasAction = isDHL||isJumingo||isUPS||isFedEx;
+  const showDate  = isDHL||isUPS||isFedEx;
 
   let h = `<table style="width:100%;border-collapse:collapse;font-size:12px">
     <thead><tr style="background:var(--bg-app)">
