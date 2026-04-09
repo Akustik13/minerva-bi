@@ -715,19 +715,34 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         # Авто-активувати multi-package: якщо є кілька типів коробок АБО qty > 1
         pkg_auto = len(pkg_rows) > 1 or (len(pkg_rows) == 1 and pkg_rows[0]["quantity"] > 1)
 
+        carriers_sender = {
+            str(c.pk): {
+                "name":    c.sender_name or c.sender_company or "",
+                "company": c.sender_company or "",
+                "street":  c.sender_street or "",
+                "city":    c.sender_city or "",
+                "zip":     c.sender_zip or "",
+                "country": c.sender_country or "DE",
+                "phone":   c.sender_phone or "",
+                "email":   c.sender_email or "",
+            }
+            for c in carriers
+        } if carriers else {}
+
         return render(request, "admin/shipping/create_shipment.html", {
             **self.admin_site.each_context(request),
-            "order":              order,
-            "shipment":           shipment,
-            "carriers":           carriers,
-            "packaging_hint":     packaging_hint,
-            "customs_articles":   customs_articles,
-            "needs_customs":      needs_customs,
-            "eu_countries_js":    ",".join(sorted(eu_countries)),
-            "default_ca_weight":  default_ca_weight,
-            "title":              f"Нове відправлення — {order.order_number}",
-            "pkg_rows_json":      _json.dumps(pkg_rows),
-            "pkg_auto":           pkg_auto,
+            "order":               order,
+            "shipment":            shipment,
+            "carriers":            carriers,
+            "carriers_sender_json": _json.dumps(carriers_sender),
+            "packaging_hint":      packaging_hint,
+            "customs_articles":    customs_articles,
+            "needs_customs":       needs_customs,
+            "eu_countries_js":     ",".join(sorted(eu_countries)),
+            "default_ca_weight":   default_ca_weight,
+            "title":               f"Нове відправлення — {order.order_number}",
+            "pkg_rows_json":       _json.dumps(pkg_rows),
+            "pkg_auto":            pkg_auto,
         })
 
     def _fill_packaging_from_order(self, shipment):
@@ -1073,11 +1088,27 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         n_articles = len(customs_articles) or 1
         default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 3)
 
+        import json as _json2
+        carriers_sender_edit = {
+            str(c.pk): {
+                "name":    c.sender_name or c.sender_company or "",
+                "company": c.sender_company or "",
+                "street":  c.sender_street or "",
+                "city":    c.sender_city or "",
+                "zip":     c.sender_zip or "",
+                "country": c.sender_country or "DE",
+                "phone":   c.sender_phone or "",
+                "email":   c.sender_email or "",
+            }
+            for c in carriers
+        }
+
         return render(request, "admin/shipping/create_shipment.html", {
             **self.admin_site.each_context(request),
             "order":                order,
             "shipment":             shipment,
             "carriers":             carriers,
+            "carriers_sender_json": _json2.dumps(carriers_sender_edit),
             "packaging_hint":       None,
             "customs_articles":     customs_articles,
             "customs_invoice_type": inv_type,

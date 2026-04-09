@@ -113,6 +113,31 @@ select.sh-input {
 <script>
 const _EU = new Set('{{ eu_countries_js }}'.split(','));
 {% localize off %}const _DEFAULT_CA_WEIGHT = {{ default_ca_weight|default:'1' }};{% endlocalize %}
+const _CARRIERS_SENDER = {{ carriers_sender_json|default:'{}' }};
+
+function _updateSenderCard(){
+  const radio = document.querySelector('[name="carrier"]:checked');
+  const card  = document.getElementById('sender-card-body');
+  if(!card) return;
+  const data = radio ? (_CARRIERS_SENDER[radio.value] || {}) : {};
+  const row = (lbl, val) => val
+    ? `<div style="display:flex;gap:8px;margin-bottom:5px;font-size:13px">
+         <span style="color:var(--text-dim);min-width:120px;flex-shrink:0">${lbl}</span>
+         <span style="color:var(--text);font-weight:500">${esc(val)}</span>
+       </div>`
+    : '';
+  if(!data.name && !data.street && !data.city){
+    card.innerHTML = '<div style="color:var(--text-dim);font-size:12px">Оберіть перевізника для перегляду даних відправника.</div>';
+    return;
+  }
+  card.innerHTML =
+    row('Ім\'я / Компанія', data.name + (data.company && data.company !== data.name ? ' / ' + data.company : ''))
+    + row('Вулиця',          data.street)
+    + row('Місто / ZIP',     (data.city || '') + (data.zip ? ', ' + data.zip : ''))
+    + row('Країна',          data.country)
+    + row('Телефон',         data.phone)
+    + row('Email',           data.email);
+}
 
 function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
   if(weight==='' || weight===null || weight===undefined) weight = _DEFAULT_CA_WEIGHT;
@@ -155,9 +180,11 @@ function updateCustomsCard(){
 document.addEventListener('DOMContentLoaded',function(){
   updateCustomsCard();
   updateCaTotal();
+  _updateSenderCard();
   const ci=document.querySelector('[name="recipient_country"]');
   if(ci){ ci.addEventListener('input',updateCustomsCard); ci.addEventListener('change',updateCustomsCard); }
   document.getElementById('customs-rows')?.addEventListener('input',updateCaTotal);
+  document.querySelectorAll('[name="carrier"]').forEach(r=>r.addEventListener('change', _updateSenderCard));
 
   // Кнопки оформлення в таблиці порівняння (event delegation)
   const _rr = document.getElementById('rates-results');
@@ -654,6 +681,22 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       {% endif %}
     </div>
+
+    <!-- Відправник (з налаштувань перевізника, read-only) -->
+    {% if carriers %}
+    <div class="sh-card">
+      <div class="sh-card-title" style="justify-content:space-between">
+        <span>📤 Відправник</span>
+        <a href="{% url 'admin:shipping_carrier_changelist' %}"
+           target="_blank"
+           style="font-size:10px;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0;text-decoration:none"
+           title="Редагувати дані відправника у налаштуваннях перевізника">✏️ змінити →</a>
+      </div>
+      <div id="sender-card-body">
+        <div style="color:var(--text-dim);font-size:12px">Оберіть перевізника для перегляду даних відправника.</div>
+      </div>
+    </div>
+    {% endif %}
 
     <!-- Отримувач -->
     <div class="sh-card">
