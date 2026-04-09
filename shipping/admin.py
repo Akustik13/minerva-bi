@@ -899,6 +899,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             order=order,
             carrier=carrier,
             status=Shipment.Status.DRAFT,
+            sender_name    = request.POST.get("sender_name", ""),
+            sender_company = request.POST.get("sender_company", ""),
+            sender_street  = request.POST.get("sender_street", ""),
+            sender_city    = request.POST.get("sender_city", ""),
+            sender_zip     = request.POST.get("sender_zip", ""),
+            sender_country = request.POST.get("sender_country", "").upper()[:2],
+            sender_phone   = request.POST.get("sender_phone", ""),
             recipient_name    = request.POST.get("recipient_name", ""),
             recipient_company = request.POST.get("recipient_company", ""),
             recipient_street  = request.POST.get("recipient_street", ""),
@@ -1141,7 +1148,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.status        = Shipment.Status.DRAFT
             shipment.error_message = ""
 
-        shipment.carrier           = carrier
+        shipment.carrier       = carrier
+        shipment.sender_name    = request.POST.get("sender_name", "")
+        shipment.sender_company = request.POST.get("sender_company", "")
+        shipment.sender_street  = request.POST.get("sender_street", "")
+        shipment.sender_city    = request.POST.get("sender_city", "")
+        shipment.sender_zip     = request.POST.get("sender_zip", "")
+        shipment.sender_country = request.POST.get("sender_country", "").upper()[:2]
+        shipment.sender_phone   = request.POST.get("sender_phone", "")
         shipment.recipient_name    = request.POST.get("recipient_name", "")
         shipment.recipient_company = request.POST.get("recipient_company", "")
         shipment.recipient_street  = request.POST.get("recipient_street", "")
@@ -1807,7 +1821,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             to_addr = self._ups_extract_address(shipment)
             packages = self._ups_extract_packages(shipment)
             customs  = self._ups_extract_customs(shipment)
-            shipper  = client._default_shipper()
+            shipper  = self._ups_extract_shipper(shipment)
         except UPSError as e:
             messages.error(request, f'❌ UPS налаштування: {e}')
             return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
@@ -1867,10 +1881,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             packages = self._ups_extract_packages(shipment)
             customs  = self._ups_extract_customs(shipment)
 
+            shipper = self._ups_extract_shipper(shipment)
             result = client.create_shipment(
                 to_address=to_addr,
                 packages=packages,
                 service_code=service_code,
+                from_address=shipper,
                 customs_info=customs or None,
                 reference=shipment.reference or str(shipment.pk),
             )
@@ -1998,6 +2014,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             messages.error(request, f'❌ UPS Void: {e}')
 
         return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+    def _ups_extract_shipper(self, shipment) -> dict:
+        """Адреса відправника: shipment.sender_* → fallback carrier.*"""
+        c = shipment.carrier
+        return {
+            'name':         shipment.sender_name    or c.sender_name or c.sender_company or 'Sender',
+            'company':      shipment.sender_company or c.sender_company or '',
+            'address_line': shipment.sender_street  or c.sender_street or '',
+            'city':         shipment.sender_city    or c.sender_city   or '',
+            'postal':       shipment.sender_zip     or c.sender_zip    or '',
+            'country':      shipment.sender_country or c.sender_country or 'DE',
+            'phone':        shipment.sender_phone   or c.sender_phone  or '',
+        }
 
     def _ups_extract_address(self, shipment) -> dict:
         return {

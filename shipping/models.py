@@ -96,6 +96,15 @@ class Shipment(models.Model):
     status  = models.CharField("Статус", max_length=20,
                                choices=Status.choices, default=Status.DRAFT)
 
+    # ── Дані відправника (перекривають Carrier якщо заповнені) ───────────────
+    sender_name    = models.CharField("Ім'я відправника", max_length=200, blank=True, default="")
+    sender_company = models.CharField("Компанія відправника", max_length=200, blank=True, default="")
+    sender_street  = models.CharField("Вулиця відправника", max_length=300, blank=True, default="")
+    sender_city    = models.CharField("Місто відправника", max_length=100, blank=True, default="")
+    sender_zip     = models.CharField("ZIP відправника", max_length=20, blank=True, default="")
+    sender_country = models.CharField("Країна відправника (ISO 2)", max_length=2, blank=True, default="")
+    sender_phone   = models.CharField("Телефон відправника", max_length=50, blank=True, default="")
+
     # ── Дані отримувача (копіюються з замовлення при створенні) ───────────────
     recipient_name    = models.CharField("Контактна особа", max_length=255, blank=True, default="")
     recipient_company = models.CharField("Компанія", max_length=255, blank=True, default="")
