@@ -110,6 +110,9 @@
         {% if a.phone %}
         <div class="jc-row"><span class="jc-lbl">Телефон</span><span class="jc-val">{{ a.phone }}</span></div>
         {% endif %}
+        {% with email=a.settings.email %}{% if email %}
+        <div class="jc-row"><span class="jc-lbl">Email</span><span class="jc-val">{{ email }}</span></div>
+        {% endif %}{% endwith %}
         {% endwith %}
       </div>
     </div>
