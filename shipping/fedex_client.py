@@ -35,7 +35,12 @@ FEDEX_SERVICES = {
     'STANDARD_OVERNIGHT':        'FedEx Standard Overnight',
     'PRIORITY_OVERNIGHT':        'FedEx Priority Overnight',
     'FIRST_OVERNIGHT':           'FedEx First Overnight',
-    # International
+    # International / Europe (returned by sandbox API)
+    'FEDEX_PRIORITY':                         'FedEx Priority',
+    'FEDEX_PRIORITY_EXPRESS':                 'FedEx Priority Express',
+    'FEDEX_PRIORITY_FREIGHT':                 'FedEx Priority Freight',
+    'FEDEX_PRIORITY_EXPRESS_FREIGHT':         'FedEx Priority Express Freight',
+    'FEDEX_ECONOMY':                          'FedEx Economy',
     'INTERNATIONAL_ECONOMY':                  'FedEx International Economy',
     'INTERNATIONAL_PRIORITY':                 'FedEx International Priority',
     'INTERNATIONAL_PRIORITY_EXPRESS':         'FedEx International Priority Express',
@@ -44,7 +49,7 @@ FEDEX_SERVICES = {
     'INTERNATIONAL_ECONOMY_FREIGHT':          'FedEx International Economy Freight',
     'INTERNATIONAL_PRIORITY_FREIGHT':         'FedEx International Priority Freight',
     # Europe intra
-    'FEDEX_REGIONAL_ECONOMY':    'FedEx Regional Economy',
+    'FEDEX_REGIONAL_ECONOMY':         'FedEx Regional Economy',
     'FEDEX_REGIONAL_ECONOMY_FREIGHT': 'FedEx Regional Economy Freight',
 }
 
