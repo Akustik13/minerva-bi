@@ -149,6 +149,12 @@ class CarrierAdmin(admin.ModelAdmin):
             path('<int:pk>/test-fedex-rates/',
                  self.admin_site.admin_view(self.test_fedex_rates_view),
                  name='carrier_test_fedex_rates'),
+            path('<int:pk>/test-dhl-rates/',
+                 self.admin_site.admin_view(self.test_dhl_rates_view),
+                 name='carrier_test_dhl_rates'),
+            path('<int:pk>/test-jumingo-rates/',
+                 self.admin_site.admin_view(self.test_jumingo_rates_view),
+                 name='carrier_test_jumingo_rates'),
         ]
         return custom + urls
 
@@ -248,6 +254,74 @@ class CarrierAdmin(admin.ModelAdmin):
                     {'name': r['name'], 'price': str(r['price']), 'currency': r['currency'],
                      'transit_days': r.get('transit_days'), 'delivery_date': r.get('delivery_date', '')}
                     for r in rates[:8]
+                ],
+            })
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+
+    def test_dhl_rates_view(self, request, pk):
+        from .services.dhl import get_rates as _dhl_rates
+        carrier = get_object_or_404(Carrier, pk=pk)
+        origin = (carrier.sender_country or 'DE').upper()
+        _test_dest = {
+            'DE': {'city': 'Munich',   'postal': '80331',    'country': 'DE'},
+            'AT': {'city': 'Vienna',   'postal': '1010',     'country': 'AT'},
+            'CH': {'city': 'Zurich',   'postal': '8001',     'country': 'CH'},
+            'PL': {'city': 'Warsaw',   'postal': '00-272',   'country': 'PL'},
+            'GB': {'city': 'London',   'postal': 'WC2N 5HR', 'country': 'GB'},
+            'US': {'city': 'New York', 'postal': '10001',    'country': 'US'},
+        }
+        to = _test_dest.get(origin, {'city': carrier.sender_city or 'Berlin',
+                                      'postal': carrier.sender_zip or '10115', 'country': origin})
+        try:
+            r = _dhl_rates(carrier, to['country'], to['postal'], to['city'], 1.0, 20, 15, 10)
+            if r.get('error'):
+                return JsonResponse({'ok': False, 'error': r['error']})
+            return JsonResponse({
+                'ok': True,
+                'route': f"{origin} → {to['country']} ({to['city']})",
+                'rates': [
+                    {'name': p.get('name', ''), 'price': str(p.get('price', '0')),
+                     'currency': p.get('currency', 'EUR'),
+                     'transit_days': p.get('transit_days'), 'delivery_date': p.get('delivery_date', '')}
+                    for p in (r.get('products') or [])[:8]
+                ],
+            })
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+
+    def test_jumingo_rates_view(self, request, pk):
+        from .services.jumingo import get_service
+        carrier = get_object_or_404(Carrier, pk=pk)
+        origin = (carrier.sender_country or 'DE').upper()
+        _test_dest = {
+            'DE': {'city': 'Munich', 'postal': '80331', 'country': 'DE'},
+            'AT': {'city': 'Vienna', 'postal': '1010',  'country': 'AT'},
+            'PL': {'city': 'Warsaw', 'postal': '00-272','country': 'PL'},
+            'GB': {'city': 'London', 'postal': 'WC2N 5HR','country': 'GB'},
+        }
+        to = _test_dest.get(origin, {'city': 'Berlin', 'postal': '10115', 'country': 'DE'})
+        try:
+            service = get_service(carrier)
+            r = service.get_rates_preview(to['country'], to['postal'], to['city'], 1.0, 20, 15, 10)
+            preview_id = r.get('preview_id')
+            if preview_id:
+                try:
+                    service.delete_shipment(preview_id)
+                except Exception:
+                    pass
+            if r.get('error'):
+                return JsonResponse({'ok': False, 'error': r['error']})
+            tariffs = r.get('tariffs') or []
+            return JsonResponse({
+                'ok': True,
+                'route': f"{origin} → {to['country']} ({to['city']})",
+                'rates': [
+                    {'name': f"{(t.get('shipper') or {}).get('name','')} {t.get('name','')}".strip(),
+                     'price': str(t.get('price_brutto', 0)), 'currency': t.get('currency', 'EUR'),
+                     'transit_days': ((t.get('dates') or {}).get('transit_time_range') or {}).get('days'),
+                     'delivery_date': ''}
+                    for t in tariffs[:8]
                 ],
             })
         except Exception as e:
@@ -633,6 +707,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "ups-track-lookup/",
                 self.admin_site.admin_view(self.ups_track_lookup_view),
                 name="shipping_ups_track_lookup",
+            ),
+            path(
+                "fedex-track-lookup/",
+                self.admin_site.admin_view(self.fedex_track_lookup_view),
+                name="shipping_fedex_track_lookup",
             ),
             path(
                 "<int:shipment_id>/dhl-cancel/",
@@ -2416,6 +2495,42 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "error":       error,
             "no_key":      no_key,
             "ups_carrier": ups_carrier,
+        })
+
+    def fedex_track_lookup_view(self, request):
+        from .fedex_client import FedExClient, FedExError
+        fedex_carrier = (
+            Carrier.objects
+            .filter(carrier_type="fedex", is_active=True)
+            .exclude(api_key="")
+            .order_by("-is_default", "pk")
+            .first()
+        )
+        tracking_number = request.GET.get("tn", "").strip()
+        result = None
+        error  = None
+        no_key = not fedex_carrier
+
+        if tracking_number and fedex_carrier:
+            try:
+                client = FedExClient(fedex_carrier)
+                result = client.track(tracking_number)
+                if result.get("status") == "UNKNOWN" and not result.get("events"):
+                    error  = result.get("status_description") or "Не вдалося отримати статус"
+                    result = None
+            except FedExError as e:
+                error = str(e)
+            except Exception as e:
+                error = f"{type(e).__name__}: {e}"
+
+        return render(request, "admin/shipping/fedex_track_lookup.html", {
+            **self.admin_site.each_context(request),
+            "title":           "🔍 FedEx Трекінг",
+            "tracking_number": tracking_number,
+            "result":          result,
+            "error":           error,
+            "no_key":          no_key,
+            "fedex_carrier":   fedex_carrier,
         })
 
     # ── Compare rates (AJAX) ──────────────────────────────────────────────────

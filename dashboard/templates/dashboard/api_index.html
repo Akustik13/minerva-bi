@@ -227,28 +227,40 @@
         <li><span class="api-method m-get">GET</span><span class="api-path">/v1/shipments/{id}</span></li>
       </ul>
       <div class="api-actions">
-        <a href="/admin/shipping/carrier/" class="api-btn api-btn-prim">Carrier</a>
-        <a href="/admin/shipping/shipment/" class="api-btn api-btn-sec">Відправлення</a>
+        <a href="/admin/shipping/carrier/{% if jumingo_carrier %}{{ jumingo_carrier.pk }}/change/{% else %}add/{% endif %}" class="api-btn api-btn-prim">
+          {% if jumingo_carrier %}Налаштування{% else %}+ Додати{% endif %}
+        </a>
+        {% if jumingo_carrier %}
+        <button class="api-btn api-btn-sec" onclick="carrierTest('jumingo','rates')">💰 Тарифи</button>
+        <a href="/admin/shipping/shipment/" class="api-btn api-btn-sec">📦 Відправлення</a>
+        {% endif %}
         <a href="{% url 'api_console' %}?preset=jumingo" class="api-btn api-btn-cons">Console</a>
       </div>
+      {% if jumingo_carrier %}
+      <div id="jumingo-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
+           font-size:12px;border:1px solid var(--border-strong);background:var(--bg-input)"></div>
+      {% endif %}
     </div>
 
-    <!-- DHL Rates -->
+    <!-- DHL -->
     <div class="api-card" style="--card-accent:#ffcc00">
       <div class="api-card-head">
         <span class="api-card-icon" style="background:#ffcc00;border-radius:4px;padding:2px 6px;font-size:14px;font-weight:800;color:#000">DHL</span>
         <div style="margin-left:4px">
-          <div class="api-card-title">DHL Express — Тарифи</div>
-          <div class="api-card-sub">MyDHL API · Rate Shopping</div>
+          <div class="api-card-title">DHL Express</div>
+          <div class="api-card-sub">MyDHL API · Rates &amp; Tracking</div>
         </div>
       </div>
-      {% if dhl_carrier %}
-      <div class="api-status ok">🟢 Налаштовано</div>
+      {% if dhl_carrier and dhl_carrier.api_key %}
+      <div class="api-status ok">🟢 Налаштовано{% if dhl_track_ok %} · Трекінг ✓{% endif %}</div>
       <div class="api-meta">
         <b>Акаунт:</b> {{ dhl_carrier.name }}<br>
         <b>Account №:</b> {{ dhl_carrier.connection_uuid|default:"—" }}<br>
         <b>Mode:</b> {% if dhl_carrier.api_url == "test" %}Sandbox{% else %}Production{% endif %}
       </div>
+      {% elif dhl_carrier %}
+      <div class="api-status warn">⚠️ API Key не вказано</div>
+      <div class="api-meta">Заповни API Key/Secret у налаштуваннях перевізника.</div>
       {% else %}
       <div class="api-status off">⚪ Не налаштовано</div>
       <div class="api-meta">
@@ -258,45 +270,25 @@
       {% endif %}
       <ul class="api-endpoint-list">
         <li><span class="api-method m-get">GET</span><span class="api-path">mydhlapi/rates</span></li>
-      </ul>
-      <div class="api-actions">
-        <a href="/admin/shipping/carrier/" class="api-btn api-btn-prim">Carrier</a>
-        <a href="{% url 'api_console' %}?preset=dhl" class="api-btn api-btn-cons">Console</a>
-      </div>
-    </div>
-
-    <!-- DHL Tracking -->
-    <div class="api-card" style="--card-accent:#f9a825">
-      <div class="api-card-head">
-        <span class="api-card-icon" style="background:#f9a825;border-radius:4px;padding:2px 6px;font-size:14px;font-weight:800;color:#000">DHL</span>
-        <div style="margin-left:4px">
-          <div class="api-card-title">DHL Tracking</div>
-          <div class="api-card-sub">Shipment Tracking – Unified API</div>
-        </div>
-      </div>
-      {% if dhl_track_ok %}
-      <div class="api-status ok">🟢 Ключ налаштовано</div>
-      {% elif dhl_carrier %}
-      <div class="api-status warn">⚠️ Tracking API Key не вказано</div>
-      {% else %}
-      <div class="api-status off">⚪ Не налаштовано</div>
-      {% endif %}
-      <div class="api-meta">
-        Пошук будь-якого відправлення DHL за трекінг-номером.<br>
-        {% if not dhl_track_ok %}
-        Ключ: <code style="color:var(--accent)">developer.dhl.com</code> → My Apps →<br>
-        <b>Shipment Tracking – Unified</b> → API Key
-        {% endif %}
-      </div>
-      <ul class="api-endpoint-list">
+        <li><span class="api-method m-post">POST</span><span class="api-path">mydhlapi/shipments</span></li>
         <li><span class="api-method m-get">GET</span><span class="api-path">api-eu.dhl.com/track/shipments</span></li>
       </ul>
       <div class="api-actions">
-        <a href="/admin/shipping/shipment/dhl-track-lookup/" class="api-btn api-btn-prim">🔍 Трекінг</a>
-        {% if not dhl_track_ok %}
-        <a href="/admin/shipping/carrier/" class="api-btn api-btn-sec">Налаштувати</a>
+        <a href="/admin/shipping/carrier/{% if dhl_carrier %}{{ dhl_carrier.pk }}/change/{% else %}add/{% endif %}" class="api-btn api-btn-prim">
+          {% if dhl_carrier %}Налаштування{% else %}+ Додати{% endif %}
+        </a>
+        {% if dhl_carrier and dhl_carrier.api_key %}
+        <button class="api-btn api-btn-sec" onclick="carrierTest('dhl','rates')">💰 Тарифи</button>
         {% endif %}
+        {% if dhl_track_ok %}
+        <a href="/admin/shipping/shipment/dhl-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
+        {% endif %}
+        <a href="{% url 'api_console' %}?preset=dhl" class="api-btn api-btn-cons">Console</a>
       </div>
+      {% if dhl_carrier and dhl_carrier.api_key %}
+      <div id="dhl-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
+           font-size:12px;border:1px solid var(--border-strong);background:var(--bg-input)"></div>
+      {% endif %}
     </div>
 
     <!-- UPS -->
@@ -317,9 +309,7 @@
       </div>
       {% elif ups_carrier %}
       <div class="api-status warn">⚠️ Client ID не вказано</div>
-      <div class="api-meta">
-        Заповни API ключ (Client ID) у налаштуваннях перевізника.
-      </div>
+      <div class="api-meta">Заповни API ключ (Client ID) у налаштуваннях перевізника.</div>
       {% else %}
       <div class="api-status off">⚪ Не налаштовано</div>
       <div class="api-meta">
@@ -337,43 +327,16 @@
           {% if ups_carrier %}Налаштування{% else %}+ Додати{% endif %}
         </a>
         {% if ups_carrier and ups_carrier.api_key %}
-        <button class="api-btn api-btn-sec" onclick="upsTest('token')">🔌 Токен</button>
-        <button class="api-btn api-btn-sec" onclick="upsTest('rates')">💰 Тарифи</button>
+        <button class="api-btn api-btn-sec" onclick="carrierTest('ups','token')">🔌 Токен</button>
+        <button class="api-btn api-btn-sec" onclick="carrierTest('ups','rates')">💰 Тарифи</button>
         <a href="/admin/shipping/carrier/{{ ups_carrier.pk }}/ups-debug/" target="_blank" class="api-btn api-btn-sec">🔬 Debug</a>
         <a href="/admin/shipping/shipment/ups-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
         {% endif %}
+        <a href="{% url 'api_console' %}?preset=ups" class="api-btn api-btn-cons">Console</a>
       </div>
       {% if ups_carrier and ups_carrier.api_key %}
       <div id="ups-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
            font-size:12px;border:1px solid var(--border-strong);background:var(--bg-input)"></div>
-      <script>
-      function upsTest(mode) {
-        var el = document.getElementById('ups-test-result');
-        el.style.display = 'block';
-        el.style.color = 'var(--text-muted)';
-        el.textContent = '⏳ Тестуємо...';
-        var url = '/admin/shipping/carrier/{{ ups_carrier.pk }}/' + (mode === 'token' ? 'test-ups-token/' : 'test-ups-rates/');
-        fetch(url, {headers: {'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''}})
-          .then(r => r.json())
-          .then(d => {
-            if (d.ok) {
-              if (mode === 'token') {
-                el.style.color = 'var(--ok)';
-                el.textContent = '✅ ' + d.message + ' · Режим: ' + d.mode;
-              } else {
-                el.style.color = 'var(--ok)';
-                var lines = (d.rates || []).map(r => r.name + ': ' + r.price + ' ' + r.currency).join('\n');
-                el.textContent = '✅ ' + (d.route || '') + '\n' + (lines || '— тарифів немає');
-                el.style.whiteSpace = 'pre';
-              }
-            } else {
-              el.style.color = 'var(--err)';
-              el.textContent = '❌ ' + (d.error || 'Помилка');
-            }
-          })
-          .catch(e => { el.style.color = 'var(--err)'; el.textContent = '❌ ' + e; });
-      }
-      </script>
       {% endif %}
     </div>
 
@@ -414,49 +377,61 @@
           {% if fedex_carrier %}Налаштування{% else %}+ Додати{% endif %}
         </a>
         {% if fedex_carrier and fedex_carrier.api_key %}
-        <button class="api-btn api-btn-sec" onclick="fedexTest('token')">🔌 Токен</button>
-        <button class="api-btn api-btn-sec" onclick="fedexTest('rates')">💰 Тарифи</button>
+        <button class="api-btn api-btn-sec" onclick="carrierTest('fedex','token')">🔌 Токен</button>
+        <button class="api-btn api-btn-sec" onclick="carrierTest('fedex','rates')">💰 Тарифи</button>
+        <a href="/admin/shipping/shipment/fedex-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
         {% endif %}
+        <a href="{% url 'api_console' %}?preset=fedex" class="api-btn api-btn-cons">Console</a>
       </div>
       {% if fedex_carrier and fedex_carrier.api_key %}
       <div id="fedex-test-result" style="display:none;margin-top:10px;padding:10px;border-radius:6px;
            font-size:12px;border:1px solid var(--border-strong);background:var(--bg-input)"></div>
-      <script>
-      function fedexTest(mode) {
-        var el = document.getElementById('fedex-test-result');
-        el.style.display = 'block';
-        el.style.color = 'var(--text-muted)';
-        el.textContent = '⏳ Тестуємо...';
-        var url = '/admin/shipping/carrier/{{ fedex_carrier.pk }}/' + (mode === 'token' ? 'test-fedex-token/' : 'test-fedex-rates/');
-        fetch(url, {headers: {'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''}})
-          .then(r => r.json())
-          .then(d => {
-            if (d.ok) {
-              if (mode === 'token') {
-                el.style.color = 'var(--ok)';
-                el.textContent = '✅ ' + d.message + ' · Режим: ' + d.mode;
-              } else {
-                el.style.color = 'var(--ok)';
-                var lines = (d.rates || []).map(r => {
-                  var t = r.transit_days != null ? ' | ' + r.transit_days + ' дн.' : ' | транзит: —';
-                  var dt = r.delivery_date ? ' | ' + r.delivery_date : '';
-                  return r.name + ': ' + r.price + ' ' + r.currency + t + dt;
-                }).join('\n');
-                el.textContent = '✅ ' + (d.route || '') + '\n' + (lines || '— тарифів немає');
-                el.style.whiteSpace = 'pre';
-              }
-            } else {
-              el.style.color = 'var(--err)';
-              el.textContent = '❌ ' + (d.error || 'Помилка');
-            }
-          })
-          .catch(e => { el.style.color = 'var(--err)'; el.textContent = '❌ ' + e; });
-      }
-      </script>
       {% endif %}
     </div>
 
   </div>
+
+  <script>
+  var _CARRIER_PK = {
+    'jumingo': {% if jumingo_carrier %}{{ jumingo_carrier.pk }}{% else %}0{% endif %},
+    'dhl':     {% if dhl_carrier %}{{ dhl_carrier.pk }}{% else %}0{% endif %},
+    'ups':     {% if ups_carrier %}{{ ups_carrier.pk }}{% else %}0{% endif %},
+    'fedex':   {% if fedex_carrier %}{{ fedex_carrier.pk }}{% else %}0{% endif %}
+  };
+  function carrierTest(carrier, mode) {
+    var el = document.getElementById(carrier + '-test-result');
+    if (!el) return;
+    var pk = _CARRIER_PK[carrier];
+    if (!pk) { el.style.display='block'; el.style.color='var(--err)'; el.textContent='❌ Carrier не налаштовано'; return; }
+    el.style.display = 'block';
+    el.style.color = 'var(--text-muted)';
+    el.style.whiteSpace = 'normal';
+    el.textContent = '⏳ Тестуємо...';
+    var url = '/admin/shipping/carrier/' + pk + '/test-' + carrier + '-' + mode + '/';
+    fetch(url, {headers: {'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || ''}})
+      .then(r => r.json())
+      .then(d => {
+        if (d.ok) {
+          el.style.color = 'var(--ok)';
+          if (mode === 'token') {
+            el.textContent = '✅ ' + d.message + ' · Режим: ' + (d.mode || '—');
+          } else {
+            var lines = (d.rates || []).map(r => {
+              var t = r.transit_days != null ? ' | ' + r.transit_days + ' дн.' : '';
+              var dt = r.delivery_date ? ' | ' + r.delivery_date : '';
+              return r.name + ': ' + r.price + ' ' + r.currency + t + dt;
+            }).join('\n');
+            el.textContent = '✅ ' + (d.route || '') + '\n' + (lines || '— тарифів немає');
+            el.style.whiteSpace = 'pre';
+          }
+        } else {
+          el.style.color = 'var(--err)';
+          el.textContent = '❌ ' + (d.error || 'Помилка');
+        }
+      })
+      .catch(e => { el.style.color = 'var(--err)'; el.textContent = '❌ ' + e; });
+  }
+  </script>
 
   <!-- ── Section 3: Marketplace APIs ── -->
   <h2 class="api-section-hdr" style="--sec-color:#ff6f00">
