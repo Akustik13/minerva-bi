@@ -543,6 +543,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_dhl_track",
             ),
             path(
+                "<int:shipment_id>/dhl-confirm/",
+                self.admin_site.admin_view(self.dhl_confirm_view),
+                name="shipping_shipment_dhl_confirm",
+            ),
+            path(
                 "<int:shipment_id>/dhl-book/",
                 self.admin_site.admin_view(self.dhl_book_view),
                 name="shipping_shipment_dhl_book",
@@ -1037,9 +1042,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 qs = urlencode({"product_code": dhl_code,
                                 "product_name": dhl_name,
                                 "price":        dhl_price})
-                messages.success(request, f"✅ Відправлення #{shipment.pk} збережено. Оформлення DHL…")
+                messages.success(request, f"✅ Відправлення #{shipment.pk} збережено.")
                 return redirect(
-                    reverse("admin:shipping_shipment_dhl_book", args=[shipment.pk]) + f"?{qs}"
+                    reverse("admin:shipping_shipment_dhl_confirm", args=[shipment.pk]) + f"?{qs}"
                 )
 
         if action == "ups_book" and carrier:
@@ -1254,9 +1259,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 qs = urlencode({"product_code": dhl_code,
                                 "product_name": dhl_name,
                                 "price":        dhl_price})
-                messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено. Оформлення DHL…")
+                messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено.")
                 return redirect(
-                    reverse("admin:shipping_shipment_dhl_book", args=[shipment.pk]) + f"?{qs}"
+                    reverse("admin:shipping_shipment_dhl_confirm", args=[shipment.pk]) + f"?{qs}"
                 )
 
         if action == "ups_book" and carrier:
@@ -2757,6 +2762,73 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "dhl_error":       result.get("error"),
             "events":          result.get("events", []),
             "title":           f"DHL Трекінг — {tracking_number}",
+        })
+
+    # ── DHL Confirm (preview before API call) ────────────────────────────────
+
+    def dhl_confirm_view(self, request, shipment_id):
+        """GET — Preview даних перед відправкою через DHL API.
+           POST — redirect to dhl_book_view (actual API call)."""
+        from urllib.parse import urlencode
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        back_url = reverse('admin:shipping_shipment_change', args=[shipment.pk])
+
+        product_code = request.GET.get('product_code', '').strip()
+        product_name = request.GET.get('product_name', product_code).strip()
+        price_str    = request.GET.get('price', '0')
+
+        if not product_code:
+            messages.error(request, '❌ Не передано product_code.')
+            return redirect(back_url)
+
+        # POST — підтверджено, передаємо на dhl_book_view зі збереженими GET-параметрами
+        if request.method == 'POST':
+            qs = urlencode({
+                'product_code': product_code,
+                'product_name': product_name,
+                'price':        price_str,
+            })
+            return redirect(
+                reverse('admin:shipping_shipment_dhl_book', args=[shipment.pk]) + f'?{qs}'
+            )
+
+        # GET — будуємо превью
+        shipper  = self._ups_extract_shipper(shipment)
+        to_addr  = self._ups_extract_address(shipment)
+        packages = self._ups_extract_packages(shipment)
+        customs  = self._ups_extract_customs(shipment)
+
+        try:
+            price_f = float(price_str)
+        except (ValueError, TypeError):
+            price_f = 0.0
+
+        dest_country   = (shipment.recipient_country or '').upper()
+        sender_country = (shipment.sender_country or shipment.carrier.sender_country or 'DE').upper()
+        is_intl = dest_country != sender_country
+
+        confirm_url = (
+            reverse('admin:shipping_shipment_dhl_confirm', args=[shipment.pk])
+            + '?' + urlencode({'product_code': product_code,
+                               'product_name': product_name,
+                               'price': price_str})
+        )
+
+        return render(request, 'admin/shipping/dhl_confirm.html', {
+            **self.admin_site.each_context(request),
+            'title':        f'Підтвердити DHL #{shipment.pk}',
+            'shipment':     shipment,
+            'product_code': product_code,
+            'product_name': product_name,
+            'price':        price_f,
+            'shipper':      shipper,
+            'to_addr':      to_addr,
+            'packages':     packages,
+            'customs':      customs,
+            'is_intl':      is_intl,
+            'confirm_url':  confirm_url,
+            'back_url':     back_url,
         })
 
     # ── DHL Book (POST /shipments) ────────────────────────────────────────────

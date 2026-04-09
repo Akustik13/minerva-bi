@@ -1,0 +1,252 @@
+{% extends "admin/base_site.html" %}
+
+{% block title %}{{ title }} | Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; <a href="{{ back_url }}">Чернетка #{{ shipment.pk }}</a>
+  &rsaquo; Підтвердити DHL
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .dc-wrap  { max-width: 860px; margin: 0 auto; padding: 0 0 48px; }
+  .dc-card  { background: var(--bg-card); border: 1px solid var(--border-strong);
+              border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .dc-head  { background: var(--bg-card-2); padding: 10px 16px; font-size: 12px;
+              font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+              color: var(--text-muted); display: flex; align-items: center; gap: 8px;
+              border-bottom: 1px solid var(--border-strong); }
+  .dc-body  { padding: 14px 16px; }
+  .dc-row   { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
+  .dc-row:last-child { margin-bottom: 0; }
+  .dc-lbl   { color: var(--text-dim); min-width: 140px; flex-shrink: 0; }
+  .dc-val   { color: var(--text); font-weight: 500; }
+  .dc-val.ok     { color: var(--ok);     font-weight: 700; }
+  .dc-val.accent { color: var(--accent); font-weight: 700; }
+  .dc-2col  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media(max-width:700px){ .dc-2col { grid-template-columns: 1fr; } }
+  .dc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .dc-table th { background: var(--bg-card-2); color: var(--text-muted); padding: 8px 10px;
+                 text-align: left; font-weight: 600; border-bottom: 1px solid var(--border-strong); }
+  .dc-table td { padding: 8px 10px; color: var(--text); border-bottom: 1px solid var(--border); }
+  .dc-table tr:last-child td { border-bottom: none; }
+  .dc-actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+  .btn-confirm { background: #ffcc00; color: #000; border: none; padding: 12px 28px;
+                 border-radius: 6px; font-size: 14px; font-weight: 700; cursor: pointer;
+                 transition: opacity .15s; }
+  .btn-confirm:hover { opacity: .85; }
+  .btn-back   { background: var(--bg-card-2); color: var(--text-muted);
+                border: 1px solid var(--border-strong); padding: 12px 20px;
+                border-radius: 6px; font-size: 13px; font-weight: 600;
+                text-decoration: none; transition: background .15s; display: inline-block; }
+  .btn-back:hover { background: var(--bg-hover); color: var(--text); }
+  .warn-banner { background: var(--bg-card-2); border: 1px solid var(--warn);
+                 border-left: 4px solid var(--warn); border-radius: 6px;
+                 padding: 12px 16px; color: var(--warn); font-size: 13px; margin-bottom: 16px; }
+</style>
+
+<div class="dc-wrap">
+  <h1 style="color:var(--text);font-size:20px;margin-bottom:20px">
+    🟡 Перевірте дані перед відправкою через DHL API
+  </h1>
+
+  {% if messages %}
+    {% for msg in messages %}
+    <div class="warn-banner">{{ msg }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Продукт -->
+  <div class="dc-card">
+    <div class="dc-head">🚚 Обраний продукт DHL</div>
+    <div class="dc-body">
+      <div class="dc-row">
+        <span class="dc-lbl">Продукт</span>
+        <span class="dc-val accent">{{ product_name }}</span>
+      </div>
+      <div class="dc-row">
+        <span class="dc-lbl">Код</span>
+        <span class="dc-val" style="font-family:monospace">{{ product_code }}</span>
+      </div>
+      {% if price %}
+      <div class="dc-row">
+        <span class="dc-lbl">Орієнтовна вартість</span>
+        <span class="dc-val ok">{{ price }} EUR</span>
+      </div>
+      {% endif %}
+      <div class="dc-row">
+        <span class="dc-lbl">Reference</span>
+        <span class="dc-val" style="font-family:monospace">{{ shipment.reference|default:shipment.pk }}</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Відправник / Отримувач -->
+  <div class="dc-2col">
+
+    <div class="dc-card">
+      <div class="dc-head">📤 Відправник</div>
+      <div class="dc-body">
+        {% if shipper.company %}
+        <div class="dc-row"><span class="dc-lbl">Компанія</span>
+          <span class="dc-val">{{ shipper.company }}</span></div>
+        {% endif %}
+        <div class="dc-row"><span class="dc-lbl">Ім'я</span>
+          <span class="dc-val">{{ shipper.name|default:"—" }}</span></div>
+        <div class="dc-row"><span class="dc-lbl">Вулиця</span>
+          <span class="dc-val">{{ shipper.address_line|default:"—" }}</span></div>
+        <div class="dc-row"><span class="dc-lbl">Місто / ZIP</span>
+          <span class="dc-val">{{ shipper.city|default:"—" }}, {{ shipper.postal|default:"" }}</span></div>
+        {% if shipper.state %}
+        <div class="dc-row"><span class="dc-lbl">Штат</span>
+          <span class="dc-val">{{ shipper.state }}</span></div>
+        {% endif %}
+        <div class="dc-row"><span class="dc-lbl">Країна</span>
+          <span class="dc-val">{{ shipper.country|default:"DE" }}</span></div>
+        {% if shipper.phone %}
+        <div class="dc-row"><span class="dc-lbl">Телефон</span>
+          <span class="dc-val">{{ shipper.phone }}</span></div>
+        {% endif %}
+        {% if shipper.email %}
+        <div class="dc-row"><span class="dc-lbl">Email</span>
+          <span class="dc-val">{{ shipper.email }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="dc-card">
+      <div class="dc-head">📥 Отримувач</div>
+      <div class="dc-body">
+        {% if to_addr.company %}
+        <div class="dc-row"><span class="dc-lbl">Компанія</span>
+          <span class="dc-val">{{ to_addr.company }}</span></div>
+        {% endif %}
+        <div class="dc-row"><span class="dc-lbl">Ім'я</span>
+          <span class="dc-val">{{ to_addr.name|default:"—" }}</span></div>
+        <div class="dc-row"><span class="dc-lbl">Вулиця</span>
+          <span class="dc-val">{{ to_addr.address_line|default:"—" }}</span></div>
+        <div class="dc-row"><span class="dc-lbl">Місто / ZIP</span>
+          <span class="dc-val">{{ to_addr.city|default:"—" }}, {{ to_addr.postal|default:"" }}</span></div>
+        {% if to_addr.state %}
+        <div class="dc-row"><span class="dc-lbl">Штат / Регіон</span>
+          <span class="dc-val">{{ to_addr.state }}</span></div>
+        {% endif %}
+        <div class="dc-row"><span class="dc-lbl">Країна</span>
+          <span class="dc-val{% if is_intl %} accent{% endif %}">{{ to_addr.country|default:"—" }}
+            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> (міжнародне)</span>{% endif %}
+          </span></div>
+        {% if to_addr.phone %}
+        <div class="dc-row"><span class="dc-lbl">Телефон</span>
+          <span class="dc-val">{{ to_addr.phone }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Коробки -->
+  <div class="dc-card">
+    <div class="dc-head">📦 Коробки ({{ packages|length }} шт.)</div>
+    <div class="dc-body" style="padding:0">
+      <table class="dc-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Вага (кг)</th>
+            <th>Довжина (см)</th>
+            <th>Ширина (см)</th>
+            <th>Висота (см)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in packages %}
+          <tr>
+            <td style="color:var(--text-dim)">{{ forloop.counter }}</td>
+            <td style="color:var(--ok);font-weight:700">{{ p.weight_kg }}</td>
+            <td>{{ p.length_cm }}</td>
+            <td>{{ p.width_cm }}</td>
+            <td>{{ p.height_cm }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Митна декларація -->
+  {% if customs and is_intl %}
+  <div class="dc-card">
+    <div class="dc-head">🛃 Митна декларація</div>
+    <div class="dc-body">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
+        <span><span class="dc-lbl" style="display:inline">Валюта: </span>
+          <b>{{ customs.currency|default:"EUR" }}</b></span>
+        <span><span class="dc-lbl" style="display:inline">Тип: </span>
+          <b>{{ customs.contents_type|default:"SALE" }}</b></span>
+        {% if customs.description %}
+        <span><span class="dc-lbl" style="display:inline">Опис: </span>
+          <b>{{ customs.description }}</b></span>
+        {% endif %}
+      </div>
+      {% if customs.items %}
+      <table class="dc-table">
+        <thead>
+          <tr>
+            <th>Опис</th>
+            <th style="text-align:center">К-сть</th>
+            <th style="text-align:right">Вартість</th>
+            <th>Вага нетто</th>
+            <th>Походження</th>
+            <th>HS код</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in customs.items %}
+          <tr>
+            <td>{{ item.description|default:"—" }}</td>
+            <td style="text-align:center">{{ item.quantity }}</td>
+            <td style="text-align:right;color:var(--ok);font-weight:700">
+              {{ item.value }} {{ customs.currency|default:"EUR" }}</td>
+            <td style="color:var(--text-muted)">{{ item.weight_kg }} кг</td>
+            <td style="color:var(--text-muted)">{{ item.country|default:"—" }}</td>
+            <td style="color:var(--text-dim);font-family:monospace">{{ item.hs_code|default:"—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Підтвердження -->
+  <div class="dc-card">
+    <div class="dc-head">⚠️ Підтвердження</div>
+    <div class="dc-body">
+      <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
+        Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
+        Minerva викличе <b style="color:var(--text)">DHL REST API</b> і
+        <b style="color:var(--text)">створить реальне відправлення</b> у системі DHL.
+        Буде згенеровано трекінг-номер та PDF-етикетку.
+      </p>
+      <form method="post" action="{{ confirm_url }}" id="dhl-confirm-form">
+        {% csrf_token %}
+      </form>
+    </div>
+  </div>
+
+  <!-- Кнопки -->
+  <div class="dc-actions">
+    <button type="submit" form="dhl-confirm-form" class="btn-confirm"
+      onclick="return confirm('Відправити через DHL API?\n\nПродукт: {{ product_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі DHL.')">
+      🟡 Підтвердити і відправити через DHL
+    </button>
+    <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
+  </div>
+
+</div>
+{% endblock %}
