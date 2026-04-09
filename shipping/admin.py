@@ -2031,6 +2031,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'postal':       shipment.sender_zip     or c.sender_zip    or '',
             'country':      shipment.sender_country or c.sender_country or 'DE',
             'phone':        shipment.sender_phone   or c.sender_phone  or '',
+            'email':        shipment.sender_email   or c.sender_email  or '',
         }
 
     def _ups_extract_address(self, shipment) -> dict:
