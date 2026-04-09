@@ -702,7 +702,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <div class="sh-grid">
         <div class="sh-field">
-          <label class="sh-label">Ім'я / Компанія</label>
+          <label class="sh-label">Ім'я</label>
           <input class="sh-input" type="text" name="sender_name"
             value="{{ shipment.carrier.sender_name|default:'' }}"
             oninput="_markEdited(this)" placeholder="Назва компанії або ім'я">
@@ -751,7 +751,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <div class="sh-card-title">📬 Отримувач</div>
       <div class="sh-grid">
         <div class="sh-field">
-          <label class="sh-label">Ім'я / Компанія *</label>
+          <label class="sh-label">Ім'я *</label>
           <input class="sh-input" type="text" name="recipient_name"
             value="{{ shipment.recipient_name }}" required>
         </div>
