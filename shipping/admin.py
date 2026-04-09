@@ -2199,6 +2199,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         except (ValueError, TypeError):
             declared_value = 1.0
 
+        # Sender override from form (user can edit sender fields)
+        sender_override = {
+            "name":         (body.get("sender_name")    or "").strip(),
+            "address_line": (body.get("sender_street")  or "").strip(),
+            "city":         (body.get("sender_city")    or "").strip(),
+            "postal":       (body.get("sender_zip")     or "").strip(),
+            "country":      (body.get("sender_country") or "").upper().strip(),
+        }
+
         if not dest_country:
             return JsonResponse({"error": "Вкажіть країну отримувача"}, status=400)
 
@@ -2286,9 +2295,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             'postal':       dest_postal,
                             'country':      dest_country,
                         }
+                        from_addr_ups = {
+                            'name':         sender_override.get('name') or carrier.sender_name or carrier.sender_company or '',
+                            'address_line': sender_override.get('address_line') or carrier.sender_street or '',
+                            'city':         sender_override.get('city') or carrier.sender_city or '',
+                            'postal':       sender_override.get('postal') or carrier.sender_zip or '',
+                            'country':      sender_override.get('country') or carrier.sender_country or 'DE',
+                        }
                         pkgs = [{'weight_kg': weight, 'length_cm': length,
                                  'width_cm': width, 'height_cm': height}]
-                        rates = client.get_rates(to_addr, pkgs)
+                        rates = client.get_rates(to_addr, pkgs, from_address=from_addr_ups)
                         entry["products"] = [
                             {
                                 "name":          r['name'],
@@ -2313,15 +2329,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
             results.append(entry)
 
-        # Use sender address from first active carrier for display
-        from_address = {}
+        # Sender address: prefer form-submitted values, fall back to first carrier
         first_carrier = carriers.first()
-        if first_carrier:
-            from_address = {
-                "country": first_carrier.sender_country,
-                "zip":     first_carrier.sender_zip,
-                "city":    first_carrier.sender_city,
-            }
+        from_address = {
+            "name":    sender_override.get("name")    or (first_carrier.sender_name or first_carrier.sender_company if first_carrier else ""),
+            "street":  sender_override.get("address_line") or (first_carrier.sender_street if first_carrier else ""),
+            "city":    sender_override.get("city")    or (first_carrier.sender_city    if first_carrier else ""),
+            "zip":     sender_override.get("postal")  or (first_carrier.sender_zip     if first_carrier else ""),
+            "country": sender_override.get("country") or (first_carrier.sender_country if first_carrier else ""),
+        }
 
         # Normalize packages for display
         display_packages = []
