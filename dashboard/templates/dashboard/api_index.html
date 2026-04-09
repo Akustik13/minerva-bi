@@ -437,7 +437,11 @@
                 el.textContent = '✅ ' + d.message + ' · Режим: ' + d.mode;
               } else {
                 el.style.color = 'var(--ok)';
-                var lines = (d.rates || []).map(r => r.name + ': ' + r.price + ' ' + r.currency).join('\n');
+                var lines = (d.rates || []).map(r => {
+                  var t = r.transit_days != null ? ' | ' + r.transit_days + ' дн.' : ' | транзит: —';
+                  var dt = r.delivery_date ? ' | ' + r.delivery_date : '';
+                  return r.name + ': ' + r.price + ' ' + r.currency + t + dt;
+                }).join('\n');
                 el.textContent = '✅ ' + (d.route || '') + '\n' + (lines || '— тарифів немає');
                 el.style.whiteSpace = 'pre';
               }

@@ -195,7 +195,8 @@ class CarrierAdmin(admin.ModelAdmin):
                 'ok': True,
                 'route': f"{origin} → {to_addr['country']} ({to_addr['city']})",
                 'rates': [
-                    {'name': r['name'], 'price': str(r['price']), 'currency': r['currency']}
+                    {'name': r['name'], 'price': str(r['price']), 'currency': r['currency'],
+                     'transit_days': r.get('transit_days'), 'delivery_date': r.get('delivery_date', '')}
                     for r in rates[:8]
                 ],
             })
@@ -244,7 +245,8 @@ class CarrierAdmin(admin.ModelAdmin):
                 'ok': True,
                 'route': f"{origin} → {to_addr['country']} ({to_addr['city']})",
                 'rates': [
-                    {'name': r['name'], 'price': str(r['price']), 'currency': r['currency']}
+                    {'name': r['name'], 'price': str(r['price']), 'currency': r['currency'],
+                     'transit_days': r.get('transit_days'), 'delivery_date': r.get('delivery_date', '')}
                     for r in rates[:8]
                 ],
             })
