@@ -363,11 +363,18 @@ def create_shipment(carrier, shipment, product_code: str,
     if include_customs is not None:
         is_customs = include_customs
 
-    sender_name    = carrier.sender_name or carrier.sender_company or "Sender"
-    sender_company = carrier.sender_company or carrier.sender_name or "Company"
+    # shipment.sender_* має пріоритет над carrier.sender_* (якщо заповнені у формі)
+    _sname    = shipment.sender_name    or carrier.sender_name    or carrier.sender_company or "Sender"
+    _scompany = shipment.sender_company or carrier.sender_company or carrier.sender_name    or "Company"
+    _sstreet  = shipment.sender_street  or carrier.sender_street  or ""
+    _scity    = shipment.sender_city    or carrier.sender_city    or ""
+    _szip     = shipment.sender_zip     or carrier.sender_zip     or ""
+    _scountry = shipment.sender_country or carrier.sender_country or "DE"
+    sender_name    = _sname
+    sender_company = _scompany
     recv_name      = shipment.recipient_name or shipment.recipient_company or "Recipient"
     recv_phone     = shipment.recipient_phone or "+4900000000"
-    send_phone     = carrier.sender_phone or "+4900000000"
+    send_phone     = shipment.sender_phone or carrier.sender_phone or "+4900000000"
 
     # ── Пакети: multi-package якщо є ShipmentPackage, інакше — один з полів Shipment ──
     pkg_qs = list(shipment.packages.order_by("pk")) if hasattr(shipment, "packages") else []
@@ -406,10 +413,10 @@ def create_shipment(carrier, shipment, product_code: str,
         "customerDetails": {
             "shipperDetails": {
                 "postalAddress": {
-                    "postalCode":  _norm_postal(carrier.sender_zip, carrier.sender_country or "DE"),
-                    "cityName":    carrier.sender_city   or "",
-                    "countryCode": carrier.sender_country or "DE",
-                    **_split_address(carrier.sender_street),
+                    "postalCode":  _norm_postal(_szip, _scountry or "DE"),
+                    "cityName":    _scity,
+                    "countryCode": _scountry or "DE",
+                    **_split_address(_sstreet),
                 },
                 "contactInformation": {
                     "fullName":    sender_name,
@@ -503,7 +510,7 @@ def create_shipment(carrier, shipment, product_code: str,
                     shipment.export_reason, "COMMERCIAL_PURPOSE_OR_SALE"
                 ),
                 "additionalCharges": [],
-                "placeOfIncoterm":   carrier.sender_city or "Frankfurt",
+                "placeOfIncoterm":   _scity or "Frankfurt",
             }
 
     try:

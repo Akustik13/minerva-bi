@@ -135,6 +135,7 @@ function _fillSenderFromCarrier(){
 function _markEdited(el){ el.dataset.edited = '1'; }
 
 function swapAddresses(){
+  if(!confirm('Поміняти відправника і отримувача місцями?\n\nВсі поля адреси будуть замінені.')) return;
   const pairs = [
     ['sender_name',    'recipient_name'],
     ['sender_company', 'recipient_company'],

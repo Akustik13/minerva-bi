@@ -278,15 +278,24 @@ class JumingoService(BaseCarrierService):
         if dest_country in self._STATE_REQUIRED and shipment.recipient_state:
             to_address["state"] = shipment.recipient_state[:10]
 
-        sender_country = (c.sender_country or "DE").upper()
+        # shipment.sender_* має пріоритет над carrier.sender_* (якщо заповнені у формі)
+        s = shipment
+        _sname    = s.sender_name    or c.sender_name    or ""
+        _scompany = s.sender_company or c.sender_company or ""
+        _sstreet  = s.sender_street  or c.sender_street  or ""
+        _scity    = s.sender_city    or c.sender_city    or ""
+        _szip     = s.sender_zip     or c.sender_zip     or ""
+        _scountry = s.sender_country or c.sender_country or "DE"
+        _sphone   = s.sender_phone   or c.sender_phone   or ""
+        sender_country = _scountry.upper()
         from_address = {
-            "name":    (c.sender_name or "")[:35],
-            "company": (c.sender_company or "")[:35],
-            "street":  (c.sender_street or "")[:35],
-            "city":    (c.sender_city or "")[:35],
-            "zip":     c.sender_zip or "",
-            "country": c.sender_country or "DE",
-            "phone":   c.sender_phone or "",
+            "name":    _sname[:35],
+            "company": _scompany[:35],
+            "street":  _sstreet[:35],
+            "city":    _scity[:35],
+            "zip":     _szip,
+            "country": _scountry,
+            "phone":   _sphone,
             "settings": {"email": c.sender_email or ""},
         }
         if sender_country in self._STATE_REQUIRED and getattr(c, "sender_state", ""):
