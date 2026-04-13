@@ -158,6 +158,12 @@ class CarrierAdmin(admin.ModelAdmin):
             path('<int:pk>/ups-log/',
                  self.admin_site.admin_view(self.ups_log_view),
                  name='carrier_ups_log'),
+            path('<int:pk>/ups-log/clear/',
+                 self.admin_site.admin_view(self.ups_log_clear_view),
+                 name='carrier_ups_log_clear'),
+            path('<int:pk>/ups-log/download/',
+                 self.admin_site.admin_view(self.ups_log_download_view),
+                 name='carrier_ups_log_download'),
             path('<int:pk>/test-fedex-token/',
                  self.admin_site.admin_view(self.test_fedex_token_view),
                  name='carrier_test_fedex_token'),
@@ -557,12 +563,27 @@ class CarrierAdmin(admin.ModelAdmin):
         })
 
     def ups_log_view(self, request, pk):
-        """Перегляд лог-файлу останніх 20 UPS API запитів/відповідей."""
+        """Перегляд лог-файлу UPS API запитів/відповідей. POST — зберегти налаштування."""
         import json as _json
         from .ups_logger import get_log, LOG_FILE
+        from .models import ShippingSettings
+
         carrier = get_object_or_404(Carrier, pk=pk)
+
+        if request.method == 'POST':
+            try:
+                val = int(request.POST.get('max_entries', 20))
+                val = max(1, min(val, 500))
+                s = ShippingSettings.get()
+                s.ups_log_max_entries = val
+                s.save(update_fields=['ups_log_max_entries'])
+                messages.success(request, f'✅ Ліміт логу збережено: {val} записів')
+            except (ValueError, TypeError):
+                messages.error(request, '❌ Невірне значення ліміту')
+            return redirect(reverse('admin:carrier_ups_log', args=[pk]))
+
+        settings_obj = ShippingSettings.get()
         raw_entries = get_log()
-        # Pre-serialize sub-dicts to JSON strings for clean display in template
         entries = []
         for e in raw_entries:
             entries.append({
@@ -580,11 +601,44 @@ class CarrierAdmin(admin.ModelAdmin):
             })
         return render(request, 'admin/shipping/ups_api_log.html', {
             **self.admin_site.each_context(request),
-            'carrier': carrier,
-            'entries': entries,
-            'log_file': LOG_FILE,
-            'title': f'UPS API Лог — {carrier.name}',
+            'carrier':     carrier,
+            'entries':     entries,
+            'log_file':    LOG_FILE,
+            'max_entries': settings_obj.ups_log_max_entries,
+            'log_json':    _json.dumps(raw_entries, ensure_ascii=False, indent=2),
+            'title':       f'UPS API Лог — {carrier.name}',
         })
+
+    def ups_log_clear_view(self, request, pk):
+        """POST — очистити лог-файл UPS API."""
+        from .ups_logger import LOG_FILE
+        import os as _os
+        carrier = get_object_or_404(Carrier, pk=pk)
+        if request.method == 'POST':
+            try:
+                if _os.path.exists(LOG_FILE):
+                    with open(LOG_FILE, 'w', encoding='utf-8') as f:
+                        f.write('[]')
+                messages.success(request, '🗑️ UPS API лог очищено')
+            except OSError as e:
+                messages.error(request, f'❌ Не вдалося очистити лог: {e}')
+        return redirect(reverse('admin:carrier_ups_log', args=[pk]))
+
+    def ups_log_download_view(self, request, pk):
+        """GET — завантажити лог-файл UPS API як JSON."""
+        import json as _json
+        from .ups_logger import get_log
+        from django.http import HttpResponse
+        from datetime import date as _date
+        carrier = get_object_or_404(Carrier, pk=pk)
+        data = get_log()
+        filename = f'ups_api_log_{_date.today().isoformat()}.json'
+        response = HttpResponse(
+            _json.dumps(data, ensure_ascii=False, indent=2),
+            content_type='application/json; charset=utf-8',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 
 # ── ShipmentPackage Inline ────────────────────────────────────────────────────
@@ -4304,9 +4358,6 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 "команда сама пропустить запуск якщо інтервал ще не вийшов):<br>"
                 "<code>*/5 * * * * docker-compose exec -T web python manage.py track_shipments</code>"
             ),
-        }),
-        ("📋 UPS API Лог", {
-            "fields": ("ups_log_max_entries",),
         }),
     ]
 

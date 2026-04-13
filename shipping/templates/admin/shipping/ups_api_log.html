@@ -7,23 +7,57 @@
 {{ block.super }}
 <style>
 .ups-log-wrap { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
-.ups-log-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
-.ups-log-header h2 { margin:0; font-size:18px; color:var(--text); }
-.log-meta { font-size:12px; color:var(--text-dim); font-family:monospace; }
-.log-empty { color:var(--text-dim); font-style:italic; padding:40px; text-align:center; }
 
+/* ── toolbar ── */
+.ups-log-toolbar {
+  display:flex; align-items:center; gap:10px; margin-bottom:18px; flex-wrap:wrap;
+}
+.ups-log-toolbar h2 { margin:0; font-size:17px; color:var(--text); flex-shrink:0; }
+.log-meta { font-size:11px; color:var(--text-dim); font-family:monospace; }
+
+/* action buttons */
+.log-btn {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:6px 13px; border-radius:6px; font-size:12px; font-weight:600;
+  border:none; cursor:pointer; text-decoration:none; white-space:nowrap;
+}
+.log-btn-sec  { background:var(--bg-card); border:1px solid var(--border-strong); color:var(--text); }
+.log-btn-sec:hover { background:var(--bg-hover); }
+.log-btn-danger { background:#b71c1c; color:#fff; border:1px solid #c62828; }
+.log-btn-danger:hover { background:#c62828; }
+.log-btn-ok  { background:#1565c0; color:#fff; border:1px solid #1976d2; }
+.log-btn-ok:hover { background:#1976d2; }
+
+/* settings inline */
+.log-settings {
+  display:flex; align-items:center; gap:8px;
+  background:var(--bg-card); border:1px solid var(--border-strong);
+  border-radius:8px; padding:8px 14px; margin-bottom:18px; flex-wrap:wrap;
+}
+.log-settings label { font-size:12px; color:var(--text-dim); }
+.log-settings input[type=number] {
+  width:70px; padding:4px 8px; border-radius:5px; font-size:13px;
+  border:1px solid var(--border-strong); background:var(--bg-input); color:var(--text);
+}
+.log-settings-hint { font-size:11px; color:var(--text-dim); }
+
+/* copy feedback */
+#copy-ok { display:none; font-size:11px; color:#4caf50; }
+
+/* entries */
+.log-empty { color:var(--text-dim); font-style:italic; padding:40px; text-align:center; }
 .log-entry { background:var(--bg-card); border:1px solid var(--border-strong);
-             border-radius:8px; margin-bottom:12px; overflow:hidden; }
-.log-entry-head { display:flex; align-items:center; gap:10px; padding:10px 14px;
+             border-radius:8px; margin-bottom:10px; overflow:hidden; }
+.log-entry-head { display:flex; align-items:center; gap:9px; padding:9px 13px;
                   cursor:pointer; user-select:none; flex-wrap:wrap; }
 .log-entry-head:hover { background:var(--bg-hover); }
 
-.log-idx { font-size:11px; color:var(--text-dim); min-width:22px; }
-.log-ts { font-size:11px; color:var(--text-dim); font-family:monospace; }
+.log-idx  { font-size:11px; color:var(--text-dim); min-width:22px; }
+.log-ts   { font-size:11px; color:var(--text-dim); font-family:monospace; }
 .log-action { font-weight:700; font-size:13px; color:var(--text); font-family:monospace; }
 .log-method { font-size:11px; font-weight:700; padding:1px 7px; border-radius:10px; }
-.m-post { background:#1565c0; color:#fff; }
-.m-get  { background:#2e7d32; color:#fff; }
+.m-post   { background:#1565c0; color:#fff; }
+.m-get    { background:#2e7d32; color:#fff; }
 .m-delete { background:#b71c1c; color:#fff; }
 .log-status { font-size:12px; font-family:monospace; font-weight:700; }
 .s-ok   { color:#4caf50; }
@@ -31,47 +65,76 @@
 .s-warn { color:#ff9800; }
 .log-dur { font-size:11px; color:var(--text-dim); }
 .log-url { font-size:11px; color:var(--text-dim); font-family:monospace;
-           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:350px; }
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:340px; }
 .log-error-badge { font-size:11px; background:#b71c1c; color:#fff;
                    padding:1px 8px; border-radius:10px; }
-.log-toggle { margin-left:auto; font-size:18px; color:var(--text-dim); flex-shrink:0; }
+.log-toggle { margin-left:auto; font-size:16px; color:var(--text-dim); flex-shrink:0; }
 
 .log-body { display:none; border-top:1px solid var(--border-strong); }
 .log-body.open { display:block; }
-.log-cols { display:grid; grid-template-columns:1fr 1fr; gap:0; }
-.log-col { padding:14px; border-right:1px solid var(--border-strong); }
+.log-cols { display:grid; grid-template-columns:1fr 1fr; }
+.log-col { padding:13px; border-right:1px solid var(--border-strong); }
 .log-col:last-child { border-right:none; }
 .log-col-title { font-size:11px; font-weight:700; text-transform:uppercase;
-                 letter-spacing:.5px; color:var(--text-dim); margin-bottom:8px; }
+                 letter-spacing:.5px; color:var(--text-dim); margin-bottom:7px; }
 .log-json { margin:0; font-size:11px; font-family:monospace; white-space:pre-wrap;
             word-break:break-all; color:var(--text); line-height:1.5;
-            max-height:400px; overflow-y:auto; }
-.log-error-row { padding:10px 14px; background:rgba(183,28,28,.1);
+            max-height:380px; overflow-y:auto; }
+.log-error-row { padding:9px 13px; background:rgba(183,28,28,.1);
                  font-size:12px; color:#ef9a9a; font-family:monospace; }
 
 @media(max-width:768px){
   .log-cols { grid-template-columns:1fr; }
   .log-col { border-right:none; border-bottom:1px solid var(--border-strong); }
-  .log-url { max-width:200px; }
+  .log-url { max-width:180px; }
 }
 </style>
 {% endblock %}
 
 {% block content %}
+{% load i18n %}
 <div class="ups-log-wrap">
-  <div class="ups-log-header">
+
+  <!-- ── Toolbar ── -->
+  <div class="ups-log-toolbar">
     <h2>📋 UPS API Лог — {{ carrier.name }}</h2>
     {% if entries %}
-    <span class="log-meta">{{ entries|length }} записів | Файл: {{ log_file }}</span>
+    <span class="log-meta">{{ entries|length }} / {{ max_entries }} записів</span>
     {% endif %}
-    <a href="{% url 'admin:carrier_ups_debug' carrier.pk %}" class="button"
-       style="margin-left:auto">🔬 Debug</a>
-    <a href="{% url 'admin:shipping_carrier_change' carrier.pk %}" class="button">← Перевізник</a>
+
+    <!-- Download -->
+    <a href="{% url 'admin:carrier_ups_log_download' carrier.pk %}"
+       class="log-btn log-btn-sec" style="margin-left:auto">💾 Зберегти лог</a>
+
+    <!-- Copy -->
+    <button class="log-btn log-btn-sec" onclick="copyLog()">📋 Копіювати лог</button>
+    <span id="copy-ok">✅ Скопійовано</span>
+
+    <!-- Clear -->
+    <form method="post" action="{% url 'admin:carrier_ups_log_clear' carrier.pk %}"
+          style="display:inline" onsubmit="return confirm('Очистити весь лог?')">
+      {% csrf_token %}
+      <button type="submit" class="log-btn log-btn-danger">🗑️ Очистити лог</button>
+    </form>
+
+    <a href="{% url 'admin:carrier_ups_debug' carrier.pk %}" class="log-btn log-btn-sec">🔬 Debug</a>
+    <a href="{% url 'admin:shipping_carrier_change' carrier.pk %}" class="log-btn log-btn-sec">← Перевізник</a>
   </div>
 
+  <!-- ── Settings ── -->
+  <form method="post" action="{% url 'admin:carrier_ups_log' carrier.pk %}" class="log-settings">
+    {% csrf_token %}
+    <label for="max_entries">Зберігати останніх</label>
+    <input type="number" id="max_entries" name="max_entries"
+           value="{{ max_entries }}" min="1" max="500">
+    <span class="log-settings-hint">записів (1–500)</span>
+    <button type="submit" class="log-btn log-btn-ok">Зберегти</button>
+  </form>
+
+  <!-- ── Entries ── -->
   {% if not entries %}
   <div class="log-empty">
-    Лог порожній. Зробіть будь-який UPS API запит (тест токену, тарифи, відправлення, трекінг) —
+    Лог порожній. Зробіть будь-який UPS API запит (токен, тарифи, відправлення, трекінг) —
     він з'явиться тут автоматично.
   </div>
   {% else %}
@@ -129,7 +192,11 @@ Carrier ID: {{ e.carrier_id|default:"—" }}
   </div>
   {% endfor %}
   {% endif %}
+
 </div>
+
+<!-- Raw log JSON for clipboard copy (hidden) -->
+<script id="log-raw-data" type="application/json">{{ log_json }}</script>
 
 <script>
 function toggleEntry(i) {
@@ -137,6 +204,15 @@ function toggleEntry(i) {
   const tog  = document.getElementById('tog-' + i);
   const open = body.classList.toggle('open');
   tog.textContent = open ? '▲' : '▼';
+}
+
+function copyLog() {
+  const raw = document.getElementById('log-raw-data').textContent;
+  navigator.clipboard.writeText(raw).then(() => {
+    const ok = document.getElementById('copy-ok');
+    ok.style.display = 'inline';
+    setTimeout(() => { ok.style.display = 'none'; }, 2000);
+  });
 }
 </script>
 {% endblock %}
