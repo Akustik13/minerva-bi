@@ -366,6 +366,7 @@ class UPSClient:
             'PaymentInformation': {
                 'ShipmentCharge': {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}},
             },
+            'ShipmentRatingOptions': {'NegotiatedRatesIndicator': ''},
             'Service': {'Code': service_code, 'Description': UPS_SERVICES.get(service_code, '')},
             'Package': self._pkg_dict(packages[0], for_ship=True) if len(packages) == 1 else [self._pkg_dict(p, for_ship=True) for p in packages],
         }
@@ -406,7 +407,9 @@ class UPSClient:
 
         tracking  = results_data.get('ShipmentIdentificationNumber', '') or pkg_results.get('TrackingNumber', '')
         label_b64 = pkg_results.get('ShippingLabel', {}).get('GraphicImage', '')
-        charges   = results_data.get('ShipmentCharges', {}).get('TotalCharges', {})
+        # Prefer negotiated rate (same as Rate API); fall back to retail TotalCharges
+        neg_charges = results_data.get('NegotiatedRateCharges', {}).get('TotalCharge', {})
+        charges     = neg_charges if neg_charges.get('MonetaryValue') else results_data.get('ShipmentCharges', {}).get('TotalCharges', {})
 
         return {
             'tracking_number': tracking,
