@@ -364,10 +364,10 @@ class UPSClient:
                 'Address': self._fmt_addr(shipper),
             },
             'PaymentInformation': {
-                'ShipmentCharge': [{'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}}],
+                'ShipmentCharge': {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}},
             },
             'Service': {'Code': service_code, 'Description': UPS_SERVICES.get(service_code, '')},
-            'Package': [self._pkg_dict(p) for p in packages],
+            'Package': self._pkg_dict(packages[0]) if len(packages) == 1 else [self._pkg_dict(p) for p in packages],
         }
 
         if reference:
@@ -590,7 +590,7 @@ class UPSClient:
     def _pkg_dict(self, pkg: dict) -> dict:
         pkg_code = pkg.get('_pkg_override', PACKAGING_CUSTOMER)
         p = {
-            'PackagingType': {'Code': pkg_code, 'Description': self._PKG_DESCRIPTIONS.get(pkg_code, 'Customer Supplied Package')},
+            'Packaging': {'Code': pkg_code, 'Description': self._PKG_DESCRIPTIONS.get(pkg_code, 'Customer Supplied Package')},
             'Dimensions': {
                 'UnitOfMeasurement': {'Code': 'CM'},
                 'Length': str(round(float(pkg.get('length_cm', 10)))),
