@@ -2130,21 +2130,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 customs_info=customs or None,
                 reference=shipment.reference or str(shipment.pk),
             )
-            # Зберігаємо реальний UPS payload (після _pkg_dict) для дебагу
-            shipment.raw_request = _json.dumps(
-                getattr(client, '_last_payload', {'packages': packages}),
-                ensure_ascii=False, default=str,
-            )
+            # Зберігаємо реальний UPS payload для дебагу
+            shipment.raw_request = getattr(client, '_last_payload', {'packages': packages})
             shipment.save(update_fields=['raw_request'])
         except UPSError as e:
             shipment.status        = Shipment.Status.ERROR
             shipment.error_message = str(e)
-            shipment.raw_response  = getattr(e, 'response', None)
             # Зберігаємо payload що викликав помилку
-            shipment.raw_request   = _json.dumps(
-                getattr(client, '_last_payload', {'packages': packages, 'error': str(e)}),
-                ensure_ascii=False, default=str,
-            )
+            shipment.raw_request = getattr(client, '_last_payload', {'packages': packages})
+            # Зберігаємо UPS error response як dict
+            try:
+                shipment.raw_response = _json.loads(getattr(e, 'response', None) or '{}')
+            except (ValueError, TypeError):
+                shipment.raw_response = {'raw': str(getattr(e, 'response', ''))}
             shipment.save(update_fields=['status', 'error_message', 'raw_response', 'raw_request'])
             messages.error(request, f'❌ UPS: {e}')
             return redirect(reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk]))

@@ -379,13 +379,12 @@ class UPSClient:
         )
         if is_intl and customs_info:
             shipment['ShipmentServiceOptions'] = {
-                'InternationalForms': self._build_customs(customs_info),
+                'InternationalForms': self._build_customs(customs_info, invoice_number=reference),
             }
 
         payload = {
             'ShipmentRequest': {
                 'Request': {
-                    'SubVersion':         _API_VERSION,
                     'RequestOption':      'nonvalidate',
                     'TransactionReference': {'CustomerContext': reference or 'minerva-bi'},
                 },
@@ -607,8 +606,11 @@ class UPSClient:
             p['ReferenceNumber'] = [{'Code': '02', 'Value': pkg['reference'][:35]}]
         return p
 
-    def _build_customs(self, info: dict) -> dict:
+    def _build_customs(self, info: dict, invoice_number: str = '') -> dict:
         """Build InternationalForms payload for UPS Ship API."""
+        from datetime import date as _date
+        today      = _date.today().strftime('%Y%m%d')
+        inv_number = (invoice_number or info.get('invoice_number', '') or today)[:35]
         items_list = info.get('items') or [{
             'description': info.get('description', 'Goods'),
             'quantity':    1,
@@ -644,6 +646,8 @@ class UPSClient:
 
         return {
             'FormType':            '01',
+            'InvoiceDate':         today,
+            'InvoiceNumber':       inv_number,
             'Product':             products,
             'ReasonForExport':     reason,
             'CurrencyCode':        info.get('currency', 'EUR'),
