@@ -2171,7 +2171,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 shipment.raw_response = {'raw': str(getattr(e, 'response', ''))}
             shipment.save(update_fields=['status', 'error_message', 'raw_response', 'raw_request'])
             messages.error(request, f'❌ UPS: {e}')
-            return redirect(reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk]))
+            return redirect(reverse('admin:shipping_shipment_detail', args=[shipment.pk]) + '#debug')
 
         # Зберегти трекінг + сервіс
         update_fields = []
@@ -3392,7 +3392,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             for line in error_text.split("\n"):
                 if line.strip():
                     messages.error(request, line.strip())
-            return redirect(reverse("admin:shipping_shipment_dhl_rates", args=[shipment.pk]))
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]) + "#debug")
 
         tracking_number = result.get("tracking_number", "")
         label_bytes     = result.get("label_bytes")

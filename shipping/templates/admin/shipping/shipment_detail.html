@@ -241,10 +241,15 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     <div>
       <div class="sd-error-title">Помилка при оформленні відправлення</div>
       <div class="sd-error-msg">{{ shipment.error_message|default:"Невідома помилка" }}</div>
-      <div style="margin-top:12px">
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
         <a href="{% url 'admin:shipping_shipment_edit_draft' shipment.pk %}" class="sd-btn sd-btn-green" style="display:inline-block;width:auto;padding:8px 18px">
           ✏️ Виправити і повторити
         </a>
+        {% if raw_request or raw_response %}
+        <a href="#debug" class="sd-btn sd-btn-ghost" style="display:inline-block;width:auto;padding:8px 18px">
+          🔍 Debug
+        </a>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -516,17 +521,45 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
       <!-- Технічні деталі API -->
       {% if raw_request or raw_response %}
-      <details class="sd-card">
-        <summary class="sd-card-title">📋 Технічні деталі API</summary>
+      <details class="sd-card" id="debug" {% if shipment.status == "error" %}open{% endif %}>
+        <summary class="sd-card-title">🔍 Debug — API запит / відповідь</summary>
         <div>
-          {% if raw_request %}
-          <div style="font-size:11px;color:var(--text-dim);margin-bottom:3px;margin-top:4px">➤ Request</div>
-          <pre class="sd-pre">{{ raw_request }}</pre>
-          {% endif %}
-          {% if raw_response %}
-          <div style="font-size:11px;color:var(--text-dim);margin:10px 0 3px">➤ Response</div>
-          <pre class="sd-pre">{{ raw_response }}</pre>
-          {% endif %}
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+
+            {% if raw_request %}
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">📤 Request (надіслано)</span>
+                <button type="button" onclick="copyDebug('dbg-req',this)"
+                  style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);
+                         border:1px solid var(--border-strong);border-radius:4px;
+                         color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
+              </div>
+              <pre class="sd-pre" id="dbg-req" style="max-height:420px;font-size:11px;color:#4fc3f7">{{ raw_request }}</pre>
+            </div>
+            {% endif %}
+
+            {% if raw_response %}
+            <div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <span style="font-size:11px;font-weight:700;{% if shipment.status == 'error' %}color:var(--err){% else %}color:var(--ok){% endif %};text-transform:uppercase;letter-spacing:.04em">
+                  {% if shipment.status == "error" %}❌{% else %}✅{% endif %} Response (отримано)
+                </span>
+                <button type="button" onclick="copyDebug('dbg-res',this)"
+                  style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);
+                         border:1px solid var(--border-strong);border-radius:4px;
+                         color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
+              </div>
+              <pre class="sd-pre" id="dbg-res" style="max-height:420px;font-size:11px;{% if shipment.status == 'error' %}color:#ef9a9a{% else %}color:#a5d6a7{% endif %}">{{ raw_response }}</pre>
+            </div>
+            {% endif %}
+
+          </div>
+          <div style="margin-top:10px;font-size:11px;color:var(--text-dim)">
+            Carrier: <b>{{ shipment.carrier.carrier_type|upper|default:"—" }}</b> ·
+            Shipment: <b>#{{ shipment.pk }}</b> ·
+            Status: <b>{{ shipment.status }}</b>
+          </div>
         </div>
       </details>
       {% endif %}
@@ -729,4 +762,28 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
   </div><!-- /body -->
 </div>
+
+<script>
+function copyDebug(id, btn) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  var text = el.textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      var orig = btn.textContent;
+      btn.textContent = '✅ Скопійовано';
+      setTimeout(function(){ btn.textContent = orig; }, 2000);
+    });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    var orig = btn.textContent;
+    btn.textContent = '✅ Скопійовано';
+    setTimeout(function(){ btn.textContent = orig; }, 2000);
+  }
+}
+</script>
 {% endblock %}
