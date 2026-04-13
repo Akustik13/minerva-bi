@@ -367,7 +367,7 @@ class UPSClient:
                 'ShipmentCharge': {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}},
             },
             'Service': {'Code': service_code, 'Description': UPS_SERVICES.get(service_code, '')},
-            'Package': self._pkg_dict(packages[0]) if len(packages) == 1 else [self._pkg_dict(p) for p in packages],
+            'Package': self._pkg_dict(packages[0], for_ship=True) if len(packages) == 1 else [self._pkg_dict(p, for_ship=True) for p in packages],
         }
 
         if reference:
@@ -587,10 +587,12 @@ class UPSClient:
         '2a': 'Small Express Box', '2b': 'Medium Express Box', '2c': 'Large Express Box',
     }
 
-    def _pkg_dict(self, pkg: dict) -> dict:
+    def _pkg_dict(self, pkg: dict, for_ship: bool = False) -> dict:
+        """for_ship=True → Ship API uses 'Packaging'; Rate API uses 'PackagingType'."""
         pkg_code = pkg.get('_pkg_override', PACKAGING_CUSTOMER)
+        pkg_key  = 'Packaging' if for_ship else 'PackagingType'
         p = {
-            'Packaging': {'Code': pkg_code, 'Description': self._PKG_DESCRIPTIONS.get(pkg_code, 'Customer Supplied Package')},
+            pkg_key: {'Code': pkg_code, 'Description': self._PKG_DESCRIPTIONS.get(pkg_code, 'Customer Supplied Package')},
             'Dimensions': {
                 'UnitOfMeasurement': {'Code': 'CM'},
                 'Length': str(round(float(pkg.get('length_cm', 10)))),
