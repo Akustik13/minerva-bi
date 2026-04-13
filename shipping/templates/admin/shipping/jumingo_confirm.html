@@ -16,7 +16,7 @@
   .jc-row    { display: flex; gap: 8px; margin-bottom: 6px; font-size: 13px; }
   .jc-lbl    { color: var(--text-dim); min-width: 140px; flex-shrink: 0; }
   .jc-val    { color: var(--text); font-weight: 500; }
-  .jc-val.accent { color: var(--accent); }
+  .jc-val.accent { color: #d97706; }
   .jc-2col   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media(max-width:700px){ .jc-2col { grid-template-columns: 1fr; } }
   .jc-table  { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -112,7 +112,7 @@
           {% if is_shop_tariff %}
             <span style="background:var(--bg-card-2);border:1px solid var(--border-strong);color:var(--text-muted);padding:2px 10px;border-radius:12px;font-size:12px">🏪 До поштомату — ти везеш самостійно</span>
           {% else %}
-            <span style="background:var(--bg-card-2);border:1px solid var(--border-strong);color:var(--accent);padding:2px 10px;border-radius:12px;font-size:12px">🚐 Кур'єр приїжджає забирати</span>
+            <span style="background:var(--bg-card-2);border:1px solid var(--border-strong);color:#d97706;padding:2px 10px;border-radius:12px;font-size:12px">🚐 Кур'єр приїжджає забирати</span>
           {% endif %}
         </span>
       </div>
