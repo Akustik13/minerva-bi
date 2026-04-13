@@ -207,6 +207,20 @@ document.addEventListener('DOMContentLoaded',function(){
   // Auto-fill sender when carrier changes (only if fields not manually edited)
   document.querySelectorAll('[name="carrier"]').forEach(r=>r.addEventListener('change', _fillSenderFromCarrier));
 
+  // Sync hidden dimension fields from first pkg table row before programmatic submit
+  // (form.submit() does NOT fire the submit event, so we do it manually here)
+  function _syncDimsAndSubmit(form) {
+    var firstRow = document.querySelector('#pkg-tbody tr');
+    if (firstRow) {
+      var gv = function(n) { return firstRow.querySelector('[name="' + n + '"]')?.value || ''; };
+      document.getElementById('id_weight_kg').value = gv('pkg_weight[]');
+      document.getElementById('id_length_cm').value = gv('pkg_length[]');
+      document.getElementById('id_width_cm').value  = gv('pkg_width[]');
+      document.getElementById('id_height_cm').value = gv('pkg_height[]');
+    }
+    form.submit();
+  }
+
   // Кнопки оформлення в таблиці порівняння (event delegation)
   const _rr = document.getElementById('rates-results');
   if(!_rr) return;
@@ -226,7 +240,7 @@ document.addEventListener('DOMContentLoaded',function(){
       document.getElementById('id_dhl_price').value = d.price;
       const h = document.createElement('input');
       h.type='hidden'; h.name='action_btn'; h.value='dhl_book';
-      form.appendChild(h); form.submit();
+      form.appendChild(h); _syncDimsAndSubmit(form);
 
     } else if(d.carrierType === 'jumingo'){
       if(!confirm(`Зберегти і обрати Jumingo "${d.name}" за ${priceF.toFixed(2)} EUR?\nПісля цього вам потрібно буде оплатити на Jumingo.`)) return;
@@ -239,7 +253,7 @@ document.addEventListener('DOMContentLoaded',function(){
       document.getElementById('id_jumingo_shipper').value     = d.shipper || '';
       const h = document.createElement('input');
       h.type='hidden'; h.name='action_btn'; h.value='jumingo_tariff';
-      form.appendChild(h); form.submit();
+      form.appendChild(h); _syncDimsAndSubmit(form);
 
     } else if(d.carrierType === 'ups'){
       if(!confirm(`Зберегти і оформити UPS "${d.name}" за ${priceF.toFixed(2)} ${d.currency||'EUR'}?`)) return;
@@ -250,7 +264,7 @@ document.addEventListener('DOMContentLoaded',function(){
       document.getElementById('id_ups_price').value        = d.price;
       const h = document.createElement('input');
       h.type='hidden'; h.name='action_btn'; h.value='ups_book';
-      form.appendChild(h); form.submit();
+      form.appendChild(h); _syncDimsAndSubmit(form);
 
     } else if(d.carrierType === 'fedex'){
       if(!confirm(`Зберегти і оформити FedEx "${d.name}" за ${priceF.toFixed(2)} ${d.currency||'EUR'}?`)) return;
@@ -261,7 +275,7 @@ document.addEventListener('DOMContentLoaded',function(){
       document.getElementById('id_fedex_price').value        = d.price;
       const h = document.createElement('input');
       h.type='hidden'; h.name='action_btn'; h.value='fedex_book';
-      form.appendChild(h); form.submit();
+      form.appendChild(h); _syncDimsAndSubmit(form);
     }
   });
 });

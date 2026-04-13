@@ -1271,6 +1271,21 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             for c in carriers
         }
 
+        existing_pkgs = list(shipment.packages.order_by("pk"))
+        if existing_pkgs:
+            pkg_rows_edit = [
+                {
+                    "weight_kg": float(p.weight_kg),
+                    "length_cm": float(p.length_cm),
+                    "width_cm":  float(p.width_cm),
+                    "height_cm": float(p.height_cm),
+                    "quantity":  p.quantity,
+                }
+                for p in existing_pkgs
+            ]
+        else:
+            pkg_rows_edit = []
+
         return render(request, "admin/shipping/create_shipment.html", {
             **self.admin_site.each_context(request),
             "order":                order,
@@ -1289,6 +1304,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "form_action":          reverse("admin:shipping_shipment_edit_draft", args=[shipment.pk]),
             "cancel_url":           reverse("admin:shipping_shipment_changelist"),
             "title":                f"{'Виправити помилку' if is_error else 'Редагувати чернетку'} #{shipment.pk}",
+            "pkg_rows_json":        _json2.dumps(pkg_rows_edit),
+            "pkg_auto":             len(pkg_rows_edit) > 1 or (len(pkg_rows_edit) == 1 and pkg_rows_edit[0]["quantity"] > 1),
         })
 
     def _handle_edit_post(self, request, shipment, carriers):
@@ -1377,6 +1394,39 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 }
 
         shipment.save()
+
+        # ── Multi-package: оновлюємо ShipmentPackage рядки ─────────────────────
+        pkg_weights = request.POST.getlist("pkg_weight[]")
+        if pkg_weights:
+            from decimal import Decimal as _D, InvalidOperation as _IE
+            shipment.packages.all().delete()
+            pkg_lengths = request.POST.getlist("pkg_length[]")
+            pkg_widths  = request.POST.getlist("pkg_width[]")
+            pkg_heights = request.POST.getlist("pkg_height[]")
+            pkg_qtys    = request.POST.getlist("pkg_qty[]")
+            def _dec2(lst, i, default):
+                try:
+                    return max(_D(default), _D(str(lst[i]).strip()))
+                except (IndexError, _IE, ValueError):
+                    return _D(default)
+            def _int2(lst, i):
+                try:
+                    return max(1, int(lst[i]))
+                except (IndexError, ValueError, TypeError):
+                    return 1
+            for i, w_raw in enumerate(pkg_weights):
+                try:
+                    w = max(_D("0.1"), _D(str(w_raw).strip()))
+                except (_IE, ValueError):
+                    continue
+                ShipmentPackage.objects.create(
+                    shipment  = shipment,
+                    weight_kg = w,
+                    length_cm = _dec2(pkg_lengths, i, "30"),
+                    width_cm  = _dec2(pkg_widths,  i, "20"),
+                    height_cm = _dec2(pkg_heights, i, "15"),
+                    quantity  = _int2(pkg_qtys, i),
+                )
 
         action = request.POST.get("action_btn", "save")
 
@@ -2358,7 +2408,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             except Exception:
                 shipper_country = 'DE'
         shipper_country = shipper_country.upper()
-        if dest == shipper_country:
+        from .services.jumingo import JumingoService as _JS
+        _EU = _JS._EU_COUNTRIES
+        if dest == shipper_country or (dest in _EU and shipper_country in _EU):
             return None
 
         reason_map = {
