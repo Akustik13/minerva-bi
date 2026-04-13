@@ -2093,16 +2093,27 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         from django.conf import settings as django_settings
         from .ups_client import UPSClient, UPSError
 
+        import json as _json
         shipment     = get_object_or_404(Shipment, pk=shipment_id)
         service_code = request.GET.get('service_code', '11')
 
         try:
-            client   = UPSClient()
+            client   = UPSClient(carrier=shipment.carrier)
             to_addr  = self._ups_extract_address(shipment)
             packages = self._ups_extract_packages(shipment)
             customs  = self._ups_extract_customs(shipment)
+            shipper  = self._ups_extract_shipper(shipment)
 
-            shipper = self._ups_extract_shipper(shipment)
+            # Зберігаємо відправлені дані для дебагу (до виклику API)
+            shipment.raw_request = _json.dumps({
+                'service_code': service_code,
+                'shipper':  shipper,
+                'to_addr':  to_addr,
+                'packages': packages,
+                'customs':  customs,
+            }, ensure_ascii=False, default=str)
+            shipment.save(update_fields=['raw_request'])
+
             result = client.create_shipment(
                 to_address=to_addr,
                 packages=packages,
@@ -2112,8 +2123,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 reference=shipment.reference or str(shipment.pk),
             )
         except UPSError as e:
+            shipment.status        = Shipment.Status.ERROR
+            shipment.error_message = str(e)
+            shipment.raw_response  = getattr(e, 'response', None)
+            shipment.save(update_fields=['status', 'error_message', 'raw_response'])
             messages.error(request, f'❌ UPS: {e}')
-            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+            return redirect(reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk]))
 
         # Зберегти трекінг + сервіс
         update_fields = []

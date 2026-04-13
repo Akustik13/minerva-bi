@@ -515,10 +515,17 @@ class UPSClient:
             result['StateProvinceCode'] = addr['state'].upper()
         return result
 
+    _PKG_DESCRIPTIONS = {
+        '01': 'UPS Letter', '02': 'Customer Supplied Package',
+        '03': 'Tube', '04': 'PAK', '21': 'UPS Express Box',
+        '24': 'UPS 25KG Box', '25': 'UPS 10KG Box', '30': 'Pallet',
+        '2a': 'Small Express Box', '2b': 'Medium Express Box', '2c': 'Large Express Box',
+    }
+
     def _pkg_dict(self, pkg: dict) -> dict:
         pkg_code = pkg.get('_pkg_override', PACKAGING_CUSTOMER)
         p = {
-            'PackagingType': {'Code': pkg_code},
+            'PackagingType': {'Code': pkg_code, 'Description': self._PKG_DESCRIPTIONS.get(pkg_code, 'Customer Supplied Package')},
             'Dimensions': {
                 'UnitOfMeasurement': {'Code': 'CM'},
                 'Length': str(round(float(pkg.get('length_cm', 10)))),
