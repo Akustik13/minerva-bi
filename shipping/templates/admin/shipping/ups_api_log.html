@@ -1,0 +1,142 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.ups-log-wrap { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
+.ups-log-header { display:flex; align-items:center; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+.ups-log-header h2 { margin:0; font-size:18px; color:var(--text); }
+.log-meta { font-size:12px; color:var(--text-dim); font-family:monospace; }
+.log-empty { color:var(--text-dim); font-style:italic; padding:40px; text-align:center; }
+
+.log-entry { background:var(--bg-card); border:1px solid var(--border-strong);
+             border-radius:8px; margin-bottom:12px; overflow:hidden; }
+.log-entry-head { display:flex; align-items:center; gap:10px; padding:10px 14px;
+                  cursor:pointer; user-select:none; flex-wrap:wrap; }
+.log-entry-head:hover { background:var(--bg-hover); }
+
+.log-idx { font-size:11px; color:var(--text-dim); min-width:22px; }
+.log-ts { font-size:11px; color:var(--text-dim); font-family:monospace; }
+.log-action { font-weight:700; font-size:13px; color:var(--text); font-family:monospace; }
+.log-method { font-size:11px; font-weight:700; padding:1px 7px; border-radius:10px; }
+.m-post { background:#1565c0; color:#fff; }
+.m-get  { background:#2e7d32; color:#fff; }
+.m-delete { background:#b71c1c; color:#fff; }
+.log-status { font-size:12px; font-family:monospace; font-weight:700; }
+.s-ok   { color:#4caf50; }
+.s-err  { color:#f44336; }
+.s-warn { color:#ff9800; }
+.log-dur { font-size:11px; color:var(--text-dim); }
+.log-url { font-size:11px; color:var(--text-dim); font-family:monospace;
+           white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:350px; }
+.log-error-badge { font-size:11px; background:#b71c1c; color:#fff;
+                   padding:1px 8px; border-radius:10px; }
+.log-toggle { margin-left:auto; font-size:18px; color:var(--text-dim); flex-shrink:0; }
+
+.log-body { display:none; border-top:1px solid var(--border-strong); }
+.log-body.open { display:block; }
+.log-cols { display:grid; grid-template-columns:1fr 1fr; gap:0; }
+.log-col { padding:14px; border-right:1px solid var(--border-strong); }
+.log-col:last-child { border-right:none; }
+.log-col-title { font-size:11px; font-weight:700; text-transform:uppercase;
+                 letter-spacing:.5px; color:var(--text-dim); margin-bottom:8px; }
+.log-json { margin:0; font-size:11px; font-family:monospace; white-space:pre-wrap;
+            word-break:break-all; color:var(--text); line-height:1.5;
+            max-height:400px; overflow-y:auto; }
+.log-error-row { padding:10px 14px; background:rgba(183,28,28,.1);
+                 font-size:12px; color:#ef9a9a; font-family:monospace; }
+
+@media(max-width:768px){
+  .log-cols { grid-template-columns:1fr; }
+  .log-col { border-right:none; border-bottom:1px solid var(--border-strong); }
+  .log-url { max-width:200px; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ups-log-wrap">
+  <div class="ups-log-header">
+    <h2>📋 UPS API Лог — {{ carrier.name }}</h2>
+    {% if entries %}
+    <span class="log-meta">{{ entries|length }} записів | Файл: {{ log_file }}</span>
+    {% endif %}
+    <a href="{% url 'admin:carrier_ups_debug' carrier.pk %}" class="button"
+       style="margin-left:auto">🔬 Debug</a>
+    <a href="{% url 'admin:shipping_carrier_change' carrier.pk %}" class="button">← Перевізник</a>
+  </div>
+
+  {% if not entries %}
+  <div class="log-empty">
+    Лог порожній. Зробіть будь-який UPS API запит (тест токену, тарифи, відправлення, трекінг) —
+    він з'явиться тут автоматично.
+  </div>
+  {% else %}
+  {% for e in entries %}
+  <div class="log-entry">
+    <div class="log-entry-head" onclick="toggleEntry({{ forloop.counter0 }})">
+      <span class="log-idx">#{{ forloop.counter }}</span>
+      <span class="log-ts">{{ e.ts }}</span>
+      <span class="log-method m-{{ e.method|lower }}">{{ e.method }}</span>
+      <span class="log-action">{{ e.action }}</span>
+      {% if e.resp_status %}
+        {% if e.resp_status < 300 %}
+          <span class="log-status s-ok">{{ e.resp_status }}</span>
+        {% elif e.resp_status < 500 %}
+          <span class="log-status s-warn">{{ e.resp_status }}</span>
+        {% else %}
+          <span class="log-status s-err">{{ e.resp_status }}</span>
+        {% endif %}
+      {% else %}
+        <span class="log-status s-err">—</span>
+      {% endif %}
+      {% if e.duration_ms %}<span class="log-dur">{{ e.duration_ms }}ms</span>{% endif %}
+      <span class="log-url" title="{{ e.url }}">{{ e.url }}</span>
+      {% if e.error %}<span class="log-error-badge">ERROR</span>{% endif %}
+      <span class="log-toggle" id="tog-{{ forloop.counter0 }}">▼</span>
+    </div>
+
+    {% if e.error %}
+    <div class="log-error-row">⚠️ {{ e.error }}</div>
+    {% endif %}
+
+    <div class="log-body" id="body-{{ forloop.counter0 }}">
+      <div class="log-cols">
+        <div class="log-col">
+          <div class="log-col-title">↑ Запит — заголовки</div>
+          <pre class="log-json">{{ e.req_headers }}</pre>
+        </div>
+        <div class="log-col">
+          <div class="log-col-title">↑ Запит — тіло</div>
+          <pre class="log-json">{{ e.req_body }}</pre>
+        </div>
+        <div class="log-col">
+          <div class="log-col-title">↓ Відповідь — статус {{ e.resp_status|default:"—" }}</div>
+          <pre class="log-json">{{ e.resp_body }}</pre>
+        </div>
+        <div class="log-col">
+          <div class="log-col-title">ℹ️ Метадані</div>
+          <pre class="log-json">URL: {{ e.url }}
+Carrier ID: {{ e.carrier_id|default:"—" }}
+Тривалість: {{ e.duration_ms|default:"—" }}ms
+Час: {{ e.ts }}</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+
+<script>
+function toggleEntry(i) {
+  const body = document.getElementById('body-' + i);
+  const tog  = document.getElementById('tog-' + i);
+  const open = body.classList.toggle('open');
+  tog.textContent = open ? '▲' : '▼';
+}
+</script>
+{% endblock %}

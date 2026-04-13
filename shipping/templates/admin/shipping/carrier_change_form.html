@@ -1,0 +1,13 @@
+{% extends "admin/change_form.html" %}
+
+{% block object-tools-items %}
+{{ block.super }}
+{% if ups_carrier_pk %}
+<li>
+  <a href="/admin/shipping/carrier/{{ ups_carrier_pk }}/ups-log/" class="historylink" target="_blank">📋 UPS Лог</a>
+</li>
+<li>
+  <a href="/admin/shipping/carrier/{{ ups_carrier_pk }}/ups-debug/" class="historylink" target="_blank">🔬 UPS Debug</a>
+</li>
+{% endif %}
+{% endblock %}

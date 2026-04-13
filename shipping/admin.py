@@ -73,6 +73,7 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
 
 @admin.register(Carrier)
 class CarrierAdmin(admin.ModelAdmin):
+    change_form_template = 'admin/shipping/carrier_change_form.html'
     list_display  = ("name", "carrier_type_badge", "is_active", "is_default",
                      "sender_name", "sender_country", "has_credentials")
     list_filter   = ("carrier_type", "is_active", "is_default")
@@ -131,6 +132,17 @@ class CarrierAdmin(admin.ModelAdmin):
         return format_html('<span style="color:#f44336">❌ Немає</span>')
     has_credentials.short_description = "API ключ"
 
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        if object_id:
+            try:
+                carrier = Carrier.objects.get(pk=object_id)
+                if carrier.carrier_type == 'ups' and carrier.api_key:
+                    extra_context['ups_carrier_pk'] = object_id
+            except Carrier.DoesNotExist:
+                pass
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
     def get_urls(self):
         urls = super().get_urls()
         custom = [
@@ -143,6 +155,9 @@ class CarrierAdmin(admin.ModelAdmin):
             path('<int:pk>/ups-debug/',
                  self.admin_site.admin_view(self.ups_debug_view),
                  name='carrier_ups_debug'),
+            path('<int:pk>/ups-log/',
+                 self.admin_site.admin_view(self.ups_log_view),
+                 name='carrier_ups_log'),
             path('<int:pk>/test-fedex-token/',
                  self.admin_site.admin_view(self.test_fedex_token_view),
                  name='carrier_test_fedex_token'),
@@ -539,6 +554,36 @@ class CarrierAdmin(admin.ModelAdmin):
             'working_route': dest['label'],
             'working_packaging_code': first_ok_pkg,
             'summary': f'{working_pkg} | Route: {dest["label"]} | OK: {ok_steps} | FAIL: {fail_steps}',
+        })
+
+    def ups_log_view(self, request, pk):
+        """Перегляд лог-файлу останніх 20 UPS API запитів/відповідей."""
+        import json as _json
+        from .ups_logger import get_log, LOG_FILE
+        carrier = get_object_or_404(Carrier, pk=pk)
+        raw_entries = get_log()
+        # Pre-serialize sub-dicts to JSON strings for clean display in template
+        entries = []
+        for e in raw_entries:
+            entries.append({
+                'ts':          e.get('ts', ''),
+                'action':      e.get('action', ''),
+                'method':      e.get('method', ''),
+                'url':         e.get('url', ''),
+                'carrier_id':  e.get('carrier_id'),
+                'duration_ms': e.get('duration_ms'),
+                'error':       e.get('error'),
+                'req_headers': _json.dumps(e.get('request', {}).get('headers') or {}, ensure_ascii=False, indent=2),
+                'req_body':    _json.dumps(e.get('request', {}).get('body'),    ensure_ascii=False, indent=2),
+                'resp_status': e.get('response', {}).get('status'),
+                'resp_body':   _json.dumps(e.get('response', {}).get('body'),   ensure_ascii=False, indent=2),
+            })
+        return render(request, 'admin/shipping/ups_api_log.html', {
+            **self.admin_site.each_context(request),
+            'carrier': carrier,
+            'entries': entries,
+            'log_file': LOG_FILE,
+            'title': f'UPS API Лог — {carrier.name}',
         })
 
 

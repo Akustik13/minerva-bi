@@ -330,6 +330,7 @@
         <button class="api-btn api-btn-sec" onclick="carrierTest('ups','token')">🔌 Токен</button>
         <button class="api-btn api-btn-sec" onclick="carrierTest('ups','rates')">💰 Тарифи</button>
         <a href="/admin/shipping/carrier/{{ ups_carrier.pk }}/ups-debug/" target="_blank" class="api-btn api-btn-sec">🔬 Debug</a>
+        <a href="/admin/shipping/carrier/{{ ups_carrier.pk }}/ups-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
         <a href="/admin/shipping/shipment/ups-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
         {% endif %}
         <a href="{% url 'api_console' %}?preset=ups" class="api-btn api-btn-cons">Console</a>

@@ -15,6 +15,7 @@ api_url='sandbox'|'' for production).
 """
 import base64
 import logging
+import time
 import uuid
 from decimal import Decimal
 
@@ -101,6 +102,7 @@ class UPSClient:
     # ── Auth ──────────────────────────────────────────────────────────────────
 
     def get_token(self) -> str:
+        from .ups_logger import log_call
         cache_key = f'ups_token_{self.carrier.pk}'
         token = cache.get(cache_key)
         if token:
@@ -110,24 +112,52 @@ class UPSClient:
             f'{self.carrier.api_key}:{self.carrier.api_secret}'.encode()
         ).decode()
 
-        r = requests.post(
-            f'{self.base_url}/security/v1/oauth/token',
-            headers={
-                'Authorization': f'Basic {credentials}',
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'x-merchant-id': self.carrier.connection_uuid,
-            },
-            data='grant_type=client_credentials',
-            timeout=30,
-        )
+        url = f'{self.base_url}/security/v1/oauth/token'
+        req_headers = {
+            'Authorization': f'Basic {credentials}',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'x-merchant-id': self.carrier.connection_uuid,
+        }
+        t0 = time.time()
+        r = None
+        resp_body = None
+        error_str = None
+
+        try:
+            r = requests.post(url, headers=req_headers, data='grant_type=client_credentials', timeout=30)
+            try:
+                resp_body = r.json()
+            except Exception:
+                resp_body = {'_raw': r.text[:200]}
+        except requests.Timeout:
+            error_str = 'Timeout (30s)'
+        except requests.ConnectionError as e:
+            error_str = str(e)
+        finally:
+            log_call(
+                action='oauth_token',
+                method='POST', url=url,
+                req_headers=req_headers,
+                req_body={'grant_type': 'client_credentials'},
+                resp_status=r.status_code if r is not None else None,
+                resp_body=resp_body,
+                duration_ms=int((time.time() - t0) * 1000),
+                error=error_str,
+                carrier_id=self.carrier.pk,
+            )
+
+        if error_str:
+            raise UPSError(f'UPS OAuth помилка: {error_str}')
         if r.status_code != 200:
             raise UPSError(
                 f'Помилка аутентифікації UPS [{r.status_code}]: {r.text[:200]}',
                 code=r.status_code, response=r.text,
             )
 
-        data = r.json()
-        token = data['access_token']
+        data = resp_body if isinstance(resp_body, dict) else {}
+        token = data.get('access_token', '')
+        if not token:
+            raise UPSError('UPS Auth: відповідь не містить access_token')
         # expires_in from API (typically 3600s = 1h); cache with 60s buffer
         expires_in = max(int(data.get('expires_in', 3600)) - 60, 60)
         cache.set(cache_key, token, expires_in)
@@ -143,32 +173,90 @@ class UPSClient:
         }
 
     def _post(self, endpoint: str, payload: dict) -> dict:
+        from .ups_logger import log_call
         url = f'{self.base_url}{endpoint}'
+        headers = self._headers()
+        t0 = time.time()
+        r = None
+        resp_body = None
+        error_str = None
+
         try:
-            r = requests.post(url, headers=self._headers(), json=payload, timeout=60)
+            r = requests.post(url, headers=headers, json=payload, timeout=60)
             if r.status_code == 401:
                 # Token expired mid-session — refresh and retry once
                 cache.delete(f'ups_token_{self.carrier.pk}')
-                r = requests.post(url, headers=self._headers(), json=payload, timeout=60)
-            if not r.ok:
-                self._handle_error(r)
-            return r.json()
+                headers = self._headers()
+                r = requests.post(url, headers=headers, json=payload, timeout=60)
+            try:
+                resp_body = r.json()
+            except Exception:
+                resp_body = {'_raw': r.text[:500]}
+        except UPSError as e:
+            error_str = str(e)
+            raise
         except requests.Timeout:
-            raise UPSError('UPS API не відповідає (timeout 60с)')
+            error_str = 'Timeout (60s)'
         except requests.ConnectionError as e:
-            raise UPSError(f"Помилка з'єднання з UPS: {e}")
+            error_str = str(e)
+        finally:
+            log_call(
+                action=endpoint.rsplit('/', 1)[-1],
+                method='POST', url=url,
+                req_headers=headers, req_body=payload,
+                resp_status=r.status_code if r is not None else None,
+                resp_body=resp_body,
+                duration_ms=int((time.time() - t0) * 1000),
+                error=error_str,
+                carrier_id=self.carrier.pk,
+            )
+
+        if error_str == 'Timeout (60s)':
+            raise UPSError('UPS API не відповідає (timeout 60с)')
+        if error_str:
+            raise UPSError(f"Помилка з'єднання з UPS: {error_str}")
+        if not r.ok:
+            self._handle_error(r)
+        return resp_body
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
+        from .ups_logger import log_call
         url = f'{self.base_url}{endpoint}'
+        headers = self._headers()
+        t0 = time.time()
+        r = None
+        resp_body = None
+        error_str = None
+
         try:
-            r = requests.get(url, headers=self._headers(), params=params, timeout=30)
-            if not r.ok:
-                self._handle_error(r)
-            return r.json()
+            r = requests.get(url, headers=headers, params=params, timeout=30)
+            try:
+                resp_body = r.json()
+            except Exception:
+                resp_body = {'_raw': r.text[:500]}
         except requests.Timeout:
-            raise UPSError('UPS API не відповідає')
+            error_str = 'Timeout (30s)'
         except requests.ConnectionError as e:
-            raise UPSError(f"Помилка з'єднання: {e}")
+            error_str = str(e)
+        finally:
+            log_call(
+                action=endpoint.rsplit('/', 1)[-1],
+                method='GET', url=url,
+                req_headers=headers, req_body=params or None,
+                resp_status=r.status_code if r is not None else None,
+                resp_body=resp_body,
+                duration_ms=int((time.time() - t0) * 1000),
+                error=error_str,
+                carrier_id=self.carrier.pk,
+            )
+
+        if error_str == 'Timeout (30s)':
+            raise UPSError('UPS API не відповідає')
+        if error_str:
+            raise UPSError(f"Помилка з'єднання: {error_str}")
+        if not r.ok:
+            self._handle_error(r)
+        return resp_body
 
     def _handle_error(self, response):
         try:
@@ -551,16 +639,43 @@ class UPSClient:
 
     def void_shipment(self, shipment_id: str) -> dict:
         """DELETE /api/shipments/v2409/void/cancel/{shipmentId}"""
+        from .ups_logger import log_call
         url = f'{self.base_url}/api/shipments/{_API_VERSION}/void/cancel/{shipment_id}'
+        headers = self._headers()
+        t0 = time.time()
+        r = None
+        resp_body = None
+        error_str = None
+
         try:
-            r = requests.delete(url, headers=self._headers(), timeout=30)
-            if not r.ok:
-                self._handle_error(r)
-            return r.json()
+            r = requests.delete(url, headers=headers, timeout=30)
+            try:
+                resp_body = r.json()
+            except Exception:
+                resp_body = {'_raw': r.text[:500]}
         except requests.Timeout:
-            raise UPSError('UPS API не відповідає')
+            error_str = 'Timeout (30s)'
         except requests.ConnectionError as e:
-            raise UPSError(f"Помилка з'єднання: {e}")
+            error_str = str(e)
+        finally:
+            log_call(
+                action='void_shipment',
+                method='DELETE', url=url,
+                req_headers=headers,
+                resp_status=r.status_code if r is not None else None,
+                resp_body=resp_body,
+                duration_ms=int((time.time() - t0) * 1000),
+                error=error_str,
+                carrier_id=self.carrier.pk,
+            )
+
+        if error_str == 'Timeout (30s)':
+            raise UPSError('UPS API не відповідає')
+        if error_str:
+            raise UPSError(f"Помилка з'єднання: {error_str}")
+        if not r.ok:
+            self._handle_error(r)
+        return resp_body
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
