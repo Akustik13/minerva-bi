@@ -115,12 +115,12 @@
         <span class="uc-val">{{ shipment.carrier.name }}</span>
       </div>
       {% endif %}
-      {% if shipment.carrier_price %}
       <div class="uc-row">
         <span class="uc-lbl">Орієнтовна вартість</span>
-        <span class="uc-val ok">{{ shipment.carrier_price }} {{ shipment.carrier_currency|default:"EUR" }}</span>
+        <span class="uc-val ok">
+          {% if shipment.carrier_price %}{{ shipment.carrier_price }} {{ shipment.carrier_currency|default:"EUR" }}{% else %}—{% endif %}
+        </span>
       </div>
-      {% endif %}
       <div class="uc-row">
         <span class="uc-lbl">Reference</span>
         <span class="uc-val" style="font-family:monospace">{{ shipment.reference|default:shipment.pk }}</span>

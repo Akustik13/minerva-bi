@@ -1195,7 +1195,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 )
 
         if action == "ups_book" and carrier:
-            ups_code = request.POST.get("ups_service_code", "11").strip() or "11"
+            ups_code  = request.POST.get("ups_service_code", "11").strip() or "11"
+            ups_price = request.POST.get("ups_price", "").strip()
+            ups_name  = request.POST.get("ups_service_name", "").strip()
+            if ups_price:
+                from decimal import Decimal as _D, InvalidOperation as _IE
+                try:
+                    shipment.carrier_price    = _D(ups_price)
+                    shipment.carrier_currency = "EUR"
+                    if ups_name:
+                        shipment.carrier_service = ups_name
+                    shipment.save(update_fields=["carrier_price", "carrier_currency", "carrier_service"])
+                except (_IE, ValueError):
+                    pass
             messages.success(request, f"✅ Відправлення #{shipment.pk} збережено. Перевірте дані перед відправкою…")
             return redirect(
                 reverse("admin:shipping_shipment_ups_confirm", args=[shipment.pk])
@@ -1471,7 +1483,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 )
 
         if action == "ups_book" and carrier:
-            ups_code = request.POST.get("ups_service_code", "11").strip() or "11"
+            ups_code  = request.POST.get("ups_service_code", "11").strip() or "11"
+            ups_price = request.POST.get("ups_price", "").strip()
+            ups_name  = request.POST.get("ups_service_name", "").strip()
+            if ups_price:
+                from decimal import Decimal as _D, InvalidOperation as _IE
+                try:
+                    shipment.carrier_price    = _D(ups_price)
+                    shipment.carrier_currency = "EUR"
+                    if ups_name:
+                        shipment.carrier_service = ups_name
+                    shipment.save(update_fields=["carrier_price", "carrier_currency", "carrier_service"])
+                except (_IE, ValueError):
+                    pass
             messages.success(request, f"✅ Відправлення #{shipment.pk} оновлено. Перевірте дані перед відправкою…")
             return redirect(
                 reverse("admin:shipping_shipment_ups_confirm", args=[shipment.pk])
