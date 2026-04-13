@@ -3275,10 +3275,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         # POST — підтверджено, передаємо на dhl_book_view зі збереженими GET-параметрами
         if request.method == 'POST':
+            pickup_type = request.POST.get('pickup_type', 'dropoff')
             qs = urlencode({
-                'product_code': product_code,
-                'product_name': product_name,
-                'price':        price_str,
+                'product_code':   product_code,
+                'product_name':   product_name,
+                'price':          price_str,
+                'pickup':         '1' if pickup_type == 'pickup' else '0',
+                'pickup_date':    request.POST.get('pickup_date', ''),
+                'pickup_ready':   request.POST.get('pickup_ready', '09:00'),
+                'pickup_close':   request.POST.get('pickup_close', '18:00'),
+                'pickup_location':request.POST.get('pickup_location', 'reception'),
             })
             return redirect(
                 reverse('admin:shipping_shipment_dhl_book', args=[shipment.pk]) + f'?{qs}'
@@ -3306,20 +3312,27 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                'price': price_str})
         )
 
+        from datetime import date as _date, timedelta as _td
+        _tomorrow = _date.today() + _td(days=1)
+        while _tomorrow.weekday() >= 5:
+            _tomorrow += _td(days=1)
+
         return render(request, 'admin/shipping/dhl_confirm.html', {
             **self.admin_site.each_context(request),
-            'title':        f'Підтвердити DHL #{shipment.pk}',
-            'shipment':     shipment,
-            'product_code': product_code,
-            'product_name': product_name,
-            'price':        price_f,
-            'shipper':      shipper,
-            'to_addr':      to_addr,
-            'packages':     packages,
-            'customs':      customs,
-            'is_intl':      is_intl,
-            'confirm_url':  confirm_url,
-            'back_url':     back_url,
+            'title':                f'Підтвердити DHL #{shipment.pk}',
+            'shipment':             shipment,
+            'product_code':         product_code,
+            'product_name':         product_name,
+            'price':                price_f,
+            'shipper':              shipper,
+            'to_addr':              to_addr,
+            'packages':             packages,
+            'customs':              customs,
+            'is_intl':              is_intl,
+            'confirm_url':          confirm_url,
+            'back_url':             back_url,
+            'pickup_min_date':      _tomorrow.strftime('%Y-%m-%d'),
+            'pickup_default_date':  _tomorrow.strftime('%Y-%m-%d'),
         })
 
     # ── DHL Book (POST /shipments) ────────────────────────────────────────────
@@ -3341,6 +3354,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         product_name    = request.GET.get("product_name", product_code).strip()
         price_str       = request.GET.get("price", "0")
         request_pickup  = request.GET.get("pickup", "0") == "1"
+        pickup_date     = request.GET.get("pickup_date", "").strip()
+        pickup_ready    = request.GET.get("pickup_ready", "09:00").strip() or "09:00"
         pickup_close    = request.GET.get("pickup_close", "18:00").strip() or "18:00"
         pickup_location = request.GET.get("pickup_location", "reception").strip() or "reception"
         customs_param   = request.GET.get("customs")
@@ -3357,6 +3372,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         result = dhl_create(dhl_carrier, shipment, product_code, product_name, price_f,
                             request_pickup=request_pickup,
+                            pickup_date=pickup_date,
+                            pickup_ready_time=pickup_ready,
                             pickup_close_time=pickup_close,
                             pickup_location=pickup_location,
                             include_customs=include_customs)

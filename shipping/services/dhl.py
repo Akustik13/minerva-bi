@@ -310,6 +310,8 @@ _EXPORT_REASON_MAP = {
 def create_shipment(carrier, shipment, product_code: str,
                     product_name: str = "", price: float = 0.0,
                     request_pickup: bool = False,
+                    pickup_date: str = "",
+                    pickup_ready_time: str = "09:00",
                     pickup_close_time: str = "18:00",
                     pickup_location: str = "reception",
                     include_customs: bool | None = None) -> dict:
@@ -340,21 +342,35 @@ def create_shipment(carrier, shipment, product_code: str,
     use_test = (carrier.api_url or "").strip().lower() == "test"
     base     = _TEST_BASE if use_test else _PROD_BASE
 
-    # Дата відправлення: наступний робочий день
-    ship_date = _date.today() + timedelta(days=1)
-    while ship_date.weekday() >= 5:          # 5=сб, 6=нд
-        ship_date += timedelta(days=1)
+    # Дата відправлення: з форми або наступний робочий день
+    if pickup_date:
+        try:
+            ship_date = _date.fromisoformat(pickup_date)
+        except (ValueError, AttributeError):
+            ship_date = _date.today() + timedelta(days=1)
+            while ship_date.weekday() >= 5:
+                ship_date += timedelta(days=1)
+    else:
+        ship_date = _date.today() + timedelta(days=1)
+        while ship_date.weekday() >= 5:          # 5=сб, 6=нд
+            ship_date += timedelta(days=1)
+
+    # Час готовності: з форми або 10:00
+    try:
+        _rh, _rm = (int(x) for x in (pickup_ready_time or "09:00").split(":")[:2])
+    except (ValueError, AttributeError):
+        _rh, _rm = 9, 0
 
     # Будуємо рядок часу з timezone Europe/Berlin
     try:
         from zoneinfo import ZoneInfo
         tz = ZoneInfo("Europe/Berlin")
-        ship_dt   = datetime(ship_date.year, ship_date.month, ship_date.day, 10, 0, 0, tzinfo=tz)
+        ship_dt   = datetime(ship_date.year, ship_date.month, ship_date.day, _rh, _rm, 0, tzinfo=tz)
         offset    = ship_dt.strftime("%z")          # "+0100" or "+0200"
         offset_f  = f"{offset[:3]}:{offset[3:]}"   # "+01:00"
-        planned_dt = f"{ship_date.isoformat()}T10:00:00 GMT{offset_f}"
+        planned_dt = f"{ship_date.isoformat()}T{_rh:02d}:{_rm:02d}:00 GMT{offset_f}"
     except Exception:
-        planned_dt = f"{ship_date.isoformat()}T10:00:00 GMT+01:00"
+        planned_dt = f"{ship_date.isoformat()}T{_rh:02d}:{_rm:02d}:00 GMT+01:00"
 
     acct         = carrier.connection_uuid or ""
     dest_country = (shipment.recipient_country or "").upper()
@@ -405,7 +421,7 @@ def create_shipment(carrier, shipment, product_code: str,
         "plannedShippingDateAndTime": planned_dt,
         "pickup": {
             "isRequested": request_pickup,
-            **({"closeTime": pickup_close_time, "location": pickup_location}
+            **({"readyTime": pickup_ready_time, "closeTime": pickup_close_time, "location": pickup_location}
                if request_pickup else {}),
         },
         "productCode": product_code,

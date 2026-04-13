@@ -25,8 +25,8 @@
   .dc-row:last-child { margin-bottom: 0; }
   .dc-lbl   { color: var(--text-dim); min-width: 140px; flex-shrink: 0; }
   .dc-val   { color: var(--text); font-weight: 500; }
-  .dc-val.ok     { color: var(--ok);     font-weight: 700; }
-  .dc-val.accent { color: var(--accent); font-weight: 700; }
+  .dc-val.ok     { color: var(--ok);  font-weight: 700; }
+  .dc-val.accent { color: #d97706;    font-weight: 700; }
   .dc-2col  { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   @media(max-width:700px){ .dc-2col { grid-template-columns: 1fr; } }
   .dc-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -46,7 +46,34 @@
   .btn-back:hover { background: var(--bg-hover); color: var(--text); }
   .warn-banner { background: var(--bg-card-2); border: 1px solid var(--warn);
                  border-left: 4px solid var(--warn); border-radius: 6px;
-                 padding: 12px 16px; color: var(--warn); font-size: 13px; margin-bottom: 16px; }
+                 padding: 12px 16px; color: #d97706; font-size: 13px; margin-bottom: 16px; }
+
+  /* Dual range slider */
+  .dr-wrap  { position:relative; height:48px; user-select:none; margin-top:6px; }
+  .dr-track { position:absolute; top:50%; left:10px; right:10px; height:6px;
+              background:var(--border-strong); border-radius:3px; transform:translateY(-50%); }
+  .dr-fill  { position:absolute; height:100%; background:#1976d2; border-radius:3px; }
+  .dr-input { position:absolute; width:100%; left:0; top:50%; transform:translateY(-50%);
+              -webkit-appearance:none; appearance:none; background:transparent;
+              pointer-events:none; height:48px; outline:none; margin:0; }
+  .dr-input::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%;
+    background:#1976d2; cursor:pointer; pointer-events:all;
+    border:2px solid var(--bg-card); box-shadow:0 1px 5px rgba(0,0,0,.35);
+  }
+  .dr-input::-moz-range-thumb {
+    width:22px; height:22px; border-radius:50%; background:#1976d2;
+    cursor:pointer; pointer-events:all; border:2px solid var(--bg-card);
+    box-shadow:0 1px 5px rgba(0,0,0,.35); border-style:solid;
+  }
+  .dr-bubble { position:absolute; top:-2px; transform:translateX(-50%);
+               background:#1976d2; color:#fff; border-radius:4px;
+               padding:2px 8px; font-size:12px; font-weight:700; white-space:nowrap;
+               pointer-events:none; }
+  .dr-bubble::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+                      border:5px solid transparent; border-top-color:#1976d2; }
+  .dr-ticks  { display:flex; justify-content:space-between; padding:0 10px;
+               font-size:10px; color:var(--text-dim); margin-top:2px; }
 </style>
 
 <div class="dc-wrap">
@@ -223,6 +250,70 @@
   </div>
   {% endif %}
 
+  <!-- Abholung / Спосіб відправки -->
+  <div class="dc-card">
+    <div class="dc-head">🚐 Спосіб відправки</div>
+    <div class="dc-body">
+      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text)">
+          <input type="radio" name="_pickup_type" value="pickup" id="pt_pickup" checked
+                 onchange="document.getElementById('pickup-details').style.display=''">
+          🚐 Кур'єр забере (Abholung)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text)">
+          <input type="radio" name="_pickup_type" value="dropoff" id="pt_dropoff"
+                 onchange="document.getElementById('pickup-details').style.display='none'">
+          🏪 Здам на відділення DHL сам
+        </label>
+      </div>
+      <div id="pickup-details" style="background:var(--bg-input);border-radius:6px;padding:14px 16px">
+        <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+          <div>
+            <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
+                           letter-spacing:.04em;display:block;margin-bottom:5px">Дата забирання</label>
+            <input type="date" id="inp_pickup_date" name="_pickup_date"
+                   min="{{ pickup_min_date }}" value="{{ pickup_default_date }}"
+                   style="background:var(--bg-card);border:1px solid var(--border-strong);
+                          color:var(--text);border-radius:4px;padding:7px 10px;font-size:13px">
+          </div>
+          <div style="flex:1;min-width:280px">
+            <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
+                           letter-spacing:.04em;display:block;margin-bottom:8px">Часове вікно (з — до)</label>
+            <div style="display:flex;justify-content:center;gap:10px;font-size:18px;font-weight:700;
+                        color:var(--text);margin-bottom:14px">
+              <span id="dr-from-lbl">09:00</span>
+              <span style="color:var(--text-dim)">—</span>
+              <span id="dr-to-lbl">18:00</span>
+            </div>
+            <div class="dr-wrap">
+              <div class="dr-track"><div class="dr-fill" id="dr-fill"></div></div>
+              <div class="dr-bubble" id="dr-b1">09:00</div>
+              <div class="dr-bubble" id="dr-b2">18:00</div>
+              <input class="dr-input" type="range" id="dr-from" min="0" max="47" value="4"  step="1">
+              <input class="dr-input" type="range" id="dr-to"   min="0" max="47" value="40" step="1">
+            </div>
+            <div class="dr-ticks">
+              <span>08:00</span><span>11:00</span><span>14:00</span><span>17:00</span><span>19:45</span>
+            </div>
+            <input type="hidden" id="inp_pickup_ready" value="09:00">
+            <input type="hidden" id="inp_pickup_close" value="18:00">
+          </div>
+          <div style="min-width:180px">
+            <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
+                           letter-spacing:.04em;display:block;margin-bottom:5px">Місце забирання</label>
+            <input type="text" id="inp_pickup_location" value="reception" maxlength="80"
+                   placeholder="reception / front door / warehouse"
+                   style="width:100%;background:var(--bg-card);border:1px solid var(--border-strong);
+                          color:var(--text);border-radius:4px;padding:7px 10px;font-size:13px">
+          </div>
+        </div>
+        <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">
+          ℹ️ DHL підтвердить час Abholung окремо. Вкажіть приблизне вікно коли кур'єр може приїхати.
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Підтвердження -->
   <div class="dc-card">
     <div class="dc-head">⚠️ Підтвердження</div>
@@ -235,7 +326,22 @@
       </p>
       <form method="post" action="{{ confirm_url }}" id="dhl-confirm-form">
         {% csrf_token %}
+        <input type="hidden" name="pickup_type"     id="fld_pickup_type"     value="dropoff">
+        <input type="hidden" name="pickup_date"     id="fld_pickup_date"     value="{{ pickup_default_date }}">
+        <input type="hidden" name="pickup_ready"    id="fld_pickup_ready"    value="09:00">
+        <input type="hidden" name="pickup_close"    id="fld_pickup_close"    value="18:00">
+        <input type="hidden" name="pickup_location" id="fld_pickup_location" value="reception">
       </form>
+      <script>
+      document.getElementById('dhl-confirm-form').addEventListener('submit', function(){
+        var isPickup = document.getElementById('pt_pickup').checked;
+        document.getElementById('fld_pickup_type').value     = isPickup ? 'pickup' : 'dropoff';
+        document.getElementById('fld_pickup_date').value     = document.getElementById('inp_pickup_date').value;
+        document.getElementById('fld_pickup_ready').value    = document.getElementById('inp_pickup_ready').value;
+        document.getElementById('fld_pickup_close').value    = document.getElementById('inp_pickup_close').value;
+        document.getElementById('fld_pickup_location').value = document.getElementById('inp_pickup_location').value;
+      });
+      </script>
     </div>
   </div>
 
@@ -249,4 +355,44 @@
   </div>
 
 </div>
+
+<script>
+(function(){
+  var STEP=15, BASE=8*60, MAX=47;
+  function fmt(slot){
+    var m=BASE+slot*STEP;
+    return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+  }
+  var rF=document.getElementById('dr-from');
+  var rT=document.getElementById('dr-to');
+  if(!rF||!rT) return;
+  var fill=document.getElementById('dr-fill');
+  var b1=document.getElementById('dr-b1');
+  var b2=document.getElementById('dr-b2');
+  var lF=document.getElementById('dr-from-lbl');
+  var lT=document.getElementById('dr-to-lbl');
+  var hF=document.getElementById('inp_pickup_ready');
+  var hT=document.getElementById('inp_pickup_close');
+  function upd(src){
+    var vf=parseInt(rF.value), vt=parseInt(rT.value);
+    if(vf>=vt){
+      if(src===rF){ vf=vt>0?vt-1:0; rF.value=vf; }
+      else         { vt=vf<MAX?vf+1:MAX; rT.value=vt; }
+    }
+    vf=parseInt(rF.value); vt=parseInt(rT.value);
+    var pf=vf/MAX*100, pt=vt/MAX*100;
+    fill.style.left=pf+'%'; fill.style.width=(pt-pf)+'%';
+    var tf=fmt(vf), tt=fmt(vt);
+    lF.textContent=tf; lT.textContent=tt;
+    hF.value=tf; hT.value=tt;
+    b1.textContent=tf; b1.style.left=(vf/MAX*100).toFixed(2)+'%';
+    b2.textContent=tt; b2.style.left=(vt/MAX*100).toFixed(2)+'%';
+    rF.style.zIndex=(vf>MAX-4)?5:3;
+    rT.style.zIndex=(vf>MAX-4)?3:5;
+  }
+  rF.addEventListener('input',function(){ upd(rF); });
+  rT.addEventListener('input',function(){ upd(rT); });
+  upd(null);
+})();
+</script>
 {% endblock %}
