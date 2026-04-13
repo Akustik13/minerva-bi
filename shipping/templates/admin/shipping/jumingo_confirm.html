@@ -47,26 +47,26 @@
   .dr-wrap  { position:relative; height:48px; user-select:none; margin-top:6px; }
   .dr-track { position:absolute; top:50%; left:10px; right:10px; height:6px;
               background:var(--border-strong); border-radius:3px; transform:translateY(-50%); }
-  .dr-fill  { position:absolute; height:100%; background:var(--accent); border-radius:3px; }
+  .dr-fill  { position:absolute; height:100%; background:#1976d2; border-radius:3px; }
   .dr-input { position:absolute; width:100%; left:0; top:50%; transform:translateY(-50%);
               -webkit-appearance:none; appearance:none; background:transparent;
               pointer-events:none; height:48px; outline:none; margin:0; }
   .dr-input::-webkit-slider-thumb {
     -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%;
-    background:var(--accent); cursor:pointer; pointer-events:all;
+    background:#1976d2; cursor:pointer; pointer-events:all;
     border:2px solid var(--bg-card); box-shadow:0 1px 5px rgba(0,0,0,.35);
   }
   .dr-input::-moz-range-thumb {
-    width:22px; height:22px; border-radius:50%; background:var(--accent);
+    width:22px; height:22px; border-radius:50%; background:#1976d2;
     cursor:pointer; pointer-events:all; border:2px solid var(--bg-card);
     box-shadow:0 1px 5px rgba(0,0,0,.35); border-style:solid;
   }
   .dr-bubble { position:absolute; top:-2px; transform:translateX(-50%);
-               background:var(--accent); color:#fff; border-radius:4px;
+               background:#1976d2; color:#fff; border-radius:4px;
                padding:2px 8px; font-size:12px; font-weight:700; white-space:nowrap;
                pointer-events:none; }
   .dr-bubble::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%);
-                      border:5px solid transparent; border-top-color:var(--accent); }
+                      border:5px solid transparent; border-top-color:#1976d2; }
   .dr-ticks  { display:flex; justify-content:space-between; padding:0 10px;
                font-size:10px; color:var(--text-dim); margin-top:2px; }
 </style>
