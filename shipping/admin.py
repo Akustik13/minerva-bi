@@ -2023,6 +2023,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         shipment = get_object_or_404(Shipment, pk=shipment_id)
         order    = shipment.order
 
+        import json as _json
         try:
             client   = UPSClient()
             to_addr  = self._ups_extract_address(shipment)
@@ -2033,13 +2034,17 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
 
         weight = float(shipment.weight_kg or 1)
+        raw_req  = getattr(client, '_last_rate_payload',  None)
+        raw_resp = getattr(client, '_last_rate_response', None)
         return render(request, 'admin/shipping/ups_rates.html', {
             **self.admin_site.each_context(request),
-            'shipment': shipment,
-            'order':    order,
-            'rates':    rates,
-            'weight':   weight,
-            'title':    f'UPS Тарифи — #{shipment.pk} → {shipment.recipient_name}',
+            'shipment':  shipment,
+            'order':     order,
+            'rates':     rates,
+            'weight':    weight,
+            'title':     f'UPS Тарифи — #{shipment.pk} → {shipment.recipient_name}',
+            'raw_request':  _json.dumps(raw_req,  ensure_ascii=False, indent=2) if raw_req  else '',
+            'raw_response': _json.dumps(raw_resp, ensure_ascii=False, indent=2) if raw_resp else '',
         })
 
     def ups_confirm_view(self, request, shipment_id):

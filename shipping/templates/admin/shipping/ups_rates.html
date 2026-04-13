@@ -97,5 +97,59 @@
   {% endif %}
 
   <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}" class="ups-back">← Назад до відправлення</a>
+
+  {% if raw_request or raw_response %}
+  <details style="margin-top:28px" {% if not rates %}open{% endif %}>
+    <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-dim);
+                    text-transform:uppercase;letter-spacing:.05em;user-select:none;
+                    padding:10px 0;border-top:1px solid var(--border-strong)">
+      🔍 Debug — Rate API запит / відповідь
+    </summary>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
+
+      {% if raw_request %}
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">📤 Request</span>
+          <button type="button" onclick="copyRateDebug('ur-req',this)"
+            style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);
+                   border:1px solid var(--border-strong);border-radius:4px;
+                   color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
+        </div>
+        <pre id="ur-req" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;
+                  padding:12px;font-size:11px;color:#4fc3f7;overflow-x:auto;
+                  white-space:pre-wrap;word-break:break-all;max-height:480px;overflow-y:auto">{{ raw_request }}</pre>
+      </div>
+      {% endif %}
+
+      {% if raw_response %}
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:11px;font-weight:700;color:var(--ok);text-transform:uppercase;letter-spacing:.04em">✅ Response</span>
+          <button type="button" onclick="copyRateDebug('ur-res',this)"
+            style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);
+                   border:1px solid var(--border-strong);border-radius:4px;
+                   color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
+        </div>
+        <pre id="ur-res" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;
+                  padding:12px;font-size:11px;color:#a5d6a7;overflow-x:auto;
+                  white-space:pre-wrap;word-break:break-all;max-height:480px;overflow-y:auto">{{ raw_response }}</pre>
+      </div>
+      {% endif %}
+
+    </div>
+  </details>
+  <script>
+  function copyRateDebug(id, btn) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.textContent).then(function() {
+      var orig = btn.textContent; btn.textContent = '✅ Скопійовано';
+      setTimeout(function(){ btn.textContent = orig; }, 2000);
+    });
+  }
+  </script>
+  {% endif %}
+
 </div>
 {% endblock %}

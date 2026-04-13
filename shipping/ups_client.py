@@ -261,6 +261,8 @@ class UPSClient:
             del shipment['DeliveryTimeInformation']
             payload['RateRequest']['Request']['RequestOption'] = 'Shop'
             data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
+        self._last_rate_payload  = payload
+        self._last_rate_response = data
         return self._parse_rated_shipments(data)
 
     def _rate_single(self, to_address, packages, from_address, service_code):
@@ -276,6 +278,8 @@ class UPSClient:
             'Shipment': self._build_rate_shipment(to_address, packages, shipper, service_code),
         }}
         data = self._post(f'/api/rating/{_API_VERSION}/Rate', payload)
+        self._last_rate_payload  = payload
+        self._last_rate_response = data
         return self._parse_rated_shipments(data)
 
     def _rate_fallback(self, to_address, packages, from_address):
