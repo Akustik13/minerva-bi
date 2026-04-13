@@ -580,9 +580,16 @@ class CarrierAdmin(admin.ModelAdmin):
                 messages.success(request, f'✅ Ліміт логу збережено: {val} записів')
             except (ValueError, TypeError):
                 messages.error(request, '❌ Невірне значення ліміту')
+            except Exception as e:
+                messages.error(request, f'❌ Помилка збереження: {e}')
             return redirect(reverse('admin:carrier_ups_log', args=[pk]))
 
-        settings_obj = ShippingSettings.get()
+        # Read max_entries with fallback (migration may not be applied yet)
+        try:
+            settings_obj = ShippingSettings.get()
+            max_entries = settings_obj.ups_log_max_entries
+        except Exception:
+            max_entries = 20
         raw_entries = get_log()
         entries = []
         for e in raw_entries:
@@ -604,8 +611,8 @@ class CarrierAdmin(admin.ModelAdmin):
             'carrier':     carrier,
             'entries':     entries,
             'log_file':    LOG_FILE,
-            'max_entries': settings_obj.ups_log_max_entries,
-            'log_json':    _json.dumps(raw_entries, ensure_ascii=False, indent=2),
+            'max_entries': max_entries,
+            'log_data':    raw_entries,   # Python list → json_script in template
             'title':       f'UPS API Лог — {carrier.name}',
         })
 

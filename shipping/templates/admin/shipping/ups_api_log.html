@@ -195,8 +195,8 @@ Carrier ID: {{ e.carrier_id|default:"—" }}
 
 </div>
 
-<!-- Raw log JSON for clipboard copy (hidden) -->
-<script id="log-raw-data" type="application/json">{{ log_json }}</script>
+<!-- Raw log JSON for clipboard copy -->
+{{ log_data|json_script:"log-raw-data" }}
 
 <script>
 function toggleEntry(i) {
@@ -207,8 +207,9 @@ function toggleEntry(i) {
 }
 
 function copyLog() {
-  const raw = document.getElementById('log-raw-data').textContent;
-  navigator.clipboard.writeText(raw).then(() => {
+  const el  = document.getElementById('log-raw-data');
+  const txt = JSON.stringify(JSON.parse(el.textContent), null, 2);
+  navigator.clipboard.writeText(txt).then(() => {
     const ok = document.getElementById('copy-ok');
     ok.style.display = 'inline';
     setTimeout(() => { ok.style.display = 'none'; }, 2000);
