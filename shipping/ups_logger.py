@@ -12,9 +12,18 @@ from datetime import datetime
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_HERE)
 LOG_FILE = os.path.join(_PROJECT_ROOT, 'logs', 'ups_api.json')
-MAX_ENTRIES = 20
+_DEFAULT_MAX = 20
 
 _lock = threading.Lock()
+
+
+def _get_max_entries() -> int:
+    """Читає ліміт із ShippingSettings (з БД). Fallback → _DEFAULT_MAX."""
+    try:
+        from shipping.models import ShippingSettings
+        return max(1, ShippingSettings.get().ups_log_max_entries)
+    except Exception:
+        return _DEFAULT_MAX
 
 # Назви ключів, значення яких треба маскувати
 _SENSITIVE_KEYS = frozenset({
@@ -118,7 +127,7 @@ def log_call(
             entries = []
 
         entries.insert(0, entry)   # найновіший — першим
-        entries = entries[:MAX_ENTRIES]
+        entries = entries[:_get_max_entries()]
 
         try:
             with open(LOG_FILE, 'w', encoding='utf-8') as f:

@@ -4305,6 +4305,9 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 "<code>*/5 * * * * docker-compose exec -T web python manage.py track_shipments</code>"
             ),
         }),
+        ("📋 UPS API Лог", {
+            "fields": ("ups_log_max_entries",),
+        }),
     ]
 
     def tracking_actions(self, obj):

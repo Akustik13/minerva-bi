@@ -437,6 +437,10 @@ class ShippingSettings(models.Model):
         "Останній запуск", null=True, blank=True,
         help_text="Заповнюється автоматично після кожного успішного запуску.",
     )
+    ups_log_max_entries = models.PositiveSmallIntegerField(
+        "UPS лог — макс. записів", default=20,
+        help_text="Скільки останніх UPS API запитів/відповідей зберігати у лог-файлі (1–200).",
+    )
 
     class Meta:
         verbose_name        = "Налаштування доставки"
