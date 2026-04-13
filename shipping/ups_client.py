@@ -40,9 +40,10 @@ UPS_SERVICES = {
     '96': 'UPS Worldwide Express Freight',
 }
 
-# Packaging code: '00'=Unknown (most permissive), '02'=My Packaging
-# Use '00' as default — some UPS accounts reject '02' for certain routes
-PACKAGING_CUSTOMER = '00'
+# Packaging code: '02'=Customer Supplied Package — required by Ship API v2409.
+# '00' (Unknown) is accepted by Rating API but rejected by Ship API with 400.
+# Rate fallback already overrides to '00' when '02' fails for rating queries.
+PACKAGING_CUSTOMER = '02'
 
 # API version
 _API_VERSION = 'v2409'
