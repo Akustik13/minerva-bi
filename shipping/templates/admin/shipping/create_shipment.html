@@ -340,12 +340,17 @@ function compareRates(){
     });
   });
 
-  const firstPkg = packages[0] || {};
+  // Use largest box by volume for dimensions (conservative estimate)
+  const largestPkg = packages.reduce((best, p) => {
+    const vol  = (p.length_cm||0) * (p.width_cm||0) * (p.height_cm||0);
+    const bvol = (best.length_cm||0) * (best.width_cm||0) * (best.height_cm||0);
+    return vol > bvol ? p : best;
+  }, packages[0] || {});
   const body = {
-    weight_kg: String(firstPkg.weight_kg || ''),
-    length_cm: String(firstPkg.length_cm || ''),
-    width_cm:  String(firstPkg.width_cm  || ''),
-    height_cm: String(firstPkg.height_cm || ''),
+    weight_kg: String(largestPkg.weight_kg || ''),
+    length_cm: String(largestPkg.length_cm || ''),
+    width_cm:  String(largestPkg.width_cm  || ''),
+    height_cm: String(largestPkg.height_cm || ''),
     recipient_country: get('recipient_country'),
     recipient_zip:     get('recipient_zip'),
     recipient_city:    get('recipient_city'),
@@ -384,14 +389,22 @@ function compareRates(){
     let pkgHtml = '';
     if (data.packages && data.packages.length) {
       const totalBoxes = data.packages.reduce((s, p) => s + (p.quantity || 1), 0);
+      const multiBox   = packages.length > 1;
       meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${totalBoxes} коробок · ${esc(data.total_weight_kg)} кг заг.</span>`
+        + (multiBox ? ` <span style="color:#d97706;font-weight:700;font-size:11px">~ приблизно</span>` : '')
         + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
       pkgHtml = '<br><span style="color:var(--text-muted)">📦 Коробки:</span> '
         + data.packages.map((p, i) =>
             `<b style="color:var(--text)">#${i+1}: ${p.weight_kg} кг · ${p.length_cm}×${p.width_cm}×${p.height_cm} см`
-            + (p.quantity > 1 ? ` <span style="color:var(--warn)">×${p.quantity} шт</span>` : '') + `</b>`
+            + (p.quantity > 1 ? ` <span style="color:#d97706">×${p.quantity} шт</span>` : '') + `</b>`
           ).join(' &nbsp;|&nbsp; ')
-        + ` &nbsp;&nbsp;<span style="color:var(--text-dim)">= ${totalBoxes} коробок, ${esc(data.total_weight_kg)} кг заг.</span>`;
+        + ` &nbsp;&nbsp;<span style="color:var(--text-dim)">= ${totalBoxes} коробок, ${esc(data.total_weight_kg)} кг заг.</span>`
+        + (multiBox
+            ? `<br><span style="display:inline-flex;align-items:center;gap:5px;margin-top:7px;`
+            + `background:rgba(217,119,6,.1);border:1px solid #d97706;border-radius:5px;`
+            + `padding:4px 10px;font-size:11px;color:#d97706">`
+            + `⚠️ Кілька коробок — розрахунок <b>приблизний</b>. Розміри найбільшої (${largestPkg.length_cm}×${largestPkg.width_cm}×${largestPkg.height_cm} см) · фінальна ціна може відрізнятись від реальної.</span>`
+            : '');
     } else {
       meta.innerHTML = `<span style="color:var(--text-muted,#9aafbe)">📦 ${esc(data.total_weight_kg||body.weight_kg)} кг · ${esc(data.dims||'')} см</span>`
         + (destStr ? ` &nbsp;→&nbsp; <span style="color:var(--text-muted,#9aafbe)">${esc(destStr)}</span>` : '');
