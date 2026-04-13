@@ -397,6 +397,7 @@ class UPSClient:
             },
         }
 
+        self._last_payload = payload  # exposed for debug logging
         data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
         resp         = data.get('ShipmentResponse', {})
         results_data = resp.get('ShipmentResults', {})

@@ -2122,16 +2122,6 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             customs  = self._ups_extract_customs(shipment)
             shipper  = self._ups_extract_shipper(shipment)
 
-            # Зберігаємо відправлені дані для дебагу (до виклику API)
-            shipment.raw_request = _json.dumps({
-                'service_code': service_code,
-                'shipper':  shipper,
-                'to_addr':  to_addr,
-                'packages': packages,
-                'customs':  customs,
-            }, ensure_ascii=False, default=str)
-            shipment.save(update_fields=['raw_request'])
-
             result = client.create_shipment(
                 to_address=to_addr,
                 packages=packages,
@@ -2140,11 +2130,22 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 customs_info=customs or None,
                 reference=shipment.reference or str(shipment.pk),
             )
+            # Зберігаємо реальний UPS payload (після _pkg_dict) для дебагу
+            shipment.raw_request = _json.dumps(
+                getattr(client, '_last_payload', {'packages': packages}),
+                ensure_ascii=False, default=str,
+            )
+            shipment.save(update_fields=['raw_request'])
         except UPSError as e:
             shipment.status        = Shipment.Status.ERROR
             shipment.error_message = str(e)
             shipment.raw_response  = getattr(e, 'response', None)
-            shipment.save(update_fields=['status', 'error_message', 'raw_response'])
+            # Зберігаємо payload що викликав помилку
+            shipment.raw_request   = _json.dumps(
+                getattr(client, '_last_payload', {'packages': packages, 'error': str(e)}),
+                ensure_ascii=False, default=str,
+            )
+            shipment.save(update_fields=['status', 'error_message', 'raw_response', 'raw_request'])
             messages.error(request, f'❌ UPS: {e}')
             return redirect(reverse('admin:shipping_shipment_edit_draft', args=[shipment.pk]))
 
