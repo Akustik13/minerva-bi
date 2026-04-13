@@ -567,7 +567,9 @@ function buildSummary(carriers){
         ? (isShopS
           ? `<span style="display:inline-block;font-size:10px;background:rgba(158,158,158,.15);color:var(--text-muted);border:1px solid var(--border-strong);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🏪 Поштомат</span>`
           : `<span style="display:inline-block;font-size:10px;background:rgba(33,150,243,.12);color:var(--accent-2,#2196f3);border:1px solid rgba(33,150,243,.3);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🚐 Кур'єр</span>`)
-        : '';
+        : (c.carrier_type==='ups'||c.carrier_type==='fedex'
+          ? `<span style="display:inline-block;font-size:10px;background:rgba(33,150,243,.12);color:var(--accent-2,#2196f3);border:1px solid rgba(33,150,243,.3);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🚐 Кур'єр</span>`
+          : '');
       h += `<td style="padding:10px 14px;border-left:1px solid var(--border);vertical-align:middle">
         <div style="color:var(--text);font-size:12px;font-weight:600;margin-bottom:4px">${esc(nameShort)}${typeBadgeS}</div>
         <div style="margin-bottom:6px">
@@ -614,7 +616,9 @@ function buildTable(c){
       ? (isShop
         ? `<span style="display:inline-block;font-size:10px;background:rgba(158,158,158,.15);color:var(--text-muted);border:1px solid var(--border-strong);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🏪 Поштомат</span>`
         : `<span style="display:inline-block;font-size:10px;background:rgba(33,150,243,.12);color:var(--accent-2,#2196f3);border:1px solid rgba(33,150,243,.3);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🚐 Кур'єр</span>`)
-      : '';
+      : (isUPS||isFedEx
+        ? `<span style="display:inline-block;font-size:10px;background:rgba(33,150,243,.12);color:var(--accent-2,#2196f3);border:1px solid rgba(33,150,243,.3);border-radius:8px;padding:1px 6px;margin-left:5px;white-space:nowrap">🚐 Кур'єр</span>`
+        : '');
     h += `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:8px 10px;color:var(--text);font-weight:600">${esc(p.name)}${typeBadge}</td>
       ${isDHL?`<td style="padding:8px 8px;color:var(--text-dim);font-family:monospace">${esc(p.code)}</td>`:''}

@@ -2031,9 +2031,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         # POST — підтверджено, передаємо на ups_book_view
         if request.method == 'POST':
+            from urllib.parse import urlencode
+            qs = urlencode({
+                'service_code':  service_code,
+                'pickup_type':   request.POST.get('pickup_type', 'dropoff'),
+                'pickup_date':   request.POST.get('pickup_date', ''),
+                'pickup_ready':  request.POST.get('pickup_ready', '0900'),
+                'pickup_close':  request.POST.get('pickup_close', '1800'),
+            })
             return redirect(
-                reverse('admin:shipping_shipment_ups_book', args=[shipment.pk])
-                + f'?service_code={service_code}'
+                reverse('admin:shipping_shipment_ups_book', args=[shipment.pk]) + f'?{qs}'
             )
 
         # GET — будуємо превью
@@ -2069,21 +2076,32 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             else reverse('admin:shipping_shipment_change', args=[shipment.pk])
         )
 
+        from datetime import date as _date, timedelta as _td
+        _today     = _date.today()
+        _tomorrow  = _today + _td(days=1)
+        # Skip to Monday if tomorrow is weekend
+        if _tomorrow.weekday() == 5:   # Saturday → Monday
+            _tomorrow += _td(days=2)
+        elif _tomorrow.weekday() == 6:  # Sunday → Monday
+            _tomorrow += _td(days=1)
+
         return render(request, 'admin/shipping/ups_confirm.html', {
             **self.admin_site.each_context(request),
-            'title':        f'Підтвердити UPS відправлення #{shipment.pk}',
-            'shipment':     shipment,
-            'service_code': service_code,
-            'service_name': service_name,
-            'to_addr':      to_addr,
-            'shipper':      shipper,
-            'packages':     packages,
-            'customs':      customs,
-            'weight_warn':  weight_warn,
-            'is_intl':      (to_addr.get('country', 'DE').upper() !=
-                             (shipper.get('country') or 'DE').upper()),
-            'confirm_url':  reverse('admin:shipping_shipment_ups_confirm', args=[shipment.pk]),
-            'back_url':     back_url,
+            'title':                f'Підтвердити UPS відправлення #{shipment.pk}',
+            'shipment':             shipment,
+            'service_code':         service_code,
+            'service_name':         service_name,
+            'to_addr':              to_addr,
+            'shipper':              shipper,
+            'packages':             packages,
+            'customs':              customs,
+            'weight_warn':          weight_warn,
+            'is_intl':              (to_addr.get('country', 'DE').upper() !=
+                                     (shipper.get('country') or 'DE').upper()),
+            'confirm_url':          reverse('admin:shipping_shipment_ups_confirm', args=[shipment.pk]),
+            'back_url':             back_url,
+            'pickup_min_date':      _tomorrow.strftime('%Y-%m-%d'),
+            'pickup_default_date':  _tomorrow.strftime('%Y-%m-%d'),
         })
 
     def ups_book_view(self, request, shipment_id):
@@ -2182,10 +2200,40 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if order_fields:
             order.save(update_fields=order_fields)
 
+        # ── Pickup scheduling (якщо обрано кур'єр) ──────────────────────────
+        pickup_type  = request.GET.get('pickup_type', 'dropoff')
+        pickup_msg   = ''
+        if pickup_type == 'pickup':
+            pickup_date  = request.GET.get('pickup_date', '')
+            pickup_ready = request.GET.get('pickup_ready', '0900')
+            pickup_close = request.GET.get('pickup_close', '1800')
+            if pickup_date:
+                try:
+                    pickup_result = client.schedule_pickup(
+                        shipper      = shipper,
+                        pickup_date  = pickup_date,
+                        ready_time   = pickup_ready,
+                        close_time   = pickup_close,
+                        service_code = service_code,
+                        packages     = packages,
+                    )
+                    if pickup_result['success']:
+                        prn = pickup_result.get('prn', '')
+                        pickup_msg = f' | 🚐 Кур\'єр: {pickup_date}'
+                        if prn:
+                            pickup_msg += f' (PRN: {prn})'
+                            shipment.notes = (shipment.notes or '') + f'\nUPS Pickup PRN: {prn} ({pickup_date} {pickup_ready}-{pickup_close})'
+                            shipment.save(update_fields=['notes'])
+                        messages.info(request, f'🚐 Кур\'єр UPS заплановано на {pickup_date} ({pickup_ready[:2]}:{pickup_ready[2:]}–{pickup_close[:2]}:{pickup_close[2:]}). PRN: {prn or "—"}')
+                    else:
+                        messages.warning(request, f'⚠️ Відправлення створено, але кур\'єра не вдалося запланувати: {pickup_result.get("error", "Невідома помилка")}')
+                except Exception as _pe:
+                    messages.warning(request, f'⚠️ Відправлення створено, але помилка планування кур\'єра: {_pe}')
+
         messages.success(
             request,
             f'✅ UPS відправлення створено! Трекінг: {result["tracking_number"]} | '
-            f'{result["service_name"]} | {result["total_charge"]} {result["currency"]}',
+            f'{result["service_name"]} | {result["total_charge"]} {result["currency"]}{pickup_msg}',
         )
         return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
 

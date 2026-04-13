@@ -475,6 +475,71 @@ class UPSClient:
                 'delivered':          False,
             }
 
+    # ── Pickup scheduling ─────────────────────────────────────────────────────
+
+    def schedule_pickup(self, shipper: dict, pickup_date: str,
+                        ready_time: str = '0900', close_time: str = '1800',
+                        service_code: str = '11', packages: list = None) -> dict:
+        """
+        POST /api/pickups/v2205/schedule
+        Планує забирання кур'єром UPS.
+
+        pickup_date  — 'YYYYMMDD'
+        ready_time   — 'HHMM' (наприклад '0900')
+        close_time   — 'HHMM' (наприклад '1800')
+        Повертає: {'prn': str, 'success': bool, 'error': str|None}
+        """
+        pkgs = packages or []
+        pkg_count   = sum(p.get('quantity', 1) for p in pkgs) or 1
+        total_weight = sum(float(p.get('weight_kg', 1)) * p.get('quantity', 1) for p in pkgs) or 1.0
+
+        payload = {
+            'PickupCreationRequest': {
+                'RatePickupIndicator': 'N',
+                'Shipper': {
+                    'Account': {
+                        'AccountNumber':     self.carrier.connection_uuid,
+                        'AccountCountryCode': (shipper.get('country') or 'DE').upper(),
+                    },
+                },
+                'PickupDateInfo': {
+                    'CloseTime':  close_time.replace(':', ''),
+                    'ReadyTime':  ready_time.replace(':', ''),
+                    'PickupDate': pickup_date.replace('-', ''),
+                },
+                'PickupAddress': {
+                    'CompanyName':          shipper.get('company') or shipper.get('name', ''),
+                    'AddressLine':          shipper.get('address_line', ''),
+                    'City':                 shipper.get('city', ''),
+                    'PostalCode':           shipper.get('postal', ''),
+                    'CountryCode':          (shipper.get('country') or 'DE').upper(),
+                    'ResidentialIndicator': 'N',
+                },
+                'OverweightIndicator': 'N',
+                'PaymentMethod': '01',
+                'ShipmentDetail': {
+                    'PackageCount': str(pkg_count),
+                    'PackageWeight': {
+                        'Weight': str(round(total_weight, 2)),
+                        'UnitOfMeasurement': {'Code': 'KGS'},
+                    },
+                    'ContainerCode': '01',
+                    'ServiceCode':   service_code,
+                    'NumberOfPieces': str(pkg_count),
+                },
+            },
+        }
+        try:
+            data = self._post('/api/pickups/v2205/schedule', payload)
+            resp = data.get('PickupCreationResponse', {})
+            status_ok = resp.get('Response', {}).get('ResponseStatus', {}).get('Code') == '1'
+            prn = resp.get('PRN', '')
+            if status_ok or prn:
+                return {'prn': prn, 'success': True, 'error': None}
+            return {'prn': '', 'success': False, 'error': str(resp)}
+        except UPSError as e:
+            return {'prn': '', 'success': False, 'error': str(e)}
+
     # ── Void ──────────────────────────────────────────────────────────────────
 
     def void_shipment(self, shipment_id: str) -> dict:
