@@ -42,6 +42,33 @@
                  padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
   .weight-warn-title { font-weight: 700; color: var(--warn); margin-bottom: 6px; }
   .weight-warn-detail { color: var(--text-muted); }
+
+  /* Dual range slider */
+  .dr-wrap  { position:relative; height:48px; user-select:none; margin-top:6px; }
+  .dr-track { position:absolute; top:50%; left:10px; right:10px; height:6px;
+              background:var(--border-strong); border-radius:3px; transform:translateY(-50%); }
+  .dr-fill  { position:absolute; height:100%; background:var(--accent); border-radius:3px; }
+  .dr-input { position:absolute; width:100%; left:0; top:50%; transform:translateY(-50%);
+              -webkit-appearance:none; appearance:none; background:transparent;
+              pointer-events:none; height:48px; outline:none; margin:0; }
+  .dr-input::-webkit-slider-thumb {
+    -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%;
+    background:var(--accent); cursor:pointer; pointer-events:all;
+    border:2px solid var(--bg-card); box-shadow:0 1px 5px rgba(0,0,0,.35);
+  }
+  .dr-input::-moz-range-thumb {
+    width:22px; height:22px; border-radius:50%; background:var(--accent);
+    cursor:pointer; pointer-events:all; border:2px solid var(--bg-card);
+    box-shadow:0 1px 5px rgba(0,0,0,.35); border-style:solid;
+  }
+  .dr-bubble { position:absolute; top:-2px; transform:translateX(-50%);
+               background:var(--accent); color:#fff; border-radius:4px;
+               padding:2px 8px; font-size:12px; font-weight:700; white-space:nowrap;
+               pointer-events:none; }
+  .dr-bubble::after { content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+                      border:5px solid transparent; border-top-color:var(--accent); }
+  .dr-ticks  { display:flex; justify-content:space-between; padding:0 10px;
+               font-size:10px; color:var(--text-dim); margin-top:2px; }
 </style>
 
 <div class="jc-wrap">
@@ -262,17 +289,27 @@
                           border-radius:5px;padding:7px 10px;font-size:13px;outline:none">
           </div>
           {% if not is_shop_tariff %}
-          <div>
-            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">З котрої</div>
-            <input type="time" name="pickup_min_time" value="09:00" step="1800"
-                   style="background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text);
-                          border-radius:5px;padding:7px 10px;font-size:13px;outline:none">
-          </div>
-          <div>
-            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">До котрої</div>
-            <input type="time" name="pickup_max_time" value="18:00" step="1800"
-                   style="background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text);
-                          border-radius:5px;padding:7px 10px;font-size:13px;outline:none">
+          <div style="flex:1;min-width:300px">
+            <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em">
+              Часове вікно забору кур'єром
+            </div>
+            <div style="display:flex;justify-content:center;gap:10px;font-size:19px;font-weight:700;color:var(--text);margin-bottom:16px">
+              <span id="dr-from-lbl">09:00</span>
+              <span style="color:var(--text-dim)">—</span>
+              <span id="dr-to-lbl">18:00</span>
+            </div>
+            <div class="dr-wrap">
+              <div class="dr-track"><div class="dr-fill" id="dr-fill"></div></div>
+              <div class="dr-bubble" id="dr-b1">09:00</div>
+              <div class="dr-bubble" id="dr-b2">18:00</div>
+              <input class="dr-input" type="range" id="dr-from" min="0" max="47" value="4"  step="1">
+              <input class="dr-input" type="range" id="dr-to"   min="0" max="47" value="40" step="1">
+            </div>
+            <div class="dr-ticks">
+              <span>08:00</span><span>11:00</span><span>14:00</span><span>17:00</span><span>19:45</span>
+            </div>
+            <input type="hidden" name="pickup_min_time" id="dr-hidden-from" value="09:00">
+            <input type="hidden" name="pickup_max_time" id="dr-hidden-to"   value="18:00">
           </div>
           {% endif %}
         </div>
@@ -290,4 +327,50 @@
   </div>
 
 </div>
+
+{% if not is_shop_tariff %}
+<script>
+(function(){
+  var STEP=15, BASE=8*60, MAX=47;
+  function fmt(slot){
+    var m=BASE+slot*STEP;
+    return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+  }
+  function pct(slot){ return (slot/MAX*100).toFixed(2)+'%'; }
+
+  var rF=document.getElementById('dr-from');
+  var rT=document.getElementById('dr-to');
+  var fill=document.getElementById('dr-fill');
+  var b1=document.getElementById('dr-b1');
+  var b2=document.getElementById('dr-b2');
+  var lF=document.getElementById('dr-from-lbl');
+  var lT=document.getElementById('dr-to-lbl');
+  var hF=document.getElementById('dr-hidden-from');
+  var hT=document.getElementById('dr-hidden-to');
+
+  function upd(src){
+    var vf=parseInt(rF.value), vt=parseInt(rT.value);
+    if(vf>=vt){
+      if(src===rF){ vf=vt>0?vt-1:0; rF.value=vf; }
+      else         { vt=vf<MAX?vf+1:MAX; rT.value=vt; }
+    }
+    vf=parseInt(rF.value); vt=parseInt(rT.value);
+    var pf=vf/MAX*100, pt=vt/MAX*100;
+    fill.style.left=pf+'%'; fill.style.width=(pt-pf)+'%';
+    var tf=fmt(vf), tt=fmt(vt);
+    lF.textContent=tf; lT.textContent=tt;
+    hF.value=tf; hT.value=tt;
+    b1.textContent=tf; b1.style.left=pct(vf);
+    b2.textContent=tt; b2.style.left=pct(vt);
+    /* z-index: drag from-thumb on top when they are close */
+    rF.style.zIndex = (vf > MAX-4) ? 5 : 3;
+    rT.style.zIndex = (vf > MAX-4) ? 3 : 5;
+  }
+
+  rF.addEventListener('input',function(){ upd(rF); });
+  rT.addEventListener('input',function(){ upd(rT); });
+  upd(null);
+})();
+</script>
+{% endif %}
 {% endblock %}

@@ -1130,7 +1130,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             pkg_qtys    = request.POST.getlist("pkg_qty[]")
             def _dec(lst, i, default):
                 try:
-                    return max(_D(default), _D(str(lst[i]).strip()))
+                    v = _D(str(lst[i]).strip())
+                    return v if v > 0 else _D(default)
                 except (IndexError, _IE, ValueError):
                     return _D(default)
             def _int(lst, i):
@@ -1406,7 +1407,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             pkg_qtys    = request.POST.getlist("pkg_qty[]")
             def _dec2(lst, i, default):
                 try:
-                    return max(_D(default), _D(str(lst[i]).strip()))
+                    v = _D(str(lst[i]).strip())
+                    return v if v > 0 else _D(default)
                 except (IndexError, _IE, ValueError):
                     return _D(default)
             def _int2(lst, i):

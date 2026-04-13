@@ -49,6 +49,7 @@
   font-family: inherit;
 }
 .sh-input:focus { border-color: var(--accent-2, #2196f3); }
+.ca-warn { border-color: var(--warn, #f90) !important; box-shadow: 0 0 0 2px rgba(255,152,0,.18); }
 select.sh-input {
   cursor: pointer;
   height: auto;
@@ -162,12 +163,12 @@ function swapAddresses(){
 function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
   if(weight==='' || weight===null || weight===undefined) weight = _DEFAULT_CA_WEIGHT;
   return `<tr class="ca-row" style="border-bottom:1px solid var(--border)">
-    <td style="padding:4px 8px"><input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="${desc}" placeholder="Electronic component"></td>
+    <td style="padding:4px 8px"><input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="${desc}" placeholder="Electronic component" oninput="this.classList.remove('ca-warn')"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px" type="number" name="ca_qty" min="1" step="1" value="${qty}"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;font-size:12px;font-family:monospace" type="text" name="ca_hs" value="${hs}" placeholder="8517.62"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_origin" maxlength="2" value="${origin}" placeholder="DE"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="${weight}"></td>
-    <td style="padding:4px 5px"><input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="${value}"></td>
+    <td style="padding:4px 5px"><input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="${value}" oninput="this.classList.remove('ca-warn')"></td>
     <td style="padding:4px 5px"><input class="sh-input ca-currency" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_currency" maxlength="3" value="${currency}"></td>
     <td style="padding:4px;text-align:center"><button type="button" onclick="removeCaRow(this)" title="Видалити" style="background:var(--bg-card);border:1px solid var(--border-strong);color:var(--err);border-radius:4px;padding:3px 7px;cursor:pointer;font-size:11px;line-height:1">✕</button></td>
   </tr>`;
@@ -953,9 +954,9 @@ document.addEventListener('DOMContentLoaded', function() {
           <tbody id="pkg-tbody"></tbody>
         </table>
         <button type="button" onclick="addPkgRow()"
-                style="margin-top:8px;background:var(--bg-hover);color:var(--accent);
+                style="margin-top:8px;background:var(--accent);color:#fff;
                        border:1px solid var(--accent);border-radius:4px;padding:5px 14px;
-                       cursor:pointer;font-size:12px">
+                       cursor:pointer;font-size:12px;font-weight:600;opacity:.9">
           ＋ Додати коробку
         </button>
       </div>
@@ -1005,7 +1006,7 @@ document.addEventListener('DOMContentLoaded', function() {
           }
 
           // Sync first row → hidden fields before submit (backend uses these for Shipment model)
-          document.getElementById('shipment-form').addEventListener('submit', function() {
+          document.getElementById('shipment-form').addEventListener('submit', function(e) {
             var firstRow = document.querySelector('#pkg-tbody tr');
             if (firstRow) {
               var g = function(n) { return firstRow.querySelector('[name="' + n + '"]')?.value || ''; };
@@ -1013,6 +1014,29 @@ document.addEventListener('DOMContentLoaded', function() {
               document.getElementById('id_length_cm').value = g('pkg_length[]');
               document.getElementById('id_width_cm').value  = g('pkg_width[]');
               document.getElementById('id_height_cm').value = g('pkg_height[]');
+            }
+            // Validate customs rows when customs card is visible
+            const customsCard = document.getElementById('customs-card');
+            if (customsCard && customsCard.style.display !== 'none') {
+              let hasEmpty = false;
+              document.querySelectorAll('.ca-row').forEach(function(row) {
+                var desc  = row.querySelector('[name="ca_desc"]');
+                var value = row.querySelector('[name="ca_value"]');
+                if (desc) {
+                  var ok = desc.value.trim().length > 0;
+                  desc.classList.toggle('ca-warn', !ok);
+                  if (!ok) hasEmpty = true;
+                }
+                if (value) {
+                  var ok2 = value.value && parseFloat(value.value) > 0;
+                  value.classList.toggle('ca-warn', !ok2);
+                  if (!ok2) hasEmpty = true;
+                }
+              });
+              if (hasEmpty) {
+                e.preventDefault();
+                customsCard.scrollIntoView({behavior:'smooth', block:'center'});
+              }
             }
           });
         });
@@ -1125,7 +1149,7 @@ document.addEventListener('DOMContentLoaded', function() {
             {% for a in customs_articles %}
             <tr class="ca-row" style="border-bottom:1px solid var(--border)">
               <td style="padding:4px 8px">
-                <input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="{{ a.description }}" placeholder="Electronic component">
+                <input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="{{ a.description }}" placeholder="Electronic component" oninput="this.classList.remove('ca-warn')">
               </td>
               <td style="padding:4px 5px">
                 <input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px" type="number" name="ca_qty" min="1" step="1" value="{{ a.quantity }}">
@@ -1140,7 +1164,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 {% localize off %}<input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="{{ a.weight|default:default_ca_weight }}">{% endlocalize %}
               </td>
               <td style="padding:4px 5px">
-                {% localize off %}<input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="{{ a.value }}">{% endlocalize %}
+                {% localize off %}<input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="{{ a.value }}" oninput="this.classList.remove('ca-warn')">{% endlocalize %}
               </td>
               <td style="padding:4px 5px">
                 <input class="sh-input ca-currency" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_currency" maxlength="3" value="{{ a.currency|default:'EUR' }}">
