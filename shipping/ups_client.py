@@ -333,23 +333,20 @@ class UPSClient:
 
     def _rate_shop(self, to_address, packages, from_address):
         """
-        Primary:  POST /api/rating/v2409/Shoptimeintransit — prices + ETA in one call.
-        Fallback: POST /api/rating/v2409/Shop             — prices only, ETA null.
+        Step 1: POST /api/rating/v2409/Shoptimeintransit — prices + ETA in one call.
+                Works for domestic routes; may fail 111212 for intl if any service in
+                the shop set rejects the package type for that origin→dest pair.
+        Step 2: If Shoptimeintransit fails → Shop for prices, then
+                Ratetimeintransit per service code for ETA (isolated calls).
+        Step 3: Any service where Ratetimeintransit fails keeps its price, ETA = null.
 
-        Shoptimeintransit requirements (all verified against UPS error responses):
-          PackageBillType '03', Packaging code '00' (not '02' → 111212 intl),
-          InvoiceLineTotal, ShipmentTotalWeight, ShipTo.AddressLine present.
-
-        Note: /api/shipments/v2409/transittimes is 404 for this account (WWDT route
-        not provisioned) — do not use it.
+        Note: /api/shipments/v2409/transittimes is 404 for this account.
         """
         from datetime import date as _date
         shipper         = from_address or self._default_shipper()
         total_weight_kg = sum(float(p.get('weight_kg', 0.5)) for p in packages)
 
-        # ── Shoptimeintransit (prices + ETA) ─────────────────────────
-        # Packaging '00' (Unknown/Other) is required — '02' triggers 111212
-        # for some intl service combinations in Shop mode.
+        # ── Step 1: Shoptimeintransit (fast path) ─────────────────────
         pkgs_tti     = [{**p, '_pkg_override': '00'} for p in packages]
         shipment_tti = self._build_rate_shipment(to_address, pkgs_tti, shipper,
                                                  use_packaging_key=True)
@@ -377,9 +374,9 @@ class UPSClient:
             self._last_rate_response = data
             return self._parse_rated_shipments(data, with_transit=True)
         except UPSError as e:
-            logger.warning('UPS Shoptimeintransit failed (%s) — falling back to Shop (no ETA)', e)
+            logger.warning('Shoptimeintransit failed (%s) — Shop + per-service Ratetimeintransit', e)
 
-        # ── Shop fallback (prices only, ETA fields remain null) ───────
+        # ── Step 2a: Shop for prices ──────────────────────────────────
         shipment = self._build_rate_shipment(to_address, packages, shipper)
         payload  = {'RateRequest': {
             'Request': {
@@ -391,7 +388,63 @@ class UPSClient:
         data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
         self._last_rate_payload  = payload
         self._last_rate_response = data
-        return self._parse_rated_shipments(data, with_transit=False)
+        rates = self._parse_rated_shipments(data, with_transit=False)
+
+        # ── Step 2b: Ratetimeintransit per service for ETA ────────────
+        # Only request ETA for the service codes that Shop already returned — this
+        # guarantees the service is valid for this route before making extra calls.
+        for r in rates:
+            try:
+                tti = self._rate_timeintransit_single(
+                    to_address, packages, shipper, r['code'], total_weight_kg)
+                if tti:
+                    days = tti.get('transit_days')
+                    date = tti.get('delivery_date', '')
+                    r['transit_days']            = days
+                    r['delivery_date']           = date
+                    r['guaranteed']              = bool(days)
+                    r['delivery_days']           = days
+                    r['delivery_date_estimated'] = date
+                    r['delivery_label']          = self._fmt_eta_label(days, date)
+            except UPSError:
+                pass  # leave ETA null for this service
+
+        return rates
+
+    def _rate_timeintransit_single(self, to_address, packages, from_address,
+                                   service_code: str, total_weight_kg: float = None):
+        """
+        POST /api/rating/v2409/Ratetimeintransit for ONE service code.
+        Avoids 111212: each isolated call only evaluates one service, so an
+        incompatible service in the Shop set can't poison the whole request.
+        Returns a single rate dict (with ETA fields) or None.
+        """
+        from datetime import date as _date
+        shipper = from_address or self._default_shipper()
+        if total_weight_kg is None:
+            total_weight_kg = sum(float(p.get('weight_kg', 0.5)) for p in packages)
+
+        shipment = self._build_rate_shipment(to_address, packages, shipper,
+                                             service_code=service_code)
+        shipment['DeliveryTimeInformation'] = {
+            'PackageBillType': '03',
+            'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
+        }
+        shipment['InvoiceLineTotal']    = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
+        shipment['ShipmentTotalWeight'] = {
+            'UnitOfMeasurement': {'Code': 'KGS'},
+            'Weight': str(round(total_weight_kg, 2)),
+        }
+        payload = {'RateRequest': {
+            'Request': {
+                'RequestOption': 'Ratetimeintransit',
+                'TransactionReference': {'CustomerContext': 'minerva-bi'},
+            },
+            'Shipment': shipment,
+        }}
+        data  = self._post(f'/api/rating/{_API_VERSION}/Ratetimeintransit', payload)
+        rates = self._parse_rated_shipments(data, with_transit=True)
+        return rates[0] if rates else None
 
     def _rate_single(self, to_address, packages, from_address, service_code):
         """
