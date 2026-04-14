@@ -622,9 +622,20 @@ function buildTable(c){
     </tr></thead><tbody>`;
 
   c.products.forEach(p=>{
-    const priceHtml = p.price!=null
-      ? `<span style="color:var(--ok);font-weight:700">${p.price.toFixed(2)}</span> <span style="color:var(--text-dim);font-size:10px">${esc(p.currency)}</span>`
-      : '<span style="color:var(--text-dim)">—</span>';
+    let priceHtml;
+    if(p.price==null){
+      priceHtml='<span style="color:var(--text-dim)">—</span>';
+    } else if(isUPS && p.pricing_source){
+      const srcBadge = p.pricing_source==='negotiated'
+        ? `<span style="font-size:10px;background:rgba(76,175,80,.15);color:#81c784;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:5px">договірний</span>`
+        : `<span style="font-size:10px;background:rgba(255,152,0,.12);color:#ffb74d;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:5px">роздрібний</span>`;
+      const refLine = (p.negotiated_total&&p.reference_total&&p.reference_total!==p.negotiated_total)
+        ? `<div style="font-size:10px;color:var(--text-dim);margin-top:2px">Роздрібний: <span style="text-decoration:line-through">${p.reference_total.toFixed(2)}</span>${p.savings?` <span style="color:#81c784;font-weight:600">−${p.savings.toFixed(2)}</span>`:''}</div>`
+        : '';
+      priceHtml=`<div><span style="color:var(--ok);font-weight:700">${p.price.toFixed(2)}</span> <span style="color:var(--text-dim);font-size:10px">${esc(p.currency)}</span>${srcBadge}</div>${refLine}`;
+    } else {
+      priceHtml=`<span style="color:var(--ok);font-weight:700">${p.price.toFixed(2)}</span> <span style="color:var(--text-dim);font-size:10px">${esc(p.currency)}</span>`;
+    }
     const isShop = String(p.code||'').startsWith('s-');
     const typeBadge = isJumingo
       ? (isShop
