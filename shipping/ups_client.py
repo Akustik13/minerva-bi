@@ -295,7 +295,12 @@ class UPSClient:
             logger.info('UPS Shop failed (%s), switching to per-service fallback', e)
             return self._rate_fallback(to_address, packages, from_address)
 
-    def _build_rate_shipment(self, to_address, packages, from_address, service_code=None):
+    def _build_rate_shipment(self, to_address, packages, from_address,
+                            service_code=None, use_packaging_key=False):
+        """
+        use_packaging_key=True  → Package uses 'Packaging'   (Shoptimeintransit / Ship API)
+        use_packaging_key=False → Package uses 'PackagingType' (Rate / Shop API)
+        """
         shipper = from_address or self._default_shipper()
         shipment = {
             'Shipper': {
@@ -312,7 +317,7 @@ class UPSClient:
                 },
             },
             'ShipmentRatingOptions': {'NegotiatedRatesIndicator': ''},
-            'Package':  [self._pkg_dict(p) for p in packages],
+            'Package':  [self._pkg_dict(p, for_ship=use_packaging_key) for p in packages],
         }
         if service_code:
             shipment['Service'] = {'Code': service_code}
@@ -323,13 +328,17 @@ class UPSClient:
         POST /api/rating/v2409/Shoptimeintransit — rates + transit days for all services.
         PickupDate (today, YYYYMMDD) is required for TimeInTransit data to be returned.
         Falls back to plain Shop if Shoptimeintransit returns an error.
+        Shoptimeintransit requires:
+          - PackageBillType: '03' (Non-Document); '02' → 111561, missing → 111561
+          - Package key 'Packaging' (not 'PackagingType') → '03' without it → 111549
         """
         from datetime import date as _date
-        shipper   = from_address or self._default_shipper()
-        shipment  = self._build_rate_shipment(to_address, packages, shipper)
-        # DeliveryTimeInformation with Pickup.Date+Time is required for TimeInTransit data
+        shipper  = from_address or self._default_shipper()
+        # Shoptimeintransit needs 'Packaging' key (not 'PackagingType')
+        shipment = self._build_rate_shipment(to_address, packages, shipper,
+                                             use_packaging_key=True)
         shipment['DeliveryTimeInformation'] = {
-            'PackageBillType': '03',  # 03=Documents; '02' rejected by UPS with 111561
+            'PackageBillType': '03',  # 03 = Non-Document (required, '02' rejected with 111561)
             'Pickup': {
                 'Date': _date.today().strftime('%Y%m%d'),
                 'Time': '1000',
