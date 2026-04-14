@@ -329,6 +329,7 @@ class UPSClient:
         shipment  = self._build_rate_shipment(to_address, packages, shipper)
         # DeliveryTimeInformation with Pickup.Date+Time is required for TimeInTransit data
         shipment['DeliveryTimeInformation'] = {
+            'PackageBillType': '03',  # 03=Documents; '02' rejected by UPS with 111561
             'Pickup': {
                 'Date': _date.today().strftime('%Y%m%d'),
                 'Time': '1000',
