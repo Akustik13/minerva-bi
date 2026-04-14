@@ -773,9 +773,10 @@ class UPSClient:
                     'AddressLine':  shipper.get('address_line', ''),
                     'City':         shipper.get('city', ''),
                     'PostalCode':   shipper.get('postal', ''),
-                    'CountryCode':  (shipper.get('country') or 'DE').upper(),
-                    'PickupPoint':  pickup_point,
-                    'Phone':        {'Number': phone},
+                    'CountryCode':          (shipper.get('country') or 'DE').upper(),
+                    'ResidentialIndicator': 'N',
+                    'PickupPoint':          pickup_point,
+                    'Phone':                {'Number': phone},
                 },
                 'AlternateAddressIndicator': 'Y',
                 'PickupPiece': [{
