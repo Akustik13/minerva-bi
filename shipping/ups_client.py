@@ -337,17 +337,26 @@ class UPSClient:
         Falls back to Shop + dedicated Transit Times API if Shoptimeintransit fails.
         Shoptimeintransit requires:
           - PackageBillType: '03' (Non-Document)
+          - Packaging code '00' (Unknown/Other) — '02' causes 111212 for DE→US/intl
           - Package key 'Packaging' (not 'PackagingType') → without it: 111549
           - InvoiceLineTotal → without it: 111549 for international routes
           - ShipmentTotalWeight → without it: 111546 Invalid Weight
+          - ShipTo.Address.AddressLine must be present (non-empty)
         """
         from datetime import date as _date
         shipper = from_address or self._default_shipper()
         total_weight_kg = sum(float(p.get('weight_kg', 0.5)) for p in packages)
 
+        # Use pkg code '00' (Unknown/Other) for TTI — '02' causes 111212 when any
+        # service in the Shop set doesn't support Customer Supplied Package for that route
+        pkgs_tti = [{**p, '_pkg_override': '00'} for p in packages]
+
         # ── Shoptimeintransit payload ────────────────────────────────
-        shipment_tti = self._build_rate_shipment(to_address, packages, shipper,
+        shipment_tti = self._build_rate_shipment(to_address, pkgs_tti, shipper,
                                                  use_packaging_key=True)
+        # Ensure ShipTo.Address has AddressLine (required for Shoptimeintransit)
+        if 'AddressLine' not in shipment_tti['ShipTo']['Address']:
+            shipment_tti['ShipTo']['Address']['AddressLine'] = ['-']
         shipment_tti['DeliveryTimeInformation'] = {
             'PackageBillType': '03',
             'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
@@ -835,7 +844,7 @@ class UPSClient:
         return result
 
     _PKG_DESCRIPTIONS = {
-        '01': 'UPS Letter', '02': 'Customer Supplied Package',
+        '00': 'Unknown', '01': 'UPS Letter', '02': 'Customer Supplied Package',
         '03': 'Tube', '04': 'PAK', '21': 'UPS Express Box',
         '24': 'UPS 25KG Box', '25': 'UPS 10KG Box', '30': 'Pallet',
         '2a': 'Small Express Box', '2b': 'Medium Express Box', '2c': 'Large Express Box',
