@@ -731,7 +731,8 @@ class UPSClient:
 
     def schedule_pickup(self, shipper: dict, pickup_date: str,
                         ready_time: str = '0900', close_time: str = '1800',
-                        service_code: str = '11', packages: list = None) -> dict:
+                        service_code: str = '11', packages: list = None,
+                        destination_country: str = 'DE') -> dict:
         """
         POST /api/pickupcreation/v2409/pickup
         Планує забирання кур'єром UPS.
@@ -745,40 +746,41 @@ class UPSClient:
         pkg_count   = sum(p.get('quantity', 1) for p in pkgs) or 1
         total_weight = sum(float(p.get('weight_kg', 1)) * p.get('quantity', 1) for p in pkgs) or 1.0
 
+        addr_line = shipper.get('address_line', '')
         payload = {
             'PickupCreationRequest': {
+                'Request': {
+                    'TransactionReference': {'CustomerContext': 'minerva-bi'},
+                },
                 'RatePickupIndicator': 'N',
                 'Shipper': {
                     'Account': {
-                        'AccountNumber':     self.carrier.connection_uuid,
+                        'AccountNumber':      self.carrier.connection_uuid,
                         'AccountCountryCode': (shipper.get('country') or 'DE').upper(),
                     },
                 },
                 'PickupDateInfo': {
-                    'CloseTime':  close_time.replace(':', ''),
-                    'ReadyTime':  ready_time.replace(':', ''),
                     'PickupDate': pickup_date.replace('-', ''),
+                    'ReadyTime':  ready_time.replace(':', ''),
+                    'CloseTime':  close_time.replace(':', ''),
                 },
                 'PickupAddress': {
                     'CompanyName':          shipper.get('company') or shipper.get('name', ''),
-                    'AddressLine':          shipper.get('address_line', ''),
+                    'ContactName':          shipper.get('name', ''),
+                    'AddressLine':          [addr_line] if addr_line else [],
                     'City':                 shipper.get('city', ''),
                     'PostalCode':           shipper.get('postal', ''),
                     'CountryCode':          (shipper.get('country') or 'DE').upper(),
                     'ResidentialIndicator': 'N',
+                    'Phone': {'Number': (shipper.get('phone', '') or '').replace(' ', '')},
                 },
-                'OverweightIndicator': 'N',
+                'PickupPiece': [{
+                    'ServiceCode':          service_code,
+                    'Quantity':             str(pkg_count),
+                    'DestinationCountryCode': destination_country.upper(),
+                    'ContainerCode':        '01',
+                }],
                 'PaymentMethod': '01',
-                'ShipmentDetail': {
-                    'PackageCount': str(pkg_count),
-                    'PackageWeight': {
-                        'Weight': str(round(total_weight, 2)),
-                        'UnitOfMeasurement': {'Code': 'KGS'},
-                    },
-                    'ContainerCode': '01',
-                    'ServiceCode':   service_code,
-                    'NumberOfPieces': str(pkg_count),
-                },
             },
         }
         try:
