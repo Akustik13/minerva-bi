@@ -17,6 +17,7 @@ Credentials зберігаються в моделі Carrier:
   Cancel: PUT  /ship/v1/shipments/cancel
 """
 import logging
+import time as _time
 from decimal import Decimal
 from datetime import datetime, timezone as _tz
 
@@ -115,37 +116,59 @@ class FedExClient:
         POST /oauth/token  (Client Credentials, form-encoded).
         Кешується на 55 хвилин (токен живе 60 хв).
         """
+        from tabele.api_logger import log_call
+
         cache_key = f'fedex_token_{self.carrier.pk}'
         token = cache.get(cache_key)
         if token:
             return token
 
-        r = requests.post(
-            f'{self.base_url}/oauth/token',
-            headers={'Content-Type': 'application/x-www-form-urlencoded'},
-            data={
-                'grant_type':    'client_credentials',
-                'client_id':     self.carrier.api_key,
-                'client_secret': self.carrier.api_secret,
-            },
-            timeout=30,
-        )
-        if r.status_code != 200:
-            raise FedExError(
-                f'Помилка аутентифікації FedEx [{r.status_code}]: {r.text[:300]}',
-                code=r.status_code, response=r.text,
+        url = f'{self.base_url}/oauth/token'
+        req_headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+        req_data = {
+            'grant_type':    'client_credentials',
+            'client_id':     self.carrier.api_key,
+            'client_secret': self.carrier.api_secret,
+        }
+        t0 = _time.time()
+        r = None
+        resp_body = None
+        error_str = None
+        try:
+            r = requests.post(url, headers=req_headers, data=req_data, timeout=30)
+            try:
+                resp_body = r.json()
+            except Exception:
+                resp_body = {'_raw': r.text[:500]}
+            if r.status_code != 200:
+                raise FedExError(
+                    f'Помилка аутентифікації FedEx [{r.status_code}]: {r.text[:300]}',
+                    code=r.status_code, response=r.text,
+                )
+            data = resp_body
+            token = data.get('access_token', '')
+            if not token:
+                raise FedExError(f'FedEx auth: відсутній access_token у відповіді: {r.text[:200]}')
+            expires_in = max(int(data.get('expires_in', 3600)) - 300, 60)
+            cache.set(cache_key, token, expires_in)
+            logger.info('FedEx OAuth token оновлено carrier=%s (ttl=%ss)', self.carrier.pk, expires_in)
+            return token
+        except FedExError as e:
+            error_str = str(e)
+            raise
+        except Exception as e:
+            error_str = str(e)
+            raise
+        finally:
+            log_call(
+                service='fedex', action='get_token', method='POST', url=url,
+                req_headers=req_headers,
+                req_body={k: v for k, v in req_data.items() if k not in ('client_id', 'client_secret')},
+                resp_status=r.status_code if r is not None else None,
+                resp_body=resp_body,
+                duration_ms=int((_time.time() - t0) * 1000),
+                error=error_str,
             )
-
-        data = r.json()
-        token = data.get('access_token', '')
-        if not token:
-            raise FedExError(f'FedEx auth: відсутній access_token у відповіді: {r.text[:200]}')
-
-        # expires_in typically 3600 (60 min); cache with 5-min buffer
-        expires_in = max(int(data.get('expires_in', 3600)) - 300, 60)
-        cache.set(cache_key, token, expires_in)
-        logger.info('FedEx OAuth token оновлено carrier=%s (ttl=%ss)', self.carrier.pk, expires_in)
-        return token
 
     def _headers(self, extra: dict = None) -> dict:
         h = {
@@ -158,32 +181,80 @@ class FedExClient:
         return h
 
     def _post(self, endpoint: str, payload: dict) -> dict:
+        from tabele.api_logger import log_call
         url = f'{self.base_url}{endpoint}'
+        headers = self._headers()
+        t0 = _time.time()
+        r = None
+        resp_body = None
+        error_str = None
         try:
-            r = requests.post(url, headers=self._headers(), json=payload, timeout=60)
+            r = requests.post(url, headers=headers, json=payload, timeout=60)
             if r.status_code == 401:
-                # Token expired — invalidate cache and retry once
                 cache.delete(f'fedex_token_{self.carrier.pk}')
-                r = requests.post(url, headers=self._headers(), json=payload, timeout=60)
+                headers = self._headers()
+                r = requests.post(url, headers=headers, json=payload, timeout=60)
+            try:
+                resp_body = r.json()
+            except Exception:
+                resp_body = {'_raw': r.text[:500]}
             if not r.ok:
                 self._handle_error(r)
-            return r.json()
+            return resp_body
+        except FedExError as e:
+            error_str = str(e)
+            raise
         except requests.Timeout:
+            error_str = 'Timeout (60s)'
             raise FedExError('FedEx API не відповідає (timeout 60с)')
         except requests.ConnectionError as e:
+            error_str = str(e)
             raise FedExError(f"Помилка з'єднання з FedEx: {e}")
+        finally:
+            log_call(
+                service='fedex', action=endpoint.rsplit('/', 1)[-1], method='POST',
+                url=url, req_headers=headers, req_body=payload,
+                resp_status=r.status_code if r is not None else None,
+                resp_body=resp_body,
+                duration_ms=int((_time.time() - t0) * 1000),
+                error=error_str,
+            )
 
     def _put(self, endpoint: str, payload: dict) -> dict:
+        from tabele.api_logger import log_call
         url = f'{self.base_url}{endpoint}'
+        headers = self._headers()
+        t0 = _time.time()
+        r = None
+        resp_body = None
+        error_str = None
         try:
-            r = requests.put(url, headers=self._headers(), json=payload, timeout=30)
+            r = requests.put(url, headers=headers, json=payload, timeout=30)
+            try:
+                resp_body = r.json()
+            except Exception:
+                resp_body = {'_raw': r.text[:500]}
             if not r.ok:
                 self._handle_error(r)
-            return r.json()
+            return resp_body
+        except FedExError as e:
+            error_str = str(e)
+            raise
         except requests.Timeout:
+            error_str = 'Timeout'
             raise FedExError('FedEx API не відповідає')
         except requests.ConnectionError as e:
+            error_str = str(e)
             raise FedExError(f"Помилка з'єднання: {e}")
+        finally:
+            log_call(
+                service='fedex', action=endpoint.rsplit('/', 1)[-1], method='PUT',
+                url=url, req_headers=headers, req_body=payload,
+                resp_status=r.status_code if r is not None else None,
+                resp_body=resp_body,
+                duration_ms=int((_time.time() - t0) * 1000),
+                error=error_str,
+            )
 
     def _handle_error(self, response):
         try:

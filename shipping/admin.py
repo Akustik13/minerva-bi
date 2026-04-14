@@ -139,6 +139,9 @@ class CarrierAdmin(admin.ModelAdmin):
                 carrier = Carrier.objects.get(pk=object_id)
                 if carrier.carrier_type == 'ups' and carrier.api_key:
                     extra_context['ups_carrier_pk'] = object_id
+                elif carrier.carrier_type in ('dhl', 'fedex', 'jumingo') and carrier.api_key:
+                    extra_context['api_log_carrier_pk'] = object_id
+                    extra_context['api_log_carrier_type'] = carrier.carrier_type.upper()
             except Carrier.DoesNotExist:
                 pass
         return super().changeform_view(request, object_id, form_url, extra_context)
@@ -164,6 +167,15 @@ class CarrierAdmin(admin.ModelAdmin):
             path('<int:pk>/ups-log/download/',
                  self.admin_site.admin_view(self.ups_log_download_view),
                  name='carrier_ups_log_download'),
+            path('<int:pk>/api-log/',
+                 self.admin_site.admin_view(self.carrier_api_log_view),
+                 name='carrier_api_log'),
+            path('<int:pk>/api-log/clear/',
+                 self.admin_site.admin_view(self.carrier_api_log_clear_view),
+                 name='carrier_api_log_clear'),
+            path('<int:pk>/api-log/download/',
+                 self.admin_site.admin_view(self.carrier_api_log_download_view),
+                 name='carrier_api_log_download'),
             path('<int:pk>/test-fedex-token/',
                  self.admin_site.admin_view(self.test_fedex_token_view),
                  name='carrier_test_fedex_token'),
@@ -640,6 +652,98 @@ class CarrierAdmin(admin.ModelAdmin):
         carrier = get_object_or_404(Carrier, pk=pk)
         data = get_log()
         filename = f'ups_api_log_{_date.today().isoformat()}.json'
+        response = HttpResponse(
+            _json.dumps(data, ensure_ascii=False, indent=2),
+            content_type='application/json; charset=utf-8',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
+    # ── Generic API log (DHL / FedEx / Jumingo) ───────────────────────────────
+
+    _CARRIER_SERVICE_MAP = {
+        'dhl':     'dhl',
+        'fedex':   'fedex',
+        'jumingo': 'jumingo',
+    }
+
+    def carrier_api_log_view(self, request, pk):
+        """GET/POST — перегляд та налаштування API логу для DHL/FedEx/Jumingo."""
+        import json as _json
+        from tabele.api_logger import get_log, clear_log
+        from .models import ShippingSettings
+
+        carrier = get_object_or_404(Carrier, pk=pk)
+        service = self._CARRIER_SERVICE_MAP.get(carrier.carrier_type, carrier.carrier_type)
+
+        if request.method == 'POST':
+            try:
+                val = int(request.POST.get('max_entries', 20))
+                val = max(1, min(val, 500))
+                s = ShippingSettings.get()
+                s.api_log_max_entries = val
+                s.save(update_fields=['api_log_max_entries'])
+                messages.success(request, f'✅ Ліміт логу збережено: {val} записів')
+            except (ValueError, TypeError):
+                messages.error(request, '❌ Невірне значення ліміту')
+            except Exception as e:
+                messages.error(request, f'❌ Помилка збереження: {e}')
+            return redirect(reverse('admin:carrier_api_log', args=[pk]))
+
+        try:
+            settings_obj = ShippingSettings.get()
+            max_entries = settings_obj.api_log_max_entries
+        except Exception:
+            max_entries = 20
+
+        raw_entries = get_log(service)
+        entries = []
+        for e in raw_entries:
+            entries.append({
+                'ts':          e.get('ts', ''),
+                'action':      e.get('action', ''),
+                'method':      e.get('method', ''),
+                'url':         e.get('url', ''),
+                'duration_ms': e.get('duration_ms'),
+                'error':       e.get('error'),
+                'req_headers': _json.dumps(e.get('request', {}).get('headers') or {}, ensure_ascii=False, indent=2),
+                'req_body':    _json.dumps(e.get('request', {}).get('body'),    ensure_ascii=False, indent=2),
+                'resp_status': e.get('response', {}).get('status'),
+                'resp_body':   _json.dumps(e.get('response', {}).get('body'),   ensure_ascii=False, indent=2),
+            })
+        return render(request, 'admin/shipping/api_log.html', {
+            **self.admin_site.each_context(request),
+            'carrier':     carrier,
+            'service':     service,
+            'entries':     entries,
+            'max_entries': max_entries,
+            'log_data':    raw_entries,
+            'title':       f'{carrier.get_carrier_type_display()} API Лог — {carrier.name}',
+        })
+
+    def carrier_api_log_clear_view(self, request, pk):
+        """POST — очистити API лог для DHL/FedEx/Jumingo."""
+        from tabele.api_logger import clear_log
+        carrier = get_object_or_404(Carrier, pk=pk)
+        service = self._CARRIER_SERVICE_MAP.get(carrier.carrier_type, carrier.carrier_type)
+        if request.method == 'POST':
+            try:
+                clear_log(service)
+                messages.success(request, f'🗑️ {carrier.get_carrier_type_display()} API лог очищено')
+            except Exception as e:
+                messages.error(request, f'❌ Не вдалося очистити лог: {e}')
+        return redirect(reverse('admin:carrier_api_log', args=[pk]))
+
+    def carrier_api_log_download_view(self, request, pk):
+        """GET — завантажити API лог як JSON."""
+        import json as _json
+        from tabele.api_logger import get_log
+        from django.http import HttpResponse
+        from datetime import date as _date
+        carrier = get_object_or_404(Carrier, pk=pk)
+        service = self._CARRIER_SERVICE_MAP.get(carrier.carrier_type, carrier.carrier_type)
+        data = get_log(service)
+        filename = f'{service}_api_log_{_date.today().isoformat()}.json'
         response = HttpResponse(
             _json.dumps(data, ensure_ascii=False, indent=2),
             content_type='application/json; charset=utf-8',

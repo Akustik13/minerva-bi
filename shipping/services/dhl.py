@@ -129,13 +129,12 @@ def get_rates(carrier, destination_country: str, destination_postal: str,
     }
 
     try:
-        resp = req.get(
-            f"{base}/rates",
-            params=params,
-            auth=(carrier.api_key, carrier.api_secret),
-            headers={"Accept": "application/json"},
-            timeout=20,
-        )
+        from tabele.api_logger import logged_request
+        resp = logged_request('dhl', 'get_rates', 'GET', f"{base}/rates", req.get,
+                              params=params,
+                              auth=(carrier.api_key, carrier.api_secret),
+                              headers={"Accept": "application/json"},
+                              timeout=20)
     except req.exceptions.Timeout:
         return {"products": [], "error": "Timeout — DHL API не відповідає"}
     except Exception as e:
@@ -226,13 +225,13 @@ def get_tracking(carrier, tracking_number: str) -> dict:
     base     = _TEST_BASE if use_test else _PROD_BASE
 
     try:
-        resp = req.get(
-            f"{base}/shipments/{tracking_number}/tracking",
-            params={"trackingView": "all-checkpoints"},
-            auth=(carrier.api_key, carrier.api_secret),
-            headers={"Accept": "application/json"},
-            timeout=20,
-        )
+        from tabele.api_logger import logged_request
+        resp = logged_request('dhl', 'get_tracking', 'GET',
+                              f"{base}/shipments/{tracking_number}/tracking", req.get,
+                              params={"trackingView": "all-checkpoints"},
+                              auth=(carrier.api_key, carrier.api_secret),
+                              headers={"Accept": "application/json"},
+                              timeout=20)
     except req.exceptions.Timeout:
         return {"events": [], "error": "Timeout — DHL API не відповідає"}
     except Exception as e:
@@ -530,13 +529,12 @@ def create_shipment(carrier, shipment, product_code: str,
             }
 
     try:
-        resp = req.post(
-            f"{base}/shipments",
-            json=payload,
-            auth=(carrier.api_key, carrier.api_secret),
-            headers={"Accept": "application/json", "Content-Type": "application/json"},
-            timeout=30,
-        )
+        from tabele.api_logger import logged_request
+        resp = logged_request('dhl', 'create_shipment', 'POST', f"{base}/shipments", req.post,
+                              json=payload,
+                              auth=(carrier.api_key, carrier.api_secret),
+                              headers={"Accept": "application/json", "Content-Type": "application/json"},
+                              timeout=30)
     except req.exceptions.Timeout:
         return {"success": False, "error": "Timeout — DHL API не відповідає",
                 "raw_request": payload, "raw_response": None}
@@ -619,16 +617,15 @@ def cancel_shipment(carrier, tracking_number: str) -> dict:
         url = f"{base}/shipments/{tracking_number}"
         last_url = url
         try:
-            resp = req.delete(
-                url,
-                auth=(carrier.api_key, carrier.api_secret),
-                headers={
-                    "Accept": "application/json",
-                    "Message-Reference": f"cancel-{tracking_number}",
-                    "Message-Reference-Date": __import__('datetime').datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S GMT+00:00"),
-                },
-                timeout=15,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('dhl', 'cancel_shipment', 'DELETE', url, req.delete,
+                                  auth=(carrier.api_key, carrier.api_secret),
+                                  headers={
+                                      "Accept": "application/json",
+                                      "Message-Reference": f"cancel-{tracking_number}",
+                                      "Message-Reference-Date": __import__('datetime').datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S GMT+00:00"),
+                                  },
+                                  timeout=15)
         except Exception as e:
             return {"success": False, "message": str(e), "url": url}
 

@@ -10,4 +10,9 @@
   <a href="/admin/shipping/carrier/{{ ups_carrier_pk }}/ups-debug/" class="historylink" target="_blank">🔬 UPS Debug</a>
 </li>
 {% endif %}
+{% if api_log_carrier_pk %}
+<li>
+  <a href="/admin/shipping/carrier/{{ api_log_carrier_pk }}/api-log/" class="historylink" target="_blank">📋 {{ api_log_carrier_type }} Лог</a>
+</li>
+{% endif %}
 {% endblock %}

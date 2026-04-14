@@ -72,15 +72,15 @@ def get_token(config) -> str:
     ):
         return config.access_token
 
-    resp = req.post(
-        f"{_base_url(config)}{TOKEN_PATH}",
-        data={
-            "client_id":     config.client_id,
-            "client_secret": config.client_secret,
-            "grant_type":    "client_credentials",
-        },
-        timeout=15,
-    )
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'get_token', 'POST',
+                          f"{_base_url(config)}{TOKEN_PATH}", req.post,
+                          data={
+                              "client_id":     config.client_id,
+                              "client_secret": config.client_secret,
+                              "grant_type":    "client_credentials",
+                          },
+                          timeout=15)
     try:
         resp.raise_for_status()
     except req.HTTPError as e:
@@ -143,12 +143,10 @@ def search_orders(config, start_date=None, end_date=None, page=1, page_size=25) 
             else str(end_date)
         )
 
-    resp = req.get(
-        f"{_base_url(config)}{ORDERS_PATH}",
-        headers=_headers(config, token),
-        params=params,
-        timeout=30,
-    )
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'search_orders', 'GET',
+                          f"{_base_url(config)}{ORDERS_PATH}", req.get,
+                          headers=_headers(config, token), params=params, timeout=30)
     try:
         resp.raise_for_status()
     except req.HTTPError as e:
@@ -169,11 +167,10 @@ def get_order(config, sales_order_id: str) -> dict:
     import requests as req
 
     token = get_token(config)
-    resp = req.get(
-        f"{_base_url(config)}{ORDERS_PATH}/{sales_order_id}",
-        headers=_headers(config, token),
-        timeout=15,
-    )
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'get_order', 'GET',
+                          f"{_base_url(config)}{ORDERS_PATH}/{sales_order_id}", req.get,
+                          headers=_headers(config, token), timeout=15)
     resp.raise_for_status()
     return resp.json()
 
@@ -389,16 +386,12 @@ def search_products(config, keywords: str, limit: int = 50, offset: int = 0) -> 
     import requests as req
 
     token = get_token(config)
-    resp = req.post(
-        f"{_base_url(config)}{KEYWORD_SEARCH_PATH}",
-        headers=_headers(config, token),
-        json={
-            "Keywords":       keywords,
-            "RecordsPerPage": min(limit, 50),
-            "Offset":         offset,
-        },
-        timeout=20,
-    )
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'search_products', 'POST',
+                          f"{_base_url(config)}{KEYWORD_SEARCH_PATH}", req.post,
+                          headers=_headers(config, token),
+                          json={"Keywords": keywords, "RecordsPerPage": min(limit, 50), "Offset": offset},
+                          timeout=20)
     try:
         resp.raise_for_status()
     except req.HTTPError as e:
@@ -423,12 +416,10 @@ def get_orders_by_po_number(config, po_number: str, limit: int = 100) -> dict:
 
     token = get_token(config)
     url = f"{_base_url(config)}{PO_SEARCH_PATH}/{po_number}"
-    resp = req.get(
-        url,
-        headers=_headers(config, token),
-        params={"ordersLimit": min(limit, 1000)},
-        timeout=15,
-    )
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'get_orders_by_po', 'GET', url, req.get,
+                          headers=_headers(config, token),
+                          params={"ordersLimit": min(limit, 1000)}, timeout=15)
     try:
         resp.raise_for_status()
     except req.HTTPError as e:
@@ -561,12 +552,10 @@ def get_marketplace_orders(config, offset: int = 0, max_results: int = 20,
     if order_state:
         params["OrderState"] = order_state
 
-    resp = req.get(
-        f"{_base_url(config)}{MARKETPLACE_PATH}",
-        headers=_headers(config, token),
-        params=params,
-        timeout=30,
-    )
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'get_marketplace_orders', 'GET',
+                          f"{_base_url(config)}{MARKETPLACE_PATH}", req.get,
+                          headers=_headers(config, token), params=params, timeout=30)
     try:
         resp.raise_for_status()
     except req.HTTPError as e:
@@ -1158,11 +1147,10 @@ MARKETPLACE_CONFIRM_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/acce
 def _fetch_marketplace_order(config, order_id: str, token: str) -> dict:
     """GET /Sales/Marketplace2/Orders/v1/orders/{orderId} — для отримання orderDetailId."""
     import requests as req
-    resp = req.get(
-        f"{_base_url(config)}{MARKETPLACE_PATH}/{order_id}",
-        headers=_headers(config, token),
-        timeout=15,
-    )
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'fetch_marketplace_order', 'GET',
+                          f"{_base_url(config)}{MARKETPLACE_PATH}/{order_id}", req.get,
+                          headers=_headers(config, token), timeout=15)
     if resp.ok:
         return resp.json()
     return {}
@@ -1193,12 +1181,9 @@ def confirm_marketplace_order(config, order_id: str) -> dict:
     payload = {"acceptOrderDetails": accept_details}
     url = f"{_base_url(config)}{MARKETPLACE_CONFIRM_PATH.format(order_id=order_id)}"
 
-    resp = req.put(
-        url,
-        headers=_headers(config, token),
-        json=payload,
-        timeout=20,
-    )
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'confirm_marketplace_order', 'PUT', url, req.put,
+                          headers=_headers(config, token), json=payload, timeout=20)
     raw = {}
     try:
         raw = resp.json()

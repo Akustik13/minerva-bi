@@ -222,6 +222,21 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.confirm_order_view),
                 name="bots_digikeyconfig_confirm_order",
             ),
+            path(
+                "api-log/",
+                self.admin_site.admin_view(self.api_log_view),
+                name="bots_digikeyconfig_api_log",
+            ),
+            path(
+                "api-log/clear/",
+                self.admin_site.admin_view(self.api_log_clear_view),
+                name="bots_digikeyconfig_api_log_clear",
+            ),
+            path(
+                "api-log/download/",
+                self.admin_site.admin_view(self.api_log_download_view),
+                name="bots_digikeyconfig_api_log_download",
+            ),
         ]
         return custom + urls
 
@@ -581,6 +596,89 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
 
         return redirect(reverse("admin:bots_digikeyconfig_marketplace_orders"))
 
+    def api_log_view(self, request):
+        """GET/POST — перегляд та налаштування DigiKey API логу."""
+        import json as _json
+        from django.shortcuts import render, redirect
+        from django.urls import reverse
+        from tabele.api_logger import get_log
+
+        config = DigiKeyConfig.get()
+
+        if request.method == 'POST':
+            try:
+                from shipping.models import ShippingSettings
+                val = int(request.POST.get('max_entries', 20))
+                val = max(1, min(val, 500))
+                s = ShippingSettings.get()
+                s.api_log_max_entries = val
+                s.save(update_fields=['api_log_max_entries'])
+                messages.success(request, f'✅ Ліміт логу збережено: {val} записів')
+            except (ValueError, TypeError):
+                messages.error(request, '❌ Невірне значення ліміту')
+            except Exception as e:
+                messages.error(request, f'❌ Помилка збереження: {e}')
+            return redirect(reverse('admin:bots_digikeyconfig_api_log'))
+
+        try:
+            from shipping.models import ShippingSettings
+            max_entries = ShippingSettings.get().api_log_max_entries
+        except Exception:
+            max_entries = 20
+
+        raw_entries = get_log('digikey')
+        entries = []
+        for e in raw_entries:
+            entries.append({
+                'ts':          e.get('ts', ''),
+                'action':      e.get('action', ''),
+                'method':      e.get('method', ''),
+                'url':         e.get('url', ''),
+                'duration_ms': e.get('duration_ms'),
+                'error':       e.get('error'),
+                'req_headers': _json.dumps(e.get('request', {}).get('headers') or {}, ensure_ascii=False, indent=2),
+                'req_body':    _json.dumps(e.get('request', {}).get('body'),    ensure_ascii=False, indent=2),
+                'resp_status': e.get('response', {}).get('status'),
+                'resp_body':   _json.dumps(e.get('response', {}).get('body'),   ensure_ascii=False, indent=2),
+            })
+        return render(request, 'admin/bots/digikey_api_log.html', {
+            **self.admin_site.each_context(request),
+            'config':      config,
+            'service':     'digikey',
+            'entries':     entries,
+            'max_entries': max_entries,
+            'log_data':    raw_entries,
+            'title':       'DigiKey API Лог',
+        })
+
+    def api_log_clear_view(self, request):
+        """POST — очистити DigiKey API лог."""
+        from django.shortcuts import redirect
+        from django.urls import reverse
+        from tabele.api_logger import clear_log
+        if request.method == 'POST':
+            try:
+                clear_log('digikey')
+                messages.success(request, '🗑️ DigiKey API лог очищено')
+            except Exception as e:
+                messages.error(request, f'❌ Помилка: {e}')
+        return redirect(reverse('admin:bots_digikeyconfig_api_log'))
+
+    def api_log_download_view(self, request):
+        """GET — завантажити DigiKey API лог як JSON."""
+        import json as _json
+        from django.http import HttpResponse
+        from datetime import date as _date
+        from tabele.api_logger import get_log
+        data = get_log('digikey')
+        filename = f'digikey_api_log_{_date.today().isoformat()}.json'
+        response = HttpResponse(
+            _json.dumps(data, ensure_ascii=False, indent=2),
+            content_type='application/json; charset=utf-8',
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
+
     # ── Readonly display fields ───────────────────────────────────────────────
 
     def action_buttons(self, obj):
@@ -593,6 +691,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         oauth_url      = reverse("admin:bots_digikeyconfig_oauth_start")
         mkorders_url   = reverse("admin:bots_digikeyconfig_marketplace_orders")
         reconcile_url  = reverse("admin:bots_digikeyconfig_reconcile")
+        log_url        = reverse("admin:bots_digikeyconfig_api_log")
 
         authorized     = bool(obj and obj.marketplace_refresh_token)
         auth_label     = "✅ Marketplace авторизовано" if authorized else "🔑 Авторизувати Marketplace"
@@ -606,6 +705,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             '<a href="{}" style="background:#00695c;{}">📦 Компоненти</a>'
             '<a href="{}" style="background:#6a1b9a;{}">🔍 Пошук за PO</a>'
             '<a href="{}" style="background:#37474f;{}">🔬 Debug</a>'
+            '<a href="{}" style="background:#4a148c;{}">📋 API Лог</a>'
             '<br>'
             '<a href="{}" style="background:{};{}">Marketplace: {}</a>'
             '<a href="{}" style="background:#1565c0;{}">📋 Marketplace замовлення</a>'
@@ -617,6 +717,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             products_url, s,
             po_url, s,
             debug_url, s,
+            log_url, s,
             oauth_url, auth_color, s, auth_label,
             mkorders_url, s,
             sync_url, s,

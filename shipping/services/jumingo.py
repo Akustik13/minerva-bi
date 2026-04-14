@@ -342,12 +342,10 @@ class JumingoService(BaseCarrierService):
 
         payload = self._build_payload(shipment)
         try:
-            resp = req.post(
-                f"{self._base()}/shipments",
-                headers=self._headers(),
-                json=payload,
-                timeout=30,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('jumingo', 'create_shipment', 'POST',
+                                  f"{self._base()}/shipments", req.post,
+                                  headers=self._headers(), json=payload, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             return ShipmentResult(
@@ -386,12 +384,10 @@ class JumingoService(BaseCarrierService):
             "settings":      {"mode": "m"},
         }
         try:
-            resp = req.post(
-                f"{self._base()}/shipment-rates",
-                headers=self._headers(),
-                json=payload,
-                timeout=30,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('jumingo', 'get_rates', 'POST',
+                                  f"{self._base()}/shipment-rates", req.post,
+                                  headers=self._headers(), json=payload, timeout=30)
             resp.raise_for_status()
             data = resp.json()
             # API повертає список тарифів напряму
@@ -478,8 +474,10 @@ class JumingoService(BaseCarrierService):
 
         # Крок 1: Тимчасове відправлення
         try:
-            r1 = req.post(f"{self._base()}/shipments",
-                          headers=self._headers(), json=payload, timeout=30)
+            from tabele.api_logger import logged_request
+            r1 = logged_request('jumingo', 'create_shipment_preview', 'POST',
+                                f"{self._base()}/shipments", req.post,
+                                headers=self._headers(), json=payload, timeout=30)
             r1.raise_for_status()
             d1 = r1.json()
         except req.HTTPError as e:
@@ -505,8 +503,9 @@ class JumingoService(BaseCarrierService):
             "settings":      {"mode": "m"},
         }
         try:
-            r2 = req.post(f"{self._base()}/shipment-rates",
-                          headers=self._headers(), json=rates_payload, timeout=30)
+            r2 = logged_request('jumingo', 'get_rates_preview', 'POST',
+                                f"{self._base()}/shipment-rates", req.post,
+                                headers=self._headers(), json=rates_payload, timeout=30)
             r2.raise_for_status()
             d2 = r2.json()
         except req.HTTPError as e:
@@ -529,11 +528,10 @@ class JumingoService(BaseCarrierService):
         """
         import requests as req
         try:
-            resp = req.delete(
-                f"{self._base()}/shipments/{carrier_shipment_id}",
-                headers=self._headers(),
-                timeout=15,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('jumingo', 'delete_shipment', 'DELETE',
+                                  f"{self._base()}/shipments/{carrier_shipment_id}", req.delete,
+                                  headers=self._headers(), timeout=15)
             # 200/204 — успішно видалено; 404 — вже не існує (теж ок)
             return resp.status_code in (200, 204, 404)
         except Exception as e:
@@ -547,11 +545,10 @@ class JumingoService(BaseCarrierService):
         import requests as req
 
         try:
-            resp = req.get(
-                f"{self._base()}/shipments/{carrier_shipment_id}",
-                headers=self._headers(),
-                timeout=15,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('jumingo', 'track', 'GET',
+                                  f"{self._base()}/shipments/{carrier_shipment_id}", req.get,
+                                  headers=self._headers(), timeout=15)
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
@@ -609,12 +606,10 @@ class JumingoService(BaseCarrierService):
             }
         }
         try:
-            resp = req.patch(
-                f"{self._base()}/shipments/{carrier_shipment_id}",
-                headers=headers,
-                json=payload,
-                timeout=20,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('jumingo', 'patch_tariff', 'PATCH',
+                                  f"{self._base()}/shipments/{carrier_shipment_id}", req.patch,
+                                  headers=headers, json=payload, timeout=20)
             resp.raise_for_status()
             return {"success": True, "data": resp.json()}
         except req.HTTPError as e:
@@ -636,12 +631,11 @@ class JumingoService(BaseCarrierService):
         import requests as req
 
         try:
-            resp = req.post(
-                f"{self._base()}/cart/total",
-                headers=self._headers(),
-                json={"shipmentIds": [carrier_shipment_id]},
-                timeout=20,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('jumingo', 'cart_total', 'POST',
+                                  f"{self._base()}/cart/total", req.post,
+                                  headers=self._headers(),
+                                  json={"shipmentIds": [carrier_shipment_id]}, timeout=20)
             resp.raise_for_status()
             return resp.json()
         except Exception as e:
@@ -653,15 +647,13 @@ class JumingoService(BaseCarrierService):
         import requests as req
 
         try:
-            resp = req.post(
-                f"{self._base()}/orders",
-                headers=self._headers(),
-                json={
-                    "paymentMethod": payment_method,
-                    "shipmentIds":   [carrier_shipment_id],
-                },
-                timeout=30,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('jumingo', 'book_order', 'POST',
+                                  f"{self._base()}/orders", req.post,
+                                  headers=self._headers(),
+                                  json={"paymentMethod": payment_method,
+                                        "shipmentIds": [carrier_shipment_id]},
+                                  timeout=30)
             resp.raise_for_status()
             return resp.json()
         except req.HTTPError as e:
@@ -681,11 +673,10 @@ class JumingoService(BaseCarrierService):
         import requests as req
 
         try:
-            resp = req.get(
-                f"{self._base()}/orders/{order_number}/documents",
-                headers=self._headers(),
-                timeout=20,
-            )
+            from tabele.api_logger import logged_request
+            resp = logged_request('jumingo', 'get_order_documents', 'GET',
+                                  f"{self._base()}/orders/{order_number}/documents", req.get,
+                                  headers=self._headers(), timeout=20)
             resp.raise_for_status()
             return resp.json()
         except Exception as e:

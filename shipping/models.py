@@ -441,6 +441,10 @@ class ShippingSettings(models.Model):
         "UPS лог — макс. записів", default=20,
         help_text="Скільки останніх UPS API запитів/відповідей зберігати у лог-файлі (1–200).",
     )
+    api_log_max_entries = models.PositiveSmallIntegerField(
+        "API лог — макс. записів (DHL/FedEx/Jumingo/DigiKey)", default=20,
+        help_text="Скільки останніх записів зберігати для DHL, FedEx, Jumingo, DigiKey (1–500).",
+    )
 
     class Meta:
         verbose_name        = "Налаштування доставки"
