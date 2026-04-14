@@ -169,7 +169,7 @@ class UPSClient:
         return {
             'Authorization': f'Bearer {self.get_token()}',
             'Content-Type':  'application/json',
-            'transId':        str(uuid.uuid4())[:32],
+            'transID':        str(uuid.uuid4())[:32],
             'transactionSrc': 'minerva-bi',
         }
 
@@ -346,6 +346,10 @@ class UPSClient:
             'PackageBillType': '03',
             'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
         }
+        is_intl = (to_address.get('country', 'DE').upper() !=
+                   (shipper.get('country') or 'DE').upper())
+        if is_intl:
+            shipment['InvoiceLineTotal'] = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
         payload  = {'RateRequest': {
             'Request': {
                 'RequestOption': 'Shop',
