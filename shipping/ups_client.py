@@ -343,7 +343,7 @@ class UPSClient:
         shipper  = from_address or self._default_shipper()
         shipment = self._build_rate_shipment(to_address, packages, shipper)
         shipment['DeliveryTimeInformation'] = {
-            'PackageBillType': '02',
+            'PackageBillType': '03',
             'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
         }
         payload  = {'RateRequest': {
@@ -386,7 +386,7 @@ class UPSClient:
         shipment = self._build_rate_shipment(to_address, packages, shipper,
                                              service_code=service_code)
         shipment['DeliveryTimeInformation'] = {
-            'PackageBillType': '02',
+            'PackageBillType': '03',
             'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
         }
         shipment['InvoiceLineTotal']    = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
