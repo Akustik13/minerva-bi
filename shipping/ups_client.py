@@ -368,7 +368,8 @@ class UPSClient:
         except UPSError as e:
             logger.warning('Shop?additionalinfo=timeintransit failed (%s) — plain Shop', e)
 
-        # Plain Shop fallback (prices only, ETA null)
+        # Plain Shop fallback (prices only, ETA null) — drop DeliveryTimeInformation
+        payload['RateRequest']['Shipment'].pop('DeliveryTimeInformation', None)
         data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
         self._last_rate_payload  = payload
         self._last_rate_response = data
@@ -924,7 +925,7 @@ class UPSClient:
             },
             'PackageWeight': {
                 'UnitOfMeasurement': {'Code': 'KGS'},
-                'Weight': str(round(float(pkg.get('weight_kg', 0.5)), 2)),
+                'Weight': str(round(max(1.0, float(pkg.get('weight_kg', 1.0))), 2)),
             },
         }
         if pkg.get('reference'):
