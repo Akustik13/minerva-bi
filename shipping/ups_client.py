@@ -648,11 +648,23 @@ class UPSClient:
         neg_charges = results_data.get('NegotiatedRateCharges', {}).get('TotalCharge', {})
         charges     = neg_charges if neg_charges.get('MonetaryValue') else results_data.get('ShipmentCharges', {}).get('TotalCharges', {})
 
+        # Customs form (commercial invoice) — present for international shipments
+        forms = results_data.get('Form', [])
+        if isinstance(forms, dict):
+            forms = [forms]
+        customs_b64 = ''
+        for form in forms:
+            img = form.get('Image', {})
+            if img.get('GraphicImage'):
+                customs_b64 = img['GraphicImage']
+                break
+
         return {
             'tracking_number': tracking,
             'shipment_id':     results_data.get('ShipmentIdentificationNumber', ''),
             'label_base64':    label_b64,
             'label_format':    label_format,
+            'customs_base64':  customs_b64,
             'total_charge':    Decimal(charges.get('MonetaryValue', '0')),
             'currency':        charges.get('CurrencyCode', 'EUR'),
             'service_code':    service_code,

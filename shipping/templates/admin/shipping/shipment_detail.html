@@ -451,6 +451,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             </span>
           </div>
           {% endif %}
+          {% if shipment.customs_url %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Митна декларація</span>
+            <span class="sd-info-val">
+              <a href="{{ shipment.customs_url }}" target="_blank" class="sd-label-link">🛃 Відкрити PDF</a>
+            </span>
+          </div>
+          {% endif %}
           {% if shipment.carrier_shipment_id %}
           <div class="sd-info-row">
             <span class="sd-info-key">ID відправлення</span>
@@ -609,6 +617,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               <span class="sd-info-key">Етикетка</span>
               <span class="sd-info-val">
                 <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 PDF</a>
+              </span>
+            </div>
+            {% endif %}
+            {% if shipment.customs_url %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Митна декларація</span>
+              <span class="sd-info-val">
+                <a href="{{ shipment.customs_url }}" target="_blank" class="sd-label-link">🛃 PDF</a>
               </span>
             </div>
             {% endif %}

@@ -172,6 +172,8 @@ class Shipment(models.Model):
                                            blank=True, default="")
     label_url           = models.URLField("URL етикетки (PDF)", max_length=500,
                                           blank=True, default="")
+    customs_url         = models.URLField("URL митної декларації (PDF)", max_length=500,
+                                          blank=True, default="")
     carrier_price       = models.DecimalField("Вартість доставки", max_digits=8,
                                               decimal_places=2, null=True, blank=True)
     carrier_currency    = models.CharField("Валюта вартості", max_length=3,

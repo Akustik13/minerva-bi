@@ -778,7 +778,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     search_fields = ("order__order_number", "recipient_name", "tracking_number",
                      "carrier_shipment_id")
     readonly_fields = (
-        "carrier_shipment_id", "tracking_number", "label_url",
+        "carrier_shipment_id", "tracking_number", "label_url", "customs_url",
         "carrier_price", "carrier_currency", "carrier_service",
         "selected_tariff_id", "jumingo_order_number",
         "raw_request", "raw_response", "error_message",
@@ -2431,6 +2431,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.label_url = f'/media/{rel}'
             shipment.save(update_fields=['label_url'])
             logger.info('UPS label saved: %s', fpath)
+
+        # Зберегти митну декларацію (комерційний інвойс)
+        if result.get('customs_base64'):
+            customs_dir = os.path.join(django_settings.MEDIA_ROOT, 'shipping', 'customs')
+            os.makedirs(customs_dir, exist_ok=True)
+            cfname = f'ups_customs_{shipment.pk}_{result["tracking_number"]}.pdf'
+            cfpath = os.path.join(customs_dir, cfname)
+            with open(cfpath, 'wb') as f:
+                f.write(_b64.b64decode(result['customs_base64']))
+            shipment.customs_url = f'/media/shipping/customs/{cfname}'
+            shipment.save(update_fields=['customs_url'])
+            logger.info('UPS customs form saved: %s', cfpath)
 
         # Синхронізуємо SalesOrder
         from datetime import date as _date
