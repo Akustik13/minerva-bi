@@ -552,7 +552,7 @@ class UPSClient:
                 'currency':         currency,
                 'transit_days':     transit_int,
                 'delivery_date':    delivery_date,
-                'guaranteed':       bool(s.get('GuaranteedDelivery') or transit_days),
+                'guaranteed':       bool(s.get('GuaranteedDelivery') or transit_int),
             })
         return sorted(results, key=lambda x: x['price'])
 
