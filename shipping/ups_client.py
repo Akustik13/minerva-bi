@@ -602,6 +602,7 @@ class UPSClient:
                 'ShipmentCharge': {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}},
             },
             'ShipmentRatingOptions': {'NegotiatedRatesIndicator': ''},
+            'Description': (customs_info or {}).get('description', 'Goods')[:50] if customs_info else 'Goods',
             'Service': {'Code': service_code, 'Description': UPS_SERVICES.get(service_code, '')},
             'Package': self._pkg_dict(packages[0], for_ship=True) if len(packages) == 1 else [self._pkg_dict(p, for_ship=True) for p in packages],
         }
