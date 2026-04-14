@@ -734,7 +734,7 @@ class UPSClient:
                         service_code: str = '11', packages: list = None,
                         destination_country: str = 'DE') -> dict:
         """
-        POST /api/pickupcreation/v2409/pickup
+        POST /api/pickupcreation/v1/pickup
         Планує забирання кур'єром UPS.
 
         pickup_date  — 'YYYYMMDD'
@@ -746,12 +746,9 @@ class UPSClient:
         pkg_count   = sum(p.get('quantity', 1) for p in pkgs) or 1
         total_weight = sum(float(p.get('weight_kg', 1)) * p.get('quantity', 1) for p in pkgs) or 1.0
 
-        addr_line = shipper.get('address_line', '')
+        phone = (shipper.get('phone', '') or '').replace(' ', '').lstrip('+')
         payload = {
             'PickupCreationRequest': {
-                'Request': {
-                    'TransactionReference': {'CustomerContext': 'minerva-bi'},
-                },
                 'RatePickupIndicator': 'N',
                 'Shipper': {
                     'Account': {
@@ -765,26 +762,31 @@ class UPSClient:
                     'CloseTime':  close_time.replace(':', ''),
                 },
                 'PickupAddress': {
-                    'CompanyName':          shipper.get('company') or shipper.get('name', ''),
-                    'ContactName':          shipper.get('name', ''),
-                    'AddressLine':          [addr_line] if addr_line else [],
-                    'City':                 shipper.get('city', ''),
-                    'PostalCode':           shipper.get('postal', ''),
-                    'CountryCode':          (shipper.get('country') or 'DE').upper(),
-                    'ResidentialIndicator': 'N',
-                    'Phone': {'Number': (shipper.get('phone', '') or '').replace(' ', '')},
+                    'CompanyName':  shipper.get('company') or shipper.get('name', ''),
+                    'ContactName':  shipper.get('name', ''),
+                    'AddressLine':  shipper.get('address_line', ''),
+                    'City':         shipper.get('city', ''),
+                    'PostalCode':   shipper.get('postal', ''),
+                    'CountryCode':  (shipper.get('country') or 'DE').upper(),
+                    'Phone':        {'Number': phone},
                 },
+                'AlternateAddressIndicator': 'Y',
                 'PickupPiece': [{
-                    'ServiceCode':          service_code,
-                    'Quantity':             str(pkg_count),
+                    'ServiceCode':            service_code.zfill(3),
+                    'Quantity':               str(pkg_count),
                     'DestinationCountryCode': destination_country.upper(),
-                    'ContainerCode':        '01',
+                    'ContainerCode':          '01',
                 }],
+                'TotalWeight': {
+                    'Weight':            str(round(total_weight, 1)),
+                    'UnitOfMeasurement': 'KGS',
+                },
+                'OverweightIndicator': 'N',
                 'PaymentMethod': '01',
             },
         }
         try:
-            data = self._post(f'/api/pickupcreation/{_API_VERSION}/pickup', payload)
+            data = self._post('/api/pickupcreation/v1/pickup', payload)
             resp = data.get('PickupCreationResponse', {})
             status_ok = resp.get('Response', {}).get('ResponseStatus', {}).get('Code') == '1'
             prn = resp.get('PRN', '')
