@@ -31,9 +31,15 @@
 .ups-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; }
 .ups-table tr:hover td { background: var(--bg-hover); }
 .ups-price { font-size: 16px; font-weight: 700; color: var(--ok); }
+.ups-price-ref { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.ups-price-src { font-size: 10px; padding: 1px 6px; border-radius: 8px;
+                 font-weight: 600; letter-spacing: .03em; vertical-align: middle; }
+.ups-price-src-neg { background: rgba(76,175,80,.15); color: #81c784; }
+.ups-price-src-ref { background: rgba(255,152,0,.12); color: #ffb74d; }
 .ups-service { font-weight: 600; }
 .ups-code { font-family: monospace; font-size: 11px; color: var(--text-dim); }
 .ups-transit { color: var(--accent); font-size: 12px; }
+.ups-date { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
 .ups-btn {
   display: inline-block; padding: 7px 16px; border-radius: 6px; font-size: 13px;
   font-weight: 600; text-decoration: none; border: none; cursor: pointer;
@@ -75,16 +81,32 @@
       {% for rate in rates %}
       <tr>
         <td class="ups-service">{{ rate.name }}</td>
-        <td class="ups-price">{{ rate.price }} {{ rate.currency }}</td>
-        <td class="ups-transit">
-          {% if rate.transit_days %}{{ rate.transit_days }} дн.{% else %}—{% endif %}
-          {% if rate.guaranteed %}<span style="color:var(--ok)">✓</span>{% endif %}
+        <td>
+          <div style="display:flex;align-items:baseline;gap:6px">
+            <span class="ups-price">{{ rate.display_price }} {{ rate.currency }}</span>
+            {% if rate.pricing_source == 'negotiated' %}
+              <span class="ups-price-src ups-price-src-neg">договірний</span>
+            {% else %}
+              <span class="ups-price-src ups-price-src-ref">роздрібний</span>
+            {% endif %}
+          </div>
+          {% if rate.negotiated_total and rate.reference_total != rate.negotiated_total %}
+          <div class="ups-price-ref">Роздрібний тариф: {{ rate.reference_total }} {{ rate.currency }}</div>
+          {% endif %}
+        </td>
+        <td>
+          <div class="ups-transit">
+            {% if rate.transit_days %}{{ rate.transit_days }} дн.{% else %}—{% endif %}
+            {% if rate.guaranteed %}<span style="color:var(--ok)">✓</span>{% endif %}
+          </div>
+          {% if rate.delivery_date %}
+          <div class="ups-date">{{ rate.delivery_date }}</div>
+          {% endif %}
         </td>
         <td class="ups-code">{{ rate.code }}</td>
         <td>
-          <a href="{% url 'admin:shipping_shipment_ups_book' shipment.pk %}?service_code={{ rate.code }}"
-             class="ups-btn"
-             onclick="return confirm('Оформити відправлення: {{ rate.name }} за {{ rate.price }} {{ rate.currency }}?')">
+          <a href="{% url 'admin:shipping_shipment_ups_confirm' shipment.pk %}?service_code={{ rate.code }}&rate_price={{ rate.display_price }}&rate_currency={{ rate.currency }}&rate_source={{ rate.pricing_source }}&rate_ref={{ rate.reference_total }}"
+             class="ups-btn">
             Оформити
           </a>
         </td>

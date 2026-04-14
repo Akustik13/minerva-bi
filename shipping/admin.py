@@ -2270,6 +2270,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         ).strip() or '11'
         service_name = UPS_SERVICES.get(service_code, f'UPS {service_code}')
 
+        # Rate price passed from rates page (informational)
+        rate_price    = request.POST.get('rate_price')    or request.GET.get('rate_price', '')
+        rate_currency = request.POST.get('rate_currency') or request.GET.get('rate_currency', 'EUR')
+        rate_source   = request.POST.get('rate_source')   or request.GET.get('rate_source', '')
+        rate_ref      = request.POST.get('rate_ref')      or request.GET.get('rate_ref', '')
+
         # POST — підтверджено, передаємо на ups_book_view
         if request.method == 'POST':
             from urllib.parse import urlencode
@@ -2343,6 +2349,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'back_url':             back_url,
             'pickup_min_date':      _tomorrow.strftime('%Y-%m-%d'),
             'pickup_default_date':  _tomorrow.strftime('%Y-%m-%d'),
+            # Rate price from rates page (may be empty if navigated directly)
+            'rate_price':           rate_price,
+            'rate_currency':        rate_currency,
+            'rate_source':          rate_source,
+            'rate_ref':             rate_ref,
         })
 
     def ups_book_view(self, request, shipment_id):

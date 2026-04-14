@@ -394,13 +394,23 @@ class UPSClient:
             code   = s.get('Service', {}).get('Code', '')
             retail = s.get('TotalCharges', {})
             neg    = s.get('NegotiatedRateCharges', {})
-            # Prefer negotiated (account) rates; fall back to retail
-            if neg.get('TotalCharge', {}).get('MonetaryValue'):
-                price    = neg['TotalCharge']['MonetaryValue']
-                currency = neg['TotalCharge'].get('CurrencyCode') or retail.get('CurrencyCode', 'EUR')
+
+            retail_val = retail.get('MonetaryValue', '0') or '0'
+            retail_cur = retail.get('CurrencyCode', 'EUR')
+            reference_total = Decimal(retail_val)
+
+            neg_charge = neg.get('TotalCharge', {}) if neg else {}
+            neg_val    = neg_charge.get('MonetaryValue') if neg_charge else None
+            if neg_val:
+                negotiated_total = Decimal(neg_val)
+                currency         = neg_charge.get('CurrencyCode') or retail_cur
+                pricing_source   = 'negotiated'
             else:
-                price    = retail.get('MonetaryValue', '0')
-                currency = retail.get('CurrencyCode', 'EUR')
+                negotiated_total = None
+                currency         = retail_cur
+                pricing_source   = 'reference'
+
+            display_price = negotiated_total if negotiated_total is not None else reference_total
 
             # Transit days: prefer Shoptimeintransit response, fall back to GuaranteedDelivery
             tti           = s.get('TimeInTransit', {})
@@ -415,13 +425,20 @@ class UPSClient:
             transit_int = int(transit_days) if str(transit_days).isdigit() else None
 
             results.append({
-                'code':          code,
-                'name':          UPS_SERVICES.get(code, f'UPS {code}'),
-                'price':         Decimal(price),
-                'currency':      currency,
-                'transit_days':  transit_int,
-                'delivery_date': delivery_date,
-                'guaranteed':    bool(s.get('GuaranteedDelivery') or transit_days),
+                'code':             code,
+                'name':             UPS_SERVICES.get(code, f'UPS {code}'),
+                # Normalized pricing
+                'negotiated_total': negotiated_total,   # Decimal or None
+                'reference_total':  reference_total,    # Decimal (retail/public rate)
+                'display_price':    display_price,      # negotiated if available, else reference
+                'booking_price':    display_price,      # price used for booking confirmation
+                'pricing_source':   pricing_source,     # 'negotiated' | 'reference'
+                # Legacy field kept for backward compat
+                'price':            display_price,
+                'currency':         currency,
+                'transit_days':     transit_int,
+                'delivery_date':    delivery_date,
+                'guaranteed':       bool(s.get('GuaranteedDelivery') or transit_days),
             })
         return sorted(results, key=lambda x: x['price'])
 

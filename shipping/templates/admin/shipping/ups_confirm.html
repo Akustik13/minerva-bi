@@ -118,7 +118,14 @@
       <div class="uc-row">
         <span class="uc-lbl">Орієнтовна вартість</span>
         <span class="uc-val ok">
-          {% if shipment.carrier_price %}{{ shipment.carrier_price }} {{ shipment.carrier_currency|default:"EUR" }}{% else %}—{% endif %}
+          {% if rate_price %}
+            {{ rate_price }} {{ rate_currency }}
+            {% if rate_source == 'negotiated' %}<span style="font-size:10px;background:rgba(76,175,80,.15);color:#81c784;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">договірний</span>{% endif %}
+            {% if rate_source == 'reference' %}<span style="font-size:10px;background:rgba(255,152,0,.12);color:#ffb74d;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">роздрібний</span>{% endif %}
+            {% if rate_ref and rate_ref != rate_price %}<div style="font-size:11px;color:var(--text-dim);font-weight:400;margin-top:2px">Роздрібний тариф: {{ rate_ref }} {{ rate_currency }}</div>{% endif %}
+          {% elif shipment.carrier_price %}
+            {{ shipment.carrier_price }} {{ shipment.carrier_currency|default:"EUR" }}
+          {% else %}—{% endif %}
         </span>
       </div>
       <div class="uc-row">
