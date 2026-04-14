@@ -592,8 +592,11 @@ class UPSClient:
                 'Address':       self._fmt_addr(to_address),
             },
             'ShipFrom': {
-                'Name':    shipper.get('name', ''),
-                'Address': self._fmt_addr(shipper),
+                'Name':          shipper.get('name', ''),
+                'AttentionName': shipper.get('name', ''),
+                'Phone':         {'Number': (shipper.get('phone', '') or '').replace(' ', '')},
+                'EMailAddress':  shipper.get('email', '') or '',
+                'Address':       self._fmt_addr(shipper),
             },
             'PaymentInformation': {
                 'ShipmentCharge': {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}},
