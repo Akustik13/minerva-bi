@@ -915,14 +915,13 @@ class UPSClient:
             prod = {
                 'Description': item.get('description', 'Goods')[:35],
                 'Unit': {
-                    'Number':             str(item.get('quantity', 1)),
-                    'UnitOfMeasurement':  {'Code': 'PCS'},
-                    'EstimatedValue':     str(round(float(item.get('value', 0)), 2)),
-                    'CurrencyCode':       info.get('currency', 'EUR'),
+                    'Number':            str(item.get('quantity', 1)),
+                    'UnitOfMeasurement': {'Code': 'PCS', 'Description': 'PCS'},
+                    'Value':             str(round(float(item.get('value', 0)), 2)),
                 },
                 'OriginCountryCode': item.get('country', self.carrier.sender_country or 'DE'),
-                'NetWeight': {
-                    'UnitOfMeasurement': {'Code': 'KGS'},
+                'ProductWeight': {
+                    'UnitOfMeasurement': {'Code': 'KGS', 'Description': 'KGS'},
                     'Weight': str(round(float(item.get('weight_kg', 0.5)), 2)),
                 },
             }
