@@ -333,15 +333,55 @@ class UPSClient:
 
     def _rate_shop(self, to_address, packages, from_address):
         """
-        Prices: POST /api/rating/v2409/Shop
-        ETA:    POST /api/shipments/v2409/transittimes  (independent call)
-        Results merged by service code. ETA fields left null if Transit Times fails.
-        """
-        shipper = from_address or self._default_shipper()
+        Primary:  POST /api/rating/v2409/Shoptimeintransit — prices + ETA in one call.
+        Fallback: POST /api/rating/v2409/Shop             — prices only, ETA null.
 
-        # ── 1. Prices via Shop ────────────────────────────────────────
+        Shoptimeintransit requirements (all verified against UPS error responses):
+          PackageBillType '03', Packaging code '00' (not '02' → 111212 intl),
+          InvoiceLineTotal, ShipmentTotalWeight, ShipTo.AddressLine present.
+
+        Note: /api/shipments/v2409/transittimes is 404 for this account (WWDT route
+        not provisioned) — do not use it.
+        """
+        from datetime import date as _date
+        shipper         = from_address or self._default_shipper()
+        total_weight_kg = sum(float(p.get('weight_kg', 0.5)) for p in packages)
+
+        # ── Shoptimeintransit (prices + ETA) ─────────────────────────
+        # Packaging '00' (Unknown/Other) is required — '02' triggers 111212
+        # for some intl service combinations in Shop mode.
+        pkgs_tti     = [{**p, '_pkg_override': '00'} for p in packages]
+        shipment_tti = self._build_rate_shipment(to_address, pkgs_tti, shipper,
+                                                 use_packaging_key=True)
+        if 'AddressLine' not in shipment_tti['ShipTo']['Address']:
+            shipment_tti['ShipTo']['Address']['AddressLine'] = ['-']
+        shipment_tti['DeliveryTimeInformation'] = {
+            'PackageBillType': '03',
+            'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
+        }
+        shipment_tti['InvoiceLineTotal']    = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
+        shipment_tti['ShipmentTotalWeight'] = {
+            'UnitOfMeasurement': {'Code': 'KGS'},
+            'Weight': str(round(total_weight_kg, 2)),
+        }
+        payload_tti = {'RateRequest': {
+            'Request': {
+                'RequestOption': 'Shoptimeintransit',
+                'TransactionReference': {'CustomerContext': 'minerva-bi'},
+            },
+            'Shipment': shipment_tti,
+        }}
+        try:
+            data = self._post(f'/api/rating/{_API_VERSION}/Shoptimeintransit', payload_tti)
+            self._last_rate_payload  = payload_tti
+            self._last_rate_response = data
+            return self._parse_rated_shipments(data, with_transit=True)
+        except UPSError as e:
+            logger.warning('UPS Shoptimeintransit failed (%s) — falling back to Shop (no ETA)', e)
+
+        # ── Shop fallback (prices only, ETA fields remain null) ───────
         shipment = self._build_rate_shipment(to_address, packages, shipper)
-        payload = {'RateRequest': {
+        payload  = {'RateRequest': {
             'Request': {
                 'RequestOption': 'Shop',
                 'TransactionReference': {'CustomerContext': 'minerva-bi'},
@@ -351,22 +391,7 @@ class UPSClient:
         data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
         self._last_rate_payload  = payload
         self._last_rate_response = data
-        rates = self._parse_rated_shipments(data)
-
-        # ── 2. ETA via Transit Times API ──────────────────────────────
-        transit_map = self._get_transit_times(to_address, packages, shipper)
-        for r in rates:
-            td = transit_map.get(r['code'])
-            if td:
-                days = td['transit_days']
-                date = td['delivery_date']
-                r['transit_days']            = days   # legacy
-                r['delivery_date']           = date   # legacy
-                r['guaranteed']              = bool(days)
-                r['delivery_days']           = days
-                r['delivery_date_estimated'] = date
-                r['delivery_label']          = self._fmt_eta_label(days, date)
-        return rates
+        return self._parse_rated_shipments(data, with_transit=False)
 
     def _rate_single(self, to_address, packages, from_address, service_code):
         """
@@ -463,8 +488,11 @@ class UPSClient:
             logger.warning('UPS Transit Times API failed: %s', e)
             return {}
 
-    def _parse_rated_shipments(self, data) -> list:
-        """Parse Shop/Rate response. ETA fields are null — filled in by _rate_shop after TTI call."""
+    def _parse_rated_shipments(self, data, with_transit=False) -> list:
+        """
+        Parse RateResponse. with_transit=True reads TimeInTransit from Shoptimeintransit
+        response and populates all ETA fields. with_transit=False leaves ETA null.
+        """
         shipments = data.get('RateResponse', {}).get('RatedShipment', [])
         if isinstance(shipments, dict):
             shipments = [shipments]
@@ -492,25 +520,39 @@ class UPSClient:
             display_price = negotiated_total if negotiated_total is not None else reference_total
             savings       = (reference_total - display_price) if negotiated_total else None
 
+            if with_transit:
+                tti          = s.get('TimeInTransit', {})
+                est_arrival  = tti.get('EstimatedArrival', {})
+                t_days_raw   = (est_arrival.get('BusinessDaysInTransit', '') or
+                                s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', ''))
+                raw_date     = est_arrival.get('Arrival', {}).get('Date', '')
+                transit_int  = int(t_days_raw) if str(t_days_raw).isdigit() else None
+                delivery_date = (f'{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}'
+                                 if len(raw_date) == 8 else raw_date)
+                delivery_label = self._fmt_eta_label(transit_int, delivery_date)
+            else:
+                transit_int    = None
+                delivery_date  = ''
+                delivery_label = None
+
             results.append({
-                'code':                   code,
-                'name':                   UPS_SERVICES.get(code, f'UPS {code}'),
-                # Pricing
-                'negotiated_total':       negotiated_total,
-                'reference_total':        reference_total,
-                'display_price':          display_price,
-                'booking_price':          display_price,
-                'pricing_source':         pricing_source,
-                'savings':                savings,
-                'price':                  display_price,   # legacy alias
-                'currency':               currency,
-                # ETA — populated by _rate_shop after _get_transit_times() merge
-                'transit_days':           None,   # legacy
-                'delivery_date':          '',     # legacy
-                'guaranteed':             False,
-                'delivery_days':          None,
-                'delivery_date_estimated': '',
-                'delivery_label':         None,
+                'code':                    code,
+                'name':                    UPS_SERVICES.get(code, f'UPS {code}'),
+                'negotiated_total':        negotiated_total,
+                'reference_total':         reference_total,
+                'display_price':           display_price,
+                'booking_price':           display_price,
+                'pricing_source':          pricing_source,
+                'savings':                 savings,
+                'price':                   display_price,
+                'currency':                currency,
+                # ETA (null when Shop fallback is used)
+                'transit_days':            transit_int,
+                'delivery_date':           delivery_date,
+                'guaranteed':              bool(s.get('GuaranteedDelivery') or transit_int),
+                'delivery_days':           transit_int,
+                'delivery_date_estimated': delivery_date,
+                'delivery_label':          delivery_label,
             })
         return sorted(results, key=lambda x: x['price'])
 
