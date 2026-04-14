@@ -581,12 +581,14 @@ class UPSClient:
                 'AttentionName': shipper.get('name', ''),
                 'ShipperNumber': self.carrier.connection_uuid,
                 'Phone':         {'Number': (shipper.get('phone', '') or '').replace(' ', '')},
+                'EMailAddress':  shipper.get('email', '') or '',
                 'Address':       self._fmt_addr(shipper),
             },
             'ShipTo': {
                 'Name':          to_address.get('name', ''),
                 'AttentionName': to_address.get('name', ''),
                 'Phone':         {'Number': (to_address.get('phone', '') or '').replace(' ', '')},
+                'EMailAddress':  to_address.get('email', '') or '',
                 'Address':       self._fmt_addr(to_address),
             },
             'ShipFrom': {

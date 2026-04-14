@@ -2687,6 +2687,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'postal':       shipment.recipient_zip or '',
             'country':      shipment.recipient_country or 'DE',
             'phone':        shipment.recipient_phone or '',
+            'email':        shipment.recipient_email or '',
         }
 
     def _ups_extract_packages(self, shipment) -> list:
