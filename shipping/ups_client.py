@@ -615,7 +615,8 @@ class UPSClient:
         )
         if is_intl and customs_info:
             shipment['ShipmentServiceOptions'] = {
-                'InternationalForms': self._build_customs(customs_info, invoice_number=reference),
+                'InternationalForms': self._build_customs(
+                    customs_info, invoice_number=reference, sold_to=to_address),
             }
 
         payload = {
@@ -901,7 +902,7 @@ class UPSClient:
             p['ReferenceNumber'] = [{'Code': '02', 'Value': pkg['reference'][:35]}]
         return p
 
-    def _build_customs(self, info: dict, invoice_number: str = '') -> dict:
+    def _build_customs(self, info: dict, invoice_number: str = '', sold_to: dict | None = None) -> dict:
         """Build InternationalForms payload for UPS Ship API."""
         from datetime import date as _date
         today      = _date.today().strftime('%Y%m%d')
@@ -938,7 +939,7 @@ class UPSClient:
         contents_map = {'SALE': '01', 'GIFT': '02', 'SAMPLE': '03', 'RETURN': '04', 'OTHER': '05'}
         reason = contents_map.get(info.get('contents_type', 'SALE').upper(), '01')
 
-        return {
+        result = {
             'FormType':            '01',
             'InvoiceDate':         today,
             'InvoiceNumber':       inv_number,
@@ -947,3 +948,15 @@ class UPSClient:
             'CurrencyCode':        info.get('currency', 'EUR'),
             'DeclarationStatement': 'I hereby certify that the information on this invoice is true and correct.',
         }
+
+        if sold_to:
+            sold_to_contact = {
+                'Name':          sold_to.get('name', ''),
+                'AttentionName': sold_to.get('name', ''),
+                'Phone':         {'Number': (sold_to.get('phone', '') or '').replace(' ', '')},
+                'EMailAddress':  sold_to.get('email', '') or '',
+                'Address':       self._fmt_addr(sold_to),
+            }
+            result['Contacts'] = {'SoldTo': sold_to_contact}
+
+        return result
