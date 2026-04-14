@@ -326,10 +326,7 @@ class UPSClient:
                 },
             },
             'ShipmentRatingOptions': {'NegotiatedRatesIndicator': 'Y'},
-            'NumOfPieces': str(len(packages)),
-            'Package': (self._pkg_dict(packages[0], for_ship=use_packaging_key)
-                        if len(packages) == 1
-                        else [self._pkg_dict(p, for_ship=use_packaging_key) for p in packages]),
+            'Package': [self._pkg_dict(p, for_ship=use_packaging_key) for p in packages],
         }
         if service_code:
             shipment['Service'] = {'Code': service_code}
@@ -917,43 +914,22 @@ class UPSClient:
     }
 
     def _pkg_dict(self, pkg: dict, for_ship: bool = False) -> dict:
-        """for_ship=True → Ship API (Packaging, KGS, CM).
-           for_ship=False → Rate API (PackagingType, LBS, IN)."""
+        """for_ship=True → Ship API uses 'Packaging'; Rate API uses 'PackagingType'."""
         pkg_code = pkg.get('_pkg_override', PACKAGING_CUSTOMER)
         pkg_key  = 'Packaging' if for_ship else 'PackagingType'
-        if for_ship:
-            # Ship API: KGS + CM (works, don't change)
-            p = {
-                pkg_key: {'Code': pkg_code, 'Description': self._PKG_DESCRIPTIONS.get(pkg_code, 'Customer Supplied Package')},
-                'Dimensions': {
-                    'UnitOfMeasurement': {'Code': 'CM'},
-                    'Length': str(round(float(pkg.get('length_cm', 10)))),
-                    'Width':  str(round(float(pkg.get('width_cm', 10)))),
-                    'Height': str(round(float(pkg.get('height_cm', 10)))),
-                },
-                'PackageWeight': {
-                    'UnitOfMeasurement': {'Code': 'KGS'},
-                    'Weight': str(round(float(pkg.get('weight_kg', 1.0)), 2)),
-                },
-            }
-        else:
-            # Rate API: LBS + IN (per official UPS Rating example)
-            weight_lbs = round(max(2.2, float(pkg.get('weight_kg', 1.0)) * 2.20462), 1)
-            p = {
-                pkg_key: {'Code': pkg_code, 'Description': self._PKG_DESCRIPTIONS.get(pkg_code, 'Customer Supplied Package')},
-                'Dimensions': {
-                    'UnitOfMeasurement': {'Code': 'IN', 'Description': 'Inches'},
-                    'Length': str(round(float(pkg.get('length_cm', 10)) / 2.54, 1)),
-                    'Width':  str(round(float(pkg.get('width_cm',  10)) / 2.54, 1)),
-                    'Height': str(round(float(pkg.get('height_cm', 10)) / 2.54, 1)),
-                },
-                'PackageWeight': {
-                    'UnitOfMeasurement': {'Code': 'LBS', 'Description': 'LBS'},
-                    'Weight': str(weight_lbs),
-                },
-                'OversizeIndicator':             'X',
-                'MinimumBillableWeightIndicator': 'X',
-            }
+        p = {
+            pkg_key: {'Code': pkg_code, 'Description': self._PKG_DESCRIPTIONS.get(pkg_code, 'Customer Supplied Package')},
+            'Dimensions': {
+                'UnitOfMeasurement': {'Code': 'CM'},
+                'Length': str(round(float(pkg.get('length_cm', 10)))),
+                'Width':  str(round(float(pkg.get('width_cm', 10)))),
+                'Height': str(round(float(pkg.get('height_cm', 10)))),
+            },
+            'PackageWeight': {
+                'UnitOfMeasurement': {'Code': 'KGS'},
+                'Weight': str(round(max(1.0, float(pkg.get('weight_kg', 1.0))), 2)),
+            },
+        }
         if pkg.get('reference'):
             p['ReferenceNumber'] = [{'Code': '02', 'Value': pkg['reference'][:35]}]
         return p
