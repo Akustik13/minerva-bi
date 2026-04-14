@@ -3055,17 +3055,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                         rates = client.get_rates(to_addr, pkgs, from_address=from_addr_ups)
                         entry["products"] = [
                             {
-                                "name":             r['name'],
-                                "code":             r['code'],
-                                "price":            float(r['display_price']),
-                                "currency":         r['currency'],
-                                "transit_days":     r.get('transit_days'),
-                                "delivery_date":    r.get('delivery_date') or '',
-                                "guaranteed":       r.get('guaranteed', False),
-                                "pricing_source":   r.get('pricing_source', 'reference'),
-                                "negotiated_total": float(r['negotiated_total']) if r.get('negotiated_total') else None,
-                                "reference_total":  float(r['reference_total']) if r.get('reference_total') else None,
-                                "savings":          float(r['savings']) if r.get('savings') else None,
+                                "name":                   r['name'],
+                                "code":                   r['code'],
+                                "price":                  float(r['display_price']),
+                                "currency":               r['currency'],
+                                "transit_days":           r.get('transit_days'),
+                                "delivery_date":          r.get('delivery_date') or '',
+                                "guaranteed":             r.get('guaranteed', False),
+                                "pricing_source":         r.get('pricing_source', 'reference'),
+                                "negotiated_total":       float(r['negotiated_total']) if r.get('negotiated_total') else None,
+                                "reference_total":        float(r['reference_total']) if r.get('reference_total') else None,
+                                "savings":                float(r['savings']) if r.get('savings') else None,
+                                "delivery_days":          r.get('delivery_days'),
+                                "delivery_date_estimated": r.get('delivery_date_estimated') or '',
+                                "delivery_label":         r.get('delivery_label'),
                             }
                             for r in rates
                         ]

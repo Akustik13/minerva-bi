@@ -180,16 +180,19 @@
       <!-- Transit -->
       <div class="ur-transit">
         <span>🕐</span>
-        {% if rate.transit_days %}
+        {% if rate.delivery_label %}
+          <span class="ur-transit-days">{{ rate.delivery_label }}</span>
+          {% if rate.guaranteed %}<span class="ur-guaranteed">✓ гарантовано</span>{% endif %}
+        {% elif rate.transit_days %}
           <span class="ur-transit-days">{{ rate.transit_days }} дн.</span>
+          {% if rate.delivery_date_estimated %}
+            <span class="ur-transit-date">до {{ rate.delivery_date_estimated }}</span>
+          {% elif rate.delivery_date %}
+            <span class="ur-transit-date">до {{ rate.delivery_date }}</span>
+          {% endif %}
+          {% if rate.guaranteed %}<span class="ur-guaranteed">✓ гарантовано</span>{% endif %}
         {% else %}
-          <span class="ur-transit-days">—</span>
-        {% endif %}
-        {% if rate.delivery_date %}
-          <span class="ur-transit-date">до {{ rate.delivery_date }}</span>
-        {% endif %}
-        {% if rate.guaranteed %}
-          <span class="ur-guaranteed">✓ гарантовано</span>
+          <span style="color:var(--text-dim);font-size:11px">ETA недоступний</span>
         {% endif %}
       </div>
 

@@ -648,8 +648,12 @@ function buildTable(c){
       <td style="padding:8px 10px;color:var(--text);font-weight:600">${esc(p.name)}${typeBadge}</td>
       ${isDHL?`<td style="padding:8px 8px;color:var(--text-dim);font-family:monospace">${esc(p.code)}</td>`:''}
       <td style="padding:8px 10px;text-align:right">${priceHtml}</td>
-      <td style="padding:8px 10px;color:var(--accent-2,#2196f3);text-align:center">${p.transit_days!=null?p.transit_days+' дн.':'—'}</td>
-      ${showDate?`<td style="padding:8px 10px;color:var(--text-muted);text-align:center;font-size:11px">${esc(p.delivery_date||'—')}</td>`:''}
+      <td style="padding:8px 10px;color:var(--accent-2,#2196f3);text-align:center;white-space:nowrap">
+        ${p.delivery_label
+          ? esc(p.delivery_label)
+          : (p.transit_days!=null ? p.transit_days+' дн.' : (isUPS?'<span style="color:var(--text-dim);font-size:10px">ETA —</span>':'—'))
+        }</td>
+      ${showDate?`<td style="padding:8px 10px;color:var(--text-muted);text-align:center;font-size:11px">${esc((p.delivery_date_estimated||p.delivery_date)||'—')}</td>`:''}
       ${hasAction?`<td style="padding:8px 8px;text-align:center">${makeBookBtn(c,p,false)}</td>`:''}
     </tr>`;
   });
