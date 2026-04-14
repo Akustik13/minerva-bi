@@ -47,8 +47,9 @@ UPS_SERVICES = {
 # Rate fallback already overrides to '00' when '02' fails for rating queries.
 PACKAGING_CUSTOMER = '02'
 
-# API version
-_API_VERSION = 'v2409'
+# API versions (Rating uses v2205; Ship/Track/Pickup use v2409)
+_API_VERSION        = 'v2409'
+_RATING_API_VERSION = 'v2205'
 
 
 class UPSError(Exception):
@@ -361,7 +362,7 @@ class UPSClient:
         # Try with ETA query param
         try:
             data = self._post(
-                f'/api/rating/{_API_VERSION}/Shop?additionalinfo=timeintransit', payload)
+                f'/api/rating/{_RATING_API_VERSION}/Shop?additionalinfo=timeintransit', payload)
             self._last_rate_payload  = payload
             self._last_rate_response = data
             return self._parse_rated_shipments(data, with_transit=True)
@@ -369,7 +370,7 @@ class UPSClient:
             logger.warning('Shop?additionalinfo=timeintransit failed (%s) — plain Shop', e)
 
         # Plain Shop fallback (prices only, ETA null)
-        data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
+        data = self._post(f'/api/rating/{_RATING_API_VERSION}/Shop', payload)
         self._last_rate_payload  = payload
         self._last_rate_response = data
         return self._parse_rated_shipments(data, with_transit=False)
@@ -405,7 +406,7 @@ class UPSClient:
             },
             'Shipment': shipment,
         }}
-        data  = self._post(f'/api/rating/{_API_VERSION}/Ratetimeintransit', payload)
+        data  = self._post(f'/api/rating/{_RATING_API_VERSION}/Ratetimeintransit', payload)
         rates = self._parse_rated_shipments(data, with_transit=True)
         return rates[0] if rates else None
 
@@ -421,7 +422,7 @@ class UPSClient:
             },
             'Shipment': self._build_rate_shipment(to_address, packages, shipper, service_code),
         }}
-        data = self._post(f'/api/rating/{_API_VERSION}/Rate', payload)
+        data = self._post(f'/api/rating/{_RATING_API_VERSION}/Rate', payload)
         self._last_rate_payload  = payload
         self._last_rate_response = data
         return self._parse_rated_shipments(data)
