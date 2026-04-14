@@ -327,6 +327,19 @@
             <input type="hidden" id="inp_pickup_close" value="18:00">
           </div>
         </div>
+        <div style="margin-top:14px">
+          <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
+                         letter-spacing:.04em;display:block;margin-bottom:5px">Місце забирання</label>
+          <select id="inp_pickup_point"
+                  style="background:var(--bg-card);border:1px solid var(--border-strong);
+                         color:var(--text);border-radius:4px;padding:7px 10px;font-size:13px;min-width:200px">
+            <option value="Reception">Рецепшен</option>
+            <option value="Office">Офіс</option>
+            <option value="Mailroom">Поштовий відділ</option>
+            <option value="Warehouse">Склад</option>
+            <option value="Lobby">Лобі</option>
+          </select>
+        </div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">
           ℹ️ Мінімум наступний робочий день. Після створення відправлення UPS отримає запит на забирання.
         </div>
@@ -352,6 +365,7 @@
         <input type="hidden" name="pickup_date" id="fld_pickup_date" value="{{ pickup_default_date }}">
         <input type="hidden" name="pickup_ready" id="fld_pickup_ready" value="0900">
         <input type="hidden" name="pickup_close" id="fld_pickup_close" value="1800">
+        <input type="hidden" name="pickup_point" id="fld_pickup_point" value="Reception">
       </form>
       <script>
       document.getElementById('ups-confirm-form').addEventListener('submit', function(){
@@ -360,6 +374,7 @@
         document.getElementById('fld_pickup_date').value  = document.getElementById('inp_pickup_date').value;
         document.getElementById('fld_pickup_ready').value = (document.getElementById('inp_pickup_ready').value||'09:00').replace(':','');
         document.getElementById('fld_pickup_close').value = (document.getElementById('inp_pickup_close').value||'18:00').replace(':','');
+        document.getElementById('fld_pickup_point').value = document.getElementById('inp_pickup_point').value;
       });
       </script>
     </div>

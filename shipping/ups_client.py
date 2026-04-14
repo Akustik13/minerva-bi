@@ -732,7 +732,8 @@ class UPSClient:
     def schedule_pickup(self, shipper: dict, pickup_date: str,
                         ready_time: str = '0900', close_time: str = '1800',
                         service_code: str = '11', packages: list = None,
-                        destination_country: str = 'DE') -> dict:
+                        destination_country: str = 'DE',
+                        pickup_point: str = 'Reception') -> dict:
         """
         POST /api/pickupcreation/v1/pickup
         Планує забирання кур'єром UPS.
@@ -768,6 +769,7 @@ class UPSClient:
                     'City':         shipper.get('city', ''),
                     'PostalCode':   shipper.get('postal', ''),
                     'CountryCode':  (shipper.get('country') or 'DE').upper(),
+                    'PickupPoint':  pickup_point,
                     'Phone':        {'Number': phone},
                 },
                 'AlternateAddressIndicator': 'Y',

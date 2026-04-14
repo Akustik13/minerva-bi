@@ -2470,6 +2470,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             pickup_date  = request.GET.get('pickup_date', '')
             pickup_ready = request.GET.get('pickup_ready', '0900')
             pickup_close = request.GET.get('pickup_close', '1800')
+            pickup_point = request.GET.get('pickup_point', 'Reception')
             if pickup_date:
                 try:
                     pickup_result = client.schedule_pickup(
@@ -2480,6 +2481,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                         service_code         = service_code,
                         packages             = packages,
                         destination_country  = to_addr.get('country', 'DE'),
+                        pickup_point         = pickup_point,
                     )
                     if pickup_result['success']:
                         prn = pickup_result.get('prn', '')
