@@ -339,8 +339,13 @@ class UPSClient:
         no special packaging, no fake addresses, no extra endpoints.
         Falls back to plain Shop (prices only) on any error.
         """
+        from datetime import date as _date
         shipper  = from_address or self._default_shipper()
         shipment = self._build_rate_shipment(to_address, packages, shipper)
+        shipment['DeliveryTimeInformation'] = {
+            'PackageBillType': '03',
+            'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
+        }
         is_intl = (to_address.get('country', 'DE').upper() !=
                    (shipper.get('country') or 'DE').upper())
         if is_intl:
