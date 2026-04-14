@@ -16,6 +16,7 @@ api_url='sandbox'|'' for production).
 import base64
 import logging
 import time
+import unicodedata
 import uuid
 from decimal import Decimal
 
@@ -272,6 +273,13 @@ class UPSClient:
     # Service codes tried in fallback (Shop not available)
     _FALLBACK_SERVICES = ['11', '07', '08', '65', '54', '03', '02', '01', '12', '59', '96']
 
+    # Time-in-Transit API service codes → Rating API numeric codes
+    _TTI_CODE_MAP = {
+        '1DM': '14', '1DA': '01', '1DP': '13', '2DM': '59', '2DA': '02',
+        '3DS': '12', 'GND': '03', 'WXS': '54', 'WXP': '07',
+        'WDA': '08', 'WES': '65', 'STD': '11', 'WXF': '96',
+    }
+
     def get_rates(self, to_address: dict, packages: list,
                   from_address: dict = None, service_code: str = None) -> list:
         """
@@ -326,28 +334,29 @@ class UPSClient:
     def _rate_shop(self, to_address, packages, from_address):
         """
         POST /api/rating/v2409/Shoptimeintransit — rates + transit days for all services.
-        PickupDate (today, YYYYMMDD) is required for TimeInTransit data to be returned.
-        Falls back to plain Shop if Shoptimeintransit returns an error.
+        Falls back to Shop + dedicated Transit Times API if Shoptimeintransit fails.
         Shoptimeintransit requires:
-          - PackageBillType: '03' (Non-Document); '02' → 111561, missing → 111561
-          - Package key 'Packaging' (not 'PackagingType') → without it → 111549
-          - InvoiceLineTotal → without it → 111549 for international routes
+          - PackageBillType: '03' (Non-Document)
+          - Package key 'Packaging' (not 'PackagingType') → without it: 111549
+          - InvoiceLineTotal → without it: 111549 for international routes
+          - ShipmentTotalWeight → without it: 111546 Invalid Weight
         """
         from datetime import date as _date
         shipper = from_address or self._default_shipper()
+        total_weight_kg = sum(float(p.get('weight_kg', 0.5)) for p in packages)
 
         # ── Shoptimeintransit payload ────────────────────────────────
         shipment_tti = self._build_rate_shipment(to_address, packages, shipper,
                                                  use_packaging_key=True)
         shipment_tti['DeliveryTimeInformation'] = {
-            'PackageBillType': '03',  # 03=Non-Document; '02' rejected with 111561
-            'Pickup': {
-                'Date': _date.today().strftime('%Y%m%d'),
-                'Time': '1000',
-            },
+            'PackageBillType': '03',
+            'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
         }
-        # Required for international Shoptimeintransit (prevents 111549)
-        shipment_tti['InvoiceLineTotal'] = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
+        shipment_tti['InvoiceLineTotal']    = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
+        shipment_tti['ShipmentTotalWeight'] = {
+            'UnitOfMeasurement': {'Code': 'KGS'},
+            'Weight': str(round(total_weight_kg, 2)),
+        }
 
         payload_tti = {'RateRequest': {
             'Request': {
@@ -361,11 +370,11 @@ class UPSClient:
             data = self._post(f'/api/rating/{_API_VERSION}/Shoptimeintransit', payload_tti)
             self._last_rate_payload  = payload_tti
             self._last_rate_response = data
-            return self._parse_rated_shipments(data)
+            return self._parse_rated_shipments(data, with_transit=True)
         except UPSError as e:
-            logger.warning('UPS Shoptimeintransit failed (%s) — falling back to Shop (no transit data)', e)
+            logger.warning('UPS Shoptimeintransit failed (%s) — falling back to Shop', e)
 
-        # ── Shop fallback (PackagingType, no DeliveryTimeInformation) ─
+        # ── Shop fallback → enrich with Transit Times API ────────────
         shipment_shop = self._build_rate_shipment(to_address, packages, shipper)
         payload_shop = {'RateRequest': {
             'Request': {
@@ -377,7 +386,17 @@ class UPSClient:
         data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload_shop)
         self._last_rate_payload  = payload_shop
         self._last_rate_response = data
-        return self._parse_rated_shipments(data)
+        rates = self._parse_rated_shipments(data, with_transit=False)
+
+        # Try dedicated Transit Times API to enrich with delivery estimates
+        transit_map = self._get_transit_times(to_address, packages, shipper)
+        if transit_map:
+            for r in rates:
+                td = transit_map.get(r['code'])
+                if td:
+                    r['transit_days']  = td['transit_days']
+                    r['delivery_date'] = td['delivery_date']
+        return rates
 
     def _rate_single(self, to_address, packages, from_address, service_code):
         """
@@ -411,7 +430,62 @@ class UPSClient:
                     pass
         return sorted(results, key=lambda x: x['price'])
 
-    def _parse_rated_shipments(self, data) -> list:
+    def _get_transit_times(self, to_address, packages, from_address=None) -> dict:
+        """
+        POST /api/shipments/v2409/transittimes — dedicated Transit Times API.
+        Used as fallback when Shoptimeintransit is unavailable.
+        Returns {rating_service_code: {transit_days, delivery_date}}.
+        """
+        from datetime import date as _date
+        shipper = from_address or self._default_shipper()
+        total_weight = sum(float(p.get('weight_kg', 0.5)) for p in packages)
+
+        payload = {
+            'originCountryCode':            (shipper.get('country') or 'DE').upper(),
+            'originCityName':               self._ascii_city(shipper.get('city', '')),
+            'originPostalCode':             shipper.get('postal', ''),
+            'destinationCountryCode':       (to_address.get('country') or 'DE').upper(),
+            'destinationCityName':          self._ascii_city(to_address.get('city', '')),
+            'destinationPostalCode':        to_address.get('postal', ''),
+            'weight':                       str(round(total_weight, 2)),
+            'weightUnitOfMeasure':          'KGS',
+            'shipmentContentsValue':        '1.00',
+            'shipmentContentsCurrencyCode': 'EUR',
+            'billType':                     '03',
+            'shipDate':                     _date.today().strftime('%Y-%m-%d'),
+            'shipTime':                     '10:00:00',
+            'numberOfPackages':             str(len(packages)),
+        }
+        if to_address.get('state'):
+            payload['destinationStateProvinceCode'] = to_address['state'].upper()
+        if shipper.get('state'):
+            payload['originStateProvinceCode'] = shipper['state'].upper()
+
+        try:
+            data = self._post(f'/api/shipments/{_API_VERSION}/transittimes', payload)
+            services = data.get('emsResponse', {}).get('services', [])
+            if isinstance(services, dict):
+                services = [services]
+            result = {}
+            for svc in services:
+                raw_code = svc.get('serviceLevel', {}).get('code', '')
+                code     = self._TTI_CODE_MAP.get(raw_code, raw_code)
+                arrival  = svc.get('serviceSummary', {}).get('estimatedArrival', {})
+                t_days   = arrival.get('businessDaysInTransit', '')
+                arr_dt   = arrival.get('arrival', {}).get('date', '')
+                if code:
+                    result[code] = {
+                        'transit_days':  int(t_days) if str(t_days).isdigit() else None,
+                        'delivery_date': (f'{arr_dt[:4]}-{arr_dt[4:6]}-{arr_dt[6:]}'
+                                         if len(arr_dt) == 8 else arr_dt),
+                    }
+            logger.info('UPS Transit Times API: %d services found', len(result))
+            return result
+        except UPSError as e:
+            logger.warning('UPS Transit Times API failed: %s', e)
+            return {}
+
+    def _parse_rated_shipments(self, data, with_transit=True) -> list:
         shipments = data.get('RateResponse', {}).get('RatedShipment', [])
         if isinstance(shipments, dict):
             shipments = [shipments]
@@ -438,17 +512,19 @@ class UPSClient:
 
             display_price = negotiated_total if negotiated_total is not None else reference_total
 
-            # Transit days: prefer Shoptimeintransit response, fall back to GuaranteedDelivery
-            tti           = s.get('TimeInTransit', {})
-            est_arrival   = tti.get('EstimatedArrival', {})
-            transit_days  = est_arrival.get('BusinessDaysInTransit', '') \
-                            or s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', '')
-
-            # Delivery date from Shoptimeintransit (YYYYMMDD → YYYY-MM-DD)
-            raw_date      = est_arrival.get('Arrival', {}).get('Date', '')
-            delivery_date = (f'{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}' if len(raw_date) == 8 else raw_date)
-
-            transit_int = int(transit_days) if str(transit_days).isdigit() else None
+            # Transit days / delivery date — only populated for Shoptimeintransit responses
+            if with_transit:
+                tti          = s.get('TimeInTransit', {})
+                est_arrival  = tti.get('EstimatedArrival', {})
+                transit_days = (est_arrival.get('BusinessDaysInTransit', '') or
+                                s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', ''))
+                raw_date     = est_arrival.get('Arrival', {}).get('Date', '')
+                delivery_date = (f'{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}'
+                                 if len(raw_date) == 8 else raw_date)
+                transit_int  = int(transit_days) if str(transit_days).isdigit() else None
+            else:
+                transit_int   = None
+                delivery_date = ''
 
             savings = (reference_total - display_price) if negotiated_total else None
 
@@ -737,13 +813,23 @@ class UPSClient:
             'phone':        c.sender_phone or '',
         }
 
+    @staticmethod
+    def _ascii_city(city: str) -> str:
+        """Normalize city to ASCII — München → Muenchen, Köln → Koeln, etc."""
+        for src, dst in (('ä','ae'),('ö','oe'),('ü','ue'),('ß','ss'),
+                         ('Ä','Ae'),('Ö','Oe'),('Ü','Ue')):
+            city = city.replace(src, dst)
+        return unicodedata.normalize('NFKD', city).encode('ascii', 'ignore').decode().strip()
+
     def _fmt_addr(self, addr: dict) -> dict:
         result = {
-            'AddressLine': [addr.get('address_line', '')],
-            'City':        addr.get('city', ''),
+            'City':        self._ascii_city(addr.get('city', '')),
             'PostalCode':  addr.get('postal', ''),
             'CountryCode': (addr.get('country') or 'DE').upper(),
         }
+        addr_line = (addr.get('address_line') or '').strip()
+        if addr_line:
+            result['AddressLine'] = [addr_line]
         if addr.get('state'):
             result['StateProvinceCode'] = addr['state'].upper()
         return result
