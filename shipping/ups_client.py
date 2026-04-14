@@ -330,35 +330,52 @@ class UPSClient:
         Falls back to plain Shop if Shoptimeintransit returns an error.
         Shoptimeintransit requires:
           - PackageBillType: '03' (Non-Document); '02' → 111561, missing → 111561
-          - Package key 'Packaging' (not 'PackagingType') → '03' without it → 111549
+          - Package key 'Packaging' (not 'PackagingType') → without it → 111549
+          - InvoiceLineTotal → without it → 111549 for international routes
         """
         from datetime import date as _date
-        shipper  = from_address or self._default_shipper()
-        # Shoptimeintransit needs 'Packaging' key (not 'PackagingType')
-        shipment = self._build_rate_shipment(to_address, packages, shipper,
-                                             use_packaging_key=True)
-        shipment['DeliveryTimeInformation'] = {
-            'PackageBillType': '03',  # 03 = Non-Document (required, '02' rejected with 111561)
+        shipper = from_address or self._default_shipper()
+
+        # ── Shoptimeintransit payload ────────────────────────────────
+        shipment_tti = self._build_rate_shipment(to_address, packages, shipper,
+                                                 use_packaging_key=True)
+        shipment_tti['DeliveryTimeInformation'] = {
+            'PackageBillType': '03',  # 03=Non-Document; '02' rejected with 111561
             'Pickup': {
                 'Date': _date.today().strftime('%Y%m%d'),
                 'Time': '1000',
             },
         }
-        payload = {'RateRequest': {
+        # Required for international Shoptimeintransit (prevents 111549)
+        shipment_tti['InvoiceLineTotal'] = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
+
+        payload_tti = {'RateRequest': {
             'Request': {
                 'RequestOption': 'Shoptimeintransit',
                 'TransactionReference': {'CustomerContext': 'minerva-bi'},
             },
-            'Shipment': shipment,
+            'Shipment': shipment_tti,
         }}
+
         try:
-            data = self._post(f'/api/rating/{_API_VERSION}/Shoptimeintransit', payload)
+            data = self._post(f'/api/rating/{_API_VERSION}/Shoptimeintransit', payload_tti)
+            self._last_rate_payload  = payload_tti
+            self._last_rate_response = data
+            return self._parse_rated_shipments(data)
         except UPSError as e:
             logger.warning('UPS Shoptimeintransit failed (%s) — falling back to Shop (no transit data)', e)
-            del shipment['DeliveryTimeInformation']
-            payload['RateRequest']['Request']['RequestOption'] = 'Shop'
-            data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
-        self._last_rate_payload  = payload
+
+        # ── Shop fallback (PackagingType, no DeliveryTimeInformation) ─
+        shipment_shop = self._build_rate_shipment(to_address, packages, shipper)
+        payload_shop = {'RateRequest': {
+            'Request': {
+                'RequestOption': 'Shop',
+                'TransactionReference': {'CustomerContext': 'minerva-bi'},
+            },
+            'Shipment': shipment_shop,
+        }}
+        data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload_shop)
+        self._last_rate_payload  = payload_shop
         self._last_rate_response = data
         return self._parse_rated_shipments(data)
 
