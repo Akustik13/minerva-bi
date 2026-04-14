@@ -109,7 +109,10 @@ urlpatterns = [
     path("bots/", include("bots.urls")),
     path("api/v1/", include("api.urls")),
     path("api-auth/", include("rest_framework.urls")),
-] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+] + [
+    # Serve media files in both DEBUG and production (no nginx in stack)
+    path('media/<path:path>', _static_serve, {'document_root': settings.MEDIA_ROOT}),
+]
 
 handler404 = lambda request, exception: render(request, "404.html", status=404)
 handler500 = lambda request: render(request, "500.html", status=500)

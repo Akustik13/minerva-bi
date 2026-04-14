@@ -721,7 +721,7 @@ class UPSClient:
                         ready_time: str = '0900', close_time: str = '1800',
                         service_code: str = '11', packages: list = None) -> dict:
         """
-        POST /api/pickups/v2205/schedule
+        POST /api/pickupcreation/v2409/pickup
         Планує забирання кур'єром UPS.
 
         pickup_date  — 'YYYYMMDD'
@@ -770,7 +770,7 @@ class UPSClient:
             },
         }
         try:
-            data = self._post('/api/pickups/v2205/schedule', payload)
+            data = self._post(f'/api/pickupcreation/{_API_VERSION}/pickup', payload)
             resp = data.get('PickupCreationResponse', {})
             status_ok = resp.get('Response', {}).get('ResponseStatus', {}).get('Code') == '1'
             prn = resp.get('PRN', '')
