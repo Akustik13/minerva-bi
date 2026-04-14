@@ -316,7 +316,7 @@ class UPSClient:
                 'ShipperNumber': self.carrier.connection_uuid,
                 'Address':       self._fmt_addr(shipper),
             },
-            'ShipTo':   {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address)},
+            'ShipTo':   {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address, addr_fallback=True)},
             'ShipFrom': {'Name': shipper.get('name', 'Shipper'),       'Address': self._fmt_addr(shipper)},
             'PaymentDetails': {
                 'ShipmentCharge': {
@@ -324,7 +324,7 @@ class UPSClient:
                     'BillShipper': {'AccountNumber': self.carrier.connection_uuid},
                 },
             },
-            'ShipmentRatingOptions': {'NegotiatedRatesIndicator': ''},
+            'ShipmentRatingOptions': {'NegotiatedRatesIndicator': 'Y'},
             'Package':  [self._pkg_dict(p, for_ship=use_packaging_key) for p in packages],
         }
         if service_code:
@@ -339,13 +339,8 @@ class UPSClient:
         no special packaging, no fake addresses, no extra endpoints.
         Falls back to plain Shop (prices only) on any error.
         """
-        from datetime import date as _date
         shipper  = from_address or self._default_shipper()
         shipment = self._build_rate_shipment(to_address, packages, shipper)
-        shipment['DeliveryTimeInformation'] = {
-            'PackageBillType': '03',
-            'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
-        }
         is_intl = (to_address.get('country', 'DE').upper() !=
                    (shipper.get('country') or 'DE').upper())
         if is_intl:
@@ -368,8 +363,7 @@ class UPSClient:
         except UPSError as e:
             logger.warning('Shop?additionalinfo=timeintransit failed (%s) — plain Shop', e)
 
-        # Plain Shop fallback (prices only, ETA null) — drop DeliveryTimeInformation
-        payload['RateRequest']['Shipment'].pop('DeliveryTimeInformation', None)
+        # Plain Shop fallback (prices only, ETA null)
         data = self._post(f'/api/rating/{_API_VERSION}/Shop', payload)
         self._last_rate_payload  = payload
         self._last_rate_response = data
@@ -886,7 +880,7 @@ class UPSClient:
             city = city.replace(src, dst)
         return unicodedata.normalize('NFKD', city).encode('ascii', 'ignore').decode().strip()
 
-    def _fmt_addr(self, addr: dict) -> dict:
+    def _fmt_addr(self, addr: dict, addr_fallback: bool = False) -> dict:
         country = (addr.get('country') or 'DE').upper()
         postal  = (addr.get('postal') or '')
         # Strip ZIP+4 suffix for US addresses (94501-1192 → 94501)
@@ -900,6 +894,8 @@ class UPSClient:
         addr_line = (addr.get('address_line') or '').strip()
         if addr_line:
             result['AddressLine'] = [addr_line]
+        elif addr_fallback:
+            result['AddressLine'] = ['-']
         if addr.get('state'):
             result['StateProvinceCode'] = addr['state'].upper()
         return result
