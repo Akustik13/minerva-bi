@@ -329,7 +329,6 @@ class UPSClient:
         shipment  = self._build_rate_shipment(to_address, packages, shipper)
         # DeliveryTimeInformation with Pickup.Date+Time is required for TimeInTransit data
         shipment['DeliveryTimeInformation'] = {
-            'PackageBillType': '02',  # 02 = Non-Documents
             'Pickup': {
                 'Date': _date.today().strftime('%Y%m%d'),
                 'Time': '1000',
@@ -424,6 +423,8 @@ class UPSClient:
 
             transit_int = int(transit_days) if str(transit_days).isdigit() else None
 
+            savings = (reference_total - display_price) if negotiated_total else None
+
             results.append({
                 'code':             code,
                 'name':             UPS_SERVICES.get(code, f'UPS {code}'),
@@ -433,6 +434,7 @@ class UPSClient:
                 'display_price':    display_price,      # negotiated if available, else reference
                 'booking_price':    display_price,      # price used for booking confirmation
                 'pricing_source':   pricing_source,     # 'negotiated' | 'reference'
+                'savings':          savings,            # how much cheaper vs retail (Decimal or None)
                 # Legacy field kept for backward compat
                 'price':            display_price,
                 'currency':         currency,

@@ -14,51 +14,129 @@
 {% block content %}
 <style>
 #content-main { max-width: none !important; }
-.ups-wrap { padding: 20px; max-width: 860px; }
-.ups-hdr {
+.ur-wrap { padding: 20px; max-width: 920px; }
+
+/* Header */
+.ur-hdr {
   display: flex; align-items: center; gap: 12px;
-  margin-bottom: 20px; padding-bottom: 12px;
+  margin-bottom: 24px; padding-bottom: 14px;
   border-bottom: 2px solid var(--gold);
 }
-.ups-hdr h2 { margin: 0; font-size: 18px; color: var(--text); }
-.ups-meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
-.ups-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
-.ups-table th {
-  background: var(--bg-card-2); color: var(--text-muted); font-size: 11px;
-  text-transform: uppercase; letter-spacing: .04em;
-  padding: 10px 14px; text-align: left; border-bottom: 2px solid var(--border-strong);
+.ur-hdr h2 { margin: 0; font-size: 18px; color: var(--text); }
+.ur-meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+/* Rate cards grid */
+.ur-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
 }
-.ups-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text); font-size: 13px; }
-.ups-table tr:hover td { background: var(--bg-hover); }
-.ups-price { font-size: 16px; font-weight: 700; color: var(--ok); }
-.ups-price-ref { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-.ups-price-src { font-size: 10px; padding: 1px 6px; border-radius: 8px;
-                 font-weight: 600; letter-spacing: .03em; vertical-align: middle; }
-.ups-price-src-neg { background: rgba(76,175,80,.15); color: #81c784; }
-.ups-price-src-ref { background: rgba(255,152,0,.12); color: #ffb74d; }
-.ups-service { font-weight: 600; }
-.ups-code { font-family: monospace; font-size: 11px; color: var(--text-dim); }
-.ups-transit { color: var(--accent); font-size: 12px; }
-.ups-date { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-.ups-btn {
-  display: inline-block; padding: 7px 16px; border-radius: 6px; font-size: 13px;
-  font-weight: 600; text-decoration: none; border: none; cursor: pointer;
-  background: var(--gold); color: #000;
+
+/* Single card */
+.ur-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+  transition: border-color .15s, box-shadow .15s;
 }
-.ups-btn:hover { opacity: .85; }
-.ups-back {
-  display: inline-block; margin-top: 20px; color: var(--text-muted);
+.ur-card:hover {
+  border-color: var(--gold);
+  box-shadow: 0 2px 12px rgba(0,0,0,.25);
+}
+
+/* Card top — service name */
+.ur-card-head {
+  padding: 12px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.ur-svc-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.ur-svc-code { font-size: 11px; color: var(--text-dim); font-family: monospace; margin-top: 2px; }
+
+/* Card body — price */
+.ur-card-price { padding: 14px 16px 10px; flex: 1; }
+
+.ur-price-main {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.ur-price-val {
+  font-size: 26px; font-weight: 800;
+  color: var(--ok); line-height: 1;
+}
+.ur-price-cur { font-size: 14px; font-weight: 600; color: var(--ok); }
+
+.ur-badge {
+  font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+  letter-spacing: .04em; white-space: nowrap; align-self: center;
+}
+.ur-badge-neg { background: rgba(76,175,80,.18); color: #81c784; }
+.ur-badge-ref { background: rgba(255,152,0,.15); color: #ffb74d; }
+
+/* Reference / savings line */
+.ur-price-ref {
+  font-size: 12px; color: var(--text-dim);
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.ur-price-strike { text-decoration: line-through; }
+.ur-savings {
+  font-size: 11px; font-weight: 700;
+  color: #81c784; background: rgba(76,175,80,.12);
+  padding: 1px 7px; border-radius: 8px;
+}
+
+/* Transit */
+.ur-transit {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 16px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--text-dim);
+}
+.ur-transit-days { font-weight: 700; color: var(--accent); font-size: 13px; }
+.ur-transit-date { font-size: 11px; color: var(--text-dim); }
+.ur-guaranteed { color: var(--ok); font-size: 11px; }
+
+/* Book button */
+.ur-card-foot { padding: 12px 16px; border-top: 1px solid var(--border); }
+.ur-btn {
+  display: block; width: 100%; padding: 9px 0; border-radius: 7px;
+  text-align: center; font-size: 13px; font-weight: 700;
+  text-decoration: none; background: var(--gold); color: #000;
+  transition: opacity .15s;
+}
+.ur-btn:hover { opacity: .85; }
+
+/* Back link */
+.ur-back {
+  display: inline-block; color: var(--text-muted);
   font-size: 12px; text-decoration: none;
 }
-.ups-back:hover { color: var(--text); }
+.ur-back:hover { color: var(--text); }
+
+/* Debug */
+.ur-debug summary {
+  cursor: pointer; font-size: 12px; font-weight: 700; color: var(--text-dim);
+  text-transform: uppercase; letter-spacing: .05em; user-select: none;
+  padding: 10px 0; border-top: 1px solid var(--border-strong);
+}
+.ur-debug pre {
+  background: var(--bg-input); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px; font-size: 11px; overflow-x: auto;
+  white-space: pre-wrap; word-break: break-all; max-height: 480px; overflow-y: auto;
+}
+
+@media(max-width:600px){ .ur-grid { grid-template-columns: 1fr; } }
 </style>
 
-<div class="ups-wrap">
-  <div class="ups-hdr">
+<div class="ur-wrap">
+  <div class="ur-hdr">
     <span style="font-size:28px">📦</span>
     <div>
       <h2>{{ title }}</h2>
-      <div class="ups-meta">
+      <div class="ur-meta">
         Вага: {{ weight }} кг &nbsp;·&nbsp;
         {{ shipment.recipient_city }}, {{ shipment.recipient_country }}
         {% if shipment.carrier.use_sandbox %}&nbsp;·&nbsp;<span style="color:var(--warn)">Sandbox</span>{% endif %}
@@ -67,102 +145,101 @@
   </div>
 
   {% if rates %}
-  <table class="ups-table">
-    <thead>
-      <tr>
-        <th>Послуга</th>
-        <th>Ціна</th>
-        <th>Транзит</th>
-        <th>Код</th>
-        <th>Дія</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for rate in rates %}
-      <tr>
-        <td class="ups-service">{{ rate.name }}</td>
-        <td>
-          <div style="display:flex;align-items:baseline;gap:6px">
-            <span class="ups-price">{{ rate.display_price }} {{ rate.currency }}</span>
-            {% if rate.pricing_source == 'negotiated' %}
-              <span class="ups-price-src ups-price-src-neg">договірний</span>
-            {% else %}
-              <span class="ups-price-src ups-price-src-ref">роздрібний</span>
-            {% endif %}
-          </div>
-          {% if rate.negotiated_total and rate.reference_total != rate.negotiated_total %}
-          <div class="ups-price-ref">Роздрібний тариф: {{ rate.reference_total }} {{ rate.currency }}</div>
+  <div class="ur-grid">
+    {% for rate in rates %}
+    <div class="ur-card">
+
+      <!-- Service name -->
+      <div class="ur-card-head">
+        <div class="ur-svc-name">{{ rate.name }}</div>
+        <div class="ur-svc-code">Код: {{ rate.code }}</div>
+      </div>
+
+      <!-- Price -->
+      <div class="ur-card-price">
+        <div class="ur-price-main">
+          <span class="ur-price-val">{{ rate.display_price }}</span>
+          <span class="ur-price-cur">{{ rate.currency }}</span>
+          {% if rate.pricing_source == 'negotiated' %}
+            <span class="ur-badge ur-badge-neg">договірний</span>
+          {% else %}
+            <span class="ur-badge ur-badge-ref">роздрібний</span>
           {% endif %}
-        </td>
-        <td>
-          <div class="ups-transit">
-            {% if rate.transit_days %}{{ rate.transit_days }} дн.{% else %}—{% endif %}
-            {% if rate.guaranteed %}<span style="color:var(--ok)">✓</span>{% endif %}
-          </div>
-          {% if rate.delivery_date %}
-          <div class="ups-date">{{ rate.delivery_date }}</div>
+        </div>
+
+        {% if rate.negotiated_total and rate.reference_total != rate.negotiated_total %}
+        <div class="ur-price-ref">
+          <span>Роздрібний: <span class="ur-price-strike">{{ rate.reference_total }} {{ rate.currency }}</span></span>
+          {% if rate.savings %}
+          <span class="ur-savings">−{{ rate.savings|floatformat:2 }}</span>
           {% endif %}
-        </td>
-        <td class="ups-code">{{ rate.code }}</td>
-        <td>
-          <a href="{% url 'admin:shipping_shipment_ups_confirm' shipment.pk %}?service_code={{ rate.code }}&rate_price={{ rate.display_price }}&rate_currency={{ rate.currency }}&rate_source={{ rate.pricing_source }}&rate_ref={{ rate.reference_total }}"
-             class="ups-btn">
-            Оформити
-          </a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- Transit -->
+      <div class="ur-transit">
+        <span>🕐</span>
+        {% if rate.transit_days %}
+          <span class="ur-transit-days">{{ rate.transit_days }} дн.</span>
+        {% else %}
+          <span class="ur-transit-days">—</span>
+        {% endif %}
+        {% if rate.delivery_date %}
+          <span class="ur-transit-date">до {{ rate.delivery_date }}</span>
+        {% endif %}
+        {% if rate.guaranteed %}
+          <span class="ur-guaranteed">✓ гарантовано</span>
+        {% endif %}
+      </div>
+
+      <!-- Book button -->
+      <div class="ur-card-foot">
+        <a href="{% url 'admin:shipping_shipment_ups_confirm' shipment.pk %}?service_code={{ rate.code }}&rate_price={{ rate.display_price }}&rate_currency={{ rate.currency }}&rate_source={{ rate.pricing_source }}&rate_ref={{ rate.reference_total }}"
+           class="ur-btn">
+          Оформити →
+        </a>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
   {% else %}
-  <p style="color:var(--text-muted)">Тарифи не знайдено. Перевір адресу та налаштування UPS.</p>
+  <p style="color:var(--text-muted);padding:40px 0;text-align:center">
+    Тарифи не знайдено. Перевір адресу та налаштування UPS.
+  </p>
   {% endif %}
 
-  <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}" class="ups-back">← Назад до відправлення</a>
+  <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}" class="ur-back">← Назад до відправлення</a>
 
   {% if raw_request or raw_response %}
-  <details style="margin-top:28px" {% if not rates %}open{% endif %}>
-    <summary style="cursor:pointer;font-size:12px;font-weight:700;color:var(--text-dim);
-                    text-transform:uppercase;letter-spacing:.05em;user-select:none;
-                    padding:10px 0;border-top:1px solid var(--border-strong)">
-      🔍 Debug — Rate API запит / відповідь
-    </summary>
+  <details class="ur-debug" style="margin-top:28px" {% if not rates %}open{% endif %}>
+    <summary>🔍 Debug — Rate API запит / відповідь</summary>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px">
-
       {% if raw_request %}
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">📤 Request</span>
-          <button type="button" onclick="copyRateDebug('ur-req',this)"
-            style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);
-                   border:1px solid var(--border-strong);border-radius:4px;
-                   color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
+          <span style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase">📤 Request</span>
+          <button type="button" onclick="copyDebug('ur-req',this)"
+            style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);border:1px solid var(--border-strong);border-radius:4px;color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
         </div>
-        <pre id="ur-req" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;
-                  padding:12px;font-size:11px;color:#4fc3f7;overflow-x:auto;
-                  white-space:pre-wrap;word-break:break-all;max-height:480px;overflow-y:auto">{{ raw_request }}</pre>
+        <pre id="ur-req" style="color:#4fc3f7">{{ raw_request }}</pre>
       </div>
       {% endif %}
-
       {% if raw_response %}
       <div>
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <span style="font-size:11px;font-weight:700;color:var(--ok);text-transform:uppercase;letter-spacing:.04em">✅ Response</span>
-          <button type="button" onclick="copyRateDebug('ur-res',this)"
-            style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);
-                   border:1px solid var(--border-strong);border-radius:4px;
-                   color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
+          <span style="font-size:11px;font-weight:700;color:var(--ok);text-transform:uppercase">✅ Response</span>
+          <button type="button" onclick="copyDebug('ur-res',this)"
+            style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);border:1px solid var(--border-strong);border-radius:4px;color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
         </div>
-        <pre id="ur-res" style="background:var(--bg-input);border:1px solid var(--border);border-radius:6px;
-                  padding:12px;font-size:11px;color:#a5d6a7;overflow-x:auto;
-                  white-space:pre-wrap;word-break:break-all;max-height:480px;overflow-y:auto">{{ raw_response }}</pre>
+        <pre id="ur-res" style="color:#a5d6a7">{{ raw_response }}</pre>
       </div>
       {% endif %}
-
     </div>
   </details>
   <script>
-  function copyRateDebug(id, btn) {
+  function copyDebug(id, btn) {
     var el = document.getElementById(id);
     if (!el) return;
     navigator.clipboard.writeText(el.textContent).then(function() {
