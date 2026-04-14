@@ -233,6 +233,7 @@
         {% if jumingo_carrier %}
         <button class="api-btn api-btn-sec" onclick="carrierTest('jumingo','rates')">💰 Тарифи</button>
         <a href="/admin/shipping/shipment/" class="api-btn api-btn-sec">📦 Відправлення</a>
+        <a href="/admin/shipping/carrier/{{ jumingo_carrier.pk }}/api-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
         {% endif %}
         <a href="{% url 'api_console' %}?preset=jumingo" class="api-btn api-btn-cons">Console</a>
       </div>
@@ -279,6 +280,7 @@
         </a>
         {% if dhl_carrier and dhl_carrier.api_key %}
         <button class="api-btn api-btn-sec" onclick="carrierTest('dhl','rates')">💰 Тарифи</button>
+        <a href="/admin/shipping/carrier/{{ dhl_carrier.pk }}/api-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
         {% endif %}
         {% if dhl_track_ok %}
         <a href="/admin/shipping/shipment/dhl-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
@@ -380,6 +382,7 @@
         {% if fedex_carrier and fedex_carrier.api_key %}
         <button class="api-btn api-btn-sec" onclick="carrierTest('fedex','token')">🔌 Токен</button>
         <button class="api-btn api-btn-sec" onclick="carrierTest('fedex','rates')">💰 Тарифи</button>
+        <a href="/admin/shipping/carrier/{{ fedex_carrier.pk }}/api-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
         <a href="/admin/shipping/shipment/fedex-track-lookup/" class="api-btn api-btn-sec">📡 Трекінг</a>
         {% endif %}
         <a href="{% url 'api_console' %}?preset=fedex" class="api-btn api-btn-cons">Console</a>
@@ -466,6 +469,9 @@
       </ul>
       <div class="api-actions">
         <a href="/admin/bots/digikeyconfig/" class="api-btn api-btn-prim">Налаштування</a>
+        {% if digikey_ok %}
+        <a href="/admin/bots/digikeyconfig/api-log/" target="_blank" class="api-btn api-btn-sec">📋 Лог</a>
+        {% endif %}
         <a href="{% url 'api_console' %}?preset=digikey" class="api-btn api-btn-cons">Console</a>
       </div>
     </div>
