@@ -820,7 +820,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 skus_parts = []
                 qtys_parts = []
                 for l in lines[:5]:
-                    sku = (l.sku_raw or (l.product.sku if l.product else '?'))[:20]
+                    sku = l.sku_raw or (l.product.sku if l.product else '?')
                     q   = l.qty
                     qty_str = str(int(q)) if q == int(q) else str(q)
                     skus_parts.append(f'<b>{sku}</b>')
