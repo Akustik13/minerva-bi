@@ -2786,11 +2786,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             for li in saved_lines:
                 if not li.get('description', '').strip():
                     continue
+                qty = int(li.get('quantity') or 1)
+                pkg_kg = float(shipment.weight_kg or 0.1)
+                has_weight = bool(li.get('weight'))
+                w_per_unit = float(li.get('weight') or 0) if has_weight else round(pkg_kg / max(1, qty), 4)
                 items.append({
                     'description': li.get('description', '')[:35],
-                    'quantity':    int(li.get('quantity') or 1),
+                    'quantity':    qty,
                     'value':       float(li.get('value') or 0),
-                    'weight_kg':   float(li.get('weight') or 0.1),
+                    'weight_kg':   w_per_unit,  # per unit
+                    'weight_auto': not has_weight,
                     'hs_code':     li.get('customs_number', '') or '',
                     'country':     (li.get('origin_country') or shipper_country).upper(),
                 })

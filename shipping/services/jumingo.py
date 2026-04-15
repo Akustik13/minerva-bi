@@ -106,10 +106,10 @@ def build_customs_articles(order, sender_country="DE", default_currency="EUR") -
 
         currency = (line.currency if line.currency else default_currency) or default_currency
 
-        # Вага (сумарна на рядок)
-        weight = None
+        # Вага за одиницю (нетто, кг/шт) — для ProductWeight у митній декларації
+        weight_per_unit = None
         if p and p.net_weight_g:
-            weight = round((float(p.net_weight_g) / 1000.0) * qty_int, 3)
+            weight_per_unit = round(float(p.net_weight_g) / 1000.0, 4)
 
         item = {
             "description":    desc,
@@ -119,8 +119,10 @@ def build_customs_articles(order, sender_country="DE", default_currency="EUR") -
             "origin_country": origin,
             "customs_number": hs,
         }
-        if weight:
-            item["weight"] = weight
+        if weight_per_unit:
+            item["weight"] = weight_per_unit  # per unit
+        else:
+            item["weight_auto"] = True  # буде вираховано JS як pkg_weight / qty
         articles.append(item)
 
     return articles

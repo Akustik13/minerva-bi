@@ -971,7 +971,8 @@ class UPSClient:
                 'OriginCountryCode': item.get('country', self.carrier.sender_country or 'DE'),
                 'ProductWeight': {
                     'UnitOfMeasurement': {'Code': 'KGS', 'Description': 'KGS'},
-                    'Weight': str(round(float(item.get('weight_kg', 0.5)), 3)),
+                    # weight_kg is per-unit; ProductWeight = total for the line
+                    'Weight': str(round(float(item.get('weight_kg', 0.1)) * qty, 3)),
                 },
             }
             if item.get('hs_code'):

@@ -160,6 +160,28 @@ function swapAddresses(){
   });
 }
 
+function _refreshAutoWeights(){
+  var pkgW = parseFloat(document.getElementById('id_weight_kg')?.value || 0);
+  document.querySelectorAll('#customs-rows .ca-row').forEach(function(row){
+    var wInp = row.querySelector('.ca-weight-inp');
+    if(!wInp || wInp.dataset.auto !== '1') return;
+    var qty = Math.max(1, parseFloat(row.querySelector('[name="ca_qty"]')?.value || 1));
+    var uW  = pkgW > 0 ? Math.round(pkgW / qty * 10000) / 10000 : 0;
+    var prev = wInp.value;
+    wInp.value = uW || '';
+    // Highlight changed
+    if(String(prev) !== String(wInp.value)){
+      wInp.style.borderColor = '#1565c0';
+      wInp.style.background  = 'rgba(21,101,192,.08)';
+      clearTimeout(wInp._hlTimer);
+      wInp._hlTimer = setTimeout(function(){
+        wInp.style.borderColor = '#e65100';
+        wInp.style.background  = 'rgba(230,81,0,.07)';
+      }, 2000);
+    }
+  });
+}
+
 function _unitVal(row){
   var qty = parseFloat(row.querySelector('[name="ca_qty"]')?.value || 1) || 1;
   var val = parseFloat(row.querySelector('[name="ca_value"]')?.value || 0);
@@ -183,7 +205,13 @@ function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px" type="number" name="ca_qty" min="1" step="1" value="${qty}" oninput="updateUnitVal(this)"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;font-size:12px;font-family:monospace" type="text" name="ca_hs" value="${hs}" placeholder="8517.62"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_origin" maxlength="2" value="${origin}" placeholder="DE"></td>
-    <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="${weight}" title="Нетто вага (кг)"></td>
+    <td style="padding:4px 5px">
+      <input class="sh-input ca-weight-inp" style="width:100%;padding:4px 5px;text-align:right;font-size:12px;border-color:#e65100;background:rgba(230,81,0,.07)"
+             type="number" name="ca_weight" step="0.0001" min="0" value="${weight}"
+             data-auto="1" title="⚠️ Авто: брутто ÷ к-сть (не з каталогу)"
+             oninput="this.dataset.auto='0';this.style.borderColor='';this.style.background=''">
+      <div style="font-size:9px;color:#e65100;text-align:right;line-height:1.2" class="ca-auto-lbl">⚠️ авто</div>
+    </td>
     <td style="padding:4px 5px;text-align:right;vertical-align:middle"><span class="ca-unitval" style="font-size:11px;color:var(--text-muted);font-family:monospace;white-space:nowrap">${uv}</span></td>
     <td style="padding:4px 5px"><input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="${value}" oninput="this.classList.remove('ca-warn');updateUnitVal(this)"></td>
     <td style="padding:4px 5px"><input class="sh-input ca-currency" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_currency" maxlength="3" value="${currency}"></td>
@@ -226,12 +254,29 @@ document.addEventListener('DOMContentLoaded',function(){
     updateCaTotal();
     if(e.target.name==='ca_qty'||e.target.name==='ca_value') updateUnitVal(e.target);
   });
-  // Sync package weight display in customs card
+  // Sync package weight → customs card display + auto-weight recalc
   var wkgInput = document.getElementById('id_weight_kg');
   var wkgDisplay = document.getElementById('ca_pkg_weight_display');
-  if(wkgInput && wkgDisplay){
-    wkgInput.addEventListener('input',function(){ wkgDisplay.textContent = wkgInput.value||'—'; });
+  if(wkgInput){
+    wkgInput.addEventListener('input',function(){
+      if(wkgDisplay) wkgDisplay.textContent = wkgInput.value || '—';
+      _refreshAutoWeights();
+    });
   }
+  // On ca_qty change for auto-weight rows → recalc weight
+  document.getElementById('customs-rows')?.addEventListener('input',function(e){
+    if(e.target.name === 'ca_qty'){
+      var row = e.target.closest('tr');
+      var wInp = row?.querySelector('.ca-weight-inp');
+      if(wInp && wInp.dataset.auto === '1'){
+        var pkgW = parseFloat(document.getElementById('id_weight_kg')?.value || 0);
+        var qty  = Math.max(1, parseFloat(e.target.value || 1));
+        wInp.value = pkgW > 0 ? Math.round(pkgW / qty * 10000) / 10000 : '';
+      }
+    }
+  });
+  // Init auto weights on page load
+  _refreshAutoWeights();
   // Auto-fill sender when carrier changes (only if fields not manually edited)
   document.querySelectorAll('[name="carrier"]').forEach(r=>r.addEventListener('change', _fillSenderFromCarrier));
 
@@ -1235,7 +1280,7 @@ document.addEventListener('DOMContentLoaded', function() {
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:52px">К-ть</th>
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:left;border-bottom:1px solid var(--border-strong);width:90px">HS-код</th>
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:52px">Країна</th>
-              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:76px" title="Нетто вага продукту на рядок (кг) — ProductWeight">Вага нетто(кг)</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:86px" title="Нетто вага 1 одиниці товару (кг/шт). В API надсилається ProductWeight = Вага/шт × К-сть">Вага/шт <span style="font-weight:400;font-size:10px;opacity:.7">(кг)</span></th>
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:78px" title="Ціна за одиницю = Total Value / К-сть">Ціна/шт</th>
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:90px" title="Загальна вартість по рядку = InvoiceLineTotal">Total Value</th>
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:48px">Вал.</th>
@@ -1258,7 +1303,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_origin" maxlength="2" value="{{ a.origin_country }}" placeholder="DE">
               </td>
               <td style="padding:4px 5px">
-                {% localize off %}<input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="{{ a.weight|default:default_ca_weight }}" title="Нетто вага для митниці (кг)">{% endlocalize %}
+                {% localize off %}
+                <input class="sh-input ca-weight-inp"
+                       style="width:100%;padding:4px 5px;text-align:right;font-size:12px{% if a.weight_auto %};border-color:#e65100;background:rgba(230,81,0,.07){% endif %}"
+                       type="number" name="ca_weight" step="0.0001" min="0"
+                       value="{{ a.weight|default:'' }}"
+                       data-auto="{% if a.weight_auto %}1{% else %}0{% endif %}"
+                       title="{% if a.weight_auto %}⚠️ Авто: брутто ÷ к-сть. Можна ввести вручну{% else %}З каталогу продуктів{% endif %}"
+                       oninput="this.dataset.auto='0';this.style.borderColor='';this.style.background='';this.nextElementSibling&&(this.nextElementSibling.style.display='none')">
+                {% endlocalize %}
+                {% if a.weight_auto %}
+                <div class="ca-auto-lbl" style="font-size:9px;color:#e65100;text-align:right;line-height:1.2">⚠️ авто</div>
+                {% endif %}
               </td>
               <td style="padding:4px 5px;text-align:right">
                 <span class="ca-unitval" style="font-size:11px;color:var(--text-muted);font-family:monospace;white-space:nowrap">—</span>
