@@ -276,6 +276,14 @@ class UPSClient:
 
     # Time-in-Transit API service codes → Rating API numeric codes
     _TTI_CODE_MAP = {
+        # v1 TimeInTransit API numeric codes → Rate API service codes
+        '01': '07',  # UPS Express+ / Worldwide Express
+        '05': '08',  # UPS Expedited / Worldwide Expedited
+        '28': '65',  # UPS Express Saver / Worldwide Saver
+        '29': '96',  # UPS Worldwide Express Freight
+        '11': '11',  # UPS Standard
+        '54': '54',  # UPS Worldwide Express Plus
+        # Legacy text codes (older API versions)
         '1DM': '14', '1DA': '01', '1DP': '13', '2DM': '59', '2DA': '02',
         '3DS': '12', 'GND': '03', 'WXS': '54', 'WXP': '07',
         'WDA': '08', 'WES': '65', 'STD': '11', 'WXF': '96',
@@ -296,13 +304,27 @@ class UPSClient:
         # Try Shop (all services at once)
         try:
             rates = self._rate_shop(to_address, packages, from_address)
-            if rates:
-                return rates
-            # Empty response — try per-service
-            return self._rate_fallback(to_address, packages, from_address)
+            if not rates:
+                rates = self._rate_fallback(to_address, packages, from_address)
         except UPSError as e:
             logger.info('UPS Shop failed (%s), switching to per-service fallback', e)
-            return self._rate_fallback(to_address, packages, from_address)
+            rates = self._rate_fallback(to_address, packages, from_address)
+
+        # Enrich with transit times from separate TimeInTransit v1 API
+        if rates:
+            transit = self._get_transit_times(to_address, packages, from_address)
+            if transit:
+                for rate in rates:
+                    tti = transit.get(rate['code'])
+                    if tti:
+                        rate['transit_days']            = tti['transit_days']
+                        rate['delivery_days']           = tti['transit_days']
+                        rate['delivery_date']           = tti['delivery_date']
+                        rate['delivery_date_estimated'] = tti['delivery_date']
+                        rate['guaranteed']              = bool(tti['transit_days'])
+                        rate['delivery_label']          = self._fmt_eta_label(
+                            tti['transit_days'], tti['delivery_date'])
+        return rates
 
     def _build_rate_shipment(self, to_address, packages, from_address,
                             service_code=None, use_packaging_key=False):
@@ -333,50 +355,23 @@ class UPSClient:
         return shipment
 
     def _rate_shop(self, to_address, packages, from_address):
-        """
-        Primary:  POST /api/rating/v2205/Shoptimeintransit  — prices + ETA in one call.
-        Fallback: POST /api/rating/v2205/Shop               — prices only.
-        """
-        from datetime import date as _date
+        """POST /api/rating/v2205/Shop — prices for all services. ETA added separately."""
         shipper  = from_address or self._default_shipper()
         shipment = self._build_rate_shipment(to_address, packages, shipper)
-        shipment['DeliveryTimeInformation'] = {
-            'PackageBillType': '03',
-            'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
-        }
-        is_intl = (to_address.get('country', 'DE').upper() !=
-                   (shipper.get('country') or 'DE').upper())
+        is_intl  = (to_address.get('country', 'DE').upper() !=
+                    (shipper.get('country') or 'DE').upper())
         if is_intl:
             shipment['InvoiceLineTotal'] = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
 
-        tti_payload = {'RateRequest': {
-            'Request': {
-                'RequestOption': 'Shoptimeintransit',
-                'TransactionReference': {'CustomerContext': 'minerva-bi'},
-            },
-            'Shipment': shipment,
-        }}
-
-        try:
-            data = self._post(
-                f'/api/rating/{_RATING_API_VERSION}/Shoptimeintransit', tti_payload)
-            self._last_rate_payload  = tti_payload
-            self._last_rate_response = data
-            return self._parse_rated_shipments(data, with_transit=True)
-        except UPSError as e:
-            logger.warning('Shoptimeintransit failed (%s) — plain Shop fallback', e)
-
-        # Plain Shop fallback (prices only, ETA null) — no DeliveryTimeInformation
-        shipment.pop('DeliveryTimeInformation', None)
-        plain_payload = {'RateRequest': {
+        payload = {'RateRequest': {
             'Request': {
                 'RequestOption': 'Shop',
                 'TransactionReference': {'CustomerContext': 'minerva-bi'},
             },
             'Shipment': shipment,
         }}
-        data = self._post(f'/api/rating/{_RATING_API_VERSION}/Shop', plain_payload)
-        self._last_rate_payload  = plain_payload
+        data = self._post(f'/api/rating/{_RATING_API_VERSION}/Shop', payload)
+        self._last_rate_payload  = payload
         self._last_rate_response = data
         return self._parse_rated_shipments(data, with_transit=False)
 
@@ -396,7 +391,7 @@ class UPSClient:
         shipment = self._build_rate_shipment(to_address, packages, shipper,
                                              service_code=service_code)
         shipment['DeliveryTimeInformation'] = {
-            'PackageBillType': '03',
+            'PackageBillType': '02',
             'Pickup': {'Date': _date.today().strftime('%Y%m%d'), 'Time': '1000'},
         }
         shipment['InvoiceLineTotal']    = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
@@ -449,35 +444,33 @@ class UPSClient:
 
     def _get_transit_times(self, to_address, packages, from_address=None) -> dict:
         """
-        POST /api/shipments/v2409/transittimes
+        POST /api/shipments/v1/transittimes
         Returns {rating_service_code: {transit_days, delivery_date}} or {} on failure.
         """
         from datetime import date as _date
         shipper      = from_address or self._default_shipper()
-        total_weight = sum(float(p.get('weight_kg', 0.5)) for p in packages)
+        total_weight = max(1.0, sum(float(p.get('weight_kg', 0.5)) for p in packages))
         dest_country = (to_address.get('country') or 'DE').upper()
 
-        # Strip ZIP+4 for US addresses (94501-1192 → 94501)
         dest_postal = to_address.get('postal', '')
         if dest_country == 'US' and '-' in dest_postal:
             dest_postal = dest_postal.split('-')[0]
 
         payload = {
-            'originCountryCode':            (shipper.get('country') or 'DE').upper(),
-            'originCityName':               self._ascii_city(shipper.get('city', '')),
-            'originPostalCode':             shipper.get('postal', ''),
-            'destinationCountryCode':       dest_country,
-            'destinationCityName':          self._ascii_city(to_address.get('city', '')),
-            'destinationPostalCode':        dest_postal,
-            'weight':                       str(round(total_weight, 2)),
-            'weightUnitOfMeasure':          'KGS',
-            'shipmentContentsValue':        '1.00',
-            'shipmentContentsCurrencyCode': 'EUR',
-            'billType':                     '03',
-            'shipDate':                     _date.today().strftime('%Y-%m-%d'),
-            'shipTime':                     '10:00:00',
-            'numberOfPackages':             str(len(packages)),
+            'originCountryCode':      (shipper.get('country') or 'DE').upper(),
+            'originPostalCode':       shipper.get('postal', ''),
+            'destinationCountryCode': dest_country,
+            'destinationPostalCode':  dest_postal,
+            'weight':                 str(round(total_weight, 2)),
+            'weightUnitOfMeasure':    'KGS',
+            'shipDate':               _date.today().strftime('%Y-%m-%d'),
+            'shipTime':               '10:00:00',
+            'residentialIndicator':   '02',
         }
+        if to_address.get('city'):
+            payload['destinationCityName'] = self._ascii_city(to_address['city'])
+        if shipper.get('city'):
+            payload['originCityName'] = self._ascii_city(shipper['city'])
         if to_address.get('state'):
             payload['destinationStateProvinceCode'] = to_address['state'].upper()
         if shipper.get('state'):
@@ -486,25 +479,23 @@ class UPSClient:
         self._last_tti_payload  = payload
         self._last_tti_response = None
         try:
-            data = self._post(f'/api/shipments/{_API_VERSION}/transittimes', payload)
+            data = self._post('/api/shipments/v1/transittimes', payload)
             self._last_tti_response = data
             services = data.get('emsResponse', {}).get('services', [])
             if isinstance(services, dict):
                 services = [services]
             result = {}
             for svc in services:
-                raw_code = svc.get('serviceLevel', {}).get('code', '')
+                raw_code = svc.get('serviceLevel', '')  # v1: string, not dict
                 code     = self._TTI_CODE_MAP.get(raw_code, raw_code)
-                arrival  = svc.get('serviceSummary', {}).get('estimatedArrival', {})
-                t_days   = arrival.get('businessDaysInTransit', '')
-                arr_dt   = arrival.get('arrival', {}).get('date', '')
+                t_days   = svc.get('businessTransitDays', '')
+                d_date   = svc.get('deliveryDate', '')  # already YYYY-MM-DD in v1
                 if code:
                     result[code] = {
                         'transit_days':  int(t_days) if str(t_days).isdigit() else None,
-                        'delivery_date': (f'{arr_dt[:4]}-{arr_dt[4:6]}-{arr_dt[6:]}'
-                                         if len(arr_dt) == 8 else arr_dt),
+                        'delivery_date': d_date,
                     }
-            logger.info('UPS Transit Times: %d services', len(result))
+            logger.info('UPS Transit Times v1: %d services', len(result))
             return result
         except UPSError as e:
             logger.warning('UPS Transit Times API failed: %s', e)
@@ -547,9 +538,9 @@ class UPSClient:
                 tti         = s.get('TimeInTransit', {})
                 svc_summary = tti.get('ServiceSummary', {})
                 est_arrival = svc_summary.get('EstimatedArrival', {})
-                t_days_raw  = (est_arrival.get('BusinessTransitDays', '') or
+                t_days_raw  = (est_arrival.get('BusinessDaysInTransit', '') or
                                s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', ''))
-                raw_date    = est_arrival.get('Date', '')
+                raw_date    = est_arrival.get('Arrival', {}).get('Date', '') or est_arrival.get('Date', '')
                 transit_int   = int(t_days_raw) if str(t_days_raw).isdigit() else None
                 delivery_date = raw_date  # already YYYY-MM-DD from Shoptimeintransit
                 delivery_label = self._fmt_eta_label(transit_int, delivery_date)
