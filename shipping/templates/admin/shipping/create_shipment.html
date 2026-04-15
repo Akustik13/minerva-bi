@@ -173,7 +173,7 @@ function _refreshAutoWeights(){
     var wInp = row.querySelector('.ca-weight-inp');
     if(!wInp || wInp.dataset.auto !== '1') return;
     var qty = Math.max(1, parseFloat(row.querySelector('[name="ca_qty"]')?.value || 1));
-    var uW  = pkgW > 0 ? Math.round(pkgW / qty * 10000) / 10000 : 0;
+    var uW  = pkgW > 0 ? Math.round(pkgW / qty * 1e5) / 1e5 : 0;
     var prev = wInp.value;
     wInp.value = uW || '';
     // Highlight changed
@@ -198,7 +198,7 @@ function _validateWeightRows(){
     if(!wInp || !qInp) return;
     var w    = parseFloat(wInp.value || 0);
     var qty  = Math.max(1, parseFloat(qInp.value || 1));
-    var lineW = Math.round(w * qty * 10000) / 10000;
+    var lineW = Math.round(w * qty * 1e5) / 1e5;
     var over  = pkgW > 0 && lineW > pkgW + 0.0001;
     if(over){
       wInp.style.borderColor = '#c62828';
@@ -244,7 +244,7 @@ function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_origin" maxlength="2" value="${origin}" placeholder="DE"></td>
     <td style="padding:4px 5px">
       <input class="sh-input ca-weight-inp" style="width:100%;padding:4px 5px;text-align:right;font-size:12px;border-color:#e65100;background:rgba(230,81,0,.07)"
-             type="number" name="ca_weight" step="0.0001" min="0" value="${weight}"
+             type="number" name="ca_weight" step="any" min="0" value="${weight}"
              data-auto="1" title="⚠️ Авто: брутто ÷ к-сть (не з каталогу)"
              oninput="this.dataset.auto='0';this.style.borderColor='';this.style.background=''">
       <div style="font-size:9px;color:#e65100;text-align:right;line-height:1.2" class="ca-auto-lbl">⚠️ авто</div>
@@ -310,7 +310,7 @@ document.addEventListener('DOMContentLoaded',function(){
       if(wInp && wInp.dataset.auto === '1'){
         var pkgW = _getPkgWeight();
         var qty  = Math.max(1, parseFloat(e.target.value || 1));
-        wInp.value = pkgW > 0 ? Math.round(pkgW / qty * 10000) / 10000 : '';
+        wInp.value = pkgW > 0 ? Math.round(pkgW / qty * 1e5) / 1e5 : '';
       }
       _validateWeightRows();
     }
@@ -1350,7 +1350,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 {% localize off %}
                 <input class="sh-input ca-weight-inp"
                        style="width:100%;padding:4px 5px;text-align:right;font-size:12px{% if a.weight_auto %};border-color:#e65100;background:rgba(230,81,0,.07){% endif %}"
-                       type="number" name="ca_weight" step="0.0001" min="0"
+                       type="number" name="ca_weight" step="any" min="0"
                        value="{{ a.weight|default:'' }}"
                        data-auto="{% if a.weight_auto %}1{% else %}0{% endif %}"
                        title="{% if a.weight_auto %}⚠️ Авто: брутто ÷ к-сть. Можна ввести вручну{% else %}З каталогу продуктів{% endif %}"

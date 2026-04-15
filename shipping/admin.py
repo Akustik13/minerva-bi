@@ -1069,7 +1069,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return self._handle_create_post(request, order, carriers)
 
         n_articles = len(customs_articles) or 1
-        default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 3)
+        default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 5)
 
         import json as _json
         pkg_rows = (packaging_hint or {}).get("pkg_rows") or []
@@ -1478,7 +1478,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         is_error = shipment.status == Shipment.Status.ERROR
 
         n_articles = len(customs_articles) or 1
-        default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 3)
+        default_ca_weight = round(float(shipment.weight_kg or 1) / n_articles, 5)
 
         import json as _json2
         carriers_sender_edit = {
@@ -2314,7 +2314,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         # Перевірка розбіжності ваги (митниця vs посилка)
         weight_warn = None
         if customs and customs.get('items'):
-            customs_kg = sum(float(i.get('weight_kg', 0)) for i in customs['items'])
+            customs_kg = sum(float(i.get('weight_kg', 0)) * int(i.get('quantity', 1)) for i in customs['items'])
             ship_kg    = float(shipment.weight_kg or 0)
             if customs_kg > 0 and ship_kg > 0:
                 diff = abs(ship_kg - customs_kg)
@@ -2789,7 +2789,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 qty = int(li.get('quantity') or 1)
                 pkg_kg = float(shipment.weight_kg or 0.1)
                 has_weight = bool(li.get('weight'))
-                w_per_unit = float(li.get('weight') or 0) if has_weight else round(pkg_kg / max(1, qty), 4)
+                w_per_unit = float(li.get('weight') or 0) if has_weight else round(pkg_kg / max(1, qty), 5)
                 items.append({
                     'description': li.get('description', '')[:35],
                     'quantity':    qty,
