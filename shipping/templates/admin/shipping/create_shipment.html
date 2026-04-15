@@ -246,7 +246,8 @@ function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
       <input class="sh-input ca-weight-inp" style="width:100%;padding:4px 5px;text-align:right;font-size:12px;border-color:#e65100;background:rgba(230,81,0,.07)"
              type="number" name="ca_weight" step="any" min="0" value="${weight}"
              data-auto="1" title="⚠️ Авто: брутто ÷ к-сть (не з каталогу)"
-             oninput="this.dataset.auto='0';this.style.borderColor='';this.style.background=''">
+             oninput="this.dataset.auto='0';this.style.borderColor='';this.style.background='';var h=this.parentNode.querySelector('.ca-wauto');if(h)h.value='0';var l=this.parentNode.querySelector('.ca-auto-lbl');if(l)l.style.display='none'">
+      <input type="hidden" name="ca_weight_auto[]" class="ca-wauto" value="1">
       <div style="font-size:9px;color:#e65100;text-align:right;line-height:1.2" class="ca-auto-lbl">⚠️ авто</div>
     </td>
     <td style="padding:4px 5px;text-align:right;vertical-align:middle"><span class="ca-unitval" style="font-size:11px;color:var(--text-muted);font-family:monospace;white-space:nowrap">${uv}</span></td>
@@ -1354,8 +1355,10 @@ document.addEventListener('DOMContentLoaded', function() {
                        value="{{ a.weight|default:'' }}"
                        data-auto="{% if a.weight_auto %}1{% else %}0{% endif %}"
                        title="{% if a.weight_auto %}⚠️ Авто: брутто ÷ к-сть. Можна ввести вручну{% else %}З каталогу продуктів{% endif %}"
-                       oninput="this.dataset.auto='0';this.style.borderColor='';this.style.background='';this.nextElementSibling&&(this.nextElementSibling.style.display='none')">
+                       oninput="this.dataset.auto='0';this.style.borderColor='';this.style.background='';var h=this.parentNode.querySelector('.ca-wauto');if(h)h.value='0';var l=this.parentNode.querySelector('.ca-auto-lbl');if(l)l.style.display='none'">
                 {% endlocalize %}
+                <input type="hidden" name="ca_weight_auto[]" class="ca-wauto"
+                       value="{% if a.weight_auto %}1{% else %}0{% endif %}">
                 {% if a.weight_auto %}
                 <div class="ca-auto-lbl" style="font-size:9px;color:#e65100;text-align:right;line-height:1.2">⚠️ авто</div>
                 {% endif %}

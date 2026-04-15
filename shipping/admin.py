@@ -1296,9 +1296,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             ca_qtys     = request.POST.getlist("ca_qty")
             ca_hscodes  = request.POST.getlist("ca_hs")
             ca_origins  = request.POST.getlist("ca_origin")
-            ca_weights  = request.POST.getlist("ca_weight")
-            ca_values   = request.POST.getlist("ca_value")
-            ca_curs     = request.POST.getlist("ca_currency")
+            ca_weights      = request.POST.getlist("ca_weight")
+            ca_weight_autos = request.POST.getlist("ca_weight_auto[]")
+            ca_values       = request.POST.getlist("ca_value")
+            ca_curs         = request.POST.getlist("ca_currency")
 
             customs_items = []
             for i, desc in enumerate(ca_descs):
@@ -1306,6 +1307,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     continue
                 def _get(lst, idx, default=""):
                     return lst[idx] if idx < len(lst) else default
+                w_auto = _get(ca_weight_autos, i, "0") == "1"
                 item = {
                     "description":    desc.strip()[:35],
                     "quantity":       max(1, int(float(_get(ca_qtys, i, "1") or 1))),
@@ -1313,13 +1315,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     "currency":       (_get(ca_curs, i, "EUR") or "EUR").upper()[:3],
                     "origin_country": (_get(ca_origins, i, "DE") or "DE").upper()[:2],
                     "customs_number": _get(ca_hscodes, i, "").strip(),
+                    "weight_auto":    w_auto,
                 }
-                w = _get(ca_weights, i, "")
-                if w:
-                    try:
-                        item["weight"] = round(float(w), 3)
-                    except ValueError:
-                        pass
+                if not w_auto:
+                    w = _get(ca_weights, i, "")
+                    if w:
+                        try:
+                            item["weight"] = round(float(w), 5)
+                        except ValueError:
+                            pass
                 customs_items.append(item)
 
             if customs_items:
@@ -1585,9 +1589,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             ca_qtys    = request.POST.getlist("ca_qty")
             ca_hscodes = request.POST.getlist("ca_hs")
             ca_origins = request.POST.getlist("ca_origin")
-            ca_weights = request.POST.getlist("ca_weight")
-            ca_values  = request.POST.getlist("ca_value")
-            ca_curs    = request.POST.getlist("ca_currency")
+            ca_weights      = request.POST.getlist("ca_weight")
+            ca_weight_autos = request.POST.getlist("ca_weight_auto[]")
+            ca_values       = request.POST.getlist("ca_value")
+            ca_curs         = request.POST.getlist("ca_currency")
 
             customs_items = []
             for i, desc in enumerate(ca_descs):
@@ -1595,6 +1600,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     continue
                 def _get(lst, idx, default=""):
                     return lst[idx] if idx < len(lst) else default
+                w_auto = _get(ca_weight_autos, i, "0") == "1"
                 item = {
                     "description":    desc.strip()[:35],
                     "quantity":       max(1, int(float(_get(ca_qtys, i, "1") or 1))),
@@ -1602,13 +1608,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     "currency":       (_get(ca_curs, i, "EUR") or "EUR").upper()[:3],
                     "origin_country": (_get(ca_origins, i, "DE") or "DE").upper()[:2],
                     "customs_number": _get(ca_hscodes, i, "").strip(),
+                    "weight_auto":    w_auto,
                 }
-                w = _get(ca_weights, i, "")
-                if w:
-                    try:
-                        item["weight"] = round(float(w), 3)
-                    except ValueError:
-                        pass
+                if not w_auto:
+                    w = _get(ca_weights, i, "")
+                    if w:
+                        try:
+                            item["weight"] = round(float(w), 5)
+                        except ValueError:
+                            pass
                 customs_items.append(item)
 
             if customs_items:
@@ -2788,14 +2796,17 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     continue
                 qty = int(li.get('quantity') or 1)
                 pkg_kg = float(shipment.weight_kg or 0.1)
-                has_weight = bool(li.get('weight'))
-                w_per_unit = float(li.get('weight') or 0) if has_weight else round(pkg_kg / max(1, qty), 5)
+                is_auto = li.get('weight_auto', not bool(li.get('weight')))
+                if is_auto:
+                    w_per_unit = round(pkg_kg / max(1, qty), 5)
+                else:
+                    w_per_unit = float(li.get('weight') or 0) or round(pkg_kg / max(1, qty), 5)
                 items.append({
                     'description': li.get('description', '')[:35],
                     'quantity':    qty,
                     'value':       float(li.get('value') or 0),
                     'weight_kg':   w_per_unit,  # per unit
-                    'weight_auto': not has_weight,
+                    'weight_auto': is_auto,
                     'hs_code':     li.get('customs_number', '') or '',
                     'country':     (li.get('origin_country') or shipper_country).upper(),
                 })
