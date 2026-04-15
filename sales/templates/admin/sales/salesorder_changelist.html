@@ -233,13 +233,23 @@ document.addEventListener('DOMContentLoaded', function () {
             📦 Склад
           </span>
         {% endif %}
-        {# Labels chip #}
-        <a href="{% url 'labels:list' %}"
-           style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                  background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong);
-                  text-decoration:none">
-          🏷️ Етикетки
-        </a>
+        {# Labels chip — JS updates to blue+link if .dymo found, grey if not #}
+        {% if lines %}
+        <span class="sv-label-chip"
+              data-skus="{% for l in lines %}{{ l.sku_raw|default:l.product.sku }}{% if not forloop.last %},{% endif %}{% endfor %}"
+              data-qtys="{% for l in lines %}{{ l.qty|floatformat:'0' }}{% if not forloop.last %},{% endif %}{% endfor %}"
+              style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                     background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong);
+                     display:inline-block;cursor:default;white-space:nowrap">
+          🏷️ …
+        </span>
+        {% else %}
+        <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                     background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong);
+                     opacity:.5">
+          🏷️ Немає
+        </span>
+        {% endif %}
         {# Shipping cost chip #}
         {% if order.shipping_cost %}
           <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
@@ -299,6 +309,58 @@ function svSetView(mode) {
 }
 (function () {
   svSetView(localStorage.getItem('salesorder_view') || 'table');
+})();
+
+// ── Label chips: batch-check .dymo availability ──────────────────────────────
+(function () {
+  var chips = document.querySelectorAll('.sv-label-chip');
+  if (!chips.length) return;
+
+  // Collect all unique SKUs
+  var allSkus = [];
+  chips.forEach(function (chip) {
+    (chip.dataset.skus || '').split(',').forEach(function (s) {
+      s = s.trim();
+      if (s && allSkus.indexOf(s) === -1) allSkus.push(s);
+    });
+  });
+  if (!allSkus.length) return;
+
+  fetch('/labels/status/?skus=' + allSkus.join(','))
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      chips.forEach(function (chip) {
+        var skus  = (chip.dataset.skus || '').split(',').map(function(s){ return s.trim(); });
+        var qtys  = (chip.dataset.qtys || '').split(',').map(function(s){ return s.trim() || '1'; });
+        // Find first SKU that has a label
+        var idx = -1;
+        for (var i = 0; i < skus.length; i++) {
+          if (data[skus[i]] && data[skus[i]].found) { idx = i; break; }
+        }
+        if (idx >= 0) {
+          var sku = skus[idx], qty = qtys[idx] || '1';
+          var a = document.createElement('a');
+          a.href = '/labels/serve/' + encodeURIComponent(sku) + '/?qty=' + qty;
+          a.target = '_blank';
+          a.title = 'Друкувати ' + sku + ' (' + qty + ' шт.)';
+          a.style.cssText = 'padding:3px 10px;border-radius:5px;font-size:11px;font-weight:600;'
+            + 'background:#1565c0;color:#fff;border:none;display:inline-block;'
+            + 'text-decoration:none;white-space:nowrap';
+          a.textContent = '\uD83D\uDDA8\uFE0F \u0414\u0440\u0443\u043A\u0443\u0432\u0430\u0442\u0438'; // 🖨️ Друкувати
+          chip.parentNode.replaceChild(a, chip);
+        } else {
+          chip.textContent = '\uD83C\uDFF7\uFE0F \u041D\u0435\u043C\u0430\u0454'; // 🏷️ Немає
+          chip.style.opacity = '0.5';
+          chip.title = 'Файл .dymo не завантажено';
+        }
+      });
+    })
+    .catch(function () {
+      // On error — show neutral state
+      chips.forEach(function (chip) {
+        chip.textContent = '\uD83C\uDFF7\uFE0F \u0415\u0442\u0438\u043A\u0435\u0442\u043A\u0438'; // 🏷️ Етикетки
+      });
+    });
 })();
 </script>
 
