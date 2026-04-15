@@ -622,6 +622,17 @@ class UPSClient:
             (shipper.get('country') or 'DE').upper()
         )
         if is_intl and customs_info:
+            # InvoiceLineTotal at Shipment level (required for international)
+            items_list = customs_info.get('items') or []
+            total_val = float(
+                customs_info.get('value_usd') or
+                sum(float(i.get('value', 0)) for i in items_list) or 0
+            )
+            if total_val > 0:
+                shipment['InvoiceLineTotal'] = {
+                    'CurrencyCode':  customs_info.get('currency', 'USD'),
+                    'MonetaryValue': str(round(total_val, 2)),
+                }
             shipment['ShipmentServiceOptions'] = {
                 'InternationalForms': self._build_customs(
                     customs_info, invoice_number=reference, sold_to=to_address),
@@ -947,36 +958,47 @@ class UPSClient:
 
         products = []
         for item in items_list:
+            qty       = max(1, int(item.get('quantity', 1)))
+            total_val = float(item.get('value', 0))
+            unit_val  = round(total_val / qty, 4)  # price per unit, not total
             prod = {
                 'Description': item.get('description', 'Goods')[:35],
                 'Unit': {
-                    'Number':            str(item.get('quantity', 1)),
+                    'Number':            str(qty),
                     'UnitOfMeasurement': {'Code': 'PCS', 'Description': 'PCS'},
-                    'Value':             str(round(float(item.get('value', 0)), 2)),
+                    'Value':             str(unit_val),  # per-unit value
                 },
                 'OriginCountryCode': item.get('country', self.carrier.sender_country or 'DE'),
                 'ProductWeight': {
                     'UnitOfMeasurement': {'Code': 'KGS', 'Description': 'KGS'},
-                    'Weight': str(round(float(item.get('weight_kg', 0.5)), 2)),
+                    'Weight': str(round(float(item.get('weight_kg', 0.5)), 3)),
                 },
             }
             if item.get('hs_code'):
                 prod['CommodityCode'] = item['hs_code']
             products.append(prod)
 
-        # ReasonForExport: 01=Sale, 02=Gift, 03=Sample, 04=Return, 05=Other
-        contents_map = {'SALE': '01', 'GIFT': '02', 'SAMPLE': '03', 'RETURN': '04', 'OTHER': '05'}
-        reason = contents_map.get(info.get('contents_type', 'SALE').upper(), '01')
+        # ReasonForExport: UPS expects text values ("Sale", "Gift", etc.), not codes
+        reason_map = {
+            'SALE': 'Sale', 'GIFT': 'Gift', 'SAMPLE': 'Sample',
+            'RETURN': 'Return', 'OTHER': 'Other',
+        }
+        reason = reason_map.get(info.get('contents_type', 'SALE').upper(), 'Sale')
 
         result = {
-            'FormType':            '01',
-            'InvoiceDate':         today,
-            'InvoiceNumber':       inv_number,
-            'Product':             products,
-            'ReasonForExport':     reason,
-            'CurrencyCode':        info.get('currency', 'EUR'),
+            'FormType':             '01',
+            'InvoiceDate':          today,
+            'InvoiceNumber':        inv_number,
+            'Product':              products,
+            'ReasonForExport':      reason,
+            'CurrencyCode':         info.get('currency', 'EUR'),
             'DeclarationStatement': 'I hereby certify that the information on this invoice is true and correct.',
         }
+
+        # TermsOfShipment (Incoterm): DAP, DDP, EXW, FOB, CIF …
+        terms = info.get('terms_of_shipment', '')
+        if terms:
+            result['TermsOfShipment'] = terms
 
         if sold_to:
             sold_to_contact = {

@@ -2280,11 +2280,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if request.method == 'POST':
             from urllib.parse import urlencode
             qs = urlencode({
-                'service_code':  service_code,
-                'pickup_type':   request.POST.get('pickup_type', 'dropoff'),
-                'pickup_date':   request.POST.get('pickup_date', ''),
-                'pickup_ready':  request.POST.get('pickup_ready', '0900'),
-                'pickup_close':  request.POST.get('pickup_close', '1800'),
+                'service_code':       service_code,
+                'pickup_type':        request.POST.get('pickup_type', 'dropoff'),
+                'pickup_date':        request.POST.get('pickup_date', ''),
+                'pickup_ready':       request.POST.get('pickup_ready', '0900'),
+                'pickup_close':       request.POST.get('pickup_close', '1800'),
+                'terms_of_shipment':  request.POST.get('terms_of_shipment', 'DAP'),
+                'package_weight_kg':  request.POST.get('package_weight_kg', ''),
             })
             return redirect(
                 reverse('admin:shipping_shipment_ups_book', args=[shipment.pk]) + f'?{qs}'
@@ -2367,12 +2369,28 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         shipment     = get_object_or_404(Shipment, pk=shipment_id)
         service_code = request.GET.get('service_code', '11')
 
+        terms_of_shipment  = request.GET.get('terms_of_shipment', 'DAP').strip()
+        package_weight_raw = request.GET.get('package_weight_kg', '').strip()
+
         try:
             client   = UPSClient(carrier=shipment.carrier)
             to_addr  = self._ups_extract_address(shipment)
             packages = self._ups_extract_packages(shipment)
             customs  = self._ups_extract_customs(shipment)
             shipper  = self._ups_extract_shipper(shipment)
+
+            # Override package weight if provided from confirm form
+            if package_weight_raw:
+                try:
+                    pkg_w = float(package_weight_raw)
+                    if pkg_w > 0:
+                        packages = [dict(p, weight_kg=pkg_w) for p in packages]
+                except ValueError:
+                    pass
+
+            # Inject Incoterm into customs_info
+            if customs and terms_of_shipment:
+                customs['terms_of_shipment'] = terms_of_shipment
 
             result = client.create_shipment(
                 to_address=to_addr,
@@ -2747,8 +2765,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'Commercial': 'SALE', 'Gift': 'GIFT', 'Personal': 'GIFT',
             'Return': 'RETURN', 'Claim': 'OTHER',
         }
-        currency = shipment.declared_currency or 'EUR'
+        currency = shipment.declared_currency or 'USD'
         contents_type = reason_map.get(shipment.export_reason, 'SALE')
+        terms_of_shipment = getattr(shipment, 'incoterm', '') or 'DAP'
 
         # ── Пріоритет: customs_articles збережені з форми ──────────────────
         saved = shipment.customs_articles or {}
@@ -2768,20 +2787,22 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 })
             if items:
                 return {
-                    'description':   f'Order #{order.order_number}',
-                    'value_usd':     sum(i['value'] for i in items),
-                    'currency':      (saved_lines[0].get('currency') or currency).upper(),
-                    'contents_type': contents_type,
-                    'items':         items,
+                    'description':      f'Order #{order.order_number}',
+                    'value_usd':        sum(i['value'] for i in items),
+                    'currency':         (saved_lines[0].get('currency') or currency).upper(),
+                    'contents_type':    contents_type,
+                    'terms_of_shipment': terms_of_shipment,
+                    'items':            items,
                 }
 
         # ── Fallback: будуємо з рядків замовлення ──────────────────────────
         items = []
         for line in order.lines.select_related('product').all():
             product = getattr(line, 'product', None)
+            qty = int(getattr(line, 'qty', None) or getattr(line, 'quantity', 1) or 1)
             items.append({
                 'description': str(product)[:35] if product else (shipment.description or 'Goods'),
-                'quantity':    int(getattr(line, 'quantity', 1) or 1),
+                'quantity':    qty,
                 'value':       float(getattr(line, 'total_price', 0) or 0),
                 'weight_kg':   float(getattr(product, 'weight', 0.1) or 0.1) if product else 0.1,
                 'hs_code':     getattr(product, 'hs_code', '') or '',
@@ -2790,18 +2811,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         if not items:
             return {
-                'description':   shipment.description or f'Order #{order.order_number}',
-                'value_usd':     float(shipment.declared_value or 0),
-                'currency':      currency,
-                'contents_type': contents_type,
+                'description':      shipment.description or f'Order #{order.order_number}',
+                'value_usd':        float(shipment.declared_value or 0),
+                'currency':         currency,
+                'contents_type':    contents_type,
+                'terms_of_shipment': terms_of_shipment,
             }
 
         return {
-            'description':   f'Order #{order.order_number}',
-            'value_usd':     sum(i['value'] for i in items),
-            'currency':      currency,
-            'contents_type': contents_type,
-            'items':         items,
+            'description':      f'Order #{order.order_number}',
+            'value_usd':        sum(i['value'] for i in items),
+            'currency':         currency,
+            'contents_type':    contents_type,
+            'terms_of_shipment': terms_of_shipment,
+            'items':            items,
         }
 
     # ── DHL Track Lookup (standalone) ────────────────────────────────────────

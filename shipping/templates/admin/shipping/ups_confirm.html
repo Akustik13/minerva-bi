@@ -228,24 +228,83 @@
   <div class="uc-card">
     <div class="uc-head">🛃 Митна декларація</div>
     <div class="uc-body">
-      <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
-        <span><span class="uc-lbl" style="display:inline">Валюта: </span>
-          <b>{{ customs.currency|default:"EUR" }}</b></span>
-        <span><span class="uc-lbl" style="display:inline">Тип: </span>
-          <b>{{ customs.contents_type|default:"SALE" }}</b></span>
-        {% if customs.description %}
-        <span><span class="uc-lbl" style="display:inline">Опис: </span>
-          <b>{{ customs.description }}</b></span>
-        {% endif %}
+
+      {# ── Editable params row ───────────────────────────────────────────── #}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+                  gap:14px;margin-bottom:16px">
+
+        {# Package weight (brutto) #}
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);font-weight:700;
+                         text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">
+            📦 Вага посилки (брутто)
+          </label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <input type="number" name="package_weight_kg" id="inp_pkg_weight"
+                   value="{{ shipment.weight_kg|default:'' }}" min="0.1" step="0.001"
+                   style="background:var(--bg-card);border:1px solid var(--border-strong);
+                          color:var(--text);border-radius:4px;padding:6px 10px;
+                          font-size:13px;width:100px">
+            <span style="font-size:12px;color:var(--text-muted)">кг</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+            Брутто вага коробки з упакуванням
+          </div>
+        </div>
+
+        {# Terms of Shipment (Incoterm) #}
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);font-weight:700;
+                         text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">
+            📋 Terms of Sale (Incoterm)
+          </label>
+          <select name="terms_of_shipment" id="inp_terms"
+                  style="background:var(--bg-card);border:1px solid var(--border-strong);
+                         color:var(--text);border-radius:4px;padding:6px 10px;
+                         font-size:13px;min-width:140px">
+            {% with cur_terms=customs.terms_of_shipment|default:"DAP" %}
+            <option value="DAP" {% if cur_terms == "DAP" %}selected{% endif %}>DAP — Delivered at Place</option>
+            <option value="DDP" {% if cur_terms == "DDP" %}selected{% endif %}>DDP — Delivered Duty Paid</option>
+            <option value="EXW" {% if cur_terms == "EXW" %}selected{% endif %}>EXW — Ex Works</option>
+            <option value="FCA" {% if cur_terms == "FCA" %}selected{% endif %}>FCA — Free Carrier</option>
+            <option value="CPT" {% if cur_terms == "CPT" %}selected{% endif %}>CPT — Carriage Paid To</option>
+            <option value="CIP" {% if cur_terms == "CIP" %}selected{% endif %}>CIP — Carriage &amp; Insurance Paid</option>
+            <option value="FOB" {% if cur_terms == "FOB" %}selected{% endif %}>FOB — Free on Board</option>
+            <option value="CFR" {% if cur_terms == "CFR" %}selected{% endif %}>CFR — Cost and Freight</option>
+            <option value="CIF" {% if cur_terms == "CIF" %}selected{% endif %}>CIF — Cost, Insurance &amp; Freight</option>
+            {% endwith %}
+          </select>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+            Умови поставки
+          </div>
+        </div>
+
+        {# Currency + ReasonForExport (info only) #}
+        <div>
+          <label style="font-size:11px;color:var(--text-dim);font-weight:700;
+                         text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">
+            💱 Валюта / Тип
+          </label>
+          <div style="font-size:14px;font-weight:700;color:var(--text);margin-top:4px">
+            {{ customs.currency|default:"USD" }}
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
+            {{ customs.contents_type|default:"SALE" }}
+          </div>
+        </div>
+
       </div>
+
+      {# ── Items table ───────────────────────────────────────────────────── #}
       {% if customs.items %}
       <table class="uc-table">
         <thead>
           <tr>
-            <th>Опис</th>
+            <th>Опис товару</th>
             <th style="text-align:center">К-сть</th>
-            <th style="text-align:right">Вартість</th>
-            <th>Вага нетто</th>
+            <th style="text-align:right">Ціна/шт</th>
+            <th style="text-align:right">Total Value</th>
+            <th style="text-align:right">Вага нетто/шт</th>
             <th>Походження</th>
             <th>HS код</th>
           </tr>
@@ -253,27 +312,55 @@
         <tbody>
           {% for item in customs.items %}
           <tr>
-            <td>{{ item.description|default:"—" }}</td>
+            <td style="font-weight:600">{{ item.description|default:"—" }}</td>
             <td style="text-align:center">{{ item.quantity }}</td>
-            <td style="text-align:right;color:var(--ok);font-weight:700">
-              {{ item.value }} {{ customs.currency|default:"EUR" }}</td>
-            <td style="color:var(--text-muted)">{{ item.weight_kg }} кг</td>
+            <td style="text-align:right;color:var(--text-muted);font-family:monospace">
+              {# Unit value = total / qty — computed here for display #}
+              {% if item.value and item.quantity %}
+                {{ item.value|floatformat:4 }}÷{{ item.quantity }} =
+                <strong style="color:var(--text)">
+                  {% widthratio item.value item.quantity 1 %}&nbsp;{{ customs.currency|default:"USD" }}
+                </strong>
+              {% else %}—{% endif %}
+            </td>
+            <td style="text-align:right;color:var(--ok,#2e7d32);font-weight:700;font-family:monospace">
+              {{ item.value|floatformat:2 }} {{ customs.currency|default:"USD" }}
+            </td>
+            <td style="text-align:right;color:var(--text-muted);font-family:monospace">
+              {{ item.weight_kg }} кг
+            </td>
             <td style="color:var(--text-muted)">{{ item.country|default:"—" }}</td>
-            <td style="color:var(--text-dim);font-family:monospace">{{ item.hs_code|default:"—" }}</td>
+            <td style="color:var(--text-dim);font-family:monospace;font-size:11px">{{ item.hs_code|default:"—" }}</td>
           </tr>
           {% endfor %}
         </tbody>
+        <tfoot>
+          <tr style="border-top:2px solid var(--border-strong)">
+            <td colspan="3" style="padding:8px 10px;text-align:right;
+                                    color:var(--text-muted);font-size:12px;font-weight:600">
+              InvoiceLineTotal:
+            </td>
+            <td style="padding:8px 10px;text-align:right;font-size:15px;
+                        font-weight:800;color:var(--ok,#2e7d32);font-family:monospace">
+              {{ customs.value_usd|floatformat:2 }} {{ customs.currency|default:"USD" }}
+            </td>
+            <td colspan="3"></td>
+          </tr>
+        </tfoot>
       </table>
       {% else %}
       <div class="uc-row">
-        <span class="uc-lbl">Загальна вартість</span>
-        <span class="uc-val ok">{{ customs.value_usd|default:"—" }} {{ customs.currency|default:"EUR" }}</span>
+        <span class="uc-lbl">InvoiceLineTotal</span>
+        <span class="uc-val ok" style="font-size:15px;font-weight:800">
+          {{ customs.value_usd|default:"—" }} {{ customs.currency|default:"USD" }}
+        </span>
       </div>
       <div class="uc-row">
         <span class="uc-lbl">Опис</span>
         <span class="uc-val">{{ customs.description|default:"—" }}</span>
       </div>
       {% endif %}
+
     </div>
   </div>
   {% endif %}
