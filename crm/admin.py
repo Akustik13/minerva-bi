@@ -239,6 +239,11 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.assign_strategy_view),
                 name="crm_customer_assign_strategy",
             ),
+            path(
+                "<int:pk>/assign-strategy/manual/",
+                self.admin_site.admin_view(self.assign_strategy_manual_view),
+                name="crm_customer_assign_strategy_manual",
+            ),
         ]
         return custom + urls
 
@@ -283,6 +288,60 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             f"✅ Стратегія «{template.name}» призначена клієнту {customer.company or customer.name}.",
         )
         return redirect(f"/strategy/{strategy.pk}/canvas/")
+
+    def assign_strategy_manual_view(self, request, pk):
+        """Ручний вибір шаблону стратегії зі списку."""
+        from strategy.models import StrategyTemplate, CustomerStrategy
+        from strategy.services.engine import start_strategy
+
+        customer = get_object_or_404(Customer, pk=pk)
+
+        existing = CustomerStrategy.objects.filter(customer=customer, status="active").first()
+        if existing:
+            messages.warning(request,
+                f"⚠️ Вже є активна стратегія «{existing.template.name}».")
+            return redirect(f"/strategy/{existing.pk}/canvas/")
+
+        if request.method == "POST":
+            template_id = request.POST.get("template_id")
+            template = get_object_or_404(StrategyTemplate, pk=template_id, is_active=True)
+            strategy = start_strategy(customer, template)
+            messages.success(request,
+                f"✅ Стратегія «{template.name}» призначена клієнту {customer.company or customer.name}.")
+            return redirect(f"/strategy/{strategy.pk}/canvas/")
+
+        templates = StrategyTemplate.objects.filter(is_active=True).order_by("behavior_type", "name")
+        ICONS = {"onboarding": "🚀", "reactivation": "🔄", "nurturing": "📈", "retention": "👑"}
+        tmpl_html = "".join(
+            f'<button type="submit" name="template_id" value="{t.pk}" '
+            f'style="display:block;width:100%;text-align:left;background:var(--bg-card);'
+            f'border:1px solid var(--border-strong);color:var(--text);padding:12px 16px;'
+            f'border-radius:6px;cursor:pointer;font-size:14px;margin-bottom:8px">'
+            f'{ICONS.get(t.behavior_type,"🎯")} <b>{t.name}</b> '
+            f'<span style="opacity:.6;font-size:12px">({t.behavior_type})</span></button>'
+            for t in templates
+        ) or "<p>Немає активних шаблонів. Запустіть: manage.py create_strategy_templates</p>"
+
+        html = (
+            f'<div style="max-width:600px;padding:24px">'
+            f'<h2 style="margin-bottom:4px">Вибір стратегії вручну</h2>'
+            f'<p style="opacity:.7;margin-bottom:20px">Клієнт: <b>{customer.company or customer.name}</b></p>'
+            f'<form method="post">'
+            f'<input type="hidden" name="csrfmiddlewaretoken" value="{request.META.get("CSRF_COOKIE","")}">'
+            f'{tmpl_html}'
+            f'</form>'
+            f'<a href="/admin/crm/customer/{pk}/change/" style="opacity:.6;font-size:12px">← Назад</a>'
+            f'</div>'
+        )
+        from django.http import HttpResponse
+        from django.middleware.csrf import get_token
+        get_token(request)  # ensure CSRF cookie is set
+        return HttpResponse(
+            f'<!doctype html><html><head><meta charset="utf-8">'
+            f'<link rel="stylesheet" href="/static/admin/css/base.css">'
+            f'<title>Стратегія — {customer.company or customer.name}</title></head>'
+            f'<body class="default">{html}</body></html>'
+        )
 
     def new_order_view(self, request, pk):
         """Редирект на форму нового замовлення з pre-filled даними клієнта."""
@@ -525,7 +584,10 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     status_badge.admin_order_field = "status"
 
     def orders_count(self, obj):
-        return obj.total_orders()
+        n = obj.total_orders()
+        return mark_safe(
+            f'<span style="font-size:16px;font-weight:800;letter-spacing:-.5px">{n}</span>'
+        )
     orders_count.short_description = "Замовлень"
     # admin_order_field removed - no annotation
 
@@ -676,8 +738,15 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             )
 
         behavior = recommend_template_behavior(obj)
+        manual_url = f"/admin/crm/customer/{obj.pk}/assign-strategy/manual/"
         if not behavior:
-            return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
+            return format_html(
+                '<a href="{}" '
+                'style="background:#455a64;color:#fff;padding:3px 10px;'
+                'border-radius:5px;font-size:11px;text-decoration:none;white-space:nowrap">'
+                '✏️ Визначити вручну</a>',
+                manual_url,
+            )
 
         icon, label, color = LABELS.get(behavior, ("🎯", behavior, "#607d8b"))
         assign_url = f"/admin/crm/customer/{obj.pk}/assign-strategy/"
@@ -742,43 +811,52 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         for line in SalesOrderLine.objects.filter(order_id__in=order_ids).select_related('product'):
             lines_map.setdefault(line.order_id, []).append(line)
 
+        TD  = "padding:7px 10px;font-size:13px"
+        TDB = TD + ";font-weight:700"
         rows = []
         for o in orders:
             lines = lines_map.get(o.pk, [])
             if lines:
-                items_parts = []
-                for l in lines[:3]:
-                    sku = (l.sku_raw or (l.product.sku if l.product else '?'))[:16]
-                    q = l.qty
+                skus_parts = []
+                qtys_parts = []
+                for l in lines[:5]:
+                    sku = (l.sku_raw or (l.product.sku if l.product else '?'))[:20]
+                    q   = l.qty
                     qty_str = str(int(q)) if q == int(q) else str(q)
-                    items_parts.append(f'{sku}&nbsp;×{qty_str}')
-                items_html = ",&nbsp;".join(items_parts)
-                if len(lines) > 3:
-                    items_html += f'&nbsp;<span style="opacity:.5">+{len(lines)-3}</span>'
-                total = sum((l.total_price or 0) for l in lines)
-                total_html = f'{total:.2f}&nbsp;{o.currency}' if total else '—'
+                    skus_parts.append(f'<b>{sku}</b>')
+                    qtys_parts.append(f'<b>{qty_str}</b>')
+                if len(lines) > 5:
+                    skus_parts.append(f'<span style="opacity:.5">+{len(lines)-5}</span>')
+                    qtys_parts.append('<span style="opacity:.5">…</span>')
+                skus_html = '<br>'.join(skus_parts)
+                qtys_html = '<br>'.join(qtys_parts)
+                total     = sum((l.total_price or 0) for l in lines)
+                total_html = f'<b>{total:.2f}</b>&nbsp;{o.currency}' if total else '—'
             else:
-                items_html, total_html = '—', '—'
+                skus_html = qtys_html = total_html = '—'
             rows.append(
                 f"<tr style='border-bottom:1px solid rgba(128,128,128,0.15)'>"
-                f"<td style='padding:6px 8px;white-space:nowrap;opacity:0.85'>{o.order_date.strftime('%d.%m.%Y') if o.order_date else '—'}</td>"
-                f"<td style='padding:6px 8px;font-weight:bold;white-space:nowrap'>{o.order_number}</td>"
-                f"<td style='padding:6px 8px;opacity:0.75'>{o.source}</td>"
-                f"<td style='padding:6px 8px;font-size:11px;font-family:monospace'>{items_html}</td>"
-                f"<td style='padding:6px 8px;white-space:nowrap;text-align:right'>{total_html}</td>"
-                f"<td style='padding:6px 8px;opacity:0.75'>{o.tracking_number or '—'}</td>"
+                f"<td style='{TD};white-space:nowrap;opacity:0.85'>{o.order_date.strftime('%d.%m.%Y') if o.order_date else '—'}</td>"
+                f"<td style='{TDB};white-space:nowrap'>{o.order_number}</td>"
+                f"<td style='{TD};opacity:0.75'>{o.source}</td>"
+                f"<td style='{TD};font-family:monospace'>{skus_html}</td>"
+                f"<td style='{TD};text-align:right'>{qtys_html}</td>"
+                f"<td style='{TD};white-space:nowrap;text-align:right'>{total_html}</td>"
+                f"<td style='{TD};opacity:0.75'>{o.tracking_number or '—'}</td>"
                 f"</tr>"
             )
+        TH = "padding:7px 10px;text-align:left;font-size:12px"
         return mark_safe(
-            '<table style="border-collapse:collapse;font-size:12px;width:100%;'
+            '<table style="border-collapse:collapse;font-size:13px;width:100%;'
             'border-radius:8px;overflow:hidden;border:1px solid rgba(128,128,128,0.2)">'
-            '<thead><tr style="background:rgba(46,125,50,0.8);color:#e8f5e9">'
-            '<th style="padding:6px 8px;text-align:left">Дата</th>'
-            '<th style="padding:6px 8px;text-align:left">№ замовлення</th>'
-            '<th style="padding:6px 8px;text-align:left">Джерело</th>'
-            '<th style="padding:6px 8px;text-align:left">Товари</th>'
-            '<th style="padding:6px 8px;text-align:right">Сума</th>'
-            '<th style="padding:6px 8px;text-align:left">Tracking</th>'
+            f'<thead><tr style="background:rgba(46,125,50,0.85);color:#e8f5e9">'
+            f'<th style="{TH}">Дата</th>'
+            f'<th style="{TH}">№ замовлення</th>'
+            f'<th style="{TH}">Джерело</th>'
+            f'<th style="{TH}">Товари</th>'
+            f'<th style="{TH};text-align:right">К-сть</th>'
+            f'<th style="{TH};text-align:right">Сума</th>'
+            f'<th style="{TH}">Tracking</th>'
             '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
         )
     order_history_display.short_description = "Останні 20 замовлень"
