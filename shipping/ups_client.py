@@ -334,11 +334,8 @@ class UPSClient:
 
     def _rate_shop(self, to_address, packages, from_address):
         """
-        POST /api/rating/v2409/Shop?additionalinfo=timeintransit
-        Standard Shop payload (RequestOption=Shop, PackagingType=02).
-        The query param requests ETA alongside rates in the same call —
-        no special packaging, no fake addresses, no extra endpoints.
-        Falls back to plain Shop (prices only) on any error.
+        Primary:  POST /api/rating/v2205/Shoptimeintransit  — prices + ETA in one call.
+        Fallback: POST /api/rating/v2205/Shop               — prices only.
         """
         from datetime import date as _date
         shipper  = from_address or self._default_shipper()
@@ -351,27 +348,35 @@ class UPSClient:
                    (shipper.get('country') or 'DE').upper())
         if is_intl:
             shipment['InvoiceLineTotal'] = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
-        payload  = {'RateRequest': {
+
+        tti_payload = {'RateRequest': {
+            'Request': {
+                'RequestOption': 'Shoptimeintransit',
+                'TransactionReference': {'CustomerContext': 'minerva-bi'},
+            },
+            'Shipment': shipment,
+        }}
+
+        try:
+            data = self._post(
+                f'/api/rating/{_RATING_API_VERSION}/Shoptimeintransit', tti_payload)
+            self._last_rate_payload  = tti_payload
+            self._last_rate_response = data
+            return self._parse_rated_shipments(data, with_transit=True)
+        except UPSError as e:
+            logger.warning('Shoptimeintransit failed (%s) — plain Shop fallback', e)
+
+        # Plain Shop fallback (prices only, ETA null) — no DeliveryTimeInformation
+        shipment.pop('DeliveryTimeInformation', None)
+        plain_payload = {'RateRequest': {
             'Request': {
                 'RequestOption': 'Shop',
                 'TransactionReference': {'CustomerContext': 'minerva-bi'},
             },
             'Shipment': shipment,
         }}
-
-        # Try with ETA query param
-        try:
-            data = self._post(
-                f'/api/rating/{_RATING_API_VERSION}/Shop?additionalinfo=timeintransit', payload)
-            self._last_rate_payload  = payload
-            self._last_rate_response = data
-            return self._parse_rated_shipments(data, with_transit=True)
-        except UPSError as e:
-            logger.warning('Shop?additionalinfo=timeintransit failed (%s) — plain Shop', e)
-
-        # Plain Shop fallback (prices only, ETA null)
-        data = self._post(f'/api/rating/{_RATING_API_VERSION}/Shop', payload)
-        self._last_rate_payload  = payload
+        data = self._post(f'/api/rating/{_RATING_API_VERSION}/Shop', plain_payload)
+        self._last_rate_payload  = plain_payload
         self._last_rate_response = data
         return self._parse_rated_shipments(data, with_transit=False)
 
@@ -538,14 +543,15 @@ class UPSClient:
             savings       = (reference_total - display_price) if negotiated_total else None
 
             if with_transit:
-                tti          = s.get('TimeInTransit', {})
-                est_arrival  = tti.get('EstimatedArrival', {})
-                t_days_raw   = (est_arrival.get('BusinessDaysInTransit', '') or
-                                s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', ''))
-                raw_date     = est_arrival.get('Arrival', {}).get('Date', '')
-                transit_int  = int(t_days_raw) if str(t_days_raw).isdigit() else None
-                delivery_date = (f'{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:]}'
-                                 if len(raw_date) == 8 else raw_date)
+                # Shoptimeintransit response: TimeInTransit.ServiceSummary.EstimatedArrival
+                tti         = s.get('TimeInTransit', {})
+                svc_summary = tti.get('ServiceSummary', {})
+                est_arrival = svc_summary.get('EstimatedArrival', {})
+                t_days_raw  = (est_arrival.get('BusinessTransitDays', '') or
+                               s.get('GuaranteedDelivery', {}).get('BusinessDaysInTransit', ''))
+                raw_date    = est_arrival.get('Date', '')
+                transit_int   = int(t_days_raw) if str(t_days_raw).isdigit() else None
+                delivery_date = raw_date  # already YYYY-MM-DD from Shoptimeintransit
                 delivery_label = self._fmt_eta_label(transit_int, delivery_date)
             else:
                 transit_int    = None
