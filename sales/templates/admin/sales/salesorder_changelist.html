@@ -17,8 +17,8 @@ document.addEventListener('DOMContentLoaded', function () {
   ];
 
   var allOpts = Array.from(sel.options);
-  var placeholder = allOpts[0];        // "-----"
-  var remaining   = allOpts.slice(1);  // всі дії
+  var placeholder = allOpts[0];
+  var remaining   = allOpts.slice(1);
 
   sel.innerHTML = '';
   sel.appendChild(placeholder);
@@ -33,7 +33,6 @@ document.addEventListener('DOMContentLoaded', function () {
     remaining = remaining.filter(function (o) { return matched.indexOf(o) === -1; });
   });
 
-  // інші дії (Видалити вибране тощо)
   if (remaining.length) {
     var og = document.createElement('optgroup');
     og.label = '⚙️ Адмін';
@@ -42,15 +41,208 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 </script>
+<style>
+.sv-toggle-btn {
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg-card);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background .15s, color .15s;
+}
+.sv-toggle-btn.active {
+  background: var(--accent, #1976d2);
+  color: #fff;
+  border-color: transparent;
+}
+.sv-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.sv-card:hover { border-color: var(--accent, #1976d2); }
+.sv-status-received   { background:#2196f3; }
+.sv-status-processing { background:#ff9800; }
+.sv-status-shipped    { background:#4caf50; }
+.sv-status-delivered  { background:#00897b; }
+.sv-status-cancelled  { background:#f44336; }
+.sv-status-default    { background:#757575; }
+</style>
 {% endblock %}
 
 {% block object-tools-items %}
     {{ block.super }}
     <li>
-        <a href="{% url 'admin:sales_salesorder_import' %}" 
+        <a href="{% url 'admin:sales_salesorder_import' %}"
            style="background:#4caf50;color:white;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
             📥 Імпорт з Excel
         </a>
     </li>
+{% endblock %}
+
+{% block result_list %}
+
+{# ── View toggle ──────────────────────────────────────────────────────────── #}
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+  <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
+  <button class="sv-toggle-btn" id="sv-btn-table" onclick="svSetView('table')">📋 Таблиця</button>
+  <button class="sv-toggle-btn" id="sv-btn-cards" onclick="svSetView('cards')">🃏 Картки</button>
+</div>
+
+{# ── Card view ────────────────────────────────────────────────────────────── #}
+<div id="sv-cards" style="display:none">
+  {% for order in cl.result_list %}
+  {% with lines=order.lines.all %}
+  <div class="sv-card">
+
+    {# Header #}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;
+                flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <a href="{% url 'admin:sales_salesorder_change' order.pk %}"
+           style="font-family:monospace;font-size:16px;font-weight:800;
+                  color:var(--text);text-decoration:none">
+          {{ order.order_number }}
+        </a>
+        {# Source badge #}
+        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;
+                     background:var(--border-strong);color:var(--text)">
+          {{ order.source|upper }}
+        </span>
+        {# Status badge #}
+        <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;
+                     color:#fff"
+              class="sv-status-{{ order.status|default:'default' }}">
+          {{ order.get_status_display }}
+        </span>
+      </div>
+      <div style="text-align:right;font-size:12px">
+        {% if order.order_date %}
+          <span style="color:var(--text-muted)">📅 {{ order.order_date|date:"d.m.Y" }}</span>
+        {% endif %}
+        {% if order.shipping_deadline and not order.shipped_at %}
+          <span style="margin-left:12px;color:var(--text);font-weight:700">
+            📦 {{ order.shipping_deadline|date:"d.m.Y" }}
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Customer + meta #}
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;
+                display:flex;gap:20px;flex-wrap:wrap">
+      {% if order.client or order.email %}
+        <span style="color:var(--text);font-weight:600">
+          👤 {{ order.client|default:order.email }}
+        </span>
+      {% endif %}
+      {% if order.addr_country %}
+        <span>🌍 {{ order.addr_country }}{% if order.addr_city %}, {{ order.addr_city }}{% endif %}</span>
+      {% endif %}
+      {% if order.tracking_number %}
+        <span>🚚 {{ order.tracking_number }}</span>
+      {% endif %}
+    </div>
+
+    {# Order lines table #}
+    {% if lines %}
+    <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px">
+      <thead>
+        <tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong);
+                   font-size:11px;text-transform:uppercase;letter-spacing:.04em">
+          <th style="padding:5px 8px;text-align:left;font-weight:600">Артикул</th>
+          <th style="padding:5px 8px;text-align:center;font-weight:600">К-сть</th>
+          <th style="padding:5px 8px;text-align:right;font-weight:600">Ціна</th>
+          <th style="padding:5px 8px;text-align:right;font-weight:600">Сума</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in lines %}
+        <tr style="border-bottom:1px solid var(--border);color:var(--text)">
+          <td style="padding:6px 8px;font-family:monospace;font-weight:700">
+            {{ line.sku_raw|default:line.product.sku|default:"—" }}
+          </td>
+          <td style="padding:6px 8px;text-align:center;font-weight:600">
+            {% if line.qty == line.qty|floatformat:"0"|add:"0" %}{{ line.qty|floatformat:"0" }}{% else %}{{ line.qty }}{% endif %}
+          </td>
+          <td style="padding:6px 8px;text-align:right;color:var(--text-muted)">
+            {% if line.unit_price %}{{ line.unit_price|floatformat:"2" }}{% else %}—{% endif %}
+          </td>
+          <td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--ok,#4caf50)">
+            {% if line.total_price %}{{ line.total_price|floatformat:"2" }} {{ line.currency }}{% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="3" style="padding:7px 8px;text-align:right;
+                                  color:var(--text-muted);font-size:12px">Разом:</td>
+          <td style="padding:7px 8px;text-align:right;font-size:15px;font-weight:800;
+                     color:var(--ok,#4caf50)">
+            {% with total=lines|length %}
+              {# Compute total in template — sum via forloop #}
+            {% endwith %}
+            {{ order.total_price|floatformat:"2" }} {{ order.currency }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+    {% else %}
+      <p style="color:var(--text-muted);font-size:12px;margin:0 0 10px">Немає позицій</p>
+    {% endif %}
+
+    {# Footer: edit + shipped #}
+    <div style="display:flex;justify-content:space-between;align-items:center;
+                flex-wrap:wrap;gap:8px">
+      <div style="display:flex;gap:8px">
+        <a href="{% url 'admin:sales_salesorder_change' order.pk %}"
+           style="padding:5px 14px;background:var(--accent,#1976d2);color:#fff;
+                  border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
+          ✏️ Редагувати
+        </a>
+      </div>
+      <div style="font-size:12px;color:var(--text-muted)">
+        {% if order.shipped_at %}
+          <span style="color:#4caf50;font-weight:600">✅ Відправлено {{ order.shipped_at|date:"d.m.Y" }}</span>
+        {% else %}
+          <span style="color:#ff9800;font-weight:600">⏳ Не відправлено</span>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+  {% endwith %}
+  {% endfor %}
+
+  {% if not cl.result_list %}
+    <p style="color:var(--text-muted);padding:20px 0">Замовлень не знайдено.</p>
+  {% endif %}
+</div>
+
+{# ── Table view (standard Django) ────────────────────────────────────────── #}
+<div id="sv-table">
+  {{ block.super }}
+</div>
+
+<script>
+function svSetView(mode) {
+  localStorage.setItem('salesorder_view', mode);
+  var isCards = mode === 'cards';
+  document.getElementById('sv-cards').style.display = isCards ? 'block' : 'none';
+  document.getElementById('sv-table').style.display = isCards ? 'none' : 'block';
+  document.getElementById('sv-btn-cards').classList.toggle('active', isCards);
+  document.getElementById('sv-btn-table').classList.toggle('active', !isCards);
+}
+(function () {
+  svSetView(localStorage.getItem('salesorder_view') || 'table');
+})();
+</script>
+
 {% endblock %}
