@@ -966,7 +966,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         # Якщо вже відправлено - показати тільки дату
         if obj.shipped_at:
             return format_html(
-                '<div style="font-size:11px;color:#7d8590">{}</div>',
+                '<div style="font-size:12px;color:var(--text-muted)">{}</div>',
                 obj.shipping_deadline.strftime('%d.%m.%Y')
             )
         
@@ -1007,23 +1007,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             text = f'Залишилось {delta}д'
         
         return format_html(
-            '''<div style="font-size:11px;line-height:1.4">
-                <div style="color:#e6edf3;font-weight:600;font-family:monospace">
-                    {}
-                </div>
-                <div style="
-                    margin-top:3px;
-                    padding:2px 6px;
-                    border-radius:4px;
-                    background:{};
-                    color:{};
-                    font-size:10px;
-                    font-weight:700;
-                    display:inline-block;
-                ">
-                    {} {}
-                </div>
-            </div>''',
+            '<div style="font-size:12px;line-height:1.5">'
+            '<div style="color:var(--text);font-weight:700;font-family:monospace">{}</div>'
+            '<div style="margin-top:3px;padding:2px 8px;border-radius:4px;'
+            'background:{};color:{};font-size:11px;font-weight:700;display:inline-block">'
+            '{} {}</div></div>',
             obj.shipping_deadline.strftime('%d.%m.%Y'),
             bg,
             color,
@@ -1150,15 +1138,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         if not lines:
             return mark_safe('<span style="opacity:.4">—</span>')
         parts = []
-        for line in lines[:3]:
-            sku = (line.sku_raw or (line.product.sku if line.product else '?'))[:16]
+        for line in lines[:4]:
+            sku = line.sku_raw or (line.product.sku if line.product else '?')
             q = line.qty
             qty_str = str(int(q)) if q == int(q) else str(q)
-            parts.append(f'<b>{sku}</b>&nbsp;×{qty_str}')
-        html = ',&nbsp; '.join(parts)
-        if len(lines) > 3:
-            html += f'&nbsp;<span style="opacity:.5">+{len(lines) - 3}</span>'
-        return mark_safe(f'<span style="font-size:11px;font-family:monospace">{html}</span>')
+            parts.append(
+                f'<span style="font-weight:700">{sku}</span>'
+                f'<span style="opacity:.6">&nbsp;×{qty_str}</span>'
+            )
+        if len(lines) > 4:
+            parts.append(f'<span style="opacity:.45">+{len(lines) - 4} ще</span>')
+        html = '<br>'.join(parts)
+        return mark_safe(f'<span style="font-size:12px;font-family:monospace;line-height:1.7">{html}</span>')
     items_summary.short_description = "Товари"
 
     def order_total(self, obj):
