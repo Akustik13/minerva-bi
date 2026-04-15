@@ -160,8 +160,15 @@ function swapAddresses(){
   });
 }
 
+function _getPkgWeight(){
+  return parseFloat(
+    document.querySelector('#pkg-tbody [name="pkg_weight[]"]')?.value ||
+    document.getElementById('id_weight_kg')?.value || 0
+  );
+}
+
 function _refreshAutoWeights(){
-  var pkgW = parseFloat(document.getElementById('id_weight_kg')?.value || 0);
+  var pkgW = _getPkgWeight();
   document.querySelectorAll('#customs-rows .ca-row').forEach(function(row){
     var wInp = row.querySelector('.ca-weight-inp');
     if(!wInp || wInp.dataset.auto !== '1') return;
@@ -178,6 +185,36 @@ function _refreshAutoWeights(){
         wInp.style.borderColor = '#e65100';
         wInp.style.background  = 'rgba(230,81,0,.07)';
       }, 2000);
+    }
+  });
+}
+
+function _validateWeightRows(){
+  var pkgW = _getPkgWeight();
+  document.querySelectorAll('#customs-rows .ca-row').forEach(function(row){
+    var wInp = row.querySelector('.ca-weight-inp');
+    var qInp = row.querySelector('[name="ca_qty"]');
+    var lbl  = row.querySelector('.ca-auto-lbl');
+    if(!wInp || !qInp) return;
+    var w    = parseFloat(wInp.value || 0);
+    var qty  = Math.max(1, parseFloat(qInp.value || 1));
+    var lineW = Math.round(w * qty * 10000) / 10000;
+    var over  = pkgW > 0 && lineW > pkgW + 0.0001;
+    if(over){
+      wInp.style.borderColor = '#c62828';
+      wInp.style.background  = 'rgba(198,40,40,.12)';
+      wInp.title = '🔴 ' + w + ' × ' + qty + ' = ' + lineW + ' кг > брутто ' + pkgW + ' кг!';
+      if(lbl){ lbl.style.color = '#c62828'; lbl.textContent = '🔴 ' + lineW + ' > ' + pkgW; }
+    } else if(wInp.dataset.auto === '1'){
+      wInp.style.borderColor = '#e65100';
+      wInp.style.background  = 'rgba(230,81,0,.07)';
+      wInp.title = '⚠️ Авто: брутто ÷ к-сть (не з каталогу)';
+      if(lbl){ lbl.style.color = '#e65100'; lbl.textContent = '⚠️ авто'; }
+    } else {
+      wInp.style.borderColor = '';
+      wInp.style.background  = '';
+      wInp.title = '';
+      if(lbl) lbl.textContent = '';
     }
   });
 }
@@ -254,29 +291,36 @@ document.addEventListener('DOMContentLoaded',function(){
     updateCaTotal();
     if(e.target.name==='ca_qty'||e.target.name==='ca_value') updateUnitVal(e.target);
   });
-  // Sync package weight → customs card display + auto-weight recalc
-  var wkgInput = document.getElementById('id_weight_kg');
+  // Sync pkg_weight[] (visible input) → id_weight_kg (hidden) + customs display + auto-weights
   var wkgDisplay = document.getElementById('ca_pkg_weight_display');
-  if(wkgInput){
-    wkgInput.addEventListener('input',function(){
-      if(wkgDisplay) wkgDisplay.textContent = wkgInput.value || '—';
-      _refreshAutoWeights();
-    });
-  }
-  // On ca_qty change for auto-weight rows → recalc weight
+  document.getElementById('pkg-tbody')?.addEventListener('input', function(e){
+    if(e.target.name !== 'pkg_weight[]') return;
+    // Always sync first row weight to hidden field (used as primary package weight)
+    var firstW = document.querySelector('#pkg-tbody [name="pkg_weight[]"]')?.value || '';
+    document.getElementById('id_weight_kg').value = firstW;
+    if(wkgDisplay) wkgDisplay.textContent = firstW || '—';
+    _refreshAutoWeights();
+    _validateWeightRows();
+  });
+  // On ca_qty / ca_weight change → recalc auto weight + validate
   document.getElementById('customs-rows')?.addEventListener('input',function(e){
     if(e.target.name === 'ca_qty'){
       var row = e.target.closest('tr');
       var wInp = row?.querySelector('.ca-weight-inp');
       if(wInp && wInp.dataset.auto === '1'){
-        var pkgW = parseFloat(document.getElementById('id_weight_kg')?.value || 0);
+        var pkgW = _getPkgWeight();
         var qty  = Math.max(1, parseFloat(e.target.value || 1));
         wInp.value = pkgW > 0 ? Math.round(pkgW / qty * 10000) / 10000 : '';
       }
+      _validateWeightRows();
+    }
+    if(e.target.classList.contains('ca-weight-inp')){
+      _validateWeightRows();
     }
   });
-  // Init auto weights on page load
+  // Init auto weights + validation on page load
   _refreshAutoWeights();
+  _validateWeightRows();
   // Auto-fill sender when carrier changes (only if fields not manually edited)
   document.querySelectorAll('[name="carrier"]').forEach(r=>r.addEventListener('change', _fillSenderFromCarrier));
 

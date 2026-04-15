@@ -229,63 +229,50 @@
     <div class="uc-head">🛃 Митна декларація</div>
     <div class="uc-body">
 
-      {# ── Editable params row ───────────────────────────────────────────── #}
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
-                  gap:14px;margin-bottom:16px">
+      {# ── Read-only params row ──────────────────────────────────────────── #}
+      {# Hidden fields so POST still sends required values to ups_book_view #}
+      <input type="hidden" name="package_weight_kg" value="{{ shipment.weight_kg|default:'' }}">
+      <input type="hidden" name="terms_of_shipment" value="{{ customs.terms_of_shipment|default:'DAP' }}">
+
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+                  gap:14px;margin-bottom:16px;background:var(--bg-input);
+                  border-radius:6px;padding:12px 14px">
 
         {# Package weight (brutto) #}
         <div>
-          <label style="font-size:11px;color:var(--text-dim);font-weight:700;
-                         text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">
+          <div style="font-size:11px;color:var(--text-dim);font-weight:700;
+                      text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">
             📦 Вага посилки (брутто)
-          </label>
-          <div style="display:flex;align-items:center;gap:6px">
-            <input type="number" name="package_weight_kg" id="inp_pkg_weight"
-                   value="{{ shipment.weight_kg|default:'' }}" min="0.1" step="0.001"
-                   style="background:var(--bg-card);border:1px solid var(--border-strong);
-                          color:var(--text);border-radius:4px;padding:6px 10px;
-                          font-size:13px;width:100px">
-            <span style="font-size:12px;color:var(--text-muted)">кг</span>
           </div>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+          <div style="font-size:16px;font-weight:700;color:var(--text)">
+            {{ shipment.weight_kg|default:"—" }} кг
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
             Брутто вага коробки з упакуванням
           </div>
         </div>
 
         {# Terms of Shipment (Incoterm) #}
         <div>
-          <label style="font-size:11px;color:var(--text-dim);font-weight:700;
-                         text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">
-            📋 Terms of Sale (Incoterm)
-          </label>
-          <select name="terms_of_shipment" id="inp_terms"
-                  style="background:var(--bg-card);border:1px solid var(--border-strong);
-                         color:var(--text);border-radius:4px;padding:6px 10px;
-                         font-size:13px;min-width:140px">
-            {% with cur_terms=customs.terms_of_shipment|default:"DAP" %}
-            <option value="DAP" {% if cur_terms == "DAP" %}selected{% endif %}>DAP — Delivered at Place</option>
-            <option value="DDP" {% if cur_terms == "DDP" %}selected{% endif %}>DDP — Delivered Duty Paid</option>
-            <option value="EXW" {% if cur_terms == "EXW" %}selected{% endif %}>EXW — Ex Works</option>
-            <option value="FCA" {% if cur_terms == "FCA" %}selected{% endif %}>FCA — Free Carrier</option>
-            <option value="CPT" {% if cur_terms == "CPT" %}selected{% endif %}>CPT — Carriage Paid To</option>
-            <option value="CIP" {% if cur_terms == "CIP" %}selected{% endif %}>CIP — Carriage &amp; Insurance Paid</option>
-            <option value="FOB" {% if cur_terms == "FOB" %}selected{% endif %}>FOB — Free on Board</option>
-            <option value="CFR" {% if cur_terms == "CFR" %}selected{% endif %}>CFR — Cost and Freight</option>
-            <option value="CIF" {% if cur_terms == "CIF" %}selected{% endif %}>CIF — Cost, Insurance &amp; Freight</option>
-            {% endwith %}
-          </select>
-          <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+          <div style="font-size:11px;color:var(--text-dim);font-weight:700;
+                      text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">
+            📋 Incoterm
+          </div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)">
+            {{ customs.terms_of_shipment|default:"DAP" }}
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
             Умови поставки
           </div>
         </div>
 
-        {# Currency + ReasonForExport (info only) #}
+        {# Currency + ReasonForExport #}
         <div>
-          <label style="font-size:11px;color:var(--text-dim);font-weight:700;
-                         text-transform:uppercase;letter-spacing:.04em;display:block;margin-bottom:5px">
+          <div style="font-size:11px;color:var(--text-dim);font-weight:700;
+                      text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">
             💱 Валюта / Тип
-          </label>
-          <div style="font-size:14px;font-weight:700;color:var(--text);margin-top:4px">
+          </div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)">
             {{ customs.currency|default:"USD" }}
           </div>
           <div style="font-size:12px;color:var(--text-muted);margin-top:2px">
