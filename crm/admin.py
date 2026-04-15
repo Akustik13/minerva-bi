@@ -203,7 +203,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
 
     # EMAIL прибраний зі списку
     list_display = (
-        "display_name", "country_flag", "segment_badge",
+        "display_name", "country_flag", "sources_display", "segment_badge",
         "status_badge", "orders_count", "revenue_display",
         "avg_order_display", "last_order_display",
         "repeat_badge", "rfm_display", "strategy_btn",
@@ -438,7 +438,6 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         }),
         ("📜 Історія замовлень", {
             "fields": ("order_history_display",),
-            "classes": ("collapse",),
         }),
         ("ℹ️ Метадані", {
             "fields": ("created_at", "updated_at"),
@@ -447,6 +446,38 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     )
 
     # ── Computed columns ──────────────────────────────────────────────────────
+
+    _SOURCE_COLORS = {
+        'digikey':  ('#d32f2f', '#ffebee'),
+        'amazon':   ('#e65100', '#fff3e0'),
+        'ebay':     ('#1565c0', '#e3f2fd'),
+        'webshop':  ('#2e7d32', '#e8f5e9'),
+        'manual':   ('#546e7a', '#eceff1'),
+    }
+
+    def sources_display(self, obj):
+        if not obj.external_key:
+            src = obj.source or ''
+            sources = [src] if src else []
+        else:
+            from sales.models import SalesOrder
+            sources = list(
+                SalesOrder.objects.filter(customer_key=obj.external_key)
+                .values_list('source', flat=True).distinct()
+            )
+            if not sources:
+                sources = [obj.source] if obj.source else []
+        if not sources:
+            return mark_safe('<span style="opacity:.4">—</span>')
+        badges = []
+        for src in sources:
+            fg, bg = self._SOURCE_COLORS.get(src.lower(), ('#37474f', '#eceff1'))
+            badges.append(
+                f'<span style="background:{bg};color:{fg};padding:2px 7px;border-radius:10px;'
+                f'font-size:11px;font-weight:600;white-space:nowrap">{src}</span>'
+            )
+        return mark_safe(' '.join(badges))
+    sources_display.short_description = "Платформи"
 
     def display_name(self, obj):
         if obj.company:
@@ -699,29 +730,56 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
 
     def order_history_display(self, obj):
         from django.db.models import Q
-        orders = SalesOrder.objects.filter(
-            Q(email=obj.email) | Q(client__iexact=obj.name)
-        ).order_by("-order_date")[:20]
+        from sales.models import SalesOrderLine
+        orders = list(SalesOrder.objects.filter(
+            Q(email=obj.email) | Q(customer_key=obj.external_key)
+        ).order_by("-order_date")[:20])
         if not orders:
             return "Немає замовлень"
-        rows = "".join(
-            f"<tr style='border-bottom:1px solid rgba(128,128,128,0.15)'>"
-            f"<td style='padding:8px;white-space:nowrap;opacity:0.85'>{o.order_date.strftime('%d.%m.%Y') if o.order_date else '—'}</td>"
-            f"<td style='padding:8px;font-weight:bold'>{o.order_number}</td>"
-            f"<td style='padding:8px;opacity:0.75'>{o.source}</td>"
-            f"<td style='padding:8px;opacity:0.75'>{o.tracking_number or '—'}</td>"
-            f"</tr>"
-            for o in orders
-        )
+        # Batch-load lines for all orders (1 query instead of N)
+        order_ids = [o.pk for o in orders]
+        lines_map: dict = {}
+        for line in SalesOrderLine.objects.filter(order_id__in=order_ids).select_related('product'):
+            lines_map.setdefault(line.order_id, []).append(line)
+
+        rows = []
+        for o in orders:
+            lines = lines_map.get(o.pk, [])
+            if lines:
+                items_parts = []
+                for l in lines[:3]:
+                    sku = (l.sku_raw or (l.product.sku if l.product else '?'))[:16]
+                    q = l.qty
+                    qty_str = str(int(q)) if q == int(q) else str(q)
+                    items_parts.append(f'{sku}&nbsp;×{qty_str}')
+                items_html = ",&nbsp;".join(items_parts)
+                if len(lines) > 3:
+                    items_html += f'&nbsp;<span style="opacity:.5">+{len(lines)-3}</span>'
+                total = sum((l.total_price or 0) for l in lines)
+                total_html = f'{total:.2f}&nbsp;{o.currency}' if total else '—'
+            else:
+                items_html, total_html = '—', '—'
+            rows.append(
+                f"<tr style='border-bottom:1px solid rgba(128,128,128,0.15)'>"
+                f"<td style='padding:6px 8px;white-space:nowrap;opacity:0.85'>{o.order_date.strftime('%d.%m.%Y') if o.order_date else '—'}</td>"
+                f"<td style='padding:6px 8px;font-weight:bold;white-space:nowrap'>{o.order_number}</td>"
+                f"<td style='padding:6px 8px;opacity:0.75'>{o.source}</td>"
+                f"<td style='padding:6px 8px;font-size:11px;font-family:monospace'>{items_html}</td>"
+                f"<td style='padding:6px 8px;white-space:nowrap;text-align:right'>{total_html}</td>"
+                f"<td style='padding:6px 8px;opacity:0.75'>{o.tracking_number or '—'}</td>"
+                f"</tr>"
+            )
         return mark_safe(
             '<table style="border-collapse:collapse;font-size:12px;width:100%;'
             'border-radius:8px;overflow:hidden;border:1px solid rgba(128,128,128,0.2)">'
             '<thead><tr style="background:rgba(46,125,50,0.8);color:#e8f5e9">'
-            '<th style="padding:8px;text-align:left">Дата</th>'
-            '<th style="padding:8px;text-align:left">№ замовлення</th>'
-            '<th style="padding:8px;text-align:left">Джерело</th>'
-            '<th style="padding:8px;text-align:left">Tracking</th>'
-            '</tr></thead><tbody>' + rows + '</tbody></table>'
+            '<th style="padding:6px 8px;text-align:left">Дата</th>'
+            '<th style="padding:6px 8px;text-align:left">№ замовлення</th>'
+            '<th style="padding:6px 8px;text-align:left">Джерело</th>'
+            '<th style="padding:6px 8px;text-align:left">Товари</th>'
+            '<th style="padding:6px 8px;text-align:right">Сума</th>'
+            '<th style="padding:6px 8px;text-align:left">Tracking</th>'
+            '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
         )
     order_history_display.short_description = "Останні 20 замовлень"
 

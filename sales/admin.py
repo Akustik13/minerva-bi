@@ -219,7 +219,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         "order_number", "source_badge", "status_badge", "order_date_fmt", 'deadline_display',
         "customer_link_display", "country_display",
         "shipped_badge",
-        "items_count", "order_total",
+        "items_count", "items_summary", "order_total",
         "stock_warning",
         "label_buttons_list",
         # "customer_link",  # disabled - no FK
@@ -1138,9 +1138,28 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     status_badge.short_description = "Статус"
     status_badge.admin_order_field = "status"
 
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related('lines__product')
+
     def items_count(self, obj):
-        return obj.lines.count()
+        return len(obj.lines.all())
     items_count.short_description = "Поз."
+
+    def items_summary(self, obj):
+        lines = sorted(obj.lines.all(), key=lambda l: l.pk)
+        if not lines:
+            return mark_safe('<span style="opacity:.4">—</span>')
+        parts = []
+        for line in lines[:3]:
+            sku = (line.sku_raw or (line.product.sku if line.product else '?'))[:16]
+            q = line.qty
+            qty_str = str(int(q)) if q == int(q) else str(q)
+            parts.append(f'<b>{sku}</b>&nbsp;×{qty_str}')
+        html = ',&nbsp; '.join(parts)
+        if len(lines) > 3:
+            html += f'&nbsp;<span style="opacity:.5">+{len(lines) - 3}</span>'
+        return mark_safe(f'<span style="font-size:11px;font-family:monospace">{html}</span>')
+    items_summary.short_description = "Товари"
 
     def order_total(self, obj):
         """Показує суму з валютою."""
