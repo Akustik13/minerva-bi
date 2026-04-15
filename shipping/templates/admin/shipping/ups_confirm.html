@@ -333,11 +333,12 @@
           <select id="inp_pickup_point"
                   style="background:var(--bg-card);border:1px solid var(--border-strong);
                          color:var(--text);border-radius:4px;padding:7px 10px;font-size:13px;min-width:200px">
-            <option value="Reception">Рецепшен</option>
-            <option value="Office">Офіс</option>
-            <option value="Mailroom">Поштовий відділ</option>
-            <option value="Warehouse">Склад</option>
-            <option value="Lobby">Лобі</option>
+            <option value="RECEPTION">Рецепшен</option>
+            <option value="SUITE">Офіс / Suite</option>
+            <option value="MAILROOM">Поштовий відділ</option>
+            <option value="FLOOR">Склад / Поверх</option>
+            <option value="LOBBY">Лобі</option>
+            <option value="OTHER">Інше</option>
           </select>
         </div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">
@@ -365,7 +366,7 @@
         <input type="hidden" name="pickup_date" id="fld_pickup_date" value="{{ pickup_default_date }}">
         <input type="hidden" name="pickup_ready" id="fld_pickup_ready" value="0900">
         <input type="hidden" name="pickup_close" id="fld_pickup_close" value="1800">
-        <input type="hidden" name="pickup_point" id="fld_pickup_point" value="Reception">
+        <input type="hidden" name="pickup_point" id="fld_pickup_point" value="RECEPTION">
       </form>
       <script>
       document.getElementById('ups-confirm-form').addEventListener('submit', function(){
