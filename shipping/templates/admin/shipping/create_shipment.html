@@ -160,15 +160,32 @@ function swapAddresses(){
   });
 }
 
+function _unitVal(row){
+  var qty = parseFloat(row.querySelector('[name="ca_qty"]')?.value || 1) || 1;
+  var val = parseFloat(row.querySelector('[name="ca_value"]')?.value || 0);
+  var uv  = val > 0 ? (val / qty).toFixed(4) : '—';
+  var span = row.querySelector('.ca-unitval');
+  if(span) span.textContent = uv !== '—' ? uv : '—';
+}
+function updateUnitVal(input){
+  var row = input.closest('tr');
+  if(row) _unitVal(row);
+}
+function _refreshAllUnitVals(){
+  document.querySelectorAll('#customs-rows .ca-row').forEach(function(r){ _unitVal(r); });
+}
+
 function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
   if(weight==='' || weight===null || weight===undefined) weight = _DEFAULT_CA_WEIGHT;
+  var uv = (parseFloat(value)>0 && parseFloat(qty)>0) ? (parseFloat(value)/parseFloat(qty)).toFixed(4) : '—';
   return `<tr class="ca-row" style="border-bottom:1px solid var(--border)">
     <td style="padding:4px 8px"><input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="${desc}" placeholder="Electronic component" oninput="this.classList.remove('ca-warn')"></td>
-    <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px" type="number" name="ca_qty" min="1" step="1" value="${qty}"></td>
+    <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px" type="number" name="ca_qty" min="1" step="1" value="${qty}" oninput="updateUnitVal(this)"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;font-size:12px;font-family:monospace" type="text" name="ca_hs" value="${hs}" placeholder="8517.62"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_origin" maxlength="2" value="${origin}" placeholder="DE"></td>
-    <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="${weight}"></td>
-    <td style="padding:4px 5px"><input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="${value}" oninput="this.classList.remove('ca-warn')"></td>
+    <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="${weight}" title="Нетто вага (кг)"></td>
+    <td style="padding:4px 5px;text-align:right;vertical-align:middle"><span class="ca-unitval" style="font-size:11px;color:var(--text-muted);font-family:monospace;white-space:nowrap">${uv}</span></td>
+    <td style="padding:4px 5px"><input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="${value}" oninput="this.classList.remove('ca-warn');updateUnitVal(this)"></td>
     <td style="padding:4px 5px"><input class="sh-input ca-currency" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_currency" maxlength="3" value="${currency}"></td>
     <td style="padding:4px;text-align:center"><button type="button" onclick="removeCaRow(this)" title="Видалити" style="background:var(--bg-card);border:1px solid var(--border-strong);color:var(--err);border-radius:4px;padding:3px 7px;cursor:pointer;font-size:11px;line-height:1">✕</button></td>
   </tr>`;
@@ -201,10 +218,20 @@ function updateCustomsCard(){
 document.addEventListener('DOMContentLoaded',function(){
   updateCustomsCard();
   updateCaTotal();
+  _refreshAllUnitVals();
   _fillSenderFromCarrier();
   const ci=document.querySelector('[name="recipient_country"]');
   if(ci){ ci.addEventListener('input',updateCustomsCard); ci.addEventListener('change',updateCustomsCard); }
-  document.getElementById('customs-rows')?.addEventListener('input',updateCaTotal);
+  document.getElementById('customs-rows')?.addEventListener('input',function(e){
+    updateCaTotal();
+    if(e.target.name==='ca_qty'||e.target.name==='ca_value') updateUnitVal(e.target);
+  });
+  // Sync package weight display in customs card
+  var wkgInput = document.getElementById('id_weight_kg');
+  var wkgDisplay = document.getElementById('ca_pkg_weight_display');
+  if(wkgInput && wkgDisplay){
+    wkgInput.addEventListener('input',function(){ wkgDisplay.textContent = wkgInput.value||'—'; });
+  }
   // Auto-fill sender when carrier changes (only if fields not manually edited)
   document.querySelectorAll('[name="carrier"]').forEach(r=>r.addEventListener('change', _fillSenderFromCarrier));
 
@@ -1155,21 +1182,49 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="sh-card" id="customs-card"{% if not needs_customs %} style="display:none"{% endif %}>
       <div class="sh-card-title">🛃 Митна декларація</div>
 
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap">
-        <div class="sh-field" style="flex:1;min-width:200px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:14px">
+
+        <div class="sh-field">
           <label class="sh-label">Тип декларації</label>
           <select class="sh-input" name="customs_invoice_type" id="customs-invoice-type">
-            <option value="commercial" {% if not customs_invoice_type or customs_invoice_type == 'commercial' %}selected{% endif %}>Gewerblich / Commercial (продаж)</option>
-            <option value="gift" {% if customs_invoice_type == 'gift' %}selected{% endif %}>Geschenk / Gift (подарунок)</option>
-            <option value="sample" {% if customs_invoice_type == 'sample' %}selected{% endif %}>Muster / Sample (зразок)</option>
-            <option value="return" {% if customs_invoice_type == 'return' %}selected{% endif %}>Rücksendung / Return (повернення)</option>
-            <option value="private" {% if customs_invoice_type == 'private' %}selected{% endif %}>Privat / Private (особисте)</option>
+            <option value="commercial" {% if not customs_invoice_type or customs_invoice_type == 'commercial' %}selected{% endif %}>Commercial (продаж)</option>
+            <option value="gift" {% if customs_invoice_type == 'gift' %}selected{% endif %}>Gift (подарунок)</option>
+            <option value="sample" {% if customs_invoice_type == 'sample' %}selected{% endif %}>Sample (зразок)</option>
+            <option value="return" {% if customs_invoice_type == 'return' %}selected{% endif %}>Return (повернення)</option>
+            <option value="private" {% if customs_invoice_type == 'private' %}selected{% endif %}>Private (особисте)</option>
           </select>
         </div>
-        <div style="font-size:11px;color:var(--text-dim);padding-top:16px">
-          Відправляється разом із посилкою до Jumingo.<br>
-          Вартість — загальна по рядку. Вага — нетто (кг).
+
+        <div class="sh-field">
+          <label class="sh-label">📋 Terms of Sale (Incoterm)</label>
+          {% with saved_incoterm=shipment.customs_articles.incoterm|default:"DAP" %}
+          <select class="sh-input" name="ca_incoterm" id="ca_incoterm">
+            <option value="DAP" {% if saved_incoterm == "DAP" %}selected{% endif %}>DAP — Delivered at Place</option>
+            <option value="DDP" {% if saved_incoterm == "DDP" %}selected{% endif %}>DDP — Delivered Duty Paid</option>
+            <option value="EXW" {% if saved_incoterm == "EXW" %}selected{% endif %}>EXW — Ex Works</option>
+            <option value="FCA" {% if saved_incoterm == "FCA" %}selected{% endif %}>FCA — Free Carrier</option>
+            <option value="CPT" {% if saved_incoterm == "CPT" %}selected{% endif %}>CPT — Carriage Paid To</option>
+            <option value="CIP" {% if saved_incoterm == "CIP" %}selected{% endif %}>CIP — Carriage &amp; Insurance Paid</option>
+            <option value="FOB" {% if saved_incoterm == "FOB" %}selected{% endif %}>FOB — Free on Board</option>
+            <option value="CFR" {% if saved_incoterm == "CFR" %}selected{% endif %}>CFR — Cost and Freight</option>
+            <option value="CIF" {% if saved_incoterm == "CIF" %}selected{% endif %}>CIF — Cost, Insurance &amp; Freight</option>
+          </select>
+          {% endwith %}
         </div>
+
+        <div class="sh-field">
+          <label class="sh-label">📦 Вага посилки брутто</label>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span id="ca_pkg_weight_display" style="font-size:15px;font-weight:700;color:var(--text)">
+              {{ shipment.weight_kg|default:"—" }}
+            </span>
+            <span style="font-size:12px;color:var(--text-muted)">кг</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+            PackageWeight = брутто + пакування
+          </div>
+        </div>
+
       </div>
 
       <div style="overflow-x:auto;margin-bottom:10px">
@@ -1180,8 +1235,9 @@ document.addEventListener('DOMContentLoaded', function() {
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:52px">К-ть</th>
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:left;border-bottom:1px solid var(--border-strong);width:90px">HS-код</th>
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:52px">Країна</th>
-              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:80px">Вага(кг)</th>
-              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:90px">Вартість</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:76px" title="Нетто вага продукту на рядок (кг) — ProductWeight">Вага нетто(кг)</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:78px" title="Ціна за одиницю = Total Value / К-сть">Ціна/шт</th>
+              <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:right;border-bottom:1px solid var(--border-strong);width:90px" title="Загальна вартість по рядку = InvoiceLineTotal">Total Value</th>
               <th style="padding:7px 5px;color:var(--text-muted);font-weight:600;text-align:center;border-bottom:1px solid var(--border-strong);width:48px">Вал.</th>
               <th style="border-bottom:1px solid var(--border-strong);width:28px"></th>
             </tr>
@@ -1202,10 +1258,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 <input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_origin" maxlength="2" value="{{ a.origin_country }}" placeholder="DE">
               </td>
               <td style="padding:4px 5px">
-                {% localize off %}<input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="{{ a.weight|default:default_ca_weight }}">{% endlocalize %}
+                {% localize off %}<input class="sh-input" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_weight" step="0.001" min="0" value="{{ a.weight|default:default_ca_weight }}" title="Нетто вага для митниці (кг)">{% endlocalize %}
+              </td>
+              <td style="padding:4px 5px;text-align:right">
+                <span class="ca-unitval" style="font-size:11px;color:var(--text-muted);font-family:monospace;white-space:nowrap">—</span>
               </td>
               <td style="padding:4px 5px">
-                {% localize off %}<input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="{{ a.value }}" oninput="this.classList.remove('ca-warn')">{% endlocalize %}
+                {% localize off %}<input class="sh-input ca-value" style="width:100%;padding:4px 5px;text-align:right;font-size:12px" type="number" name="ca_value" step="0.01" min="0" value="{{ a.value }}" oninput="this.classList.remove('ca-warn');updateUnitVal(this)">{% endlocalize %}
               </td>
               <td style="padding:4px 5px">
                 <input class="sh-input ca-currency" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_currency" maxlength="3" value="{{ a.currency|default:'EUR' }}">

@@ -315,12 +315,9 @@
             <td style="font-weight:600">{{ item.description|default:"—" }}</td>
             <td style="text-align:center">{{ item.quantity }}</td>
             <td style="text-align:right;color:var(--text-muted);font-family:monospace">
-              {# Unit value = total / qty — computed here for display #}
-              {% if item.value and item.quantity %}
-                {{ item.value|floatformat:4 }}÷{{ item.quantity }} =
-                <strong style="color:var(--text)">
-                  {% widthratio item.value item.quantity 1 %}&nbsp;{{ customs.currency|default:"USD" }}
-                </strong>
+              {% if item.unit_value %}
+                <strong style="color:var(--text)">{{ item.unit_value }}</strong>
+                <span style="font-size:10px;color:var(--text-muted)"> {{ customs.currency|default:"USD" }}</span>
               {% else %}—{% endif %}
             </td>
             <td style="text-align:right;color:var(--ok,#2e7d32);font-weight:700;font-family:monospace">

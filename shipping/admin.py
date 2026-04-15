@@ -1325,6 +1325,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if customs_items:
                 shipment.customs_articles = {
                     "type":               request.POST.get("customs_invoice_type", "commercial"),
+                    "incoterm":           request.POST.get("ca_incoterm", "DAP"),
                     "customs_line_items": customs_items,
                 }
 
@@ -1613,6 +1614,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if customs_items:
                 shipment.customs_articles = {
                     "type":               request.POST.get("customs_invoice_type", "commercial"),
+                    "incoterm":           request.POST.get("ca_incoterm", "DAP"),
                     "customs_line_items": customs_items,
                 }
 
@@ -2299,6 +2301,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             packages = self._ups_extract_packages(shipment)
             customs  = self._ups_extract_customs(shipment)
             shipper  = self._ups_extract_shipper(shipment)
+            # Pre-compute unit values for each item (total / qty) — template can't do float div
+            if customs and customs.get('items'):
+                for item in customs['items']:
+                    qty = max(1, int(item.get('quantity', 1)))
+                    val = float(item.get('value', 0))
+                    item['unit_value'] = round(val / qty, 4) if val > 0 else 0
         except UPSError as e:
             messages.error(request, f'❌ UPS налаштування: {e}')
             return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
@@ -2767,7 +2775,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         }
         currency = shipment.declared_currency or 'USD'
         contents_type = reason_map.get(shipment.export_reason, 'SALE')
-        terms_of_shipment = getattr(shipment, 'incoterm', '') or 'DAP'
+        saved_ca = shipment.customs_articles or {}
+        terms_of_shipment = saved_ca.get('incoterm') or getattr(shipment, 'incoterm', '') or 'DAP'
 
         # ── Пріоритет: customs_articles збережені з форми ──────────────────
         saved = shipment.customs_articles or {}
