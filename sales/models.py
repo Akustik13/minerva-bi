@@ -94,6 +94,24 @@ class SalesOrder(models.Model):
     def __str__(self):
         return f"{self.source}:{self.order_number}"
 
+    @property
+    def deadline_status(self):
+        """Returns dict with deadline info for template rendering, or None."""
+        if not self.shipping_deadline:
+            return None
+        from datetime import date
+        today = date.today()
+        days = (self.shipping_deadline - today).days
+        if days < 0:
+            return {'days': abs(days), 'icon': '🔴', 'label': f'Прострочено {abs(days)}д', 'color': '#c62828'}
+        if days == 0:
+            return {'days': 0, 'icon': '🔴', 'label': 'Дедлайн сьогодні!', 'color': '#c62828'}
+        if days <= 3:
+            return {'days': days, 'icon': '⚠️', 'label': f'Залишилось {days}д', 'color': '#e65100'}
+        if days <= 7:
+            return {'days': days, 'icon': '⏰', 'label': f'Залишилось {days}д', 'color': '#e65100'}
+        return {'days': days, 'icon': '✅', 'label': f'Залишилось {days}д', 'color': '#2e7d32'}
+
     def order_total(self):
         """Сума з рядків якщо є unit_price, інакше total_price замовлення."""
         from django.db.models import Sum, F, ExpressionWrapper, DecimalField

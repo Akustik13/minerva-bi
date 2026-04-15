@@ -138,21 +138,23 @@ document.addEventListener('DOMContentLoaded', function () {
           {{ order.get_status_display }}
         </span>
       </div>
-      <div style="text-align:right;font-size:12px">
+      {# Dates column #}
+      <div style="text-align:right;font-size:12px;display:flex;flex-direction:column;gap:3px;align-items:flex-end">
         {% if order.order_date %}
-          <span style="color:var(--text-muted)">📅 {{ order.order_date|date:"d.m.Y" }}</span>
+          <span style="color:var(--text-muted)">📅 Замовлено: <strong style="color:var(--text)">{{ order.order_date|date:"d.m.Y" }}</strong></span>
         {% endif %}
-        {% if order.shipping_deadline and not order.shipped_at %}
-          <span style="margin-left:12px;color:var(--text);font-weight:700">
-            📦 {{ order.shipping_deadline|date:"d.m.Y" }}
-          </span>
+        {% if order.shipped_at %}
+          <span style="color:var(--text-muted)">📬 Відправлено: <strong style="color:#2e7d32">{{ order.shipped_at|date:"d.m.Y" }}</strong></span>
+        {% endif %}
+        {% if order.delivered_at %}
+          <span style="color:var(--text-muted)">✅ Доставлено: <strong style="color:#00695c">{{ order.delivered_at|date:"d.m.Y" }}</strong></span>
         {% endif %}
       </div>
     </div>
 
     {# Customer + meta #}
-    <div style="font-size:13px;color:var(--text-muted);margin-bottom:12px;
-                display:flex;gap:20px;flex-wrap:wrap">
+    <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;
+                display:flex;gap:16px;flex-wrap:wrap;align-items:center">
       {% if order.client or order.email %}
         <span style="color:var(--text);font-weight:600">
           👤 {{ order.client|default:order.email }}
@@ -162,7 +164,10 @@ document.addEventListener('DOMContentLoaded', function () {
         <span>🌍 {{ order.addr_country }}{% if order.addr_city %}, {{ order.addr_city }}{% endif %}</span>
       {% endif %}
       {% if order.tracking_number %}
-        <span>🚚 {{ order.tracking_number }}</span>
+        <span style="font-family:monospace;background:var(--bg-input,#141f2b);padding:1px 7px;border-radius:5px;
+                     color:var(--text);font-size:12px">
+          {% if order.shipping_courier %}{{ order.shipping_courier }} {% endif %}🔍 {{ order.tracking_number }}
+        </span>
       {% endif %}
     </div>
 
@@ -170,7 +175,7 @@ document.addEventListener('DOMContentLoaded', function () {
     {% if lines %}
     <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:10px">
       <thead>
-        <tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong);
+        <tr style="color:var(--text-muted);border-bottom:1px solid var(--border-strong);
                    font-size:11px;text-transform:uppercase;letter-spacing:.04em">
           <th style="padding:5px 8px;text-align:left;font-weight:600">Артикул</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600">К-сть</th>
@@ -190,21 +195,17 @@ document.addEventListener('DOMContentLoaded', function () {
           <td style="padding:6px 8px;text-align:right;color:var(--text-muted)">
             {% if line.unit_price %}{{ line.unit_price|floatformat:"2" }}{% else %}—{% endif %}
           </td>
-          <td style="padding:6px 8px;text-align:right;font-weight:700;color:var(--ok,#4caf50)">
+          <td style="padding:6px 8px;text-align:right;font-weight:700;color:#2e7d32">
             {% if line.total_price %}{{ line.total_price|floatformat:"2" }} {{ line.currency }}{% else %}—{% endif %}
           </td>
         </tr>
         {% endfor %}
       </tbody>
       <tfoot>
-        <tr>
+        <tr style="border-top:2px solid var(--border-strong)">
           <td colspan="3" style="padding:7px 8px;text-align:right;
                                   color:var(--text-muted);font-size:12px">Разом:</td>
-          <td style="padding:7px 8px;text-align:right;font-size:15px;font-weight:800;
-                     color:var(--ok,#4caf50)">
-            {% with total=lines|length %}
-              {# Compute total in template — sum via forloop #}
-            {% endwith %}
+          <td style="padding:7px 8px;text-align:right;font-size:15px;font-weight:800;color:#2e7d32">
             {{ order.total_price|floatformat:"2" }} {{ order.currency }}
           </td>
         </tr>
@@ -214,23 +215,63 @@ document.addEventListener('DOMContentLoaded', function () {
       <p style="color:var(--text-muted);font-size:12px;margin:0 0 10px">Немає позицій</p>
     {% endif %}
 
-    {# Footer: edit + shipped #}
+    {# Footer: chips row + action #}
     <div style="display:flex;justify-content:space-between;align-items:center;
-                flex-wrap:wrap;gap:8px">
-      <div style="display:flex;gap:8px">
+                flex-wrap:wrap;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
+
+      {# Left: action button + info chips #}
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <a href="{% url 'admin:sales_salesorder_change' order.pk %}"
-           style="padding:5px 14px;background:var(--accent,#1976d2);color:#fff;
+           style="padding:5px 14px;background:#1565c0;color:#fff;
                   border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
           ✏️ Редагувати
         </a>
-      </div>
-      <div style="font-size:12px;color:var(--text-muted)">
-        {% if order.shipped_at %}
-          <span style="color:#4caf50;font-weight:600">✅ Відправлено {{ order.shipped_at|date:"d.m.Y" }}</span>
-        {% else %}
-          <span style="color:#ff9800;font-weight:600">⏳ Не відправлено</span>
+        {# Склад chip #}
+        {% if order.affects_stock %}
+          <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                       background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong)">
+            📦 Склад
+          </span>
+        {% endif %}
+        {# Labels chip #}
+        <a href="{% url 'labels:list' %}"
+           style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                  background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong);
+                  text-decoration:none">
+          🏷️ Етикетки
+        </a>
+        {# Shipping cost chip #}
+        {% if order.shipping_cost %}
+          <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                       background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong)">
+            🚚 {{ order.shipping_cost|floatformat:"2" }} {{ order.shipping_currency }}
+          </span>
         {% endif %}
       </div>
+
+      {# Right: deadline or delivery status #}
+      <div style="font-size:12px;font-weight:700">
+        {% if order.status == 'delivered' %}
+          {% if order.delivered_at %}
+            <span style="color:#00695c">✅ Доставлено: {{ order.delivered_at|date:"d.m.Y" }}</span>
+          {% else %}
+            <span style="color:#00695c">✅ Доставлено</span>
+          {% endif %}
+        {% elif order.status == 'cancelled' %}
+          <span style="color:#c62828">🚫 Скасовано</span>
+        {% elif order.shipped_at %}
+          <span style="color:#2e7d32">📬 Відправлено: {{ order.shipped_at|date:"d.m.Y" }}</span>
+        {% else %}
+          {% with ds=order.deadline_status %}
+          {% if ds %}
+            <span style="color:{{ ds.color }}">{{ ds.icon }} Дедлайн {{ order.shipping_deadline|date:"d.m.Y" }} — {{ ds.label }}</span>
+          {% else %}
+            <span style="color:var(--text-muted)">⏳ Не відправлено</span>
+          {% endif %}
+          {% endwith %}
+        {% endif %}
+      </div>
+
     </div>
 
   </div>
