@@ -983,14 +983,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             text = f'Прострочено {abs(delta)}д'
         elif delta == 0:
             # Сьогодні
-            color = '#e3b341'
-            bg = 'rgba(227,179,65,0.15)'
+            color = '#e65100'
+            bg = 'rgba(230,81,0,0.12)'
             icon = '⚠️'
             text = 'Сьогодні!'
         elif delta <= 2:
             # Критично (1-2 дні)
-            color = '#e3b341'
-            bg = 'rgba(227,179,65,0.1)'
+            color = '#e65100'
+            bg = 'rgba(230,81,0,0.1)'
             icon = '⏰'
             text = f'Залишилось {delta}д'
         elif delta <= 5:
@@ -1116,8 +1116,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     source_badge.short_description = "Джерело"
 
     def status_badge(self, obj):
-        colors = {"received": "#2196f3", "processing": "#ff9800",
-                  "shipped": "#4caf50", "cancelled": "#f44336"}
+        colors = {"received": "#1565c0", "processing": "#e65100",
+                  "shipped": "#2e7d32", "delivered": "#00695c", "cancelled": "#c62828"}
         color = colors.get(obj.status, "#757575")
         return format_html(
             '<span style="background:{};color:#fff;padding:3px 10px;border-radius:12px;'
@@ -1175,9 +1175,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     def shipped_badge(self, obj):
         if obj.shipped_at:
-            return format_html('<span style="color:#4caf50;white-space:nowrap">✅ {}</span>',
+            return format_html('<span style="color:#2e7d32;font-weight:700;white-space:nowrap">✅ {}</span>',
                                obj.shipped_at.strftime("%d.%m.%Y"))
-        return format_html('<span style="color:#ff9800;font-weight:bold;white-space:nowrap">⏳ Очікує</span>')
+        return format_html('<span style="color:#e65100;font-weight:700;white-space:nowrap">⏳ Очікує</span>')
     shipped_badge.short_description = "Відправлено"
     shipped_badge.admin_order_field = "shipped_at"
 

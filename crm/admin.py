@@ -507,11 +507,12 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Computed columns ──────────────────────────────────────────────────────
 
     _SOURCE_COLORS = {
-        'digikey':  ('#d32f2f', '#ffebee'),
-        'amazon':   ('#e65100', '#fff3e0'),
-        'ebay':     ('#1565c0', '#e3f2fd'),
-        'webshop':  ('#2e7d32', '#e8f5e9'),
-        'manual':   ('#546e7a', '#eceff1'),
+        'digikey':  '#c62828',  # DigiKey red
+        'amazon':   '#e65100',  # Amazon deep orange
+        'ebay':     '#1565c0',  # eBay blue
+        'webshop':  '#2e7d32',  # Webshop green
+        'nova_post':'#1565c0',  # Nova Post blue
+        'manual':   '#455a64',  # Steel grey
     }
 
     def sources_display(self, obj):
@@ -530,10 +531,11 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             return mark_safe('<span style="opacity:.4">—</span>')
         badges = []
         for src in sources:
-            fg, bg = self._SOURCE_COLORS.get(src.lower(), ('#37474f', '#eceff1'))
+            color = self._SOURCE_COLORS.get(src.lower(), '#455a64')
             badges.append(
-                f'<span style="background:{bg};color:{fg};padding:2px 7px;border-radius:10px;'
-                f'font-size:11px;font-weight:600;white-space:nowrap">{src}</span>'
+                f'<span style="background:{color};color:#fff;padding:2px 8px;border-radius:10px;'
+                f'font-size:11px;font-weight:700;white-space:nowrap;letter-spacing:.02em">'
+                f'{src.upper()}</span>'
             )
         return mark_safe(' '.join(badges))
     sources_display.short_description = "Платформи"

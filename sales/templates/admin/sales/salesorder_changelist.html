@@ -54,24 +54,35 @@ document.addEventListener('DOMContentLoaded', function () {
   transition: background .15s, color .15s;
 }
 .sv-toggle-btn.active {
-  background: var(--accent, #1976d2);
+  background: #1565c0;
   color: #fff;
   border-color: transparent;
 }
 .sv-card {
   background: var(--bg-card);
   border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--border-strong);
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  transition: box-shadow .15s, border-left-color .15s;
 }
-.sv-card:hover { border-color: var(--accent, #1976d2); }
-.sv-status-received   { background:#2196f3; }
-.sv-status-processing { background:#ff9800; }
-.sv-status-shipped    { background:#4caf50; }
-.sv-status-delivered  { background:#00897b; }
-.sv-status-cancelled  { background:#f44336; }
-.sv-status-default    { background:#757575; }
+.sv-card:hover {
+  box-shadow: 0 3px 10px rgba(0,0,0,.14);
+  border-left-color: #1565c0;
+}
+.sv-card.sv-card-processing { border-left-color: #e65100; }
+.sv-card.sv-card-shipped    { border-left-color: #2e7d32; }
+.sv-card.sv-card-delivered  { border-left-color: #00695c; }
+.sv-card.sv-card-cancelled  { border-left-color: #c62828; }
+.sv-card.sv-card-received   { border-left-color: #1565c0; }
+.sv-status-received   { background:#1565c0; }
+.sv-status-processing { background:#e65100; }
+.sv-status-shipped    { background:#2e7d32; }
+.sv-status-delivered  { background:#00695c; }
+.sv-status-cancelled  { background:#c62828; }
+.sv-status-default    { background:#546e7a; }
 </style>
 {% endblock %}
 
@@ -79,7 +90,7 @@ document.addEventListener('DOMContentLoaded', function () {
     {{ block.super }}
     <li>
         <a href="{% url 'admin:sales_salesorder_import' %}"
-           style="background:#4caf50;color:white;padding:8px 16px;border-radius:6px;
+           style="background:#2e7d32;color:white;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
             📥 Імпорт з Excel
         </a>
@@ -99,7 +110,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <div id="sv-cards" style="display:none">
   {% for order in cl.result_list %}
   {% with lines=order.lines.all %}
-  <div class="sv-card">
+  <div class="sv-card sv-card-{{ order.status|default:'default' }}">
 
     {# Header #}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;
@@ -110,11 +121,16 @@ document.addEventListener('DOMContentLoaded', function () {
                   color:var(--text);text-decoration:none">
           {{ order.order_number }}
         </a>
-        {# Source badge #}
-        <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;
-                     background:var(--border-strong);color:var(--text)">
-          {{ order.source|upper }}
-        </span>
+        {# Source badge — colored by source #}
+        {% with src=order.source|lower %}
+        {% if src == 'digikey' %}<span style="background:#c62828;color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.02em">{{ order.source|upper }}</span>
+        {% elif src == 'amazon' %}<span style="background:#e65100;color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.02em">{{ order.source|upper }}</span>
+        {% elif src == 'ebay' %}<span style="background:#1565c0;color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.02em">{{ order.source|upper }}</span>
+        {% elif src == 'webshop' %}<span style="background:#2e7d32;color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.02em">{{ order.source|upper }}</span>
+        {% elif src == 'nova_post' %}<span style="background:#1565c0;color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.02em">{{ order.source|upper }}</span>
+        {% else %}<span style="background:#455a64;color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;letter-spacing:.02em">{{ order.source|upper }}</span>
+        {% endif %}
+        {% endwith %}
         {# Status badge #}
         <span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;
                      color:#fff"
