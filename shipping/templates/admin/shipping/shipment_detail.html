@@ -843,6 +843,10 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 </div>
 
 <script>
+// Reset details state on page load (Chrome persists open state within session)
+document.querySelectorAll('details.sd-card').forEach(function(el) {
+  if (el.id !== 'debug') el.removeAttribute('open');
+});
 function copyDebug(id, btn) {
   var el = document.getElementById(id);
   if (!el) return;
