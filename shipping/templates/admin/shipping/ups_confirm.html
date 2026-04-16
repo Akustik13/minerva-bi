@@ -132,6 +132,12 @@
         <span class="uc-lbl">Reference</span>
         <span class="uc-val" style="font-family:monospace">{{ shipment.reference|default:shipment.pk }}</span>
       </div>
+      {% if delivery_date %}
+      <div class="uc-row">
+        <span class="uc-lbl">Орієнтовна доставка</span>
+        <span class="uc-val ok">📅 {{ delivery_date }}</span>
+      </div>
+      {% endif %}
     </div>
   </div>
 
@@ -231,8 +237,8 @@
 
       {# ── Read-only params row ──────────────────────────────────────────── #}
       {# Hidden fields so POST still sends required values to ups_book_view #}
-      <input type="hidden" name="package_weight_kg" value="{{ shipment.weight_kg|default:'' }}">
-      <input type="hidden" name="terms_of_shipment" value="{{ customs.terms_of_shipment|default:'DAP' }}">
+      <input type="hidden" name="package_weight_kg" value="{{ shipment.weight_kg|default:'' }}" form="ups-confirm-form">
+      <input type="hidden" name="terms_of_shipment" value="{{ customs.terms_of_shipment|default:'DAP' }}" form="ups-confirm-form">
 
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
                   gap:14px;margin-bottom:16px;background:var(--bg-input);
@@ -438,6 +444,7 @@
         <input type="hidden" name="pickup_ready" id="fld_pickup_ready" value="0900">
         <input type="hidden" name="pickup_close" id="fld_pickup_close" value="1800">
         <input type="hidden" name="pickup_point" id="fld_pickup_point" value="RECEPTION">
+        <input type="hidden" name="delivery_date" value="{{ delivery_date }}">
       </form>
       <script>
       document.getElementById('ups-confirm-form').addEventListener('submit', function(){

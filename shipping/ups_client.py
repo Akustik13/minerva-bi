@@ -751,7 +751,8 @@ class UPSClient:
                         ready_time: str = '0900', close_time: str = '1800',
                         service_code: str = '11', packages: list = None,
                         destination_country: str = 'DE',
-                        pickup_point: str = 'Reception') -> dict:
+                        pickup_point: str = 'RECEPTION',
+                        tracking_number: str = '') -> dict:
         """
         POST /api/pickupcreation/v1/pickup
         Планує забирання кур'єром UPS.
@@ -804,6 +805,8 @@ class UPSClient:
                 },
                 'OverweightIndicator': 'N',
                 'PaymentMethod': '01',
+                **({'TrackingData': [{'TrackingNumber': tracking_number}]}
+                   if tracking_number else {}),
             },
         }
         try:
@@ -935,7 +938,7 @@ class UPSClient:
             },
             'PackageWeight': {
                 'UnitOfMeasurement': {'Code': 'KGS'},
-                'Weight': str(round(max(1.0, float(pkg.get('weight_kg', 1.0))), 2)),
+                'Weight': str(round(max(0.1, float(pkg.get('weight_kg', 0.1))), 2)),
             },
         }
         if pkg.get('reference'):

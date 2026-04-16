@@ -205,6 +205,10 @@ class Shipment(models.Model):
         "Очікувана доставка до", null=True, blank=True,
         help_text="Кінець вікна очікуваної доставки"
     )
+    carrier_eta = models.DateField(
+        "Орієнтовна дата доставки (тариф)", null=True, blank=True,
+        help_text="Дата з тарифу перевізника, заповнюється при бронюванні",
+    )
 
     # ── Технічні поля ─────────────────────────────────────────────────────────
     raw_request  = models.JSONField("Запит (JSON)", null=True, blank=True)

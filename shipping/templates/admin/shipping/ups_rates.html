@@ -198,7 +198,7 @@
 
       <!-- Book button -->
       <div class="ur-card-foot">
-        <a href="{% url 'admin:shipping_shipment_ups_confirm' shipment.pk %}?service_code={{ rate.code }}&rate_price={{ rate.display_price }}&rate_currency={{ rate.currency }}&rate_source={{ rate.pricing_source }}&rate_ref={{ rate.reference_total }}"
+        <a href="{% url 'admin:shipping_shipment_ups_confirm' shipment.pk %}?service_code={{ rate.code }}&rate_price={{ rate.display_price }}&rate_currency={{ rate.currency }}&rate_source={{ rate.pricing_source }}&rate_ref={{ rate.reference_total }}&delivery_date={{ rate.delivery_date_estimated|default:rate.delivery_date }}"
            class="ur-btn">
           Оформити →
         </a>

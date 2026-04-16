@@ -1866,6 +1866,73 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     "jumingo_status": jumingo_status,
                 }
 
+        # ── UPS Pickup result (parsed from notes) ─────────────────────────────
+        pickup_info = None
+        notes = shipment.notes or ''
+        import re as _re
+        _pm = _re.search(
+            r'UPS_PICKUP \| PRN:([^\s|]+) \| DATE:([^\s|]+) \| TIME:([^\s|]+)-([^\s|]+) \| POINT:([^\s|]+)',
+            notes
+        )
+        if _pm:
+            _ready_raw = _pm.group(3).replace(':', '')
+            _close_raw = _pm.group(4).replace(':', '')
+            _rfmt = f'{_ready_raw[:2]}:{_ready_raw[2:4]}' if len(_ready_raw) >= 4 else _ready_raw
+            _cfmt = f'{_close_raw[:2]}:{_close_raw[2:4]}' if len(_close_raw) >= 4 else _close_raw
+            _POINT_LABELS = {
+                'RECEPTION': 'Рецепшен', 'SUITE': 'Офіс / Suite',
+                'MAILROOM': 'Поштовий відділ', 'FLOOR': 'Склад / Поверх',
+                'LOBBY': 'Лобі', 'OTHER': 'Інше',
+            }
+            _pt = _pm.group(5)
+            pickup_info = {
+                'prn':        _pm.group(1),
+                'date':       _pm.group(2),
+                'ready':      _rfmt,
+                'close':      _cfmt,
+                'point_code': _pt,
+                'point_label': _POINT_LABELS.get(_pt, _pt),
+            }
+
+        # ── Митна декларація: підготовлені дані для відображення ────────────────
+        customs_display = None
+        ca = shipment.customs_articles or {}
+        ca_lines = ca.get('customs_line_items') or []
+        if ca_lines:
+            pkg_kg = float(shipment.weight_kg or 0)
+            disp_lines = []
+            for li in ca_lines:
+                if not (li.get('description') or '').strip():
+                    continue
+                qty = int(li.get('quantity') or 1)
+                total_val = float(li.get('value') or 0)
+                unit_val  = round(total_val / max(1, qty), 4)
+                is_auto   = li.get('weight_auto', not bool(li.get('weight')))
+                if is_auto:
+                    w_per_unit = round(pkg_kg / max(1, qty), 5) if pkg_kg else 0
+                else:
+                    w_per_unit = float(li.get('weight') or 0) or (round(pkg_kg / max(1, qty), 5) if pkg_kg else 0)
+                disp_lines.append({
+                    'description':    li.get('description', '')[:35],
+                    'quantity':       qty,
+                    'unit_value':     unit_val,
+                    'total_value':    total_val,
+                    'currency':       (li.get('currency') or ca.get('currency') or shipment.declared_currency or 'EUR').upper(),
+                    'origin_country': (li.get('origin_country') or 'DE').upper(),
+                    'hs_code':        (li.get('customs_number') or '').strip(),
+                    'weight_per_unit': w_per_unit,
+                    'weight_total':    round(w_per_unit * qty, 3),
+                    'weight_auto':     is_auto,
+                })
+            _reason_map = {'Commercial': 'Sale', 'Gift': 'Gift', 'Personal': 'Gift', 'Return': 'Return', 'Claim': 'Other'}
+            customs_display = {
+                'incoterm':      ca.get('incoterm') or 'DAP',
+                'currency':      (ca_lines[0].get('currency') or shipment.declared_currency or 'EUR').upper(),
+                'reason':        _reason_map.get(shipment.export_reason, 'Sale'),
+                'invoice_total': round(sum(l['total_value'] for l in disp_lines), 2),
+                'lines':         disp_lines,
+            }
+
         # ── Raw API data ───────────────────────────────────────────────────────
         def _to_str(val, limit=4000):
             if val is None:
@@ -1889,6 +1956,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "actions":          actions,
             "status_choices":   status_choices,
             "carrier_tracking": carrier_tracking,
+            "pickup_info":      pickup_info,
+            "customs_display":  customs_display,
             "raw_request":      _to_str(shipment.raw_request),
             "raw_response":     _to_str(shipment.raw_response),
             "title":            f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
@@ -2285,6 +2354,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         rate_currency = request.POST.get('rate_currency') or request.GET.get('rate_currency', 'EUR')
         rate_source   = request.POST.get('rate_source')   or request.GET.get('rate_source', '')
         rate_ref      = request.POST.get('rate_ref')      or request.GET.get('rate_ref', '')
+        delivery_date = request.POST.get('delivery_date') or request.GET.get('delivery_date', '')
 
         # POST — підтверджено, передаємо на ups_book_view
         if request.method == 'POST':
@@ -2295,8 +2365,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 'pickup_date':        request.POST.get('pickup_date', ''),
                 'pickup_ready':       request.POST.get('pickup_ready', '0900'),
                 'pickup_close':       request.POST.get('pickup_close', '1800'),
+                'pickup_point':       request.POST.get('pickup_point', 'RECEPTION'),
                 'terms_of_shipment':  request.POST.get('terms_of_shipment', 'DAP'),
                 'package_weight_kg':  request.POST.get('package_weight_kg', ''),
+                'delivery_date':      request.POST.get('delivery_date', ''),
             })
             return redirect(
                 reverse('admin:shipping_shipment_ups_book', args=[shipment.pk]) + f'?{qs}'
@@ -2372,6 +2444,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'rate_currency':        rate_currency,
             'rate_source':          rate_source,
             'rate_ref':             rate_ref,
+            'delivery_date':        delivery_date,
         })
 
     def ups_book_view(self, request, shipment_id):
@@ -2387,6 +2460,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         terms_of_shipment  = request.GET.get('terms_of_shipment', 'DAP').strip()
         package_weight_raw = request.GET.get('package_weight_kg', '').strip()
+        delivery_date_raw  = request.GET.get('delivery_date', '').strip()
 
         try:
             client   = UPSClient(carrier=shipment.carrier)
@@ -2448,6 +2522,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if result.get('shipment_id'):
             shipment.carrier_shipment_id = result['shipment_id']
             update_fields.append('carrier_shipment_id')
+        # Save ETA from tariff selection
+        if delivery_date_raw:
+            from datetime import date as _date
+            try:
+                shipment.carrier_eta = _date.fromisoformat(delivery_date_raw[:10])
+                update_fields.append('carrier_eta')
+            except ValueError:
+                pass
         shipment.status = Shipment.Status.LABEL_READY
         update_fields.append('status')
         shipment.save(update_fields=update_fields)
@@ -2494,6 +2576,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if not order.shipped_at:
             order.shipped_at = _date.today()
             order_fields.append('shipped_at')
+        # Sync shipping cost from UPS API
+        if result['total_charge'] and not order.shipping_cost:
+            order.shipping_cost     = result['total_charge']
+            order.shipping_currency = result['currency']
+            order_fields += ['shipping_cost', 'shipping_currency']
         if order_fields:
             order.save(update_fields=order_fields)
 
@@ -2516,14 +2603,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                         packages             = packages,
                         destination_country  = to_addr.get('country', 'DE'),
                         pickup_point         = pickup_point,
+                        tracking_number      = result.get('tracking_number', ''),
                     )
                     if pickup_result['success']:
                         prn = pickup_result.get('prn', '')
                         pickup_msg = f' | 🚐 Кур\'єр: {pickup_date}'
                         if prn:
                             pickup_msg += f' (PRN: {prn})'
-                            shipment.notes = (shipment.notes or '') + f'\nUPS Pickup PRN: {prn} ({pickup_date} {pickup_ready}-{pickup_close})'
-                            shipment.save(update_fields=['notes'])
+                        shipment.notes = (shipment.notes or '') + (
+                            f'\nUPS_PICKUP | PRN:{prn or "-"} | DATE:{pickup_date}'
+                            f' | TIME:{pickup_ready}-{pickup_close} | POINT:{pickup_point}'
+                        )
+                        shipment.save(update_fields=['notes'])
                         messages.info(request, f'🚐 Кур\'єр UPS заплановано на {pickup_date} ({pickup_ready[:2]}:{pickup_ready[2:]}–{pickup_close[:2]}:{pickup_close[2:]}). PRN: {prn or "—"}')
                     else:
                         messages.warning(request, f'⚠️ Відправлення створено, але кур\'єра не вдалося запланувати: {pickup_result.get("error", "Невідома помилка")}')
