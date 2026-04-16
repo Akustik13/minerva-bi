@@ -83,6 +83,24 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-status-delivered  { background:#00695c; }
 .sv-status-cancelled  { background:#c62828; }
 .sv-status-default    { background:#546e7a; }
+/* Progress bar — horizontal inline */
+.sv-prog{display:flex;align-items:center;gap:0;margin:8px 0 12px;overflow:hidden}
+.sv-ps{display:flex;flex-direction:row!important;align-items:center;gap:5px;flex-shrink:0}
+.sv-pd{width:18px;height:18px;border-radius:50%;background:var(--bg-input,#141f2b);border:1.5px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--text-dim);flex-shrink:0;line-height:1}
+.sv-ps-done .sv-pd{background:#2e7d32;border-color:#2e7d32;color:#fff}
+.sv-ps-cur .sv-pd{background:#1565c0;border-color:#1565c0;color:#fff}
+.sv-pl{font-size:11px;color:var(--text-dim);white-space:nowrap;line-height:1}
+.sv-pl small{font-size:9px;opacity:.7;margin-left:2px}
+.sv-ps-done .sv-pl{color:var(--text-muted)}
+.sv-ps-cur .sv-pl{color:var(--text);font-weight:700}
+.sv-pc{flex:1;height:1px;background:var(--border-strong);min-width:10px;max-width:40px}
+.sv-pc-done{background:#2e7d32}
+.sv-ps-warn .sv-pd{background:#e65100;border-color:#e65100;color:#fff;animation:sv-pulse 1.2s ease-in-out infinite}
+@keyframes sv-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.65;transform:scale(1.2)}}
+/* Label row buttons */
+.sv-lbl-btn{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;white-space:nowrap;cursor:pointer;border:none;display:inline-block;text-decoration:none}
+.sv-lbl-on{background:#1565c0;color:#fff}
+.sv-lbl-off{background:var(--bg-input,#141f2b);color:var(--text-dim);opacity:.6;cursor:default;border:1px solid var(--border-strong)}
 </style>
 {% endblock %}
 
@@ -143,6 +161,9 @@ document.addEventListener('DOMContentLoaded', function () {
         {% if order.order_date %}
           <span style="color:var(--text-muted)">📅 Замовлено: <strong style="color:var(--text)">{{ order.order_date|date:"d.m.Y" }}</strong></span>
         {% endif %}
+        {% if order.status == 'received' or order.status == 'processing' %}{% with ds=order.deadline_status %}{% if ds %}
+          <span style="color:{{ ds.color }};font-size:11px">{{ ds.icon }} Дедлайн {{ order.shipping_deadline|date:"d.m.Y" }} — {{ ds.label }}</span>
+        {% endif %}{% endwith %}{% endif %}
         {% if order.shipped_at %}
           <span style="color:var(--text-muted)">📬 Відправлено: <strong style="color:#2e7d32">{{ order.shipped_at|date:"d.m.Y" }}</strong></span>
         {% endif %}
@@ -151,6 +172,35 @@ document.addEventListener('DOMContentLoaded', function () {
         {% endif %}
       </div>
     </div>
+
+    {% with s=order.status sh=order.shipments.first %}
+    <div class="sv-prog">
+      <div class="sv-ps {% if s != 'cancelled' %}sv-ps-done{% endif %}">
+        <div class="sv-pd">✓</div>
+        <div class="sv-pl">Чернетка{% if order.order_date %}<small>{{ order.order_date|date:"d.m" }}</small>{% endif %}</div>
+      </div>
+      <div class="sv-pc {% if sh %}sv-pc-done{% endif %}"></div>
+      <div class="sv-ps {% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-ps-done{% else %}sv-ps-cur{% endif %}{% endif %}">
+        <div class="sv-pd">{% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}✓{% else %}●{% endif %}{% else %}·{% endif %}</div>
+        <div class="sv-pl">Надіслано</div>
+      </div>
+      <div class="sv-pc {% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
+      <div class="sv-ps {% if s == 'shipped' or s == 'delivered' %}sv-ps-done{% elif sh.label_url %}sv-ps-cur{% endif %}">
+        <div class="sv-pd">{% if s == 'shipped' or s == 'delivered' %}✓{% elif sh.label_url %}●{% else %}·{% endif %}</div>
+        <div class="sv-pl">Етикетка{% if sh.label_url and s != 'shipped' and s != 'delivered' %}<small><a href="{{ sh.label_url }}" target="_blank" style="color:inherit">PDF</a></small>{% endif %}</div>
+      </div>
+      <div class="sv-pc {% if s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
+      <div class="sv-ps {% if s == 'shipped' %}{% if sh.carrier_delayed %}sv-ps-warn{% else %}sv-ps-cur{% endif %}{% elif s == 'delivered' %}sv-ps-done{% endif %}">
+        <div class="sv-pd">{% if s == 'delivered' %}✓{% elif s == 'shipped' and sh.carrier_delayed %}!{% elif s == 'shipped' %}●{% else %}·{% endif %}</div>
+        <div class="sv-pl">{% if s == 'shipped' and sh.carrier_delayed %}<span style="color:#e65100;font-weight:700">Затримка!</span>{% else %}В дорозі{% if order.shipped_at %}<small>{{ order.shipped_at|date:"d.m" }}</small>{% endif %}{% endif %}</div>
+      </div>
+      <div class="sv-pc {% if s == 'delivered' %}sv-pc-done{% endif %}"></div>
+      <div class="sv-ps {% if s == 'delivered' %}sv-ps-done{% endif %}">
+        <div class="sv-pd">{% if s == 'delivered' %}✓{% else %}·{% endif %}</div>
+        <div class="sv-pl">Доставлено{% if s == 'delivered' and order.delivered_at %}<small>{{ order.delivered_at|date:"d.m" }}</small>{% elif s == 'shipped' and sh %}{% if sh.carrier_eta %}<small>~{{ sh.carrier_eta|date:"d.m" }}</small>{% elif sh.eta_to %}<small>до {{ sh.eta_to|date:"d.m" }}</small>{% endif %}{% endif %}</div>
+      </div>
+    </div>
+    {% endwith %}
 
     {# Customer + meta #}
     <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;
@@ -178,6 +228,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <tr style="color:var(--text-muted);border-bottom:1px solid var(--border-strong);
                    font-size:11px;text-transform:uppercase;letter-spacing:.04em">
           <th style="padding:5px 8px;text-align:left;font-weight:600">Артикул</th>
+          <th style="padding:5px 8px;text-align:center;font-weight:600">🏷️</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600">К-сть</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">Ціна</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">Сума</th>
@@ -186,8 +237,10 @@ document.addEventListener('DOMContentLoaded', function () {
       <tbody>
         {% for line in lines %}
         <tr style="border-bottom:1px solid var(--border);color:var(--text)">
-          <td style="padding:6px 8px;font-family:monospace;font-weight:700">
-            {{ line.sku_raw|default:line.product.sku|default:"—" }}
+          {% with lsku=line.sku_raw|default:line.product.sku lqty=line.qty|floatformat:"0" %}
+          <td style="padding:6px 8px;font-family:monospace;font-weight:700">{{ lsku|default:"—" }}</td>
+          <td style="padding:6px 8px;text-align:center">
+            {% if lsku %}<span class="sv-lbl-btn sv-lbl-off sv-line-lbl" data-sku="{{ lsku }}" data-qty="{{ lqty }}">🏷️</span>{% else %}—{% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center;font-weight:600">
             {% if line.qty == line.qty|floatformat:"0"|add:"0" %}{{ line.qty|floatformat:"0" }}{% else %}{{ line.qty }}{% endif %}
@@ -198,15 +251,15 @@ document.addEventListener('DOMContentLoaded', function () {
           <td style="padding:6px 8px;text-align:right;font-weight:700;color:#2e7d32">
             {% if line.total_price %}{{ line.total_price|floatformat:"2" }} {{ line.currency }}{% else %}—{% endif %}
           </td>
+          {% endwith %}
         </tr>
         {% endfor %}
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--border-strong)">
-          <td colspan="3" style="padding:7px 8px;text-align:right;
-                                  color:var(--text-muted);font-size:12px">Разом:</td>
-          <td style="padding:7px 8px;text-align:right;font-size:15px;font-weight:800;color:#2e7d32">
-            {{ order.total_price|floatformat:"2" }} {{ order.currency }}
+          <td colspan="4" style="padding:7px 8px;text-align:right;color:var(--text-muted);font-size:12px">Разом:</td>
+          <td style="padding:7px 8px;text-align:right;font-size:15px;font-weight:800;color:#2e7d32;white-space:nowrap">
+            {% with t=order.order_total %}{% if t %}{{ t|floatformat:"2" }} {{ lines.0.currency|default:order.currency }}{% else %}—{% endif %}{% endwith %}
           </td>
         </tr>
       </tfoot>
@@ -219,36 +272,29 @@ document.addEventListener('DOMContentLoaded', function () {
     <div style="display:flex;justify-content:space-between;align-items:center;
                 flex-wrap:wrap;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
 
-      {# Left: action button + info chips #}
+      {# Left: action buttons + chips #}
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <a href="{% url 'admin:sales_salesorder_change' order.pk %}"
            style="padding:5px 14px;background:#1565c0;color:#fff;
                   border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
-          ✏️ Редагувати
+          ⚙️ Обробити
         </a>
-        {# Склад chip #}
+        <a href="{% url 'admin:shipping_shipment_create' order.pk %}"
+           style="padding:5px 14px;background:#2e7d32;color:#fff;
+                  border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
+          🚚 Відправлення
+        </a>
+        {# Склад chip — green if affects_stock, red if not #}
         {% if order.affects_stock %}
           <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                       background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong)">
-            📦 Склад
+                       background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32">
+            ✅ Склад
           </span>
-        {% endif %}
-        {# Labels chip — JS updates to blue+link if .dymo found, grey if not #}
-        {% if lines %}
-        <span class="sv-label-chip"
-              data-skus="{% for l in lines %}{{ l.sku_raw|default:l.product.sku }}{% if not forloop.last %},{% endif %}{% endfor %}"
-              data-qtys="{% for l in lines %}{{ l.qty|floatformat:'0' }}{% if not forloop.last %},{% endif %}{% endfor %}"
-              style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                     background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong);
-                     display:inline-block;cursor:default;white-space:nowrap">
-          🏷️ …
-        </span>
         {% else %}
-        <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                     background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong);
-                     opacity:.5">
-          🏷️ Немає
-        </span>
+          <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                       background:rgba(198,40,40,.12);color:#ef5350;border:1px solid #c62828">
+            ❌ Немає
+          </span>
         {% endif %}
         {# Shipping cost chip #}
         {% if order.shipping_cost %}
@@ -256,29 +302,6 @@ document.addEventListener('DOMContentLoaded', function () {
                        background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong)">
             🚚 {{ order.shipping_cost|floatformat:"2" }} {{ order.shipping_currency }}
           </span>
-        {% endif %}
-      </div>
-
-      {# Right: deadline or delivery status #}
-      <div style="font-size:12px;font-weight:700">
-        {% if order.status == 'delivered' %}
-          {% if order.delivered_at %}
-            <span style="color:#00695c">✅ Доставлено: {{ order.delivered_at|date:"d.m.Y" }}</span>
-          {% else %}
-            <span style="color:#00695c">✅ Доставлено</span>
-          {% endif %}
-        {% elif order.status == 'cancelled' %}
-          <span style="color:#c62828">🚫 Скасовано</span>
-        {% elif order.shipped_at %}
-          <span style="color:#2e7d32">📬 Відправлено: {{ order.shipped_at|date:"d.m.Y" }}</span>
-        {% else %}
-          {% with ds=order.deadline_status %}
-          {% if ds %}
-            <span style="color:{{ ds.color }}">{{ ds.icon }} Дедлайн {{ order.shipping_deadline|date:"d.m.Y" }} — {{ ds.label }}</span>
-          {% else %}
-            <span style="color:var(--text-muted)">⏳ Не відправлено</span>
-          {% endif %}
-          {% endwith %}
         {% endif %}
       </div>
 
@@ -311,56 +334,37 @@ function svSetView(mode) {
   svSetView(localStorage.getItem('salesorder_view') || 'table');
 })();
 
-// ── Label chips: batch-check .dymo availability ──────────────────────────────
+// ── Per-row label buttons: batch-check .dymo availability ───────────────────
 (function () {
-  var chips = document.querySelectorAll('.sv-label-chip');
-  if (!chips.length) return;
-
-  // Collect all unique SKUs
+  var btns = document.querySelectorAll('.sv-line-lbl');
+  if (!btns.length) return;
   var allSkus = [];
-  chips.forEach(function (chip) {
-    (chip.dataset.skus || '').split(',').forEach(function (s) {
-      s = s.trim();
-      if (s && allSkus.indexOf(s) === -1) allSkus.push(s);
-    });
+  btns.forEach(function (b) {
+    var s = (b.dataset.sku || '').trim();
+    if (s && allSkus.indexOf(s) === -1) allSkus.push(s);
   });
   if (!allSkus.length) return;
-
-  fetch('/labels/status/?skus=' + allSkus.join(','))
+  fetch('/labels/status/?skus=' + allSkus.map(encodeURIComponent).join(','))
     .then(function (r) { return r.json(); })
     .then(function (data) {
-      chips.forEach(function (chip) {
-        var skus  = (chip.dataset.skus || '').split(',').map(function(s){ return s.trim(); });
-        var qtys  = (chip.dataset.qtys || '').split(',').map(function(s){ return s.trim() || '1'; });
-        // Find first SKU that has a label
-        var idx = -1;
-        for (var i = 0; i < skus.length; i++) {
-          if (data[skus[i]] && data[skus[i]].found) { idx = i; break; }
-        }
-        if (idx >= 0) {
-          var sku = skus[idx], qty = qtys[idx] || '1';
+      btns.forEach(function (btn) {
+        var sku = (btn.dataset.sku || '').trim();
+        var qty = btn.dataset.qty || '1';
+        if (data[sku] && data[sku].found) {
           var a = document.createElement('a');
           a.href = '/labels/serve/' + encodeURIComponent(sku) + '/?qty=' + qty;
           a.target = '_blank';
-          a.title = 'Друкувати ' + sku + ' (' + qty + ' шт.)';
-          a.style.cssText = 'padding:3px 10px;border-radius:5px;font-size:11px;font-weight:600;'
-            + 'background:#1565c0;color:#fff;border:none;display:inline-block;'
-            + 'text-decoration:none;white-space:nowrap';
-          a.textContent = '\uD83D\uDDA8\uFE0F \u0414\u0440\u0443\u043A\u0443\u0432\u0430\u0442\u0438'; // 🖨️ Друкувати
-          chip.parentNode.replaceChild(a, chip);
+          a.title = '🖨️ ' + sku + ' × ' + qty;
+          a.className = 'sv-lbl-btn sv-lbl-on';
+          a.textContent = '🖨️';
+          btn.parentNode.replaceChild(a, btn);
         } else {
-          chip.textContent = '\uD83C\uDFF7\uFE0F \u041D\u0435\u043C\u0430\u0454'; // 🏷️ Немає
-          chip.style.opacity = '0.5';
-          chip.title = 'Файл .dymo не завантажено';
+          btn.title = 'Файл .dymo не завантажено для ' + sku;
+          btn.textContent = '🏷️';
         }
       });
     })
-    .catch(function () {
-      // On error — show neutral state
-      chips.forEach(function (chip) {
-        chip.textContent = '\uD83C\uDFF7\uFE0F \u0415\u0442\u0438\u043A\u0435\u0442\u043A\u0438'; // 🏷️ Етикетки
-      });
-    });
+    .catch(function () {});
 })();
 </script>
 

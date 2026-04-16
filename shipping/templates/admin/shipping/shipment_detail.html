@@ -291,6 +291,59 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     <!-- ── Ліва колонка ── -->
     <div>
 
+      <!-- Відправник -->
+      {% with s_name=shipment.sender_name|default:shipment.carrier.sender_name s_company=shipment.sender_company|default:shipment.carrier.sender_company s_street=shipment.sender_street|default:shipment.carrier.sender_street s_city=shipment.sender_city|default:shipment.carrier.sender_city s_zip=shipment.sender_zip|default:shipment.carrier.sender_zip s_country=shipment.sender_country|default:shipment.carrier.sender_country s_phone=shipment.sender_phone|default:shipment.carrier.sender_phone s_email=shipment.sender_email|default:shipment.carrier.sender_email %}
+      {% if s_name or s_street %}
+      <div class="sd-card">
+        <div class="sd-card-title">📦 Відправник</div>
+        <div class="sd-info-grid">
+          {% if s_company %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Компанія</span>
+            <span class="sd-info-val">{{ s_company }}</span>
+          </div>
+          {% endif %}
+          {% if s_name %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Ім'я</span>
+            <span class="sd-info-val">{{ s_name }}</span>
+          </div>
+          {% endif %}
+          {% if s_street %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Адреса</span>
+            <span class="sd-info-val">{{ s_street }}</span>
+          </div>
+          {% endif %}
+          {% if s_city or s_zip %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Місто / Індекс</span>
+            <span class="sd-info-val">{{ s_city }}{% if s_zip %}, {{ s_zip }}{% endif %}</span>
+          </div>
+          {% endif %}
+          {% if s_country %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Країна</span>
+            <span class="sd-info-val sd-country">{{ s_country }}</span>
+          </div>
+          {% endif %}
+          {% if s_phone %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Телефон</span>
+            <span class="sd-info-val">{{ s_phone }}</span>
+          </div>
+          {% endif %}
+          {% if s_email %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Email</span>
+            <span class="sd-info-val">{{ s_email }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endwith %}
+
       <!-- Отримувач -->
       <div class="sd-card">
         <div class="sd-card-title">📬 Отримувач</div>
@@ -375,6 +428,31 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
         </div>
       </div>
 
+      <!-- UPS Забирання (Abholung) -->
+      {% if pickup_info %}
+      <div class="sd-card">
+        <div class="sd-card-title">🚐 Виклик кур'єра</div>
+        <div class="sd-info-grid">
+          <div class="sd-info-row">
+            <span class="sd-info-key">Номер PRN</span>
+            <span class="sd-info-val sd-mono" style="font-weight:700">{{ pickup_info.prn }}</span>
+          </div>
+          <div class="sd-info-row">
+            <span class="sd-info-key">Дата забирання</span>
+            <span class="sd-info-val">{{ pickup_info.date }}</span>
+          </div>
+          <div class="sd-info-row">
+            <span class="sd-info-key">Часове вікно</span>
+            <span class="sd-info-val">{{ pickup_info.ready }} — {{ pickup_info.close }}</span>
+          </div>
+          <div class="sd-info-row">
+            <span class="sd-info-key">Місце забирання</span>
+            <span class="sd-info-val">{{ pickup_info.point_label }}</span>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <!-- Результат від перевізника -->
       <div class="sd-card">
         <div class="sd-card-title">🚚 Результат від перевізника</div>
@@ -423,6 +501,12 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                 до {{ shipment.eta_to|date:"d.m.y" }}
               {% endif %}
             </span>
+          </div>
+          {% endif %}
+          {% if shipment.carrier_eta %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Орієнтовна доставка</span>
+            <span class="sd-info-val" style="font-weight:600;color:var(--ok)">📅 {{ shipment.carrier_eta|date:"d.m.Y" }}</span>
           </div>
           {% endif %}
           {% if shipment.tracking_number %}
@@ -491,8 +575,8 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
       <!-- Митна декларація / Комерційний інвойс -->
       {% if customs_display %}
-      <details class="sd-card">
-        <summary class="sd-card-title">🛃 Комерційний інвойс (передано в API)</summary>
+      <div class="sd-card">
+        <div class="sd-card-title">🛃 Комерційний інвойс (передано в API)</div>
         <div>
           {# Метадані інвойсу #}
           <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:12px;
@@ -541,14 +625,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             </table>
           </div>
         </div>
-      </details>
+      </div>
       {% elif shipment.customs_articles %}
-      <details class="sd-card">
-        <summary class="sd-card-title">🛃 Митна декларація</summary>
+      <div class="sd-card">
+        <div class="sd-card-title">🛃 Митна декларація</div>
         <div style="font-size:12px;color:var(--text-muted);padding:6px 0">
           Немає артикулів для відображення.
         </div>
-      </details>
+      </div>
       {% endif %}
 
       <!-- Технічні деталі API -->
@@ -774,31 +858,6 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           </div>
         </div>
 
-        <!-- UPS Забирання (Abholung) -->
-        {% if pickup_info %}
-        <div class="sd-card">
-          <div class="sd-card-title">🚐 Забирання (Abholung)</div>
-          <div class="sd-info-grid">
-            <div class="sd-info-row">
-              <span class="sd-info-key">Номер PRN</span>
-              <span class="sd-info-val sd-mono" style="font-weight:700">{{ pickup_info.prn }}</span>
-            </div>
-            <div class="sd-info-row">
-              <span class="sd-info-key">Дата забирання</span>
-              <span class="sd-info-val">{{ pickup_info.date }}</span>
-            </div>
-            <div class="sd-info-row">
-              <span class="sd-info-key">Часове вікно</span>
-              <span class="sd-info-val">{{ pickup_info.ready }} — {{ pickup_info.close }}</span>
-            </div>
-            <div class="sd-info-row">
-              <span class="sd-info-key">Місце забирання</span>
-              <span class="sd-info-val">{{ pickup_info.point_label }}</span>
-            </div>
-          </div>
-        </div>
-        {% endif %}
-
         <!-- Дані замовлення -->
         <div class="sd-card">
           <div class="sd-card-title">📋 Замовлення {{ order.order_number }}</div>
@@ -843,10 +902,6 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 </div>
 
 <script>
-// Reset details state on page load (Chrome persists open state within session)
-document.querySelectorAll('details.sd-card').forEach(function(el) {
-  if (el.id !== 'debug') el.removeAttribute('open');
-});
 function copyDebug(id, btn) {
   var el = document.getElementById(id);
   if (!el) return;
