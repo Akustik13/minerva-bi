@@ -28,7 +28,7 @@ services:
     environment: &django_env
       # ⚠️  Змініть SECRET_KEY перед deploy на production!
       DJANGO_SECRET_KEY:  "change-me-to-a-long-random-string-in-production"
-      DJANGO_DEBUG:       "0"
+      DJANGO_DEBUG:       "1"
       DJANGO_ALLOWED_HOSTS: "localhost,127.0.0.1,akustik.synology.me,192.168.2.123"
 
       # База даних
