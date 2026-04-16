@@ -214,6 +214,7 @@ class Shipment(models.Model):
     raw_request  = models.JSONField("Запит (JSON)", null=True, blank=True)
     raw_response = models.JSONField("Відповідь (JSON)", null=True, blank=True)
     error_message = models.TextField("Повідомлення про помилку", blank=True, default="")
+    notes         = models.TextField("Нотатки", blank=True, default="")
 
     created_at   = models.DateTimeField("Створено", auto_now_add=True)
     submitted_at = models.DateTimeField("Відправлено", null=True, blank=True)
