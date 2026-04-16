@@ -1283,7 +1283,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             width_cm          = request.POST.get("width_cm") or None,
             height_cm         = request.POST.get("height_cm") or None,
             description       = request.POST.get("description", ""),
-            export_reason     = request.POST.get("export_reason", "Commercial"),
+            export_reason     = {'commercial':'Commercial','gift':'Gift','sample':'Personal','return':'Return','private':'Personal','claim':'Claim'}.get(request.POST.get("customs_invoice_type","commercial").lower(),'Commercial'),
             declared_value    = request.POST.get("declared_value") or None,
             declared_currency = request.POST.get("declared_currency", "EUR"),
             insurance_type    = request.POST.get("insurance_type", "none"),
@@ -1578,7 +1578,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         shipment.width_cm          = request.POST.get("width_cm") or None
         shipment.height_cm         = request.POST.get("height_cm") or None
         shipment.description       = request.POST.get("description", "")
-        shipment.export_reason     = request.POST.get("export_reason", "Commercial")
+        shipment.export_reason     = {'commercial':'Commercial','gift':'Gift','sample':'Personal','return':'Return','private':'Personal','claim':'Claim'}.get(request.POST.get("customs_invoice_type","commercial").lower(),'Commercial')
         shipment.declared_value    = request.POST.get("declared_value") or None
         shipment.declared_currency = request.POST.get("declared_currency", "EUR")
         shipment.insurance_type    = request.POST.get("insurance_type", "none")

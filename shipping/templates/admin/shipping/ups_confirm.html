@@ -386,22 +386,22 @@
                            letter-spacing:.04em;display:block;margin-bottom:8px">Часове вікно забирання</label>
             <div style="display:flex;justify-content:center;gap:10px;font-size:18px;font-weight:700;
                         color:var(--text);margin-bottom:14px">
-              <span id="dr-from-lbl">09:00</span>
+              <span id="dr-from-lbl">11:00</span>
               <span style="color:var(--text-dim)">—</span>
-              <span id="dr-to-lbl">18:00</span>
+              <span id="dr-to-lbl">16:00</span>
             </div>
             <div class="dr-wrap">
               <div class="dr-track"><div class="dr-fill" id="dr-fill"></div></div>
               <div class="dr-bubble" id="dr-b1">09:00</div>
               <div class="dr-bubble" id="dr-b2">18:00</div>
-              <input class="dr-input" type="range" id="dr-from" min="0" max="47" value="4"  step="1">
-              <input class="dr-input" type="range" id="dr-to"   min="0" max="47" value="40" step="1">
+              <input class="dr-input" type="range" id="dr-from" min="0" max="47" value="12" step="1">
+              <input class="dr-input" type="range" id="dr-to"   min="0" max="47" value="32" step="1">
             </div>
             <div class="dr-ticks">
               <span>08:00</span><span>11:00</span><span>14:00</span><span>17:00</span><span>19:45</span>
             </div>
-            <input type="hidden" id="inp_pickup_ready" value="09:00">
-            <input type="hidden" id="inp_pickup_close" value="18:00">
+            <input type="hidden" id="inp_pickup_ready" value="11:00">
+            <input type="hidden" id="inp_pickup_close" value="16:00">
           </div>
         </div>
         <div style="margin-top:14px">
@@ -411,7 +411,7 @@
                   style="background:var(--bg-card);border:1px solid var(--border-strong);
                          color:var(--text);border-radius:4px;padding:7px 10px;font-size:13px;min-width:200px">
             <option value="RECEPTION">Рецепшен</option>
-            <option value="SUITE">Офіс / Suite</option>
+            <option value="SUITE" selected>Офіс / Suite</option>
             <option value="MAILROOM">Поштовий відділ</option>
             <option value="FLOOR">Склад / Поверх</option>
             <option value="LOBBY">Лобі</option>
@@ -441,9 +441,9 @@
         <input type="hidden" name="service_code" value="{{ service_code }}">
         <input type="hidden" name="pickup_type" id="fld_pickup_type" value="pickup">
         <input type="hidden" name="pickup_date" id="fld_pickup_date" value="{{ pickup_default_date }}">
-        <input type="hidden" name="pickup_ready" id="fld_pickup_ready" value="0900">
-        <input type="hidden" name="pickup_close" id="fld_pickup_close" value="1800">
-        <input type="hidden" name="pickup_point" id="fld_pickup_point" value="RECEPTION">
+        <input type="hidden" name="pickup_ready" id="fld_pickup_ready" value="1100">
+        <input type="hidden" name="pickup_close" id="fld_pickup_close" value="1600">
+        <input type="hidden" name="pickup_point" id="fld_pickup_point" value="SUITE">
         <input type="hidden" name="delivery_date" value="{{ delivery_date }}">
       </form>
       <script>
@@ -451,8 +451,8 @@
         var isPickup = document.getElementById('pt_pickup').checked;
         document.getElementById('fld_pickup_type').value  = isPickup ? 'pickup' : 'dropoff';
         document.getElementById('fld_pickup_date').value  = document.getElementById('inp_pickup_date').value;
-        document.getElementById('fld_pickup_ready').value = (document.getElementById('inp_pickup_ready').value||'09:00').replace(':','');
-        document.getElementById('fld_pickup_close').value = (document.getElementById('inp_pickup_close').value||'18:00').replace(':','');
+        document.getElementById('fld_pickup_ready').value = (document.getElementById('inp_pickup_ready').value||'11:00').replace(':','');
+        document.getElementById('fld_pickup_close').value = (document.getElementById('inp_pickup_close').value||'16:00').replace(':','');
         document.getElementById('fld_pickup_point').value = document.getElementById('inp_pickup_point').value;
       });
       </script>
