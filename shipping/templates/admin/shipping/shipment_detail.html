@@ -658,6 +658,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               </span>
             </div>
             {% endif %}
+            {% if shipment.tracking_number and shipment.carrier and shipment.carrier.carrier_type == 'ups' %}
+            <div class="sd-info-row">
+              <span class="sd-info-key">Empfangsbestätigung</span>
+              <span class="sd-info-val">
+                <a href="https://www.ups.com/track?tracknum={{ shipment.tracking_number }}&loc=de_DE" target="_blank" class="sd-label-link">🧾 UPS сайт</a>
+              </span>
+            </div>
+            {% endif %}
             {% if not shipment.tracking_number and not shipment.carrier_service and not shipment.carrier_price %}
             <div style="color:var(--text-dim);font-size:13px;padding:4px 0">Дані від перевізника ще не отримано.</div>
             {% endif %}
