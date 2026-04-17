@@ -8,7 +8,7 @@ from core.mixins import AuditableMixin
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path, reverse
-from django.utils.html import format_html
+from django.utils.html import format_html, escape
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -4685,7 +4685,7 @@ class TrackingAttemptLogAdmin(admin.ModelAdmin):
 class ShippingSettingsAdmin(admin.ModelAdmin):
     """Singleton — налаштування доставки."""
 
-    readonly_fields = ("last_tracking_run", "tracking_actions")
+    readonly_fields = ("last_tracking_run", "tracking_actions", "tracking_rules_panel")
 
     fieldsets = [
         ("🔄 Автоматичний трекінг", {
@@ -4696,25 +4696,23 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 "tracking_actions",
             ),
             "description": (
-                "Додайте cron для автоматичного запуску (рекомендується кожні 5 хвилин — "
-                "команда сама пропустить запуск якщо інтервал ще не вийшов):<br>"
+                "Cron запускає команду кожні 5 хвилин, але команда сама пропустить запуск "
+                "якщо ще не вийшов інтервал:<br>"
                 "<code>*/5 * * * * docker-compose exec -T web python manage.py track_shipments</code>"
             ),
         }),
         ("📋 Правила трекінгу", {
-            "fields": (),
+            "fields": ("tracking_rules_panel",),
             "description": (
-                "Визначте які сервіси трекінгу використовувати для кожного типу перевізника. "
-                "Система намагатиметься їх по порядку пріоритету. "
-                "Запустіть <code>python manage.py setup_tracking_rules</code> для створення стандартних правил."
+                "<b>Як працює:</b> для кожного відправлення система визначає тип перевізника "
+                "(UPS/DHL/Jumingo/FedEx) і перебирає правила по порядку пріоритету. "
+                "Якщо перший трекер повернув помилку — пробує наступний. "
+                "Кожна спроба записується в лог."
             ),
-            "classes": ("collapse",),
         }),
         ("📝 Лог спроб трекінгу", {
             "fields": ("tracking_log_max_entries",),
-        }),
-        ("🔧 Логування API", {
-            "fields": ("ups_log_max_entries", "api_log_max_entries"),
+            "description": "Останні записи: <a href='/admin/shipping/trackingattemptlog/'>Відкрити лог трекінгу →</a>",
         }),
     ]
 
@@ -4726,9 +4724,85 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             'display:inline-block;padding:8px 18px;'
             'background:#1976d2;color:#fff;border-radius:6px;'
             'text-decoration:none;font-weight:600;font-size:13px">'
-            '🔄 Запустити оновлення зараз</a>'
+            '🔄 Запустити оновлення зараз</a>&nbsp;&nbsp;'
+            '<span style="color:var(--text-muted,#888);font-size:12px">'
+            'Ігнорує інтервал — оновить всі активні відправлення негайно</span>'
         )
     tracking_actions.short_description = "Дії"
+
+    def tracking_rules_panel(self, obj):
+        from django.utils.safestring import mark_safe
+
+        try:
+            rules = list(TrackingRule.objects.order_by("carrier_type", "priority"))
+        except Exception:
+            return format_html(
+                '<span style="color:#f44336">Таблиця правил недоступна — запустіть migrate</span>'
+            )
+
+        if not rules:
+            return format_html(
+                '<span style="color:#ff9800">Правила не налаштовані.</span> '
+                'Запустіть: <code>python manage.py setup_tracking_rules</code><br>'
+                '<a href="/admin/shipping/trackingrule/" style="color:#1976d2">Додати вручну →</a>'
+            )
+
+        TRACKER_ICONS = {
+            "jumingo":   "🔗",
+            "dhl":       "📦",
+            "dhl_track": "📡",
+            "ups":       "🟤",
+            "fedex":     "🟣",
+        }
+        CARRIER_ICONS = {
+            "jumingo": "🔗",
+            "dhl":     "📦",
+            "ups":     "🟤",
+            "fedex":   "🟣",
+            "other":   "📮",
+        }
+        PRIORITY_LABELS = {1: "основний", 2: "fallback 1", 3: "fallback 2"}
+
+        rows = []
+        prev_carrier = None
+        for rule in rules:
+            border = "border-top:1px solid var(--border-color,#333)" if rule.carrier_type != prev_carrier else ""
+            prev_carrier = rule.carrier_type
+            enabled_html = (
+                '<span style="color:#4caf50;font-size:11px">✅ увімк</span>'
+                if rule.enabled else
+                '<span style="color:#f44336;font-size:11px">⛔ вимк</span>'
+            )
+            rows.append(
+                f'<tr style="font-size:13px;{border}">'
+                f'<td style="padding:5px 10px;color:var(--text-muted,#888)">'
+                f'{CARRIER_ICONS.get(rule.carrier_type,"📮")} {escape(rule.get_carrier_type_display())}</td>'
+                f'<td style="padding:5px 10px;color:var(--text-muted,#888);font-size:11px">'
+                f'{PRIORITY_LABELS.get(rule.priority, f"p{rule.priority}")}</td>'
+                f'<td style="padding:5px 10px">'
+                f'{TRACKER_ICONS.get(rule.tracker,"🔧")} {escape(rule.get_tracker_display())}</td>'
+                f'<td style="padding:5px 10px">{enabled_html}</td>'
+                f'</tr>'
+            )
+
+        edit_url = reverse("admin:shipping_trackingrule_changelist")
+        html = (
+            '<table style="border-collapse:collapse;margin-bottom:10px">'
+            '<thead><tr style="font-size:11px;color:var(--text-muted,#888)">'
+            '<th style="padding:4px 10px;text-align:left">Перевізник</th>'
+            '<th style="padding:4px 10px;text-align:left">Роль у ланцюгу</th>'
+            '<th style="padding:4px 10px;text-align:left">Трекер</th>'
+            '<th style="padding:4px 10px;text-align:left">Стан</th>'
+            '</tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody>'
+            '</table>'
+            f'<a href="{escape(edit_url)}" style="display:inline-block;padding:6px 14px;'
+            'background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4);'
+            'border-radius:5px;text-decoration:none;font-size:12px;'
+            'border:1px solid var(--border-color,#333)">✏️ Редагувати правила</a>'
+        )
+        return mark_safe(html)
+    tracking_rules_panel.short_description = "Поточні правила"
 
     def get_urls(self):
         urls = super().get_urls()
