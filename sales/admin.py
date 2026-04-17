@@ -8,18 +8,52 @@ from django.db import transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import path, reverse
+from django import forms
+from django.forms import widgets
 from .models import SalesOrder, SalesOrderLine, SalesSource
 from .forms import SalesImportForm, SalesExcelUploadForm
 import openpyxl
 from decimal import Decimal, InvalidOperation
 import re
+
+
+COMMON_CURRENCIES = ["USD", "EUR", "GBP", "CHF", "JPY", "CNY", "PLN", "UAH",
+                     "CZK", "HUF", "CAD", "AUD", "SEK", "NOK", "DKK"]
+
+
+class CurrencyComboWidget(widgets.TextInput):
+    """Text input with datalist — shows all options on focus, allows free entry."""
+    def render(self, name, value, attrs=None, renderer=None):
+        if attrs is None:
+            attrs = {}
+        list_id = "sv-currency-datalist"
+        attrs["list"] = list_id
+        attrs.setdefault("style", "width:82px")
+        # On focus: clear so all datalist options appear; on blur: restore if empty
+        attrs["onfocus"] = "this._sv=this.value;this.value=''"
+        attrs["onblur"] = "if(!this.value)this.value=this._sv"
+        html = super().render(name, value, attrs, renderer)
+        options = "".join(f'<option value="{c}">' for c in COMMON_CURRENCIES)
+        html += f'<datalist id="{list_id}">{options}</datalist>'
+        return mark_safe(html)
+
+
+class SalesOrderLineInlineForm(forms.ModelForm):
+    currency = forms.CharField(
+        max_length=8,
+        required=False,
+        initial="USD",
+        widget=CurrencyComboWidget(),
+    )
+
+    class Meta:
+        model = SalesOrderLine
+        fields = "__all__"
 import json
 import os
 import tempfile
 import uuid
 from datetime import date
-
-from django import forms
 from pathlib import Path
 import shutil
 
@@ -122,11 +156,12 @@ except Exception:
 
 class SalesOrderLineInline(admin.TabularInline):
     model = SalesOrderLine
+    form = SalesOrderLineInlineForm
     extra = 0
     readonly_fields = ("stock_status",)
     fields = ("product", "sku_raw", "qty", "unit_price", "total_price", "currency", "stock_status")
     autocomplete_fields = ("product",)
-    
+
     # Темний фон для inline
 
 

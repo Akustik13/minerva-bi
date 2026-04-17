@@ -123,6 +123,18 @@ class SalesOrder(models.Model):
         )['t']
         return line_total or self.total_price or 0
 
+    @property
+    def crm_customer(self):
+        """Returns linked CRM Customer (cached per instance)."""
+        if not hasattr(self, '_crm_cust'):
+            from crm.models import Customer
+            self._crm_cust = None
+            if self.customer_key:
+                self._crm_cust = Customer.objects.filter(external_key=self.customer_key).first()
+            if not self._crm_cust and self.email:
+                self._crm_cust = Customer.objects.filter(email=self.email).first()
+        return self._crm_cust
+
 
 class SalesOrderLine(models.Model):
     order       = models.ForeignKey(SalesOrder, on_delete=models.CASCADE, related_name="lines")

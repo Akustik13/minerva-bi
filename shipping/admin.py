@@ -13,7 +13,10 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-from .models import Carrier, Shipment, ShipmentPackage, PackagingMaterial, OrderPackaging, ProductPackaging, ShippingSettings
+from .models import (
+    Carrier, Shipment, ShipmentPackage, PackagingMaterial, OrderPackaging,
+    ProductPackaging, ShippingSettings, TrackingRule, TrackingAttemptLog,
+)
 from .services.registry import get_service
 
 
@@ -764,11 +767,39 @@ class ShipmentPackageInline(admin.TabularInline):
     fields              = ("weight_kg", "length_cm", "width_cm", "height_cm", "quantity")
 
 
+# ── TrackingAttemptLog Inline (for Shipment change page) ─────────────────────
+
+class TrackingAttemptLogInline(admin.TabularInline):
+    model = TrackingAttemptLog
+    extra = 0
+    can_delete = False
+    max_num = 0
+    verbose_name = "Спроба трекінгу"
+    verbose_name_plural = "📋 Лог трекінгу"
+    fields = ("created_at", "tracker", "success_icon", "status_found",
+              "error_short", "duration_ms")
+    readonly_fields = ("created_at", "tracker", "success_icon", "status_found",
+                       "error_short", "duration_ms")
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).order_by("-created_at")[:20]
+
+    def success_icon(self, obj):
+        return "✅" if obj.success else "❌"
+    success_icon.short_description = "OK"
+
+    def error_short(self, obj):
+        if not obj.error:
+            return ""
+        return obj.error[:80] + ("…" if len(obj.error) > 80 else "")
+    error_short.short_description = "Помилка"
+
+
 # ── Shipment Admin ────────────────────────────────────────────────────────────
 
 @admin.register(Shipment)
 class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
-    inlines = [ShipmentPackageInline]
+    inlines = [ShipmentPackageInline, TrackingAttemptLogInline]
     list_display  = (
         "id_badge", "order_link", "carrier_badge", "status_badge",
         "recipient_name", "recipient_country", "weight_kg",
@@ -4623,6 +4654,33 @@ def _get_shipping_stats():
         return empty
 
 
+@admin.register(TrackingRule)
+class TrackingRuleAdmin(admin.ModelAdmin):
+    list_display  = ("carrier_type", "priority", "tracker", "enabled", "interval_override")
+    list_editable = ("tracker", "enabled", "interval_override")
+    list_filter   = ("carrier_type", "tracker", "enabled")
+    ordering      = ("carrier_type", "priority")
+
+
+@admin.register(TrackingAttemptLog)
+class TrackingAttemptLogAdmin(admin.ModelAdmin):
+    list_display  = ("created_at", "shipment_id", "tracker", "success", "status_found",
+                     "duration_ms", "error_short")
+    list_filter   = ("tracker", "success")
+    readonly_fields = ("created_at", "shipment", "tracker", "success", "status_found",
+                       "error", "duration_ms")
+    search_fields = ("tracker", "status_found", "error")
+
+    def has_add_permission(self, request):
+        return False
+
+    def error_short(self, obj):
+        if not obj.error:
+            return ""
+        return obj.error[:80] + ("…" if len(obj.error) > 80 else "")
+    error_short.short_description = "Помилка"
+
+
 @admin.register(ShippingSettings)
 class ShippingSettingsAdmin(admin.ModelAdmin):
     """Singleton — налаштування доставки."""
@@ -4642,6 +4700,21 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 "команда сама пропустить запуск якщо інтервал ще не вийшов):<br>"
                 "<code>*/5 * * * * docker-compose exec -T web python manage.py track_shipments</code>"
             ),
+        }),
+        ("📋 Правила трекінгу", {
+            "fields": (),
+            "description": (
+                "Визначте які сервіси трекінгу використовувати для кожного типу перевізника. "
+                "Система намагатиметься їх по порядку пріоритету. "
+                "Запустіть <code>python manage.py setup_tracking_rules</code> для створення стандартних правил."
+            ),
+            "classes": ("collapse",),
+        }),
+        ("📝 Лог спроб трекінгу", {
+            "fields": ("tracking_log_max_entries",),
+        }),
+        ("🔧 Логування API", {
+            "fields": ("ups_log_max_entries", "api_log_max_entries"),
         }),
     ]
 

@@ -1,0 +1,107 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Етикетки DYMO{% endblock %}
+{% block content_title %}<h1>🏷️ Етикетки DYMO</h1>{% endblock %}
+
+{% block content %}
+{% load i18n %}
+
+{# ── Upload widget ────────────────────────────────────────────────────────── #}
+<div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;
+            padding:20px;margin-bottom:24px">
+  <p style="margin:0 0 12px;font-weight:700;font-size:14px">
+    📤 Завантажити або оновити .dymo файли</p>
+  <input type="file" id="dymoFiles" multiple accept=".dymo"
+         style="margin-bottom:10px;display:block">
+  <button type="button" id="dymoUploadBtn"
+          style="background:#4caf50;color:#fff;border:none;padding:8px 20px;
+                 border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">
+    ⬆️ Завантажити на сервер
+  </button>
+  <div id="dymoResult" style="margin-top:10px;font-size:13px"></div>
+</div>
+
+{# ── Labels table ─────────────────────────────────────────────────────────── #}
+<div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;
+            padding:20px">
+  <p style="margin:0 0 12px;font-size:13px;color:var(--text-muted)">
+    Знайдено файлів: <b style="color:var(--text)">{{ labels|length }}</b></p>
+
+  {% if labels %}
+  <table style="border-collapse:collapse;width:100%;font-size:13px">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border-strong);color:var(--text-muted);
+                 font-size:11px;text-transform:uppercase;letter-spacing:.04em">
+        <th style="padding:8px 10px;text-align:left">SKU</th>
+        <th style="padding:8px 10px;text-align:left">Файл</th>
+        <th style="padding:8px 10px;text-align:right">Розмір</th>
+        <th style="padding:8px 10px;text-align:left">Змінено</th>
+        <th style="padding:8px 10px;text-align:center">Дія</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lbl in labels %}
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:8px 10px;font-family:monospace;font-weight:700;color:var(--text)">
+          {{ lbl.sku }}</td>
+        <td style="padding:8px 10px;color:var(--text-muted)">{{ lbl.filename }}</td>
+        <td style="padding:8px 10px;text-align:right;color:var(--text-muted)">
+          {{ lbl.size_kb }} KB</td>
+        <td style="padding:8px 10px;color:var(--text-muted);white-space:nowrap">
+          {{ lbl.modified_fmt }}</td>
+        <td style="padding:8px 10px;text-align:center">
+          <a href="/labels/serve/{{ lbl.sku }}/?qty=1" target="_blank"
+             style="background:#1565c0;color:#fff;padding:3px 10px;border-radius:4px;
+                    text-decoration:none;font-size:12px;font-weight:600">
+            🖨️ Друкувати
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p style="color:var(--text-muted)">Файлів ще немає.</p>
+  {% endif %}
+</div>
+
+<script>
+{% csrf_token %}
+(function () {
+  var csrfToken = '{{ csrf_token }}';
+  document.getElementById('dymoUploadBtn').addEventListener('click', function () {
+    var input = document.getElementById('dymoFiles');
+    var result = document.getElementById('dymoResult');
+    if (!input.files.length) {
+      result.innerHTML = '<span style="color:#f44336">Оберіть файли!</span>';
+      return;
+    }
+    var fd = new FormData();
+    for (var i = 0; i < input.files.length; i++) fd.append('labels', input.files[i]);
+    result.innerHTML = '⏳ Завантаження...';
+    fetch('/labels/upload/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrfToken},
+      body: fd,
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      var html = '<ul style="margin:5px 0;padding-left:20px">';
+      data.results.forEach(function (r) {
+        var icon = r.status === 'created' ? '✅' : r.status === 'updated' ? '🔄' : '❌';
+        var color = r.status === 'error' ? '#f44336' : '#4caf50';
+        html += '<li style="color:' + color + '">' + icon + ' ' + r.name + ': ' + r.status;
+        if (r.size) html += ' (' + (r.size / 1024).toFixed(1) + ' KB)';
+        html += '</li>';
+      });
+      html += '</ul><button onclick="location.reload()" '
+            + 'style="background:#1976d2;color:#fff;border:none;padding:6px 14px;'
+            + 'border-radius:4px;cursor:pointer;margin-top:6px">🔄 Оновити сторінку</button>';
+      result.innerHTML = html;
+    })
+    .catch(function (e) {
+      result.innerHTML = '<span style="color:#f44336">Помилка: ' + e + '</span>';
+    });
+  });
+})();
+</script>
+{% endblock %}

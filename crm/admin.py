@@ -836,6 +836,9 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 total_html = f'<b>{total:.2f}</b>&nbsp;{o.currency}' if total else '—'
             else:
                 skus_html = qtys_html = total_html = '—'
+            ship_cost = ''
+            if o.shipping_cost:
+                ship_cost = f'{o.shipping_cost:.2f}&nbsp;{o.shipping_currency}'
             rows.append(
                 f"<tr style='border-bottom:1px solid rgba(128,128,128,0.15)'>"
                 f"<td style='{TD};white-space:nowrap;opacity:0.85'>{o.order_date.strftime('%d.%m.%Y') if o.order_date else '—'}</td>"
@@ -845,6 +848,8 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 f"<td style='{TD};text-align:right'>{qtys_html}</td>"
                 f"<td style='{TD};white-space:nowrap;text-align:right'>{total_html}</td>"
                 f"<td style='{TD};opacity:0.75'>{o.tracking_number or '—'}</td>"
+                f"<td style='{TD};white-space:nowrap;text-align:right;opacity:0.85'>{ship_cost or '—'}</td>"
+                f"<td style='{TD};opacity:0.75;white-space:nowrap'>{o.shipping_courier or '—'}</td>"
                 f"</tr>"
             )
         TH = "padding:7px 10px;text-align:left;font-size:12px"
@@ -859,6 +864,8 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             f'<th style="{TH};text-align:right">К-сть</th>'
             f'<th style="{TH};text-align:right">Сума</th>'
             f'<th style="{TH}">Tracking</th>'
+            f'<th style="{TH};text-align:right">Доставка</th>'
+            f'<th style="{TH}">Перевізник</th>'
             '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
         )
     order_history_display.short_description = "Останні 20 замовлень"

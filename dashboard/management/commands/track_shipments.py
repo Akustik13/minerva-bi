@@ -1,8 +1,9 @@
 """
 dashboard/management/commands/track_shipments.py
 
-Автоматичне оновлення трекінгу відправлень (Jumingo + DHL).
-Поважає інтервал з ShippingSettings — безпечно запускати через cron кожні 5 хв.
+Автоматичне оновлення трекінгу відправлень.
+Підтримує Jumingo, DHL, DHL Tracking Unified, UPS, FedEx через fallback-ланцюг
+правил TrackingRule (налаштовується в адмінці → Налаштування доставки).
 
 Використання:
   python manage.py track_shipments              # пропускає якщо ще не час
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Оновлює трекінг активних відправлень через Jumingo та DHL API"
+    help = "Оновлює трекінг активних відправлень (Jumingo / DHL / UPS / FedEx)"
 
     def add_arguments(self, parser):
         parser.add_argument("--dry-run", action="store_true",
@@ -33,8 +34,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from shipping.models import Shipment, ShippingSettings
-        from shipping.services.registry import get_service
-        from shipping.admin import _apply_tracking_update
+        from shipping.services.tracking_engine import track_with_fallback
 
         dry_run       = options["dry_run"]
         force         = options["force"]
@@ -44,7 +44,10 @@ class Command(BaseCommand):
 
         # ── Перевірка чи увімкнено (--force обходить) ────────────────────────
         if not cfg.auto_tracking_enabled and not force:
-            self.stdout.write("⏸ Автоматичний трекінг вимкнено. Використайте --force для ручного запуску.")
+            self.stdout.write(
+                "⏸ Автоматичний трекінг вимкнено. "
+                "Використайте --force для ручного запуску."
+            )
             return
 
         # ── Антиспам-інтервал ─────────────────────────────────────────────────
@@ -64,40 +67,64 @@ class Command(BaseCommand):
             Shipment.Status.LABEL_READY,
             Shipment.Status.IN_TRANSIT,
         ]
-        qs = Shipment.objects.filter(
-            status__in=active_statuses,
-        ).select_related("carrier", "order")
+        qs = (
+            Shipment.objects
+            .filter(status__in=active_statuses)
+            .select_related("carrier", "order")
+        )
 
-        # Розбиваємо по типу перевізника
-        jumingo_qs = qs.filter(carrier__carrier_type="jumingo",
-                               carrier_shipment_id__gt="")
-        dhl_qs     = qs.filter(carrier__carrier_type="dhl",
-                               tracking_number__gt="")
-
-        total = jumingo_qs.count() + dhl_qs.count()
+        total = qs.count()
         self.stdout.write(
-            f"[track_shipments] {total} активних відправлень "
-            f"(Jumingo: {jumingo_qs.count()}, DHL: {dhl_qs.count()})"
+            f"[track_shipments] {total} активних відправлень"
             + (" [dry-run]" if dry_run else "")
         )
 
         updated = 0
         errors  = 0
-        changes = []   # деталі для нотифікації
+        changes = []
 
-        def _track_one(shipment, get_data_fn, label):
+        def _track_one(shipment):
             nonlocal updated, errors
+
+            carrier_label = (
+                f"{shipment.carrier.carrier_type}({shipment.carrier.name})"
+                if shipment.carrier else "?"
+            )
+            label = f"#{shipment.pk} {carrier_label}"
             old_status = shipment.status
+
             try:
-                data = get_data_fn()
-                if not data:
-                    self.stdout.write(f"  {label} — немає відповіді")
-                    return
+                changed, log_entries = track_with_fallback(shipment, dry_run=dry_run)
+
+                # Друкуємо результат кожної спроби в dry-run
                 if dry_run:
-                    self.stdout.write(f"  {label}: {data.get('status','—')}")
+                    for entry in log_entries:
+                        if entry.get("error"):
+                            self.stdout.write(
+                                f"  {label} [{entry['tracker']}] ❌ {entry['error']}"
+                            )
+                        else:
+                            self.stdout.write(
+                                f"  {label} [{entry['tracker']}] "
+                                f"→ {entry.get('normalized_class', entry.get('status', '—'))}"
+                            )
                     return
-                if _apply_tracking_update(shipment, data):
+
+                # Визначаємо чи були реальні зміни
+                successful = [e for e in log_entries if not e.get("error")]
+                if not successful:
+                    err_msg = "; ".join(
+                        f"{e['tracker']}: {e['error']}" for e in log_entries
+                    )
+                    errors += 1
+                    self.stdout.write(
+                        self.style.ERROR(f"  ❌ {label} — {err_msg}")
+                    )
+                    return
+
+                if changed:
                     updated += 1
+                    tracker_used = successful[0]["tracker"]
                     changes.append({
                         "order":      shipment.order.order_number if shipment.order else f"#{shipment.pk}",
                         "client":     (shipment.order.client or shipment.order.email or "—") if shipment.order else "—",
@@ -106,34 +133,50 @@ class Command(BaseCommand):
                         "tracking":   shipment.tracking_number or "",
                     })
                     self.stdout.write(self.style.SUCCESS(
-                        f"  ✅ {label} → {shipment.get_status_display()}"
+                        f"  ✅ {label} [{tracker_used}]"
+                        f" → {shipment.get_status_display()}"
                         + (f" TN:{shipment.tracking_number}" if shipment.tracking_number else "")
                     ))
                 else:
-                    self.stdout.write(f"  {label} — без змін")
+                    tracker_used = successful[0]["tracker"]
+                    self.stdout.write(f"  {label} [{tracker_used}] — без змін")
+
             except Exception as exc:
                 errors += 1
                 logger.exception("track_shipments error %s: %s", label, exc)
                 self.stdout.write(self.style.ERROR(f"  ❌ {label} — {exc}"))
 
-        # ── Jumingo ───────────────────────────────────────────────────────────
-        for shipment in jumingo_qs:
-            service = get_service(shipment.carrier)
-            _track_one(shipment,
-                       lambda s=shipment: service.track(s.carrier_shipment_id),
-                       f"#{shipment.pk} Jumingo({shipment.carrier_shipment_id})")
+        # ── Головний цикл ─────────────────────────────────────────────────────
+        for shipment in qs:
+            _track_one(shipment)
 
-        # ── DHL ───────────────────────────────────────────────────────────────
-        from shipping.services.dhl import get_tracking as dhl_get_tracking
-        for shipment in dhl_qs:
-            _track_one(shipment,
-                       lambda s=shipment: dhl_get_tracking(s.carrier, s.tracking_number),
-                       f"#{shipment.pk} DHL({shipment.tracking_number})")
+        if dry_run:
+            return
+
+        # ── Перевірка прострочених ETA (незалежно від API) ────────────────────
+        self._check_overdue_eta(changes)
+
+        # ── Оновлюємо час останнього запуску ─────────────────────────────────
+        ShippingSettings.objects.filter(pk=1).update(last_tracking_run=timezone.now())
+        self.stdout.write(self.style.SUCCESS(
+            f"[track_shipments] Готово: оновлено {updated}/{total}, помилок {errors}"
+        ))
+
+        if updated or (notify_always and errors):
+            try:
+                from dashboard.notifications import notify_sync_result
+                notify_sync_result("Авто-трекінг відправлень", {
+                    "created": 0,
+                    "updated": updated,
+                    "errors":  errors,
+                    "changes": changes,
+                }, force_notify=notify_always)
+            except Exception:
+                pass
 
     def _check_overdue_eta(self, changes: list):
         """
         Позначає посилки як затримані якщо eta_to < сьогодні і статус IN_TRANSIT.
-        Перевізник міг не надіслати явного сигналу затримки — виявляємо самостійно.
         """
         from shipping.models import Shipment
         from dashboard.notifications import _send_telegram, _get_ns
@@ -176,7 +219,6 @@ class Command(BaseCommand):
                 "extra":      f"⚠️ Затримка +{days_late} дн.",
             })
 
-            # Telegram-сповіщення
             if tg_enabled:
                 try:
                     eta_str = shipment.eta_to.strftime("%d.%m.%Y")
@@ -189,29 +231,5 @@ class Command(BaseCommand):
                         f"Перевір статус у перевізника"
                     )
                     _send_telegram(ns, msg)
-                except Exception:
-                    pass
-
-        # ── Перевірка прострочених ETA (незалежно від API) ───────────────────
-        if not dry_run:
-            self._check_overdue_eta(changes)
-
-        # ── Оновлюємо час останнього запуску ─────────────────────────────────
-        if not dry_run:
-            ShippingSettings.objects.filter(pk=1).update(last_tracking_run=timezone.now())
-            self.stdout.write(self.style.SUCCESS(
-                f"[track_shipments] Готово: оновлено {updated}/{total}, помилок {errors}"
-            ))
-            # Сповіщення якщо були зміни
-            # errors без updated — не сповіщаємо (API errors ≠ зміни замовлень)
-            if updated or (notify_always and errors):
-                try:
-                    from dashboard.notifications import notify_sync_result
-                    notify_sync_result("Авто-трекінг відправлень", {
-                        "created": 0,
-                        "updated": updated,
-                        "errors":  errors,
-                        "changes": changes,
-                    }, force_notify=notify_always)
                 except Exception:
                     pass

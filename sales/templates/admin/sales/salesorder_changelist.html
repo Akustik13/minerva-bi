@@ -60,12 +60,12 @@ document.addEventListener('DOMContentLoaded', function () {
 }
 .sv-card {
   background: var(--bg-card);
-  border: 1px solid var(--border-strong);
+  border: 1.5px solid var(--border-strong);
   border-left: 4px solid var(--border-strong);
   border-radius: 8px;
   padding: 16px 18px;
-  margin-bottom: 10px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  margin-bottom: 14px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.12);
   transition: box-shadow .15s, border-left-color .15s;
 }
 .sv-card:hover {
@@ -97,10 +97,16 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-pc-done{background:#2e7d32}
 .sv-ps-warn .sv-pd{background:#e65100;border-color:#e65100;color:#fff;animation:sv-pulse 1.2s ease-in-out infinite}
 @keyframes sv-pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.65;transform:scale(1.2)}}
+/* Table column separators */
+.sv-card table th{border-right:1px solid var(--border-strong);border-bottom:2px solid var(--border-strong)}
+.sv-card table th:last-child{border-right:none}
+.sv-card table td{border-right:1px solid var(--border)}
+.sv-card table td:last-child{border-right:none}
 /* Label row buttons */
-.sv-lbl-btn{font-size:10px;padding:2px 7px;border-radius:4px;font-weight:600;white-space:nowrap;cursor:pointer;border:none;display:inline-block;text-decoration:none}
-.sv-lbl-on{background:#1565c0;color:#fff}
+.sv-lbl-btn{font-size:10px;padding:3px 10px;border-radius:4px;font-weight:600;white-space:nowrap;cursor:pointer;border:none;display:inline-block;text-decoration:none;min-width:42px;text-align:center}
+.sv-lbl-on{background:#1565c0;color:#fff!important}
 .sv-lbl-off{background:var(--bg-input,#141f2b);color:var(--text-dim);opacity:.6;cursor:default;border:1px solid var(--border-strong)}
+.sv-lbl-add{background:rgba(46,125,50,.15);color:#4caf50!important;border:1px solid #2e7d32}
 </style>
 {% endblock %}
 
@@ -182,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <div class="sv-pc {% if sh %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-ps-done{% else %}sv-ps-cur{% endif %}{% endif %}">
         <div class="sv-pd">{% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}✓{% else %}●{% endif %}{% else %}·{% endif %}</div>
-        <div class="sv-pl">Надіслано</div>
+        <div class="sv-pl">Оформлення</div>
       </div>
       <div class="sv-pc {% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'shipped' or s == 'delivered' %}sv-ps-done{% elif sh.label_url %}sv-ps-cur{% endif %}">
@@ -202,23 +208,28 @@ document.addEventListener('DOMContentLoaded', function () {
     </div>
     {% endwith %}
 
-    {# Customer + meta #}
     <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;
-                display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+                display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       {% if order.client or order.email %}
-        <span style="color:var(--text);font-weight:600">
-          👤 {{ order.client|default:order.email }}
-        </span>
+        <span style="color:var(--text);font-weight:600">👤 {{ order.client|default:order.email }}</span>
       {% endif %}
       {% if order.addr_country %}
-        <span>🌍 {{ order.addr_country }}{% if order.addr_city %}, {{ order.addr_city }}{% endif %}</span>
-      {% endif %}
-      {% if order.tracking_number %}
-        <span style="font-family:monospace;background:var(--bg-input,#141f2b);padding:1px 7px;border-radius:5px;
-                     color:var(--text);font-size:12px">
-          {% if order.shipping_courier %}{{ order.shipping_courier }} {% endif %}🔍 {{ order.tracking_number }}
+        <span class="sv-country" data-code="{{ order.addr_country }}"
+              style="font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif">
+          {{ order.addr_country }}{% if order.addr_city %}, {{ order.addr_city }}{% endif %}
         </span>
       {% endif %}
+      {% with c=order.crm_customer %}{% if c %}
+        {% with rfm=c.rfm_score %}
+        <a href="{% url 'admin:crm_customer_change' c.pk %}"
+           style="font-size:11px;background:var(--bg-input,#141f2b);padding:2px 9px;border-radius:5px;
+                  border:1px solid var(--border-strong);color:var(--text-muted);display:inline-flex;gap:6px;align-items:center;text-decoration:none">
+          <span style="color:var(--text)">{{ c.get_status_display }}</span>
+          {% if rfm %}<span style="color:var(--text)">{{ rfm.segment }}</span>{% endif %}
+          · <b style="color:var(--text)">{{ c.total_orders }}</b> замов.
+        </a>
+        {% endwith %}
+      {% endif %}{% endwith %}
     </div>
 
     {# Order lines table #}
@@ -228,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <tr style="color:var(--text-muted);border-bottom:1px solid var(--border-strong);
                    font-size:11px;text-transform:uppercase;letter-spacing:.04em">
           <th style="padding:5px 8px;text-align:left;font-weight:600">Артикул</th>
-          <th style="padding:5px 8px;text-align:center;font-weight:600">🏷️</th>
+          <th style="padding:5px 8px;text-align:center;font-weight:600;white-space:nowrap">🏷️ Етикетка</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600">К-сть</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">Ціна</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">Сума</th>
@@ -269,41 +280,88 @@ document.addEventListener('DOMContentLoaded', function () {
     {% endif %}
 
     {# Footer: chips row + action #}
-    <div style="display:flex;justify-content:space-between;align-items:center;
-                flex-wrap:wrap;gap:8px;padding-top:10px;border-top:1px solid var(--border)">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;
+                padding-top:10px;border-top:1px solid var(--border)">
 
-      {# Left: action buttons + chips #}
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <a href="{% url 'admin:sales_salesorder_change' order.pk %}"
-           style="padding:5px 14px;background:#1565c0;color:#fff;
-                  border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
-          ⚙️ Обробити
-        </a>
-        <a href="{% url 'admin:shipping_shipment_create' order.pk %}"
-           style="padding:5px 14px;background:#2e7d32;color:#fff;
-                  border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
-          🚚 Відправлення
-        </a>
-        {# Склад chip — green if affects_stock, red if not #}
-        {% if order.affects_stock %}
-          <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                       background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32">
-            ✅ Склад
-          </span>
-        {% else %}
-          <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                       background:rgba(198,40,40,.12);color:#ef5350;border:1px solid #c62828">
-            ❌ Немає
-          </span>
+      <a href="{% url 'admin:sales_salesorder_change' order.pk %}"
+         style="padding:5px 14px;background:#1565c0;color:#fff;
+                border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
+        ⚙️ Обробити
+      </a>
+
+      {% if order.status != 'delivered' and order.status != 'shipped' %}
+      <a href="{% url 'admin:shipping_shipment_create' order.pk %}"
+         style="padding:5px 14px;background:#2e7d32;color:#fff;
+                border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
+        🚚 Відправлення
+      </a>
+      {# Склад chip — green if affects_stock, red if not #}
+      {% if order.affects_stock %}
+        <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                     background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32">
+          ✅ Склад
+        </span>
+      {% else %}
+        <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                     background:rgba(198,40,40,.12);color:#ef5350;border:1px solid #c62828">
+          ❌ Немає
+        </span>
+      {% endif %}
+      {% endif %}
+
+      {# Carrier + cost + tracking + shipments — one info row #}
+      {% if order.shipping_cost or order.tracking_number or order.shipments.exists %}
+      <span style="font-size:11px;background:var(--bg-input,#141f2b);padding:4px 10px;border-radius:5px;
+                   border:1px solid var(--border-strong);color:var(--text-muted);
+                   display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:monospace">
+        {# Carrier badge #}
+        {% with cr=order.shipping_courier|lower %}
+        {% if cr == 'ups' %}<b style="background:#4b2a00;color:#ffd100;font-size:10px;padding:1px 5px;border-radius:3px;font-family:sans-serif">UPS</b>
+        {% elif cr == 'dhl' %}<b style="background:#ffcc00;color:#000;font-size:10px;padding:1px 5px;border-radius:3px;font-family:sans-serif">DHL</b>
+        {% elif cr == 'fedex' %}<b style="background:#4d148c;color:#ff6600;font-size:10px;padding:1px 5px;border-radius:3px;font-family:sans-serif">FedEx</b>
+        {% elif cr == 'dpd' %}<b style="background:#dc0032;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;font-family:sans-serif">DPD</b>
+        {% elif cr == 'gls' %}<b style="background:#ff6400;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;font-family:sans-serif">GLS</b>
+        {% elif cr == 'post' or cr == 'deutsche post' %}<b style="background:#f5a800;color:#000;font-size:10px;padding:1px 5px;border-radius:3px;font-family:sans-serif">Post</b>
+        {% elif cr == 'nova poshta' or cr == 'nova' %}<b style="background:#da3b2f;color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;font-family:sans-serif">NP</b>
+        {% elif order.shipping_courier %}<b style="background:var(--border-strong);color:var(--text);font-size:10px;padding:1px 5px;border-radius:3px;font-family:sans-serif">{{ order.shipping_courier }}</b>
         {% endif %}
-        {# Shipping cost chip #}
-        {% if order.shipping_cost %}
-          <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                       background:var(--bg-input,#141f2b);color:var(--text-muted);border:1px solid var(--border-strong)">
-            🚚 {{ order.shipping_cost|floatformat:"2" }} {{ order.shipping_currency }}
-          </span>
+        {# Cost #}
+        {% if order.shipping_cost %}<span style="color:var(--text);font-weight:700">{{ order.shipping_cost|floatformat:"2" }} {{ order.shipping_currency }}</span>{% endif %}
+        {# Tracking — link to carrier site if known #}
+        {% if order.tracking_number %}
+        {% with tn=order.tracking_number %}
+        {% if cr == 'ups' %}<a href="https://www.ups.com/track?tracknum={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
+        {% elif cr == 'dhl' %}<a href="https://nolp.dhl.de/nextt-online-public/set_identcodes.do?idc={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
+        {% elif cr == 'fedex' %}<a href="https://www.fedex.com/fedextrack/?trknbr={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
+        {% elif cr == 'dpd' %}<a href="https://www.dpd.com/tracking/?parcelNo={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
+        {% elif cr == 'gls' %}<a href="https://gls-group.eu/track/{{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
+        {% elif cr == 'post' or cr == 'deutsche post' %}<a href="https://www.deutschepost.de/sendung/simpleQueryResult.html?form.sendungsnummer={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
+        {% elif cr == 'nova poshta' or cr == 'nova' %}<a href="https://novaposhta.ua/tracking/?cargo_number={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
+        {% else %}<span style="color:var(--text)">🔍 {{ tn }}</span>
         {% endif %}
-      </div>
+        {% endwith %}
+        {% endif %}
+        {% endwith %}
+        {# Shipments list #}
+        {% with shipments=order.shipments.all %}{% if shipments %}
+        <span style="font-family:sans-serif;border-left:1px solid var(--border-strong);padding-left:6px;display:inline-flex;align-items:center;gap:4px">
+          Відправлень: <b style="color:var(--text)">{{ shipments|length }}</b>
+          {% for sh in shipments %}
+          · <a href="/admin/shipping/shipment/{{ sh.pk }}/detail/"
+               style="text-decoration:none;font-weight:600;
+                      {% if sh.status == 'delivered' %}color:#4caf50
+                      {% elif sh.status == 'in_transit' %}color:#ff9800
+                      {% elif sh.status == 'label_ready' %}color:#00bcd4
+                      {% elif sh.status == 'submitted' %}color:#2196f3
+                      {% elif sh.status == 'error' %}color:#f44336
+                      {% elif sh.status == 'cancelled' %}color:#9e9e9e
+                      {% else %}color:#607d8b{% endif %}"
+               title="{{ sh.get_status_display|default:sh.status }}">{% if sh.status == 'delivered' %}✅{% elif sh.status == 'in_transit' %}🚚{% elif sh.status == 'label_ready' %}🏷️{% elif sh.status == 'submitted' %}📤{% elif sh.status == 'error' %}❌{% elif sh.status == 'cancelled' %}🚫{% else %}⬜{% endif %} #{{ sh.pk }}</a>
+          {% endfor %}
+        </span>
+        {% endif %}{% endwith %}
+      </span>
+      {% endif %}
 
     </div>
 
@@ -334,6 +392,37 @@ function svSetView(mode) {
   svSetView(localStorage.getItem('salesorder_view') || 'table');
 })();
 
+// ── Country flag: img from flagcdn.com + emoji fallback ──────────────────────
+(function () {
+  document.querySelectorAll('.sv-country[data-code]').forEach(function (el) {
+    var code = (el.dataset.code || '').toUpperCase().trim();
+    if (code.length !== 2) return;
+
+    // Emoji fallback text (works on macOS/iOS, not on Windows)
+    var emojiFlag = '';
+    try {
+      emojiFlag = String.fromCodePoint(0x1F1E6 + code.charCodeAt(0) - 65) +
+                  String.fromCodePoint(0x1F1E6 + code.charCodeAt(1) - 65);
+    } catch (e) {}
+
+    var img = document.createElement('img');
+    img.src = 'https://flagcdn.com/16x12/' + code.toLowerCase() + '.png';
+    img.alt = emojiFlag || code;
+    img.width = 16;
+    img.height = 12;
+    img.style.cssText = 'vertical-align:middle;margin-right:3px;border-radius:1px;display:inline-block';
+    img.onerror = function () {
+      // CDN недоступний → emoji span
+      var span = document.createElement('span');
+      span.style.fontFamily = '"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+      span.textContent = emojiFlag + ' ';
+      el.insertAdjacentElement('afterbegin', span);
+      img.remove();
+    };
+    el.insertAdjacentElement('afterbegin', img);
+  });
+})();
+
 // ── Per-row label buttons: batch-check .dymo availability ───────────────────
 (function () {
   var btns = document.querySelectorAll('.sv-line-lbl');
@@ -356,11 +445,60 @@ function svSetView(mode) {
           a.target = '_blank';
           a.title = '🖨️ ' + sku + ' × ' + qty;
           a.className = 'sv-lbl-btn sv-lbl-on';
-          a.textContent = '🖨️';
+          a.textContent = '🖨️ Друкувати';
           btn.parentNode.replaceChild(a, btn);
         } else {
-          btn.title = 'Файл .dymo не завантажено для ' + sku;
-          btn.textContent = '🏷️';
+          (function(origBtn, sku, qty) {
+            var fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.dymo';
+            fileInput.style.display = 'none';
+            document.body.appendChild(fileInput);
+
+            var addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.title = 'Додати етикетку для ' + sku;
+            addBtn.className = 'sv-lbl-btn sv-lbl-add';
+            addBtn.textContent = '➕ Додати';
+            origBtn.parentNode.replaceChild(addBtn, origBtn);
+
+            addBtn.addEventListener('click', function() { fileInput.click(); });
+
+            fileInput.addEventListener('change', function() {
+              if (!fileInput.files.length) return;
+              var fd = new FormData();
+              fd.append('labels', fileInput.files[0]);
+              var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+              addBtn.textContent = '⏳';
+              addBtn.disabled = true;
+              fetch('/labels/upload/', {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrf},
+                body: fd,
+              })
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                var ok = data.results && data.results[0] && data.results[0].status !== 'error';
+                if (ok) {
+                  var a = document.createElement('a');
+                  a.href = '/labels/serve/' + encodeURIComponent(sku) + '/?qty=' + qty;
+                  a.target = '_blank';
+                  a.title = '🖨️ ' + sku + ' × ' + qty;
+                  a.className = 'sv-lbl-btn sv-lbl-on';
+                  a.textContent = '🖨️ Друкувати';
+                  addBtn.parentNode.replaceChild(a, addBtn);
+                  document.body.removeChild(fileInput);
+                } else {
+                  addBtn.textContent = '❌ Помилка';
+                  addBtn.disabled = false;
+                }
+              })
+              .catch(function() {
+                addBtn.textContent = '❌ Помилка';
+                addBtn.disabled = false;
+              });
+            });
+          })(btn, sku, qty);
         }
       });
     })

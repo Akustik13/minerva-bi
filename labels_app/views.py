@@ -10,9 +10,11 @@ import copy
 from pathlib import Path
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse, Http404
+from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.admin.views.decorators import staff_member_required
 from django.utils.decorators import method_decorator
+from datetime import datetime
 import xml.etree.ElementTree as ET
 
 
@@ -154,16 +156,15 @@ def upload_label(request):
 
 @staff_member_required
 def list_labels(request):
-    """Список всіх доступних етикеток."""
+    """Список всіх доступних етикеток — HTML-сторінка."""
     LABELS_DIR.mkdir(parents=True, exist_ok=True)
-    
     labels = []
     for f in sorted(LABELS_DIR.glob('*.dymo')):
+        mtime = f.stat().st_mtime
         labels.append({
             'sku': f.stem,
             'filename': f.name,
             'size_kb': round(f.stat().st_size / 1024, 1),
-            'modified': f.stat().st_mtime,
+            'modified_fmt': datetime.fromtimestamp(mtime).strftime('%d.%m.%Y %H:%M'),
         })
-    
-    return JsonResponse({'labels': labels, 'count': len(labels)})
+    return render(request, 'labels/list.html', {'labels': labels})

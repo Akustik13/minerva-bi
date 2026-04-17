@@ -11,7 +11,7 @@ class Customer(models.Model):
 
     class Segment(models.TextChoices):
         B2B         = "b2b",         "B2B (компанія)"
-        B2C         = "b2c",         "B2C (фізична особа)"
+        B2C         = "b2c",         "B2C"
         DISTRIBUTOR = "distributor", "Дистриб'ютор"
         RESELLER    = "reseller",    "Реселер"
         OTHER       = "other",       "Інше"

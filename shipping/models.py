@@ -464,7 +464,74 @@ class ShippingSettings(models.Model):
         self.pk = 1
         super().save(*args, **kwargs)
 
+    tracking_log_max_entries = models.PositiveSmallIntegerField(
+        "Лог трекінгу — макс. записів", default=500,
+        help_text="Скільки останніх спроб трекінгу зберігати у базі (100–2000).",
+    )
+
     @classmethod
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+class TrackingRule(models.Model):
+    """Правило трекінгу — який сервіс використовувати для певного типу перевізника."""
+
+    TRACKER_CHOICES = [
+        ("jumingo",   "Jumingo"),
+        ("dhl",       "DHL (MyDHL+ API)"),
+        ("dhl_track", "DHL Tracking Unified"),
+        ("ups",       "UPS"),
+        ("fedex",     "FedEx"),
+    ]
+
+    carrier_type = models.CharField(
+        "Тип перевізника", max_length=20,
+        choices=Carrier.CarrierType.choices,
+    )
+    priority = models.PositiveSmallIntegerField(
+        "Пріоритет", default=1,
+        help_text="1=основний, 2=перший fallback, 3=другий fallback",
+    )
+    tracker = models.CharField(
+        "Сервіс трекінгу", max_length=20,
+        choices=TRACKER_CHOICES,
+    )
+    enabled = models.BooleanField("Увімкнено", default=True)
+    interval_override = models.PositiveSmallIntegerField(
+        "Інтервал (хв, 0=глобальний)", default=0,
+    )
+
+    class Meta:
+        ordering = ["carrier_type", "priority"]
+        unique_together = [["carrier_type", "priority"]]
+        verbose_name = "Правило трекінгу"
+        verbose_name_plural = "Правила трекінгу"
+
+    def __str__(self):
+        return f"{self.get_carrier_type_display()} → {self.get_tracker_display()} (p{self.priority})"
+
+
+class TrackingAttemptLog(models.Model):
+    """Журнал спроб трекінгу — хто що пробував і з яким результатом."""
+
+    shipment = models.ForeignKey(
+        Shipment, null=True, on_delete=models.SET_NULL,
+        related_name="tracking_logs", verbose_name="Відправлення",
+    )
+    tracker     = models.CharField("Сервіс", max_length=20)
+    success     = models.BooleanField("Успіх")
+    status_found = models.CharField("Знайдений статус", max_length=100, blank=True)
+    error       = models.TextField("Помилка", blank=True)
+    duration_ms = models.PositiveIntegerField("Час (мс)", default=0)
+    created_at  = models.DateTimeField("Час", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "Лог трекінгу"
+        verbose_name_plural = "Лог трекінгу"
+
+    def __str__(self):
+        status = "✅" if self.success else "❌"
+        return f"{status} {self.tracker} #{self.shipment_id} {self.created_at:%d.%m %H:%M}"
