@@ -131,15 +131,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    /* ── upload button ─────────────────────────────────────────────────── */
-    var uploadBtn = document.getElementById('docUploadBtn');
-    if (uploadBtn) uploadBtn.addEventListener('click', function() {
-        var input  = document.getElementById('docFiles');
+    /* ── auto-upload on file select ────────────────────────────────────── */
+    var docFilesInput = document.getElementById('docFiles');
+    if (docFilesInput) docFilesInput.addEventListener('change', function() {
+        var input  = this;
         var result = document.getElementById('docResult');
-        if (!input || !input.files.length) {
-            if (result) result.innerHTML = '<span style="color:#f44336">Оберіть файли!</span>';
-            return;
-        }
+        if (!input.files.length) return;
 
         var files = Array.from(input.files);
         var fd    = new FormData();
@@ -258,9 +255,11 @@ document.addEventListener('DOMContentLoaded', function() {
                   + (d.local_mkdir_error ? '❌ ' + d.local_mkdir_error : '✅ mkdir OK')
                   + '</pre></details>';
         }
-        html += '<button type="button" onclick="location.reload()"'
-              + ' style="background:#417690;color:#fff;border:none;padding:6px 14px;'
-              + 'border-radius:4px;cursor:pointer;margin-top:6px">🔄 Оновити список</button>';
+        var pk = (document.getElementById('order-docs-panel') || {}).dataset && document.getElementById('order-docs-panel').dataset.pk;
+        if (pk && typeof _refreshDocsPanel === 'function') {
+            _refreshDocsPanel(pk);
+        }
+        html += '<span style="color:#4caf50;font-size:12px;margin-left:6px">↑ список оновлено</span>';
         return html;
     }
 
