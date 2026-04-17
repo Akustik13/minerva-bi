@@ -442,7 +442,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             "fields": ("stock_summary",)
         }),
         ("🏷️ Етикетки DYMO", {
-            "fields": ("label_buttons_detail", "label_upload_widget"),
+            "fields": ("label_buttons_detail",),
             "description": "Натисніть кнопку — файл завантажиться і відкриється в DYMO Label Software",
         }),
         
@@ -462,7 +462,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ['stock_summary', 'label_buttons_detail', 'label_upload_widget',
+    readonly_fields = ['stock_summary', 'label_buttons_detail',
                        'documents_list', 'upload_widget', 'doc_buttons', 'packaging_panel']
     
     def _docs_panel_html(self, obj):
@@ -1292,8 +1292,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def label_buttons_detail(self, obj):
         from pathlib import Path
         from django.conf import settings
+        import re as _re
+
         labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
         rows = []
+        inputs_js = []
+
         for line in obj.lines.all():
             sku = line.product.sku if line.product else line.sku_raw
             name = line.product.name if line.product else (line.sku_raw or '—')
@@ -1301,8 +1305,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             if not sku:
                 continue
             sku = sku.strip().replace('\u2013', '-').replace('\u2014', '-').replace('\u2010', '-').replace('\u2011', '-')
-            label_path = None
             sku_up = sku.upper()
+            # safe ID: тільки [a-z0-9_]
+            sku_id = _re.sub(r'[^a-z0-9]', '_', sku.lower())
+
+            label_path = None
             for f in labels_dir.glob('*.dymo'):
                 s = f.stem.upper()
                 if s == sku_up:
@@ -1310,26 +1317,54 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     break
                 if label_path is None and s.startswith(sku_up) and len(s) > len(sku_up) and s[len(sku_up)] in (' ', '_'):
                     label_path = f
+
             if label_path:
-                url = f"/labels/serve/{sku}/?qty={qty}"
-                btn = (f'<a href="{url}" target="_blank" '
-                       f'style="background:#1976d2;color:#fff;padding:8px 16px;'
-                       f'border-radius:8px;text-decoration:none;font-weight:bold">'
-                       f'🖨️ Друкувати ({qty} шт.)</a>')
-                st = f'<span style="color:#4caf50;margin-left:10px">✅ {label_path.name}</span>'
+                print_url = f"/labels/serve/{sku}/?qty={qty}"
+                print_btn = (
+                    f'<a href="{print_url}" target="_blank" '
+                    f'style="background:#1976d2;color:#fff;padding:7px 14px;'
+                    f'border-radius:7px;text-decoration:none;font-weight:bold;font-size:13px">'
+                    f'🖨️ Друкувати ({qty} шт.)</a>'
+                )
+                upload_btn = (
+                    f'<button type="button" onclick="document.getElementById(\'dfi_{sku_id}\').click()" '
+                    f'style="background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4);'
+                    f'border:1px solid var(--border-color,#333);padding:7px 14px;'
+                    f'border-radius:7px;cursor:pointer;font-size:13px;margin-left:8px">'
+                    f'🔄 Оновити етикетку</button>'
+                )
+                status = f'<span style="color:#4caf50;font-size:12px;margin-left:8px">✅ {label_path.name}</span>'
+                actions = print_btn + upload_btn + status
             else:
-                btn = '<span style="color:rgba(150,150,150,0.9);font-style:italic">Файл не завантажено</span>'
-                st = (f'<span style="color:#f44336;margin-left:10px">'
-                      f'❌ {sku}.dymo — завантажте нижче</span>')
+                upload_btn = (
+                    f'<button type="button" onclick="document.getElementById(\'dfi_{sku_id}\').click()" '
+                    f'style="background:#388e3c;color:#fff;border:none;padding:7px 14px;'
+                    f'border-radius:7px;cursor:pointer;font-size:13px;font-weight:bold">'
+                    f'📎 Додати етикетку</button>'
+                )
+                status = f'<span style="color:#f44336;font-size:12px;margin-left:8px">❌ {sku}.dymo відсутній</span>'
+                actions = upload_btn + status
+
+            # прихований file input + авто-завантаження по change
+            hidden_input = (
+                f'<input type="file" id="dfi_{sku_id}" accept=".dymo" style="display:none" '
+                f'data-sku="{sku}">'
+            )
+            result_div = f'<div id="dres_{sku_id}" style="font-size:12px;margin-top:4px"></div>'
+
             rows.append(
                 f'<tr style="border-bottom:1px solid rgba(128,128,128,0.15)">'
                 f'<td style="padding:10px;font-weight:bold">{sku}</td>'
                 f'<td style="padding:10px;opacity:0.85">{name}</td>'
                 f'<td style="padding:10px;text-align:center;font-weight:bold">{qty}</td>'
-                f'<td style="padding:10px">{btn}{st}</td></tr>')
+                f'<td style="padding:10px">{actions}{hidden_input}{result_div}</td>'
+                f'</tr>'
+            )
+
         if not rows:
             return mark_safe('<p style="color:#999">Немає позицій</p>')
-        return mark_safe(
+
+        html = (
             '<table style="border-collapse:collapse;width:100%;'
             'border-radius:8px;overflow:hidden;border:1px solid rgba(128,128,128,0.2)">'
             '<thead><tr style="background:rgba(21,101,192,0.85);color:#e3f2fd">'
@@ -1337,70 +1372,50 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '<th style="padding:10px;text-align:left">Назва</th>'
             '<th style="padding:10px;text-align:center">К-сть</th>'
             '<th style="padding:10px;text-align:left">Дія</th>'
-            '</tr></thead><tbody>' + "".join(rows) + '</tbody></table>')
-    label_buttons_detail.short_description = "Друк етикеток"
-
-    # ── Завантаження ───────────────────────────────────────────────────────────
-
-    def label_upload_widget(self, obj):
-        # CSRF через hidden input Django, не через cookie
-        return mark_safe('''
-        <div style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);
-                    padding:16px;border-radius:8px">
-          <p style="margin:0 0 10px;font-weight:bold;opacity:0.9">
-            📤 Завантажити або оновити .dymo файли</p>
-          <input type="file" id="dymoFiles" multiple accept=".dymo"
-                 style="margin-bottom:10px;display:block;opacity:0.85">
-          <button type="button" id="dymoUploadBtn"
-                  style="background:#4caf50;color:#fff;border:none;padding:8px 20px;
-                         border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold">
-            ⬆️ Завантажити на сервер
-          </button>
-          <div id="dymoResult" style="margin-top:10px;font-size:13px"></div>
-        </div>
-        <script>
-        document.getElementById("dymoUploadBtn").addEventListener("click", function() {
-            var input = document.getElementById("dymoFiles");
-            var result = document.getElementById("dymoResult");
-            if (!input.files.length) {
-                result.innerHTML = "<span style=\'color:#f44336\'>Оберіть файли!</span>";
-                return;
-            }
-            var formData = new FormData();
-            for (var i = 0; i < input.files.length; i++) {
-                formData.append("labels", input.files[i]);
-            }
-            // CSRF з Django hidden input
-            var csrfEl = document.querySelector("[name=csrfmiddlewaretoken]");
-            var csrf = csrfEl ? csrfEl.value : "";
-            result.innerHTML = "⏳ Завантаження...";
-            fetch("/labels/upload/", {
-                method: "POST",
-                headers: {"X-CSRFToken": csrf},
-                body: formData
-            })
-            .then(function(r) { return r.json(); })
-            .then(function(data) {
-                var html = "<ul style=\'margin:5px 0;padding-left:20px\'>";
-                data.results.forEach(function(r) {
-                    var icon = r.status === "created" ? "✅" : r.status === "updated" ? "🔄" : "❌";
-                    var color = r.status === "error" ? "#f44336" : "#4caf50";
-                    html += "<li style=\'color:" + color + "\'>" + icon + " " + r.name + ": " + r.status;
-                    if (r.size) html += " (" + (r.size/1024).toFixed(1) + " KB)";
-                    html += "</li>";
-                });
-                html += "</ul><button onclick=\'location.reload()\' "
-                     + "style=\'background:#1976d2;color:#fff;border:none;padding:6px 14px;"
-                     + "border-radius:4px;cursor:pointer;margin-top:6px\'>🔄 Оновити</button>";
-                result.innerHTML = html;
-            })
-            .catch(function(e) {
-                result.innerHTML = "<span style=\'color:#f44336\'>Помилка: " + e + "</span>";
-            });
-        });
-        </script>
-        ''')
-    label_upload_widget.short_description = "Завантажити етикетки"
+            '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
+            '''
+<script>
+(function() {
+  function uploadDymo(input) {
+    var sku = input.dataset.sku;
+    var safeId = sku.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    var resultEl = document.getElementById('dres_' + safeId);
+    if (!input.files.length) return;
+    var formData = new FormData();
+    formData.append('labels', input.files[0]);
+    var csrf = (document.querySelector('[name=csrfmiddlewaretoken]') || {}).value || '';
+    resultEl.innerHTML = '<span style="color:#ff9800">⏳ Завантаження...</span>';
+    fetch('/labels/upload/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf},
+      body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var r = (data.results || [])[0] || {};
+      if (r.status === 'error') {
+        resultEl.innerHTML = '<span style="color:#f44336">❌ ' + (r.name || '') + ': ' + (r.error || 'помилка') + '</span>';
+      } else {
+        var icon = r.status === 'created' ? '✅' : '🔄';
+        var sz = r.size ? ' (' + (r.size/1024).toFixed(1) + ' KB)' : '';
+        resultEl.innerHTML = icon + ' Збережено' + sz
+          + ' <button onclick="location.reload()" style="background:#1976d2;color:#fff;'
+          + 'border:none;padding:3px 10px;border-radius:4px;cursor:pointer;margin-left:6px;font-size:12px">'
+          + '🔄 Оновити</button>';
+      }
+    })
+    .catch(function(e) {
+      resultEl.innerHTML = '<span style="color:#f44336">Помилка: ' + e + '</span>';
+    });
+  }
+  document.querySelectorAll('input[id^="dfi_"]').forEach(function(inp) {
+    inp.addEventListener('change', function() { uploadDymo(this); });
+  });
+})();
+</script>'''
+        )
+        return mark_safe(html)
+    label_buttons_detail.short_description = "Друк та завантаження етикеток"
 
     # ── Склад ──────────────────────────────────────────────────────────────────
 
