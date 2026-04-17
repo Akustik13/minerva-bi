@@ -50,6 +50,11 @@ def _get_app_list(self, request, app_label=None):
         'bots':     ['digikeyconfig', 'bot', 'botlog'],
     }
 
+    # Моделі що реєструються в admin але не показуються в сайдбарі
+    model_exclude = {
+        'shipping': ['trackingrule', 'trackingattemptlog'],
+    }
+
     app_list = []
     for app_name in app_order:
         if app_name in app_dict:
@@ -59,6 +64,15 @@ def _get_app_list(self, request, app_label=None):
     for app_name, app in app_dict.items():
         if app_name not in app_order:
             app_list.append(app)
+
+    # Виключаємо моделі що не мають бути в сайдбарі
+    for app in app_list:
+        excluded = model_exclude.get(app['app_label'], [])
+        if excluded:
+            app['models'] = [
+                m for m in app['models']
+                if m['object_name'].lower() not in excluded
+            ]
 
     # Сортуємо моделі всередині аппів де задано порядок
     for app in app_list:

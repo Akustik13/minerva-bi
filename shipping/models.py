@@ -454,11 +454,11 @@ class ShippingSettings(models.Model):
     )
 
     class Meta:
-        verbose_name        = "Налаштування доставки"
-        verbose_name_plural = "Налаштування доставки"
+        verbose_name        = "Налаштування"
+        verbose_name_plural = "Налаштування"
 
     def __str__(self):
-        return "Налаштування доставки"
+        return "Налаштування доставки & трекінгу"
 
     def save(self, *args, **kwargs):
         self.pk = 1

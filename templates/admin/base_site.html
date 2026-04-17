@@ -1012,7 +1012,7 @@ document.addEventListener('DOMContentLoaded', function(){
     }
   }
 
-  /* ── Доставка: insert Відслідковування + DHL Трекінг before Перевізники ── */
+  /* ── Доставка: insert Відслідковування before Перевізники ── */
   if (mods['shipping']) {
     var shTbody = mods['shipping'].querySelector('tbody');
     if (shTbody) {
@@ -1024,10 +1024,6 @@ document.addEventListener('DOMContentLoaded', function(){
       var otRow = document.createElement('tr');
       otRow.innerHTML = '<th scope="row"><a href="/admin/shipping/shipment/order-tracking/" style="color:#2196f3">📡 Відслідковування</a></th>';
       shTbody.insertBefore(otRow, carrierRow);
-      var trackRow = document.createElement('tr');
-      trackRow.innerHTML = '<th scope="row"><a href="/admin/shipping/shipment/dhl-track-lookup/" style="color:#f9a825">🔍 DHL Трекінг</a></th>';
-      shTbody.insertBefore(trackRow, carrierRow);
-
     }
   }
 
