@@ -4685,7 +4685,7 @@ class TrackingAttemptLogAdmin(admin.ModelAdmin):
 class ShippingSettingsAdmin(admin.ModelAdmin):
     """Singleton — налаштування доставки."""
 
-    readonly_fields = ("last_tracking_run", "tracking_actions", "tracking_rules_panel")
+    readonly_fields = ("last_tracking_run", "tracking_actions", "tracking_rules_panel", "tracking_log_link")
 
     fieldsets = [
         ("🔄 Автоматичний трекінг", {
@@ -4711,8 +4711,7 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ("📝 Лог спроб трекінгу", {
-            "fields": ("tracking_log_max_entries",),
-            "description": "Останні записи: <a href='/admin/shipping/trackingattemptlog/'>Відкрити лог трекінгу →</a>",
+            "fields": ("tracking_log_max_entries", "tracking_log_link"),
         }),
     ]
 
@@ -4803,6 +4802,18 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
         )
         return mark_safe(html)
     tracking_rules_panel.short_description = "Поточні правила"
+
+    def tracking_log_link(self, obj):
+        url = reverse("admin:shipping_trackingattemptlog_changelist")
+        count = TrackingAttemptLog.objects.count()
+        return format_html(
+            '<a href="{}" style="display:inline-block;padding:6px 14px;'
+            'background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4);'
+            'border-radius:5px;text-decoration:none;font-size:12px;'
+            'border:1px solid var(--border-color,#333)">📋 Відкрити лог трекінгу ({} записів) →</a>',
+            url, count,
+        )
+    tracking_log_link.short_description = ""
 
     def get_urls(self):
         urls = super().get_urls()
