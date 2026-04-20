@@ -2,7 +2,7 @@
 
 {% block extrahead %}{{ block.super }}
 <style>
-#lpBrowseBtn, #lpNativeBtn {
+#lpBrowseBtn {
   background: #37474f;
   color: #b0bec5;
   border: 1px solid #546e7a;
@@ -13,8 +13,7 @@
   margin-left: 6px;
   vertical-align: middle;
 }
-#lpBrowseBtn:hover, #lpNativeBtn:hover { background: #455a64; color: #c9d8e4; }
-#lpNativeHint { margin-left:10px; font-size:12px; color:#9aafbe; display:none; vertical-align:middle; }
+#lpBrowseBtn:hover { background: #455a64; color: #c9d8e4; }
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -44,39 +43,6 @@ document.addEventListener('DOMContentLoaded', function () {
     + 'background:#0d1f2d;border:1px solid #2a6049;border-radius:4px;'
     + 'font-family:monospace;font-size:12px;color:#4caf50;word-break:break-all';
   btn.insertAdjacentElement('afterend', pathDisplay);
-
-  /* ── Кнопка «Провідник ПК» (Chrome/Edge: showDirectoryPicker) ────── */
-  var hint = document.createElement('span');
-  hint.id  = 'lpNativeHint';
-  pathDisplay.insertAdjacentElement('afterend', hint);
-
-  if (typeof window.showDirectoryPicker === 'function') {
-    var nativeBtn = document.createElement('button');
-    nativeBtn.type  = 'button';
-    nativeBtn.id    = 'lpNativeBtn';
-    nativeBtn.title = 'Відкрити провідник Windows (Chrome/Edge)';
-    nativeBtn.textContent = '🖥️ Провідник ПК';
-    hint.insertAdjacentElement('afterend', nativeBtn);
-
-    nativeBtn.addEventListener('click', function () {
-      window.showDirectoryPicker({ mode: 'readwrite' })
-        .then(function (handle) {
-          /* Браузер не дає повний шлях з міркувань безпеки.
-             Показуємо назву папки як підказку — шлях вводиться вручну. */
-          hint.style.display = 'inline';
-          hint.innerHTML = '✅ Обрано: <b>' + handle.name + '</b>'
-            + ' <span style="font-size:11px;color:#607d8b">'
-            + '(браузер не повертає повний шлях — введіть або уточніть вручну)</span>';
-          if (!inp.value.trim()) {
-            inp.value = handle.name;
-            inp.focus();
-          }
-        })
-        .catch(function (e) {
-          if (e.name !== 'AbortError') console.error('Picker error:', e);
-        });
-    });
-  }
 
   /* ── Серверний браузер (завжди доступний) ──────────────────────────── */
   btn.addEventListener('click', function () {
