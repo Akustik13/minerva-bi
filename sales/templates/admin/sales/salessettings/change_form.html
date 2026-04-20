@@ -1,0 +1,168 @@
+{% extends "admin/change_form.html" %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+#lpBrowseBtn {
+  background: #37474f;
+  color: #b0bec5;
+  border: 1px solid #546e7a;
+  padding: 6px 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+#lpBrowseBtn:hover { background: #455a64; color: #c9d8e4; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var inp = document.getElementById('id_local_docs_path');
+  if (!inp) return;
+
+  /* ── Кнопка «Вибрати папку» ──────────────────────────────────────────── */
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id   = 'lpBrowseBtn';
+  btn.textContent = '📂 Вибрати папку';
+  inp.insertAdjacentElement('afterend', btn);
+
+  var BROWSE_URL = '{% url "admin:sales_salesorder_browse_dir" %}';
+  var _curDir    = '';
+
+  btn.addEventListener('click', function () {
+    dirOpen(inp.value.trim() || '');
+  });
+
+  /* ── Server-side folder browser ────────────────────────────────────────── */
+  /* Modal HTML — вставляємо в body */
+  var modalHtml =
+    '<div id="lpModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;'
+    + 'background:rgba(0,0,0,.72);z-index:100000">'
+    + '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
+    + 'background:#1e2a35;border:1px solid #2a3f52;border-radius:10px;'
+    + 'padding:24px;width:660px;max-width:94vw;'
+    + 'display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.7)">'
+    /* header */
+    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
+    + '<span style="color:#c9d8e4;font-weight:700;font-size:15px">📂 Вибрати папку</span>'
+    + '<button type="button" id="lpModalClose" style="background:none;border:none;'
+    + 'color:#9aafbe;font-size:22px;cursor:pointer;line-height:1;padding:0">✕</button>'
+    + '</div>'
+    /* path bar */
+    + '<div style="display:flex;gap:6px;margin-bottom:8px">'
+    + '<input type="text" id="lpPathInput" placeholder="Введіть шлях або оберіть нижче…"'
+    + ' style="flex:1;background:#111c26;border:1px solid #2a3f52;border-radius:4px;'
+    + 'padding:7px 10px;font-size:12px;font-family:monospace;color:#c9d8e4;outline:none">'
+    + '<button type="button" id="lpGoBtn" style="background:#2a3f52;color:#9aafbe;'
+    + 'border:1px solid #3a5570;border-radius:4px;padding:7px 14px;cursor:pointer;'
+    + 'font-size:13px;white-space:nowrap">→ Перейти</button>'
+    + '</div>'
+    /* note */
+    + '<div style="font-size:11px;color:#546e7a;margin-bottom:10px;line-height:1.5">'
+    + 'ℹ️ Браузер показує файлову систему <b style="color:#607d8b">сервера</b>. '
+    + 'Для локального Django на Windows — шлях у форматі '
+    + '<code style="color:#9aafbe">C:\\Users\\...</code></div>'
+    /* dir list */
+    + '<div id="lpDirList" style="overflow-y:auto;border:1px solid #2a3f52;border-radius:4px;'
+    + 'background:#0d1117;min-height:160px;max-height:320px"></div>'
+    /* footer */
+    + '<div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">'
+    + '<button type="button" id="lpCancelBtn" style="background:#37474f;color:#b0bec5;'
+    + 'border:1px solid #546e7a;padding:8px 18px;border-radius:6px;cursor:pointer">'
+    + 'Скасувати</button>'
+    + '<button type="button" id="lpConfirmBtn" style="background:#4caf50;color:#fff;'
+    + 'border:none;padding:8px 22px;border-radius:6px;cursor:pointer;font-weight:700">'
+    + '✅ Вибрати цю папку</button>'
+    + '</div></div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  var modal     = document.getElementById('lpModal');
+  var dirList   = document.getElementById('lpDirList');
+  var pathInput = document.getElementById('lpPathInput');
+
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function dirOpen(startPath) {
+    modal.style.display = 'block';
+    dirLoad(startPath || '');
+  }
+  function dirClose() { modal.style.display = 'none'; }
+
+  function dirLoad(path) {
+    dirList.innerHTML = '<div style="padding:14px;color:#607d8b">⏳ Завантаження...</div>';
+    fetch(BROWSE_URL + '?path=' + encodeURIComponent(path))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        _curDir = data.current;
+        if (pathInput) pathInput.value = data.current;
+        var h = '';
+        if (data.parent !== null && data.parent !== undefined) {
+          h += '<div data-dir="' + esc(data.parent) + '"'
+             + ' style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #162030;'
+             + 'color:#9aafbe;display:flex;align-items:center;gap:10px">'
+             + '<span>⬆️</span><span style="color:#607d8b;font-size:12px">..</span>'
+             + '<span style="font-size:11px;color:#455a64;font-family:monospace">'
+             + esc(data.parent) + '</span></div>';
+        }
+        if (!data.dirs || !data.dirs.length) {
+          h += '<div style="padding:14px;color:#607d8b;font-style:italic">Немає підпапок</div>';
+        } else {
+          data.dirs.forEach(function(d) {
+            h += '<div data-dir="' + esc(d.path) + '"'
+               + ' style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #0d1117;'
+               + 'color:#c9d8e4;display:flex;align-items:center;gap:10px">'
+               + '<span>📁</span><span>' + esc(d.name) + '</span></div>';
+          });
+        }
+        dirList.innerHTML = h;
+      })
+      .catch(function(err) {
+        if (pathInput) pathInput.value = path;
+        dirList.innerHTML = '<div style="padding:14px;color:#f44336">⚠️ ' + esc(String(err)) + '</div>';
+      });
+  }
+
+  /* Клік по папці */
+  dirList.addEventListener('click', function(e) {
+    var item = e.target.closest('[data-dir]');
+    if (item) dirLoad(item.getAttribute('data-dir'));
+  });
+  dirList.addEventListener('mouseover', function(e) {
+    var item = e.target.closest('[data-dir]');
+    if (item) item.style.background = '#162030';
+  });
+  dirList.addEventListener('mouseout', function(e) {
+    var item = e.target.closest('[data-dir]');
+    if (item) item.style.background = '';
+  });
+
+  /* Ввід шляху вручну */
+  if (pathInput) pathInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); dirLoad(this.value.trim()); }
+  });
+  document.getElementById('lpGoBtn').addEventListener('click', function() {
+    dirLoad(pathInput.value.trim());
+  });
+
+  /* Закрити */
+  ['lpModalClose', 'lpCancelBtn'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener('click', dirClose);
+  });
+  modal.addEventListener('click', function(e) { if (e.target === this) dirClose(); });
+
+  /* Підтвердити */
+  document.getElementById('lpConfirmBtn').addEventListener('click', function() {
+    var chosen = (pathInput ? pathInput.value.trim() : '') || _curDir;
+    if (!chosen) return;
+    inp.value = chosen;
+    dirClose();
+  });
+});
+</script>
+{% endblock %}

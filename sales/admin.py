@@ -136,6 +136,7 @@ class SalesSourceAdmin(admin.ModelAdmin):
 
 @admin.register(SalesSettings)
 class SalesSettingsAdmin(admin.ModelAdmin):
+    change_form_template = 'admin/sales/salessettings/change_form.html'
     fieldsets = (
         ('📁 Локальне збереження документів', {
             'fields': ('local_save_enabled', 'local_docs_path'),
