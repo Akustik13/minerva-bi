@@ -24,6 +24,11 @@ document.addEventListener('DOMContentLoaded', function () {
   var BROWSE_URL = '{% url "admin:sales_salesorder_browse_dir" %}';
   var _curDir    = '';
 
+  /* ── Показати поточний шлях відразу (якщо вже вказаний) ─────────── */
+  if (inp.value.trim()) {
+    inp.style.fontFamily = 'monospace';
+  }
+
   /* ── Кнопка «Провідник сервера» (завжди) ───────────────────────────── */
   var btn = document.createElement('button');
   btn.type = 'button';
@@ -32,10 +37,18 @@ document.addEventListener('DOMContentLoaded', function () {
   btn.textContent = '📂 Вибрати папку';
   inp.insertAdjacentElement('afterend', btn);
 
+  /* ── Відображення вибраного шляху ─────────────────────────────────── */
+  var pathDisplay = document.createElement('div');
+  pathDisplay.id = 'lpPathDisplay';
+  pathDisplay.style.cssText = 'display:none;margin-top:6px;padding:6px 10px;'
+    + 'background:#0d1f2d;border:1px solid #2a6049;border-radius:4px;'
+    + 'font-family:monospace;font-size:12px;color:#4caf50;word-break:break-all';
+  btn.insertAdjacentElement('afterend', pathDisplay);
+
   /* ── Кнопка «Провідник ПК» (Chrome/Edge: showDirectoryPicker) ────── */
   var hint = document.createElement('span');
   hint.id  = 'lpNativeHint';
-  btn.insertAdjacentElement('afterend', hint);
+  pathDisplay.insertAdjacentElement('afterend', hint);
 
   if (typeof window.showDirectoryPicker === 'function') {
     var nativeBtn = document.createElement('button');
@@ -195,6 +208,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!chosen) return;
     inp.value = chosen;
     hint.style.display = 'none';
+    /* ── Показати вибраний шлях і підсвітити поле ─────────────────── */
+    pathDisplay.textContent = '✅ ' + chosen;
+    pathDisplay.style.display = 'block';
+    inp.style.borderColor = '#4caf50';
+    inp.style.boxShadow = '0 0 0 2px rgba(76,175,80,.35)';
+    setTimeout(function() {
+      inp.style.borderColor = '';
+      inp.style.boxShadow = '';
+    }, 3000);
     dirClose();
   });
 });
