@@ -1667,24 +1667,30 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             elif not cfg.local_docs_path:
                 local_info = {'skip': 'local_docs_path не вказано'}
             else:
+                import re as _re
                 raw_base = cfg.local_docs_path.strip()
-                base_path = _Path(raw_base.replace('\\', os.sep))
-                # Якщо шлях вже закінчується на номер замовлення — зберігаємо туди
-                # Інакше додаємо тільки номер замовлення (без source/date)
-                if base_path.name == order.order_number:
-                    local_dir = base_path
+                is_win_path = bool(_re.match(r'^[A-Za-z]:[/\\]', raw_base))
+                # Windows-шлях на Linux-сервері — не намагатись записувати
+                if is_win_path and _sys.platform != 'win32':
+                    local_info = {
+                        'skip': 'Windows-шлях недоступний з Linux/Docker сервера',
+                        'hint': 'Вкажіть Linux-шлях до примонтованого тому, напр. /volume1/homes/...',
+                        'platform': _sys.platform,
+                    }
                 else:
-                    local_dir = base_path / order.order_number
-                dest_local = local_dir / filename
-                local_info['base'] = raw_base
-                local_info['target'] = str(dest_local)
-                local_info['platform'] = _sys.platform
-                local_info['is_absolute'] = (
-                    bool(__import__('re').match(r'^[A-Za-z]:[/\\]', raw_base))
-                    or _Path(raw_base.replace('\\', os.sep)).is_absolute()
-                )
-                local_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(str(dest_file), str(dest_local))
+                    base_path = _Path(raw_base.replace('\\', os.sep))
+                    if base_path.name == order.order_number:
+                        local_dir = base_path
+                    else:
+                        local_dir = base_path / order.order_number
+                    dest_local = local_dir / filename
+                    local_info['base'] = raw_base
+                    local_info['target'] = str(dest_local)
+                    local_info['platform'] = _sys.platform
+                    local_info['is_absolute'] = (is_win_path
+                        or _Path(raw_base.replace('\\', os.sep)).is_absolute())
+                    local_dir.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(str(dest_file), str(dest_local))
                 local_info['ok'] = True
         except Exception as e:
             local_info['ok'] = False
@@ -1799,10 +1805,20 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def check_local_path_view(self, request):
         """AJAX GET — перевіряє чи існує вказаний шлях на сервері і чи доступний для запису."""
         from django.http import JsonResponse
-        import os, sys
+        import os, sys, re
         raw = request.GET.get('path', '').strip()
         if not raw:
             return JsonResponse({'error': 'Шлях не вказано'})
+        is_windows_path = bool(re.match(r'^[A-Za-z]:[/\\]', raw))
+        # Windows-шлях на Linux-сервері — фізично неможливо
+        if is_windows_path and sys.platform != 'win32':
+            return JsonResponse({
+                'path': raw,
+                'platform': sys.platform,
+                'windows_on_linux': True,
+                'exists': False,
+                'writable': False,
+            })
         normalized = raw.replace('\\', os.sep)
         exists   = os.path.isdir(normalized)
         writable = os.access(normalized, os.W_OK) if exists else False

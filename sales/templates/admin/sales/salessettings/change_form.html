@@ -66,6 +66,17 @@ document.addEventListener('DOMContentLoaded', function () {
           result.innerHTML = '❌ ' + d.error;
           return;
         }
+        if (d.windows_on_linux) {
+          result.style.background = 'rgba(183,28,28,.15)';
+          result.style.border = '1px solid rgba(183,28,28,.4)';
+          result.style.color = '#ef9a9a';
+          result.innerHTML = '🖥️❌ Це Windows-шлях, але сервер працює на <b>Linux/Docker</b>.<br>'
+            + '<span style="color:#9aafbe">Сервер фізично не може записувати на <code>' + d.path + '</code></span><br><br>'
+            + '<b style="color:#ffb74d">Варіанти:</b><br>'
+            + '1️⃣ Запусти Django локально на Windows → шлях C:\\ запрацює<br>'
+            + '2️⃣ Вкажи Linux-шлях до папки NAS, напр.: <code style="color:#81c784">/volume1/homes/prymv/Documents/Orders</code>';
+          return;
+        }
         if (d.exists && d.writable) {
           result.style.background = 'rgba(46,125,50,.15)';
           result.style.border = '1px solid rgba(46,125,50,.4)';
@@ -85,7 +96,7 @@ document.addEventListener('DOMContentLoaded', function () {
           result.innerHTML = '❌ Шлях не знайдено на сервері (' + d.platform + ')<br>'
             + '<span style="color:#607d8b">Перевірено: ' + d.normalized + '</span><br>'
             + (d.platform !== 'win32'
-              ? '<span style="color:#546e7a">Сервер — Linux/Docker. Вкажіть шлях до примонтованого тому, напр.: <code>/volume1/homes/prymv/Documents</code></span>'
+              ? '<span style="color:#546e7a">Сервер — Linux/Docker. Вкажіть шлях до примонтованого тому NAS, напр.: <code>/volume1/homes/prymv/Documents</code></span>'
               : '<span style="color:#546e7a">Перевірте правильність шляху</span>');
         }
       })
