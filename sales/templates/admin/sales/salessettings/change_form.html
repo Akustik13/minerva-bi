@@ -14,176 +14,88 @@
   vertical-align: middle;
 }
 #lpBrowseBtn:hover { background: #455a64; color: #c9d8e4; }
+#lpPathResult {
+  display: none;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: monospace;
+  line-height: 1.6;
+  word-break: break-all;
+}
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var inp = document.getElementById('id_local_docs_path');
   if (!inp) return;
 
-  var BROWSE_URL = '{% url "admin:sales_salesorder_browse_dir" %}';
-  var _curDir    = '';
+  inp.style.fontFamily = 'monospace';
+  inp.style.width = '60%';
 
-  /* ── Показати поточний шлях відразу (якщо вже вказаний) ─────────── */
-  if (inp.value.trim()) {
-    inp.style.fontFamily = 'monospace';
-  }
+  var CHECK_URL = '{% url "admin:sales_salesorder_check_local_path" %}';
 
-  /* ── Кнопка «Провідник сервера» (завжди) ───────────────────────────── */
+  /* ── Кнопка «Перевірити шлях» ──────────────────────────────────────── */
   var btn = document.createElement('button');
   btn.type = 'button';
   btn.id   = 'lpBrowseBtn';
-  btn.title = 'Відкрити браузер папок сервера';
-  btn.textContent = '📂 Вибрати папку';
+  btn.title = 'Перевірити чи існує шлях на сервері';
+  btn.textContent = '🔍 Перевірити';
   inp.insertAdjacentElement('afterend', btn);
 
-  /* ── Відображення вибраного шляху ─────────────────────────────────── */
-  var pathDisplay = document.createElement('div');
-  pathDisplay.id = 'lpPathDisplay';
-  pathDisplay.style.cssText = 'display:none;margin-top:6px;padding:6px 10px;'
-    + 'background:#0d1f2d;border:1px solid #2a6049;border-radius:4px;'
-    + 'font-family:monospace;font-size:12px;color:#4caf50;word-break:break-all';
-  btn.insertAdjacentElement('afterend', pathDisplay);
+  /* ── Результат перевірки ────────────────────────────────────────────── */
+  var result = document.createElement('div');
+  result.id = 'lpPathResult';
+  btn.insertAdjacentElement('afterend', result);
 
-  /* ── Серверний браузер (завжди доступний) ──────────────────────────── */
   btn.addEventListener('click', function () {
-    dirOpen(inp.value.trim() || '');
-  });
-
-  /* ── Modal HTML ─────────────────────────────────────────────────────── */
-  var modalHtml =
-    '<div id="lpModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;'
-    + 'background:rgba(0,0,0,.72);z-index:100000">'
-    + '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
-    + 'background:#1e2a35;border:1px solid #2a3f52;border-radius:10px;'
-    + 'padding:24px;width:660px;max-width:94vw;'
-    + 'display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.7)">'
-    /* header */
-    + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-    + '<span style="color:#c9d8e4;font-weight:700;font-size:15px">📂 Вибрати папку</span>'
-    + '<button type="button" id="lpModalClose" style="background:none;border:none;'
-    + 'color:#9aafbe;font-size:22px;cursor:pointer;line-height:1;padding:0">✕</button>'
-    + '</div>'
-    /* path bar */
-    + '<div style="display:flex;gap:6px;margin-bottom:8px">'
-    + '<input type="text" id="lpPathInput" placeholder="Введіть шлях або оберіть нижче…"'
-    + ' style="flex:1;background:#111c26;border:1px solid #2a3f52;border-radius:4px;'
-    + 'padding:7px 10px;font-size:12px;font-family:monospace;color:#c9d8e4;outline:none">'
-    + '<button type="button" id="lpGoBtn" style="background:#2a3f52;color:#9aafbe;'
-    + 'border:1px solid #3a5570;border-radius:4px;padding:7px 14px;cursor:pointer;'
-    + 'font-size:13px;white-space:nowrap">→ Перейти</button>'
-    + '</div>'
-    /* note */
-    + '<div style="font-size:11px;color:#546e7a;margin-bottom:10px;line-height:1.5">'
-    + 'ℹ️ Показує файлову систему <b style="color:#607d8b">сервера</b>. '
-    + 'На Windows (локально) — шляхи типу <code style="color:#9aafbe">C:\\Users\\...</code>. '
-    + 'У Docker — Linux-шляхи: <code style="color:#9aafbe">/volume1/...</code>, <code style="color:#9aafbe">/data/...</code>'
-    + '</div>'
-    /* dir list */
-    + '<div id="lpDirList" style="overflow-y:auto;border:1px solid #2a3f52;border-radius:4px;'
-    + 'background:#0d1117;min-height:160px;max-height:320px"></div>'
-    /* footer */
-    + '<div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">'
-    + '<button type="button" id="lpCancelBtn" style="background:#37474f;color:#b0bec5;'
-    + 'border:1px solid #546e7a;padding:8px 18px;border-radius:6px;cursor:pointer">'
-    + 'Скасувати</button>'
-    + '<button type="button" id="lpConfirmBtn" style="background:#4caf50;color:#fff;'
-    + 'border:none;padding:8px 22px;border-radius:6px;cursor:pointer;font-weight:700">'
-    + '✅ Вибрати цю папку</button>'
-    + '</div></div></div>';
-
-  document.body.insertAdjacentHTML('beforeend', modalHtml);
-
-  var modal     = document.getElementById('lpModal');
-  var dirList   = document.getElementById('lpDirList');
-  var pathInput = document.getElementById('lpPathInput');
-
-  function esc(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
-                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  function dirOpen(startPath) {
-    modal.style.display = 'block';
-    dirLoad(startPath || '');
-  }
-  function dirClose() { modal.style.display = 'none'; }
-
-  function dirLoad(path) {
-    dirList.innerHTML = '<div style="padding:14px;color:#607d8b">⏳ Завантаження...</div>';
-    fetch(BROWSE_URL + '?path=' + encodeURIComponent(path))
-      .then(function(r) { return r.json(); })
-      .then(function(data) {
-        _curDir = data.current;
-        if (pathInput) pathInput.value = data.drives ? '' : data.current;
-        var h = '';
-        /* Якщо повернули список дисків (Windows) або є батьківська папка */
-        if (!data.drives && data.parent !== null && data.parent !== undefined) {
-          h += '<div data-dir="' + esc(data.parent) + '"'
-             + ' style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #162030;'
-             + 'color:#9aafbe;display:flex;align-items:center;gap:10px">'
-             + '<span>⬆️</span><span style="color:#607d8b;font-size:12px">..</span>'
-             + '<span style="font-size:11px;color:#455a64;font-family:monospace">'
-             + esc(data.parent) + '</span></div>';
+    var p = inp.value.trim();
+    if (!p) { alert('Введіть шлях'); return; }
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    fetch(CHECK_URL + '?path=' + encodeURIComponent(p))
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        btn.disabled = false;
+        btn.textContent = '🔍 Перевірити';
+        result.style.display = 'block';
+        if (d.error) {
+          result.style.background = 'rgba(183,28,28,.15)';
+          result.style.border = '1px solid rgba(183,28,28,.4)';
+          result.style.color = '#ef9a9a';
+          result.innerHTML = '❌ ' + d.error;
+          return;
         }
-        if (!data.dirs || !data.dirs.length) {
-          h += '<div style="padding:14px;color:#607d8b;font-style:italic">Немає підпапок</div>';
+        if (d.exists && d.writable) {
+          result.style.background = 'rgba(46,125,50,.15)';
+          result.style.border = '1px solid rgba(46,125,50,.4)';
+          result.style.color = '#81c784';
+          result.innerHTML = '✅ Шлях існує і доступний для запису<br>'
+            + '<span style="color:#607d8b">Сервер: ' + d.platform + ' → ' + d.normalized + '</span>';
+        } else if (d.exists && !d.writable) {
+          result.style.background = 'rgba(230,81,0,.12)';
+          result.style.border = '1px solid rgba(230,81,0,.4)';
+          result.style.color = '#ffb74d';
+          result.innerHTML = '⚠️ Папка існує, але немає прав на запис<br>'
+            + '<span style="color:#607d8b">Сервер: ' + d.platform + ' → ' + d.normalized + '</span>';
         } else {
-          data.dirs.forEach(function(d) {
-            h += '<div data-dir="' + esc(d.path) + '"'
-               + ' style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #0d1117;'
-               + 'color:#c9d8e4;display:flex;align-items:center;gap:8px">'
-               + '<span>' + (data.drives ? '💾' : '📁') + '</span>'
-               + '<span style="font-family:monospace">' + esc(d.name) + '</span>'
-               + '</div>';
-          });
+          result.style.background = 'rgba(183,28,28,.15)';
+          result.style.border = '1px solid rgba(183,28,28,.4)';
+          result.style.color = '#ef9a9a';
+          result.innerHTML = '❌ Шлях не знайдено на сервері (' + d.platform + ')<br>'
+            + '<span style="color:#607d8b">Перевірено: ' + d.normalized + '</span><br>'
+            + (d.platform !== 'win32'
+              ? '<span style="color:#546e7a">Сервер — Linux/Docker. Вкажіть шлях до примонтованого тому, напр.: <code>/volume1/homes/prymv/Documents</code></span>'
+              : '<span style="color:#546e7a">Перевірте правильність шляху</span>');
         }
-        dirList.innerHTML = h;
       })
-      .catch(function(err) {
-        if (pathInput) pathInput.value = path;
-        dirList.innerHTML = '<div style="padding:14px;color:#f44336">⚠️ ' + esc(String(err)) + '</div>';
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = '🔍 Перевірити';
+        result.style.display = 'block';
+        result.style.color = '#ef9a9a';
+        result.innerHTML = '❌ Помилка мережі';
       });
-  }
-
-  dirList.addEventListener('click', function(e) {
-    var item = e.target.closest('[data-dir]');
-    if (item) dirLoad(item.getAttribute('data-dir'));
-  });
-  dirList.addEventListener('mouseover', function(e) {
-    var item = e.target.closest('[data-dir]');
-    if (item) item.style.background = '#162030';
-  });
-  dirList.addEventListener('mouseout', function(e) {
-    var item = e.target.closest('[data-dir]');
-    if (item) item.style.background = '';
-  });
-  if (pathInput) pathInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); dirLoad(this.value.trim()); }
-  });
-  document.getElementById('lpGoBtn').addEventListener('click', function() {
-    dirLoad(pathInput.value.trim());
-  });
-  ['lpModalClose', 'lpCancelBtn'].forEach(function(id) {
-    var el = document.getElementById(id);
-    if (el) el.addEventListener('click', dirClose);
-  });
-  modal.addEventListener('click', function(e) { if (e.target === this) dirClose(); });
-
-  document.getElementById('lpConfirmBtn').addEventListener('click', function() {
-    var chosen = (pathInput ? pathInput.value.trim() : '') || _curDir;
-    if (!chosen) return;
-    inp.value = chosen;
-    hint.style.display = 'none';
-    /* ── Показати вибраний шлях і підсвітити поле ─────────────────── */
-    pathDisplay.textContent = '✅ ' + chosen;
-    pathDisplay.style.display = 'block';
-    inp.style.borderColor = '#4caf50';
-    inp.style.boxShadow = '0 0 0 2px rgba(76,175,80,.35)';
-    setTimeout(function() {
-      inp.style.borderColor = '';
-      inp.style.boxShadow = '';
-    }, 3000);
-    dirClose();
   });
 });
 </script>

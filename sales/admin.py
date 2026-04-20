@@ -1577,9 +1577,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/upload-docs/',
                  self.admin_site.admin_view(self.upload_docs_view),
                  name='sales_salesorder_upload_docs'),
-            path('browse-dir/',
-                 self.admin_site.admin_view(self.browse_dir_view),
-                 name='sales_salesorder_browse_dir'),
+            path('check-local-path/',
+                 self.admin_site.admin_view(self.check_local_path_view),
+                 name='sales_salesorder_check_local_path'),
             # PDF document generators (download + ?action=save)
             path('<int:pk>/doc/packing-list/',
                  self.admin_site.admin_view(self._doc_packing_list),
@@ -1796,54 +1796,23 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         }
         return JsonResponse({'results': results, 'debug': debug})
 
-    def browse_dir_view(self, request):
-        """AJAX — повертає список підпапок для серверного браузера директорій.
-        Windows: пустий шлях → список дисків (C:\\, D:\\, ...).
-        Linux:   пустий шлях → / (shows mounted volumes like /volume1).
-        """
+    def check_local_path_view(self, request):
+        """AJAX GET — перевіряє чи існує вказаний шлях на сервері і чи доступний для запису."""
         from django.http import JsonResponse
         import os, sys
-
-        path = request.GET.get('path', '').strip()
-
-        # ── Windows: пустий шлях → показуємо диски ────────────────────────────
-        if not path and sys.platform == 'win32':
-            import string
-            drives = []
-            for letter in string.ascii_uppercase:
-                dp = f'{letter}:\\'
-                if os.path.exists(dp):
-                    drives.append({'name': dp, 'path': dp})
-            return JsonResponse({'current': '', 'parent': None, 'dirs': drives, 'drives': True})
-
-        # ── Linux/Docker: пустий шлях → стартуємо з / ─────────────────────────
-        if not path:
-            saved = request.session.get('local_base_path', '')
-            path = saved if saved and os.path.isdir(saved) else '/'
-
-        path = os.path.normpath(path)
-        if not os.path.isdir(path):
-            parent = os.path.dirname(path)
-            fallback = '/' if sys.platform != 'win32' else os.path.expanduser('~')
-            path = parent if os.path.isdir(parent) else fallback
-
-        parent = os.path.dirname(path)
-        if parent == path:
-            parent = None  # корінь файлової системи (/ або диск Windows)
-
-        dirs = []
-        try:
-            with os.scandir(path) as it:
-                for entry in sorted(it, key=lambda e: e.name.lower()):
-                    try:
-                        if entry.is_dir(follow_symlinks=False):
-                            dirs.append({'name': entry.name, 'path': entry.path})
-                    except OSError:
-                        pass
-        except OSError:
-            pass
-
-        return JsonResponse({'current': path, 'parent': parent, 'dirs': dirs})
+        raw = request.GET.get('path', '').strip()
+        if not raw:
+            return JsonResponse({'error': 'Шлях не вказано'})
+        normalized = raw.replace('\\', os.sep)
+        exists   = os.path.isdir(normalized)
+        writable = os.access(normalized, os.W_OK) if exists else False
+        return JsonResponse({
+            'path': raw,
+            'normalized': normalized,
+            'platform': sys.platform,
+            'exists': exists,
+            'writable': writable,
+        })
 
     def import_excel_view(self, request):
         """3-кроковий wizard імпорту замовлень з Excel з динамічним маппінгом колонок."""
