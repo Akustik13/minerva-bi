@@ -897,6 +897,25 @@ class UPSClient:
             city = city.replace(src, dst)
         return unicodedata.normalize('NFKD', city).encode('ascii', 'ignore').decode().strip()
 
+    @staticmethod
+    def _split_addr_line(line: str, max_len: int = 35) -> list:
+        """Split a long address line into ≤max_len-char chunks (word-aware, max 3 lines)."""
+        if len(line) <= max_len:
+            return [line]
+        words = line.split()
+        chunks, current = [], ""
+        for word in words:
+            if not current:
+                current = word[:max_len]
+            elif len(current) + 1 + len(word) <= max_len:
+                current += " " + word
+            else:
+                chunks.append(current)
+                current = word[:max_len]
+        if current:
+            chunks.append(current)
+        return chunks[:3]  # UPS allows max 3 address lines
+
     def _fmt_addr(self, addr: dict, addr_fallback: bool = False) -> dict:
         country = (addr.get('country') or 'DE').upper()
         postal  = (addr.get('postal') or '')
@@ -910,7 +929,8 @@ class UPSClient:
         }
         addr_line = (addr.get('address_line') or '').strip()
         if addr_line:
-            result['AddressLine'] = [addr_line]
+            # UPS requires each address line ≤ 35 chars
+            result['AddressLine'] = self._split_addr_line(addr_line)
         elif addr_fallback:
             result['AddressLine'] = ['-']
         if addr.get('state'):
