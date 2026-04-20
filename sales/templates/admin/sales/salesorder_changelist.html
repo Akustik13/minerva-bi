@@ -141,21 +141,21 @@ document.addEventListener('DOMContentLoaded', function () {
 <div class="sv-qf-bar" id="sv-qf-bar">
   {# Status filters — built by JS from window.location #}
   <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Статус:</span>
-  <a class="sv-qf-btn" id="svf-s-all"       onclick="svQF('status','');return false" href="#">Всі</a>
-  <a class="sv-qf-btn" id="svf-s-received"  onclick="svQF('status','received');return false" href="#">📥 Отримано</a>
-  <a class="sv-qf-btn" id="svf-s-processing" onclick="svQF('status','processing');return false" href="#">⚙️ Обробка</a>
-  <a class="sv-qf-btn" id="svf-s-shipped"   onclick="svQF('status','shipped');return false" href="#">🚚 Відправлено</a>
-  <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQF('status','delivered');return false" href="#">✅ Доставлено</a>
-  <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQF('status','cancelled');return false" href="#">🚫 Скасовано</a>
+  <a class="sv-qf-btn" id="svf-s-all"       onclick="svQFStatus('');return false" href="#">Всі</a>
+  <a class="sv-qf-btn" id="svf-s-received"  onclick="svQFStatus('received');return false" href="#">📥 Отримано</a>
+  <a class="sv-qf-btn" id="svf-s-processing" onclick="svQFStatus('processing');return false" href="#">⚙️ Обробка</a>
+  <a class="sv-qf-btn" id="svf-s-shipped"   onclick="svQFStatus('shipped');return false" href="#">🚚 Відправлено</a>
+  <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQFStatus('delivered');return false" href="#">✅ Доставлено</a>
+  <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQFStatus('cancelled');return false" href="#">🚫 Скасовано</a>
   <div class="sv-qf-sep"></div>
-  <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQF('delayed','1');return false" href="#">🚨 Затримки</a>
-  <a class="sv-qf-btn" id="svf-overdue" onclick="svQF('overdue','1');return false" href="#">🔴 Прострочені</a>
+  <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#">🚨 Затримки</a>
+  <a class="sv-qf-btn" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#">🔴 Прострочені</a>
   {% if sv_sources %}
   <div class="sv-qf-sep"></div>
   <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Джерело:</span>
-  <a class="sv-qf-btn" id="svf-src-all" onclick="svQF('source','');return false" href="#">Всі</a>
+  <a class="sv-qf-btn" id="svf-src-all" onclick="svQFSource('');return false" href="#">Всі</a>
   {% for src in sv_sources %}
-  <a class="sv-qf-btn" id="svf-src-{{ src.slug }}" onclick="svQF('source','{{ src.slug }}');return false" href="#">{{ src.name }}</a>
+  <a class="sv-qf-btn" id="svf-src-{{ src.slug }}" onclick="svQFSource('{{ src.slug }}');return false" href="#">{{ src.name }}</a>
   {% endfor %}
   {% endif %}
 </div>
@@ -429,10 +429,25 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <script>
 // ── Quick filter bar ─────────────────────────────────────────────────────────
-function svQF(key, value) {
+// Status group: mutually exclusive
+function svQFStatus(value) {
   var p = new URLSearchParams(window.location.search);
-  if (!value) { p.delete(key); } else { p.set(key, value); }
-  p.delete('p');  // reset pagination
+  if (!value) { p.delete('status'); } else { p.set('status', value); }
+  p.delete('p');
+  window.location.search = p.toString();
+}
+// Toggle filters: click again to deactivate
+function svQFToggle(key) {
+  var p = new URLSearchParams(window.location.search);
+  if (p.get(key) === '1') { p.delete(key); } else { p.set(key, '1'); }
+  p.delete('p');
+  window.location.search = p.toString();
+}
+// Source group: mutually exclusive
+function svQFSource(value) {
+  var p = new URLSearchParams(window.location.search);
+  if (!value) { p.delete('source'); } else { p.set('source', value); }
+  p.delete('p');
   window.location.search = p.toString();
 }
 (function() {
