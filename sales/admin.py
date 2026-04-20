@@ -762,6 +762,25 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '_rows.forEach(function(r){r.style.display="";});'
             'setTimeout(function(){_fs.scrollIntoView({behavior:"smooth",block:"nearest"});},50);'
             '}}'
+            /* local save debug panel */
+            'if(d.local){'
+            'var dbgId="doc-local-dbg-"+id;'
+            'var dbg=document.getElementById(dbgId);'
+            'if(!dbg){dbg=document.createElement("div");dbg.id=dbgId;'
+            'dbg.style.cssText="margin-top:6px;padding:6px 10px;border-radius:4px;'
+            'font-size:11px;font-family:monospace;line-height:1.6;border-left:3px solid #555";'
+            'var wrap=document.getElementById("savebtn-"+id);'
+            'if(wrap)wrap.parentNode.insertAdjacentElement("afterend",dbg);}'
+            'var li=d.local;'
+            'if(li.skip){dbg.innerHTML="⏭️ "+li.skip;dbg.style.borderColor="#546e7a";dbg.style.color="#607d8b";}'
+            'else if(li.ok){'
+            'dbg.innerHTML="✅ Збережено локально:<br><b>"+li.target+"</b>";'
+            'dbg.style.borderColor="#4caf50";dbg.style.color="#4caf50";}'
+            'else if(li.error){'
+            'var warn=!li.is_absolute?"⚠️ Шлях не абсолютний (<b>"+li.base+"</b>) — вкажіть повний шлях типу C:\\\\Users\\\\...":"";'
+            'dbg.innerHTML="❌ Помилка: "+li.error+"<br>"+(warn||"📁 "+li.target);'
+            'dbg.style.borderColor="#f44336";dbg.style.color="#ef9a9a";}'
+            '}'
             'setTimeout(()=>{btn.disabled=false;btn.textContent="💾";},3000);'
             '}else{'
             'btn.textContent="❌";alert("Помилка: "+(d.error||"?"));'
@@ -921,19 +940,35 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
         # Інформаційний рядок про локальне збереження
         if cfg.local_save_enabled and cfg.local_docs_path:
-            local_info = (
-                '<div style="margin:8px 0;padding:8px 12px;'
-                'background:rgba(46,125,50,.12);border:1px solid rgba(46,125,50,.3);'
-                'border-radius:5px;font-size:12px;display:flex;align-items:center;'
-                'gap:10px;flex-wrap:wrap">'
-                '📂 Копія зберігається в: '
-                '<code style="color:#4caf50;word-break:break-all">'
-                + cfg.local_docs_path +
-                '</code>'
-                ' <a href="' + settings_url + '" style="color:#9aafbe;font-size:11px;white-space:nowrap">'
-                '⚙️ Налаштування</a>'
-                '</div>'
-            )
+            import os as _os
+            from pathlib import Path as _PathW
+            _raw = cfg.local_docs_path.strip()
+            _is_abs = _PathW(_raw.replace('\\', _os.sep)).is_absolute()
+            if _is_abs:
+                local_info = (
+                    '<div style="margin:8px 0;padding:8px 12px;'
+                    'background:rgba(46,125,50,.12);border:1px solid rgba(46,125,50,.3);'
+                    'border-radius:5px;font-size:12px;display:flex;align-items:center;'
+                    'gap:10px;flex-wrap:wrap">'
+                    '📂 Копія зберігається в: '
+                    '<code style="color:#4caf50;word-break:break-all">'
+                    + _raw +
+                    '</code>'
+                    ' <a href="' + settings_url + '" style="color:#9aafbe;font-size:11px;white-space:nowrap">'
+                    '⚙️ Налаштування</a>'
+                    '</div>'
+                )
+            else:
+                local_info = (
+                    '<div style="margin:8px 0;padding:8px 12px;'
+                    'background:rgba(230,81,0,.12);border:1px solid rgba(230,81,0,.4);'
+                    'border-radius:5px;font-size:12px">'
+                    '⚠️ <b>Шлях відносний</b> (<code style="color:#ff9800">' + _raw + '</code>) — '
+                    'вкажіть повний абсолютний шлях, наприклад: '
+                    '<code>C:\\Users\\prymv\\Documents\\Orders</code>. '
+                    '<a href="' + settings_url + '" style="color:#ff9800">⚙️ Налаштування</a>'
+                    '</div>'
+                )
         elif cfg.local_save_enabled:
             local_info = (
                 '<div style="margin:8px 0;padding:6px 10px;'
@@ -1619,24 +1654,37 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             f'{settings.MEDIA_URL}orders/{order.source or "manual"}'
             f'/{order.order_number}/{filename}'
         )
-        # ── Локальна копія ────────────────────────────────────────────────────
+        # ── Локальна копія з детальним debug-інфо ────────────────────────────
+        import os, sys as _sys
+        from pathlib import Path as _Path
+        from datetime import date as _date
+        local_info = {}
         try:
             cfg = SalesSettings.get()
-            if cfg.local_save_enabled and cfg.local_docs_path:
-                import os
-                from pathlib import Path as _Path
-                from datetime import date as _date
+            if not cfg.local_save_enabled:
+                local_info = {'skip': 'local_save_enabled = False'}
+            elif not cfg.local_docs_path:
+                local_info = {'skip': 'local_docs_path не вказано'}
+            else:
+                raw_base = cfg.local_docs_path.strip()
                 source_slug = (order.source or 'manual').lower().replace(' ', '_')
                 date_str = _date.today().strftime('%Y-%m-%d')
                 local_dir = (
-                    _Path(cfg.local_docs_path.replace('\\', os.sep))
+                    _Path(raw_base.replace('\\', os.sep))
                     / source_slug / date_str / order.order_number
                 )
+                dest_local = local_dir / filename
+                local_info['base'] = raw_base
+                local_info['target'] = str(dest_local)
+                local_info['platform'] = _sys.platform
+                local_info['is_absolute'] = _Path(raw_base.replace('\\', os.sep)).is_absolute()
                 local_dir.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(str(dest_file), str(local_dir / filename))
-        except Exception:
-            pass
-        return JsonResponse({'ok': True, 'filename': filename, 'url': rel_url})
+                shutil.copy2(str(dest_file), str(dest_local))
+                local_info['ok'] = True
+        except Exception as e:
+            local_info['ok'] = False
+            local_info['error'] = str(e)
+        return JsonResponse({'ok': True, 'filename': filename, 'url': rel_url, 'local': local_info})
 
     def delete_doc_view(self, request, pk):
         """AJAX POST — видаляє один файл із media/orders/{source}/{order_number}/."""
