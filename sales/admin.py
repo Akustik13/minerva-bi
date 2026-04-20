@@ -762,7 +762,6 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '_rows.forEach(function(r){r.style.display="";});'
             'setTimeout(function(){_fs.scrollIntoView({behavior:"smooth",block:"nearest"});},50);'
             '}}'
-            /* local save debug panel */
             'if(d.local){'
             'var dbgId="doc-local-dbg-"+id;'
             'var dbg=document.getElementById(dbgId);'
