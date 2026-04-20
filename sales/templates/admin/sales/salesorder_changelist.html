@@ -117,8 +117,8 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-qf-btn.sv-qf-warn.sv-qf-active{background:#c62828;color:#fff}
 /* Card checkbox */
 .sv-card-check-input{width:17px;height:17px;cursor:pointer;accent-color:#1565c0;flex-shrink:0;vertical-align:middle}
-/* Select-all bar */
-#sv-select-bar{display:none;align-items:center;gap:10px;padding:6px 12px;margin-bottom:8px;background:rgba(21,101,192,.12);border:1px solid rgba(21,101,192,.3);border-radius:6px;font-size:13px}
+/* Select-all inline (inside action row) */
+#sv-select-bar{padding:4px 10px;background:rgba(21,101,192,.12);border:1px solid rgba(21,101,192,.3);border-radius:6px;font-size:13px}
 </style>
 {% endblock %}
 
@@ -158,18 +158,25 @@ document.addEventListener('DOMContentLoaded', function () {
   {% endif %}
 </div>
 
-{# ── Select-all bar ────────────────────────────────────────────────────────── #}
-<div id="sv-select-bar">
-  <input type="checkbox" id="sv-check-all" onchange="svCheckAll(this)" style="width:16px;height:16px;accent-color:#1565c0">
-  <label for="sv-check-all" style="color:var(--text);font-weight:600;cursor:pointer">Вибрати всі</label>
-  <span id="sv-selected-count" style="color:var(--text-muted);font-size:12px"></span>
-</div>
-
-{# ── View toggle ──────────────────────────────────────────────────────────── #}
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-  <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
-  <button class="sv-toggle-btn" id="sv-btn-table" onclick="svSetView('table')">📋 Таблиця</button>
-  <button class="sv-toggle-btn" id="sv-btn-cards" onclick="svSetView('cards')">🃏 Картки</button>
+{# ── Action + View toggle row ─────────────────────────────────────────────── #}
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;
+            margin-bottom:10px;flex-wrap:wrap">
+  {# Left: action bar placeholder (filled by JS) + select-all #}
+  <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;flex-wrap:wrap">
+    <div id="sv-actions-area" style="display:flex;align-items:center;gap:6px;flex-shrink:0"></div>
+    <div id="sv-select-bar" style="display:none;align-items:center;gap:8px">
+      <input type="checkbox" id="sv-check-all" onchange="svCheckAll(this)"
+             style="width:16px;height:16px;accent-color:#1565c0">
+      <label for="sv-check-all" style="color:var(--text);font-weight:600;cursor:pointer;font-size:13px">Вибрати всі</label>
+      <span id="sv-selected-count" style="color:var(--text-muted);font-size:12px"></span>
+    </div>
+  </div>
+  {# Right: view toggle #}
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+    <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
+    <button class="sv-toggle-btn" id="sv-btn-table" onclick="svSetView('table')">📋 Таблиця</button>
+    <button class="sv-toggle-btn" id="sv-btn-cards" onclick="svSetView('cards')">🃏 Картки</button>
+  </div>
 </div>
 
 {# ── Card view ────────────────────────────────────────────────────────────── #}
@@ -472,9 +479,8 @@ function svCardCheckChange() {
   var selected = Array.from(checks).filter(function(c) { return c.checked; }).length;
   var bar = document.getElementById('sv-select-bar');
   var cnt = document.getElementById('sv-selected-count');
-  bar.style.display = selected ? 'flex' : 'none';
+  if (bar) bar.style.display = selected ? 'flex' : 'none';
   if (cnt) cnt.textContent = selected ? ('Вибрано: ' + selected) : '';
-  // Sync Django's action checkbox state
   var allChecked = selected === checks.length && checks.length > 0;
   var allCheck = document.getElementById('sv-check-all');
   if (allCheck) allCheck.checked = allChecked;
@@ -493,24 +499,33 @@ function svSetView(mode) {
   document.getElementById('sv-table').style.display = isCards ? 'none' : 'block';
   document.getElementById('sv-btn-cards').classList.toggle('active', isCards);
   document.getElementById('sv-btn-table').classList.toggle('active', !isCards);
-  // Show action bar clone in card mode; disable hidden one to avoid double-submit
-  var cardAct = document.getElementById('sv-card-actions');
-  if (cardAct) cardAct.style.display = isCards ? '' : 'none';
-  var tableActSel = document.querySelector('#sv-table .actions select[name="action"]');
-  if (tableActSel) tableActSel.disabled = isCards;
-  var tableActBtn = document.querySelector('#sv-table .actions [type="submit"]');
-  if (tableActBtn) tableActBtn.disabled = isCards;
+  // Swap which action bar is active (disable hidden to avoid double-submit)
+  var cardAct  = document.getElementById('sv-card-actions');
+  var tableAct = document.querySelector('#sv-table .actions');
+  if (cardAct) {
+    cardAct.style.display = isCards ? '' : 'none';
+    cardAct.querySelectorAll('select,button,[type="submit"]').forEach(function(el) {
+      el.disabled = !isCards;
+    });
+  }
+  if (tableAct) {
+    tableAct.querySelectorAll('select,button,[type="submit"]').forEach(function(el) {
+      el.disabled = isCards;
+    });
+  }
 }
 (function () {
-  // Clone Django action bar for card view (before #sv-cards)
+  // Clone Django action bar into sv-actions-area (shared left area)
   var tableAct = document.querySelector('#sv-table .actions');
-  if (tableAct) {
+  var actArea  = document.getElementById('sv-actions-area');
+  if (tableAct && actArea) {
     var clone = tableAct.cloneNode(true);
     clone.id = 'sv-card-actions';
-    clone.style.marginBottom = '8px';
-    clone.style.display = 'none';
-    var svCards = document.getElementById('sv-cards');
-    svCards.parentNode.insertBefore(clone, svCards);
+    clone.style.margin = '0';
+    clone.style.padding = '0';
+    clone.style.background = 'none';
+    clone.style.border = 'none';
+    actArea.appendChild(clone);
   }
   svSetView(localStorage.getItem('salesorder_view') || 'table');
 })();

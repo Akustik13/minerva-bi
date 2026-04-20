@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, render, redirect
 from django.urls import path, reverse
 from django import forms
 from django.forms import widgets
-from .models import SalesOrder, SalesOrderLine, SalesSource
+from .models import SalesOrder, SalesOrderLine, SalesSource, SalesSettings
 from .forms import SalesImportForm, SalesExcelUploadForm
 import openpyxl
 from decimal import Decimal, InvalidOperation
@@ -132,6 +132,33 @@ class SalesSourceAdmin(admin.ModelAdmin):
             'font-size:12px;font-weight:bold">{}</span>',
             obj.color, obj.name)
     color_badge.short_description = "Вигляд бейджу"
+
+
+@admin.register(SalesSettings)
+class SalesSettingsAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ('📁 Локальне збереження документів', {
+            'fields': ('local_save_enabled', 'local_docs_path'),
+            'description': (
+                'Вкажіть папку на ПК, куди автоматично копіюватимуться всі документи '
+                '(завантажені файли та згенеровані PDF). '
+                'Працює коли Django запущено локально або при монтуванні тому Docker → Windows.'
+            ),
+        }),
+        ('⚙️ Поведінка при генерації документів', {
+            'fields': ('auto_save_to_server',),
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        obj = SalesSettings.get()
+        return redirect(reverse('admin:sales_salessettings_change', args=[obj.pk]))
 
 
 class OrderPackagingInline(admin.TabularInline):
@@ -477,8 +504,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         }),
         ("📄 Документи замовлення", {
             "fields": ("documents_list", "upload_widget"),
-            "classes": ("collapse",),
-            "description": "Завантаження документів: етикетки, декларації, чеки тощо. Автоматичне збереження на сервер та локально."
+            "description": "Завантаження документів: етикетки, декларації, чеки тощо. Автоматичне збереження на сервер та локально.",
         }),
     )
 
@@ -885,14 +911,43 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return format_html('<em style="color:#7d8590">Збережіть замовлення спочатку</em>')
 
         upload_url = str(reverse('admin:sales_salesorder_upload_docs', args=[obj.pk]))
-        browse_url = str(reverse('admin:sales_salesorder_browse_dir'))
+        settings_url = str(reverse('admin:sales_salessettings_changelist'))
+        cfg = SalesSettings.get()
 
-        # Тільки HTML + data-атрибути. Весь JS — у change_form_template (salesorder_change_form.html).
-        # Це гарантує виконання скрипту незалежно від collapsed-fieldset.
-        # Лише HTML з data-атрибутами. Скрипт — у salesorder_change_form.html → block extrahead.
+        # Інформаційний рядок про локальне збереження
+        if cfg.local_save_enabled and cfg.local_docs_path:
+            local_info = (
+                '<div style="margin:8px 0;padding:8px 12px;'
+                'background:rgba(46,125,50,.12);border:1px solid rgba(46,125,50,.3);'
+                'border-radius:5px;font-size:12px;display:flex;align-items:center;'
+                'gap:10px;flex-wrap:wrap">'
+                '📂 Копія зберігається в: '
+                '<code style="color:#4caf50;word-break:break-all">'
+                + cfg.local_docs_path +
+                '</code>'
+                ' <a href="' + settings_url + '" style="color:#9aafbe;font-size:11px;white-space:nowrap">'
+                '⚙️ Налаштування</a>'
+                '</div>'
+            )
+        elif cfg.local_save_enabled:
+            local_info = (
+                '<div style="margin:8px 0;padding:6px 10px;'
+                'background:rgba(230,81,0,.1);border:1px solid rgba(230,81,0,.3);'
+                'border-radius:5px;font-size:12px">'
+                '⚠️ Локальне збереження увімкнено, але шлях не вказано. '
+                '<a href="' + settings_url + '" style="color:#ff9800">⚙️ Вказати шлях</a>'
+                '</div>'
+            )
+        else:
+            local_info = (
+                '<div style="margin:8px 0;font-size:11px;color:var(--text-dim,#607d8b)">'
+                '📂 Локальне збереження вимкнено. '
+                '<a href="' + settings_url + '" style="color:var(--text-muted,#9aafbe)">⚙️ Налаштування</a>'
+                '</div>'
+            )
+
         html = (
             '<div id="docWidgetRoot"'
-            ' data-browse-url="' + browse_url + '"'
             ' data-upload-url="' + upload_url + '"'
             ' data-order-number="' + (obj.order_number or '') + '"'
             ' data-source="' + (obj.source or '') + '"'
@@ -903,65 +958,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             'border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;margin-bottom:10px">'
             '📎 Вибрати файли для завантаження</label>'
             '<input type="file" id="docFiles" multiple style="display:none">'
-            '<p style="margin:0 0 10px;font-size:12px;color:#888">'
+            '<p style="margin:0 0 6px;font-size:12px;color:#888">'
             'Можна кілька файлів одночасно. Завантаження на сервер починається автоматично після вибору.</p>'
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">'
-            '<button type="button" id="docBrowseBtn"'
-            ' style="background:#37474f;color:#b0bec5;border:1px solid #546e7a;'
-            'padding:6px 14px;border-radius:6px;cursor:pointer;font-size:13px">'
-            '📂 Зберегти копію на ПК</button>'
-            '<span id="docSelectedPath" style="font-size:12px;color:#4caf50;display:none">'
-            '✅ <span id="docPathDisplay" style="font-family:monospace;word-break:break-all"></span></span>'
-            '<span id="docPathHint" style="font-size:11px;color:#546e7a;display:none">'
-            '🕓 <span id="docPathHintText"></span></span>'
-            '</div>'
+            + local_info +
             '<div id="docResult" style="margin-top:10px;font-size:13px"></div>'
             '</div>'
-            # ── Modal: folder browser ──
-            '<div id="dirBrowserModal"'
-            ' style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;'
-            'background:rgba(0,0,0,.72);z-index:100000">'
-            '<div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);'
-            'background:#1e2a35;border:1px solid #2a3f52;border-radius:10px;'
-            'padding:24px;width:660px;max-width:94vw;'
-            'display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.7)">'
-            # header
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">'
-            '<span style="color:#c9d8e4;font-weight:700;font-size:15px">📂 Вибрати папку</span>'
-            '<button type="button" id="dirBrowserCloseBtn"'
-            ' style="background:none;border:none;color:#9aafbe;font-size:22px;'
-            'cursor:pointer;line-height:1;padding:0">✕</button>'
-            '</div>'
-            # editable path bar
-            '<div style="display:flex;gap:6px;margin-bottom:8px">'
-            '<input type="text" id="dirBrowserPathInput"'
-            ' placeholder="Введіть шлях або оберіть нижче…"'
-            ' style="flex:1;background:#111c26;border:1px solid #2a3f52;border-radius:4px;'
-            'padding:7px 10px;font-size:12px;font-family:monospace;color:#c9d8e4;outline:none">'
-            '<button type="button" id="dirBrowserGoBtn"'
-            ' style="background:#2a3f52;color:#9aafbe;border:1px solid #3a5570;'
-            'border-radius:4px;padding:7px 14px;cursor:pointer;font-size:13px;white-space:nowrap">'
-            '→ Перейти</button>'
-            '</div>'
-            # info note
-            '<div style="font-size:11px;color:#546e7a;margin-bottom:10px;line-height:1.5">'
-            'ℹ️ Браузер показує файлову систему <b style="color:#607d8b">сервера</b>. '
-            'Для Django у Docker — вкажіть Linux-шлях до примонтованого каталогу. '
-            'Для локального запуску на Windows — шлях у форматі <code style="color:#9aafbe">C:\\Users\\...</code>'
-            '</div>'
-            # dir list
-            '<div id="dirBrowserList"'
-            ' style="overflow-y:auto;border:1px solid #2a3f52;border-radius:4px;'
-            'background:#0d1117;min-height:160px;max-height:320px"></div>'
-            # footer
-            '<div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end">'
-            '<button type="button" id="dirBrowserCancelBtn"'
-            ' style="background:#37474f;color:#b0bec5;border:1px solid #546e7a;'
-            'padding:8px 18px;border-radius:6px;cursor:pointer">Скасувати</button>'
-            '<button type="button" id="dirBrowserConfirm"'
-            ' style="background:#4caf50;color:#fff;border:none;'
-            'padding:8px 22px;border-radius:6px;cursor:pointer;font-weight:700">✅ Вибрати цю папку</button>'
-            '</div></div></div>'
         )
         return mark_safe(html)
 
@@ -1601,16 +1602,35 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return response
 
     def _save_pdf_to_media(self, order, buf, filename):
-        """Зберігає PDF в media/orders/{source}/{order_number}/ та повертає JSON."""
+        """Зберігає PDF в media/orders/{source}/{order_number}/ та повертає JSON.
+        Якщо SalesSettings.local_save_enabled — копіює також локально."""
         from django.http import JsonResponse
         from django.conf import settings
         dest_dir = settings.MEDIA_ROOT / 'orders' / (order.source or 'manual') / order.order_number
         dest_dir.mkdir(parents=True, exist_ok=True)
-        (dest_dir / filename).write_bytes(buf.getvalue())
+        dest_file = dest_dir / filename
+        dest_file.write_bytes(buf.getvalue())
         rel_url = (
             f'{settings.MEDIA_URL}orders/{order.source or "manual"}'
             f'/{order.order_number}/{filename}'
         )
+        # ── Локальна копія ────────────────────────────────────────────────────
+        try:
+            cfg = SalesSettings.get()
+            if cfg.local_save_enabled and cfg.local_docs_path:
+                import os
+                from pathlib import Path as _Path
+                from datetime import date as _date
+                source_slug = (order.source or 'manual').lower().replace(' ', '_')
+                date_str = _date.today().strftime('%Y-%m-%d')
+                local_dir = (
+                    _Path(cfg.local_docs_path.replace('\\', os.sep))
+                    / source_slug / date_str / order.order_number
+                )
+                local_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(str(dest_file), str(local_dir / filename))
+        except Exception:
+            pass
         return JsonResponse({'ok': True, 'filename': filename, 'url': rel_url})
 
     def delete_doc_view(self, request, pk):
@@ -1656,13 +1676,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         import os
         from pathlib import Path as _Path
 
-        raw_path = request.POST.get('local_base_path', '').strip().strip('"\'')
-        if not raw_path:
-            raw_path = getattr(settings, 'LOCAL_DOCS_BASE_PATH', '')
-        local_base_path = raw_path.strip().rstrip('/\\')
-
-        if local_base_path:
-            request.session['local_base_path'] = local_base_path
+        cfg = SalesSettings.get()
+        local_base_path = ''
+        if cfg.local_save_enabled and cfg.local_docs_path:
+            local_base_path = cfg.local_docs_path.strip().rstrip('/\\')
 
         server_base = settings.MEDIA_ROOT / 'orders' / order.source / order.order_number
         server_base.mkdir(parents=True, exist_ok=True)

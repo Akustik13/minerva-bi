@@ -13,6 +13,30 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+
+def _copy_shipment_file_local(abs_path: str, shipment) -> None:
+    """Копіює файл до локальної папки ПК якщо SalesSettings.local_save_enabled."""
+    try:
+        from sales.models import SalesSettings
+        cfg = SalesSettings.get()
+        if not cfg.local_save_enabled or not cfg.local_docs_path:
+            return
+        import os, shutil
+        from pathlib import Path as _Path
+        from datetime import date as _date
+        order = shipment.order
+        source_slug = (order.source if order else 'shipping').lower().replace(' ', '_')
+        order_num = order.order_number if order else f'shipment_{shipment.pk}'
+        date_str = _date.today().strftime('%Y-%m-%d')
+        local_dir = (
+            _Path(cfg.local_docs_path.replace('\\', os.sep))
+            / source_slug / date_str / order_num
+        )
+        local_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(abs_path, str(local_dir / os.path.basename(abs_path)))
+    except Exception:
+        pass
+
 from .models import (
     Carrier, Shipment, ShipmentPackage, PackagingMaterial, OrderPackaging,
     ProductPackaging, ShippingSettings, TrackingRule, TrackingAttemptLog,
@@ -2652,6 +2676,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.label_url = f'/media/{rel}'
             shipment.save(update_fields=['label_url'])
             logger.info('UPS label saved: %s', fpath)
+            _copy_shipment_file_local(fpath, shipment)
 
         # Зберегти митну декларацію (комерційний інвойс)
         if result.get('customs_base64'):
@@ -2664,6 +2689,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.customs_url = f'/media/shipping/customs/{cfname}'
             shipment.save(update_fields=['customs_url'])
             logger.info('UPS customs form saved: %s', cfpath)
+            _copy_shipment_file_local(cfpath, shipment)
 
         # Синхронізуємо SalesOrder
         from datetime import date as _date
@@ -3881,9 +3907,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 labels_dir = os.path.join(settings.MEDIA_ROOT, "labels", "dhl")
                 os.makedirs(labels_dir, exist_ok=True)
                 label_filename = f"{tracking_number}.pdf"
-                with open(os.path.join(labels_dir, label_filename), "wb") as fh:
+                label_fpath = os.path.join(labels_dir, label_filename)
+                with open(label_fpath, "wb") as fh:
                     fh.write(label_bytes)
                 label_url = f"{settings.MEDIA_URL}labels/dhl/{label_filename}"
+                _copy_shipment_file_local(label_fpath, shipment)
             except Exception as exc:
                 logger.warning("DHL label save failed: %s", exc)
 

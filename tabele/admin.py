@@ -40,7 +40,7 @@ def _get_app_list(self, request, app_label=None):
         'core':     ['auditlog', 'userprofile', 'modulebundle', 'moduleregistry'],
         'strategy': ['aisettings', 'strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
         'ai_assistant': ['aiconversation', 'aibudgetlog'],
-        'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory'],
+        'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',
                       'purchaseorder', 'purchaseorderline'],

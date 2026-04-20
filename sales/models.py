@@ -164,3 +164,38 @@ class SalesOrderLine(models.Model):
                         'qty': f'Товар "{self.product.sku}" вимірюється в штуках. '
                                f'Кількість має бути цілим числом.'
                     })
+
+
+class SalesSettings(models.Model):
+    """Налаштування модуля продажів — синглтон (завжди pk=1)."""
+    local_docs_path = models.CharField(
+        max_length=500, blank=True, default='',
+        verbose_name='Шлях для локального збереження',
+        help_text='Основна директорія на ПК куди копіювати документи. '
+                  r'Приклад: C:\Users\name\Documents\Orders',
+    )
+    local_save_enabled = models.BooleanField(
+        default=False,
+        verbose_name='Зберігати копії локально',
+        help_text='Якщо ввімкнено і вказано шлях — документи автоматично '
+                  'копіюються на ПК при завантаженні та генерації.',
+    )
+    auto_save_to_server = models.BooleanField(
+        default=True,
+        verbose_name='Автоматично зберігати PDF на сервер',
+        help_text='При натисканні 💾 на Пакувальному листі / Proforma / Митній декларації '
+                  'зберігати PDF на сервер (без зайвого підтвердження).',
+    )
+
+    class Meta:
+        verbose_name = 'Налаштування'
+        verbose_name_plural = 'Налаштування'
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
