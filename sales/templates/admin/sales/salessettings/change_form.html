@@ -2,7 +2,7 @@
 
 {% block extrahead %}{{ block.super }}
 <style>
-#lpBrowseBtn {
+#lpBrowseBtn, #lpNativeBtn {
   background: #37474f;
   color: #b0bec5;
   border: 1px solid #546e7a;
@@ -10,32 +10,67 @@
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  margin-left: 8px;
+  margin-left: 6px;
   vertical-align: middle;
 }
-#lpBrowseBtn:hover { background: #455a64; color: #c9d8e4; }
+#lpBrowseBtn:hover, #lpNativeBtn:hover { background: #455a64; color: #c9d8e4; }
+#lpNativeHint { margin-left:10px; font-size:12px; color:#9aafbe; display:none; vertical-align:middle; }
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var inp = document.getElementById('id_local_docs_path');
   if (!inp) return;
 
-  /* ── Кнопка «Вибрати папку» ──────────────────────────────────────────── */
-  var btn = document.createElement('button');
-  btn.type = 'button';
-  btn.id   = 'lpBrowseBtn';
-  btn.textContent = '📂 Вибрати папку';
-  inp.insertAdjacentElement('afterend', btn);
-
   var BROWSE_URL = '{% url "admin:sales_salesorder_browse_dir" %}';
   var _curDir    = '';
 
+  /* ── Кнопка «Провідник сервера» (завжди) ───────────────────────────── */
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id   = 'lpBrowseBtn';
+  btn.title = 'Відкрити браузер папок сервера';
+  btn.textContent = '📂 Вибрати папку';
+  inp.insertAdjacentElement('afterend', btn);
+
+  /* ── Кнопка «Провідник ПК» (Chrome/Edge: showDirectoryPicker) ────── */
+  var hint = document.createElement('span');
+  hint.id  = 'lpNativeHint';
+  btn.insertAdjacentElement('afterend', hint);
+
+  if (typeof window.showDirectoryPicker === 'function') {
+    var nativeBtn = document.createElement('button');
+    nativeBtn.type  = 'button';
+    nativeBtn.id    = 'lpNativeBtn';
+    nativeBtn.title = 'Відкрити провідник Windows (Chrome/Edge)';
+    nativeBtn.textContent = '🖥️ Провідник ПК';
+    hint.insertAdjacentElement('afterend', nativeBtn);
+
+    nativeBtn.addEventListener('click', function () {
+      window.showDirectoryPicker({ mode: 'readwrite' })
+        .then(function (handle) {
+          /* Браузер не дає повний шлях з міркувань безпеки.
+             Показуємо назву папки як підказку — шлях вводиться вручну. */
+          hint.style.display = 'inline';
+          hint.innerHTML = '✅ Обрано: <b>' + handle.name + '</b>'
+            + ' <span style="font-size:11px;color:#607d8b">'
+            + '(браузер не повертає повний шлях — введіть або уточніть вручну)</span>';
+          if (!inp.value.trim()) {
+            inp.value = handle.name;
+            inp.focus();
+          }
+        })
+        .catch(function (e) {
+          if (e.name !== 'AbortError') console.error('Picker error:', e);
+        });
+    });
+  }
+
+  /* ── Серверний браузер (завжди доступний) ──────────────────────────── */
   btn.addEventListener('click', function () {
     dirOpen(inp.value.trim() || '');
   });
 
-  /* ── Server-side folder browser ────────────────────────────────────────── */
-  /* Modal HTML — вставляємо в body */
+  /* ── Modal HTML ─────────────────────────────────────────────────────── */
   var modalHtml =
     '<div id="lpModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;'
     + 'background:rgba(0,0,0,.72);z-index:100000">'
@@ -60,9 +95,10 @@ document.addEventListener('DOMContentLoaded', function () {
     + '</div>'
     /* note */
     + '<div style="font-size:11px;color:#546e7a;margin-bottom:10px;line-height:1.5">'
-    + 'ℹ️ Браузер показує файлову систему <b style="color:#607d8b">сервера</b>. '
-    + 'Для локального Django на Windows — шлях у форматі '
-    + '<code style="color:#9aafbe">C:\\Users\\...</code></div>'
+    + 'ℹ️ Показує файлову систему <b style="color:#607d8b">сервера</b>. '
+    + 'На Windows (локально) — шляхи типу <code style="color:#9aafbe">C:\\Users\\...</code>. '
+    + 'У Docker — Linux-шляхи: <code style="color:#9aafbe">/volume1/...</code>, <code style="color:#9aafbe">/data/...</code>'
+    + '</div>'
     /* dir list */
     + '<div id="lpDirList" style="overflow-y:auto;border:1px solid #2a3f52;border-radius:4px;'
     + 'background:#0d1117;min-height:160px;max-height:320px"></div>'
@@ -99,9 +135,10 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(function(r) { return r.json(); })
       .then(function(data) {
         _curDir = data.current;
-        if (pathInput) pathInput.value = data.current;
+        if (pathInput) pathInput.value = data.drives ? '' : data.current;
         var h = '';
-        if (data.parent !== null && data.parent !== undefined) {
+        /* Якщо повернули список дисків (Windows) або є батьківська папка */
+        if (!data.drives && data.parent !== null && data.parent !== undefined) {
           h += '<div data-dir="' + esc(data.parent) + '"'
              + ' style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #162030;'
              + 'color:#9aafbe;display:flex;align-items:center;gap:10px">'
@@ -115,8 +152,10 @@ document.addEventListener('DOMContentLoaded', function () {
           data.dirs.forEach(function(d) {
             h += '<div data-dir="' + esc(d.path) + '"'
                + ' style="padding:10px 16px;cursor:pointer;border-bottom:1px solid #0d1117;'
-               + 'color:#c9d8e4;display:flex;align-items:center;gap:10px">'
-               + '<span>📁</span><span>' + esc(d.name) + '</span></div>';
+               + 'color:#c9d8e4;display:flex;align-items:center;gap:8px">'
+               + '<span>' + (data.drives ? '💾' : '📁') + '</span>'
+               + '<span style="font-family:monospace">' + esc(d.name) + '</span>'
+               + '</div>';
           });
         }
         dirList.innerHTML = h;
@@ -127,7 +166,6 @@ document.addEventListener('DOMContentLoaded', function () {
       });
   }
 
-  /* Клік по папці */
   dirList.addEventListener('click', function(e) {
     var item = e.target.closest('[data-dir]');
     if (item) dirLoad(item.getAttribute('data-dir'));
@@ -140,27 +178,23 @@ document.addEventListener('DOMContentLoaded', function () {
     var item = e.target.closest('[data-dir]');
     if (item) item.style.background = '';
   });
-
-  /* Ввід шляху вручну */
   if (pathInput) pathInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); dirLoad(this.value.trim()); }
   });
   document.getElementById('lpGoBtn').addEventListener('click', function() {
     dirLoad(pathInput.value.trim());
   });
-
-  /* Закрити */
   ['lpModalClose', 'lpCancelBtn'].forEach(function(id) {
     var el = document.getElementById(id);
     if (el) el.addEventListener('click', dirClose);
   });
   modal.addEventListener('click', function(e) { if (e.target === this) dirClose(); });
 
-  /* Підтвердити */
   document.getElementById('lpConfirmBtn').addEventListener('click', function() {
     var chosen = (pathInput ? pathInput.value.trim() : '') || _curDir;
     if (!chosen) return;
     inp.value = chosen;
+    hint.style.display = 'none';
     dirClose();
   });
 });

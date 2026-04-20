@@ -515,7 +515,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def _docs_panel_html(self, obj):
         """Inner HTML for the documents panel (used by documents_list and doc_list_view)."""
         from django.conf import settings
-        media_path = settings.MEDIA_ROOT / 'orders' / obj.source / obj.order_number
+        source = obj.source or 'manual'
+        media_path = settings.MEDIA_ROOT / 'orders' / source / obj.order_number
 
         if not media_path.exists():
             return '<em style="color:#999">Документів немає</em>'
@@ -528,16 +529,19 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         rows = ''
         for file in sorted(files):
             size_kb = file.stat().st_size / 1024
-            url = f'{settings.MEDIA_URL}orders/{obj.source}/{obj.order_number}/{file.name}'
+            url = f'{settings.MEDIA_URL}orders/{source}/{obj.order_number}/{file.name}'
             rows += (
                 f'<tr style="border-bottom:1px solid #2a3f52">'
-                f'<td style="padding:8px 4px 8px 0"><span style="color:#e0e0e0">📄 {file.name}</span></td>'
+                f'<td style="padding:8px 4px 8px 0">'
+                f'<a href="{url}" target="_blank" title="Переглянути у браузері"'
+                f' style="color:#c9d8e4;text-decoration:none">'
+                f'📄 {file.name}</a></td>'
                 f'<td style="padding:8px 4px;text-align:right;color:#9aafbe;font-size:11px;white-space:nowrap">'
                 f'{size_kb:.1f} KB</td>'
                 f'<td style="padding:8px 0;text-align:right;white-space:nowrap">'
-                f'<a href="{url}" target="_blank" '
-                f'style="background:#417690;color:#fff;padding:5px 10px;text-decoration:none;'
-                f'border-radius:3px;font-size:11px;margin-right:4px">⬇️</a>'
+                f'<a href="{url}" download="{file.name}"'
+                f' style="background:#417690;color:#fff;padding:5px 10px;text-decoration:none;'
+                f'border-radius:3px;font-size:11px;margin-right:4px" title="Завантажити файл">⬇️</a>'
                 f'<button type="button"'
                 f' data-del-url="{delete_url}"'
                 f' data-filename="{file.name}"'
@@ -1742,22 +1746,39 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return JsonResponse({'results': results, 'debug': debug})
 
     def browse_dir_view(self, request):
-        """AJAX — повертає список підпапок для серверного браузера директорій."""
+        """AJAX — повертає список підпапок для серверного браузера директорій.
+        Windows: пустий шлях → список дисків (C:\\, D:\\, ...).
+        Linux:   пустий шлях → / (shows mounted volumes like /volume1).
+        """
         from django.http import JsonResponse
-        import os
+        import os, sys
 
         path = request.GET.get('path', '').strip()
+
+        # ── Windows: пустий шлях → показуємо диски ────────────────────────────
+        if not path and sys.platform == 'win32':
+            import string
+            drives = []
+            for letter in string.ascii_uppercase:
+                dp = f'{letter}:\\'
+                if os.path.exists(dp):
+                    drives.append({'name': dp, 'path': dp})
+            return JsonResponse({'current': '', 'parent': None, 'dirs': drives, 'drives': True})
+
+        # ── Linux/Docker: пустий шлях → стартуємо з / ─────────────────────────
         if not path:
-            path = request.session.get('local_base_path', '') or os.path.expanduser('~')
+            saved = request.session.get('local_base_path', '')
+            path = saved if saved and os.path.isdir(saved) else '/'
 
         path = os.path.normpath(path)
         if not os.path.isdir(path):
             parent = os.path.dirname(path)
-            path = parent if os.path.isdir(parent) else os.path.expanduser('~')
+            fallback = '/' if sys.platform != 'win32' else os.path.expanduser('~')
+            path = parent if os.path.isdir(parent) else fallback
 
         parent = os.path.dirname(path)
         if parent == path:
-            parent = None  # корінь файлової системи
+            parent = None  # корінь файлової системи (/ або диск Windows)
 
         dirs = []
         try:
