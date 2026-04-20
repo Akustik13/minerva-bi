@@ -940,6 +940,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_set_status",
             ),
             path(
+                "<int:shipment_id>/sync-order/",
+                self.admin_site.admin_view(self.sync_order_view),
+                name="shipping_shipment_sync_order",
+            ),
+            path(
                 "dhl-track-lookup/",
                 self.admin_site.admin_view(self.dhl_track_lookup_view),
                 name="shipping_dhl_track_lookup",
@@ -1838,6 +1843,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                  "cls": "yellow"})
 
         elif st == "delivered":
+            # Показуємо кнопку синхронізації якщо замовлення ще не "delivered"
+            if order.status != "delivered":
+                actions.append({
+                    "label": "🔄 Синхр. замовлення",
+                    "url":   reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
+                    "cls":   "green",
+                })
             if shipment.label_url:
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
@@ -1993,6 +2005,33 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "raw_response":     _to_str(shipment.raw_response),
             "title":            f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
         })
+
+    # ── Синхронізація статусу замовлення ─────────────────────────────────────
+
+    def sync_order_view(self, request, shipment_id):
+        """Синхронізує статус SalesOrder зі статусом відправлення."""
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order = shipment.order
+
+        if shipment.status == "delivered" and order.status != "delivered":
+            update_fields = ["status"]
+            order.status = "delivered"
+            if not order.delivered_at:
+                order.delivered_at = timezone.now()
+                update_fields.append("delivered_at")
+            order.save(update_fields=update_fields)
+            messages.success(
+                request,
+                f"✅ Замовлення {order.order_number} оновлено до «Доставлено».",
+            )
+        elif order.status == "delivered":
+            messages.info(request, "ℹ️ Замовлення вже має статус «Доставлено».")
+        else:
+            messages.warning(
+                request,
+                f"⚠️ Відправлення #{shipment.pk} ще не доставлено (статус: {shipment.get_status_display()}).",
+            )
+        return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
     # ── Ручна зміна статусу ───────────────────────────────────────────────────
 
