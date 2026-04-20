@@ -1843,13 +1843,22 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                  "cls": "yellow"})
 
         elif st == "delivered":
-            # Показуємо кнопку синхронізації якщо замовлення ще не "delivered"
+            # Кнопка синхронізації якщо замовлення ще не "delivered"
             if order.status != "delivered":
                 actions.append({
                     "label": "🔄 Синхр. замовлення",
                     "url":   reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
                     "cls":   "green",
                 })
+
+        # Якщо carrier_status_label = "Delivered" але Shipment ще не delivered
+        carrier_delivered = "delivered" in (shipment.carrier_status_label or "").lower()
+        if carrier_delivered and st != "delivered":
+            actions.insert(0, {
+                "label": "🔄 Синхр. замовлення",
+                "url":   reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
+                "cls":   "green",
+            })
             if shipment.label_url:
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
@@ -2009,11 +2018,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Синхронізація статусу замовлення ─────────────────────────────────────
 
     def sync_order_view(self, request, shipment_id):
-        """Синхронізує статус SalesOrder зі статусом відправлення."""
+        """
+        Синхронізує статус SalesOrder зі статусом відправлення.
+        Якщо carrier_status_label показує доставку — форсово оновлює і Shipment.
+        """
+        from shipping.services.tracking_engine import track_with_fallback
+
         shipment = get_object_or_404(Shipment, pk=shipment_id)
         order = shipment.order
 
-        if shipment.status == "delivered" and order.status != "delivered":
+        # Якщо shipment вже delivered — просто синхронізуємо замовлення
+        if shipment.status == "delivered":
+            if order.status == "delivered":
+                messages.info(request, "ℹ️ Замовлення вже має статус «Доставлено».")
+                return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
             update_fields = ["status"]
             order.status = "delivered"
             if not order.delivered_at:
@@ -2024,13 +2042,39 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 request,
                 f"✅ Замовлення {order.order_number} оновлено до «Доставлено».",
             )
-        elif order.status == "delivered":
-            messages.info(request, "ℹ️ Замовлення вже має статус «Доставлено».")
-        else:
-            messages.warning(
-                request,
-                f"⚠️ Відправлення #{shipment.pk} ще не доставлено (статус: {shipment.get_status_display()}).",
-            )
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        # Carrier показує "Delivered" але Shipment ще не оновлено — запускаємо трекінг
+        carrier_label = (shipment.carrier_status_label or "").lower()
+        if "delivered" in carrier_label or "доставлено" in carrier_label:
+            changed, log_entries = track_with_fallback(shipment)
+            shipment.refresh_from_db()
+            if shipment.status == "delivered":
+                messages.success(
+                    request,
+                    f"✅ Трекінг оновлено + замовлення {order.order_number} синхронізовано.",
+                )
+            else:
+                # Трекінг не зміг оновити — форсово встановлюємо delivered
+                shipment.status = "delivered"
+                shipment.save(update_fields=["status"])
+                update_fields = ["status"]
+                order.status = "delivered"
+                if not order.delivered_at:
+                    order.delivered_at = timezone.now()
+                    update_fields.append("delivered_at")
+                order.save(update_fields=update_fields)
+                messages.success(
+                    request,
+                    f"✅ Статус примусово оновлено: відправлення + замовлення {order.order_number} → Доставлено.",
+                )
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        messages.warning(
+            request,
+            f"⚠️ Відправлення #{shipment.pk} ще не доставлено "
+            f"(статус: {shipment.get_status_display()}, перевізник: '{shipment.carrier_status_label or '—'}').",
+        )
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
     # ── Ручна зміна статусу ───────────────────────────────────────────────────
@@ -3457,51 +3501,35 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Оновлення трекінгу ────────────────────────────────────────────────────
 
     def track_view(self, request, shipment_id):
-        """Вручну оновлює статус і трекінг через Jumingo API."""
+        """Вручну оновлює статус і трекінг (Jumingo / UPS / DHL / FedEx)."""
+        from shipping.services.tracking_engine import track_with_fallback
+
         shipment = get_object_or_404(Shipment, pk=shipment_id)
 
-        if not shipment.carrier_shipment_id:
-            messages.warning(request, "Відправлення не має Jumingo ID — спочатку надішліть.")
-            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+        if not (shipment.carrier_shipment_id or shipment.tracking_number):
+            messages.warning(request, "⚠️ Відправлення не має ID/трекінг-номера.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
-        service = get_service(shipment.carrier)
-        data    = service.track(shipment.carrier_shipment_id)
+        changed, log_entries = track_with_fallback(shipment)
 
-        if not data:
-            messages.error(request, "❌ Не вдалося отримати дані від Jumingo API.")
-            return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+        successful = [e for e in log_entries if not e.get("error")]
+        failed     = [e for e in log_entries if e.get("error")]
 
-        # Зберігаємо raw_response від track
-        shipment.raw_response = data
-        shipment.save(update_fields=["raw_response"])
-
-        # Перезавантажуємо об'єкт з БД щоб мати актуальний стан
-        shipment.refresh_from_db()
-
-        changed = _apply_tracking_update(shipment, data)
-
-        # ── Діагностика митної декларації ─────────────────────────────────────
-        shipment.refresh_from_db()
-        customs_inv   = data.get("customs_invoice") or {}
-        line_items_in = customs_inv.get("lineItems") or []
-        customs_saved = (shipment.customs_articles or {}).get("customs_line_items") or []
-        if line_items_in and not customs_saved:
-            messages.warning(
-                request,
-                f"⚠️ DEBUG: customs_invoice має {len(line_items_in)} рядків у API-відповіді, "
-                f"але customs_articles в БД порожнє! "
-                f"exportReason={customs_inv.get('exportReason')!r}, "
-                f"першийLI={line_items_in[0] if line_items_in else 'N/A'!r}"
-            )
-        elif customs_saved:
-            messages.success(request, f"🛃 Митна декларація: {len(customs_saved)} рядків збережено.")
-
-        if changed:
-            messages.success(request, f"🔄 Оновлено: {shipment.get_status_display()}")
+        if not successful:
+            errs = "; ".join(f"{e['tracker']}: {e['error']}" for e in failed)
+            messages.error(request, f"❌ Помилка трекінгу: {errs}")
         else:
-            messages.info(request, "ℹ️ Дані актуальні.")
+            tracker_used = successful[0]["tracker"].upper()
+            shipment.refresh_from_db()
+            if changed:
+                messages.success(
+                    request,
+                    f"✅ [{tracker_used}] Статус оновлено: {shipment.get_status_display()}"
+                )
+            else:
+                messages.info(request, f"ℹ️ [{tracker_used}] Без змін — статус актуальний.")
 
-        return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
+        return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
     # ── Вибір тарифу (Variant 2) ─────────────────────────────────────────────
 
