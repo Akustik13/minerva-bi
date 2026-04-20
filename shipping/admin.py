@@ -1843,22 +1843,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                  "cls": "yellow"})
 
         elif st == "delivered":
-            # Кнопка синхронізації якщо замовлення ще не "delivered"
             if order.status != "delivered":
+                # Edge case: shipment delivered but order not synced
                 actions.append({
                     "label": "🔄 Синхр. замовлення",
                     "url":   reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
                     "cls":   "green",
                 })
-
-        # Якщо carrier_status_label = "Delivered" але Shipment ще не delivered
-        carrier_delivered = "delivered" in (shipment.carrier_status_label or "").lower()
-        if carrier_delivered and st != "delivered":
-            actions.insert(0, {
-                "label": "🔄 Синхр. замовлення",
-                "url":   reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
-                "cls":   "green",
-            })
             if shipment.label_url:
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
