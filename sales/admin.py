@@ -1668,12 +1668,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 local_info = {'skip': 'local_docs_path не вказано'}
             else:
                 raw_base = cfg.local_docs_path.strip()
-                source_slug = (order.source or 'manual').lower().replace(' ', '_')
-                date_str = _date.today().strftime('%Y-%m-%d')
-                local_dir = (
-                    _Path(raw_base.replace('\\', os.sep))
-                    / source_slug / date_str / order.order_number
-                )
+                base_path = _Path(raw_base.replace('\\', os.sep))
+                # Якщо шлях вже закінчується на номер замовлення — зберігаємо туди
+                # Інакше додаємо тільки номер замовлення (без source/date)
+                if base_path.name == order.order_number:
+                    local_dir = base_path
+                else:
+                    local_dir = base_path / order.order_number
                 dest_local = local_dir / filename
                 local_info['base'] = raw_base
                 local_info['target'] = str(dest_local)
@@ -1756,10 +1757,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
                 if order.order_number and path_obj.name == order.order_number:
                     local_dir = path_obj
-                elif path_obj.name.lower() == source_slug:
-                    local_dir = path_obj / date_str / order.order_number
                 else:
-                    local_dir = path_obj / source_slug / date_str / order.order_number
+                    local_dir = path_obj / order.order_number
                 local_dir.mkdir(parents=True, exist_ok=True)
                 local_dir_str = str(local_dir)
             except Exception as e:
