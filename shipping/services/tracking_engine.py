@@ -32,8 +32,10 @@ def get_rules_for_carrier(carrier_type: str) -> list:
     try:
         from shipping.models import TrackingRule
         rules = list(
-            TrackingRule.objects.filter(carrier_type=carrier_type, enabled=True)
-                                .order_by("priority")
+            TrackingRule.objects.filter(
+                carrier_type=carrier_type, enabled=True,
+                tracking_number_prefix="",      # тільки правила без префіксу
+            ).order_by("priority")
         )
         if rules:
             return rules
@@ -47,6 +49,46 @@ def get_rules_for_carrier(carrier_type: str) -> list:
             return [_FakeRule("jumingo", 1)]
     except Exception:
         pass
+
+    return [_FakeRule("jumingo", 1)]
+
+
+def get_rules_for_shipment(shipment) -> list:
+    """
+    Визначає правила трекінгу для конкретного відправлення.
+
+    Пріоритет пошуку:
+    1. Правила з matching tracking_number_prefix (напр. 1Z → UPS, JD → DHL)
+    2. Правила за carrier_type (стандартна логіка)
+    3. Jumingo fallback
+
+    Дозволяє системі автоматично вибирати правильний трекер по префіксу
+    незалежно від налаштованого типу перевізника.
+    """
+    tn = (shipment.tracking_number or "").strip()
+
+    # ── Крок 1: prefix-based matching ─────────────────────────────────────────
+    if tn:
+        try:
+            from shipping.models import TrackingRule
+            # Беремо всі правила з непорожнім префіксом
+            prefix_rules = list(
+                TrackingRule.objects.filter(enabled=True)
+                                    .exclude(tracking_number_prefix="")
+                                    .order_by("priority")
+            )
+            matched = [
+                r for r in prefix_rules
+                if tn.upper().startswith(r.tracking_number_prefix.upper())
+            ]
+            if matched:
+                return matched
+        except Exception as e:
+            logger.warning("TrackingEngine: prefix lookup failed: %s", e)
+
+    # ── Крок 2: carrier_type-based matching ────────────────────────────────────
+    if shipment.carrier:
+        return get_rules_for_carrier(shipment.carrier.carrier_type)
 
     return [_FakeRule("jumingo", 1)]
 
@@ -367,11 +409,10 @@ def track_with_fallback(shipment, dry_run: bool = False) -> tuple:
     """
     from shipping.admin import _apply_tracking_update
 
-    if not shipment.carrier:
-        return False, [{"tracker": "—", "error": "carrier відсутній", "success": False}]
+    if not shipment.carrier and not shipment.tracking_number:
+        return False, [{"tracker": "—", "error": "carrier і tracking_number відсутні", "success": False}]
 
-    carrier_type = shipment.carrier.carrier_type
-    rules = get_rules_for_carrier(carrier_type)
+    rules = get_rules_for_shipment(shipment)
     log_entries = []
 
     for rule in rules:

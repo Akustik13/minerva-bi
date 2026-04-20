@@ -177,40 +177,67 @@ class Command(BaseCommand):
     def _check_overdue_eta(self, changes: list):
         """
         Позначає посилки як затримані якщо eta_to < сьогодні і статус IN_TRANSIT.
+        Відправляє Telegram-сповіщення згідно налаштувань ShippingSettings.
         """
-        from shipping.models import Shipment
+        from shipping.models import Shipment, ShippingSettings
         from dashboard.notifications import _send_telegram, _get_ns
 
+        cfg = ShippingSettings.get()
+        notify_enabled   = cfg.delay_notify_enabled
+        notify_frequency = cfg.delay_notify_frequency  # once / daily / every_sync
+
         today = timezone.now().date()
-        overdue_qs = Shipment.objects.filter(
+
+        # ── Нові затримки (carrier_delayed=False → треба позначити) ───────────
+        newly_overdue = Shipment.objects.filter(
             status=Shipment.Status.IN_TRANSIT,
             carrier_delayed=False,
             eta_to__lt=today,
             eta_to__isnull=False,
         ).select_related("carrier", "order")
 
-        if not overdue_qs.exists():
-            return
-
         ns = _get_ns()
         tg_enabled = (
-            ns and ns.telegram_enabled
+            notify_enabled and ns and ns.telegram_enabled
             and ns.telegram_bot_token and ns.telegram_chat_id
         )
 
-        for shipment in overdue_qs:
-            shipment.carrier_delayed = True
-            shipment.save(update_fields=["carrier_delayed"])
-
+        def _send_overdue_notification(shipment):
+            if not tg_enabled:
+                return
             order_num = shipment.order.order_number if shipment.order else f"#{shipment.pk}"
             client    = (shipment.order.client or "") if shipment.order else ""
             tn        = shipment.tracking_number or shipment.carrier_shipment_id or "—"
             days_late = (today - shipment.eta_to).days
+            eta_str   = shipment.eta_to.strftime("%d.%m.%Y")
+            try:
+                msg = (
+                    f"🚨 <b>Посилка затримується</b>\n"
+                    f"Замовлення: <b>{order_num}</b>"
+                    + (f" | {client}" if client else "") +
+                    f"\nТрекінг: <code>{tn}</code>\n"
+                    f"Очікувалось до: <b>{eta_str}</b> (+{days_late} дн.)\n"
+                    f"Перевір статус у перевізника"
+                )
+                _send_telegram(ns, msg)
+            except Exception:
+                pass
+
+        for shipment in newly_overdue:
+            order_num = shipment.order.order_number if shipment.order else f"#{shipment.pk}"
+            client    = (shipment.order.client or "") if shipment.order else ""
+            days_late = (today - shipment.eta_to).days
+
+            save_fields = ["carrier_delayed"]
+            shipment.carrier_delayed = True
+            if notify_enabled:
+                shipment.last_delay_notified = today
+                save_fields.append("last_delay_notified")
+            shipment.save(update_fields=save_fields)
 
             self.stdout.write(self.style.WARNING(
                 f"  ⚠️ Затримка #{shipment.pk} {order_num} — ETA {shipment.eta_to} (+{days_late} дн.)"
             ))
-
             changes.append({
                 "order":      order_num,
                 "client":     client,
@@ -218,18 +245,21 @@ class Command(BaseCommand):
                 "new_status": "in_transit",
                 "extra":      f"⚠️ Затримка +{days_late} дн.",
             })
+            _send_overdue_notification(shipment)
 
-            if tg_enabled:
-                try:
-                    eta_str = shipment.eta_to.strftime("%d.%m.%Y")
-                    msg = (
-                        f"🚨 <b>Посилка затримується</b>\n"
-                        f"Замовлення: <b>{order_num}</b>"
-                        + (f" | {client}" if client else "") +
-                        f"\nТрекінг: <code>{tn}</code>\n"
-                        f"Очікувалось до: <b>{eta_str}</b> (+{days_late} дн.)\n"
-                        f"Перевір статус у перевізника"
-                    )
-                    _send_telegram(ns, msg)
-                except Exception:
-                    pass
+        # ── Повторні сповіщення для вже позначених затримок ───────────────────
+        if notify_enabled and notify_frequency in ("daily", "every_sync"):
+            repeat_qs = Shipment.objects.filter(
+                status=Shipment.Status.IN_TRANSIT,
+                carrier_delayed=True,
+                eta_to__lt=today,
+                eta_to__isnull=False,
+            ).select_related("carrier", "order")
+
+            if notify_frequency == "daily":
+                repeat_qs = repeat_qs.exclude(last_delay_notified=today)
+
+            for shipment in repeat_qs:
+                shipment.last_delay_notified = today
+                shipment.save(update_fields=["last_delay_notified"])
+                _send_overdue_notification(shipment)

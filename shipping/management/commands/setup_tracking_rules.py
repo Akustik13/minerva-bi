@@ -43,6 +43,7 @@ class Command(BaseCommand):
             obj, was_created = TrackingRule.objects.get_or_create(
                 carrier_type=carrier_type,
                 priority=priority,
+                tracking_number_prefix="",   # стандартні правила — без префіксу
                 defaults={"tracker": tracker, "enabled": True},
             )
             if was_created:

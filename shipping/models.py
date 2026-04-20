@@ -209,6 +209,10 @@ class Shipment(models.Model):
         "Орієнтовна дата доставки (тариф)", null=True, blank=True,
         help_text="Дата з тарифу перевізника, заповнюється при бронюванні",
     )
+    last_delay_notified = models.DateField(
+        "Останнє сповіщення про затримку", null=True, blank=True,
+        help_text="Дата останнього відправленого Telegram-сповіщення про затримку",
+    )
 
     # ── Технічні поля ─────────────────────────────────────────────────────────
     raw_request  = models.JSONField("Запит (JSON)", null=True, blank=True)
@@ -468,6 +472,20 @@ class ShippingSettings(models.Model):
         "Лог трекінгу — макс. записів", default=500,
         help_text="Скільки останніх спроб трекінгу зберігати у базі (100–2000).",
     )
+    delay_notify_enabled = models.BooleanField(
+        "Сповіщення про затримки", default=True,
+        help_text="Вмикає Telegram-сповіщення коли посилка затримується або ETA прострочена.",
+    )
+    delay_notify_frequency = models.CharField(
+        "Частота сповіщень про затримки", max_length=20,
+        choices=[
+            ("once",       "Один раз (при першому виявленні)"),
+            ("daily",      "Щодня (поки затримка не усунена)"),
+            ("every_sync", "Кожен раз при синхронізації"),
+        ],
+        default="once",
+        help_text="Як часто надсилати Telegram-сповіщення про одну і ту ж затриману посилку.",
+    )
 
     @classmethod
     def get(cls):
@@ -502,15 +520,24 @@ class TrackingRule(models.Model):
     interval_override = models.PositiveSmallIntegerField(
         "Інтервал (хв, 0=глобальний)", default=0,
     )
+    tracking_number_prefix = models.CharField(
+        "Префікс трекінг-номера", max_length=20, blank=True, default="",
+        help_text=(
+            "Якщо вказано — правило застосовується ТІЛЬКИ для трекінг-номерів з цим префіксом. "
+            "Приклади: 1Z (UPS), JD (DHL Paket), 7489 (DHL Express). "
+            "Порожньо = матчить за типом перевізника."
+        ),
+    )
 
     class Meta:
         ordering = ["carrier_type", "priority"]
-        unique_together = [["carrier_type", "priority"]]
+        unique_together = [["carrier_type", "priority", "tracking_number_prefix"]]
         verbose_name = "Правило трекінгу"
         verbose_name_plural = "Правила трекінгу"
 
     def __str__(self):
-        return f"{self.get_carrier_type_display()} → {self.get_tracker_display()} (p{self.priority})"
+        prefix_info = f" [{self.tracking_number_prefix}*]" if self.tracking_number_prefix else ""
+        return f"{self.get_carrier_type_display()}{prefix_info} → {self.get_tracker_display()} (p{self.priority})"
 
 
 class TrackingAttemptLog(models.Model):

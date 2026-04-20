@@ -4406,8 +4406,10 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         changed = True
 
     old_delayed = shipment.carrier_delayed
-    if prog_delayed != shipment.carrier_delayed:
-        shipment.carrier_delayed = prog_delayed
+    # Only set True, never auto-reset: prevents repeated notifications when
+    # UPS/FedEx/DHL normalized responses don't include a 'delayed' key
+    if prog_delayed and not shipment.carrier_delayed:
+        shipment.carrier_delayed = True
         changed = True
 
     # ── ETA дати (очікувана доставка) ─────────────────────────────────────────
@@ -4480,29 +4482,35 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
     # ── Нотифікація при появі затримки ────────────────────────────────────────
     if not old_delayed and prog_delayed:
         try:
-            from config.models import NotificationSettings
-            ns = NotificationSettings.get()
-            order_num = shipment.order.order_number if shipment.order else f"#{shipment.pk}"
-            tn = shipment.tracking_number or shipment.carrier_shipment_id or "—"
-            eta_str = ""
-            if eta_f or eta_t:
-                parts = []
-                if eta_f:
-                    parts.append(eta_f.strftime("%d.%m.%y"))
-                if eta_t and eta_t != eta_f:
-                    parts.append(eta_t.strftime("%d.%m.%y"))
-                eta_str = f" · Доставка: {' – '.join(parts)}"
-            msg = (
-                f"🚨 <b>Затримка відправлення</b>\n"
-                f"Замовлення: <b>{order_num}</b>\n"
-                f"Трекінг: <code>{tn}</code>\n"
-                f"Статус: {prog_label or 'Verspätet'}{eta_str}"
-            )
-            if ns.telegram_enabled and ns.telegram_bot_token and ns.telegram_chat_id:
-                from dashboard.notifications import _send_telegram
-                _send_telegram(ns, msg)
+            from shipping.models import ShippingSettings as _SS
+            _delay_notify = _SS.get().delay_notify_enabled
         except Exception:
-            pass
+            _delay_notify = True
+        if _delay_notify:
+            try:
+                from config.models import NotificationSettings
+                ns = NotificationSettings.get()
+                order_num = shipment.order.order_number if shipment.order else f"#{shipment.pk}"
+                tn = shipment.tracking_number or shipment.carrier_shipment_id or "—"
+                eta_str = ""
+                if eta_f or eta_t:
+                    parts = []
+                    if eta_f:
+                        parts.append(eta_f.strftime("%d.%m.%y"))
+                    if eta_t and eta_t != eta_f:
+                        parts.append(eta_t.strftime("%d.%m.%y"))
+                    eta_str = f" · Доставка: {' – '.join(parts)}"
+                msg = (
+                    f"🚨 <b>Затримка відправлення</b>\n"
+                    f"Замовлення: <b>{order_num}</b>\n"
+                    f"Трекінг: <code>{tn}</code>\n"
+                    f"Статус: {prog_label or 'Verspätet'}{eta_str}"
+                )
+                if ns.telegram_enabled and ns.telegram_bot_token and ns.telegram_chat_id:
+                    from dashboard.notifications import _send_telegram
+                    _send_telegram(ns, msg)
+            except Exception:
+                pass
 
     # ── Синхронізація SalesOrder (незалежно від змін у відправленні) ──────────
     order         = shipment.order
@@ -4656,10 +4664,13 @@ def _get_shipping_stats():
 
 @admin.register(TrackingRule)
 class TrackingRuleAdmin(admin.ModelAdmin):
-    list_display  = ("carrier_type", "priority", "tracker", "enabled", "interval_override")
-    list_editable = ("tracker", "enabled", "interval_override")
+    list_display  = ("carrier_type", "tracking_number_prefix", "priority", "tracker", "enabled", "interval_override")
+    list_editable = ("tracking_number_prefix", "tracker", "enabled", "interval_override")
     list_filter   = ("carrier_type", "tracker", "enabled")
     ordering      = ("carrier_type", "priority")
+
+    def get_list_display_links(self, request, list_display):
+        return ("carrier_type",)
 
 
 @admin.register(TrackingAttemptLog)
@@ -4701,13 +4712,20 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 "<code>*/5 * * * * docker-compose exec -T web python manage.py track_shipments</code>"
             ),
         }),
+        ("🔔 Сповіщення про затримки", {
+            "fields": ("delay_notify_enabled", "delay_notify_frequency"),
+            "description": (
+                "Telegram-сповіщення надсилаються коли ETA посилки прострочена або "
+                "перевізник підтвердив затримку."
+            ),
+        }),
         ("📋 Правила трекінгу", {
             "fields": ("tracking_rules_panel",),
             "description": (
-                "<b>Як працює:</b> для кожного відправлення система визначає тип перевізника "
-                "(UPS/DHL/Jumingo/FedEx) і перебирає правила по порядку пріоритету. "
-                "Якщо перший трекер повернув помилку — пробує наступний. "
-                "Кожна спроба записується в лог."
+                "<b>Як працює:</b> система перевіряє трекінг-номер на відповідність "
+                "префіксу (напр. <code>1Z</code> → UPS, <code>JD</code> → DHL Paket). "
+                "Якщо префікс не знайдено — визначає трекер за типом перевізника. "
+                "Правила перебираються по пріоритету; при помилці пробує наступний."
             ),
         }),
         ("📝 Лог спроб трекінгу", {
@@ -4772,10 +4790,17 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 if rule.enabled else
                 '<span style="color:#f44336;font-size:11px">⛔ вимк</span>'
             )
+            prefix_html = (
+                f'<code style="background:var(--bg-hover,#1e2d40);padding:1px 5px;border-radius:3px">'
+                f'{escape(rule.tracking_number_prefix)}*</code>'
+                if rule.tracking_number_prefix else
+                '<span style="color:var(--text-muted,#888);font-size:11px">за типом</span>'
+            )
             rows.append(
                 f'<tr style="font-size:13px;{border}">'
                 f'<td style="padding:5px 10px;color:var(--text-muted,#888)">'
                 f'{CARRIER_ICONS.get(rule.carrier_type,"📮")} {escape(rule.get_carrier_type_display())}</td>'
+                f'<td style="padding:5px 10px">{prefix_html}</td>'
                 f'<td style="padding:5px 10px;color:var(--text-muted,#888);font-size:11px">'
                 f'{PRIORITY_LABELS.get(rule.priority, f"p{rule.priority}")}</td>'
                 f'<td style="padding:5px 10px">'
@@ -4789,6 +4814,7 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             '<table style="border-collapse:collapse;margin-bottom:10px">'
             '<thead><tr style="font-size:11px;color:var(--text-muted,#888)">'
             '<th style="padding:4px 10px;text-align:left">Перевізник</th>'
+            '<th style="padding:4px 10px;text-align:left">Префікс</th>'
             '<th style="padding:4px 10px;text-align:left">Роль у ланцюгу</th>'
             '<th style="padding:4px 10px;text-align:left">Трекер</th>'
             '<th style="padding:4px 10px;text-align:left">Стан</th>'
