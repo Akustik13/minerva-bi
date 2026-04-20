@@ -939,10 +939,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
         # Інформаційний рядок про локальне збереження
         if cfg.local_save_enabled and cfg.local_docs_path:
-            import os as _os
+            import os as _os, re as _re
             from pathlib import Path as _PathW
             _raw = cfg.local_docs_path.strip()
-            _is_abs = _PathW(_raw.replace('\\', _os.sep)).is_absolute()
+            # Windows C:\... is absolute even when checked on Linux server
+            _is_abs = (bool(_re.match(r'^[A-Za-z]:[/\\]', _raw))
+                       or _PathW(_raw.replace('\\', _os.sep)).is_absolute())
             if _is_abs:
                 local_info = (
                     '<div style="margin:8px 0;padding:8px 12px;'
@@ -1676,7 +1678,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 local_info['base'] = raw_base
                 local_info['target'] = str(dest_local)
                 local_info['platform'] = _sys.platform
-                local_info['is_absolute'] = _Path(raw_base.replace('\\', os.sep)).is_absolute()
+                local_info['is_absolute'] = (
+                    bool(__import__('re').match(r'^[A-Za-z]:[/\\]', raw_base))
+                    or _Path(raw_base.replace('\\', os.sep)).is_absolute()
+                )
                 local_dir.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(str(dest_file), str(dest_local))
                 local_info['ok'] = True
