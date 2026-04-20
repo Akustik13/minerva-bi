@@ -116,9 +116,7 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-qf-btn.sv-qf-warn{background:rgba(198,40,40,.15);color:#ef5350;border-color:#c62828}
 .sv-qf-btn.sv-qf-warn.sv-qf-active{background:#c62828;color:#fff}
 /* Card checkbox */
-.sv-card-check-wrap{position:absolute;top:12px;right:14px}
-.sv-card-check-wrap input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:#1565c0}
-.sv-card{position:relative}
+.sv-card-check-input{width:17px;height:17px;cursor:pointer;accent-color:#1565c0;flex-shrink:0;vertical-align:middle}
 /* Select-all bar */
 #sv-select-bar{display:none;align-items:center;gap:10px;padding:6px 12px;margin-bottom:8px;background:rgba(21,101,192,.12);border:1px solid rgba(21,101,192,.3);border-radius:6px;font-size:13px}
 </style>
@@ -179,15 +177,13 @@ document.addEventListener('DOMContentLoaded', function () {
   {% for order in cl.result_list %}
   {% with lines=order.lines.all %}
   <div class="sv-card sv-card-{{ order.status|default:'default' }}" data-pk="{{ order.pk }}">
-    <div class="sv-card-check-wrap">
-      <input type="checkbox" name="_selected_action" value="{{ order.pk }}"
-             class="action-select sv-card-check-input" onchange="svCardCheckChange()">
-    </div>
 
     {# Header #}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;
                 flex-wrap:wrap;gap:8px;margin-bottom:10px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <input type="checkbox" name="_selected_action" value="{{ order.pk }}"
+               class="action-select sv-card-check-input" onchange="svCardCheckChange()">
         <a href="{% url 'admin:sales_salesorder_change' order.pk %}"
            style="font-family:monospace;font-size:16px;font-weight:800;
                   color:var(--text);text-decoration:none">
@@ -497,8 +493,25 @@ function svSetView(mode) {
   document.getElementById('sv-table').style.display = isCards ? 'none' : 'block';
   document.getElementById('sv-btn-cards').classList.toggle('active', isCards);
   document.getElementById('sv-btn-table').classList.toggle('active', !isCards);
+  // Show action bar clone in card mode; disable hidden one to avoid double-submit
+  var cardAct = document.getElementById('sv-card-actions');
+  if (cardAct) cardAct.style.display = isCards ? '' : 'none';
+  var tableActSel = document.querySelector('#sv-table .actions select[name="action"]');
+  if (tableActSel) tableActSel.disabled = isCards;
+  var tableActBtn = document.querySelector('#sv-table .actions [type="submit"]');
+  if (tableActBtn) tableActBtn.disabled = isCards;
 }
 (function () {
+  // Clone Django action bar for card view (before #sv-cards)
+  var tableAct = document.querySelector('#sv-table .actions');
+  if (tableAct) {
+    var clone = tableAct.cloneNode(true);
+    clone.id = 'sv-card-actions';
+    clone.style.marginBottom = '8px';
+    clone.style.display = 'none';
+    var svCards = document.getElementById('sv-cards');
+    svCards.parentNode.insertBefore(clone, svCards);
+  }
   svSetView(localStorage.getItem('salesorder_view') || 'table');
 })();
 
