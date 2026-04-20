@@ -211,7 +211,13 @@ class Command(BaseCommand):
             days_late = (today - shipment.eta_to).days
             eta_str   = shipment.eta_to.strftime("%d.%m.%Y")
             try:
+                try:
+                    from config.models import SystemSettings as _SyS
+                    _cname = _SyS.get().company_name or 'Minerva'
+                except Exception:
+                    _cname = 'Minerva'
                 msg = (
+                    f"🏛️ <b>{_cname}</b>\n"
                     f"🚨 <b>Посилка затримується</b>\n"
                     f"Замовлення: <b>{order_num}</b>"
                     + (f" | {client}" if client else "") +

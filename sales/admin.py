@@ -221,6 +221,20 @@ class ShippedThisMonthFilter(admin.SimpleListFilter):
         return queryset
 
 
+class DelayedShipmentFilter(admin.SimpleListFilter):
+    title = "Затримка"
+    parameter_name = "delayed"
+    def lookups(self, request, model_admin):
+        return [("1", "🚨 Затримка відправлення")]
+    def queryset(self, request, queryset):
+        if self.value() == "1":
+            return queryset.filter(
+                shipments__carrier_delayed=True,
+                shipments__status="in_transit",
+            ).distinct()
+        return queryset
+
+
 def export_sales_excel(modeladmin, request, queryset):
     try:
         from exports import export_sales
@@ -261,8 +275,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     )
     search_fields = ("order_number", "tracking_number", "client", "email", "phone",
                      "addr_city", "addr_street")
-    list_filter   = ("source", "status", "addr_country", UnshippedFilter, OverdueFilter, ShippedThisMonthFilter)
+    list_filter   = ("source", "status", "addr_country", UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter)
     ordering       = ("-order_date",)
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        from .models import SalesSource
+        extra_context['sv_sources'] = list(SalesSource.objects.values('slug', 'name').order_by('name'))
+        return super().changelist_view(request, extra_context=extra_context)
     date_hierarchy = "order_date"
     actions        = [
         export_sales_excel,

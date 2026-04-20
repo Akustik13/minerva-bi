@@ -9,6 +9,14 @@ from datetime import timedelta
 from django.utils import timezone
 
 
+def _get_company_name() -> str:
+    try:
+        from config.models import SystemSettings
+        return SystemSettings.get().company_name or 'Minerva'
+    except Exception:
+        return 'Minerva'
+
+
 # ── Data collection ────────────────────────────────────────────────────────────
 
 def _get_critical_stock():
@@ -560,7 +568,8 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
 
     if send_tg:
         try:
-            lines = [f'⚙️ <b>{source}</b>', f'<i>{now_str}</i>']
+            _cname = _get_company_name()
+            lines = [f'🏛️ <b>{_cname}</b>', f'⚙️ <b>{source}</b>', f'<i>{now_str}</i>']
             if created:
                 lines.append(f'➕ Нових: <b>{created}</b>')
             if updated:
@@ -805,9 +814,11 @@ def notify_new_order(order):
 
     if send_tg:
         try:
+            _cname = _get_company_name()
             tg = [
+                f'🏛️ <b>{_cname}</b>',
                 f'🆕 <b>Нове замовлення</b>',
-                f'<i>Minerva · {timezone.now().strftime("%d.%m.%Y %H:%M")}</i>',
+                f'<i>{_cname} · {timezone.now().strftime("%d.%m.%Y %H:%M")}</i>',
                 '',
                 f'Замовлення: <code>{order.order_number}</code>',
                 f'Клієнт: <b>{client}</b>',
@@ -880,7 +891,9 @@ def notify_status_change(order, old_status, new_status):
 
     if send_tg:
         try:
+            _cname = _get_company_name()
             lines = [
+                f'🏛️ <b>{_cname}</b>',
                 f'🔄 <b>Зміна статусу</b>',
                 f'<code>{order.order_number}</code> · {order.source}',
                 f'Клієнт: {client}',

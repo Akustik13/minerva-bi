@@ -4558,7 +4558,13 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
                     if eta_t and eta_t != eta_f:
                         parts.append(eta_t.strftime("%d.%m.%y"))
                     eta_str = f" · Доставка: {' – '.join(parts)}"
+                try:
+                    from config.models import SystemSettings as _SyS
+                    _cname = _SyS.get().company_name or 'Minerva'
+                except Exception:
+                    _cname = 'Minerva'
                 msg = (
+                    f"🏛️ <b>{_cname}</b>\n"
                     f"🚨 <b>Затримка відправлення</b>\n"
                     f"Замовлення: <b>{order_num}</b>\n"
                     f"Трекінг: <code>{tn}</code>\n"

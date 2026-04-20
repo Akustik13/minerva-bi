@@ -107,6 +107,20 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-lbl-on{background:#1565c0;color:#fff!important}
 .sv-lbl-off{background:var(--bg-input,#141f2b);color:var(--text-dim);opacity:.6;cursor:default;border:1px solid var(--border-strong)}
 .sv-lbl-add{background:rgba(46,125,50,.15);color:#4caf50!important;border:1px solid #2e7d32}
+/* Quick filter bar */
+.sv-qf-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:7px}
+.sv-qf-sep{width:1px;height:20px;background:var(--border-strong);margin:0 4px;flex-shrink:0}
+.sv-qf-btn{padding:4px 12px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-input,#141f2b);color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:600;text-decoration:none;transition:background .12s,color .12s;white-space:nowrap}
+.sv-qf-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.sv-qf-btn.sv-qf-active{background:#1565c0;color:#fff;border-color:transparent}
+.sv-qf-btn.sv-qf-warn{background:rgba(198,40,40,.15);color:#ef5350;border-color:#c62828}
+.sv-qf-btn.sv-qf-warn.sv-qf-active{background:#c62828;color:#fff}
+/* Card checkbox */
+.sv-card-check-wrap{position:absolute;top:12px;right:14px}
+.sv-card-check-wrap input[type=checkbox]{width:17px;height:17px;cursor:pointer;accent-color:#1565c0}
+.sv-card{position:relative}
+/* Select-all bar */
+#sv-select-bar{display:none;align-items:center;gap:10px;padding:6px 12px;margin-bottom:8px;background:rgba(21,101,192,.12);border:1px solid rgba(21,101,192,.3);border-radius:6px;font-size:13px}
 </style>
 {% endblock %}
 
@@ -123,6 +137,36 @@ document.addEventListener('DOMContentLoaded', function () {
 
 {% block result_list %}
 
+{# ── Quick filter bar ──────────────────────────────────────────────────────── #}
+<div class="sv-qf-bar" id="sv-qf-bar">
+  {# Status filters — built by JS from window.location #}
+  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Статус:</span>
+  <a class="sv-qf-btn" id="svf-s-all"       onclick="svQF('status','');return false" href="#">Всі</a>
+  <a class="sv-qf-btn" id="svf-s-received"  onclick="svQF('status','received');return false" href="#">📥 Отримано</a>
+  <a class="sv-qf-btn" id="svf-s-processing" onclick="svQF('status','processing');return false" href="#">⚙️ Обробка</a>
+  <a class="sv-qf-btn" id="svf-s-shipped"   onclick="svQF('status','shipped');return false" href="#">🚚 Відправлено</a>
+  <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQF('status','delivered');return false" href="#">✅ Доставлено</a>
+  <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQF('status','cancelled');return false" href="#">🚫 Скасовано</a>
+  <div class="sv-qf-sep"></div>
+  <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQF('delayed','1');return false" href="#">🚨 Затримки</a>
+  <a class="sv-qf-btn" id="svf-overdue" onclick="svQF('overdue','1');return false" href="#">🔴 Прострочені</a>
+  {% if sv_sources %}
+  <div class="sv-qf-sep"></div>
+  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Джерело:</span>
+  <a class="sv-qf-btn" id="svf-src-all" onclick="svQF('source','');return false" href="#">Всі</a>
+  {% for src in sv_sources %}
+  <a class="sv-qf-btn" id="svf-src-{{ src.slug }}" onclick="svQF('source','{{ src.slug }}');return false" href="#">{{ src.name }}</a>
+  {% endfor %}
+  {% endif %}
+</div>
+
+{# ── Select-all bar ────────────────────────────────────────────────────────── #}
+<div id="sv-select-bar">
+  <input type="checkbox" id="sv-check-all" onchange="svCheckAll(this)" style="width:16px;height:16px;accent-color:#1565c0">
+  <label for="sv-check-all" style="color:var(--text);font-weight:600;cursor:pointer">Вибрати всі</label>
+  <span id="sv-selected-count" style="color:var(--text-muted);font-size:12px"></span>
+</div>
+
 {# ── View toggle ──────────────────────────────────────────────────────────── #}
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
   <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
@@ -134,7 +178,11 @@ document.addEventListener('DOMContentLoaded', function () {
 <div id="sv-cards" style="display:none">
   {% for order in cl.result_list %}
   {% with lines=order.lines.all %}
-  <div class="sv-card sv-card-{{ order.status|default:'default' }}">
+  <div class="sv-card sv-card-{{ order.status|default:'default' }}" data-pk="{{ order.pk }}">
+    <div class="sv-card-check-wrap">
+      <input type="checkbox" name="_selected_action" value="{{ order.pk }}"
+             class="action-select sv-card-check-input" onchange="svCardCheckChange()">
+    </div>
 
     {# Header #}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;
@@ -380,6 +428,53 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 <script>
+// ── Quick filter bar ─────────────────────────────────────────────────────────
+function svQF(key, value) {
+  var p = new URLSearchParams(window.location.search);
+  if (!value) { p.delete(key); } else { p.set(key, value); }
+  p.delete('p');  // reset pagination
+  window.location.search = p.toString();
+}
+(function() {
+  var p = new URLSearchParams(window.location.search);
+  var status  = p.get('status')  || '';
+  var delayed = p.get('delayed') || '';
+  var overdue = p.get('overdue') || '';
+  var source  = p.get('source')  || '';
+  // Status buttons
+  var smap = {
+    '': 'svf-s-all', 'received': 'svf-s-received',
+    'processing': 'svf-s-processing', 'shipped': 'svf-s-shipped',
+    'delivered': 'svf-s-delivered', 'cancelled': 'svf-s-cancelled',
+  };
+  var activeS = document.getElementById(smap[status] || 'svf-s-all');
+  if (activeS) activeS.classList.add('sv-qf-active');
+  if (delayed === '1') { var d = document.getElementById('svf-delayed'); if(d) d.classList.add('sv-qf-active'); }
+  if (overdue === '1') { var o = document.getElementById('svf-overdue'); if(o) o.classList.add('sv-qf-active'); }
+  if (source) { var sr = document.getElementById('svf-src-' + source); if(sr) sr.classList.add('sv-qf-active'); else { var sa = document.getElementById('svf-src-all'); if(sa) sa.classList.add('sv-qf-active'); } }
+  else { var sa2 = document.getElementById('svf-src-all'); if(sa2) sa2.classList.add('sv-qf-active'); }
+})();
+
+// ── Card checkboxes ──────────────────────────────────────────────────────────
+function svCardCheckChange() {
+  var checks = document.querySelectorAll('.sv-card-check-input');
+  var selected = Array.from(checks).filter(function(c) { return c.checked; }).length;
+  var bar = document.getElementById('sv-select-bar');
+  var cnt = document.getElementById('sv-selected-count');
+  bar.style.display = selected ? 'flex' : 'none';
+  if (cnt) cnt.textContent = selected ? ('Вибрано: ' + selected) : '';
+  // Sync Django's action checkbox state
+  var allChecked = selected === checks.length && checks.length > 0;
+  var allCheck = document.getElementById('sv-check-all');
+  if (allCheck) allCheck.checked = allChecked;
+}
+function svCheckAll(master) {
+  document.querySelectorAll('.sv-card-check-input').forEach(function(c) {
+    c.checked = master.checked;
+  });
+  svCardCheckChange();
+}
+
 function svSetView(mode) {
   localStorage.setItem('salesorder_view', mode);
   var isCards = mode === 'cards';
