@@ -219,7 +219,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       <div class="sd-meta">
         {{ shipment.carrier.name|default:"Без перевізника" }}
         <span class="sd-dot">·</span>
-        <a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>
+        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% else %}<span style="color:var(--text-muted)">Без замовлення</span>{% endif %}
         <span class="sd-dot">·</span>
         Створено {{ shipment.created_at|date:"d.m.Y H:i" }}
         {% if shipment.submitted_at %}
