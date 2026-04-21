@@ -1866,6 +1866,17 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 actions.append({"label": "🔄 Оновити трекінг",
                                  "url": reverse("admin:shipping_shipment_track", args=[shipment.pk]),
                                  "cls": "orange"})
+            elif shipment.tracking_number:
+                # UPS/FedEx/DHL — немає Jumingo ID, але є tracking number
+                actions.append({"label": "🔄 Оновити трекінг",
+                                 "url": reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
+                                 "cls": "orange"})
+            # Якщо перевізник вже каже "Delivered" — показати кнопку синхронізації
+            carrier_lbl = (shipment.carrier_status_label or "").lower()
+            if "delivered" in carrier_lbl or "доставлено" in carrier_lbl:
+                actions.append({"label": "✅ Позначити доставлено",
+                                 "url": reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
+                                 "cls": "green"})
             if shipment.label_url:
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
