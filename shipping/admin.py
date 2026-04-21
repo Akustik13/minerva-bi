@@ -1871,7 +1871,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                  "cls": "yellow"})
 
         elif st == "delivered":
-            if order.status != "delivered":
+            if order and order.status != "delivered":
                 # Edge case: shipment delivered but order not synced
                 actions.append({
                     "label": "🔄 Синхр. замовлення",
@@ -1900,10 +1900,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 ),
             })
 
-        # Завжди — назад до замовлення
-        actions.append({"label": "← Замовлення",
-                         "url": reverse("admin:sales_salesorder_change", args=[order.pk]),
-                         "cls": "ghost"})
+        # Назад до замовлення (якщо є)
+        if order:
+            actions.append({"label": "← Замовлення",
+                             "url": reverse("admin:sales_salesorder_change", args=[order.pk]),
+                             "cls": "ghost"})
 
         # ── Статус від перевізника (з raw_response) ───────────────────────────
         carrier_tracking = None
@@ -2173,25 +2174,36 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             )
 
         # Для кожного товару без ProductPackaging — створюємо
+        # Вага ділиться між SKU пропорційно (груба оцінка)
+        lines_with_product = [l for l in order.lines.select_related("product").all()
+                               if l.product]
+        num_skus = max(1, len(lines_with_product))
+        total_g = int(float(weight_kg) * 1000) if weight_kg else None
+
         created = []
-        estimated_g = int(float(weight_kg) * 1000) if weight_kg else None
-        for line in order.lines.select_related("product").all():
-            if not line.product:
+        for line in lines_with_product:
+            qty_int = max(1, int(round(float(line.qty))))
+            if ProductPackaging.objects.filter(
+                product=line.product, qty_per_box=qty_int
+            ).exists():
                 continue
-            if ProductPackaging.objects.filter(product=line.product).exists():
-                continue
-            pp = ProductPackaging.objects.create(
+            weight_g = (total_g // num_skus) if total_g else None
+            note = f"Авто зі відправлення #{shipment.pk}"
+            if num_skus > 1:
+                note += " (вага ≈ — мультипродуктове замовлення)"
+            ProductPackaging.objects.create(
                 product=line.product,
                 packaging=material,
-                qty_per_box=max(1, int(float(line.qty))),
-                estimated_weight_g=estimated_g,
-                is_default=True,
-                notes=f"Авто зі відправлення #{shipment.pk}",
+                qty_per_box=qty_int,
+                estimated_weight_g=weight_g,
+                is_default=qty_int == 1,
+                notes=note,
             )
             created.append({
                 "sku": line.product.sku,
+                "qty": qty_int,
                 "box": str(material),
-                "weight_g": estimated_g,
+                "weight_g": weight_g,
             })
 
         if not created:
@@ -5118,27 +5130,34 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             '      res.innerHTML=\'<span style="color:var(--ok)">✅ Всі товари вже мають упаковку</span>\';'
             '      return;'
             '    }}'
-            '    var rows=d.candidates.map(function(c){{'
-            '      return "<tr><td style=\'padding:4px 8px;font-family:monospace;color:var(--accent)\'>"+c.sku+"</td>"'
-            '        +"<td style=\'padding:4px 8px;color:var(--text-muted)\'>"+c.order_number+"</td>"'
-            '        +"<td style=\'padding:4px 8px;color:var(--text-muted)\'>"+c.dims+"</td>"'
-            '        +"<td style=\'padding:4px 8px;color:var(--text-muted)\'>"+(c.weight_g?c.weight_g+"г":"—")+"</td>"'
+            '    var rows=d.candidates.map(function(c,i){{'
+            '      var wt=c.weight_g?(c.weight_g+"г"+(c.approx?" ≈":"")):"—";'
+            '      var bg=i%2===0?"background:var(--bg-card-2)":"background:var(--bg-hover)";'
+            '      return "<tr style=\'"+bg+";border-bottom:1px solid var(--border)\'>"'
+            '        +"<td style=\'padding:5px 10px;font-family:monospace;font-weight:600;color:var(--text)\'>"+c.sku+"</td>"'
+            '        +"<td style=\'padding:5px 10px;color:var(--text)\'>"+c.order_number+"</td>"'
+            '        +"<td style=\'padding:5px 10px;text-align:center;color:var(--text);font-weight:600\'>"+c.qty+"</td>"'
+            '        +"<td style=\'padding:5px 10px;color:var(--text)\'>"+c.dims+"</td>"'
+            '        +"<td style=\'padding:5px 10px;color:var(--text)\'>"+wt+"</td>"'
             '        +"</tr>";'
             '    }}).join("");'
             '    res.innerHTML='
-            '      \'<div style="color:var(--text);margin-bottom:8px">Знайдено <b>\'+d.total+\'</b> товар(ів) без упаковки:</div>\''
-            '      +\'<table style="font-size:12px;border-collapse:collapse;margin-bottom:12px">\''
-            '      +\'<tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong)">\''
-            '      +\'<th style="padding:3px 8px;text-align:left">SKU</th>\''
-            '      +\'<th style="padding:3px 8px;text-align:left">Замовлення</th>\''
-            '      +\'<th style="padding:3px 8px;text-align:left">Розміри</th>\''
-            '      +\'<th style="padding:3px 8px;text-align:left">Вага</th>\''
-            '      +\'</tr>\'+rows+\'</table>\''
+            '      \'<div style="color:var(--text);margin-bottom:8px">Знайдено <b>\'+d.total+\'</b> комбінацій товар+кількість без упаковки:</div>\''
+            '      +\'<div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">≈ — вага приблизна (кілька SKU у замовленні)</div>\''
+            '      +\'<div style="border:1px solid var(--border-strong);border-radius:6px;overflow:hidden;margin-bottom:12px">\''
+            '      +\'<table style="font-size:12px;border-collapse:collapse;width:100%">\''
+            '      +\'<thead><tr style="background:var(--bg-card-2)">\''
+            '      +\'<th style="padding:6px 10px;text-align:left;color:var(--text);font-weight:700;border-bottom:2px solid var(--border-strong)">SKU</th>\''
+            '      +\'<th style="padding:6px 10px;text-align:left;color:var(--text);font-weight:700;border-bottom:2px solid var(--border-strong)">Замовлення</th>\''
+            '      +\'<th style="padding:6px 10px;text-align:center;color:var(--text);font-weight:700;border-bottom:2px solid var(--border-strong)">К-сть</th>\''
+            '      +\'<th style="padding:6px 10px;text-align:left;color:var(--text);font-weight:700;border-bottom:2px solid var(--border-strong)">Розміри</th>\''
+            '      +\'<th style="padding:6px 10px;text-align:left;color:var(--text);font-weight:700;border-bottom:2px solid var(--border-strong)">Вага</th>\''
+            '      +\'</tr></thead><tbody>\'+rows+\'</tbody></table></div>\''
             '      +\'<button type="button" id="pkgSyncApplyBtn"\''
             '      +\' style="padding:8px 20px;background:var(--ok);color:#fff;border:none;\''
             '      +\'border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">\''
             '      +\'✅ Застосувати (\'+d.total+\' товар(ів))</button>\''
-            '      +\'<span id="pkgSyncApplyStatus" style="margin-left:12px;font-size:12px;color:var(--text-muted)"></span>\';'
+            '      +\'<span id="pkgSyncApplyStatus" style="margin-left:12px;font-size:12px;color:var(--text)"></span>\';'
             '    var applyBtn=document.getElementById("pkgSyncApplyBtn");'
             '    if(applyBtn){{'
             '      applyBtn.addEventListener("click",function(){{'
@@ -5166,7 +5185,12 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
     packaging_sync_panel.short_description = "Синхронізація"
 
     def _sync_packaging(self, request, pk):
-        """Аналізує відправлення, для товарів без ProductPackaging створює записи."""
+        """Аналізує відправлення, для товарів без ProductPackaging створює записи.
+
+        Ключ унікальності: (product, qty_per_box) — для одного товару може бути
+        кілька записів з різними кількостями (1 шт → маленька коробка, 5 шт → більша).
+        Вага ділиться пропорційно між товарами замовлення (якщо їх кілька).
+        """
         from django.http import JsonResponse
         from decimal import Decimal
 
@@ -5175,9 +5199,9 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
 
         apply = request.method == "POST"
 
-        # Збираємо дані: відправлення → замовлення → товари без ProductPackaging
-        candidates = []  # [{product, sku, shipment, dims, weight_g}]
-        seen_products = set()
+        candidates = []
+        # Ключ: (product_pk, qty_per_box) — дозволяємо різні qty для одного товару
+        seen_keys = set()
 
         shipments = (Shipment.objects
                      .filter(order__isnull=False)
@@ -5190,7 +5214,6 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             if not order:
                 continue
 
-            # Визначаємо розміри
             pkg = shipment.packages.first()
             if pkg:
                 L, W, H = pkg.length_cm, pkg.width_cm, pkg.height_cm
@@ -5199,38 +5222,57 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 L, W, H = shipment.length_cm, shipment.width_cm, shipment.height_cm
                 wkg = shipment.weight_kg
             else:
-                continue  # немає розмірів — пропускаємо
+                continue
 
-            for line in order.lines.all():
-                if not line.product:
+            lines_with_product = [l for l in order.lines.all() if l.product]
+            if not lines_with_product:
+                continue
+
+            # Загальна вага ÷ кількість рядків = приблизна вага на один SKU
+            total_w_g = int(float(wkg) * 1000) if wkg else None
+            num_skus = len(lines_with_product)
+
+            for line in lines_with_product:
+                qty_int = max(1, int(round(float(line.qty))))
+                key = (line.product.pk, qty_int)
+                if key in seen_keys:
                     continue
-                pk_prod = line.product.pk
-                if pk_prod in seen_products:
+
+                # Перевіряємо чи вже є запис з такою кількістю
+                if ProductPackaging.objects.filter(
+                    product=line.product, qty_per_box=qty_int
+                ).exists():
+                    seen_keys.add(key)
                     continue
-                if ProductPackaging.objects.filter(product=line.product).exists():
-                    seen_products.add(pk_prod)
-                    continue
-                seen_products.add(pk_prod)
+
+                seen_keys.add(key)
+
+                # Вага цього SKU: загальна / кількість різних SKU в замовленні
+                # (груба оцінка для мультипродуктових замовлень)
+                weight_g = (total_w_g // num_skus) if total_w_g else None
+
                 candidates.append({
-                    "product":    line.product,
-                    "sku":        line.product.sku,
-                    "shipment_pk": shipment.pk,
+                    "product":      line.product,
+                    "sku":          line.product.sku,
+                    "shipment_pk":  shipment.pk,
                     "order_number": order.order_number or str(order.pk),
-                    "length_cm":  L,
-                    "width_cm":   W,
-                    "height_cm":  H,
-                    "weight_g":   int(float(wkg) * 1000) if wkg else None,
+                    "length_cm":    L,
+                    "width_cm":     W,
+                    "height_cm":    H,
+                    "weight_g":     weight_g,
+                    "qty_per_box":  qty_int,
+                    "multi_sku":    num_skus > 1,
                 })
 
         if not apply:
-            # Повертаємо JSON-попередній перегляд
             preview = [
                 {
                     "sku":          c["sku"],
                     "order_number": c["order_number"],
-                    "shipment_pk":  c["shipment_pk"],
+                    "qty":          c["qty_per_box"],
                     "dims":         f'{c["length_cm"]}×{c["width_cm"]}×{c["height_cm"]} см',
                     "weight_g":     c["weight_g"],
+                    "approx":       c["multi_sku"],
                 }
                 for c in candidates
             ]
@@ -5252,16 +5294,19 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                     box_type=PackagingMaterial.BoxType.BOX,
                     length_cm=L, width_cm=W, height_cm=H,
                     tare_weight_kg=Decimal("0"),
-                    notes=f"Авто-створено при синхронізації зі відправлення #{c['shipment_pk']}",
+                    notes=f"Авто зі відправлення #{c['shipment_pk']}",
                 )
+            note = f"Синхр. зі відправлення #{c['shipment_pk']}"
+            if c["multi_sku"]:
+                note += " (вага ≈ — мультипродуктове замовлення)"
             ProductPackaging.objects.get_or_create(
                 product=c["product"],
+                qty_per_box=c["qty_per_box"],
                 defaults={
-                    "packaging":         material,
-                    "qty_per_box":       1,
+                    "packaging":          material,
                     "estimated_weight_g": c["weight_g"],
-                    "is_default":        True,
-                    "notes":             f"Синхр. зі відправлення #{c['shipment_pk']}",
+                    "is_default":         c["qty_per_box"] == 1,
+                    "notes":              note,
                 },
             )
             created_count += 1
