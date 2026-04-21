@@ -1,113 +1,168 @@
 {% extends "admin/change_form.html" %}
+{% load static %}
 
 {% block extrahead %}{{ block.super }}
 <style>
-#lpBrowseBtn {
+#ls-folder-ui {
+  margin-top: 8px;
+  padding: 14px 16px;
+  background: #0d1520;
+  border: 1px solid #2a3f52;
+  border-radius: 8px;
+  font-size: 13px;
+  max-width: 560px;
+}
+#ls-folder-name {
+  font-family: monospace;
+  color: #c9d8e4;
+  font-weight: 600;
+  font-size: 14px;
+  word-break: break-all;
+}
+#ls-status { font-size: 12px; margin-top: 4px; }
+.ls-btn {
   background: #37474f;
   color: #b0bec5;
   border: 1px solid #546e7a;
-  padding: 6px 14px;
+  padding: 6px 16px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
-  margin-left: 6px;
-  vertical-align: middle;
+  margin-right: 8px;
+  margin-top: 10px;
 }
-#lpBrowseBtn:hover { background: #455a64; color: #c9d8e4; }
-#lpPathResult {
-  display: none;
-  margin-top: 6px;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-family: monospace;
-  line-height: 1.6;
-  word-break: break-all;
+.ls-btn:hover { background: #455a64; color: #c9d8e4; }
+.ls-btn.primary { background: #1565c0; border-color: #1976d2; color: #fff; }
+.ls-btn.primary:hover { background: #1976d2; }
+.ls-btn.danger  { background: #b71c1c; border-color: #c62828; color: #fff; }
+.ls-btn.danger:hover { background: #c62828; }
+#ls-no-support {
+  padding: 10px 14px;
+  background: rgba(230,81,0,.12);
+  border: 1px solid rgba(230,81,0,.35);
+  border-radius: 6px;
+  color: #ffb74d;
+  font-size: 13px;
+  max-width: 560px;
+  margin-top: 8px;
 }
 </style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var inp = document.getElementById('id_local_docs_path');
-  if (!inp) return;
 
-  inp.style.fontFamily = 'monospace';
-  inp.style.width = '60%';
+  /* Знаходимо поле local_docs_path — ховаємо його (замінюємо своїм UI) */
+  var pathRow = (function () {
+    var inp = document.getElementById('id_local_docs_path');
+    if (!inp) return null;
+    var row = inp.closest('.form-row, .field-local_docs_path') || inp.parentElement;
+    return { inp: inp, row: row };
+  })();
 
-  var CHECK_URL = '{% url "admin:sales_salesorder_check_local_path" %}';
+  if (pathRow) {
+    /* Ховаємо стандартне поле — воно зберігає значення але не видно */
+    pathRow.row.style.display = 'none';
+  }
 
-  /* ── Кнопка «Перевірити шлях» ──────────────────────────────────────── */
-  var btn = document.createElement('button');
-  btn.type = 'button';
-  btn.id   = 'lpBrowseBtn';
-  btn.title = 'Перевірити чи існує шлях на сервері';
-  btn.textContent = '🔍 Перевірити';
-  inp.insertAdjacentElement('afterend', btn);
+  /* Перевіряємо підтримку */
+  if (!window.MinervaLocalSave || !window.MinervaLocalSave.supported) {
+    var noSupport = document.createElement('div');
+    noSupport.id = 'ls-no-support';
+    noSupport.innerHTML =
+      '⚠️ Ваш браузер не підтримує File System Access API.<br>'
+      + 'Для локального збереження використовуйте <b>Chrome</b> або <b>Edge</b> (версія 86+).';
+    if (pathRow) pathRow.row.insertAdjacentElement('afterend', noSupport);
+    return;
+  }
 
-  /* ── Результат перевірки ────────────────────────────────────────────── */
-  var result = document.createElement('div');
-  result.id = 'lpPathResult';
-  btn.insertAdjacentElement('afterend', result);
+  var LS = window.MinervaLocalSave;
 
-  btn.addEventListener('click', function () {
-    var p = inp.value.trim();
-    if (!p) { alert('Введіть шлях'); return; }
-    btn.disabled = true;
-    btn.textContent = '⏳';
-    fetch(CHECK_URL + '?path=' + encodeURIComponent(p))
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        btn.disabled = false;
-        btn.textContent = '🔍 Перевірити';
-        result.style.display = 'block';
-        if (d.error) {
-          result.style.background = 'rgba(183,28,28,.15)';
-          result.style.border = '1px solid rgba(183,28,28,.4)';
-          result.style.color = '#ef9a9a';
-          result.innerHTML = '❌ ' + d.error;
-          return;
-        }
-        if (d.windows_on_linux) {
-          result.style.background = 'rgba(183,28,28,.15)';
-          result.style.border = '1px solid rgba(183,28,28,.4)';
-          result.style.color = '#ef9a9a';
-          result.innerHTML = '🖥️❌ Це Windows-шлях, але сервер працює на <b>Linux/Docker</b>.<br>'
-            + '<span style="color:#9aafbe">Сервер фізично не може записувати на <code>' + d.path + '</code></span><br><br>'
-            + '<b style="color:#ffb74d">Варіанти:</b><br>'
-            + '1️⃣ Запусти Django локально на Windows → шлях C:\\ запрацює<br>'
-            + '2️⃣ Вкажи Linux-шлях до папки NAS, напр.: <code style="color:#81c784">/volume1/homes/prymv/Documents/Orders</code>';
-          return;
-        }
-        if (d.exists && d.writable) {
-          result.style.background = 'rgba(46,125,50,.15)';
-          result.style.border = '1px solid rgba(46,125,50,.4)';
-          result.style.color = '#81c784';
-          result.innerHTML = '✅ Шлях існує і доступний для запису<br>'
-            + '<span style="color:#607d8b">Сервер: ' + d.platform + ' → ' + d.normalized + '</span>';
-        } else if (d.exists && !d.writable) {
-          result.style.background = 'rgba(230,81,0,.12)';
-          result.style.border = '1px solid rgba(230,81,0,.4)';
-          result.style.color = '#ffb74d';
-          result.innerHTML = '⚠️ Папка існує, але немає прав на запис<br>'
-            + '<span style="color:#607d8b">Сервер: ' + d.platform + ' → ' + d.normalized + '</span>';
-        } else {
-          result.style.background = 'rgba(183,28,28,.15)';
-          result.style.border = '1px solid rgba(183,28,28,.4)';
-          result.style.color = '#ef9a9a';
-          result.innerHTML = '❌ Шлях не знайдено на сервері (' + d.platform + ')<br>'
-            + '<span style="color:#607d8b">Перевірено: ' + d.normalized + '</span><br>'
-            + (d.platform !== 'win32'
-              ? '<span style="color:#546e7a">Сервер — Linux/Docker. Вкажіть шлях до примонтованого тому NAS, напр.: <code>/volume1/homes/prymv/Documents</code></span>'
-              : '<span style="color:#546e7a">Перевірте правильність шляху</span>');
-        }
-      })
-      .catch(function () {
-        btn.disabled = false;
-        btn.textContent = '🔍 Перевірити';
-        result.style.display = 'block';
-        result.style.color = '#ef9a9a';
-        result.innerHTML = '❌ Помилка мережі';
-      });
+  /* ── Будуємо UI ───────────────────────────────────────────────────────── */
+  var ui = document.createElement('div');
+  ui.id = 'ls-folder-ui';
+  ui.innerHTML =
+    '<div style="color:#7ab3cc;font-weight:700;margin-bottom:10px">📂 Локальна папка для збереження</div>'
+    + '<div id="ls-folder-name">—</div>'
+    + '<div id="ls-status" style="color:#607d8b">Перевірка...</div>'
+    + '<div style="margin-top:10px">'
+    +   '<button type="button" class="ls-btn primary" id="ls-pick-btn">📂 Обрати папку</button>'
+    +   '<button type="button" class="ls-btn danger"  id="ls-forget-btn" style="display:none">🗑️ Забути папку</button>'
+    + '</div>'
+    + '<div style="margin-top:10px;font-size:11px;color:#455a64;line-height:1.6">'
+    +   'ℹ️ Папка обирається один раз і запам\'ятовується в браузері (IndexedDB).<br>'
+    +   'Файли зберігаються браузером напряму на ваш ПК — сервер не потрібен.'
+    + '</div>';
+
+  if (pathRow) {
+    pathRow.row.insertAdjacentElement('afterend', ui);
+  }
+
+  var nameEl    = document.getElementById('ls-folder-name');
+  var statusEl  = document.getElementById('ls-status');
+  var pickBtn   = document.getElementById('ls-pick-btn');
+  var forgetBtn = document.getElementById('ls-forget-btn');
+
+  /* ── Оновити відображення ─────────────────────────────────────────────── */
+  function setReady(folderName) {
+    nameEl.textContent   = '📁 ' + folderName;
+    statusEl.innerHTML   = '<span style="color:#4caf50">✅ Доступ є — файли зберігатимуться сюди</span>';
+    pickBtn.textContent  = '🔄 Змінити папку';
+    forgetBtn.style.display = 'inline-block';
+    /* Зберігаємо назву папки у прихованому полі (для відображення в upload_widget) */
+    if (pathRow) pathRow.inp.value = folderName;
+  }
+
+  function setEmpty() {
+    nameEl.textContent   = '—';
+    statusEl.innerHTML   = '<span style="color:#607d8b">Папку не обрано</span>';
+    pickBtn.textContent  = '📂 Обрати папку';
+    forgetBtn.style.display = 'none';
+    if (pathRow) pathRow.inp.value = '';
+  }
+
+  function setError(msg) {
+    statusEl.innerHTML = '<span style="color:#ef9a9a">⚠️ ' + msg + '</span>';
+  }
+
+  /* ── Ініціалізація: перевірити збережений handle ──────────────────────── */
+  LS.getHandle().then(function (handle) {
+    if (handle) {
+      setReady(handle.name);
+    } else {
+      setEmpty();
+    }
+  }).catch(function () {
+    setEmpty();
   });
+
+  /* ── Обрати папку ─────────────────────────────────────────────────────── */
+  pickBtn.addEventListener('click', function () {
+    pickBtn.disabled = true;
+    pickBtn.textContent = '⏳ Відкриття...';
+    LS.pickFolder().then(function (handle) {
+      pickBtn.disabled = false;
+      if (handle) {
+        setReady(handle.name);
+      } else {
+        /* Користувач скасував picker */
+        setEmpty();
+        pickBtn.textContent = '📂 Обрати папку';
+      }
+    }).catch(function (e) {
+      pickBtn.disabled = false;
+      setError('Помилка: ' + (e.message || String(e)));
+      pickBtn.textContent = '📂 Обрати папку';
+    });
+  });
+
+  /* ── Забути папку ─────────────────────────────────────────────────────── */
+  forgetBtn.addEventListener('click', function () {
+    if (!confirm('Забути збережену папку?')) return;
+    LS.forgetFolder().then(function () {
+      setEmpty();
+    });
+  });
+
 });
 </script>
 {% endblock %}
