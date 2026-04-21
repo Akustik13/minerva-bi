@@ -781,7 +781,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             'var _w2=document.getElementById("savebtn-"+id);'
             'if(_w2)_w2.parentNode.insertAdjacentElement("afterend",_lsEl);}'
             '_lsEl.style.color="#90caf9";_lsEl.textContent="💾 Збереження локально...";'
-            'var _subs=(d.date_str&&d.order_number)?[d.date_str,d.order_number]:null;'
+            'var _subs=(d.source_slug&&d.date_str&&d.order_number)?[d.source_slug,d.date_str,d.order_number]:null;'
             'MinervaLocalSave.saveUrlToFolder(d.url,d.filename,_subs).then(function(r){'
             'if(r.ok){'
             '_lsEl.textContent="✅ "+r.path;'
@@ -1714,6 +1714,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             'url': rel_url,
             'local': local_info,
             'order_number': order.order_number,
+            'source_slug': order.source or 'manual',
             'date_str': _date.today().strftime('%Y-%m-%d'),
         })
 
