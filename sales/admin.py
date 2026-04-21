@@ -210,11 +210,97 @@ class SalesOrderLineInline(admin.TabularInline):
     stock_status.short_description = "На складі"
 
 
+def _base_qs():
+    """Unfiltered SalesOrder queryset for computing counts."""
+    return SalesOrder.objects.all()
+
+
+class StatusFilter(admin.SimpleListFilter):
+    title = "Статус"
+    parameter_name = "status"
+
+    STATUS_ICONS = {
+        "received":   "📥",
+        "processing": "⚙️",
+        "shipped":    "🚚",
+        "delivered":  "✅",
+        "cancelled":  "❌",
+    }
+
+    def lookups(self, request, model_admin):
+        from django.db.models import Count
+        counts = dict(
+            _base_qs().values_list("status").annotate(n=Count("id")).values_list("status", "n")
+        )
+        return [
+            (val, f"{self.STATUS_ICONS.get(val, '')} {label} {counts[val]}"
+                  if val in counts else f"{self.STATUS_ICONS.get(val, '')} {label}")
+            for val, label in SalesOrder.STATUS_CHOICES
+            if val in counts
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(status=self.value())
+        return queryset
+
+
+class SourceFilter(admin.SimpleListFilter):
+    title = "Джерело"
+    parameter_name = "source"
+
+    def lookups(self, request, model_admin):
+        from django.db.models import Count
+        counts = dict(
+            _base_qs().values_list("source").annotate(n=Count("id")).values_list("source", "n")
+        )
+        # Pull friendly names from SalesSource
+        names = dict(SalesSource.objects.values_list("slug", "name"))
+        return [
+            (slug, f"{names.get(slug, slug)} {n}")
+            for slug, n in sorted(counts.items(), key=lambda x: -x[1])
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(source=self.value())
+        return queryset
+
+
+class CountryFilter(admin.SimpleListFilter):
+    title = "Країна"
+    parameter_name = "addr_country"
+
+    def lookups(self, request, model_admin):
+        from django.db.models import Count
+        return [
+            (cc, f"{cc} {n}")
+            for cc, n in _base_qs()
+                .exclude(addr_country="")
+                .values_list("addr_country")
+                .annotate(n=Count("id"))
+                .order_by("-n")
+                .values_list("addr_country", "n")
+        ]
+
+    def queryset(self, request, queryset):
+        if self.value():
+            return queryset.filter(addr_country=self.value())
+        return queryset
+
+
 class UnshippedFilter(admin.SimpleListFilter):
     title = "Відправлено"
     parameter_name = "shipped"
+
     def lookups(self, request, model_admin):
-        return [("no", "⏳ Не відправлено"), ("yes", "✅ Відправлено")]
+        not_shipped = _base_qs().filter(shipped_at__isnull=True).count()
+        shipped     = _base_qs().filter(shipped_at__isnull=False).count()
+        return [
+            ("no",  f"⏳ Не відправлено {not_shipped}" if not_shipped else "⏳ Не відправлено"),
+            ("yes", f"✅ Відправлено {shipped}"         if shipped     else "✅ Відправлено"),
+        ]
+
     def queryset(self, request, queryset):
         if self.value() == "no": return queryset.filter(shipped_at__isnull=True)
         if self.value() == "yes": return queryset.filter(shipped_at__isnull=False)
@@ -224,8 +310,16 @@ class UnshippedFilter(admin.SimpleListFilter):
 class OverdueFilter(admin.SimpleListFilter):
     title = "Прострочені"
     parameter_name = "overdue"
+
     def lookups(self, request, model_admin):
-        return [("1", "🔴 Прострочений дедлайн")]
+        from datetime import date
+        n = _base_qs().filter(
+            shipping_deadline__lt=date.today(),
+            status__in=["received", "processing"],
+        ).count()
+        label = f"🔴 Прострочений дедлайн {n}" if n else "🔴 Прострочений дедлайн"
+        return [("1", label)]
+
     def queryset(self, request, queryset):
         if self.value() == "1":
             from datetime import date
@@ -239,8 +333,14 @@ class OverdueFilter(admin.SimpleListFilter):
 class ShippedThisMonthFilter(admin.SimpleListFilter):
     title = "Відправлено"
     parameter_name = "shipped_period"
+
     def lookups(self, request, model_admin):
-        return [("month", "🚚 Цього місяця")]
+        from datetime import date
+        today = date.today()
+        n = _base_qs().filter(shipped_at__year=today.year, shipped_at__month=today.month).count()
+        label = f"🚚 Цього місяця {n}" if n else "🚚 Цього місяця"
+        return [("month", label)]
+
     def queryset(self, request, queryset):
         if self.value() == "month":
             from datetime import date
@@ -252,8 +352,15 @@ class ShippedThisMonthFilter(admin.SimpleListFilter):
 class DelayedShipmentFilter(admin.SimpleListFilter):
     title = "Затримка"
     parameter_name = "delayed"
+
     def lookups(self, request, model_admin):
-        return [("1", "🚨 Затримка відправлення")]
+        n = _base_qs().filter(
+            shipments__carrier_delayed=True,
+            shipments__status="in_transit",
+        ).distinct().count()
+        label = f"🚨 Затримка відправлення {n}" if n else "🚨 Затримка відправлення"
+        return [("1", label)]
+
     def queryset(self, request, queryset):
         if self.value() == "1":
             return queryset.filter(
@@ -303,7 +410,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     )
     search_fields = ("order_number", "tracking_number", "client", "email", "phone",
                      "addr_city", "addr_street")
-    list_filter   = ("source", "status", "addr_country", UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter)
+    list_filter   = (StatusFilter, SourceFilter, CountryFilter, UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter)
     ordering       = ("-order_date",)
 
     def changelist_view(self, request, extra_context=None):
