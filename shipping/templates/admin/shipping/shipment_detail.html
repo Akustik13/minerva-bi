@@ -122,6 +122,13 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   padding: 3px 10px; border-radius: 5px; text-decoration: none; font-size: 12px;
 }
 .sd-label-link:hover { background: var(--bg-hover); }
+.sd-save-local-btn {
+  background: var(--bg-card-2); color: var(--text-muted);
+  border: 1px solid var(--border-strong); padding: 3px 8px;
+  border-radius: 5px; cursor: pointer; font-size: 13px; line-height: 1;
+}
+.sd-save-local-btn:hover { background: var(--bg-hover); color: var(--text); }
+.sd-save-local-btn:disabled { opacity: .5; cursor: default; }
 
 /* ── Action buttons ── */
 .sd-actions { display: flex; flex-direction: column; gap: 8px; }
@@ -530,16 +537,26 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           {% if shipment.label_url %}
           <div class="sd-info-row">
             <span class="sd-info-key">Етикетка</span>
-            <span class="sd-info-val">
+            <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 Відкрити PDF</a>
+              <button type="button" class="sd-save-local-btn"
+                data-url="{{ shipment.label_url }}"
+                data-filename=""
+                title="Зберегти на ПК">💾</button>
+              <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
             </span>
           </div>
           {% endif %}
           {% if shipment.customs_url %}
           <div class="sd-info-row">
             <span class="sd-info-key">Митна декларація</span>
-            <span class="sd-info-val">
+            <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <a href="{{ shipment.customs_url }}" target="_blank" class="sd-label-link">🛃 Відкрити PDF</a>
+              <button type="button" class="sd-save-local-btn"
+                data-url="{{ shipment.customs_url }}"
+                data-filename=""
+                title="Зберегти на ПК">💾</button>
+              <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
             </span>
           </div>
           {% endif %}
@@ -729,16 +746,26 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             {% if shipment.label_url %}
             <div class="sd-info-row">
               <span class="sd-info-key">Етикетка</span>
-              <span class="sd-info-val">
+              <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 PDF</a>
+                <button type="button" class="sd-save-local-btn"
+                  data-url="{{ shipment.label_url }}"
+                  data-filename=""
+                  title="Зберегти на ПК">💾</button>
+                <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
               </span>
             </div>
             {% endif %}
             {% if shipment.customs_url %}
             <div class="sd-info-row">
               <span class="sd-info-key">Комерційний інвойс</span>
-              <span class="sd-info-val">
+              <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <a href="{{ shipment.customs_url }}" target="_blank" class="sd-label-link">🧾 PDF</a>
+                <button type="button" class="sd-save-local-btn"
+                  data-url="{{ shipment.customs_url }}"
+                  data-filename=""
+                  title="Зберегти на ПК">💾</button>
+                <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
               </span>
             </div>
             {% endif %}
@@ -902,6 +929,45 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 </div>
 
 <script>
+/* ── 💾 Зберегти документ відправки локально (MinervaLocalSave) ── */
+(function() {
+  var ORDER_NUMBER = '{{ shipment.order.order_number|default:"" }}';
+  var SOURCE       = '{{ shipment.order.source|default:"manual" }}';
+  var DATE_STR     = '{{ shipment.created_at|date:"Y-m-d" }}';
+
+  function doSave(btn) {
+    if (!window.MinervaLocalSave || !MinervaLocalSave.supported) {
+      alert('File System Access API не підтримується.\nВикористовуйте Chrome або Edge 86+.');
+      return;
+    }
+    var url      = btn.dataset.url;
+    var filename = url.split('/').pop();
+    var subfolders = (SOURCE && DATE_STR && ORDER_NUMBER)
+      ? [SOURCE, DATE_STR, ORDER_NUMBER] : null;
+    var statusEl = btn.nextElementSibling;
+    btn.disabled = true; btn.textContent = '⏳';
+    if (statusEl) { statusEl.textContent = 'Збереження…'; statusEl.style.color = 'var(--text-dim)'; }
+
+    MinervaLocalSave.saveUrlToFolder(url, filename, subfolders).then(function(r) {
+      btn.disabled = false; btn.textContent = '💾';
+      if (r.ok) {
+        if (statusEl) { statusEl.textContent = '✅ ' + r.path; statusEl.style.color = 'var(--ok)'; }
+      } else if (r.reason === 'no_handle') {
+        if (statusEl) statusEl.textContent = '📂 Оберіть папку…';
+        MinervaLocalSave.pickFolder().then(function(h) { if (h) doSave(btn); });
+      } else {
+        if (statusEl) { statusEl.textContent = '⚠️ ' + r.reason; statusEl.style.color = 'var(--err)'; }
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.sd-save-local-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() { doSave(btn); });
+    });
+  });
+})();
+
 function copyDebug(id, btn) {
   var el = document.getElementById(id);
   if (!el) return;
