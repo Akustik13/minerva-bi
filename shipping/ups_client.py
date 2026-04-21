@@ -726,11 +726,21 @@ class UPSClient:
                     est_delivery = d['date']
                     break
 
+            # Actual delivery datetime for delivered packages (events newest-first)
+            actual_delivery = ''
+            if status.get('type') == 'D' and events:
+                ev = events[0]
+                ev_date = ev.get('date', '')  # "YYYY-MM-DD"
+                ev_time = ev.get('time', '')  # "HH:MM"
+                if ev_date:
+                    actual_delivery = f"{ev_date}T{ev_time}:00" if ev_time else ev_date
+
             return {
                 'tracking_number':    tracking_number,
                 'status':             status.get('type', ''),
                 'status_description': status.get('description', ''),
                 'estimated_delivery': est_delivery,
+                'actual_delivery':    actual_delivery,
                 'location':           events[0]['location'] if events else '',
                 'events':             events,
                 'delivered':          status.get('type') == 'D',

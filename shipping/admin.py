@@ -4681,6 +4681,19 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         shipment.eta_to = eta_t
         changed = True
 
+    # ── Фактична дата доставки (для delivered посилок) ────────────────────────
+    actual_del_str = tracking_data.get("actual_delivery", "")
+    if actual_del_str and not shipment.delivered_at:
+        try:
+            from datetime import datetime as _dt
+            raw_dt = _dt.fromisoformat(actual_del_str[:16])
+            shipment.delivered_at = timezone.make_aware(
+                raw_dt, timezone.get_default_timezone()
+            )
+            changed = True
+        except Exception:
+            pass
+
     # ── Статус: progress.class → Minerva статус ───────────────────────────────
     progress_class  = progress.get("class", "")
     shipment_status = data.get("status", "")
@@ -4794,7 +4807,7 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         order_changed = True
         update_fields.append("status")
         if not order.delivered_at:
-            order.delivered_at = timezone.now()
+            order.delivered_at = shipment.delivered_at or timezone.now()
             order_changed = True
             update_fields.append("delivered_at")
 

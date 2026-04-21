@@ -300,6 +300,7 @@ def _normalize_ups(raw: dict) -> dict:
                 "tracking_number": raw.get("tracking_number", ""),
                 "estimated_delivery": est_delivery,
                 "estimated_delivery_to": est_delivery,
+                "actual_delivery": raw.get("actual_delivery", ""),
             },
             "dates": {
                 "eta_to": est_delivery,

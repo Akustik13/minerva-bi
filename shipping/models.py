@@ -213,6 +213,10 @@ class Shipment(models.Model):
         "Останнє сповіщення про затримку", null=True, blank=True,
         help_text="Дата останнього відправленого Telegram-сповіщення про затримку",
     )
+    delivered_at = models.DateTimeField(
+        "Фактична дата доставки", null=True, blank=True,
+        help_text="Фактична дата і час доставки від API перевізника",
+    )
 
     # ── Технічні поля ─────────────────────────────────────────────────────────
     raw_request  = models.JSONField("Запит (JSON)", null=True, blank=True)

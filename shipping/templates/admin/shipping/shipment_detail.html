@@ -519,6 +519,12 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             </span>
           </div>
           {% endif %}
+          {% if shipment.delivered_at %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">Доставлено</span>
+            <span class="sd-info-val" style="color:var(--ok);font-weight:700">✅ {{ shipment.delivered_at|date:"d.m.Y H:i" }}</span>
+          </div>
+          {% endif %}
           {% if shipment.carrier_eta %}
           <div class="sd-info-row">
             <span class="sd-info-key">Орієнтовна доставка</span>
