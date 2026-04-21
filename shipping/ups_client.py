@@ -929,8 +929,17 @@ class UPSClient:
         }
         addr_line = (addr.get('address_line') or '').strip()
         if addr_line:
-            # UPS requires each address line ≤ 35 chars
-            result['AddressLine'] = self._split_addr_line(addr_line)
+            # UPS requires each address line ≤ 35 chars.
+            # Respect explicit newlines entered by the user (line order matters),
+            # then word-wrap each part individually.
+            explicit_parts = [p.strip() for p in addr_line.splitlines() if p.strip()]
+            if len(explicit_parts) > 1:
+                lines = []
+                for part in explicit_parts:
+                    lines.extend(self._split_addr_line(part))
+                result['AddressLine'] = lines[:3]
+            else:
+                result['AddressLine'] = self._split_addr_line(addr_line)
         elif addr_fallback:
             result['AddressLine'] = ['-']
         if addr.get('state'):

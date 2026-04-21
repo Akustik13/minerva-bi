@@ -1001,9 +1001,9 @@ document.addEventListener('DOMContentLoaded', function() {
             value="{{ shipment.recipient_company }}">
         </div>
         <div class="sh-field full">
-          <label class="sh-label">Вулиця, будинок *</label>
-          <input class="sh-input" type="text" name="recipient_street"
-            value="{{ shipment.recipient_street }}" required>
+          <label class="sh-label">Вулиця, будинок * <span style="font-weight:400;color:var(--text-dim);font-size:11px">(кожен рядок — окрема строчка на етикетці)</span></label>
+          <textarea class="sh-input" name="recipient_street" rows="2" required
+            style="resize:vertical;min-height:52px">{{ shipment.recipient_street }}</textarea>
         </div>
         <div class="sh-field">
           <label class="sh-label">Місто *</label>
