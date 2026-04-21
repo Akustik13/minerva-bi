@@ -80,6 +80,12 @@
 .sd-tl-label        { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--text-dim); }
 .sd-tl-done   .sd-tl-label { color: var(--ok); }
 .sd-tl-active .sd-tl-label { color: var(--accent); }
+.sd-tl-delay  .sd-tl-dot   { background: var(--err); border-color: var(--err); }
+.sd-tl-delay  .sd-tl-label { color: var(--err); }
+.sd-tl-delay-reason {
+  font-size: 10px; color: var(--text-muted); text-align: center;
+  max-width: 110px; white-space: normal; line-height: 1.3; word-break: break-word;
+}
 .sd-tl-line           { flex: 1; height: 2px; background: var(--border-strong); min-width: 40px; margin-bottom: 19px; }
 .sd-tl-line-done      { background: var(--ok); }
 
@@ -280,9 +286,12 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   <div class="sd-timeline-wrap">
     <div class="sd-timeline">
       {% for step in timeline %}
-      <div class="sd-tl-item sd-tl-{{ step.state }}">
+      <div class="sd-tl-item sd-tl-{{ step.state }}{% if step.delay_reason %} sd-tl-delay{% endif %}">
         <div class="sd-tl-dot"></div>
         <div class="sd-tl-label">{{ step.label }}</div>
+        {% if step.delay_reason %}
+        <div class="sd-tl-delay-reason">📦 {{ step.delay_reason }}</div>
+        {% endif %}
       </div>
       {% if not step.is_last %}
       <div class="sd-tl-line {% if step.state == 'done' %}sd-tl-line-done{% endif %}"></div>

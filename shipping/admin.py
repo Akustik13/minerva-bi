@@ -1824,9 +1824,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 state = "done"
             elif i == current_idx:
                 state = "active"
+                if shipment.carrier_delayed and st == "in_transit":
+                    lbl = "! Затримка!"
             else:
                 state = "pending"
-            timeline.append({"label": lbl, "state": state, "is_last": i == len(STEPS) - 1})
+            entry = {"label": lbl, "state": state, "is_last": i == len(STEPS) - 1}
+            if state == "active" and shipment.carrier_delayed and shipment.carrier_status_label:
+                entry["delay_reason"] = shipment.carrier_status_label
+            timeline.append(entry)
 
         show_timeline = shipment.status not in ("error", "cancelled")
 
@@ -2075,6 +2080,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         # Якщо shipment вже delivered — просто синхронізуємо замовлення
         if shipment.status == "delivered":
+            if not order:
+                messages.info(request, "ℹ️ Відправлення доставлено. Замовлення не прив'язано.")
+                return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
             if order.status == "delivered":
                 messages.info(request, "ℹ️ Замовлення вже має статус «Доставлено».")
                 return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
@@ -2096,24 +2104,29 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             changed, log_entries = track_with_fallback(shipment)
             shipment.refresh_from_db()
             if shipment.status == "delivered":
+                order_num = order.order_number if order else f"#{shipment.pk}"
                 messages.success(
                     request,
-                    f"✅ Трекінг оновлено + замовлення {order.order_number} синхронізовано.",
+                    f"✅ Трекінг оновлено + замовлення {order_num} синхронізовано.",
                 )
             else:
                 # Трекінг не зміг оновити — форсово встановлюємо delivered
                 shipment.status = "delivered"
-                shipment.save(update_fields=["status"])
-                update_fields = ["status"]
-                order.status = "delivered"
-                if not order.delivered_at:
-                    order.delivered_at = timezone.now()
-                    update_fields.append("delivered_at")
-                order.save(update_fields=update_fields)
-                messages.success(
-                    request,
-                    f"✅ Статус примусово оновлено: відправлення + замовлення {order.order_number} → Доставлено.",
-                )
+                shipment.carrier_delayed = False
+                shipment.save(update_fields=["status", "carrier_delayed"])
+                if order:
+                    update_fields = ["status"]
+                    order.status = "delivered"
+                    if not order.delivered_at:
+                        order.delivered_at = timezone.now()
+                        update_fields.append("delivered_at")
+                    order.save(update_fields=update_fields)
+                    messages.success(
+                        request,
+                        f"✅ Статус примусово оновлено: відправлення + замовлення {order.order_number} → Доставлено.",
+                    )
+                else:
+                    messages.success(request, "✅ Відправлення оновлено → Доставлено.")
             return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
         messages.warning(
@@ -4611,8 +4624,6 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         changed = True
 
     old_delayed = shipment.carrier_delayed
-    # Only set True, never auto-reset: prevents repeated notifications when
-    # UPS/FedEx/DHL normalized responses don't include a 'delayed' key
     if prog_delayed and not shipment.carrier_delayed:
         shipment.carrier_delayed = True
         changed = True
@@ -4681,6 +4692,11 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         shipment.status = new_status_str
         changed = True
 
+    # Clear carrier_delayed flag when shipment is delivered
+    if shipment.status == "delivered" and shipment.carrier_delayed:
+        shipment.carrier_delayed = False
+        changed = True
+
     if changed:
         shipment.save()
 
@@ -4725,6 +4741,9 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
 
     # ── Синхронізація SalesOrder (незалежно від змін у відправленні) ──────────
     order         = shipment.order
+    if not order:
+        return changed
+
     order_changed = False
     update_fields = []
 

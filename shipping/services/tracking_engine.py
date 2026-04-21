@@ -433,8 +433,8 @@ def track_with_fallback(shipment, dry_run: bool = False) -> tuple:
 
         if raw.get("error"):
             logger.debug(
-                "track_with_fallback: %s/%s failed (%s), trying next",
-                carrier_type, rule.tracker, raw["error"]
+                "track_with_fallback: tracker=%s failed (%s), trying next",
+                rule.tracker, raw["error"]
             )
             continue
 
