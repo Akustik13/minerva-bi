@@ -519,11 +519,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         media_path = settings.MEDIA_ROOT / 'orders' / source / obj.order_number
 
         if not media_path.exists():
-            return '<em style="color:#999">Документів немає</em>'
+            return '<em style="color:var(--text-dim,#607d8b)">Документів немає</em>'
 
         files = list(media_path.glob('*'))
         if not files:
-            return '<em style="color:#999">Документів немає</em>'
+            return '<em style="color:var(--text-dim,#607d8b)">Документів немає</em>'
 
         delete_url = f'/admin/sales/salesorder/{obj.pk}/doc/delete/'
         rows = ''
@@ -531,12 +531,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             size_kb = file.stat().st_size / 1024
             url = f'{settings.MEDIA_URL}orders/{source}/{obj.order_number}/{file.name}'
             rows += (
-                f'<tr style="border-bottom:1px solid #2a3f52">'
+                f'<tr style="border-bottom:1px solid var(--border-strong,#2a3f52)">'
                 f'<td style="padding:8px 4px 8px 0">'
                 f'<a href="{url}" target="_blank" title="Переглянути у браузері"'
-                f' style="color:#c9d8e4;text-decoration:none">'
+                f' style="color:var(--text,#c9d8e4);text-decoration:none">'
                 f'📄 {file.name}</a></td>'
-                f'<td style="padding:8px 4px;text-align:right;color:#9aafbe;font-size:11px;white-space:nowrap">'
+                f'<td style="padding:8px 4px;text-align:right;color:var(--text-muted,#9aafbe);font-size:11px;white-space:nowrap">'
                 f'{size_kb:.1f} KB</td>'
                 f'<td style="padding:8px 0;text-align:right;white-space:nowrap">'
                 f'<button type="button"'
@@ -548,14 +548,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 f' data-del-url="{delete_url}"'
                 f' data-filename="{file.name}"'
                 f' onclick="deleteOrderDoc(this)"'
-                f' style="background:#b71c1c;color:#fff;border:none;padding:5px 10px;'
+                f' style="background:#c62828;color:#fff;border:none;padding:5px 10px;'
                 f'border-radius:3px;font-size:11px;cursor:pointer"'
                 f' title="Видалити файл з сервера">🗑️</button>'
                 f'</td></tr>'
             )
 
         return (
-            f'<div style="color:#7ab3cc;font-weight:bold;margin-bottom:10px;font-size:13px">'
+            f'<div style="color:var(--text-muted,#9aafbe);font-weight:bold;margin-bottom:10px;font-size:13px">'
             f'📁 Завантажені документи ({len(files)})</div>'
             f'<table style="width:100%;border-collapse:collapse">{rows}</table>'
         )
@@ -563,7 +563,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def documents_list(self, obj):
         """Показує список завантажених документів з кнопками видалення."""
         if not obj.pk:
-            return format_html('<em style="color:#999">Збережіть замовлення для завантаження документів</em>')
+            return format_html('<em style="color:var(--text-dim,#607d8b)">Збережіть замовлення для завантаження документів</em>')
 
         js = (
             '<script>'
@@ -602,8 +602,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         inner = self._docs_panel_html(obj)
         return format_html(
             '{}<div id="order-docs-panel" data-pk="{}"'
-            ' style="background:#1e2a35;border:1px solid #2a3f52;border-radius:4px;'
-            'padding:15px;margin-top:10px">'
+            ' style="background:var(--bg-card,#161b22);border:1px solid var(--border-strong,#2a3f52);'
+            'border-radius:6px;padding:15px;margin-top:10px">'
             '{}</div>',
             mark_safe(js), obj.pk, mark_safe(inner)
         )
@@ -965,12 +965,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     '<div style="margin:8px 0;padding:8px 12px;'
                     'background:rgba(46,125,50,.12);border:1px solid rgba(46,125,50,.3);'
                     'border-radius:5px;font-size:12px;display:flex;align-items:center;'
-                    'gap:10px;flex-wrap:wrap">'
+                    'gap:10px;flex-wrap:wrap;color:var(--text,#e6edf3)">'
                     '📂 Копія зберігається в: '
-                    '<code style="color:#4caf50;word-break:break-all">'
+                    '<code style="color:var(--ok,#3fb950);word-break:break-all">'
                     + _raw +
                     '</code>'
-                    ' <a href="' + settings_url + '" style="color:#9aafbe;font-size:11px;white-space:nowrap">'
+                    ' <a href="' + settings_url + '" style="color:var(--text-muted,#9aafbe);font-size:11px;white-space:nowrap">'
                     '⚙️ Налаштування</a>'
                     '</div>'
                 )
@@ -978,20 +978,20 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 local_info = (
                     '<div style="margin:8px 0;padding:8px 12px;'
                     'background:rgba(230,81,0,.12);border:1px solid rgba(230,81,0,.4);'
-                    'border-radius:5px;font-size:12px">'
-                    '⚠️ <b>Шлях відносний</b> (<code style="color:#ff9800">' + _raw + '</code>) — '
+                    'border-radius:5px;font-size:12px;color:var(--text,#e6edf3)">'
+                    '⚠️ <b>Шлях відносний</b> (<code style="color:var(--warn,#e3b341)">' + _raw + '</code>) — '
                     'вкажіть повний абсолютний шлях, наприклад: '
                     '<code>C:\\Users\\prymv\\Documents\\Orders</code>. '
-                    '<a href="' + settings_url + '" style="color:#ff9800">⚙️ Налаштування</a>'
+                    '<a href="' + settings_url + '" style="color:var(--warn,#e3b341)">⚙️ Налаштування</a>'
                     '</div>'
                 )
         elif cfg.local_save_enabled:
             local_info = (
                 '<div style="margin:8px 0;padding:6px 10px;'
                 'background:rgba(230,81,0,.1);border:1px solid rgba(230,81,0,.3);'
-                'border-radius:5px;font-size:12px">'
+                'border-radius:5px;font-size:12px;color:var(--text,#e6edf3)">'
                 '⚠️ Локальне збереження увімкнено, але шлях не вказано. '
-                '<a href="' + settings_url + '" style="color:#ff9800">⚙️ Вказати шлях</a>'
+                '<a href="' + settings_url + '" style="color:var(--warn,#e3b341)">⚙️ Вказати шлях</a>'
                 '</div>'
             )
         else:
@@ -1007,17 +1007,17 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             ' data-upload-url="' + upload_url + '"'
             ' data-order-number="' + (obj.order_number or '') + '"'
             ' data-source="' + (obj.source or '') + '"'
-            ' style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);'
+            ' style="background:var(--bg-card-2,#1c2128);border:1px solid var(--border-strong,#2a3f52);'
             'padding:16px;border-radius:8px">'
             '<label for="docFiles"'
             ' style="display:inline-block;padding:8px 20px;background:#417690;color:#fff;'
             'border-radius:6px;cursor:pointer;font-size:14px;font-weight:bold;margin-bottom:10px">'
             '📎 Вибрати файли для завантаження</label>'
             '<input type="file" id="docFiles" multiple style="display:none">'
-            '<p style="margin:0 0 6px;font-size:12px;color:#888">'
+            '<p style="margin:0 0 6px;font-size:12px;color:var(--text-dim,#607d8b)">'
             'Можна кілька файлів одночасно. Завантаження на сервер починається автоматично після вибору.</p>'
             + local_info +
-            '<div id="docResult" style="margin-top:10px;font-size:13px"></div>'
+            '<div id="docResult" style="margin-top:10px;font-size:13px;color:var(--text,#e6edf3)"></div>'
             '</div>'
         )
         return mark_safe(html)
