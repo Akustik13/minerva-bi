@@ -496,7 +496,6 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         
         ("📦 Пакування", {
             "fields": ("packaging_panel",),
-            "classes": ("collapse",),
             "description": "Рекомендована упаковка на основі товарів замовлення. Фактичну упаковку зафіксуй нижче (inline).",
         }),
         ("📄 Автоматичні документи", {

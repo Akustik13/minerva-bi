@@ -1058,6 +1058,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.fedex_book_view),
                 name="shipping_shipment_fedex_book",
             ),
+            path(
+                "<int:shipment_id>/save-packaging/",
+                self.admin_site.admin_view(self.save_packaging_view),
+                name="shipping_shipment_save_packaging",
+            ),
         ]
         return custom + urls
 
@@ -2013,20 +2018,46 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if v != Shipment.Status.DRAFT
         ]
 
+        # ── Запропонувати зберегти упаковку для товарів без ProductPackaging ─
+        suggest_packaging = []
+        has_pkg_data = (
+            shipment.packages.exists()
+            or (shipment.length_cm and shipment.width_cm and shipment.height_cm)
+        )
+        if has_pkg_data and order:
+            try:
+                lines = list(order.lines.select_related('product').all())
+                for line in lines:
+                    if not line.product:
+                        continue
+                    has_pp = ProductPackaging.objects.filter(
+                        product=line.product
+                    ).exists()
+                    if not has_pp:
+                        suggest_packaging.append({
+                            'product_pk':  line.product.pk,
+                            'sku':         line.product.sku,
+                            'product_name': str(line.product),
+                            'qty':         float(line.qty),
+                        })
+            except Exception:
+                pass
+
         return render(request, "admin/shipping/shipment_detail.html", {
             **self.admin_site.each_context(request),
-            "shipment":         shipment,
-            "order":            order,
-            "timeline":         timeline,
-            "show_timeline":    show_timeline,
-            "actions":          actions,
-            "status_choices":   status_choices,
-            "carrier_tracking": carrier_tracking,
-            "pickup_info":      pickup_info,
-            "customs_display":  customs_display,
-            "raw_request":      _to_str(shipment.raw_request),
-            "raw_response":     _to_str(shipment.raw_response),
-            "title":            f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
+            "shipment":          shipment,
+            "order":             order,
+            "timeline":          timeline,
+            "show_timeline":     show_timeline,
+            "actions":           actions,
+            "status_choices":    status_choices,
+            "carrier_tracking":  carrier_tracking,
+            "pickup_info":       pickup_info,
+            "customs_display":   customs_display,
+            "raw_request":       _to_str(shipment.raw_request),
+            "raw_response":      _to_str(shipment.raw_response),
+            "suggest_packaging": suggest_packaging,
+            "title":             f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
         })
 
     # ── Синхронізація статусу замовлення ─────────────────────────────────────
@@ -2090,6 +2121,83 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             f"(статус: {shipment.get_status_display()}, перевізник: '{shipment.carrier_status_label or '—'}').",
         )
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+    # ── Зберегти упаковку з параметрів відправлення ──────────────────────────
+
+    def save_packaging_view(self, request, shipment_id):
+        """POST: знаходить або створює PackagingMaterial і ProductPackaging
+        для товарів замовлення що не мають налаштованої упаковки."""
+        from django.http import JsonResponse
+        from decimal import Decimal
+        if request.method != "POST":
+            return JsonResponse({"error": "POST required"}, status=405)
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order = shipment.order
+        if not order:
+            return JsonResponse({"error": "Немає замовлення"}, status=400)
+
+        # Визначаємо розміри і вагу з відправлення
+        pkg = shipment.packages.first()
+        if pkg:
+            length_cm = pkg.length_cm
+            width_cm  = pkg.width_cm
+            height_cm = pkg.height_cm
+            weight_kg = pkg.weight_kg
+        else:
+            length_cm = shipment.length_cm
+            width_cm  = shipment.width_cm
+            height_cm = shipment.height_cm
+            weight_kg = shipment.weight_kg
+
+        if not (length_cm and width_cm and height_cm):
+            return JsonResponse({"error": "Розміри посилки не вказані"}, status=400)
+
+        # Знаходимо або створюємо PackagingMaterial з ±1 см точністю
+        tol = Decimal("1.0")
+        material = PackagingMaterial.objects.filter(
+            length_cm__gte=length_cm - tol, length_cm__lte=length_cm + tol,
+            width_cm__gte=width_cm - tol,   width_cm__lte=width_cm + tol,
+            height_cm__gte=height_cm - tol, height_cm__lte=height_cm + tol,
+            is_active=True,
+        ).first()
+
+        if not material:
+            material = PackagingMaterial.objects.create(
+                box_type=PackagingMaterial.BoxType.BOX,
+                length_cm=length_cm,
+                width_cm=width_cm,
+                height_cm=height_cm,
+                tare_weight_kg=Decimal("0"),
+                notes="Авто-створено із параметрів відправлення",
+            )
+
+        # Для кожного товару без ProductPackaging — створюємо
+        created = []
+        estimated_g = int(float(weight_kg) * 1000) if weight_kg else None
+        for line in order.lines.select_related("product").all():
+            if not line.product:
+                continue
+            if ProductPackaging.objects.filter(product=line.product).exists():
+                continue
+            pp = ProductPackaging.objects.create(
+                product=line.product,
+                packaging=material,
+                qty_per_box=max(1, int(float(line.qty))),
+                estimated_weight_g=estimated_g,
+                is_default=True,
+                notes=f"Авто зі відправлення #{shipment.pk}",
+            )
+            created.append({
+                "sku": line.product.sku,
+                "box": str(material),
+                "weight_g": estimated_g,
+            })
+
+        if not created:
+            return JsonResponse({"ok": True, "created": [], "msg": "Всі товари вже мають упаковку"})
+        return JsonResponse({"ok": True, "created": created,
+                             "msg": f"Створено {len(created)} запис(ів) упаковки"})
 
     # ── Ручна зміна статусу ───────────────────────────────────────────────────
 
@@ -4787,9 +4895,17 @@ class TrackingAttemptLogAdmin(admin.ModelAdmin):
 class ShippingSettingsAdmin(admin.ModelAdmin):
     """Singleton — налаштування доставки."""
 
-    readonly_fields = ("last_tracking_run", "tracking_actions", "tracking_rules_panel", "tracking_log_link")
+    readonly_fields = ("last_tracking_run", "tracking_actions", "tracking_rules_panel",
+                       "tracking_log_link", "packaging_sync_panel")
 
     fieldsets = [
+        ("📦 Синхронізація упаковок", {
+            "fields": ("packaging_sync_panel",),
+            "description": (
+                "Аналізує параметри минулих відправлень і автоматично "
+                "налаштовує упаковку для товарів що ніколи не пакувались вручну."
+            ),
+        }),
         ("🔄 Автоматичний трекінг", {
             "fields": (
                 "auto_tracking_enabled",
@@ -4945,6 +5061,11 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self._run_tracking),
                 name="shipping_shippingsettings_run_tracking",
             ),
+            path(
+                "<int:pk>/sync-packaging/",
+                self.admin_site.admin_view(self._sync_packaging),
+                name="shipping_shippingsettings_sync_packaging",
+            ),
         ]
         return custom + urls
 
@@ -4962,6 +5083,192 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
         except Exception as e:
             messages.error(request, f"❌ Помилка: {e}")
         return redirect(reverse("admin:shipping_shippingsettings_change", args=[1]))
+
+    def packaging_sync_panel(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        sync_url = reverse("admin:shipping_shippingsettings_sync_packaging", args=[obj.pk])
+        return format_html(
+            '<div id="pkg-sync-wrap">'
+            '<p style="color:var(--text-muted);font-size:13px;margin:0 0 10px">'
+            'Аналізує всі минулі відправлення і для товарів без налаштованої упаковки '
+            'автоматично визначає розміри та вагу на основі параметрів посилки. '
+            'Знаходить або створює відповідний пакувальний матеріал.'
+            '</p>'
+            '<button type="button" id="pkgSyncPreviewBtn"'
+            ' data-url="{}"'
+            ' style="padding:8px 18px;background:#1565c0;color:#fff;border:none;'
+            'border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">'
+            '🔍 Аналізувати відправлення</button>'
+            '<div id="pkgSyncResult" style="margin-top:14px"></div>'
+            '</div>'
+            '<script>'
+            '(function(){{'
+            'var btn=document.getElementById("pkgSyncPreviewBtn");'
+            'if(!btn)return;'
+            'btn.addEventListener("click",function(){{'
+            '  btn.disabled=true;btn.textContent="⏳ Аналіз...";'
+            '  var url=btn.dataset.url;'
+            '  fetch(url,{{headers:{{"X-Requested-With":"XMLHttpRequest"}}}})'
+            '  .then(function(r){{return r.json();}})'
+            '  .then(function(d){{'
+            '    btn.disabled=false;btn.textContent="🔍 Аналізувати відправлення";'
+            '    var res=document.getElementById("pkgSyncResult");'
+            '    if(!d.total){{'
+            '      res.innerHTML=\'<span style="color:var(--ok)">✅ Всі товари вже мають упаковку</span>\';'
+            '      return;'
+            '    }}'
+            '    var rows=d.candidates.map(function(c){{'
+            '      return "<tr><td style=\'padding:4px 8px;font-family:monospace;color:var(--accent)\'>"+c.sku+"</td>"'
+            '        +"<td style=\'padding:4px 8px;color:var(--text-muted)\'>"+c.order_number+"</td>"'
+            '        +"<td style=\'padding:4px 8px;color:var(--text-muted)\'>"+c.dims+"</td>"'
+            '        +"<td style=\'padding:4px 8px;color:var(--text-muted)\'>"+(c.weight_g?c.weight_g+"г":"—")+"</td>"'
+            '        +"</tr>";'
+            '    }}).join("");'
+            '    res.innerHTML='
+            '      \'<div style="color:var(--text);margin-bottom:8px">Знайдено <b>\'+d.total+\'</b> товар(ів) без упаковки:</div>\''
+            '      +\'<table style="font-size:12px;border-collapse:collapse;margin-bottom:12px">\''
+            '      +\'<tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong)">\''
+            '      +\'<th style="padding:3px 8px;text-align:left">SKU</th>\''
+            '      +\'<th style="padding:3px 8px;text-align:left">Замовлення</th>\''
+            '      +\'<th style="padding:3px 8px;text-align:left">Розміри</th>\''
+            '      +\'<th style="padding:3px 8px;text-align:left">Вага</th>\''
+            '      +\'</tr>\'+rows+\'</table>\''
+            '      +\'<button type="button" id="pkgSyncApplyBtn"\''
+            '      +\' style="padding:8px 20px;background:var(--ok);color:#fff;border:none;\''
+            '      +\'border-radius:6px;cursor:pointer;font-weight:600;font-size:13px">\''
+            '      +\'✅ Застосувати (\'+d.total+\' товар(ів))</button>\''
+            '      +\'<span id="pkgSyncApplyStatus" style="margin-left:12px;font-size:12px;color:var(--text-muted)"></span>\';'
+            '    var applyBtn=document.getElementById("pkgSyncApplyBtn");'
+            '    if(applyBtn){{'
+            '      applyBtn.addEventListener("click",function(){{'
+            '        applyBtn.disabled=true;applyBtn.textContent="⏳ Застосування...";'
+            '        var csrf=document.querySelector("[name=csrfmiddlewaretoken]");'
+            '        fetch(url,{{method:"POST",headers:{{"X-CSRFToken":csrf?csrf.value:"","X-Requested-With":"XMLHttpRequest"}}}})'
+            '        .then(function(r){{return r.json();}})'
+            '        .then(function(d2){{'
+            '          applyBtn.textContent="✅ Готово";'
+            '          var st=document.getElementById("pkgSyncApplyStatus");'
+            '          if(st)st.textContent=d2.msg||d2.error;'
+            '        }}).catch(function(e){{'
+            '          applyBtn.disabled=false;applyBtn.textContent="✅ Застосувати";'
+            '        }});'
+            '      }});'
+            '    }}'
+            '  }}).catch(function(){{'
+            '    btn.disabled=false;btn.textContent="🔍 Аналізувати відправлення";'
+            '  }});'
+            '}});'
+            '}})();'
+            '</script>',
+            sync_url,
+        )
+    packaging_sync_panel.short_description = "Синхронізація"
+
+    def _sync_packaging(self, request, pk):
+        """Аналізує відправлення, для товарів без ProductPackaging створює записи."""
+        from django.http import JsonResponse
+        from decimal import Decimal
+
+        if request.method not in ("GET", "POST"):
+            return JsonResponse({"error": "Method not allowed"}, status=405)
+
+        apply = request.method == "POST"
+
+        # Збираємо дані: відправлення → замовлення → товари без ProductPackaging
+        candidates = []  # [{product, sku, shipment, dims, weight_g}]
+        seen_products = set()
+
+        shipments = (Shipment.objects
+                     .filter(order__isnull=False)
+                     .select_related("order")
+                     .prefetch_related("packages", "order__lines__product")
+                     .order_by("-pk"))
+
+        for shipment in shipments:
+            order = shipment.order
+            if not order:
+                continue
+
+            # Визначаємо розміри
+            pkg = shipment.packages.first()
+            if pkg:
+                L, W, H = pkg.length_cm, pkg.width_cm, pkg.height_cm
+                wkg = pkg.weight_kg
+            elif shipment.length_cm and shipment.width_cm and shipment.height_cm:
+                L, W, H = shipment.length_cm, shipment.width_cm, shipment.height_cm
+                wkg = shipment.weight_kg
+            else:
+                continue  # немає розмірів — пропускаємо
+
+            for line in order.lines.all():
+                if not line.product:
+                    continue
+                pk_prod = line.product.pk
+                if pk_prod in seen_products:
+                    continue
+                if ProductPackaging.objects.filter(product=line.product).exists():
+                    seen_products.add(pk_prod)
+                    continue
+                seen_products.add(pk_prod)
+                candidates.append({
+                    "product":    line.product,
+                    "sku":        line.product.sku,
+                    "shipment_pk": shipment.pk,
+                    "order_number": order.order_number or str(order.pk),
+                    "length_cm":  L,
+                    "width_cm":   W,
+                    "height_cm":  H,
+                    "weight_g":   int(float(wkg) * 1000) if wkg else None,
+                })
+
+        if not apply:
+            # Повертаємо JSON-попередній перегляд
+            preview = [
+                {
+                    "sku":          c["sku"],
+                    "order_number": c["order_number"],
+                    "shipment_pk":  c["shipment_pk"],
+                    "dims":         f'{c["length_cm"]}×{c["width_cm"]}×{c["height_cm"]} см',
+                    "weight_g":     c["weight_g"],
+                }
+                for c in candidates
+            ]
+            return JsonResponse({"candidates": preview, "total": len(preview)})
+
+        # POST — застосовуємо
+        created_count = 0
+        tol = Decimal("1.0")
+        for c in candidates:
+            L, W, H = c["length_cm"], c["width_cm"], c["height_cm"]
+            material = PackagingMaterial.objects.filter(
+                length_cm__gte=L - tol, length_cm__lte=L + tol,
+                width_cm__gte=W - tol,  width_cm__lte=W + tol,
+                height_cm__gte=H - tol, height_cm__lte=H + tol,
+                is_active=True,
+            ).first()
+            if not material:
+                material = PackagingMaterial.objects.create(
+                    box_type=PackagingMaterial.BoxType.BOX,
+                    length_cm=L, width_cm=W, height_cm=H,
+                    tare_weight_kg=Decimal("0"),
+                    notes=f"Авто-створено при синхронізації зі відправлення #{c['shipment_pk']}",
+                )
+            ProductPackaging.objects.get_or_create(
+                product=c["product"],
+                defaults={
+                    "packaging":         material,
+                    "qty_per_box":       1,
+                    "estimated_weight_g": c["weight_g"],
+                    "is_default":        True,
+                    "notes":             f"Синхр. зі відправлення #{c['shipment_pk']}",
+                },
+            )
+            created_count += 1
+
+        msg = (f"Створено {created_count} запис(ів) упаковки" if created_count
+               else "Всі товари вже мають налаштовану упаковку")
+        return JsonResponse({"ok": True, "created": created_count, "msg": msg})
 
     def has_add_permission(self, request):
         return False

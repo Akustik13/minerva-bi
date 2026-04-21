@@ -926,6 +926,34 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     </div><!-- /right -->
 
   </div><!-- /body -->
+
+{% if suggest_packaging %}
+<div style="margin:24px 32px 0;padding:16px 20px;
+  background:var(--bg-card-2);border:1px solid var(--warn,#e3b341);
+  border-radius:8px;border-left:4px solid var(--warn,#e3b341)">
+  <div style="font-weight:700;color:var(--warn,#e3b341);margin-bottom:10px;font-size:14px">
+    📦 Зберегти упаковку для товарів
+  </div>
+  <p style="color:var(--text-muted);font-size:13px;margin:0 0 10px">
+    Наступні товари не мають налаштованої упаковки. Перейняти параметри посилки ({% with pkg=shipment.packages.first %}{% if pkg %}{{pkg.length_cm}}×{{pkg.width_cm}}×{{pkg.height_cm}} см, {{pkg.weight_kg}} кг{% else %}{{shipment.length_cm}}×{{shipment.width_cm}}×{{shipment.height_cm}} см, {{shipment.weight_kg}} кг{% endif %}{% endwith %}) і зберегти як упаковку?
+  </p>
+  <ul style="margin:0 0 12px;padding-left:20px;color:var(--text);font-size:13px">
+    {% for item in suggest_packaging %}
+    <li style="margin-bottom:3px">
+      <code style="color:var(--accent)">{{ item.sku }}</code>
+      <span style="color:var(--text-muted)"> — {{ item.product_name }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  <button type="button" id="savePkgBtn"
+    style="background:var(--ok,#3fb950);color:#fff;border:none;padding:8px 20px;
+    border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
+    💾 Зберегти упаковку ({{ suggest_packaging|length }} товар{{suggest_packaging|length|pluralize:"","и,ів"}})
+  </button>
+  <span id="savePkgStatus" style="margin-left:12px;font-size:12px;color:var(--text-muted)"></span>
+</div>
+{% endif %}
+
 </div>
 
 <script>
@@ -989,5 +1017,39 @@ function copyDebug(id, btn) {
     setTimeout(function(){ btn.textContent = orig; }, 2000);
   }
 }
+
+/* ── 💾 Збереження упаковки з параметрів відправлення ── */
+document.addEventListener('DOMContentLoaded', function() {
+  var btn = document.getElementById('savePkgBtn');
+  if (!btn) return;
+  btn.addEventListener('click', function() {
+    btn.disabled = true; btn.textContent = '⏳ Збереження…';
+    var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
+    fetch('{% url "admin:shipping_shipment_save_packaging" shipment.pk %}',
+      { method: 'POST', headers: { 'X-CSRFToken': csrf ? csrf.value : '' } })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      var st = document.getElementById('savePkgStatus');
+      if (d.ok) {
+        btn.textContent = '✅ Збережено';
+        btn.style.background = 'var(--text-dim)';
+        if (st) st.textContent = d.msg;
+        /* Приховуємо панель через 3с */
+        setTimeout(function() {
+          var panel = btn.closest('div[style*="border-left:4px"]');
+          if (panel) panel.style.display = 'none';
+        }, 3000);
+      } else {
+        btn.disabled = false; btn.textContent = '💾 Зберегти упаковку';
+        if (st) { st.textContent = '⚠️ ' + (d.error || d.msg); st.style.color = 'var(--err)'; }
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false; btn.textContent = '💾 Зберегти упаковку';
+      var st = document.getElementById('savePkgStatus');
+      if (st) { st.textContent = '⚠️ Помилка: ' + e; st.style.color = 'var(--err)'; }
+    });
+  });
+});
 </script>
 {% endblock %}
