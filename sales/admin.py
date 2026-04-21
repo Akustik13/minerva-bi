@@ -1754,19 +1754,20 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         local_dir_str = ''
         if local_base_path:
             try:
-                import os as _os
-                from datetime import date as _date2
-                normalized  = local_base_path.replace('\\', _os.sep).replace('/', _os.sep)
-                path_obj    = _Path(normalized)
-                source_slug = (order.source or 'manual').lower().replace(' ', '_')
-                date_str    = _date2.today().strftime('%Y-%m-%d')
-
-                if order.order_number and path_obj.name == order.order_number:
-                    local_dir = path_obj
+                import os as _os, re as _re2, sys as _sys2
+                normalized  = local_base_path.replace('\\', _os.sep)
+                # Windows-шлях на Linux-сервері — не намагатись записувати
+                if _re2.match(r'^[A-Za-z]:[/\\]', local_base_path) and _sys2.platform != 'win32':
+                    local_error = 'Windows-шлях недоступний з Linux/Docker сервера'
+                    local_dir = None
                 else:
-                    local_dir = path_obj / order.order_number
-                local_dir.mkdir(parents=True, exist_ok=True)
-                local_dir_str = str(local_dir)
+                    path_obj = _Path(normalized)
+                    if order.order_number and path_obj.name == order.order_number:
+                        local_dir = path_obj
+                    else:
+                        local_dir = path_obj / order.order_number
+                    local_dir.mkdir(parents=True, exist_ok=True)
+                    local_dir_str = str(local_dir)
             except Exception as e:
                 local_error = str(e)
                 local_dir = None

@@ -15,23 +15,22 @@ logger = logging.getLogger(__name__)
 
 
 def _copy_shipment_file_local(abs_path: str, shipment) -> None:
-    """Копіює файл до локальної папки ПК якщо SalesSettings.local_save_enabled."""
+    """Копіює файл до локальної папки якщо SalesSettings.local_save_enabled."""
     try:
         from sales.models import SalesSettings
         cfg = SalesSettings.get()
         if not cfg.local_save_enabled or not cfg.local_docs_path:
             return
-        import os, shutil
+        import os, re, shutil, sys
         from pathlib import Path as _Path
-        from datetime import date as _date
+        raw = cfg.local_docs_path.strip()
+        # Windows-шлях на Linux-сервері — пропускаємо
+        if re.match(r'^[A-Za-z]:[/\\]', raw) and sys.platform != 'win32':
+            return
         order = shipment.order
-        source_slug = (order.source if order else 'shipping').lower().replace(' ', '_')
         order_num = order.order_number if order else f'shipment_{shipment.pk}'
-        date_str = _date.today().strftime('%Y-%m-%d')
-        local_dir = (
-            _Path(cfg.local_docs_path.replace('\\', os.sep))
-            / source_slug / date_str / order_num
-        )
+        base = _Path(raw.replace('\\', os.sep))
+        local_dir = base if base.name == order_num else base / order_num
         local_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy2(abs_path, str(local_dir / os.path.basename(abs_path)))
     except Exception:
