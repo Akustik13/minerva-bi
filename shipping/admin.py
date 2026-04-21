@@ -1803,25 +1803,6 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     def shipment_detail_view(self, request, shipment_id):
         import json as _json
-        import traceback as _tb
-        from .services.jumingo import JUMINGO_APP_URL
-
-        try:
-            return self._shipment_detail_view_inner(request, shipment_id)
-        except Exception as _exc:
-            _trace = _tb.format_exc()
-            logger.error("shipment_detail_view #%s crashed: %s\n%s",
-                         shipment_id, _exc, _trace)
-            from django.http import HttpResponse
-            return HttpResponse(
-                f"<pre style='padding:20px;color:red;white-space:pre-wrap'>"
-                f"<b>DEBUG 500 — shipment #{shipment_id}</b>\n\n{escape(_trace)}"
-                f"</pre>",
-                status=500,
-            )
-
-    def _shipment_detail_view_inner(self, request, shipment_id):
-        import json as _json
         from .services.jumingo import JUMINGO_APP_URL
 
         shipment = get_object_or_404(Shipment, pk=shipment_id)

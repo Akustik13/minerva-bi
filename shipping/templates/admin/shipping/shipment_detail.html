@@ -948,7 +948,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   <button type="button" id="savePkgBtn"
     style="background:var(--ok,#3fb950);color:#fff;border:none;padding:8px 20px;
     border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
-    💾 Зберегти упаковку ({{ suggest_packaging|length }} товар{{suggest_packaging|length|pluralize:"","и,ів"}})
+    {% with cnt=suggest_packaging|length %}💾 Зберегти упаковку ({{ cnt }} {% if cnt == 1 %}товар{% elif cnt < 5 %}товари{% else %}товарів{% endif %}){% endwith %}
   </button>
   <span id="savePkgStatus" style="margin-left:12px;font-size:12px;color:var(--text)"></span>
 </div>
