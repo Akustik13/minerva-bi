@@ -51,6 +51,11 @@ document.addEventListener('DOMContentLoaded', function() {
     var _dirHandle   = null;   /* FileSystemDirectoryHandle — нативний вибір папки */
     var _curDir      = '';     /* шлях для server-side browser (резерв) */
 
+    /* ── Відновити handle із MinervaLocalSave (IndexedDB, спільний для всіх сторінок) ── */
+    if (window.MinervaLocalSave && MinervaLocalSave.supported) {
+        MinervaLocalSave.getHandle().then(function(h) { if (h) _dirHandle = h; });
+    }
+
     var LS_PATH = 'docLocalBasePath';       /* localStorage: останній текстовий шлях */
     var LS_NAME = 'docLocalBaseFolderName'; /* localStorage: ім'я нативної папки */
 
@@ -98,27 +103,20 @@ document.addEventListener('DOMContentLoaded', function() {
     /* ── browse button ─────────────────────────────────────────────────── */
     var browseBtn = document.getElementById('docBrowseBtn');
     if (browseBtn) browseBtn.addEventListener('click', function() {
-        if (typeof window.showDirectoryPicker === 'function') {
-            /* ── режим 1: нативний OS-діалог (Chrome/Edge) ── */
-            window.showDirectoryPicker({ mode: 'readwrite' })
+        if (window.MinervaLocalSave && MinervaLocalSave.supported) {
+            /* ── режим 1: MinervaLocalSave.pickFolder() — зберігає в IndexedDB ── */
+            MinervaLocalSave.pickFolder()
                 .then(function(handle) {
+                    if (!handle) return;
                     _dirHandle = handle;
-                    _curDir    = '';   /* скидаємо серверний шлях */
+                    _curDir    = '';
 
                     var span = document.getElementById('docPathDisplay');
                     var disp = document.getElementById('docSelectedPath');
-
-                    /* Показуємо назву папки (повний шлях браузер не дає з міркувань безпеки) */
                     if (span) span.textContent = handle.name;
                     if (disp) disp.style.display = 'inline';
-
-                    /* Ховаємо підказку — вже вибрано свіжу папку */
                     if (hintEl) hintEl.style.display = 'none';
-
-                    /* Очищаємо server-side поле */
                     if (inp) inp.value = '';
-
-                    /* Запам'ятовуємо ім'я для підказки на наступний сеанс */
                     localStorage.setItem(LS_NAME, handle.name);
                 })
                 .catch(function(e) {
@@ -355,6 +353,22 @@ document.addEventListener('DOMContentLoaded', function() {
         dirClose();
     });
 });
+
+/* ── Надійне скачування файлу (fetch+blob обходить обмеження браузера для PDF) ── */
+window.dlDocFile = function(url, name) {
+    fetch(url).then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.blob();
+    }).then(function(blob) {
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+    }).catch(function(e) { alert('Помилка завантаження: ' + e); });
+};
 </script>
 
 <style>
