@@ -781,9 +781,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             'var _w2=document.getElementById("savebtn-"+id);'
             'if(_w2)_w2.parentNode.insertAdjacentElement("afterend",_lsEl);}'
             '_lsEl.style.color="#90caf9";_lsEl.textContent="💾 Збереження локально...";'
-            'MinervaLocalSave.saveUrlToFolder(d.url,d.filename).then(function(r){'
+            'var _subs=(d.date_str&&d.order_number)?[d.date_str,d.order_number]:null;'
+            'MinervaLocalSave.saveUrlToFolder(d.url,d.filename,_subs).then(function(r){'
             'if(r.ok){'
-            '_lsEl.textContent="✅ Збережено в: "+r.folderName+"/"+d.filename;'
+            '_lsEl.textContent="✅ "+r.path;'
             '_lsEl.style.borderColor="#4caf50";_lsEl.style.color="#81c784";'
             '}else if(r.reason==="no_handle"){'
             '_lsEl.textContent="📂 Локальна папка не обрана (Налаштування → Обрати папку)";'
@@ -1707,7 +1708,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception as e:
             local_info['ok'] = False
             local_info['error'] = str(e)
-        return JsonResponse({'ok': True, 'filename': filename, 'url': rel_url, 'local': local_info})
+        return JsonResponse({
+            'ok': True,
+            'filename': filename,
+            'url': rel_url,
+            'local': local_info,
+            'order_number': order.order_number,
+            'date_str': _date.today().strftime('%Y-%m-%d'),
+        })
 
     def delete_doc_view(self, request, pk):
         """AJAX POST — видаляє один файл із media/orders/{source}/{order_number}/."""
