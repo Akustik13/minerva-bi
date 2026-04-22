@@ -264,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function () {
       📦 {{ sh.carrier_status_label }}
     </div>
     {% endif %}
-    {% endwith %}
+    {# endwith for s/sh moved below footer so sh is available for TN display #}
 
     <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;
                 display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -368,7 +368,9 @@ document.addEventListener('DOMContentLoaded', function () {
       {% endif %}
 
       {# Carrier + cost + tracking + shipments — one info row #}
-      {% if order.shipping_cost or order.tracking_number or order.shipments.exists %}
+      {# tn: prefer active shipment's TN over (possibly stale) order.tracking_number #}
+      {% with tn=sh.tracking_number|default:order.tracking_number %}
+      {% if order.shipping_cost or tn or order.shipments.exists %}
       <span style="font-size:11px;background:var(--bg-input,#141f2b);padding:4px 10px;border-radius:5px;
                    border:1px solid var(--border-strong);color:var(--text-muted);
                    display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;font-family:monospace">
@@ -385,9 +387,8 @@ document.addEventListener('DOMContentLoaded', function () {
         {% endif %}
         {# Cost #}
         {% if order.shipping_cost %}<span style="color:var(--text);font-weight:700">{{ order.shipping_cost|floatformat:"2" }} {{ order.shipping_currency }}</span>{% endif %}
-        {# Tracking — link to carrier site if known #}
-        {% if order.tracking_number %}
-        {% with tn=order.tracking_number %}
+        {# Tracking — prefer active shipment's TN; link to carrier site if known #}
+        {% if tn %}
         {% if cr == 'ups' %}<a href="https://www.ups.com/track?tracknum={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
         {% elif cr == 'dhl' %}<a href="https://nolp.dhl.de/nextt-online-public/set_identcodes.do?idc={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
         {% elif cr == 'fedex' %}<a href="https://www.fedex.com/fedextrack/?trknbr={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
@@ -397,7 +398,6 @@ document.addEventListener('DOMContentLoaded', function () {
         {% elif cr == 'nova poshta' or cr == 'nova' %}<a href="https://novaposhta.ua/tracking/?cargo_number={{ tn }}" target="_blank" style="color:var(--text);text-decoration:none">🔍 {{ tn }}</a>
         {% else %}<span style="color:var(--text)">🔍 {{ tn }}</span>
         {% endif %}
-        {% endwith %}
         {% endif %}
         {% endwith %}
         {# Shipments list #}
@@ -420,11 +420,13 @@ document.addEventListener('DOMContentLoaded', function () {
         {% endif %}{% endwith %}
       </span>
       {% endif %}
+      {% endwith %}{# end with tn #}
 
     </div>
 
   </div>
-  {% endwith %}
+  {% endwith %}{# end with lines #}
+  {% endwith %}{# end with s/sh — moved here so sh is available in footer #}
   {% endfor %}
 
   {% if not cl.result_list %}
