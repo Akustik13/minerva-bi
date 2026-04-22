@@ -3482,7 +3482,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "city":         (body.get("sender_city")    or "").strip(),
             "postal":       (body.get("sender_zip")     or "").strip(),
             "country":      (body.get("sender_country") or "").upper().strip(),
+            "state":        (body.get("sender_state")   or "").upper().strip(),
         }
+        dest_state = (body.get("recipient_state") or "").upper().strip()
 
         if not dest_country:
             return JsonResponse({"error": "Вкажіть країну отримувача"}, status=400)
@@ -3570,6 +3572,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             'city':         dest_city,
                             'postal':       dest_postal,
                             'country':      dest_country,
+                            'state':        dest_state,
                         }
                         from_addr_ups = {
                             'name':         sender_override.get('name') or carrier.sender_name or carrier.sender_company or '',
@@ -3577,6 +3580,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             'city':         sender_override.get('city') or carrier.sender_city or '',
                             'postal':       sender_override.get('postal') or carrier.sender_zip or '',
                             'country':      sender_override.get('country') or carrier.sender_country or 'DE',
+                            'state':        sender_override.get('state') or carrier.sender_state or '',
                         }
                         pkgs = [{'weight_kg': weight, 'length_cm': length,
                                  'width_cm': width, 'height_cm': height}]
@@ -3618,6 +3622,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             'city':         dest_city,
                             'postal':       dest_postal,
                             'country':      dest_country,
+                            'state':        dest_state,
                         }
                         from_addr_fedex = {
                             'name':         sender_override.get('name') or carrier.sender_name or carrier.sender_company or '',
@@ -3625,6 +3630,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             'city':         sender_override.get('city') or carrier.sender_city or '',
                             'postal':       sender_override.get('postal') or carrier.sender_zip or '',
                             'country':      sender_override.get('country') or carrier.sender_country or 'DE',
+                            'state':        sender_override.get('state') or carrier.sender_state or '',
                         }
                         pkgs = [{'weight_kg': weight, 'length_cm': length,
                                  'width_cm': width, 'height_cm': height}]
