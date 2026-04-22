@@ -1968,54 +1968,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception:
             pkg_html = ''
 
-        # ── Assemble HTML ──────────────────────────────────────────────────
+        # ── Assemble HTML (no <script> — functions live in changelist template) ──
         sep = '<div style="border-top:1px solid var(--border-strong,#2a3f52);margin:14px 0"></div>'
 
         html = (
-            # JS helpers (idempotent guard)
-            '<script>'
-            'if(!window._cexDef){'
-            'window._cexDef=true;'
-            # Upload
-            'function _cexUpload(input,pk,listUrl,resultEl){'
-            'var files=input.files;if(!files.length)return;'
-            'var fd=new FormData();'
-            'Array.from(files).forEach(function(f){fd.append("files",f);});'
-            'var csrf=document.cookie.match(/csrftoken=([^;]+)/);'
-            'if(csrf)fd.append("csrfmiddlewaretoken",csrf[1]);'
-            'resultEl.textContent="⏳ Завантаження…";'
-            'fetch("/admin/sales/salesorder/"+pk+"/upload-docs/",'
-            '{method:"POST",body:fd,headers:{"X-Requested-With":"XMLHttpRequest"}})'
-            '.then(r=>r.json())'
-            '.then(function(d){'
-            'resultEl.textContent=d.saved?("✅ "+d.saved.join(", ")):(d.error||"Помилка");'
-            'var panel=document.getElementById("cex-docs-"+pk);'
-            'if(panel)fetch(listUrl,{headers:{"X-Requested-With":"XMLHttpRequest"}})'
-            '.then(r=>r.text()).then(function(h){panel.innerHTML=h;});'
-            '})'
-            '.catch(function(){resultEl.textContent="❌ Помилка мережі";});'
-            'input.value="";}'
-            # Save doc
-            'function _cexDocSave(btn){'
-            'var orig=btn.textContent;btn.disabled=true;btn.textContent="⏳";'
-            'fetch(btn.dataset.saveUrl,{headers:{"X-Requested-With":"XMLHttpRequest"}})'
-            '.then(r=>r.json())'
-            '.then(function(d){'
-            'btn.textContent=d.ok?"✅":"❌";'
-            'if(d.ok){'
-            'var pk=btn.dataset.pk;'
-            'var lurl="/admin/sales/salesorder/"+pk+"/doc/list/";'
-            'var panel=document.getElementById("cex-docs-"+pk);'
-            'if(panel)fetch(lurl,{headers:{"X-Requested-With":"XMLHttpRequest"}})'
-            '.then(r=>r.text()).then(function(h){panel.innerHTML=h;});}'
-            '})'
-            '.catch(function(){btn.textContent="❌";});}'
-            # Toggle override panel
-            'function _cexToggleOvr(id){'
-            'var el=document.getElementById(id);'
-            'if(el)el.style.display=el.style.display==="none"?"block":"none";}'
-            '}'
-            '</script>'
             # Docs section
             f'<div id="cex-docs-{pk}">{docs_html}</div>'
             f'{sep}'

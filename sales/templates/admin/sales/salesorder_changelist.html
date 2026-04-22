@@ -507,16 +507,22 @@ function svQFSource(value) {
 })();
 
 // ── Card expand ──────────────────────────────────────────────────────────────
-function svCardExpand(btn, pk) {
+var _SV_CEX_KEY = 'sv_cex_open_' + window.location.pathname;
+
+function _svCexOpen(pk) {
   var panel = document.getElementById('sv-cex-' + pk);
-  if (!panel) return;
-  var isOpen = panel.style.display === 'block';
-  // Toggle
-  panel.style.display = isOpen ? 'none' : 'block';
-  btn.classList.toggle('sv-cex-open', !isOpen);
-  btn.textContent = isOpen ? '⛶' : '⊠';
-  // Load on first open only
-  if (!isOpen && !panel.dataset.loaded) {
+  var btn   = document.getElementById('sv-cex-btn-' + pk);
+  if (!panel || !btn) return;
+  panel.style.display = 'block';
+  btn.classList.add('sv-cex-open');
+  btn.textContent = '⊠';
+  // Persist
+  try {
+    var s = JSON.parse(sessionStorage.getItem(_SV_CEX_KEY) || '[]');
+    if (s.indexOf(pk) === -1) { s.push(pk); sessionStorage.setItem(_SV_CEX_KEY, JSON.stringify(s)); }
+  } catch(e) {}
+  // Load AJAX on first open
+  if (!panel.dataset.loaded) {
     panel.dataset.loaded = '1';
     fetch('/admin/sales/salesorder/' + pk + '/card-expand/', {
       headers: {'X-Requested-With': 'XMLHttpRequest'}
@@ -526,6 +532,72 @@ function svCardExpand(btn, pk) {
     .catch(function() { panel.innerHTML = '<span style="color:#ef5350">❌ Помилка завантаження</span>'; });
   }
 }
+function _svCexClose(pk) {
+  var panel = document.getElementById('sv-cex-' + pk);
+  var btn   = document.getElementById('sv-cex-btn-' + pk);
+  if (!panel || !btn) return;
+  panel.style.display = 'none';
+  btn.classList.remove('sv-cex-open');
+  btn.textContent = '⛶';
+  try {
+    var s = JSON.parse(sessionStorage.getItem(_SV_CEX_KEY) || '[]');
+    sessionStorage.setItem(_SV_CEX_KEY, JSON.stringify(s.filter(function(p){ return p !== pk; })));
+  } catch(e) {}
+}
+function svCardExpand(btn, pk) {
+  var panel = document.getElementById('sv-cex-' + pk);
+  if (!panel) return;
+  if (panel.style.display === 'block') { _svCexClose(pk); } else { _svCexOpen(pk); }
+}
+
+// JS helpers for the AJAX-loaded expand content (NOT in <script> via innerHTML)
+function _cexUpload(input, pk, listUrl, resultEl) {
+  var files = input.files; if (!files.length) return;
+  var fd = new FormData();
+  Array.from(files).forEach(function(f) { fd.append('files', f); });
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  if (csrf) fd.append('csrfmiddlewaretoken', csrf[1]);
+  resultEl.textContent = '⏳ Завантаження…';
+  fetch('/admin/sales/salesorder/' + pk + '/upload-docs/',
+    {method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'}})
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    resultEl.textContent = d.saved ? ('✅ ' + d.saved.join(', ')) : (d.error || 'Помилка');
+    var panel = document.getElementById('cex-docs-' + pk);
+    if (panel) fetch(listUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+      .then(function(r) { return r.text(); }).then(function(h) { panel.innerHTML = h; });
+  })
+  .catch(function() { resultEl.textContent = '❌ Помилка мережі'; });
+  input.value = '';
+}
+function _cexDocSave(btn) {
+  btn.disabled = true; btn.textContent = '⏳';
+  fetch(btn.dataset.saveUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    btn.textContent = d.ok ? '✅' : '❌';
+    if (d.ok) {
+      var pk = btn.dataset.pk;
+      var panel = document.getElementById('cex-docs-' + pk);
+      if (panel) fetch('/admin/sales/salesorder/' + pk + '/doc/list/',
+        {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+        .then(function(r) { return r.text(); }).then(function(h) { panel.innerHTML = h; });
+    }
+  })
+  .catch(function() { btn.textContent = '❌'; });
+}
+function _cexToggleOvr(id) {
+  var el = document.getElementById(id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// Restore expanded panels from sessionStorage on page load
+(function() {
+  try {
+    var s = JSON.parse(sessionStorage.getItem(_SV_CEX_KEY) || '[]');
+    s.forEach(function(pk) { _svCexOpen(pk); });
+  } catch(e) {}
+})();
 
 // ── Date hierarchy: highlight active year + inject "last month" button ───────
 (function() {
