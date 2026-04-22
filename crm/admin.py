@@ -813,10 +813,33 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         for line in SalesOrderLine.objects.filter(order_id__in=order_ids).select_related('product'):
             lines_map.setdefault(line.order_id, []).append(line)
 
+        _LA = "color:inherit;text-decoration:underline dotted;text-underline-offset:2px"
+
+        def _tracking_url(courier, tn):
+            if not tn:
+                return None
+            cr = (courier or '').lower()
+            if 'ups' in cr or tn.startswith('1Z'):
+                return f'https://www.ups.com/track?tracknum={tn}&loc=en_US'
+            if 'dhl' in cr:
+                return f'https://nolp.dhl.de/nextt-online-public/set_identcodes.do?idc={tn}'
+            if 'fedex' in cr:
+                return f'https://www.fedex.com/fedextrack/?trknbr={tn}'
+            if 'dpd' in cr:
+                return f'https://www.dpd.com/tracking/?parcelNo={tn}'
+            if 'gls' in cr:
+                return f'https://gls-group.eu/track/{tn}'
+            if 'post' in cr:
+                return f'https://www.deutschepost.de/sendung/simpleQueryResult.html?form.sendungsnummer={tn}'
+            if 'nova' in cr:
+                return f'https://novaposhta.ua/tracking/?cargo_number={tn}'
+            return None
+
         TD  = "padding:7px 10px;font-size:13px"
         TDB = TD + ";font-weight:700"
         rows = []
         for o in orders:
+            order_url = f'/admin/sales/salesorder/{o.pk}/change/'
             lines = lines_map.get(o.pk, [])
             if lines:
                 skus_parts = []
@@ -825,7 +848,11 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                     sku = l.sku_raw or (l.product.sku if l.product else '?')
                     q   = l.qty
                     qty_str = str(int(q)) if q == int(q) else str(q)
-                    skus_parts.append(f'<b>{sku}</b>')
+                    if l.product_id:
+                        prod_url = f'/admin/inventory/product/{l.product_id}/change/'
+                        skus_parts.append(f'<a href="{prod_url}" style="{_LA}"><b>{sku}</b></a>')
+                    else:
+                        skus_parts.append(f'<b>{sku}</b>')
                     qtys_parts.append(f'<b>{qty_str}</b>')
                 if len(lines) > 5:
                     skus_parts.append(f'<span style="opacity:.5">+{len(lines)-5}</span>')
@@ -839,15 +866,19 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             ship_cost = ''
             if o.shipping_cost:
                 ship_cost = f'{o.shipping_cost:.2f}&nbsp;{o.shipping_currency}'
+            tn = o.tracking_number or ''
+            track_url = _tracking_url(o.shipping_courier, tn)
+            tn_html = (f'<a href="{track_url}" target="_blank" style="{_LA}">{tn}</a>'
+                       if track_url else (tn or '—'))
             rows.append(
                 f"<tr style='border-bottom:1px solid rgba(128,128,128,0.15)'>"
                 f"<td style='{TD};white-space:nowrap;opacity:0.85'>{o.order_date.strftime('%d.%m.%Y') if o.order_date else '—'}</td>"
-                f"<td style='{TDB};white-space:nowrap'>{o.order_number}</td>"
+                f"<td style='{TDB};white-space:nowrap'><a href='{order_url}' style='{_LA}'>{o.order_number}</a></td>"
                 f"<td style='{TD};opacity:0.75'>{o.source}</td>"
                 f"<td style='{TD};font-family:monospace'>{skus_html}</td>"
                 f"<td style='{TD};text-align:right'>{qtys_html}</td>"
                 f"<td style='{TD};white-space:nowrap;text-align:right'>{total_html}</td>"
-                f"<td style='{TD};opacity:0.75'>{o.tracking_number or '—'}</td>"
+                f"<td style='{TD};font-family:monospace;font-size:11px'>{tn_html}</td>"
                 f"<td style='{TD};white-space:nowrap;text-align:right;opacity:0.85'>{ship_cost or '—'}</td>"
                 f"<td style='{TD};opacity:0.75;white-space:nowrap'>{o.shipping_courier or '—'}</td>"
                 f"</tr>"
