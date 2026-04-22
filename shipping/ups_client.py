@@ -333,12 +333,19 @@ class UPSClient:
         use_packaging_key=False → Package uses 'PackagingType' (Rate / Shop API)
         """
         shipper = from_address or self._default_shipper()
+        # ShipperNumber must match the account's registered country.
+        # Omit it when the shipper country differs (e.g. swapped sender/recipient)
+        # so UPS doesn't return error 111617.
+        account_country = (self.carrier.sender_country or 'DE').upper()
+        shipper_country = (shipper.get('country') or account_country).upper()
+        shipper_block = {
+            'Name':    shipper.get('name', 'Shipper'),
+            'Address': self._fmt_addr(shipper),
+        }
+        if shipper_country == account_country:
+            shipper_block['ShipperNumber'] = self.carrier.connection_uuid
         shipment = {
-            'Shipper': {
-                'Name':          shipper.get('name', 'Shipper'),
-                'ShipperNumber': self.carrier.connection_uuid,
-                'Address':       self._fmt_addr(shipper),
-            },
+            'Shipper': shipper_block,
             'ShipTo':   {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address, addr_fallback=True)},
             'ShipFrom': {'Name': shipper.get('name', 'Shipper'),       'Address': self._fmt_addr(shipper)},
             'PaymentDetails': {
