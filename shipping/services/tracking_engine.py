@@ -249,6 +249,25 @@ def _normalize_dhl(tracker_name: str, raw: dict) -> dict:
 
     est_delivery = raw.get("estimated_delivery", "")
 
+    # Enrich status_label with first event timestamp (dhl_track: ts is ISO; dhl: may have events)
+    events = raw.get("events", [])
+    if events:
+        ev = events[0]
+        ev_ts   = ev.get("ts", "")    # ISO: "2026-04-21T22:46:00"
+        ev_desc = ev.get("desc", "") or ev.get("description", "")
+        if ev_desc:
+            if ev_ts:
+                # Format ISO ts as "21.04.2026 22:46"
+                try:
+                    from datetime import datetime as _dt
+                    _d = _dt.fromisoformat(ev_ts[:16])
+                    ts_str = _d.strftime("%d.%m.%Y %H:%M")
+                    status_label = f"{ts_str} — {ev_desc}"
+                except Exception:
+                    status_label = ev_desc
+            else:
+                status_label = ev_desc
+
     return {
         "tracking": {
             "progress": {
@@ -288,6 +307,21 @@ def _normalize_ups(raw: dict) -> dict:
     # UPS estimated_delivery format: "20260417" → "2026-04-17"
     if est_delivery and len(est_delivery) == 8 and est_delivery.isdigit():
         est_delivery = f"{est_delivery[:4]}-{est_delivery[4:6]}-{est_delivery[6:]}"
+
+    # Use events[0] for a richer status label with date+time+description
+    events = raw.get("events", [])
+    if events:
+        ev = events[0]
+        ev_date = ev.get("date", "")   # "04/21/2026"
+        ev_time = ev.get("time", "")   # "10:46 P.M."
+        ev_desc = ev.get("description", "")
+        if ev_desc:
+            if ev_date and ev_time:
+                status_label = f"{ev_date} {ev_time} — {ev_desc}"
+            elif ev_date:
+                status_label = f"{ev_date} — {ev_desc}"
+            else:
+                status_label = ev_desc
 
     return {
         "tracking": {

@@ -84,7 +84,9 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-status-cancelled  { background:#c62828; }
 .sv-status-default    { background:#546e7a; }
 /* Progress bar — horizontal inline */
-.sv-prog{display:flex;align-items:center;gap:0;margin:8px 0 12px;overflow:hidden}
+.sv-prog{display:flex;align-items:center;gap:0;margin:8px 0 4px;overflow:hidden}
+.sv-carrier-event{font-size:10px;color:var(--text-dim);margin:0 0 10px;padding-left:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
 .sv-ps{display:flex;flex-direction:row!important;align-items:center;gap:5px;flex-shrink:0}
 .sv-pd{width:18px;height:18px;border-radius:50%;background:var(--bg-input,#141f2b);border:1.5px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:var(--text-dim);flex-shrink:0;line-height:1}
 .sv-ps-done .sv-pd{background:#2e7d32;border-color:#2e7d32;color:#fff}
@@ -257,6 +259,11 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="sv-pl">Доставлено{% if s == 'delivered' and order.delivered_at %}<small>{{ order.delivered_at|date:"d.m" }}</small>{% elif s == 'shipped' and sh %}{% if sh.carrier_eta %}<small>~{{ sh.carrier_eta|date:"d.m" }}</small>{% elif sh.eta_to %}<small>до {{ sh.eta_to|date:"d.m" }}</small>{% endif %}{% endif %}</div>
       </div>
     </div>
+    {% if sh and sh.carrier_status_label %}
+    <div class="sv-carrier-event" title="{{ sh.carrier_status_label }}">
+      📦 {{ sh.carrier_status_label }}
+    </div>
+    {% endif %}
     {% endwith %}
 
     <div style="font-size:13px;color:var(--text-muted);margin-bottom:10px;
