@@ -119,6 +119,15 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-qf-btn.sv-qf-warn.sv-qf-active{background:#c62828;color:#fff}
 .sv-qf-cnt{display:inline-block;background:rgba(255,255,255,.15);color:inherit;font-size:10px;font-weight:700;line-height:1;padding:1px 5px;border-radius:8px;margin-left:3px;vertical-align:middle}
 .sv-qf-btn.sv-qf-active .sv-qf-cnt{background:rgba(255,255,255,.25)}
+/* Date hierarchy (year/month links) — style consistently */
+.xfull{margin-bottom:10px}
+.toplinks{display:flex;flex-wrap:wrap;align-items:center;gap:5px;list-style:none;padding:0;margin:0}
+.toplinks li a,.toplinks li span{display:inline-block;padding:3px 11px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-input,#141f2b);color:var(--text-muted);font-size:12px;font-weight:600;text-decoration:none;transition:background .12s,color .12s;white-space:nowrap}
+.toplinks li a:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.toplinks li.sv-dh-active a,.toplinks li.date-back a{background:#1565c0!important;color:#fff!important;border-color:transparent}
+.sv-lm-btn{display:inline-block;padding:3px 11px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-input,#141f2b);color:var(--text-muted);font-size:12px;font-weight:600;text-decoration:none;transition:background .12s,color .12s;cursor:pointer;white-space:nowrap;margin-left:4px}
+.sv-lm-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.sv-lm-btn.sv-lm-active{background:#1565c0;color:#fff;border-color:transparent}
 /* Card checkbox */
 .sv-card-check-input{width:17px;height:17px;cursor:pointer;accent-color:#1565c0;flex-shrink:0;vertical-align:middle}
 /* Select-all inline (inside action row) */
@@ -482,6 +491,49 @@ function svQFSource(value) {
   if (overdue === '1') { var o = document.getElementById('svf-overdue'); if(o) o.classList.add('sv-qf-active'); }
   if (source) { var sr = document.getElementById('svf-src-' + source); if(sr) sr.classList.add('sv-qf-active'); else { var sa = document.getElementById('svf-src-all'); if(sa) sa.classList.add('sv-qf-active'); } }
   else { var sa2 = document.getElementById('svf-src-all'); if(sa2) sa2.classList.add('sv-qf-active'); }
+})();
+
+// ── Date hierarchy: highlight active year + inject "last month" button ───────
+(function() {
+  var p = new URLSearchParams(window.location.search);
+  var activeYear  = p.get('order_date__year');
+  var activeMonth = p.get('order_date__month');
+
+  // Highlight active year link in .toplinks
+  if (activeYear) {
+    document.querySelectorAll('.toplinks li').forEach(function(li) {
+      var a = li.querySelector('a');
+      if (!a) return;
+      try {
+        var lp = new URLSearchParams(new URL(a.href).search);
+        if (lp.get('order_date__year') === activeYear && !lp.get('order_date__month')) {
+          li.classList.add('sv-dh-active');
+        }
+      } catch(e) {}
+    });
+  }
+
+  // Inject "last month" button after .toplinks (or after .xfull)
+  var dh = document.querySelector('.xfull');
+  if (!dh) return;
+
+  var today = new Date();
+  var lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  var lmY = lm.getFullYear(), lmM = lm.getMonth() + 1;
+  var MONTHS_UK = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
+                   'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+  var isActive = activeYear === String(lmY) && activeMonth === String(lmM);
+
+  var lmP = new URLSearchParams(p);
+  lmP.set('order_date__year', lmY);
+  lmP.set('order_date__month', lmM);
+  lmP.delete('p');
+
+  var btn = document.createElement('a');
+  btn.href = '?' + lmP.toString();
+  btn.className = 'sv-lm-btn' + (isActive ? ' sv-lm-active' : '');
+  btn.textContent = '📅 ' + MONTHS_UK[lmM - 1] + ' ' + lmY;
+  dh.appendChild(btn);
 })();
 
 // ── Card checkboxes ──────────────────────────────────────────────────────────
