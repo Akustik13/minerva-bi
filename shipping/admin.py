@@ -2399,8 +2399,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         shipment.save(update_fields=update_fields)
 
-        # Копіюємо TN на SalesOrder якщо там ще немає
-        if shipment.order and not shipment.order.tracking_number:
+        # Копіюємо TN на SalesOrder (замінюємо якщо попередній від скасованого відправлення)
+        if shipment.order and _should_set_order_tn(shipment.order, tn):
             shipment.order.tracking_number = tn
             shipment.order.save(update_fields=["tracking_number"])
 
@@ -2850,7 +2850,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         from datetime import date as _date
         order        = shipment.order
         order_fields = []
-        if result['tracking_number'] and not order.tracking_number:
+        if _should_set_order_tn(order, result['tracking_number']):
             order.tracking_number = result['tracking_number']
             order_fields.append('tracking_number')
         if not order.shipping_courier:
@@ -4094,7 +4094,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         from datetime import date as _date
         order         = shipment.order
         order_fields  = []
-        if tracking_number and not order.tracking_number:
+        if _should_set_order_tn(order, tracking_number):
             order.tracking_number = tracking_number
             order_fields.append("tracking_number")
         if not order.shipping_courier:
@@ -4526,6 +4526,26 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         return redirect(reverse("admin:shipping_order_tracking"))
 
 
+# ── Utility: tracking number sync helper ─────────────────────────────────────
+
+def _should_set_order_tn(order, new_tn: str) -> bool:
+    """True if order.tracking_number should be replaced with new_tn.
+
+    Replaces the TN if:
+    - order has no TN, OR
+    - order's current TN belongs to a cancelled shipment (stale from prior attempt).
+    """
+    if not new_tn or new_tn == order.tracking_number:
+        return False
+    if not order.tracking_number:
+        return True
+    cancelled_tns = set(
+        order.shipments.filter(status="cancelled")
+                       .values_list("tracking_number", flat=True)
+    )
+    return order.tracking_number in cancelled_tns
+
+
 # ── Utility: apply tracking update ───────────────────────────────────────────
 
 def _apply_tracking_update(shipment, data: dict) -> bool:
@@ -4785,8 +4805,9 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
 
     carrier_name = (rate.get("carrier") or {}).get("shipper_group_name", "")
 
-    # Трекінг-номер
-    if new_tn and not order.tracking_number:
+    # Трекінг-номер: встановлюємо якщо порожній АБО якщо поточний ТН
+    # належить скасованому відправленню (замінюємо на активний)
+    if _should_set_order_tn(order, new_tn):
         order.tracking_number = new_tn
         order_changed = True
         update_fields.append("tracking_number")
