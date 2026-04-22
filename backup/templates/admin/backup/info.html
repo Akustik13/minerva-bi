@@ -267,7 +267,11 @@
         </button>
         <button id="btn-apply-update" class="bk-btn" style="background:#059669; display:none;"
                 onclick="applyUpdate(this)">
-          ⬇️ Оновити зараз
+          ⬇️ Оновити код (git pull)
+        </button>
+        <button id="btn-collectstatic" class="bk-btn" style="background:#0f766e;"
+                onclick="runCollectstatic(this)">
+          📦 Зібрати статику
         </button>
         <button id="btn-migrate" class="bk-btn" style="background:#7c3aed;"
                 onclick="runMigrate(this)">
@@ -279,8 +283,16 @@
         </button>
         <button id="btn-restart-web" class="bk-btn" style="background:#b45309;"
                 onclick="restartWeb(this)">
-          🔁 Перезапустити веб
+          🔁 Перезапустити воркери
         </button>
+        <hr style="border:none;border-top:1px solid var(--border-strong);margin:2px 0">
+        <button id="btn-full-deploy" class="bk-btn" style="background:#7f1d1d;font-weight:700;"
+                onclick="runFullDeploy(this)">
+          🚀 Повне оновлення
+        </button>
+        <div style="font-size:.72rem;color:var(--text-dim);text-align:center;margin-top:-4px">
+          git pull → static → migrate → reload
+        </div>
       </div>
 
     </div>
@@ -990,8 +1002,9 @@ async function runMigrate(btn) {
 /* ══════════════════════════════════════════════════════════════════
    Setup Modules
 ════════════════════════════════════════════════════════════════════ */
-const SETUP_MODULES_URL = '{% url "admin:backup_setup_modules" %}';
-const RESTART_WEB_URL   = '{% url "admin:backup_restart_web" %}';
+const SETUP_MODULES_URL  = '{% url "admin:backup_setup_modules" %}';
+const RESTART_WEB_URL    = '{% url "admin:backup_restart_web" %}';
+const COLLECTSTATIC_URL  = '{% url "admin:backup_collectstatic" %}';
 
 async function runSetupModules(btn) {
   const resultEl = document.getElementById('git-result');
@@ -1038,6 +1051,101 @@ async function restartWeb(btn) {
     resultEl.textContent = '❌ ' + e.message;
   }
   btn.disabled = false;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Collectstatic
+════════════════════════════════════════════════════════════════════ */
+async function runCollectstatic(btn) {
+  const resultEl = document.getElementById('git-result');
+  btn.disabled = true;
+  resultEl.style.display = 'block';
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ collectstatic… зачекайте (~30–60 с).';
+  try {
+    const resp = await fetch(COLLECTSTATIC_URL, {
+      method: 'POST', headers: { 'X-CSRFToken': CSRF },
+    });
+    const data = await resp.json();
+    resultEl.className = data.ok ? 'bk-result ok' : 'bk-result error';
+    const icon = data.ok ? '✅' : '❌';
+    const dur  = data.duration ? ` (${data.duration}с)` : '';
+    const out  = (data.output || data.error || '').split('\n').slice(-5).join('\n');
+    resultEl.textContent = `${icon} collectstatic${dur}\n${out}`;
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ ' + e.message;
+  }
+  btn.disabled = false;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Full Deploy: git pull → collectstatic → migrate → reload
+════════════════════════════════════════════════════════════════════ */
+async function runFullDeploy(btn) {
+  const resultEl = document.getElementById('git-result');
+  const steps = [
+    { url: GIT_UPDATE_URL,     label: 'git pull',       key: 'output' },
+    { url: COLLECTSTATIC_URL,  label: 'collectstatic',  key: 'output', tail: 5 },
+    { url: MIGRATE_URL,        label: 'migrate',        key: 'output', tail: 10 },
+    { url: SETUP_MODULES_URL,  label: 'setup_modules',  key: 'output' },
+    { url: RESTART_WEB_URL,    label: 'restart',        key: 'message' },
+  ];
+
+  // Disable all update buttons
+  ['btn-check-update','btn-apply-update','btn-collectstatic','btn-migrate',
+   'btn-setup-modules','btn-restart-web','btn-full-deploy'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = true;
+  });
+  resultEl.style.display = 'block';
+
+  let log = '';
+  let allOk = true;
+
+  for (const step of steps) {
+    resultEl.className = 'bk-result running';
+    log += `\n⏳ ${step.label}…`;
+    resultEl.textContent = log.trim();
+    try {
+      const resp = await fetch(step.url, {
+        method: 'POST', headers: { 'X-CSRFToken': CSRF },
+      });
+      const data = await resp.json();
+      const dur = data.duration ? ` (${data.duration}с)` : '';
+      let out = (data[step.key] || data.output || data.error || '').trim();
+      if (step.tail && out) out = out.split('\n').slice(-step.tail).join('\n');
+      if (data.ok || data.ok === undefined) {
+        log += ` ✅${dur}\n${out ? out + '\n' : ''}`;
+      } else {
+        allOk = false;
+        log += ` ❌${dur}\n${out}\n`;
+        resultEl.className = 'bk-result error';
+        resultEl.textContent = log.trim();
+        break;
+      }
+      resultEl.textContent = log.trim();
+    } catch(e) {
+      allOk = false;
+      log += ` ❌ ${e.message}\n`;
+      resultEl.className = 'bk-result error';
+      resultEl.textContent = log.trim();
+      break;
+    }
+  }
+
+  if (allOk) {
+    resultEl.className = 'bk-result ok';
+    log += '\n🚀 Повне оновлення завершено! Сторінка оновиться через 10 с.';
+    resultEl.textContent = log.trim();
+    setTimeout(() => location.reload(), 10000);
+  }
+
+  ['btn-check-update','btn-collectstatic','btn-migrate',
+   'btn-setup-modules','btn-restart-web','btn-full-deploy'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = false;
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════════

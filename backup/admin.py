@@ -96,6 +96,11 @@ class BackupAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.restart_web_view),
                 name="backup_restart_web",
             ),
+            path(
+                "collectstatic/",
+                self.admin_site.admin_view(self.collectstatic_view),
+                name="backup_collectstatic",
+            ),
         ]
 
     def _ctx(self, request, **extra):
@@ -326,6 +331,12 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
         return JsonResponse(utils.run_setup_modules())
+
+    def collectstatic_view(self, request):
+        """AJAX — run manage.py collectstatic --noinput."""
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        return JsonResponse(utils.run_collectstatic())
 
     def restart_web_view(self, request):
         """AJAX — graceful gunicorn reload via SIGHUP to PID 1."""

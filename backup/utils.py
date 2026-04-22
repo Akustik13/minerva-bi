@@ -660,6 +660,30 @@ def run_setup_modules() -> dict:
         return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
 
 
+def run_collectstatic() -> dict:
+    """Run manage.py collectstatic --noinput and return output."""
+    start = time.time()
+    try:
+        import sys
+        result = subprocess.run(
+            [sys.executable, "manage.py", "collectstatic", "--noinput"],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(settings.BASE_DIR),
+        )
+        output = (result.stdout + result.stderr).strip()
+        ok = result.returncode == 0
+        return {
+            "ok": ok,
+            "output": output,
+            "duration": round(time.time() - start, 1),
+            **({"error": output} if not ok else {}),
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "collectstatic timeout (>120с)", "duration": round(time.time() - start, 1)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
+
+
 def restart_web() -> dict:
     """Graceful gunicorn worker reload — надсилає SIGHUP до PID 1.
 
@@ -669,7 +693,7 @@ def restart_web() -> dict:
     import os, signal as _signal
     try:
         os.kill(1, _signal.SIGHUP)
-        return {"ok": True, "message": "SIGHUP надіслано до PID 1. Voркери перезавантажуються (~5–10 с)."}
+        return {"ok": True, "message": "SIGHUP надіслано до PID 1. Воркери перезавантажуються (~5–10 с)."}
     except (ProcessLookupError, PermissionError) as exc:
         return {"ok": False, "error": f"Не вдалося надіслати SIGHUP до PID 1: {exc}"}
     except Exception as exc:
