@@ -116,10 +116,47 @@ class Command(BaseCommand):
                     err_msg = "; ".join(
                         f"{e['tracker']}: {e['error']}" for e in log_entries
                     )
-                    errors += 1
-                    self.stdout.write(
-                        self.style.ERROR(f"  ❌ {label} — {err_msg}")
+
+                    # Перевіряємо кешований статус — перевізник міг підтвердити доставку раніше
+                    carrier_lbl = (shipment.carrier_status_label or "").lower()
+                    raw_prog_class = ""
+                    if isinstance(shipment.raw_response, dict):
+                        raw_prog_class = (
+                            shipment.raw_response.get("tracking", {})
+                            .get("progress", {}).get("class", "")
+                        )
+                    is_cached_delivered = (
+                        "delivered" in carrier_lbl
+                        or "доставлено" in carrier_lbl
+                        or raw_prog_class == "completed"
                     )
+
+                    if is_cached_delivered:
+                        # Форсово оновлюємо на основі кешованих даних
+                        shipment.status = "delivered"
+                        shipment.carrier_delayed = False
+                        save_flds = ["status", "carrier_delayed"]
+                        if not shipment.delivered_at:
+                            shipment.delivered_at = timezone.now()
+                            save_flds.append("delivered_at")
+                        shipment.save(update_fields=save_flds)
+                        _order = shipment.order
+                        if _order and _order.status != "delivered":
+                            _upd = ["status"]
+                            _order.status = "delivered"
+                            if not _order.delivered_at:
+                                _order.delivered_at = shipment.delivered_at or timezone.now()
+                                _upd.append("delivered_at")
+                            _order.save(update_fields=_upd)
+                        updated += 1
+                        self.stdout.write(self.style.SUCCESS(
+                            f"  ✅ {label} — примусово → Доставлено (кеш; API: {err_msg})"
+                        ))
+                    else:
+                        errors += 1
+                        self.stdout.write(
+                            self.style.ERROR(f"  ❌ {label} — {err_msg}")
+                        )
                     return
 
                 if changed:

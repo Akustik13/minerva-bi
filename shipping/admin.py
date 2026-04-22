@@ -2111,7 +2111,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         # Carrier показує "Delivered" але Shipment ще не оновлено — запускаємо трекінг
         carrier_label = (shipment.carrier_status_label or "").lower()
-        if "delivered" in carrier_label or "доставлено" in carrier_label:
+        # Також перевіряємо raw_response (на випадок якщо carrier_status_label порожній)
+        raw_prog_class = ""
+        if isinstance(shipment.raw_response, dict):
+            raw_prog_class = (
+                shipment.raw_response.get("tracking", {})
+                .get("progress", {}).get("class", "")
+            )
+        is_carrier_delivered = (
+            "delivered" in carrier_label
+            or "доставлено" in carrier_label
+            or raw_prog_class == "completed"
+        )
+        if is_carrier_delivered:
             changed, log_entries = track_with_fallback(shipment)
             shipment.refresh_from_db()
             if shipment.status == "delivered":
