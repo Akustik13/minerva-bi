@@ -424,19 +424,33 @@ class UPSClient:
     def _rate_single(self, to_address, packages, from_address, service_code):
         """
         POST /api/rating/v2409/Rate — single service.
+        On error 111057 (invalid units for country) flips metric↔imperial, caches, retries once.
         """
         shipper = from_address or self._default_shipper()
-        payload = {'RateRequest': {
-            'Request': {
-                'RequestOption': 'Rate',
-                'TransactionReference': {'CustomerContext': 'minerva-bi'},
-            },
-            'Shipment': self._build_rate_shipment(to_address, packages, shipper, service_code),
-        }}
-        data = self._post(f'/api/rating/{_RATING_API_VERSION}/Rate', payload)
-        self._last_rate_payload  = payload
-        self._last_rate_response = data
-        return self._parse_rated_shipments(data)
+        from_country = (shipper.get('country') or '').upper()
+
+        def _do_request():
+            p = {'RateRequest': {
+                'Request': {
+                    'RequestOption': 'Rate',
+                    'TransactionReference': {'CustomerContext': 'minerva-bi'},
+                },
+                'Shipment': self._build_rate_shipment(to_address, packages, shipper, service_code),
+            }}
+            d = self._post(f'/api/rating/{_RATING_API_VERSION}/Rate', p)
+            self._last_rate_payload  = p
+            self._last_rate_response = d
+            return self._parse_rated_shipments(d)
+
+        try:
+            return _do_request()
+        except UPSError as e:
+            if '111057' in str(e) and from_country:
+                # UPS rejected units — flip and remember for this country
+                was_imperial = self._get_is_imperial(from_country)
+                self._set_units(from_country, not was_imperial)
+                return _do_request()   # retry with new units (no further catch)
+            raise
 
     # Service codes valid only for domestic US shipments (error 111210 on intl routes)
     _DOMESTIC_ONLY_SERVICES = {'01', '02', '03', '12', '13', '14', '59'}
@@ -678,7 +692,26 @@ class UPSClient:
         }
 
         self._last_payload = payload  # exposed for debug logging
-        data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
+        from_country = (pickup.get('country') or '').upper()
+
+        def _rebuild_packages():
+            """Rebuild Package field in-place with current unit pref (after unit flip)."""
+            payload['ShipmentRequest']['Shipment']['Package'] = (
+                self._pkg_dict(packages[0], for_ship=True, from_country=pickup.get('country', ''))
+                if len(packages) == 1 else
+                [self._pkg_dict(p, for_ship=True, from_country=pickup.get('country', '')) for p in packages]
+            )
+
+        try:
+            data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
+        except UPSError as e:
+            if '111057' in str(e) and from_country:
+                # UPS rejected units — flip, remember, rebuild packages, retry once
+                self._set_units(from_country, not self._get_is_imperial(from_country))
+                _rebuild_packages()
+                data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
+            else:
+                raise
         resp         = data.get('ShipmentResponse', {})
         results_data = resp.get('ShipmentResults', {})
         pkg_results  = results_data.get('PackageResults', {})
@@ -913,6 +946,31 @@ class UPSClient:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
+    # UPS error 111057: units must match origin country.
+    # We cache the discovered preference (30 days) so subsequent requests skip the round-trip.
+    _UNIT_CACHE_TTL = 86400 * 30  # 30 days
+
+    def _get_is_imperial(self, country: str) -> bool:
+        """True → send IN/LBS; False → CM/KGS.
+        Checks Django cache first; falls back to US=imperial, rest=metric."""
+        if not country:
+            return False
+        key = f'ups_unit_{country.upper()}'
+        cached = cache.get(key)
+        if cached is not None:
+            return cached == 'imperial'
+        return country.upper() == 'US'
+
+    def _set_units(self, country: str, use_imperial: bool) -> None:
+        """Persist unit preference for a country (Django cache, 30 days)."""
+        if not country:
+            return
+        cache.set(f'ups_unit_{country.upper()}',
+                  'imperial' if use_imperial else 'metric',
+                  timeout=self._UNIT_CACHE_TTL)
+        logger.info('UPS units cached: %s → %s', country.upper(),
+                    'imperial (IN/LBS)' if use_imperial else 'metric (CM/KGS)')
+
     def _default_shipper(self) -> dict:
         c = self.carrier
         return {
@@ -1009,7 +1067,7 @@ class UPSClient:
         pkg_code = pkg.get('_pkg_override', PACKAGING_CUSTOMER)
         pkg_key  = 'Packaging' if for_ship else 'PackagingType'
 
-        use_imperial = (from_country or '').upper() == 'US'
+        use_imperial = self._get_is_imperial(from_country)
         if use_imperial:
             dim_unit = 'IN'
             wt_unit  = 'LBS'
