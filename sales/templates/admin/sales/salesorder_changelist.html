@@ -117,6 +117,8 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-qf-btn.sv-qf-active{background:#1565c0;color:#fff;border-color:transparent}
 .sv-qf-btn.sv-qf-warn{background:rgba(198,40,40,.15);color:#ef5350;border-color:#c62828}
 .sv-qf-btn.sv-qf-warn.sv-qf-active{background:#c62828;color:#fff}
+.sv-qf-cnt{display:inline-block;background:rgba(255,255,255,.15);color:inherit;font-size:10px;font-weight:700;line-height:1;padding:1px 5px;border-radius:8px;margin-left:3px;vertical-align:middle}
+.sv-qf-btn.sv-qf-active .sv-qf-cnt{background:rgba(255,255,255,.25)}
 /* Card checkbox */
 .sv-card-check-input{width:17px;height:17px;cursor:pointer;accent-color:#1565c0;flex-shrink:0;vertical-align:middle}
 /* Select-all inline (inside action row) */
@@ -142,20 +144,20 @@ document.addEventListener('DOMContentLoaded', function () {
   {# Status filters — built by JS from window.location #}
   <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Статус:</span>
   <a class="sv-qf-btn" id="svf-s-all"       onclick="svQFStatus('');return false" href="#">Всі</a>
-  <a class="sv-qf-btn" id="svf-s-received"  onclick="svQFStatus('received');return false" href="#">📥 Отримано</a>
-  <a class="sv-qf-btn" id="svf-s-processing" onclick="svQFStatus('processing');return false" href="#">⚙️ Обробка</a>
-  <a class="sv-qf-btn" id="svf-s-shipped"   onclick="svQFStatus('shipped');return false" href="#">🚚 Відправлено</a>
-  <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQFStatus('delivered');return false" href="#">✅ Доставлено</a>
-  <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQFStatus('cancelled');return false" href="#">🚫 Скасовано</a>
+  <a class="sv-qf-btn" id="svf-s-received"  onclick="svQFStatus('received');return false" href="#">📥 Отримано{% if sv_status_counts.received %} <span class="sv-qf-cnt">{{ sv_status_counts.received }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-s-processing" onclick="svQFStatus('processing');return false" href="#">⚙️ Обробка{% if sv_status_counts.processing %} <span class="sv-qf-cnt">{{ sv_status_counts.processing }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-s-shipped"   onclick="svQFStatus('shipped');return false" href="#">🚚 Відправлено{% if sv_status_counts.shipped %} <span class="sv-qf-cnt">{{ sv_status_counts.shipped }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQFStatus('delivered');return false" href="#">✅ Доставлено{% if sv_status_counts.delivered %} <span class="sv-qf-cnt">{{ sv_status_counts.delivered }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQFStatus('cancelled');return false" href="#">🚫 Скасовано{% if sv_status_counts.cancelled %} <span class="sv-qf-cnt">{{ sv_status_counts.cancelled }}</span>{% endif %}</a>
   <div class="sv-qf-sep"></div>
-  <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#">🚨 Затримки</a>
-  <a class="sv-qf-btn" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#">🔴 Прострочені</a>
+  <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#">🚨 Затримки{% if sv_count_delayed %} <span class="sv-qf-cnt">{{ sv_count_delayed }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#">🔴 Прострочені{% if sv_count_overdue %} <span class="sv-qf-cnt">{{ sv_count_overdue }}</span>{% endif %}</a>
   {% if sv_sources %}
   <div class="sv-qf-sep"></div>
   <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Джерело:</span>
   <a class="sv-qf-btn" id="svf-src-all" onclick="svQFSource('');return false" href="#">Всі</a>
   {% for src in sv_sources %}
-  <a class="sv-qf-btn" id="svf-src-{{ src.slug }}" onclick="svQFSource('{{ src.slug }}');return false" href="#">{{ src.name }}</a>
+  <a class="sv-qf-btn" id="svf-src-{{ src.slug }}" onclick="svQFSource('{{ src.slug }}');return false" href="#">{{ src.name }}{% if src.count %} <span class="sv-qf-cnt">{{ src.count }}</span>{% endif %}</a>
   {% endfor %}
   {% endif %}
 </div>

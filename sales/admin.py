@@ -422,7 +422,32 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
         from .models import SalesSource
-        extra_context['sv_sources'] = list(SalesSource.objects.values('slug', 'name').order_by('name'))
+        from django.db.models import Count
+        from datetime import date
+
+        # Status counts (all orders)
+        sc = dict(_base_qs().values_list('status').annotate(n=Count('id')).values_list('status', 'n'))
+        extra_context['sv_status_counts'] = sc
+
+        # Sources enriched with counts
+        source_counts = dict(
+            _base_qs().values_list('source').annotate(n=Count('id')).values_list('source', 'n')
+        )
+        extra_context['sv_sources'] = [
+            {'slug': s['slug'], 'name': s['name'], 'count': source_counts.get(s['slug'], 0)}
+            for s in SalesSource.objects.values('slug', 'name').order_by('name')
+        ]
+
+        # Special filter counts
+        today = date.today()
+        extra_context['sv_count_delayed'] = (
+            _base_qs().filter(shipments__carrier_delayed=True, shipments__status='in_transit')
+            .distinct().count()
+        )
+        extra_context['sv_count_overdue'] = (
+            _base_qs().filter(shipping_deadline__lt=today, status__in=['received', 'processing']).count()
+        )
+
         return super().changelist_view(request, extra_context=extra_context)
     date_hierarchy = "order_date"
     actions        = [
