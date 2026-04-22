@@ -704,16 +704,30 @@ class UPSClient:
             if isinstance(package, list):
                 package = package[0] if package else {}
 
-            status = package.get('currentStatus', {})
+            # UPS API: currentStatus has {description, code} but NO 'type'.
+            # The 'type' (D/I/X/M/P) is only in activity[].status.
+            # Bug fix: get status_type from activity[0].status, not currentStatus.
+            current_status   = package.get('currentStatus', {})
+            activity_list    = package.get('activity', [])
+            first_act_status = activity_list[0].get('status', {}) if activity_list else {}
+
+            status_type = first_act_status.get('type', '')
+            status_description = (
+                current_status.get('description', '') or
+                first_act_status.get('description', '')
+            ).strip()
+
             events = []
-            for act in package.get('activity', []):
-                loc  = act.get('location', {}).get('address', {})
-                date = act.get('date', '')
-                time = act.get('time', '')
+            for act in activity_list:
+                loc        = act.get('location', {}).get('address', {})
+                date       = act.get('date', '')
+                time_      = act.get('time', '')
+                act_status = act.get('status', {})   # Bug fix: description is nested here
                 events.append({
                     'date':        f'{date[:4]}-{date[4:6]}-{date[6:]}' if len(date) == 8 else date,
-                    'time':        f'{time[:2]}:{time[2:4]}' if len(time) >= 4 else time,
-                    'description': act.get('description', ''),
+                    'time':        f'{time_[:2]}:{time_[2:4]}' if len(time_) >= 4 else time_,
+                    'description': act_status.get('description', '').strip(),
+                    'status_type': act_status.get('type', ''),
                     'location':    ', '.join(filter(None, [
                         loc.get('city', ''), loc.get('stateProvince', ''), loc.get('countryCode', ''),
                     ])),
@@ -728,22 +742,22 @@ class UPSClient:
 
             # Actual delivery datetime for delivered packages (events newest-first)
             actual_delivery = ''
-            if status.get('type') == 'D' and events:
+            if status_type == 'D' and events:   # Bug fix: was status.get('type') == 'D'
                 ev = events[0]
-                ev_date = ev.get('date', '')  # "YYYY-MM-DD"
-                ev_time = ev.get('time', '')  # "HH:MM"
+                ev_date = ev.get('date', '')    # "YYYY-MM-DD"
+                ev_time = ev.get('time', '')    # "HH:MM"
                 if ev_date:
                     actual_delivery = f"{ev_date}T{ev_time}:00" if ev_time else ev_date
 
             return {
                 'tracking_number':    tracking_number,
-                'status':             status.get('type', ''),
-                'status_description': status.get('description', ''),
+                'status':             status_type,           # Bug fix: was status.get('type', '')
+                'status_description': status_description,    # Bug fix: was status.get('description', '')
                 'estimated_delivery': est_delivery,
                 'actual_delivery':    actual_delivery,
                 'location':           events[0]['location'] if events else '',
                 'events':             events,
-                'delivered':          status.get('type') == 'D',
+                'delivered':          status_type == 'D',   # Bug fix: was status.get('type') == 'D'
             }
         except (KeyError, IndexError) as e:
             logger.error('UPS tracking parse error: %s', e)
