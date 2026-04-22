@@ -52,6 +52,8 @@ class Carrier(models.Model):
     sender_zip     = models.CharField("Поштовий індекс", max_length=20, blank=True, default="")
     sender_country = models.CharField("Країна (ISO 2)", max_length=2, blank=True, default="DE",
                                       help_text="Двобуквений код: DE, UA, PL, US...")
+    sender_state   = models.CharField("Штат / провінція відправника", max_length=100, blank=True, default="",
+                                      help_text="Для США/Канади: дволітерний код (CA, NY, TX). Обов'язково для UPS з US-адресою.")
     sender_phone   = models.CharField("Телефон відправника", max_length=50, blank=True, default="")
     sender_email   = models.EmailField("Email відправника", blank=True, default="")
 

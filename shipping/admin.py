@@ -144,7 +144,7 @@ class CarrierAdmin(admin.ModelAdmin):
                 ("sender_name", "sender_company"),
                 "sender_street",
                 ("sender_city", "sender_zip", "sender_country"),
-                ("sender_phone", "sender_email"),
+                ("sender_state", "sender_phone", "sender_email"),
             ),
             "description": "Ці дані підставляються автоматично при кожному відправленні."
         }),
