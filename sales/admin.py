@@ -1778,6 +1778,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/doc/list/',
                  self.admin_site.admin_view(self.doc_list_view),
                  name='sales_salesorder_doc_list'),
+            # AJAX: card expand panel (docs + autodoc + packaging)
+            path('<int:pk>/card-expand/',
+                 self.admin_site.admin_view(self.card_expand_view),
+                 name='sales_salesorder_card_expand'),
         ]
         return custom_urls + urls
 
@@ -1906,6 +1910,134 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         """AJAX GET — повертає HTML-фрагмент панелі документів для оновлення без перезавантаження."""
         order = get_object_or_404(SalesOrder, pk=pk)
         return HttpResponse(self._docs_panel_html(order))
+
+    def card_expand_view(self, request, pk):
+        """AJAX GET — HTML для розгорнутої секції картки в changelist."""
+        order = get_object_or_404(SalesOrder, pk=pk)
+        upload_url   = reverse('admin:sales_salesorder_upload_docs', args=[pk])
+        doc_list_url = reverse('admin:sales_salesorder_doc_list', args=[pk])
+        base = f'/admin/sales/salesorder/{pk}/doc'
+
+        # ── 1. Uploaded documents ──────────────────────────────────────────
+        docs_html = self._docs_panel_html(order)
+
+        # ── 2. Auto-doc buttons (same structure as doc_buttons, compact) ───
+        _S = 'display:inline-flex;align-items:stretch;border-radius:6px;overflow:hidden;margin-right:6px'
+        autodoc_rows = []
+        for doc_id, color, label, url in [
+            ('pl', '#1976d2', '📋 Пакувальний лист', f'{base}/packing-list/'),
+            ('pf', '#388e3c', '📄 Proforma Invoice',   f'{base}/proforma/'),
+            ('cn', '#6a1b9a', '🛃 Митна декларація',   f'{base}/customs/'),
+        ]:
+            save_url = url + '?action=save'
+            btn_style = (
+                f'background:{color};color:#fff;padding:6px 13px;'
+                f'text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap'
+            )
+            save_style = (
+                f'background:{color};color:#fff;border:none;'
+                f'border-left:1px solid rgba(255,255,255,.3);'
+                f'padding:6px 10px;cursor:pointer;font-size:12px'
+            )
+            toggle_style = (
+                'background:#1e2d3e;color:#9aafbe;border:1px solid #2a3f52;'
+                'border-radius:5px;padding:4px 9px;cursor:pointer;font-size:12px;'
+                'vertical-align:middle;margin-left:2px'
+            )
+            panel_id = f'cex-ovr-{pk}-{doc_id}'
+            autodoc_rows.append(
+                f'<div style="margin-bottom:8px">'
+                f'<span style="{_S}">'
+                f'<a href="{url}" target="_blank" style="{btn_style}">{label}</a>'
+                f'<button type="button" data-save-url="{save_url}" data-doc-id="{doc_id}" data-pk="{pk}"'
+                f' onclick="_cexDocSave(this)" title="Зберегти PDF на сервер" style="{save_style}">💾</button>'
+                f'</span>'
+                f'<button type="button" onclick="_cexToggleOvr(\'{panel_id}\')" style="{toggle_style}" title="Параметри">⚙️</button>'
+                f'<div id="{panel_id}" style="display:none;margin-top:8px;padding:10px 12px;'
+                f'background:#0b1520;border:1px solid #2a3f52;border-left:3px solid {color};'
+                f'border-radius:6px;max-width:400px;font-size:12px;color:var(--text-muted)">'
+                f'<em>Щоб змінити параметри — відкрийте <a href="/admin/sales/salesorder/{pk}/change/" '
+                f'style="color:#4fc3f7">форму замовлення</a></em>'
+                f'</div>'
+                f'</div>'
+            )
+
+        # ── 3. Packaging info ──────────────────────────────────────────────
+        try:
+            pkg_html = str(self.packaging_panel(order)) if order.lines.exists() else ''
+        except Exception:
+            pkg_html = ''
+
+        # ── Assemble HTML ──────────────────────────────────────────────────
+        sep = '<div style="border-top:1px solid var(--border-strong,#2a3f52);margin:14px 0"></div>'
+
+        html = (
+            # JS helpers (idempotent guard)
+            '<script>'
+            'if(!window._cexDef){'
+            'window._cexDef=true;'
+            # Upload
+            'function _cexUpload(input,pk,listUrl,resultEl){'
+            'var files=input.files;if(!files.length)return;'
+            'var fd=new FormData();'
+            'Array.from(files).forEach(function(f){fd.append("files",f);});'
+            'var csrf=document.cookie.match(/csrftoken=([^;]+)/);'
+            'if(csrf)fd.append("csrfmiddlewaretoken",csrf[1]);'
+            'resultEl.textContent="⏳ Завантаження…";'
+            'fetch("/admin/sales/salesorder/"+pk+"/upload-docs/",'
+            '{method:"POST",body:fd,headers:{"X-Requested-With":"XMLHttpRequest"}})'
+            '.then(r=>r.json())'
+            '.then(function(d){'
+            'resultEl.textContent=d.saved?("✅ "+d.saved.join(", ")):(d.error||"Помилка");'
+            'var panel=document.getElementById("cex-docs-"+pk);'
+            'if(panel)fetch(listUrl,{headers:{"X-Requested-With":"XMLHttpRequest"}})'
+            '.then(r=>r.text()).then(function(h){panel.innerHTML=h;});'
+            '})'
+            '.catch(function(){resultEl.textContent="❌ Помилка мережі";});'
+            'input.value="";}'
+            # Save doc
+            'function _cexDocSave(btn){'
+            'var orig=btn.textContent;btn.disabled=true;btn.textContent="⏳";'
+            'fetch(btn.dataset.saveUrl,{headers:{"X-Requested-With":"XMLHttpRequest"}})'
+            '.then(r=>r.json())'
+            '.then(function(d){'
+            'btn.textContent=d.ok?"✅":"❌";'
+            'if(d.ok){'
+            'var pk=btn.dataset.pk;'
+            'var lurl="/admin/sales/salesorder/"+pk+"/doc/list/";'
+            'var panel=document.getElementById("cex-docs-"+pk);'
+            'if(panel)fetch(lurl,{headers:{"X-Requested-With":"XMLHttpRequest"}})'
+            '.then(r=>r.text()).then(function(h){panel.innerHTML=h;});}'
+            '})'
+            '.catch(function(){btn.textContent="❌";});}'
+            # Toggle override panel
+            'function _cexToggleOvr(id){'
+            'var el=document.getElementById(id);'
+            'if(el)el.style.display=el.style.display==="none"?"block":"none";}'
+            '}'
+            '</script>'
+            # Docs section
+            f'<div id="cex-docs-{pk}">{docs_html}</div>'
+            f'{sep}'
+            # Upload
+            '<div style="margin-bottom:6px">'
+            f'<label style="display:inline-block;padding:6px 16px;background:#417690;color:#fff;'
+            f'border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">'
+            f'📎 Вибрати файли'
+            f'<input type="file" multiple style="display:none"'
+            f' onchange="_cexUpload(this,{pk},{json.dumps(doc_list_url)},document.getElementById(\'cex-upres-{pk}\'))">'
+            f'</label>'
+            f'<span id="cex-upres-{pk}" style="margin-left:10px;font-size:12px;color:var(--text-muted)"></span>'
+            '</div>'
+            f'{sep}'
+            # Auto-doc buttons
+            '<div style="font-size:11px;color:var(--text-muted);font-weight:600;'
+            'text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">'
+            '📄 Автоматичні документи</div>'
+            + ''.join(autodoc_rows)
+            + (f'{sep}<div>{pkg_html}</div>' if pkg_html else '')
+        )
+        return HttpResponse(html)
 
     def upload_docs_view(self, request, pk):
         """AJAX-ендпоінт: зберігає документи замовлення на сервер (і локально)."""

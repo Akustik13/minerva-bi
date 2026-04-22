@@ -128,6 +128,11 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-lm-btn{display:inline-block;padding:3px 11px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-input,#141f2b);color:var(--text-muted);font-size:12px;font-weight:600;text-decoration:none;transition:background .12s,color .12s;cursor:pointer;white-space:nowrap;margin-left:4px}
 .sv-lm-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .sv-lm-btn.sv-lm-active{background:#1565c0;color:#fff;border-color:transparent}
+/* Card expand button + panel */
+.sv-cex-btn{margin-left:auto;padding:4px 10px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-input,#141f2b);color:var(--text-muted);cursor:pointer;font-size:13px;line-height:1;transition:background .12s,color .12s;flex-shrink:0}
+.sv-cex-btn:hover{background:var(--bg-hover);color:var(--text)}
+.sv-cex-btn.sv-cex-open{background:#1e2d3e;color:#4fc3f7;border-color:#2a5f8a}
+.sv-cex-panel{display:none;margin-top:12px;padding:14px 16px;background:var(--bg-input,#141f2b);border:1px solid var(--border-strong);border-radius:7px;font-size:12px;color:var(--text)}
 /* Card checkbox */
 .sv-card-check-input{width:17px;height:17px;cursor:pointer;accent-color:#1565c0;flex-shrink:0;vertical-align:middle}
 /* Select-all inline (inside action row) */
@@ -433,6 +438,14 @@ document.addEventListener('DOMContentLoaded', function () {
       {% endif %}
       {% endwith %}{# end with tn #}
 
+      {# Expand button — rightmost in footer #}
+      <button class="sv-cex-btn" id="sv-cex-btn-{{ order.pk }}"
+              onclick="svCardExpand(this, {{ order.pk }})" title="Документи та деталі">⛶</button>
+    </div>
+
+    {# Expandable panel — docs, upload, auto-doc, packaging #}
+    <div class="sv-cex-panel" id="sv-cex-{{ order.pk }}">
+      <span style="color:var(--text-muted);font-size:12px">⏳ Завантаження…</span>
     </div>
 
   </div>
@@ -492,6 +505,27 @@ function svQFSource(value) {
   if (source) { var sr = document.getElementById('svf-src-' + source); if(sr) sr.classList.add('sv-qf-active'); else { var sa = document.getElementById('svf-src-all'); if(sa) sa.classList.add('sv-qf-active'); } }
   else { var sa2 = document.getElementById('svf-src-all'); if(sa2) sa2.classList.add('sv-qf-active'); }
 })();
+
+// ── Card expand ──────────────────────────────────────────────────────────────
+function svCardExpand(btn, pk) {
+  var panel = document.getElementById('sv-cex-' + pk);
+  if (!panel) return;
+  var isOpen = panel.style.display === 'block';
+  // Toggle
+  panel.style.display = isOpen ? 'none' : 'block';
+  btn.classList.toggle('sv-cex-open', !isOpen);
+  btn.textContent = isOpen ? '⛶' : '⊠';
+  // Load on first open only
+  if (!isOpen && !panel.dataset.loaded) {
+    panel.dataset.loaded = '1';
+    fetch('/admin/sales/salesorder/' + pk + '/card-expand/', {
+      headers: {'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(function(r) { return r.text(); })
+    .then(function(html) { panel.innerHTML = html; })
+    .catch(function() { panel.innerHTML = '<span style="color:#ef5350">❌ Помилка завантаження</span>'; });
+  }
+}
 
 // ── Date hierarchy: highlight active year + inject "last month" button ───────
 (function() {
