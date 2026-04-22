@@ -437,10 +437,19 @@ class UPSClient:
         self._last_rate_response = data
         return self._parse_rated_shipments(data)
 
+    # Service codes valid only for domestic US shipments (error 111210 on intl routes)
+    _DOMESTIC_ONLY_SERVICES = {'01', '02', '03', '12', '13', '14', '59'}
+
     def _rate_fallback(self, to_address, packages, from_address):
-        """Перебирає service codes по одному, повертає ті що відповіли успішно."""
+        """Перебирає service codes по одному, повертає ті що відповіли успішно.
+        Domestic-only codes (01/02/03/12/13/14/59) skipped for international routes."""
+        pickup = from_address or self._default_shipper()
+        is_intl = (pickup.get('country') or 'DE').upper() != (to_address.get('country') or 'DE').upper()
+
         results = []
         for code in self._FALLBACK_SERVICES:
+            if is_intl and code in self._DOMESTIC_ONLY_SERVICES:
+                continue
             try:
                 results.extend(self._rate_single(to_address, packages, from_address, code))
             except UPSError:
