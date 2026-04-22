@@ -972,17 +972,40 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 </div>
 
 <script>
-/* ── 💾 Зберегти документ відправки локально (MinervaLocalSave) ── */
+/* ── 💾 Зберегти документ відправки локально + на сервер ── */
 (function() {
-  var ORDER_NUMBER = '{{ shipment.order.order_number|default:"" }}';
-  var SOURCE       = '{{ shipment.order.source|default:"manual" }}';
-  var DATE_STR     = '{{ shipment.created_at|date:"Y-m-d" }}';
+  var ORDER_NUMBER          = '{{ shipment.order.order_number|default:"" }}';
+  var SOURCE                = '{{ shipment.order.source|default:"manual" }}';
+  var DATE_STR              = '{{ shipment.created_at|date:"Y-m-d" }}';
+  var AUTO_SAVE_SERVER      = {{ auto_save_labels_to_server|yesno:"true,false" }};
+  var SAVE_LABELS_URL       = '{{ save_labels_url }}';
+  var CSRF_TOKEN            = '{{ csrf_token }}';
+
+  /* Server-side save: copies from media/shipping/... → media/orders/.../ */
+  function doServerSave(statusEl) {
+    if (!AUTO_SAVE_SERVER || !SAVE_LABELS_URL) return;
+    fetch(SAVE_LABELS_URL, {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF_TOKEN, 'X-Requested-With': 'XMLHttpRequest'},
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!statusEl) return;
+      if (d.ok && d.saved && d.saved.length) {
+        var existing = statusEl.textContent || '';
+        statusEl.textContent = (existing ? existing + ' | ' : '') +
+          '📁 Сервер: ' + d.saved.join(', ');
+        statusEl.style.color = 'var(--ok,#3fb950)';
+      } else if (d.errors && d.errors.length) {
+        var existing = statusEl.textContent || '';
+        statusEl.textContent = (existing ? existing + ' | ' : '') +
+          '⚠️ Сервер: ' + d.errors[0];
+      }
+    })
+    .catch(function() {});
+  }
 
   function doSave(btn) {
-    if (!window.MinervaLocalSave || !MinervaLocalSave.supported) {
-      alert('File System Access API не підтримується.\nВикористовуйте Chrome або Edge 86+.');
-      return;
-    }
     var url      = btn.dataset.url;
     var filename = url.split('/').pop();
     var subfolders = (SOURCE && DATE_STR && ORDER_NUMBER)
@@ -991,15 +1014,24 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     btn.disabled = true; btn.textContent = '⏳';
     if (statusEl) { statusEl.textContent = 'Збереження…'; statusEl.style.color = 'var(--text-dim)'; }
 
+    if (!window.MinervaLocalSave || !MinervaLocalSave.supported) {
+      /* No local save support — just do server save */
+      btn.disabled = false; btn.textContent = '💾';
+      doServerSave(statusEl);
+      return;
+    }
+
     MinervaLocalSave.saveUrlToFolder(url, filename, subfolders).then(function(r) {
       btn.disabled = false; btn.textContent = '💾';
       if (r.ok) {
         if (statusEl) { statusEl.textContent = '✅ ' + r.path; statusEl.style.color = 'var(--ok)'; }
+        doServerSave(statusEl);
       } else if (r.reason === 'no_handle') {
         if (statusEl) statusEl.textContent = '📂 Оберіть папку…';
         MinervaLocalSave.pickFolder().then(function(h) { if (h) doSave(btn); });
       } else {
         if (statusEl) { statusEl.textContent = '⚠️ ' + r.reason; statusEl.style.color = 'var(--err)'; }
+        doServerSave(statusEl);
       }
     });
   }

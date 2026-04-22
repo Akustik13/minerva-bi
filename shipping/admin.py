@@ -14,6 +14,26 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
+def _copy_shipment_file_to_order_docs(abs_path: str, shipment) -> None:
+    """Copies shipment label/customs file into media/orders/{source}/{order_number}/
+    if SalesSettings.auto_save_labels_to_server is True."""
+    try:
+        from sales.models import SalesSettings
+        cfg = SalesSettings.get()
+        if not cfg.auto_save_labels_to_server:
+            return
+        import os, shutil
+        from django.conf import settings as _s
+        order = shipment.order
+        if not order:
+            return
+        dest_dir = _s.MEDIA_ROOT / 'orders' / (order.source or 'manual') / order.order_number
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(abs_path, str(dest_dir / os.path.basename(abs_path)))
+    except Exception:
+        pass
+
+
 def _copy_shipment_file_local(abs_path: str, shipment) -> None:
     """Копіює файл до локальної папки якщо SalesSettings.local_save_enabled."""
     try:
@@ -1063,6 +1083,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.save_packaging_view),
                 name="shipping_shipment_save_packaging",
             ),
+            path(
+                "<int:shipment_id>/save-labels-to-docs/",
+                self.admin_site.admin_view(self.save_labels_to_docs_view),
+                name="shipping_shipment_save_labels_to_docs",
+            ),
         ]
         return custom + urls
 
@@ -2060,21 +2085,29 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             except Exception:
                 pass
 
+        from sales.models import SalesSettings as _SS
+        _sales_cfg = _SS.get()
+        _save_labels_url = reverse(
+            "admin:shipping_shipment_save_labels_to_docs", args=[shipment.pk]
+        )
+
         return render(request, "admin/shipping/shipment_detail.html", {
             **self.admin_site.each_context(request),
-            "shipment":          shipment,
-            "order":             order,
-            "timeline":          timeline,
-            "show_timeline":     show_timeline,
-            "actions":           actions,
-            "status_choices":    status_choices,
-            "carrier_tracking":  carrier_tracking,
-            "pickup_info":       pickup_info,
-            "customs_display":   customs_display,
-            "raw_request":       _to_str(shipment.raw_request),
-            "raw_response":      _to_str(shipment.raw_response),
-            "suggest_packaging": suggest_packaging,
-            "title":             f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
+            "shipment":                  shipment,
+            "order":                     order,
+            "timeline":                  timeline,
+            "show_timeline":             show_timeline,
+            "actions":                   actions,
+            "status_choices":            status_choices,
+            "carrier_tracking":          carrier_tracking,
+            "pickup_info":               pickup_info,
+            "customs_display":           customs_display,
+            "raw_request":               _to_str(shipment.raw_request),
+            "raw_response":              _to_str(shipment.raw_response),
+            "suggest_packaging":         suggest_packaging,
+            "title":                     f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
+            "auto_save_labels_to_server": _sales_cfg.auto_save_labels_to_server,
+            "save_labels_url":           _save_labels_url,
         })
 
     # ── Синхронізація статусу замовлення ─────────────────────────────────────
@@ -2246,6 +2279,58 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({"ok": True, "created": [], "msg": "Всі товари вже мають упаковку"})
         return JsonResponse({"ok": True, "created": created,
                              "msg": f"Створено {len(created)} запис(ів) упаковки"})
+
+    def save_labels_to_docs_view(self, request, shipment_id):
+        """POST — copies label/customs PDFs from media/shipping/ into
+        media/orders/{source}/{order_number}/ so they appear in the order document list."""
+        from django.http import JsonResponse
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+
+        from sales.models import SalesSettings
+        cfg = SalesSettings.get()
+        if not cfg.auto_save_labels_to_server:
+            return JsonResponse({"ok": False, "reason": "disabled"})
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order = shipment.order
+        if not order:
+            return JsonResponse({"error": "Немає замовлення"}, status=400)
+
+        import shutil
+        from pathlib import Path as _P
+        from django.conf import settings as _s
+
+        dest_dir = _P(str(_s.MEDIA_ROOT)) / 'orders' / (order.source or 'manual') / order.order_number
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        saved, errors = [], []
+        for url_attr in ('label_url', 'customs_url'):
+            url = getattr(shipment, url_attr, '') or ''
+            if not url:
+                continue
+            # Resolve URL to filesystem path
+            media_url = _s.MEDIA_URL.rstrip('/')
+            if url.startswith('/media/'):
+                rel = url[7:]
+            elif url.startswith(media_url + '/'):
+                rel = url[len(media_url) + 1:]
+            else:
+                errors.append(f"{url_attr}: external URL, cannot copy")
+                continue
+            src = _P(str(_s.MEDIA_ROOT)) / rel
+            if not src.exists():
+                errors.append(f"{url_attr}: file not found ({src.name})")
+                continue
+            dest = dest_dir / src.name
+            try:
+                shutil.copy2(str(src), str(dest))
+                saved.append(src.name)
+            except Exception as exc:
+                errors.append(f"{url_attr}: {exc}")
+
+        return JsonResponse({"ok": True, "saved": saved, "errors": errors,
+                             "order_number": order.order_number})
 
     # ── Ручна зміна статусу ───────────────────────────────────────────────────
 
@@ -2832,6 +2917,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.save(update_fields=['label_url'])
             logger.info('UPS label saved: %s', fpath)
             _copy_shipment_file_local(fpath, shipment)
+            _copy_shipment_file_to_order_docs(fpath, shipment)
 
         # Зберегти митну декларацію (комерційний інвойс)
         if result.get('customs_base64'):
@@ -2845,6 +2931,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             shipment.save(update_fields=['customs_url'])
             logger.info('UPS customs form saved: %s', cfpath)
             _copy_shipment_file_local(cfpath, shipment)
+            _copy_shipment_file_to_order_docs(cfpath, shipment)
 
         # Синхронізуємо SalesOrder
         from datetime import date as _date
@@ -4067,6 +4154,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     fh.write(label_bytes)
                 label_url = f"{settings.MEDIA_URL}labels/dhl/{label_filename}"
                 _copy_shipment_file_local(label_fpath, shipment)
+                _copy_shipment_file_to_order_docs(label_fpath, shipment)
             except Exception as exc:
                 logger.warning("DHL label save failed: %s", exc)
 

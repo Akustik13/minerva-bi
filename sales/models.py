@@ -186,6 +186,13 @@ class SalesSettings(models.Model):
         help_text='При натисканні 💾 на Пакувальному листі / Proforma / Митній декларації '
                   'зберігати PDF на сервер (без зайвого підтвердження).',
     )
+    auto_save_labels_to_server = models.BooleanField(
+        default=True,
+        verbose_name='Зберігати мітки перевізника в документи замовлення',
+        help_text='При створенні UPS/DHL мітки — автоматично копіювати PDF етикетки '
+                  'і митної декларації у папку документів замовлення '
+                  '(media/orders/{source}/{order_number}/).',
+    )
 
     class Meta:
         verbose_name = 'Налаштування'

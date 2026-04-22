@@ -147,7 +147,13 @@ class SalesSettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ('⚙️ Поведінка при генерації документів', {
-            'fields': ('auto_save_to_server',),
+            'fields': ('auto_save_to_server', 'auto_save_labels_to_server'),
+            'description': (
+                '<b>Автоматично зберігати PDF на сервер</b> — для кнопок 💾 на Пакувальному листі / Proforma / CN23. '
+                '<b>Зберігати мітки перевізника</b> — при створенні UPS/DHL мітки '
+                'PDF автоматично копіюється у папку документів замовлення на сервері '
+                'і відображається в розділі «📋 Завантажені документи».'
+            ),
         }),
     )
 
@@ -1108,6 +1114,30 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 '</div>'
             )
 
+        # Server-side label auto-save status
+        if cfg.auto_save_labels_to_server:
+            server_order_path = f'media/orders/{obj.source or "manual"}/{obj.order_number}/'
+            server_save_info = (
+                '<div style="margin:6px 0;padding:7px 12px;'
+                'background:rgba(46,125,50,.12);border:1px solid rgba(46,125,50,.3);'
+                'border-radius:5px;font-size:12px;display:flex;align-items:center;'
+                'gap:8px;flex-wrap:wrap;color:var(--text,#e6edf3)">'
+                '📦 Мітки перевізника (UPS/DHL): автозбереження в '
+                '<code style="color:var(--ok,#3fb950);word-break:break-all">'
+                + server_order_path +
+                '</code>'
+                ' <a href="' + settings_url + '" style="color:var(--text-muted,#9aafbe);font-size:11px;white-space:nowrap">'
+                '⚙️ Налаштування</a>'
+                '</div>'
+            )
+        else:
+            server_save_info = (
+                '<div style="margin:6px 0;font-size:11px;color:var(--text-dim,#607d8b)">'
+                '📦 Автозбереження міток перевізника вимкнено. '
+                '<a href="' + settings_url + '" style="color:var(--text-muted,#9aafbe)">⚙️ Налаштування</a>'
+                '</div>'
+            )
+
         html = (
             '<div id="docWidgetRoot"'
             ' data-upload-url="' + upload_url + '"'
@@ -1122,6 +1152,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '<input type="file" id="docFiles" multiple style="display:none">'
             '<p style="margin:0 0 6px;font-size:12px;color:var(--text-dim,#607d8b)">'
             'Можна кілька файлів одночасно. Завантаження на сервер починається автоматично після вибору.</p>'
+            + server_save_info
             + local_info +
             '<div id="docResult" style="margin-top:10px;font-size:13px;color:var(--text,#e6edf3)"></div>'
             '</div>'
@@ -1142,6 +1173,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     "admin:bots_digikeyconfig_confirm_order",
                     args=[obj.order_number],
                 )
+            # Auto-sync shipping fields from active shipment (GET only)
+            if obj and request.method == "GET":
+                _sync_order_from_active_shipment(obj)
         except Exception:
             pass
         return super().change_view(request, object_id, form_url, extra_context)
@@ -2324,6 +2358,67 @@ def _get_sales_stats():
         }
     except Exception:
         return {"received": "—", "processing": "—", "overdue": "—", "shipped_month": "—"}
+
+
+def _sync_order_from_active_shipment(order) -> None:
+    """Syncs shipping fields on order from its active (non-cancelled/error) shipment.
+
+    Updates only fields that are stale or empty. Never overwrites user-edited data
+    unless the existing value clearly belongs to a cancelled shipment (tracking_number).
+    Silent — any exception is swallowed.
+    """
+    try:
+        shipment = (
+            order.shipments
+                 .exclude(status__in=("cancelled", "error"))
+                 .order_by("-pk")
+                 .first()
+        )
+        if not shipment:
+            return
+
+        changed_fields = []
+
+        # tracking_number: replace only if current belongs to a cancelled shipment
+        new_tn = shipment.tracking_number
+        if new_tn and new_tn != order.tracking_number:
+            cancelled_tns = set(
+                order.shipments.filter(status="cancelled")
+                               .values_list("tracking_number", flat=True)
+            )
+            if not order.tracking_number or order.tracking_number in cancelled_tns:
+                order.tracking_number = new_tn
+                changed_fields.append("tracking_number")
+
+        # shipping_cost: fill from carrier_price if order still shows 0
+        if shipment.carrier_price and (not order.shipping_cost or order.shipping_cost == 0):
+            order.shipping_cost = shipment.carrier_price
+            changed_fields.append("shipping_cost")
+
+        # shipping_currency: fill if empty
+        if shipment.carrier_currency and not order.shipping_currency:
+            order.shipping_currency = shipment.carrier_currency
+            changed_fields.append("shipping_currency")
+
+        # shipping_courier: fill if empty, derive from carrier name/type
+        if not order.shipping_courier:
+            courier = (
+                shipment.carrier_service
+                or (shipment.carrier.get_carrier_type_display() if shipment.carrier else "")
+            )
+            if courier:
+                order.shipping_courier = courier
+                changed_fields.append("shipping_courier")
+
+        # lieferschein_nr: fill from Jumingo order number if empty
+        if not order.lieferschein_nr and shipment.jumingo_order_number:
+            order.lieferschein_nr = shipment.jumingo_order_number
+            changed_fields.append("lieferschein_nr")
+
+        if changed_fields:
+            order.save(update_fields=changed_fields)
+    except Exception:
+        pass
 
 
 _orig_sales_app_index = admin.site.app_index
