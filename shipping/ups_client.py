@@ -331,16 +331,23 @@ class UPSClient:
         """
         use_packaging_key=True  → Package uses 'Packaging'   (Shoptimeintransit / Ship API)
         use_packaging_key=False → Package uses 'PackagingType' (Rate / Shop API)
+
+        UPS rule: Shipper.ShipperNumber country must match Shipper.Address country.
+        Solution:
+          - Shipper   = carrier account holder (always DE + ShipperNumber)
+          - ShipFrom  = actual physical pickup address (can be US when swapped)
+          - ShipTo    = recipient
         """
-        shipper = from_address or self._default_shipper()
+        pickup  = from_address or self._default_shipper()   # physical pickup location
+        account = self._default_shipper()                   # carrier account (billing, always DE)
         shipment = {
             'Shipper': {
-                'Name':          shipper.get('name', 'Shipper'),
+                'Name':          account.get('name', 'Shipper'),
                 'ShipperNumber': self.carrier.connection_uuid,
-                'Address':       self._fmt_addr(shipper),
+                'Address':       self._fmt_addr(account),
             },
             'ShipTo':   {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address, addr_fallback=True)},
-            'ShipFrom': {'Name': shipper.get('name', 'Shipper'),       'Address': self._fmt_addr(shipper)},
+            'ShipFrom': {'Name': pickup.get('name', 'Shipper'),       'Address': self._fmt_addr(pickup)},
             'PaymentDetails': {
                 'ShipmentCharge': {
                     'Type': '01',
@@ -356,10 +363,11 @@ class UPSClient:
 
     def _rate_shop(self, to_address, packages, from_address):
         """POST /api/rating/v2205/Shop — prices for all services. ETA added separately."""
-        shipper  = from_address or self._default_shipper()
-        shipment = self._build_rate_shipment(to_address, packages, shipper)
+        pickup   = from_address or self._default_shipper()
+        shipment = self._build_rate_shipment(to_address, packages, pickup)
+        # is_intl = physical ShipFrom country ≠ ShipTo country
         is_intl  = (to_address.get('country', 'DE').upper() !=
-                    (shipper.get('country') or 'DE').upper())
+                    (pickup.get('country') or 'DE').upper())
         if is_intl:
             shipment['InvoiceLineTotal'] = {'CurrencyCode': 'EUR', 'MonetaryValue': '1.00'}
 
@@ -579,17 +587,19 @@ class UPSClient:
         POST /api/shipments/v2409/ship
         Повертає: {tracking_number, shipment_id, label_base64, label_format, total_charge, currency}
         """
-        shipper = from_address or self._default_shipper()
+        pickup  = from_address or self._default_shipper()  # physical pickup (can be US)
+        account = self._default_shipper()                  # carrier account holder (always DE)
         label_format = 'PDF'
 
         shipment = {
+            # Shipper = account holder (billing) — always carrier's DE address + ShipperNumber
             'Shipper': {
-                'Name':          shipper.get('name', ''),
-                'AttentionName': shipper.get('name', ''),
+                'Name':          account.get('name', ''),
+                'AttentionName': account.get('name', ''),
                 'ShipperNumber': self.carrier.connection_uuid,
-                'Phone':         {'Number': (shipper.get('phone', '') or '').replace(' ', '')},
-                'EMailAddress':  shipper.get('email', '') or '',
-                'Address':       self._fmt_addr(shipper),
+                'Phone':         {'Number': (account.get('phone', '') or '').replace(' ', '')},
+                'EMailAddress':  account.get('email', '') or '',
+                'Address':       self._fmt_addr(account),
             },
             'ShipTo': {
                 'Name':          to_address.get('name', ''),
@@ -598,12 +608,13 @@ class UPSClient:
                 'EMailAddress':  to_address.get('email', '') or '',
                 'Address':       self._fmt_addr(to_address),
             },
+            # ShipFrom = physical pickup location (can differ from Shipper when swapped)
             'ShipFrom': {
-                'Name':          shipper.get('name', ''),
-                'AttentionName': shipper.get('name', ''),
-                'Phone':         {'Number': (shipper.get('phone', '') or '').replace(' ', '')},
-                'EMailAddress':  shipper.get('email', '') or '',
-                'Address':       self._fmt_addr(shipper),
+                'Name':          pickup.get('name', ''),
+                'AttentionName': pickup.get('name', ''),
+                'Phone':         {'Number': (pickup.get('phone', '') or '').replace(' ', '')},
+                'EMailAddress':  pickup.get('email', '') or '',
+                'Address':       self._fmt_addr(pickup),
             },
             'PaymentInformation': {
                 'ShipmentCharge': {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}},
@@ -619,7 +630,7 @@ class UPSClient:
 
         is_intl = (
             (to_address.get('country') or 'DE').upper() !=
-            (shipper.get('country') or 'DE').upper()
+            (pickup.get('country') or 'DE').upper()
         )
         if is_intl and customs_info:
             # InvoiceLineTotal at Shipment level (required for international)
@@ -894,10 +905,11 @@ class UPSClient:
             'name':         c.sender_name or c.sender_company or '',
             'address_line': c.sender_street or '',
             'city':         c.sender_city or '',
-            'state':        '',
+            'state':        c.sender_state or '',
             'postal':       c.sender_zip or '',
             'country':      c.sender_country or 'DE',
             'phone':        c.sender_phone or '',
+            'email':        c.sender_email or '',
         }
 
     @staticmethod
