@@ -272,7 +272,9 @@ class UPSClient:
     # ── Rates ─────────────────────────────────────────────────────────────────
 
     # Service codes tried in fallback (Shop not available)
-    _FALLBACK_SERVICES = ['11', '07', '08', '65', '54', '03', '02', '01', '12', '59', '96']
+    # '96' (Worldwide Express Freight) excluded — freight-only (68+ kg), incompatible
+    # with PackagingType 00/02 for small parcels → causes UPS error 111500.
+    _FALLBACK_SERVICES = ['11', '07', '08', '65', '54', '03', '02', '01', '12', '59']
 
     # Time-in-Transit API service codes → Rating API numeric codes
     _TTI_CODE_MAP = {
