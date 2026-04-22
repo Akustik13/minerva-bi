@@ -162,13 +162,21 @@ def display_country(iso2: str) -> str:
 
 
 def country_flag_html(iso2: str) -> str:
-    """Повертає рядок HTML: прапор + код країни для admin list_display.
+    """Повертає HTML: прапор + ISO-2 код для admin list_display.
 
-    Приклад: '🇩🇪 DE' або '🇩🇪 DEU' залежно від налаштувань.
+    Логіка:
+    - .fi.fi-xx  = flag-icons SVG sprite (CDN); коли завантажений, CSS ховає
+                   emoji text через font-size:0 і показує background-image
+    - .mv-flag-emoji = emoji fallback з правильним font-family; активний
+                       коли CDN недоступний (.fi не визначений → font-size не 0)
+
+    Приклад: 🇩🇪 DE (Mac/iOS: флаг SVG або emoji, Windows: завжди SVG з CDN)
     """
-    c = (iso2 or "").strip().upper()
+    c = normalize_to_iso2(iso2)
     if not c:
         return "—"
-    flag  = FLAG_MAP.get(c, "🌍")
-    label = display_country(c)
-    return f'<span title="{c}">{flag}&nbsp;{label}</span>'
+    emoji = FLAG_MAP.get(c, "🌍")
+    return (
+        f'<span class="fi fi-{c.lower()} mv-flag-emoji" title="{c}">{emoji}</span>'
+        f'&nbsp;<span style="vertical-align:middle;font-size:.9em">{c}</span>'
+    )
