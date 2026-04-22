@@ -835,6 +835,13 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 return f'https://novaposhta.ua/tracking/?cargo_number={tn}'
             return None
 
+        STATUS_BADGE = {
+            'received':   ('📥', '#455a64', 'Отримано'),
+            'processing': ('⚙️', '#e65100', 'В обробці'),
+            'shipped':    ('🚚', '#1565c0', 'Відправлено'),
+            'delivered':  ('✅', '#2e7d32', 'Доставлено'),
+            'cancelled':  ('🚫', '#c62828', 'Скасовано'),
+        }
         TD  = "padding:7px 10px;font-size:13px"
         TDB = TD + ";font-weight:700"
         rows = []
@@ -870,6 +877,14 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             track_url = _tracking_url(o.shipping_courier, tn)
             tn_html = (f'<a href="{track_url}" target="_blank" style="{_LA}">{tn}</a>'
                        if track_url else (tn or '—'))
+            st = o.status or ''
+            st_icon, st_color, st_label = STATUS_BADGE.get(st, ('❓', '#607d8b', st or '—'))
+            status_html = (
+                f'<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;'
+                f'border-radius:12px;font-size:11px;font-weight:600;white-space:nowrap;'
+                f'background:{st_color}22;color:{st_color};border:1px solid {st_color}55">'
+                f'{st_icon} {st_label}</span>'
+            )
             rows.append(
                 f"<tr style='border-bottom:1px solid rgba(128,128,128,0.15)'>"
                 f"<td style='{TD};white-space:nowrap;opacity:0.85'>{o.order_date.strftime('%d.%m.%Y') if o.order_date else '—'}</td>"
@@ -881,6 +896,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 f"<td style='{TD};font-family:monospace;font-size:11px'>{tn_html}</td>"
                 f"<td style='{TD};white-space:nowrap;text-align:right;opacity:0.85'>{ship_cost or '—'}</td>"
                 f"<td style='{TD};opacity:0.75;white-space:nowrap'>{o.shipping_courier or '—'}</td>"
+                f"<td style='{TD};white-space:nowrap'>{status_html}</td>"
                 f"</tr>"
             )
         TH = "padding:7px 10px;text-align:left;font-size:12px"
@@ -897,6 +913,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             f'<th style="{TH}">Tracking</th>'
             f'<th style="{TH};text-align:right">Доставка</th>'
             f'<th style="{TH}">Перевізник</th>'
+            f'<th style="{TH}">Статус</th>'
             '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
         )
     order_history_display.short_description = "Останні 20 замовлень"
