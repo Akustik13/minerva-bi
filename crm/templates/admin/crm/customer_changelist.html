@@ -2,70 +2,175 @@
 
 {% block extrahead %}{{ block.super }}
 <style>
-/* ── Toggle buttons ──────────────────────────────────────────────────────── */
+/* ── Toolbar ──────────────────────────────────────────────────────────────── */
+.crm-view-bar {
+  display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-wrap:wrap;
+}
 .crm-toggle-btn {
-  padding: 6px 16px; border-radius: 6px;
-  border: 1px solid var(--border-strong); background: var(--bg-card);
-  color: var(--text); cursor: pointer; font-size: 12px; font-weight: 600;
-  transition: background .15s, color .15s;
+  padding:6px 16px; border-radius:6px;
+  border:1px solid var(--border-strong); background:var(--bg-card);
+  color:var(--text); cursor:pointer; font-size:12px; font-weight:600;
+  transition:background .15s, color .15s;
 }
-.crm-toggle-btn.active { background: #1565c0; color: #fff; border-color: transparent; }
+.crm-toggle-btn.active { background:#1565c0; color:#fff; border-color:transparent; }
 
-/* ── Customer cards ─────────────────────────────────────────────────────── */
+/* ── Selection bar ───────────────────────────────────────────────────────── */
+.crm-sel-bar {
+  display:flex; align-items:center; gap:10px; font-size:12px;
+  padding:4px 12px; border-radius:6px;
+  background:rgba(21,101,192,.1); border:1px solid rgba(21,101,192,.3);
+}
+.crm-sel-bar label { display:flex; align-items:center; gap:5px; cursor:pointer; color:var(--text); }
+#crm-sel-count { font-weight:700; color:#1565c0; min-width:70px; }
+
+/* ── Card ─────────────────────────────────────────────────────────────────── */
 .crm-card {
-  background: var(--bg-card); border: 1.5px solid var(--border-strong);
-  border-left: 4px solid var(--border-strong); border-radius: 8px;
-  padding: 16px 18px; margin-bottom: 12px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.12);
-  transition: box-shadow .15s, border-left-color .15s;
+  background:var(--bg-card); border:1.5px solid var(--border-strong);
+  border-left:4px solid var(--border-strong); border-radius:8px;
+  margin-bottom:10px; box-shadow:0 2px 6px rgba(0,0,0,.12);
+  transition:box-shadow .15s, border-left-color .15s, background .15s;
+  overflow:hidden;
 }
-.crm-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,.18); }
-.crm-card.crm-s-active   { border-left-color: #4caf50; }
-.crm-card.crm-s-vip      { border-left-color: #ffd700; }
-.crm-card.crm-s-inactive { border-left-color: #9e9e9e; }
-.crm-card.crm-s-blocked  { border-left-color: #f44336; }
+.crm-card:hover { box-shadow:0 4px 12px rgba(0,0,0,.2); }
+.crm-card.crm-s-active   { border-left-color:#4caf50; }
+.crm-card.crm-s-vip      { border-left-color:#ffd700; }
+.crm-card.crm-s-inactive { border-left-color:#9e9e9e; }
+.crm-card.crm-s-blocked  { border-left-color:#f44336; }
+.crm-card.crm-selected   { background:rgba(21,101,192,.07); }
 
-/* ── Stat chip ──────────────────────────────────────────────────────────── */
-.crm-stat {
-  display:inline-flex; align-items:center; gap:4px; font-size:12px;
-  color:var(--text-muted); padding:2px 8px; border-radius:5px;
+/* ── Card header ──────────────────────────────────────────────────────────── */
+.crm-card-hd {
+  display:flex; align-items:flex-start; gap:8px;
+  padding:13px 15px 10px; border-bottom:1px solid var(--border);
+}
+.crm-card-title-col { flex:1; min-width:0; }
+.crm-card-name-row  { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:5px; }
+.crm-card-name {
+  font-size:15px; font-weight:800; color:var(--text); text-decoration:none;
+}
+.crm-card-name:hover { text-decoration:underline; }
+.crm-card-sub  { font-size:11px; color:var(--text-muted); }
+.crm-card-city { font-size:11px; color:var(--text-muted); }
+.crm-badges-row { display:flex; gap:5px; flex-wrap:wrap; align-items:center; }
+
+/* ── Checkbox ─────────────────────────────────────────────────────────────── */
+.crm-cb-wrap {
+  flex-shrink:0; margin-top:1px; cursor:pointer;
+  display:flex; align-items:flex-start; padding:2px 0;
+}
+.crm-cb-wrap input[type=checkbox] {
+  width:17px; height:17px; cursor:pointer; accent-color:#1565c0;
+  border-radius:3px;
+}
+
+/* ── Flag ─────────────────────────────────────────────────────────────────── */
+.crm-flag {
+  display:inline-flex; align-items:center; gap:3px;
+  white-space:nowrap; vertical-align:middle;
+}
+.crm-flag img  { display:inline-block; vertical-align:middle; border-radius:1px; }
+.crm-flag-code { font-size:.85em; color:var(--text-muted); vertical-align:middle; }
+
+/* ── Stats row ────────────────────────────────────────────────────────────── */
+.crm-stats-row {
+  display:flex; border-bottom:1px solid var(--border);
+}
+.crm-stat-cell {
+  flex:1; padding:9px 12px; text-align:center;
+  border-right:1px solid var(--border);
+}
+.crm-stat-cell:last-child { border-right:none; }
+.crm-stat-val {
+  font-size:15px; font-weight:800; color:var(--text); line-height:1.2;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.crm-stat-lbl {
+  font-size:10px; color:var(--text-muted); margin-top:2px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── Top products ─────────────────────────────────────────────────────────── */
+.crm-tops { padding:9px 15px 7px; border-bottom:1px solid var(--border); }
+.crm-tops-hd {
+  font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.05em; color:var(--text-muted); margin-bottom:5px;
+}
+.crm-top-row {
+  display:flex; align-items:center; gap:6px; padding:3px 0;
+  font-size:12px; border-bottom:1px solid rgba(128,128,128,.07);
+}
+.crm-top-row:last-of-type { border-bottom:none; }
+.crm-top-num  { min-width:16px; color:var(--text-muted); font-size:10px; flex-shrink:0; }
+.crm-top-sku  { flex:1; font-weight:600; color:var(--text); font-family:monospace; font-size:11px;
+                overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.crm-top-qty  { min-width:36px; text-align:right; color:var(--text-muted); font-size:11px; flex-shrink:0; }
+.crm-top-rev  { min-width:52px; text-align:right; font-weight:700; color:#4caf50; font-size:11px; flex-shrink:0; }
+.crm-top-extra { display:none; }
+.crm-tops-more {
+  display:inline-flex; align-items:center; gap:3px; margin-top:4px;
+  padding:2px 8px; border-radius:4px; font-size:11px; cursor:pointer;
+  background:transparent; color:var(--text-muted);
+  border:1px solid var(--border-strong);
+  transition:background .12s;
+}
+.crm-tops-more:hover { background:var(--bg-hover, rgba(255,255,255,.05)); }
+
+/* ── Meta row ─────────────────────────────────────────────────────────────── */
+.crm-card-meta {
+  display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+  padding:7px 15px; border-bottom:1px solid var(--border);
+  font-size:12px; color:var(--text-muted);
+}
+.crm-meta-link { color:var(--text-muted); text-decoration:underline dotted; }
+
+/* ── RFM chip ──────────────────────────────────────────────────────────────── */
+.crm-rfm {
+  display:inline-flex; gap:5px; align-items:center; font-size:11px;
+  padding:2px 8px; border-radius:5px;
   border:1px solid var(--border-strong); background:var(--bg-input,#141f2b);
-  white-space:nowrap;
+  color:var(--text-muted); white-space:nowrap;
 }
-.crm-stat b { color:var(--text); font-size:13px; }
+.crm-rfm b { font-size:12px; color:var(--text); }
 
-/* ── Source / status / segment badges ──────────────────────────────────── */
+/* ── Badges ───────────────────────────────────────────────────────────────── */
 .crm-badge { font-size:11px; font-weight:700; padding:2px 9px; border-radius:10px;
              color:#fff; white-space:nowrap; }
 .crm-src   { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px;
              color:#fff; letter-spacing:.02em; white-space:nowrap; }
 
-/* ── RFM chip ───────────────────────────────────────────────────────────── */
-.crm-rfm {
-  display:inline-flex; gap:6px; align-items:center; font-size:11px;
-  padding:2px 9px; border-radius:5px;
-  border:1px solid var(--border-strong); background:var(--bg-input,#141f2b);
-  color:var(--text-muted); white-space:nowrap;
+/* ── Footer ───────────────────────────────────────────────────────────────── */
+.crm-card-ft {
+  display:flex; align-items:center; flex-wrap:wrap; gap:7px; padding:9px 15px;
 }
-.crm-rfm b { font-size:12px; }
+.crm-btn {
+  padding:5px 13px; border-radius:5px; text-decoration:none;
+  font-size:12px; font-weight:600; white-space:nowrap;
+}
+.crm-btn-primary   { background:#1565c0; color:#fff; }
+.crm-btn-success   { background:#2e7d32; color:#fff; }
+.crm-btn-secondary {
+  background:var(--bg-input,#141f2b); color:var(--text-muted);
+  border:1px solid var(--border-strong);
+}
+.crm-notes-preview {
+  font-size:11px; color:var(--text-muted); font-style:italic;
+  max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
 </style>
 <script>
+/* ── Action dropdown grouping ─────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', function () {
   var sel = document.querySelector('select[name="action"]');
   if (!sel) return;
-
   var GROUPS = [
-    { label: '🔄 Статус',   match: 'Статус →' },
-    { label: '🏷️ Сегмент',  match: 'Сегмент →' },
+    { label: '🔄 Статус',  match: 'Статус →' },
+    { label: '🏷️ Сегмент', match: 'Сегмент →' },
   ];
-
   var allOpts = Array.from(sel.options);
   var placeholder = allOpts[0];
   var remaining   = allOpts.slice(1);
-
   sel.innerHTML = '';
   sel.appendChild(placeholder);
-
   GROUPS.forEach(function (g) {
     var matched = remaining.filter(function (o) { return o.text.indexOf(g.match) !== -1; });
     if (!matched.length) return;
@@ -75,7 +180,6 @@ document.addEventListener('DOMContentLoaded', function () {
     sel.appendChild(og);
     remaining = remaining.filter(function (o) { return matched.indexOf(o) === -1; });
   });
-
   if (remaining.length) {
     var og = document.createElement('optgroup');
     og.label = '⚙️ Адмін';
@@ -88,87 +192,131 @@ document.addEventListener('DOMContentLoaded', function () {
 
 {% block result_list %}
 
-{# ── View toggle ──────────────────────────────────────────────────────────── #}
-<div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-bottom:10px">
-  <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
-  <button class="crm-toggle-btn" id="crm-btn-table" onclick="crmSetView('table')">📋 Таблиця</button>
-  <button class="crm-toggle-btn" id="crm-btn-cards" onclick="crmSetView('cards')">🃏 Картки</button>
+{# ── Toolbar: selection + view toggle ─────────────────────────────────────── #}
+<div class="crm-view-bar">
+  <div class="crm-sel-bar" id="crm-sel-bar" style="display:none">
+    <label>
+      <input type="checkbox" id="crm-sel-all" onchange="crmSelectAll(this.checked)">
+      Всі
+    </label>
+    <span id="crm-sel-count">0 вибрано</span>
+  </div>
+  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+    <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
+    <button class="crm-toggle-btn" id="crm-btn-table" onclick="crmSetView('table')">📋 Таблиця</button>
+    <button class="crm-toggle-btn" id="crm-btn-cards" onclick="crmSetView('cards')">🃏 Картки</button>
+  </div>
 </div>
 
-{# ── Card view ────────────────────────────────────────────────────────────── #}
+{# ── Card view ─────────────────────────────────────────────────────────────── #}
 <div id="crm-cards" style="display:none">
+
 {% for customer in cl.result_list %}
-{% with rfm=customer.rfm_score orders=customer.total_orders last=customer.last_order_date days=customer.days_since_last_order %}
-<div class="crm-card crm-s-{{ customer.status }}">
+{% with rfm=customer.rfm_score orders=customer.total_orders last=customer.last_order_date days=customer.days_since_last_order rev=customer.total_revenue avg=customer.avg_order_value tops=customer.top_products %}
 
-  {# Header: name + country + status + segment #}
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;
-              flex-wrap:wrap;gap:8px;margin-bottom:10px">
+<div class="crm-card crm-s-{{ customer.status }}" id="crm-card-{{ customer.pk }}">
 
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0">
-      <a href="{% url 'admin:crm_customer_change' customer.pk %}"
-         style="font-size:15px;font-weight:800;color:var(--text);text-decoration:none">
-        {% if customer.company %}{{ customer.company }}{% else %}{{ customer.name }}{% endif %}
-      </a>
-      {% if customer.company %}
-        <span style="font-size:11px;color:var(--text-muted)">{{ customer.name }}</span>
-      {% endif %}
-      {# Country — flag-icons SVG (global CSS) + text fallback #}
-      {% if customer.country %}
-      <span class="fi fi-{{ customer.country|lower }} mv-flag-emoji"
-            data-code="{{ customer.country }}"
-            title="{{ customer.country }}"
-            style="border-radius:2px;vertical-align:middle">{{ customer.country }}</span>
-      {% if customer.addr_city %}
-        <span style="font-size:11px;color:var(--text-muted)">{{ customer.addr_city }}</span>
-      {% endif %}
-      {% endif %}
+  {# ── Header: flag + name + badges + checkbox ───────────────────────────── #}
+  <div class="crm-card-hd">
+    <div class="crm-card-title-col">
+
+      <div class="crm-card-name-row">
+        {# Country flag (flagcdn.com PNG, text fallback) #}
+        {% if customer.country %}
+        <span class="crm-flag" title="{{ customer.country }}">
+          <img src="https://flagcdn.com/16x12/{{ customer.country|lower }}.png"
+               width="16" height="12"
+               style="vertical-align:middle;border-radius:1px"
+               onerror="this.style.display='none'"
+               alt="{{ customer.country }}">
+          <span class="crm-flag-code">{{ customer.country }}</span>
+        </span>
+        {% endif %}
+
+        <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="crm-card-name">
+          {% if customer.company %}{{ customer.company }}{% else %}{{ customer.name }}{% endif %}
+        </a>
+        {% if customer.company %}
+          <span class="crm-card-sub">{{ customer.name }}</span>
+        {% endif %}
+        {% if customer.addr_city %}
+          <span class="crm-card-city">• {{ customer.addr_city }}</span>
+        {% endif %}
+      </div>
+
+      <div class="crm-badges-row">
+        {# Status #}
+        {% if customer.status == 'active' %}    <span class="crm-badge" style="background:#4caf50">Активний</span>
+        {% elif customer.status == 'vip' %}     <span class="crm-badge" style="background:#f9a825;color:#000">⭐ VIP</span>
+        {% elif customer.status == 'inactive' %}<span class="crm-badge" style="background:#757575">Неактивний</span>
+        {% elif customer.status == 'blocked' %} <span class="crm-badge" style="background:#f44336">🚫 Заблоковано</span>
+        {% endif %}
+        {# Segment / Тип #}
+        {% if customer.segment == 'b2b' %}         <span class="crm-badge" style="background:#1976d2">B2B</span>
+        {% elif customer.segment == 'b2c' %}        <span class="crm-badge" style="background:#388e3c">B2C</span>
+        {% elif customer.segment == 'distributor' %}<span class="crm-badge" style="background:#f57c00">Дистриб'ютор</span>
+        {% elif customer.segment == 'reseller' %}   <span class="crm-badge" style="background:#7b1fa2">Реселер</span>
+        {% else %}                                  <span class="crm-badge" style="background:#757575">{{ customer.get_segment_display }}</span>
+        {% endif %}
+      </div>
     </div>
 
-    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
-      {# Status badge #}
-      {% if customer.status == 'active' %}   <span class="crm-badge" style="background:#4caf50">Активний</span>
-      {% elif customer.status == 'vip' %}    <span class="crm-badge" style="background:#f9a825;color:#000">⭐ VIP</span>
-      {% elif customer.status == 'inactive' %}<span class="crm-badge" style="background:#757575">Неактивний</span>
-      {% elif customer.status == 'blocked' %} <span class="crm-badge" style="background:#f44336">🚫 Заблоковано</span>
-      {% endif %}
-      {# Segment badge #}
-      {% if customer.segment == 'b2b' %}        <span class="crm-badge" style="background:#1976d2">B2B</span>
-      {% elif customer.segment == 'b2c' %}       <span class="crm-badge" style="background:#388e3c">B2C</span>
-      {% elif customer.segment == 'distributor' %}<span class="crm-badge" style="background:#f57c00">Дистриб'ютор</span>
-      {% elif customer.segment == 'reseller' %}   <span class="crm-badge" style="background:#7b1fa2">Реселер</span>
-      {% else %}                                  <span class="crm-badge" style="background:#757575">{{ customer.get_segment_display }}</span>
-      {% endif %}
-    </div>
+    {# Checkbox top-right #}
+    <label class="crm-cb-wrap" title="Вибрати для дій">
+      <input type="checkbox" class="crm-card-cb" data-pk="{{ customer.pk }}"
+             onchange="crmCardCheck(this)">
+    </label>
   </div>
 
-  {# Contacts #}
-  <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;
-              font-size:12px;color:var(--text-muted)">
+  {# ── Stats: Замовлення | Виручка | Сер. чек | Остання покупка ────────────── #}
+  <div class="crm-stats-row">
+    <div class="crm-stat-cell">
+      <div class="crm-stat-val">{{ orders }}</div>
+      <div class="crm-stat-lbl">Замовлення</div>
+    </div>
+    <div class="crm-stat-cell">
+      <div class="crm-stat-val">{{ rev|floatformat:0 }}</div>
+      <div class="crm-stat-lbl">Виручка</div>
+    </div>
+    <div class="crm-stat-cell">
+      <div class="crm-stat-val">{{ avg|floatformat:0 }}</div>
+      <div class="crm-stat-lbl">Сер. чек</div>
+    </div>
+    {% if last %}
+    <div class="crm-stat-cell">
+      <div class="crm-stat-val">{{ last|date:"d.m.Y" }}</div>
+      <div class="crm-stat-lbl">{% if days %}{{ days }} дн. тому{% else %}Остання покупка{% endif %}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── Top products (3 shown, rest collapsed) ───────────────────────────────── #}
+  {% if tops %}
+  <div class="crm-tops">
+    <div class="crm-tops-hd">📦 Топ товари</div>
+    {% for prod in tops %}
+    <div class="crm-top-row{% if forloop.counter > 3 %} crm-top-extra{% endif %}">
+      <span class="crm-top-num">{{ forloop.counter }}.</span>
+      <span class="crm-top-sku">{{ prod.sku_raw|default:"—" }}</span>
+      <span class="crm-top-qty">× {{ prod.total_qty|default:0 }}</span>
+      <span class="crm-top-rev">{{ prod.total_revenue|floatformat:0 }}</span>
+    </div>
+    {% endfor %}
+    {% if tops|length > 3 %}
+    <button class="crm-tops-more" onclick="crmToggleTops(this)">
+      ▼ +{{ tops|length|add:"-3" }} більше
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {# ── Meta: email + phone + source + RFM ───────────────────────────────────── #}
+  <div class="crm-card-meta">
     {% if customer.email %}
-      <span>📧 <a href="mailto:{{ customer.email }}"
-          style="color:var(--text-muted);text-decoration:underline dotted">{{ customer.email }}</a></span>
+      <span>📧 <a href="mailto:{{ customer.email }}" class="crm-meta-link">{{ customer.email }}</a></span>
     {% endif %}
     {% if customer.phone %}<span>📞 {{ customer.phone }}</span>{% endif %}
-  </div>
-
-  {# Stats + RFM #}
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
-    <span class="crm-stat">📦 <b>{{ orders }}</b> замовл.</span>
-    {% if last %}
-      <span class="crm-stat">📅 <b>{{ last|date:"d.m.Y" }}</b>
-        {% if days %}<span style="opacity:.6;margin-left:2px">({{ days }} дн.)</span>{% endif %}
-      </span>
-    {% endif %}
-    <span class="crm-rfm">
-      <span style="opacity:.6">R:{{ rfm.R }} F:{{ rfm.F }} M:{{ rfm.M }}</span>
-      <b>{{ rfm.segment }}</b>
-    </span>
-  </div>
-
-  {# Source badges #}
-  {% if customer.source %}
-  <div style="margin-bottom:10px">
+    {% if customer.source %}
     {% with src=customer.source|lower %}
     {% if src == 'digikey' %}    <span class="crm-src" style="background:#c62828">DIGIKEY</span>
     {% elif src == 'amazon' %}   <span class="crm-src" style="background:#e65100">AMAZON</span>
@@ -178,37 +326,31 @@ document.addEventListener('DOMContentLoaded', function () {
     {% else %}                   <span class="crm-src" style="background:#455a64">{{ customer.source|upper }}</span>
     {% endif %}
     {% endwith %}
+    {% endif %}
+    <span class="crm-rfm">
+      <span style="opacity:.65">R:{{ rfm.R }} F:{{ rfm.F }} M:{{ rfm.M }}</span>
+      <b>{{ rfm.segment }}</b>
+    </span>
   </div>
-  {% endif %}
 
-  {# Footer: actions + notes #}
-  <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;
-              padding-top:10px;border-top:1px solid var(--border)">
-    <a href="{% url 'admin:crm_customer_change' customer.pk %}"
-       style="padding:5px 14px;background:#1565c0;color:#fff;border-radius:5px;
-              text-decoration:none;font-size:12px;font-weight:600">⚙️ Відкрити</a>
-    <a href="{% url 'admin:crm_customer_new_order' customer.pk %}"
-       style="padding:5px 14px;background:#2e7d32;color:#fff;border-radius:5px;
-              text-decoration:none;font-size:12px;font-weight:600">➕ Замовлення</a>
-    <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/"
-       style="padding:5px 14px;background:var(--bg-input,#141f2b);color:var(--text-muted);
-              border:1px solid var(--border-strong);border-radius:5px;
-              text-decoration:none;font-size:12px;font-weight:600">🎯 Стратегія</a>
+  {# ── Footer: action buttons + notes ───────────────────────────────────────── #}
+  <div class="crm-card-ft">
+    <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="crm-btn crm-btn-primary">⚙️ Відкрити</a>
+    <a href="{% url 'admin:crm_customer_new_order' customer.pk %}" class="crm-btn crm-btn-success">➕ Замовлення</a>
+    <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-secondary">🎯 Стратегія</a>
     {% if customer.notes %}
-      <span style="font-size:11px;color:var(--text-muted);font-style:italic;
-                   max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
-            title="{{ customer.notes }}">💬 {{ customer.notes|truncatechars:60 }}</span>
+      <span class="crm-notes-preview" title="{{ customer.notes }}">💬 {{ customer.notes|truncatechars:60 }}</span>
     {% endif %}
   </div>
 
-</div>
+</div>{# /crm-card #}
 {% endwith %}
 {% endfor %}
 
 {% if not cl.result_list %}
   <p style="color:var(--text-muted);padding:20px 0">Клієнтів не знайдено.</p>
 {% endif %}
-</div>
+</div>{# /crm-cards #}
 
 {# ── Table view (standard Django) ─────────────────────────────────────────── #}
 <div id="crm-table">
@@ -216,14 +358,88 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 
 <script>
+/* ══ Card selection — sync with Django admin action form ════════════════════ */
+
+function crmCardCheck(cb) {
+  var pk  = cb.dataset.pk;
+  var frm = document.getElementById('changelist-form');
+  if (!frm) return;
+
+  // Remove existing hidden input for this pk (avoid duplicates)
+  var old = frm.querySelector('input[data-card-pk="' + pk + '"]');
+  if (old) old.remove();
+
+  var card = document.getElementById('crm-card-' + pk);
+  if (cb.checked) {
+    var inp = document.createElement('input');
+    inp.type = 'hidden';
+    inp.name = '_selected_action';
+    inp.value = pk;
+    inp.dataset.cardPk = pk;
+    frm.appendChild(inp);
+    if (card) card.classList.add('crm-selected');
+  } else {
+    if (card) card.classList.remove('crm-selected');
+  }
+  crmUpdateCount();
+}
+
+function crmSelectAll(checked) {
+  document.querySelectorAll('.crm-card-cb').forEach(function (cb) {
+    if (cb.checked !== checked) {
+      cb.checked = checked;
+      crmCardCheck(cb);
+    }
+  });
+}
+
+function crmUpdateCount() {
+  var checked = document.querySelectorAll('.crm-card-cb:checked');
+  var total   = document.querySelectorAll('.crm-card-cb');
+  var n = checked.length, t = total.length;
+  var el = document.getElementById('crm-sel-count');
+  if (el) el.textContent = n + ' з ' + t + ' вибрано';
+  var selAll = document.getElementById('crm-sel-all');
+  if (selAll) {
+    selAll.checked       = (n === t && t > 0);
+    selAll.indeterminate = (n > 0 && n < t);
+  }
+}
+
+/* ══ Top products expand/collapse ════════════════════════════════════════════ */
+
+function crmToggleTops(btn) {
+  var container = btn.closest('.crm-tops');
+  var extras = container.querySelectorAll('.crm-top-extra');
+  var isOpen  = btn.dataset.open === '1';
+  extras.forEach(function (r) { r.style.display = isOpen ? 'none' : 'flex'; });
+  btn.dataset.open   = isOpen ? '0' : '1';
+  btn.textContent    = isOpen
+    ? '▼ +' + extras.length + ' більше'
+    : '▲ Згорнути';
+}
+
+/* ══ View toggle ═════════════════════════════════════════════════════════════ */
+
 function crmSetView(mode) {
-  localStorage.setItem('crm_customer_view', mode);
   var isCards = mode === 'cards';
+  localStorage.setItem('crm_customer_view', mode);
+
   document.getElementById('crm-cards').style.display = isCards ? 'block' : 'none';
   document.getElementById('crm-table').style.display = isCards ? 'none'  : 'block';
   document.getElementById('crm-btn-cards').classList.toggle('active', isCards);
   document.getElementById('crm-btn-table').classList.toggle('active', !isCards);
+  document.getElementById('crm-sel-bar').style.display = isCards ? 'flex' : 'none';
+
+  if (!isCards) {
+    // Clear card-injected hidden inputs when switching to table
+    document.querySelectorAll('input[data-card-pk]').forEach(function (el) { el.remove(); });
+    document.querySelectorAll('.crm-card-cb').forEach(function (cb) { cb.checked = false; });
+    document.querySelectorAll('.crm-selected').forEach(function (c) { c.classList.remove('crm-selected'); });
+    crmUpdateCount();
+  }
 }
+
 (function () {
   crmSetView(localStorage.getItem('crm_customer_view') || 'table');
 })();

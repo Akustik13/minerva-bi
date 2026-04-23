@@ -105,6 +105,18 @@ class Customer(models.Model):
             return Decimal("0")
         return (self.total_revenue() / total).quantize(Decimal("0.01"))
 
+    def top_products(self, limit: int = 5) -> list:
+        """Топ N товарів за виручкою: [{sku_raw, total_qty, total_revenue}, ...]"""
+        from sales.models import SalesOrderLine
+        from django.db.models import Sum
+        return list(
+            SalesOrderLine.objects
+            .filter(order__customer_key=self.external_key)
+            .values("sku_raw")
+            .annotate(total_qty=Sum("qty"), total_revenue=Sum("total_price"))
+            .order_by("-total_revenue")[:limit]
+        )
+
     def last_order_date(self):
         from sales.models import SalesOrder
         result = SalesOrder.objects.filter(
