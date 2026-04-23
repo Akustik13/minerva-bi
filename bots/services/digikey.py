@@ -29,6 +29,22 @@ MARKETPLACE_PATH     = "/Sales/Marketplace2/Orders/v1/orders"
 PO_SEARCH_PATH       = "/OrderManagement/v1/SalesOrders/Search/PoNumber"
 KEYWORD_SEARCH_PATH  = "/products/v4/search/keyword"
 
+# ── Status priority (higher = more advanced; never downgrade) ─────────────────
+
+_STATUS_PRIORITY = {
+    "received":   0,
+    "processing": 1,
+    "shipped":    2,
+    "delivered":  3,
+    "cancelled":  99,
+}
+
+
+def _status_can_advance(current: str, new: str) -> bool:
+    """Return True only if new status is more advanced than current."""
+    return _STATUS_PRIORITY.get(new, 0) > _STATUS_PRIORITY.get(current, 0)
+
+
 # ── DigiKey order status → Minerva status ────────────────────────────────────
 
 DIGIKEY_STATUS_MAP = {
@@ -330,8 +346,8 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
         stats["created"] += 1
         _create_lines(sale, so, so_currency, stats)
     else:
-        # Update status if it progressed
-        if sale.status != minerva_status and minerva_status != "received":
+        # Only advance status (never downgrade: DigiKey may lag behind our shipment)
+        if _status_can_advance(sale.status, minerva_status):
             sale.status = minerva_status
             sale.save(update_fields=["status"])
             stats["updated"] += 1
@@ -776,8 +792,8 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
         if config:
             _maybe_auto_confirm(config, order_number, sale)
     else:
-        # Оновлюємо статус якщо змінився
-        if sale.status != minerva_status:
+        # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
+        if _status_can_advance(sale.status, minerva_status):
             old_status = sale.status
             sale.status = minerva_status
             sale.save(update_fields=["status"])
