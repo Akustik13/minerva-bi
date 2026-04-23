@@ -4406,8 +4406,27 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     price_col.short_description = "Вартість"
 
     def tracking_badge(self, obj):
-        if obj.tracking_number:
-            return format_html('<code style="font-size:11px">{}</code>', obj.tracking_number)
+        import re as _re
+        tn = obj.tracking_number or ''
+        # PRN pickup number stored in notes: "UPS_PICKUP | PRN:xxx | ..."
+        notes = obj.notes or ''
+        _pm = _re.search(r'(?:UPS_PICKUP|PICKUP)\s*\|\s*PRN:([^\s|]+)', notes)
+        prn = _pm.group(1) if _pm else ''
+        if tn and prn:
+            return format_html(
+                '<code style="font-size:11px">{}</code>'
+                '<br><small style="color:#607d8b;font-size:10px">'
+                'PRN&nbsp;<span style="color:#9aafbe;font-family:monospace">{}</span></small>',
+                tn, prn
+            )
+        if tn:
+            return format_html('<code style="font-size:11px">{}</code>', tn)
+        if prn:
+            return format_html(
+                '<small style="color:#607d8b;font-size:10px">'
+                'PRN&nbsp;<span style="color:#9aafbe;font-family:monospace">{}</span></small>',
+                prn
+            )
         return format_html('<span style="color:#607d8b">—</span>')
     tracking_badge.short_description = "Трекінг"
 
