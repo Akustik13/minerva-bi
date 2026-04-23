@@ -164,19 +164,27 @@ def display_country(iso2: str) -> str:
 def country_flag_html(iso2: str) -> str:
     """Повертає HTML: прапор + ISO-2 код для admin list_display.
 
-    Логіка:
-    - .fi.fi-xx  = flag-icons SVG sprite (CDN); коли завантажений, CSS ховає
-                   emoji text через font-size:0 і показує background-image
-    - .mv-flag-emoji = emoji fallback з правильним font-family; активний
-                       коли CDN недоступний (.fi не визначений → font-size не 0)
-
-    Приклад: 🇩🇪 DE (Mac/iOS: флаг SVG або emoji, Windows: завжди SVG з CDN)
+    Ієрархія:
+    1. <img> з flagcdn.com PNG — реальний PNG прапор, рендериться на всіх платформах
+       (Windows/Mac/Linux), не залежить від emoji-підтримки ОС.
+    2. onerror → показує emoji span (.mv-flag-emoji) з правильним font-family
+       (Apple Color Emoji / Segoe UI Emoji / Noto Color Emoji).
+    3. Завжди показує ISO-2 код текстом поруч.
     """
     c = normalize_to_iso2(iso2)
     if not c:
         return "—"
     emoji = FLAG_MAP.get(c, "🌍")
+    c_lower = c.lower()
+    # onerror: ховаємо img і показуємо emoji-span
     return (
-        f'<span class="fi fi-{c.lower()} mv-flag-emoji" title="{c}">{emoji}</span>'
-        f'&nbsp;<span style="vertical-align:middle;font-size:.9em">{c}</span>'
+        f'<span style="white-space:nowrap;vertical-align:middle" title="{c}">'
+        f'<img src="https://flagcdn.com/16x12/{c_lower}.png" width="16" height="12"'
+        f' style="vertical-align:middle;margin-right:3px;border-radius:1px"'
+        f' onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline\'"'
+        f' alt="{emoji}">'
+        f'<span class="mv-flag-emoji"'
+        f' style="display:none;margin-right:2px;vertical-align:middle">{emoji}</span>'
+        f'<span style="vertical-align:middle;font-size:.9em">{c}</span>'
+        f'</span>'
     )

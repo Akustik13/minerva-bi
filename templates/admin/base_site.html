@@ -20,25 +20,13 @@
 <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <link rel="icon" type="image/png" sizes="96x96" href="/static/icons/icon-96.png">
 <link rel="stylesheet" href="/static/admin/css/mobile.css">
-<!-- Flag icons (SVG sprites, CDN) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css">
 <style>
-/* Emoji fallback: shows when flag-icons CDN not loaded */
+/* Emoji fallback font stack for country flags (shown via onerror on flagcdn.com img) */
 .mv-flag-emoji {
   font-family: "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",EmojiOne,sans-serif;
-  font-size: 1.1em;
+  font-size: 1.15em;
   line-height: 1;
   vertical-align: middle;
-}
-/* When flag-icons IS loaded: .fi sets background-image → hide emoji text,
-   set size so SVG renders correctly */
-.fi.mv-flag-emoji {
-  font-size: 0;
-  width: 1.33em;
-  height: 1em;
-  border-radius: 2px;
-  vertical-align: middle;
-  margin-right: 4px;
 }
 </style>
 <style>
