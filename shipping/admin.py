@@ -845,7 +845,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     inlines = [ShipmentPackageInline, TrackingAttemptLogInline]
     list_display  = (
         "id_badge", "order_link", "carrier_badge", "status_col",
-        "recipient_name", "recipient_country", "weight_kg",
+        "recipient_name", "recipient_country_flag", "weight_kg",
         "price_col", "tracking_badge", "label_badge", "created_at_fmt",
     )
     list_filter   = ("status", "carrier", "carrier__carrier_type", "recipient_country")
@@ -4439,6 +4439,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             )
         return format_html('<span style="color:#607d8b">—</span>')
     label_badge.short_description = "Етикетка"
+
+    def recipient_country_flag(self, obj):
+        from config.country_utils import country_flag_html
+        return format_html(country_flag_html(obj.recipient_country or ""))
+    recipient_country_flag.short_description = "Країна"
+    recipient_country_flag.admin_order_field = "recipient_country"
 
     def created_at_fmt(self, obj):
         return obj.created_at.strftime("%d.%m.%Y %H:%M")
