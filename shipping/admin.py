@@ -4412,21 +4412,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         notes = obj.notes or ''
         _pm = _re.search(r'(?:UPS_PICKUP|PICKUP)\s*\|\s*PRN:([^\s|]+)', notes)
         prn = _pm.group(1) if _pm else ''
+        _PRN = (
+            '<br><span style="font-size:10px;color:#b0bec5">PRN\u00a0</span>'
+            '<code style="font-size:11px;color:#e0e0e0;font-weight:700">'
+        )
         if tn and prn:
             return format_html(
-                '<code style="font-size:11px">{}</code>'
-                '<br><small style="color:#607d8b;font-size:10px">'
-                'PRN&nbsp;<span style="color:#9aafbe;font-family:monospace">{}</span></small>',
-                tn, prn
+                '<code style="font-size:11px">{}</code>' + _PRN + '{}</code>', tn, prn
             )
         if tn:
             return format_html('<code style="font-size:11px">{}</code>', tn)
         if prn:
-            return format_html(
-                '<small style="color:#607d8b;font-size:10px">'
-                'PRN&nbsp;<span style="color:#9aafbe;font-family:monospace">{}</span></small>',
-                prn
-            )
+            return format_html(_PRN + '{}</code>', prn)
         return format_html('<span style="color:#607d8b">—</span>')
     tracking_badge.short_description = "Трекінг"
 
