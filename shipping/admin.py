@@ -844,9 +844,9 @@ class TrackingAttemptLogInline(admin.TabularInline):
 class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     inlines = [ShipmentPackageInline, TrackingAttemptLogInline]
     list_display  = (
-        "id_badge", "order_link", "carrier_badge", "status_badge",
+        "id_badge", "order_link", "carrier_badge", "status_col",
         "recipient_name", "recipient_country", "weight_kg",
-        "tracking_badge", "label_badge", "created_at_fmt",
+        "price_col", "tracking_badge", "label_badge", "created_at_fmt",
     )
     list_filter   = ("status", "carrier", "carrier__carrier_type", "recipient_country")
     search_fields = ("order__order_number", "recipient_name", "tracking_number",
@@ -4359,6 +4359,51 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             color, icon, obj.get_status_display()
         )
     status_badge.short_description = "Статус"
+
+    def status_col(self, obj):
+        colors = {
+            "draft":       ("#607d8b", "⬜"), "submitted":   ("#2196f3", "📤"),
+            "label_ready": ("#00bcd4", "🏷️"), "in_transit":  ("#ff9800", "🚚"),
+            "delivered":   ("#4caf50", "✅"), "error":       ("#f44336", "❌"),
+            "cancelled":   ("#9e9e9e", "🚫"),
+        }
+        color, icon = colors.get(obj.status, ("#607d8b", "❓"))
+        main = format_html(
+            '<span style="color:{};font-weight:600;white-space:nowrap">{} {}</span>',
+            color, icon, obj.get_status_display()
+        )
+        if obj.status == "delivered":
+            # Показуємо дату доставки
+            if obj.delivered_at:
+                d = obj.delivered_at.strftime("%d.%m.%Y")
+                return format_html(
+                    '{}<br><small style="color:#4caf50;opacity:.8">{}</small>', main, d
+                )
+            return main
+        # Не доставлено — показуємо очікувану дату або статус від перевізника
+        sub = ""
+        if obj.carrier_eta:
+            sub = "Очік. " + obj.carrier_eta.strftime("%d.%m.%Y")
+        elif obj.carrier_status_label:
+            label = obj.carrier_status_label
+            sub = label if len(label) <= 35 else label[:33] + "…"
+        if sub:
+            return format_html(
+                '{}<br><small style="color:var(--text-dim,#607d8b);opacity:.85;'
+                'font-size:10px;white-space:normal;max-width:160px;display:inline-block">{}</small>',
+                main, sub
+            )
+        return main
+    status_col.short_description = "Статус"
+
+    def price_col(self, obj):
+        if obj.carrier_price:
+            return format_html(
+                '<span style="font-weight:700;white-space:nowrap">{}&nbsp;{}</span>',
+                obj.carrier_price, obj.carrier_currency or ""
+            )
+        return format_html('<span style="color:#607d8b">—</span>')
+    price_col.short_description = "Вартість"
 
     def tracking_badge(self, obj):
         if obj.tracking_number:
