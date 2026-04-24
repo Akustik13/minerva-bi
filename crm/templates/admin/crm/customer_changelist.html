@@ -246,6 +246,84 @@
 .crm-rfm-scores { font-size:10px; color:var(--text); font-weight:600; }
 .crm-rfm b { color:var(--text); font-size:12px; }
 
+/* ══ STRATEGY MINI-TIMELINE ═══════════════════════════════════ */
+.crm-strat-mini {
+  padding:10px 16px 8px; border-bottom:1px solid var(--border);
+}
+.crm-strat-hd {
+  display:flex; align-items:center; gap:7px; margin-bottom:6px;
+}
+.crm-strat-badge {
+  font-size:10px; font-weight:700; padding:1px 7px; border-radius:10px;
+  white-space:nowrap; flex-shrink:0;
+}
+.crm-strat-badge-active { background:rgba(21,101,192,.18); color:#42a5f5; }
+.crm-strat-badge-paused { background:rgba(120,144,156,.15); color:#90a4ae; }
+.crm-strat-name {
+  flex:1; font-size:12px; font-weight:700; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.crm-strat-prog {
+  font-size:11px; font-weight:700; color:#1976d2;
+  background:rgba(21,101,192,.12); padding:1px 7px; border-radius:10px;
+  white-space:nowrap; flex-shrink:0;
+}
+.crm-strat-canvas {
+  font-size:11px; color:var(--text-muted) !important; text-decoration:none !important;
+  padding:2px 8px; border-radius:4px; border:1px solid var(--border-strong);
+  white-space:nowrap; flex-shrink:0; transition:color .12s;
+}
+.crm-strat-canvas:hover { color:#42a5f5 !important; }
+
+/* Progress bar */
+.crm-strat-bar-wrap {
+  height:3px; background:var(--border); border-radius:2px;
+  margin-bottom:8px; overflow:hidden;
+}
+.crm-strat-bar-fill {
+  height:100%; background:linear-gradient(90deg,#1565c0,#42a5f5);
+  border-radius:2px;
+}
+
+/* Steps list */
+.crm-strat-steps { display:flex; flex-direction:column; gap:1px; }
+.crm-strat-step {
+  display:flex; align-items:center; gap:7px;
+  padding:3px 6px; border-radius:5px; font-size:11px;
+  border:1px solid transparent;
+}
+.crm-step-dot {
+  width:18px; height:18px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:10px;
+}
+.crm-step-lbl {
+  flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.crm-step-tag {
+  font-size:9px; font-weight:800; padding:1px 5px; border-radius:8px;
+  text-transform:uppercase; letter-spacing:.04em; flex-shrink:0;
+}
+
+/* States */
+.crm-step-done .crm-step-dot  { background:rgba(67,160,71,.15); }
+.crm-step-done .crm-step-lbl  { color:var(--text-muted); text-decoration:line-through; opacity:.65; }
+.crm-step-warn .crm-step-dot  { background:rgba(255,152,0,.15); }
+.crm-step-warn .crm-step-lbl  { color:#fb8c00; opacity:.8; }
+.crm-step-skip .crm-step-dot  { background:rgba(120,144,156,.12); }
+.crm-step-skip .crm-step-lbl  { color:var(--text-muted); opacity:.55; }
+.crm-step-todo .crm-step-dot  { background:rgba(128,128,128,.08); border:1px dashed var(--border-strong); }
+.crm-step-todo .crm-step-lbl  { color:var(--text-muted); opacity:.5; }
+.crm-step-cur {
+  background:rgba(21,101,192,.08); border-color:rgba(21,101,192,.2) !important;
+}
+.crm-step-cur .crm-step-dot   { background:#1565c0; }
+.crm-step-cur .crm-step-lbl   { color:var(--text); font-weight:700; }
+.crm-step-cur .crm-step-tag   { background:#1565c0; color:#fff; }
+
+.crm-strat-extra {
+  font-size:10px; color:var(--text-muted); padding:3px 6px; opacity:.6;
+}
+
 /* ══ FOOTER ═══════════════════════════════════════════════════ */
 .crm-ft {
   display:flex; align-items:center; flex-wrap:wrap; gap:7px;
@@ -365,7 +443,7 @@ function crmDoAction() {
 <div id="crm-cards" style="display:none">
 
 {% for customer in cl.result_list %}
-{% with stats=customer.card_stats rfm=customer.rfm_score tops=customer.top_products %}
+{% with stats=customer.card_stats rfm=customer.rfm_score tops=customer.top_products sdata=customer.active_strategy_card %}
 
 <div class="crm-card crm-s-{{ customer.status }}" id="crm-card-{{ customer.pk }}">
 
@@ -513,12 +591,72 @@ function crmDoAction() {
     {% endif %}
   </div>
 
+  {# ┌── STRATEGY MINI-TIMELINE ───────────────────────────── #}
+  {% if sdata %}
+  <div class="crm-strat-mini">
+    {# Header: badge + name + progress count + canvas link #}
+    <div class="crm-strat-hd">
+      {% if sdata.status == 'active' %}
+        <span class="crm-strat-badge crm-strat-badge-active">⚡ Активна</span>
+      {% else %}
+        <span class="crm-strat-badge crm-strat-badge-paused">⏸ Призупинена</span>
+      {% endif %}
+      <span class="crm-strat-name">{{ sdata.name }}</span>
+      <span class="crm-strat-prog">{{ sdata.done }}/{{ sdata.total }}</span>
+      <a href="/strategy/{{ sdata.pk }}/canvas/" class="crm-strat-canvas">Canvas →</a>
+    </div>
+    {# Progress bar #}
+    <div class="crm-strat-bar-wrap">
+      <div class="crm-strat-bar-fill" style="width:{{ sdata.pct }}%"></div>
+    </div>
+    {# Steps #}
+    <div class="crm-strat-steps">
+      {% for step in sdata.steps %}
+        {% if step.pk == sdata.current_pk %}
+          <div class="crm-strat-step crm-step-cur">
+            <span class="crm-step-dot">⚡</span>
+            <span class="crm-step-lbl">{{ step.title|truncatechars:32 }}</span>
+            <span class="crm-step-tag">зараз</span>
+          </div>
+        {% elif step.outcome == 'done_pos' %}
+          <div class="crm-strat-step crm-step-done">
+            <span class="crm-step-dot">✅</span>
+            <span class="crm-step-lbl">{{ step.title|truncatechars:32 }}</span>
+          </div>
+        {% elif step.outcome == 'done_neg' %}
+          <div class="crm-strat-step crm-step-warn">
+            <span class="crm-step-dot">⚠️</span>
+            <span class="crm-step-lbl">{{ step.title|truncatechars:32 }}</span>
+          </div>
+        {% elif step.outcome == 'skipped' or step.outcome == 'no_response' %}
+          <div class="crm-strat-step crm-step-skip">
+            <span class="crm-step-dot">{% if step.outcome == 'skipped' %}⏭{% else %}🔇{% endif %}</span>
+            <span class="crm-step-lbl">{{ step.title|truncatechars:32 }}</span>
+          </div>
+        {% else %}
+          <div class="crm-strat-step crm-step-todo">
+            <span class="crm-step-dot" style="font-size:8px;color:var(--border-strong)">●</span>
+            <span class="crm-step-lbl">{{ step.title|truncatechars:32 }}</span>
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% if sdata.extra > 0 %}
+        <div class="crm-strat-extra">+ ще {{ sdata.extra }} кроків…</div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
   {# ┌── FOOTER: actions ──────────────────────────────────── #}
   <div class="crm-ft">
     <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="crm-btn crm-btn-open">⚙️ Відкрити</a>
     <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ customer.email|default:customer.name }}" class="crm-btn crm-btn-orders">📋 Замовлення</a>
     <a href="{% url 'admin:crm_customer_new_order' customer.pk %}" class="crm-btn crm-btn-order">➕ Нове</a>
-    <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-strat">🎯 Стратегія</a>
+    {% if sdata %}
+      <a href="/strategy/{{ sdata.pk }}/canvas/" class="crm-btn crm-btn-strat">🎯 Canvas</a>
+    {% else %}
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-strat">🎯 Стратегія</a>
+    {% endif %}
   </div>
 
 </div>{# /crm-card #}

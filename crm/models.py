@@ -187,6 +187,38 @@ class Customer(models.Model):
             "sym":         main_sym,   # символ валюти для топ-товарів
         }
 
+    def active_strategy_card(self) -> dict | None:
+        """Compact strategy data for the CRM card. 1 DB query."""
+        try:
+            from strategy.models import CustomerStrategy
+            strategy = (
+                CustomerStrategy.objects
+                .filter(customer=self, status__in=["active", "paused"])
+                .select_related("template", "current_step")
+                .prefetch_related("steps")
+                .order_by("-started_at")
+                .first()
+            )
+            if not strategy:
+                return None
+            steps = sorted(strategy.steps.all(), key=lambda s: s.pk)
+            total = len(steps)
+            done  = sum(1 for s in steps if s.outcome != "pending")
+            pct   = int(done / total * 100) if total else 0
+            return {
+                "pk":         strategy.pk,
+                "name":       (strategy.name or strategy.template.name)[:40],
+                "status":     strategy.status,
+                "current_pk": strategy.current_step_id,
+                "steps":      steps[:8],
+                "total":      total,
+                "done":       done,
+                "pct":        pct,
+                "extra":      max(0, total - 8),
+            }
+        except Exception:
+            return None
+
     def last_order_date(self):
         from sales.models import SalesOrder
         result = SalesOrder.objects.filter(
