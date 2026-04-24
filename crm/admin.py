@@ -217,7 +217,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         "orders_count", "revenue_display", "avg_order_display",
         "last_order_display", "repeat_badge",
         "top_products_display", "order_history_display",
-        "strategy_btn",
+        "strategy_btn", "upload_widget_customer",
     )
     inlines = [CustomerNoteInline]
 
@@ -243,6 +243,11 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 "<int:pk>/assign-strategy/manual/",
                 self.admin_site.admin_view(self.assign_strategy_manual_view),
                 name="crm_customer_assign_strategy_manual",
+            ),
+            path(
+                "<int:pk>/upload-docs/",
+                self.admin_site.admin_view(self.upload_docs_view_customer),
+                name="crm_customer_upload_docs",
             ),
         ]
         return custom + urls
@@ -485,6 +490,11 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             "fields": ("strategy_btn",),
             "description": "Рекомендована стратегія на основі RFM-аналізу. "
                            "Один клік — і стратегія призначена.",
+        }),
+        ("📎 Документи", {
+            "fields": ("upload_widget_customer",),
+            "description": "Файли клієнта: договори, рахунки, листування. "
+                           "Зберігаються у <code>media/customers/{pk}/</code>.",
         }),
         ("📊 Аналітика", {
             "fields": (
@@ -760,6 +770,125 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             assign_url, color, icon, label,
         )
     strategy_btn.short_description = "🎯 Стратегія"
+
+    def upload_widget_customer(self, obj):
+        """HTML-віджет для завантаження документів клієнта."""
+        if not obj.pk:
+            return format_html('<em style="color:#7d8590">Збережіть клієнта спочатку</em>')
+
+        from django.urls import reverse
+        upload_url = reverse('admin:crm_customer_upload_docs', args=[obj.pk])
+
+        # List existing files
+        from django.conf import settings
+        from pathlib import Path
+        customer_dir = Path(settings.MEDIA_ROOT) / 'customers' / str(obj.pk)
+        files_html = ''
+        if customer_dir.exists():
+            files = sorted(customer_dir.iterdir(), key=lambda f: f.stat().st_mtime, reverse=True)
+            if files:
+                rows = ''.join(
+                    f'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;'
+                    f'border-bottom:1px solid rgba(128,128,128,.1)">'
+                    f'<span style="font-size:14px">📄</span>'
+                    f'<a href="{settings.MEDIA_URL}customers/{obj.pk}/{f.name}" target="_blank" '
+                    f'style="color:var(--text);text-decoration:underline dotted;flex:1;'
+                    f'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{f.name}</a>'
+                    f'<span style="font-size:11px;color:var(--text-muted);white-space:nowrap">'
+                    f'{f.stat().st_size // 1024} KB</span>'
+                    f'</div>'
+                    for f in files
+                )
+                files_html = (
+                    f'<div style="margin-top:10px;padding:8px 12px;'
+                    f'background:var(--bg-input,#141f2b);border-radius:6px;'
+                    f'border:1px solid var(--border-strong)">'
+                    f'<div style="font-size:11px;font-weight:700;color:var(--text-muted);'
+                    f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">'
+                    f'📂 Завантажені файли ({len(files)} шт.)</div>'
+                    f'{rows}</div>'
+                )
+
+        widget_html = (
+            f'<div id="custDocWidget" data-upload-url="{upload_url}">'
+            f'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+            f'<label style="display:inline-flex;align-items:center;gap:8px;padding:7px 16px;'
+            f'background:#1565c0;color:#fff;border-radius:6px;cursor:pointer;'
+            f'font-size:13px;font-weight:600;white-space:nowrap">'
+            f'📎 Вибрати файли'
+            f'<input type="file" multiple style="display:none" id="custDocInput">'
+            f'</label>'
+            f'<span id="custDocStatus" style="font-size:12px;color:var(--text-muted)">Оберіть файли для завантаження</span>'
+            f'</div>'
+            f'<div id="custDocProgress" style="display:none;margin-top:8px">'
+            f'<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden">'
+            f'<div id="custDocBar" style="height:100%;background:#1565c0;width:0;transition:width .3s"></div>'
+            f'</div>'
+            f'</div>'
+            f'{files_html}'
+            f'</div>'
+            f'<script>'
+            f'(function(){{'
+            f'var inp=document.getElementById("custDocInput");'
+            f'if(!inp)return;'
+            f'inp.addEventListener("change",function(){{'
+            f'var files=Array.from(this.files);'
+            f'if(!files.length)return;'
+            f'var url=document.getElementById("custDocWidget").dataset.uploadUrl;'
+            f'var fd=new FormData();'
+            f'files.forEach(function(f){{fd.append("documents",f);}});'
+            f'fd.append("csrfmiddlewaretoken",document.cookie.match(/csrftoken=([^;]+)/)?.[1]||"");'
+            f'document.getElementById("custDocProgress").style.display="block";'
+            f'document.getElementById("custDocBar").style.width="30%";'
+            f'document.getElementById("custDocStatus").textContent="Завантаження...";'
+            f'fetch(url,{{method:"POST",body:fd}})'
+            f'.then(function(r){{return r.json();}})'
+            f'.then(function(d){{'
+            f'document.getElementById("custDocBar").style.width="100%";'
+            f'document.getElementById("custDocStatus").textContent='
+            f'(d.saved||0)+" файл(ів) збережено";'
+            f'setTimeout(function(){{location.reload();}},800);'
+            f'}})'
+            f'.catch(function(){{'
+            f'document.getElementById("custDocStatus").textContent="Помилка завантаження";'
+            f'}});'
+            f'}});'
+            f'}})()'
+            f'</script>'
+        )
+        return mark_safe(widget_html)
+    upload_widget_customer.short_description = "📎 Документи клієнта"
+
+    def upload_docs_view_customer(self, request, pk):
+        """AJAX: зберігає документи у media/customers/{pk}/"""
+        from django.http import JsonResponse
+        from django.conf import settings
+        from pathlib import Path
+
+        if request.method != 'POST':
+            return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+        customer = get_object_or_404(Customer, pk=pk)
+        files = request.FILES.getlist('documents')
+        if not files:
+            return JsonResponse({'error': 'Файли не вибрані'}, status=400)
+
+        dest_dir = Path(settings.MEDIA_ROOT) / 'customers' / str(pk)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        results = []
+        for f in files:
+            try:
+                dest = dest_dir / f.name
+                with dest.open('wb+') as fh:
+                    for chunk in f.chunks():
+                        fh.write(chunk)
+                results.append({'name': f.name, 'status': 'saved', 'size': f.size})
+            except Exception as e:
+                results.append({'name': f.name, 'status': 'error', 'error': str(e)})
+
+        saved = sum(1 for r in results if r['status'] == 'saved')
+        return JsonResponse({'saved': saved, 'results': results})
 
     def top_products_display(self, obj):
         from sales.models import SalesOrderLine

@@ -19,14 +19,33 @@
 }
 .crm-toggle-btn.active { background:#1565c0; color:#fff; border-color:transparent; }
 
-/* ── Selection bar ────────────────────────────────────────── */
-.crm-sel-bar {
-  display:flex; align-items:center; gap:10px; font-size:12px;
-  padding:5px 13px; border-radius:20px;
-  background:rgba(21,101,192,.1); border:1px solid rgba(21,101,192,.25);
+/* ── Card-mode action bar ─────────────────────────────────── */
+.crm-action-bar {
+  display:none; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:6px 12px; border-radius:8px;
+  background:rgba(21,101,192,.08); border:1px solid rgba(21,101,192,.22);
+  font-size:12px; margin-bottom:10px;
 }
-.crm-sel-bar label { display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text); }
-#crm-sel-count { font-weight:700; color:#1976d2; min-width:80px; }
+.crm-action-bar label {
+  display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text);
+  white-space:nowrap;
+}
+#crm-sel-count {
+  font-weight:700; color:#1976d2; white-space:nowrap; min-width:90px;
+}
+.crm-act-sel {
+  padding:4px 8px; border-radius:5px; font-size:12px;
+  background:var(--bg-card); color:var(--text);
+  border:1px solid var(--border-strong); cursor:pointer;
+  min-width:160px;
+}
+.crm-act-go {
+  padding:5px 16px; border-radius:5px; font-size:12px; font-weight:700;
+  background:#1565c0; color:#fff; border:none; cursor:pointer;
+  white-space:nowrap; transition:background .12s;
+}
+.crm-act-go:hover { background:#1976d2; }
+.crm-bar-sep { color:var(--border-strong); user-select:none; }
 
 /* ══ CARD ═════════════════════════════════════════════════════ */
 .crm-card {
@@ -55,10 +74,17 @@
 /* ── Header ───────────────────────────────────────────────── */
 .crm-hd {
   display:flex; align-items:flex-start; gap:10px;
-  padding:14px 16px 11px;
+  padding:12px 16px 11px;
   border-bottom:1px solid var(--border);
 }
-.crm-hd-left   { flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
+.crm-cb-wrap {
+  cursor:pointer; padding:2px; flex-shrink:0; margin-top:2px;
+  display:flex; align-items:center;
+}
+.crm-cb-wrap input[type=checkbox] {
+  width:17px; height:17px; cursor:pointer; accent-color:#1565c0;
+}
+.crm-hd-center { flex:1; min-width:0; display:flex; flex-direction:column; gap:5px; }
 .crm-hd-right  { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
 
 .crm-name-row  { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
@@ -93,15 +119,6 @@
   font-size:11px; font-weight:700; padding:2px 10px; border-radius:20px;
   color:#fff; white-space:nowrap; letter-spacing:.01em;
   opacity:.9;
-}
-
-/* ── Checkbox ─────────────────────────────────────────────── */
-.crm-cb-wrap {
-  cursor:pointer; padding:1px;
-  display:flex; align-items:center;
-}
-.crm-cb-wrap input[type=checkbox] {
-  width:17px; height:17px; cursor:pointer; accent-color:#1565c0;
 }
 
 /* ══ STATS STRIP ══════════════════════════════════════════════ */
@@ -226,6 +243,7 @@
   border:1px solid var(--border-strong); background:var(--bg-input,#141f2b);
   color:var(--text-muted); white-space:nowrap;
 }
+.crm-rfm-scores { font-size:10px; color:var(--text); font-weight:600; }
 .crm-rfm b { color:var(--text); font-size:12px; }
 
 /* ══ FOOTER ═══════════════════════════════════════════════════ */
@@ -245,8 +263,8 @@
 .crm-btn-open   { background:#1565c0; color:#fff; }
 .crm-btn-order  { background:#2e7d32; color:#fff; }
 .crm-btn-strat  {
-  background:var(--bg-input,#141f2b); color:var(--text-muted);
-  border:1px solid var(--border-strong);
+  background:var(--bg-input,#1e2d40); color:var(--text);
+  border:1.5px solid var(--border-strong);
 }
 .crm-notes {
   font-size:11px; color:var(--text-muted); font-style:italic;
@@ -281,7 +299,36 @@ document.addEventListener('DOMContentLoaded', function () {
     remaining.forEach(function(o){ og.appendChild(o); });
     sel.appendChild(og);
   }
+
+  /* Populate card-mode action select from Django's native select */
+  crmInitActionBar();
 });
+
+function crmInitActionBar() {
+  var src = document.querySelector('select[name="action"]');
+  var dst = document.getElementById('crm-act-sel');
+  if (!src || !dst) return;
+  dst.innerHTML = '';
+  Array.from(src.options).forEach(function(opt) {
+    dst.appendChild(opt.cloneNode(true));
+  });
+}
+
+function crmDoAction() {
+  var dst = document.getElementById('crm-act-sel');
+  if (!dst || !dst.value) { alert('Виберіть дію'); return; }
+  var native = document.querySelector('select[name="action"]');
+  if (native) native.value = dst.value;
+  /* Click Django's native submit button to include name="index" */
+  var goBtn = document.querySelector('#changelist-form [name="index"]');
+  if (goBtn) { goBtn.click(); return; }
+  /* Fallback */
+  var frm = document.getElementById('changelist-form');
+  var inp = document.createElement('input');
+  inp.type = 'hidden'; inp.name = 'index'; inp.value = '0';
+  frm.appendChild(inp);
+  frm.submit();
+}
 </script>
 {% endblock %}
 
@@ -289,18 +336,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
 {# ── Toolbar ───────────────────────────────────────────────── #}
 <div class="crm-view-bar">
-  <div class="crm-sel-bar" id="crm-sel-bar" style="display:none">
-    <label>
-      <input type="checkbox" id="crm-sel-all" onchange="crmSelectAll(this.checked)">
-      Вибрати всі
-    </label>
-    <span id="crm-sel-count">0 вибрано</span>
-  </div>
-  <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+  <div style="display:flex;gap:8px;align-items:center">
     <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
     <button class="crm-toggle-btn" id="crm-btn-table" onclick="crmSetView('table')">📋 Таблиця</button>
     <button class="crm-toggle-btn" id="crm-btn-cards" onclick="crmSetView('cards')">🃏 Картки</button>
   </div>
+</div>
+
+{# ── Card-mode action bar ──────────────────────────────────── #}
+<div class="crm-action-bar" id="crm-action-bar">
+  <label>
+    <input type="checkbox" id="crm-sel-all" onchange="crmSelectAll(this.checked)">
+    Вибрати всі
+  </label>
+  <span class="crm-bar-sep">|</span>
+  <span style="font-size:12px;color:var(--text-muted)">Дія:</span>
+  <select id="crm-act-sel" class="crm-act-sel">
+    <option value="">---------</option>
+  </select>
+  <button type="button" class="crm-act-go" onclick="crmDoAction()">Вперед →</button>
+  <span class="crm-bar-sep">|</span>
+  <span id="crm-sel-count" style="font-size:12px;font-weight:700;color:#1976d2">Обрано 0 з {{ cl.result_list|length }}</span>
 </div>
 
 {# ── Card view ─────────────────────────────────────────────── #}
@@ -314,7 +370,13 @@ document.addEventListener('DOMContentLoaded', function () {
   {# ┌── HEADER ────────────────────────────────────────────── #}
   <div class="crm-hd">
 
-    <div class="crm-hd-left">
+    {# Checkbox — top-left #}
+    <label class="crm-cb-wrap" title="Вибрати">
+      <input type="checkbox" class="crm-card-cb" data-pk="{{ customer.pk }}"
+             onchange="crmCardCheck(this)">
+    </label>
+
+    <div class="crm-hd-center">
       <div class="crm-name-row">
         {# Country flag — flagcdn.com PNG #}
         {% if customer.country %}
@@ -353,12 +415,8 @@ document.addEventListener('DOMContentLoaded', function () {
       </div>
     </div>
 
-    {# Right: badges + checkbox #}
+    {# Right: badges #}
     <div class="crm-hd-right">
-      <label class="crm-cb-wrap" title="Вибрати">
-        <input type="checkbox" class="crm-card-cb" data-pk="{{ customer.pk }}"
-               onchange="crmCardCheck(this)">
-      </label>
       <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
         {# Status #}
         {% if customer.status == 'active' %}    <span class="crm-badge" style="background:#43a047">Активний</span>
@@ -445,7 +503,7 @@ document.addEventListener('DOMContentLoaded', function () {
     {% endwith %}
     {% endif %}
     <span class="crm-rfm">
-      <span style="opacity:.6;font-size:10px">R:{{ rfm.R }} F:{{ rfm.F }} M:{{ rfm.M }}</span>
+      <span class="crm-rfm-scores">R:{{ rfm.R }} F:{{ rfm.F }} M:{{ rfm.M }}</span>
       <b>{{ rfm.segment }}</b>
     </span>
     {% if customer.notes %}
@@ -506,7 +564,7 @@ function crmUpdateCount() {
   var n = document.querySelectorAll('.crm-card-cb:checked').length;
   var t = document.querySelectorAll('.crm-card-cb').length;
   var el = document.getElementById('crm-sel-count');
-  if (el) el.textContent = n + ' з ' + t + ' вибрано';
+  if (el) el.textContent = 'Обрано ' + n + ' з ' + t;
   var sa = document.getElementById('crm-sel-all');
   if (sa) { sa.checked = (n === t && t > 0); sa.indeterminate = (n > 0 && n < t); }
 }
@@ -530,7 +588,7 @@ function crmSetView(mode) {
   document.getElementById('crm-table').style.display = isCards ? 'none'  : 'block';
   document.getElementById('crm-btn-cards').classList.toggle('active', isCards);
   document.getElementById('crm-btn-table').classList.toggle('active', !isCards);
-  document.getElementById('crm-sel-bar').style.display = isCards ? 'flex' : 'none';
+  document.getElementById('crm-action-bar').style.display = isCards ? 'flex' : 'none';
   if (!isCards) {
     document.querySelectorAll('input[data-card-pk]').forEach(function(el){ el.remove(); });
     document.querySelectorAll('.crm-card-cb').forEach(function(cb){ cb.checked = false; });
