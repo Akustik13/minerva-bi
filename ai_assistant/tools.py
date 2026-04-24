@@ -1,3 +1,4 @@
+from decimal import Decimal
 from django.db import models as django_models
 
 # ── Tool schemas for Anthropic API ────────────────────────────────────────────
@@ -149,6 +150,17 @@ ALL_TOOLS = [
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _safe_result(obj):
+    """Recursively convert Decimal→float so result is always JSON-serializable."""
+    if isinstance(obj, dict):
+        return {k: _safe_result(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_safe_result(v) for v in obj]
+    if isinstance(obj, Decimal):
+        return float(obj)
+    return obj
+
+
 def _stock_map_for_products(product_ids=None):
     """
     Returns {product_id: float_stock} computed from InventoryTransaction.
@@ -180,11 +192,12 @@ def _stock_map_for_products(product_ids=None):
 
 def execute_tool(tool_name: str, tool_input: dict, profile=None) -> dict:
     try:
-        return _TOOL_HANDLERS[tool_name](tool_input, profile)
+        result = _TOOL_HANDLERS[tool_name](tool_input, profile)
     except KeyError:
-        return {"error": f"Tool '{tool_name}' не знайдено"}
+        result = {"error": f"Tool '{tool_name}' не знайдено"}
     except Exception as e:
-        return {"error": str(e)}
+        result = {"error": str(e)}
+    return _safe_result(result)
 
 
 def _get_system_overview(inp, profile):
