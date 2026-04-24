@@ -117,6 +117,73 @@ class Customer(models.Model):
             .order_by("-total_revenue")[:limit]
         )
 
+    def card_stats(self) -> dict:
+        """Всі дані для картки CRM — 2 запити замість 5+.
+        Повертає: count, rev (рядок з валютою), avg, last, days, recency_cls
+        """
+        from sales.models import SalesOrder, SalesOrderLine
+        from django.db.models import Sum, Max, Count
+        from django.utils import timezone
+
+        SYMBOLS = {"EUR": "€", "USD": "$", "GBP": "£", "CHF": "Fr"}
+
+        # Query 1: кількість замовлень + дата останнього
+        agg = (
+            SalesOrder.objects
+            .filter(customer_key=self.external_key)
+            .aggregate(count=Count("id"), last=Max("order_date"))
+        )
+        count = agg["count"] or 0
+        last  = agg["last"]
+
+        days = None
+        if last:
+            ld   = last.date() if hasattr(last, "date") else last
+            days = (timezone.now().date() - ld).days
+
+        # Recency CSS class: green/amber/orange/red
+        if days is None:
+            recency_cls = "crm-rec-none"
+        elif days <= 30:
+            recency_cls = "crm-rec-fresh"
+        elif days <= 90:
+            recency_cls = "crm-rec-ok"
+        elif days <= 365:
+            recency_cls = "crm-rec-warn"
+        else:
+            recency_cls = "crm-rec-old"
+
+        # Query 2: виручка по валютах
+        rev_rows = list(
+            SalesOrderLine.objects
+            .filter(order__customer_key=self.external_key)
+            .values("currency")
+            .annotate(total=Sum("total_price"))
+            .order_by("-total")
+        )
+
+        def _fmt(total, currency):
+            sym = SYMBOLS.get(currency or "EUR", (currency or "") + "\u00a0")
+            return f"{sym}{float(total or 0):,.0f}"
+
+        if rev_rows:
+            main       = rev_rows[0]
+            main_total = float(main["total"] or 0)
+            main_curr  = main["currency"] or "EUR"
+            rev_str    = " + ".join(_fmt(p["total"], p["currency"]) for p in rev_rows[:2])
+            avg_str    = _fmt(main_total / count, main_curr) if count else "—"
+        else:
+            rev_str = avg_str = "—"
+
+        return {
+            "count":       count,
+            "rev":         rev_str,
+            "avg":         avg_str,
+            "last":        last,
+            "days":        days,
+            "recency_cls": recency_cls,
+        }
+
     def last_order_date(self):
         from sales.models import SalesOrder
         result = SalesOrder.objects.filter(
