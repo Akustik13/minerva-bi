@@ -170,9 +170,11 @@ class Customer(models.Model):
             main       = rev_rows[0]
             main_total = float(main["total"] or 0)
             main_curr  = main["currency"] or "EUR"
+            main_sym   = SYMBOLS.get(main_curr, main_curr + "\u00a0")
             rev_str    = " + ".join(_fmt(p["total"], p["currency"]) for p in rev_rows[:2])
             avg_str    = _fmt(main_total / count, main_curr) if count else "—"
         else:
+            main_sym = "€"
             rev_str = avg_str = "—"
 
         return {
@@ -182,6 +184,7 @@ class Customer(models.Model):
             "last":        last,
             "days":        days,
             "recency_cls": recency_cls,
+            "sym":         main_sym,   # символ валюти для топ-товарів
         }
 
     def last_order_date(self):

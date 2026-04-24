@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <span class="crm-top-num">{{ forloop.counter }}</span>
       <span class="crm-top-sku">{{ prod.sku_raw|default:"—" }}</span>
       <span class="crm-top-qty">× {{ prod.total_qty|default:0 }} шт</span>
-      <span class="crm-top-rev">{{ prod.total_revenue|floatformat:0 }}</span>
+      <span class="crm-top-rev">{{ stats.sym }}{{ prod.total_revenue|floatformat:0 }}</span>
     </div>
     {% endfor %}
     {% if tops|length > 3 %}
