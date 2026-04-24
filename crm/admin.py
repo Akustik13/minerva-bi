@@ -209,9 +209,52 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         "repeat_badge", "rfm_display", "strategy_btn",
     )
     list_filter = ("segment", "status", "country", RepeatCustomerFilter, RFMSegmentFilter)
-    search_fields = ("name", "email", "company", "phone", "addr_city", "addr_street")
+    search_fields = ("name", "email", "company", "phone", "addr_city", "addr_street", "external_key")
     # Зберігаємо фільтри між сесіями
     preserve_filters = True
+
+    def get_search_results(self, request, queryset, search_term):
+        """
+        Розширений пошук: крім полів клієнта, шукає по:
+        - № замовлення (order_number)
+        - трекінг-номеру (tracking_number)
+        - SKU товару в замовленні
+        - коду клієнта (external_key, вже в search_fields)
+        """
+        qs, use_distinct = super().get_search_results(request, queryset, search_term)
+
+        if not search_term or len(search_term) < 2:
+            return qs, use_distinct
+
+        term = search_term.strip()
+        from django.db.models import Q
+
+        # Пошук по полях замовлень → отримуємо customer_key
+        order_keys = list(
+            SalesOrder.objects
+            .filter(
+                Q(order_number__icontains=term) |
+                Q(tracking_number__icontains=term)
+            )
+            .values_list("customer_key", flat=True)
+            .distinct()
+        )
+
+        # Пошук по SKU в рядках замовлень
+        sku_keys = list(
+            SalesOrderLine.objects
+            .filter(sku_raw__icontains=term)
+            .values_list("order__customer_key", flat=True)
+            .distinct()
+        )
+
+        all_keys = list({k for k in order_keys + sku_keys if k})
+        if all_keys:
+            extra = Customer.objects.filter(external_key__in=all_keys)
+            qs = (qs | extra).distinct()
+            use_distinct = True
+
+        return qs, use_distinct
     readonly_fields = (
         "created_at", "updated_at",
         "orders_count", "revenue_display", "avg_order_display",
