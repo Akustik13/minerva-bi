@@ -261,9 +261,10 @@
 }
 a.crm-btn:hover { opacity:.88; filter:brightness(1.08); }
 /* Use a.crm-btn-* for higher specificity than Django's a:link selector */
-a.crm-btn-open  { background:#1565c0; color:#fff !important; }
-a.crm-btn-order { background:#2e7d32; color:#fff !important; }
-a.crm-btn-strat {
+a.crm-btn-open   { background:#1565c0; color:#fff !important; }
+a.crm-btn-order  { background:#2e7d32; color:#fff !important; }
+a.crm-btn-orders { background:#00838f; color:#fff !important; }
+a.crm-btn-strat  {
   background:var(--bg-input,#1e2d40); color:var(--text) !important;
   border:1.5px solid var(--border-strong);
 }
@@ -515,7 +516,8 @@ function crmDoAction() {
   {# ┌── FOOTER: actions ──────────────────────────────────── #}
   <div class="crm-ft">
     <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="crm-btn crm-btn-open">⚙️ Відкрити</a>
-    <a href="{% url 'admin:crm_customer_new_order' customer.pk %}" class="crm-btn crm-btn-order">➕ Замовлення</a>
+    <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ customer.email|default:customer.name }}" class="crm-btn crm-btn-orders">📋 Замовлення</a>
+    <a href="{% url 'admin:crm_customer_new_order' customer.pk %}" class="crm-btn crm-btn-order">➕ Нове</a>
     <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-strat">🎯 Стратегія</a>
   </div>
 
