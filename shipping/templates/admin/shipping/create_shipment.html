@@ -132,6 +132,9 @@ function _fillSenderFromCarrier(){
   set('sender_country', d.country || '');
   set('sender_phone',   d.phone   || '');
   set('sender_email',   d.email   || '');
+  /* Refresh country hint after auto-fill */
+  const sc=document.getElementById('sender_country');
+  if(sc) _showCountryHint(sc,'sh-hint-sc');
 }
 // Mark field as manually edited so carrier switch won't overwrite it
 function _markEdited(el){ el.dataset.edited = '1'; }
@@ -281,13 +284,35 @@ function updateCustomsCard(){
   if(card) card.style.display=(!_EU.has(country)&&country)?'':'none';
 }
 
+/* Country name hint — uses built-in browser Intl API, no dictionary needed */
+const _cnames = typeof Intl !== 'undefined' && Intl.DisplayNames
+  ? new Intl.DisplayNames(['en'], {type:'region'})
+  : null;
+
+function _showCountryHint(input, spanId){
+  const code = (input.value||'').trim().toUpperCase();
+  const el = document.getElementById(spanId);
+  if(!el) return;
+  if(code.length === 2 && _cnames){
+    try{
+      const name = _cnames.of(code);
+      el.textContent = (name && name !== code) ? name : '';
+    } catch(e){ el.textContent = ''; }
+  } else {
+    el.textContent = '';
+  }
+}
+
 document.addEventListener('DOMContentLoaded',function(){
   updateCustomsCard();
   updateCaTotal();
   _refreshAllUnitVals();
   _fillSenderFromCarrier();
-  const ci=document.querySelector('[name="recipient_country"]');
-  if(ci){ ci.addEventListener('input',updateCustomsCard); ci.addEventListener('change',updateCustomsCard); }
+  /* Initialize country name hints for pre-filled values */
+  const rc=document.getElementById('recipient_country');
+  const sc=document.getElementById('sender_country');
+  if(rc){ _showCountryHint(rc,'sh-hint-rc'); rc.addEventListener('input',updateCustomsCard); rc.addEventListener('change',updateCustomsCard); }
+  if(sc){ _showCountryHint(sc,'sh-hint-sc'); }
   document.getElementById('customs-rows')?.addEventListener('input',function(e){
     updateCaTotal();
     if(e.target.name==='ca_qty'||e.target.name==='ca_value') updateUnitVal(e.target);
@@ -955,10 +980,14 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="sh-field">
           <label class="sh-label">Країна (ISO 2)</label>
-          <input class="sh-input" type="text" name="sender_country"
-            value="{{ shipment.sender_country|default:shipment.carrier.sender_country|default:'DE' }}"
-            {% if shipment.sender_country %}data-edited="1"{% endif %}
-            maxlength="2" oninput="_markEdited(this)" placeholder="DE">
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="sh-input" type="text" name="sender_country" id="sender_country"
+              value="{{ shipment.sender_country|default:shipment.carrier.sender_country|default:'DE' }}"
+              {% if shipment.sender_country %}data-edited="1"{% endif %}
+              maxlength="2" oninput="_markEdited(this);_showCountryHint(this,'sh-hint-sc')" placeholder="DE"
+              style="max-width:80px">
+            <span id="sh-hint-sc" style="font-size:12px;color:var(--text-muted);font-style:italic"></span>
+          </div>
         </div>
         <div class="sh-field">
           <label class="sh-label">Телефон</label>
@@ -1026,9 +1055,14 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
         <div class="sh-field">
           <label class="sh-label">Країна (ISO 2) *</label>
-          <input class="sh-input" type="text" name="recipient_country"
-            value="{{ shipment.recipient_country }}" maxlength="2"
-            placeholder="UA, DE, PL..." required>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="sh-input" type="text" name="recipient_country" id="recipient_country"
+              value="{{ shipment.recipient_country }}" maxlength="2"
+              placeholder="UA, DE, PL..." required
+              oninput="updateCustomsCard();_showCountryHint(this,'sh-hint-rc')"
+              style="max-width:80px">
+            <span id="sh-hint-rc" style="font-size:12px;color:var(--text-muted);font-style:italic"></span>
+          </div>
         </div>
         <div class="sh-field">
           <label class="sh-label">Телефон</label>
