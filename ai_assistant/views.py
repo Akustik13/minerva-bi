@@ -81,3 +81,36 @@ def history_api(request):
     for m in conv.messages.filter(role__in=('user', 'assistant')).order_by('created_at'):
         msgs.append({'role': m.role, 'content': m.content})
     return JsonResponse({'messages': msgs})
+
+
+@login_required
+def tools_diagnostic_view(request):
+    """Diagnostic page — staff only."""
+    if not request.user.is_staff:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden()
+    from .tools import ALL_TOOLS
+    return render(request, 'ai_assistant/diagnostic.html', {'tools': ALL_TOOLS})
+
+
+@login_required
+@require_POST
+def run_tool_diagnostic(request):
+    """Run a single tool and return JSON result with timing."""
+    if not request.user.is_staff:
+        return JsonResponse({'error': 'Forbidden'}, status=403)
+    import time
+    try:
+        data = json.loads(request.body)
+        tool_name = data.get('tool', '')
+        tool_input = data.get('input', {})
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    from .tools import execute_tool
+    profile = _get_profile(request.user)
+    t0 = time.monotonic()
+    result = execute_tool(tool_name, tool_input, profile)
+    ms = int((time.monotonic() - t0) * 1000)
+
+    return JsonResponse({'result': result, 'ms': ms, 'tool': tool_name})

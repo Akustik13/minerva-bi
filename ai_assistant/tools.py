@@ -147,6 +147,35 @@ ALL_TOOLS = [
 ]
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _stock_map_for_products(product_ids=None):
+    """
+    Returns {product_id: float_stock} computed from InventoryTransaction.
+    Stock = sum(Incoming) - sum(Outgoing) + sum(Adjustment).
+    If product_ids is None, returns map for all products.
+    """
+    from django.db.models import Sum, F, Value
+    from inventory.models import InventoryTransaction
+
+    qs = InventoryTransaction.objects.all()
+    if product_ids is not None:
+        qs = qs.filter(product_id__in=product_ids)
+
+    rows = qs.values('product_id').annotate(
+        stock=Sum(
+            django_models.Case(
+                django_models.When(tx_type='Incoming',   then=django_models.F('qty')),
+                django_models.When(tx_type='Outgoing',   then=-django_models.F('qty')),
+                django_models.When(tx_type='Adjustment', then=django_models.F('qty')),
+                default=Value(0),
+                output_field=django_models.DecimalField(),
+            )
+        )
+    )
+    return {r['product_id']: float(r['stock'] or 0) for r in rows}
+
+
 # ── Tool handlers ─────────────────────────────────────────────────────────────
 
 def execute_tool(tool_name: str, tool_input: dict, profile=None) -> dict:
@@ -175,9 +204,14 @@ def _get_system_overview(inp, profile):
 
     low_stock = 0
     try:
-        low_stock = Product.objects.filter(
-            quantity__lte=django_models.F('reorder_point')
-        ).count()
+        products = list(Product.objects.filter(is_active=True).values('id', 'reorder_point'))
+        if products:
+            pids = [p['id'] for p in products]
+            smap = _stock_map_for_products(pids)
+            low_stock = sum(
+                1 for p in products
+                if smap.get(p['id'], 0) <= float(p['reorder_point'] or 0)
+            )
     except Exception:
         pass
 
@@ -194,35 +228,47 @@ def _get_inventory_status(inp, profile):
     from django.db.models import Q
     from inventory.models import Product
 
-    qs = Product.objects.all()
+    qs = Product.objects.filter(is_active=True)
     if inp.get('search'):
         qs = qs.filter(
             Q(name__icontains=inp['search']) | Q(sku__icontains=inp['search'])
         )
-    if inp.get('low_stock_only'):
-        try:
-            qs = qs.filter(quantity__lte=django_models.F('reorder_point'))
-        except Exception:
-            pass
+
+    products = list(qs.values('id', 'sku', 'name', 'reorder_point', 'purchase_price', 'sale_price')[:50])
+    if not products:
+        return {"products": [], "total_shown": 0}
+
+    pids = [p['id'] for p in products]
+    smap = _stock_map_for_products(pids)
 
     items = []
-    for p in qs[:20]:
-        item = {"name": str(p), "sku": getattr(p, 'sku', '—')}
-        for field in ('quantity', 'reorder_point', 'purchase_price', 'sale_price'):
-            val = getattr(p, field, None)
-            if val is not None:
-                item[field] = float(val)
+    for p in products:
+        stock = smap.get(p['id'], 0)
+        rp = float(p['reorder_point'] or 0)
+        if inp.get('low_stock_only') and stock > rp:
+            continue
+        item = {
+            "name":          p['name'] or p['sku'],
+            "sku":           p['sku'],
+            "stock":         stock,
+            "reorder_point": rp,
+        }
+        if p['purchase_price'] is not None:
+            item["purchase_price"] = float(p['purchase_price'])
+        if p['sale_price'] is not None:
+            item["sale_price"] = float(p['sale_price'])
         items.append(item)
-    return {"products": items, "total_shown": len(items)}
+
+    return {"products": items[:20], "total_shown": len(items[:20])}
 
 
 def _get_recent_orders(inp, profile):
     from django.db.models import Sum
     from sales.models import SalesOrder
 
-    qs = SalesOrder.objects.select_related('customer').order_by('-order_date')
+    qs = SalesOrder.objects.order_by('-order_date')
     if inp.get('customer_name'):
-        qs = qs.filter(customer__name__icontains=inp['customer_name'])
+        qs = qs.filter(client__icontains=inp['customer_name'])
     status = inp.get('status', 'all')
     if status != 'all':
         qs = qs.filter(status=status)
@@ -238,7 +284,7 @@ def _get_recent_orders(inp, profile):
         orders.append({
             "id":           o.pk,
             "order_number": getattr(o, 'order_number', str(o.pk)),
-            "customer":     str(o.customer) if o.customer else '—',
+            "customer":     getattr(o, 'client', None) or '—',
             "status":       o.status,
             "date":         o.order_date.strftime('%d.%m.%Y') if o.order_date else '—',
             "total":        total,
@@ -259,10 +305,14 @@ def _get_customer_info(inp, profile):
             "email":   getattr(c, 'email', '—'),
             "segment": getattr(c, 'segment', '—'),
         }
-        for field in ('rfm_r', 'rfm_f', 'rfm_m'):
-            val = getattr(c, field, None)
-            if val is not None:
-                info[field] = val
+        try:
+            rfm = c.rfm_score()
+            info["rfm_r"]       = rfm.get("R")
+            info["rfm_f"]       = rfm.get("F")
+            info["rfm_m"]       = rfm.get("M")
+            info["rfm_segment"] = rfm.get("segment", "")
+        except Exception:
+            pass
         result.append(info)
     return {"customers": result, "found": len(result)}
 
@@ -291,15 +341,15 @@ def _get_sales_analytics(inp, profile):
 
     if metric == 'top_products':
         rows = list(
-            base_qs.values('sku').annotate(
-                total=Sum('total_price'), qty=Sum('quantity')
+            base_qs.values('sku_raw').annotate(
+                total=Sum('total_price'), qty=Sum('qty')
             ).order_by('-total')[:10]
         )
         return {"top_products": rows, "period": period}
 
     if metric == 'top_customers':
         rows = list(
-            base_qs.values('order__customer__name').annotate(
+            base_qs.values('order__client').annotate(
                 total=Sum('total_price'), orders=Count('order', distinct=True)
             ).order_by('-total')[:10]
         )
@@ -308,13 +358,13 @@ def _get_sales_analytics(inp, profile):
     agg = base_qs.aggregate(
         revenue=Sum('total_price'),
         orders=Count('order', distinct=True),
-        qty=Sum('quantity'),
+        qty=Sum('qty'),
     )
     return {
         "period":       period,
         "revenue":      float(agg['revenue'] or 0),
         "orders_count": agg['orders'] or 0,
-        "items_sold":   agg['qty'] or 0,
+        "items_sold":   float(agg['qty'] or 0),
     }
 
 
@@ -325,13 +375,13 @@ def _get_financial_overview(inp, profile):
     today = timezone.now().date()
     overdue = SalesOrder.objects.filter(
         shipping_deadline__lt=today
-    ).exclude(status__in=['completed', 'shipped', 'cancelled']).select_related('customer')
+    ).exclude(status__in=['completed', 'shipped', 'cancelled'])
 
     return {
         "overdue_orders": [
             {
                 "id":          o.pk,
-                "customer":    str(o.customer) if o.customer else '—',
+                "customer":    getattr(o, 'client', None) or '—',
                 "deadline":    o.shipping_deadline.strftime('%d.%m.%Y'),
                 "days_overdue":(today - o.shipping_deadline).days,
             }
@@ -356,10 +406,14 @@ def _get_email_strategy(inp, profile):
             "комунікації з клієнтом. Враховуй RFM сегмент."
         ),
     }
-    for field in ('rfm_r', 'rfm_f', 'rfm_m'):
-        val = getattr(c, field, None)
-        if val is not None:
-            info[field] = val
+    try:
+        rfm = c.rfm_score()
+        info["rfm_r"]       = rfm.get("R")
+        info["rfm_f"]       = rfm.get("F")
+        info["rfm_m"]       = rfm.get("M")
+        info["rfm_segment"] = rfm.get("segment", "")
+    except Exception:
+        pass
     return info
 
 
@@ -394,9 +448,9 @@ def _send_email(inp, profile):
             "error": "Потрібне підтвердження. Відправити цей лист?",
             "requires_confirm": True,
             "preview": {
-                "to":            inp.get('to_email'),
-                "subject":       inp.get('subject'),
-                "body_preview":  (inp.get('body', '')[:200] + '...'),
+                "to":           inp.get('to_email'),
+                "subject":      inp.get('subject'),
+                "body_preview": (inp.get('body', '')[:200] + '...'),
             },
         }
     from django.core.mail import send_mail
