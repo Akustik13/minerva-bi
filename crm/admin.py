@@ -249,6 +249,11 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.upload_docs_view_customer),
                 name="crm_customer_upload_docs",
             ),
+            path(
+                "<int:pk>/delete-doc/",
+                self.admin_site.admin_view(self.delete_doc_view_customer),
+                name="crm_customer_delete_doc",
+            ),
         ]
         return custom + urls
 
@@ -781,31 +786,42 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
 
         # List existing files
         from django.conf import settings
+        from django.urls import reverse as _rev
         from pathlib import Path
+        delete_url = _rev('admin:crm_customer_delete_doc', args=[obj.pk])
         customer_dir = Path(settings.MEDIA_ROOT) / 'customers' / str(obj.pk)
         files_html = ''
         if customer_dir.exists():
             files = sorted(customer_dir.iterdir(), key=lambda f: f.stat().st_mtime, reverse=True)
             if files:
+                _btn = (
+                    'padding:3px 9px;border-radius:4px;font-size:11px;font-weight:600;'
+                    'cursor:pointer;border:none;white-space:nowrap'
+                )
                 rows = ''.join(
-                    f'<div style="display:flex;align-items:center;gap:8px;padding:4px 0;'
-                    f'border-bottom:1px solid rgba(128,128,128,.1)">'
-                    f'<span style="font-size:14px">📄</span>'
-                    f'<a href="{settings.MEDIA_URL}customers/{obj.pk}/{f.name}" target="_blank" '
-                    f'style="color:var(--text);text-decoration:underline dotted;flex:1;'
-                    f'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{f.name}</a>'
-                    f'<span style="font-size:11px;color:var(--text-muted);white-space:nowrap">'
-                    f'{f.stat().st_size // 1024} KB</span>'
+                    f'<div class="cust-doc-row" style="display:flex;align-items:center;gap:8px;'
+                    f'padding:6px 0;border-bottom:1px solid rgba(128,128,128,.1)">'
+                    f'<span style="font-size:14px;flex-shrink:0">📄</span>'
+                    f'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+                    f'color:var(--text);font-size:13px" title="{f.name}">{f.name}</span>'
+                    f'<span style="font-size:11px;color:var(--text-muted);white-space:nowrap;flex-shrink:0">'
+                    f'{f.stat().st_size // 1024 or "<1"} KB</span>'
+                    f'<a href="{settings.MEDIA_URL}customers/{obj.pk}/{f.name}" download '
+                    f'style="{_btn};background:rgba(21,101,192,.15);color:#42a5f5;text-decoration:none">'
+                    f'💾 Зберегти</a>'
+                    f'<button type="button" style="{_btn};background:rgba(229,57,53,.12);color:#ef5350" '
+                    f'onclick="custDocDelete(this,\'{delete_url}\',\'{f.name}\')">'
+                    f'🗑️ Видалити</button>'
                     f'</div>'
                     for f in files
                 )
                 files_html = (
-                    f'<div style="margin-top:10px;padding:8px 12px;'
+                    f'<div id="custDocList" style="margin-top:10px;padding:8px 12px;'
                     f'background:var(--bg-input,#141f2b);border-radius:6px;'
                     f'border:1px solid var(--border-strong)">'
                     f'<div style="font-size:11px;font-weight:700;color:var(--text-muted);'
-                    f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">'
-                    f'📂 Завантажені файли ({len(files)} шт.)</div>'
+                    f'text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">'
+                    f'📂 Файли клієнта ({len(files)} шт.)</div>'
                     f'{rows}</div>'
                 )
 
@@ -855,6 +871,22 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             f'}});'
             f'}})()'
             f'</script>'
+            f'<script>'
+            f'function custDocDelete(btn,url,fname){{'
+            f'if(!confirm("Видалити файл \\""+fname+"\\"?"))return;'
+            f'var fd=new FormData();'
+            f'fd.append("filename",fname);'
+            f'fd.append("csrfmiddlewaretoken",document.cookie.match(/csrftoken=([^;]+)/)?.[1]||"");'
+            f'btn.disabled=true;btn.textContent="...";'
+            f'fetch(url,{{method:"POST",body:fd}})'
+            f'.then(function(r){{return r.json();}})'
+            f'.then(function(d){{'
+            f'if(d.ok){{btn.closest(".cust-doc-row").remove();}}'
+            f'else{{btn.disabled=false;btn.textContent="❌ Помилка";}}'
+            f'}})'
+            f'.catch(function(){{btn.disabled=false;btn.textContent="❌";}});'
+            f'}}'
+            f'</script>'
         )
         return mark_safe(widget_html)
     upload_widget_customer.short_description = "📎 Документи клієнта"
@@ -889,6 +921,31 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
 
         saved = sum(1 for r in results if r['status'] == 'saved')
         return JsonResponse({'saved': saved, 'results': results})
+
+    def delete_doc_view_customer(self, request, pk):
+        """AJAX: видаляє один документ клієнта."""
+        from django.http import JsonResponse
+        from django.conf import settings
+        from pathlib import Path
+        import os
+
+        if request.method != 'POST':
+            return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+        filename = request.POST.get('filename', '').strip()
+        # Security: no path traversal
+        if not filename or os.sep in filename or '/' in filename or '..' in filename:
+            return JsonResponse({'error': 'Invalid filename'}, status=400)
+
+        dest = Path(settings.MEDIA_ROOT) / 'customers' / str(pk) / filename
+        if not dest.exists():
+            return JsonResponse({'error': 'Файл не знайдено'}, status=404)
+
+        try:
+            dest.unlink()
+            return JsonResponse({'ok': True})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
     def top_products_display(self, obj):
         from sales.models import SalesOrderLine
