@@ -654,8 +654,16 @@ function crmDoAction() {
     <a href="{% url 'admin:crm_customer_new_order' customer.pk %}" class="crm-btn crm-btn-order">➕ Нове</a>
     {% if sdata %}
       <a href="/strategy/{{ sdata.pk }}/canvas/" class="crm-btn crm-btn-strat">🎯 Canvas</a>
+    {% elif rfm.R > 3 and rfm.F == 1 %}
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#1976d2;color:#fff !important">🚀 Онбординг</a>
+    {% elif "At Risk" in rfm.segment or "Hibernating" in rfm.segment %}
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#e53935;color:#fff !important">🔄 Реактивація</a>
+    {% elif "Potential" in rfm.segment or "Regular" in rfm.segment or "New" in rfm.segment %}
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#f57c00;color:#fff !important">📈 Нарощування</a>
+    {% elif "Champion" in rfm.segment or "Loyal" in rfm.segment %}
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#7b1fa2;color:#fff !important">👑 Утримання</a>
     {% else %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-strat">🎯 Стратегія</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-strat">✏️ Вибрати</a>
     {% endif %}
   </div>
 
