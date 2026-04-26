@@ -376,6 +376,20 @@ class DelayedShipmentFilter(admin.SimpleListFilter):
         return queryset
 
 
+class FlaggedFilter(admin.SimpleListFilter):
+    title = "Важливі"
+    parameter_name = "flagged"
+
+    def lookups(self, request, model_admin):
+        n = _base_qs().filter(is_flagged=True).count()
+        return [("1", f"⭐ Важливі {n}" if n else "⭐ Важливі")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "1":
+            return queryset.filter(is_flagged=True)
+        return queryset
+
+
 def export_sales_excel(modeladmin, request, queryset):
     try:
         from exports import export_sales
@@ -406,6 +420,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     form = SalesOrderDocumentsForm
     # ── Прибрано: phone, tracking_number, customer_link (без лінку) ───────────
     list_display = (
+        "flag_col", "note_col",
         "order_number", "source_badge", "status_badge", "order_date_fmt", 'deadline_display',
         "customer_link_display", "country_display",
         "shipped_badge",
@@ -416,7 +431,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     )
     search_fields = ("order_number", "tracking_number", "client", "email", "phone",
                      "addr_city", "addr_street")
-    list_filter   = (StatusFilter, SourceFilter, CountryFilter, UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter)
+    list_filter   = (StatusFilter, SourceFilter, CountryFilter, UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter, FlaggedFilter)
     ordering       = ("-order_date",)
 
     def changelist_view(self, request, extra_context=None):
@@ -447,6 +462,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context['sv_count_overdue'] = (
             _base_qs().filter(shipping_deadline__lt=today, status__in=['received', 'processing']).count()
         )
+        extra_context['sv_count_flagged'] = _base_qs().filter(is_flagged=True).count()
 
         return super().changelist_view(request, extra_context=extra_context)
     date_hierarchy = "order_date"
@@ -1453,6 +1469,26 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     shipped_badge.short_description = "Відправлено"
     shipped_badge.admin_order_field = "shipped_at"
 
+    @admin.display(description="⭐")
+    def flag_col(self, obj):
+        icon = '⭐' if obj.is_flagged else '☆'
+        return format_html(
+            '<button class="sv-flag-btn {}" data-pk="{}" onclick="svFlagOrder({});return false" '
+            'style="background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;'
+            'color:{}" title="{}">{}</button>',
+            'sv-flagged' if obj.is_flagged else '', obj.pk, obj.pk,
+            '#FFB300' if obj.is_flagged else 'var(--text-dim)',
+            'Зняти позначку' if obj.is_flagged else 'Позначити як важливе', icon,
+        )
+
+    @admin.display(description="📝 Нотатка")
+    def note_col(self, obj):
+        if not obj.internal_note:
+            return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
+        truncated = obj.internal_note[:40] + ('…' if len(obj.internal_note) > 40 else '')
+        return format_html('<span style="font-size:11px" title="{}">{}</span>',
+                           obj.internal_note, truncated)
+
     def stock_warning(self, obj):
         if obj.shipped_at:
             return format_html('<span style="color:#999">—</span>')
@@ -1782,8 +1818,34 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/card-expand/',
                  self.admin_site.admin_view(self.card_expand_view),
                  name='sales_salesorder_card_expand'),
+            # AJAX: flag toggle + note save
+            path('<int:pk>/flag/',
+                 self.admin_site.admin_view(self.flag_order_view),
+                 name='sales_salesorder_flag'),
+            path('<int:pk>/note/',
+                 self.admin_site.admin_view(self.set_note_view),
+                 name='sales_salesorder_note'),
         ]
         return custom_urls + urls
+
+    def flag_order_view(self, request, pk):
+        from django.http import JsonResponse
+        order = get_object_or_404(SalesOrder, pk=pk)
+        order.is_flagged = not order.is_flagged
+        order.save(update_fields=['is_flagged'])
+        return JsonResponse({'flagged': order.is_flagged, 'pk': pk})
+
+    def set_note_view(self, request, pk):
+        from django.http import JsonResponse
+        import json as _json
+        order = get_object_or_404(SalesOrder, pk=pk)
+        try:
+            data = _json.loads(request.body or b'{}')
+        except Exception:
+            data = {}
+        order.internal_note = (data.get('note') or '').strip()[:200]
+        order.save(update_fields=['internal_note'])
+        return JsonResponse({'ok': True, 'note': order.internal_note})
 
     # ── PDF document views ─────────────────────────────────────────────────────
 

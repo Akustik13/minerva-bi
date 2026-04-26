@@ -135,6 +135,15 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-cex-panel{display:none;margin-top:12px;padding:14px 16px;background:var(--bg-input,#141f2b);border:1px solid var(--border-strong);border-radius:7px;font-size:12px;color:var(--text)}
 /* Card checkbox */
 .sv-card-check-input{width:17px;height:17px;cursor:pointer;accent-color:#1565c0;flex-shrink:0;vertical-align:middle}
+/* Flag + Note */
+.sv-flag-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:2px 3px;line-height:1;transition:transform .1s}
+.sv-flag-btn:hover{transform:scale(1.25)}
+.sv-flag-btn.sv-flagged{color:#FFB300!important}
+.sv-card.sv-card-flagged{border-left-color:#FFB300!important}
+.sv-note-btn{background:none;border:1px solid var(--border-strong);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--text-dim);display:inline-flex;align-items:center;gap:4px;max-width:190px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sv-note-btn.sv-note-has{background:rgba(255,179,0,.1);border-color:#FFB300;color:#FFB300}
+.sv-note-panel{display:none;align-items:center;gap:6px;margin-top:8px;padding:8px 10px;background:var(--bg-input,#141f2b);border:1px solid var(--border-strong);border-radius:6px}
+.sv-note-input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;padding:0;min-width:0}
 /* Select-all inline (inside action row) */
 #sv-select-bar{padding:4px 10px;background:rgba(21,101,192,.12);border:1px solid rgba(21,101,192,.3);border-radius:6px;font-size:13px}
 </style>
@@ -166,6 +175,8 @@ document.addEventListener('DOMContentLoaded', function () {
   <div class="sv-qf-sep"></div>
   <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#">🚨 Затримки{% if sv_count_delayed %} <span class="sv-qf-cnt">{{ sv_count_delayed }}</span>{% endif %}</a>
   <a class="sv-qf-btn" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#">🔴 Прострочені{% if sv_count_overdue %} <span class="sv-qf-cnt">{{ sv_count_overdue }}</span>{% endif %}</a>
+  <div class="sv-qf-sep"></div>
+  <a class="sv-qf-btn" id="svf-flagged" onclick="svQFToggle('flagged');return false" href="#">⭐ Важливі{% if sv_count_flagged %} <span class="sv-qf-cnt">{{ sv_count_flagged }}</span>{% endif %}</a>
   {% if sv_sources %}
   <div class="sv-qf-sep"></div>
   <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Джерело:</span>
@@ -201,7 +212,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <div id="sv-cards" style="display:none">
   {% for order in cl.result_list %}
   {% with lines=order.lines.all %}
-  <div class="sv-card sv-card-{{ order.status|default:'default' }}" data-pk="{{ order.pk }}">
+  <div class="sv-card sv-card-{{ order.status|default:'default' }} {% if order.is_flagged %}sv-card-flagged{% endif %}" data-pk="{{ order.pk }}">
 
     {# Header #}
     <div style="display:flex;justify-content:space-between;align-items:flex-start;
@@ -230,6 +241,14 @@ document.addEventListener('DOMContentLoaded', function () {
               class="sv-status-{{ order.status|default:'default' }}">
           {{ order.get_status_display }}
         </span>
+        {# Flag toggle #}
+        <button class="sv-flag-btn {% if order.is_flagged %}sv-flagged{% endif %}"
+                data-pk="{{ order.pk }}"
+                onclick="svFlagOrder({{ order.pk }});return false"
+                style="color:{% if order.is_flagged %}#FFB300{% else %}var(--text-dim){% endif %}"
+                title="{% if order.is_flagged %}Зняти позначку{% else %}Позначити як важливе{% endif %}">
+          {% if order.is_flagged %}⭐{% else %}☆{% endif %}
+        </button>
       </div>
       {# Dates column #}
       <div style="text-align:right;font-size:12px;display:flex;flex-direction:column;gap:3px;align-items:flex-end">
@@ -438,9 +457,28 @@ document.addEventListener('DOMContentLoaded', function () {
       {% endif %}
       {% endwith %}{# end with tn #}
 
+      {# Note button #}
+      <button class="sv-note-btn {% if order.internal_note %}sv-note-has{% endif %}"
+              id="sv-note-btn-{{ order.pk }}"
+              onclick="svNoteToggle({{ order.pk }})"
+              title="{{ order.internal_note|default:'Додати нотатку' }}">
+        📝{% if order.internal_note %} {{ order.internal_note|truncatechars:22 }}{% endif %}
+      </button>
+
       {# Expand button — rightmost in footer #}
       <button class="sv-cex-btn" id="sv-cex-btn-{{ order.pk }}"
               onclick="svCardExpand(this, {{ order.pk }})" title="Документи та деталі">⛶</button>
+    </div>
+
+    {# Note edit panel #}
+    <div class="sv-note-panel" id="sv-note-panel-{{ order.pk }}">
+      <span style="font-size:13px;flex-shrink:0">📝</span>
+      <input class="sv-note-input" id="sv-note-input-{{ order.pk }}" type="text" maxlength="200"
+             value="{{ order.internal_note }}"
+             placeholder="Короткий коментар (Enter — зберегти, Esc — закрити)…"
+             onkeydown="if(event.key==='Enter')svNoteSave({{ order.pk }});if(event.key==='Escape')svNoteToggle({{ order.pk }})">
+      <button onclick="svNoteSave({{ order.pk }})" style="background:#1565c0;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">💾 Зберегти</button>
+      <button onclick="svNoteToggle({{ order.pk }})" style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong);border-radius:4px;padding:4px 8px;cursor:pointer;color:var(--text-muted);font-size:11px;flex-shrink:0">✕</button>
     </div>
 
     {# Expandable panel — docs, upload, auto-doc, packaging #}
@@ -502,6 +540,7 @@ function svQFSource(value) {
   if (activeS) activeS.classList.add('sv-qf-active');
   if (delayed === '1') { var d = document.getElementById('svf-delayed'); if(d) d.classList.add('sv-qf-active'); }
   if (overdue === '1') { var o = document.getElementById('svf-overdue'); if(o) o.classList.add('sv-qf-active'); }
+  if (p.get('flagged') === '1') { var fl = document.getElementById('svf-flagged'); if(fl) fl.classList.add('sv-qf-active'); }
   if (source) { var sr = document.getElementById('svf-src-' + source); if(sr) sr.classList.add('sv-qf-active'); else { var sa = document.getElementById('svf-src-all'); if(sa) sa.classList.add('sv-qf-active'); } }
   else { var sa2 = document.getElementById('svf-src-all'); if(sa2) sa2.classList.add('sv-qf-active'); }
 })();
@@ -811,6 +850,51 @@ function svSetView(mode) {
     })
     .catch(function () {});
 })();
+
+// ── Flag + Note ───────────────────────────────────────────────────────────────
+function svFlagOrder(pk) {
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/); if (!csrf) return;
+  fetch('/admin/sales/salesorder/' + pk + '/flag/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf[1], 'X-Requested-With': 'XMLHttpRequest'},
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    document.querySelectorAll('.sv-flag-btn[data-pk="' + pk + '"]').forEach(function(btn) {
+      btn.classList.toggle('sv-flagged', d.flagged);
+      btn.style.color = d.flagged ? '#FFB300' : 'var(--text-dim)';
+      btn.title = d.flagged ? 'Зняти позначку' : 'Позначити як важливе';
+      btn.textContent = d.flagged ? '⭐' : '☆';
+    });
+    var card = document.querySelector('.sv-card[data-pk="' + pk + '"]');
+    if (card) card.classList.toggle('sv-card-flagged', d.flagged);
+  });
+}
+function svNoteToggle(pk) {
+  var panel = document.getElementById('sv-note-panel-' + pk); if (!panel) return;
+  var open = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'flex';
+  if (!open) { var inp = document.getElementById('sv-note-input-' + pk); if (inp) inp.focus(); }
+}
+function svNoteSave(pk) {
+  var inp = document.getElementById('sv-note-input-' + pk); if (!inp) return;
+  var note = inp.value.trim();
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/); if (!csrf) return;
+  fetch('/admin/sales/salesorder/' + pk + '/note/', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': csrf[1], 'X-Requested-With': 'XMLHttpRequest'},
+    body: JSON.stringify({note: note}),
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (!d.ok) return;
+    svNoteToggle(pk);
+    var btn = document.getElementById('sv-note-btn-' + pk);
+    if (btn) {
+      btn.classList.toggle('sv-note-has', !!note);
+      btn.title = note || 'Додати нотатку';
+      btn.innerHTML = note
+        ? '📝 <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle">' + note.substring(0, 22) + (note.length > 22 ? '…' : '') + '</span>'
+        : '📝';
+    }
+  });
+}
 </script>
 
 {% endblock %}

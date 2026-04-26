@@ -75,6 +75,8 @@ class SalesOrder(models.Model):
     currency        = models.CharField(max_length=8, blank=True, default="USD", verbose_name="Валюта продажу")
     shipping_cost   = models.DecimalField("Вартість доставки", max_digits=10, decimal_places=2, default=0)
     shipping_currency = models.CharField(max_length=8, blank=True, default="EUR", verbose_name="Валюта доставки")
+    is_flagged    = models.BooleanField("⭐ Важливе", default=False, db_index=True)
+    internal_note = models.CharField("Нотатка", max_length=200, blank=True, default="")
 
     class Meta:
         unique_together = [("source", "order_number")]
