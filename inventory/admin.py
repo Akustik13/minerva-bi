@@ -449,7 +449,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail",
-                       "image_preview", "datasheet_link")
+                       "image_preview", "datasheet_link", "movement_history")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -475,6 +475,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             "fields": (),
             "classes": ("collapse",),
             "description": "Прив'яжи упаковку нижче (inline) — буде відображатись як рекомендація на замовленні",
+        }),
+        ("📋 Рух товару", {
+            "fields": ("movement_history",),
+            "classes": ("collapse",),
         }),
         ("🏷️ Етикетка DYMO", {"fields": ("label_detail",)}),
         ("⚙️ Quick actions", {"fields": ("set_stock_link",)}),
@@ -744,6 +748,152 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return mark_safe(
             f'<span style="color:#607d8b;font-size:11px" title="Немає {sku}.dymo">—</span>')
     label_btn.short_description = "🏷️ Друк"
+
+    def movement_history(self, obj):
+        """Рух товару: всі InventoryTransaction з посиланнями на замовлення/PO."""
+        if not obj.pk:
+            return mark_safe('<span style="color:var(--text-dim,#607d8b)">Збережіть товар спочатку</span>')
+
+        txs = list(
+            InventoryTransaction.objects.filter(product=obj)
+            .select_related('location')
+            .order_by('-tx_date', '-pk')[:150]
+        )
+        if not txs:
+            return mark_safe('<span style="color:var(--text-dim,#607d8b)">Транзакцій немає</span>')
+
+        # ── Batch-fetch related SalesOrders ────────────────────────────────────
+        so_keys = set()
+        po_codes = set()
+        for tx in txs:
+            ek = tx.external_key
+            if ek.startswith('so:'):
+                parts = ek.split(':')
+                if len(parts) >= 3:
+                    so_keys.add((parts[1], parts[2]))
+            elif ek.startswith('po:'):
+                parts = ek.split(':')
+                if len(parts) >= 2:
+                    po_codes.add(parts[1])
+
+        orders_map = {}
+        if so_keys:
+            from sales.models import SalesOrder
+            from django.db.models import Q as _Q
+            q = _Q()
+            for source, order_num in so_keys:
+                q |= _Q(source=source, order_number=order_num)
+            for o in SalesOrder.objects.filter(q).values(
+                'source', 'order_number', 'pk', 'client', 'contact_name'
+            ):
+                orders_map[(o['source'], o['order_number'])] = o
+
+        po_map = {}
+        if po_codes:
+            for po in PurchaseOrder.objects.filter(code__in=po_codes).values(
+                'code', 'pk', 'supplier__name'
+            ):
+                po_map[po['code']] = po
+
+        # ── Render ─────────────────────────────────────────────────────────────
+        TYPE_CFG = {
+            'Incoming':   ('▲', '#4caf50', 'Прихід'),
+            'Outgoing':   ('▼', '#ef5350', 'Відвантаження'),
+            'Adjustment': ('⇄', '#2196f3', 'Коригування'),
+        }
+
+        rows = []
+        for tx in txs:
+            icon, color, label = TYPE_CFG.get(tx.tx_type, ('?', '#607d8b', tx.tx_type))
+            qty = float(tx.qty)
+            if tx.tx_type == 'Incoming':
+                qty_str = f'+{abs(qty):g}'
+            elif tx.tx_type == 'Outgoing':
+                qty_str = f'−{abs(qty):g}'
+            else:
+                qty_str = f'{qty:+g}'
+
+            doc_html = who_html = ''
+            ek = tx.external_key
+
+            if ek.startswith('so:'):
+                parts = ek.split(':')
+                source = parts[1] if len(parts) > 1 else ''
+                order_num = parts[2] if len(parts) > 2 else ''
+                order = orders_map.get((source, order_num))
+                if order:
+                    url = f'/admin/sales/salesorder/{order["pk"]}/change/'
+                    doc_html = (
+                        f'<a href="{url}" style="color:#58a6ff;text-decoration:none">'
+                        f'#{order_num}</a>'
+                        + (f' <span style="font-size:10px;opacity:.55">[{source}]</span>' if source else '')
+                    )
+                    client = (order['contact_name'] or order['client'] or '').strip()
+                    who_html = f'<span style="font-size:11px">{client[:35]}</span>' if client else ''
+                else:
+                    doc_html = f'<span style="font-size:11px">{tx.ref_doc}</span>'
+
+            elif ek.startswith('po:'):
+                parts = ek.split(':')
+                po_code = parts[1] if len(parts) > 1 else ''
+                po = po_map.get(po_code)
+                if po:
+                    url = f'/admin/inventory/purchaseorder/{po["pk"]}/change/'
+                    doc_html = f'<a href="{url}" style="color:#58a6ff;text-decoration:none">{po_code}</a>'
+                    supplier = (po.get('supplier__name') or '').strip()
+                    who_html = f'<span style="font-size:11px">{supplier[:35]}</span>' if supplier else ''
+                else:
+                    doc_html = f'<span style="font-size:11px">{tx.ref_doc}</span>'
+
+            else:
+                doc_html = f'<span style="font-size:11px;opacity:.65">{tx.ref_doc or ek[:40]}</span>'
+
+            date_str = tx.tx_date.strftime('%d.%m.%Y') if tx.tx_date else '—'
+            loc = tx.location.code if tx.location_id else '—'
+
+            rows.append(
+                f'<tr style="border-bottom:1px solid rgba(128,128,128,.1)">'
+                f'<td style="padding:5px 10px;white-space:nowrap;font-size:12px;color:var(--text-muted,#9aafbe)">{date_str}</td>'
+                f'<td style="padding:5px 10px">'
+                f'<span style="background:{color}22;color:{color};padding:2px 8px;border-radius:8px;'
+                f'font-size:11px;font-weight:700;white-space:nowrap">{icon} {label}</span></td>'
+                f'<td style="padding:5px 10px;text-align:right">'
+                f'<b style="color:{color};font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap">{qty_str}</b></td>'
+                f'<td style="padding:5px 10px">{doc_html}</td>'
+                f'<td style="padding:5px 10px">{who_html}</td>'
+                f'<td style="padding:5px 10px;font-size:11px;color:var(--text-muted,#9aafbe)">{loc}</td>'
+                f'</tr>'
+            )
+
+        total = InventoryTransaction.objects.filter(product=obj).count()
+        note = (
+            f' <span style="opacity:.5">(показано {len(txs)} з {total})</span>'
+            if total > len(txs) else ''
+        )
+
+        return mark_safe(
+            f'<div style="overflow-x:auto">'
+            f'<div style="font-size:12px;color:var(--text-muted,#9aafbe);margin-bottom:8px">'
+            f'Всього записів: <b>{total}</b>{note}</div>'
+            f'<table style="width:100%;border-collapse:collapse">'
+            f'<thead><tr style="border-bottom:2px solid rgba(128,128,128,.2)">'
+            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
+            f'white-space:nowrap;color:var(--text-muted,#9aafbe)">Дата</th>'
+            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
+            f'color:var(--text-muted,#9aafbe)">Тип</th>'
+            f'<th style="padding:5px 10px;text-align:right;font-size:11px;font-weight:600;'
+            f'color:var(--text-muted,#9aafbe)">К-сть</th>'
+            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
+            f'color:var(--text-muted,#9aafbe)">Документ</th>'
+            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
+            f'color:var(--text-muted,#9aafbe)">Клієнт / Постачальник</th>'
+            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
+            f'color:var(--text-muted,#9aafbe)">Локація</th>'
+            f'</tr></thead>'
+            f'<tbody>{"".join(rows)}</tbody>'
+            f'</table></div>'
+        )
+    movement_history.short_description = "📋 Рух товару"
 
     def datasheet_link(self, obj):
         if not obj.datasheet_url:
