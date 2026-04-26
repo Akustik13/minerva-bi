@@ -24,7 +24,7 @@ from .models import (
     Product, ProductAlias, Location,
     InventoryTransaction, ProductComponent,
     Supplier, PurchaseOrder, PurchaseOrderLine,
-    ProductCategory,
+    ProductCategory, InventorySettings,
 )
 from shipping.models import ProductPackaging
 
@@ -402,7 +402,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     list_filter   = ("category", "kind", "bom_type", "is_active")
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "incoming_qty", "buildable_qty",
-                       "set_stock_link", "reorder_info", "label_detail")
+                       "set_stock_link", "reorder_info", "label_detail",
+                       "image_preview", "datasheet_link")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -415,6 +416,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         }),
         ("📦 Availability", {"fields": ("stock_qty", "incoming_qty",
                                         "buildable_qty", "reorder_info")}),
+        ("🔗 Медіа та документи", {
+            "fields": ("datasheet_url", "datasheet_link", "image_url", "image", "image_preview"),
+            "classes": ("collapse",),
+        }),
         ("🛃 Митне оформлення", {
             "fields": ("name_export", ("hs_code", "country_of_origin"), "net_weight_g"),
             "classes": ("collapse",),
@@ -624,6 +629,32 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return mark_safe(
             f'<span style="color:#607d8b;font-size:11px" title="Немає {sku}.dymo">—</span>')
     label_btn.short_description = "🏷️ Друк"
+
+    def datasheet_link(self, obj):
+        if not obj.datasheet_url:
+            return mark_safe('<span style="color:var(--text-dim,#607d8b);font-size:12px">— не вказано —</span>')
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener noreferrer" '
+            'style="display:inline-flex;align-items:center;gap:6px;'
+            'background:#1a2e4a;border:1px solid #2a4a6a;border-radius:7px;'
+            'padding:6px 14px;font-size:12px;color:#58a6ff;text-decoration:none">'
+            '📄 Відкрити Datasheet</a>',
+            obj.datasheet_url,
+        )
+    datasheet_link.short_description = "Datasheet"
+
+    def image_preview(self, obj):
+        url = obj.image.url if obj.image else obj.image_url
+        if not url:
+            return mark_safe('<span style="color:var(--text-dim,#607d8b);font-size:12px">— немає зображення —</span>')
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener noreferrer">'
+            '<img src="{}" style="max-height:160px;max-width:320px;border-radius:8px;'
+            'border:1px solid rgba(128,128,128,.25);object-fit:contain">'
+            '</a>',
+            url, url,
+        )
+    image_preview.short_description = "Попередній перегляд"
 
     def set_stock_link(self, obj):
         url = reverse("admin:inventory_product_set_stock", args=[obj.pk])
@@ -904,6 +935,39 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
         # Fallback
         return redirect(reverse("admin:inventory_product_import_excel"))
+
+
+# ── Inventory Settings ─────────────────────────────────────────────────────────
+
+@admin.register(InventorySettings)
+class InventorySettingsAdmin(admin.ModelAdmin):
+    fieldsets = (
+        ("📤 Списання зі складу (при продажах)", {
+            "fields": ("deduct_on", "allow_negative_stock"),
+            "description": (
+                "<b>При створенні</b> — списується одразу при додаванні замовлення.<br>"
+                "<b>При відправці</b> — лише коли статус змінюється на «Відправлено».<br>"
+                "<b>При доставці</b> — лише коли статус змінюється на «Доставлено»."
+            ),
+        }),
+        ("📥 Надходження на склад (закупівлі)", {
+            "fields": ("add_on_po_receive",),
+            "description": "Контролює чи автоматично зараховувати товар при зміні qty_received у PO.",
+        }),
+        ("📍 Загальні параметри", {
+            "fields": ("default_location", "low_stock_alert_enabled"),
+        }),
+    )
+
+    def has_add_permission(self, request):
+        return not InventorySettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        obj, _ = InventorySettings.objects.get_or_create(pk=1)
+        return redirect(reverse("admin:inventory_inventorysettings_change", args=[obj.pk]))
 
 
 # ── Purchase Orders ────────────────────────────────────────────────────────────

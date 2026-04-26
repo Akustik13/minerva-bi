@@ -102,6 +102,12 @@ class Product(models.Model):
     net_weight_g      = models.DecimalField("Вага нетто (г/шт)", max_digits=12, decimal_places=4,
                                            null=True, blank=True)
 
+    # ── Медіа та документи ────────────────────────────────────────────────────
+    datasheet_url = models.URLField("Посилання на Datasheet", blank=True, default="")
+    image_url     = models.URLField("Зображення (URL)", blank=True, default="")
+    image         = models.ImageField("Зображення (файл)", upload_to="products/images/",
+                                      null=True, blank=True)
+
     def __str__(self) -> str:
         return self.sku
 
@@ -275,3 +281,54 @@ class PurchaseOrderLine(models.Model):
                         'qty_received': f'Товар "{self.product.sku}" вимірюється в штуках. '
                                        f'Отримана кількість має бути цілим числом.'
                     })
+
+
+class InventorySettings(models.Model):
+    """Налаштування модуля складу — синглтон (завжди pk=1)."""
+
+    class DeductOn(models.TextChoices):
+        CREATION  = "creation",  "При створенні замовлення"
+        SHIPPED   = "shipped",   "При зміні статусу на «Відправлено»"
+        DELIVERED = "delivered", "При зміні статусу на «Доставлено»"
+
+    deduct_on = models.CharField(
+        "Списувати товар зі складу",
+        max_length=16,
+        choices=DeductOn.choices,
+        default=DeductOn.CREATION,
+        help_text="Коли автоматично зменшувати залишок при продажах.",
+    )
+    add_on_po_receive = models.BooleanField(
+        "Додавати при надходженні закупівлі",
+        default=True,
+        help_text="Автоматично збільшувати залишок при зміні qty_received у замовленні на закупівлю.",
+    )
+    default_location = models.CharField(
+        "Локація за замовчуванням",
+        max_length=50,
+        default="MAIN",
+        help_text="Код складської локації для нових транзакцій (наприклад: MAIN, WAREHOUSE-A).",
+    )
+    allow_negative_stock = models.BooleanField(
+        "Дозволити від'ємний залишок",
+        default=True,
+        help_text="Дозволити відвантаження навіть якщо залишок менший за 0.",
+    )
+    low_stock_alert_enabled = models.BooleanField(
+        "Попередження про низький залишок",
+        default=True,
+        help_text="Показувати попередження в інтерфейсі для товарів нижче точки дозамовлення.",
+    )
+
+    class Meta:
+        verbose_name = "Налаштування складу"
+        verbose_name_plural = "⚙️ Налаштування складу"
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)

@@ -949,7 +949,11 @@ document.addEventListener('DOMContentLoaded', function(){
     { id: 'sales',      label: '🛒 Продажі',      apps: ['sales'] },
     { id: 'accounting', label: '💰 Бухгалтерія',  apps: ['accounting'] },
     { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'] },
-    { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'] },
+    { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'],
+      links: [
+        { href: '/admin/inventory/inventorysettings/', label: '⚙️ Налаштування складу' },
+      ]
+    },
     { id: 'tasks',      label: '📋 Задачі',       apps: ['tasks'] },
     { id: 'ai',         label: '🏛️ Minerva AI',   href: '/dashboard/ai/',   apps: ['ai_assistant'],
       links: [
