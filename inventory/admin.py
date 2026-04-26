@@ -51,13 +51,22 @@ def _get_monthly_sales(product, months=3):
         return 0
 
 
-def _reorder(product):
-    """Повертає dict з аналізом reorder."""
-    stock = _get_stock(product)
+def _reorder(product, stock=None, sales_3m_total=None):
+    """Повертає dict з аналізом reorder.
+    stock: optional pre-computed stock (from queryset annotation)
+    sales_3m_total: optional pre-computed 3-month sales qty (from annotation)
+    """
+    if stock is None:
+        stock = _get_stock(product)
+    else:
+        stock = float(stock)
     # Від'ємний stock = борг — для розрахунків вважаємо 0
     stock_calc = max(0.0, stock)
 
-    monthly = _get_monthly_sales(product, months=3)
+    if sales_3m_total is not None:
+        monthly = float(sales_3m_total) / 3
+    else:
+        monthly = _get_monthly_sales(product, months=3)
     if monthly <= 0:
         monthly = _get_monthly_sales(product, months=24)
         if monthly <= 0:
@@ -132,15 +141,51 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None): return False
 
     def get_queryset(self, request):
-        return super().get_queryset(request).filter(is_active=True)
+        from django.db.models import OuterRef, Subquery, ExpressionWrapper, DecimalField, Value
+        from django.db.models.functions import Coalesce
+        from django.utils import timezone
+        from datetime import timedelta
+        try:
+            from sales.models import SalesOrderLine
+            since_3m = (timezone.now() - timedelta(days=90)).date()
+            stock_subq = (
+                InventoryTransaction.objects.filter(product=OuterRef('pk'))
+                .values('product').annotate(t=Sum('qty')).values('t')
+            )
+            sales_subq = (
+                SalesOrderLine.objects.filter(
+                    product=OuterRef('pk'),
+                    order__order_date__gte=since_3m,
+                ).values('product').annotate(t=Sum('qty')).values('t')
+            )
+            return (
+                super().get_queryset(request).filter(is_active=True)
+                .annotate(
+                    _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
+                    _sales_3m=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
+                )
+            )
+        except Exception:
+            return super().get_queryset(request).filter(is_active=True)
 
     def name_col(self, obj):
         n = obj.name
         return (n[:45] + "…") if len(n) > 45 else n
     name_col.short_description = "Назва"
 
+    def _get_reorder_cached(self, obj):
+        if not hasattr(obj, '_reorder_cache'):
+            s = getattr(obj, '_stock_total', None)
+            s3m = getattr(obj, '_sales_3m', None)
+            obj._reorder_cache = _reorder(
+                obj,
+                stock=float(s) if s is not None else None,
+                sales_3m_total=float(s3m) if s3m is not None else None,
+            )
+        return obj._reorder_cache
+
     def stock_col(self, obj):
-        s = _get_stock(obj)
+        s = float(getattr(obj, '_stock_total', None) or _get_stock(obj))
         if s <= 0:
             return format_html('<b style="color:#f44336">🚫 0</b>')
         elif s < 5:
@@ -149,14 +194,14 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     stock_col.short_description = "На складі"
 
     def monthly_col(self, obj):
-        d = _reorder(obj)
+        d = self._get_reorder_cached(obj)
         if not d['monthly']:
             return format_html('<span style="opacity:.4">—</span>')
         return format_html('{}/міс', d['monthly'])
     monthly_col.short_description = "Прод./міс"
 
     def months_left_col(self, obj):
-        d = _reorder(obj)
+        d = self._get_reorder_cached(obj)
         ml = d['months_left']
         if ml is None:
             return format_html('<span style="opacity:.4">—</span>')
@@ -171,14 +216,14 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     months_left_col.short_description = "Вистачить"
 
     def reorder_col(self, obj):
-        d = _reorder(obj)
+        d = self._get_reorder_cached(obj)
         if not d['reorder_qty']:
             return format_html('<span style="opacity:.4">—</span>')
         return format_html('<b style="color:#2196f3">📦 {} шт.</b>', d['reorder_qty'])
     reorder_col.short_description = "Замовити"
 
     def status_col(self, obj):
-        d = _reorder(obj)
+        d = self._get_reorder_cached(obj)
         cfg = {
             'critical': ('#f44336', '🔥 КРИТИЧНО'),
             'warning':  ('#ff9800', '⚠️ Мало'),
@@ -400,6 +445,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     )
     search_fields = ("sku", "sku_short", "name")
     list_filter   = ("category", "kind", "bom_type", "is_active")
+    list_per_page = 50
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail",
@@ -445,18 +491,81 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             )
         return form
 
+    def get_queryset(self, request):
+        """Annotate stock, incoming and 3-month sales totals to avoid N+1 queries."""
+        from django.db.models import OuterRef, Subquery, ExpressionWrapper, DecimalField, Value
+        from django.db.models.functions import Coalesce
+        from django.utils import timezone
+        from datetime import timedelta
+        try:
+            from sales.models import SalesOrderLine
+            since_3m = (timezone.now() - timedelta(days=90)).date()
+            stock_subq = (
+                InventoryTransaction.objects.filter(product=OuterRef('pk'))
+                .values('product').annotate(t=Sum('qty')).values('t')
+            )
+            incoming_subq = (
+                PurchaseOrderLine.objects
+                .filter(product=OuterRef('pk'),
+                        purchase_order__status__in=['draft', 'ordered', 'partial'])
+                .values('product')
+                .annotate(i=ExpressionWrapper(
+                    Sum('qty_ordered') - Sum('qty_received'),
+                    output_field=DecimalField(max_digits=18, decimal_places=3),
+                ))
+                .values('i')
+            )
+            sales_subq = (
+                SalesOrderLine.objects.filter(
+                    product=OuterRef('pk'),
+                    order__order_date__gte=since_3m,
+                ).values('product').annotate(t=Sum('qty')).values('t')
+            )
+            return super().get_queryset(request).annotate(
+                _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
+                _incoming_total=Coalesce(Subquery(incoming_subq), Value(Decimal('0'))),
+                _sales_3m=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
+            )
+        except Exception:
+            return super().get_queryset(request)
+
+    def changelist_view(self, request, extra_context=None):
+        """Pre-load labels dir listing once per request to avoid per-row filesystem scans."""
+        from pathlib import Path
+        from django.conf import settings
+        labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
+        try:
+            self._cached_labels = {f.stem.upper() for f in labels_dir.glob('*.dymo')}
+        except Exception:
+            self._cached_labels = set()
+        return super().changelist_view(request, extra_context)
+
     # ── Computed columns ──────────────────────────────────────────────────────
 
     def stock_qty(self, obj):
+        if hasattr(obj, '_stock_total'):
+            return obj._stock_total
         total = (InventoryTransaction.objects
                  .filter(product=obj).aggregate(total=Sum("qty")).get("total"))
         return total or Decimal("0")
     stock_qty.short_description = "On stock"
 
+    def _get_reorder_cached(self, obj):
+        """Return _reorder() result, cached on obj to avoid duplicate calls per row."""
+        if not hasattr(obj, '_reorder_cache'):
+            s = getattr(obj, '_stock_total', None)
+            s3m = getattr(obj, '_sales_3m', None)
+            obj._reorder_cache = _reorder(
+                obj,
+                stock=float(s) if s is not None else None,
+                sales_3m_total=float(s3m) if s3m is not None else None,
+            )
+        return obj._reorder_cache
+
     def stock_badge(self, obj):
         """Візуальний індикатор залишку."""
-        s = float(self.stock_qty(obj))
-        d = _reorder(obj)
+        d = self._get_reorder_cached(obj)
+        s = d['stock']
         status = d['status']
         if s <= 0:
             return format_html('<span style="color:#f44336;font-weight:bold">🚫</span>')
@@ -470,7 +579,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     stock_badge.short_description = "⚡"
 
     def reorder_badge(self, obj):
-        d = _reorder(obj)
+        d = self._get_reorder_cached(obj)
         if d['status'] in ('ok', 'no_sales'):
             return format_html('<span style="opacity:.4">—</span>')
         colors = {'critical': '#f44336', 'warning': '#ff9800', 'low': '#ffb300'}
@@ -512,6 +621,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     reorder_info.short_description = "📊 Аналіз запасів"
 
     def incoming_qty(self, obj):
+        if hasattr(obj, '_incoming_total'):
+            return obj._incoming_total
         q = (PurchaseOrderLine.objects
              .filter(product=obj,
                      purchase_order__status__in=['draft', 'ordered', 'partial'])
@@ -606,19 +717,23 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     label_detail.short_description = "Друк етикетки"
 
     def label_btn(self, obj):
-        from pathlib import Path
-        from django.conf import settings
         sku = (obj.sku or "").strip()
         if not sku:
             return format_html('<span style="color:#607d8b">—</span>')
-        labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
+        labels = getattr(self, '_cached_labels', None)
+        if labels is None:
+            from pathlib import Path
+            from django.conf import settings
+            labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
+            try:
+                labels = {f.stem.upper() for f in labels_dir.glob('*.dymo')}
+            except Exception:
+                labels = set()
         sku_up = sku.upper()
-        found = False
-        for f in labels_dir.glob('*.dymo'):
-            s = f.stem.upper()
-            if s == sku_up or (s.startswith(sku_up) and len(s) > len(sku_up) and s[len(sku_up)] in (' ', '_')):
-                found = True
-                break
+        found = any(
+            s == sku_up or (s.startswith(sku_up) and len(s) > len(sku_up) and s[len(sku_up)] in (' ', '_'))
+            for s in labels
+        )
         if found:
             url = f"/labels/serve/{sku}/?qty=1"
             return mark_safe(

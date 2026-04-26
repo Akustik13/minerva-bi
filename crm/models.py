@@ -86,11 +86,17 @@ class Customer(models.Model):
     # ---- Аналітичні властивості ----
 
     def total_orders(self) -> int:
+        # Use annotation if pre-loaded by admin get_queryset()
+        if hasattr(self, '_orders_count') and self._orders_count is not None:
+            return int(self._orders_count)
         from sales.models import SalesOrder
         return SalesOrder.objects.filter(customer_key=self.external_key).count()
 
     def total_revenue(self) -> Decimal:
         """Сума всіх продажів (з SalesOrderLine)."""
+        # Use annotation if pre-loaded by admin get_queryset()
+        if hasattr(self, '_revenue') and self._revenue is not None:
+            return Decimal(str(self._revenue))
         from sales.models import SalesOrderLine
         result = (
             SalesOrderLine.objects
@@ -220,6 +226,9 @@ class Customer(models.Model):
             return None
 
     def last_order_date(self):
+        # Use annotation if pre-loaded by admin get_queryset()
+        if hasattr(self, '_last_order_date') and self._last_order_date is not None:
+            return self._last_order_date
         from sales.models import SalesOrder
         result = SalesOrder.objects.filter(
             customer_key=self.external_key

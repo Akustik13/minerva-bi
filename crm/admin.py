@@ -507,12 +507,45 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         )
         return redirect("admin:crm_customer_changelist")
 
+    list_per_page = 50
+
+    def changelist_view(self, request, extra_context=None):
+        # Reset per-request caches so stale data doesn't leak between requests
+        self._sources_cache = {}
+        return super().changelist_view(request, extra_context)
+
     def get_queryset(self, request):
-        """
-        Анотації прибрані — всі дані рахуються через методи моделі.
-        Швидкість: повільніше, але точно.
-        """
-        return super().get_queryset(request)
+        from django.db.models import OuterRef, Subquery, Count, Value
+        from django.db.models.functions import Coalesce
+        from sales.models import SalesOrder, SalesOrderLine
+
+        # Subquery: date of the most recent order
+        last_order_subq = (
+            SalesOrder.objects.filter(customer_key=OuterRef('external_key'))
+            .order_by('-order_date').values('order_date')[:1]
+        )
+        # Subquery: total order count
+        order_count_subq = (
+            SalesOrder.objects.filter(customer_key=OuterRef('external_key'))
+            .values('customer_key').annotate(c=Count('id')).values('c')
+        )
+        # Subquery: total revenue across all lines
+        revenue_subq = (
+            SalesOrderLine.objects.filter(order__customer_key=OuterRef('external_key'))
+            .values('order__customer_key').annotate(r=Sum('total_price')).values('r')
+        )
+        # Subquery: currency of the most recent order
+        currency_subq = (
+            SalesOrder.objects.filter(customer_key=OuterRef('external_key'))
+            .order_by('-order_date').values('currency')[:1]
+        )
+
+        return super().get_queryset(request).annotate(
+            _last_order_date=Subquery(last_order_subq),
+            _orders_count=Coalesce(Subquery(order_count_subq), Value(0)),
+            _revenue=Coalesce(Subquery(revenue_subq), Value(Decimal('0'))),
+            _main_currency=Subquery(currency_subq),
+        )
 
     fieldsets = (
         ("📋 Контактна інформація", {
@@ -574,17 +607,21 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     }
 
     def sources_display(self, obj):
-        if not obj.external_key:
+        key = obj.external_key or ''
+        if not key:
             src = obj.source or ''
             sources = [src] if src else []
         else:
-            from sales.models import SalesOrder
-            sources = list(
-                SalesOrder.objects.filter(customer_key=obj.external_key)
-                .values_list('source', flat=True).distinct()
-            )
-            if not sources:
-                sources = [obj.source] if obj.source else []
+            cache = getattr(self, '_sources_cache', None)
+            if cache is None:
+                self._sources_cache = cache = {}
+            if key not in cache:
+                from sales.models import SalesOrder
+                cache[key] = list(
+                    SalesOrder.objects.filter(customer_key=key)
+                    .values_list('source', flat=True).distinct()
+                ) or ([obj.source] if obj.source else [])
+            sources = cache[key]
         if not sources:
             return mark_safe('<span style="opacity:.4">—</span>')
         badges = []
@@ -684,43 +721,24 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     revenue_display.short_description = "Виручка"
     
     def avg_order_display(self, obj):
-        """Середній чек з валютою основної."""
-        from sales.models import SalesOrder, SalesOrderLine
-        from django.db.models import Sum
-        from django.utils.html import format_html
-        
-        orders = SalesOrder.objects.filter(customer_key=obj.external_key)
-        
-        if not orders.exists():
+        """Середній чек — використовує annotations з get_queryset()."""
+        count = getattr(obj, '_orders_count', None)
+        if count is None:
+            count = obj.total_orders()
+        if not count:
             return "—"
-        
-        # Беремо валюту першого замовлення
-        first_currency = orders.first().currency or 'USD'
-        
-        # Рахуємо загальну суму з SalesOrderLine
-        total_revenue = (
-            SalesOrderLine.objects
-            .filter(
-                order__customer_key=obj.external_key,
-                currency=first_currency
-            )
-            .aggregate(total=Sum('total_price'))
-        )['total']
-        
-        if not total_revenue:
+
+        revenue = getattr(obj, '_revenue', None)
+        if revenue is None:
+            revenue = obj.total_revenue()
+        if not revenue:
             return "—"
-        
-        # Кількість замовлень
-        order_count = orders.count()
-        avg = float(total_revenue) / order_count
-        
+
+        avg = float(revenue) / int(count)
+        currency = getattr(obj, '_main_currency', None) or 'EUR'
         symbols = {'USD': '$', 'EUR': '€', 'GBP': '£'}
-        symbol = symbols.get(first_currency, first_currency)
-        
-        # Форматуємо число ПЕРЕД format_html
-        formatted_amount = f"{avg:.2f}"
-        
-        return format_html('<b>{}{}</b>', symbol, formatted_amount)
+        symbol = symbols.get(currency, currency)
+        return format_html('<b>{}{}</b>', symbol, f"{avg:.2f}")
 
     avg_order_display.short_description = "Середній чек"
 
