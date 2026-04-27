@@ -926,6 +926,132 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return format_html('<a class="button" href="{}">Set stock…</a>', url)
     set_stock_link.short_description = "⚙️ Дії"
 
+    def history_view(self, request, object_id, extra_context=None):
+        """Рух товару замість стандартного Django LogEntry history."""
+        from django.template.response import TemplateResponse
+        from django.core.exceptions import PermissionDenied
+        from django.db.models import Q as _Q
+
+        obj = get_object_or_404(Product, pk=object_id)
+        if not self.has_view_or_change_permission(request, obj):
+            raise PermissionDenied
+
+        txs = list(
+            InventoryTransaction.objects.filter(product=obj)
+            .select_related('location')
+            .order_by('-tx_date', '-pk')[:500]
+        )
+
+        # ── Batch-fetch SalesOrders and POs ────────────────────────────────────
+        so_keys, po_codes = set(), set()
+        for tx in txs:
+            ek = tx.external_key
+            if ek.startswith('so:'):
+                parts = ek.split(':')
+                if len(parts) >= 3:
+                    so_keys.add((parts[1], parts[2]))
+            elif ek.startswith('po:'):
+                parts = ek.split(':')
+                if len(parts) >= 2:
+                    po_codes.add(parts[1])
+
+        orders_map = {}
+        if so_keys:
+            from sales.models import SalesOrder
+            q = _Q()
+            for source, order_num in so_keys:
+                q |= _Q(source=source, order_number=order_num)
+            for o in SalesOrder.objects.filter(q).values(
+                'source', 'order_number', 'pk', 'client', 'contact_name'
+            ):
+                orders_map[(o['source'], o['order_number'])] = o
+
+        po_map = {}
+        if po_codes:
+            for po in PurchaseOrder.objects.filter(code__in=po_codes).values(
+                'code', 'pk', 'supplier__name'
+            ):
+                po_map[po['code']] = po
+
+        # ── Build rows ─────────────────────────────────────────────────────────
+        TYPE_CFG = {
+            'Incoming':   ('▲', 'green',  'Прихід'),
+            'Outgoing':   ('▼', 'red',    'Відвантаження'),
+            'Adjustment': ('⇄', 'blue',   'Коригування'),
+        }
+        rows = []
+        running = 0.0
+        for tx in reversed(txs):   # chronological for running total
+            running += float(tx.qty)
+        running_total = running
+
+        # Re-iterate in display order (newest first) with running balance
+        balance = running_total
+        for tx in txs:
+            kind, color, label = TYPE_CFG.get(tx.tx_type, ('?', 'gray', tx.tx_type))
+            qty = float(tx.qty)
+            qty_str = (f'+{abs(qty):g}' if tx.tx_type == 'Incoming'
+                       else f'−{abs(qty):g}' if tx.tx_type == 'Outgoing'
+                       else f'{qty:+g}')
+            balance_str = f'{balance:g}'
+
+            doc_url = doc_label = who = ''
+            ek = tx.external_key
+            if ek.startswith('so:'):
+                parts = ek.split(':')
+                source, order_num = (parts[1] if len(parts) > 1 else ''), (parts[2] if len(parts) > 2 else '')
+                order = orders_map.get((source, order_num))
+                if order:
+                    doc_url   = f'/admin/sales/salesorder/{order["pk"]}/change/'
+                    doc_label = f'#{order_num}' + (f' [{source}]' if source else '')
+                    who = (order['contact_name'] or order['client'] or '').strip()[:45]
+                else:
+                    doc_label = tx.ref_doc or ek
+            elif ek.startswith('po:'):
+                parts = ek.split(':')
+                po_code = parts[1] if len(parts) > 1 else ''
+                po = po_map.get(po_code)
+                if po:
+                    doc_url   = f'/admin/inventory/purchaseorder/{po["pk"]}/change/'
+                    doc_label = po_code
+                    who = (po.get('supplier__name') or '').strip()[:45]
+                else:
+                    doc_label = tx.ref_doc or ek
+            else:
+                doc_label = tx.ref_doc or ek[:55]
+
+            rows.append({
+                'date':      tx.tx_date.strftime('%d.%m.%Y') if tx.tx_date else '—',
+                'label':     label,
+                'color':     color,
+                'qty_str':   qty_str,
+                'balance':   balance_str,
+                'doc_url':   doc_url,
+                'doc_label': doc_label,
+                'who':       who,
+                'loc':       tx.location.code if tx.location_id else '—',
+            })
+            balance -= qty  # go back in time
+
+        total = InventoryTransaction.objects.filter(product=obj).count()
+        ctx = {
+            **self.admin_site.each_context(request),
+            'title': f'Рух товару — {obj.sku}',
+            'object': obj,
+            'opts': self.model._meta,
+            'rows': rows,
+            'total': total,
+            'shown': len(txs),
+            'current_stock': f'{running_total:g}',
+            'has_change_permission': self.has_change_permission(request),
+            'preserved_filters': self.get_preserved_filters(request),
+        }
+        if extra_context:
+            ctx.update(extra_context)
+        return TemplateResponse(
+            request, 'admin/inventory/product/object_history.html', ctx
+        )
+
     def get_urls(self):
         urls = super().get_urls()
         custom = [

@@ -1,0 +1,167 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Рух товару — {{ object.sku }}{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:inventory_product_changelist' %}">Товари</a>
+  &rsaquo; <a href="{% url 'admin:inventory_product_change' object.pk %}">{{ object.sku }}</a>
+  &rsaquo; Рух товару
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.mv-history-wrap { padding: 24px 28px 60px; max-width: 1100px; }
+
+.mv-header {
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 24px; padding-bottom: 18px;
+  border-bottom: 1px solid var(--border);
+}
+.mv-header-icon {
+  width: 48px; height: 48px; border-radius: 12px; flex-shrink: 0;
+  background: linear-gradient(135deg,rgba(63,185,80,.2),rgba(88,166,255,.1));
+  display: flex; align-items: center; justify-content: center; font-size: 24px;
+}
+.mv-header h2 { font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 0; }
+.mv-header p  { color: var(--text-muted); font-size: 13px; margin: 3px 0 0; }
+
+.mv-chips {
+  display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+}
+.mv-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 700;
+  border: 1px solid;
+}
+.mv-chip-stock  { background: rgba(63,185,80,.12);  color: #3fb950; border-color: rgba(63,185,80,.3); }
+.mv-chip-total  { background: rgba(88,166,255,.12); color: #58a6ff; border-color: rgba(88,166,255,.3); }
+.mv-chip-shown  { background: rgba(125,133,144,.1); color: #9198a1; border-color: rgba(125,133,144,.3); }
+
+.mv-table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.mv-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mv-table th {
+  padding: 9px 14px; background: var(--bg-card);
+  color: var(--text-muted); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .6px;
+  border-bottom: 1px solid var(--border); text-align: left;
+}
+.mv-table th.num { text-align: right; }
+.mv-table td { padding: 8px 14px; border-bottom: 1px solid rgba(128,128,128,.08); vertical-align: middle; }
+.mv-table tr:last-child td { border-bottom: none; }
+.mv-table tr:hover td { background: var(--bg-hover); }
+
+.mv-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 2px 10px; border-radius: 10px; font-size: 11px; font-weight: 700;
+  white-space: nowrap;
+}
+.mv-badge-green  { background: rgba(63,185,80,.15);  color: #3fb950; }
+.mv-badge-red    { background: rgba(248,81,73,.15);  color: #f85149; }
+.mv-badge-blue   { background: rgba(88,166,255,.15); color: #58a6ff; }
+.mv-badge-gray   { background: rgba(125,133,144,.15);color: #9198a1; }
+
+.mv-qty { font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; text-align: right; }
+.mv-qty-green  { color: #3fb950; }
+.mv-qty-red    { color: #f85149; }
+.mv-qty-blue   { color: #58a6ff; }
+.mv-balance    { font-size: 12px; color: var(--text-muted); text-align: right; font-variant-numeric: tabular-nums; }
+.mv-doc-link   { color: #58a6ff; text-decoration: none; font-size: 12px; }
+.mv-doc-link:hover { text-decoration: underline; }
+.mv-who        { font-size: 12px; color: var(--text-muted); }
+.mv-loc        { font-size: 11px; color: var(--text-dim,#607d8b); }
+.mv-date       { white-space: nowrap; font-size: 12px; color: var(--text-muted); }
+
+.mv-empty {
+  text-align: center; padding: 40px; color: var(--text-muted);
+  font-size: 14px;
+}
+
+.mv-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-top: 20px;
+  padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600;
+  background: var(--bg-card); border: 1px solid var(--border);
+  color: var(--text); text-decoration: none;
+  transition: border-color .2s;
+}
+.mv-back:hover { border-color: rgba(88,166,255,.4); color: #58a6ff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mv-history-wrap">
+
+  <div class="mv-header">
+    <div class="mv-header-icon">📋</div>
+    <div>
+      <h2>Рух товару — {{ object.sku }}</h2>
+      <p>{{ object.name }}</p>
+    </div>
+  </div>
+
+  <div class="mv-chips">
+    <span class="mv-chip mv-chip-stock">📦 Поточний залишок: <b>{{ current_stock }} шт</b></span>
+    <span class="mv-chip mv-chip-total">📊 Всього операцій: <b>{{ total }}</b></span>
+    {% if shown < total %}
+    <span class="mv-chip mv-chip-shown">Показано останні {{ shown }}</span>
+    {% endif %}
+  </div>
+
+  {% if rows %}
+  <div class="mv-table-wrap">
+    <table class="mv-table">
+      <thead>
+        <tr>
+          <th>Дата</th>
+          <th>Тип</th>
+          <th class="num">К-сть</th>
+          <th class="num">Залишок</th>
+          <th>Документ</th>
+          <th>Клієнт / Постачальник</th>
+          <th>Локація</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        <tr>
+          <td class="mv-date">{{ row.date }}</td>
+          <td>
+            <span class="mv-badge mv-badge-{{ row.color }}">
+              {% if row.color == 'green' %}▲{% elif row.color == 'red' %}▼{% else %}⇄{% endif %}
+              {{ row.label }}
+            </span>
+          </td>
+          <td class="mv-qty mv-qty-{{ row.color }}">{{ row.qty_str }}</td>
+          <td class="mv-balance">{{ row.balance }}</td>
+          <td>
+            {% if row.doc_url %}
+              <a class="mv-doc-link" href="{{ row.doc_url }}" target="_blank">{{ row.doc_label }}</a>
+            {% else %}
+              <span class="mv-who">{{ row.doc_label }}</span>
+            {% endif %}
+          </td>
+          <td class="mv-who">{{ row.who }}</td>
+          <td class="mv-loc">{{ row.loc }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="mv-empty">
+    <div style="font-size:40px;margin-bottom:12px">📋</div>
+    Транзакцій для цього товару ще немає
+  </div>
+  {% endif %}
+
+  <a class="mv-back" href="{% url 'admin:inventory_product_change' object.pk %}">
+    ← Повернутись до товару
+  </a>
+
+</div>
+{% endblock %}
