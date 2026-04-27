@@ -705,10 +705,18 @@ class UPSClient:
         try:
             data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
         except UPSError as e:
-            if '111057' in str(e) and from_country:
+            err_str = str(e)
+            if '111057' in err_str and from_country:
                 # UPS rejected units — flip, remember, rebuild packages, retry once
                 self._set_units(from_country, not self._get_is_imperial(from_country))
                 _rebuild_packages()
+                data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
+            elif '120317' in err_str:
+                # ShipFrom country must match Shipper country — use Shipper address as ShipFrom
+                shipper_node = payload['ShipmentRequest']['Shipment']['Shipper']
+                payload['ShipmentRequest']['Shipment']['ShipFrom'] = {
+                    k: v for k, v in shipper_node.items() if k != 'ShipperNumber'
+                }
                 data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
             else:
                 raise
