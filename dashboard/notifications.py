@@ -596,6 +596,107 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
             pass
 
 
+def notify_digikey_auto_confirmed(sale, mode: str):
+    """Надсилає сповіщення після успішного авто-підтвердження DigiKey замовлення."""
+    ns = _get_ns()
+    if not ns:
+        return
+
+    send_tg    = ns.telegram_enabled and ns.new_order_telegram
+    send_email = ns.email_enabled    and ns.new_order_email
+    if not send_tg and not send_email:
+        return
+
+    MODE_LABELS = {
+        'always':   'всі замовлення (always)',
+        'in_stock': 'є на складі (in_stock)',
+    }
+    mode_label = MODE_LABELS.get(mode, mode)
+    client = sale.client or sale.email or '—'
+
+    # Collect product lines
+    lines_data = []
+    try:
+        for line in sale.lines.select_related('product').all():
+            p = line.product
+            lines_data.append({
+                'sku':       (p.sku if p else line.sku_raw) or '—',
+                'name':      (p.name if p else '') or '—',
+                'qty':       line.qty,
+                'datasheet': (p.datasheet_url if p else '') or '',
+            })
+    except Exception:
+        pass
+
+    if send_tg:
+        try:
+            _cname = _get_company_name()
+            tg = [
+                f'🏛️ <b>{_cname}</b>',
+                f'✅ <b>DigiKey: авто-підтверджено</b>',
+                '',
+                f'Замовлення: <code>{sale.order_number}</code>',
+                f'Клієнт: <b>{client}</b>',
+                f'🤖 Система підтвердила автоматично <i>({mode_label})</i>',
+                f'Статус → <b>В обробці</b>',
+            ]
+            if lines_data:
+                tg.append('')
+                tg.append('📋 <b>Товари:</b>')
+                for ld in lines_data:
+                    name_part = f' {ld["name"]}' if ld['name'] not in ('—', '') else ''
+                    line_txt  = f'• <code>{ld["sku"]}</code>{name_part} × {ld["qty"]}'
+                    if ld.get('datasheet'):
+                        line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
+                    tg.append(line_txt)
+            _send_telegram(ns, '\n'.join(tg))
+        except Exception:
+            pass
+
+    if send_email:
+        try:
+            lines_html = ''
+            if lines_data:
+                rows = ''
+                for ld in lines_data:
+                    ds = ld.get('datasheet', '')
+                    sku_cell = (
+                        f'<a href="{ds}" style="color:#1565c0;font-family:monospace;font-size:12px;'
+                        f'text-decoration:none">{ld["sku"]} 📄</a>'
+                        if ds else
+                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
+                    )
+                    rows += (
+                        f'<tr style="border-bottom:1px solid #eee">'
+                        f'<td style="padding:5px 8px">{sku_cell}</td>'
+                        f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
+                        f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
+                        f'</tr>'
+                    )
+                lines_html = (
+                    '<div style="margin-top:12px"><b style="font-size:13px">📋 Товари:</b>'
+                    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">'
+                    '<tr style="background:#f0f4f8;color:#555;font-size:11px">'
+                    '<th style="padding:5px 8px;text-align:left">SKU</th>'
+                    '<th style="padding:5px 8px;text-align:left">Назва</th>'
+                    '<th style="padding:5px 8px;text-align:center">К-сть</th>'
+                    '</tr>' + rows + '</table></div>'
+                )
+            extra = (
+                f'<br><b>🤖 Підтверджено:</b> автоматично системою'
+                f' <span style="color:#555;font-size:12px">({mode_label})</span>'
+                f'<br><b>Статус:</b> → <b style="color:#f57c00">В обробці</b>'
+            )
+            if lines_html:
+                extra += f'<br>{lines_html}'
+            html = _order_email_html(
+                sale, '✅ DigiKey: авто-підтверджено', '#2e7d32', extra
+            )
+            _send_event_email(ns, f'✅ DigiKey авто-підтверджено: {sale.order_number}', html)
+        except Exception:
+            pass
+
+
 STATUS_LABELS = {
     'received':   'Отримано (нове)',
     'processing': 'В обробці',
@@ -704,6 +805,7 @@ def notify_new_order(order):
                 lines_data.append({
                     'sku': line.sku_raw or '—', 'name': '—',
                     'qty': line.qty, 'in_stock': None, 'stock': 0,
+                    'datasheet': '',
                 })
                 continue
             stock = (
@@ -711,11 +813,12 @@ def notify_new_order(order):
                 .aggregate(t=Sum('qty'))['t'] or 0
             )
             lines_data.append({
-                'sku':      line.product.sku,
-                'name':     line.product.name,
-                'qty':      line.qty,
-                'stock':    int(stock),
-                'in_stock': stock >= line.qty,
+                'sku':       line.product.sku,
+                'name':      line.product.name,
+                'qty':       line.qty,
+                'stock':     int(stock),
+                'in_stock':  stock >= line.qty,
+                'datasheet': line.product.datasheet_url or '',
             })
     except Exception:
         pass
@@ -767,10 +870,16 @@ def notify_new_order(order):
                         )
                     else:
                         stock_cell = '—'
+                    ds = ld.get('datasheet', '')
+                    sku_cell = (
+                        f'<a href="{ds}" style="color:#1565c0;font-family:monospace;font-size:12px;'
+                        f'text-decoration:none" title="📄 Datasheet">{ld["sku"]} 📄</a>'
+                        if ds else
+                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
+                    )
                     rows += (
                         f'<tr style="border-bottom:1px solid #eee">'
-                        f'<td style="padding:5px 8px;font-family:monospace;font-size:12px;'
-                        f'color:#1565c0">{ld["sku"]}</td>'
+                        f'<td style="padding:5px 8px">{sku_cell}</td>'
                         f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
                         f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
                         f'<td style="padding:5px 8px;text-align:right;font-size:12px">{stock_cell}</td>'
@@ -839,7 +948,10 @@ def notify_new_order(order):
                     icon = '✅' if ld['in_stock'] is True else ('❌' if ld['in_stock'] is False else '•')
                     name_part  = f' {ld["name"]}' if ld['name'] != '—' else ''
                     stock_part = f' | склад: {ld["stock"]} шт' if ld['in_stock'] is not None else ''
-                    tg.append(f'{icon} <code>{ld["sku"]}</code>{name_part} × {ld["qty"]}{stock_part}')
+                    line_txt = f'{icon} <code>{ld["sku"]}</code>{name_part} × {ld["qty"]}{stock_part}'
+                    if ld.get('datasheet'):
+                        line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
+                    tg.append(line_txt)
             _send_telegram(ns, '\n'.join(tg))
         except Exception:
             pass
@@ -879,11 +991,58 @@ def notify_status_change(order, old_status, new_status):
     color   = status_colors.get(new_status, '#455a64')
     subject = f'🔄 Minerva: {order.order_number} → {new_label}'
 
+    # Extra context: manual DigiKey confirm + product lines
+    is_dk_manual = (
+        new_status == 'processing'
+        and 'digikey' in (getattr(order, 'source', '') or '').lower()
+    )
+    prod_lines_data = []
+    if is_dk_manual:
+        try:
+            for line in order.lines.select_related('product').all():
+                p = line.product
+                prod_lines_data.append({
+                    'sku':       (p.sku if p else line.sku_raw) or '—',
+                    'name':      (p.name if p else '') or '—',
+                    'qty':       line.qty,
+                    'datasheet': (p.datasheet_url if p else '') or '',
+                })
+        except Exception:
+            pass
+
     if send_email:
         try:
             extra = f'<br><b>Статус:</b> {old_label} → <b>{new_label}</b>'
+            if is_dk_manual:
+                extra += '<br><b>✋ Підтверджено:</b> вручну на DigiKey'
             if new_status == 'shipped' and order.tracking_number:
                 extra += f'<br><b>Трекінг:</b> <code>{order.tracking_number}</code>'
+            if prod_lines_data:
+                rows = ''
+                for ld in prod_lines_data:
+                    ds = ld.get('datasheet', '')
+                    sku_cell = (
+                        f'<a href="{ds}" style="color:#1565c0;font-family:monospace;font-size:12px;'
+                        f'text-decoration:none">{ld["sku"]} 📄</a>'
+                        if ds else
+                        f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
+                    )
+                    rows += (
+                        f'<tr style="border-bottom:1px solid #eee">'
+                        f'<td style="padding:5px 8px">{sku_cell}</td>'
+                        f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
+                        f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
+                        f'</tr>'
+                    )
+                extra += (
+                    '<div style="margin-top:12px"><b style="font-size:13px">📋 Товари:</b>'
+                    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">'
+                    '<tr style="background:#f0f4f8;color:#555;font-size:11px">'
+                    '<th style="padding:5px 8px;text-align:left">SKU</th>'
+                    '<th style="padding:5px 8px;text-align:left">Назва</th>'
+                    '<th style="padding:5px 8px;text-align:center">К-сть</th>'
+                    '</tr>' + rows + '</table></div>'
+                )
             html = _order_email_html(order, f'🔄 {new_label}', color, extra)
             _send_event_email(ns, subject, html)
         except Exception:
@@ -899,8 +1058,18 @@ def notify_status_change(order, old_status, new_status):
                 f'Клієнт: {client}',
                 f'Статус: {old_label} → <b>{new_label}</b>',
             ]
+            if is_dk_manual:
+                lines.append('✋ Підтверджено вручну на DigiKey')
             if new_status == 'shipped' and order.tracking_number:
                 lines.append(f'Трекінг: <code>{order.tracking_number}</code>')
+            if prod_lines_data:
+                lines.append('')
+                lines.append('📋 <b>Товари:</b>')
+                for ld in prod_lines_data:
+                    line_txt = f'• <code>{ld["sku"]}</code> {ld["name"]} × {ld["qty"]}'
+                    if ld.get('datasheet'):
+                        line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
+                    lines.append(line_txt)
             _send_telegram(ns, '\n'.join(lines))
         except Exception:
             pass

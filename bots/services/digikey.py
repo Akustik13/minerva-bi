@@ -727,7 +727,7 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
     dk_state       = order.get("orderState", "")
     minerva_status = MARKETPLACE_STATUS_MAP.get(dk_state, "received")
 
-    currency    = _get_additional_field(add_fields, "currency", "USD")
+    currency    = (config.locale_currency if config and config.locale_currency else None) or "USD"
     po_number   = _get_additional_field(add_fields, "customer-purchase-order-number", "")
     order_date  = _parse_date(order.get("createDateUtc"))
     deadline    = _parse_date(order.get("shippingDeadlineUtc"))
@@ -782,15 +782,16 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
 
     if created:
         stats["created"] += 1
-        stats["changes"].append({
+        _change_entry = {
             "order":      order_number,
             "client":     client,
             "old_status": "—",
             "new_status": minerva_status,
-        })
+        }
+        stats["changes"].append(_change_entry)
         _create_marketplace_lines(sale, order, currency, stats)
         if config:
-            _maybe_auto_confirm(config, order_number, sale)
+            _maybe_auto_confirm(config, order_number, sale, _change_entry)
     else:
         # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
         if _status_can_advance(sale.status, minerva_status):
@@ -911,6 +912,7 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     """Звіряє одне DigiKey замовлення з Minerva."""
     from sales.models import SalesOrder, SalesOrderLine
     from inventory.models import Product
+    from bots.models import DigiKeyConfig as _DKConfig
 
     order_number = str(order.get("businessId", ""))
     if not order_number:
@@ -920,10 +922,11 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     addr       = customer.get("shippingAddress") or customer.get("billingAddress") or {}
     add_fields = order.get("additionalFields") or []
 
+    _cfg = _DKConfig.objects.filter(pk=1).first()
     # ── Витягуємо всі поля ────────────────────────────────────────────────────
     dk_state   = order.get("orderState", "")
     new_status = MARKETPLACE_STATUS_MAP.get(dk_state, "received")
-    currency   = _get_additional_field(add_fields, "currency", "USD")
+    currency   = (_cfg.locale_currency if _cfg and _cfg.locale_currency else None) or "USD"
     po_number  = _get_additional_field(add_fields, "customer-purchase-order-number", "")
     tracking   = _get_additional_field(add_fields, "internal-tracking-number", "")
     carrier    = order.get("shippingMethodLabel") or ""
@@ -1122,7 +1125,7 @@ def _check_stock_for_order(sale) -> bool:
     return True
 
 
-def _maybe_auto_confirm(config, order_id: str, sale) -> None:
+def _maybe_auto_confirm(config, order_id: str, sale, change_entry: dict = None) -> None:
     """
     Перевіряє auto_confirm_mode і при потребі підтверджує замовлення на DigiKey.
     Викликається одразу після створення нового Marketplace замовлення.
@@ -1146,6 +1149,19 @@ def _maybe_auto_confirm(config, order_id: str, sale) -> None:
     result = confirm_marketplace_order(config, order_id)
     if result["ok"]:
         logger.info("DigiKey auto-confirmed order=%s mode=%s", order_id, mode)
+        # Immediately advance to «processing» — bypass signal to avoid duplicate
+        # notify_status_change (we send our own richer notification below).
+        from sales.models import SalesOrder as _SO
+        _SO.objects.filter(pk=sale.pk).update(status="processing")
+        sale.status = "processing"
+        if change_entry is not None:
+            change_entry["new_status"] = "processing"
+            change_entry["extra"] = "🤖 авто-підтверджено"
+        try:
+            from dashboard.notifications import notify_digikey_auto_confirmed
+            notify_digikey_auto_confirmed(sale, mode)
+        except Exception:
+            pass
     else:
         logger.warning(
             "DigiKey auto-confirm FAILED order=%s mode=%s: %s",

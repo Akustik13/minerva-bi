@@ -146,6 +146,12 @@ document.addEventListener('DOMContentLoaded', function () {
 .sv-note-input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:12px;padding:0;min-width:0}
 /* Select-all inline (inside action row) */
 #sv-select-bar{padding:4px 10px;background:rgba(21,101,192,.12);border:1px solid rgba(21,101,192,.3);border-radius:6px;font-size:13px}
+/* Product image tooltip */
+#sv-img-tip{position:fixed;z-index:9999;pointer-events:none;display:none;
+  background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+  border-radius:8px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:180px;text-align:center}
+#sv-img-tip img{max-width:160px;max-height:160px;border-radius:5px;display:block}
+#sv-img-tip .sv-img-nophoto{font-size:11px;color:var(--text-muted);padding:12px 20px;white-space:nowrap}
 </style>
 {% endblock %}
 
@@ -336,13 +342,15 @@ document.addEventListener('DOMContentLoaded', function () {
           <th style="padding:5px 8px;text-align:center;font-weight:600">К-сть</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">Ціна</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">Сума</th>
+          <th style="padding:5px 8px;text-align:center;font-weight:600">📄</th>
         </tr>
       </thead>
       <tbody>
         {% for line in lines %}
         <tr style="border-bottom:1px solid var(--border);color:var(--text)">
-          {% with lsku=line.sku_raw|default:line.product.sku lqty=line.qty|floatformat:"0" %}
-          <td style="padding:6px 8px;font-family:monospace;font-weight:700">{{ lsku|default:"—" }}</td>
+          {% with lsku=line.sku_raw|default:line.product.sku lqty=line.qty|floatformat:"0" limg=line.product.image.url|default:line.product.image_url %}
+          <td style="padding:6px 8px;font-family:monospace;font-weight:700;white-space:nowrap;position:relative"
+              {% if limg %}class="sv-sku-img" data-img="{{ limg }}"{% endif %}>{{ lsku|default:"—" }}</td>
           <td style="padding:6px 8px;text-align:center">
             {% if lsku %}<span class="sv-lbl-btn sv-lbl-off sv-line-lbl" data-sku="{{ lsku }}" data-qty="{{ lqty }}">🏷️</span>{% else %}—{% endif %}
           </td>
@@ -355,13 +363,22 @@ document.addEventListener('DOMContentLoaded', function () {
           <td style="padding:6px 8px;text-align:right;font-weight:700;color:#2e7d32">
             {% if line.total_price %}{{ line.total_price|floatformat:"2" }} {{ line.currency }}{% else %}—{% endif %}
           </td>
+          <td style="padding:6px 8px;text-align:center">
+            {% if line.product.datasheet_url %}
+              <a href="{{ line.product.datasheet_url }}" target="_blank"
+                 title="{{ lsku }} — Datasheet"
+                 style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
+            {% else %}
+              <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
+            {% endif %}
+          </td>
           {% endwith %}
         </tr>
         {% endfor %}
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--border-strong)">
-          <td colspan="4" style="padding:7px 8px;text-align:right;color:var(--text-muted);font-size:12px">Разом:</td>
+          <td colspan="5" style="padding:7px 8px;text-align:right;color:var(--text-muted);font-size:12px">Разом:</td>
           <td style="padding:7px 8px;text-align:right;font-size:15px;font-weight:800;color:#2e7d32;white-space:nowrap">
             {% with t=order.order_total %}{% if t %}{{ t|floatformat:"2" }} {{ lines.0.currency|default:order.currency }}{% else %}—{% endif %}{% endwith %}
           </td>
@@ -895,6 +912,42 @@ function svNoteSave(pk) {
     }
   });
 }
+
+// ── Product image tooltip ─────────────────────────────────────────────────────
+(function () {
+  var tip = document.createElement('div');
+  tip.id = 'sv-img-tip';
+  document.body.appendChild(tip);
+
+  function show(el, e) {
+    var src = el.dataset.img;
+    tip.innerHTML = src
+      ? '<img src="' + src + '" alt="">'
+      : '<div class="sv-img-nophoto">Немає фото</div>';
+    tip.style.display = 'block';
+    move(e);
+  }
+  function move(e) {
+    var x = e.clientX + 14, y = e.clientY + 14;
+    if (x + 190 > window.innerWidth)  x = e.clientX - 190;
+    if (y + 190 > window.innerHeight) y = e.clientY - 190;
+    tip.style.left = x + 'px';
+    tip.style.top  = y + 'px';
+  }
+  function hide() { tip.style.display = 'none'; }
+
+  document.addEventListener('mouseover', function(e) {
+    var el = e.target.closest('.sv-sku-img');
+    if (el) show(el, e);
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (tip.style.display !== 'none') move(e);
+  });
+  document.addEventListener('mouseout', function(e) {
+    var el = e.target.closest('.sv-sku-img');
+    if (el) hide();
+  });
+})();
 </script>
 
 {% endblock %}
