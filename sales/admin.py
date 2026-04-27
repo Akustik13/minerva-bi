@@ -148,7 +148,7 @@ class SalesSettingsAdmin(admin.ModelAdmin):
         }),
         ('🖥️ Відображення списку замовлень', {
             'fields': ('show_product_image_tooltip', 'show_pdf_preview', 'datasheet_priority', 'image_priority',
-                       'label_open_mode'),
+                       'label_open_mode', 'dymo_open_mode'),
             'description': (
                 '<b>Попередній перегляд фото / PDF</b> — при наведенні на Артикул або значок 📄 '
                 'показує фото або PDF у маленькому спливаючому вікні.<br>'
@@ -480,6 +480,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context['sv_datasheet_prio']   = _ss.datasheet_priority
         extra_context['sv_image_prio']       = _ss.image_priority
         extra_context['sv_label_open_mode']  = _ss.label_open_mode
+        extra_context['sv_dymo_open_mode']   = _ss.dymo_open_mode
 
         return super().changelist_view(request, extra_context=extra_context)
     date_hierarchy = "order_date"
@@ -1564,11 +1565,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     break
             if found:
                 url = f"/labels/serve/{sku}/?qty={qty}"
+                _sku_js = sku.replace("'", "\\'")
                 buttons.append(
-                    f'<a href="{url}" '
-                    f'style="display:inline-block;margin:2px;background:#1976d2;color:#fff;'
-                    f'padding:3px 8px;border-radius:6px;font-size:11px;text-decoration:none;'
-                    f'white-space:nowrap">🖨️ {sku}</a>')
+                    f'<button type="button" onclick="svDymoOpen(\'{url}\',\'{_sku_js}\',{qty})" '
+                    f'style="display:inline-block;margin:2px;background:#1976d2;color:#fff;border:none;'
+                    f'padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;'
+                    f'white-space:nowrap">🖨️ {sku}</button>')
             else:
                 buttons.append(
                     f'<span style="display:inline-block;margin:2px;background:#bdbdbd;color:#fff;'
@@ -1610,11 +1612,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
             if label_path:
                 print_url = f"/labels/serve/{sku}/?qty={qty}"
+                _sku_js = sku.replace("'", "\\'")
                 print_btn = (
-                    f'<a href="{print_url}" target="_blank" '
-                    f'style="background:#1976d2;color:#fff;padding:7px 14px;'
-                    f'border-radius:7px;text-decoration:none;font-weight:bold;font-size:13px">'
-                    f'🖨️ Друкувати ({qty} шт.)</a>'
+                    f'<button type="button" '
+                    f'onclick="svDymoOpen(\'{print_url}\',\'{_sku_js}\',{qty})" '
+                    f'style="background:#1976d2;color:#fff;padding:7px 14px;border:none;'
+                    f'border-radius:7px;cursor:pointer;font-weight:bold;font-size:13px">'
+                    f'🖨️ Друкувати ({qty} шт.)</button>'
                 )
                 upload_btn = (
                     f'<button type="button" onclick="document.getElementById(\'dfi_{sku_id}\').click()" '
@@ -1665,6 +1669,90 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
             '''
 <script>
+// ── DYMO open helper (shared with changelist; define only if not already loaded) ──
+if (!window.svDymoOpen) {
+  (function(){
+    var _fwL=false,_fwLg=false,_fwCb=[];
+    function _loadFW(cb){
+      if(_fwL&&window.dymo&&window.dymo.label){cb(null);return;}
+      _fwCb.push(cb);if(_fwLg)return;_fwLg=true;
+      var s=document.createElement('script');
+      s.src='https://labelwriter.com/software/dls/sdk/js/DYMO.Label.Framework.latest.js';
+      s.onload=function(){_fwL=true;_fwLg=false;_fwCb.forEach(function(f){f(null);});_fwCb=[];};
+      s.onerror=function(){_fwLg=false;_fwCb.forEach(function(f){f('SDK error');});_fwCb=[];};
+      document.head.appendChild(s);
+    }
+    function _modal(html){
+      var m=document.getElementById('sv-dymo-modal')||document.createElement('div');
+      m.id='sv-dymo-modal';
+      m.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+      m.innerHTML=html;if(!m.parentNode)document.body.appendChild(m);
+      m.onclick=function(e){if(e.target===m)m.remove();};
+    }
+    window.svDymoDownload=function(url,sku){
+      var a=document.createElement('a');a.href=url;a.download=(sku||'label')+'.dymo';
+      document.body.appendChild(a);a.click();document.body.removeChild(a);
+    };
+    window.svDymoError=function(url,sku,msg){
+      _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:24px 28px;max-width:440px;width:90%">'
+        +'<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text,#c9d8e4)">⚠️ DYMO недоступний</div>'
+        +'<div style="font-size:13px;color:var(--text-muted,#9aafbe);margin-bottom:18px;line-height:1.6">'+msg+'</div>'
+        +'<div style="display:flex;gap:10px">'
+        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
+          +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">⬇️ Завантажити файл</button>'
+        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
+          +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 12px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
+        +'</div></div>');
+    };
+    window.svDymoPrint=function(url,sku,qty){
+      var ctrl=new AbortController();
+      var t=setTimeout(function(){ctrl.abort();},2500);
+      fetch('http://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected',{mode:'no-cors',signal:ctrl.signal})
+      .then(function(){
+        clearTimeout(t);
+        _loadFW(function(err){
+          if(err){window.svDymoError(url,sku,'Помилка завантаження DYMO SDK: '+err);return;}
+          fetch(url).then(function(r){return r.text();}).then(function(xml){
+            try{
+              var printers=window.dymo.label.framework.getLabelWriterPrinters();
+              if(!printers||!printers.length){window.svDymoError(url,sku,'Принтер DYMO не знайдено. Перевірте підключення принтера і що DYMO Label Software запущено.');return;}
+              var label=window.dymo.label.framework.openLabelXml(xml);
+              label.print(printers[0].name);
+            }catch(e){window.svDymoError(url,sku,'Помилка DYMO SDK: '+(e.message||e));}
+          }).catch(function(e){window.svDymoError(url,sku,'Помилка завантаження мітки: '+e);});
+        });
+      })
+      .catch(function(){
+        clearTimeout(t);
+        window.svDymoError(url,sku,
+          'DYMO Label Software не запущено або не встановлено на цьому ПК.<br><br>'
+          +'<b>Що зробити:</b><br>'
+          +'① Встановіть <a href="https://www.dymo.com/label-makers-printers/label-software.html" target="_blank" style="color:#64b5f6">DYMO Label Software</a><br>'
+          +'② Запустіть програму перед друком<br>'
+          +'③ Спробуйте ще раз — або завантажте файл нижче'
+        );
+      });
+    };
+    window.svDymoAsk=function(url,sku,qty){
+      _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:22px 26px;max-width:360px;width:90%">'
+        +'<div style="font-weight:700;font-size:15px;margin-bottom:14px;color:var(--text,#c9d8e4)">🖨️ Мітка: '+sku+'</div>'
+        +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoPrint(\''+url+'\',\''+sku+'\','+qty+')" '
+          +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">🖨️ Через DYMO</button>'
+        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
+          +'style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted,#9aafbe)">⬇️ Завантажити</button>'
+        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
+          +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
+        +'</div></div>');
+    };
+    window.svDymoOpen=function(url,sku,qty,mode){
+      mode=mode||(typeof window.SV_DYMO_MODE!=='undefined'?window.SV_DYMO_MODE:'download');
+      if(mode==='print') window.svDymoPrint(url,sku,qty);
+      else if(mode==='ask') window.svDymoAsk(url,sku,qty);
+      else window.svDymoDownload(url,sku);
+    };
+  })();
+}
 (function() {
   function uploadDymo(input) {
     var sku = input.dataset.sku;

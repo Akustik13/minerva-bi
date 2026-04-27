@@ -241,6 +241,22 @@ class SalesSettings(models.Model):
                   "Якщо браузер не може відкрити PDF — автоматично завантажується.",
     )
 
+    class DymoOpenMode(models.TextChoices):
+        DOWNLOAD = "download", "⬇️ Завантажити .dymo файл"
+        PRINT    = "print",    "🖨️ Надрукувати через DYMO Label Software (localhost)"
+        ASK      = "ask",      "❓ Запитувати щоразу"
+
+    dymo_open_mode = models.CharField(
+        "Дія при натисканні 🖨️ Друкувати (DYMO мітка)",
+        max_length=16,
+        choices=DymoOpenMode.choices,
+        default=DymoOpenMode.DOWNLOAD,
+        help_text="«Завантажити» — зберігає .dymo файл у Downloads; "
+                  "«Через DYMO» — надсилає на принтер через DYMO Label Software (localhost:41951) — "
+                  "програма має бути встановлена і запущена; "
+                  "«Запитувати» — показує діалог вибору щоразу.",
+    )
+
     class Meta:
         verbose_name = 'Налаштування'
         verbose_name_plural = 'Налаштування'
