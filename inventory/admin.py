@@ -463,7 +463,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         ("📦 Availability", {"fields": ("stock_qty", "incoming_qty",
                                         "buildable_qty", "reorder_info")}),
         ("🔗 Медіа та документи", {
-            "fields": ("datasheet_url", "datasheet_link", "image_url", "image", "image_preview"),
+            "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview"),
             "classes": ("collapse",),
         }),
         ("🛃 Митне оформлення", {
@@ -896,15 +896,17 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     movement_history.short_description = "📋 Рух товару"
 
     def datasheet_link(self, obj):
-        if not obj.datasheet_url:
+        url = obj.datasheet_display_url
+        if not url:
             return mark_safe('<span style="color:var(--text-dim,#607d8b);font-size:12px">— не вказано —</span>')
+        label = '📎 Відкрити (файл)' if (obj.datasheet_file and obj.datasheet_file.name) else '📄 Відкрити Datasheet'
         return format_html(
             '<a href="{}" target="_blank" rel="noopener noreferrer" '
             'style="display:inline-flex;align-items:center;gap:6px;'
             'background:#1a2e4a;border:1px solid #2a4a6a;border-radius:7px;'
             'padding:6px 14px;font-size:12px;color:#58a6ff;text-decoration:none">'
-            '📄 Відкрити Datasheet</a>',
-            obj.datasheet_url,
+            '{}</a>',
+            url, label,
         )
     datasheet_link.short_description = "Datasheet"
 

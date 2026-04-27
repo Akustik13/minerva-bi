@@ -103,7 +103,12 @@ class Product(models.Model):
                                            null=True, blank=True)
 
     # ── Медіа та документи ────────────────────────────────────────────────────
-    datasheet_url = models.URLField("Посилання на Datasheet", blank=True, default="")
+    datasheet_url  = models.URLField("Посилання на Datasheet", blank=True, default="")
+    datasheet_file = models.FileField(
+        "Datasheet (PDF файл)", upload_to="products/datasheets/",
+        null=True, blank=True,
+        help_text="Завантажте PDF з ПК. Якщо заповнено — має пріоритет над посиланням.",
+    )
     image_url     = models.URLField("Зображення (URL)", blank=True, default="")
     image         = models.ImageField("Зображення (файл)", upload_to="products/images/",
                                       null=True, blank=True)
@@ -120,6 +125,16 @@ class Product(models.Model):
             except Exception:
                 pass
         return self.image_url or ""
+
+    @property
+    def datasheet_display_url(self) -> str:
+        """Returns uploaded datasheet URL if available, else datasheet_url."""
+        if self.datasheet_file and self.datasheet_file.name:
+            try:
+                return self.datasheet_file.url
+            except Exception:
+                pass
+        return self.datasheet_url or ""
 
     def is_fractional_unit(self) -> bool:
         """Повертає True якщо товар може мати дробну кількість"""

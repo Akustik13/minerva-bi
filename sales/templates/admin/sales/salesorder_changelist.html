@@ -370,13 +370,15 @@ document.addEventListener('DOMContentLoaded', function () {
             {% if line.total_price %}{{ line.total_price|floatformat:"2" }} {{ line.currency }}{% else %}—{% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center">
-            {% if line.product.datasheet_url %}
-              <a href="{{ line.product.datasheet_url }}" target="_blank"
+            {% with ds=line.product.datasheet_display_url %}
+            {% if ds %}
+              <a href="{{ ds }}" target="_blank"
                  title="{{ lsku }} — Datasheet"
                  style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
             {% else %}
               <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
             {% endif %}
+            {% endwith %}
           </td>
           {% endwith %}
         </tr>
