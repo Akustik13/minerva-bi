@@ -1381,7 +1381,166 @@ class InventorySettingsAdmin(admin.ModelAdmin):
         ("📍 Загальні параметри", {
             "fields": ("default_location", "low_stock_alert_enabled"),
         }),
+        ("🖼️ Кешування медіа (Datasheet / Фото)", {
+            "fields": ("media_cache_panel",),
+            "description": (
+                "Завантажує PDF-датащити та фото товарів з вказаних URL на сервер. "
+                "Після кешування файли відкриваються швидше і залишаються доступними навіть якщо зовнішній сервер недоступний."
+            ),
+        }),
     )
+
+    readonly_fields = ("media_cache_panel",)
+
+    def media_cache_panel(self, obj):
+        total  = Product.objects.count()
+        ds_url  = Product.objects.filter(datasheet_url__gt='').count()
+        ds_file = Product.objects.exclude(datasheet_file='').exclude(datasheet_file__isnull=True).count()
+        ds_need = Product.objects.filter(datasheet_url__gt='').filter(datasheet_file='').count() + \
+                  Product.objects.filter(datasheet_url__gt='').filter(datasheet_file__isnull=True).count()
+        img_url  = Product.objects.filter(image_url__gt='').count()
+        img_file = Product.objects.exclude(image='').exclude(image__isnull=True).count()
+        img_need = Product.objects.filter(image_url__gt='').filter(image='').count() + \
+                   Product.objects.filter(image_url__gt='').filter(image__isnull=True).count()
+
+        cache_url = reverse('admin:inventory_inventorysettings_media_cache')
+
+        return format_html('''
+<div id="inv-mc-panel" style="font-size:13px">
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;max-width:480px">
+    <div style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong);border-radius:6px;padding:10px 14px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">📄 Datasheet PDF</div>
+      <div style="color:var(--text)">URL вказано: <b>{}</b></div>
+      <div style="color:#4caf50">Локально: <b>{}</b></div>
+      <div style="color:{};font-weight:700">Потрібно завантажити: {}</div>
+    </div>
+    <div style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong);border-radius:6px;padding:10px 14px">
+      <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px">🖼️ Фото товару</div>
+      <div style="color:var(--text)">URL вказано: <b>{}</b></div>
+      <div style="color:#4caf50">Локально: <b>{}</b></div>
+      <div style="color:{};font-weight:700">Потрібно завантажити: {}</div>
+    </div>
+  </div>
+  <button type="button" id="inv-mc-btn"
+          onclick="invMediaCache()"
+          style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:9px 20px;
+                 font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px">
+    📥 Завантажити відсутні файли на сервер
+  </button>
+  <div id="inv-mc-result" style="margin-top:10px;display:none"></div>
+</div>
+<script>
+function invMediaCache() {{
+  var btn = document.getElementById('inv-mc-btn');
+  var res = document.getElementById('inv-mc-result');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Завантажується… (може зайняти кілька хвилин)';
+  res.style.display = 'none';
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  fetch('{}', {{
+    method: 'POST',
+    headers: {{'X-CSRFToken': csrf ? csrf[1] : '', 'X-Requested-With': 'XMLHttpRequest'}},
+  }}).then(function(r){{ return r.json(); }}).then(function(d) {{
+    btn.disabled = false;
+    btn.innerHTML = '📥 Завантажити відсутні файли на сервер';
+    if (!d.ok) {{ res.innerHTML = '<span style="color:var(--err)">❌ Помилка: ' + (d.error||'невідома') + '</span>'; res.style.display='block'; return; }}
+    var s = d.stats;
+    res.innerHTML =
+      '<div style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong);border-radius:6px;padding:10px 14px;max-width:460px">' +
+      '<div style="font-weight:700;margin-bottom:6px;color:var(--text)">✅ Готово!</div>' +
+      '<div>📄 Datasheet: <span style="color:#4caf50">+' + s.datasheets.done + ' завантажено</span>' +
+           (s.datasheets.skipped ? ', ' + s.datasheets.skipped + ' вже є' : '') +
+           (s.datasheets.failed  ? ', <span style="color:var(--err)">' + s.datasheets.failed + ' помилок</span>' : '') + '</div>' +
+      '<div>🖼️ Фото: <span style="color:#4caf50">+' + s.images.done + ' завантажено</span>' +
+           (s.images.skipped ? ', ' + s.images.skipped + ' вже є' : '') +
+           (s.images.failed  ? ', <span style="color:var(--err)">' + s.images.failed + ' помилок</span>' : '') + '</div>' +
+      (d.errors && d.errors.length ? '<details style="margin-top:6px"><summary style="font-size:11px;cursor:pointer;color:var(--text-muted)">' + d.errors.length + ' помилок — деталі</summary>' +
+           '<pre style="font-size:10px;color:var(--err);margin:4px 0 0;overflow:auto;max-height:120px">' + d.errors.join('\\n') + '</pre></details>' : '') +
+      '</div>';
+    res.style.display = 'block';
+  }}).catch(function(e) {{
+    btn.disabled = false;
+    btn.innerHTML = '📥 Завантажити відсутні файли на сервер';
+    res.innerHTML = '<span style="color:var(--err)">❌ Мережева помилка: ' + e + '</span>';
+    res.style.display = 'block';
+  }});
+}}
+</script>
+''',
+            ds_url, ds_file,
+            '#ff9800' if ds_need else '#4caf50', ds_need,
+            img_url, img_file,
+            '#ff9800' if img_need else '#4caf50', img_need,
+            cache_url,
+        )
+    media_cache_panel.short_description = "Статус медіафайлів"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path("media-cache/",
+                 self.admin_site.admin_view(self.media_cache_view),
+                 name="inventory_inventorysettings_media_cache"),
+        ]
+        return custom + urls
+
+    def media_cache_view(self, request):
+        from django.http import JsonResponse
+        from django.core.files.base import ContentFile
+        import urllib.request as _urllib
+        import urllib.error
+        import posixpath
+        import os as _os
+
+        stats  = {'datasheets': {'done': 0, 'skipped': 0, 'failed': 0},
+                  'images':     {'done': 0, 'skipped': 0, 'failed': 0}}
+        errors = []
+
+        products = Product.objects.filter(is_active=True)
+
+        for p in products:
+            # ── Datasheet ──────────────────────────────────────────────
+            has_ds = p.datasheet_file and p.datasheet_file.name
+            if p.datasheet_url and not has_ds:
+                try:
+                    req = _urllib.Request(p.datasheet_url,
+                                         headers={'User-Agent': 'Mozilla/5.0 (compatible; Minerva-BI/1.0)'})
+                    with _urllib.urlopen(req, timeout=20) as resp:
+                        data = resp.read()
+                    url_path = p.datasheet_url.split('?')[0]
+                    ext = _os.path.splitext(posixpath.basename(url_path))[1].lower() or '.pdf'
+                    fname = p.sku.replace('/', '_').replace(' ', '_') + '_datasheet' + ext
+                    p.datasheet_file.save(fname, ContentFile(data), save=True)
+                    stats['datasheets']['done'] += 1
+                except Exception as e:
+                    stats['datasheets']['failed'] += 1
+                    errors.append(f'DS {p.sku}: {e}')
+            else:
+                stats['datasheets']['skipped'] += 1
+
+            # ── Image ──────────────────────────────────────────────────
+            has_img = p.image and p.image.name
+            if p.image_url and not has_img:
+                try:
+                    req = _urllib.Request(p.image_url,
+                                         headers={'User-Agent': 'Mozilla/5.0 (compatible; Minerva-BI/1.0)'})
+                    with _urllib.urlopen(req, timeout=15) as resp:
+                        ct   = resp.headers.get('Content-Type', '')
+                        data = resp.read()
+                    url_path = p.image_url.split('?')[0]
+                    ext = _os.path.splitext(posixpath.basename(url_path))[1].lower()
+                    if not ext:
+                        ext = '.png' if 'png' in ct else '.jpg'
+                    fname = p.sku.replace('/', '_').replace(' ', '_') + ext
+                    p.image.save(fname, ContentFile(data), save=True)
+                    stats['images']['done'] += 1
+                except Exception as e:
+                    stats['images']['failed'] += 1
+                    errors.append(f'IMG {p.sku}: {e}')
+            else:
+                stats['images']['skipped'] += 1
+
+        return JsonResponse({'ok': True, 'stats': stats, 'errors': errors[:50]})
 
     def has_add_permission(self, request):
         return not InventorySettings.objects.exists()
