@@ -264,7 +264,15 @@ class UPSClient:
         try:
             data = response.json()
             errors = (data.get('response', {}).get('errors', []) or data.get('errors', []))
-            msg = '; '.join(e.get('message', str(e)) for e in errors[:3]) if errors else response.text[:300]
+            if errors:
+                parts = []
+                for e in errors[:3]:
+                    ec = e.get('code', '')
+                    em = e.get('message', str(e))
+                    parts.append(f'[{ec}] {em}' if ec else em)
+                msg = '; '.join(parts)
+            else:
+                msg = response.text[:300]
         except Exception:
             msg = response.text[:300]
         raise UPSError(f'UPS API [{response.status_code}]: {msg}', code=response.status_code, response=response.text)
