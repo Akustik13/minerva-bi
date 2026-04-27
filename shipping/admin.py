@@ -1143,9 +1143,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         customs_articles = build_customs_articles(order, sender_country, default_currency)
 
         eu_countries = JumingoService._EU_COUNTRIES
+        _rcountry = (shipment.recipient_country or '').upper()
+        _scountry = (shipment.sender_country or sender_country or '').upper()
         needs_customs = bool(
-            shipment.recipient_country
-            and shipment.recipient_country.upper() not in eu_countries
+            (_rcountry and _rcountry not in eu_countries)
+            or (_scountry and _scountry not in eu_countries)
         )
 
         from django.db.models import Case, When, IntegerField
@@ -1563,9 +1565,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             customs_articles = build_customs_articles(order, sender_country, default_currency)
 
         eu_countries  = JumingoService._EU_COUNTRIES
+        _rcountry = (shipment.recipient_country or '').upper()
+        _scountry = (shipment.sender_country or (shipment.carrier.sender_country if shipment.carrier else '') or '').upper()
         needs_customs = bool(
-            shipment.recipient_country
-            and shipment.recipient_country.upper() not in eu_countries
+            (_rcountry and _rcountry not in eu_countries)
+            or (_scountry and _scountry not in eu_countries)
         )
 
         is_error = shipment.status == Shipment.Status.ERROR
