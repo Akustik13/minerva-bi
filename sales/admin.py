@@ -147,7 +147,8 @@ class SalesSettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ('🖥️ Відображення списку замовлень', {
-            'fields': ('show_product_image_tooltip', 'show_pdf_preview', 'datasheet_priority', 'image_priority'),
+            'fields': ('show_product_image_tooltip', 'show_pdf_preview', 'datasheet_priority', 'image_priority',
+                       'label_open_mode'),
             'description': (
                 '<b>Попередній перегляд фото / PDF</b> — при наведенні на Артикул або значок 📄 '
                 'показує фото або PDF у маленькому спливаючому вікні.<br>'
@@ -478,6 +479,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context['sv_show_pdf_preview'] = _ss.show_pdf_preview
         extra_context['sv_datasheet_prio']   = _ss.datasheet_priority
         extra_context['sv_image_prio']       = _ss.image_priority
+        extra_context['sv_label_open_mode']  = _ss.label_open_mode
 
         return super().changelist_view(request, extra_context=extra_context)
     date_hierarchy = "order_date"
@@ -635,7 +637,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     fieldsets = (
         ("📦 Замовлення", {
             "fields": ("source", "status", "document_type", "affects_stock",
-                       "order_number", "order_date")
+                       "order_number", "order_date", "is_flagged", "internal_note")
         }),
         ("👤 Клієнт", {
             "fields": ("client", "contact_name", "email", "phone")
@@ -1858,7 +1860,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             data = _json.loads(request.body or b'{}')
         except Exception:
             data = {}
-        order.internal_note = (data.get('note') or '').strip()[:200]
+        order.internal_note = (data.get('note') or '').strip()[:500]
         order.save(update_fields=['internal_note'])
         return JsonResponse({'ok': True, 'note': order.internal_note})
 

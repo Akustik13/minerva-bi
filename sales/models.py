@@ -76,7 +76,7 @@ class SalesOrder(models.Model):
     shipping_cost   = models.DecimalField("Вартість доставки", max_digits=10, decimal_places=2, default=0)
     shipping_currency = models.CharField(max_length=8, blank=True, default="EUR", verbose_name="Валюта доставки")
     is_flagged    = models.BooleanField("⭐ Важливе", default=False, db_index=True)
-    internal_note = models.CharField("Нотатка", max_length=200, blank=True, default="")
+    internal_note = models.CharField("Нотатка", max_length=500, blank=True, default="")
 
     class Meta:
         unique_together = [("source", "order_number")]
@@ -225,6 +225,20 @@ class SalesSettings(models.Model):
         choices=MediaPriority.choices,
         default=MediaPriority.FILE_FIRST,
         help_text="Якщо є і завантажений файл, і URL — яке фото використовувати?",
+    )
+
+    class LabelOpenMode(models.TextChoices):
+        VIEW     = "view",     "🔗 Відкрити в новій вкладці браузера"
+        DOWNLOAD = "download", "⬇️ Завантажити файл"
+        ASK      = "ask",      "❓ Запитувати щоразу"
+
+    label_open_mode = models.CharField(
+        "Дія при натисканні на мітку перевізника (PDF)",
+        max_length=16,
+        choices=LabelOpenMode.choices,
+        default=LabelOpenMode.VIEW,
+        help_text="Що робити при натисканні PDF-лінку мітки UPS/DHL у списку замовлень. "
+                  "Якщо браузер не може відкрити PDF — автоматично завантажується.",
     )
 
     class Meta:

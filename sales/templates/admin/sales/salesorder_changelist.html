@@ -219,8 +219,8 @@ document.addEventListener('DOMContentLoaded', function () {
   {# Right: view toggle #}
   <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
     <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
-    <button class="sv-toggle-btn" id="sv-btn-table" onclick="svSetView('table')">📋 Таблиця</button>
-    <button class="sv-toggle-btn" id="sv-btn-cards" onclick="svSetView('cards')">🃏 Картки</button>
+    <button type="button" class="sv-toggle-btn" id="sv-btn-table" onclick="svSetView('table')">📋 Таблиця</button>
+    <button type="button" class="sv-toggle-btn" id="sv-btn-cards" onclick="svSetView('cards')">🃏 Картки</button>
   </div>
 </div>
 
@@ -258,9 +258,9 @@ document.addEventListener('DOMContentLoaded', function () {
           {{ order.get_status_display }}
         </span>
         {# Flag toggle #}
-        <button class="sv-flag-btn {% if order.is_flagged %}sv-flagged{% endif %}"
+        <button type="button" class="sv-flag-btn {% if order.is_flagged %}sv-flagged{% endif %}"
                 data-pk="{{ order.pk }}"
-                onclick="svFlagOrder({{ order.pk }});return false"
+                onclick="svFlagOrder({{ order.pk }})"
                 style="color:{% if order.is_flagged %}#FFB300{% else %}var(--text-dim){% endif %}"
                 title="{% if order.is_flagged %}Зняти позначку{% else %}Позначити як важливе{% endif %}">
           {% if order.is_flagged %}⭐{% else %}☆{% endif %}
@@ -297,7 +297,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <div class="sv-pc {% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'shipped' or s == 'delivered' %}sv-ps-done{% elif sh.label_url %}sv-ps-cur{% endif %}">
         <div class="sv-pd">{% if s == 'shipped' or s == 'delivered' %}✓{% elif sh.label_url %}●{% else %}·{% endif %}</div>
-        <div class="sv-pl">Етикетка{% if sh.label_url and s != 'shipped' and s != 'delivered' %}<small><a href="{{ sh.label_url }}" target="_blank" style="color:inherit">PDF</a></small>{% endif %}</div>
+        <div class="sv-pl">Етикетка{% if sh.label_url and s != 'shipped' and s != 'delivered' %}<small>{% if sv_label_open_mode == 'download' %}<a href="{{ sh.label_url }}" download style="color:inherit">PDF ⬇️</a>{% elif sv_label_open_mode == 'ask' %}<a href="#" onclick="svOpenLabel('{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% else %}<a href="{{ sh.label_url }}" target="_blank" style="color:inherit">PDF</a>{% endif %}</small>{% endif %}</div>
       </div>
       <div class="sv-pc {% if s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'shipped' %}{% if sh.carrier_delayed %}sv-ps-warn{% else %}sv-ps-cur{% endif %}{% elif s == 'delivered' %}sv-ps-done{% endif %}">
@@ -348,11 +348,11 @@ document.addEventListener('DOMContentLoaded', function () {
         <tr style="color:var(--text-muted);border-bottom:1px solid var(--border-strong);
                    font-size:11px;text-transform:uppercase;letter-spacing:.04em">
           <th style="padding:5px 8px;text-align:left;font-weight:600">Артикул</th>
+          <th style="padding:5px 8px;text-align:center;font-weight:600">📄</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600;white-space:nowrap">🏷️ Етикетка</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600">К-сть</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">Ціна</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">Сума</th>
-          <th style="padding:5px 8px;text-align:center;font-weight:600">📄</th>
         </tr>
       </thead>
       <tbody>
@@ -366,18 +366,6 @@ document.addEventListener('DOMContentLoaded', function () {
                  style="color:inherit;text-decoration:none;border-bottom:1px dashed var(--text-dim)"
                  title="Перейти на склад: {{ lsku }}">{{ lsku|default:"—" }}</a>
             {% else %}{{ lsku|default:"—" }}{% endif %}
-          </td>
-          <td style="padding:6px 8px;text-align:center">
-            {% if lsku %}<span class="sv-lbl-btn sv-lbl-off sv-line-lbl" data-sku="{{ lsku }}" data-qty="{{ lqty }}">🏷️</span>{% else %}—{% endif %}
-          </td>
-          <td style="padding:6px 8px;text-align:center;font-weight:600">
-            {% if line.qty == line.qty|floatformat:"0"|add:"0" %}{{ line.qty|floatformat:"0" }}{% else %}{{ line.qty }}{% endif %}
-          </td>
-          <td style="padding:6px 8px;text-align:right;color:var(--text-muted)">
-            {% if line.unit_price %}{{ line.unit_price|floatformat:"2" }}{% else %}—{% endif %}
-          </td>
-          <td style="padding:6px 8px;text-align:right;font-weight:700;color:#2e7d32">
-            {% if line.total_price %}{{ line.total_price|floatformat:"2" }} {{ line.currency }}{% else %}—{% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center">
             {% if sv_datasheet_prio == 'url' %}
@@ -406,6 +394,18 @@ document.addEventListener('DOMContentLoaded', function () {
               {% endif %}
               {% endwith %}
             {% endif %}
+          </td>
+          <td style="padding:6px 8px;text-align:center">
+            {% if lsku %}<span class="sv-lbl-btn sv-lbl-off sv-line-lbl" data-sku="{{ lsku }}" data-qty="{{ lqty }}">🏷️</span>{% else %}—{% endif %}
+          </td>
+          <td style="padding:6px 8px;text-align:center;font-weight:600">
+            {% if line.qty == line.qty|floatformat:"0"|add:"0" %}{{ line.qty|floatformat:"0" }}{% else %}{{ line.qty }}{% endif %}
+          </td>
+          <td style="padding:6px 8px;text-align:right;color:var(--text-muted)">
+            {% if line.unit_price %}{{ line.unit_price|floatformat:"2" }}{% else %}—{% endif %}
+          </td>
+          <td style="padding:6px 8px;text-align:right;font-weight:700;color:#2e7d32">
+            {% if line.total_price %}{{ line.total_price|floatformat:"2" }} {{ line.currency }}{% else %}—{% endif %}
           </td>
           {% endwith %}
         </tr>
@@ -510,7 +510,7 @@ document.addEventListener('DOMContentLoaded', function () {
       {% endwith %}{# end with tn #}
 
       {# Note button #}
-      <button class="sv-note-btn {% if order.internal_note %}sv-note-has{% endif %}"
+      <button type="button" class="sv-note-btn {% if order.internal_note %}sv-note-has{% endif %}"
               id="sv-note-btn-{{ order.pk }}"
               onclick="svNoteToggle({{ order.pk }})"
               title="{{ order.internal_note|default:'Додати нотатку' }}">
@@ -518,19 +518,19 @@ document.addEventListener('DOMContentLoaded', function () {
       </button>
 
       {# Expand button — rightmost in footer #}
-      <button class="sv-cex-btn" id="sv-cex-btn-{{ order.pk }}"
+      <button type="button" class="sv-cex-btn" id="sv-cex-btn-{{ order.pk }}"
               onclick="svCardExpand(this, {{ order.pk }})" title="Документи та деталі">⛶</button>
     </div>
 
     {# Note edit panel #}
     <div class="sv-note-panel" id="sv-note-panel-{{ order.pk }}">
       <span style="font-size:13px;flex-shrink:0">📝</span>
-      <input class="sv-note-input" id="sv-note-input-{{ order.pk }}" type="text" maxlength="200"
+      <input class="sv-note-input" id="sv-note-input-{{ order.pk }}" type="text" maxlength="500"
              value="{{ order.internal_note }}"
              placeholder="Короткий коментар (Enter — зберегти, Esc — закрити)…"
              onkeydown="if(event.key==='Enter')svNoteSave({{ order.pk }});if(event.key==='Escape')svNoteToggle({{ order.pk }})">
-      <button onclick="svNoteSave({{ order.pk }})" style="background:#1565c0;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">💾 Зберегти</button>
-      <button onclick="svNoteToggle({{ order.pk }})" style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong);border-radius:4px;padding:4px 8px;cursor:pointer;color:var(--text-muted);font-size:11px;flex-shrink:0">✕</button>
+      <button type="button" onclick="svNoteSave({{ order.pk }})" style="background:#1565c0;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">💾 Зберегти</button>
+      <button type="button" onclick="svNoteToggle({{ order.pk }})" style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong);border-radius:4px;padding:4px 8px;cursor:pointer;color:var(--text-muted);font-size:11px;flex-shrink:0">✕</button>
     </div>
 
     {# Expandable panel — docs, upload, auto-doc, packaging #}
@@ -946,6 +946,15 @@ function svNoteSave(pk) {
         : '📝';
     }
   });
+}
+
+function svOpenLabel(url) {
+  if (confirm('Як відкрити мітку?\n\nОК → відкрити у браузері\nСкасувати → завантажити')) {
+    var w = window.open(url, '_blank');
+    if (!w) { var a = document.createElement('a'); a.href = url; a.download = ''; a.click(); }
+  } else {
+    var a = document.createElement('a'); a.href = url; a.download = ''; a.click();
+  }
 }
 
 // ── Product image tooltip ─────────────────────────────────────────────────────
