@@ -655,7 +655,7 @@ class UPSClient:
             'PaymentInformation': {
                 'ShipmentCharge': {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}},
             },
-            'ShipmentRatingOptions': {'NegotiatedRatesIndicator': ''},
+            'ShipmentRatingOptions': {'NegotiatedRatesIndicator': 'X'},
             'Description': (customs_info or {}).get('description', 'Goods')[:50] if customs_info else 'Goods',
             'Service': {'Code': service_code, 'Description': UPS_SERVICES.get(service_code, '')},
             'Package': (self._pkg_dict(packages[0], for_ship=True, from_country=pickup.get('country', ''))
@@ -682,9 +682,11 @@ class UPSClient:
                     'CurrencyCode':  customs_info.get('currency', 'USD'),
                     'MonetaryValue': str(round(total_val, 2)),
                 }
+            # When ShipFrom differs from Shipper (cross-country pickup), add Seller = pickup party
+            _seller = pickup if (pickup.get('country', '').upper() != account.get('country', 'DE').upper()) else None
             shipment['ShipmentServiceOptions'] = {
                 'InternationalForms': self._build_customs(
-                    customs_info, invoice_number=reference, sold_to=to_address),
+                    customs_info, invoice_number=reference, sold_to=to_address, seller=_seller),
             }
 
         payload = {
@@ -1127,7 +1129,7 @@ class UPSClient:
             p['ReferenceNumber'] = [{'Code': '02', 'Value': pkg['reference'][:35]}]
         return p
 
-    def _build_customs(self, info: dict, invoice_number: str = '', sold_to: dict | None = None) -> dict:
+    def _build_customs(self, info: dict, invoice_number: str = '', sold_to: dict | None = None, seller: dict | None = None) -> dict:
         """Build InternationalForms payload for UPS Ship API."""
         from datetime import date as _date
         today      = _date.today().strftime('%Y%m%d')
@@ -1186,14 +1188,24 @@ class UPSClient:
         if terms:
             result['TermsOfShipment'] = terms
 
+        contacts = {}
         if sold_to:
-            sold_to_contact = {
+            contacts['SoldTo'] = {
                 'Name':          sold_to.get('name', ''),
                 'AttentionName': sold_to.get('name', ''),
                 'Phone':         {'Number': (sold_to.get('phone', '') or '').replace(' ', '')},
                 'EMailAddress':  sold_to.get('email', '') or '',
                 'Address':       self._fmt_addr(sold_to),
             }
-            result['Contacts'] = {'SoldTo': sold_to_contact}
+        if seller:
+            contacts['Seller'] = {
+                'Name':          seller.get('name', ''),
+                'AttentionName': seller.get('name', ''),
+                'Phone':         {'Number': (seller.get('phone', '') or '').replace(' ', '')},
+                'EMailAddress':  seller.get('email', '') or '',
+                'Address':       self._fmt_addr(seller),
+            }
+        if contacts:
+            result['Contacts'] = contacts
 
         return result
