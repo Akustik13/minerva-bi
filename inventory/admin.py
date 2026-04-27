@@ -1141,6 +1141,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         ("sale_price",     "Ціна продажу"),
         ("reorder_point",  "Поріг reorder"),
         ("lead_time_days", "Термін постачання (днів)"),
+        ("datasheet_url",  "Посилання на Datasheet (URL)"),
+        ("image_url",      "Посилання на зображення (URL)"),
         ("notes",          "Нотатки"),
         ("is_active",      "Активний (1/0/true/false)"),
         ("initial_stock",  "Початковий залишок (ADJUSTMENT)"),

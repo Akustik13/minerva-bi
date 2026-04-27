@@ -72,6 +72,10 @@ INVENTORY_COLS = [
      "50",            "200",              "10"),
     ("is_active",      "Активний",         12, False,
      "1",             "1",                "1"),
+    ("datasheet_url",  "Datasheet URL",    40, False,
+     "https://example.com/ds.pdf", "", "https://taoglas.com/ant.pdf"),
+    ("image_url",      "Image URL",        40, False,
+     "https://example.com/img.jpg", "", "https://taoglas.com/ant.jpg"),
     ("notes",          "Примітки",         28, False,
      "",              "Стандартний RG-58", "Для зовнішнього монтажу"),
 ]
