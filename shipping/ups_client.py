@@ -682,8 +682,12 @@ class UPSClient:
                     'CurrencyCode':  customs_info.get('currency', 'USD'),
                     'MonetaryValue': str(round(total_val, 2)),
                 }
-            # When ShipFrom differs from Shipper (cross-country pickup), add Seller = pickup party
-            _seller = pickup if (pickup.get('country', '').upper() != account.get('country', 'DE').upper()) else None
+            # Seller in InternationalForms:
+            # - ShipFrom ≠ Shipper country (e.g. CN pickup, DE account): seller = pickup (Grace CN)
+            # - ShipFrom == Shipper country (swapped: DE→CN): seller = Shipper/account (Sergey DE)
+            _pickup_country  = pickup.get('country', '').upper()
+            _account_country = (account.get('country') or 'DE').upper()
+            _seller = pickup if _pickup_country != _account_country else account
             shipment['ShipmentServiceOptions'] = {
                 'InternationalForms': self._build_customs(
                     customs_info, invoice_number=reference, sold_to=to_address, seller=_seller),
