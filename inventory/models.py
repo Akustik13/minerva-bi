@@ -111,6 +111,16 @@ class Product(models.Model):
     def __str__(self) -> str:
         return self.sku
 
+    @property
+    def image_display_url(self) -> str:
+        """Returns best available image URL without raising ValueError on empty ImageField."""
+        if self.image and self.image.name:
+            try:
+                return self.image.url
+            except Exception:
+                pass
+        return self.image_url or ""
+
     def is_fractional_unit(self) -> bool:
         """Повертає True якщо товар може мати дробну кількість"""
         return self.unit_type in [

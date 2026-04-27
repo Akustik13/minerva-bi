@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <tbody>
         {% for line in lines %}
         <tr style="border-bottom:1px solid var(--border);color:var(--text)">
-          {% with lsku=line.sku_raw|default:line.product.sku lqty=line.qty|floatformat:"0" limg=line.product.image.url|default:line.product.image_url %}
+          {% with lsku=line.sku_raw|default:line.product.sku lqty=line.qty|floatformat:"0" limg=line.product.image_display_url %}
           <td style="padding:6px 8px;font-family:monospace;font-weight:700;white-space:nowrap;position:relative"
               {% if limg %}class="sv-sku-img" data-img="{{ limg }}"{% endif %}>{{ lsku|default:"—" }}</td>
           <td style="padding:6px 8px;text-align:center">
