@@ -201,7 +201,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
       </div>
       <div class="card" onclick="show('inventory')" style="cursor:pointer">
         <div class="card-head"><span class="icon">📦</span><h3>Склад</h3></div>
-        <p>Залишки товарів, транзакції. Аналіз reorder: скільки вистачить, скільки замовити. Purchase Orders постачальникам. Імпорт з Excel.</p>
+        <p>Залишки товарів, транзакції, аналіз reorder. Purchase Orders постачальникам. Датасіти та фото товарів. Історія руху товару. Налаштування: коли списувати залишки.</p>
       </div>
       <div class="card" onclick="show('labels')" style="cursor:pointer">
         <div class="card-head"><span class="icon">🏷️</span><h3>Етикетки DYMO</h3></div>
@@ -223,9 +223,9 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
         <div class="card-head"><span class="icon">🤖</span><h3>Боти та API</h3></div>
         <p>REST API Minerva (per-scope токени). DigiKey: пошук компонентів, ціни, наявність. DHL Express: тарифи та трекінг. Shopify / Telegram webhooks.</p>
       </div>
-      <div class="card" onclick="window.location='/admin/bots/bot/ai-info/'" style="cursor:pointer">
-        <div class="card-head"><span class="icon">🧠</span><h3>AI (в розробці)</h3></div>
-        <p>Прогнозування попиту, рекомендації reorder, ML-сегментація клієнтів. <a href="/admin/bots/bot/ai-info/" onclick="event.stopPropagation()">AI модуль</a></p>
+      <div class="card" onclick="window.location='/ai/'" style="cursor:pointer">
+        <div class="card-head"><span class="icon">🧠</span><h3>AI Асистент</h3></div>
+        <p>Чат-асистент на базі Claude (Anthropic). Відповідає на питання по продажах, клієнтах, складу. Telegram-бот, бюджет використання, ролі доступу. <a href="/ai/" onclick="event.stopPropagation()">Відкрити →</a></p>
       </div>
       <div class="card" onclick="window.location='/admin/faq/faqplaceholder/'" style="cursor:pointer">
         <div class="card-head"><span class="icon">❓</span><h3>FAQ та підтримка</h3></div>
@@ -250,15 +250,16 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
           <tr><td>Налаштування компанії (реквізити, IBAN)</td><td><code>/admin/accounting/companysettings/</code></td></tr>
           <tr><td rowspan="2">🛒 Sales</td><td>Замовлення — статуси, bulk-дії, Excel-імпорт</td><td><code>/admin/sales/salesorder/</code></td></tr>
           <tr><td>Джерела замовлень (словник)</td><td><code>/admin/sales/salessource/</code></td></tr>
-          <tr><td rowspan="5">📦 Склад</td><td>Товари — SKU, залишки, Excel-імпорт</td><td><code>/admin/inventory/product/</code></td></tr>
+          <tr><td rowspan="6">📦 Склад</td><td>Товари — SKU, залишки, датасіт, фото, рух товару</td><td><code>/admin/inventory/product/</code></td></tr>
           <tr><td>Транзакції — прихід/витрата</td><td><code>/admin/inventory/inventorytransaction/</code></td></tr>
           <tr><td>Аналіз reorder — що замовити</td><td><code>/admin/inventory/reorderproxy/</code></td></tr>
           <tr><td>Постачальники</td><td><code>/admin/inventory/supplier/</code></td></tr>
           <tr><td>Purchase Orders</td><td><code>/admin/inventory/purchaseorder/</code></td></tr>
+          <tr><td>Налаштування складу (коли списувати, локація)</td><td><code>/admin/inventory/inventorysettings/</code></td></tr>
           <tr><td rowspan="2">🚚 Доставка</td><td>Відправлення — список, статуси, трекінг</td><td><code>/admin/shipping/shipment/</code></td></tr>
           <tr><td>Перевізники — налаштування API, дані відправника</td><td><code>/admin/shipping/carrier/</code></td></tr>
-          <tr><td rowspan="2">🤖 Боти</td><td>Управління ботами та API-ключами</td><td><code>/admin/bots/bot/</code></td></tr>
-          <tr><td>AI модуль (в розробці)</td><td><code>/admin/bots/bot/ai-info/</code></td></tr>
+          <tr><td>🤖 Боти</td><td>Управління ботами та API-ключами</td><td><code>/admin/bots/bot/</code></td></tr>
+          <tr><td>🧠 AI Асистент</td><td>Веб-чат та Telegram-бот на Claude</td><td><code>/ai/</code></td></tr>
           <tr><td rowspan="2">📊 Аналітика</td><td>Статистика — KPI, графіки, фільтри</td><td><code>/dashboard/</code></td></tr>
           <tr><td>Сигнали — попередження системи</td><td><code>/dashboard/signals/</code></td></tr>
           <tr><td rowspan="3">⚙️ Конфігурація</td><td>Системні налаштування (модулі, валюта, компанія)</td><td><code>/admin/config/systemsettings/</code></td></tr>
@@ -350,6 +351,19 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
       <tr><td>🛃 Митна декларація CN23</td><td>Product.hs_code, .net_weight_g, .country_of_origin</td><td><strong>HS-код, вага, країна</strong> у картці кожного товару (📦 Склад → Товари)</td></tr>
     </tbody></table></div>
     <div class="alert alert-orange"><span>⚠️</span><div>Для митної декларації обов'язково заповніть <strong>HS-код</strong>, <strong>вагу нетто (г/шт)</strong> та <strong>країну виробника</strong> в картці кожного товару. Без цих даних поля будуть показані як "—".</div></div>
+
+    <h3 class="sub">⭐ Позначки та нотатки до замовлень</h3>
+    <div class="alert alert-blue"><span>💡</span><div>Доступно в обох режимах перегляду: картки та таблиця. Зміни відбуваються <strong>без перезавантаження сторінки</strong> — через AJAX.</div></div>
+    <div class="cards">
+      <div class="card">
+        <div class="card-head"><span class="icon">⭐</span><h3>Позначити важливе</h3></div>
+        <p>Кнопка <strong>☆</strong> у картці або колонці таблиці. Клік — стає <strong>⭐ золотою</strong>. Картка виділяється золотою лівою рамкою. Фільтр: кнопка <strong>⭐ Важливі</strong> у панелі швидких фільтрів або <code>?flagged=1</code>.</p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="icon">📝</span><h3>Внутрішня нотатка</h3></div>
+        <p>Кнопка <strong>📝</strong> у підвалі картки або колонці таблиці. Натисніть — розкривається поле вводу. <strong>Enter</strong> або кнопка «💾 Зберегти» — збережено. <strong>Esc</strong> — закрити без збереження. Нотатка видима в картці та таблиці (до 22 символів + «…»).</p>
+      </div>
+    </div>
 
     <h3 class="sub">Всередині замовлення</h3>
     <div class="steps">
@@ -535,6 +549,35 @@ hr.div{border:none;border-top:1px solid var(--border);margin:24px 0;}
       <tr><td><span class="badge b-orange">⚠️ Мало</span></td><td>&lt;1.5 місяці</td><td>Замовити найближчим часом</td></tr>
       <tr><td><span class="badge b-blue">📉 Низько</span></td><td>&lt;3 місяців</td><td>Планувати замовлення</td></tr>
       <tr><td><span class="badge b-green">✅ OK</span></td><td>&gt;3 місяців</td><td>Нічого не потрібно</td></tr>
+    </tbody></table></div>
+
+    <hr class="div">
+    <h3 class="sub">⚙️ Налаштування складу</h3>
+    <div class="alert alert-blue"><span>ℹ️</span><div>Керує логікою списання залишків та поповнення. <a href="/admin/inventory/inventorysettings/" style="color:var(--accent)">Склад → Налаштування складу →</a></div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Параметр</th><th>Варіанти</th><th>За замовч.</th></tr></thead><tbody>
+      <tr><td><strong>Коли списувати залишки</strong></td><td>При створенні замовлення · При відправленні · При доставці</td><td>При створенні</td></tr>
+      <tr><td><strong>Поповнювати при отриманні PO</strong></td><td>✅ Так / ⬜ Ні</td><td>✅ Так</td></tr>
+      <tr><td><strong>Локація за замовч.</strong></td><td>Довільний рядок (MAIN, A1, SHELF-B…)</td><td>MAIN</td></tr>
+      <tr><td><strong>Дозволити від'ємний залишок</strong></td><td>✅ Так / ⬜ Ні</td><td>✅ Так</td></tr>
+    </tbody></table></div>
+    <div class="alert alert-orange"><span>⚠️</span><div>Зміна режиму <strong>«Коли списувати»</strong> впливає лише на нові замовлення. Ідемпотентність: якщо транзакції для замовлення вже існують — повторне списання не відбувається.</div></div>
+
+    <hr class="div">
+    <h3 class="sub">🔗 Датасіт та фото товару</h3>
+    <div class="alert alert-blue"><span>ℹ️</span><div>Секція <strong>"🔗 Медіа та документи"</strong> в картці товару (collapse). URL та завантажений файл зображення.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Поле</th><th>Опис</th></tr></thead><tbody>
+      <tr><td><code>datasheet_url</code></td><td>Посилання на PDF даташіту — відображається кнопкою «📄 Датасіт» прямо в картці товару</td></tr>
+      <tr><td><code>image_url</code></td><td>URL зовнішнього зображення товару</td></tr>
+      <tr><td><code>image</code></td><td>Завантажений файл зображення (upload_to: <code>products/images/</code>). Пріоритет над image_url.</td></tr>
+    </tbody></table></div>
+
+    <hr class="div">
+    <h3 class="sub">📋 Рух товару</h3>
+    <div class="alert alert-blue"><span>ℹ️</span><div>Секція <strong>"📋 Рух товару"</strong> в картці товару (collapse). Показує останні 150 операцій: звідки і куди пішов товар.</div></div>
+    <div class="t-wrap"><table class="ht"><thead><tr><th>Тип операції</th><th>Значення</th><th>Що показує</th></tr></thead><tbody>
+      <tr><td><span class="badge b-red">− Продаж</span></td><td>Від'ємна кількість</td><td>Замовлення → клієнт, номер замовлення (клікабельне)</td></tr>
+      <tr><td><span class="badge b-green">+ Прихід</span></td><td>Додатна кількість</td><td>Purchase Order → постачальник, номер PO (клікабельне)</td></tr>
+      <tr><td><span class="badge b-blue">± Коригування</span></td><td>Будь-яке значення</td><td>Ручне коригування залишку</td></tr>
     </tbody></table></div>
 
     <hr class="div">
@@ -908,7 +951,7 @@ curl.exe -X POST -H "Authorization: Token ВАШ_ТОКЕН" -H "Content-Type: a
         <tbody>
           <tr><td>🔀 <strong>Jumingo</strong></td><td>Агрегатор</td><td><span style="color:#4caf50">✅ Активний</span></td><td>Порівнює тарифи DHL/GLS/Hermes/DPD, авто-трекінг, митні декларації</td></tr>
           <tr><td>📦 <strong>DHL Express</strong></td><td>MyDHL API</td><td><span style="color:#4caf50">✅ Тарифи + Трекінг</span></td><td>Ціни, час доставки, DHL Express трекінг</td></tr>
-          <tr><td>📦 UPS</td><td>Пряма інтеграція</td><td><span style="color:#ff9800">🔜 Заплановано</span></td><td>—</td></tr>
+          <tr><td>📦 <strong>UPS</strong></td><td>Пряма інтеграція</td><td><span style="color:#4caf50">✅ Активний</span></td><td>Тарифи, створення відправлень, pickup-підтвердження (11:00–16:00)</td></tr>
           <tr><td>📦 FedEx</td><td>Пряма інтеграція</td><td><span style="color:#ff9800">🔜 Заплановано</span></td><td>—</td></tr>
         </tbody>
       </table>
