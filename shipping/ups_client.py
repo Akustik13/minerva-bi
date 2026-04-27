@@ -720,12 +720,19 @@ class UPSClient:
                 _rebuild_packages()
                 data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
             elif '120317' in err_str:
-                # ShipFrom country must match Shipper country — use Shipper address as ShipFrom
-                shipper_node = payload['ShipmentRequest']['Shipment']['Shipper']
-                payload['ShipmentRequest']['Shipment']['ShipFrom'] = {
-                    k: v for k, v in shipper_node.items() if k != 'ShipperNumber'
-                }
-                data = self._post(f'/api/shipments/{_API_VERSION}/ship', payload)
+                # Account not enabled for cross-country ShipFrom (Importer of Record scheme).
+                # Raise informative error instead of creating a wrong label.
+                shipper_acct = payload['ShipmentRequest']['Shipment']['Shipper'].get('ShipperNumber', '')
+                shipfrom_country = (
+                    payload['ShipmentRequest']['Shipment']
+                    .get('ShipFrom', {}).get('Address', {}).get('CountryCode', '?')
+                )
+                raise UPSError(
+                    f'UPS помилка 120317: Обліковий запис {shipper_acct} не налаштований '
+                    f'для відправлень з {shipfrom_country}. '
+                    f'Зверніться до UPS для активації схеми «Importer of Record» / '
+                    f'«Bill to Third Party» для відправлень з третіх країн.'
+                )
             else:
                 raise
         resp         = data.get('ShipmentResponse', {})
