@@ -75,6 +75,10 @@
 .mv-who        { font-size: 12px; color: var(--text-muted); }
 .mv-loc        { font-size: 11px; color: var(--text-dim,#607d8b); }
 .mv-date       { white-space: nowrap; font-size: 12px; color: var(--text-muted); }
+.mv-operator   { font-size: 11px; white-space:nowrap; }
+.mv-op-system  { color: var(--text-dim,#607d8b); }
+.mv-op-ai      { color: #7b5ea7; font-weight:600; }
+.mv-op-user    { color: #42a5f5; font-weight:600; }
 
 .mv-empty {
   text-align: center; padding: 40px; color: var(--text-muted);
@@ -123,6 +127,7 @@
           <th class="num">Залишок</th>
           <th>Документ</th>
           <th>Клієнт / Постачальник</th>
+          <th>Виконавець</th>
           <th>Локація</th>
         </tr>
       </thead>
@@ -146,6 +151,7 @@
             {% endif %}
           </td>
           <td class="mv-who">{{ row.who }}</td>
+          <td class="mv-operator {% if '🤖' in row.operator %}mv-op-ai{% elif '⚙️' in row.operator %}mv-op-system{% else %}mv-op-user{% endif %}">{{ row.operator }}</td>
           <td class="mv-loc">{{ row.loc }}</td>
         </tr>
         {% endfor %}

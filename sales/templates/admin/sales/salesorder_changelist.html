@@ -152,6 +152,16 @@ document.addEventListener('DOMContentLoaded', function () {
   border-radius:8px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.4);max-width:180px;text-align:center}
 #sv-img-tip img{max-width:160px;max-height:160px;border-radius:5px;display:block}
 #sv-img-tip .sv-img-nophoto{font-size:11px;color:var(--text-muted);padding:12px 20px;white-space:nowrap}
+/* PDF preview tooltip */
+#sv-pdf-tip{position:fixed;z-index:9998;display:none;
+  background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+  border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.5);overflow:hidden;width:320px}
+#sv-pdf-tip-hd{display:flex;align-items:center;gap:6px;padding:6px 10px;
+  border-bottom:1px solid var(--border-strong,#243347);font-size:11px;font-weight:700;
+  color:var(--text-muted);background:var(--bg-input,#141f2b)}
+#sv-pdf-tip embed{display:block;width:320px;height:420px;border:none}
+.sv-pdf-icon{cursor:pointer;display:inline-block;transition:transform .1s}
+.sv-pdf-icon:hover{transform:scale(1.2)}
 </style>
 {% endblock %}
 
@@ -350,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <tr style="border-bottom:1px solid var(--border);color:var(--text)">
           {% with lsku=line.sku_raw|default:line.product.sku lqty=line.qty|floatformat:"0" limg=line.product.image_display_url %}
           <td style="padding:6px 8px;font-family:monospace;font-weight:700;white-space:nowrap;position:relative"
-              {% if limg and sv_show_img_tooltip %}class="sv-sku-img" data-img="{{ limg }}"{% endif %}>
+              {% if sv_show_img_tooltip %}{% if sv_image_prio == 'url' and line.product.image_url %}class="sv-sku-img" data-img="{{ line.product.image_url }}"{% elif limg %}class="sv-sku-img" data-img="{{ limg }}"{% endif %}{% endif %}>
             {% if line.product %}
               <a href="{% url 'admin:inventory_product_change' line.product.pk %}"
                  style="color:inherit;text-decoration:none;border-bottom:1px dashed var(--text-dim)"
@@ -370,15 +380,32 @@ document.addEventListener('DOMContentLoaded', function () {
             {% if line.total_price %}{{ line.total_price|floatformat:"2" }} {{ line.currency }}{% else %}—{% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center">
-            {% with ds=line.product.datasheet_display_url %}
-            {% if ds %}
-              <a href="{{ ds }}" target="_blank"
-                 title="{{ lsku }} — Datasheet"
-                 style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
+            {% if sv_datasheet_prio == 'url' %}
+              {% if line.product.datasheet_url %}
+                <a href="{{ line.product.datasheet_url }}" target="_blank"
+                   title="{{ lsku }} — Datasheet (🔗 URL)"
+                   {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ line.product.datasheet_url }}" data-pdfname="{{ lsku }}"{% endif %}
+                   style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
+              {% elif line.product.datasheet_display_url %}
+                <a href="{{ line.product.datasheet_display_url }}" target="_blank"
+                   title="{{ lsku }} — Datasheet (📁 файл)"
+                   {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ line.product.datasheet_display_url }}" data-pdfname="{{ lsku }}"{% endif %}
+                   style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
+              {% else %}
+                <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
+              {% endif %}
             {% else %}
-              <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
+              {% with ds=line.product.datasheet_display_url %}
+              {% if ds %}
+                <a href="{{ ds }}" target="_blank"
+                   title="{{ lsku }} — Datasheet{% if line.product.datasheet_file %} (📁 файл){% else %} (🔗 URL){% endif %}"
+                   {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ ds }}" data-pdfname="{{ lsku }}"{% endif %}
+                   style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
+              {% else %}
+                <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
+              {% endif %}
+              {% endwith %}
             {% endif %}
-            {% endwith %}
           </td>
           {% endwith %}
         </tr>
@@ -956,6 +983,64 @@ function svNoteSave(pk) {
     if (el) hide();
   });
 })();
+
+// ── PDF preview tooltip ────────────────────────────────────────────────────────
+{% if sv_show_pdf_preview %}
+(function () {
+  var tip = document.createElement('div');
+  tip.id = 'sv-pdf-tip';
+  tip.innerHTML = '<div id="sv-pdf-tip-hd">📄 <span id="sv-pdf-tip-name"></span></div><embed id="sv-pdf-embed" src="" type="application/pdf">';
+  document.body.appendChild(tip);
+
+  var hoverTimer = null;
+  var currentEl  = null;
+
+  function show(el, e) {
+    currentEl = el;
+    var url  = el.dataset.pdf;
+    var name = el.dataset.pdfname || '';
+    document.getElementById('sv-pdf-tip-name').textContent = name;
+    document.getElementById('sv-pdf-embed').src = url;
+    tip.style.display = 'block';
+    position(e);
+  }
+  function position(e) {
+    var W = window.innerWidth, H = window.innerHeight;
+    var tw = 330, th = 450;
+    var x = e.clientX + 16, y = e.clientY - 50;
+    if (x + tw > W) x = e.clientX - tw - 10;
+    if (y + th > H) y = H - th - 10;
+    if (y < 5) y = 5;
+    tip.style.left = x + 'px';
+    tip.style.top  = y + 'px';
+  }
+  function hide() {
+    tip.style.display = 'none';
+    document.getElementById('sv-pdf-embed').src = '';
+    currentEl = null;
+  }
+
+  document.addEventListener('mouseover', function(e) {
+    var el = e.target.closest('.sv-pdf-icon');
+    if (el) {
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(function(){ show(el, e); }, 350);
+    } else if (currentEl && !tip.contains(e.target)) {
+      clearTimeout(hoverTimer);
+    }
+  });
+  document.addEventListener('mousemove', function(e) {
+    if (tip.style.display !== 'none') position(e);
+  });
+  document.addEventListener('mouseout', function(e) {
+    var el = e.target.closest('.sv-pdf-icon');
+    if (el) {
+      clearTimeout(hoverTimer);
+      setTimeout(function(){ if (currentEl === el) hide(); }, 200);
+    }
+  });
+})();
+{% endif %}
 </script>
 
 {% endblock %}

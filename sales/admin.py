@@ -147,7 +147,14 @@ class SalesSettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ('🖥️ Відображення списку замовлень', {
-            'fields': ('show_product_image_tooltip',),
+            'fields': ('show_product_image_tooltip', 'show_pdf_preview', 'datasheet_priority', 'image_priority'),
+            'description': (
+                '<b>Попередній перегляд фото / PDF</b> — при наведенні на Артикул або значок 📄 '
+                'показує фото або PDF у маленькому спливаючому вікні.<br>'
+                '<b>Пріоритет PDF / Фото</b> — якщо у товару є і локально завантажений файл, '
+                'і посилання (URL) — вкажіть що відображати в першу чергу. '
+                'Fallback: якщо пріоритетне джерело порожнє — використовується інше.'
+            ),
         }),
         ('⚙️ Поведінка при генерації документів', {
             'fields': ('auto_save_to_server', 'auto_save_labels_to_server'),
@@ -466,7 +473,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             _base_qs().filter(shipping_deadline__lt=today, status__in=['received', 'processing']).count()
         )
         extra_context['sv_count_flagged'] = _base_qs().filter(is_flagged=True).count()
-        extra_context['sv_show_img_tooltip'] = SalesSettings.get().show_product_image_tooltip
+        _ss = SalesSettings.get()
+        extra_context['sv_show_img_tooltip'] = _ss.show_product_image_tooltip
+        extra_context['sv_show_pdf_preview'] = _ss.show_pdf_preview
+        extra_context['sv_datasheet_prio']   = _ss.datasheet_priority
+        extra_context['sv_image_prio']       = _ss.image_priority
 
         return super().changelist_view(request, extra_context=extra_context)
     date_hierarchy = "order_date"

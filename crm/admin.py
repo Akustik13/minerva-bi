@@ -133,6 +133,20 @@ class RFMSegmentFilter(admin.SimpleListFilter):
                 'display': f'{title} ({count})',
             }
 
+class FavoriteFilter(admin.SimpleListFilter):
+    title = "Обрані"
+    parameter_name = "favorite"
+
+    def lookups(self, request, model_admin):
+        n = Customer.objects.filter(is_favorite=True).count()
+        return [("1", f"⭐ Обрані ({n})" if n else "⭐ Обрані")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "1":
+            return queryset.filter(is_favorite=True)
+        return queryset
+
+
 @admin.register(Customer)
 class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     change_list_template = "admin/crm/customer_changelist.html"
@@ -203,12 +217,12 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
 
     # EMAIL прибраний зі списку
     list_display = (
-        "display_name", "country_flag", "sources_display", "segment_badge",
+        "favorite_col", "display_name", "country_flag", "sources_display", "segment_badge",
         "status_badge", "orders_count", "revenue_display",
         "avg_order_display", "last_order_display",
         "repeat_badge", "rfm_display", "strategy_btn",
     )
-    list_filter = ("segment", "status", "country", RepeatCustomerFilter, RFMSegmentFilter)
+    list_filter = ("segment", "status", "country", RepeatCustomerFilter, RFMSegmentFilter, FavoriteFilter)
     search_fields = ("name", "email", "company", "phone", "addr_city", "addr_street", "external_key")
     # Зберігаємо фільтри між сесіями
     preserve_filters = True
@@ -271,6 +285,11 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 "sync-crm/",
                 self.admin_site.admin_view(self.sync_view),
                 name="crm_customer_sync",
+            ),
+            path(
+                "<int:pk>/favorite/",
+                self.admin_site.admin_view(self.favorite_view),
+                name="crm_customer_favorite",
             ),
             path(
                 "<int:pk>/new-order/",
@@ -510,9 +529,21 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     list_per_page = 50
 
     def changelist_view(self, request, extra_context=None):
-        # Reset per-request caches so stale data doesn't leak between requests
         self._sources_cache = {}
+        extra_context = extra_context or {}
+        extra_context['crm_status_counts'] = {
+            s: Customer.objects.filter(status=s).count()
+            for s in ['active', 'vip', 'inactive', 'blocked']
+        }
+        extra_context['crm_count_favorites'] = Customer.objects.filter(is_favorite=True).count()
         return super().changelist_view(request, extra_context)
+
+    def favorite_view(self, request, pk):
+        from django.http import JsonResponse
+        customer = get_object_or_404(Customer, pk=pk)
+        customer.is_favorite = not customer.is_favorite
+        customer.save(update_fields=['is_favorite'])
+        return JsonResponse({'is_favorite': customer.is_favorite, 'pk': pk})
 
     def get_queryset(self, request):
         from django.db.models import OuterRef, Subquery, Count, Value
@@ -596,6 +627,20 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     )
 
     # ── Computed columns ──────────────────────────────────────────────────────
+
+    @admin.display(description="⭐")
+    def favorite_col(self, obj):
+        icon = '⭐' if obj.is_favorite else '☆'
+        return format_html(
+            '<button class="crm-fav-btn {}" data-pk="{}" '
+            'onclick="crmFavorite({});return false" '
+            'style="background:none;border:none;cursor:pointer;font-size:16px;padding:0 2px;'
+            'color:{}" title="{}">{}</button>',
+            'crm-fav-on' if obj.is_favorite else '', obj.pk, obj.pk,
+            '#FFB300' if obj.is_favorite else 'var(--text-dim)',
+            'Зняти обраність' if obj.is_favorite else 'Позначити як обраний',
+            icon,
+        )
 
     _SOURCE_COLORS = {
         'digikey':  '#c62828',  # DigiKey red

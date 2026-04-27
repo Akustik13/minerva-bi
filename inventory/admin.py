@@ -975,6 +975,27 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             ):
                 po_map[po['code']] = po
 
+        # ── Fetch AuditLog creators for manual transactions ─────────────────────
+        tx_pk_list = [tx.pk for tx in txs]
+        audit_user_map: dict = {}   # tx.pk → username string
+        try:
+            from core.models import AuditLog
+            from django.contrib.contenttypes.models import ContentType
+            inv_ct = ContentType.objects.get_for_model(InventoryTransaction)
+            for entry in AuditLog.objects.filter(
+                content_type=inv_ct,
+                object_id__in=[str(pk) for pk in tx_pk_list],
+                action='create',
+            ).select_related('user').values('object_id', 'user__username', 'user__first_name', 'user__last_name'):
+                uid = entry['object_id']
+                uname = (
+                    f"{entry['user__first_name']} {entry['user__last_name']}".strip()
+                    or entry['user__username'] or 'Адмін'
+                )
+                audit_user_map[int(uid)] = uname
+        except Exception:
+            pass
+
         # ── Build rows ─────────────────────────────────────────────────────────
         TYPE_CFG = {
             'Incoming':   ('▲', 'green',  'Прихід'),
@@ -998,6 +1019,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             balance_str = f'{balance:g}'
 
             doc_url = doc_label = who = ''
+            operator = ''   # хто виконав операцію
             ek = tx.external_key
             if ek.startswith('so:'):
                 parts = ek.split(':')
@@ -1009,6 +1031,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     who = (order['contact_name'] or order['client'] or '').strip()[:45]
                 else:
                     doc_label = tx.ref_doc or ek
+                operator = audit_user_map.get(tx.pk, '⚙️ Система')
             elif ek.startswith('po:'):
                 parts = ek.split(':')
                 po_code = parts[1] if len(parts) > 1 else ''
@@ -1019,11 +1042,16 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     who = (po.get('supplier__name') or '').strip()[:45]
                 else:
                     doc_label = tx.ref_doc or ek
+                operator = audit_user_map.get(tx.pk, '⚙️ Система')
+            elif ek.startswith('ai:'):
+                doc_label = tx.ref_doc or ek[:55]
+                operator = '🤖 AI'
             else:
                 doc_label = tx.ref_doc or ek[:55]
+                operator = audit_user_map.get(tx.pk, '⚙️ Система')
 
             rows.append({
-                'date':      tx.tx_date.strftime('%d.%m.%Y') if tx.tx_date else '—',
+                'date':      tx.tx_date.strftime('%d.%m.%Y %H:%M') if tx.tx_date else '—',
                 'label':     label,
                 'color':     color,
                 'qty_str':   qty_str,
@@ -1031,6 +1059,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 'doc_url':   doc_url,
                 'doc_label': doc_label,
                 'who':       who,
+                'operator':  operator,
                 'loc':       tx.location.code if tx.location_id else '—',
             })
             balance -= qty  # go back in time

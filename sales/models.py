@@ -202,6 +202,31 @@ class SalesSettings(models.Model):
                   'Вимкніть якщо це сповільнює роботу.',
     )
 
+    show_pdf_preview = models.BooleanField(
+        default=True,
+        verbose_name='Відображення PDF при наведенні',
+        help_text='У списку замовлень при наведенні на значок 📄 показує маленький попередній перегляд PDF.',
+    )
+
+    class MediaPriority(models.TextChoices):
+        FILE_FIRST = "file", "📁 Локальний файл (пріоритет) → потім посилання"
+        URL_FIRST  = "url",  "🔗 Посилання (пріоритет) → потім локальний файл"
+
+    datasheet_priority = models.CharField(
+        "Пріоритет: Datasheet PDF",
+        max_length=8,
+        choices=MediaPriority.choices,
+        default=MediaPriority.FILE_FIRST,
+        help_text="Якщо є і завантажений PDF, і URL — що показувати в таблиці/картках?",
+    )
+    image_priority = models.CharField(
+        "Пріоритет: Фото товару",
+        max_length=8,
+        choices=MediaPriority.choices,
+        default=MediaPriority.FILE_FIRST,
+        help_text="Якщо є і завантажений файл, і URL — яке фото використовувати?",
+    )
+
     class Meta:
         verbose_name = 'Налаштування'
         verbose_name_plural = 'Налаштування'

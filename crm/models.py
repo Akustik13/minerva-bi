@@ -58,9 +58,10 @@ class Customer(models.Model):
     # --- Метадані ---
     source     = models.CharField("Джерело", max_length=64, blank=True, default="",
                                   help_text="digikey / webshop / manual / etc")
-    notes      = models.TextField("Примітки", blank=True, default="")
-    created_at = models.DateTimeField("Створено", auto_now_add=True)
-    updated_at = models.DateTimeField("Оновлено", auto_now=True)
+    notes       = models.TextField("Примітки", blank=True, default="")
+    is_favorite = models.BooleanField("⭐ Обраний", default=False, db_index=True)
+    created_at  = models.DateTimeField("Створено", auto_now_add=True)
+    updated_at  = models.DateTimeField("Оновлено", auto_now=True)
 
     class Meta:
         verbose_name = "Клієнт"

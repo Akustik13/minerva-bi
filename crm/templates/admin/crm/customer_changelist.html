@@ -6,27 +6,28 @@
    CRM CARD VIEW — design system
    ══════════════════════════════════════════════════════════════ */
 
-/* ── Toolbar ──────────────────────────────────────────────── */
-.crm-view-bar {
-  display:flex; align-items:center; gap:10px;
-  margin-bottom:12px; flex-wrap:wrap;
-}
-.crm-toggle-btn {
-  padding:6px 16px; border-radius:6px;
-  border:1px solid var(--border-strong); background:var(--bg-card);
-  color:var(--text); cursor:pointer; font-size:12px; font-weight:600;
-  transition:background .15s, color .15s;
-}
-.crm-toggle-btn.active { background:#1565c0; color:#fff; border-color:transparent; }
+/* ── Quick filter bar ─────────────────────────────────────── */
+.crm-qf-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px;padding:8px 12px;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:7px}
+.crm-qf-sep{width:1px;height:20px;background:var(--border-strong);margin:0 4px;flex-shrink:0}
+.crm-qf-btn{padding:4px 12px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-input,#141f2b);color:var(--text-muted);cursor:pointer;font-size:12px;font-weight:600;text-decoration:none;transition:background .12s,color .12s;white-space:nowrap}
+.crm-qf-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.crm-qf-btn.crm-qf-active{background:#1565c0;color:#fff;border-color:transparent}
+.crm-qf-btn.crm-qf-fav{color:#fb8c00;border-color:rgba(251,140,0,.4)}
+.crm-qf-btn.crm-qf-fav.crm-qf-active{background:#FFB300;color:#000;border-color:transparent}
+.crm-qf-cnt{display:inline-block;background:rgba(255,255,255,.15);color:inherit;font-size:10px;font-weight:700;line-height:1;padding:1px 5px;border-radius:8px;margin-left:3px;vertical-align:middle}
+.crm-qf-btn.crm-qf-active .crm-qf-cnt{background:rgba(255,255,255,.25)}
 
-/* ── Card-mode action bar ─────────────────────────────────── */
-.crm-action-bar {
-  display:none; align-items:center; gap:8px; flex-wrap:wrap;
+/* ── Combined toolbar ─────────────────────────────────────── */
+.crm-combo-bar {
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
   padding:6px 12px; border-radius:8px;
   background:rgba(21,101,192,.08); border:1px solid rgba(21,101,192,.22);
   font-size:12px; margin-bottom:10px;
 }
-.crm-action-bar label {
+#crm-card-controls {
+  display:none; flex:1; align-items:center; gap:8px; flex-wrap:wrap;
+}
+#crm-card-controls label {
   display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--text);
   white-space:nowrap;
 }
@@ -46,6 +47,21 @@
 }
 .crm-act-go:hover { background:#1976d2; }
 .crm-bar-sep { color:var(--border-strong); user-select:none; }
+
+/* ── View toggle buttons ──────────────────────────────────── */
+.crm-toggle-btn {
+  padding:5px 14px; border-radius:6px;
+  border:1px solid var(--border-strong); background:var(--bg-card);
+  color:var(--text); cursor:pointer; font-size:12px; font-weight:600;
+  transition:background .15s, color .15s;
+}
+.crm-toggle-btn.active { background:#1565c0; color:#fff; border-color:transparent; }
+
+/* ── Favorite button ──────────────────────────────────────── */
+.crm-fav-btn{background:none;border:none;cursor:pointer;font-size:18px;padding:2px 3px;line-height:1;transition:transform .1s;color:var(--text-dim)}
+.crm-fav-btn:hover{transform:scale(1.25)}
+.crm-fav-btn.crm-fav-on{color:#FFB300!important}
+.crm-card.crm-card-fav{border-left-color:#FFB300!important}
 
 /* ══ CARD ═════════════════════════════════════════════════════ */
 .crm-card {
@@ -414,29 +430,39 @@ function crmDoAction() {
 
 {% block result_list %}
 
-{# ── Toolbar ───────────────────────────────────────────────── #}
-<div class="crm-view-bar">
-  <div style="display:flex;gap:8px;align-items:center">
-    <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
+{# ── Quick filter bar ─────────────────────────────────────── #}
+<div class="crm-qf-bar">
+  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Статус:</span>
+  <a class="crm-qf-btn" id="cqf-all"      onclick="crmQFStatus('');return false" href="#">Всі</a>
+  <a class="crm-qf-btn" id="cqf-active"   onclick="crmQFStatus('active');return false" href="#">🟢 Активні{% if crm_status_counts.active %} <span class="crm-qf-cnt">{{ crm_status_counts.active }}</span>{% endif %}</a>
+  <a class="crm-qf-btn" id="cqf-vip"      onclick="crmQFStatus('vip');return false" href="#">⭐ VIP{% if crm_status_counts.vip %} <span class="crm-qf-cnt">{{ crm_status_counts.vip }}</span>{% endif %}</a>
+  <a class="crm-qf-btn" id="cqf-inactive" onclick="crmQFStatus('inactive');return false" href="#">⚪ Неактивні{% if crm_status_counts.inactive %} <span class="crm-qf-cnt">{{ crm_status_counts.inactive }}</span>{% endif %}</a>
+  <a class="crm-qf-btn" id="cqf-blocked"  onclick="crmQFStatus('blocked');return false" href="#">🚫 Заблоковані{% if crm_status_counts.blocked %} <span class="crm-qf-cnt">{{ crm_status_counts.blocked }}</span>{% endif %}</a>
+  <div class="crm-qf-sep"></div>
+  <a class="crm-qf-btn crm-qf-fav" id="cqf-favorites" onclick="crmQFFavorite();return false" href="#">⭐ Обрані{% if crm_count_favorites %} <span class="crm-qf-cnt">{{ crm_count_favorites }}</span>{% endif %}</a>
+</div>
+
+{# ── Combined toolbar (actions + view toggle) ─────────────── #}
+<div class="crm-combo-bar">
+  <div id="crm-card-controls">
+    <label>
+      <input type="checkbox" id="crm-sel-all" onchange="crmSelectAll(this.checked)">
+      Вибрати всі
+    </label>
+    <span class="crm-bar-sep">|</span>
+    <span style="font-size:12px;color:var(--text-muted)">Дія:</span>
+    <select id="crm-act-sel" class="crm-act-sel">
+      <option value="">---------</option>
+    </select>
+    <button type="button" class="crm-act-go" onclick="crmDoAction()">Вперед →</button>
+    <span class="crm-bar-sep">|</span>
+    <span id="crm-sel-count" style="font-size:12px;font-weight:700;color:#1976d2">Обрано 0 з {{ cl.result_list|length }}</span>
+  </div>
+  <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
+    <span style="font-size:11px;color:var(--text-muted)">Вигляд:</span>
     <button class="crm-toggle-btn" id="crm-btn-table" onclick="crmSetView('table')">📋 Таблиця</button>
     <button class="crm-toggle-btn" id="crm-btn-cards" onclick="crmSetView('cards')">🃏 Картки</button>
   </div>
-</div>
-
-{# ── Card-mode action bar ──────────────────────────────────── #}
-<div class="crm-action-bar" id="crm-action-bar">
-  <label>
-    <input type="checkbox" id="crm-sel-all" onchange="crmSelectAll(this.checked)">
-    Вибрати всі
-  </label>
-  <span class="crm-bar-sep">|</span>
-  <span style="font-size:12px;color:var(--text-muted)">Дія:</span>
-  <select id="crm-act-sel" class="crm-act-sel">
-    <option value="">---------</option>
-  </select>
-  <button type="button" class="crm-act-go" onclick="crmDoAction()">Вперед →</button>
-  <span class="crm-bar-sep">|</span>
-  <span id="crm-sel-count" style="font-size:12px;font-weight:700;color:#1976d2">Обрано 0 з {{ cl.result_list|length }}</span>
 </div>
 
 {# ── Card view ─────────────────────────────────────────────── #}
@@ -445,7 +471,7 @@ function crmDoAction() {
 {% for customer in cl.result_list %}
 {% with stats=customer.card_stats rfm=customer.rfm_score tops=customer.top_products sdata=customer.active_strategy_card %}
 
-<div class="crm-card crm-s-{{ customer.status }}" id="crm-card-{{ customer.pk }}">
+<div class="crm-card crm-s-{{ customer.status }}{% if customer.is_favorite %} crm-card-fav{% endif %}" id="crm-card-{{ customer.pk }}" data-pk="{{ customer.pk }}">
 
   {# ┌── HEADER ────────────────────────────────────────────── #}
   <div class="crm-hd">
@@ -495,9 +521,14 @@ function crmDoAction() {
       </div>
     </div>
 
-    {# Right: badges #}
+    {# Right: ⭐ + badges #}
     <div class="crm-hd-right">
-      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center">
+        {# Favorite toggle #}
+        <button class="crm-fav-btn {% if customer.is_favorite %}crm-fav-on{% endif %}"
+                data-pk="{{ customer.pk }}"
+                onclick="crmFavorite({{ customer.pk }});return false"
+                title="{% if customer.is_favorite %}Зняти обраність{% else %}Позначити як обраний{% endif %}">{% if customer.is_favorite %}⭐{% else %}☆{% endif %}</button>
         {# Status #}
         {% if customer.status == 'active' %}    <span class="crm-badge" style="background:#43a047">Активний</span>
         {% elif customer.status == 'vip' %}     <span class="crm-badge" style="background:#f9a825;color:#000">⭐ VIP</span>
@@ -737,7 +768,8 @@ function crmSetView(mode) {
   document.getElementById('crm-table').style.display = isCards ? 'none'  : 'block';
   document.getElementById('crm-btn-cards').classList.toggle('active', isCards);
   document.getElementById('crm-btn-table').classList.toggle('active', !isCards);
-  document.getElementById('crm-action-bar').style.display = isCards ? 'flex' : 'none';
+  var cc = document.getElementById('crm-card-controls');
+  if (cc) cc.style.display = isCards ? 'flex' : 'none';
   if (!isCards) {
     document.querySelectorAll('input[data-card-pk]').forEach(function(el){ el.remove(); });
     document.querySelectorAll('.crm-card-cb').forEach(function(cb){ cb.checked = false; });
@@ -746,7 +778,57 @@ function crmSetView(mode) {
   }
 }
 
-(function(){ crmSetView(localStorage.getItem('crm_customer_view') || 'table'); })();
+/* ══ Quick filters ═════════════════════════════════════════ */
+
+function crmQFStatus(status) {
+  var p = new URLSearchParams(window.location.search);
+  if (status) p.set('status', status);
+  else p.delete('status');
+  p.delete('p');
+  window.location.search = '?' + p.toString();
+}
+
+function crmQFFavorite() {
+  var p = new URLSearchParams(window.location.search);
+  if (p.get('favorite') === '1') p.delete('favorite');
+  else p.set('favorite', '1');
+  p.delete('p');
+  window.location.search = '?' + p.toString();
+}
+
+/* ══ Favorite AJAX toggle ══════════════════════════════════ */
+
+function crmFavorite(pk) {
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  if (!csrf) return;
+  fetch('/admin/crm/customer/' + pk + '/favorite/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrf[1], 'X-Requested-With': 'XMLHttpRequest'},
+  }).then(function(r){ return r.json(); }).then(function(d){
+    document.querySelectorAll('.crm-fav-btn[data-pk="' + pk + '"]').forEach(function(btn){
+      btn.classList.toggle('crm-fav-on', d.is_favorite);
+      btn.title = d.is_favorite ? 'Зняти обраність' : 'Позначити як обраний';
+      btn.textContent = d.is_favorite ? '⭐' : '☆';
+    });
+    var card = document.getElementById('crm-card-' + pk);
+    if (card) card.classList.toggle('crm-card-fav', d.is_favorite);
+  });
+}
+
+/* ══ Init ══════════════════════════════════════════════════ */
+
+(function(){
+  /* View mode */
+  crmSetView(localStorage.getItem('crm_customer_view') || 'table');
+  /* Active quick filter highlight */
+  var p = new URLSearchParams(window.location.search);
+  var status = p.get('status') || '';
+  var fav    = p.get('favorite') || '';
+  var smap   = {'':'cqf-all','active':'cqf-active','vip':'cqf-vip','inactive':'cqf-inactive','blocked':'cqf-blocked'};
+  var activeBtn = document.getElementById(smap[status] || 'cqf-all');
+  if (activeBtn) activeBtn.classList.add('crm-qf-active');
+  if (fav === '1') { var fb = document.getElementById('cqf-favorites'); if(fb) fb.classList.add('crm-qf-active'); }
+})();
 </script>
 
 {% endblock %}
