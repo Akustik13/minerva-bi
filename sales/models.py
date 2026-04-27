@@ -195,6 +195,12 @@ class SalesSettings(models.Model):
                   'і митної декларації у папку документів замовлення '
                   '(media/orders/{source}/{order_number}/).',
     )
+    show_product_image_tooltip = models.BooleanField(
+        default=True,
+        verbose_name='Показувати фото товару при наведенні',
+        help_text='У списку замовлень при наведенні на Артикул показує фото товару зі складу. '
+                  'Вимкніть якщо це сповільнює роботу.',
+    )
 
     class Meta:
         verbose_name = 'Налаштування'

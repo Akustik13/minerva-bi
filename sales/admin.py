@@ -146,6 +146,9 @@ class SalesSettingsAdmin(admin.ModelAdmin):
                 'Працює коли Django запущено локально або при монтуванні тому Docker → Windows.'
             ),
         }),
+        ('🖥️ Відображення списку замовлень', {
+            'fields': ('show_product_image_tooltip',),
+        }),
         ('⚙️ Поведінка при генерації документів', {
             'fields': ('auto_save_to_server', 'auto_save_labels_to_server'),
             'description': (
@@ -463,6 +466,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             _base_qs().filter(shipping_deadline__lt=today, status__in=['received', 'processing']).count()
         )
         extra_context['sv_count_flagged'] = _base_qs().filter(is_flagged=True).count()
+        extra_context['sv_show_img_tooltip'] = SalesSettings.get().show_product_image_tooltip
 
         return super().changelist_view(request, extra_context=extra_context)
     date_hierarchy = "order_date"

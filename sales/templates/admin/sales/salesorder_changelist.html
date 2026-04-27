@@ -350,7 +350,13 @@ document.addEventListener('DOMContentLoaded', function () {
         <tr style="border-bottom:1px solid var(--border);color:var(--text)">
           {% with lsku=line.sku_raw|default:line.product.sku lqty=line.qty|floatformat:"0" limg=line.product.image_display_url %}
           <td style="padding:6px 8px;font-family:monospace;font-weight:700;white-space:nowrap;position:relative"
-              {% if limg %}class="sv-sku-img" data-img="{{ limg }}"{% endif %}>{{ lsku|default:"—" }}</td>
+              {% if limg and sv_show_img_tooltip %}class="sv-sku-img" data-img="{{ limg }}"{% endif %}>
+            {% if line.product %}
+              <a href="{% url 'admin:inventory_product_change' line.product.pk %}"
+                 style="color:inherit;text-decoration:none;border-bottom:1px dashed var(--text-dim)"
+                 title="Перейти на склад: {{ lsku }}">{{ lsku|default:"—" }}</a>
+            {% else %}{{ lsku|default:"—" }}{% endif %}
+          </td>
           <td style="padding:6px 8px;text-align:center">
             {% if lsku %}<span class="sv-lbl-btn sv-lbl-off sv-line-lbl" data-sku="{{ lsku }}" data-qty="{{ lqty }}">🏷️</span>{% else %}—{% endif %}
           </td>
