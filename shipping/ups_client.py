@@ -616,9 +616,11 @@ class UPSClient:
 
     def create_shipment(self, to_address: dict, packages: list,
                         service_code: str = '11', from_address: dict = None,
-                        customs_info: dict = None, reference: str = '') -> dict:
+                        customs_info: dict = None, reference: str = '',
+                        dry_run: bool = False) -> dict:
         """
         POST /api/shipments/v2409/ship
+        dry_run=True — build and return the payload dict without sending to UPS.
         Повертає: {tracking_number, shipment_id, label_base64, label_format, total_charge, currency}
         """
         pickup  = from_address or self._default_shipper()  # physical pickup (can be US)
@@ -700,6 +702,8 @@ class UPSClient:
         }
 
         self._last_payload = payload  # exposed for debug logging
+        if dry_run:
+            return payload
         from_country = (pickup.get('country') or '').upper()
 
         def _rebuild_packages():

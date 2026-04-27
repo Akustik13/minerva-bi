@@ -465,12 +465,71 @@
       onclick="return confirm('Відправити через UPS API?\n\nСервіс: {{ service_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі UPS і списано кошти з акаунту.')">
       🟤 Підтвердити і відправити через UPS
     </button>
+    <button type="button" class="btn-back" id="btn-dry-run" onclick="ucDryRun()">
+      🔍 Переглянути тіло запиту
+    </button>
     <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
+  </div>
+
+  <!-- Debug JSON panel -->
+  <div id="uc-dry-panel" style="display:none;margin-top:16px">
+    <div class="uc-card">
+      <div class="uc-head" style="justify-content:space-between">
+        <span>📋 UPS API Request Body (dry run — не відправляється)</span>
+        <div style="display:flex;gap:8px">
+          <button onclick="ucCopyPayload()" style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;color:var(--text-muted)">📋 Копіювати</button>
+          <button onclick="document.getElementById('uc-dry-panel').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-dim)">✕</button>
+        </div>
+      </div>
+      <div class="uc-body" style="padding:0">
+        <pre id="uc-dry-json" style="margin:0;padding:14px 16px;font-size:12px;font-family:monospace;
+             color:var(--text);background:var(--bg-input);overflow-x:auto;white-space:pre;
+             max-height:600px;overflow-y:auto;line-height:1.5">Завантаження…</pre>
+      </div>
+    </div>
   </div>
 
 </div>
 
 <script>
+var _ucDryPayload = '';
+
+function ucDryRun() {
+  var panel = document.getElementById('uc-dry-panel');
+  var pre   = document.getElementById('uc-dry-json');
+  panel.style.display = '';
+  pre.textContent = 'Завантаження…';
+  var url = '{% url "admin:shipping_shipment_ups_dry_run" shipment.pk %}?service_code={{ service_code }}&terms_of_shipment={{ customs.terms_of_shipment|default:"DAP" }}';
+  fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        _ucDryPayload = JSON.stringify(d.payload, null, 2);
+        pre.textContent = _ucDryPayload;
+      } else {
+        pre.style.color = '#f85149';
+        pre.textContent = '❌ ' + (d.error || 'Помилка');
+        _ucDryPayload = '';
+      }
+      panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    })
+    .catch(function(e){
+      pre.style.color = '#f85149';
+      pre.textContent = '❌ Network error: ' + e;
+      _ucDryPayload = '';
+    });
+}
+
+function ucCopyPayload() {
+  if (!_ucDryPayload) return;
+  navigator.clipboard.writeText(_ucDryPayload).then(function(){
+    var btn = event.target;
+    var old = btn.textContent;
+    btn.textContent = '✅ Скопійовано';
+    setTimeout(function(){ btn.textContent = old; }, 1500);
+  });
+}
+
 (function(){
   var STEP=15, BASE=8*60, MAX=47;
   function fmt(slot){

@@ -1059,6 +1059,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_ups_confirm",
             ),
             path(
+                "<int:shipment_id>/ups-dry-run/",
+                self.admin_site.admin_view(self.ups_dry_run_view),
+                name="shipping_shipment_ups_dry_run",
+            ),
+            path(
                 "<int:shipment_id>/ups-track/",
                 self.admin_site.admin_view(self.ups_track_view),
                 name="shipping_shipment_ups_track",
@@ -2819,6 +2824,41 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'rate_ref':             rate_ref,
             'delivery_date':        delivery_date,
         })
+
+    def ups_dry_run_view(self, request, shipment_id):
+        """GET — build UPS shipment payload without sending. Returns JSON for debug."""
+        import json as _json
+        from django.http import JsonResponse
+        from .ups_client import UPSClient, UPSError
+
+        shipment     = get_object_or_404(Shipment, pk=shipment_id)
+        service_code = request.GET.get('service_code', '11').strip() or '11'
+        terms        = request.GET.get('terms_of_shipment', 'DAP').strip()
+
+        try:
+            client   = UPSClient(carrier=shipment.carrier)
+            to_addr  = self._ups_extract_address(shipment)
+            packages = self._ups_extract_packages(shipment)
+            customs  = self._ups_extract_customs(shipment)
+            shipper  = self._ups_extract_shipper(shipment)
+
+            if customs and terms:
+                customs['terms_of_shipment'] = terms
+
+            payload = client.create_shipment(
+                to_address   = to_addr,
+                packages     = packages,
+                service_code = service_code,
+                from_address = shipper,
+                customs_info = customs or None,
+                reference    = shipment.reference or str(shipment.pk),
+                dry_run      = True,
+            )
+            return JsonResponse({'ok': True, 'payload': payload}, json_dumps_params={'indent': 2, 'ensure_ascii': False})
+        except UPSError as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
     def ups_book_view(self, request, shipment_id):
         """Оформити відправлення через UPS."""
