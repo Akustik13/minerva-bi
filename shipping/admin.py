@@ -923,6 +923,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_quick_create",
             ),
             path(
+                "create/blank/",
+                self.admin_site.admin_view(self.create_blank_view),
+                name="shipping_shipment_create_blank",
+            ),
+            path(
                 "create/<int:order_id>/",
                 self.admin_site.admin_view(self.create_from_order_view),
                 name="shipping_shipment_create",
@@ -1145,6 +1150,75 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'error': error,
         }
         return render(request, 'admin/shipping/quick_create.html', ctx)
+
+    def create_blank_view(self, request):
+        """Show the shipment creation form without a linked order (manual entry)."""
+        from django.db.models import Case, When, IntegerField
+        carriers = Carrier.objects.filter(is_active=True).order_by(
+            Case(When(carrier_type="jumingo", then=0), default=1, output_field=IntegerField()),
+            "-is_default", "name",
+        )
+
+        if request.method == "POST":
+            return self._handle_create_post(request, order=None, carriers=carriers)
+
+        carriers = list(carriers)
+        carriers_sender = {
+            str(c.pk): {
+                'sender_name': c.sender_name or '',
+                'sender_company': c.sender_company or '',
+                'sender_street': c.sender_street or '',
+                'sender_city': c.sender_city or '',
+                'sender_zip': c.sender_zip or '',
+                'sender_state': c.sender_state or '',
+                'sender_country': c.sender_country or 'DE',
+                'sender_phone': c.sender_phone or '',
+                'sender_email': c.sender_email or '',
+            }
+            for c in carriers
+        }
+
+        # Recent recipients for address book
+        recent_recipients = list(
+            Shipment.objects.exclude(recipient_name='').order_by('-created_at')
+            .values(
+                'recipient_name', 'recipient_company',
+                'recipient_street', 'recipient_city',
+                'recipient_zip', 'recipient_state', 'recipient_country',
+                'recipient_phone', 'recipient_email',
+            )[:60]
+        )
+        seen = set()
+        unique_recipients = []
+        for r in recent_recipients:
+            key = (r['recipient_name'].lower(), r['recipient_country'].upper())
+            if key not in seen:
+                seen.add(key)
+                unique_recipients.append(r)
+            if len(unique_recipients) >= 20:
+                break
+
+        shipment = Shipment()
+        if carriers:
+            shipment.carrier = carriers[0]
+
+        return render(request, 'admin/shipping/create_shipment.html', {
+            **self.admin_site.each_context(request),
+            'order':                None,
+            'shipment':             shipment,
+            'carriers':             carriers,
+            'carriers_sender_json': _json.dumps(carriers_sender),
+            'packaging_hint':       None,
+            'customs_articles':     [],
+            'needs_customs':        False,
+            'eu_countries_js':      '',
+            'default_ca_weight':    None,
+            'title':                'Нове відправлення',
+            'pkg_rows_json':        '[]',
+            'pkg_auto':             False,
+            'recent_recipients_json': _json.dumps(unique_recipients),
+            'cancel_url':           reverse('admin:shipping_shipment_changelist'),
+        })
 
     def create_from_order_view(self, request, order_id):
         from sales.models import SalesOrder

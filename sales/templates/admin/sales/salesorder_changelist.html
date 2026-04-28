@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function () {
       <div class="sv-pc {% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'shipped' or s == 'delivered' %}sv-ps-done{% elif sh.label_url %}sv-ps-cur{% endif %}">
         <div class="sv-pd">{% if s == 'shipped' or s == 'delivered' %}✓{% elif sh.label_url %}●{% else %}·{% endif %}</div>
-        <div class="sv-pl">Етикетка{% if sh.label_url and s != 'shipped' and s != 'delivered' %}<small>{% if sv_label_open_mode == 'download' %}<a href="{{ sh.label_url }}" download style="color:inherit">PDF ⬇️</a>{% elif sv_label_open_mode == 'ask' %}<a href="#" onclick="svOpenLabel('{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% else %}<a href="{{ sh.label_url }}" target="_blank" style="color:inherit">PDF</a>{% endif %}</small>{% endif %}</div>
+        <div class="sv-pl">Етикетка{% if sh.label_url and s != 'shipped' and s != 'delivered' %}<small>{% if sv_label_open_mode == 'download' %}<a href="#" onclick="svLabelAction('download','{{ sh.label_url }}');return false" style="color:inherit">PDF ⬇️</a>{% elif sv_label_open_mode == 'ask' %}<a href="#" onclick="svLabelAction('ask','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% else %}<a href="#" onclick="svLabelAction('view','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% endif %}</small>{% endif %}</div>
       </div>
       <div class="sv-pc {% if s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'shipped' %}{% if sh.carrier_delayed %}sv-ps-warn{% else %}sv-ps-cur{% endif %}{% elif s == 'delivered' %}sv-ps-done{% endif %}">
@@ -587,11 +587,15 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
       +'</div></div>');
   };
   window.svDymoPrint=function(url,sku,qty){
-    var ctrl=new AbortController();
-    var t=setTimeout(function(){ctrl.abort();},2500);
-    fetch('http://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected',{mode:'no-cors',signal:ctrl.signal})
-    .then(function(){
-      clearTimeout(t);
+    // Try HTTPS first (DYMO Connect 2022+), then HTTP (old DYMO Label Software)
+    function _tryConnect(baseUrl, onOk, onFail) {
+      var ctrl=new AbortController();
+      var t=setTimeout(function(){ctrl.abort();},2500);
+      fetch(baseUrl+'/DYMO/DLS/Printing/StatusConnected',{mode:'no-cors',signal:ctrl.signal})
+      .then(function(){clearTimeout(t);window._dymoBaseUrl=baseUrl;onOk();})
+      .catch(function(){clearTimeout(t);onFail();});
+    }
+    function _doPrint(){
       _loadFW(function(err){
         if(err){window.svDymoError(url,sku,'Помилка завантаження DYMO SDK: '+err);return;}
         fetch(url).then(function(r){return r.text();}).then(function(xml){
@@ -603,16 +607,20 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
           }catch(e){window.svDymoError(url,sku,'Помилка DYMO SDK: '+(e.message||e));}
         }).catch(function(e){window.svDymoError(url,sku,'Помилка завантаження мітки: '+e);});
       });
-    })
-    .catch(function(){
-      clearTimeout(t);
-      window.svDymoError(url,sku,
-        'DYMO Label Software не запущено або не встановлено на цьому ПК.<br><br>'
-        +'<b>Що зробити:</b><br>'
-        +'① Встановіть <a href="https://www.dymo.com/label-makers-printers/label-software.html" target="_blank" style="color:#64b5f6">DYMO Label Software</a><br>'
-        +'② Запустіть програму перед друком<br>'
-        +'③ Спробуйте ще раз — або завантажте файл нижче'
-      );
+    }
+    _tryConnect('https://127.0.0.1:41951', _doPrint, function(){
+      _tryConnect('http://127.0.0.1:41951', _doPrint, function(){
+        window.svDymoError(url,sku,
+          'DYMO не відповідає на цьому ПК.<br><br>'
+          +'<b>DYMO Connect (нова версія):</b><br>'
+          +'① Відкрийте у браузері: <a href="https://127.0.0.1:41951" target="_blank" style="color:#64b5f6">https://127.0.0.1:41951</a><br>'
+          +'② Натисніть «Додатково» → «Перейти» — щоб прийняти сертифікат<br>'
+          +'③ Поверніться сюди і спробуйте ще раз<br><br>'
+          +'<b>DYMO Label Software (стара версія):</b><br>'
+          +'① Запустіть DYMO Label Software<br>'
+          +'② Спробуйте ще раз — або завантажте файл нижче'
+        );
+      });
     });
   };
   window.svDymoAsk=function(url,sku,qty){
@@ -1032,14 +1040,32 @@ function svNoteSave(pk) {
   });
 }
 
-function svOpenLabel(url) {
-  if (confirm('Як відкрити мітку?\n\nОК → відкрити у браузері\nСкасувати → завантажити')) {
-    var w = window.open(url, '_blank');
-    if (!w) { var a = document.createElement('a'); a.href = url; a.download = ''; a.click(); }
+function svLabelAction(mode, url) {
+  if (mode === 'download') {
+    // Use fetch+blob for reliable cross-origin download
+    fetch(url).then(function(r){ return r.blob(); }).then(function(blob){
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'label.pdf';
+      a.click();
+      setTimeout(function(){ URL.revokeObjectURL(a.href); }, 2000);
+    }).catch(function(){
+      // Fallback: direct link (works for same-origin)
+      var a = document.createElement('a'); a.href = url; a.download = 'label.pdf'; a.click();
+    });
+  } else if (mode === 'ask') {
+    if (confirm('Як відкрити мітку?\n\nОК → відкрити у браузері\nСкасувати → завантажити')) {
+      var w = window.open(url, '_blank');
+      if (!w) { svLabelAction('download', url); }
+    } else {
+      svLabelAction('download', url);
+    }
   } else {
-    var a = document.createElement('a'); a.href = url; a.download = ''; a.click();
+    window.open(url, '_blank');
   }
 }
+// Backward compat alias
+function svOpenLabel(url) { svLabelAction('ask', url); }
 
 // ── Product image tooltip ─────────────────────────────────────────────────────
 (function () {
@@ -1082,7 +1108,7 @@ function svOpenLabel(url) {
 (function () {
   var tip = document.createElement('div');
   tip.id = 'sv-pdf-tip';
-  tip.innerHTML = '<div id="sv-pdf-tip-hd">📄 <span id="sv-pdf-tip-name"></span></div><embed id="sv-pdf-embed" src="" type="application/pdf">';
+  tip.innerHTML = '<div id="sv-pdf-tip-hd">📄 <span id="sv-pdf-tip-name"></span></div><div id="sv-pdf-frame"></div>';
   document.body.appendChild(tip);
 
   var hoverTimer = null;
@@ -1093,7 +1119,10 @@ function svOpenLabel(url) {
     var url  = el.dataset.pdf || el.dataset.docPdf || '';
     var name = el.dataset.pdfname || el.dataset.docName || '';
     document.getElementById('sv-pdf-tip-name').textContent = name;
-    document.getElementById('sv-pdf-embed').src = url;
+    // Rebuild iframe each time — setting embed.src dynamically is unreliable in Chrome
+    document.getElementById('sv-pdf-frame').innerHTML = url
+      ? '<iframe src="' + url + '" style="display:block;width:320px;height:420px;border:none;background:#fff" title="PDF"></iframe>'
+      : '';
     tip.style.display = 'block';
     position(e);
   }
@@ -1109,7 +1138,7 @@ function svOpenLabel(url) {
   }
   function hide() {
     tip.style.display = 'none';
-    document.getElementById('sv-pdf-embed').src = '';
+    document.getElementById('sv-pdf-frame').innerHTML = '';
     currentEl = null;
   }
 

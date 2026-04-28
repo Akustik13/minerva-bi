@@ -36,7 +36,15 @@
   margin-top: 12px;
 }
 .qc-btn:hover { background: #1976d2; }
+.qc-btn-green {
+  background: #2e7d32; color: #fff; border: none; border-radius: 6px;
+  padding: 10px 22px; font-size: 14px; font-weight: 600; cursor: pointer;
+  text-decoration: none; display: inline-block; margin-top: 12px;
+}
+.qc-btn-green:hover { background: #388e3c; }
 .qc-error { color: #ef5350; font-size: 13px; margin-top: 10px; }
+.qc-sep { display: flex; align-items: center; gap: 12px; margin: 4px 0; color: var(--text-dim); font-size: 12px; }
+.qc-sep::before, .qc-sep::after { content: ''; flex: 1; border-top: 1px solid var(--border-strong); }
 .qc-match {
   display: flex; align-items: center; justify-content: space-between;
   padding: 10px 14px; border-bottom: 1px solid var(--border,#1e2d40);
@@ -54,13 +62,25 @@
 
 <div class="qc-card">
   <div class="qc-title">✈️ Нове відправлення</div>
-  <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">
-    Введіть номер замовлення (повний або частину) для пошуку:
+
+  <!-- Option 1: Blank form (no order) -->
+  <p style="font-size:13px;color:var(--text-muted);margin:0 0 10px">
+    Створити порожнє відправлення та заповнити вручну (або з адресної книги):
+  </p>
+  <a href="{% url 'admin:shipping_shipment_create_blank' %}" class="qc-btn-green">
+    📝 Заповнити вручну
+  </a>
+
+  <div class="qc-sep" style="margin-top:18px">або</div>
+
+  <!-- Option 2: Search order -->
+  <p style="font-size:13px;color:var(--text-muted);margin:10px 0 10px">
+    Знайти замовлення і заповнити автоматично:
   </p>
   <form method="get">
     <input class="qc-input" type="text" name="q" value="{{ q|default:'' }}"
-           placeholder="Напр. 1234567 або ANI-000123"
-           autofocus autocomplete="off">
+           placeholder="Номер замовлення: 1234567 або ANI-000123"
+           autocomplete="off">
     {% if error %}
     <div class="qc-error">❌ {{ error }}</div>
     {% endif %}
