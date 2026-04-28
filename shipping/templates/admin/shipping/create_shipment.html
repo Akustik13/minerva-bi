@@ -1019,7 +1019,75 @@ document.addEventListener('DOMContentLoaded', function() {
 
     <!-- Отримувач -->
     <div class="sh-card">
-      <div class="sh-card-title">📬 Отримувач</div>
+      <div class="sh-card-title" style="justify-content:space-between">
+        <span>📬 Отримувач</span>
+        {% if recent_recipients_json and recent_recipients_json != '[]' %}
+        <button type="button" onclick="shToggleAddrBook()" id="sh-addr-btn"
+          style="background:var(--bg-input);border:1px solid var(--border-strong);border-radius:5px;
+                 padding:4px 10px;cursor:pointer;font-size:12px;color:var(--text-muted);display:flex;
+                 align-items:center;gap:5px">
+          📖 <span id="sh-addr-btn-lbl">Адресна книга</span>
+        </button>
+        {% endif %}
+      </div>
+      {% if recent_recipients_json and recent_recipients_json != '[]' %}
+      <div id="sh-addr-book" style="display:none;margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px">
+          Останні отримувачі — натисніть для заповнення форми:
+        </div>
+        <div id="sh-addr-list" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+      <script>
+      (function(){
+        var RECIP = {{ recent_recipients_json|safe }};
+        var list = document.getElementById('sh-addr-list');
+        if (!list) return;
+        RECIP.forEach(function(r, i) {
+          var label = (r.recipient_name || r.recipient_company || '?');
+          if (r.recipient_country) label += ' (' + r.recipient_country + ')';
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.title = [r.recipient_street, r.recipient_city, r.recipient_zip, r.recipient_country].filter(Boolean).join(', ');
+          btn.style.cssText = 'background:var(--bg-input);border:1px solid var(--border-strong);border-radius:5px;padding:5px 10px;cursor:pointer;font-size:11px;color:var(--text);white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;text-align:left';
+          btn.textContent = label;
+          btn.addEventListener('mouseover', function(){this.style.borderColor='#2196f3';this.style.color='#2196f3';});
+          btn.addEventListener('mouseout',  function(){this.style.borderColor='';this.style.color='';});
+          btn.addEventListener('click', function(){
+            var f = document.querySelector('form');
+            var set = function(n,v){var el=f.querySelector('[name="'+n+'"]');if(el)el.value=v||'';};
+            set('recipient_name',    r.recipient_name);
+            set('recipient_company', r.recipient_company);
+            set('recipient_street',  r.recipient_street);
+            set('recipient_city',    r.recipient_city);
+            set('recipient_zip',     r.recipient_zip);
+            set('recipient_state',   r.recipient_state);
+            set('recipient_country', r.recipient_country);
+            set('recipient_phone',   r.recipient_phone);
+            set('recipient_email',   r.recipient_email);
+            // trigger customs update if country changed
+            var rc = f.querySelector('[name="recipient_country"]');
+            if(rc && typeof updateCustomsCard === 'function') updateCustomsCard();
+            if(rc && typeof _showCountryHint === 'function') _showCountryHint(rc,'sh-hint-rc');
+            shToggleAddrBook(true);
+          });
+          list.appendChild(btn);
+        });
+      })();
+      function shToggleAddrBook(forceClose) {
+        var panel = document.getElementById('sh-addr-book');
+        var lbl   = document.getElementById('sh-addr-btn-lbl');
+        if (!panel) return;
+        var isOpen = panel.style.display !== 'none';
+        if (forceClose === true || isOpen) {
+          panel.style.display = 'none';
+          if(lbl) lbl.textContent = 'Адресна книга';
+        } else {
+          panel.style.display = 'block';
+          if(lbl) lbl.textContent = '✕ Закрити';
+        }
+      }
+      </script>
+      {% endif %}
       <div class="sh-grid">
         <div class="sh-field">
           <label class="sh-label">Ім'я *</label>

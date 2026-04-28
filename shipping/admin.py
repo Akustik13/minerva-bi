@@ -8,7 +8,7 @@ from core.mixins import AuditableMixin
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import path, reverse
-from django.utils.html import format_html, escape
+from django.utils.html import format_html, escape, mark_safe
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
@@ -918,6 +918,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_compare_rates",
             ),
             path(
+                "create/",
+                self.admin_site.admin_view(self.quick_create_view),
+                name="shipping_shipment_quick_create",
+            ),
+            path(
                 "create/<int:order_id>/",
                 self.admin_site.admin_view(self.create_from_order_view),
                 name="shipping_shipment_create",
@@ -1114,6 +1119,33 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     # ── Форма створення ───────────────────────────────────────────────────────
 
+    def quick_create_view(self, request):
+        """Search for an order by number and redirect to create_from_order_view."""
+        from sales.models import SalesOrder
+        q = (request.GET.get('q') or '').strip()
+        matches = []
+        error = None
+        if q:
+            matches = list(
+                SalesOrder.objects
+                .filter(order_number__icontains=q)
+                .order_by('-order_date')[:20]
+            )
+            if len(matches) == 1:
+                return redirect(
+                    reverse('admin:shipping_shipment_create', args=[matches[0].pk])
+                )
+            if not matches:
+                error = f'Замовлення «{q}» не знайдено'
+        ctx = {
+            **self.admin_site.each_context(request),
+            'title': 'Нове відправлення — вибір замовлення',
+            'q': q,
+            'matches': matches,
+            'error': error,
+        }
+        return render(request, 'admin/shipping/quick_create.html', ctx)
+
     def create_from_order_view(self, request, order_id):
         from sales.models import SalesOrder
         from .services.jumingo import build_customs_articles, JumingoService
@@ -1186,6 +1218,29 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             for c in carriers
         } if carriers else {}
 
+        # Адресна книга — останні унікальні отримувачі з попередніх відправлень
+        recent_recipients = list(
+            Shipment.objects
+            .exclude(recipient_name='')
+            .order_by('-created_at')
+            .values(
+                'recipient_name', 'recipient_company',
+                'recipient_street', 'recipient_city',
+                'recipient_zip', 'recipient_state', 'recipient_country',
+                'recipient_phone', 'recipient_email',
+            )[:60]
+        )
+        # Дедублікуємо за іменем + країною (зберігаємо перший/найновіший)
+        seen = set()
+        unique_recipients = []
+        for r in recent_recipients:
+            key = (r['recipient_name'].lower(), r['recipient_country'].upper())
+            if key not in seen:
+                seen.add(key)
+                unique_recipients.append(r)
+            if len(unique_recipients) >= 20:
+                break
+
         return render(request, "admin/shipping/create_shipment.html", {
             **self.admin_site.each_context(request),
             "order":               order,
@@ -1200,6 +1255,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "title":               f"Нове відправлення — {order.order_number}",
             "pkg_rows_json":       _json.dumps(pkg_rows),
             "pkg_auto":            pkg_auto,
+            "recent_recipients_json": _json.dumps(unique_recipients),
         })
 
     def _fill_packaging_from_order(self, shipment):
@@ -4449,6 +4505,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         return format_html('<span style="color:#607d8b">—</span>')
     price_col.short_description = "Вартість"
 
+    @staticmethod
+    def _carrier_tracking_url(carrier_type, tn):
+        """Returns public tracking URL for the given carrier type / tracking number."""
+        if not tn:
+            return ''
+        ct = (carrier_type or '').lower()
+        if ct == 'ups' or tn.startswith('1Z'):
+            return f'https://www.ups.com/track?tracknum={tn}&requester=WT/trackdetails'
+        if ct == 'dhl' or tn.startswith(('JD', '00')):
+            return f'https://www.dhl.com/en/express/tracking.html?AWB={tn}&brand=DHL'
+        if ct == 'fedex':
+            return f'https://www.fedex.com/apps/fedextrack/?tracknumbers={tn}'
+        return ''
+
     def tracking_badge(self, obj):
         import re as _re
         tn = obj.tracking_number or ''
@@ -4464,14 +4534,25 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'border:1px solid rgba(255,152,0,.4)">'
             'PRN\u00a0'
         )
-        if tn and prn:
-            return format_html(
-                '<code style="font-size:11px">{}</code>' + _PRN + '{}</span>', tn, prn
+        ct = obj.carrier.carrier_type if obj.carrier else ''
+        track_url = self._carrier_tracking_url(ct, tn)
+        if tn and track_url:
+            tn_html = mark_safe(
+                f'<a href="{track_url}" target="_blank" rel="noopener noreferrer" '
+                f'style="color:inherit;text-decoration:underline dotted;'
+                f'font-family:monospace;font-size:11px">{escape(tn)}</a>'
             )
-        if tn:
-            return format_html('<code style="font-size:11px">{}</code>', tn)
+        elif tn:
+            tn_html = mark_safe(f'<code style="font-size:11px">{escape(tn)}</code>')
+        else:
+            tn_html = None
+
+        if tn_html and prn:
+            return format_html('{}' + _PRN + '{}</span>', tn_html, prn)
+        if tn_html:
+            return format_html('{}', tn_html)
         if prn:
-            return format_html(_PRN + '{}</span>', prn)
+            return format_html(mark_safe(_PRN + '{}</span>'), prn)
         return format_html('<span style="color:#607d8b">—</span>')
     tracking_badge.short_description = "Трекінг"
 
@@ -4487,8 +4568,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     def recipient_country_flag(self, obj):
         from config.country_utils import country_flag_html
-        return format_html(country_flag_html(obj.recipient_country or ""))
-    recipient_country_flag.short_description = "Країна"
+        sender = (
+            obj.sender_country
+            or (obj.carrier.sender_country if obj.carrier else '')
+            or 'DE'
+        ).upper()
+        recipient = obj.recipient_country or ''
+        s_html = country_flag_html(sender)
+        r_html = country_flag_html(recipient) if recipient else '—'
+        return format_html(
+            '<span style="white-space:nowrap">{} '
+            '<span style="color:var(--text-dim,#607d8b)">→</span> {}</span>',
+            mark_safe(s_html), mark_safe(r_html)
+        )
+    recipient_country_flag.short_description = "Маршрут"
     recipient_country_flag.admin_order_field = "recipient_country"
 
     def created_at_fmt(self, obj):

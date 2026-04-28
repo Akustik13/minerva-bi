@@ -1,0 +1,96 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Нове відправлення | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; Нове відправлення
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: 680px !important; padding: 24px 0; }
+.qc-card {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 24px 28px; margin-bottom: 20px;
+}
+.qc-title {
+  font-size: 16px; font-weight: 700; color: var(--text);
+  margin-bottom: 18px; display: flex; align-items: center; gap: 8px;
+}
+.qc-input {
+  width: 100%; background: var(--bg-input,#141f2b);
+  border: 1px solid var(--border-strong,#243347);
+  color: var(--text,#c9d8e4); border-radius: 6px;
+  padding: 10px 14px; font-size: 15px; box-sizing: border-box;
+}
+.qc-input:focus { border-color: #2196f3; outline: none; }
+.qc-btn {
+  background: #1565c0; color: #fff; border: none; border-radius: 6px;
+  padding: 10px 22px; font-size: 14px; font-weight: 600; cursor: pointer;
+  margin-top: 12px;
+}
+.qc-btn:hover { background: #1976d2; }
+.qc-error { color: #ef5350; font-size: 13px; margin-top: 10px; }
+.qc-match {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border,#1e2d40);
+  gap: 10px;
+}
+.qc-match:last-child { border-bottom: none; }
+.qc-match:hover { background: var(--bg-hover,#1e2d40); border-radius: 6px; }
+.qc-match a {
+  color: var(--accent,#58a6ff); font-weight: 600; font-size: 13px;
+  text-decoration: none; flex: 1;
+}
+.qc-match a:hover { text-decoration: underline; }
+.qc-match-meta { font-size: 11px; color: var(--text-muted,#9aafbe); }
+</style>
+
+<div class="qc-card">
+  <div class="qc-title">✈️ Нове відправлення</div>
+  <p style="font-size:13px;color:var(--text-muted);margin:0 0 16px">
+    Введіть номер замовлення (повний або частину) для пошуку:
+  </p>
+  <form method="get">
+    <input class="qc-input" type="text" name="q" value="{{ q|default:'' }}"
+           placeholder="Напр. 1234567 або ANI-000123"
+           autofocus autocomplete="off">
+    {% if error %}
+    <div class="qc-error">❌ {{ error }}</div>
+    {% endif %}
+    <button class="qc-btn" type="submit">🔍 Знайти замовлення</button>
+  </form>
+</div>
+
+{% if matches %}
+<div class="qc-card">
+  <div class="qc-title">📋 Знайдені замовлення ({{ matches|length }})</div>
+  <div>
+    {% for order in matches %}
+    <div class="qc-match">
+      <a href="{% url 'admin:shipping_shipment_create' order.pk %}">
+        {{ order.order_number }}
+      </a>
+      <span class="qc-match-meta">
+        {{ order.source }} &nbsp;·&nbsp;
+        {{ order.get_status_display }}
+        {% if order.client %}&nbsp;·&nbsp; {{ order.client|truncatechars:30 }}{% endif %}
+        {% if order.order_date %}&nbsp;·&nbsp; {{ order.order_date|date:"d.m.Y" }}{% endif %}
+      </span>
+      <a href="{% url 'admin:shipping_shipment_create' order.pk %}"
+         style="background:#1565c0;color:#fff;padding:5px 14px;border-radius:5px;
+                text-decoration:none;font-size:12px;font-weight:600;white-space:nowrap">
+        Відправити →
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{% endblock %}

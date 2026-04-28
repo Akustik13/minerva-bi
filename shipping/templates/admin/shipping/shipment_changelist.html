@@ -3,6 +3,13 @@
 {% block object-tools-items %}
     {{ block.super }}
     <li>
+        <a href="{% url 'admin:shipping_shipment_quick_create' %}"
+           style="background:#4caf50;color:#fff;padding:8px 16px;border-radius:6px;
+                  text-decoration:none;font-weight:600;display:inline-block">
+            ✈️ Нове відправлення
+        </a>
+    </li>
+    <li>
         <a href="{% url 'admin:shipping_order_tracking' %}"
            style="background:#2196f3;color:#fff;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
