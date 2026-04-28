@@ -586,41 +586,78 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
         +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 12px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
       +'</div></div>');
   };
+  // DYMO Connect REST API — no old Framework SDK needed
+  var _DYMO_BASE = 'https://127.0.0.1:41951';
+  function _dymoCertError(url,sku){
+    var btnStyle='background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;margin-top:10px;margin-right:8px';
+    window.svDymoError(url,sku,
+      '⚠️ DYMO Connect не відповідає.<br><br>'
+      +'<b>Крок 1:</b> Прийміть сертифікат (один раз у браузері):<br>'
+      +'<button onclick="window.open(\'https://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected\',\'_blank\')" style="'+btnStyle+'">🔒 Відкрити DYMO (прийняти сертифікат)</button><br><br>'
+      +'<b>Крок 2:</b> У вкладці що відкрилась:<br>'
+      +'&nbsp;&nbsp;Chrome: <b>Додатково → Перейти до 127.0.0.1</b><br>'
+      +'&nbsp;&nbsp;Firefox: <b>Прийняти ризик і продовжити</b><br><br>'
+      +'<b>Крок 3:</b> Поверніться і натисніть «Повторити»'
+    );
+    // Append retry button to error modal
+    setTimeout(function(){
+      var m=document.getElementById('sv-dymo-modal');
+      if(!m) return;
+      var box=m.querySelector('div');
+      if(!box) return;
+      var rb=document.createElement('button');
+      rb.type='button';
+      rb.textContent='🔄 Повторити';
+      rb.style.cssText=btnStyle+';background:#2e7d32;margin-top:6px';
+      rb.onclick=function(){m.remove();window.svDymoPrint(url,sku,qty);};
+      box.appendChild(rb);
+    },50);
+  }
   window.svDymoPrint=function(url,sku,qty){
-    // Try HTTPS first (DYMO Connect 2022+), then HTTP (old DYMO Label Software)
-    function _tryConnect(baseUrl, onOk, onFail) {
-      var ctrl=new AbortController();
-      var t=setTimeout(function(){ctrl.abort();},2500);
-      fetch(baseUrl+'/DYMO/DLS/Printing/StatusConnected',{mode:'no-cors',signal:ctrl.signal})
-      .then(function(){clearTimeout(t);window._dymoBaseUrl=baseUrl;onOk();})
-      .catch(function(){clearTimeout(t);onFail();});
-    }
-    function _doPrint(){
-      _loadFW(function(err){
-        if(err){window.svDymoError(url,sku,'Помилка завантаження DYMO SDK: '+err);return;}
-        fetch(url).then(function(r){return r.text();}).then(function(xml){
-          try{
-            var printers=window.dymo.label.framework.getLabelWriterPrinters();
-            if(!printers||!printers.length){window.svDymoError(url,sku,'Принтер DYMO не знайдено.<br>Перевірте підключення принтера та що DYMO Label Software запущено.');return;}
-            var label=window.dymo.label.framework.openLabelXml(xml);
-            label.print(printers[0].name);
-          }catch(e){window.svDymoError(url,sku,'Помилка DYMO SDK: '+(e.message||e));}
-        }).catch(function(e){window.svDymoError(url,sku,'Помилка завантаження мітки: '+e);});
-      });
-    }
-    _tryConnect('https://127.0.0.1:41951', _doPrint, function(){
-      _tryConnect('http://127.0.0.1:41951', _doPrint, function(){
-        window.svDymoError(url,sku,
-          'DYMO не відповідає на цьому ПК.<br><br>'
-          +'<b>DYMO Connect (нова версія):</b><br>'
-          +'① Відкрийте у браузері: <a href="https://127.0.0.1:41951" target="_blank" style="color:#64b5f6">https://127.0.0.1:41951</a><br>'
-          +'② Натисніть «Додатково» → «Перейти» — щоб прийняти сертифікат<br>'
-          +'③ Поверніться сюди і спробуйте ще раз<br><br>'
-          +'<b>DYMO Label Software (стара версія):</b><br>'
-          +'① Запустіть DYMO Label Software<br>'
-          +'② Спробуйте ще раз — або завантажте файл нижче'
-        );
-      });
+    // Step 1: get printers list (REST API, no SDK needed)
+    fetch(_DYMO_BASE+'/DYMO/DLS/Printing/GetPrinters')
+    .then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.text();
+    })
+    .then(function(xml){
+      var m=xml.match(/<Name>([^<]+)<\/Name>/);
+      if(!m){window.svDymoError(url,sku,'Принтер DYMO не знайдено.<br>Перевірте підключення USB та що DYMO Connect запущено.');return;}
+      var printer=m[1];
+      // Step 2: fetch label XML
+      fetch(url)
+      .then(function(r){return r.text();})
+      .then(function(labelXml){
+        // Step 3: print via REST API
+        var fd=new FormData();
+        fd.append('printerName',printer);
+        fd.append('printParamsXml','');
+        fd.append('labelXml',labelXml);
+        fd.append('labelSetXml','');
+        fetch(_DYMO_BASE+'/DYMO/DLS/Printing/PrintLabel',{method:'POST',body:fd})
+        .then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t);});})
+        .catch(function(e){window.svDymoError(url,sku,'Помилка друку: '+(e.message||String(e)));});
+      })
+      .catch(function(e){window.svDymoError(url,sku,'Помилка завантаження мітки: '+e);});
+    })
+    .catch(function(e){
+      // Try HTTP fallback (old DYMO Label Software)
+      fetch('http://127.0.0.1:41951/DYMO/DLS/Printing/GetPrinters')
+      .then(function(r){return r.text();})
+      .then(function(xml){
+        var m=xml.match(/<Name>([^<]+)<\/Name>/);
+        if(!m){window.svDymoError(url,sku,'Принтер DYMO не знайдено.');return;}
+        _loadFW(function(err){
+          if(err){window.svDymoError(url,sku,'Помилка SDK: '+err);return;}
+          fetch(url).then(function(r){return r.text();}).then(function(lxml){
+            try{
+              var label=window.dymo.label.framework.openLabelXml(lxml);
+              label.print(m[1]);
+            }catch(ex){window.svDymoError(url,sku,'Помилка SDK: '+(ex.message||ex));}
+          });
+        });
+      })
+      .catch(function(){_dymoCertError(url,sku);});
     });
   };
   window.svDymoAsk=function(url,sku,qty){
