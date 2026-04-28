@@ -89,7 +89,8 @@ class Shipment(models.Model):
     # ── Зв'язки ───────────────────────────────────────────────────────────────
     order   = models.ForeignKey(
         "sales.SalesOrder", on_delete=models.PROTECT,
-        related_name="shipments", verbose_name="Замовлення"
+        related_name="shipments", verbose_name="Замовлення",
+        null=True, blank=True,
     )
     carrier = models.ForeignKey(
         Carrier, on_delete=models.PROTECT,

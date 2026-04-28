@@ -1513,7 +1513,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             declared_value    = request.POST.get("declared_value") or None,
             declared_currency = request.POST.get("declared_currency", "EUR"),
             insurance_type    = request.POST.get("insurance_type", "none"),
-            reference         = request.POST.get("reference", order.order_number),
+            reference         = request.POST.get("reference", order.order_number if order else ''),
             created_by        = request.user,
         )
         # Парсимо митну декларацію з форми
@@ -1679,7 +1679,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return self._handle_edit_post(request, shipment, carriers)
 
         # Авто-заповнення задекларованої вартості якщо поле порожнє
-        if not shipment.declared_value:
+        if order and not shipment.declared_value:
             from decimal import Decimal, InvalidOperation
             try:
                 total = order.order_total()
@@ -1810,7 +1810,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         shipment.declared_value    = request.POST.get("declared_value") or None
         shipment.declared_currency = request.POST.get("declared_currency", "EUR")
         shipment.insurance_type    = request.POST.get("insurance_type", "none")
-        shipment.reference         = request.POST.get("reference", shipment.order.order_number)
+        shipment.reference         = request.POST.get("reference", shipment.order.order_number if shipment.order else '')
 
         ca_descs = request.POST.getlist("ca_desc")
         if ca_descs:
@@ -2493,26 +2493,27 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         # Синхронізуємо SalesOrder
         order = shipment.order
         order_fields = []
-        if new_status == "delivered" and order.status != "delivered":
-            order.status = "delivered"
-            order_fields.append("status")
-            if not order.delivered_at:
-                order.delivered_at = timezone.now()
-                order_fields.append("delivered_at")
-        elif new_status == "in_transit" and order.status in ("received", "processing"):
-            order.status = "shipped"
-            order_fields.append("status")
-            if not order.shipped_at:
-                order.shipped_at = timezone.now().date()
-                order_fields.append("shipped_at")
-        elif new_status == "label_ready" and order.status in ("received", "processing"):
-            order.status = "shipped"
-            order_fields.append("status")
-            if not order.shipped_at:
-                order.shipped_at = timezone.now().date()
-                order_fields.append("shipped_at")
-        if order_fields:
-            order.save(update_fields=order_fields)
+        if order:
+            if new_status == "delivered" and order.status != "delivered":
+                order.status = "delivered"
+                order_fields.append("status")
+                if not order.delivered_at:
+                    order.delivered_at = timezone.now()
+                    order_fields.append("delivered_at")
+            elif new_status == "in_transit" and order.status in ("received", "processing"):
+                order.status = "shipped"
+                order_fields.append("status")
+                if not order.shipped_at:
+                    order.shipped_at = timezone.now().date()
+                    order_fields.append("shipped_at")
+            elif new_status == "label_ready" and order.status in ("received", "processing"):
+                order.status = "shipped"
+                order_fields.append("status")
+                if not order.shipped_at:
+                    order.shipped_at = timezone.now().date()
+                    order_fields.append("shipped_at")
+            if order_fields:
+                order.save(update_fields=order_fields)
 
         new_label = shipment.get_status_display()
         messages.success(
@@ -3111,25 +3112,26 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         from datetime import date as _date
         order        = shipment.order
         order_fields = []
-        if _should_set_order_tn(order, result['tracking_number']):
-            order.tracking_number = result['tracking_number']
-            order_fields.append('tracking_number')
-        if not order.shipping_courier:
-            order.shipping_courier = 'UPS'
-            order_fields.append('shipping_courier')
-        if order.status in ('received', 'processing'):
-            order.status = 'shipped'
-            order_fields.append('status')
-        if not order.shipped_at:
-            order.shipped_at = _date.today()
-            order_fields.append('shipped_at')
-        # Sync shipping cost from UPS API
-        if result['total_charge'] and not order.shipping_cost:
-            order.shipping_cost     = result['total_charge']
-            order.shipping_currency = result['currency']
-            order_fields += ['shipping_cost', 'shipping_currency']
-        if order_fields:
-            order.save(update_fields=order_fields)
+        if order:
+            if _should_set_order_tn(order, result['tracking_number']):
+                order.tracking_number = result['tracking_number']
+                order_fields.append('tracking_number')
+            if not order.shipping_courier:
+                order.shipping_courier = 'UPS'
+                order_fields.append('shipping_courier')
+            if order.status in ('received', 'processing'):
+                order.status = 'shipped'
+                order_fields.append('status')
+            if not order.shipped_at:
+                order.shipped_at = _date.today()
+                order_fields.append('shipped_at')
+            # Sync shipping cost from UPS API
+            if result['total_charge'] and not order.shipping_cost:
+                order.shipping_cost     = result['total_charge']
+                order.shipping_currency = result['currency']
+                order_fields += ['shipping_cost', 'shipping_currency']
+            if order_fields:
+                order.save(update_fields=order_fields)
 
         # ── Pickup scheduling (якщо обрано кур'єр) ──────────────────────────
         pickup_type  = request.GET.get('pickup_type', 'dropoff')
@@ -4362,20 +4364,21 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         from datetime import date as _date
         order         = shipment.order
         order_fields  = []
-        if _should_set_order_tn(order, tracking_number):
-            order.tracking_number = tracking_number
-            order_fields.append("tracking_number")
-        if not order.shipping_courier:
-            order.shipping_courier = "DHL"
-            order_fields.append("shipping_courier")
-        if order.status in ("received", "processing"):
-            order.status = "shipped"
-            order_fields.append("status")
-        if not order.shipped_at:
-            order.shipped_at = _date.today()
-            order_fields.append("shipped_at")
-        if order_fields:
-            order.save(update_fields=order_fields)
+        if order:
+            if _should_set_order_tn(order, tracking_number):
+                order.tracking_number = tracking_number
+                order_fields.append("tracking_number")
+            if not order.shipping_courier:
+                order.shipping_courier = "DHL"
+                order_fields.append("shipping_courier")
+            if order.status in ("received", "processing"):
+                order.status = "shipped"
+                order_fields.append("status")
+            if not order.shipped_at:
+                order.shipped_at = _date.today()
+                order_fields.append("shipped_at")
+            if order_fields:
+                order.save(update_fields=order_fields)
 
         msg = f"✅ DHL відправлення створено! Трекінг: {tracking_number}."
         if label_url:
@@ -4685,7 +4688,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             tn = shipment.tracking_number or ""
             # ERROR shipment: prefer manually-set TN on the SalesOrder
             if shipment.status == Shipment.Status.ERROR:
-                order_tn = (shipment.order.tracking_number or "").strip()
+                order_tn = (shipment.order.tracking_number or "").strip() if shipment.order else ""
                 if order_tn:
                     tn = order_tn
             info = _detect_carrier(tn)
@@ -4911,7 +4914,7 @@ def _should_set_order_tn(order, new_tn: str) -> bool:
     - order has no TN, OR
     - order's current TN belongs to a cancelled shipment (stale from prior attempt).
     """
-    if not new_tn or new_tn == order.tracking_number:
+    if not order or not new_tn or new_tn == order.tracking_number:
         return False
     if not order.tracking_number:
         return True
