@@ -1153,6 +1153,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     def create_blank_view(self, request):
         """Show the shipment creation form without a linked order (manual entry)."""
+        import json as _json
         from django.db.models import Case, When, IntegerField
         carriers = Carrier.objects.filter(is_active=True).order_by(
             Case(When(carrier_type="jumingo", then=0), default=1, output_field=IntegerField()),
@@ -1165,15 +1166,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         carriers = list(carriers)
         carriers_sender = {
             str(c.pk): {
-                'sender_name': c.sender_name or '',
-                'sender_company': c.sender_company or '',
-                'sender_street': c.sender_street or '',
-                'sender_city': c.sender_city or '',
-                'sender_zip': c.sender_zip or '',
-                'sender_state': c.sender_state or '',
-                'sender_country': c.sender_country or 'DE',
-                'sender_phone': c.sender_phone or '',
-                'sender_email': c.sender_email or '',
+                'name':    c.sender_name or c.sender_company or '',
+                'company': c.sender_company or '',
+                'street':  c.sender_street or '',
+                'city':    c.sender_city or '',
+                'zip':     c.sender_zip or '',
+                'country': c.sender_country or 'DE',
+                'phone':   c.sender_phone or '',
+                'email':   c.sender_email or '',
             }
             for c in carriers
         }
