@@ -189,6 +189,7 @@ document.addEventListener('DOMContentLoaded', function () {
   <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQFStatus('delivered');return false" href="#">✅ Доставлено{% if sv_status_counts.delivered %} <span class="sv-qf-cnt">{{ sv_status_counts.delivered }}</span>{% endif %}</a>
   <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQFStatus('cancelled');return false" href="#">🚫 Скасовано{% if sv_status_counts.cancelled %} <span class="sv-qf-cnt">{{ sv_status_counts.cancelled }}</span>{% endif %}</a>
   <div class="sv-qf-sep"></div>
+  <a class="sv-qf-btn" id="svf-in-transit" onclick="svQFToggle('in_transit');return false" href="#">🚚 В дорозі{% if sv_count_in_transit %} <span class="sv-qf-cnt">{{ sv_count_in_transit }}</span>{% endif %}</a>
   <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#">🚨 Затримки{% if sv_count_delayed %} <span class="sv-qf-cnt">{{ sv_count_delayed }}</span>{% endif %}</a>
   <a class="sv-qf-btn" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#">🔴 Прострочені{% if sv_count_overdue %} <span class="sv-qf-cnt">{{ sv_count_overdue }}</span>{% endif %}</a>
   <div class="sv-qf-sep"></div>
@@ -368,31 +369,24 @@ document.addEventListener('DOMContentLoaded', function () {
             {% else %}{{ lsku|default:"—" }}{% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center">
-            {% if sv_datasheet_prio == 'url' %}
-              {% if line.product.datasheet_url %}
-                <a href="{{ line.product.datasheet_url }}" target="_blank"
-                   title="{{ lsku }} — Datasheet (🔗 URL)"
-                   {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ line.product.datasheet_url }}" data-pdfname="{{ lsku }}"{% endif %}
-                   style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
-              {% elif line.product.datasheet_display_url %}
-                <a href="{{ line.product.datasheet_display_url }}" target="_blank"
-                   title="{{ lsku }} — Datasheet (📁 файл)"
-                   {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ line.product.datasheet_display_url }}" data-pdfname="{{ lsku }}"{% endif %}
-                   style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
-              {% else %}
-                <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
-              {% endif %}
+            {# Serve local files via Django admin view (bypasses Synology nginx/PHP for media) #}
+            {% if sv_datasheet_prio == 'url' and line.product.datasheet_url %}
+              <a href="{{ line.product.datasheet_url }}" target="_blank"
+                 title="{{ lsku }} — Datasheet (🔗 URL)"
+                 {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ line.product.datasheet_url }}" data-pdfname="{{ lsku }}"{% endif %}
+                 style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
+            {% elif line.product.datasheet_file %}
+              <a href="{{ line.product.datasheet_display_url }}" target="_blank"
+                 title="{{ lsku }} — Datasheet (📁 файл)"
+                 {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="/admin/inventory/product/{{ line.product.pk }}/datasheet/" data-pdfname="{{ lsku }}"{% endif %}
+                 style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
+            {% elif line.product.datasheet_url %}
+              <a href="{{ line.product.datasheet_url }}" target="_blank"
+                 title="{{ lsku }} — Datasheet (🔗 URL)"
+                 {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ line.product.datasheet_url }}" data-pdfname="{{ lsku }}"{% endif %}
+                 style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
             {% else %}
-              {% with ds=line.product.datasheet_display_url %}
-              {% if ds %}
-                <a href="{{ ds }}" target="_blank"
-                   title="{{ lsku }} — Datasheet{% if line.product.datasheet_file %} (📁 файл){% else %} (🔗 URL){% endif %}"
-                   {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ ds }}" data-pdfname="{{ lsku }}"{% endif %}
-                   style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
-              {% else %}
-                <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
-              {% endif %}
-              {% endwith %}
+              <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
             {% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center">
@@ -680,6 +674,7 @@ function svQFSource(value) {
   if (delayed === '1') { var d = document.getElementById('svf-delayed'); if(d) d.classList.add('sv-qf-active'); }
   if (overdue === '1') { var o = document.getElementById('svf-overdue'); if(o) o.classList.add('sv-qf-active'); }
   if (p.get('flagged') === '1') { var fl = document.getElementById('svf-flagged'); if(fl) fl.classList.add('sv-qf-active'); }
+  if (p.get('in_transit') === '1') { var it = document.getElementById('svf-in-transit'); if(it) it.classList.add('sv-qf-active'); }
   if (source) { var sr = document.getElementById('svf-src-' + source); if(sr) sr.classList.add('sv-qf-active'); else { var sa = document.getElementById('svf-src-all'); if(sa) sa.classList.add('sv-qf-active'); } }
   else { var sa2 = document.getElementById('svf-src-all'); if(sa2) sa2.classList.add('sv-qf-active'); }
 })();
@@ -1095,8 +1090,8 @@ function svOpenLabel(url) {
 
   function show(el, e) {
     currentEl = el;
-    var url  = el.dataset.pdf;
-    var name = el.dataset.pdfname || '';
+    var url  = el.dataset.pdf || el.dataset.docPdf || '';
+    var name = el.dataset.pdfname || el.dataset.docName || '';
     document.getElementById('sv-pdf-tip-name').textContent = name;
     document.getElementById('sv-pdf-embed').src = url;
     tip.style.display = 'block';
@@ -1119,7 +1114,7 @@ function svOpenLabel(url) {
   }
 
   document.addEventListener('mouseover', function(e) {
-    var el = e.target.closest('.sv-pdf-icon');
+    var el = e.target.closest('.sv-pdf-icon') || e.target.closest('[data-doc-pdf]');
     if (el) {
       clearTimeout(hoverTimer);
       hoverTimer = setTimeout(function(){ show(el, e); }, 350);
@@ -1131,7 +1126,7 @@ function svOpenLabel(url) {
     if (tip.style.display !== 'none') position(e);
   });
   document.addEventListener('mouseout', function(e) {
-    var el = e.target.closest('.sv-pdf-icon');
+    var el = e.target.closest('.sv-pdf-icon') || e.target.closest('[data-doc-pdf]');
     if (el) {
       clearTimeout(hoverTimer);
       setTimeout(function(){ if (currentEl === el) hide(); }, 200);
@@ -1139,6 +1134,50 @@ function svOpenLabel(url) {
   });
 })();
 {% endif %}
+
+// ── dlDocFile: trigger browser download for document files ────────────────────
+window.dlDocFile = function(url, name) {
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+// ── deleteOrderDoc / _refreshDocsPanel for expand panel docs ─────────────────
+if (!window._cexDelDocDef) {
+  window._cexDelDocDef = true;
+  window._refreshCexDocs = function(pk) {
+    var panel = document.getElementById('cex-docs-' + pk);
+    if (!panel) return;
+    fetch('/admin/sales/salesorder/' + pk + '/doc/list/',
+      {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+      .then(function(r) { return r.text(); })
+      .then(function(html) { panel.innerHTML = html; })
+      .catch(function() {});
+  };
+  window.deleteOrderDoc = function(btn) {
+    var fn = btn.dataset.filename;
+    if (!confirm('Видалити файл "' + fn + '" з сервера?')) return;
+    btn.disabled = true; btn.textContent = '…';
+    var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+    if (!csrf) return;
+    var fd = new FormData(); fd.append('filename', fn);
+    var pk = btn.closest('[id^="cex-docs-"]');
+    pk = pk ? pk.id.replace('cex-docs-', '') : null;
+    if (!pk) return;
+    fetch(btn.dataset.delUrl, {method: 'POST',
+      headers: {'X-CSRFToken': csrf[1]}, body: fd})
+      .then(function(r) { return r.json(); })
+      .then(function(d) {
+        if (d.ok) { window._refreshCexDocs(pk); }
+        else { alert('Помилка: ' + (d.error || '?'));
+               btn.disabled = false; btn.textContent = '🗑️'; }
+      })
+      .catch(function() { alert('Помилка мережі');
+                          btn.disabled = false; btn.textContent = '🗑️'; });
+  };
+}
 </script>
 
 {% endblock %}

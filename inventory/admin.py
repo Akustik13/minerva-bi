@@ -1092,8 +1092,28 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             path("import-excel/",
                  self.admin_site.admin_view(self.import_excel_view),
                  name="inventory_product_import_excel"),
+            path("<int:pk>/datasheet/",
+                 self.admin_site.admin_view(self.serve_datasheet_view),
+                 name="inventory_product_serve_datasheet"),
         ]
         return custom + urls
+
+    def serve_datasheet_view(self, request, pk):
+        """Serve product datasheet file via Django (bypasses Synology/nginx media routing)."""
+        from django.http import FileResponse, Http404
+        product = get_object_or_404(Product, pk=pk)
+        if not product.datasheet_file or not product.datasheet_file.name:
+            raise Http404('No datasheet file')
+        try:
+            fname = product.datasheet_file.name.split('/')[-1]
+            resp = FileResponse(
+                product.datasheet_file.open('rb'),
+                content_type='application/pdf',
+            )
+            resp['Content-Disposition'] = f'inline; filename="{fname}"'
+            return resp
+        except Exception:
+            raise Http404('File not found')
 
     def set_stock_view(self, request, object_id):
         product = get_object_or_404(Product, pk=object_id)

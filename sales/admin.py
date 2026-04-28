@@ -387,6 +387,26 @@ class DelayedShipmentFilter(admin.SimpleListFilter):
         return queryset
 
 
+class InTransitFilter(admin.SimpleListFilter):
+    title = "В дорозі"
+    parameter_name = "in_transit"
+
+    def lookups(self, request, model_admin):
+        n = _base_qs().filter(
+            status='shipped',
+            shipments__status='in_transit',
+        ).distinct().count()
+        return [("1", f"🚚 В дорозі {n}" if n else "🚚 В дорозі")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "1":
+            return queryset.filter(
+                status='shipped',
+                shipments__status='in_transit',
+            ).distinct()
+        return queryset
+
+
 class FlaggedFilter(admin.SimpleListFilter):
     title = "Важливі"
     parameter_name = "flagged"
@@ -442,7 +462,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     )
     search_fields = ("order_number", "tracking_number", "client", "email", "phone",
                      "addr_city", "addr_street")
-    list_filter   = (StatusFilter, SourceFilter, CountryFilter, UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter, FlaggedFilter)
+    list_filter   = (StatusFilter, SourceFilter, CountryFilter, UnshippedFilter, OverdueFilter, ShippedThisMonthFilter, DelayedShipmentFilter, InTransitFilter, FlaggedFilter)
     ordering       = ("-order_date",)
 
     def changelist_view(self, request, extra_context=None):
@@ -473,7 +493,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context['sv_count_overdue'] = (
             _base_qs().filter(shipping_deadline__lt=today, status__in=['received', 'processing']).count()
         )
-        extra_context['sv_count_flagged'] = _base_qs().filter(is_flagged=True).count()
+        extra_context['sv_count_flagged']     = _base_qs().filter(is_flagged=True).count()
+        extra_context['sv_count_in_transit']  = _base_qs().filter(
+            status='shipped', shipments__status='in_transit').distinct().count()
         _ss = SalesSettings.get()
         extra_context['sv_show_img_tooltip'] = _ss.show_product_image_tooltip
         extra_context['sv_show_pdf_preview'] = _ss.show_pdf_preview
@@ -686,6 +708,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     def _docs_panel_html(self, obj):
         """Inner HTML for the documents panel (used by documents_list and doc_list_view)."""
         from django.conf import settings
+        from urllib.parse import quote
         source = obj.source or 'manual'
         media_path = settings.MEDIA_ROOT / 'orders' / source / obj.order_number
 
@@ -700,21 +723,27 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         rows = ''
         for file in sorted(files):
             size_kb = file.stat().st_size / 1024
-            url = f'{settings.MEDIA_URL}orders/{source}/{obj.order_number}/{file.name}'
+            # URL-encode filename to handle special chars like # which break URLs
+            safe_name = quote(file.name, safe='')
+            url = f'{settings.MEDIA_URL}orders/{source}/{obj.order_number}/{safe_name}'
+            is_pdf = file.suffix.lower() == '.pdf'
+            pdf_attrs = (
+                f' data-doc-pdf="{url}" data-doc-name="{file.name}"'
+                f' style="color:var(--text,#c9d8e4);text-decoration:none;cursor:pointer"'
+            ) if is_pdf else ' style="color:var(--text,#c9d8e4);text-decoration:none"'
             rows += (
                 f'<tr style="border-bottom:1px solid var(--border-strong,#2a3f52)">'
                 f'<td style="padding:8px 4px 8px 0">'
                 f'<a href="{url}" target="_blank" title="Переглянути у браузері"'
-                f' style="color:var(--text,#c9d8e4);text-decoration:none">'
+                f'{pdf_attrs}>'
                 f'📄 {file.name}</a></td>'
                 f'<td style="padding:8px 4px;text-align:right;color:var(--text-muted,#9aafbe);font-size:11px;white-space:nowrap">'
                 f'{size_kb:.1f} KB</td>'
                 f'<td style="padding:8px 0;text-align:right;white-space:nowrap">'
                 f'<button type="button"'
-                f' onclick="if(window.dlDocFile)dlDocFile({json.dumps(url)},{json.dumps(file.name)});'
-                f'else location.href={json.dumps(url)}"'
+                f' onclick="dlDocFile({json.dumps(url)},{json.dumps(file.name)})"'
                 f' style="background:#417690;color:#fff;border:none;padding:5px 10px;'
-                f'border-radius:3px;font-size:11px;margin-right:4px;cursor:pointer" title="Завантажити файл">⬇️</button>'
+                f'border-radius:3px;font-size:11px;margin-right:4px;cursor:pointer" title="Завантажити файл на ПК">⬇️</button>'
                 f'<button type="button"'
                 f' data-del-url="{delete_url}"'
                 f' data-filename="{file.name}"'
@@ -766,7 +795,30 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             'btn.disabled=false;btn.textContent="🗑️";}})'
             '.catch(()=>{alert("Помилка мережі");'
             'btn.disabled=false;btn.textContent="🗑️";})'
-            '}}'
+            '}'
+            'window.dlDocFile=function(url,name){var a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();document.body.removeChild(a);};'
+            '(function(){'
+            'if(document.getElementById("sv-doc-pdf-tip"))return;'
+            'var dt=document.createElement("div");'
+            'dt.id="sv-doc-pdf-tip";'
+            'dt.style.cssText="position:fixed;z-index:9998;display:none;background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,.6);overflow:hidden;pointer-events:none";'
+            'var hd=document.createElement("div");'
+            'hd.style.cssText="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg-hover,#1e2d40);border-bottom:1px solid var(--border-strong,#243347);font-size:12px;color:var(--text,#c9d8e4)";'
+            'hd.innerHTML="📄 <span id=\'sv-doc-pdf-name\'></span>";'
+            'var em=document.createElement("embed");'
+            'em.id="sv-doc-pdf-embed";'
+            'em.setAttribute("type","application/pdf");'
+            'em.style.cssText="display:block;width:320px;height:420px;border:none";'
+            'dt.appendChild(hd);dt.appendChild(em);document.body.appendChild(dt);'
+            'var ht=null,ce=null;'
+            'function dpos(e){var W=window.innerWidth,H=window.innerHeight;var x=e.clientX+16,y=e.clientY-50;if(x+330>W)x=e.clientX-340;if(y+460>H)y=H-465;if(y<5)y=5;dt.style.left=x+"px";dt.style.top=y+"px";}'
+            'function dshow(el,e){ce=el;document.getElementById("sv-doc-pdf-name").textContent=el.dataset.docName||"";document.getElementById("sv-doc-pdf-embed").src=el.dataset.docPdf||"";dt.style.display="block";dpos(e);}'
+            'function dhide(){dt.style.display="none";document.getElementById("sv-doc-pdf-embed").src="";ce=null;}'
+            'document.addEventListener("mouseover",function(e){var el=e.target.closest("[data-doc-pdf]");if(el){clearTimeout(ht);ht=setTimeout(function(){dshow(el,e);},350);}else if(ce&&!dt.contains(e.target)){clearTimeout(ht);}});'
+            'document.addEventListener("mousemove",function(e){if(dt.style.display!=="none")dpos(e);});'
+            'document.addEventListener("mouseout",function(e){var el=e.target.closest("[data-doc-pdf]");if(el){clearTimeout(ht);setTimeout(function(){if(ce===el)dhide();},200);}});'
+            '})();'
+            '}'
             '</script>'
         )
 
