@@ -580,15 +580,17 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
 
     fieldsets = (
         ("📋 Контактна інформація", {
-            "fields": ("company", "name", "email", "phone"),
-            "description": "<b>Компанія</b> — юридична назва або торгова марка. "
-                           "<b>Контактна особа</b> — ім'я людини (FABIEN SANTOS тощо).",
+            "fields": ("email", "phone"),
         }),
         ("📬 Адреса доставки", {
             "fields": (
-                ("addr_street",),
-                ("addr_city", "addr_zip", "addr_state", "country"),
-            )
+                ("company", "name"),
+                "addr_street",
+                ("addr_city", "addr_zip"),
+                ("addr_state", "country"),
+            ),
+            "description": "<b>Компанія</b> — юридична назва або торгова марка. "
+                           "<b>Контактна особа</b> — ім'я людини (FABIEN SANTOS тощо).",
         }),
         ("📋 Legacy адреса (raw)", {
             "fields": ("shipping_address",),
