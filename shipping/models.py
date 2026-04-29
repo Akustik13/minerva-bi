@@ -243,19 +243,31 @@ class Shipment(models.Model):
     def copy_from_order(self):
         """Заповнює дані отримувача з пов'язаного замовлення."""
         o = self.order
-        contact = getattr(o, 'contact_name', '') or ''
-        client  = o.client or ''
-        if contact:
-            # B2B: company = client, name = contact person
-            self.recipient_company = client
-            self.recipient_name    = contact
+
+        # Prefer dedicated ship_* fields (actual delivery recipient).
+        # Fall back to billing contact fields for backward compatibility.
+        ship_name    = getattr(o, 'ship_name',    None)
+        ship_company = getattr(o, 'ship_company', None)
+        ship_phone   = getattr(o, 'ship_phone',   None)
+        ship_email   = getattr(o, 'ship_email',   None)
+
+        if ship_name or ship_company:
+            self.recipient_name    = ship_name    or ''
+            self.recipient_company = ship_company or ''
         else:
-            # B2C: name = client (person or company)
-            self.recipient_name    = client
-            self.recipient_company = ""
-        self.recipient_phone = o.phone or ""
-        self.recipient_email = o.email or ""
-        self.reference       = o.order_number or ""
+            # Legacy fallback: derive from billing fields
+            contact = getattr(o, 'contact_name', '') or ''
+            client  = o.client or ''
+            if contact:
+                self.recipient_company = client
+                self.recipient_name    = contact
+            else:
+                self.recipient_name    = client
+                self.recipient_company = ''
+
+        self.recipient_phone = ship_phone or o.phone or ''
+        self.recipient_email = ship_email or o.email or ''
+        self.reference       = o.order_number or ''
 
         # Пріоритет: структуровані поля addr_*
         if o.addr_street or o.addr_city:

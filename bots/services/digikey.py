@@ -313,10 +313,13 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
 
     so_currency = so.get("Currency") or order_currency
 
-    # ── Ім'я клієнта / отримувача ─────────────────────────────────────────────
-    addr_first = addr.get("FirstName", "")
-    addr_last  = addr.get("LastName", "")
-    client_str = f"{addr_first} {addr_last}".strip() or contact_name
+    # ── Shipping recipient (may differ from billing contact) ──────────────────
+    addr_first   = addr.get("FirstName", "")
+    addr_last    = addr.get("LastName", "")
+    ship_name_str = f"{addr_first} {addr_last}".strip()  # actual recipient
+    ship_company_str = addr.get("CompanyName", "")
+    # client (legacy display): shipping company or recipient name or billing contact
+    client_str = ship_company_str or ship_name_str or contact_name
 
     defaults = {
         "document_type":  "SALE",
@@ -328,6 +331,11 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
         "client":         client_str,
         "total_price":    so.get("TotalPrice"),
         "currency":       so_currency,
+        # Shipping recipient
+        "ship_name":      ship_name_str,
+        "ship_company":   ship_company_str,
+        "ship_phone":     addr.get("PhoneNumber", ""),
+        "ship_email":     addr.get("Email", "") or "",
         "addr_city":      addr.get("City", ""),
         "addr_state":     addr.get("State", ""),
         "addr_zip":       addr.get("ZipCode", ""),
@@ -732,11 +740,19 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
     order_date  = _parse_date(order.get("createDateUtc"))
     deadline    = _parse_date(order.get("shippingDeadlineUtc"))
 
-    company   = addr.get("companyName", "")
-    first     = customer.get("firstName", "")
-    last      = customer.get("lastName", "")
-    client    = company or f"{first} {last}".strip()
-    contact   = f"{first} {last}".strip()
+    # Billing contact (who placed the order)
+    bill_first  = customer.get("firstName", "")
+    bill_last   = customer.get("lastName", "")
+    contact     = f"{bill_first} {bill_last}".strip()  # e.g. ANGELA LEONES
+
+    # Shipping recipient (who receives the package — may differ from billing)
+    ship_first   = addr.get("firstName", "")
+    ship_last    = addr.get("lastName", "")
+    ship_name_str = f"{ship_first} {ship_last}".strip()  # e.g. CHARLES GORDON P-21118
+    ship_company_str = addr.get("companyName", "")        # e.g. SCIENCE CORPORATION
+
+    # client = shipping company (or billing name if no company) — legacy field kept for display
+    client    = ship_company_str or contact
 
     street       = " ".join(filter(None, [addr.get("street1", ""), addr.get("street2", "").strip()]))
     phone        = addr.get("phoneNumber", "")
@@ -745,8 +761,8 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
 
     # Legacy raw address block
     shipping_address_raw = "\n".join(filter(None, [
-        addr.get("companyName", ""),
-        f"{addr.get('firstName', '')} {addr.get('lastName', '')}".strip(),
+        ship_company_str,
+        ship_name_str,
         street,
         f"{addr.get('city', '')}, {addr.get('postalCode', '')} {addr.get('countryCode', '')}".strip(", "),
         f"Phone: {phone}" if phone else "",
@@ -758,10 +774,16 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
         "affects_stock":    True,
         "order_date":       order_date,
         "status":           minerva_status,
+        # Billing contact
         "contact_name":     contact,
-        "email":            customer.get("customerEmail", ""),
+        "email":            email,
         "client":           client,
         "phone":            phone,
+        # Shipping recipient (dedicated fields)
+        "ship_name":        ship_name_str,
+        "ship_company":     ship_company_str,
+        "ship_phone":       phone,
+        "ship_email":       addr.get("emailAddress", "") or "",
         "shipping_address": shipping_address_raw,
         "total_price":      order.get("totalPrice"),
         "currency":         currency,

@@ -60,6 +60,15 @@ class SalesOrder(models.Model):
                                     help_text="США/Канада: дволітерний код (CA, NY, TX). Інші країни: повна назва регіону.")
     addr_country = models.CharField("Країна (ISO 2)",  max_length=2,   blank=True, default="",
                                     help_text="Двобуквений код: DE, UA, PL, US...")
+    # ── Отримувач посилки (може відрізнятись від білінгового клієнта) ─────────
+    ship_name    = models.CharField("Ім'я отримувача", max_length=255, blank=True, default="",
+                                    help_text="Особа, яка отримує посилку. Якщо порожньо — береться з «Контактна особа».")
+    ship_company = models.CharField("Компанія отримувача", max_length=255, blank=True, default="",
+                                    help_text="Якщо порожньо — береться з «Client».")
+    ship_phone   = models.CharField("Телефон доставки", max_length=64, blank=True, default="",
+                                    help_text="Якщо порожньо — береться з «Phone».")
+    ship_email   = models.EmailField("Email доставки", blank=True, default="",
+                                     help_text="Якщо порожньо — береться з «Email».")
 
     shipping_deadline  = models.DateField(null=True, blank=True)
     # ── Загальна сума замовлення ──

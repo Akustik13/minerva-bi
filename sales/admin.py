@@ -662,17 +662,25 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             "fields": ("source", "status", "document_type", "affects_stock",
                        "order_number", "order_date", "is_flagged", "internal_note")
         }),
-        ("👤 Клієнт", {
-            "fields": ("client", "contact_name", "email", "phone")
+        ("👤 Клієнт (білінг)", {
+            "fields": ("client", "contact_name", "email", "phone"),
+            "description": "Дані особи, яка зробила замовлення (білінговий контакт).",
         }),
         ("🚚 Доставка", {
             "fields": (
                 ("addr_street",),
                 ("addr_city", "addr_zip", "addr_state", "addr_country"),
+                ("ship_name", "ship_company"),
+                ("ship_phone", "ship_email"),
                 "shipping_deadline", "shipped_at", "delivered_at",
                 "shipping_courier", "tracking_number", "lieferschein_nr",
                 ("shipping_cost", "shipping_currency"),
-            )
+            ),
+            "description": (
+                "Адреса та дані отримувача посилки. "
+                "«Ім'я отримувача» / «Компанія отримувача» — можуть відрізнятись від білінгового клієнта. "
+                "Якщо порожні — при створенні відправлення автоматично беруться з розділу «Клієнт»."
+            ),
         }),
         ("📋 Legacy адреса (raw)", {
             "fields": ("shipping_region", "shipping_address"),
