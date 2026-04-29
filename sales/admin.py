@@ -668,18 +668,21 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         }),
         ("🚚 Доставка", {
             "fields": (
+                # ── Отримувач (формат як на етикетці) ────────────────────────
+                "ship_company",
+                "ship_name",
                 ("addr_street",),
-                ("addr_city", "addr_zip", "addr_state", "addr_country"),
-                ("ship_name", "ship_company"),
+                ("addr_city", "addr_zip"),
+                ("addr_state", "addr_country"),
                 ("ship_phone", "ship_email"),
+                # ── Логістика ─────────────────────────────────────────────────
                 "shipping_deadline", "shipped_at", "delivered_at",
                 "shipping_courier", "tracking_number", "lieferschein_nr",
                 ("shipping_cost", "shipping_currency"),
             ),
             "description": (
-                "Адреса та дані отримувача посилки. "
-                "«Ім'я отримувача» / «Компанія отримувача» — можуть відрізнятись від білінгового клієнта. "
-                "Якщо порожні — при створенні відправлення автоматично беруться з розділу «Клієнт»."
+                "Отримувач посилки (може відрізнятись від білінгового клієнта). "
+                "Якщо поля порожні — при створенні відправлення беруться з розділу «Клієнт (білінг)»."
             ),
         }),
         ("📋 Legacy адреса (raw)", {
