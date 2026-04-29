@@ -461,86 +461,158 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         import requests as req
         from bots.services.digikey import get_token, _headers, _base_url, ORDERS_PATH, DigiKeyAPIError
 
-        config = DigiKeyConfig.get()
+        config       = DigiKeyConfig.get()
         no_credentials = not (config.client_id and config.client_secret)
-
-        endpoint = request.GET.get("endpoint", "orders")
-        calls = []
+        order_number   = request.GET.get("order", "").strip()
+        calls          = []
+        db_record      = None
+        db_lines       = []
 
         if not no_credentials:
-            # ── Step 1: Token ──────────────────────────────────────────────────
+            # ── Step 1: Token (always) ─────────────────────────────────────────
             t0 = time.time()
-            token_call = {"label": "POST /v1/oauth2/token", "ok": False}
+            token_call = {"label": "POST /v1/oauth2/token", "ok": False, "method": "POST"}
             try:
-                from bots.services.digikey import TOKEN_PATH, _SANDBOX_BASE, _PROD_BASE
-                base = _base_url(config)
+                from bots.services.digikey import TOKEN_PATH
+                base      = _base_url(config)
                 token_url = f"{base}{TOKEN_PATH}"
-                token_resp = req.post(
-                    token_url,
-                    data={
-                        "client_id":     config.client_id,
-                        "client_secret": "***",
-                        "grant_type":    "client_credentials",
-                    },
-                    timeout=15,
-                )
-                # Real call for actual token
                 token = get_token(config)
                 token_call.update({
-                    "ok":         True,
-                    "url":        token_url,
-                    "method":     "POST",
-                    "status":     token_resp.status_code,
+                    "ok":          True,
+                    "url":         token_url,
+                    "status":      200,
                     "duration_ms": int((time.time() - t0) * 1000),
-                    "request_body": "client_id=*** client_secret=*** grant_type=client_credentials",
-                    "response_body": json.dumps({"access_token": token[:16] + "…", "token_type": "Bearer", "expires_in": 600}, indent=2),
+                    "request_body":  "client_id=*** client_secret=*** grant_type=client_credentials",
+                    "response_body": json.dumps({
+                        "access_token": token[:20] + "…",
+                        "token_type":   "Bearer",
+                        "expires_in":   600,
+                    }, indent=2),
                 })
             except Exception as e:
                 token_call.update({"ok": False, "error": str(e), "duration_ms": int((time.time() - t0) * 1000)})
                 calls.append(token_call)
                 ctx = dict(self.admin_site.each_context(request), title="DigiKey Debug",
-                           config=config, no_credentials=False, calls=calls, endpoint=endpoint)
+                           config=config, no_credentials=False, calls=calls,
+                           order_number=order_number, db_record=None, db_lines=[])
                 return render(request, "admin/bots/digikey_debug.html", ctx)
             calls.append(token_call)
 
-            # ── Step 2: API call ───────────────────────────────────────────────
-            t0 = time.time()
-            base = _base_url(config)
-            hdrs = _headers(config, token)
-            # Mask token in display
+            base         = _base_url(config)
+            hdrs         = _headers(config, token)
             display_hdrs = {k: (v[:20] + "…" if k == "Authorization" else v) for k, v in hdrs.items()}
 
-            if endpoint == "orders":
-                url    = f"{base}{ORDERS_PATH}"
-                params = {"Shared": False, "PageNumber": 1, "PageSize": 25}
-                label  = "GET /orderstatus/v4/orders"
-            else:
-                url    = f"{base}{ORDERS_PATH}"
-                params = {"Shared": False, "PageNumber": 1, "PageSize": 25}
-                label  = "GET /orderstatus/v4/orders"
-
-            api_call = {"label": label, "url": url, "method": "GET",
-                        "request_headers": display_hdrs, "request_params": params}
-            try:
-                resp = req.get(url, headers=hdrs, params=params, timeout=30)
-                duration_ms = int((time.time() - t0) * 1000)
+            if order_number:
+                # ── Step 2a: GET /orderstatus/v4/orders/{id} ──────────────────
+                t0  = time.time()
+                url = f"{base}{ORDERS_PATH}/{order_number}"
+                api_call = {
+                    "label":           f"GET /orderstatus/v4/orders/{order_number}",
+                    "url":             url,
+                    "method":          "GET",
+                    "request_headers": display_hdrs,
+                }
                 try:
-                    body_parsed = resp.json()
-                    body_str = json.dumps(body_parsed, ensure_ascii=False, indent=2)
-                except Exception:
-                    body_str = resp.text[:10000]
+                    resp        = req.get(url, headers=hdrs, timeout=30)
+                    duration_ms = int((time.time() - t0) * 1000)
+                    try:
+                        body_parsed = resp.json()
+                        body_str    = json.dumps(body_parsed, ensure_ascii=False, indent=2)
+                    except Exception:
+                        body_str = resp.text[:15000]
+                    api_call.update({
+                        "ok":               resp.ok,
+                        "status":           resp.status_code,
+                        "status_text":      resp.reason,
+                        "duration_ms":      duration_ms,
+                        "response_headers": {k: v for k, v in resp.headers.items()
+                                             if k.lower() in ("content-type", "x-request-id",
+                                                               "x-correlationid", "x-ratelimit-remaining")},
+                        "response_body":    body_str,
+                    })
+                except Exception as e:
+                    api_call.update({"ok": False, "error": str(e),
+                                     "duration_ms": int((time.time() - t0) * 1000)})
+                calls.append(api_call)
 
-                api_call.update({
-                    "ok":           resp.ok,
-                    "status":       resp.status_code,
-                    "status_text":  resp.reason,
-                    "duration_ms":  duration_ms,
-                    "response_headers": dict(resp.headers),
-                    "response_body":    body_str,
-                })
-            except Exception as e:
-                api_call.update({"ok": False, "error": str(e), "duration_ms": int((time.time() - t0) * 1000)})
-            calls.append(api_call)
+                # ── Step 2b: search Marketplace by businessId / order number ──
+                try:
+                    from bots.services.digikey import get_marketplace_token, get_marketplace_orders
+                    mk_token = get_marketplace_token(config)
+                    if mk_token:
+                        mk_hdrs = {**hdrs, "Authorization": f"Bearer {mk_token}"}
+                        mk_disp = {k: (v[:20] + "…" if k == "Authorization" else v)
+                                   for k, v in mk_hdrs.items()}
+                        t0 = time.time()
+                        mk_url = (f"{base}/Sales/Marketplace2/Orders/v1/orders"
+                                  f"?status=All&offset=0&limit=5&orderNumber={order_number}")
+                        mk_call = {
+                            "label":           f"GET /Sales/Marketplace2/Orders (order={order_number})",
+                            "url":             mk_url,
+                            "method":          "GET",
+                            "request_headers": mk_disp,
+                        }
+                        resp2 = req.get(mk_url, headers=mk_hdrs, timeout=30)
+                        duration_ms2 = int((time.time() - t0) * 1000)
+                        try:
+                            mk_body = json.dumps(resp2.json(), ensure_ascii=False, indent=2)
+                        except Exception:
+                            mk_body = resp2.text[:15000]
+                        mk_call.update({
+                            "ok":               resp2.ok,
+                            "status":           resp2.status_code,
+                            "status_text":      resp2.reason,
+                            "duration_ms":      duration_ms2,
+                            "response_headers": {k: v for k, v in resp2.headers.items()
+                                                 if k.lower() in ("content-type", "x-request-id",
+                                                                   "x-correlationid")},
+                            "response_body":    mk_body,
+                        })
+                        calls.append(mk_call)
+                except Exception:
+                    pass  # marketplace token not available — skip silently
+
+                # ── Step 3: Minerva DB record ──────────────────────────────────
+                try:
+                    from sales.models import SalesOrder, SalesOrderLine
+                    db_record = SalesOrder.objects.filter(order_number=order_number).first()
+                    if db_record:
+                        db_lines = list(SalesOrderLine.objects.filter(order=db_record).select_related("product"))
+                except Exception:
+                    pass
+
+            else:
+                # ── Default: list last 25 orders ──────────────────────────────
+                t0     = time.time()
+                url    = f"{base}{ORDERS_PATH}"
+                params = {"Shared": False, "PageNumber": 1, "PageSize": 25}
+                api_call = {
+                    "label":           "GET /orderstatus/v4/orders (last 25)",
+                    "url":             url,
+                    "method":          "GET",
+                    "request_headers": display_hdrs,
+                    "request_params":  params,
+                }
+                try:
+                    resp        = req.get(url, headers=hdrs, params=params, timeout=30)
+                    duration_ms = int((time.time() - t0) * 1000)
+                    try:
+                        body_str = json.dumps(resp.json(), ensure_ascii=False, indent=2)
+                    except Exception:
+                        body_str = resp.text[:15000]
+                    api_call.update({
+                        "ok":               resp.ok,
+                        "status":           resp.status_code,
+                        "status_text":      resp.reason,
+                        "duration_ms":      duration_ms,
+                        "response_headers": {k: v for k, v in resp.headers.items()
+                                             if k.lower() in ("content-type", "x-request-id")},
+                        "response_body":    body_str,
+                    })
+                except Exception as e:
+                    api_call.update({"ok": False, "error": str(e),
+                                     "duration_ms": int((time.time() - t0) * 1000)})
+                calls.append(api_call)
 
         ctx = dict(
             self.admin_site.each_context(request),
@@ -548,7 +620,9 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             config=config,
             no_credentials=no_credentials,
             calls=calls,
-            endpoint=endpoint,
+            order_number=order_number,
+            db_record=db_record,
+            db_lines=db_lines,
         )
         return render(request, "admin/bots/digikey_debug.html", ctx)
 

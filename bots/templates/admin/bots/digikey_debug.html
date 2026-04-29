@@ -12,24 +12,35 @@
 {% block extrahead %}{{ block.super }}
 <style>
 #content { padding: 0 !important; }
-.dbg-wrap { max-width: 1000px; margin: 0 auto; padding: 32px 24px 60px; }
+.dbg-wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 60px; }
 
 .dbg-title { font-size: 20px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
 .dbg-sub   { font-size: 12px; color: var(--text-dim); margin-bottom: 28px; }
 
-.dbg-run {
+/* Search form */
+.dbg-search {
   background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px;
-  padding: 20px 24px; margin-bottom: 28px; display: flex; gap: 12px; align-items: center;
+  padding: 20px 24px; margin-bottom: 28px;
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
 }
+.dbg-search-label { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
+.dbg-search-input {
+  flex: 1; min-width: 200px; max-width: 320px;
+  background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 6px; padding: 9px 14px;
+  font-size: 14px; font-family: monospace;
+}
+.dbg-search-input:focus { border-color: var(--accent); outline: none; }
 .dbg-btn {
   background: var(--bg-hover); color: var(--text); border: 1px solid var(--border-strong);
   border-radius: 6px; padding: 9px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
-  text-decoration: none; display: inline-block;
+  text-decoration: none; display: inline-block; white-space: nowrap;
 }
 .dbg-btn:hover { border-color: var(--accent); color: var(--accent); }
 .dbg-btn-run { background: var(--accent); color: #fff; border-color: var(--accent); }
 .dbg-btn-run:hover { opacity: .85; color: #fff; }
 
+/* API call cards */
 .dbg-call {
   background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px;
   margin-bottom: 20px; overflow: hidden;
@@ -65,7 +76,7 @@
   background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 6px;
   padding: 14px 16px; font-family: monospace; font-size: 12px; color: var(--text);
   white-space: pre-wrap; word-break: break-all;
-  max-height: 400px; overflow-y: auto; margin: 0;
+  max-height: 500px; overflow-y: auto; margin: 0;
 }
 .dbg-error {
   background: var(--bg-card); border-left: 4px solid var(--err);
@@ -76,6 +87,36 @@
   border-radius: 8px; padding: 14px 18px; margin-bottom: 24px;
   font-size: 13px; color: var(--warn);
 }
+
+/* DB record */
+.dbg-db {
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px;
+  margin-bottom: 28px; overflow: hidden;
+}
+.dbg-db-head {
+  padding: 14px 20px; background: rgba(76,175,80,.1);
+  border-bottom: 1px solid var(--border-strong);
+  display: flex; align-items: center; gap: 10px;
+}
+.dbg-db-head-title { font-size: 14px; font-weight: 700; color: var(--text); flex: 1; }
+.dbg-db-none {
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 20px 24px; margin-bottom: 28px; color: var(--text-dim); font-size: 13px;
+  display: flex; align-items: center; gap: 10px;
+}
+.dbg-badge {
+  display: inline-block; padding: 2px 9px; border-radius: 4px; font-size: 11px; font-weight: 700;
+}
+.dbg-badge-ok  { background: rgba(76,175,80,.2);  color: var(--ok); }
+.dbg-badge-err { background: rgba(244,67,54,.15); color: var(--err); }
+.dbg-badge-warn{ background: rgba(255,152,0,.2);  color: var(--warn); }
+
+.dbg-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dbg-table th { text-align:left; color:var(--text-dim); font-weight:600; padding:8px 12px;
+                border-bottom:1px solid var(--border-strong); }
+.dbg-table td { padding:8px 12px; border-bottom:1px solid var(--border); vertical-align:top; }
+.dbg-table tr:last-child td { border-bottom:none; }
+.dbg-table td:first-child { font-family:monospace; color:var(--text-dim); }
 </style>
 {% endblock %}
 
@@ -83,8 +124,8 @@
 <div class="dbg-wrap">
   <div class="dbg-title">🔬 DigiKey API Debug</div>
   <div class="dbg-sub">
-    Сирі HTTP запити / відповіді
-    · {% if config.use_sandbox %}<span style="color:var(--warn)">Sandbox</span>{% else %}<span style="color:var(--ok)">Production</span>{% endif %}
+    Сирі HTTP запити / відповіді ·
+    {% if config.use_sandbox %}<span style="color:var(--warn)">Sandbox</span>{% else %}<span style="color:var(--ok)">Production</span>{% endif %}
   </div>
 
   {% if no_credentials %}
@@ -94,14 +135,94 @@
   </div>
   {% else %}
 
-  <div class="dbg-run">
-    <span style="font-size:13px;color:var(--text-muted)">Endpoint:</span>
-    <a href="?endpoint=orders" class="dbg-btn {% if endpoint == 'orders' %}dbg-btn-run{% endif %}">
-      GET /orderstatus/v4/orders
-    </a>
+  <!-- Search form -->
+  <form method="get" class="dbg-search">
+    <span class="dbg-search-label">🔍 Номер замовлення:</span>
+    <input class="dbg-search-input" type="text" name="order"
+           value="{{ order_number }}"
+           placeholder="напр. 98741630"
+           autocomplete="off" autofocus>
+    <button type="submit" class="dbg-btn dbg-btn-run">▶ Виконати запит</button>
+    {% if order_number %}
+    <a href="?" class="dbg-btn">✕ Очистити</a>
+    {% else %}
+    <a href="?order=" class="dbg-btn">GET /orders (список)</a>
+    {% endif %}
     <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}" class="dbg-btn">← Назад</a>
+  </form>
+
+  {% if order_number %}
+
+  <!-- ── Minerva DB Record ────────────────────────────────────────────────── -->
+  {% if db_record %}
+  <div class="dbg-db">
+    <div class="dbg-db-head">
+      <span class="dbg-db-head-title">🗄 Minerva DB — замовлення {{ db_record.order_number }}</span>
+      <a href="{% url 'admin:sales_salesorder_change' db_record.pk %}"
+         style="font-size:12px;color:var(--accent);text-decoration:none">✏️ Відкрити →</a>
+    </div>
+    <div class="dbg-section">
+      <table class="dbg-table">
+        <tr><td>order_number</td><td>{{ db_record.order_number }}</td></tr>
+        <tr><td>source</td><td>{{ db_record.source }}</td></tr>
+        <tr><td>status</td><td>
+          <span class="dbg-badge {% if db_record.status == 'delivered' %}dbg-badge-ok{% elif db_record.status == 'cancelled' %}dbg-badge-err{% else %}dbg-badge-warn{% endif %}">
+            {{ db_record.get_status_display }}
+          </span>
+        </td></tr>
+        <tr><td>order_date</td><td>{{ db_record.order_date|default:"—" }}</td></tr>
+        <tr><td>client</td><td>{{ db_record.client|default:"—" }}</td></tr>
+        <tr><td>contact_name</td><td>{{ db_record.contact_name|default:"—" }}</td></tr>
+        <tr><td>email</td><td>{{ db_record.email|default:"—" }}</td></tr>
+        <tr><td>phone</td><td>{{ db_record.phone|default:"—" }}</td></tr>
+        <tr><td>addr_street</td><td>{{ db_record.addr_street|default:"—" }}</td></tr>
+        <tr><td>addr_city</td><td>{{ db_record.addr_city|default:"—" }}</td></tr>
+        <tr><td>addr_zip</td><td>{{ db_record.addr_zip|default:"—" }}</td></tr>
+        <tr><td>addr_country</td><td>{{ db_record.addr_country|default:"—" }}</td></tr>
+        <tr><td>addr_state</td><td>{{ db_record.addr_state|default:"—" }}</td></tr>
+        <tr><td>total_price</td><td>{{ db_record.total_price|default:"—" }} {{ db_record.currency }}</td></tr>
+        <tr><td>tracking_number</td><td>{{ db_record.tracking_number|default:"—" }}</td></tr>
+        <tr><td>shipping_courier</td><td>{{ db_record.shipping_courier|default:"—" }}</td></tr>
+        <tr><td>shipping_deadline</td><td>{{ db_record.shipping_deadline|default:"—" }}</td></tr>
+        <tr><td>shipped_at</td><td>{{ db_record.shipped_at|default:"—" }}</td></tr>
+        <tr><td>lieferschein_nr</td><td>{{ db_record.lieferschein_nr|default:"—" }}</td></tr>
+        <tr><td>affects_stock</td><td>{{ db_record.affects_stock }}</td></tr>
+        <tr><td>created_at / updated_at</td><td>{{ db_record.created_at|default:"—" }} / {{ db_record.updated_at|default:"—" }}</td></tr>
+      </table>
+    </div>
+    {% if db_lines %}
+    <div class="dbg-section">
+      <div class="dbg-section-title">Рядки замовлення ({{ db_lines|length }})</div>
+      <table class="dbg-table">
+        <thead><tr><th>#</th><th>SKU raw</th><th>Product</th><th>Qty</th><th>Unit price</th><th>Total</th><th>Currency</th></tr></thead>
+        <tbody>
+        {% for line in db_lines %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ line.sku_raw|default:"—" }}</td>
+          <td>{{ line.product.sku|default:"—" }}</td>
+          <td>{{ line.qty }}</td>
+          <td>{{ line.unit_price|default:"—" }}</td>
+          <td>{{ line.total_price|default:"—" }}</td>
+          <td>{{ line.currency|default:"—" }}</td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </div>
 
+  {% else %}
+  <div class="dbg-db-none">
+    ℹ️ Замовлення <b>{{ order_number }}</b> не знайдено в Minerva DB
+    (source=digikey, order_number={{ order_number }}).
+  </div>
+  {% endif %}
+
+  {% endif %}{# order_number #}
+
+  <!-- ── API Calls ──────────────────────────────────────────────────────────── -->
   {% for call in calls %}
   <div class="dbg-call">
     <div class="dbg-call-head">
@@ -153,16 +274,18 @@
       <div class="dbg-section-title">Response</div>
       {% if call.response_headers %}
         {% for k, v in call.response_headers.items %}
-        {% if k|lower == "content-type" or k|lower == "x-request-id" or k|lower == "x-correlationid" %}
         <div class="dbg-kv"><span class="dbg-kv-key">{{ k }}</span><span class="dbg-kv-val">{{ v }}</span></div>
-        {% endif %}
         {% endfor %}
       {% endif %}
       {% if call.response_body %}
-      <div style="margin-top:10px">
-        <div class="dbg-section-title">Response Body</div>
-        <pre class="dbg-pre">{{ call.response_body }}</pre>
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div class="dbg-section-title" style="margin:0">Response Body</div>
+        <button type="button" class="dbg-btn" style="padding:3px 10px;font-size:11px"
+                onclick="(function(btn){var pre=btn.closest('.dbg-section').querySelector('pre');navigator.clipboard.writeText(pre.textContent).then(function(){var t=btn.textContent;btn.textContent='✅ Скопійовано';setTimeout(function(){btn.textContent=t;},1500)});})(this)">
+          📋 Копіювати
+        </button>
       </div>
+      <pre class="dbg-pre">{{ call.response_body }}</pre>
       {% endif %}
     </div>
     {% endif %}
@@ -170,10 +293,11 @@
   {% endfor %}
 
   {% if not calls %}
-  <div style="text-align:center;color:var(--text-dim);padding:40px;font-size:13px">
-    Натисни кнопку вище щоб виконати запит.
+  <div style="text-align:center;color:var(--text-dim);padding:60px;font-size:13px">
+    Введи номер замовлення та натисни <b>▶ Виконати запит</b>.
   </div>
   {% endif %}
-  {% endif %}
+
+  {% endif %}{# no_credentials #}
 </div>
 {% endblock %}
