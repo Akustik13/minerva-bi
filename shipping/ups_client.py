@@ -356,8 +356,8 @@ class UPSClient:
                 'ShipperNumber': self.carrier.connection_uuid,
                 'Address':       self._fmt_addr(account),
             },
-            'ShipTo':   {'Name': to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address, addr_fallback=True)},
-            'ShipFrom': {'Name': pickup.get('name', 'Shipper'),       'Address': self._fmt_addr(pickup)},
+            'ShipTo':   {'Name': to_address.get('company') or to_address.get('name', 'Recipient'), 'Address': self._fmt_addr(to_address, addr_fallback=True)},
+            'ShipFrom': {'Name': pickup.get('company') or pickup.get('name', 'Shipper'),           'Address': self._fmt_addr(pickup)},
             'PaymentDetails': {
                 'ShipmentCharge': {
                     'Type': '01',
@@ -630,7 +630,7 @@ class UPSClient:
         shipment = {
             # Shipper = account holder (billing) — always carrier's DE address + ShipperNumber
             'Shipper': {
-                'Name':          account.get('name', ''),
+                'Name':          account.get('company') or account.get('name', ''),
                 'AttentionName': account.get('name', ''),
                 'ShipperNumber': self.carrier.connection_uuid,
                 'Phone':         {'Number': (account.get('phone', '') or '').replace(' ', '')},
@@ -638,7 +638,7 @@ class UPSClient:
                 'Address':       self._fmt_addr(account),
             },
             'ShipTo': {
-                'Name':          to_address.get('name', ''),
+                'Name':          to_address.get('company') or to_address.get('name', ''),
                 'AttentionName': to_address.get('name', ''),
                 'Phone':         {'Number': (to_address.get('phone', '') or '').replace(' ', '')},
                 'EMailAddress':  to_address.get('email', '') or '',
@@ -646,7 +646,7 @@ class UPSClient:
             },
             # ShipFrom = physical pickup location (can differ from Shipper when swapped)
             'ShipFrom': {
-                'Name':          pickup.get('name', ''),
+                'Name':          pickup.get('company') or pickup.get('name', ''),
                 'AttentionName': pickup.get('name', ''),
                 'Phone':         {'Number': (pickup.get('phone', '') or '').replace(' ', '')},
                 'EMailAddress':  pickup.get('email', '') or '',
@@ -1195,7 +1195,7 @@ class UPSClient:
         contacts = {}
         if sold_to:
             contacts['SoldTo'] = {
-                'Name':          sold_to.get('name', ''),
+                'Name':          sold_to.get('company') or sold_to.get('name', ''),
                 'AttentionName': sold_to.get('name', ''),
                 'Phone':         {'Number': (sold_to.get('phone', '') or '').replace(' ', '')},
                 'EMailAddress':  sold_to.get('email', '') or '',
@@ -1203,7 +1203,7 @@ class UPSClient:
             }
         if seller:
             contacts['Seller'] = {
-                'Name':          seller.get('name', ''),
+                'Name':          seller.get('company') or seller.get('name', ''),
                 'AttentionName': seller.get('name', ''),
                 'Phone':         {'Number': (seller.get('phone', '') or '').replace(' ', '')},
                 'EMailAddress':  seller.get('email', '') or '',
