@@ -932,9 +932,21 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="sh-card">
       <div class="sh-card-title" style="justify-content:space-between">
         <span>📤 Відправник</span>
-        <span style="font-size:10px;color:var(--text-dim);font-weight:400;text-transform:none;letter-spacing:0">
-          Автозаповнення з перевізника — можна змінити вручну
-        </span>
+        <button type="button" onclick="shToggleAddrBookFor('sender')" id="sh-addr-btn-sender"
+          style="background:var(--bg-input);border:1px solid var(--border-strong);border-radius:5px;
+                 padding:4px 10px;cursor:pointer;font-size:12px;color:var(--text-muted);display:flex;
+                 align-items:center;gap:5px">
+          📖 <span id="sh-addr-btn-lbl-sender">Адресна книга</span>
+        </button>
+      </div>
+      <div id="sh-addr-book-sender" style="display:none;margin-bottom:14px;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden">
+        <div style="padding:7px 10px;background:var(--bg-card-2);border-bottom:1px solid var(--border-strong)">
+          <input id="sh-addr-search-sender" type="text" placeholder="🔍 Пошук відправника…"
+            style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;
+                   padding:5px 8px;font-size:12px;color:var(--text);outline:none;box-sizing:border-box"
+            oninput="shAddrSearchFor('sender',this.value)">
+        </div>
+        <div id="sh-addr-groups-sender" style="max-height:260px;overflow-y:auto"></div>
       </div>
       <div class="sh-grid">
         <div class="sh-field">
@@ -1022,25 +1034,25 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="sh-card">
       <div class="sh-card-title" style="justify-content:space-between">
         <span>📬 Отримувач</span>
-        <button type="button" onclick="shToggleAddrBook()" id="sh-addr-btn"
+        <button type="button" onclick="shToggleAddrBookFor('recipient')" id="sh-addr-btn-recipient"
           style="background:var(--bg-input);border:1px solid var(--border-strong);border-radius:5px;
                  padding:4px 10px;cursor:pointer;font-size:12px;color:var(--text-muted);display:flex;
                  align-items:center;gap:5px">
-          📖 <span id="sh-addr-btn-lbl">Адресна книга</span>
+          📖 <span id="sh-addr-btn-lbl-recipient">Адресна книга</span>
         </button>
       </div>
-      <div id="sh-addr-book" style="display:none;margin-bottom:14px;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden">
+      <div id="sh-addr-book-recipient" style="display:none;margin-bottom:14px;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden">
         <div style="padding:7px 10px;background:var(--bg-card-2);border-bottom:1px solid var(--border-strong)">
-          <input id="sh-addr-search" type="text" placeholder="🔍 Пошук клієнта, міста, email…"
+          <input id="sh-addr-search-recipient" type="text" placeholder="🔍 Пошук клієнта, міста, email…"
             style="width:100%;background:var(--bg-input);border:1px solid var(--border);border-radius:4px;
                    padding:5px 8px;font-size:12px;color:var(--text);outline:none;box-sizing:border-box"
-            oninput="shAddrSearch(this.value)">
+            oninput="shAddrSearchFor('recipient',this.value)">
         </div>
-        <div id="sh-addr-groups" style="max-height:340px;overflow-y:auto"></div>
+        <div id="sh-addr-groups-recipient" style="max-height:340px;overflow-y:auto"></div>
       </div>
       <script>
       (function(){
-        var ADDR = {{ addr_book_json|safe }};
+        var ADDR = {{ addr_book_json|default:"{}"|safe }};
         var CNAMES = {
           'DE':'🇩🇪 Німеччина','UA':'🇺🇦 Україна','US':'🇺🇸 США','PL':'🇵🇱 Польща',
           'AT':'🇦🇹 Австрія','CH':'🇨🇭 Швейцарія','GB':'🇬🇧 Велика Британія',
@@ -1051,29 +1063,89 @@ document.addEventListener('DOMContentLoaded', function() {
           'CN':'🇨🇳 Китай','KR':'🇰🇷 Пд. Корея','SG':'🇸🇬 Сінгапур',
           'MY':'🇲🇾 Малайзія','IN':'🇮🇳 Індія','XX':'🌍 Без країни'
         };
-        var container = document.getElementById('sh-addr-groups');
-        function renderGroups(filter) {
-          container.innerHTML = '';
-          var fl = filter ? filter.toLowerCase() : '';
+        var CAT_LABELS = {
+          'client':'🧑 Клієнт','supplier':'🏭 Постачальник','sender':'📤 Відправник',
+          'warehouse':'🏢 Склад','other':'📌 Інше','crm':'👤 CRM'
+        };
+        var CAT_COLORS = {
+          'client':'#1565c0','supplier':'#2e7d32','sender':'#e65100','warehouse':'#4527a0','other':'#424242','crm':'#607d8b'
+        };
+        // Active category filter per target
+        var _activeCat = {recipient:'all', sender:'all'};
+        var _activeSearch = {recipient:'', sender:''};
+
+        function _allEntries() {
+          var all = [];
+          Object.keys(ADDR).forEach(function(cc){
+            ADDR[cc].forEach(function(e){ e._cc = cc; all.push(e); });
+          });
+          return all;
+        }
+
+        function _renderCatBar(target, containerEl) {
+          var all = _allEntries();
+          var cats = {};
+          all.forEach(function(e){
+            var c = e.src === 'crm' ? 'crm' : (e.cat || 'other');
+            cats[c] = (cats[c]||0)+1;
+          });
+          var bar = document.createElement('div');
+          bar.style.cssText = 'display:flex;gap:4px;flex-wrap:wrap;padding:6px 8px;background:var(--bg-card-2);border-bottom:1px solid var(--border)';
+          // All button
+          var btnAll = document.createElement('button');
+          btnAll.type='button';
+          btnAll.textContent = 'Всі ('+all.length+')';
+          var _setActive = function(key) {
+            _activeCat[target] = key;
+            bar.querySelectorAll('button').forEach(function(b){
+              b.style.background = b.dataset.cat===key ? 'rgba(88,166,255,.2)' : 'var(--bg-input)';
+              b.style.borderColor = b.dataset.cat===key ? '#58a6ff' : 'var(--border-strong)';
+              b.style.color = b.dataset.cat===key ? '#58a6ff' : 'var(--text-muted)';
+            });
+            _renderGroups(target, containerEl);
+          };
+          btnAll.dataset.cat='all';
+          btnAll.style.cssText = 'background:rgba(88,166,255,.2);border:1px solid #58a6ff;border-radius:12px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;color:#58a6ff;transition:all .1s';
+          btnAll.onclick = function(){ _setActive('all'); };
+          bar.appendChild(btnAll);
+
+          Object.keys(cats).sort().forEach(function(cat){
+            var b = document.createElement('button');
+            b.type='button'; b.dataset.cat=cat;
+            b.textContent = (CAT_LABELS[cat]||cat) + ' ('+cats[cat]+')';
+            b.style.cssText = 'background:var(--bg-input);border:1px solid var(--border-strong);border-radius:12px;padding:3px 10px;font-size:10px;font-weight:700;cursor:pointer;color:var(--text-muted);transition:all .1s';
+            b.onclick = function(){ _setActive(cat); };
+            bar.appendChild(b);
+          });
+          return bar;
+        }
+
+        function _renderGroups(target, containerEl) {
+          containerEl.innerHTML = '';
+          var fl = (_activeSearch[target]||'').toLowerCase();
+          var catF = _activeCat[target]||'all';
           var countries = Object.keys(ADDR).sort(function(a,b){
             if(a==='DE') return -1; if(b==='DE') return 1;
             return a.localeCompare(b);
           });
           var anyVisible = false;
           countries.forEach(function(cc) {
-            var customers = ADDR[cc];
-            var filtered = fl ? customers.filter(function(c){
+            var entries = ADDR[cc];
+            var filtered = entries.filter(function(c){
+              var mCat = catF==='all' || (c.src==='crm' ? catF==='crm' : c.cat===catF);
+              if(!mCat) return false;
+              if(!fl) return true;
               return (c.name||'').toLowerCase().indexOf(fl)>=0 ||
                      (c.company||'').toLowerCase().indexOf(fl)>=0 ||
                      (c.city||'').toLowerCase().indexOf(fl)>=0 ||
                      (c.email||'').toLowerCase().indexOf(fl)>=0;
-            }) : customers;
+            });
             if (!filtered.length) return;
             anyVisible = true;
             var hdr = document.createElement('div');
             hdr.style.cssText = 'background:var(--bg-card-2);padding:5px 10px;font-size:11px;font-weight:700;color:var(--text-muted);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1';
             hdr.textContent = (CNAMES[cc]||cc) + ' (' + filtered.length + ')';
-            container.appendChild(hdr);
+            containerEl.appendChild(hdr);
             var row = document.createElement('div');
             row.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;padding:7px 8px;border-bottom:1px solid var(--border)';
             filtered.forEach(function(c) {
@@ -1082,44 +1154,74 @@ document.addEventListener('DOMContentLoaded', function() {
               var tip = [c.name, c.company, c.street, c.city+' '+c.zip, cc, c.phone, c.email].filter(function(x){return x&&x.trim();}).join(' | ');
               var btn = document.createElement('button');
               btn.type = 'button'; btn.title = tip;
-              btn.style.cssText = 'background:var(--bg-input);border:1px solid var(--border-strong);border-radius:5px;padding:4px 9px;cursor:pointer;font-size:11px;color:var(--text);white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis;text-align:left;transition:border-color .1s,color .1s';
+              var catColor = c.src==='crm' ? '#607d8b' : (CAT_COLORS[c.cat]||'#424242');
+              btn.style.cssText = 'background:var(--bg-input);border:1px solid var(--border-strong);border-radius:5px;padding:4px 9px;cursor:pointer;font-size:11px;color:var(--text);white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis;text-align:left;transition:border-color .1s,color .1s;border-left:3px solid '+catColor;
               btn.textContent = label;
-              btn.onmouseover = function(){this.style.borderColor='#2196f3';this.style.color='#2196f3';};
-              btn.onmouseout  = function(){this.style.borderColor='';this.style.color='';};
+              btn.onmouseover = function(){this.style.borderColor=catColor;this.style.color=catColor;};
+              btn.onmouseout  = function(){this.style.borderColor='';this.style.borderLeftColor=catColor;this.style.color='';};
               btn.onclick = function(){
                 var f = document.querySelector('form');
-                var set = function(n,v){var el=f.querySelector('[name="'+n+'"]');if(el)el.value=v||''; };
-                set('recipient_name',    c.name);
-                set('recipient_company', c.company);
-                set('recipient_street',  c.street);
-                set('recipient_city',    c.city);
-                set('recipient_zip',     c.zip);
-                set('recipient_state',   c.state);
-                set('recipient_country', cc);
-                set('recipient_phone',   c.phone);
-                set('recipient_email',   c.email);
-                var rc = f.querySelector('[name="recipient_country"]');
-                if(rc && typeof updateCustomsCard === 'function') updateCustomsCard();
-                if(rc && typeof _showCountryHint === 'function') _showCountryHint(rc,'sh-hint-rc');
-                shToggleAddrBook(true);
+                var pre = target; // 'recipient' or 'sender'
+                var set = function(n,v){var el=f.querySelector('[name="'+pre+'_'+n+'"]');if(el)el.value=v||''; };
+                set('name',    c.name);
+                set('company', c.company);
+                set('street',  c.street);
+                set('city',    c.city);
+                set('zip',     c.zip);
+                set('state',   c.state);
+                set('country', c.country||cc);
+                set('phone',   c.phone);
+                set('email',   c.email);
+                if(target==='recipient'){
+                  var rc = f.querySelector('[name="recipient_country"]');
+                  if(rc && typeof updateCustomsCard === 'function') updateCustomsCard();
+                  if(rc && typeof _showCountryHint === 'function') _showCountryHint(rc,'sh-hint-rc');
+                }
+                shToggleAddrBookFor(target, true);
+                // Increment use_count if AB entry
+                if(c.pk){
+                  var csrf=document.cookie.match(/csrftoken=([^;]+)/);
+                  if(csrf) fetch('/admin/shipping/addressbook/'+c.pk+'/use/',{method:'POST',headers:{'X-CSRFToken':csrf[1],'X-Requested-With':'XMLHttpRequest'}}).catch(function(){});
+                }
               };
               row.appendChild(btn);
             });
-            container.appendChild(row);
+            containerEl.appendChild(row);
           });
           if (!anyVisible) {
             var empty = document.createElement('div');
             empty.style.cssText = 'padding:20px;text-align:center;color:var(--text-dim);font-size:12px';
-            empty.textContent = filter ? 'Нічого не знайдено' : 'Адресна книга порожня (немає клієнтів з адресою)';
-            container.appendChild(empty);
+            empty.textContent = fl ? 'Нічого не знайдено' : 'Адресна книга порожня';
+            containerEl.appendChild(empty);
           }
         }
-        renderGroups('');
-        window.shAddrSearch = function(val){ renderGroups(val); };
+
+        // Init both panels
+        ['recipient','sender'].forEach(function(target){
+          var listEl = document.getElementById('sh-addr-groups-'+target);
+          if(!listEl) return;
+          // Build cat bar and prepend to panel
+          var panel = document.getElementById('sh-addr-book-'+target);
+          if(panel){
+            var catBar = _renderCatBar(target, listEl);
+            var searchRow = panel.querySelector('div');
+            panel.insertBefore(catBar, searchRow);
+          }
+          _renderGroups(target, listEl);
+        });
+
+        window.shAddrSearchFor = function(target, val){
+          _activeSearch[target] = val;
+          var listEl = document.getElementById('sh-addr-groups-'+target);
+          if(listEl) _renderGroups(target, listEl);
+        };
+        // Keep old shAddrSearch alias
+        window.shAddrSearch = function(val){ shAddrSearchFor('recipient', val); };
       })();
-      function shToggleAddrBook(forceClose) {
-        var panel = document.getElementById('sh-addr-book');
-        var lbl   = document.getElementById('sh-addr-btn-lbl');
+
+      function shToggleAddrBookFor(target, forceClose) {
+        var panel = document.getElementById('sh-addr-book-'+target);
+        var lbl   = document.getElementById('sh-addr-btn-lbl-'+target);
         if (!panel) return;
         var isOpen = panel.style.display !== 'none';
         if (forceClose === true || isOpen) {
@@ -1128,10 +1230,12 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
           panel.style.display = 'block';
           if(lbl) lbl.textContent = '✕ Закрити';
-          var si = document.getElementById('sh-addr-search');
-          if(si){si.value=''; if(typeof shAddrSearch==='function') shAddrSearch(''); si.focus();}
+          var si = document.getElementById('sh-addr-search-'+target);
+          if(si){si.value=''; if(typeof shAddrSearchFor==='function') shAddrSearchFor(target,''); si.focus();}
         }
       }
+      // Backwards compat alias
+      function shToggleAddrBook(forceClose){ shToggleAddrBookFor('recipient', forceClose); }
       </script>
       <div class="sh-grid">
         <div class="sh-field">

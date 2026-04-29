@@ -948,7 +948,13 @@ document.addEventListener('DOMContentLoaded', function(){
     },
     { id: 'sales',      label: '🛒 Продажі',      apps: ['sales'] },
     { id: 'accounting', label: '💰 Бухгалтерія',  apps: ['accounting'] },
-    { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'] },
+    { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'],
+      links: [
+        { href: '/admin/shipping/shipment/create/blank/', label: '✉️ Нове відправлення' },
+        { href: '/admin/shipping/addressbook/',           label: '📖 Адресна книга' },
+        { href: '/admin/shipping/shipment/add-tracking/', label: '📦 Додати трекінг' },
+      ]
+    },
     { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'],
       links: [
         { href: '/admin/inventory/inventorysettings/', label: '⚙️ Налаштування складу' },

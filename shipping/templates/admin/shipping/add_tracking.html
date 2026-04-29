@@ -1,0 +1,83 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Додати трекінг{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  &rsaquo; Додати трекінг
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.at-wrap { padding: 24px 28px 60px; max-width: 560px; }
+.at-header { display:flex;align-items:center;gap:14px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border); }
+.at-header-icon { width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,rgba(88,166,255,.2),rgba(63,185,80,.1));display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0; }
+.at-header h2 { font-size:18px;font-weight:800;margin:0;letter-spacing:-.3px; }
+.at-card { background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:16px; }
+.at-label { font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:block; }
+.at-input { width:100%;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text);outline:none;box-sizing:border-box;transition:border-color .15s; }
+.at-input:focus { border-color:rgba(88,166,255,.6); }
+.at-row { margin-bottom:14px; }
+.at-actions { display:flex;gap:10px;margin-top:20px; }
+.at-btn-save { background:#1565c0;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s; }
+.at-btn-save:hover { background:#1976d2; }
+.at-btn-cancel { background:var(--bg-card);border:1px solid var(--border-strong);border-radius:7px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted);text-decoration:none;display:inline-flex;align-items:center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="at-wrap">
+  <div class="at-header">
+    <div class="at-header-icon">📦</div>
+    <div><h2>Додати трекінг вручну</h2></div>
+  </div>
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="at-card">
+      <div class="at-row">
+        <label class="at-label">Номер трекінгу *</label>
+        <input class="at-input" type="text" name="tracking_number" required
+               placeholder="1Z999AA10123456784, JD014600006161234567…" autofocus>
+      </div>
+      <div class="at-row">
+        <label class="at-label">Перевізник</label>
+        <select class="at-input" name="carrier">
+          <option value="">— Не вибрано —</option>
+          {% for c in carriers %}
+          <option value="{{ c.pk }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="at-row">
+        <label class="at-label">Референс / номер замовлення</label>
+        <input class="at-input" type="text" name="reference" placeholder="SO-12345…">
+      </div>
+    </div>
+
+    <div class="at-card">
+      <div class="at-row">
+        <label class="at-label">Ім'я отримувача</label>
+        <input class="at-input" type="text" name="recipient_name">
+      </div>
+      <div class="at-row">
+        <label class="at-label">Країна отримувача (ISO 2)</label>
+        <input class="at-input" type="text" name="recipient_country" maxlength="2" placeholder="DE" style="max-width:80px">
+      </div>
+      <div class="at-row">
+        <label class="at-label">Нотатки</label>
+        <input class="at-input" type="text" name="notes">
+      </div>
+    </div>
+
+    <div class="at-actions">
+      <button type="submit" class="at-btn-save">💾 Зберегти</button>
+      <a href="{{ cancel_url }}" class="at-btn-cancel">Скасувати</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

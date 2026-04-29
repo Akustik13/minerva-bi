@@ -4,6 +4,7 @@ shipping/admin.py — Адмін-панель модуля доставки
 import logging
 
 from django.contrib import admin, messages
+from django.db import models
 from core.mixins import AuditableMixin
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -59,6 +60,7 @@ def _copy_shipment_file_local(abs_path: str, shipment) -> None:
 from .models import (
     Carrier, Shipment, ShipmentPackage, PackagingMaterial, OrderPackaging,
     ProductPackaging, ShippingSettings, TrackingRule, TrackingAttemptLog,
+    AddressBook,
 )
 from .services.registry import get_service
 
@@ -909,6 +911,111 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     change_list_template = "admin/shipping/shipment_changelist.html"
 
+    def _build_addr_book_json(self):
+        """Build address book JSON: AddressBook entries + CRM customers, grouped by country."""
+        import json as _j
+        from collections import defaultdict as _dd
+
+        entries = []
+
+        # AddressBook entries (primary source)
+        for ab in AddressBook.objects.order_by('-use_count', 'name').values(
+            'pk', 'name', 'company', 'email', 'phone',
+            'addr_street', 'addr_city', 'addr_zip', 'addr_state', 'addr_country',
+            'category', 'is_sender',
+        ):
+            entries.append({
+                'pk':      ab['pk'],
+                'name':    ab['name'],
+                'company': ab['company'],
+                'email':   ab['email'],
+                'phone':   ab['phone'],
+                'street':  ab['addr_street'],
+                'city':    ab['addr_city'],
+                'zip':     ab['addr_zip'],
+                'state':   ab['addr_state'],
+                'country': ab['addr_country'] or 'XX',
+                'cat':     ab['category'],
+                'src':     'ab',
+                'is_sender': ab['is_sender'],
+            })
+
+        # CRM customers (supplement, if no matching email in AB)
+        ab_emails = {e['email'].lower() for e in entries if e['email']}
+        try:
+            from crm.models import Customer as _Cust
+            for c in (_Cust.objects
+                      .filter(status__in=['active', 'vip'])
+                      .exclude(addr_city='')
+                      .order_by('country', 'name')
+                      .values('name', 'company', 'email', 'phone',
+                              'addr_street', 'addr_city', 'addr_zip', 'addr_state', 'country')):
+                if c['email'] and c['email'].lower() in ab_emails:
+                    continue
+                entries.append({
+                    'pk':      None,
+                    'name':    c['name'],
+                    'company': c['company'],
+                    'email':   c['email'],
+                    'phone':   c['phone'],
+                    'street':  c['addr_street'],
+                    'city':    c['addr_city'],
+                    'zip':     c['addr_zip'],
+                    'state':   c['addr_state'],
+                    'country': c['country'] or 'XX',
+                    'cat':     'client',
+                    'src':     'crm',
+                    'is_sender': False,
+                })
+        except Exception:
+            pass
+
+        # Group by country
+        groups = _dd(list)
+        for e in entries:
+            groups[e['country']].append(e)
+        return _j.dumps(dict(groups), ensure_ascii=False)
+
+    def add_tracking_view(self, request):
+        """Minimal form to add a tracking number for a shipment created outside the system."""
+        import json as _j
+        if request.method == "POST":
+            carrier_id    = request.POST.get("carrier") or None
+            tracking      = request.POST.get("tracking_number", "").strip()
+            reference     = request.POST.get("reference", "").strip()
+            recipient_name = request.POST.get("recipient_name", "").strip()
+            recipient_country = request.POST.get("recipient_country", "").strip().upper()[:2]
+            notes         = request.POST.get("notes", "").strip()
+            if not tracking:
+                messages.error(request, "Номер трекінгу обов'язковий.")
+                return redirect(reverse("admin:shipping_shipment_add_tracking"))
+            carrier = None
+            if carrier_id:
+                try:
+                    carrier = Carrier.objects.get(pk=carrier_id)
+                except Carrier.DoesNotExist:
+                    pass
+            shipment = Shipment.objects.create(
+                carrier=carrier,
+                tracking_number=tracking,
+                reference=reference,
+                recipient_name=recipient_name,
+                recipient_country=recipient_country,
+                notes=notes,
+                status=Shipment.Status.IN_TRANSIT,
+                submitted_at=timezone.now(),
+            )
+            messages.success(request, f"✅ Відправлення #{shipment.pk} з трекінгом {tracking} додано.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        carriers = Carrier.objects.filter(is_active=True).order_by("-is_default", "name")
+        return render(request, "admin/shipping/add_tracking.html", {
+            **self.admin_site.each_context(request),
+            "title": "Додати трекінг",
+            "carriers": carriers,
+            "cancel_url": reverse("admin:shipping_shipment_changelist"),
+        })
+
     def get_urls(self):
         urls = super().get_urls()
         custom = [
@@ -1113,6 +1220,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.save_labels_to_docs_view),
                 name="shipping_shipment_save_labels_to_docs",
             ),
+            path(
+                "add-tracking/",
+                self.admin_site.admin_view(self.add_tracking_view),
+                name="shipping_shipment_add_tracking",
+            ),
         ]
         return custom + urls
 
@@ -1188,31 +1300,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             for c in carriers
         }
 
-        # Address book from CRM customers grouped by country
-        from crm.models import Customer as _Customer
-        from collections import defaultdict as _defaultdict
-        _cust_qs = (
-            _Customer.objects
-            .filter(status__in=['active', 'vip'])
-            .exclude(addr_city='')
-            .order_by('country', 'company', 'name')
-            .values('name', 'company', 'email', 'phone',
-                    'addr_street', 'addr_city', 'addr_zip', 'addr_state', 'country')
-        )
-        _addr_groups = _defaultdict(list)
-        for c in _cust_qs:
-            _addr_groups[c['country'] or 'XX'].append({
-                'name':    c['name'],
-                'company': c['company'],
-                'email':   c['email'],
-                'phone':   c['phone'],
-                'street':  c['addr_street'],
-                'city':    c['addr_city'],
-                'zip':     c['addr_zip'],
-                'state':   c['addr_state'],
-                'country': c['country'],
-            })
-        addr_book_json = _json.dumps(dict(_addr_groups), ensure_ascii=False)
+        addr_book_json = self._build_addr_book_json()
 
         shipment = Shipment()
         if carriers:
@@ -1346,6 +1434,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "pkg_rows_json":       _json.dumps(pkg_rows),
             "pkg_auto":            pkg_auto,
             "recent_recipients_json": _json.dumps(unique_recipients),
+            "addr_book_json":      self._build_addr_book_json(),
         })
 
     def _fill_packaging_from_order(self, shipment):
@@ -1778,6 +1867,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "title":                f"{'Виправити помилку' if is_error else 'Редагувати чернетку'} #{shipment.pk}",
             "pkg_rows_json":        _json2.dumps(pkg_rows_edit),
             "pkg_auto":             len(pkg_rows_edit) > 1 or (len(pkg_rows_edit) == 1 and pkg_rows_edit[0]["quantity"] > 1),
+            "addr_book_json":       self._build_addr_book_json(),
         })
 
     def _handle_edit_post(self, request, shipment, carriers):
@@ -5848,6 +5938,65 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(AddressBook)
+class AddressBookAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'company', 'cat_badge', 'addr_city', 'addr_country',
+                     'email', 'phone', 'is_sender', 'use_count')
+    list_filter   = ('category', 'addr_country', 'is_sender')
+    search_fields = ('name', 'company', 'email', 'addr_city', 'addr_zip')
+    list_editable = ('is_sender',)
+    ordering      = ('-use_count', 'name')
+
+    fieldsets = (
+        ('👤 Контакт', {
+            'fields': ('name', 'company', 'category', 'is_sender'),
+        }),
+        ('📮 Адреса', {
+            'fields': ('addr_street', ('addr_city', 'addr_zip'), ('addr_state', 'addr_country')),
+        }),
+        ('📞 Зв\'язок', {
+            'fields': ('email', 'phone'),
+        }),
+        ('📝 Нотатки', {
+            'fields': ('notes',),
+            'classes': ('collapse',),
+        }),
+    )
+    readonly_fields = ('use_count', 'created_at', 'updated_at')
+
+    @admin.display(description="Категорія")
+    def cat_badge(self, obj):
+        colors = {
+            'client':    ('#1565c0', '#bbdefb'),
+            'supplier':  ('#2e7d32', '#c8e6c9'),
+            'sender':    ('#e65100', '#ffe0b2'),
+            'warehouse': ('#4527a0', '#ede7f6'),
+            'other':     ('#424242', '#eeeeee'),
+        }
+        bg, fg = colors.get(obj.category, ('#424242', '#eeeeee'))
+        label = obj.get_category_display()
+        return format_html(
+            '<span style="background:{};color:{};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">'
+            '{}</span>', bg, fg, label
+        )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                '<int:pk>/use/',
+                self.admin_site.admin_view(self._use_view),
+                name='shipping_addressbook_use',
+            ),
+        ]
+        return custom + urls
+
+    def _use_view(self, request, pk):
+        if request.method == 'POST':
+            AddressBook.objects.filter(pk=pk).update(use_count=models.F('use_count') + 1)
+        return JsonResponse({'ok': True})
 
 
 _orig_shipping_app_index = admin.site.app_index

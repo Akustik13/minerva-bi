@@ -559,6 +559,50 @@ class TrackingRule(models.Model):
         return f"{self.get_carrier_type_display()}{prefix_info} → {self.get_tracker_display()} (p{self.priority})"
 
 
+class AddressBook(models.Model):
+    """Адресна книга відправлень — збережені адреси відправників та отримувачів."""
+
+    class Category(models.TextChoices):
+        CLIENT   = "client",    "Клієнт"
+        SUPPLIER = "supplier",  "Постачальник"
+        SENDER   = "sender",    "Відправник (склад)"
+        WAREHOUSE= "warehouse", "Склад/партнер"
+        OTHER    = "other",     "Інше"
+
+    name        = models.CharField("Ім'я", max_length=150)
+    company     = models.CharField("Компанія", max_length=150, blank=True, default="")
+    category    = models.CharField("Категорія", max_length=20,
+                                   choices=Category.choices, default=Category.CLIENT)
+    is_sender   = models.BooleanField("Відправник", default=False,
+                                      help_text="Позначити як типового відправника")
+    email       = models.EmailField("Email", blank=True, default="")
+    phone       = models.CharField("Телефон", max_length=30, blank=True, default="")
+    addr_street = models.CharField("Вулиця, будинок", max_length=200, blank=True, default="")
+    addr_city   = models.CharField("Місто", max_length=100, blank=True, default="")
+    addr_zip    = models.CharField("Поштовий індекс", max_length=20, blank=True, default="")
+    addr_state  = models.CharField("Штат / провінція", max_length=100, blank=True, default="")
+    addr_country= models.CharField("Країна (ISO 2)", max_length=2, blank=True, default="")
+    notes       = models.TextField("Нотатки", blank=True, default="")
+    use_count   = models.PositiveIntegerField("Використань", default=0)
+    created_at  = models.DateTimeField("Створено", auto_now_add=True)
+    updated_at  = models.DateTimeField("Оновлено", auto_now=True)
+
+    class Meta:
+        ordering = ["-use_count", "name"]
+        verbose_name = "Адреса"
+        verbose_name_plural = "Адресна книга"
+
+    def __str__(self):
+        parts = [self.name]
+        if self.company:
+            parts.append(self.company)
+        if self.addr_city:
+            parts.append(self.addr_city)
+        if self.addr_country:
+            parts.append(self.addr_country)
+        return " · ".join(parts)
+
+
 class TrackingAttemptLog(models.Model):
     """Журнал спроб трекінгу — хто що пробував і з яким результатом."""
 
