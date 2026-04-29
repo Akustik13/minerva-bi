@@ -1188,25 +1188,31 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             for c in carriers
         }
 
-        # Recent recipients for address book
-        recent_recipients = list(
-            Shipment.objects.exclude(recipient_name='').order_by('-created_at')
-            .values(
-                'recipient_name', 'recipient_company',
-                'recipient_street', 'recipient_city',
-                'recipient_zip', 'recipient_state', 'recipient_country',
-                'recipient_phone', 'recipient_email',
-            )[:60]
+        # Address book from CRM customers grouped by country
+        from crm.models import Customer as _Customer
+        from collections import defaultdict as _defaultdict
+        _cust_qs = (
+            _Customer.objects
+            .filter(status__in=['active', 'vip'])
+            .exclude(addr_city='')
+            .order_by('country', 'company', 'name')
+            .values('name', 'company', 'email', 'phone',
+                    'addr_street', 'addr_city', 'addr_zip', 'addr_state', 'country')
         )
-        seen = set()
-        unique_recipients = []
-        for r in recent_recipients:
-            key = (r['recipient_name'].lower(), r['recipient_country'].upper())
-            if key not in seen:
-                seen.add(key)
-                unique_recipients.append(r)
-            if len(unique_recipients) >= 20:
-                break
+        _addr_groups = _defaultdict(list)
+        for c in _cust_qs:
+            _addr_groups[c['country'] or 'XX'].append({
+                'name':    c['name'],
+                'company': c['company'],
+                'email':   c['email'],
+                'phone':   c['phone'],
+                'street':  c['addr_street'],
+                'city':    c['addr_city'],
+                'zip':     c['addr_zip'],
+                'state':   c['addr_state'],
+                'country': c['country'],
+            })
+        addr_book_json = _json.dumps(dict(_addr_groups), ensure_ascii=False)
 
         shipment = Shipment()
         if carriers:
@@ -1226,7 +1232,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'title':                'Нове відправлення',
             'pkg_rows_json':        '[]',
             'pkg_auto':             False,
-            'recent_recipients_json': _json.dumps(unique_recipients),
+            'addr_book_json':       addr_book_json,
             'cancel_url':           reverse('admin:shipping_shipment_changelist'),
         })
 
