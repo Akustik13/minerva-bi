@@ -399,7 +399,7 @@ class LocationAdmin(admin.ModelAdmin):
 @admin.register(InventoryTransaction)
 class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
     list_display  = ("tx_type", "signed_qty", "product", "location",
-                     "ref_doc", "tx_date", "created_at")
+                     "ref_doc", "tx_date", "created_at", "performer_col")
     search_fields = ("product__sku", "ref_doc", "external_key")
     list_filter   = ("tx_type", "location__code", "product__category")
     date_hierarchy = "created_at"
@@ -416,6 +416,37 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         if not getattr(obj, "external_key", None):
             obj.external_key = f"manual:{uuid.uuid4()}"
         super().save_model(request, obj, form, change)
+
+    def changelist_view(self, request, extra_context=None):
+        self._performer_map = {}
+        response = super().changelist_view(request, extra_context)
+        try:
+            cl = response.context_data.get('cl')
+            pks = [obj.pk for obj in cl.queryset]
+            if pks:
+                from core.models import AuditLog
+                from django.contrib.contenttypes.models import ContentType
+                ct = ContentType.objects.get_for_model(InventoryTransaction)
+                for entry in AuditLog.objects.filter(
+                    content_type=ct,
+                    object_id__in=[str(pk) for pk in pks],
+                    action='create',
+                ).values('object_id', 'user__username', 'user__first_name', 'user__last_name'):
+                    uname = (
+                        f"{entry['user__first_name']} {entry['user__last_name']}".strip()
+                        or entry['user__username'] or ''
+                    )
+                    self._performer_map[int(entry['object_id'])] = uname
+        except Exception:
+            pass
+        return response
+
+    @admin.display(description="Виконавець")
+    def performer_col(self, obj):
+        name = getattr(self, '_performer_map', {}).get(obj.pk, '')
+        if name:
+            return format_html('<span style="color:#42a5f5;font-weight:600">{}</span>', name)
+        return format_html('<span style="color:var(--text-dim,#607d8b);font-size:11px">⚙️ Система</span>')
 
 
 class ProductComponentInline(admin.TabularInline):
@@ -754,6 +785,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         if not obj.pk:
             return mark_safe('<span style="color:var(--text-dim,#607d8b)">Збережіть товар спочатку</span>')
 
+        from django.utils.timezone import localtime as _localtime
         txs = list(
             InventoryTransaction.objects.filter(product=obj)
             .select_related('location')
@@ -761,6 +793,25 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         )
         if not txs:
             return mark_safe('<span style="color:var(--text-dim,#607d8b)">Транзакцій немає</span>')
+
+        # ── Batch-fetch AuditLog performer ─────────────────────────────────────
+        audit_user_map: dict = {}
+        try:
+            from core.models import AuditLog
+            from django.contrib.contenttypes.models import ContentType
+            inv_ct = ContentType.objects.get_for_model(InventoryTransaction)
+            for entry in AuditLog.objects.filter(
+                content_type=inv_ct,
+                object_id__in=[str(tx.pk) for tx in txs],
+                action='create',
+            ).values('object_id', 'user__username', 'user__first_name', 'user__last_name'):
+                uname = (
+                    f"{entry['user__first_name']} {entry['user__last_name']}".strip()
+                    or entry['user__username'] or ''
+                )
+                audit_user_map[int(entry['object_id'])] = uname
+        except Exception:
+            pass
 
         # ── Batch-fetch related SalesOrders ────────────────────────────────────
         so_keys = set()
@@ -848,8 +899,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             else:
                 doc_html = f'<span style="font-size:11px;opacity:.65">{tx.ref_doc or ek[:40]}</span>'
 
-            date_str = tx.tx_date.strftime('%d.%m.%Y') if tx.tx_date else '—'
+            date_str = _localtime(tx.tx_date).strftime('%d.%m.%Y %H:%M') if tx.tx_date else '—'
             loc = tx.location.code if tx.location_id else '—'
+            _op = audit_user_map.get(tx.pk, '')
+            if _op:
+                op_html = f'<span style="font-size:11px;color:#42a5f5;font-weight:600">{_op}</span>'
+            else:
+                op_html = '<span style="font-size:10px;color:var(--text-dim,#607d8b)">⚙️ Система</span>'
 
             rows.append(
                 f'<tr style="border-bottom:1px solid rgba(128,128,128,.1)">'
@@ -861,6 +917,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 f'<b style="color:{color};font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap">{qty_str}</b></td>'
                 f'<td style="padding:5px 10px">{doc_html}</td>'
                 f'<td style="padding:5px 10px">{who_html}</td>'
+                f'<td style="padding:5px 10px">{op_html}</td>'
                 f'<td style="padding:5px 10px;font-size:11px;color:var(--text-muted,#9aafbe)">{loc}</td>'
                 f'</tr>'
             )
@@ -887,6 +944,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             f'color:var(--text-muted,#9aafbe)">Документ</th>'
             f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
             f'color:var(--text-muted,#9aafbe)">Клієнт / Постачальник</th>'
+            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
+            f'color:var(--text-muted,#9aafbe)">Виконавець</th>'
             f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
             f'color:var(--text-muted,#9aafbe)">Локація</th>'
             f'</tr></thead>'
@@ -933,6 +992,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         from django.template.response import TemplateResponse
         from django.core.exceptions import PermissionDenied
         from django.db.models import Q as _Q
+        from django.utils.timezone import localtime
 
         obj = get_object_or_404(Product, pk=object_id)
         if not self.has_view_or_change_permission(request, obj):
@@ -1051,7 +1111,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 operator = audit_user_map.get(tx.pk, '⚙️ Система')
 
             rows.append({
-                'date':      tx.tx_date.strftime('%d.%m.%Y %H:%M') if tx.tx_date else '—',
+                'date':      localtime(tx.tx_date).strftime('%d.%m.%Y %H:%M') if tx.tx_date else '—',
                 'label':     label,
                 'color':     color,
                 'qty_str':   qty_str,
