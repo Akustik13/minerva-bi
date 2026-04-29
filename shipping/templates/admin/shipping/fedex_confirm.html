@@ -252,8 +252,53 @@
       onclick="return confirm('Відправити через FedEx API?\n\nСервіс: {{ service_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі FedEx і списано кошти з акаунту.')">
       🟣 Підтвердити і відправити через FedEx
     </button>
+    <button type="button" class="btn-back" id="btn-fedex-dry-run" onclick="fedexDryRun()">
+      🔍 Переглянути тіло запиту
+    </button>
     <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
   </div>
 
+  <!-- FedEx Debug JSON panel -->
+  <div id="fedex-dry-panel" style="display:none;margin-top:16px">
+    <div class="fc-card">
+      <div class="fc-head" style="justify-content:space-between">
+        <span>📋 FedEx API Request Body (dry run — не відправляється)</span>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn-back" onclick="fedexCopyPayload()" style="padding:4px 10px;font-size:12px">📋 Копіювати</button>
+          <button type="button" class="btn-back" onclick="document.getElementById('fedex-dry-panel').style.display='none'" style="padding:4px 10px;font-size:12px">✕</button>
+        </div>
+      </div>
+      <pre id="fedex-dry-json" style="margin:0;padding:12px;overflow:auto;max-height:500px;font-size:12px;line-height:1.4;white-space:pre-wrap">Завантаження…</pre>
+    </div>
+  </div>
+
 </div>
+<script>
+var _fedexDryPayload = '';
+function fedexDryRun() {
+  var panel = document.getElementById('fedex-dry-panel');
+  var pre   = document.getElementById('fedex-dry-json');
+  panel.style.display = 'block';
+  pre.textContent = 'Завантаження…';
+  var url = '{% url "admin:shipping_shipment_fedex_dry_run" shipment.pk %}?service_code={{ service_code }}';
+  fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        _fedexDryPayload = JSON.stringify(d.payload, null, 2);
+        pre.textContent = _fedexDryPayload;
+      } else {
+        pre.textContent = '❌ ' + (d.error || 'Помилка');
+      }
+    })
+    .catch(function(e){ pre.textContent = '❌ ' + e; });
+}
+function fedexCopyPayload() {
+  if (!_fedexDryPayload) return;
+  navigator.clipboard.writeText(_fedexDryPayload).then(function(){
+    var btn = document.querySelector('#fedex-dry-panel button');
+    if (btn) { var t = btn.textContent; btn.textContent = '✅ Скопійовано'; setTimeout(function(){ btn.textContent = t; }, 1500); }
+  });
+}
+</script>
 {% endblock %}

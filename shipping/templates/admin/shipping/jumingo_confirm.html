@@ -323,7 +323,24 @@
       onclick="return confirm('Відправити дані на Jumingo API?\n\nПісля підтвердження відправлення буде створено на Jumingo.')">
       ✅ Підтвердити і відправити на Jumingo
     </button>
+    <button type="button" class="btn-back" onclick="jcDryRun()">
+      🔍 Переглянути тіло запиту
+    </button>
     <a href="{{ back_url }}" class="btn-back">← Назад до тарифів</a>
+  </div>
+
+  <!-- Jumingo Debug JSON panel -->
+  <div id="jc-dry-panel" style="display:none;margin-top:16px">
+    <div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;overflow:hidden">
+      <div style="padding:10px 14px;background:var(--bg-input);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:600">📋 Jumingo API Request Body (dry run — не відправляється)</span>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn-back" onclick="jcCopyPayload()" style="padding:4px 10px;font-size:12px">📋 Копіювати</button>
+          <button type="button" class="btn-back" onclick="document.getElementById('jc-dry-panel').style.display='none'" style="padding:4px 10px;font-size:12px">✕</button>
+        </div>
+      </div>
+      <pre id="jc-dry-json" style="margin:0;padding:12px;overflow:auto;max-height:500px;font-size:12px;line-height:1.4;white-space:pre-wrap"></pre>
+    </div>
   </div>
 
 </div>
@@ -373,4 +390,20 @@
 })();
 </script>
 {% endif %}
+<script>
+var _jcPayload = {{ payload_json|safe }};
+var _jcPayloadStr = JSON.stringify(_jcPayload, null, 2);
+function jcDryRun() {
+  var panel = document.getElementById('jc-dry-panel');
+  var pre   = document.getElementById('jc-dry-json');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  pre.textContent = _jcPayloadStr;
+}
+function jcCopyPayload() {
+  navigator.clipboard.writeText(_jcPayloadStr).then(function(){
+    var btn = document.querySelector('#jc-dry-panel button');
+    if (btn) { var t = btn.textContent; btn.textContent = '✅ Скопійовано'; setTimeout(function(){ btn.textContent = t; }, 1500); }
+  });
+}
+</script>
 {% endblock %}

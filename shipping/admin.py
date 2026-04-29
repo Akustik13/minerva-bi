@@ -1084,6 +1084,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_ups_void",
             ),
             path(
+                "<int:shipment_id>/dhl-dry-run/",
+                self.admin_site.admin_view(self.dhl_dry_run_view),
+                name="shipping_shipment_dhl_dry_run",
+            ),
+            path(
+                "<int:shipment_id>/fedex-dry-run/",
+                self.admin_site.admin_view(self.fedex_dry_run_view),
+                name="shipping_shipment_fedex_dry_run",
+            ),
+            path(
                 "<int:shipment_id>/fedex-confirm/",
                 self.admin_site.admin_view(self.fedex_confirm_view),
                 name="shipping_shipment_fedex_confirm",
@@ -2795,11 +2805,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         while default_pickup.weekday() >= 5:
             default_pickup += timedelta(days=1)
 
+        import json as _json
+        payload_json = _json.dumps(payload, indent=2, ensure_ascii=False)
+
         return render(request, "admin/shipping/jumingo_confirm.html", {
             **self.admin_site.each_context(request),
             "title":    f"Підтвердити відправлення #{shipment.pk}",
             "shipment": shipment,
             "payload":  payload,
+            "payload_json": payload_json,
             "from_address":    payload.get("from_address", {}),
             "to_address":      payload.get("to_address", {}),
             "packages":        payload.get("packages", []),
@@ -2987,6 +3001,59 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             )
             return JsonResponse({'ok': True, 'payload': payload}, json_dumps_params={'indent': 2, 'ensure_ascii': False})
         except UPSError as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+    def dhl_dry_run_view(self, request, shipment_id):
+        """GET — build DHL shipment payload without sending. Returns JSON for debug."""
+        from django.http import JsonResponse
+        from .services.dhl import create_shipment as dhl_create
+
+        shipment     = get_object_or_404(Shipment, pk=shipment_id)
+        product_code = request.GET.get('product_code', '').strip() or 'P'
+        request_pickup = request.GET.get('pickup', '0') == '1'
+
+        dhl_carrier = shipment.carrier
+        try:
+            payload = dhl_create(
+                carrier        = dhl_carrier,
+                shipment       = shipment,
+                product_code   = product_code,
+                request_pickup = request_pickup,
+                dry_run        = True,
+            )
+            return JsonResponse({'ok': True, 'payload': payload}, json_dumps_params={'indent': 2, 'ensure_ascii': False})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+    def fedex_dry_run_view(self, request, shipment_id):
+        """GET — build FedEx shipment payload without sending. Returns JSON for debug."""
+        from django.http import JsonResponse
+        from .fedex_client import FedExClient, FedExError
+
+        shipment     = get_object_or_404(Shipment, pk=shipment_id)
+        service_code = request.GET.get('service_code', 'FEDEX_PRIORITY').strip() or 'FEDEX_PRIORITY'
+
+        shipper  = self._ups_extract_shipper(shipment)
+        to_addr  = self._ups_extract_address(shipment)
+        packages = self._ups_extract_packages(shipment)
+        customs  = self._ups_extract_customs(shipment)
+        is_intl  = (to_addr.get('country', 'DE').upper() != (shipper.get('country') or 'DE').upper())
+
+        try:
+            client  = FedExClient(carrier=shipment.carrier)
+            payload = client.create_shipment(
+                to_address   = to_addr,
+                packages     = packages,
+                service_code = service_code,
+                from_address = shipper,
+                customs_info = customs if is_intl else None,
+                reference    = str(shipment.reference or shipment.pk),
+                dry_run      = True,
+            )
+            return JsonResponse({'ok': True, 'payload': payload}, json_dumps_params={'indent': 2, 'ensure_ascii': False})
+        except FedExError as e:
             return JsonResponse({'ok': False, 'error': str(e)}, status=400)
         except Exception as e:
             return JsonResponse({'ok': False, 'error': str(e)}, status=500)

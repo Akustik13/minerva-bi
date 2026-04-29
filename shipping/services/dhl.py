@@ -313,7 +313,8 @@ def create_shipment(carrier, shipment, product_code: str,
                     pickup_ready_time: str = "09:00",
                     pickup_close_time: str = "18:00",
                     pickup_location: str = "reception",
-                    include_customs: bool | None = None) -> dict:
+                    include_customs: bool | None = None,
+                    dry_run: bool = False) -> dict:
     """
     POST /shipments — створює відправлення DHL Express.
 
@@ -527,6 +528,9 @@ def create_shipment(carrier, shipment, product_code: str,
                 "additionalCharges": [],
                 "placeOfIncoterm":   _scity or "Frankfurt",
             }
+
+    if dry_run:
+        return payload
 
     try:
         from tabele.api_logger import logged_request

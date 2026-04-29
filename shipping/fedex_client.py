@@ -356,7 +356,8 @@ class FedExClient:
                         service_code: str = 'INTERNATIONAL_ECONOMY',
                         from_address: dict = None,
                         customs_info: dict = None,
-                        reference: str = '') -> dict:
+                        reference: str = '',
+                        dry_run: bool = False) -> dict:
         """
         POST /ship/v1/shipments
         Повертає: {tracking_number, master_tracking, label_base64, label_format,
@@ -422,6 +423,9 @@ class FedExClient:
             'requestedShipment':      requested_shipment,
             'accountNumber':          {'value': self.carrier.connection_uuid},
         }
+
+        if dry_run:
+            return payload
 
         data = self._post('/ship/v1/shipments', payload)
         return self._parse_shipment_response(data, service_code, label_format)

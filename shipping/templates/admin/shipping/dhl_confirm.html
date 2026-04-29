@@ -351,7 +351,24 @@
       onclick="return confirm('Відправити через DHL API?\n\nПродукт: {{ product_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі DHL.')">
       🟡 Підтвердити і відправити через DHL
     </button>
+    <button type="button" class="btn-back" id="btn-dhl-dry-run" onclick="dhlDryRun()">
+      🔍 Переглянути тіло запиту
+    </button>
     <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
+  </div>
+
+  <!-- DHL Debug JSON panel -->
+  <div id="dhl-dry-panel" style="display:none;margin-top:16px">
+    <div class="dc-card">
+      <div class="dc-head" style="justify-content:space-between">
+        <span>📋 DHL API Request Body (dry run — не відправляється)</span>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn-back" onclick="dhlCopyPayload()" style="padding:4px 10px;font-size:12px">📋 Копіювати</button>
+          <button type="button" class="btn-back" onclick="document.getElementById('dhl-dry-panel').style.display='none'" style="padding:4px 10px;font-size:12px">✕</button>
+        </div>
+      </div>
+      <pre id="dhl-dry-json" style="margin:0;padding:12px;overflow:auto;max-height:500px;font-size:12px;line-height:1.4;white-space:pre-wrap">Завантаження…</pre>
+    </div>
   </div>
 
 </div>
@@ -394,5 +411,33 @@
   rT.addEventListener('input',function(){ upd(rT); });
   upd(null);
 })();
+</script>
+<script>
+var _dhlDryPayload = '';
+function dhlDryRun() {
+  var panel = document.getElementById('dhl-dry-panel');
+  var pre   = document.getElementById('dhl-dry-json');
+  panel.style.display = 'block';
+  pre.textContent = 'Завантаження…';
+  var url = '{% url "admin:shipping_shipment_dhl_dry_run" shipment.pk %}?product_code={{ product_code|urlencode }}&pickup=0';
+  fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        _dhlDryPayload = JSON.stringify(d.payload, null, 2);
+        pre.textContent = _dhlDryPayload;
+      } else {
+        pre.textContent = '❌ ' + (d.error || 'Помилка');
+      }
+    })
+    .catch(function(e){ pre.textContent = '❌ ' + e; });
+}
+function dhlCopyPayload() {
+  if (!_dhlDryPayload) return;
+  navigator.clipboard.writeText(_dhlDryPayload).then(function(){
+    var btn = document.querySelector('#dhl-dry-panel button');
+    if (btn) { var t = btn.textContent; btn.textContent = '✅ Скопійовано'; setTimeout(function(){ btn.textContent = t; }, 1500); }
+  });
+}
 </script>
 {% endblock %}
