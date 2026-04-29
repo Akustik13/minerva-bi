@@ -169,9 +169,14 @@ IMPORT_FIELDS = {
         ('source',            'Джерело замовлення',      False),
         ('order_date',        'Дата замовлення',         False),
         ('status',            'Статус',                  False),
-        ('client',            'Клієнт',                  False),
-        ('email',             'Email',                   False),
-        ('phone',             'Телефон',                 False),
+        ('client',            'Клієнт (білінг)',          False),
+        ('contact_name',      'Контактна особа (білінг)',False),
+        ('email',             'Email (білінг)',           False),
+        ('phone',             'Телефон (білінг)',         False),
+        ('ship_name',         "Ім'я отримувача",         False),
+        ('ship_company',      'Компанія отримувача',     False),
+        ('ship_phone',        'Телефон доставки',        False),
+        ('ship_email',        'Email доставки',          False),
         ('unit_price',        'Ціна за одиницю',         False),
         ('currency',          'Валюта',                  False),
         ('shipping_courier',  'Перевізник',              False),
@@ -233,9 +238,14 @@ def import_sales(df: pd.DataFrame, source: str = 'auto', conflict_strategy: str 
     order_col    = rc('order_number',      ['order_number', 'sales order', 'order number', 'order', 'замовлення'])
     date_col     = rc('order_date',        ['order_date', 'order date', 'date', 'дата'])
     status_col   = rc('status',            ['status', 'статус'])
-    client_col   = rc('client',            ['client', 'customer', 'клієнт'])
-    email_col    = rc('email',             ['email'])
-    phone_col    = rc('phone',             ['phone', 'телефон'])
+    client_col      = rc('client',       ['client', 'customer', 'клієнт'])
+    contact_col     = rc('contact_name', ['contact_name', 'contact', 'контактна особа', 'контакт'])
+    email_col       = rc('email',        ['email'])
+    phone_col       = rc('phone',        ['phone', 'телефон'])
+    ship_name_col   = rc('ship_name',    ['ship_name', 'recipient', 'recipient name', 'отримувач'])
+    ship_company_col= rc('ship_company', ['ship_company', 'recipient company', 'компанія отримувача'])
+    ship_phone_col  = rc('ship_phone',   ['ship_phone', 'recipient phone', 'телефон доставки'])
+    ship_email_col  = rc('ship_email',   ['ship_email', 'recipient email', 'email доставки'])
     source_col   = rc('source',            ['source', 'джерело'])
     ship_col     = rc('shipped_at',        ['shipped_at', 'shipping', 'відправлено'])
     courier_col  = rc('shipping_courier',  ['shipping_courier', 'courier', 'перевізник'])
@@ -263,8 +273,13 @@ def import_sales(df: pd.DataFrame, source: str = 'auto', conflict_strategy: str 
     last_courier      = ''
     last_tracking     = ''
     last_client       = ''
+    last_contact      = ''
     last_email        = ''
     last_phone        = ''
+    last_ship_name    = ''
+    last_ship_company = ''
+    last_ship_phone   = ''
+    last_ship_email   = ''
     last_deadline     = None
     last_addr         = ''
     last_street       = ''
@@ -320,9 +335,14 @@ def import_sales(df: pd.DataFrame, source: str = 'auto', conflict_strategy: str 
             last_ship_date = _inherit_dt(row.get(ship_col) if ship_col else None, last_ship_date)
             last_courier   = _inherit_str(row.get(courier_col) if courier_col else None, last_courier)
             last_tracking  = _inherit_str(row.get(tracking_col) if tracking_col else None, last_tracking)
-            last_client    = _inherit_str(row.get(client_col) if client_col else None, last_client)
-            last_email     = _inherit_str(row.get(email_col) if email_col else None, last_email)
-            last_phone     = _inherit_str(row.get(phone_col) if phone_col else None, last_phone)
+            last_client       = _inherit_str(row.get(client_col)       if client_col       else None, last_client)
+            last_contact      = _inherit_str(row.get(contact_col)     if contact_col      else None, last_contact)
+            last_email        = _inherit_str(row.get(email_col)       if email_col        else None, last_email)
+            last_phone        = _inherit_str(row.get(phone_col)       if phone_col        else None, last_phone)
+            last_ship_name    = _inherit_str(row.get(ship_name_col)   if ship_name_col    else None, last_ship_name)
+            last_ship_company = _inherit_str(row.get(ship_company_col)if ship_company_col else None, last_ship_company)
+            last_ship_phone   = _inherit_str(row.get(ship_phone_col)  if ship_phone_col   else None, last_ship_phone)
+            last_ship_email   = _inherit_str(row.get(ship_email_col)  if ship_email_col   else None, last_ship_email)
             last_deadline  = _inherit_date(row.get(deadline_col) if deadline_col else None, last_deadline)
             last_addr      = _inherit_str(row.get(addr_col) if addr_col else None, last_addr)
             last_street    = _inherit_str(row.get(street_col) if street_col else None, last_street)
@@ -346,8 +366,13 @@ def import_sales(df: pd.DataFrame, source: str = 'auto', conflict_strategy: str 
                         'status':           last_status,
                         'affects_stock':    last_affects,
                         'client':           last_client,
+                        'contact_name':     last_contact,
                         'email':            last_email,
                         'phone':            last_phone,
+                        'ship_name':        last_ship_name,
+                        'ship_company':     last_ship_company,
+                        'ship_phone':       last_ship_phone,
+                        'ship_email':       last_ship_email,
                         'shipping_deadline':last_deadline,
                         'shipping_address': last_addr,
                         'addr_street':      last_street,

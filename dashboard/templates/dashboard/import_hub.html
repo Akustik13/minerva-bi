@@ -100,15 +100,20 @@
       <a href="/admin/sales/salesorder/import-excel/" class="imp-btn imp-btn-primary">⬆️ Відкрити wizard</a>
       <a href="/dashboard/import-template/sales/" class="imp-btn imp-btn-secondary">📄 Шаблон .xlsx</a>
       <details class="imp-fields">
-        <summary>▶ Колонки файлу (24 поля)</summary>
+        <summary>▶ Колонки файлу (28 полів)</summary>
         <div class="imp-fields-body">
           <span class="imp-field-item imp-field-req">order_number ✱</span>
           <span class="imp-field-item imp-field-req">source ✱</span>
           <span class="imp-field-item">order_date</span>
           <span class="imp-field-item">status</span>
-          <span class="imp-field-item">client</span>
-          <span class="imp-field-item">email</span>
-          <span class="imp-field-item">phone</span>
+          <span class="imp-field-item" title="Білінг: компанія/особа замовника">client</span>
+          <span class="imp-field-item" title="Білінг: контактна особа">contact_name</span>
+          <span class="imp-field-item" title="Білінг: email замовника">email</span>
+          <span class="imp-field-item" title="Білінг: телефон замовника">phone</span>
+          <span class="imp-field-item" style="color:var(--accent)" title="Отримувач посилки (може відрізнятись від клієнта)">ship_name</span>
+          <span class="imp-field-item" style="color:var(--accent)" title="Компанія отримувача">ship_company</span>
+          <span class="imp-field-item" style="color:var(--accent)" title="Телефон доставки">ship_phone</span>
+          <span class="imp-field-item" style="color:var(--accent)" title="Email доставки">ship_email</span>
           <span class="imp-field-item">addr_street</span>
           <span class="imp-field-item">addr_city</span>
           <span class="imp-field-item">addr_zip</span>
