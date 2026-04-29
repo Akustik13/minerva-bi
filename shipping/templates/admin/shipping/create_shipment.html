@@ -1368,7 +1368,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="sh-field full">
           <label class="sh-label">Референс (друкується на етикетці)</label>
           <input class="sh-input" type="text" name="reference"
-            value="{{ shipment.reference|default:order.order_number|default:'' }}">
+            value="{% if shipment.reference %}{{ shipment.reference }}{% elif order %}{{ order.order_number }}{% endif %}">
         </div>
       </div>
     </div>
