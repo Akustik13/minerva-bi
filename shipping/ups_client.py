@@ -352,7 +352,7 @@ class UPSClient:
         account = self._default_shipper()                   # carrier account (billing, always DE)
         shipment = {
             'Shipper': {
-                'Name':          account.get('name', 'Shipper'),
+                'Name':          account.get('company') or account.get('name', 'Shipper'),
                 'ShipperNumber': self.carrier.connection_uuid,
                 'Address':       self._fmt_addr(account),
             },
@@ -1007,7 +1007,8 @@ class UPSClient:
     def _default_shipper(self) -> dict:
         c = self.carrier
         return {
-            'name':         c.sender_name or c.sender_company or '',
+            'name':         c.sender_name or '',
+            'company':      c.sender_company or '',
             'address_line': c.sender_street or '',
             'city':         c.sender_city or '',
             'state':        c.sender_state or '',
