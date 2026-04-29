@@ -1,4 +1,21 @@
-"""core/utils.py — Role permissions + AI prompt builder."""
+"""core/utils.py — Role permissions + AI prompt builder + thread-local user."""
+import threading as _threading
+
+_current_user_local = _threading.local()
+
+
+def set_current_user(user):
+    """Store current HTTP request user for use in signals/async code."""
+    _current_user_local.user = user
+
+
+def get_current_user():
+    """Return the user stored by set_current_user(), or None."""
+    return getattr(_current_user_local, 'user', None)
+
+
+def clear_current_user():
+    _current_user_local.user = None
 
 ROLE_DEFAULTS = {
     'superadmin': {

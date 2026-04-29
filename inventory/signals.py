@@ -64,6 +64,12 @@ def update_inventory_on_purchase_receipt(sender, instance, created, **kwargs):
     # qty must always be positive; tx_type determines direction
     tx_type = InventoryTransaction.TxType.INCOMING if delta > 0 else InventoryTransaction.TxType.OUTGOING
 
+    try:
+        from core.utils import get_current_user
+        _performer = get_current_user()
+    except Exception:
+        _performer = None
+
     InventoryTransaction.objects.create(
         external_key=f"po:{instance.purchase_order.code}:line:{instance.pk}:{uuid.uuid4()}",
         tx_type=tx_type,
@@ -72,28 +78,48 @@ def update_inventory_on_purchase_receipt(sender, instance, created, **kwargs):
         location=location,
         ref_doc=f"PO-{instance.purchase_order.code}",
         tx_date=timezone.now(),
+        performed_by=_performer,
     )
 
 
-def _deduct_line(line, order, location):
+def _deduct_line(line, order, location, tx_type=None):
     """
-    Внутрішня функція: списати один рядок замовлення зі складу.
+    Внутрішня функція: створити транзакцію для рядка замовлення.
+    tx_type = OUTGOING (фактичне списання) або RESERVED (бронювання).
     Повертає True якщо транзакція створена, False — якщо вже існує.
     """
+    if tx_type is None:
+        tx_type = InventoryTransaction.TxType.OUTGOING
+
     external_key_prefix = f"so:{order.source}:{order.order_number}:line:{line.pk}:"
-    if InventoryTransaction.objects.filter(
+    existing = InventoryTransaction.objects.filter(
         external_key__startswith=external_key_prefix
-    ).exists():
-        return False  # вже списано
+    ).first()
+
+    if existing:
+        # Якщо є резерв і тепер треба списати — конвертуємо
+        if (existing.tx_type == InventoryTransaction.TxType.RESERVED
+                and tx_type == InventoryTransaction.TxType.OUTGOING):
+            existing.tx_type = InventoryTransaction.TxType.OUTGOING
+            existing.save(update_fields=['tx_type'])
+            return True
+        return False  # вже є потрібна транзакція
+
+    try:
+        from core.utils import get_current_user
+        _performer = get_current_user()
+    except Exception:
+        _performer = None
 
     InventoryTransaction.objects.create(
         external_key=f"so:{order.source}:{order.order_number}:line:{line.pk}:{uuid.uuid4()}",
-        tx_type=InventoryTransaction.TxType.OUTGOING,
-        qty=-abs(line.qty),  # негативне значення зменшує залишок через Sum("qty")
+        tx_type=tx_type,
+        qty=-abs(line.qty),
         product=line.product,
         location=location,
         ref_doc=f"SO-{order.source}:{order.order_number}",
         tx_date=order.order_date or timezone.now(),
+        performed_by=_performer,
     )
     return True
 
@@ -161,8 +187,8 @@ def _capture_sales_order_old_status(sender, instance, **kwargs):
 
 def _salesorder_post_save(sender, instance, created, **kwargs):
     """
-    SHIPPED та DELIVERED: списання при зміні статусу замовлення.
-    CREATION: НЕ обробляється тут — дивись _salesorderline_post_save.
+    SHIPPED / DELIVERED: списання або конвертація резервів при зміні статусу.
+    CREATION mode обробляється в _salesorderline_post_save.
     """
     if not instance.affects_stock:
         return
@@ -172,30 +198,26 @@ def _salesorder_post_save(sender, instance, created, **kwargs):
     except Exception:
         return
 
-    deduct_on = settings.deduct_on
+    deduct_on       = settings.deduct_on
+    use_reservation = getattr(settings, 'use_reservation', False)
+    old_status      = getattr(instance, '_old_status', None)
+    just_shipped    = (not created and instance.status == 'shipped' and old_status != 'shipped')
+    just_delivered  = (not created and instance.status == 'delivered' and old_status != 'delivered')
 
-    should_deduct = False
-    if deduct_on == InventorySettings.DeductOn.SHIPPED and not created:
-        old = getattr(instance, '_old_status', None)
-        if instance.status == 'shipped' and old != 'shipped':
+    should_deduct         = False
+    should_convert_reserv = False
+
+    if just_shipped:
+        if use_reservation:
+            # Convert any existing RESERVED → OUTGOING
+            should_convert_reserv = True
+        if deduct_on == InventorySettings.DeductOn.SHIPPED and not use_reservation:
             should_deduct = True
-    elif deduct_on == InventorySettings.DeductOn.DELIVERED and not created:
-        old = getattr(instance, '_old_status', None)
-        if instance.status == 'delivered' and old != 'delivered':
-            should_deduct = True
 
-    if not should_deduct:
-        return
+    if just_delivered and deduct_on == InventorySettings.DeductOn.DELIVERED and not use_reservation:
+        should_deduct = True
 
-    # Ідемпотентність: якщо хоч один рядок вже списаний — пропускаємо
-    existing_prefix = f"so:{instance.source}:{instance.order_number}:line:"
-    if InventoryTransaction.objects.filter(
-        external_key__startswith=existing_prefix
-    ).exists():
-        logger.info(
-            "Inventory: order %s:%s already deducted — skipping",
-            instance.source, instance.order_number
-        )
+    if not should_deduct and not should_convert_reserv:
         return
 
     try:
@@ -204,30 +226,56 @@ def _salesorder_post_save(sender, instance, created, **kwargs):
         logger.error("Inventory: cannot get/create location: %s", e)
         return
 
-    count = 0
-    for line in instance.lines.all():
-        if line.qty > 0:
-            try:
-                if _deduct_line(line, instance, location):
-                    count += 1
-            except Exception as e:
-                logger.error(
-                    "Inventory: failed to deduct line %s for order %s:%s — %s",
-                    line.pk, instance.source, instance.order_number, e
-                )
+    existing_prefix = f"so:{instance.source}:{instance.order_number}:line:"
 
-    if count:
-        logger.info(
-            "Inventory: deducted %d lines for order %s:%s (trigger: %s)",
-            count, instance.source, instance.order_number,
-            InventorySettings.get().deduct_on,
-        )
+    if should_convert_reserv:
+        # Convert RESERVED → OUTGOING (idempotent: re-run is safe)
+        count = InventoryTransaction.objects.filter(
+            external_key__startswith=existing_prefix,
+            tx_type=InventoryTransaction.TxType.RESERVED,
+        ).update(tx_type=InventoryTransaction.TxType.OUTGOING)
+        if count:
+            logger.info(
+                "Inventory: converted %d reservations → deductions for order %s:%s",
+                count, instance.source, instance.order_number,
+            )
+
+    if should_deduct:
+        # Ідемпотентність: якщо рядки вже є (не RESERVED) — пропускаємо
+        if InventoryTransaction.objects.filter(
+            external_key__startswith=existing_prefix,
+        ).exclude(tx_type=InventoryTransaction.TxType.RESERVED).exists():
+            logger.info(
+                "Inventory: order %s:%s already deducted — skipping",
+                instance.source, instance.order_number,
+            )
+            return
+
+        count = 0
+        for line in instance.lines.all():
+            if line.qty > 0:
+                try:
+                    if _deduct_line(line, instance, location):
+                        count += 1
+                except Exception as e:
+                    logger.error(
+                        "Inventory: failed to deduct line %s for order %s:%s — %s",
+                        line.pk, instance.source, instance.order_number, e,
+                    )
+        if count:
+            logger.info(
+                "Inventory: deducted %d lines for order %s:%s (trigger: %s)",
+                count, instance.source, instance.order_number, deduct_on,
+            )
 
 
 def _salesorderline_post_save(sender, instance, created, **kwargs):
     """
-    CREATION mode: списання при збереженні рядка замовлення.
-    Спрацьовує тільки при deduct_on='creation' і тільки для нових рядків.
+    CREATION mode / Reservation: транзакція при збереженні рядка замовлення.
+
+    - deduct_on='creation' + use_reservation=False → OUTGOING одразу
+    - use_reservation=True (будь-який deduct_on)    → RESERVED (бронювання)
+    Тільки для нових рядків.
     """
     if not created:
         return
@@ -241,17 +289,24 @@ def _salesorderline_post_save(sender, instance, created, **kwargs):
     except Exception:
         return
 
-    if settings.deduct_on != InventorySettings.DeductOn.CREATION:
+    use_reservation = getattr(settings, 'use_reservation', False)
+
+    # Спрацьовуємо якщо: режим CREATION або увімкнено бронювання
+    if not use_reservation and settings.deduct_on != InventorySettings.DeductOn.CREATION:
         return
 
     if instance.qty <= 0:
         return
 
+    tx_type = (InventoryTransaction.TxType.RESERVED
+               if use_reservation
+               else InventoryTransaction.TxType.OUTGOING)
+
     try:
         location = _get_or_create_location(settings)
-        _deduct_line(instance, order, location)
+        _deduct_line(instance, order, location, tx_type=tx_type)
     except Exception as e:
         logger.error(
-            "Inventory: failed to deduct line %s for order %s:%s — %s",
-            instance.pk, order.source, order.order_number, e
+            "Inventory: failed to create %s transaction for line %s order %s:%s — %s",
+            tx_type, instance.pk, order.source, order.order_number, e,
         )

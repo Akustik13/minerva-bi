@@ -18,7 +18,20 @@ class AuditableMixin:
     """
 
     def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
+        # Set thread-local user BEFORE super() so signals fired by save() can read it
+        try:
+            from core.utils import set_current_user, clear_current_user
+            set_current_user(request.user)
+        except Exception:
+            pass
+        try:
+            super().save_model(request, obj, form, change)
+        finally:
+            try:
+                from core.utils import clear_current_user
+                clear_current_user()
+            except Exception:
+                pass
         try:
             from core.models import AuditLog
             from django.contrib.contenttypes.models import ContentType

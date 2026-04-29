@@ -169,9 +169,10 @@ class Location(models.Model):
 
 class InventoryTransaction(models.Model):
     class TxType(models.TextChoices):
-        INCOMING = "Incoming", "Incoming"
-        OUTGOING = "Outgoing", "Outgoing"
+        INCOMING   = "Incoming",   "Incoming"
+        OUTGOING   = "Outgoing",   "Outgoing"
         ADJUSTMENT = "Adjustment", "Adjustment"
+        RESERVED   = "Reserved",   "Резерв"
 
     tx_type = models.CharField(max_length=20, choices=TxType.choices)
     qty = models.DecimalField(max_digits=18, decimal_places=3)
@@ -181,6 +182,13 @@ class InventoryTransaction(models.Model):
     external_key = models.CharField(max_length=255, unique=True)
     tx_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(auto_now_add=True)
+    performed_by = models.ForeignKey(
+        "auth.User",
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name="Виконавець",
+        related_name="inventory_transactions",
+    )
 
     class Meta:
         indexes = [
@@ -343,6 +351,15 @@ class InventorySettings(models.Model):
         "Попередження про низький залишок",
         default=True,
         help_text="Показувати попередження в інтерфейсі для товарів нижче точки дозамовлення.",
+    )
+    use_reservation = models.BooleanField(
+        "Бронювати замовлення (не списувати одразу)",
+        default=False,
+        help_text=(
+            "При надходженні замовлення — створювати резерв (🔒 Резерв) замість негайного списання. "
+            "Товар залишається на складі, але позначається як зарезервований. "
+            "При переведенні замовлення у «Відправлено» — резерв автоматично конвертується у фактичне списання."
+        ),
     )
 
     class Meta:

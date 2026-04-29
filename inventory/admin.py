@@ -417,35 +417,15 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             obj.external_key = f"manual:{uuid.uuid4()}"
         super().save_model(request, obj, form, change)
 
-    def changelist_view(self, request, extra_context=None):
-        self._performer_map = {}
-        response = super().changelist_view(request, extra_context)
-        try:
-            cl = response.context_data.get('cl')
-            pks = [obj.pk for obj in cl.queryset]
-            if pks:
-                from core.models import AuditLog
-                from django.contrib.contenttypes.models import ContentType
-                ct = ContentType.objects.get_for_model(InventoryTransaction)
-                for entry in AuditLog.objects.filter(
-                    content_type=ct,
-                    object_id__in=[str(pk) for pk in pks],
-                    action='create',
-                ).values('object_id', 'user__username', 'user__first_name', 'user__last_name'):
-                    uname = (
-                        f"{entry['user__first_name']} {entry['user__last_name']}".strip()
-                        or entry['user__username'] or ''
-                    )
-                    self._performer_map[int(entry['object_id'])] = uname
-        except Exception:
-            pass
-        return response
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('performed_by')
 
     @admin.display(description="Виконавець")
     def performer_col(self, obj):
-        name = getattr(self, '_performer_map', {}).get(obj.pk, '')
-        if name:
-            return format_html('<span style="color:#42a5f5;font-weight:600">{}</span>', name)
+        u = obj.performed_by
+        if u:
+            name = (f"{u.first_name} {u.last_name}".strip()) or u.username
+            return format_html('<span style="color:#42a5f5;font-weight:600">👤 {}</span>', name)
         return format_html('<span style="color:var(--text-dim,#607d8b);font-size:11px">⚙️ Система</span>')
 
 
@@ -471,14 +451,14 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     change_list_template = "admin/inventory/product/change_list.html"
     list_display = (
         "sku", "sku_short", "category", "kind", "bom_type", "is_active",
-        "stock_qty", "stock_badge", "incoming_qty", "buildable_qty",
+        "stock_qty", "reserved_qty", "stock_badge", "incoming_qty", "buildable_qty",
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
     list_filter   = ("category", "kind", "bom_type", "is_active")
     list_per_page = 50
     inlines       = (ProductComponentInline, ProductPackagingInline)
-    readonly_fields = ("stock_qty", "incoming_qty", "buildable_qty",
+    readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail",
                        "image_preview", "datasheet_link", "movement_history")
     fieldsets = (
@@ -491,7 +471,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 ("reorder_point", "lead_time_days"),
             )
         }),
-        ("📦 Availability", {"fields": ("stock_qty", "incoming_qty",
+        ("📦 Availability", {"fields": ("stock_qty", "reserved_qty", "incoming_qty",
                                         "buildable_qty", "reorder_info")}),
         ("🔗 Медіа та документи", {
             "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview"),
@@ -539,6 +519,12 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 InventoryTransaction.objects.filter(product=OuterRef('pk'))
                 .values('product').annotate(t=Sum('qty')).values('t')
             )
+            reserved_subq = (
+                InventoryTransaction.objects.filter(
+                    product=OuterRef('pk'),
+                    tx_type=InventoryTransaction.TxType.RESERVED,
+                ).values('product').annotate(t=Sum('qty')).values('t')
+            )
             incoming_subq = (
                 PurchaseOrderLine.objects
                 .filter(product=OuterRef('pk'),
@@ -558,6 +544,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             )
             return super().get_queryset(request).annotate(
                 _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
+                _reserved_total=Coalesce(Subquery(reserved_subq), Value(Decimal('0'))),
                 _incoming_total=Coalesce(Subquery(incoming_subq), Value(Decimal('0'))),
                 _sales_3m=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
             )
@@ -584,6 +571,21 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                  .filter(product=obj).aggregate(total=Sum("qty")).get("total"))
         return total or Decimal("0")
     stock_qty.short_description = "On stock"
+
+    def reserved_qty(self, obj):
+        if hasattr(obj, '_reserved_total'):
+            r = obj._reserved_total
+        else:
+            r = (InventoryTransaction.objects
+                 .filter(product=obj, tx_type=InventoryTransaction.TxType.RESERVED)
+                 .aggregate(t=Sum("qty")).get("t")) or Decimal("0")
+        if r and r < 0:
+            return format_html(
+                '<span style="color:#FFB300;font-weight:700" title="Зарезервовано під замовлення">🔒 {}</span>',
+                abs(r),
+            )
+        return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
+    reserved_qty.short_description = "🔒 Резерв"
 
     def _get_reorder_cached(self, obj):
         """Return _reorder() result, cached on obj to avoid duplicate calls per row."""
@@ -851,6 +853,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             'Incoming':   ('▲', '#4caf50', 'Прихід'),
             'Outgoing':   ('▼', '#ef5350', 'Відвантаження'),
             'Adjustment': ('⇄', '#2196f3', 'Коригування'),
+            'Reserved':   ('🔒', '#FFB300', 'Резерв'),
         }
 
         rows = []
@@ -1061,6 +1064,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             'Incoming':   ('▲', 'green',  'Прихід'),
             'Outgoing':   ('▼', 'red',    'Відвантаження'),
             'Adjustment': ('⇄', 'blue',   'Коригування'),
+            'Reserved':   ('🔒', 'orange', 'Резерв'),
         }
         rows = []
         running = 0.0
@@ -1447,11 +1451,16 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 class InventorySettingsAdmin(admin.ModelAdmin):
     fieldsets = (
         ("📤 Списання зі складу (при продажах)", {
-            "fields": ("deduct_on", "allow_negative_stock"),
+            "fields": ("deduct_on", "use_reservation", "allow_negative_stock"),
             "description": (
-                "<b>При створенні</b> — списується одразу при додаванні замовлення.<br>"
-                "<b>При відправці</b> — лише коли статус змінюється на «Відправлено».<br>"
-                "<b>При доставці</b> — лише коли статус змінюється на «Доставлено»."
+                "<b>Коли списувати:</b><br>"
+                "• <b>При створенні</b> — одразу при додаванні замовлення.<br>"
+                "• <b>При відправці</b> — коли статус змінюється на «Відправлено».<br>"
+                "• <b>При доставці</b> — коли статус змінюється на «Доставлено».<br><br>"
+                "<b>Бронювання (🔒 Резерв):</b> якщо увімкнено — при надходженні замовлення "
+                "створюється м'яке бронювання (товар ще на складі, але позначений як зарезервований). "
+                "При переведенні замовлення у «Відправлено» — резерв автоматично стає фактичним списанням. "
+                "Це дозволяє бачити: <em>Доступно = Склад − Резерв</em>."
             ),
         }),
         ("📥 Надходження на склад (закупівлі)", {
