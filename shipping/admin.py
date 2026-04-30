@@ -911,6 +911,32 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     change_list_template = "admin/shipping/shipment_changelist.html"
 
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        from django.db.models import Count
+        counts = dict(
+            Shipment.objects.values_list('status')
+                            .annotate(n=Count('id'))
+                            .values_list('status', 'n')
+        )
+        total = sum(counts.values())
+        _status_meta = [
+            ('draft',       'Чернетка',             '#9198a1'),
+            ('submitted',   'Передано перевізнику',  '#58a6ff'),
+            ('label_ready', 'Етикетка готова',       '#a78bfa'),
+            ('in_transit',  'В дорозі',              '#FFB300'),
+            ('delivered',   'Доставлено',            '#3fb950'),
+            ('error',       'Помилка',               '#f85149'),
+            ('cancelled',   'Скасовано',             '#607d8b'),
+        ]
+        extra_context['sv_status_items'] = [
+            {'val': v, 'label': l, 'color': c, 'count': counts.get(v, 0)}
+            for v, l, c in _status_meta
+        ]
+        extra_context['sv_status_total']  = total
+        extra_context['sv_status_filter'] = request.GET.get('status__exact', '')
+        return super().changelist_view(request, extra_context=extra_context)
+
     def _build_addr_book_json(self, request=None):
         """Build address book JSON: AddressBook entries + CRM customers, grouped by country.
         AddressBook: shared (owner=null) + personal of current user.

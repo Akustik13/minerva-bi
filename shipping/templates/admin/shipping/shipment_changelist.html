@@ -1,5 +1,32 @@
 {% extends "admin/change_list.html" %}
 
+{% block search %}
+{{ block.super }}
+{% if sv_status_items %}
+<div style="display:flex;flex-wrap:wrap;gap:6px;padding:10px 0 6px">
+  {% url 'admin:shipping_shipment_changelist' as cl_url %}
+
+  <a href="{{ cl_url }}"
+     style="display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;
+            font-size:12px;font-weight:700;text-decoration:none;border:1px solid;
+            {% if not sv_status_filter %}background:rgba(88,166,255,.18);color:#58a6ff;border-color:rgba(88,166,255,.5)
+            {% else %}background:var(--bg-card,#1a2535);color:var(--text-muted);border-color:var(--border){% endif %}">
+    Всі&nbsp;<span style="background:rgba(128,128,128,.18);border-radius:10px;padding:1px 6px;font-size:10px">{{ sv_status_total }}</span>
+  </a>
+
+  {% for item in sv_status_items %}{% if item.count or sv_status_filter == item.val %}
+  <a href="{{ cl_url }}?status__exact={{ item.val }}"
+     style="display:inline-flex;align-items:center;gap:5px;padding:5px 13px;border-radius:20px;
+            font-size:12px;font-weight:700;text-decoration:none;border:1px solid;
+            {% if sv_status_filter == item.val %}background:{{ item.color }}22;color:{{ item.color }};border-color:{{ item.color }}77
+            {% else %}background:var(--bg-card,#1a2535);color:var(--text-muted);border-color:var(--border){% endif %}">
+    {{ item.label }}&nbsp;<span style="background:rgba(128,128,128,.18);border-radius:10px;padding:1px 6px;font-size:10px">{{ item.count }}</span>
+  </a>
+  {% endif %}{% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
 {% block object-tools-items %}
     {{ block.super }}
     <li>
