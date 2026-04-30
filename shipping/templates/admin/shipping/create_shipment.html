@@ -1018,23 +1018,35 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
       <!-- Зберегти відправника до адресної книги -->
-      <div id="sh-ab-save-sender" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:6px">
-        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">💾 Зберегти до адресної книги</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <select id="sh-ab-cat-sender" style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:5px;padding:4px 8px;font-size:12px;color:var(--text);cursor:pointer">
-            <option value="sender">📤 Відправник</option>
-            <option value="client">🧑 Клієнт</option>
-            <option value="warehouse">🏢 Склад</option>
-            <option value="supplier">🏭 Постачальник</option>
-            <option value="other">📌 Інше</option>
-          </select>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
-            <input type="checkbox" id="sh-ab-personal-sender"> Особистий (тільки я)
+      <div id="sh-ab-save-sender" style="display:none;margin-top:10px;padding:12px 14px;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:700;color:var(--text-muted)">💾 Зберегти до адресної книги</span>
+          <button type="button" onclick="document.getElementById('sh-ab-save-sender').style.display='none'"
+            style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;line-height:1;padding:0">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px">Ім'я / Назва *</label>
+            <input id="sh-ab-name-sender" type="text" placeholder="Ім'я або назва компанії"
+              style="width:100%;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:5px;padding:5px 8px;font-size:12px;color:var(--text);outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px">Категорія</label>
+            <select id="sh-ab-cat-sender" style="width:100%;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:5px;padding:5px 8px;font-size:12px;color:var(--text);cursor:pointer">
+              <option value="sender">📤 Відправник</option>
+              <option value="client">🧑 Клієнт</option>
+              <option value="warehouse">🏢 Склад</option>
+              <option value="supplier">🏭 Постачальник</option>
+              <option value="other">📌 Інше</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:var(--text-muted)">
+            <input type="checkbox" id="sh-ab-personal-sender"> 🔒 Особистий (тільки я)
           </label>
           <button type="button" onclick="shSaveToAddrBook('sender')"
-            style="background:#1565c0;color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">Зберегти</button>
-          <button type="button" onclick="document.getElementById('sh-ab-save-sender').style.display='none'"
-            style="background:none;border:1px solid var(--border-strong);border-radius:5px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text-muted)">✕</button>
+            style="background:#1565c0;color:#fff;border:none;border-radius:5px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">💾 Зберегти</button>
         </div>
         <div id="sh-ab-msg-sender" style="font-size:11px;margin-top:6px;display:none"></div>
       </div>
@@ -1188,7 +1200,7 @@ document.addEventListener('DOMContentLoaded', function() {
               btn.onmouseover = function(){this.style.borderColor=catColor;this.style.color=catColor;};
               btn.onmouseout  = function(){this.style.borderColor='';this.style.borderLeftColor=catColor;this.style.color='';};
               btn.onclick = function(){
-                var f = document.querySelector('form');
+                var f = document.getElementById('shipment-form');
                 var pre = target; // 'recipient' or 'sender'
                 var set = function(n,v){var el=f.querySelector('[name="'+pre+'_'+n+'"]');if(el)el.value=v||''; };
                 set('name',    c.name);
@@ -1271,16 +1283,34 @@ document.addEventListener('DOMContentLoaded', function() {
       function shToggleSavePanel(target) {
         var panel = document.getElementById('sh-ab-save-'+target);
         if(!panel) return;
-        panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+        var isOpen = panel.style.display !== 'none';
+        panel.style.display = isOpen ? 'none' : 'block';
         var msg = document.getElementById('sh-ab-msg-'+target);
         if(msg) msg.style.display='none';
+        if(!isOpen){
+          // Pre-fill name field from form
+          var f = document.getElementById('shipment-form');
+          var nameField = f && f.querySelector('[name="'+target+'_name"]');
+          var compField = f && f.querySelector('[name="'+target+'_company"]');
+          var nameInput = document.getElementById('sh-ab-name-'+target);
+          if(nameInput && nameField){
+            nameInput.value = (compField && compField.value.trim()) || nameField.value.trim() || '';
+            nameInput.focus();
+          }
+        }
       }
 
       function shSaveToAddrBook(target) {
-        var f = document.querySelector('form');
+        var f = document.getElementById('shipment-form');
         var get = function(n){ var el=f.querySelector('[name="'+target+'_'+n+'"]'); return el ? el.value.trim() : ''; };
-        var name = get('name');
-        if(!name){ alert("Ім'я обов'язкове"); return; }
+        // Name comes from the panel input (user can edit it before saving)
+        var nameInput = document.getElementById('sh-ab-name-'+target);
+        var name = nameInput ? nameInput.value.trim() : get('name');
+        if(!name){
+          if(nameInput){ nameInput.style.borderColor='#f85149'; nameInput.focus(); }
+          return;
+        }
+        if(nameInput) nameInput.style.borderColor='';
         var cat = (document.getElementById('sh-ab-cat-'+target)||{}).value || 'client';
         var personal = !!(document.getElementById('sh-ab-personal-'+target)||{}).checked;
         var csrf = document.cookie.match(/csrftoken=([^;]+)/);
@@ -1392,23 +1422,35 @@ document.addEventListener('DOMContentLoaded', function() {
         </div>
       </div>
       <!-- Зберегти отримувача до адресної книги -->
-      <div id="sh-ab-save-recipient" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:6px">
-        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">💾 Зберегти до адресної книги</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-          <select id="sh-ab-cat-recipient" style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:5px;padding:4px 8px;font-size:12px;color:var(--text);cursor:pointer">
-            <option value="client">🧑 Клієнт</option>
-            <option value="supplier">🏭 Постачальник</option>
-            <option value="warehouse">🏢 Склад</option>
-            <option value="sender">📤 Відправник</option>
-            <option value="other">📌 Інше</option>
-          </select>
-          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
-            <input type="checkbox" id="sh-ab-personal-recipient"> Особистий (тільки я)
+      <div id="sh-ab-save-recipient" style="display:none;margin-top:10px;padding:12px 14px;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:700;color:var(--text-muted)">💾 Зберегти до адресної книги</span>
+          <button type="button" onclick="document.getElementById('sh-ab-save-recipient').style.display='none'"
+            style="background:none;border:none;cursor:pointer;color:var(--text-dim);font-size:14px;line-height:1;padding:0">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px">Ім'я / Назва *</label>
+            <input id="sh-ab-name-recipient" type="text" placeholder="Ім'я або назва компанії"
+              style="width:100%;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:5px;padding:5px 8px;font-size:12px;color:var(--text);outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px">Категорія</label>
+            <select id="sh-ab-cat-recipient" style="width:100%;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:5px;padding:5px 8px;font-size:12px;color:var(--text);cursor:pointer">
+              <option value="client">🧑 Клієнт</option>
+              <option value="supplier">🏭 Постачальник</option>
+              <option value="warehouse">🏢 Склад</option>
+              <option value="sender">📤 Відправник</option>
+              <option value="other">📌 Інше</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:var(--text-muted)">
+            <input type="checkbox" id="sh-ab-personal-recipient"> 🔒 Особистий (тільки я)
           </label>
           <button type="button" onclick="shSaveToAddrBook('recipient')"
-            style="background:#1565c0;color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">Зберегти</button>
-          <button type="button" onclick="document.getElementById('sh-ab-save-recipient').style.display='none'"
-            style="background:none;border:1px solid var(--border-strong);border-radius:5px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text-muted)">✕</button>
+            style="background:#1565c0;color:#fff;border:none;border-radius:5px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">💾 Зберегти</button>
         </div>
         <div id="sh-ab-msg-recipient" style="font-size:11px;margin-top:6px;display:none"></div>
       </div>
