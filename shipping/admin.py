@@ -911,60 +911,70 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     change_list_template = "admin/shipping/shipment_changelist.html"
 
-    def _build_addr_book_json(self):
-        """Build address book JSON: AddressBook entries + CRM customers, grouped by country."""
+    def _build_addr_book_json(self, request=None):
+        """Build address book JSON: AddressBook entries + CRM customers, grouped by country.
+        AddressBook: shared (owner=null) + personal of current user.
+        CRM: all customers with any address field set (no status filter)."""
         import json as _j
+        from django.db.models import Q
         from collections import defaultdict as _dd
 
         entries = []
 
-        # AddressBook entries (primary source)
-        for ab in AddressBook.objects.order_by('-use_count', 'name').values(
+        # AddressBook entries — shared + own
+        ab_qs = AddressBook.objects.order_by('-use_count', 'name')
+        if request and request.user.is_authenticated:
+            ab_qs = ab_qs.filter(Q(owner__isnull=True) | Q(owner=request.user))
+        else:
+            ab_qs = ab_qs.filter(owner__isnull=True)
+
+        for ab in ab_qs.values(
             'pk', 'name', 'company', 'email', 'phone',
             'addr_street', 'addr_city', 'addr_zip', 'addr_state', 'addr_country',
-            'category', 'is_sender',
+            'category', 'is_sender', 'owner_id',
         ):
             entries.append({
-                'pk':      ab['pk'],
-                'name':    ab['name'],
-                'company': ab['company'],
-                'email':   ab['email'],
-                'phone':   ab['phone'],
-                'street':  ab['addr_street'],
-                'city':    ab['addr_city'],
-                'zip':     ab['addr_zip'],
-                'state':   ab['addr_state'],
-                'country': ab['addr_country'] or 'XX',
-                'cat':     ab['category'],
-                'src':     'ab',
+                'pk':       ab['pk'],
+                'name':     ab['name'],
+                'company':  ab['company'],
+                'email':    ab['email'],
+                'phone':    ab['phone'],
+                'street':   ab['addr_street'],
+                'city':     ab['addr_city'],
+                'zip':      ab['addr_zip'],
+                'state':    ab['addr_state'],
+                'country':  ab['addr_country'] or 'XX',
+                'cat':      ab['category'],
+                'src':      'ab',
+                'personal': ab['owner_id'] is not None,
                 'is_sender': ab['is_sender'],
             })
 
-        # CRM customers (supplement, if no matching email in AB)
+        # CRM customers — all with at least a city or street (no status filter)
         ab_emails = {e['email'].lower() for e in entries if e['email']}
         try:
             from crm.models import Customer as _Cust
             for c in (_Cust.objects
-                      .filter(status__in=['active', 'vip'])
-                      .exclude(addr_city='')
+                      .exclude(addr_city='', addr_street='')
                       .order_by('country', 'name')
                       .values('name', 'company', 'email', 'phone',
                               'addr_street', 'addr_city', 'addr_zip', 'addr_state', 'country')):
                 if c['email'] and c['email'].lower() in ab_emails:
                     continue
                 entries.append({
-                    'pk':      None,
-                    'name':    c['name'],
-                    'company': c['company'],
-                    'email':   c['email'],
-                    'phone':   c['phone'],
-                    'street':  c['addr_street'],
-                    'city':    c['addr_city'],
-                    'zip':     c['addr_zip'],
-                    'state':   c['addr_state'],
-                    'country': c['country'] or 'XX',
-                    'cat':     'client',
-                    'src':     'crm',
+                    'pk':       None,
+                    'name':     c['name'],
+                    'company':  c['company'],
+                    'email':    c['email'],
+                    'phone':    c['phone'],
+                    'street':   c['addr_street'],
+                    'city':     c['addr_city'],
+                    'zip':      c['addr_zip'],
+                    'state':    c['addr_state'],
+                    'country':  c['country'] or 'XX',
+                    'cat':      'client',
+                    'src':      'crm',
+                    'personal': False,
                     'is_sender': False,
                 })
         except Exception:
@@ -975,6 +985,36 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         for e in entries:
             groups[e['country']].append(e)
         return _j.dumps(dict(groups), ensure_ascii=False)
+
+    def save_to_addr_book_view(self, request):
+        """AJAX: save current sender/recipient fields as new AddressBook entry."""
+        if request.method != 'POST':
+            return JsonResponse({'ok': False}, status=405)
+        import json as _j
+        try:
+            data = _j.loads(request.body)
+        except Exception:
+            return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+        name = (data.get('name') or '').strip()
+        if not name:
+            return JsonResponse({'ok': False, 'error': "Ім'я обов'язкове"})
+        personal = bool(data.get('personal', False))
+        cat = (data.get('cat') or 'client')
+        obj = AddressBook.objects.create(
+            name=name,
+            company=(data.get('company') or '').strip(),
+            email=(data.get('email') or '').strip(),
+            phone=(data.get('phone') or '').strip(),
+            addr_street=(data.get('street') or '').strip(),
+            addr_city=(data.get('city') or '').strip(),
+            addr_zip=(data.get('zip') or '').strip(),
+            addr_state=(data.get('state') or '').strip(),
+            addr_country=(data.get('country') or '').strip().upper()[:2],
+            category=cat,
+            is_sender=(cat == 'sender'),
+            owner=request.user if personal else None,
+        )
+        return JsonResponse({'ok': True, 'pk': obj.pk, 'label': str(obj)})
 
     def add_tracking_view(self, request):
         """Minimal form to add a tracking number for a shipment created outside the system."""
@@ -1225,6 +1265,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.add_tracking_view),
                 name="shipping_shipment_add_tracking",
             ),
+            path(
+                "save-to-addr-book/",
+                self.admin_site.admin_view(self.save_to_addr_book_view),
+                name="shipping_shipment_save_to_addr_book",
+            ),
         ]
         return custom + urls
 
@@ -1300,7 +1345,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             for c in carriers
         }
 
-        addr_book_json = self._build_addr_book_json()
+        addr_book_json = self._build_addr_book_json(request)
 
         shipment = Shipment()
         if carriers:
@@ -1434,7 +1479,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "pkg_rows_json":       _json.dumps(pkg_rows),
             "pkg_auto":            pkg_auto,
             "recent_recipients_json": _json.dumps(unique_recipients),
-            "addr_book_json":      self._build_addr_book_json(),
+            "addr_book_json":      self._build_addr_book_json(request),
         })
 
     def _fill_packaging_from_order(self, shipment):
@@ -1867,7 +1912,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "title":                f"{'Виправити помилку' if is_error else 'Редагувати чернетку'} #{shipment.pk}",
             "pkg_rows_json":        _json2.dumps(pkg_rows_edit),
             "pkg_auto":             len(pkg_rows_edit) > 1 or (len(pkg_rows_edit) == 1 and pkg_rows_edit[0]["quantity"] > 1),
-            "addr_book_json":       self._build_addr_book_json(),
+            "addr_book_json":       self._build_addr_book_json(request),
         })
 
     def _handle_edit_post(self, request, shipment, carriers):
@@ -5942,16 +5987,15 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
 
 @admin.register(AddressBook)
 class AddressBookAdmin(admin.ModelAdmin):
-    list_display  = ('name', 'company', 'cat_badge', 'addr_city', 'addr_country',
-                     'email', 'phone', 'is_sender', 'use_count')
+    list_display  = ('name', 'company', 'cat_badge', 'scope_badge', 'addr_city',
+                     'addr_country', 'email', 'phone', 'use_count')
     list_filter   = ('category', 'addr_country', 'is_sender')
     search_fields = ('name', 'company', 'email', 'addr_city', 'addr_zip')
-    list_editable = ('is_sender',)
     ordering      = ('-use_count', 'name')
 
     fieldsets = (
         ('👤 Контакт', {
-            'fields': ('name', 'company', 'category', 'is_sender'),
+            'fields': ('name', 'company', 'category', 'is_sender', 'owner'),
         }),
         ('📮 Адреса', {
             'fields': ('addr_street', ('addr_city', 'addr_zip'), ('addr_state', 'addr_country')),
@@ -5966,6 +6010,19 @@ class AddressBookAdmin(admin.ModelAdmin):
     )
     readonly_fields = ('use_count', 'created_at', 'updated_at')
 
+    def get_queryset(self, request):
+        from django.db.models import Q
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(Q(owner__isnull=True) | Q(owner=request.user))
+
+    def save_model(self, request, obj, form, change):
+        # Non-superusers creating a new entry: default owner = themselves (personal)
+        if not change and not obj.owner and not request.user.is_superuser:
+            obj.owner = request.user
+        super().save_model(request, obj, form, change)
+
     @admin.display(description="Категорія")
     def cat_badge(self, obj):
         colors = {
@@ -5976,10 +6033,20 @@ class AddressBookAdmin(admin.ModelAdmin):
             'other':     ('#424242', '#eeeeee'),
         }
         bg, fg = colors.get(obj.category, ('#424242', '#eeeeee'))
-        label = obj.get_category_display()
         return format_html(
             '<span style="background:{};color:{};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700">'
-            '{}</span>', bg, fg, label
+            '{}</span>', bg, fg, obj.get_category_display()
+        )
+
+    @admin.display(description="Доступ")
+    def scope_badge(self, obj):
+        if obj.owner_id is None:
+            return format_html(
+                '<span style="color:#3fb950;font-size:11px;font-weight:700">🌐 Спільний</span>'
+            )
+        return format_html(
+            '<span style="color:#58a6ff;font-size:11px;font-weight:700">🔒 {}</span>',
+            obj.owner.get_username() if obj.owner else '—'
         )
 
     def get_urls(self):

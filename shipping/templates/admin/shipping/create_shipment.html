@@ -1017,6 +1017,33 @@ document.addEventListener('DOMContentLoaded', function() {
             oninput="_markEdited(this)">
         </div>
       </div>
+      <!-- Зберегти відправника до адресної книги -->
+      <div id="sh-ab-save-sender" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:6px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">💾 Зберегти до адресної книги</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select id="sh-ab-cat-sender" style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:5px;padding:4px 8px;font-size:12px;color:var(--text);cursor:pointer">
+            <option value="sender">📤 Відправник</option>
+            <option value="client">🧑 Клієнт</option>
+            <option value="warehouse">🏢 Склад</option>
+            <option value="supplier">🏭 Постачальник</option>
+            <option value="other">📌 Інше</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+            <input type="checkbox" id="sh-ab-personal-sender"> Особистий (тільки я)
+          </label>
+          <button type="button" onclick="shSaveToAddrBook('sender')"
+            style="background:#1565c0;color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">Зберегти</button>
+          <button type="button" onclick="document.getElementById('sh-ab-save-sender').style.display='none'"
+            style="background:none;border:1px solid var(--border-strong);border-radius:5px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text-muted)">✕</button>
+        </div>
+        <div id="sh-ab-msg-sender" style="font-size:11px;margin-top:6px;display:none"></div>
+      </div>
+      <div style="text-align:right;margin-top:8px">
+        <button type="button" onclick="shToggleSavePanel('sender')"
+          style="background:none;border:1px dashed var(--border-strong);border-radius:5px;padding:3px 10px;font-size:11px;color:var(--text-dim);cursor:pointer">
+          💾 До адресної книги
+        </button>
+      </div>
     </div>
 
     <!-- Swap кнопка -->
@@ -1051,8 +1078,9 @@ document.addEventListener('DOMContentLoaded', function() {
         <div id="sh-addr-groups-recipient" style="max-height:340px;overflow-y:auto"></div>
       </div>
       <script>
+      var ADDR = {{ addr_book_json|default:"{}"|safe }};
+      var _renderGroupsGlobal;
       (function(){
-        var ADDR = {{ addr_book_json|default:"{}"|safe }};
         var CNAMES = {
           'DE':'🇩🇪 Німеччина','UA':'🇺🇦 Україна','US':'🇺🇸 США','PL':'🇵🇱 Польща',
           'AT':'🇦🇹 Австрія','CH':'🇨🇭 Швейцарія','GB':'🇬🇧 Велика Британія',
@@ -1149,7 +1177,7 @@ document.addEventListener('DOMContentLoaded', function() {
             var row = document.createElement('div');
             row.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px;padding:7px 8px;border-bottom:1px solid var(--border)';
             filtered.forEach(function(c) {
-              var label = c.company || c.name;
+              var label = (c.personal ? '🔒 ' : '') + (c.company || c.name);
               if (c.city) label += ', ' + c.city;
               var tip = [c.name, c.company, c.street, c.city+' '+c.zip, cc, c.phone, c.email].filter(function(x){return x&&x.trim();}).join(' | ');
               var btn = document.createElement('button');
@@ -1196,6 +1224,9 @@ document.addEventListener('DOMContentLoaded', function() {
           }
         }
 
+        // Expose for external use (save button re-render)
+        _renderGroupsGlobal = _renderGroups;
+
         // Init both panels
         ['recipient','sender'].forEach(function(target){
           var listEl = document.getElementById('sh-addr-groups-'+target);
@@ -1236,6 +1267,74 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       // Backwards compat alias
       function shToggleAddrBook(forceClose){ shToggleAddrBookFor('recipient', forceClose); }
+
+      function shToggleSavePanel(target) {
+        var panel = document.getElementById('sh-ab-save-'+target);
+        if(!panel) return;
+        panel.style.display = panel.style.display==='none' ? 'block' : 'none';
+        var msg = document.getElementById('sh-ab-msg-'+target);
+        if(msg) msg.style.display='none';
+      }
+
+      function shSaveToAddrBook(target) {
+        var f = document.querySelector('form');
+        var get = function(n){ var el=f.querySelector('[name="'+target+'_'+n+'"]'); return el ? el.value.trim() : ''; };
+        var name = get('name');
+        if(!name){ alert("Ім'я обов'язкове"); return; }
+        var cat = (document.getElementById('sh-ab-cat-'+target)||{}).value || 'client';
+        var personal = !!(document.getElementById('sh-ab-personal-'+target)||{}).checked;
+        var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+        if(!csrf) return;
+        var btn = document.querySelector('#sh-ab-save-'+target+' button');
+        fetch('/admin/shipping/shipment/save-to-addr-book/', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json','X-CSRFToken':csrf[1],'X-Requested-With':'XMLHttpRequest'},
+          body: JSON.stringify({
+            name:     name,
+            company:  get('company'),
+            street:   get('street'),
+            city:     get('city'),
+            zip:      get('zip'),
+            state:    get('state'),
+            country:  get('country'),
+            phone:    get('phone'),
+            email:    get('email'),
+            cat:      cat,
+            personal: personal,
+          }),
+        }).then(function(r){return r.json();}).then(function(d){
+          var msg = document.getElementById('sh-ab-msg-'+target);
+          if(msg){
+            msg.style.display='block';
+            if(d.ok){
+              msg.style.color='#3fb950';
+              msg.textContent = '✅ Збережено: ' + (d.label||name);
+              // Add to ADDR so the panel shows it without page reload
+              var newEntry = {
+                pk: d.pk, name: name,
+                company: get('company'), email: get('email'), phone: get('phone'),
+                street: get('street'), city: get('city'), zip: get('zip'),
+                state: get('state'), country: get('country')||'XX',
+                cat: cat, src: 'ab', personal: personal, is_sender: cat==='sender',
+              };
+              var cc = newEntry.country;
+              if(!ADDR[cc]) ADDR[cc]=[];
+              ADDR[cc].unshift(newEntry);
+              // Re-render both panels
+              ['recipient','sender'].forEach(function(t){
+                var listEl=document.getElementById('sh-addr-groups-'+t);
+                if(listEl) _renderGroupsGlobal(t, listEl);
+              });
+            } else {
+              msg.style.color='#f85149';
+              msg.textContent = '❌ ' + (d.error||'Помилка');
+            }
+          }
+        }).catch(function(){
+          var msg=document.getElementById('sh-ab-msg-'+target);
+          if(msg){msg.style.display='block';msg.style.color='#f85149';msg.textContent='❌ Помилка мережі';}
+        });
+      }
       </script>
       <div class="sh-grid">
         <div class="sh-field">
@@ -1291,6 +1390,33 @@ document.addEventListener('DOMContentLoaded', function() {
           <input class="sh-input" type="email" name="recipient_email"
             value="{{ shipment.recipient_email }}">
         </div>
+      </div>
+      <!-- Зберегти отримувача до адресної книги -->
+      <div id="sh-ab-save-recipient" style="display:none;margin-top:10px;padding:10px 12px;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:6px">
+        <div style="font-size:11px;font-weight:700;color:var(--text-muted);margin-bottom:8px">💾 Зберегти до адресної книги</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select id="sh-ab-cat-recipient" style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:5px;padding:4px 8px;font-size:12px;color:var(--text);cursor:pointer">
+            <option value="client">🧑 Клієнт</option>
+            <option value="supplier">🏭 Постачальник</option>
+            <option value="warehouse">🏢 Склад</option>
+            <option value="sender">📤 Відправник</option>
+            <option value="other">📌 Інше</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+            <input type="checkbox" id="sh-ab-personal-recipient"> Особистий (тільки я)
+          </label>
+          <button type="button" onclick="shSaveToAddrBook('recipient')"
+            style="background:#1565c0;color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:12px;font-weight:700;cursor:pointer">Зберегти</button>
+          <button type="button" onclick="document.getElementById('sh-ab-save-recipient').style.display='none'"
+            style="background:none;border:1px solid var(--border-strong);border-radius:5px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--text-muted)">✕</button>
+        </div>
+        <div id="sh-ab-msg-recipient" style="font-size:11px;margin-top:6px;display:none"></div>
+      </div>
+      <div style="text-align:right;margin-top:8px">
+        <button type="button" onclick="shToggleSavePanel('recipient')"
+          style="background:none;border:1px dashed var(--border-strong);border-radius:5px;padding:3px 10px;font-size:11px;color:var(--text-dim);cursor:pointer">
+          💾 До адресної книги
+        </button>
       </div>
     </div>
 
