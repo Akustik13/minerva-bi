@@ -11,11 +11,42 @@ def _get_ip(request):
 class AuditableMixin:
     """
     Add to ModelAdmin to log create/update/delete actions to AuditLog.
+    Also bypasses Django's model-level permission checks — Minerva controls
+    access via UserProfile.allowed_modules + middleware instead.
 
     Usage:
         class MyAdmin(AuditableMixin, admin.ModelAdmin):
             ...
     """
+
+    def _minerva_staff_ok(self, request):
+        return request.user.is_active and request.user.is_staff
+
+    def has_module_permission(self, request):
+        return self._minerva_staff_ok(request)
+
+    def has_view_permission(self, request, obj=None):
+        if not self._minerva_staff_ok(request):
+            return False
+        return not self._minerva_model_denied(request)
+
+    def has_add_permission(self, request):
+        return self._minerva_staff_ok(request)
+
+    def has_change_permission(self, request, obj=None):
+        return self._minerva_staff_ok(request)
+
+    def _minerva_model_denied(self, request):
+        """Return True if this model is in the user's denied_models list."""
+        try:
+            profile = request.user.profile
+            denied = getattr(profile, 'denied_models', None) or []
+            if not denied:
+                return False
+            key = f'{self.opts.app_label}:{self.opts.object_name}'
+            return key in denied
+        except Exception:
+            return False
 
     def save_model(self, request, obj, form, change):
         # Set thread-local user BEFORE super() so signals fired by save() can read it

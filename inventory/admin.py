@@ -10,7 +10,8 @@ import tempfile
 from django import forms
 from django.contrib import admin, messages
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Sum, Window
+from django.db.models.functions import Coalesce
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
@@ -398,11 +399,28 @@ class LocationAdmin(admin.ModelAdmin):
 
 @admin.register(InventoryTransaction)
 class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
-    list_display  = ("tx_type", "signed_qty", "product", "location",
+    list_display  = ("tx_type_badge", "signed_qty", "balance_col", "product_link", "location",
                      "ref_doc", "tx_date", "created_at", "performer_col")
     search_fields = ("product__sku", "ref_doc", "external_key")
     list_filter   = ("tx_type", "location__code", "product__category")
     date_hierarchy = "created_at"
+
+    _TX_META = {
+        'Incoming':   ('▲', 'var(--ok,#3fb950)',  'rgba(63,185,80,.13)',   'Прихід'),
+        'Outgoing':   ('▼', 'var(--err,#f85149)', 'rgba(248,81,73,.13)',   'Відвантаження'),
+        'Adjustment': ('⇄', '#78909c',            'rgba(120,144,156,.13)', 'Коригування'),
+        'Reserved':   ('🔒', '#FFB300',           'rgba(255,179,0,.13)',   'Резерв'),
+    }
+
+    @admin.display(description="Тип", ordering="tx_type")
+    def tx_type_badge(self, obj):
+        icon, color, bg, label = self._TX_META.get(obj.tx_type, ('•', 'var(--text-dim)', 'transparent', obj.tx_type))
+        return format_html(
+            '<span style="display:inline-flex;align-items:center;gap:5px;'
+            'padding:3px 9px;border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;'
+            'background:{};color:{}">{} {}</span>',
+            bg, color, icon, label,
+        )
 
     def signed_qty(self, obj):
         try:
@@ -418,7 +436,35 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
     def get_queryset(self, request):
-        return super().get_queryset(request).select_related('performed_by')
+        return (
+            super().get_queryset(request)
+            .select_related('product', 'performed_by')
+            .annotate(running_balance=Window(
+                expression=Sum('qty'),
+                partition_by=['product_id'],
+                order_by=['tx_date', 'pk'],
+            ))
+        )
+
+    @admin.display(description="Залишок")
+    def balance_col(self, obj):
+        val = getattr(obj, 'running_balance', None)
+        if val is None:
+            return '—'
+        n = int(val)
+        color = 'var(--ok,#3fb950)' if n > 0 else ('var(--err,#f85149)' if n < 0 else 'var(--text-dim)')
+        return format_html(
+            '<span style="font-weight:700;color:{};font-family:monospace">{}</span>',
+            color, n,
+        )
+
+    @admin.display(description="Товар")
+    def product_link(self, obj):
+        url = reverse("admin:inventory_product_change", args=[obj.product_id])
+        return format_html(
+            '<a href="{}" style="font-weight:600;color:var(--link-fg)">{}</a>',
+            url, obj.product.sku,
+        )
 
     @admin.display(description="Виконавець")
     def performer_col(self, obj):
@@ -1003,7 +1049,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
         txs = list(
             InventoryTransaction.objects.filter(product=obj)
-            .select_related('location')
+            .select_related('location', 'performed_by')
             .order_by('-tx_date', '-pk')[:500]
         )
 
@@ -1059,6 +1105,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception:
             pass
 
+        def _operator(tx):
+            """Return display name for who performed the transaction."""
+            if tx.performed_by_id:
+                u = tx.performed_by
+                return (f"{u.first_name} {u.last_name}".strip() or u.username or 'Адмін')
+            return audit_user_map.get(tx.pk, '⚙️ Система')
+
         # ── Build rows ─────────────────────────────────────────────────────────
         TYPE_CFG = {
             'Incoming':   ('▲', 'green',  'Прихід'),
@@ -1095,7 +1148,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     who = (order['contact_name'] or order['client'] or '').strip()[:45]
                 else:
                     doc_label = tx.ref_doc or ek
-                operator = audit_user_map.get(tx.pk, '⚙️ Система')
+                operator = _operator(tx)
             elif ek.startswith('po:'):
                 parts = ek.split(':')
                 po_code = parts[1] if len(parts) > 1 else ''
@@ -1106,13 +1159,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     who = (po.get('supplier__name') or '').strip()[:45]
                 else:
                     doc_label = tx.ref_doc or ek
-                operator = audit_user_map.get(tx.pk, '⚙️ Система')
+                operator = _operator(tx)
             elif ek.startswith('ai:'):
                 doc_label = tx.ref_doc or ek[:55]
                 operator = '🤖 AI'
             else:
                 doc_label = tx.ref_doc or ek[:55]
-                operator = audit_user_map.get(tx.pk, '⚙️ Система')
+                operator = _operator(tx)
 
             rows.append({
                 'date':      localtime(tx.tx_date).strftime('%d.%m.%Y %H:%M') if tx.tx_date else '—',

@@ -171,6 +171,12 @@ class UserProfile(models.Model):
         help_text='Порожньо = за роллю',
     )
 
+    denied_models  = models.JSONField(
+        default=list, blank=True,
+        verbose_name='Заблоковані моделі',
+        help_text='Список "app_label:ModelName" — моделі заблоковані всередині дозволеного модуля.',
+    )
+
     class Meta:
         verbose_name        = 'Профіль користувача'
         verbose_name_plural = 'Профілі користувачів'

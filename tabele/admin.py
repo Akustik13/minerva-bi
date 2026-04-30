@@ -13,7 +13,15 @@ CSRF_TRUSTED_ORIGINS = [
 
 def _get_app_list(self, request, app_label=None):
     """Кастомний порядок секцій та моделей у сайдбарі Django Admin."""
-    app_dict = self._build_app_dict(request, app_label)
+    # Bypass Django's model-permission check — Minerva uses its own module system.
+    # Temporarily elevate to superuser so _build_app_dict includes all registered apps.
+    _was_super = request.user.is_superuser
+    if not _was_super:
+        request.user.is_superuser = True
+    try:
+        app_dict = self._build_app_dict(request, app_label)
+    finally:
+        request.user.is_superuser = _was_super
 
     app_order = [
         'core',       # 🔐 Ядро системи
@@ -87,15 +95,48 @@ def _get_app_list(self, request, app_label=None):
                 )
             )
 
-    # Фільтрація по ModuleRegistry (core app)
+    # Фільтрація по ModuleRegistry + per-user allowed_modules
     try:
         from core.models import ModuleRegistry
         always_show = {"auth", "config", "core"}
-        app_list = [
-            a for a in app_list
-            if a["app_label"] in always_show
-            or ModuleRegistry.check_active(a["app_label"])
-        ]
+
+        profile = getattr(getattr(request, 'user', None), 'profile', None)
+        is_super = _was_super or (profile and profile.role == 'superadmin')
+
+        if is_super:
+            # Superuser/superadmin: show all active modules
+            app_list = [
+                a for a in app_list
+                if a["app_label"] in always_show
+                or ModuleRegistry.check_active(a["app_label"])
+            ]
+        else:
+            allowed = profile.get_allowed_modules() if profile else '__all__'
+            denied_models = set(getattr(profile, 'denied_models', None) or [])
+
+            app_list = [
+                a for a in app_list
+                if a["app_label"] in always_show
+                or (
+                    ModuleRegistry.check_active(a["app_label"])
+                    and (allowed == '__all__' or a["app_label"] in allowed)
+                )
+            ]
+
+            # Filter denied sub-models within allowed apps
+            if denied_models:
+                for app in app_list:
+                    prefix = app["app_label"] + ":"
+                    denied_here = {
+                        d[len(prefix):].lower()
+                        for d in denied_models
+                        if d.startswith(prefix)
+                    }
+                    if denied_here:
+                        app["models"] = [
+                            m for m in app["models"]
+                            if m["object_name"].lower() not in denied_here
+                        ]
     except Exception:
         pass  # БД не мігрована або помилка — показати все
 

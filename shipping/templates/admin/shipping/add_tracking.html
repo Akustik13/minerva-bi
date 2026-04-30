@@ -13,19 +13,25 @@
 
 {% block extrahead %}{{ block.super }}
 <style>
-.at-wrap { padding: 24px 28px 60px; max-width: 560px; }
+.at-wrap { padding: 24px 28px 60px; max-width: 640px; }
 .at-header { display:flex;align-items:center;gap:14px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--border); }
 .at-header-icon { width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,rgba(88,166,255,.2),rgba(63,185,80,.1));display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0; }
 .at-header h2 { font-size:18px;font-weight:800;margin:0;letter-spacing:-.3px; }
-.at-card { background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:16px; }
+.at-section { font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text-muted);margin:0 0 10px;padding:0; }
+.at-card { background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:20px 22px;margin-bottom:14px; }
 .at-label { font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;display:block; }
 .at-input { width:100%;background:var(--bg-input);border:1px solid var(--border-strong);border-radius:6px;padding:8px 10px;font-size:13px;color:var(--text);outline:none;box-sizing:border-box;transition:border-color .15s; }
 .at-input:focus { border-color:rgba(88,166,255,.6); }
 .at-row { margin-bottom:14px; }
+.at-row:last-child { margin-bottom:0; }
+.at-cols { display:flex;gap:12px; }
+.at-cols > div { flex:1;min-width:0; }
 .at-actions { display:flex;gap:10px;margin-top:20px; }
 .at-btn-save { background:#1565c0;color:#fff;border:none;border-radius:7px;padding:9px 20px;font-size:13px;font-weight:700;cursor:pointer;transition:background .15s; }
 .at-btn-save:hover { background:#1976d2; }
 .at-btn-cancel { background:var(--bg-card);border:1px solid var(--border-strong);border-radius:7px;padding:9px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted);text-decoration:none;display:inline-flex;align-items:center; }
+.at-hint { font-size:11px;color:var(--text-muted);margin-top:4px; }
+#at-order-search { margin-bottom:6px; }
 </style>
 {% endblock %}
 
@@ -38,36 +44,101 @@
 
   <form method="post">
     {% csrf_token %}
+
+    <!-- ── Трекінг + перевізник ── -->
+    <p class="at-section">📡 Трекінг</p>
     <div class="at-card">
       <div class="at-row">
         <label class="at-label">Номер трекінгу *</label>
         <input class="at-input" type="text" name="tracking_number" required
                placeholder="1Z999AA10123456784, JD014600006161234567…" autofocus>
       </div>
-      <div class="at-row">
-        <label class="at-label">Перевізник</label>
-        <select class="at-input" name="carrier">
-          <option value="">— Не вибрано —</option>
-          {% for c in carriers %}
-          <option value="{{ c.pk }}">{{ c.name }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="at-row">
-        <label class="at-label">Референс / номер замовлення</label>
-        <input class="at-input" type="text" name="reference" placeholder="SO-12345…">
+      <div class="at-cols">
+        <div>
+          <label class="at-label">Перевізник</label>
+          <select class="at-input" name="carrier">
+            <option value="">— Не вибрано —</option>
+            {% for c in carriers %}
+            <option value="{{ c.pk }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="at-label">Референс</label>
+          <input class="at-input" type="text" name="reference" placeholder="SO-12345…">
+        </div>
       </div>
     </div>
 
+    <!-- ── Замовлення ── -->
+    <p class="at-section">🛒 Замовлення (необов'язково)</p>
+    <div class="at-card">
+      <div class="at-row">
+        <label class="at-label">Пов'язати з замовленням</label>
+        <input class="at-input" type="text" id="at-order-search"
+               placeholder="Пошук за номером або клієнтом…"
+               oninput="atFilterOrders(this.value)" autocomplete="off">
+        <select class="at-input" name="order" id="at-order-select" size="5"
+                style="height:auto;max-height:160px;margin-top:4px">
+          <option value="">— Без замовлення —</option>
+          {% for o in orders %}
+          <option value="{{ o.pk }}" data-label="{{ o.order_number }} {{ o.client }}">
+            {{ o.order_number }}{% if o.client %} — {{ o.client }}{% endif %}
+          </option>
+          {% endfor %}
+        </select>
+        <p class="at-hint">Тільки замовлення що вже є в системі (останні 300). Можна залишити порожнім.</p>
+      </div>
+    </div>
+
+    <!-- ── Отримувач ── -->
+    <p class="at-section">📬 Отримувач</p>
     <div class="at-card">
       <div class="at-row">
         <label class="at-label">Ім'я отримувача</label>
         <input class="at-input" type="text" name="recipient_name">
       </div>
-      <div class="at-row">
-        <label class="at-label">Країна отримувача (ISO 2)</label>
-        <input class="at-input" type="text" name="recipient_country" maxlength="2" placeholder="DE" style="max-width:80px">
+      <div class="at-cols">
+        <div>
+          <label class="at-label">Країна відправника (ISO 2)</label>
+          <input class="at-input" type="text" name="sender_country" maxlength="2" placeholder="CN" style="max-width:80px">
+        </div>
+        <div>
+          <label class="at-label">Країна отримувача (ISO 2)</label>
+          <input class="at-input" type="text" name="recipient_country" maxlength="2" placeholder="DE" style="max-width:80px">
+        </div>
       </div>
+    </div>
+
+    <!-- ── Вартість + етикетка ── -->
+    <p class="at-section">💰 Вартість та етикетка</p>
+    <div class="at-card">
+      <div class="at-cols at-row">
+        <div>
+          <label class="at-label">Вартість доставки</label>
+          <input class="at-input" type="text" name="carrier_price" placeholder="12.50">
+        </div>
+        <div>
+          <label class="at-label">Валюта</label>
+          <select class="at-input" name="carrier_currency">
+            <option value="EUR" selected>EUR €</option>
+            <option value="USD">USD $</option>
+            <option value="GBP">GBP £</option>
+            <option value="CHF">CHF</option>
+            <option value="UAH">UAH ₴</option>
+          </select>
+        </div>
+      </div>
+      <div class="at-row">
+        <label class="at-label">URL етикетки (PDF)</label>
+        <input class="at-input" type="url" name="label_url"
+               placeholder="https://… або /media/labels/…">
+        <p class="at-hint">Посилання на PDF-файл етикетки, якщо є.</p>
+      </div>
+    </div>
+
+    <!-- ── Нотатки ── -->
+    <div class="at-card">
       <div class="at-row">
         <label class="at-label">Нотатки</label>
         <input class="at-input" type="text" name="notes">
@@ -80,4 +151,27 @@
     </div>
   </form>
 </div>
+
+<script>
+(function(){
+  var allOpts = null;
+  function atFilterOrders(q) {
+    var sel = document.getElementById('at-order-select');
+    if (!allOpts) {
+      allOpts = Array.from(sel.options).map(function(o){ return {val:o.value, text:o.text, label:(o.dataset.label||'').toLowerCase()}; });
+    }
+    q = q.toLowerCase();
+    while (sel.options.length > 1) sel.remove(1);
+    allOpts.forEach(function(o){
+      if (!o.val) return;
+      if (!q || o.label.indexOf(q) !== -1) {
+        var opt = document.createElement('option');
+        opt.value = o.val; opt.text = o.text;
+        sel.add(opt);
+      }
+    });
+  }
+  window.atFilterOrders = atFilterOrders;
+})();
+</script>
 {% endblock %}

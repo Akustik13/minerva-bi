@@ -870,9 +870,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         }),
         ("📬 Отримувач", {
             "fields": (
+                ("sender_country", "recipient_country"),
                 ("recipient_company", "recipient_name"),
                 "recipient_street",
-                ("recipient_city", "recipient_zip", "recipient_state", "recipient_country"),
+                ("recipient_city", "recipient_zip", "recipient_state"),
                 ("recipient_phone", "recipient_email"),
             ),
             "description": "<b>Компанія</b> — юридична назва (DRONISOS). "
@@ -921,13 +922,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         )
         total = sum(counts.values())
         _status_meta = [
-            ('draft',       'Чернетка',             '#9198a1'),
-            ('submitted',   'Передано перевізнику',  '#58a6ff'),
-            ('label_ready', 'Етикетка готова',       '#a78bfa'),
-            ('in_transit',  'В дорозі',              '#FFB300'),
-            ('delivered',   'Доставлено',            '#3fb950'),
-            ('error',       'Помилка',               '#f85149'),
-            ('cancelled',   'Скасовано',             '#607d8b'),
+            ('draft',       '✏️ Чернетка',               '#9198a1'),
+            ('submitted',   '📤 Передано перевізнику',    '#58a6ff'),
+            ('label_ready', '🏷️ Етикетка готова',         '#a78bfa'),
+            ('in_transit',  '🚚 В дорозі',                '#FFB300'),
+            ('delivered',   '✅ Доставлено',              '#3fb950'),
+            ('error',       '❌ Помилка',                 '#f85149'),
+            ('cancelled',   '🚫 Скасовано',               '#607d8b'),
         ]
         extra_context['sv_status_items'] = [
             {'val': v, 'label': l, 'color': c, 'count': counts.get(v, 0)}
@@ -1044,14 +1045,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     def add_tracking_view(self, request):
         """Minimal form to add a tracking number for a shipment created outside the system."""
-        import json as _j
+        from sales.models import SalesOrder
+        import decimal as _dec
         if request.method == "POST":
-            carrier_id    = request.POST.get("carrier") or None
-            tracking      = request.POST.get("tracking_number", "").strip()
-            reference     = request.POST.get("reference", "").strip()
-            recipient_name = request.POST.get("recipient_name", "").strip()
+            carrier_id        = request.POST.get("carrier") or None
+            order_id          = request.POST.get("order") or None
+            tracking          = request.POST.get("tracking_number", "").strip()
+            reference         = request.POST.get("reference", "").strip()
+            recipient_name    = request.POST.get("recipient_name", "").strip()
             recipient_country = request.POST.get("recipient_country", "").strip().upper()[:2]
-            notes         = request.POST.get("notes", "").strip()
+            sender_country    = request.POST.get("sender_country", "").strip().upper()[:2]
+            label_url         = request.POST.get("label_url", "").strip()
+            price_raw         = request.POST.get("carrier_price", "").strip().replace(",", ".")
+            currency          = request.POST.get("carrier_currency", "EUR").strip().upper() or "EUR"
+            notes             = request.POST.get("notes", "").strip()
             if not tracking:
                 messages.error(request, "Номер трекінгу обов'язковий.")
                 return redirect(reverse("admin:shipping_shipment_add_tracking"))
@@ -1061,12 +1068,28 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     carrier = Carrier.objects.get(pk=carrier_id)
                 except Carrier.DoesNotExist:
                     pass
+            order = None
+            if order_id:
+                try:
+                    order = SalesOrder.objects.get(pk=order_id)
+                except SalesOrder.DoesNotExist:
+                    pass
+            carrier_price = None
+            try:
+                carrier_price = _dec.Decimal(price_raw) if price_raw else None
+            except _dec.InvalidOperation:
+                pass
             shipment = Shipment.objects.create(
                 carrier=carrier,
+                order=order,
                 tracking_number=tracking,
                 reference=reference,
                 recipient_name=recipient_name,
                 recipient_country=recipient_country,
+                sender_country=sender_country,
+                label_url=label_url or "",
+                carrier_price=carrier_price,
+                carrier_currency=currency,
                 notes=notes,
                 status=Shipment.Status.IN_TRANSIT,
                 submitted_at=timezone.now(),
@@ -1074,11 +1097,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             messages.success(request, f"✅ Відправлення #{shipment.pk} з трекінгом {tracking} додано.")
             return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
+        from sales.models import SalesOrder
         carriers = Carrier.objects.filter(is_active=True).order_by("-is_default", "name")
+        orders   = SalesOrder.objects.order_by("-order_date").values("pk", "order_number", "client")[:300]
         return render(request, "admin/shipping/add_tracking.html", {
             **self.admin_site.each_context(request),
             "title": "Додати трекінг",
             "carriers": carriers,
+            "orders": orders,
             "cancel_url": reverse("admin:shipping_shipment_changelist"),
         })
 
@@ -2407,10 +2433,37 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "admin:shipping_shipment_save_labels_to_docs", args=[shipment.pk]
         )
 
+        # Sender display: for outbound (has order) fall back to carrier data;
+        # for manual/inbound tracking only use explicitly stored fields.
+        _c = shipment.carrier
+        if order:
+            _sv_sender = {
+                "name":    shipment.sender_name    or (_c.sender_name    if _c else ""),
+                "company": shipment.sender_company or (_c.sender_company if _c else ""),
+                "street":  shipment.sender_street  or (_c.sender_street  if _c else ""),
+                "city":    shipment.sender_city    or (_c.sender_city    if _c else ""),
+                "zip":     shipment.sender_zip     or (_c.sender_zip     if _c else ""),
+                "country": shipment.sender_country or (_c.sender_country if _c else ""),
+                "phone":   shipment.sender_phone   or (_c.sender_phone   if _c else ""),
+                "email":   shipment.sender_email   or (_c.sender_email   if _c else ""),
+            }
+        else:
+            _sv_sender = {
+                "name":    shipment.sender_name,
+                "company": shipment.sender_company,
+                "street":  shipment.sender_street,
+                "city":    shipment.sender_city,
+                "zip":     shipment.sender_zip,
+                "country": shipment.sender_country,
+                "phone":   shipment.sender_phone,
+                "email":   shipment.sender_email,
+            }
+
         return render(request, "admin/shipping/shipment_detail.html", {
             **self.admin_site.each_context(request),
             "shipment":                  shipment,
             "order":                     order,
+            "sv_sender":                 _sv_sender,
             "timeline":                  timeline,
             "show_timeline":             show_timeline,
             "actions":                   actions,
@@ -4879,13 +4932,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     def recipient_country_flag(self, obj):
         from config.country_utils import country_flag_html
-        sender = (
-            obj.sender_country
-            or (obj.carrier.sender_country if obj.carrier else '')
-            or 'DE'
-        ).upper()
+        # For outbound shipments use carrier sender_country as fallback;
+        # for manually-added inbound tracking (no order) only use explicit sender_country
+        sender_raw = obj.sender_country or (
+            (obj.carrier.sender_country if obj.carrier else '') if obj.order_id else ''
+        )
         recipient = obj.recipient_country or ''
-        s_html = country_flag_html(sender)
+        s_html = country_flag_html(sender_raw.upper()) if sender_raw else '—'
         r_html = country_flag_html(recipient) if recipient else '—'
         return format_html(
             '<span style="white-space:nowrap">{} '

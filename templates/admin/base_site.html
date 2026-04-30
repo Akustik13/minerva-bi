@@ -926,6 +926,21 @@ document.addEventListener('DOMContentLoaded', function(){
   }
 
   var USER_ROLE = '{{ user_role|default:"" }}';
+  var ALLOWED_MODULES = {{ allowed_modules_json|default:'"__all__"'|safe }};  // list or '__all__'
+  var DENIED_MODELS   = {{ denied_models_json|default:'[]'|safe }};           // ["app:Model", ...]
+  function _moduleAllowed(app) {
+    if (USER_ROLE === 'superadmin') return true;
+    if (ALLOWED_MODULES === '__all__') return true;
+    return Array.isArray(ALLOWED_MODULES) && ALLOWED_MODULES.indexOf(app) !== -1;
+  }
+  /* Called after mods is built. Hides links whose app is not allowed or model is denied. */
+  function _linkAllowed(lnk) {
+    if (!lnk.app) return true;
+    if (!mods[lnk.app]) return false;                       // app absent from user's admin
+    if (!_moduleAllowed(lnk.app)) return false;             // app not in user's allowed_modules
+    if (lnk.model && DENIED_MODELS.indexOf(lnk.app + ':' + lnk.model) !== -1) return false;
+    return true;
+  }
 
   var GROUPS = [
     {
@@ -941,34 +956,34 @@ document.addEventListener('DOMContentLoaded', function(){
       id: 'crm', label: '👥 CRM',
       apps: ['crm', 'strategy'],
       links: [
-        { href: '/admin/crm/customer/',                     label: '👤 Клієнти' },
-        { href: '/admin/strategy/customerstrategy/',        label: '🎯 Стратегії' },
-        { href: '/admin/strategy/strategytemplate/',        label: '📋 Шаблони' },
+        { href: '/admin/crm/customer/',                  label: '👤 Клієнти',   app: 'crm',      model: 'Customer' },
+        { href: '/admin/strategy/customerstrategy/',     label: '🎯 Стратегії', app: 'strategy', model: 'CustomerStrategy' },
+        { href: '/admin/strategy/strategytemplate/',     label: '📋 Шаблони',   app: 'strategy', model: 'StrategyTemplate' },
       ],
     },
     { id: 'sales',      label: '🛒 Продажі',      apps: ['sales'] },
     { id: 'accounting', label: '💰 Бухгалтерія',  apps: ['accounting'] },
     { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'],
       links: [
-        { href: '/admin/shipping/shipment/create/blank/', label: '✉️ Нове відправлення' },
-        { href: '/admin/shipping/addressbook/',           label: '📖 Адресна книга' },
-        { href: '/admin/shipping/shipment/add-tracking/', label: '📦 Додати трекінг' },
+        { href: '/admin/shipping/shipment/create/blank/', label: '✉️ Нове відправлення', app: 'shipping' },
+        { href: '/admin/shipping/addressbook/',           label: '📖 Адресна книга',      app: 'shipping' },
+        { href: '/admin/shipping/shipment/add-tracking/', label: '📦 Додати трекінг',     app: 'shipping' },
       ]
     },
     { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'],
       links: [
-        { href: '/admin/inventory/inventorysettings/', label: '⚙️ Налаштування складу' },
+        { href: '/admin/inventory/inventorysettings/', label: '⚙️ Налаштування складу', app: 'inventory' },
       ]
     },
     { id: 'tasks',      label: '📋 Задачі',       apps: ['tasks'] },
     { id: 'ai',         label: '🏛️ Minerva AI',   href: '/dashboard/ai/',   apps: ['ai_assistant'],
       links: [
-        { href: '/dashboard/ai/',                          label: '🏛️ Огляд AI' },
-        { href: '/ai/',                                    label: '💬 WebChat' },
-        { href: '/admin/ai_assistant/aiconversation/',     label: '📜 Розмови' },
-        { href: '/admin/ai_assistant/aibudgetlog/',        label: '💰 Бюджет' },
-        { href: '/admin/strategy/aisettings/',             label: '⚙️ Налаштування AI' },
-        { href: '/ai/diagnostic/',                         label: '🔧 Діагностика' },
+        { href: '/dashboard/ai/',                        label: '🏛️ Огляд AI' },
+        { href: '/ai/',                                  label: '💬 WebChat' },
+        { href: '/admin/ai_assistant/aiconversation/',   label: '📜 Розмови',           app: 'ai_assistant', model: 'AIConversation' },
+        { href: '/admin/ai_assistant/aibudgetlog/',      label: '💰 Бюджет',            app: 'ai_assistant', model: 'AIBudgetLog' },
+        { href: '/admin/strategy/aisettings/',           label: '⚙️ Налаштування AI',   app: 'strategy',     model: 'AISettings' },
+        { href: '/ai/diagnostic/',                       label: '🔧 Діагностика' },
       ]
     },
     { id: 'bots',       label: '🧠 Боти та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
@@ -976,19 +991,19 @@ document.addEventListener('DOMContentLoaded', function(){
       id: 'system', label: '⚙️ Система',
       href: '/dashboard/system/',
       links: [
-        { href: '/admin/config/integrations/',           label: '🔌 Інтеграції' },
-        { href: '/admin/autoimport/autoimportprofile/',  label: '🔄 Авто-імпорт' },
-        { href: '/dashboard/import/',                    label: '📥 Імпорт даних' },
-        { href: '/dashboard/help/',                      label: '📖 Довідник' },
+        { href: '/admin/config/integrations/',          label: '🔌 Інтеграції',   app: 'config' },
+        { href: '/admin/autoimport/autoimportprofile/', label: '🔄 Авто-імпорт',  app: 'autoimport' },
+        { href: '/dashboard/import/',                   label: '📥 Імпорт даних' },
+        { href: '/dashboard/help/',                     label: '📖 Довідник' },
       ],
       apps: ['autoimport', 'config', 'backup', 'auth']
     },
     {
       id: 'security', label: '🔐 Безпека',
       links: [
-        { href: '/admin/core/auditlog/',       label: '📋 Журнал аудиту' },
-        { href: '/admin/core/userprofile/',    label: '👤 Ролі користувачів' },
-        { href: '/admin/core/moduleregistry/', label: '🧩 Реєстр модулів' },
+        { href: '/admin/core/auditlog/',       label: '📋 Журнал аудиту',     app: 'core', model: 'AuditLog' },
+        { href: '/admin/core/userprofile/',    label: '👤 Ролі користувачів', app: 'core', model: 'UserProfile' },
+        { href: '/admin/core/moduleregistry/', label: '🧩 Реєстр модулів',    app: 'core', model: 'ModuleRegistry' },
       ],
       apps: ['core']
     },
@@ -1111,9 +1126,9 @@ document.addEventListener('DOMContentLoaded', function(){
   /* Build groups */
   GROUPS.forEach(function(grp){
     if (grp.adminOnly && USER_ROLE !== 'superadmin') return;
-    var hasLinks = grp.links && grp.links.length;
-    var appsFound = (grp.apps || []).filter(function(a){ return mods[a]; });
-    if (!hasLinks && !appsFound.length) return;
+    var appsFound    = (grp.apps || []).filter(function(a){ return mods[a] && _moduleAllowed(a); });
+    var linksToShow  = (grp.links || []).filter(_linkAllowed);
+    if (!linksToShow.length && !appsFound.length) return;
 
     var collapsed;
     if (_activeGroup !== null) {
@@ -1134,7 +1149,7 @@ document.addEventListener('DOMContentLoaded', function(){
     var labelHtml = grp.label;
     if (grp.href) {
       labelHtml = '<a href="' + grp.href + '" class="mg-header-link">' + grp.label + '</a>';
-    } else if (!hasLinks && appsFound.length === 1) {
+    } else if (!linksToShow.length && appsFound.length === 1) {
       var capLink = mods[appsFound[0]].querySelector('caption a');
       if (capLink) {
         labelHtml = '<a href="' + capLink.href + '" class="mg-header-link">' + grp.label + '</a>';
@@ -1160,16 +1175,14 @@ document.addEventListener('DOMContentLoaded', function(){
     var content = document.createElement('div');
     content.className = 'mg-content';
 
-    if (grp.links) {
-      grp.links.forEach(function(lnk){
-        var a = document.createElement('a');
-        a.href = lnk.href;
-        a.className = 'mg-link' + (lnk.cls ? ' ' + lnk.cls : '');
-        if (lnk.id) a.id = lnk.id;
-        a.textContent = lnk.label;
-        content.appendChild(a);
-      });
-    }
+    linksToShow.forEach(function(lnk){
+      var a = document.createElement('a');
+      a.href = lnk.href;
+      a.className = 'mg-link' + (lnk.cls ? ' ' + lnk.cls : '');
+      if (lnk.id) a.id = lnk.id;
+      a.textContent = lnk.label;
+      content.appendChild(a);
+    });
 
     appsFound.forEach(function(name){
       if (appsFound.length > 1) makeModCollapsible(mods[name]);

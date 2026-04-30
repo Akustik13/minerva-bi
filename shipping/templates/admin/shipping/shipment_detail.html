@@ -308,8 +308,8 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     <div>
 
       <!-- Відправник -->
-      {% with s_name=shipment.sender_name|default:shipment.carrier.sender_name s_company=shipment.sender_company|default:shipment.carrier.sender_company s_street=shipment.sender_street|default:shipment.carrier.sender_street s_city=shipment.sender_city|default:shipment.carrier.sender_city s_zip=shipment.sender_zip|default:shipment.carrier.sender_zip s_country=shipment.sender_country|default:shipment.carrier.sender_country s_phone=shipment.sender_phone|default:shipment.carrier.sender_phone s_email=shipment.sender_email|default:shipment.carrier.sender_email %}
-      {% if s_name or s_street %}
+      {% with s_name=sv_sender.name s_company=sv_sender.company s_street=sv_sender.street s_city=sv_sender.city s_zip=sv_sender.zip s_country=sv_sender.country s_phone=sv_sender.phone s_email=sv_sender.email %}
+      {% if s_name or s_street or s_country %}
       <div class="sd-card">
         <div class="sd-card-title">📦 Відправник</div>
         <div class="sd-info-grid">

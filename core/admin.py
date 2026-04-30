@@ -1,10 +1,142 @@
 import json
 from django import forms
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as _DjangoUserAdmin
 from django.contrib.auth.models import User
+from django.urls import reverse, NoReverseMatch
 from django.utils.html import format_html, mark_safe
 
 from .models import AuditLog, UserProfile, ModuleBundle, ModuleRegistry, TenantAccount
+
+
+# ── Custom User Admin (replaces Django default) ───────────────────────────────
+
+admin.site.unregister(User)
+
+@admin.register(User)
+class MinervaUserAdmin(_DjangoUserAdmin):
+    """
+    Simplified User admin for Minerva.
+    Hides Django's unused groups/permissions — real access control
+    is in UserProfile (role, can_delete, can_export, etc.).
+    """
+
+    list_display  = ('username', 'email', 'full_name_col', 'is_active',
+                     'is_staff', 'is_superuser', 'profile_link_col')
+    list_display_links = ('username',)
+    list_filter   = ('is_active', 'is_staff', 'is_superuser')
+    search_fields = ('username', 'email', 'first_name', 'last_name')
+
+    fieldsets = (
+        ('👤 Обліковий запис', {
+            'fields': ('username', 'password'),
+        }),
+        ('📋 Особисті дані', {
+            'fields': ('first_name', 'last_name', 'email'),
+        }),
+        ('🔑 Доступ до системи', {
+            'fields': ('is_active', 'is_staff', 'is_superuser'),
+            'description': (
+                '<b>is_staff</b> — дозволяє вхід в адмін-панель.&nbsp;&nbsp;'
+                '<b>is_superuser</b> — повний доступ до всього (обережно!).'
+            ),
+        }),
+        ('⚙️ Роль та права Minerva', {
+            'fields': ('profile_panel',),
+            'description': (
+                '<div style="background:rgba(255,152,0,.08);border:1px solid rgba(255,152,0,.3);'
+                'border-left:4px solid #ff9800;border-radius:6px;padding:10px 14px;font-size:12px;margin-bottom:6px">'
+                '👆 Роль, модулі, can_delete/export/import — все керується в <strong>Профілі користувача</strong>, '
+                'не тут. Натисніть кнопку нижче щоб перейти.'
+                '</div>'
+            ),
+        }),
+        ('🕒 Активність', {
+            'fields': ('last_login', 'date_joined'),
+            'classes': ('collapse',),
+        }),
+    )
+    readonly_fields = ('last_login', 'date_joined', 'profile_panel')
+
+    # Hide add_fieldsets groups/permissions too
+    add_fieldsets = (
+        ('👤 Новий користувач', {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'first_name', 'last_name',
+                       'password1', 'password2', 'is_active', 'is_staff'),
+        }),
+    )
+
+    @admin.display(description='Профіль Minerva')
+    def profile_panel(self, obj):
+        role_colors = {
+            'superadmin': '#f85149', 'admin': '#ff9800', 'manager': '#58a6ff',
+            'warehouse': '#3fb950', 'accountant': '#c9a84c', 'ai': '#a78bfa',
+        }
+        try:
+            profile = obj.profile
+            color = role_colors.get(profile.role, '#9aafbe')
+            url = reverse('admin:core_userprofile_change', args=[profile.pk])
+            allowed = profile.get_allowed_modules()
+            if allowed == '__all__':
+                modules_html = '<span style="color:var(--ok,#3fb950);font-weight:700">✅ Всі модулі</span>'
+            else:
+                modules_html = ', '.join(f'<code>{m}</code>' for m in allowed) or '<em>жодного</em>'
+            return format_html(
+                '<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
+                '<a href="{}" style="display:inline-flex;align-items:center;gap:8px;padding:8px 18px;'
+                'border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;'
+                'background:{}22;color:{};border:1px solid {}55">'
+                '⚙️ Редагувати профіль — {}</a>'
+                '<span style="font-size:11px;color:var(--text-muted)">Модулі: {}</span>'
+                '</div>',
+                url, color, color, color, profile.get_role_display(),
+                mark_safe(modules_html),
+            )
+        except UserProfile.DoesNotExist:
+            try:
+                url = reverse('admin:core_userprofile_add') + f'?user={obj.pk}'
+            except NoReverseMatch:
+                url = '#'
+            return format_html(
+                '<a href="{}" style="display:inline-flex;align-items:center;gap:8px;padding:8px 18px;'
+                'border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;'
+                'background:rgba(248,81,73,.1);color:var(--err,#f85149);border:1px solid rgba(248,81,73,.3)">'
+                '⚠️ Профілю немає — створити зараз</a>',
+                url,
+            )
+
+    @admin.display(description='Ім\'я')
+    def full_name_col(self, obj):
+        name = f'{obj.first_name} {obj.last_name}'.strip()
+        return name or '—'
+
+    @admin.display(description='Профіль / Права')
+    def profile_link_col(self, obj):
+        try:
+            profile = obj.profile
+            role_colors = {
+                'superadmin': '#f85149', 'admin': '#ff9800', 'manager': '#58a6ff',
+                'warehouse': '#3fb950', 'accountant': '#c9a84c', 'ai': '#a78bfa',
+            }
+            color = role_colors.get(profile.role, '#9aafbe')
+            url = reverse('admin:core_userprofile_change', args=[profile.pk])
+            return format_html(
+                '<a href="{}" style="display:inline-flex;align-items:center;gap:6px;'
+                'padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700;'
+                'text-decoration:none;background:{}22;color:{};border:1px solid {}55">'
+                '⚙️ {}</a>',
+                url, color, color, color, profile.get_role_display(),
+            )
+        except UserProfile.DoesNotExist:
+            try:
+                url = reverse('admin:core_userprofile_add') + f'?user={obj.pk}'
+            except NoReverseMatch:
+                url = '#'
+            return format_html(
+                '<a href="{}" style="color:var(--err,#f85149);font-size:11px;font-weight:600">'
+                '⚠️ Немає профілю</a>', url
+            )
 
 
 # ── UserProfile custom form ───────────────────────────────────────────────────
@@ -38,6 +170,9 @@ class UserProfileForm(forms.ModelForm):
             self.fields['modules_override'].initial = (
                 ModuleRegistry.objects.filter(app_label__in=self.instance.allowed_modules)
             )
+        # Render denied_models as hidden input — UI managed by JS
+        self.fields['denied_models'].widget  = forms.HiddenInput()
+        self.fields['denied_models'].required = False
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -147,7 +282,7 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display  = ('user', 'role_badge', 'effective_access', 'ai_enabled')
     list_filter   = ('role', 'bundle', 'ai_enabled')
     search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
-    readonly_fields = ('effective_access_detail',)
+    readonly_fields = ('effective_access_detail', 'denied_models_panel')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'bundle':
@@ -157,13 +292,13 @@ class UserProfileAdmin(admin.ModelAdmin):
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         from core.utils import ROLE_PERMISSIONS
+        from django.contrib import admin as _admin
         extra = extra_context or {}
 
         # app_label → pk (string) — needed because checkbox values are PKs
-        module_pk_map = {
-            m.app_label: str(m.pk)
-            for m in ModuleRegistry.objects.all()
-        }
+        all_modules = list(ModuleRegistry.objects.all())
+        module_pk_map = {m.app_label: str(m.pk) for m in all_modules}
+        module_names  = {m.app_label: m.name     for m in all_modules}
 
         # role → [app_labels] or '__all__'
         role_modules = {
@@ -177,10 +312,24 @@ class UserProfileAdmin(admin.ModelAdmin):
             for b in ModuleBundle.objects.prefetch_related('modules')
         }
 
-        extra['mv_module_pk_map']  = json.dumps(module_pk_map,  ensure_ascii=False)
-        extra['mv_role_modules']   = json.dumps(role_modules,   ensure_ascii=False)
-        extra['mv_bundle_modules'] = json.dumps(bundle_modules, ensure_ascii=False)
-        extra['mv_changelist_url'] = '../'
+        # app_label → [{object_name, verbose_name}] from admin registry
+        app_models: dict = {}
+        for model_cls in _admin.site._registry:
+            al = model_cls._meta.app_label
+            app_models.setdefault(al, [])
+            app_models[al].append({
+                'object_name':  model_cls.__name__,
+                'verbose_name': str(model_cls._meta.verbose_name_plural or model_cls.__name__),
+            })
+        for al in app_models:
+            app_models[al].sort(key=lambda m: m['verbose_name'])
+
+        extra['mv_module_pk_map']   = json.dumps(module_pk_map,  ensure_ascii=False)
+        extra['mv_module_names']    = json.dumps(module_names,   ensure_ascii=False)
+        extra['mv_role_modules']    = json.dumps(role_modules,   ensure_ascii=False)
+        extra['mv_bundle_modules']  = json.dumps(bundle_modules, ensure_ascii=False)
+        extra['mv_app_models_json'] = json.dumps(app_models,     ensure_ascii=False)
+        extra['mv_changelist_url']  = '../'
         return super().changeform_view(request, object_id, form_url, extra)
 
     fieldsets = (
@@ -194,6 +343,14 @@ class UserProfileAdmin(admin.ModelAdmin):
                 '1️⃣ <strong>Ручне перевизначення</strong> — якщо відмічено нижче<br>'
                 '2️⃣ <strong>Пакет</strong> — якщо вибрано пакет<br>'
                 '3️⃣ <strong>Роль</strong> — автоматично за роллю користувача'
+            ),
+        }),
+        ('🚫 Заборонені підмодулі', {
+            'fields': ('denied_models_panel', 'denied_models'),
+            'description': (
+                'Тут можна заборонити окремі моделі (підрозділи) всередині дозволеного модуля. '
+                'Заборонений підмодуль не з\'являтиметься у навігаційному меню. '
+                'Натисніть на назву модуля щоб розкрити список підмодулів.'
             ),
         }),
         ('🔒 Дозволи (перевизначення)', {
@@ -294,6 +451,14 @@ class UserProfileAdmin(admin.ModelAdmin):
             )
 
         return format_html('{}&nbsp; {}', source_html, badges)
+
+    @admin.display(description='Управління підмодулями')
+    def denied_models_panel(self, obj):
+        return mark_safe(
+            '<div id="mv-denied-panel" style="min-height:40px">'
+            '<em style="color:var(--text-dim);font-size:12px">Завантаження…</em>'
+            '</div>'
+        )
 
 
 # ── ModuleRegistry ────────────────────────────────────────────────────────────

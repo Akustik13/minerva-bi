@@ -5,10 +5,13 @@
 {{ block.super }}
 <script>
 (function () {
-  var MODULE_PK_MAP  = {{ mv_module_pk_map|safe }};   // {app_label: "pk"}
-  var ROLE_MODULES   = {{ mv_role_modules|safe }};     // {role: [app_label,...] | "__all__"}
-  var BUNDLE_MODULES = {{ mv_bundle_modules|safe }};   // {bundle_pk: [app_label,...]}
+  var MODULE_PK_MAP  = {{ mv_module_pk_map|safe }};
+  var ROLE_MODULES   = {{ mv_role_modules|safe }};
+  var BUNDLE_MODULES = {{ mv_bundle_modules|safe }};
+  var APP_MODELS     = {{ mv_app_models_json|default:"{}"|safe }};
+  var MODULE_NAMES   = {{ mv_module_names|default:"{}"|safe }};
 
+  /* ── Module checkboxes sync ────────────────────────────────────────────── */
   function toPks(appLabels) {
     if (appLabels === '__all__') return '__all__';
     return appLabels.map(function (l) { return MODULE_PK_MAP[l]; }).filter(Boolean);
@@ -24,7 +27,6 @@
     var bundleSel = document.querySelector('select[name="bundle"]');
     var roleSel   = document.querySelector('select[name="role"]');
     var bundleVal = bundleSel ? bundleSel.value : '';
-
     if (bundleVal && BUNDLE_MODULES[bundleVal]) {
       setCheckboxes(toPks(BUNDLE_MODULES[bundleVal]));
     } else if (roleSel) {
@@ -32,6 +34,164 @@
     }
   }
 
+  /* ── Denied models panel ───────────────────────────────────────────────── */
+  function getDeniedInput() {
+    return document.querySelector('input[name="denied_models"]');
+  }
+
+  function getDenied() {
+    var inp = getDeniedInput();
+    if (!inp || !inp.value) return [];
+    try { return JSON.parse(inp.value) || []; } catch (e) { return []; }
+  }
+
+  function setDenied(arr) {
+    var inp = getDeniedInput();
+    if (inp) inp.value = JSON.stringify(arr || []);
+  }
+
+  window.mvToggleDeniedSec = function (al) {
+    var sec   = document.getElementById('mv-denied-sec-' + al);
+    var arrow = document.getElementById('mv-denied-arr-' + al);
+    if (!sec) return;
+    var open = sec.style.display !== 'none';
+    sec.style.display = open ? 'none' : 'block';
+    if (arrow) arrow.textContent = open ? '▶' : '▼';
+  };
+
+  window.mvDeniedChange = function (key, cb) {
+    var safeKey = key.replace(':', '-');
+    var icon  = document.getElementById('mv-di-' + safeKey);
+    var label = document.getElementById('mv-dl-' + safeKey);
+    if (icon)  icon.style.display = cb.checked ? 'inline' : 'none';
+    if (label) label.style.color  = cb.checked ? 'var(--err,#f85149)' : '';
+    /* rebuild denied set */
+    var current = getDenied();
+    var set = {};
+    current.forEach(function (k) { set[k] = true; });
+    if (cb.checked) set[key] = true;
+    else delete set[key];
+    setDenied(Object.keys(set));
+    /* update count badge */
+    var al    = key.split(':')[0];
+    var badge = document.getElementById('mv-denied-badge-' + al);
+    if (badge) {
+      var sec = document.getElementById('mv-denied-sec-' + al);
+      var n   = sec ? sec.querySelectorAll('input[type="checkbox"]:checked').length : 0;
+      badge.textContent = n + '\u00a0забор.';
+      badge.style.display = n ? 'inline' : 'none';
+    }
+  };
+
+  function buildDeniedPanel() {
+    var panel = document.getElementById('mv-denied-panel');
+    if (!panel) return;
+
+    var denied    = getDenied();
+    var deniedSet = {};
+    denied.forEach(function (k) { deniedSet[k] = true; });
+
+    /* show only apps registered in ModuleRegistry */
+    var apps = Object.keys(APP_MODELS).filter(function (al) {
+      return MODULE_PK_MAP[al] !== undefined && APP_MODELS[al] && APP_MODELS[al].length;
+    });
+    apps.sort(function (a, b) {
+      return (MODULE_NAMES[a] || a).localeCompare(MODULE_NAMES[b] || b);
+    });
+
+    if (!apps.length) {
+      panel.innerHTML = '<em style="color:var(--text-dim);font-size:12px">Немає зареєстрованих модулів</em>';
+      return;
+    }
+
+    var grid = document.createElement('div');
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;margin-top:4px';
+
+    apps.forEach(function (al) {
+      var models = APP_MODELS[al] || [];
+      if (!models.length) return;
+      var appName     = MODULE_NAMES[al] || al;
+      var deniedCount = models.filter(function (m) { return deniedSet[al + ':' + m.object_name]; }).length;
+
+      var card = document.createElement('div');
+      card.style.cssText = 'border:1px solid var(--border-strong);border-radius:6px;overflow:hidden';
+
+      /* header */
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'padding:7px 10px;cursor:pointer;display:flex;align-items:center;gap:7px;'
+        + 'background:var(--bg-hover);user-select:none;font-size:12px';
+      (function (capturedAl) { hdr.onclick = function () { mvToggleDeniedSec(capturedAl); }; })(al);
+
+      var arrow = document.createElement('span');
+      arrow.id = 'mv-denied-arr-' + al;
+      arrow.textContent = '▶';
+      arrow.style.cssText = 'font-size:9px;color:var(--text-dim);flex-shrink:0';
+
+      var nameSpan = document.createElement('span');
+      nameSpan.style.fontWeight = '600';
+      nameSpan.textContent = appName;
+
+      var countSpan = document.createElement('span');
+      countSpan.style.cssText = 'font-size:10px;color:var(--text-dim);margin-left:auto;flex-shrink:0;padding-left:4px';
+      countSpan.textContent = models.length + '\u00a0мод.';
+
+      var badge = document.createElement('span');
+      badge.id = 'mv-denied-badge-' + al;
+      badge.style.cssText = 'background:#f85149;color:#fff;border-radius:10px;padding:1px 6px;'
+        + 'font-size:10px;flex-shrink:0;margin-left:4px;display:' + (deniedCount > 0 ? 'inline' : 'none');
+      badge.textContent = deniedCount + '\u00a0забор.';
+
+      hdr.appendChild(arrow);
+      hdr.appendChild(nameSpan);
+      hdr.appendChild(countSpan);
+      hdr.appendChild(badge);
+
+      /* body */
+      var body = document.createElement('div');
+      body.id = 'mv-denied-sec-' + al;
+      body.style.cssText = 'display:none;padding:6px 10px 8px';
+
+      models.forEach(function (m) {
+        var key     = al + ':' + m.object_name;
+        var safeKey = key.replace(':', '-');
+        var isDenied = !!deniedSet[key];
+
+        var lbl = document.createElement('label');
+        lbl.style.cssText = 'display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12px';
+
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = isDenied;
+        cb.style.cssText = 'width:14px;height:14px;cursor:pointer;flex-shrink:0;margin:0';
+        cb.setAttribute('data-denied-key', key);
+        (function (capturedKey) { cb.onchange = function () { mvDeniedChange(capturedKey, this); }; })(key);
+
+        var icon = document.createElement('span');
+        icon.id = 'mv-di-' + safeKey;
+        icon.textContent = '🚫';
+        icon.style.cssText = 'flex-shrink:0;font-size:11px;display:' + (isDenied ? 'inline' : 'none');
+
+        var nameEl = document.createElement('span');
+        nameEl.id = 'mv-dl-' + safeKey;
+        nameEl.style.color = isDenied ? 'var(--err,#f85149)' : '';
+        nameEl.textContent = m.verbose_name;
+
+        lbl.appendChild(cb);
+        lbl.appendChild(icon);
+        lbl.appendChild(nameEl);
+        body.appendChild(lbl);
+      });
+
+      card.appendChild(hdr);
+      card.appendChild(body);
+      grid.appendChild(card);
+    });
+
+    panel.innerHTML = '';
+    panel.appendChild(grid);
+  }
+
+  /* ── Init ──────────────────────────────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', function () {
     var bundleSel = document.querySelector('select[name="bundle"]');
     var roleSel   = document.querySelector('select[name="role"]');
@@ -39,7 +199,7 @@
     if (bundleSel) bundleSel.addEventListener('change', syncFromForm);
     if (roleSel)   roleSel.addEventListener('change', syncFromForm);
 
-    // ── Cancel button ──────────────────────────────────────────────
+    /* Cancel button */
     var submitRow = document.querySelector('.submit-row');
     if (submitRow) {
       var btn = document.createElement('a');
@@ -59,6 +219,9 @@
       };
       submitRow.appendChild(btn);
     }
+
+    /* Build denied-models panel */
+    buildDeniedPanel();
   });
 })();
 </script>

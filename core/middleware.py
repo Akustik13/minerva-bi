@@ -51,11 +51,41 @@ class ModuleAccessMiddleware:
         app_label = parts[1]
         if not app_label or app_label in self._ALWAYS_ALLOW:
             return False
+
+        # Layer 1: global module flag — blocks everyone
         try:
             from core.models import ModuleRegistry
-            return not ModuleRegistry.check_active(app_label)
+            if not ModuleRegistry.check_active(app_label):
+                return True
         except Exception:
-            return False  # fail open
+            pass
+
+        # Layer 2+3: per-user allowed modules + denied model URLs
+        user = getattr(request, 'user', None)
+        if not user or not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return False
+        try:
+            profile = user.profile
+            if profile.role == 'superadmin':
+                return False
+            allowed = profile.get_allowed_modules()
+            # Layer 2: app-level
+            if allowed != '__all__' and app_label not in allowed:
+                return True
+            # Layer 3: model-level — /admin/<app>/<model_slug>/
+            if len(parts) >= 3 and parts[2]:
+                model_slug = parts[2]
+                for entry in (profile.denied_models or []):
+                    if ':' not in entry:
+                        continue
+                    ent_app, ent_model = entry.split(':', 1)
+                    if ent_app == app_label and ent_model.lower() == model_slug:
+                        return True
+            return False
+        except Exception:
+            return False  # fail open — no profile means full access
 
 
 class TenantMiddleware:
