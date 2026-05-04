@@ -314,10 +314,10 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
     so_currency = so.get("Currency") or order_currency
 
     # ── Shipping recipient (may differ from billing contact) ──────────────────
-    addr_first   = addr.get("FirstName", "")
-    addr_last    = addr.get("LastName", "")
+    addr_first   = addr.get("FirstName") or ""
+    addr_last    = addr.get("LastName") or ""
     ship_name_str = f"{addr_first} {addr_last}".strip()  # actual recipient
-    ship_company_str = addr.get("CompanyName", "")
+    ship_company_str = addr.get("CompanyName") or ""
     # client (legacy display): shipping company or recipient name or billing contact
     client_str = ship_company_str or ship_name_str or contact_name
 
@@ -327,18 +327,18 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
         "order_date":     order_date,
         "status":         minerva_status,
         "contact_name":   contact_name,
-        "email":          contact.get("Email", ""),
+        "email":          contact.get("Email") or "",
         "client":         client_str,
         "total_price":    so.get("TotalPrice"),
         "currency":       so_currency,
         # Shipping recipient
         "ship_name":      ship_name_str,
         "ship_company":   ship_company_str,
-        "ship_phone":     addr.get("PhoneNumber", ""),
-        "ship_email":     addr.get("Email", "") or "",
-        "addr_city":      addr.get("City", ""),
-        "addr_state":     addr.get("State", ""),
-        "addr_zip":       addr.get("ZipCode", ""),
+        "ship_phone":     addr.get("PhoneNumber") or "",
+        "ship_email":     addr.get("Email") or "",
+        "addr_city":      addr.get("City") or "",
+        "addr_state":     addr.get("State") or "",
+        "addr_zip":       addr.get("ZipCode") or "",
         "addr_country":   _normalize_country(addr.get("IsoCode") or ""),
         # Store main OrderNumber for reference
         "lieferschein_nr": order_number,
@@ -746,17 +746,17 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
     contact     = f"{bill_first} {bill_last}".strip()  # e.g. ANGELA LEONES
 
     # Shipping recipient (who receives the package — may differ from billing)
-    ship_first   = addr.get("firstName", "")
-    ship_last    = addr.get("lastName", "")
+    ship_first   = addr.get("firstName") or ""
+    ship_last    = addr.get("lastName") or ""
     ship_name_str = f"{ship_first} {ship_last}".strip()  # e.g. CHARLES GORDON P-21118
-    ship_company_str = addr.get("companyName", "")        # e.g. SCIENCE CORPORATION
+    ship_company_str = addr.get("companyName") or ""      # e.g. SCIENCE CORPORATION
 
     # client = shipping company (or billing name if no company) — legacy field kept for display
     client    = ship_company_str or contact
 
-    street       = " ".join(filter(None, [addr.get("street1", ""), addr.get("street2", "").strip()]))
-    phone        = addr.get("phoneNumber", "")
-    email        = customer.get("customerEmail", "")
+    street       = " ".join(filter(None, [addr.get("street1") or "", (addr.get("street2") or "").strip()]))
+    phone        = addr.get("phoneNumber") or ""
+    email        = customer.get("customerEmail") or ""
     addr_country = _normalize_country(addr.get("countryCode") or "")
 
     # Legacy raw address block
@@ -783,14 +783,14 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
         "ship_name":        ship_name_str,
         "ship_company":     ship_company_str,
         "ship_phone":       phone,
-        "ship_email":       addr.get("emailAddress", "") or "",
+        "ship_email":       addr.get("emailAddress") or "",
         "shipping_address": shipping_address_raw,
         "total_price":      order.get("totalPrice"),
         "currency":         currency,
         "addr_street":      street,
-        "addr_city":        addr.get("city", ""),
-        "addr_state":       addr.get("state", "") if addr_country in ("US", "CA") else "",
-        "addr_zip":         addr.get("postalCode", ""),
+        "addr_city":        addr.get("city") or "",
+        "addr_state":       (addr.get("state") or "") if addr_country in ("US", "CA") else "",
+        "addr_zip":         addr.get("postalCode") or "",
         "addr_country":     addr_country,
         "lieferschein_nr":  po_number,
         "shipping_deadline": deadline,
