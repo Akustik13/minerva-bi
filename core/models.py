@@ -208,6 +208,34 @@ class UserProfile(models.Model):
     )
     created_at         = models.DateTimeField(auto_now_add=True, verbose_name='Дата створення')
 
+    # ── Особиста пошта (IMAP) ─────────────────────────────────
+    imap_enabled = models.BooleanField(
+        default=False, verbose_name='IMAP увімкнено',
+        help_text='Читати листи з особистого ящика і додавати в хронологію клієнтів.',
+    )
+    imap_host = models.CharField(
+        max_length=255, blank=True, verbose_name='IMAP Host',
+        help_text='ionos: imap.ionos.de | Gmail: imap.gmail.com',
+    )
+    imap_port = models.PositiveSmallIntegerField(
+        default=993, verbose_name='IMAP Port',
+    )
+    imap_use_ssl = models.BooleanField(
+        default=True, verbose_name='SSL (порт 993)',
+    )
+    imap_user = models.CharField(
+        max_length=255, blank=True, verbose_name='IMAP Login',
+        help_text='Зазвичай повна email-адреса.',
+    )
+    imap_password = models.CharField(
+        max_length=255, blank=True, verbose_name='IMAP Password',
+    )
+    imap_sent_folder = models.CharField(
+        max_length=100, blank=True, default='INBOX.Sent',
+        verbose_name='Sent папка',
+        help_text='ionos: INBOX.Sent | Gmail: [Gmail]/Sent Mail',
+    )
+
     class Meta:
         verbose_name        = 'Профіль користувача'
         verbose_name_plural = 'Профілі користувачів'

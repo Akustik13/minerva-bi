@@ -2,13 +2,13 @@
 config/management/commands/fetch_emails.py
 
 Читає листи з IMAP (inbox + sent) і зберігає в CustomerTimeline.
-Матчинг по Customer.email. Дублікати відфільтровуються по IMAP UID.
+Кожен користувач має власні IMAP налаштування (UserProfile).
+Матчинг по Customer.email. Дублікати відфільтровуються по IMAP UID + user.
 Запускається автоматично кожні 15 хв через cron_runner.sh.
 """
 import email
 import imaplib
 import logging
-import quopri
 from datetime import datetime, timedelta, timezone as dt_tz
 from email.header import decode_header
 from email.utils import parseaddr, parsedate_to_datetime
@@ -52,7 +52,7 @@ def _get_body(msg) -> str:
 
 
 class Command(BaseCommand):
-    help = 'Завантажити листи з IMAP і додати в хронологію клієнтів'
+    help = 'Завантажити листи з IMAP і додати в хронологію клієнтів (per-user)'
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -61,67 +61,84 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             '--days', type=int, default=None,
-            help='Завантажити за N днів (перевизначає налаштування)',
+            help='Завантажити за N днів (default: 30)',
+        )
+        parser.add_argument(
+            '--customer', metavar='EMAIL', default=None,
+            help='Фільтрувати листи тільки від/до цього email (напр. ivan@example.com)',
+        )
+        parser.add_argument(
+            '--user', metavar='USERNAME', default=None,
+            help='Синхронізувати тільки для цього користувача',
         )
 
     def handle(self, *args, **options):
-        from config.models import NotificationSettings
-        s = NotificationSettings.objects.first()
-        if not s:
-            self.stderr.write('NotificationSettings не налаштовані')
+        from core.models import UserProfile
+
+        dry_run         = options['dry_run']
+        lookback        = options['days'] or 30
+        customer_filter = options['customer'].lower().strip() if options['customer'] else None
+        username_filter = options['user']
+
+        qs = UserProfile.objects.filter(imap_enabled=True).select_related('user')
+        if username_filter:
+            qs = qs.filter(user__username=username_filter)
+
+        if not qs.exists():
+            self.stdout.write('Немає користувачів з увімкненим IMAP — пропускаємо')
             return
 
-        if not s.imap_enabled:
-            self.stdout.write('IMAP вимкнено (увімкніть в Конфігурація → Сповіщення)')
-            return
+        total_created = total_skipped = total_errors = 0
 
-        if not s.imap_host or not s.imap_user or not s.imap_password:
-            self.stderr.write('IMAP host/user/password не заповнені')
-            return
-
-        dry_run  = options['dry_run']
-        lookback = options['days'] or s.imap_lookback_days or 30
-
-        created = skipped = errors = 0
-
-        for folder, event_type in [
-            (s.imap_inbox_folder or 'INBOX', 'email_in'),
-            (s.imap_sent_folder  or '',       'email_out'),
-        ]:
-            if not folder:
+        for profile in qs:
+            if not profile.imap_host or not profile.imap_user or not profile.imap_password:
+                self.stderr.write(
+                    f'[{profile.user.username}] IMAP host/user/password не заповнені — пропускаємо'
+                )
                 continue
-            c, sk, er = self._process_folder(
-                s, folder, event_type, lookback, dry_run)
-            created += c; skipped += sk; errors += er
+
+            self.stdout.write(f'--- {profile.user.username} ({profile.imap_user}) ---')
+
+            for folder, event_type in [
+                ('INBOX',                               'email_in'),
+                (profile.imap_sent_folder or '',        'email_out'),
+            ]:
+                if not folder:
+                    continue
+                c, sk, er = self._process_folder(
+                    profile, folder, event_type, lookback, dry_run, customer_filter)
+                total_created += c
+                total_skipped += sk
+                total_errors  += er
 
         self.stdout.write(
-            f'fetch_emails: +{created} нових, {skipped} пропущено, {errors} помилок'
+            f'fetch_emails: +{total_created} нових, {total_skipped} пропущено, {total_errors} помилок'
         )
 
-    def _connect(self, s) -> imaplib.IMAP4_SSL | imaplib.IMAP4:
-        if s.imap_use_ssl:
-            conn = imaplib.IMAP4_SSL(s.imap_host, s.imap_port)
+    def _connect(self, profile) -> imaplib.IMAP4_SSL | imaplib.IMAP4:
+        if profile.imap_use_ssl:
+            conn = imaplib.IMAP4_SSL(profile.imap_host, profile.imap_port)
         else:
-            conn = imaplib.IMAP4(s.imap_host, s.imap_port)
+            conn = imaplib.IMAP4(profile.imap_host, profile.imap_port)
             conn.starttls()
-        conn.login(s.imap_user, s.imap_password)
+        conn.login(profile.imap_user, profile.imap_password)
         return conn
 
-    def _process_folder(self, s, folder, event_type, lookback_days, dry_run):
+    def _process_folder(self, profile, folder, event_type, lookback_days, dry_run, customer_filter):
         from crm.models import Customer, CustomerTimeline
 
         # Побудувати карту email → customer (нижній регістр)
-        email_map = {
-            c.email.lower(): c
-            for c in Customer.objects.exclude(email='').only('pk', 'name', 'email')
-        }
+        customer_qs = Customer.objects.exclude(email='').only('pk', 'name', 'email')
+        if customer_filter:
+            customer_qs = customer_qs.filter(email__iexact=customer_filter)
+        email_map = {c.email.lower(): c for c in customer_qs}
         if not email_map:
             return 0, 0, 0
 
-        # UIDs вже збережених листів для цього event_type
+        # UIDs вже збережених листів: скоуп по user + event_type (кожен юзер — свій mailbox)
         existing_uids = set(
             CustomerTimeline.objects
-            .filter(event_type=event_type, related_email_id__isnull=False)
+            .filter(event_type=event_type, related_email_id__isnull=False, user=profile.user)
             .values_list('related_email_id', flat=True)
         )
 
@@ -129,15 +146,17 @@ class Command(BaseCommand):
 
         created = skipped = errors = 0
         try:
-            conn = self._connect(s)
+            conn = self._connect(profile)
         except Exception as e:
-            self.stderr.write(f'IMAP connect error ({folder}): {e}')
+            self.stderr.write(f'[{profile.user.username}] IMAP connect error ({folder}): {e}')
             return 0, 0, 1
 
         try:
             status, _ = conn.select(f'"{folder}"', readonly=True)
             if status != 'OK':
-                self.stderr.write(f'Cannot select folder: {folder}')
+                self.stderr.write(
+                    f'[{profile.user.username}] Cannot select folder: {folder}'
+                )
                 return 0, 0, 1
 
             _, data = conn.uid('search', None, f'SINCE {since_date}')
@@ -162,6 +181,12 @@ class Command(BaseCommand):
                     from_email = from_email.lower()
                     to_email   = to_email.lower()
 
+                    # Пропустити листи від самого себе в inbox (власний відправлений)
+                    own_email = profile.imap_user.lower()
+                    if event_type == 'email_in' and from_email == own_email:
+                        skipped += 1
+                        continue
+
                     # Знайти клієнта
                     customer = None
                     if event_type == 'email_in':
@@ -177,7 +202,6 @@ class Command(BaseCommand):
                     try:
                         date_str = msg.get('Date', '')
                         msg_date = parsedate_to_datetime(date_str)
-                        # Конвертувати в UTC-aware
                         if msg_date.tzinfo is None:
                             msg_date = msg_date.replace(tzinfo=dt_tz.utc)
                     except Exception:
@@ -195,6 +219,7 @@ class Command(BaseCommand):
 
                     obj = CustomerTimeline(
                         customer=customer,
+                        user=profile.user,
                         event_type=event_type,
                         title=subject[:300] or '(без теми)',
                         body=body,
@@ -206,7 +231,7 @@ class Command(BaseCommand):
                     created += 1
 
                 except Exception as e:
-                    logger.error(f'fetch_emails uid={uid}: {e}')
+                    logger.error(f'[{profile.user.username}] fetch_emails uid={uid}: {e}')
                     errors += 1
 
         finally:

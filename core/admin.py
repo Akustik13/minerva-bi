@@ -394,6 +394,21 @@ class UserProfileAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
             'description': 'Ці налаштування юзер може змінити самостійно на сторінці /core/my-settings/',
         }),
+        ('📧 Особиста пошта (IMAP)', {
+            'fields': (
+                'imap_enabled',
+                ('imap_host', 'imap_port'),
+                'imap_use_ssl',
+                'imap_user', 'imap_password',
+                'imap_sent_folder',
+            ),
+            'classes': ('collapse',),
+            'description': (
+                'Листи цього юзера будуть читатися з його особистого ящика. '
+                'ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. '
+                'Команда: <code>python manage.py fetch_emails</code>'
+            ),
+        }),
         ('🤖 AI-асистент', {
             'fields': (
                 'ai_enabled', 'ai_assistant_role',
