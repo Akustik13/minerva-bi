@@ -404,7 +404,10 @@ class CustomerTimeline(models.Model):
     remind_sent = models.BooleanField(default=False)
 
     is_pinned  = models.BooleanField(default=False, verbose_name='Закріплено вгорі')
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(
+        default=None, null=True, blank=True,
+        help_text='Залиш порожнім — заповниться автоматично (поточний час).',
+    )
 
     class Meta:
         verbose_name        = 'Подія клієнта'
@@ -415,5 +418,12 @@ class CustomerTimeline(models.Model):
             models.Index(fields=['remind_at', 'remind_sent']),
         ]
 
+    def save(self, *args, **kwargs):
+        if self.created_at is None:
+            from django.utils import timezone
+            self.created_at = timezone.now()
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f'{self.customer} | {self.get_event_type_display()} | {self.created_at:%d.%m.%Y}'
+        ts = self.created_at.strftime('%d.%m.%Y') if self.created_at else '?'
+        return f'{self.customer} | {self.get_event_type_display()} | {ts}'

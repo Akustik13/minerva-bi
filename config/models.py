@@ -346,6 +346,37 @@ class NotificationSettings(models.Model):
         help_text="Email-адреси через кому: admin@example.com, boss@company.com",
     )
 
+    # ── IMAP (читання пошти) ──────────────────────────────────────────────────
+    imap_enabled = models.BooleanField(
+        "IMAP увімкнено", default=False,
+        help_text="Увімкніть після налаштування — Мінерва читатиме листи і додаватиме в хронологію клієнтів.",
+    )
+    imap_host = models.CharField(
+        "IMAP Host", max_length=255, default="imap.ionos.de", blank=True,
+        help_text="ionos: imap.ionos.de | Gmail: imap.gmail.com",
+    )
+    imap_port = models.PositiveSmallIntegerField(
+        "IMAP Port", default=993,
+        help_text="SSL: 993 | STARTTLS: 143",
+    )
+    imap_use_ssl = models.BooleanField(
+        "SSL (порт 993)", default=True,
+        help_text="Вимкни якщо використовуєш STARTTLS (порт 143).",
+    )
+    imap_user = models.CharField("IMAP Login (email)", max_length=255, blank=True)
+    imap_password = models.CharField("IMAP Password", max_length=255, blank=True)
+    imap_inbox_folder = models.CharField(
+        "Inbox папка", max_length=100, default="INBOX", blank=True,
+    )
+    imap_sent_folder = models.CharField(
+        "Sent папка", max_length=100, default="INBOX.Sent", blank=True,
+        help_text="ionos: INBOX.Sent | Gmail: [Gmail]/Sent Mail | Outlook: Sent",
+    )
+    imap_lookback_days = models.PositiveSmallIntegerField(
+        "Завантажити за останні N днів", default=30,
+        help_text="Листи старіші цього терміну ігноруються.",
+    )
+
     # ── Sync result alerts ────────────────────────────────────────────────────
     sync_result_email = models.BooleanField(
         "Email: звіт після синхронізації", default=False,

@@ -222,6 +222,23 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "2-Step Verification → App Passwords."
             ),
         }),
+        ("📥 IMAP — читання пошти", {
+            "fields": (
+                "imap_enabled",
+                ("imap_host", "imap_port"),
+                "imap_use_ssl",
+                "imap_user", "imap_password",
+                ("imap_inbox_folder", "imap_sent_folder"),
+                "imap_lookback_days",
+            ),
+            "classes": ("collapse",),
+            "description": (
+                "Мінерва підключається до вашої пошти і додає листи в хронологію клієнтів CRM. "
+                "ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. "
+                "Листи ідентифікуються по email-адресі клієнта з CRM. "
+                "Команда: <code>python manage.py fetch_emails</code> — запускається автоматично кожні 15 хв."
+            ),
+        }),
         ("📬 Нові замовлення", {
             "fields": (
                 ("new_order_email", "new_order_telegram"),
