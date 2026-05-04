@@ -57,6 +57,10 @@ Thumbs.db
 
 # ── Windows path artifact ────────────────────────────────
 C/
+C:/
+"C:/"
+C\357\200\272/
+digikey/
 gunicorn.ctl
 
 # ── Backup copies of source files ────────────────────────
