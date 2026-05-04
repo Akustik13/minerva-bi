@@ -991,7 +991,6 @@ document.addEventListener('DOMContentLoaded', function(){
     {
       id: 'system', label: '⚙️ Система',
       href: '/dashboard/system/',
-      roles: ['superadmin', 'admin'],
       links: [
         { href: '/admin/config/integrations/',          label: '🔌 Інтеграції',   app: 'config' },
         { href: '/admin/autoimport/autoimportprofile/', label: '🔄 Авто-імпорт',  app: 'autoimport' },
@@ -1002,7 +1001,6 @@ document.addEventListener('DOMContentLoaded', function(){
     },
     {
       id: 'security', label: '🔐 Безпека',
-      roles: ['superadmin', 'admin'],
       links: [
         { href: '/admin/core/auditlog/',       label: '📋 Журнал аудиту',     app: 'core', model: 'AuditLog' },
         { href: '/admin/core/userprofile/',    label: '👤 Ролі користувачів', app: 'core', model: 'UserProfile' },
