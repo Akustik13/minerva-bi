@@ -113,11 +113,11 @@ class UserProfile(models.Model):
         verbose_name='Пакет модулів',
         help_text='Якщо вказано — використовується замість дефолтів ролі',
     )
-    # Повне ручне перевизначення (найвищий пріоритет; порожній = авто)
+    # Повне ручне перевизначення (найвищий пріоритет; None = авто)
     allowed_modules  = models.JSONField(
-        default=list, blank=True,
+        null=True, blank=True, default=None,
         verbose_name='Ручний список модулів',
-        help_text='Заповнюйте лише якщо пакет не підходить. Порожній = авто',
+        help_text='None = авто (роль/пакет). [] = заблокувати все крім ядра. [...] = явний список.',
     )
 
     # ── AI Асистент — Telegram ───────────────────────────────
@@ -209,16 +209,17 @@ class UserProfile(models.Model):
     def get_allowed_modules(self):
         """
         Priority (highest → lowest):
-          1. allowed_modules (manual JSON list) — explicit override
+          1. allowed_modules is not None — explicit override
+             - []    → only ALWAYS modules (full restriction)
+             - [...] → exactly these modules
           2. bundle — assigned package
           3. role defaults (ROLE_PERMISSIONS)
-        Always returns '__all__' for superadmin regardless.
-        Core modules are always included.
+        Returns '__all__' for superadmin/admin, or a list.
         """
-        if self.role == self.Role.SUPERADMIN:
+        if self.role in (self.Role.SUPERADMIN, self.Role.ADMIN):
             return '__all__'
-        # 1. Manual override
-        if self.allowed_modules:
+        # 1. Manual override (None = not set; [] = explicit empty)
+        if self.allowed_modules is not None:
             return self.allowed_modules
         # 2. Bundle
         if self.bundle_id:
@@ -232,22 +233,20 @@ class UserProfile(models.Model):
         return perms.get('modules', '__all__')
 
     def has_module_access(self, app_label: str) -> bool:
-        ALWAYS = frozenset({'core', 'auth', 'faq', 'admin', 'authtoken'})
+        ALWAYS = frozenset({'core', 'auth', 'faq', 'admin', 'authtoken', 'dashboard'})
         if app_label in ALWAYS:
-            return True
-        if self.role in (self.Role.SUPERADMIN, self.Role.ADMIN):
             return True
         allowed = self.get_allowed_modules()
         if allowed == '__all__':
             return True
-        return app_label in (allowed or [])
+        return app_label in allowed
 
     def get_allowed_apps(self) -> list:
         modules = self.get_allowed_modules()
         if modules == '__all__':
             from core.models import ModuleRegistry
             return ModuleRegistry.get_active_apps()
-        return list(modules or [])
+        return list(modules)
 
 
 class ModuleBundle(models.Model):

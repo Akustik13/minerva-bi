@@ -112,15 +112,8 @@ def user_can(user, permission: str) -> bool:
 
 
 def apply_role_defaults(profile) -> None:
-    """Fill allowed_modules from role defaults (filtered by active modules)."""
-    from core.models import ModuleRegistry
-    role_cfg = ROLE_DEFAULTS.get(profile.role, {})
-    modules  = role_cfg.get('modules', [])
-    if modules == '__all__':
-        profile.allowed_modules = ModuleRegistry.get_active_apps()
-    else:
-        active = set(ModuleRegistry.get_active_apps())
-        profile.allowed_modules = [m for m in modules if m in active]
+    """Reset allowed_modules to None so role/bundle defaults apply automatically."""
+    profile.allowed_modules = None
 
 
 def build_ai_system_prompt(profile, customer=None, strategy=None) -> str:

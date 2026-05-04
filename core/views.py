@@ -1,4 +1,4 @@
-"""core/views.py — Personal settings page."""
+"""core/views.py — Personal settings page + custom error views."""
 import json
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
@@ -79,3 +79,12 @@ def my_settings_view(request):
         'title': 'Мої налаштування',
     }
     return render(request, 'core/my_settings.html', context)
+
+
+def custom_403_view(request, exception=None):
+    return render(request, 'core/access_denied.html', {
+        'title': 'Доступ обмежено',
+        'reason': 'У вас немає прав для перегляду цієї сторінки.',
+        'module_disabled': False,
+        'app_label': '',
+    }, status=403)

@@ -947,11 +947,11 @@ document.addEventListener('DOMContentLoaded', function(){
       id: 'analytics', label: '📊 Аналітика',
       href: '/dashboard/',
       links: [
-        { href: '/dashboard/signals/', label: '🚨 Сигнали', id: 'signals-link' },
-        { href: '/dashboard/trends/',  label: '📈 Тенденції', id: 'trends-link' },
+        { href: '/dashboard/signals/', label: '🚨 Сигнали',          app: 'dashboard', id: 'signals-link' },
+        { href: '/dashboard/trends/',  label: '📈 Тенденції',         app: 'dashboard', id: 'trends-link' },
         { href: '/core/my-settings/',  label: '⚙️ Мої налаштування' },
       ],
-      apps: []
+      apps: ['dashboard']
     },
     {
       id: 'crm', label: '👥 CRM',
@@ -979,28 +979,30 @@ document.addEventListener('DOMContentLoaded', function(){
     { id: 'tasks',      label: '📋 Задачі',       apps: ['tasks'] },
     { id: 'ai',         label: '🏛️ Minerva AI',   href: '/dashboard/ai/',   apps: ['ai_assistant'],
       links: [
-        { href: '/dashboard/ai/',                        label: '🏛️ Огляд AI' },
-        { href: '/ai/',                                  label: '💬 WebChat' },
+        { href: '/dashboard/ai/',                        label: '🏛️ Огляд AI',          app: 'ai_assistant' },
+        { href: '/ai/',                                  label: '💬 WebChat',            app: 'ai_assistant' },
         { href: '/admin/ai_assistant/aiconversation/',   label: '📜 Розмови',           app: 'ai_assistant', model: 'AIConversation' },
         { href: '/admin/ai_assistant/aibudgetlog/',      label: '💰 Бюджет',            app: 'ai_assistant', model: 'AIBudgetLog' },
         { href: '/admin/strategy/aisettings/',           label: '⚙️ Налаштування AI',   app: 'strategy',     model: 'AISettings' },
-        { href: '/ai/diagnostic/',                       label: '🔧 Діагностика' },
+        { href: '/ai/diagnostic/',                       label: '🔧 Діагностика',       app: 'ai_assistant' },
       ]
     },
     { id: 'bots',       label: '🧠 Боти та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
     {
       id: 'system', label: '⚙️ Система',
       href: '/dashboard/system/',
+      roles: ['superadmin', 'admin'],
       links: [
         { href: '/admin/config/integrations/',          label: '🔌 Інтеграції',   app: 'config' },
         { href: '/admin/autoimport/autoimportprofile/', label: '🔄 Авто-імпорт',  app: 'autoimport' },
-        { href: '/dashboard/import/',                   label: '📥 Імпорт даних' },
-        { href: '/dashboard/help/',                     label: '📖 Довідник' },
+        { href: '/dashboard/import/',                   label: '📥 Імпорт даних', app: 'config' },
+        { href: '/dashboard/help/',                     label: '📖 Довідник',     app: 'config' },
       ],
       apps: ['autoimport', 'config', 'backup', 'auth']
     },
     {
       id: 'security', label: '🔐 Безпека',
+      roles: ['superadmin', 'admin'],
       links: [
         { href: '/admin/core/auditlog/',       label: '📋 Журнал аудиту',     app: 'core', model: 'AuditLog' },
         { href: '/admin/core/userprofile/',    label: '👤 Ролі користувачів', app: 'core', model: 'UserProfile' },
@@ -1127,6 +1129,7 @@ document.addEventListener('DOMContentLoaded', function(){
   /* Build groups */
   GROUPS.forEach(function(grp){
     if (grp.adminOnly && USER_ROLE !== 'superadmin') return;
+    if (grp.roles && grp.roles.indexOf(USER_ROLE) === -1) return;
     var appsFound    = (grp.apps || []).filter(function(a){ return mods[a] && _moduleAllowed(a); });
     var linksToShow  = (grp.links || []).filter(_linkAllowed);
     if (!linksToShow.length && !appsFound.length) return;

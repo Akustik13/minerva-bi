@@ -33,48 +33,61 @@ class ModuleAccessMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if self._should_block(request):
+        block, ctx = self._check_access(request)
+        if block:
             from django.shortcuts import render
-            return render(request, 'core/access_denied.html', status=403)
+            return render(request, 'core/access_denied.html', ctx, status=403)
         return self.get_response(request)
 
-    def _should_block(self, request):
+    def _check_access(self, request):
+        """Returns (should_block: bool, context: dict)."""
         path = request.path
+        _empty = {}
         if not path.startswith('/admin/'):
-            return False
+            return False, _empty
         for prefix in self._SKIP_PREFIXES:
             if path.startswith(prefix):
-                return False
+                return False, _empty
         parts = path.strip('/').split('/')
-        # parts[0]='admin', parts[1]=app_label
         if len(parts) < 2:
-            return False
+            return False, _empty
         app_label = parts[1]
         if not app_label or app_label in self._ALWAYS_ALLOW:
-            return False
+            return False, _empty
 
         # Layer 1: global module flag — blocks everyone
         try:
             from core.models import ModuleRegistry
             if not ModuleRegistry.check_active(app_label):
-                return True
+                return True, {
+                    'app_label': app_label,
+                    'module_disabled': True,
+                    'reason': None,
+                }
         except Exception:
             pass
 
         # Layer 2+3: per-user allowed modules + denied model URLs
         user = getattr(request, 'user', None)
         if not user or not user.is_authenticated:
-            return False
+            return False, _empty
         if user.is_superuser:
-            return False
+            return False, _empty
         try:
             profile = user.profile
             if profile.role == 'superadmin':
-                return False
+                return False, _empty
             allowed = profile.get_allowed_modules()
             # Layer 2: app-level
             if allowed != '__all__' and app_label not in allowed:
-                return True
+                return True, {
+                    'app_label': app_label,
+                    'module_disabled': False,
+                    'reason': (
+                        f'Ваша роль ({profile.get_role_display()}) '
+                        f'не має доступу до розділу «{app_label}».'
+                    ),
+                }
             # Layer 3: model-level — /admin/<app>/<model_slug>/
             if len(parts) >= 3 and parts[2]:
                 model_slug = parts[2]
@@ -83,10 +96,17 @@ class ModuleAccessMiddleware:
                         continue
                     ent_app, ent_model = entry.split(':', 1)
                     if ent_app == app_label and ent_model.lower() == model_slug:
-                        return True
-            return False
+                        return True, {
+                            'app_label': f'{app_label}.{model_slug}',
+                            'module_disabled': False,
+                            'reason': (
+                                f'Ваша роль ({profile.get_role_display()}) '
+                                f'не має доступу до цієї моделі.'
+                            ),
+                        }
+            return False, _empty
         except Exception:
-            return False  # fail open — no profile means full access
+            return False, _empty  # fail open
 
 
 class TenantMiddleware:

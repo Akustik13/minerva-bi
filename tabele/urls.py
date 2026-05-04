@@ -117,5 +117,6 @@ urlpatterns = [
     path('media/<path:path>', _xfo_exempt(_static_serve), {'document_root': settings.MEDIA_ROOT}),
 ]
 
+handler403 = 'core.views.custom_403_view'
 handler404 = lambda request, exception: render(request, "404.html", status=404)
 handler500 = lambda request: render(request, "500.html", status=500)

@@ -179,7 +179,12 @@ class UserProfileForm(forms.ModelForm):
     def save(self, commit=True):
         instance = super().save(commit=False)
         selected = self.cleaned_data.get('modules_override', [])
-        instance.allowed_modules = [m.app_label for m in selected]
+        if selected:
+            # Explicit list selected → use it
+            instance.allowed_modules = [m.app_label for m in selected]
+        else:
+            # Nothing selected → None = use role/bundle defaults
+            instance.allowed_modules = None
         if commit:
             instance.save()
             self.save_m2m()
@@ -383,12 +388,12 @@ class UserProfileAdmin(admin.ModelAdmin):
             try:
                 old = UserProfile.objects.get(pk=obj.pk)
                 if old.role != obj.role:
-                    from core.utils import apply_role_defaults
-                    apply_role_defaults(obj)
+                    # Role changed → reset to None so new role defaults apply
+                    obj.allowed_modules = None
                     self.message_user(
                         request,
                         f'Роль змінено → {obj.get_role_display()}. '
-                        f'Модулі: {", ".join(obj.allowed_modules or [])}',
+                        f'Модулі скинуто до дефолтів нової ролі.',
                     )
             except UserProfile.DoesNotExist:
                 pass

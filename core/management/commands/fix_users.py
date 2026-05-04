@@ -31,13 +31,14 @@ class Command(BaseCommand):
                 User.objects.filter(pk=user.pk).update(is_staff=True)
                 action_parts.append('set is_staff=True')
 
-            # 3. Fill empty allowed_modules
-            if profile.allowed_modules == [] or profile.allowed_modules is None:
-                apply_role_defaults(profile)
-                profile.save(update_fields=['allowed_modules'])
-                action_parts.append(f'filled modules ({len(profile.allowed_modules)})')
+            # 3. allowed_modules=None is correct (role defaults); [] would be explicit lock
+            # No action needed — None means "use role defaults automatically"
 
-            mods_count = len(profile.allowed_modules) if isinstance(profile.allowed_modules, list) else '?'
+            modules = profile.get_allowed_modules()
+            if modules == '__all__':
+                mods_count = 'all'
+            else:
+                mods_count = len(modules)
             action = ', '.join(action_parts) if action_parts else 'ok'
             rows.append((user.username, profile.role, user.is_staff, mods_count, action))
 
