@@ -24,44 +24,55 @@ ROLE_DEFAULTS = {
         'can_export': True,
         'can_import': True,
         'can_view_audit': True,
+        'can_manage_users': True,
     },
     'admin': {
-        'modules': [
-            'crm', 'strategy', 'sales', 'accounting', 'shipping', 'inventory',
-            'tasks', 'bots', 'api', 'config', 'backup', 'auth', 'autoimport', 'core',
-        ],
+        'modules': '__all__',
         'can_delete': True,
         'can_export': True,
         'can_import': True,
         'can_view_audit': True,
+        'can_manage_users': True,
     },
     'manager': {
-        'modules': ['crm', 'strategy', 'sales', 'shipping'],
+        'modules': ['crm', 'strategy', 'sales', 'shipping', 'dashboard', 'tasks', 'faq', 'labels_app'],
         'can_delete': False,
         'can_export': True,
         'can_import': False,
         'can_view_audit': False,
+        'can_manage_users': False,
     },
     'warehouse': {
-        'modules': ['inventory', 'shipping'],
+        'modules': ['inventory', 'shipping', 'labels_app', 'dashboard', 'faq'],
         'can_delete': False,
         'can_export': False,
         'can_import': True,
         'can_view_audit': False,
+        'can_manage_users': False,
     },
     'accountant': {
-        'modules': ['sales', 'accounting', 'inventory'],
+        'modules': ['sales', 'accounting', 'inventory', 'dashboard', 'faq'],
         'can_delete': False,
         'can_export': True,
         'can_import': False,
         'can_view_audit': False,
+        'can_manage_users': False,
     },
     'ai': {
-        'modules': ['crm', 'strategy'],
+        'modules': ['crm', 'strategy', 'dashboard', 'faq'],
         'can_delete': False,
         'can_export': False,
         'can_import': False,
         'can_view_audit': False,
+        'can_manage_users': False,
+    },
+    'readonly': {
+        'modules': ['dashboard', 'faq'],
+        'can_delete': False,
+        'can_export': False,
+        'can_import': False,
+        'can_view_audit': False,
+        'can_manage_users': False,
     },
 }
 
@@ -100,10 +111,16 @@ def user_can(user, permission: str) -> bool:
         return False
 
 
-def apply_role_defaults(profile):
-    """Clear per-user module overrides so role defaults apply."""
-    profile.allowed_modules = []
-    profile.save(update_fields=['allowed_modules'])
+def apply_role_defaults(profile) -> None:
+    """Fill allowed_modules from role defaults (filtered by active modules)."""
+    from core.models import ModuleRegistry
+    role_cfg = ROLE_DEFAULTS.get(profile.role, {})
+    modules  = role_cfg.get('modules', [])
+    if modules == '__all__':
+        profile.allowed_modules = ModuleRegistry.get_active_apps()
+    else:
+        active = set(ModuleRegistry.get_active_apps())
+        profile.allowed_modules = [m for m in modules if m in active]
 
 
 def build_ai_system_prompt(profile, customer=None, strategy=None) -> str:

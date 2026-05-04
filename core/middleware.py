@@ -22,10 +22,11 @@ class ModuleAccessMiddleware:
     Returns 403 access_denied page if module is inactive.
     """
 
-    _ALWAYS_ALLOW = frozenset({'core', 'auth', 'admin', 'authtoken'})
+    _ALWAYS_ALLOW = frozenset({'core', 'auth', 'admin', 'authtoken', 'faq', 'dashboard'})
     _SKIP_PREFIXES = (
         '/admin/login', '/admin/logout', '/admin/jsi18n',
         '/admin/r/', '/static/', '/media/',
+        '/admin/password_', '/accounts/', '/onboarding/',
     )
 
     def __init__(self, get_response):

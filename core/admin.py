@@ -72,6 +72,7 @@ class MinervaUserAdmin(_DjangoUserAdmin):
         role_colors = {
             'superadmin': '#f85149', 'admin': '#ff9800', 'manager': '#58a6ff',
             'warehouse': '#3fb950', 'accountant': '#c9a84c', 'ai': '#a78bfa',
+            'readonly': '#607d8b',
         }
         try:
             profile = obj.profile
@@ -118,6 +119,7 @@ class MinervaUserAdmin(_DjangoUserAdmin):
             role_colors = {
                 'superadmin': '#f85149', 'admin': '#ff9800', 'manager': '#58a6ff',
                 'warehouse': '#3fb950', 'accountant': '#c9a84c', 'ai': '#a78bfa',
+                'readonly': '#607d8b',
             }
             color = role_colors.get(profile.role, '#9aafbe')
             url = reverse('admin:core_userprofile_change', args=[profile.pk])
@@ -354,12 +356,17 @@ class UserProfileAdmin(admin.ModelAdmin):
             ),
         }),
         ('🔒 Дозволи (перевизначення)', {
-            'fields': ('can_delete', 'can_export', 'can_import', 'can_view_audit'),
+            'fields': ('can_delete', 'can_export', 'can_import', 'can_view_audit', 'can_manage_users'),
             'classes': ('collapse',),
             'description': (
                 'Порожньо = використовуються дефолти ролі. '
                 'Явне Так/Ні — перевизначає роль.'
             ),
+        }),
+        ('⚙️ Персональні налаштування', {
+            'fields': ('notify_email', 'notify_telegram', 'interface_language', 'items_per_page', 'theme'),
+            'classes': ('collapse',),
+            'description': 'Ці налаштування юзер може змінити самостійно на сторінці /core/my-settings/',
         }),
         ('🤖 AI-асистент', {
             'fields': (
@@ -371,12 +378,31 @@ class UserProfileAdmin(admin.ModelAdmin):
         }),
     )
 
+    def save_model(self, request, obj, form, change):
+        if change:
+            try:
+                old = UserProfile.objects.get(pk=obj.pk)
+                if old.role != obj.role:
+                    from core.utils import apply_role_defaults
+                    apply_role_defaults(obj)
+                    self.message_user(
+                        request,
+                        f'Роль змінено → {obj.get_role_display()}. '
+                        f'Модулі: {", ".join(obj.allowed_modules or [])}',
+                    )
+            except UserProfile.DoesNotExist:
+                pass
+        super().save_model(request, obj, form, change)
+        if not obj.user.is_staff:
+            User.objects.filter(pk=obj.user_id).update(is_staff=True)
+
     @admin.display(description='Роль')
     def role_badge(self, obj):
         colors = {
             'superadmin': '#f85149', 'admin': '#c9a84c',
             'manager': '#58a6ff',    'warehouse': '#3fb950',
             'accountant': '#2196f3', 'ai': '#9c27b0',
+            'readonly': '#607d8b',
         }
         color = colors.get(obj.role, '#9aafbe')
         return format_html(

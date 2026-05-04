@@ -89,12 +89,13 @@ class UserProfile(models.Model):
         WAREHOUSE  = 'warehouse',  '📦 Складник'
         ACCOUNTANT = 'accountant', '💰 Бухгалтер'
         AI         = 'ai',         '🤖 AI-асистент'
+        READONLY   = 'readonly',   '👁 Тільки перегляд'
 
     user             = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name='profile', verbose_name='Користувач',
     )
     role             = models.CharField(
-        max_length=20, choices=Role.choices, default=Role.ADMIN, verbose_name='Роль',
+        max_length=20, choices=Role.choices, default=Role.MANAGER, verbose_name='Роль',
     )
     notes            = models.TextField(blank=True, verbose_name='Нотатки')
 
@@ -170,12 +171,33 @@ class UserProfile(models.Model):
         verbose_name='Бачить журнал аудиту',
         help_text='Порожньо = за роллю',
     )
+    can_manage_users = models.BooleanField(
+        null=True, blank=True, default=None,
+        verbose_name='Може керувати юзерами',
+        help_text='Порожньо = за роллю',
+    )
 
     denied_models  = models.JSONField(
         default=list, blank=True,
         verbose_name='Заблоковані моделі',
         help_text='Список "app_label:ModelName" — моделі заблоковані всередині дозволеного модуля.',
     )
+
+    # ── Персональні налаштування ──────────────────────────────
+    notify_email       = models.BooleanField(default=True,  verbose_name='Email сповіщення')
+    notify_telegram    = models.BooleanField(default=False, verbose_name='Telegram сповіщення')
+    interface_language = models.CharField(
+        max_length=5,
+        choices=[('uk', 'Українська'), ('de', 'Deutsch'), ('en', 'English')],
+        default='uk', verbose_name='Мова інтерфейсу',
+    )
+    items_per_page     = models.PositiveIntegerField(default=25, verbose_name='Записів на сторінку')
+    theme              = models.CharField(
+        max_length=20,
+        choices=[('dark', 'Темна'), ('light', 'Світла'), ('minerva', 'Minerva'), ('auto', 'Авто')],
+        default='dark', verbose_name='Тема',
+    )
+    created_at         = models.DateTimeField(auto_now_add=True, verbose_name='Дата створення')
 
     class Meta:
         verbose_name        = 'Профіль користувача'
@@ -208,6 +230,24 @@ class UserProfile(models.Model):
         from core.utils import ROLE_PERMISSIONS
         perms = ROLE_PERMISSIONS.get(self.role, {})
         return perms.get('modules', '__all__')
+
+    def has_module_access(self, app_label: str) -> bool:
+        ALWAYS = frozenset({'core', 'auth', 'faq', 'admin', 'authtoken'})
+        if app_label in ALWAYS:
+            return True
+        if self.role in (self.Role.SUPERADMIN, self.Role.ADMIN):
+            return True
+        allowed = self.get_allowed_modules()
+        if allowed == '__all__':
+            return True
+        return app_label in (allowed or [])
+
+    def get_allowed_apps(self) -> list:
+        modules = self.get_allowed_modules()
+        if modules == '__all__':
+            from core.models import ModuleRegistry
+            return ModuleRegistry.get_active_apps()
+        return list(modules or [])
 
 
 class ModuleBundle(models.Model):
@@ -299,6 +339,11 @@ class ModuleRegistry(models.Model):
             return list(cls.objects.filter(is_active=True).values_list('app_label', flat=True))
         except Exception:
             return []
+
+    @classmethod
+    def is_app_active(cls, app_label: str) -> bool:
+        """Alias for check_active."""
+        return cls.check_active(app_label)
 
 
 class TenantAccount(models.Model):

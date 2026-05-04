@@ -13,7 +13,7 @@ def create_user_profile(sender, instance, created, **kwargs):
         return
     try:
         from core.models import UserProfile
-        role = UserProfile.Role.SUPERADMIN if instance.is_superuser else UserProfile.Role.ADMIN
+        role = UserProfile.Role.SUPERADMIN if instance.is_superuser else UserProfile.Role.MANAGER
         UserProfile.objects.get_or_create(user=instance, defaults={'role': role})
         if not instance.is_staff:
             User.objects.filter(pk=instance.pk).update(is_staff=True)

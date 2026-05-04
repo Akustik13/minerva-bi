@@ -101,6 +101,7 @@ urlpatterns = [
         name="password_reset_complete",
     ),
     path("admin/", admin.site.urls),
+    path("core/", include("core.urls")),
     path("onboarding/", include("config.urls")),
     path("strategy/", include("strategy.urls")),
     path("dashboard/", include("dashboard.urls")),
