@@ -56,6 +56,7 @@ class Migration(migrations.Migration):
             model_name='userprofile',
             name='created_at',
             field=models.DateTimeField(
+                auto_now_add=True,
                 default=django.utils.timezone.now,
                 verbose_name='Дата створення',
             ),
