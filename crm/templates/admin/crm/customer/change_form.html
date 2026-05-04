@@ -91,6 +91,14 @@
           Згенерувати →
         </button>
       </div>
+      <textarea id="email-prompt"
+                placeholder="Додатковий промпт: що саме хочеш донести клієнту, на що акцентувати увагу, особливі умови тощо..."
+                rows="2"
+                style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;
+                       font-size:13px;border:1px solid var(--border-strong);
+                       background:var(--bg-input);color:var(--text);
+                       resize:vertical;margin-bottom:8px;font-family:inherit">
+      </textarea>
       <div id="email-result"
            style="display:none;font-size:13px;line-height:1.7;padding:12px;
                   border-radius:8px;background:var(--bg-input);
@@ -202,7 +210,7 @@ async function generateEmail() {
     const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-email/`, {
       method:'POST',
       headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
-      body:JSON.stringify({purpose:document.getElementById('email-purpose').value,language:document.getElementById('email-lang').value}),
+      body:JSON.stringify({purpose:document.getElementById('email-purpose').value,language:document.getElementById('email-lang').value,extra_prompt:document.getElementById('email-prompt').value.trim()}),
     });
     const d = await r.json();
     if (d.ok) { res.textContent = d.email; act.style.display = 'flex'; }

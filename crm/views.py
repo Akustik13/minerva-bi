@@ -88,10 +88,11 @@ def ai_compose_email_for_customer(request, customer_pk):
     except Customer.DoesNotExist:
         return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
 
-    data    = json.loads(request.body or '{}')
-    purpose = data.get('purpose', 'follow_up')
-    lang    = data.get('language', 'uk')
-    profile = getattr(request.user, 'profile', None)
+    data         = json.loads(request.body or '{}')
+    purpose      = data.get('purpose', 'follow_up')
+    lang         = data.get('language', 'uk')
+    extra_prompt = data.get('extra_prompt', '').strip()
+    profile      = getattr(request.user, 'profile', None)
 
     try:
         from ai_assistant.tools import execute_tool
@@ -110,6 +111,9 @@ def ai_compose_email_for_customer(request, customer_pk):
     instruction = result.get('instruction')
     if not instruction:
         return JsonResponse({'ok': False, 'error': 'Помилка генерації'})
+
+    if extra_prompt:
+        instruction += f'\n\nДодаткові вказівки від менеджера: {extra_prompt}'
 
     try:
         from ai_assistant.service import chat
