@@ -1,6 +1,10 @@
 """
 dashboard/views.py — Minerva Dashboard v2
-Виручка = SalesOrderLine.unit_price × qty (або total_price рядка якщо є)
+
+Revenue priority:
+  1. SalesOrder.total_price — завжди встановлюється з DigiKey API і є джерелом правди.
+     Включає ВСІ рядки, навіть ті що не синхронізувались (unmatched SKU).
+  2. SalesOrderLine fallback (для category-filter або ручних замовлень без order.total_price).
 """
 from datetime import timedelta
 from decimal import Decimal
@@ -19,8 +23,7 @@ import json
 _ZERO_DEC = Value(Decimal('0'), output_field=DecimalField(max_digits=18, decimal_places=2))
 
 def _line_rev_expr():
-    """Per-line revenue: total_price if set, else unit_price × qty, else 0.
-    Handles old DigiKey-synced lines where total_price is NULL."""
+    """Per-line revenue: total_price if set, else unit_price × qty, else 0."""
     return Coalesce(
         'total_price',
         ExpressionWrapper(
@@ -31,10 +34,20 @@ def _line_rev_expr():
     )
 
 
-# Revenue helpers — graceful fallback якщо поля ще не існують
-def _safe_rev(qs, field='total_price'):
+def _order_rev(qs_orders):
+    """Sum SalesOrder.total_price (order-level — source of truth for DigiKey).
+    More accurate than line-level sum when some lines were skipped during sync."""
     try:
-        r = qs.aggregate(t=Sum(_line_rev_expr()))['t']
+        r = qs_orders.aggregate(t=Sum(Coalesce('total_price', _ZERO_DEC)))['t']
+        return float(r or 0)
+    except Exception:
+        return 0.0
+
+
+def _line_rev(qs_lines):
+    """Sum line-level revenue (used for category-filtered views and per-SKU breakdowns)."""
+    try:
+        r = qs_lines.aggregate(t=Sum(_line_rev_expr()))['t']
         return float(r or 0)
     except Exception:
         return 0.0
@@ -106,16 +119,20 @@ def dashboard(request):
         SalesOrderLine.objects.values_list('product__category', flat=True)
         .distinct().exclude(product__category='').order_by('product__category'))
 
-    def rev(qs):
-        return _safe_rev(qs, 'total_price')
-
     def pct(curr, prev):
         if not prev: return None
         return round((curr - prev) / prev * 100, 1)
 
     try:
-        rev_curr = rev(qs_lines)
-        rev_prev = rev(qs_prev_lines)
+        if filter_category:
+            # Category filter: sum line-level to get category-specific portion
+            rev_curr = _line_rev(qs_lines)
+            rev_prev = _line_rev(qs_prev_lines)
+        else:
+            # No category filter: use order-level total_price — correct for DigiKey
+            # (includes all lines even if some weren't matched during sync)
+            rev_curr = _order_rev(qs_period)
+            rev_prev = _order_rev(qs_prev)
     except Exception:
         rev_curr = 0.0
         rev_prev = 0.0
@@ -135,40 +152,52 @@ def dashboard(request):
         'unshipped': {'val': unshipped_cnt, 'fmt': str(unshipped_cnt), 'change': None},
     }
 
-    # ── Виручка по місяцях (two-query merge for reliability) ─────────────────
-    # Q1: line-level revenue per month — uses qs_lines (respects category filter)
-    # Q2: order-level total_price per month (fallback for DigiKey-synced orders
-    #     whose SalesOrderLine prices are NULL)
+    # ── Виручка по місяцях ────────────────────────────────────────────────────
+    # Використовуємо SalesOrder.total_price (order-level) як основне джерело.
+    # Для category-filter — лінійний рівень (потрібна розбивка по категорії).
     try:
-        _line_m = {
-            r['month']: float(r['rev'] or 0)
-            for r in (
-                qs_lines
-                .annotate(month=TruncMonth('order__order_date'))
-                .values('month')
-                .annotate(rev=Sum('total_price'))
-                .order_by('month')
-            )
-        }
-        _ord_m = {
-            r['month']: {'rev': float(r['rev'] or 0), 'cnt': int(r['cnt'])}
-            for r in (
-                qs_period
-                .annotate(month=TruncMonth('order_date'))
-                .values('month')
-                .annotate(rev=Sum('total_price'), cnt=Count('id'))
-                .order_by('month')
-            )
-        }
-        rev_by_month = []
-        for m in sorted(set(list(_line_m) + list(_ord_m))):
-            line_rev = _line_m.get(m, 0)
-            ord_data = _ord_m.get(m, {'rev': 0, 'cnt': 0})
-            rev_by_month.append({
-                'month':   m,
-                'revenue': line_rev if line_rev > 0 else ord_data['rev'],
-                'orders':  ord_data['cnt'],
-            })
+        if filter_category:
+            # Line-level: category-specific revenue per month
+            _line_m = {
+                r['month']: float(r['rev'] or 0)
+                for r in (
+                    qs_lines
+                    .annotate(month=TruncMonth('order__order_date'))
+                    .values('month')
+                    .annotate(rev=Sum(_line_rev_expr()))
+                    .order_by('month')
+                )
+            }
+            _ord_cnt = {
+                r['month']: int(r['cnt'])
+                for r in (
+                    qs_period
+                    .annotate(month=TruncMonth('order_date'))
+                    .values('month')
+                    .annotate(cnt=Count('id'))
+                    .order_by('month')
+                )
+            }
+            rev_by_month = [
+                {'month': m, 'revenue': v, 'orders': _ord_cnt.get(m, 0)}
+                for m, v in sorted(_line_m.items())
+            ]
+        else:
+            # Order-level: most accurate (includes all lines, even unmatched SKUs)
+            rev_by_month = [
+                {
+                    'month':   r['month'],
+                    'revenue': float(r['rev'] or 0),
+                    'orders':  int(r['cnt']),
+                }
+                for r in (
+                    qs_period
+                    .annotate(month=TruncMonth('order_date'))
+                    .values('month')
+                    .annotate(rev=Sum(Coalesce('total_price', _ZERO_DEC)), cnt=Count('id'))
+                    .order_by('month')
+                )
+            ]
     except Exception:
         rev_by_month = []
 
@@ -194,12 +223,13 @@ def dashboard(request):
         .annotate(
             qty_total=Sum('qty'),
             orders_cnt=Count('order', distinct=True),
-            revenue=Sum('total_price'),
+            revenue=Sum(_line_rev_expr()),
         )
         .order_by('-revenue')[:15]
     )
 
     # ── Топ клієнти по виручці ─────────────────────────────────────────────────
+    # Використовуємо order.total_price — правильно для DigiKey (не залежить від matched ліній)
     top_clients = list(
         qs_period
         .exclude(client='')
@@ -207,7 +237,7 @@ def dashboard(request):
         .annotate(
             orders=Count('id'),
             units=Sum('lines__qty'),
-            revenue=Sum('lines__total_price'),
+            revenue=Sum(Coalesce('total_price', _ZERO_DEC)),
         )
         .order_by('-revenue')[:10]
     )
@@ -217,7 +247,7 @@ def dashboard(request):
         qs_period
         .exclude(shipping_region='')
         .values('shipping_region')
-        .annotate(orders=Count('id'), revenue=Sum('lines__total_price'))
+        .annotate(orders=Count('id'), revenue=Sum(Coalesce('total_price', _ZERO_DEC)))
         .order_by('-orders')[:20]
     )
     max_region_orders = by_region[0]['orders'] if by_region else 1
