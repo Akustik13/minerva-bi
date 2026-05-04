@@ -175,6 +175,9 @@ class UserProfileForm(forms.ModelForm):
         # Render denied_models as hidden input — UI managed by JS
         self.fields['denied_models'].widget  = forms.HiddenInput()
         self.fields['denied_models'].required = False
+        # Render module_operations as hidden input — UI managed by JS
+        self.fields['module_operations'].widget   = forms.HiddenInput()
+        self.fields['module_operations'].required = False
 
     def save(self, commit=True):
         instance = super().save(commit=False)
@@ -289,7 +292,7 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display  = ('user', 'role_badge', 'effective_access', 'ai_enabled')
     list_filter   = ('role', 'bundle', 'ai_enabled')
     search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
-    readonly_fields = ('effective_access_detail', 'denied_models_panel')
+    readonly_fields = ('effective_access_detail', 'denied_models_panel', 'module_operations_panel')
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'bundle':
@@ -298,7 +301,7 @@ class UserProfileAdmin(admin.ModelAdmin):
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
-        from core.utils import ROLE_PERMISSIONS
+        from core.utils import ROLE_PERMISSIONS, ROLE_OPERATIONS, ALL_OPS, OP_LABELS
         from django.contrib import admin as _admin
         extra = extra_context or {}
 
@@ -331,12 +334,20 @@ class UserProfileAdmin(admin.ModelAdmin):
         for al in app_models:
             app_models[al].sort(key=lambda m: m['verbose_name'])
 
-        extra['mv_module_pk_map']   = json.dumps(module_pk_map,  ensure_ascii=False)
-        extra['mv_module_names']    = json.dumps(module_names,   ensure_ascii=False)
-        extra['mv_role_modules']    = json.dumps(role_modules,   ensure_ascii=False)
-        extra['mv_bundle_modules']  = json.dumps(bundle_modules, ensure_ascii=False)
-        extra['mv_app_models_json'] = json.dumps(app_models,     ensure_ascii=False)
-        extra['mv_changelist_url']  = '../'
+        # role_operations: for each role, serialize (convert '__all__' to list for JS)
+        role_operations_js = {}
+        for role, ops in ROLE_OPERATIONS.items():
+            role_operations_js[role] = ops  # keep '__all__' string, JS handles it
+
+        extra['mv_module_pk_map']    = json.dumps(module_pk_map,       ensure_ascii=False)
+        extra['mv_module_names']     = json.dumps(module_names,        ensure_ascii=False)
+        extra['mv_role_modules']     = json.dumps(role_modules,        ensure_ascii=False)
+        extra['mv_bundle_modules']   = json.dumps(bundle_modules,      ensure_ascii=False)
+        extra['mv_app_models_json']  = json.dumps(app_models,          ensure_ascii=False)
+        extra['mv_role_operations']  = json.dumps(role_operations_js,  ensure_ascii=False)
+        extra['mv_all_ops']          = json.dumps(ALL_OPS,             ensure_ascii=False)
+        extra['mv_op_labels']        = json.dumps(OP_LABELS,           ensure_ascii=False)
+        extra['mv_changelist_url']   = '../'
         return super().changeform_view(request, object_id, form_url, extra)
 
     fieldsets = (
@@ -358,6 +369,16 @@ class UserProfileAdmin(admin.ModelAdmin):
                 'Тут можна заборонити окремі моделі (підрозділи) всередині дозволеного модуля. '
                 'Заборонений підмодуль не з\'являтиметься у навігаційному меню. '
                 'Натисніть на назву модуля щоб розкрити список підмодулів.'
+            ),
+        }),
+        ('⚡ Гранулярні операції', {
+            'fields': ('module_operations_panel', 'module_operations'),
+            'classes': ('collapse',),
+            'description': (
+                'Дозволити/заборонити конкретні операції (перегляд, створення, редагування, видалення, '
+                'експорт, імпорт) окремо для кожного модуля. '
+                '<strong>None = авто за роллю.</strong> '
+                'Увімкніть "Ручне перевизначення" щоб задати явні операції.'
             ),
         }),
         ('🔒 Дозволи (перевизначення)', {
@@ -487,6 +508,14 @@ class UserProfileAdmin(admin.ModelAdmin):
     def denied_models_panel(self, obj):
         return mark_safe(
             '<div id="mv-denied-panel" style="min-height:40px">'
+            '<em style="color:var(--text-dim);font-size:12px">Завантаження…</em>'
+            '</div>'
+        )
+
+    @admin.display(description='Операції по модулях')
+    def module_operations_panel(self, obj):
+        return mark_safe(
+            '<div id="mv-ops-panel" style="min-height:40px">'
             '<em style="color:var(--text-dim);font-size:12px">Завантаження…</em>'
             '</div>'
         )

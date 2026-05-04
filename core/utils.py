@@ -79,6 +79,58 @@ ROLE_DEFAULTS = {
 # Backward-compatibility alias
 ROLE_PERMISSIONS = ROLE_DEFAULTS
 
+# ── Granular operations per role ───────────────────────────────────────────────
+# Operations: view, add, change, delete, export, import
+ALL_OPS = ['view', 'add', 'change', 'delete', 'export', 'import']
+
+OP_LABELS = {
+    'view':   'Перегляд',
+    'add':    'Створення',
+    'change': 'Редагування',
+    'delete': 'Видалення',
+    'export': 'Експорт',
+    'import': 'Імпорт',
+}
+
+ROLE_OPERATIONS = {
+    'superadmin': '__all__',
+    'admin':      '__all__',
+    'manager': {
+        'crm':        ['view', 'add', 'change', 'export'],
+        'sales':      ['view', 'add', 'change', 'export'],
+        'shipping':   ['view', 'add', 'change'],
+        'tasks':      ['view', 'add', 'change', 'delete'],
+        'strategy':   ['view', 'add', 'change'],
+        'dashboard':  ['view'],
+        'faq':        ['view'],
+        'labels_app': ['view', 'add'],
+    },
+    'warehouse': {
+        'inventory':  ['view', 'add', 'change', 'import'],
+        'shipping':   ['view', 'add', 'change'],
+        'labels_app': ['view', 'add'],
+        'dashboard':  ['view'],
+        'faq':        ['view'],
+    },
+    'accountant': {
+        'sales':      ['view', 'export'],
+        'accounting': ['view', 'add', 'change', 'export'],
+        'inventory':  ['view', 'export'],
+        'dashboard':  ['view'],
+        'faq':        ['view'],
+    },
+    'ai': {
+        'crm':       ['view'],
+        'strategy':  ['view'],
+        'dashboard': ['view'],
+        'faq':       ['view'],
+    },
+    'readonly': {
+        'dashboard': ['view'],
+        'faq':       ['view'],
+    },
+}
+
 
 def user_can(user, permission: str) -> bool:
     """
@@ -109,6 +161,28 @@ def user_can(user, permission: str) -> bool:
         return bool(defaults.get(field_name, False))
     except Exception:
         return False
+
+
+def user_has_operation(user, app_label: str, operation: str) -> bool:
+    """
+    Check if user has a given operation for an app module.
+    Operations: view, add, change, delete, export, import
+    Returns True if allowed, False if denied.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    try:
+        profile = user.profile
+        if profile.role in ('superadmin', 'admin'):
+            return True
+        ops = profile.get_allowed_operations(app_label)
+        if ops == '__all__':
+            return True
+        return operation in (ops or [])
+    except Exception:
+        return True  # fail open
 
 
 def apply_role_defaults(profile) -> None:

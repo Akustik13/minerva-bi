@@ -15,6 +15,18 @@ class AuditMiddleware:
         return self.get_response(request)
 
 
+def _url_to_operation(parts: list) -> str:
+    """Map URL parts to operation name (view/add/change/delete)."""
+    # /admin/<app>/<model>/add/                 → add
+    # /admin/<app>/<model>/<id>/change/         → change
+    # /admin/<app>/<model>/<id>/delete/         → delete
+    # /admin/<app>/<model>/                     → view
+    last = parts[-1] if parts else ''
+    if last in ('add', 'change', 'delete'):
+        return last
+    return 'view'
+
+
 class ModuleAccessMiddleware:
     """
     Block access to disabled modules.
@@ -104,6 +116,26 @@ class ModuleAccessMiddleware:
                                 f'не має доступу до цієї моделі.'
                             ),
                         }
+
+            # Layer 4: operation-level (only if explicit module_operations set)
+            if profile.module_operations is not None:
+                operation = _url_to_operation(parts)
+                ops = profile.get_allowed_operations(app_label)
+                if ops != '__all__' and operation not in (ops or []):
+                    op_labels = {
+                        'view': 'перегляд', 'add': 'створення',
+                        'change': 'редагування', 'delete': 'видалення',
+                        'export': 'експорт', 'import': 'імпорт',
+                    }
+                    return True, {
+                        'app_label': app_label,
+                        'module_disabled': False,
+                        'reason': (
+                            f'Ваша роль ({profile.get_role_display()}) не має права '
+                            f'«{op_labels.get(operation, operation)}» у модулі «{app_label}».'
+                        ),
+                    }
+
             return False, _empty
         except Exception:
             return False, _empty  # fail open

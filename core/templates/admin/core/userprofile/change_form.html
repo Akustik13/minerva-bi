@@ -5,11 +5,14 @@
 {{ block.super }}
 <script>
 (function () {
-  var MODULE_PK_MAP  = {{ mv_module_pk_map|safe }};
-  var ROLE_MODULES   = {{ mv_role_modules|safe }};
-  var BUNDLE_MODULES = {{ mv_bundle_modules|safe }};
-  var APP_MODELS     = {{ mv_app_models_json|default:"{}"|safe }};
-  var MODULE_NAMES   = {{ mv_module_names|default:"{}"|safe }};
+  var MODULE_PK_MAP    = {{ mv_module_pk_map|safe }};
+  var ROLE_MODULES     = {{ mv_role_modules|safe }};
+  var BUNDLE_MODULES   = {{ mv_bundle_modules|safe }};
+  var APP_MODELS       = {{ mv_app_models_json|default:"{}"|safe }};
+  var MODULE_NAMES     = {{ mv_module_names|default:"{}"|safe }};
+  var ROLE_OPERATIONS  = {{ mv_role_operations|default:"{}"|safe }};
+  var ALL_OPS          = {{ mv_all_ops|default:"[]"|safe }};
+  var OP_LABELS        = {{ mv_op_labels|default:"{}"|safe }};
 
   /* ── Module checkboxes sync ────────────────────────────────────────────── */
   function toPks(appLabels) {
@@ -191,6 +194,213 @@
     panel.appendChild(grid);
   }
 
+  /* ── Operations panel ──────────────────────────────────────────────────── */
+  function getOpsInput() {
+    return document.querySelector('input[name="module_operations"]');
+  }
+
+  function getOps() {
+    var inp = getOpsInput();
+    if (!inp || !inp.value || inp.value === 'null') return null;
+    try { return JSON.parse(inp.value); } catch (e) { return null; }
+  }
+
+  function setOps(obj) {
+    var inp = getOpsInput();
+    if (!inp) return;
+    inp.value = (obj === null || obj === undefined) ? 'null' : JSON.stringify(obj);
+  }
+
+  function syncOpsFromCheckboxes() {
+    var toggle = document.getElementById('mv-ops-override-toggle');
+    if (!toggle || !toggle.checked) return;
+    var ops = {};
+    document.querySelectorAll('input[data-ops-app]').forEach(function (cb) {
+      var al = cb.getAttribute('data-ops-app');
+      var op = cb.getAttribute('data-ops-op');
+      if (!ops[al]) ops[al] = [];
+      if (cb.checked) ops[al].push(op);
+    });
+    setOps(ops);
+  }
+
+  function buildOpsPanel() {
+    var panel = document.getElementById('mv-ops-panel');
+    if (!panel) return;
+
+    var roleSel  = document.querySelector('select[name="role"]');
+    var role     = roleSel ? roleSel.value : '';
+    var roleOps  = ROLE_OPERATIONS[role] || {};
+
+    /* modules registered in ModuleRegistry, sorted by name */
+    var apps = Object.keys(MODULE_NAMES).filter(function (al) {
+      return MODULE_PK_MAP[al] !== undefined;
+    });
+    apps.sort(function (a, b) {
+      return (MODULE_NAMES[a] || a).localeCompare(MODULE_NAMES[b] || b);
+    });
+
+    if (!apps.length) {
+      panel.innerHTML = '<em style="color:var(--text-dim);font-size:12px">Немає зареєстрованих модулів</em>';
+      return;
+    }
+
+    var current    = getOps();       /* null = auto; {} = explicit */
+    var isOverride = current !== null;
+
+    /* ── Toggle row ── */
+    var wrap = document.createElement('div');
+
+    var toggleRow = document.createElement('div');
+    toggleRow.style.cssText = 'margin-bottom:10px;padding:8px 12px;background:var(--bg-hover);'
+      + 'border-radius:6px;border:1px solid var(--border-strong)';
+
+    var toggleLbl = document.createElement('label');
+    toggleLbl.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;font-weight:600';
+
+    var toggleCb = document.createElement('input');
+    toggleCb.type = 'checkbox';
+    toggleCb.id   = 'mv-ops-override-toggle';
+    toggleCb.checked = isOverride;
+    toggleCb.style.cssText = 'width:15px;height:15px;cursor:pointer;flex-shrink:0;margin:0';
+
+    var toggleText = document.createElement('span');
+    toggleText.textContent = 'Ручне перевизначення операцій';
+
+    var toggleHint = document.createElement('span');
+    toggleHint.style.cssText = 'font-size:10px;color:var(--text-dim);font-weight:400;margin-left:4px';
+    toggleHint.textContent = isOverride ? '(активно)' : '(None = авто за роллю)';
+
+    toggleLbl.appendChild(toggleCb);
+    toggleLbl.appendChild(toggleText);
+    toggleLbl.appendChild(toggleHint);
+    toggleRow.appendChild(toggleLbl);
+    wrap.appendChild(toggleRow);
+
+    /* ── Grid of modules ── */
+    var grid = document.createElement('div');
+    grid.id = 'mv-ops-grid';
+    grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px;'
+      + (isOverride ? '' : 'opacity:0.4;pointer-events:none');
+
+    apps.forEach(function (al) {
+      var appName     = MODULE_NAMES[al] || al;
+      var roleAppOps  = (roleOps === '__all__') ? ALL_OPS.slice() : (roleOps[al] || []);
+      var currentOps  = isOverride ? ((current || {})[al] || []) : roleAppOps;
+
+      var card = document.createElement('div');
+      card.style.cssText = 'border:1px solid var(--border-strong);border-radius:6px;overflow:hidden';
+
+      /* header */
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'padding:6px 10px;background:var(--bg-hover);'
+        + 'display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600';
+
+      var nameSpan = document.createElement('span');
+      nameSpan.textContent = appName;
+
+      var defBadge = document.createElement('span');
+      defBadge.style.cssText = 'font-size:10px;font-weight:400;color:var(--text-dim)';
+      defBadge.textContent = roleAppOps === '__all__' ? 'роль: всі'
+        : 'роль: ' + (roleAppOps.length ? roleAppOps.join(', ') : 'немає');
+
+      hdr.appendChild(nameSpan);
+      hdr.appendChild(defBadge);
+
+      /* ops row */
+      var body = document.createElement('div');
+      body.style.cssText = 'padding:8px 10px;display:flex;flex-wrap:wrap;gap:5px';
+
+      ALL_OPS.forEach(function (op) {
+        var isChecked = (currentOps.indexOf(op) !== -1);
+        var isRoleDefault = (roleAppOps === '__all__' || roleAppOps.indexOf(op) !== -1);
+
+        var lbl = document.createElement('label');
+        lbl.style.cssText = 'display:inline-flex;align-items:center;gap:4px;cursor:pointer;'
+          + 'padding:3px 8px;border-radius:4px;font-size:11px;user-select:none;'
+          + 'border:1px solid ' + (isChecked ? 'var(--accent,#58a6ff)' : 'var(--border-strong)')
+          + ';background:' + (isChecked ? 'rgba(88,166,255,.12)' : 'var(--bg-card)');
+
+        var cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = isChecked;
+        cb.setAttribute('data-ops-app', al);
+        cb.setAttribute('data-ops-op', op);
+        cb.style.cssText = 'width:13px;height:13px;cursor:pointer;flex-shrink:0;margin:0';
+
+        var opText = document.createElement('span');
+        opText.textContent = OP_LABELS[op] || op;
+        if (isRoleDefault) {
+          opText.title = 'Дефолт ролі';
+          opText.style.textDecoration = 'underline dotted';
+        }
+
+        cb.addEventListener('change', function () {
+          lbl.style.borderColor = this.checked ? 'var(--accent,#58a6ff)' : 'var(--border-strong)';
+          lbl.style.background  = this.checked ? 'rgba(88,166,255,.12)' : 'var(--bg-card)';
+          syncOpsFromCheckboxes();
+        });
+
+        lbl.appendChild(cb);
+        lbl.appendChild(opText);
+        body.appendChild(lbl);
+      });
+
+      card.appendChild(hdr);
+      card.appendChild(body);
+      grid.appendChild(card);
+    });
+
+    wrap.appendChild(grid);
+    panel.innerHTML = '';
+    panel.appendChild(wrap);
+
+    /* bind toggle */
+    document.getElementById('mv-ops-override-toggle').addEventListener('change', function () {
+      var gridEl   = document.getElementById('mv-ops-grid');
+      var hintEl   = toggleHint;
+      if (this.checked) {
+        gridEl.style.opacity       = '1';
+        gridEl.style.pointerEvents = '';
+        hintEl.textContent = '(активно)';
+        /* initialize from role defaults */
+        var initial = {};
+        apps.forEach(function (al) {
+          var rOps = (roleOps === '__all__') ? ALL_OPS.slice() : (roleOps[al] || []);
+          initial[al] = rOps.slice();
+        });
+        setOps(initial);
+        /* sync checkboxes to match initial */
+        document.querySelectorAll('input[data-ops-app]').forEach(function (cb) {
+          var ial  = cb.getAttribute('data-ops-app');
+          var iop  = cb.getAttribute('data-ops-op');
+          var rOps = (roleOps === '__all__') ? ALL_OPS : (roleOps[ial] || []);
+          cb.checked = rOps.indexOf(iop) !== -1;
+          var lbl = cb.parentElement;
+          if (lbl) {
+            lbl.style.borderColor = cb.checked ? 'var(--accent,#58a6ff)' : 'var(--border-strong)';
+            lbl.style.background  = cb.checked ? 'rgba(88,166,255,.12)' : 'var(--bg-card)';
+          }
+        });
+      } else {
+        gridEl.style.opacity       = '0.4';
+        gridEl.style.pointerEvents = 'none';
+        hintEl.textContent = '(None = авто за роллю)';
+        setOps(null);
+      }
+    });
+
+    /* rebuild panel when role changes */
+    var roleSel2 = document.querySelector('select[name="role"]');
+    if (roleSel2) {
+      roleSel2.addEventListener('change', function () {
+        /* only rebuild if not in override mode */
+        var tog = document.getElementById('mv-ops-override-toggle');
+        if (!tog || !tog.checked) buildOpsPanel();
+      });
+    }
+  }
+
   /* ── Init ──────────────────────────────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', function () {
     var bundleSel = document.querySelector('select[name="bundle"]');
@@ -220,8 +430,9 @@
       submitRow.appendChild(btn);
     }
 
-    /* Build denied-models panel */
+    /* Build panels */
     buildDeniedPanel();
+    buildOpsPanel();
   });
 })();
 </script>

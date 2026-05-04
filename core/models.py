@@ -182,6 +182,15 @@ class UserProfile(models.Model):
         verbose_name='Заблоковані моделі',
         help_text='Список "app_label:ModelName" — моделі заблоковані всередині дозволеного модуля.',
     )
+    module_operations = models.JSONField(
+        null=True, blank=True, default=None,
+        verbose_name='Операції по модулях',
+        help_text=(
+            'None = авто (роль). '
+            '{"crm": ["view","add","change"]} = явні операції для модуля. '
+            '{} = повна заборона всіх операцій.'
+        ),
+    )
 
     # ── Персональні налаштування ──────────────────────────────
     notify_email       = models.BooleanField(default=True,  verbose_name='Email сповіщення')
@@ -247,6 +256,31 @@ class UserProfile(models.Model):
             from core.models import ModuleRegistry
             return ModuleRegistry.get_active_apps()
         return list(modules)
+
+    def get_allowed_operations(self, app_label: str):
+        """
+        Returns list of allowed operations for app_label, or '__all__'.
+        Operations: view, add, change, delete, export, import
+
+        Priority:
+          1. superadmin/admin → '__all__'
+          2. module_operations is not None → explicit per-app list ([] = deny all)
+          3. ROLE_OPERATIONS defaults for this role
+        """
+        if self.role in (self.Role.SUPERADMIN, self.Role.ADMIN):
+            return '__all__'
+        if self.module_operations is not None:
+            # Explicit override — app not in map means deny
+            ops = self.module_operations.get(app_label)
+            if ops is None:
+                return ['view']  # default to view-only for unlisted apps
+            return list(ops)
+        # Role defaults
+        from core.utils import ROLE_OPERATIONS
+        role_ops = ROLE_OPERATIONS.get(self.role, {})
+        if role_ops == '__all__':
+            return '__all__'
+        return list(role_ops.get(app_label, ['view']))
 
 
 class ModuleBundle(models.Model):
