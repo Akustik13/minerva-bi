@@ -2196,8 +2196,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             else:
                 state = "pending"
             entry = {"label": lbl, "state": state, "is_last": i == len(STEPS) - 1}
-            if state == "active" and shipment.carrier_delayed and shipment.carrier_status_label:
-                entry["delay_reason"] = shipment.carrier_status_label
+            if state == "active" and shipment.carrier_status_label:
+                entry["carrier_note"] = shipment.carrier_status_label
             timeline.append(entry)
 
         show_timeline = shipment.status not in ("error", "cancelled")
