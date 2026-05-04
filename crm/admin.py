@@ -7,7 +7,7 @@ from django.urls import path
 from django.utils.html import format_html
 from django.utils.http import urlencode
 from django.utils.safestring import mark_safe
-from .models import Customer, CustomerNote
+from .models import Customer, CustomerNote, CustomerTimeline
 from sales.models import SalesOrder, SalesOrderLine
 from core.mixins import AuditableMixin
 
@@ -17,6 +17,19 @@ class CustomerNoteInline(admin.TabularInline):
     extra = 1
     fields = ("note_type", "subject", "body", "created_at", "created_by")
     readonly_fields = ("created_at",)
+
+
+class CustomerTimelineInline(admin.TabularInline):
+    model            = CustomerTimeline
+    extra            = 0
+    fields           = ('event_type', 'title', 'ai_summary', 'remind_at', 'is_pinned', 'created_at')
+    readonly_fields  = ('created_at', 'ai_summary')
+    ordering         = ('-created_at',)
+    show_change_link = True
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related('user')
+        return qs[:20]
 
 
 # ── Фільтр: постійні клієнти ──────────────────────────────────────────────────
@@ -276,7 +289,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         "top_products_display", "order_history_display",
         "strategy_btn", "upload_widget_customer",
     )
-    inlines = [CustomerNoteInline]
+    inlines = [CustomerNoteInline, CustomerTimelineInline]
 
     def get_urls(self):
         urls = super().get_urls()
@@ -1211,6 +1224,38 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
         )
     order_history_display.short_description = "Останні 20 замовлень"
+
+
+@admin.register(CustomerTimeline)
+class CustomerTimelineAdmin(admin.ModelAdmin):
+    list_display    = ('customer', 'event_type_icon', 'title_short',
+                       'user', 'remind_badge', 'created_at')
+    list_filter     = ('event_type', 'is_pinned',
+                       ('created_at', admin.DateFieldListFilter))
+    search_fields   = ('customer__name', 'title', 'body')
+    readonly_fields = ('created_at', 'ai_summary')
+    date_hierarchy  = 'created_at'
+
+    def event_type_icon(self, obj):
+        return obj.get_event_type_display()
+    event_type_icon.short_description = 'Тип'
+
+    def title_short(self, obj):
+        return obj.title[:60]
+    title_short.short_description = 'Заголовок'
+
+    def remind_badge(self, obj):
+        from django.utils import timezone
+        if not obj.remind_at:
+            return '—'
+        if obj.remind_sent:
+            return format_html('<span style="color:var(--ok)">✓ Надіслано</span>')
+        if obj.remind_at < timezone.now():
+            return format_html('<span style="color:var(--err)">⚠ Прострочено</span>')
+        return format_html(
+            '<span style="color:var(--accent)">{}</span>',
+            obj.remind_at.strftime('%d.%m %H:%M'))
+    remind_badge.short_description = 'Нагадування'
 
 
 @admin.register(CustomerNote)

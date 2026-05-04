@@ -145,6 +145,21 @@ ALL_TOOLS = [
             "required": [],
         },
     },
+    {
+        "name": "get_customer_emails",
+        "description": (
+            "Знайти email листи з конкретним клієнтом. "
+            "Повертає останні листи з теми, датами і коротким змістом."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "customer_name": {"type": "string", "description": "Ім'я або частина імені клієнта"},
+                "limit":         {"type": "integer", "description": "Кількість листів (макс 20)", "default": 5},
+            },
+            "required": ["customer_name"],
+        },
+    },
 ]
 
 
@@ -526,6 +541,38 @@ def _get_audit_log(inp, profile):
     }
 
 
+def _get_customer_emails(inp, profile):
+    """Знайти email листи з клієнтом з CustomerTimeline."""
+    from crm.models import CustomerTimeline, Customer
+    name  = inp.get('customer_name', '')
+    limit = min(int(inp.get('limit', 5)), 20)
+
+    customers = list(Customer.objects.filter(name__icontains=name)[:3])
+    if not customers:
+        return {'error': f"Клієнт '{name}' не знайдений"}
+
+    emails = []
+    for customer in customers:
+        events = (CustomerTimeline.objects
+                  .filter(customer=customer,
+                          event_type__in=['email_in', 'email_out'])
+                  .order_by('-created_at')[:limit])
+        for e in events:
+            emails.append({
+                'customer':  customer.name,
+                'direction': e.event_type,
+                'title':     e.title,
+                'body':      e.body[:300],
+                'date':      e.created_at.strftime('%d.%m.%Y'),
+            })
+
+    return {
+        'emails':           emails,
+        'total':            len(emails),
+        'customers_found':  [c.name for c in customers],
+    }
+
+
 _TOOL_HANDLERS = {
     "get_system_overview":   _get_system_overview,
     "get_inventory_status":  _get_inventory_status,
@@ -539,4 +586,5 @@ _TOOL_HANDLERS = {
     "create_order":          _create_order,
     "update_inventory":      _update_inventory,
     "get_audit_log":         _get_audit_log,
+    "get_customer_emails":   _get_customer_emails,
 }

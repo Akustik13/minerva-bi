@@ -29,3 +29,243 @@
   {% endif %}
   {{ block.super }}
 {% endblock %}
+
+{% block after_related_objects %}
+{{ block.super }}
+{% if original %}
+<div style="margin:20px 0">
+
+  <!-- ═══ AI ПАНЕЛЬ ══════════════════════════════════════════════════════ -->
+  <div style="background:var(--bg-card);border:1px solid var(--border-strong);
+              border-radius:12px;overflow:hidden;margin-bottom:16px">
+
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border-strong);
+                display:flex;align-items:center;justify-content:space-between">
+      <div style="font-weight:600;font-size:14px;color:var(--text)">🏛️ Minerva AI</div>
+      <div style="display:flex;gap:8px">
+        <button type="button" onclick="runAnalysis()" id="btn-analysis"
+                style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
+                       background:rgba(0,212,170,.12);color:#00d4aa;
+                       border:1px solid rgba(0,212,170,.3);cursor:pointer">
+          🔍 Аналіз клієнта
+        </button>
+        <button type="button" onclick="toggleEmailComposer()"
+                style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
+                       background:rgba(79,143,255,.12);color:var(--accent);
+                       border:1px solid rgba(79,143,255,.3);cursor:pointer">
+          ✉️ Написати лист
+        </button>
+      </div>
+    </div>
+
+    <div id="analysis-result"
+         style="padding:14px 16px;font-size:13px;line-height:1.6;
+                color:var(--text);display:none">
+    </div>
+
+    <div id="email-composer"
+         style="padding:14px 16px;border-top:1px solid var(--border-strong);display:none">
+      <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+        <select id="email-purpose"
+                style="padding:6px 10px;border-radius:6px;font-size:13px;
+                       border:1px solid var(--border-strong);
+                       background:var(--bg-input);color:var(--text)">
+          <option value="follow_up">Follow-up</option>
+          <option value="reactivation">Реактивація</option>
+          <option value="overdue_payment">Прострочений платіж</option>
+          <option value="new_offer">Нова пропозиція</option>
+          <option value="thank_you">Подяка</option>
+          <option value="shipping_update">Статус доставки</option>
+        </select>
+        <select id="email-lang"
+                style="padding:6px 10px;border-radius:6px;font-size:13px;
+                       border:1px solid var(--border-strong);
+                       background:var(--bg-input);color:var(--text)">
+          <option value="uk">Українська</option>
+          <option value="de">Deutsch</option>
+          <option value="en">English</option>
+        </select>
+        <button type="button" onclick="generateEmail()"
+                style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
+                       background:var(--accent);color:#fff;border:none;cursor:pointer">
+          Згенерувати →
+        </button>
+      </div>
+      <div id="email-result"
+           style="display:none;font-size:13px;line-height:1.7;padding:12px;
+                  border-radius:8px;background:var(--bg-input);
+                  border:1px solid var(--border-strong);
+                  color:var(--text);white-space:pre-wrap;font-family:monospace">
+      </div>
+      <div id="email-actions" style="display:none;margin-top:10px;gap:8px">
+        <button type="button" onclick="copyEmail()"
+                style="padding:6px 14px;border-radius:6px;font-size:12px;
+                       border:1px solid var(--border-strong);
+                       background:transparent;color:var(--text);cursor:pointer">
+          📋 Копіювати
+        </button>
+        <button type="button" onclick="generateEmail()"
+                style="padding:6px 14px;border-radius:6px;font-size:12px;
+                       border:1px solid var(--border-strong);
+                       background:transparent;color:var(--text);cursor:pointer">
+          🔄 Ще варіант
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ХРОНОЛОГІЯ ═══════════════════════════════════════════════════ -->
+  <div style="background:var(--bg-card);border:1px solid var(--border-strong);
+              border-radius:12px;overflow:hidden">
+
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border-strong);
+                display:flex;align-items:center;justify-content:space-between">
+      <div style="font-weight:600;font-size:14px;color:var(--text)">📋 Хронологія клієнта</div>
+      <button type="button" onclick="loadTimeline()"
+              style="padding:4px 10px;border-radius:5px;font-size:11px;
+                     border:1px solid var(--border-strong);
+                     background:transparent;cursor:pointer;color:var(--text-dim)">
+        Оновити
+      </button>
+    </div>
+
+    <div style="padding:10px 16px;border-bottom:1px solid var(--border-strong);
+                display:flex;gap:8px">
+      <input type="text" id="note-text"
+             placeholder="Додати нотатку або нагадування..."
+             style="flex:1;padding:6px 10px;border-radius:6px;font-size:13px;
+                    border:1px solid var(--border-strong);
+                    background:var(--bg-input);color:var(--text)">
+      <input type="datetime-local" id="note-remind"
+             title="Нагадати о..."
+             style="padding:6px 8px;border-radius:6px;font-size:12px;
+                    border:1px solid var(--border-strong);
+                    background:var(--bg-input);color:var(--text)">
+      <button type="button" onclick="addNote()"
+              style="padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;
+                     background:var(--accent);color:#fff;border:none;cursor:pointer">
+        + Додати
+      </button>
+    </div>
+
+    <div id="timeline-list"
+         style="max-height:400px;overflow-y:auto;padding:4px 16px 8px">
+      <div style="text-align:center;color:var(--text-dim);font-size:13px;padding:20px">
+        Завантаження...
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CUSTOMER_PK = '{{ original.pk }}';
+const CSRF = (document.cookie.split(';').find(c=>c.trim().startsWith('csrftoken='))||'=').split('=')[1];
+
+const EVENT_COLORS = {
+  order:'#007bff', email_in:'#17a2b8', email_out:'#6610f2',
+  ai_analysis:'#00d4aa', note:'#ffc107', reminder:'#fd7e14',
+  call:'#28a745', meeting:'#e83e8c',
+};
+
+async function runAnalysis() {
+  const btn = document.getElementById('btn-analysis');
+  const res = document.getElementById('analysis-result');
+  btn.disabled = true; btn.textContent = '⏳ Аналізую...';
+  res.style.display = 'block';
+  res.innerHTML = '<span style="color:var(--text-dim)">Мінерва аналізує клієнта...</span>';
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-analysis/`);
+    const d = await r.json();
+    if (d.ok) {
+      res.innerHTML = d.analysis.replace(/\n/g,'<br>');
+      loadTimeline();
+    } else {
+      res.innerHTML = '<span style="color:var(--err)">⚠️ ' + (d.error||'Помилка') + '</span>';
+    }
+  } catch(e) {
+    res.innerHTML = '<span style="color:var(--err)">⚠️ Помилка з\'єднання</span>';
+  }
+  btn.disabled = false; btn.textContent = '🔍 Аналіз клієнта';
+}
+
+function toggleEmailComposer() {
+  const el = document.getElementById('email-composer');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function generateEmail() {
+  const res = document.getElementById('email-result');
+  const act = document.getElementById('email-actions');
+  res.style.display = 'block'; act.style.display = 'none';
+  res.textContent = 'Генерую лист...';
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-email/`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+      body:JSON.stringify({purpose:document.getElementById('email-purpose').value,language:document.getElementById('email-lang').value}),
+    });
+    const d = await r.json();
+    if (d.ok) { res.textContent = d.email; act.style.display = 'flex'; }
+    else { res.textContent = '⚠️ '+(d.error||'Помилка'); }
+  } catch(e) { res.textContent = '⚠️ Помилка'; }
+}
+
+function copyEmail() {
+  navigator.clipboard.writeText(document.getElementById('email-result').textContent)
+    .then(()=>{ const b=event.target; b.textContent='✓ Скопійовано'; setTimeout(()=>b.textContent='📋 Копіювати',2000); });
+}
+
+async function loadTimeline() {
+  const list = document.getElementById('timeline-list');
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/timeline/`);
+    const d = await r.json();
+    if (!d.events || d.events.length === 0) {
+      list.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:20px">Поки немає подій</div>';
+      return;
+    }
+    list.innerHTML = d.events.map(e => `
+      <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-strong)">
+        <div style="flex-shrink:0;width:4px;border-radius:2px;background:${EVENT_COLORS[e.type]||'var(--text-dim)'}"></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+            <div style="font-size:13px;font-weight:500;color:var(--text)">${e.is_pinned?'📌 ':''}${e.type_label} — ${e.title}</div>
+            <div style="font-size:11px;color:var(--text-dim);flex-shrink:0">${e.date}</div>
+          </div>
+          ${e.ai_summary?`<div style="margin-top:4px;font-size:12px;color:#00d4aa;line-height:1.5">${e.ai_summary}</div>`:''}
+          ${(e.body&&!e.ai_summary)?`<div style="margin-top:4px;font-size:12px;color:var(--text-dim)">${e.body}</div>`:''}
+          ${e.remind_at?`<div style="margin-top:4px;font-size:11px;color:#fd7e14">🔔 ${e.remind_at}</div>`:''}
+          <div style="font-size:11px;color:var(--text-dim);margin-top:2px">${e.user}</div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--err);font-size:13px;padding:10px">Помилка завантаження</div>';
+  }
+}
+
+async function addNote() {
+  const text = document.getElementById('note-text').value.trim();
+  const remindAt = document.getElementById('note-remind').value;
+  if (!text) return;
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/timeline/`, {
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+      body:JSON.stringify({event_type:remindAt?'reminder':'note',title:text,remind_at:remindAt||null}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      document.getElementById('note-text').value = '';
+      document.getElementById('note-remind').value = '';
+      loadTimeline();
+    }
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (CUSTOMER_PK && CUSTOMER_PK !== 'None') loadTimeline();
+});
+</script>
+{% endif %}
+{% endblock %}

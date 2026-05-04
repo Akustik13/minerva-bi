@@ -349,3 +349,71 @@ class CustomerNote(models.Model):
 
     def __str__(self) -> str:
         return f"{self.customer.name} — {self.subject}"
+
+
+class CustomerTimeline(models.Model):
+    """
+    Єдина хронологічна стрічка подій по клієнту.
+    Агрегує: замовлення, email листи, AI аналізи, нотатки, нагадування.
+    """
+
+    EVENT_TYPES = [
+        ('order',       '🛒 Замовлення'),
+        ('email_in',    '📨 Отримано лист'),
+        ('email_out',   '📤 Відправлено лист'),
+        ('ai_analysis', '🏛️ AI аналіз'),
+        ('note',        '📝 Нотатка'),
+        ('reminder',    '🔔 Нагадування'),
+        ('call',        '📞 Дзвінок'),
+        ('meeting',     '🤝 Зустріч'),
+    ]
+
+    customer   = models.ForeignKey(
+                   'crm.Customer',
+                   on_delete=models.CASCADE,
+                   related_name='timeline_events',
+                   verbose_name='Клієнт')
+    user       = models.ForeignKey(
+                   'auth.User',
+                   null=True, blank=True,
+                   on_delete=models.SET_NULL,
+                   verbose_name='Автор')
+    event_type = models.CharField(
+                   max_length=20,
+                   choices=EVENT_TYPES,
+                   default='note',
+                   verbose_name='Тип події')
+    title      = models.CharField(max_length=300, verbose_name='Заголовок')
+    body       = models.TextField(blank=True, verbose_name='Деталі')
+    ai_summary = models.TextField(
+                   blank=True,
+                   verbose_name='AI резюме',
+                   help_text='Короткий висновок Мінерви')
+
+    related_order_id = models.PositiveIntegerField(
+                         null=True, blank=True,
+                         verbose_name='ID замовлення')
+    related_email_id = models.PositiveIntegerField(
+                         null=True, blank=True,
+                         verbose_name='ID email')
+
+    remind_at   = models.DateTimeField(
+                    null=True, blank=True,
+                    verbose_name='Нагадати о',
+                    help_text='Якщо заповнено — Мінерва надішле алерт')
+    remind_sent = models.BooleanField(default=False)
+
+    is_pinned  = models.BooleanField(default=False, verbose_name='Закріплено вгорі')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Подія клієнта'
+        verbose_name_plural = 'Хронологія клієнта'
+        ordering            = ['-created_at']
+        indexes             = [
+            models.Index(fields=['customer', '-created_at']),
+            models.Index(fields=['remind_at', 'remind_sent']),
+        ]
+
+    def __str__(self):
+        return f'{self.customer} | {self.get_event_type_display()} | {self.created_at:%d.%m.%Y}'

@@ -68,6 +68,30 @@ def auto_sync_customer(sender, instance, created, **kwargs):
     sender.objects.filter(pk=instance.pk).update(customer_key=key)
 
 
+@receiver(post_save, sender='sales.SalesOrder')
+def create_order_timeline_event(sender, instance, created, **kwargs):
+    """При створенні замовлення — автоматично додати запис в хронологію клієнта."""
+    if not created or not instance.customer_key:
+        return
+    try:
+        from crm.models import Customer, CustomerTimeline
+        customer = Customer.objects.filter(
+            external_key=instance.customer_key).first()
+        if not customer:
+            return
+        CustomerTimeline.objects.create(
+            customer=customer,
+            event_type='order',
+            title=f'Замовлення #{instance.order_number}',
+            body=(f'Сума: €{float(instance.total_price or 0):.2f} '
+                  f'| Статус: {instance.status}'),
+            related_order_id=instance.pk,
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger('crm').error(f'Timeline signal error: {e}')
+
+
 @receiver(pre_save, sender='sales.SalesOrder')
 def _capture_old_status(sender, instance, **kwargs):
     """Зберігаємо старий статус перед збереженням для порівняння."""
