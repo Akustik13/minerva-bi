@@ -291,9 +291,9 @@ def _ups_status_to_class(status_type: str, delivered: bool) -> str:
     """UPS status type → Jumingo progress.class"""
     if delivered or status_type == "D":
         return "completed"
-    if status_type in ("I", "O"):
+    if status_type in ("I", "O", "X"):   # X = Exception (rescheduled/delay) — still in transit
         return "in_transit"
-    if status_type in ("M", "P", "X"):
+    if status_type in ("M", "P"):        # M = Manifest/label created, P = Pickup at shipper
         return "in_system"
     return "in_transit"
 
@@ -431,13 +431,24 @@ def _log_attempt(shipment, tracker_name: str, raw: dict, duration_ms: int,
 # Головна функція
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _detect_direct_tracker(tracking_number: str) -> str | None:
-    """Автовизначення прямого трекера за форматом трекінг-номера."""
+def _detect_direct_tracker(tracking_number: str, carrier=None) -> str | None:
+    """Автовизначення прямого трекера за форматом трекінг-номера.
+
+    carrier — об'єкт Carrier (опційно) — використовується як fallback якщо
+    формат номера не дозволяє однозначно визначити перевізника.
+    """
     tn = (tracking_number or "").strip().upper()
     if not tn:
         return None
     if tn.startswith("1Z"):   # UPS universal format
         return "ups"
+    # Fallback: визначаємо по типу перевізника (наприклад UPS reference / import TN)
+    if carrier:
+        ct = getattr(carrier, "carrier_type", "")
+        if ct == "ups":
+            return "ups"
+        if ct in ("dhl", "dhl_paket"):
+            return "dhl_track"
     return "dhl_track"        # DHL Unified Tracking покриває JD/00340/числові та Express
 
 
@@ -466,7 +477,7 @@ def track_with_fallback(shipment, dry_run: bool = False) -> tuple:
 
     if prefer_tn and shipment.tracking_number:
         if not rules or rules[0].tracker == "jumingo":
-            direct = _detect_direct_tracker(shipment.tracking_number)
+            direct = _detect_direct_tracker(shipment.tracking_number, carrier=shipment.carrier)
             if direct:
                 rules = [_FakeRule(direct, 0)] + list(rules)
 
