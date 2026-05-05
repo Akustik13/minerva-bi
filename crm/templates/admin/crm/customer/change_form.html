@@ -318,7 +318,7 @@ function _renderBody(text, color, idx) {
     <span style="white-space:pre-wrap">
       <span id="tlp-${idx}">${esc.slice(0,PREVIEW_LEN)}…</span><span id="tlf-${idx}" style="display:none;white-space:pre-wrap">${esc}</span>
     </span>
-    <button id="tlb-${idx}" onclick="tlExpand(${idx})"
+    <button type="button" id="tlb-${idx}" onclick="tlExpand(${idx})"
             style="background:none;border:none;color:var(--link-fg);font-size:11px;
                    cursor:pointer;padding:0 0 0 4px;vertical-align:baseline">▾ більше</button>
   </div>`;

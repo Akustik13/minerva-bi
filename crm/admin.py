@@ -27,6 +27,7 @@ class CustomerTimelineInline(admin.TabularInline):
     readonly_fields  = ('created_at', 'ai_summary')
     ordering         = ('-created_at',)
     show_change_link = True
+    classes          = ('collapse',)
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('user').order_by('-created_at')
