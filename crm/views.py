@@ -43,10 +43,50 @@ def _parse_strategy_response(text: str) -> dict | None:
     return None
 
 
+def _fetch_customer_shipments(customer) -> list:
+    """Відправлення клієнта через його замовлення (прямий запит, без tools)."""
+    try:
+        from django.db.models import Q
+        from shipping.models import Shipment
+
+        q = Q(order__client__icontains=customer.name)
+        if getattr(customer, 'email', ''):
+            q |= Q(order__email__iexact=customer.email)
+
+        qs = (Shipment.objects
+              .filter(q, order__isnull=False)
+              .select_related('carrier', 'order')
+              .order_by('-created_at')[:10])
+
+        result = []
+        for s in qs:
+            item = {
+                'order_number':    getattr(s.order, 'order_number', str(s.order_id)),
+                'carrier':         str(s.carrier),
+                'status':          s.get_status_display(),
+                'tracking_number': s.tracking_number or '—',
+                'delayed':         s.carrier_delayed,
+                'created_at':      s.created_at.strftime('%d.%m.%Y'),
+            }
+            if s.carrier_status_label:
+                item['carrier_status'] = s.carrier_status_label
+            if s.eta_from or s.eta_to:
+                item['eta'] = f"{s.eta_from} – {s.eta_to}"
+            if s.delivered_at:
+                item['delivered_at'] = s.delivered_at.strftime('%d.%m.%Y')
+            if s.error_message:
+                item['error'] = s.error_message[:100]
+            result.append(item)
+        return result
+    except Exception:
+        return []
+
+
 @staff_member_required
 def ai_customer_analysis(request, customer_pk):
     """
-    GET: AI-аналіз клієнта.  Результат зберігається в CustomerTimeline.
+    GET: AI-аналіз клієнта. Scope задається через ?include=customer,orders,emails,shipments
+    За замовчуванням аналізуються всі 4 блоки. Результат зберігається в CustomerTimeline.
     """
     from crm.models import Customer, CustomerTimeline
 
@@ -55,36 +95,60 @@ def ai_customer_analysis(request, customer_pk):
     except Customer.DoesNotExist:
         return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
 
+    # Scope: які блоки включати в аналіз
+    include_raw = request.GET.get('include', 'customer,orders,emails,shipments')
+    include = {x.strip() for x in include_raw.split(',') if x.strip()}
+
     profile = getattr(request.user, 'profile', None)
+
+    customer_data = {}
+    orders_data   = {}
+    emails_data   = {}
+    shipments_data = []
 
     try:
         from ai_assistant.tools import execute_tool
-        customer_data = execute_tool(
-            'get_customer_info',
-            {'customer_name': customer.name},
-            profile=profile,
-        )
-        orders_data = execute_tool(
-            'get_recent_orders',
-            {'customer_name': customer.name, 'limit': 5},
-            profile=profile,
-        )
+        if 'customer' in include:
+            customer_data = execute_tool(
+                'get_customer_info', {'customer_name': customer.name}, profile=profile)
+        if 'orders' in include:
+            orders_data = execute_tool(
+                'get_recent_orders', {'customer_name': customer.name, 'limit': 5}, profile=profile)
+        if 'emails' in include:
+            emails_data = execute_tool(
+                'get_customer_emails', {'customer_name': customer.name, 'limit': 10}, profile=profile)
     except Exception:
-        customer_data = {}
-        orders_data = {}
+        pass
 
-    prompt = (
-        f"Проаналізуй клієнта {customer.name} і дай конкретні рекомендації.\n\n"
-        f"Дані клієнта: {json.dumps(customer_data, ensure_ascii=False, default=str)}\n"
-        f"Останні замовлення: {json.dumps(orders_data, ensure_ascii=False, default=str)}\n\n"
-        "Дай відповідь у форматі:\n"
-        "1. Короткий профіль (1-2 речення хто цей клієнт)\n"
-        "2. Поточний статус стосунків (активний/відходить/потенційний)\n"
-        "3. Рекомендований наступний крок (конкретна дія)\n"
-        "4. Найкращий час для контакту\n"
-        "5. Тон спілкування (офіційний/дружній/тощо)\n\n"
-        "Будь конкретним, без загальних фраз."
-    )
+    if 'shipments' in include:
+        shipments_data = _fetch_customer_shipments(customer)
+
+    # Будуємо промпт динамічно — тільки з наявних блоків
+    parts = [f"Проаналізуй клієнта {customer.name} і дай конкретні рекомендації.\n"]
+    if customer_data:
+        parts.append(f"Дані клієнта: {json.dumps(customer_data, ensure_ascii=False, default=str)}")
+    if orders_data:
+        parts.append(f"Останні замовлення: {json.dumps(orders_data, ensure_ascii=False, default=str)}")
+    if emails_data:
+        parts.append(f"Листування: {json.dumps(emails_data, ensure_ascii=False, default=str)}")
+    if shipments_data:
+        parts.append(f"Відправлення та доставки: {json.dumps(shipments_data, ensure_ascii=False, default=str)}")
+
+    format_items = [
+        "1. Короткий профіль (1-2 речення хто цей клієнт)",
+        "2. Поточний статус стосунків (активний/відходить/потенційний)",
+        "3. Рекомендований наступний крок (конкретна дія)",
+        "4. Найкращий час для контакту",
+        "5. Тон спілкування (офіційний/дружній/тощо)",
+    ]
+    if shipments_data:
+        format_items.append(
+            "6. Стан доставок — чи є незавершені відправлення, затримки, проблеми"
+        )
+    parts.append("Дай відповідь у форматі:\n" + "\n".join(format_items))
+    parts.append("Будь конкретним, без загальних фраз.")
+
+    prompt = "\n\n".join(parts)
 
     try:
         from ai_assistant.service import chat
@@ -245,11 +309,16 @@ def ai_suggest_strategy(request, customer_pk):
         orders_data   = {}
         emails_data   = {}
 
+    shipments_data = _fetch_customer_shipments(customer)
+
     prompt = (
         f"Проаналізуй клієнта '{customer.name}' і згенеруй персоналізовану CRM-стратегію.\n\n"
         f"Дані клієнта: {json.dumps(customer_data, ensure_ascii=False, default=str)}\n"
         f"Останні замовлення: {json.dumps(orders_data, ensure_ascii=False, default=str)}\n"
-        f"Листування: {json.dumps(emails_data, ensure_ascii=False, default=str)}\n\n"
+        f"Листування: {json.dumps(emails_data, ensure_ascii=False, default=str)}\n"
+        + (f"Відправлення та доставки: {json.dumps(shipments_data, ensure_ascii=False, default=str)}\n"
+           if shipments_data else "")
+        + "\n"
         "ОБОВ'ЯЗКОВО поверни ТІЛЬКИ валідний JSON без жодного тексту до або після:\n"
         '{\n'
         '  "strategy_name": "назва стратегії",\n'

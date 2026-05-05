@@ -172,6 +172,21 @@ ALL_TOOLS = [
             "required": ["customer_name"],
         },
     },
+    {
+        "name": "get_customer_shipments",
+        "description": (
+            "Відправлення та доставки клієнта: статус, трекінг, затримки, ETA, "
+            "фактична дата доставки. Дозволяє бачити проблеми з доставкою."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "customer_name": {"type": "string", "description": "Ім'я або частина імені клієнта"},
+                "limit":         {"type": "integer", "description": "Кількість відправлень (макс 20)", "default": 10},
+            },
+            "required": ["customer_name"],
+        },
+    },
 ]
 
 
@@ -615,6 +630,55 @@ def _get_customer_timeline(inp, profile):
         return {'error': str(ex), 'events': []}
 
 
+def _get_customer_shipments(inp, profile):
+    """Відправлення та доставки клієнта через його замовлення."""
+    from django.db.models import Q
+    from crm.models import Customer
+    from shipping.models import Shipment
+
+    name  = inp.get('customer_name', '')
+    limit = min(int(inp.get('limit', 10)), 20)
+
+    customers = list(Customer.objects.filter(name__icontains=name)[:3])
+    if not customers:
+        return {'error': f"Клієнт '{name}' не знайдений", 'shipments': []}
+
+    result = []
+    for customer in customers:
+        q = Q(order__client__icontains=customer.name)
+        if getattr(customer, 'email', ''):
+            q |= Q(order__email__iexact=customer.email)
+        qs = (Shipment.objects
+              .filter(q, order__isnull=False)
+              .select_related('carrier', 'order')
+              .order_by('-created_at')[:limit])
+        for s in qs:
+            item = {
+                'customer':        customer.name,
+                'order_number':    getattr(s.order, 'order_number', str(s.order_id)),
+                'carrier':         str(s.carrier),
+                'status':          s.get_status_display(),
+                'tracking_number': s.tracking_number or '—',
+                'delayed':         s.carrier_delayed,
+                'created_at':      s.created_at.strftime('%d.%m.%Y'),
+            }
+            if s.carrier_status_label:
+                item['carrier_status'] = s.carrier_status_label
+            if s.eta_from or s.eta_to:
+                item['eta'] = f"{s.eta_from} – {s.eta_to}"
+            if s.delivered_at:
+                item['delivered_at'] = s.delivered_at.strftime('%d.%m.%Y')
+            if s.error_message:
+                item['error'] = s.error_message[:100]
+            result.append(item)
+
+    return {
+        'shipments':       result[:limit],
+        'total':           len(result),
+        'customers_found': [c.name for c in customers],
+    }
+
+
 _TOOL_HANDLERS = {
     "get_system_overview":   _get_system_overview,
     "get_inventory_status":  _get_inventory_status,
@@ -628,6 +692,7 @@ _TOOL_HANDLERS = {
     "create_order":          _create_order,
     "update_inventory":      _update_inventory,
     "get_audit_log":         _get_audit_log,
-    "get_customer_emails":   _get_customer_emails,
-    "get_customer_timeline": _get_customer_timeline,
+    "get_customer_emails":     _get_customer_emails,
+    "get_customer_timeline":   _get_customer_timeline,
+    "get_customer_shipments":  _get_customer_shipments,
 }

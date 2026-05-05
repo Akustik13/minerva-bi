@@ -1,6 +1,27 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 
+{% block extrahead %}{{ block.super }}
+<style>
+.scope-pill {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.scope-pill.active {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+</style>
+{% endblock %}
+
 {% block object-tools-items %}
   {% if original %}
     {% if original.email %}
@@ -56,6 +77,16 @@
           ✉️ Написати лист
         </button>
       </div>
+    </div>
+
+    <!-- Scope toggles: що включати в аналіз -->
+    <div style="padding:8px 16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
+                border-bottom:1px solid var(--border)">
+      <span style="font-size:11px;color:var(--text-dim);margin-right:2px">Аналізувати:</span>
+      <button type="button" id="sc-customer"  onclick="toggleScope('customer')"  class="scope-pill active">👤 Клієнт</button>
+      <button type="button" id="sc-orders"    onclick="toggleScope('orders')"    class="scope-pill active">📦 Замовлення</button>
+      <button type="button" id="sc-emails"    onclick="toggleScope('emails')"    class="scope-pill active">📧 Листування</button>
+      <button type="button" id="sc-shipments" onclick="toggleScope('shipments')" class="scope-pill active">🚚 Доставка</button>
     </div>
 
     <div id="analysis-result"
@@ -237,14 +268,36 @@ const EVENT_COLORS = {
   call:'#28a745', meeting:'#e83e8c',
 };
 
+// ── Analysis scope (зберігається в localStorage) ──────────────────────────
+const _SCOPE_KEY = 'mv-analysis-scope';
+const _analysisScope = {customer: true, orders: true, emails: true, shipments: true};
+try { Object.assign(_analysisScope, JSON.parse(localStorage.getItem(_SCOPE_KEY) || '{}')); } catch(e) {}
+
+function _applyScopeUI() {
+  ['customer','orders','emails','shipments'].forEach(k => {
+    const btn = document.getElementById('sc-' + k);
+    if (btn) btn.classList.toggle('active', !!_analysisScope[k]);
+  });
+}
+
+function toggleScope(key) {
+  _analysisScope[key] = !_analysisScope[key];
+  const btn = document.getElementById('sc-' + key);
+  if (btn) btn.classList.toggle('active', !!_analysisScope[key]);
+  try { localStorage.setItem(_SCOPE_KEY, JSON.stringify(_analysisScope)); } catch(e) {}
+}
+
 async function runAnalysis() {
   const btn = document.getElementById('btn-analysis');
   const res = document.getElementById('analysis-result');
   btn.disabled = true; btn.textContent = '⏳ Аналізую...';
   res.style.display = 'block';
   res.innerHTML = '<span style="color:var(--text-dim)">Мінерва аналізує клієнта...</span>';
+
+  const include = Object.keys(_analysisScope).filter(k => _analysisScope[k]).join(',') || 'customer';
+
   try {
-    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-analysis/`);
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-analysis/?include=${include}`);
     const d = await r.json();
     if (d.ok) {
       res.innerHTML = d.analysis.replace(/\n/g,'<br>');
@@ -500,6 +553,7 @@ async function applyStrategy() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  _applyScopeUI();
   if (CUSTOMER_PK && CUSTOMER_PK !== 'None') loadTimeline();
 });
 </script>
