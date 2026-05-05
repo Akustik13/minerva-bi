@@ -58,6 +58,7 @@ def chat(
     profile=None,
     channel: str = 'webchat',
     telegram_chat_id: str = '',
+    enable_web_search: bool = False,
 ) -> str:
     """
     Main entry point. Returns assistant reply text.
@@ -74,6 +75,8 @@ def chat(
     conversation = _get_or_create_conversation(profile, channel, telegram_chat_id)
     model = choose_model(user_text)
     tools = get_allowed_tools(profile)
+    if enable_web_search:
+        tools = [{"type": "web_search_20250305", "name": "web_search"}] + list(tools)
     system_prompt = build_system_prompt(profile)
 
     # Save user message
@@ -132,6 +135,16 @@ def chat(
             tool_results = []
             for block in assistant_content:
                 if block.type == 'tool_use':
+                    if block.name == 'web_search':
+                        # Server-side managed tool — Anthropic handles the search.
+                        # We must return a tool_result to satisfy the API contract,
+                        # but the actual results are injected by Anthropic's infrastructure.
+                        tool_results.append({
+                            'type': 'tool_result',
+                            'tool_use_id': block.id,
+                            'content': '',
+                        })
+                        continue
                     result = execute_tool(block.name, block.input, profile)
                     # Save tool message
                     AIMessage.objects.create(

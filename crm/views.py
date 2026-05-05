@@ -154,8 +154,22 @@ def ai_customer_analysis(request, customer_pk):
     prompt = "\n\n".join(parts)
 
     try:
+        from strategy.models import AISettings
+        use_web_search = AISettings.get().enable_web_search
+    except Exception:
+        use_web_search = False
+
+    if use_web_search:
+        prompt += (
+            "\n\nДОДАТКОВО: використай web_search щоб знайти актуальну інформацію "
+            "про компанію клієнта — сфера бізнесу, розмір, останні новини. "
+            "Це допоможе зробити рекомендацію точнішою."
+        )
+
+    try:
         from ai_assistant.service import chat
-        analysis = chat(prompt, profile=profile, channel='crm_analysis')
+        analysis = chat(prompt, profile=profile, channel='crm_analysis',
+                        enable_web_search=use_web_search)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 

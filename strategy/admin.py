@@ -23,6 +23,14 @@ class AISettingsAdmin(admin.ModelAdmin):
             'ai_allow_email_sending', 'ai_allow_order_creation',
             'ai_allow_inventory_edit', 'ai_allow_financial_data',
         )}),
+        ('🌐 Web Search', {
+            'fields': ('enable_web_search',),
+            'description': (
+                'Anthropic Web Search — пошук в інтернеті під час аналізу клієнтів. '
+                'Використовується тільки у функції «Аналіз клієнта», не в WebChat. '
+                'Робить аналіз точнішим для B2B компаній.'
+            ),
+        }),
     )
 
     def get_form(self, request, obj=None, **kwargs):

@@ -63,6 +63,16 @@ class AISettings(models.Model):
         default=True,
         verbose_name='Дозволити AI бачити фінансові дані')
 
+    # ── Web Search ────────────────────────────────────────────
+    enable_web_search = models.BooleanField(
+        default=True,
+        verbose_name='Web Search для аналізу клієнтів',
+        help_text=(
+            'Мінерва шукає інформацію про компанію клієнта в інтернеті '
+            'під час аналізу. Робить аналіз точнішим для B2B клієнтів. '
+            'Вимкни щоб зменшити витрати токенів (~$0.02 за аналіз).'
+        ))
+
     class Meta:
         verbose_name = 'Налаштування AI'
         verbose_name_plural = 'Налаштування AI'
