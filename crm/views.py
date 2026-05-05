@@ -269,9 +269,9 @@ def ai_apply_strategy(request, customer_pk):
     POST: Зберегти AI-згенеровану стратегію і запустити її для клієнта.
     Body JSON: {strategy_name, behavior_type, steps: [...]}
     """
+    from django.utils import timezone
     from crm.models import Customer
-    from strategy.models import StrategyTemplate, TemplateStep
-    from strategy.services.engine import start_strategy
+    from strategy.models import StrategyTemplate, TemplateStep, CustomerStrategy, CustomerStep
 
     try:
         customer = Customer.objects.get(pk=customer_pk)
@@ -284,6 +284,12 @@ def ai_apply_strategy(request, customer_pk):
     behavior_type = data.get('behavior_type', 'nurturing')
     steps         = data.get('steps', [])
 
+    if not steps:
+        return JsonResponse(
+            {'error': 'AI не повернув кроки стратегії. Спробуйте перегенерувати.'},
+            status=400,
+        )
+
     # Validate behavior_type
     valid_bt = [c[0] for c in StrategyTemplate.BehaviorType.choices]
     if behavior_type not in valid_bt:
@@ -293,12 +299,16 @@ def ai_apply_strategy(request, customer_pk):
     valid_st = [c[0] for c in TemplateStep.StepType.choices]
 
     tmpl = None
+    cs   = None
     try:
+        # 1. Створити шаблон
         tmpl = StrategyTemplate.objects.create(
             name=strategy_name,
             behavior_type=behavior_type,
             is_ai_generated=True,
         )
+
+        # 2. Створити кроки шаблону
         for i, step in enumerate(steps):
             st = step.get('step_type', 'email')
             if st not in valid_st:
@@ -311,8 +321,48 @@ def ai_apply_strategy(request, customer_pk):
                 delay_days=int(step.get('delay_days', 0)),
                 order=i,
             )
-        cs = start_strategy(customer, tmpl)
+
+        # 3. Створити CustomerStrategy вручну
+        now = timezone.now()
+        cs = CustomerStrategy.objects.create(
+            customer=customer,
+            template=tmpl,
+            name=strategy_name,
+            status=CustomerStrategy.Status.ACTIVE,
+            started_at=now,
+        )
+
+        # 4. Створити ВСІ CustomerStep одразу (AI стратегія — повний план відомий зразу)
+        tmpl_steps = list(tmpl.steps.order_by('order'))
+        cumulative_days = 0
+        first_cstep = None
+        for i, step_data in enumerate(steps):
+            cumulative_days += int(step_data.get('delay_days', 0))
+            tmpl_step = tmpl_steps[i] if i < len(tmpl_steps) else None
+            cstep = CustomerStep.objects.create(
+                strategy=cs,
+                template_step=tmpl_step,
+                step_type=(tmpl_step.step_type if tmpl_step
+                           else step_data.get('step_type', 'email')),
+                title=(tmpl_step.title if tmpl_step
+                       else step_data.get('title', f'Крок {i + 1}')),
+                description=(tmpl_step.description if tmpl_step
+                             else step_data.get('description', '')),
+                scheduled_at=now + timezone.timedelta(days=cumulative_days),
+            )
+            if first_cstep is None:
+                first_cstep = cstep
+
+        # 5. Встановити поточний крок
+        if first_cstep:
+            cs.current_step = first_cstep
+            cs.next_action_at = first_cstep.scheduled_at
+            cs.save(update_fields=['current_step', 'next_action_at'])
+
     except Exception as e:
+        # Очистити в правильному порядку: спочатку cs (PROTECT на tmpl), потім tmpl
+        if cs is not None:
+            cs.delete()
         if tmpl is not None:
             tmpl.delete()
         return JsonResponse({'error': str(e)}, status=500)
