@@ -58,7 +58,7 @@ def chat(
     profile=None,
     channel: str = 'webchat',
     telegram_chat_id: str = '',
-    enable_web_search: bool = False,
+    enable_web_search=None,   # True/False = explicit; None = use AISettings.enable_web_search_chat
 ) -> str:
     """
     Main entry point. Returns assistant reply text.
@@ -75,13 +75,14 @@ def chat(
     conversation = _get_or_create_conversation(profile, channel, telegram_chat_id)
     model = choose_model(user_text)
     tools = get_allowed_tools(profile)
-    _use_web_search = enable_web_search
-    if not _use_web_search:
+    if enable_web_search is None:
         try:
             from strategy.models import AISettings
             _use_web_search = AISettings.get().enable_web_search_chat
         except Exception:
-            pass
+            _use_web_search = False
+    else:
+        _use_web_search = bool(enable_web_search)
     if _use_web_search:
         tools = [{"type": "web_search_20250305", "name": "web_search"}] + list(tools)
     system_prompt = build_system_prompt(profile)

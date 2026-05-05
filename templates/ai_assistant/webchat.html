@@ -75,6 +75,16 @@
   border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: 13px;
 }
 #mv-reset-btn:hover { border-color: var(--err); color: var(--err); }
+#mv-web-search-label {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--text-muted); cursor: pointer;
+  white-space: nowrap; user-select: none;
+  padding: 4px 8px; border: 1px solid var(--border);
+  border-radius: 6px; transition: border-color .15s, color .15s;
+}
+#mv-web-search-label:hover { border-color: var(--accent); color: var(--text); }
+#mv-web-search-label.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+#mv-web-search-toggle { display: none; }
 .mv-typing { display: none; align-items: center; gap: 6px; color: var(--text-muted); font-size: 13px; }
 .mv-typing.show { display: flex; }
 .mv-dots span {
@@ -110,6 +120,10 @@
 
   <div id="mv-chat-input-row">
     <textarea id="mv-chat-input" rows="2" placeholder="Напишіть питання…"></textarea>
+    <label id="mv-web-search-label" title="Шукати в інтернеті при відповіді">
+      <input type="checkbox" id="mv-web-search-toggle">
+      🌐
+    </label>
     <button id="mv-reset-btn" title="Нова розмова">🔄</button>
     <button id="mv-send-btn">Надіслати</button>
   </div>
@@ -122,6 +136,20 @@ const input = document.getElementById('mv-chat-input');
 const sendBtn = document.getElementById('mv-send-btn');
 const typing = document.getElementById('mv-typing');
 const ME = '{{ profile.user.get_full_name|default:profile.user.username }}';
+
+// Web search toggle — persist in localStorage; default from server setting
+const wsToggle = document.getElementById('mv-web-search-toggle');
+const wsLabel  = document.getElementById('mv-web-search-label');
+const WS_KEY   = 'mv_chat_web_search';
+const wsDefault = {{ web_search_default|yesno:"true,false" }};
+wsToggle.checked = localStorage.getItem(WS_KEY) !== null
+    ? localStorage.getItem(WS_KEY) === 'true'
+    : wsDefault;
+if (wsToggle.checked) wsLabel.classList.add('active');
+wsToggle.addEventListener('change', () => {
+    localStorage.setItem(WS_KEY, wsToggle.checked);
+    wsLabel.classList.toggle('active', wsToggle.checked);
+});
 
 function addMsg(role, text) {
   const wrap = document.createElement('div');
@@ -171,7 +199,7 @@ async function send() {
     const r = await fetch('{% url "ai_assistant:chat_api" %}', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
-      body: JSON.stringify({message: text}),
+      body: JSON.stringify({message: text, web_search: wsToggle.checked}),
     });
     const data = await r.json();
     addMsg('bot', data.reply || 'Помилка відповіді.');

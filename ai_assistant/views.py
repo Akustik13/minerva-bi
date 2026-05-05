@@ -20,7 +20,15 @@ def _get_profile(user):
 @login_required
 def webchat_view(request):
     profile = _get_profile(request.user)
-    return render(request, 'ai_assistant/webchat.html', {'profile': profile})
+    try:
+        from strategy.models import AISettings
+        web_search_default = AISettings.get().enable_web_search_chat
+    except Exception:
+        web_search_default = False
+    return render(request, 'ai_assistant/webchat.html', {
+        'profile': profile,
+        'web_search_default': web_search_default,
+    })
 
 
 @login_required
@@ -40,12 +48,17 @@ def chat_api(request):
     if profile and not profile.ai_enabled:
         return JsonResponse({'reply': '🔒 AI-асистент для вас вимкнений.'})
 
+    # web_search: explicit True/False from UI toggle; absent = None (use global setting)
+    ws = data.get('web_search')
+    explicit_web_search = bool(ws) if ws is not None else None
+
     try:
         from .service import chat
         reply = chat(
             user_text=user_text,
             profile=profile,
             channel='webchat',
+            enable_web_search=explicit_web_search,
         )
     except Exception as e:
         logger.exception("AI chat error for user %s: %s", request.user, e)
