@@ -83,6 +83,37 @@ def history_api(request):
     return JsonResponse({'messages': msgs})
 
 
+_DIAGNOSTIC_COMMANDS = [
+    {
+        'key':         'morning_briefing',
+        'label':       'Morning Briefing',
+        'description': 'Генерує і надсилає ранковий брифінг в Telegram',
+    },
+    {
+        'key':         'auto_advance',
+        'label':       'Auto Advance Strategies',
+        'description': 'Просуває кроки стратегій (pause/email timeout)',
+    },
+    {
+        'key':         'fetch_emails',
+        'label':       'Fetch Emails (IMAP)',
+        'description': 'Читає пошту і додає листи в хронологію CRM',
+    },
+    {
+        'key':         'send_reminders',
+        'label':       'Send Reminders',
+        'description': 'Надсилає нагадування з CustomerTimeline',
+    },
+]
+
+_CMD_MAP = {
+    'morning_briefing': 'morning_briefing',
+    'auto_advance':     'auto_advance_strategies',
+    'fetch_emails':     'fetch_emails',
+    'send_reminders':   'send_reminders',
+}
+
+
 @login_required
 def tools_diagnostic_view(request):
     """Diagnostic page — staff only."""
@@ -90,23 +121,52 @@ def tools_diagnostic_view(request):
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden()
     from .tools import ALL_TOOLS
-    return render(request, 'ai_assistant/diagnostic.html', {'tools': ALL_TOOLS})
+    return render(request, 'ai_assistant/diagnostic.html', {
+        'tools':               ALL_TOOLS,
+        'diagnostic_commands': _DIAGNOSTIC_COMMANDS,
+    })
 
 
 @login_required
 @require_POST
 def run_tool_diagnostic(request):
-    """Run a single tool and return JSON result with timing."""
+    """Run a single tool (or management command) and return JSON result with timing."""
     if not request.user.is_staff:
         return JsonResponse({'error': 'Forbidden'}, status=403)
     import time
     try:
         data = json.loads(request.body)
-        tool_name = data.get('tool', '')
-        tool_input = data.get('input', {})
+        tool_name  = data.get('tool', '') or data.get('tool_name', '')
+        tool_input = data.get('input', {}) or data.get('tool_input', {})
     except (json.JSONDecodeError, AttributeError):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
+    # ── Management command runner ────────────────────────────────
+    if tool_name.startswith('__cmd_'):
+        cmd_key = tool_name[len('__cmd_'):]
+        cmd = _CMD_MAP.get(cmd_key)
+        if not cmd:
+            return JsonResponse({'error': f'Unknown command: {cmd_key}'}, status=400)
+        from io import StringIO
+        from django.core.management import call_command
+        t0  = time.monotonic()
+        out = StringIO()
+        try:
+            call_command(cmd, stdout=out, stderr=out)
+            output = out.getvalue().strip() or 'OK (no output)'
+            has_error = False
+        except Exception as e:
+            output    = f'ERROR: {e}'
+            has_error = True
+        ms = int((time.monotonic() - t0) * 1000)
+        return JsonResponse({
+            'result':    {'output': output},
+            'ms':        ms,
+            'tool':      tool_name,
+            'has_error': has_error,
+        })
+
+    # ── Regular tool ─────────────────────────────────────────────
     from .tools import execute_tool
     profile = _get_profile(request.user)
     t0 = time.monotonic()

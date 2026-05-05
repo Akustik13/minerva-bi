@@ -58,6 +58,7 @@ while true; do
   if [ $((NOW - LAST_REMINDER)) -ge "$REMINDER_INTERVAL" ]; then
     python manage.py send_reminders 2>&1 || true
     python manage.py fetch_emails 2>&1 || true
+    python manage.py auto_advance_strategies 2>&1 || true
     LAST_REMINDER=$(date +%s)
   fi
 

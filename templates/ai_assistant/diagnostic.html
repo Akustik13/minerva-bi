@@ -126,9 +126,62 @@
 {% endfor %}
 </div>
 
+{% if diagnostic_commands %}
+<div style="margin-top:28px">
+  <div style="font-size:11px;font-weight:600;color:var(--text-dim);
+              text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px">
+    ⚙️ Management Commands
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+  {% for cmd in diagnostic_commands %}
+    <div style="background:var(--bg-card);border:1px solid var(--border-strong);
+                border-radius:8px;padding:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-weight:600;font-size:13px;color:var(--text)">{{ cmd.label }}</div>
+        <button onclick="runCommand('{{ cmd.key }}')"
+                style="padding:4px 12px;border-radius:5px;font-size:12px;
+                       background:var(--primary,#417690);color:#fff;
+                       border:none;cursor:pointer">
+          ▶ Run
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px">
+        {{ cmd.description }}
+      </div>
+      <pre id="cmd-result-{{ cmd.key }}"
+           style="display:none;font-size:11px;font-family:monospace;
+                  background:var(--bg-input,#141f2b);padding:8px;border-radius:4px;
+                  margin:0;white-space:pre-wrap;word-break:break-all;max-height:120px;
+                  overflow-y:auto"></pre>
+    </div>
+  {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 <script>
 const DIAG_URL = '{% url "ai_assistant:diagnostic_run" %}';
 const CSRF = '{{ csrf_token }}';
+
+async function runCommand(key) {
+  const el = document.getElementById('cmd-result-' + key);
+  el.style.display = 'block';
+  el.style.color   = 'var(--text-dim)';
+  el.textContent   = 'Запускаю...';
+  try {
+    const r = await fetch(DIAG_URL, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify({tool_name: '__cmd_' + key, tool_input: {}}),
+    });
+    const d = await r.json();
+    el.textContent = d.result?.output || JSON.stringify(d.result, null, 2);
+    el.style.color = d.has_error ? 'var(--err,#dc3545)' : 'var(--ok,#28a745)';
+  } catch(e) {
+    el.textContent = 'Помилка запиту: ' + e;
+    el.style.color = 'var(--err,#dc3545)';
+  }
+}
 
 async function diagRun(toolName, input) {
   input = input || {};

@@ -122,6 +122,26 @@
     </div>
   </div>
 
+  <!-- ═══ AI АДАПТИВНА СТРАТЕГІЯ ══════════════════════════════════════ -->
+  <div style="background:var(--bg-card);border:1px solid var(--border-strong);
+              border-radius:12px;overflow:hidden;margin-bottom:16px">
+
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border-strong);
+                display:flex;align-items:center;justify-content:space-between">
+      <div style="font-weight:600;font-size:14px;color:var(--text)">🧠 Адаптивна стратегія</div>
+      <button type="button" id="btn-gen-strategy" onclick="generateStrategy()"
+              style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
+                     background:rgba(147,112,219,.15);color:#9370db;
+                     border:1px solid rgba(147,112,219,.4);cursor:pointer">
+        Генерувати
+      </button>
+    </div>
+
+    <div id="strategy-result" style="display:none;padding:14px 16px">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
   <!-- ═══ ХРОНОЛОГІЯ ═══════════════════════════════════════════════════ -->
   <div style="background:var(--bg-card);border:1px solid var(--border-strong);
               border-radius:12px;overflow:hidden">
@@ -269,6 +289,98 @@ async function addNote() {
       loadTimeline();
     }
   } catch(e) {}
+}
+
+// ── AI Адаптивна стратегія ──────────────────────────────────────────
+window._aiStrategy = null;
+const STEP_TYPE_ICONS = {email:'📧', call:'📞', pause:'⏸', decision:'🔀'};
+const BEHAVIOR_LABELS = {
+  reactivation:'Реактивація', nurturing:'Нарощування',
+  retention:'Утримання', onboarding:'Онбординг',
+};
+
+async function generateStrategy() {
+  const btn = document.getElementById('btn-gen-strategy');
+  const box = document.getElementById('strategy-result');
+  btn.disabled = true; btn.textContent = '⏳ Генерую...';
+  box.style.display = 'block';
+  box.innerHTML = '<span style="color:var(--text-dim)">Мінерва аналізує клієнта і будує стратегію...</span>';
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-strategy/`);
+    const d = await r.json();
+    if (d.ok) {
+      window._aiStrategy = d.strategy;
+      _renderStrategy(d.strategy);
+    } else {
+      box.innerHTML = `<span style="color:var(--err)">⚠️ ${d.error||'Помилка'}</span>`;
+    }
+  } catch(e) {
+    box.innerHTML = '<span style="color:var(--err)">⚠️ Помилка з\'єднання</span>';
+  }
+  btn.disabled = false; btn.textContent = 'Генерувати';
+}
+
+function _renderStrategy(s) {
+  const box = document.getElementById('strategy-result');
+  const steps = (s.steps||[]).map((st, i) => {
+    const icon = STEP_TYPE_ICONS[st.step_type] || '▸';
+    const delay = st.delay_days > 0 ? ` (+${st.delay_days}д)` : ' (одразу)';
+    return `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border-strong)">
+      <div style="flex-shrink:0;font-size:13px;color:var(--text-dim);width:20px;text-align:right">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">${icon} ${st.title}
+          <span style="font-size:11px;color:var(--text-dim)">(${st.step_type}${delay})</span>
+        </div>
+        ${st.description ? `<div style="font-size:12px;color:var(--text-dim);margin-top:2px">${st.description}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  box.innerHTML = `
+    <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="font-size:14px;font-weight:600;color:var(--text)">${s.strategy_name||''}</div>
+      <span style="font-size:11px;padding:2px 8px;border-radius:10px;
+                   background:rgba(147,112,219,.15);color:#9370db;border:1px solid rgba(147,112,219,.3)">
+        ${BEHAVIOR_LABELS[s.behavior_type]||s.behavior_type}
+      </span>
+    </div>
+    ${s.analysis_summary ? `<div style="font-size:13px;color:var(--text-dim);line-height:1.6;margin-bottom:12px">${s.analysis_summary}</div>` : ''}
+    <div style="margin-bottom:12px">${steps}</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button type="button" onclick="applyStrategy()"
+              style="padding:6px 16px;border-radius:6px;font-size:12px;font-weight:600;
+                     background:#9370db;color:#fff;border:none;cursor:pointer">
+        ✅ Застосувати
+      </button>
+      <button type="button" onclick="generateStrategy()"
+              style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
+                     background:transparent;color:var(--text-dim);
+                     border:1px solid var(--border-strong);cursor:pointer">
+        🔄 Перегенерувати
+      </button>
+      <span style="font-size:11px;color:var(--text-dim)">${(s.steps||[]).length} кроків</span>
+      <span id="strategy-applied" style="display:none;font-size:13px;color:#9370db"></span>
+    </div>
+  `;
+}
+
+async function applyStrategy() {
+  if (!window._aiStrategy) return;
+  const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-strategy/apply/`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-CSRFToken':CSRF},
+    body: JSON.stringify(window._aiStrategy),
+  });
+  const d = await r.json();
+  const el = document.getElementById('strategy-applied');
+  if (d.ok && el) {
+    el.style.display = 'inline';
+    el.innerHTML = `→ <a href="${d.strategy_url}" style="color:#9370db">Переглянути стратегію #${d.strategy_id}</a>`;
+  } else if (el) {
+    el.style.display = 'inline';
+    el.style.color = 'var(--err)';
+    el.textContent = '⚠️ ' + (d.error||'Помилка');
+  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {

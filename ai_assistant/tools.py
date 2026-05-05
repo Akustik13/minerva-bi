@@ -160,6 +160,18 @@ ALL_TOOLS = [
             "required": ["customer_name"],
         },
     },
+    {
+        "name": "get_customer_timeline",
+        "description": "Хронологія подій клієнта: замовлення, листи, нотатки, аналізи, нагадування.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "customer_name": {"type": "string", "description": "Ім'я або частина імені клієнта"},
+                "limit":         {"type": "integer", "description": "Кількість записів (макс 30)", "default": 10},
+            },
+            "required": ["customer_name"],
+        },
+    },
 ]
 
 
@@ -573,6 +585,36 @@ def _get_customer_emails(inp, profile):
     }
 
 
+def _get_customer_timeline(inp, profile):
+    """Хронологія подій клієнта з CustomerTimeline."""
+    try:
+        from crm.models import CustomerTimeline, Customer
+        name  = inp.get('customer_name', '')
+        limit = min(int(inp.get('limit', 10)), 30)
+
+        customers = list(Customer.objects.filter(name__icontains=name)[:3])
+        if not customers:
+            return {'error': f"Клієнт '{name}' не знайдений", 'events': []}
+
+        events = []
+        for customer in customers:
+            qs = (CustomerTimeline.objects
+                  .filter(customer=customer)
+                  .order_by('-created_at')[:limit])
+            for e in qs:
+                events.append({
+                    'customer':   customer.name,
+                    'type':       e.event_type,
+                    'type_label': e.get_event_type_display(),
+                    'title':      e.title,
+                    'ai_summary': (e.ai_summary or '')[:200],
+                    'date':       e.created_at.strftime('%d.%m.%Y'),
+                })
+        return {'events': events, 'total': len(events)}
+    except Exception as ex:
+        return {'error': str(ex), 'events': []}
+
+
 _TOOL_HANDLERS = {
     "get_system_overview":   _get_system_overview,
     "get_inventory_status":  _get_inventory_status,
@@ -587,4 +629,5 @@ _TOOL_HANDLERS = {
     "update_inventory":      _update_inventory,
     "get_audit_log":         _get_audit_log,
     "get_customer_emails":   _get_customer_emails,
+    "get_customer_timeline": _get_customer_timeline,
 }

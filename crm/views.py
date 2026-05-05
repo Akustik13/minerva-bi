@@ -1,5 +1,6 @@
 """crm/views.py — AI-аналіз клієнта, генерація email, хронологія (AJAX)."""
 import json
+import re
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
@@ -178,3 +179,146 @@ def customer_timeline_json(request, customer_pk):
         }
         for e in events
     ]})
+
+
+@staff_member_required
+def ai_suggest_strategy(request, customer_pk):
+    """
+    GET: AI генерує персоналізовану стратегію для клієнта.
+    Повертає JSON зі структурою стратегії (без збереження в БД).
+    """
+    from crm.models import Customer, CustomerTimeline
+
+    try:
+        customer = Customer.objects.get(pk=customer_pk)
+    except Customer.DoesNotExist:
+        return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+
+    profile = getattr(request.user, 'profile', None)
+
+    try:
+        from ai_assistant.tools import execute_tool
+        customer_data = execute_tool('get_customer_info',
+                                     {'customer_name': customer.name}, profile=profile)
+        orders_data   = execute_tool('get_recent_orders',
+                                     {'customer_name': customer.name, 'limit': 5}, profile=profile)
+        emails_data   = execute_tool('get_customer_emails',
+                                     {'customer_name': customer.name, 'limit': 10}, profile=profile)
+    except Exception:
+        customer_data = {}
+        orders_data   = {}
+        emails_data   = {}
+
+    prompt = (
+        f"Проаналізуй клієнта '{customer.name}' і згенеруй персоналізовану CRM-стратегію.\n\n"
+        f"Дані клієнта: {json.dumps(customer_data, ensure_ascii=False, default=str)}\n"
+        f"Останні замовлення: {json.dumps(orders_data, ensure_ascii=False, default=str)}\n"
+        f"Листування: {json.dumps(emails_data, ensure_ascii=False, default=str)}\n\n"
+        "Поверни ТІЛЬКИ валідний JSON (без markdown, без ```) у такому форматі:\n"
+        '{"strategy_name":"...", "behavior_type":"reactivation|nurturing|retention|onboarding",'
+        '"analysis_summary":"УКРАЇНСЬКОЮ 2-4 речення про клієнта та рекомендацію",'
+        '"steps":[{"step_type":"email|call|pause|decision","title":"...","description":"...","delay_days":0}]}'
+        "\n\nКількість кроків: від 3 до 7. Кроки мають бути конкретними і персоналізованими."
+    )
+
+    try:
+        from ai_assistant.service import chat, reset_conversation
+        reset_conversation(profile, 'crm_strategy')
+        raw = chat(prompt, profile=profile, channel='crm_strategy')
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+    # Parse JSON: direct → regex fallback → graceful fallback
+    strategy = None
+    try:
+        strategy = json.loads(raw)
+    except Exception:
+        m = re.search(r'\{[\s\S]+\}', raw)
+        if m:
+            try:
+                strategy = json.loads(m.group(0))
+            except Exception:
+                pass
+
+    if strategy is None:
+        strategy = {
+            'strategy_name': f'Стратегія для {customer.name}',
+            'behavior_type': 'nurturing',
+            'analysis_summary': raw[:500],
+            'steps': [],
+        }
+
+    try:
+        CustomerTimeline.objects.create(
+            customer=customer,
+            user=request.user,
+            event_type='ai_analysis',
+            title=f"AI стратегія: {strategy.get('strategy_name', '')}",
+            body=strategy.get('analysis_summary', '')[:500],
+        )
+    except Exception:
+        pass
+
+    return JsonResponse({'ok': True, 'strategy': strategy})
+
+
+@staff_member_required
+@require_POST
+def ai_apply_strategy(request, customer_pk):
+    """
+    POST: Зберегти AI-згенеровану стратегію і запустити її для клієнта.
+    Body JSON: {strategy_name, behavior_type, steps: [...]}
+    """
+    from crm.models import Customer
+    from strategy.models import StrategyTemplate, TemplateStep
+    from strategy.services.engine import start_strategy
+
+    try:
+        customer = Customer.objects.get(pk=customer_pk)
+    except Customer.DoesNotExist:
+        return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+
+    data = json.loads(request.body or '{}')
+
+    strategy_name = data.get('strategy_name', f'AI стратегія для {customer.name}')
+    behavior_type = data.get('behavior_type', 'nurturing')
+    steps         = data.get('steps', [])
+
+    # Validate behavior_type
+    valid_bt = [c[0] for c in StrategyTemplate.BehaviorType.choices]
+    if behavior_type not in valid_bt:
+        behavior_type = 'nurturing'
+
+    # Validate step_type values
+    valid_st = [c[0] for c in TemplateStep.StepType.choices]
+
+    tmpl = None
+    try:
+        tmpl = StrategyTemplate.objects.create(
+            name=strategy_name,
+            behavior_type=behavior_type,
+            is_ai_generated=True,
+        )
+        for i, step in enumerate(steps):
+            st = step.get('step_type', 'email')
+            if st not in valid_st:
+                st = 'email'
+            TemplateStep.objects.create(
+                template=tmpl,
+                step_type=st,
+                title=step.get('title', f'Крок {i + 1}'),
+                description=step.get('description', ''),
+                delay_days=int(step.get('delay_days', 0)),
+                order=i,
+            )
+        cs = start_strategy(customer, tmpl)
+    except Exception as e:
+        if tmpl is not None:
+            tmpl.delete()
+        return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({
+        'ok': True,
+        'strategy_id': cs.pk,
+        'strategy_url': f'/admin/strategy/customerstrategy/{cs.pk}/change/',
+    })

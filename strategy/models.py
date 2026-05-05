@@ -103,7 +103,11 @@ class StrategyTemplate(models.Model):
         "Тип поведінки", max_length=20,
         choices=BehaviorType.choices, default=BehaviorType.NURTURING,
     )
-    is_active  = models.BooleanField("Активний", default=True)
+    is_active        = models.BooleanField("Активний", default=True)
+    is_ai_generated  = models.BooleanField(
+        "AI-генерована", default=False,
+        help_text="Шаблон згенерований AI адаптивно для конкретного клієнта",
+    )
     created_at = models.DateTimeField("Створено", auto_now_add=True)
 
     class Meta:
