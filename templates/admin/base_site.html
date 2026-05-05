@@ -1629,6 +1629,16 @@ window.addEventListener('appinstalled', function() {
   border: none; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 700;
 }
 #mv-cp-send:disabled { opacity: .45; cursor: not-allowed; }
+#mv-cp-ws-label {
+  display: flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 6px;
+  cursor: pointer; font-size: 14px; color: var(--text-muted);
+  transition: border-color .15s, color .15s; user-select: none;
+}
+#mv-cp-ws-label:hover { border-color: var(--accent); color: var(--text); }
+#mv-cp-ws-label.active { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+#mv-cp-ws-toggle { display: none; }
 
 @media (max-width: 480px) {
   #mv-chat-panel { width: calc(100vw - 16px); right: 8px; bottom: 80px; }
@@ -1653,6 +1663,9 @@ window.addEventListener('appinstalled', function() {
   </div>
   <div id="mv-cpanel-input-row">
     <textarea id="mv-cp-input" rows="1" placeholder="Запитати Minerva…"></textarea>
+    <label id="mv-cp-ws-label" title="Шукати в інтернеті при відповіді">
+      <input type="checkbox" id="mv-cp-ws-toggle">🌐
+    </label>
     <button id="mv-cp-send">↑</button>
   </div>
 </div>
@@ -1665,7 +1678,18 @@ window.addEventListener('appinstalled', function() {
   var cpTyping = document.getElementById('mv-cp-typing');
   var cpInput = document.getElementById('mv-cp-input');
   var cpSend  = document.getElementById('mv-cp-send');
+  var cpWsToggle = document.getElementById('mv-cp-ws-toggle');
+  var cpWsLabel  = document.getElementById('mv-cp-ws-label');
   var histLoaded = false;
+
+  // Web search toggle — shared key with full webchat page
+  var WS_KEY = 'mv_chat_web_search';
+  cpWsToggle.checked = localStorage.getItem(WS_KEY) === 'true';
+  if (cpWsToggle.checked) cpWsLabel.classList.add('active');
+  cpWsToggle.addEventListener('change', function(){
+    localStorage.setItem(WS_KEY, cpWsToggle.checked);
+    cpWsLabel.classList.toggle('active', cpWsToggle.checked);
+  });
 
   // Don't show FAB on the full-page /ai/ — it already has chat
   if (window.location.pathname === '/ai/') { fab.style.display = 'none'; return; }
@@ -1761,7 +1785,7 @@ window.addEventListener('appinstalled', function() {
       var r = await fetch('/ai/chat/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCsrf()},
-        body: JSON.stringify({message: text}),
+        body: JSON.stringify({message: text, web_search: cpWsToggle.checked}),
       });
       var data = await r.json();
       cpTyping.classList.remove('show');
