@@ -268,11 +268,13 @@ def ai_suggest_strategy(request, customer_pk):
     )
 
     try:
-        from ai_assistant.service import chat, reset_conversation
-        reset_conversation(profile, 'crm_strategy')
-        raw = chat(prompt, profile=profile, channel='crm_strategy')
+        from ai_assistant.service import generate_structured
+        raw = generate_structured(prompt, profile=profile)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
+
+    if not raw:
+        return JsonResponse({'error': 'Бюджет AI вичерпано або немає відповіді.'}, status=400)
 
     logger.info('AI strategy raw response for %s: %s', customer.name, raw[:500])
 

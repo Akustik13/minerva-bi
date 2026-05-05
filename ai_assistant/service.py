@@ -172,6 +172,59 @@ def chat(
     return final_text
 
 
+def generate_structured(prompt: str, profile=None) -> str:
+    """
+    Генерувати структурований JSON без Minerva-персонажа і без tools.
+    Використовується для ai_suggest_strategy та інших JSON-only запитів.
+    Повертає raw рядок (не зберігає в conversation history).
+    """
+    allowed, reason = check_budget(profile)
+    if not allowed:
+        return ''
+
+    from strategy.models import AISettings
+    s = AISettings.get()
+    client = _get_client()
+    model = choose_model(prompt)
+
+    system = (
+        'You are a JSON generator. '
+        'Return ONLY valid JSON, no markdown, no explanations, no text before or after. '
+        'Respond in Ukrainian for string values.'
+    )
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=2048,
+        system=system,
+        messages=[{'role': 'user', 'content': prompt}],
+    )
+
+    text = ''
+    for block in response.content:
+        if hasattr(block, 'text'):
+            text += block.text
+
+    # Record usage against global monthly budget only (no conversation/message objects)
+    try:
+        from .budget_guard import calc_cost
+        from .models import AIBudgetLog
+        cost = calc_cost(model, response.usage.input_tokens, response.usage.output_tokens)
+        budget_log = AIBudgetLog.current()
+        budget_log.total_requests += 1
+        budget_log.total_input_tokens += response.usage.input_tokens
+        budget_log.total_output_tokens += response.usage.output_tokens
+        budget_log.total_cost_usd += cost
+        budget_log.save(update_fields=[
+            'total_requests', 'total_input_tokens',
+            'total_output_tokens', 'total_cost_usd',
+        ])
+    except Exception:
+        pass
+
+    return text
+
+
 def reset_conversation(profile, channel: str = 'webchat', telegram_chat_id: str = ''):
     """Mark current conversation inactive — next message starts fresh."""
     qs = AIConversation.objects.filter(
