@@ -24,11 +24,12 @@ class AISettingsAdmin(admin.ModelAdmin):
             'ai_allow_inventory_edit', 'ai_allow_financial_data',
         )}),
         ('🌐 Web Search', {
-            'fields': ('enable_web_search',),
+            'fields': ('enable_web_search', 'enable_web_search_chat'),
             'description': (
-                'Anthropic Web Search — пошук в інтернеті під час аналізу клієнтів. '
-                'Використовується тільки у функції «Аналіз клієнта», не в WebChat. '
-                'Робить аналіз точнішим для B2B компаній.'
+                'Anthropic Web Search — пошук в інтернеті за запитом Мінерви. '
+                '<b>Аналіз клієнта</b>: шукає інфо про компанію, вмикати рекомендовано для B2B. '
+                '<b>WebChat / Telegram</b>: пошук у звичайних розмовах — вмикати за потреби, '
+                'збільшує витрати на кожне повідомлення.'
             ),
         }),
     )

@@ -75,7 +75,14 @@ def chat(
     conversation = _get_or_create_conversation(profile, channel, telegram_chat_id)
     model = choose_model(user_text)
     tools = get_allowed_tools(profile)
-    if enable_web_search:
+    _use_web_search = enable_web_search
+    if not _use_web_search:
+        try:
+            from strategy.models import AISettings
+            _use_web_search = AISettings.get().enable_web_search_chat
+        except Exception:
+            pass
+    if _use_web_search:
         tools = [{"type": "web_search_20250305", "name": "web_search"}] + list(tools)
     system_prompt = build_system_prompt(profile)
 

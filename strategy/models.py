@@ -72,6 +72,14 @@ class AISettings(models.Model):
             'під час аналізу. Робить аналіз точнішим для B2B клієнтів. '
             'Вимкни щоб зменшити витрати токенів (~$0.02 за аналіз).'
         ))
+    enable_web_search_chat = models.BooleanField(
+        default=False,
+        verbose_name='Web Search для WebChat та Telegram бота',
+        help_text=(
+            'Мінерва шукає в інтернеті під час звичайних розмов у WebChat і Telegram. '
+            'Вмикай лише якщо потрібні актуальні дані (курси, новини тощо). '
+            'Збільшує витрати токенів для кожного запиту (~$0.01–0.05 за повідомлення).'
+        ))
 
     class Meta:
         verbose_name = 'Налаштування AI'
