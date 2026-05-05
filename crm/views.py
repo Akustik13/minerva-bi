@@ -98,6 +98,7 @@ def ai_customer_analysis(request, customer_pk):
     # Scope: які блоки включати в аналіз
     include_raw = request.GET.get('include', 'customer,orders,emails,shipments')
     include = {x.strip() for x in include_raw.split(',') if x.strip()}
+    extra_prompt = request.GET.get('extra_prompt', '').strip()
 
     profile = getattr(request.user, 'profile', None)
 
@@ -147,6 +148,8 @@ def ai_customer_analysis(request, customer_pk):
         )
     parts.append("Дай відповідь у форматі:\n" + "\n".join(format_items))
     parts.append("Будь конкретним, без загальних фраз.")
+    if extra_prompt:
+        parts.append(f"Додаткове завдання від менеджера: {extra_prompt}")
 
     prompt = "\n\n".join(parts)
 
@@ -295,6 +298,7 @@ def ai_suggest_strategy(request, customer_pk):
         return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
 
     profile = getattr(request.user, 'profile', None)
+    extra_prompt = request.GET.get('extra_prompt', '').strip()
 
     try:
         from ai_assistant.tools import execute_tool
@@ -334,6 +338,7 @@ def ai_suggest_strategy(request, customer_pk):
         'step_type: одне з email / call / pause / decision\n'
         'delay_days: ціле число (0 або більше)\n'
         'Мінімум 3 кроки, максимум 7. Тільки JSON, без пояснень, без markdown.'
+        + (f'\n\nДодаткові вказівки від менеджера: {extra_prompt}' if extra_prompt else '')
     )
 
     try:

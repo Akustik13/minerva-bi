@@ -15,9 +15,9 @@
   transition: background .15s, color .15s, border-color .15s;
 }
 .scope-pill.active {
-  background: var(--accent-subtle);
-  color: var(--accent);
-  border-color: var(--accent);
+  background: rgba(63,185,80,.15);
+  color: #3fb950;
+  border-color: #3fb950;
 }
 </style>
 {% endblock %}
@@ -72,7 +72,7 @@
         </button>
         <button type="button" onclick="toggleEmailComposer()"
                 style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
-                       background:rgba(79,143,255,.12);color:var(--accent);
+                       background:rgba(79,143,255,.12);color:#4f8fff;
                        border:1px solid rgba(79,143,255,.3);cursor:pointer">
           ✉️ Написати лист
         </button>
@@ -87,6 +87,16 @@
       <button type="button" id="sc-orders"    onclick="toggleScope('orders')"    class="scope-pill active">📦 Замовлення</button>
       <button type="button" id="sc-emails"    onclick="toggleScope('emails')"    class="scope-pill active">📧 Листування</button>
       <button type="button" id="sc-shipments" onclick="toggleScope('shipments')" class="scope-pill active">🚚 Доставка</button>
+    </div>
+
+    <div style="padding:6px 16px 10px;border-bottom:1px solid var(--border)">
+      <textarea id="analysis-extra"
+                placeholder="На що акцентувати аналіз: конкретне питання, сфера інтересів, проблема... (необов'язково)"
+                rows="2"
+                style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;
+                       font-size:12px;border:1px solid var(--border-strong);
+                       background:var(--bg-input);color:var(--text);
+                       resize:vertical;font-family:inherit"></textarea>
     </div>
 
     <div id="analysis-result"
@@ -166,6 +176,16 @@
                      border:1px solid rgba(147,112,219,.4);cursor:pointer">
         Генерувати
       </button>
+    </div>
+
+    <div style="padding:6px 16px 10px;border-bottom:1px solid var(--border-strong)">
+      <textarea id="strategy-extra"
+                placeholder="На що акцентувати стратегію: галузь, проблема клієнта, особливий підхід... (необов'язково)"
+                rows="2"
+                style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;
+                       font-size:12px;border:1px solid var(--border-strong);
+                       background:var(--bg-input);color:var(--text);
+                       resize:vertical;font-family:inherit"></textarea>
     </div>
 
     <div id="strategy-result" style="display:none;padding:14px 16px">
@@ -295,9 +315,12 @@ async function runAnalysis() {
   res.innerHTML = '<span style="color:var(--text-dim)">Мінерва аналізує клієнта...</span>';
 
   const include = Object.keys(_analysisScope).filter(k => _analysisScope[k]).join(',') || 'customer';
+  const extraAnalysis = (document.getElementById('analysis-extra')?.value || '').trim();
+  const analysisUrl = `/crm/customer/${CUSTOMER_PK}/ai-analysis/?include=${include}`
+    + (extraAnalysis ? `&extra_prompt=${encodeURIComponent(extraAnalysis)}` : '');
 
   try {
-    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-analysis/?include=${include}`);
+    const r = await fetch(analysisUrl);
     const d = await r.json();
     if (d.ok) {
       res.innerHTML = d.analysis.replace(/\n/g,'<br>');
@@ -474,8 +497,12 @@ async function generateStrategy() {
   btn.disabled = true; btn.textContent = '⏳ Генерую...';
   box.style.display = 'block';
   box.innerHTML = '<span style="color:var(--text-dim)">Мінерва аналізує клієнта і будує стратегію...</span>';
+  const extraStrategy = (document.getElementById('strategy-extra')?.value || '').trim();
+  const strategyUrl = `/crm/customer/${CUSTOMER_PK}/ai-strategy/`
+    + (extraStrategy ? `?extra_prompt=${encodeURIComponent(extraStrategy)}` : '');
+
   try {
-    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-strategy/`);
+    const r = await fetch(strategyUrl);
     const d = await r.json();
     if (d.ok) {
       window._aiStrategy = d.strategy;
