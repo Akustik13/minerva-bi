@@ -204,8 +204,8 @@ def customer_timeline_json(request, customer_pk):
             'type':       e.event_type,
             'type_label': e.get_event_type_display(),
             'title':      e.title,
-            'body':       e.body[:200],
-            'ai_summary': e.ai_summary[:300] if e.ai_summary else '',
+            'body':       e.body[:2000],
+            'ai_summary': e.ai_summary[:2000] if e.ai_summary else '',
             'user':       (e.user.get_full_name() or e.user.username
                            if e.user else 'Система'),
             'date':       e.created_at.strftime('%d.%m.%Y %H:%M'),
