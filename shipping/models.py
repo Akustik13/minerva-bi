@@ -506,6 +506,22 @@ class ShippingSettings(models.Model):
         default="once",
         help_text="Як часто надсилати Telegram-сповіщення про одну і ту ж затриману посилку.",
     )
+    prefer_tracking_number = models.BooleanField(
+        "Пріоритет трекінг-номера", default=True,
+        help_text=(
+            "Якщо є трекінг-номер — спочатку запитати пряму API перевізника "
+            "(DHL Tracking Unified, UPS), лише потім Jumingo. "
+            "Допомагає коли Jumingo показує «Етикетка готова», а посилка вже в дорозі."
+        ),
+    )
+    status_upgrade_only = models.BooleanField(
+        "Тільки підвищувати статус", default=True,
+        help_text=(
+            "Не знижувати статус при синхронізації "
+            "(наприклад «В дорозі» → «Етикетка готова» буде ігноровано). "
+            "Рекомендовано: увімкнено."
+        ),
+    )
 
     @classmethod
     def get(cls):

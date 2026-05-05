@@ -431,6 +431,16 @@ def _log_attempt(shipment, tracker_name: str, raw: dict, duration_ms: int,
 # Головна функція
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _detect_direct_tracker(tracking_number: str) -> str | None:
+    """Автовизначення прямого трекера за форматом трекінг-номера."""
+    tn = (tracking_number or "").strip().upper()
+    if not tn:
+        return None
+    if tn.startswith("1Z"):   # UPS universal format
+        return "ups"
+    return "dhl_track"        # DHL Unified Tracking покриває JD/00340/числові та Express
+
+
 def track_with_fallback(shipment, dry_run: bool = False) -> tuple:
     """
     Намагається отримати трекінг для відправлення по всіх правилах у ланцюгу.
@@ -443,11 +453,23 @@ def track_with_fallback(shipment, dry_run: bool = False) -> tuple:
     - НІКОЛИ не кидає виняток
     """
     from shipping.admin import _apply_tracking_update
+    from shipping.models import ShippingSettings
 
     if not shipment.carrier and not shipment.tracking_number:
         return False, [{"tracker": "—", "error": "carrier і tracking_number відсутні", "success": False}]
 
+    settings = ShippingSettings.get()
+    prefer_tn = getattr(settings, "prefer_tracking_number", True)
+    upgrade_only = getattr(settings, "status_upgrade_only", True)
+
     rules = get_rules_for_shipment(shipment)
+
+    if prefer_tn and shipment.tracking_number:
+        if not rules or rules[0].tracker == "jumingo":
+            direct = _detect_direct_tracker(shipment.tracking_number)
+            if direct:
+                rules = [_FakeRule(direct, 0)] + list(rules)
+
     log_entries = []
 
     for rule in rules:
@@ -485,7 +507,7 @@ def track_with_fallback(shipment, dry_run: bool = False) -> tuple:
             return True, log_entries
 
         try:
-            changed = _apply_tracking_update(shipment, normalized)
+            changed = _apply_tracking_update(shipment, normalized, upgrade_only=upgrade_only)
             return changed, log_entries
         except Exception as e:
             logger.exception("track_with_fallback: _apply_tracking_update error: %s", e)

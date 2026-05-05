@@ -5214,7 +5214,7 @@ def _should_set_order_tn(order, new_tn: str) -> bool:
 
 # ── Utility: apply tracking update ───────────────────────────────────────────
 
-def _apply_tracking_update(shipment, data: dict) -> bool:
+def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> bool:
     """Оновлює Shipment та SalesOrder з відповіді GET /v1/shipments/{id}.
     Повертає True якщо були зміни.
 
@@ -5410,9 +5410,14 @@ def _apply_tracking_update(shipment, data: dict) -> bool:
         PROGRESS_CLASS_MAP.get(progress_class)
         or SHIPMENT_STATUS_MAP.get(shipment_status)
     )
+    _STATUS_RANK = {'draft': 0, 'submitted': 1, 'label_ready': 2, 'in_transit': 3, 'delivered': 4}
     if new_status_str and new_status_str != shipment.status:
-        shipment.status = new_status_str
-        changed = True
+        if upgrade_only and _STATUS_RANK.get(new_status_str, -1) < _STATUS_RANK.get(shipment.status, -1):
+            logger.info("_apply_tracking_update: статус не знижено %s → %s (upgrade_only)",
+                        shipment.status, new_status_str)
+        else:
+            shipment.status = new_status_str
+            changed = True
 
     # Clear carrier_delayed flag when shipment is delivered
     if shipment.status == "delivered" and shipment.carrier_delayed:
@@ -5678,6 +5683,15 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             "description": (
                 "Telegram-сповіщення надсилаються коли ETA посилки прострочена або "
                 "перевізник підтвердив затримку."
+            ),
+        }),
+        ("⚙️ Пріоритет та захист статусу", {
+            "fields": ("prefer_tracking_number", "status_upgrade_only"),
+            "description": (
+                "<b>Пріоритет трекінг-номера:</b> якщо посилка має трекінг-номер, "
+                "система спочатку запитує пряму API (DHL/UPS), потім Jumingo.<br>"
+                "<b>Тільки підвищувати статус:</b> блокує ситуацію коли API повертає "
+                "застарілий статус і посилка «відкочується» назад."
             ),
         }),
         ("📋 Правила трекінгу", {
