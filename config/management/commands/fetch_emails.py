@@ -71,9 +71,17 @@ class Command(BaseCommand):
             '--user', metavar='USERNAME', default=None,
             help='Синхронізувати тільки для цього користувача',
         )
+        parser.add_argument(
+            '--list-folders', action='store_true',
+            help='Показати список IMAP папок для кожного юзера і вийти (діагностика)',
+        )
 
     def handle(self, *args, **options):
         from core.models import UserProfile
+
+        if options.get('list_folders'):
+            self._list_folders(options)
+            return
 
         dry_run         = options['dry_run']
         lookback        = options['days'] or 30
@@ -124,6 +132,74 @@ class Command(BaseCommand):
         conn.login(profile.imap_user, profile.imap_password)
         return conn
 
+    def _select_folder(self, conn, folder_name: str) -> bool:
+        """
+        Спробувати вибрати IMAP папку.
+        Перевіряє кілька варіантів назви (з/без лапок, альтернативні sent-назви).
+        Повертає True якщо успішно обрано.
+        """
+        candidates = [folder_name]
+
+        # Додати варіант з/без лапок
+        if folder_name.startswith('"') and folder_name.endswith('"'):
+            candidates.append(folder_name[1:-1])
+        else:
+            candidates.append(f'"{folder_name}"')
+
+        # Для sent-папок — спробувати поширені альтернативні назви
+        if 'sent' in folder_name.lower():
+            candidates += [
+                'INBOX.Sent',
+                '"INBOX.Sent"',
+                'Sent',
+                '"Sent"',
+                'Sent Items',
+                '"Sent Items"',
+                '[Gmail]/Sent Mail',
+                'Sent Messages',
+            ]
+
+        seen = set()
+        for candidate in candidates:
+            if candidate in seen:
+                continue
+            seen.add(candidate)
+            try:
+                status, _ = conn.select(candidate, readonly=True)
+                if status == 'OK':
+                    return True
+            except Exception:
+                continue
+        return False
+
+    def _list_folders(self, options):
+        """Показати список IMAP папок для кожного юзера — для діагностики."""
+        from core.models import UserProfile
+
+        username_filter = options.get('user')
+        qs = UserProfile.objects.filter(imap_enabled=True).select_related('user')
+        if username_filter:
+            qs = qs.filter(user__username=username_filter)
+
+        if not qs.exists():
+            self.stdout.write('Немає користувачів з увімкненим IMAP')
+            return
+
+        for profile in qs:
+            if not profile.imap_host or not profile.imap_user or not profile.imap_password:
+                self.stdout.write(f'[{profile.user.username}] IMAP не налаштований — пропускаємо')
+                continue
+            try:
+                conn = self._connect(profile)
+                _, folders = conn.list()
+                self.stdout.write(f'\n=== {profile.user.username} ({profile.imap_user}) ===')
+                for f in (folders or []):
+                    line = f.decode() if isinstance(f, bytes) else str(f)
+                    self.stdout.write(f'  {line}')
+                conn.logout()
+            except Exception as e:
+                self.stdout.write(f'[{profile.user.username}] Помилка підключення: {e}')
+
     def _process_folder(self, profile, folder, event_type, lookback_days, dry_run, customer_filter):
         from crm.models import Customer, CustomerTimeline
 
@@ -152,12 +228,13 @@ class Command(BaseCommand):
             return 0, 0, 1
 
         try:
-            status, _ = conn.select(f'"{folder}"', readonly=True)
-            if status != 'OK':
+            if not self._select_folder(conn, folder):
                 self.stderr.write(
-                    f'[{profile.user.username}] Cannot select folder: {folder}'
+                    f'[{profile.user.username}] Cannot select folder: {folder} '
+                    f'— пропускаємо (не критично для sent папки)'
                 )
-                return 0, 0, 1
+                # Не рахуємо як помилку — sent папка може називатись інакше
+                return 0, 0, 0
 
             _, data = conn.uid('search', None, f'SINCE {since_date}')
             uids = data[0].split() if data[0] else []

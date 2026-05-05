@@ -1,10 +1,46 @@
 """crm/views.py — AI-аналіз клієнта, генерація email, хронологія (AJAX)."""
 import json
+import logging
 import re
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
+
+logger = logging.getLogger('crm')
+
+
+def _parse_strategy_response(text: str) -> dict | None:
+    """
+    Надійний парсинг відповіді AI.
+    Підтримує: чистий JSON, ```json ... ```, будь-який вкладений { ... }.
+    """
+    if not text:
+        return None
+
+    # Варіант 1: весь текст є JSON
+    try:
+        return json.loads(text.strip())
+    except json.JSONDecodeError:
+        pass
+
+    # Варіант 2: JSON в ```json ... ``` або ``` ... ``` блоці
+    m = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, re.DOTALL)
+    if m:
+        try:
+            return json.loads(m.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Варіант 3: перший { ... } блок у тексті
+    m = re.search(r'\{[\s\S]+\}', text)
+    if m:
+        try:
+            return json.loads(m.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    return None
 
 
 @staff_member_required
@@ -214,11 +250,21 @@ def ai_suggest_strategy(request, customer_pk):
         f"Дані клієнта: {json.dumps(customer_data, ensure_ascii=False, default=str)}\n"
         f"Останні замовлення: {json.dumps(orders_data, ensure_ascii=False, default=str)}\n"
         f"Листування: {json.dumps(emails_data, ensure_ascii=False, default=str)}\n\n"
-        "Поверни ТІЛЬКИ валідний JSON (без markdown, без ```) у такому форматі:\n"
-        '{"strategy_name":"...", "behavior_type":"reactivation|nurturing|retention|onboarding",'
-        '"analysis_summary":"УКРАЇНСЬКОЮ 2-4 речення про клієнта та рекомендацію",'
-        '"steps":[{"step_type":"email|call|pause|decision","title":"...","description":"...","delay_days":0}]}'
-        "\n\nКількість кроків: від 3 до 7. Кроки мають бути конкретними і персоналізованими."
+        "ОБОВ'ЯЗКОВО поверни ТІЛЬКИ валідний JSON без жодного тексту до або після:\n"
+        '{\n'
+        '  "strategy_name": "назва стратегії",\n'
+        '  "behavior_type": "reactivation",\n'
+        '  "analysis_summary": "УКРАЇНСЬКОЮ 2-4 речення про клієнта та рекомендацію",\n'
+        '  "steps": [\n'
+        '    {"step_type": "email", "title": "Перший контакт", "description": "що зробити", "delay_days": 0},\n'
+        '    {"step_type": "pause", "title": "Чекати відповідь", "description": "пауза 5 днів", "delay_days": 5},\n'
+        '    {"step_type": "call", "title": "Дзвінок", "description": "зателефонувати", "delay_days": 3}\n'
+        '  ]\n'
+        '}\n\n'
+        'behavior_type: одне з reactivation / nurturing / retention / onboarding\n'
+        'step_type: одне з email / call / pause / decision\n'
+        'delay_days: ціле число (0 або більше)\n'
+        'Мінімум 3 кроки, максимум 7. Тільки JSON, без пояснень, без markdown.'
     )
 
     try:
@@ -228,25 +274,26 @@ def ai_suggest_strategy(request, customer_pk):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
-    # Parse JSON: direct → regex fallback → graceful fallback
-    strategy = None
-    try:
-        strategy = json.loads(raw)
-    except Exception:
-        m = re.search(r'\{[\s\S]+\}', raw)
-        if m:
-            try:
-                strategy = json.loads(m.group(0))
-            except Exception:
-                pass
+    logger.info('AI strategy raw response for %s: %s', customer.name, raw[:500])
+
+    strategy = _parse_strategy_response(raw)
 
     if strategy is None:
-        strategy = {
-            'strategy_name': f'Стратегія для {customer.name}',
-            'behavior_type': 'nurturing',
-            'analysis_summary': raw[:500],
-            'steps': [],
-        }
+        logger.error('Failed to parse AI strategy response for %s: %s', customer.name, raw[:300])
+        return JsonResponse({
+            'error': 'AI не повернув валідний JSON. Спробуйте ще раз.',
+            'raw': raw[:400],
+        }, status=400)
+
+    steps = strategy.get('steps', [])
+    if not steps:
+        logger.error('No steps in AI strategy for %s. Parsed keys: %s', customer.name, list(strategy.keys()))
+        return JsonResponse({
+            'error': f'AI не повернув кроки стратегії. Отримані поля: {list(strategy.keys())}',
+            'strategy': strategy,
+        }, status=400)
+
+    logger.info('Parsed %d steps for %s', len(steps), customer.name)
 
     try:
         CustomerTimeline.objects.create(
