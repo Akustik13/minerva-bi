@@ -180,7 +180,7 @@ def ai_customer_analysis(request, customer_pk):
             event_type='ai_analysis',
             title='AI аналіз клієнта',
             body=prompt[:500],
-            ai_summary=analysis[:1000],
+            ai_summary=analysis,
         )
     except Exception:
         pass
@@ -285,8 +285,8 @@ def customer_timeline_json(request, customer_pk):
             'type':       e.event_type,
             'type_label': e.get_event_type_display(),
             'title':      e.title,
-            'body':       e.body[:2000],
-            'ai_summary': e.ai_summary[:2000] if e.ai_summary else '',
+            'body':       e.body,
+            'ai_summary': e.ai_summary or '',
             'user':       (e.user.get_full_name() or e.user.username
                            if e.user else 'Система'),
             'date':       e.created_at.strftime('%d.%m.%Y %H:%M'),
