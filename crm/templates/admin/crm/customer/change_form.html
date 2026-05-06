@@ -140,72 +140,141 @@
                        background:var(--bg-input);color:var(--text);
                        resize:vertical;margin-bottom:8px;font-family:inherit">
       </textarea>
-      <textarea id="email-result" rows="10"
-           style="display:none;width:100%;box-sizing:border-box;
-                  font-size:13px;line-height:1.7;padding:12px;
-                  border-radius:8px 8px 0 0;background:var(--bg-input);
-                  border:1px solid var(--border-strong);border-bottom:none;
-                  color:var(--text);font-family:monospace;resize:none;
-                  min-height:180px;outline:none"
-           oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight+4,560)+'px'">
-      </textarea>
-      <div id="sig-preview" style="display:none;padding:10px 14px 12px;
-           border-radius:0 0 8px 8px;
-           border:1px solid var(--border-strong);border-top:1px dashed var(--border-strong);
-           background:var(--bg-card)">
-        <div style="font-size:10px;color:var(--text-dim);margin-bottom:6px;letter-spacing:.4px">
-          — підпис —
+      <!-- ── 1. Відповідь AI ───────────────────────────────────────────── -->
+      <div id="ai-response-section" style="display:none;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+          <div style="font-size:10px;font-weight:700;color:var(--text-dim);
+                      text-transform:uppercase;letter-spacing:.7px">💬 Відповідь AI</div>
+          <div style="display:flex;gap:5px">
+            <button type="button" onclick="generateEmail()"
+                    style="padding:2px 9px;border-radius:4px;font-size:11px;cursor:pointer;
+                           border:1px solid var(--border-strong);background:transparent;
+                           color:var(--text-dim)">🔄 Ще варіант</button>
+            <button type="button" id="btn-toggle-ai" onclick="toggleAiResponse()"
+                    style="padding:2px 9px;border-radius:4px;font-size:11px;cursor:pointer;
+                           border:1px solid var(--border-strong);background:transparent;
+                           color:var(--text-dim)">▾ Згорнути</button>
+          </div>
         </div>
-        <div id="sig-preview-content" style="font-size:13px;line-height:1.7"></div>
+        <div id="ai-response-body"
+             style="font-size:12px;line-height:1.6;padding:10px 12px;max-height:220px;
+                    overflow-y:auto;border-radius:8px;background:var(--bg-input);
+                    border:1px solid var(--border-strong);color:var(--text-muted);
+                    white-space:pre-wrap;font-family:monospace"></div>
       </div>
-      <div id="email-actions" style="display:none;margin-top:10px;flex-wrap:wrap;gap:8px">
-        <button type="button" onclick="copyEmail()"
-                style="padding:6px 14px;border-radius:6px;font-size:12px;
-                       border:1px solid var(--border-strong);
-                       background:transparent;color:var(--text);cursor:pointer">
-          📋 Копіювати
-        </button>
-        <button type="button" onclick="generateEmail()"
-                style="padding:6px 14px;border-radius:6px;font-size:12px;
-                       border:1px solid var(--border-strong);
-                       background:transparent;color:var(--text);cursor:pointer">
-          🔄 Ще варіант
-        </button>
-        <button type="button" onclick="toggleSendPanel()"
-                style="padding:6px 14px;border-radius:6px;font-size:12px;
-                       border:1px solid var(--accent);
-                       background:transparent;color:var(--accent);cursor:pointer">
-          📤 Надіслати
-        </button>
-      </div>
-      <div id="email-send-panel" style="display:none;margin-top:12px;padding:12px;
-           border-radius:8px;background:var(--bg-input);border:1px solid var(--border-strong)">
-        <div style="display:grid;grid-template-columns:52px 1fr;gap:6px;align-items:center">
-          <label style="font-size:12px;color:var(--text-muted);text-align:right;padding-right:4px">Кому:</label>
+
+      <!-- ── 2. Сформований лист ──────────────────────────────────────── -->
+      <div id="email-compose-section" style="display:none">
+        <div style="font-size:10px;font-weight:700;color:var(--text);
+                    text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">
+          📧 Сформований лист
+        </div>
+
+        <!-- Заголовки -->
+        <div style="display:grid;grid-template-columns:46px 1fr;gap:5px 6px;
+                    margin-bottom:10px;align-items:center">
+          <label style="font-size:12px;color:var(--text-muted);text-align:right">Кому:</label>
           <input id="email-to" type="text"
-                 style="padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);
-                        background:var(--bg-card);color:var(--text);font-size:13px;width:100%;box-sizing:border-box"
+                 style="padding:5px 9px;border-radius:6px;font-size:13px;width:100%;
+                        box-sizing:border-box;border:1px solid var(--border-strong);
+                        background:var(--bg-card);color:var(--text)"
                  placeholder="email@example.com">
-          <label style="font-size:12px;color:var(--text-muted);text-align:right;padding-right:4px">Копія:</label>
+          <label style="font-size:12px;color:var(--text-muted);text-align:right">Копія:</label>
           <input id="email-cc" type="text"
-                 style="padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);
-                        background:var(--bg-card);color:var(--text);font-size:13px;width:100%;box-sizing:border-box"
+                 style="padding:5px 9px;border-radius:6px;font-size:13px;width:100%;
+                        box-sizing:border-box;border:1px solid var(--border-strong);
+                        background:var(--bg-card);color:var(--text)"
                  placeholder="email1, email2 (через кому)">
-          <label style="font-size:12px;color:var(--text-muted);text-align:right;padding-right:4px">Тема:</label>
+          <label style="font-size:12px;color:var(--text-muted);text-align:right">Тема:</label>
           <input id="email-subject" type="text"
-                 style="padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);
-                        background:var(--bg-card);color:var(--text);font-size:13px;width:100%;box-sizing:border-box"
+                 style="padding:5px 9px;border-radius:6px;font-size:13px;width:100%;font-weight:600;
+                        box-sizing:border-box;border:1px solid var(--border-strong);
+                        background:var(--bg-card);color:var(--text)"
                  placeholder="Тема листа">
         </div>
-        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+
+        <!-- Rich-text редактор тіла листа -->
+        <div style="border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;
+                    margin-bottom:10px">
+          <!-- Toolbar -->
+          <div style="display:flex;gap:3px;padding:5px 8px;flex-wrap:wrap;align-items:center;
+                      background:var(--bg-hover);border-bottom:1px solid var(--border-strong)">
+            <button type="button" title="Жирний" onclick="mvBodyCmd('bold')"
+                    style="padding:2px 8px;border-radius:3px;font-weight:700;font-size:13px;cursor:pointer;
+                           border:1px solid var(--border-strong);background:transparent;color:var(--text)">B</button>
+            <button type="button" title="Курсив" onclick="mvBodyCmd('italic')"
+                    style="padding:2px 8px;border-radius:3px;font-style:italic;font-size:13px;cursor:pointer;
+                           border:1px solid var(--border-strong);background:transparent;color:var(--text)">I</button>
+            <button type="button" title="Підкреслення" onclick="mvBodyCmd('underline')"
+                    style="padding:2px 8px;border-radius:3px;text-decoration:underline;font-size:13px;cursor:pointer;
+                           border:1px solid var(--border-strong);background:transparent;color:var(--text)">U</button>
+            <div style="width:1px;height:18px;background:var(--border-strong);margin:0 2px"></div>
+            <select title="Розмір" onchange="mvBodyCmd('fontSize',this.value);this.selectedIndex=0"
+                    style="padding:2px 5px;border-radius:3px;font-size:11px;cursor:pointer;
+                           border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text)">
+              <option value="">Розмір</option>
+              <option value="1">Дрібний (8px)</option>
+              <option value="2">Малий (10px)</option>
+              <option value="3">Звичайний (12px)</option>
+              <option value="4">Середній (14px)</option>
+              <option value="5">Великий (18px)</option>
+              <option value="6">XL (24px)</option>
+              <option value="7">XXL (36px)</option>
+            </select>
+            <select title="Шрифт" onchange="mvBodyCmd('fontName',this.value);this.selectedIndex=0"
+                    style="padding:2px 5px;border-radius:3px;font-size:11px;cursor:pointer;
+                           border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text)">
+              <option value="">Шрифт</option>
+              <option value="Arial">Arial</option>
+              <option value="Georgia">Georgia</option>
+              <option value="Verdana">Verdana</option>
+              <option value="Courier New">Courier New</option>
+              <option value="Times New Roman">Times New Roman</option>
+            </select>
+            <div style="width:1px;height:18px;background:var(--border-strong);margin:0 2px"></div>
+            <label title="Колір тексту"
+                   style="display:flex;align-items:center;gap:3px;cursor:pointer;
+                          font-size:12px;color:var(--text-muted);font-weight:700">
+              A <input type="color" value="#c9d8e4" oninput="mvBodyCmd('foreColor',this.value)"
+                       style="width:20px;height:20px;padding:0;cursor:pointer;
+                              border:1px solid var(--border-strong);border-radius:3px;
+                              background:transparent">
+            </label>
+            <button type="button" title="Зняти форматування"
+                    onclick="document.execCommand('removeFormat')"
+                    style="margin-left:auto;padding:2px 7px;border-radius:3px;font-size:10px;cursor:pointer;
+                           border:1px solid var(--border-strong);background:transparent;
+                           color:var(--text-dim)">✕ Форм.</button>
+          </div>
+          <!-- Editable body -->
+          <div id="email-body-editor" contenteditable="true"
+               style="min-height:220px;max-height:500px;overflow-y:auto;padding:12px 14px;
+                      outline:none;font-size:14px;line-height:1.7;
+                      background:var(--bg-card);color:var(--text);
+                      font-family:Arial,sans-serif;word-wrap:break-word"></div>
+          <!-- Підпис у листі -->
+          <div id="sig-in-compose" style="display:none;padding:10px 14px 12px;
+               border-top:1px dashed var(--border-strong);background:var(--bg-card)">
+            <div style="font-size:10px;color:var(--text-dim);margin-bottom:5px">— підпис —</div>
+            <div id="sig-in-compose-content" style="font-size:13px;line-height:1.6"></div>
+          </div>
+        </div>
+
+        <!-- Кнопки відправки -->
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <button type="button" id="btn-send-email" onclick="sendEmailToCustomer()"
-                  style="padding:7px 18px;border-radius:6px;font-size:13px;font-weight:600;
+                  style="padding:7px 20px;border-radius:6px;font-size:13px;font-weight:600;
                          border:none;background:var(--accent);color:#fff;cursor:pointer">
             📤 Надіслати
           </button>
+          <button type="button" onclick="copyEmail()"
+                  style="padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;
+                         border:1px solid var(--border-strong);background:transparent;
+                         color:var(--text)">📋 Копіювати</button>
           <span id="email-send-status" style="font-size:12px;color:var(--text-muted)"></span>
         </div>
       </div>
+
     </div>
   </div>
 
@@ -402,27 +471,52 @@ function _extractSubject(text) {
   return '';
 }
 
-function _showSigPreview() {
-  const prev = document.getElementById('sig-preview');
-  const cont = document.getElementById('sig-preview-content');
-  if (!prev || !cont) return;
+function _extractBody(text) {
+  // After "TEXT:" marker
+  let m = text.match(/TEXT\s*:\s*\n+([\s\S]+?)(?:\n---|\n\*\*|$)/i);
+  if (m) return m[1].trim();
+  // After second "---" separator
+  const parts = text.split(/\n---+\n/);
+  if (parts.length >= 3) return parts.slice(2).join('\n---\n').trim();
+  if (parts.length === 2) return parts[1].trim();
+  return text.trim();
+}
+
+function _showSigInCompose() {
+  const wrap = document.getElementById('sig-in-compose');
+  const cont = document.getElementById('sig-in-compose-content');
+  if (!wrap || !cont) return;
   if (USER_SIG_HTML) {
     cont.innerHTML = USER_SIG_HTML.replace(/\{name\}/g, USER_DISPLAY_NAME);
-    prev.style.display = 'block';
+    wrap.style.display = 'block';
   } else {
-    prev.style.display = 'none';
+    wrap.style.display = 'none';
   }
 }
 
+function mvBodyCmd(cmd, val) {
+  document.getElementById('email-body-editor').focus();
+  document.execCommand(cmd, false, val || null);
+}
+
+function toggleAiResponse() {
+  const body = document.getElementById('ai-response-body');
+  const btn  = document.getElementById('btn-toggle-ai');
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  btn.textContent = open ? '▸ Розгорнути' : '▾ Згорнути';
+}
+
 async function generateEmail() {
-  const res = document.getElementById('email-result');
-  const act = document.getElementById('email-actions');
-  res.style.display = 'block';
-  act.style.display = 'none';
-  document.getElementById('sig-preview').style.display = 'none';
-  document.getElementById('email-send-panel').style.display = 'none';
-  res.value = 'Генерую лист...';
-  res.style.height = 'auto';
+  const aiSection      = document.getElementById('ai-response-section');
+  const aiBody         = document.getElementById('ai-response-body');
+  const composeSection = document.getElementById('email-compose-section');
+  const editor         = document.getElementById('email-body-editor');
+  aiSection.style.display      = 'block';
+  composeSection.style.display = 'none';
+  aiBody.style.display         = 'block';
+  aiBody.textContent           = 'Генерую лист...';
+  document.getElementById('btn-toggle-ai').textContent = '▾ Згорнути';
   try {
     const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-email/`, {
       method: 'POST',
@@ -435,27 +529,25 @@ async function generateEmail() {
     });
     const d = await r.json();
     if (d.ok) {
-      res.value = d.email;
-      res.style.height = 'auto';
-      res.style.height = Math.min(res.scrollHeight + 4, 560) + 'px';
-      act.style.display = 'flex';
-      _showSigPreview();
-      // Auto-fill fields and open send panel
+      aiBody.textContent = d.email;
+      editor.innerText   = _extractBody(d.email);
+      _showSigInCompose();
       const toField = document.getElementById('email-to');
       if (!toField.value) toField.value = CUSTOMER_EMAIL;
       const subj = document.getElementById('email-subject');
       if (!subj.value) subj.value = _extractSubject(d.email);
-      document.getElementById('email-send-panel').style.display = 'block';
+      composeSection.style.display = 'block';
     } else {
-      res.value = '⚠️ ' + (d.error || 'Помилка');
+      aiBody.textContent = '⚠️ ' + (d.error || 'Помилка');
     }
   } catch(e) {
-    res.value = '⚠️ Помилка з\'єднання';
+    aiBody.textContent = "⚠️ Помилка з'єднання";
   }
 }
 
 function copyEmail() {
-  navigator.clipboard.writeText(document.getElementById('email-result').value)
+  const editor = document.getElementById('email-body-editor');
+  navigator.clipboard.writeText(editor.innerText || '')
     .then(() => {
       const b = event.target;
       b.textContent = '✓ Скопійовано';
@@ -463,27 +555,17 @@ function copyEmail() {
     });
 }
 
-function toggleSendPanel() {
-  const panel = document.getElementById('email-send-panel');
-  const open  = panel.style.display !== 'none';
-  panel.style.display = open ? 'none' : 'block';
-  if (!open) {
-    const toField = document.getElementById('email-to');
-    if (!toField.value) toField.value = CUSTOMER_EMAIL;
-    const subj = document.getElementById('email-subject');
-    if (!subj.value) subj.value = _extractSubject(document.getElementById('email-result').value || '');
-  }
-}
-
 async function sendEmailToCustomer() {
-  const btn    = document.getElementById('btn-send-email');
-  const status = document.getElementById('email-send-status');
-  const body   = document.getElementById('email-result').value.trim();
-  const to     = document.getElementById('email-to').value.trim();
-  const cc     = document.getElementById('email-cc').value.trim();
-  const subj   = document.getElementById('email-subject').value.trim();
-  if (!to)   { status.style.color = 'var(--err)'; status.textContent = '⚠️ Вкажіть отримувача'; return; }
-  if (!body) { status.style.color = 'var(--err)'; status.textContent = '⚠️ Текст листа порожній'; return; }
+  const btn      = document.getElementById('btn-send-email');
+  const status   = document.getElementById('email-send-status');
+  const editor   = document.getElementById('email-body-editor');
+  const bodyHtml = editor.innerHTML.trim();
+  const bodyText = editor.innerText.trim();
+  const to       = document.getElementById('email-to').value.trim();
+  const cc       = document.getElementById('email-cc').value.trim();
+  const subj     = document.getElementById('email-subject').value.trim();
+  if (!to)       { status.style.color='var(--err)'; status.textContent='⚠️ Вкажіть отримувача'; return; }
+  if (!bodyText) { status.style.color='var(--err)'; status.textContent='⚠️ Текст листа порожній'; return; }
   btn.disabled = true;
   status.style.color = 'var(--text-muted)';
   status.textContent = 'Відправляю…';
@@ -491,7 +573,7 @@ async function sendEmailToCustomer() {
     const r = await fetch(`/crm/customer/${CUSTOMER_PK}/send-email/`, {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
-      body: JSON.stringify({to, cc, subject: subj, body}),
+      body: JSON.stringify({to, cc, subject: subj, body: bodyHtml, body_text: bodyText}),
     });
     const d = await r.json();
     if (d.ok) {

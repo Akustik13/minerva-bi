@@ -266,7 +266,10 @@ def send_customer_email(request, customer_pk):
     to_raw    = (data.get('to') or '').strip()
     cc_raw    = (data.get('cc') or '').strip()
     subject   = (data.get('subject') or '').strip()
-    body_text = (data.get('body') or '').strip()
+    body_html = (data.get('body') or '').strip()        # HTML from contenteditable
+    body_text = (data.get('body_text') or '').strip()   # plain text from innerText
+    if not body_text:
+        body_text = re.sub(r'<[^>]+>', '', body_html).strip()
 
     if not to_raw or not body_text:
         return JsonResponse({'error': 'Вкажіть отримувача та текст листа'}, status=400)
@@ -325,11 +328,10 @@ def send_customer_email(request, customer_pk):
     # Plain-text версія (для поштових клієнтів без HTML)
     full_body = body_text + '\n\n' + sig_text
 
-    # HTML версія: тіло листа + розділювач + HTML-підпис
+    # HTML версія: тіло листа (вже HTML з редактора) + розділювач + HTML-підпис
     html_body = (
-        '<div style="font-family:Arial,sans-serif;font-size:14px;'
-        'line-height:1.6;white-space:pre-wrap;margin-bottom:20px">'
-        + _html.escape(body_text)
+        '<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.6">'
+        + body_html
         + '</div>'
         '<hr style="border:none;border-top:1px solid #ccc;margin:16px 0">'
         + sig_html
