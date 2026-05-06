@@ -401,7 +401,10 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display  = ('user', 'role_badge', 'effective_access', 'ai_enabled')
     list_filter   = ('role', 'bundle', 'ai_enabled')
     search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
-    readonly_fields = ('effective_access_detail', 'denied_models_panel', 'module_operations_panel')
+    readonly_fields = (
+        'effective_access_detail', 'denied_models_panel', 'module_operations_panel',
+        'effective_permissions_display', 'permissions_debug_link',
+    )
 
     def get_form(self, request, obj=None, **kwargs):
         from django.forms import PasswordInput
@@ -474,7 +477,12 @@ class UserProfileAdmin(admin.ModelAdmin):
             'fields': ('user', 'role', 'notes'),
         }),
         ('🧩 Доступ до модулів', {
-            'fields': ('effective_access_detail', 'bundle', 'modules_override'),
+            'fields': (
+                'effective_access_detail',
+                'effective_permissions_display',
+                'permissions_debug_link',
+                'bundle', 'modules_override',
+            ),
             'description': (
                 '<strong>Як визначається доступ (за пріоритетом):</strong><br>'
                 '1️⃣ <strong>Ручне перевизначення</strong> — якщо відмічено нижче<br>'
@@ -554,6 +562,54 @@ class UserProfileAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    def get_urls(self):
+        from django.urls import path
+        return [
+            path(
+                '<int:pk>/debug/',
+                self.admin_site.admin_view(self._debug_view),
+                name='userprofile_debug',
+            ),
+        ] + super().get_urls()
+
+    def _debug_view(self, request, pk):
+        from django.http import JsonResponse
+        from django.contrib.auth.models import User as _User
+        from core.utils import user_can
+        from core.models import ModuleRegistry
+        try:
+            u = _User.objects.select_related('profile').get(pk=pk)
+            p = u.profile
+        except Exception as e:
+            return JsonResponse({'error': str(e)}, status=404)
+
+        allowed = p.get_allowed_modules()
+        modules = {}
+        for app in ModuleRegistry.get_active_apps():
+            has = (allowed == '__all__' or app in (allowed or []))
+            ops = p.get_allowed_operations(app) if has else []
+            modules[app] = {
+                'access': has,
+                'ops': ops if ops != '__all__' else 'all',
+            }
+
+        return JsonResponse({
+            'user': {
+                'username':    u.username,
+                'is_superuser': u.is_superuser,
+                'is_staff':     u.is_staff,
+            },
+            'profile': {
+                'role':              p.role,
+                'allowed_modules':   allowed if allowed != '__all__' else 'all',
+                'module_operations': p.module_operations,
+                'denied_models':     p.denied_models,
+            },
+            'can': {a: user_can(u, a) for a in
+                    ['delete', 'export', 'import', 'manage_users', 'view_audit']},
+            'modules': modules,
+        }, json_dumps_params={'ensure_ascii': False, 'indent': 2})
 
     def save_model(self, request, obj, form, change):
         if change:
@@ -669,6 +725,70 @@ class UserProfileAdmin(admin.ModelAdmin):
             '<div id="mv-ops-panel" style="min-height:40px">'
             '<em style="color:var(--text-dim);font-size:12px">Завантаження…</em>'
             '</div>'
+        )
+
+    @admin.display(description='Реальні права')
+    def effective_permissions_display(self, obj):
+        """Shows effective permissions — source and per-module operations."""
+        if not obj or not obj.pk:
+            return '—'
+        from core.utils import ROLE_OPERATIONS, ROLE_DEFAULTS
+
+        if obj.role in ('superadmin', 'admin'):
+            return format_html(
+                '<span style="color:var(--ok,#3fb950);font-weight:600">'
+                '✅ Повний доступ ({})</span>',
+                obj.get_role_display(),
+            )
+
+        allowed = obj.get_allowed_modules()
+        if isinstance(allowed, list):
+            modules = allowed
+        else:
+            modules = ROLE_DEFAULTS.get(obj.role, {}).get('modules', []) or []
+
+        if not modules:
+            return format_html(
+                '<span style="color:var(--text-dim,#607d8b)">Дефолт ролі: {}</span>',
+                obj.get_role_display(),
+            )
+
+        role_ops = ROLE_OPERATIONS.get(obj.role, {})
+        rows = mark_safe('')
+        for app in modules[:15]:
+            if obj.module_operations and app in (obj.module_operations or {}):
+                ops, color, src = obj.module_operations[app], '#17a2b8', 'custom'
+            elif isinstance(role_ops, dict) and app in role_ops:
+                ops, color, src = role_ops[app], '#607d8b', 'role'
+            else:
+                ops, color, src = ['view'], '#9aafbe', 'default'
+            ops_str = ', '.join(ops) if isinstance(ops, list) else str(ops)
+            rows += format_html(
+                '<div style="font-size:12px;margin:2px 0;display:flex;gap:8px">'
+                '<span style="width:110px;font-weight:500">{}</span>'
+                '<span style="color:{}">{}</span>'
+                '<span style="color:var(--text-dim,#607d8b);font-size:10px">({})</span>'
+                '</div>',
+                app, color, ops_str, src,
+            )
+
+        return format_html(
+            '<div style="font-family:monospace;line-height:1.6">{}</div>'
+            '<div style="font-size:10px;color:var(--text-dim,#607d8b);margin-top:4px">'
+            'сірий=дефолт ролі · синій=перевизначено · світлий=тільки view</div>',
+            rows,
+        )
+
+    @admin.display(description='Діагностика')
+    def permissions_debug_link(self, obj):
+        if not obj or not obj.pk:
+            return '—'
+        return format_html(
+            '<a href="/admin/core/userprofile/{}/debug/" target="_blank"'
+            ' style="padding:4px 12px;background:#17a2b8;color:#fff;'
+            'border-radius:6px;text-decoration:none;font-size:12px">'
+            '🔍 JSON діагностика прав</a>',
+            obj.pk,
         )
 
 

@@ -136,6 +136,9 @@ class MinervaAdminMixin(AuditableMixin):
             return ''
 
     def has_add_permission(self, request):
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
         if not super().has_add_permission(request):
             return False
         try:
@@ -145,6 +148,9 @@ class MinervaAdminMixin(AuditableMixin):
             return True
 
     def has_change_permission(self, request, obj=None):
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
         if not super().has_change_permission(request, obj):
             return False
         try:
@@ -156,6 +162,9 @@ class MinervaAdminMixin(AuditableMixin):
     def has_delete_permission(self, request, obj=None):
         if not self._minerva_staff_ok(request):
             return False
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
         try:
             from core.utils import user_can, user_has_operation
             if not user_can(request.user, 'delete'):

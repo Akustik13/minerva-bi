@@ -151,6 +151,12 @@ class SystemSettingsAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
+    def has_change_permission(self, request, obj=None):
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
+        return super().has_change_permission(request, obj)
+
     def has_delete_permission(self, request, obj=None):
         return False
 
@@ -186,6 +192,12 @@ class DocumentSettingsAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    def has_change_permission(self, request, obj=None):
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
+        return super().has_change_permission(request, obj)
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -581,6 +593,12 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
+    def has_change_permission(self, request, obj=None):
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
+        return super().has_change_permission(request, obj)
+
     def has_delete_permission(self, request, obj=None):
         return False
 
@@ -705,6 +723,12 @@ class ThemeSettingsAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    def has_change_permission(self, request, obj=None):
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
+        return super().has_change_permission(request, obj)
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -909,6 +933,12 @@ class BriefingSettingsAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    def has_change_permission(self, request, obj=None):
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
+        return super().has_change_permission(request, obj)
 
     def has_delete_permission(self, request, obj=None):
         return False

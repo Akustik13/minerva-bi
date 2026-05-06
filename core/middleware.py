@@ -87,7 +87,7 @@ class ModuleAccessMiddleware:
             return False, _empty
         try:
             profile = user.profile
-            if profile.role == 'superadmin':
+            if profile.role in ('superadmin', 'admin'):
                 return False, _empty
             allowed = profile.get_allowed_modules()
             # Layer 2: app-level

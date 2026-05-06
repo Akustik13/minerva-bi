@@ -17,6 +17,22 @@ def get_current_user():
 def clear_current_user():
     _current_user_local.user = None
 
+
+def is_minerva_admin(user) -> bool:
+    """
+    True if user is Django superuser OR has superadmin/admin Minerva role.
+    Use instead of bare `user.is_superuser` checks in admin permission methods.
+    """
+    if not user or not user.is_authenticated:
+        return False
+    if user.is_superuser:
+        return True
+    try:
+        return user.profile.role in ('superadmin', 'admin')
+    except Exception:
+        return False
+
+
 ROLE_DEFAULTS = {
     'superadmin': {
         'modules': '__all__',
@@ -150,7 +166,7 @@ def user_can(user, permission: str) -> bool:
         return True
     try:
         profile = user.profile
-        if profile.role == 'superadmin':
+        if profile.role in ('superadmin', 'admin'):
             return True
         field_name = f'can_{permission}'
         if hasattr(profile, field_name):

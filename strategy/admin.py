@@ -47,6 +47,12 @@ class AISettingsAdmin(admin.ModelAdmin):
         except Exception:
             return True
 
+    def has_change_permission(self, request, obj=None):
+        from core.utils import is_minerva_admin
+        if is_minerva_admin(request.user):
+            return True
+        return super().has_change_permission(request, obj)
+
     def has_delete_permission(self, request, obj=None):
         return False
 
