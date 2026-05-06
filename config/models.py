@@ -538,12 +538,81 @@ class NotificationSettings(models.Model):
         help_text="Товари з запасом менше 1.5 місяців.",
     )
 
+    # ── IMAP last fetch tracking ───────────────────────────────────────────────
+    imap_last_fetched = models.DateTimeField(
+        "Останнє оновлення пошти", null=True, blank=True,
+    )
+
+    # ── Weekly digest ─────────────────────────────────────────────────────────
+    weekly_digest_enabled = models.BooleanField("Тижневий звіт увімкнено", default=False)
+    weekly_digest_day = models.PositiveSmallIntegerField(
+        "День тижня (0=Пн, 1=Вт, …, 6=Нд)", default=0,
+    )
+    weekly_digest_time = models.TimeField("Час відправки", default="08:00")
+    weekly_digest_last_sent = models.DateTimeField(
+        "Тижневий звіт: останній", null=True, blank=True,
+    )
+
+    # ── Monthly digest ────────────────────────────────────────────────────────
+    monthly_digest_enabled = models.BooleanField("Місячний звіт увімкнено", default=False)
+    monthly_digest_day = models.PositiveSmallIntegerField(
+        "День місяця (1–28)", default=1,
+    )
+    monthly_digest_time = models.TimeField("Час відправки", default="08:00")
+    monthly_digest_last_sent = models.DateTimeField(
+        "Місячний звіт: останній", null=True, blank=True,
+    )
+
     class Meta:
         verbose_name = "Налаштування сповіщень"
         verbose_name_plural = "Налаштування сповіщень"
 
     def __str__(self):
         return "Налаштування сповіщень"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+# ── BriefingSettings ──────────────────────────────────────────────────────────
+
+class BriefingSettings(models.Model):
+    """Singleton: налаштування ранкового AI-брифінгу."""
+
+    enabled = models.BooleanField(
+        "Увімкнено", default=True,
+        help_text="Брифінг відправляється в Telegram кожному юзеру з Telegram ID.",
+    )
+    send_time = models.TimeField(
+        "Час відправки", default="08:00",
+        help_text="Час по серверному поясу (Europe/Berlin). Налаштуйте cron на цей час.",
+    )
+    include_orders = models.BooleanField("📦 Замовлення місяця", default=True)
+    include_revenue = models.BooleanField("💰 Виручка місяця", default=True)
+    include_overdue = models.BooleanField("⏰ Прострочені дедлайни", default=True)
+    include_reminders = models.BooleanField("🔔 Нагадування на сьогодні", default=True)
+    include_stock_alerts = models.BooleanField("🔥 Критичний залишок", default=False)
+    include_new_emails = models.BooleanField("📬 Нові листи від клієнтів", default=False)
+    custom_instructions = models.TextField(
+        "Додаткові інструкції для AI", blank=True,
+        help_text=(
+            "AI може проявляти ініціативу і включати важливі речі незалежно від цих налаштувань. "
+            "Тут можна вказати акценти: мова, стиль, додаткові метрики тощо."
+        ),
+    )
+
+    class Meta:
+        verbose_name = "Налаштування брифінгу"
+        verbose_name_plural = "Налаштування брифінгу"
+
+    def __str__(self):
+        return "Налаштування брифінгу"
 
     def save(self, *args, **kwargs):
         self.pk = 1

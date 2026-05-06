@@ -122,6 +122,15 @@ class Command(BaseCommand):
         self.stdout.write(
             f'fetch_emails: +{total_created} нових, {total_skipped} пропущено, {total_errors} помилок'
         )
+        # Update last-fetch timestamp in NotificationSettings
+        try:
+            from config.models import NotificationSettings
+            ns = NotificationSettings.objects.filter(pk=1).first()
+            if ns:
+                ns.imap_last_fetched = timezone.now()
+                ns.save(update_fields=['imap_last_fetched'])
+        except Exception:
+            pass
 
     def _connect(self, profile) -> imaplib.IMAP4_SSL | imaplib.IMAP4:
         if profile.imap_use_ssl:

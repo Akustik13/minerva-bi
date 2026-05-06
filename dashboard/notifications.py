@@ -806,6 +806,9 @@ def notify_new_order(order):
                     'sku': line.sku_raw or '—', 'name': '—',
                     'qty': line.qty, 'in_stock': None, 'stock': 0,
                     'datasheet': '',
+                    'unit_price': float(line.unit_price or 0),
+                    'line_total': float(line.total_price or 0),
+                    'currency':   line.currency or '',
                 })
                 continue
             stock = (
@@ -813,12 +816,17 @@ def notify_new_order(order):
                 .aggregate(t=Sum('qty'))['t'] or 0
             )
             lines_data.append({
-                'sku':       line.product.sku,
-                'name':      line.product.name,
-                'qty':       line.qty,
-                'stock':     int(stock),
-                'in_stock':  stock >= line.qty,
-                'datasheet': line.product.datasheet_url or '',
+                'sku':        line.product.sku,
+                'name':       line.product.name,
+                'qty':        line.qty,
+                'stock':      int(stock),
+                'in_stock':   stock >= line.qty,
+                'datasheet':  line.product.datasheet_url or '',
+                'unit_price': float(line.unit_price or 0),
+                'line_total': float(line.total_price or (
+                    (line.unit_price or 0) * (line.qty or 0)
+                )),
+                'currency':   line.currency or getattr(order, 'currency', '') or '',
             })
     except Exception:
         pass
@@ -839,8 +847,9 @@ def notify_new_order(order):
         else:
             days_left_str = f'Прострочено ({-days_left} дн.) 🔴'
 
-    # Destination
-    dest_parts  = [p for p in [order.addr_city, order.addr_country] if p]
+    # Destination (full address)
+    zip_city = f"{order.addr_zip} {order.addr_city}".strip() if (order.addr_zip or order.addr_city) else ""
+    dest_parts  = [p for p in [order.addr_street, zip_city, order.addr_country] if p]
     destination = ', '.join(dest_parts) if dest_parts else ''
 
     # Total
@@ -877,11 +886,15 @@ def notify_new_order(order):
                         if ds else
                         f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
                     )
+                    unit_str  = f'{ld["unit_price"]:.2f} {ld["currency"]}'.strip() if ld.get('unit_price') else '—'
+                    total_str_ld = f'{ld["line_total"]:.2f} {ld["currency"]}'.strip() if ld.get('line_total') else '—'
                     rows += (
                         f'<tr style="border-bottom:1px solid #eee">'
                         f'<td style="padding:5px 8px">{sku_cell}</td>'
                         f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
                         f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
+                        f'<td style="padding:5px 8px;text-align:right;color:#555;white-space:nowrap">{unit_str}</td>'
+                        f'<td style="padding:5px 8px;text-align:right;font-weight:600;white-space:nowrap">{total_str_ld}</td>'
                         f'<td style="padding:5px 8px;text-align:right;font-size:12px">{stock_cell}</td>'
                         f'</tr>'
                     )
@@ -893,6 +906,8 @@ def notify_new_order(order):
                     '<th style="padding:5px 8px;text-align:left">SKU</th>'
                     '<th style="padding:5px 8px;text-align:left">Назва</th>'
                     '<th style="padding:5px 8px;text-align:center">Кіл-ть</th>'
+                    '<th style="padding:5px 8px;text-align:right">Ціна/шт</th>'
+                    '<th style="padding:5px 8px;text-align:right">Сума</th>'
                     '<th style="padding:5px 8px;text-align:right">Склад</th>'
                     '</tr>'
                     + rows +
@@ -948,7 +963,14 @@ def notify_new_order(order):
                     icon = '✅' if ld['in_stock'] is True else ('❌' if ld['in_stock'] is False else '•')
                     name_part  = f' {ld["name"]}' if ld['name'] != '—' else ''
                     stock_part = f' | склад: {ld["stock"]} шт' if ld['in_stock'] is not None else ''
-                    line_txt = f'{icon} <code>{ld["sku"]}</code>{name_part} × {ld["qty"]}{stock_part}'
+                    curr = ld.get('currency', '')
+                    price_part = ''
+                    if ld.get('unit_price'):
+                        price_part = f' | {ld["unit_price"]:.2f} {curr}/шт'.strip()
+                    total_part = ''
+                    if ld.get('line_total'):
+                        total_part = f' | сума: {ld["line_total"]:.2f} {curr}'.strip()
+                    line_txt = f'{icon} <code>{ld["sku"]}</code>{name_part} × {ld["qty"]}{price_part}{total_part}{stock_part}'
                     if ld.get('datasheet'):
                         line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
                     tg.append(line_txt)

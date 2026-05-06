@@ -6,7 +6,8 @@ from django.urls import path, reverse
 from django.utils.html import format_html
 
 from config.models import (
-    ALL_MODULES, SystemSettings, DocumentSettings, NotificationSettings, ThemeSettings,
+    ALL_MODULES, SystemSettings, DocumentSettings,
+    NotificationSettings, ThemeSettings, BriefingSettings,
 )
 
 
@@ -197,7 +198,13 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         obj = NotificationSettings.get()
         return redirect(reverse("admin:config_notificationsettings_change", args=[obj.pk]))
 
-    readonly_fields = ("alert_actions", "last_alert_sent", "digest_actions", "digest_last_sent")
+    readonly_fields = (
+        "alert_actions", "last_alert_sent",
+        "digest_actions", "digest_last_sent",
+        "imap_actions", "imap_last_fetched",
+        "weekly_digest_actions", "weekly_digest_last_sent",
+        "monthly_digest_actions", "monthly_digest_last_sent",
+    )
 
     def get_form(self, request, obj=None, **kwargs):
         from django.forms import PasswordInput
@@ -231,13 +238,14 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "imap_user", "imap_password",
                 ("imap_inbox_folder", "imap_sent_folder"),
                 "imap_lookback_days",
+                "imap_last_fetched",
+                "imap_actions",
             ),
             "classes": ("collapse",),
             "description": (
                 "Мінерва підключається до вашої пошти і додає листи в хронологію клієнтів CRM. "
                 "ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. "
-                "Листи ідентифікуються по email-адресі клієнта з CRM. "
-                "Команда: <code>python manage.py fetch_emails</code> — запускається автоматично кожні 15 хв."
+                "Листи ідентифікуються по email-адресі клієнта з CRM."
             ),
         }),
         ("📬 Нові замовлення", {
@@ -295,7 +303,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "3. Chat ID: для каналу @username або числовий ID (дізнатись через @userinfobot)."
             ),
         }),
-        ("📊 Щоденний / Щотижневий звіт", {
+        ("📅 Щоденний звіт", {
             "fields": (
                 "digest_enabled",
                 ("digest_email", "digest_telegram"),
@@ -309,9 +317,32 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "digest_actions",
             ),
             "description": (
-                "Зведений звіт: очікують відправки, прострочені, нові замовлення, "
-                "доставлені, критичний залишок. "
+                "Зведений звіт: очікують відправки, прострочені, нові замовлення, доставлені, критичний залишок. "
                 "Cron: <code>0 8 * * * docker-compose exec -T web python manage.py send_digest</code>"
+            ),
+        }),
+        ("📅 Щотижневий звіт", {
+            "fields": (
+                "weekly_digest_enabled",
+                ("weekly_digest_day", "weekly_digest_time"),
+                "weekly_digest_last_sent",
+                "weekly_digest_actions",
+            ),
+            "description": (
+                "Містить: відправлень за тиждень, прострочені, топ-5 товарів. "
+                "Cron запускати щодня — система сама перевіряє чи сьогодні потрібний день."
+            ),
+        }),
+        ("📅 Місячний звіт", {
+            "fields": (
+                "monthly_digest_enabled",
+                ("monthly_digest_day", "monthly_digest_time"),
+                "monthly_digest_last_sent",
+                "monthly_digest_actions",
+            ),
+            "description": (
+                "Містить: виручка місяця vs попередній, топ-10 товарів, кількість відправлень. "
+                "Cron запускати щодня — система сама перевіряє чи сьогодні потрібний день."
             ),
         }),
         ("🚀 Дії", {
@@ -372,6 +403,21 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "<int:pk>/send-digest/",
                 self.admin_site.admin_view(self._send_digest),
                 name="config_notificationsettings_send_digest",
+            ),
+            path(
+                "<int:pk>/fetch-emails/",
+                self.admin_site.admin_view(self._fetch_emails),
+                name="config_notificationsettings_fetch_emails",
+            ),
+            path(
+                "<int:pk>/send-weekly-digest/",
+                self.admin_site.admin_view(self._send_weekly_digest),
+                name="config_notificationsettings_send_weekly_digest",
+            ),
+            path(
+                "<int:pk>/send-monthly-digest/",
+                self.admin_site.admin_view(self._send_monthly_digest),
+                name="config_notificationsettings_send_monthly_digest",
             ),
         ]
         return custom + urls
@@ -461,7 +507,76 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
             '📊 Надіслати звіт зараз</a>{}',
             format_html(last),
         )
-    digest_actions.short_description = "Тест звіту"
+    digest_actions.short_description = "Тест щоденного звіту"
+
+    def _fetch_emails(self, request, pk):
+        from django.contrib import messages
+        from django.core.management import call_command
+        from django.utils import timezone
+        from io import StringIO
+        out = StringIO()
+        try:
+            call_command('fetch_emails', stdout=out)
+            ns = NotificationSettings.get()
+            ns.imap_last_fetched = timezone.now()
+            ns.save(update_fields=['imap_last_fetched'])
+            messages.success(request, f"✅ Пошту оновлено: {out.getvalue().strip() or 'готово'}")
+        except Exception as e:
+            messages.error(request, f"❌ Помилка: {e}")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def _send_weekly_digest(self, request, pk):
+        from django.contrib import messages
+        from dashboard.digest import send_digest
+        result = send_digest(force=True, period='weekly')
+        if result.get("sent"):
+            messages.success(request, "✅ Тижневий звіт надіслано!")
+        else:
+            messages.error(request, f"❌ {result.get('reason') or result.get('error') or '?'}")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def _send_monthly_digest(self, request, pk):
+        from django.contrib import messages
+        from dashboard.digest import send_digest
+        result = send_digest(force=True, period='monthly')
+        if result.get("sent"):
+            messages.success(request, "✅ Місячний звіт надіслано!")
+        else:
+            messages.error(request, f"❌ {result.get('reason') or result.get('error') or '?'}")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def imap_actions(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="../fetch-emails/" style="display:inline-block;padding:8px 18px;'
+            'background:#00796b;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '🔄 Оновити пошту зараз</a>'
+        )
+    imap_actions.short_description = "Дії"
+
+    def weekly_digest_actions(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="../send-weekly-digest/" style="display:inline-block;padding:8px 18px;'
+            'background:#37474f;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '📊 Надіслати тижневий звіт зараз</a>'
+        )
+    weekly_digest_actions.short_description = "Тест тижневого звіту"
+
+    def monthly_digest_actions(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="../send-monthly-digest/" style="display:inline-block;padding:8px 18px;'
+            'background:#37474f;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '📊 Надіслати місячний звіт зараз</a>'
+        )
+    monthly_digest_actions.short_description = "Тест місячного звіту"
 
     def has_add_permission(self, request):
         return False
@@ -752,3 +867,83 @@ def integrations_hub_view(request):
         **admin.site.each_context(request),
     }
     return render(request, "admin/config/integrations.html", context)
+
+
+# ── BriefingSettingsAdmin ─────────────────────────────────────────────────────
+
+@admin.register(BriefingSettings)
+class BriefingSettingsAdmin(admin.ModelAdmin):
+    readonly_fields = ("briefing_actions",)
+
+    fieldsets = [
+        ("⏰ Розклад", {
+            "fields": ("enabled", "send_time"),
+            "description": (
+                "Налаштуйте cron на відповідний час: "
+                "<code>0 8 * * * docker-compose exec -T web python manage.py morning_briefing</code>"
+            ),
+        }),
+        ("📋 Що включати у брифінг", {
+            "fields": (
+                "include_orders", "include_revenue",
+                "include_overdue", "include_reminders",
+                "include_stock_alerts", "include_new_emails",
+            ),
+            "description": "AI може включати додаткову важливу інформацію на свій розсуд.",
+        }),
+        ("🤖 Інструкції для AI", {
+            "fields": ("custom_instructions",),
+            "description": (
+                "Необов'язково. Задайте акценти або стиль: мова, тон, додаткові метрики. "
+                "AI завжди може включити критично важливе навіть без вказівки."
+            ),
+        }),
+        ("🚀 Дії", {
+            "fields": ("briefing_actions",),
+        }),
+    ]
+
+    def changelist_view(self, request, extra_context=None):
+        obj = BriefingSettings.get()
+        return redirect(reverse("admin:config_briefingsettings_change", args=[obj.pk]))
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def briefing_actions(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="../send-briefing/" style="display:inline-block;padding:8px 18px;'
+            'background:#1976d2;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '📤 Тестова відправка в Telegram</a>'
+        )
+    briefing_actions.short_description = "Дії"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path(
+                "<int:pk>/send-briefing/",
+                self.admin_site.admin_view(self._send_briefing),
+                name="config_briefingsettings_send_briefing",
+            ),
+        ]
+        return custom + urls
+
+    def _send_briefing(self, request, pk):
+        from django.contrib import messages
+        from django.core.management import call_command
+        from io import StringIO
+        out = StringIO()
+        try:
+            call_command('morning_briefing', stdout=out)
+            result = out.getvalue().strip()
+            messages.success(request, f"✅ Брифінг надіслано. {result}")
+        except Exception as e:
+            messages.error(request, f"❌ Помилка: {e}")
+        return redirect(reverse("admin:config_briefingsettings_change", args=[1]))
