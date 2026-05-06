@@ -429,8 +429,10 @@ def _get_financial_overview(inp, profile):
 
     today = timezone.now().date()
     overdue = SalesOrder.objects.filter(
-        shipping_deadline__lt=today
-    ).exclude(status__in=['completed', 'shipped', 'cancelled'])
+        shipping_deadline__lt=today,
+        affects_stock=True,
+        shipped_at__isnull=True,
+    ).exclude(status__in=['delivered', 'shipped', 'cancelled'])
 
     return {
         "overdue_orders": [

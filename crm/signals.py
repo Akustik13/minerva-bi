@@ -10,59 +10,68 @@ from django.dispatch import receiver
 def auto_sync_customer(sender, instance, created, **kwargs):
     """
     Автоматично створює/оновлює Customer при збереженні SalesOrder.
+
+    B2B (contact_name + client): ключ за назвою компанії → один запис для всіх контактів.
+    B2C (тільки email/client): ключ за email+ім'ям → один запис на людину.
     """
     # Якщо вже є customer_key — пропускаємо
     if instance.customer_key:
         return
-    
+
     # Потрібен хоча б email або client
     if not instance.email and not instance.client:
         return
-    
+
     from crm.models import Customer
-    
-    # Генеруємо ключ
-    key = Customer.generate_key(
-        instance.email or instance.client,
-        instance.client or instance.email
-    )
-    
+
+    contact = getattr(instance, 'contact_name', '') or ''
+    client  = instance.client or ''
+
+    if contact and client:
+        # B2B: ключ за назвою компанії — всі контакти однієї компанії → 1 запис
+        key              = Customer.generate_key('b2b', client)
+        customer_name    = client
+        customer_company = client
+    else:
+        # B2C або невідомо: ключ за email + ім'ям
+        key = Customer.generate_key(
+            instance.email or instance.client,
+            instance.client or instance.email
+        )
+        customer_name    = client or (instance.email.split('@')[0] if instance.email else '')
+        customer_company = ''
+
     # Нормалізуємо країну до ISO-2
     from config.country_utils import normalize_to_iso2
     country_iso2 = normalize_to_iso2(instance.shipping_region or "")
 
-    # Розділяємо: client = компанія, contact_name = контактна особа
-    contact = getattr(instance, 'contact_name', '') or ''
-    client  = instance.client or ''
-    if contact:
-        # B2B: client = компанія, contact_name = контактна особа
-        customer_name    = contact
-        customer_company = client
-    else:
-        # B2C або невідомо: client = ім'я людини, company порожня
-        customer_name    = client or (instance.email.split('@')[0] if instance.email else '')
-        customer_company = ''
+    # Шукаємо за новим ключем
+    customer = Customer.objects.filter(external_key=key).first()
 
-    # Шукаємо існуючого клієнта
-    customer, created = Customer.objects.get_or_create(
-        external_key=key,
-        defaults={
-            'name':         customer_name,
-            'company':      customer_company,
-            'email':        instance.email or '',
-            'phone':        instance.phone or '',
-            'country':      instance.addr_country or country_iso2,
-            'addr_street':  instance.addr_street or '',
-            'addr_city':    instance.addr_city or '',
-            'addr_zip':     instance.addr_zip or '',
-            'source':       instance.source,
-        }
-    )
-    # Якщо клієнт вже існував — оновити company/name якщо з'явились нові дані
-    if not created and contact and not customer.company:
-        customer.name    = contact
+    # Fallback для B2B: знайти за назвою компанії (для старих записів зі старим ключем)
+    if customer is None and contact and client:
+        customer = Customer.objects.filter(company__iexact=client).first()
+        if customer:
+            # Переводимо існуючий запис на новий B2B-ключ
+            customer.external_key = key
+            customer.save(update_fields=['external_key'])
+
+    if customer is None:
+        customer = Customer.objects.create(
+            external_key=key,
+            name=customer_name,
+            company=customer_company,
+            email=instance.email or '',
+            phone=instance.phone or '',
+            country=instance.addr_country or country_iso2,
+            addr_street=instance.addr_street or '',
+            addr_city=instance.addr_city or '',
+            addr_zip=instance.addr_zip or '',
+            source=instance.source,
+        )
+    elif contact and client and not customer.company:
         customer.company = client
-        customer.save(update_fields=['name', 'company'])
+        customer.save(update_fields=['company'])
 
     # Оновлюємо SalesOrder з customer_key
     sender.objects.filter(pk=instance.pk).update(customer_key=key)
