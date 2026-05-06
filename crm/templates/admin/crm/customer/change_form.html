@@ -157,10 +157,10 @@
           </div>
         </div>
         <div id="ai-response-body"
-             style="font-size:12px;line-height:1.6;padding:10px 12px;max-height:220px;
+             style="font-size:12px;line-height:1.6;padding:10px 12px;max-height:420px;
                     overflow-y:auto;border-radius:8px;background:var(--bg-input);
                     border:1px solid var(--border-strong);color:var(--text-muted);
-                    white-space:pre-wrap;font-family:monospace"></div>
+                    white-space:pre-wrap;font-family:monospace;word-break:break-word"></div>
       </div>
 
       <!-- ── 2. Сформований лист ──────────────────────────────────────── -->
@@ -173,6 +173,11 @@
         <!-- Заголовки -->
         <div style="display:grid;grid-template-columns:46px 1fr;gap:5px 6px;
                     margin-bottom:10px;align-items:center">
+          <label style="font-size:12px;color:var(--text-muted);text-align:right">Від:</label>
+          <div id="email-from-display"
+               style="padding:5px 9px;border-radius:6px;font-size:13px;
+                      color:var(--text-dim);background:var(--bg-input);
+                      border:1px solid var(--border-strong)">—</div>
           <label style="font-size:12px;color:var(--text-muted);text-align:right">Кому:</label>
           <input id="email-to" type="text"
                  style="padding:5px 9px;border-radius:6px;font-size:13px;width:100%;
@@ -398,6 +403,7 @@
 const CUSTOMER_PK = '{{ original.pk }}';
 const CUSTOMER_EMAIL = '{{ original.email|default:"" }}';
 const USER_DISPLAY_NAME = '{{ request.user.get_full_name|default:request.user.username|escapejs }}';
+const USER_FROM_EMAIL = '{{ request.user.profile.smtp_from|default:request.user.profile.smtp_user|default:""|escapejs }}';
 const _sigEl = document.getElementById('mv-user-sig');
 const USER_SIG_HTML = _sigEl ? JSON.parse(_sigEl.textContent) : '';
 const CSRF = (document.cookie.split(';').find(c=>c.trim().startsWith('csrftoken='))||'=').split('=')[1];
@@ -462,24 +468,38 @@ function toggleEmailComposer() {
 // ── Email composer helpers ─────────────────────────────────────────────────
 
 function _extractSubject(text) {
-  // "Subject: ..." / "Тема: ..." on same line
-  let m = text.match(/^(?:SUBJECT|Subject|Тема|Betreff)\s*:\s*([^\n]+)/im);
+  // "**📧 SUBJECT:** Text on same line" (AI output format)
+  let m = text.match(/SUBJECT\s*:\*{0,2}\s*([^\n*][^\n]+)/i);
+  if (m) return m[1].replace(/[*_`📧📬]/g, '').trim();
+  // "Subject: text" / "Тема: text" plain line
+  m = text.match(/^(?:SUBJECT|Subject|Тема|Betreff)\s*:\s*([^\n]+)/im);
   if (m) return m[1].replace(/[*_`📬]/g, '').trim();
-  // AI markdown: "**📬 SUBJECT:**\n\n*Subject text*"
+  // AI markdown: subject on next line after SUBJECT: marker
   m = text.match(/SUBJECT[^:\n]*:\s*\n+[*\s]*([^\n*]+)/im);
   if (m) return m[1].replace(/[*_`]/g, '').trim();
   return '';
 }
 
+function _stripMinervaSignoff(text) {
+  // Remove the generic AI sign-off inserted by Minerva prompt
+  return text
+    .replace(/\n*Best regards,?\s*\n+\*?Your Minerva[^\n]*/gi, '')
+    .replace(/\n*З повагою,?\s*\n+\*?Minerva[^\n]*/gi, '')
+    .trim();
+}
+
 function _extractBody(text) {
-  // After "TEXT:" marker
-  let m = text.match(/TEXT\s*:\s*\n+([\s\S]+?)(?:\n---|\n\*\*|$)/i);
-  if (m) return m[1].trim();
-  // After second "---" separator
-  const parts = text.split(/\n---+\n/);
-  if (parts.length >= 3) return parts.slice(2).join('\n---\n').trim();
-  if (parts.length === 2) return parts[1].trim();
-  return text.trim();
+  // Match content between TEXT: marker (any format, e.g. "**📧 TEXT:**") and "---"
+  let m = text.match(/TEXT\s*:[^\n]*\n+([\s\S]+?)(?:\n---)/i);
+  if (m) return _stripMinervaSignoff(m[1].trim());
+  // Fallback: split by --- and use first block that looks like email body
+  const parts = text.split(/\n---+\n?/);
+  for (const part of parts) {
+    // Strip any "**📧 LABEL:** ..." header lines from the block
+    const clean = part.replace(/^\*{0,2}[📧📬✅][^\n]*\n+/gm, '').trim();
+    if (clean.length > 20 && !clean.startsWith('**')) return _stripMinervaSignoff(clean);
+  }
+  return _stripMinervaSignoff(text.trim());
 }
 
 function _showSigInCompose() {
@@ -492,6 +512,9 @@ function _showSigInCompose() {
   } else {
     wrap.style.display = 'none';
   }
+  // Show "Від:" address
+  const fromEl = document.getElementById('email-from-display');
+  if (fromEl) fromEl.textContent = USER_FROM_EMAIL || '(глобальний SMTP)';
 }
 
 function mvBodyCmd(cmd, val) {
