@@ -308,12 +308,31 @@ def send_customer_email(request, customer_pk):
         )
 
     user_name = request.user.get_full_name() or request.user.username
-    sig_tpl   = (ns.email_signature_template or 'З повагою,\n{name}').replace('{name}', user_name)
-    full_body = body_text + '\n\n' + sig_tpl
 
+    # Підпис: особистий HTML (профіль юзера) → глобальний plain-text (NotificationSettings)
+    personal_sig = getattr(profile, 'smtp_signature', '') or ''
+    if personal_sig:
+        sig_html = personal_sig.replace('{name}', _html.escape(user_name))
+        sig_text = re.sub(r'<[^>]+>', '', sig_html).strip()
+    else:
+        sig_text = (ns.email_signature_template or 'З повагою,\n{name}').replace('{name}', user_name)
+        sig_html = (
+            '<div style="font-family:Arial,sans-serif;font-size:13px;'
+            'line-height:1.6;white-space:pre-wrap">'
+            + _html.escape(sig_text) + '</div>'
+        )
+
+    # Plain-text версія (для поштових клієнтів без HTML)
+    full_body = body_text + '\n\n' + sig_text
+
+    # HTML версія: тіло листа + розділювач + HTML-підпис
     html_body = (
-        '<pre style="font-family:inherit;font-size:14px;line-height:1.6;white-space:pre-wrap">'
-        + _html.escape(full_body) + '</pre>'
+        '<div style="font-family:Arial,sans-serif;font-size:14px;'
+        'line-height:1.6;white-space:pre-wrap;margin-bottom:20px">'
+        + _html.escape(body_text)
+        + '</div>'
+        '<hr style="border:none;border-top:1px solid #ccc;margin:16px 0">'
+        + sig_html
     )
 
     try:

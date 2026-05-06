@@ -263,6 +263,11 @@ class UserProfile(models.Model):
         max_length=255, blank=True, verbose_name='Від кого (From)',
         help_text='Ім\'я та email: "Іван Петренко <ivan@example.com>". Якщо порожньо — використовується SMTP Login.',
     )
+    smtp_signature = models.TextField(
+        blank=True, default='',
+        verbose_name='Підпис листа',
+        help_text='{name} замінюється на ім\'я користувача при відправці.',
+    )
 
     class Meta:
         verbose_name        = 'Профіль користувача'

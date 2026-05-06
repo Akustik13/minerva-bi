@@ -284,6 +284,115 @@ class ModuleBundleAdmin(admin.ModelAdmin):
         return badges or '—'
 
 
+# ── RichSignatureWidget ───────────────────────────────────────────────────────
+
+class RichSignatureWidget(forms.Widget):
+    """Mini WYSIWYG editor for email signature stored as HTML.
+    Supports per-line bold / italic / underline / font-size / color / font-face.
+    """
+
+    def render(self, name, value, attrs=None, renderer=None):
+        uid     = (attrs or {}).get('id', f'id_{name}')
+        initial = json.dumps(value or '')   # safe JSON string for JS innerHTML assignment
+        return mark_safe(f'''
+<div style="border:1px solid var(--border-strong,#3d4f61);border-radius:8px;
+            overflow:hidden;max-width:640px">
+  <div style="display:flex;gap:4px;padding:6px 8px;flex-wrap:wrap;align-items:center;
+              background:var(--bg-hover,#1e2d40);
+              border-bottom:1px solid var(--border-strong,#3d4f61)">
+    <button type="button" title="Жирний" onclick="mvSigCmd('{uid}','bold')"
+            style="padding:2px 9px;border-radius:4px;font-weight:700;font-size:13px;
+                   cursor:pointer;border:1px solid var(--border-strong,#3d4f61);
+                   background:transparent;color:var(--text,#c9d8e4)">B</button>
+    <button type="button" title="Курсив" onclick="mvSigCmd('{uid}','italic')"
+            style="padding:2px 9px;border-radius:4px;font-style:italic;font-size:13px;
+                   cursor:pointer;border:1px solid var(--border-strong,#3d4f61);
+                   background:transparent;color:var(--text,#c9d8e4)">I</button>
+    <button type="button" title="Підкреслення" onclick="mvSigCmd('{uid}','underline')"
+            style="padding:2px 9px;border-radius:4px;text-decoration:underline;font-size:13px;
+                   cursor:pointer;border:1px solid var(--border-strong,#3d4f61);
+                   background:transparent;color:var(--text,#c9d8e4)">U</button>
+    <div style="width:1px;height:20px;background:var(--border-strong,#3d4f61);margin:0 2px"></div>
+    <select title="Розмір" onchange="mvSigCmd('{uid}','fontSize',this.value);this.selectedIndex=0"
+            style="padding:2px 6px;border-radius:4px;font-size:12px;cursor:pointer;
+                   border:1px solid var(--border-strong,#3d4f61);
+                   background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4)">
+      <option value="">Розмір</option>
+      <option value="1">Дрібний (8px)</option>
+      <option value="2">Малий (10px)</option>
+      <option value="3">Звичайний (12px)</option>
+      <option value="4">Середній (14px)</option>
+      <option value="5">Великий (18px)</option>
+      <option value="6">Дуже великий (24px)</option>
+      <option value="7">Максимальний (36px)</option>
+    </select>
+    <select title="Шрифт" onchange="mvSigCmd('{uid}','fontName',this.value);this.selectedIndex=0"
+            style="padding:2px 6px;border-radius:4px;font-size:12px;cursor:pointer;
+                   border:1px solid var(--border-strong,#3d4f61);
+                   background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4)">
+      <option value="">Шрифт</option>
+      <option value="Arial">Arial</option>
+      <option value="Georgia">Georgia</option>
+      <option value="Verdana">Verdana</option>
+      <option value="Courier New">Courier New</option>
+      <option value="Times New Roman">Times New Roman</option>
+    </select>
+    <div style="width:1px;height:20px;background:var(--border-strong,#3d4f61);margin:0 2px"></div>
+    <label title="Колір тексту"
+           style="display:flex;align-items:center;gap:3px;cursor:pointer;
+                  font-size:12px;color:var(--text-muted,#9aafbe)">
+      <span style="font-weight:700;font-size:14px">A</span>
+      <input type="color" value="#c9d8e4"
+             oninput="mvSigCmd('{uid}','foreColor',this.value)"
+             style="width:22px;height:22px;padding:0;cursor:pointer;
+                    border:1px solid var(--border-strong,#3d4f61);
+                    border-radius:3px;background:transparent">
+    </label>
+    <button type="button" title="Очистити" onclick="mvSigClear('{uid}')"
+            style="margin-left:auto;padding:2px 8px;border-radius:4px;font-size:11px;
+                   cursor:pointer;border:1px solid var(--border-strong,#3d4f61);
+                   background:transparent;color:var(--err,#f85149)">✕ Очистити</button>
+  </div>
+  <div id="{uid}_ed" contenteditable="true"
+       oninput="mvSigSync('{uid}')" onblur="mvSigSync('{uid}')"
+       style="min-height:90px;max-height:280px;overflow-y:auto;padding:10px 14px;
+              outline:none;font-size:13px;line-height:1.7;
+              background:var(--bg-card,#1a2535);color:var(--text,#c9d8e4);
+              font-family:Arial,sans-serif"></div>
+  <div style="padding:3px 10px;font-size:10px;color:var(--text-dim,#607d8b);
+              background:var(--bg-input,#141f2b);border-top:1px solid var(--border-strong,#3d4f61)">
+    Підказка: виділіть текст і застосуйте форматування. {{name}} → ім'я користувача.
+  </div>
+</div>
+<textarea id="{uid}" name="{name}" style="display:none"></textarea>
+<script>
+function mvSigSync(uid){{
+  document.getElementById(uid).value=document.getElementById(uid+'_ed').innerHTML;
+}}
+function mvSigCmd(uid,cmd,val){{
+  document.getElementById(uid+'_ed').focus();
+  document.execCommand(cmd,false,val||null);
+  mvSigSync(uid);
+}}
+function mvSigClear(uid){{
+  document.getElementById(uid+'_ed').innerHTML='';
+  document.getElementById(uid).value='';
+}}
+(function(){{
+  var ed=document.getElementById('{uid}_ed');
+  var ta=document.getElementById('{uid}');
+  ed.innerHTML={initial};
+  ta.value=ed.innerHTML;
+  var f=ed.closest('form');
+  if(f) f.addEventListener('submit',function(){{ta.value=ed.innerHTML;}},true);
+}})();
+</script>
+''')
+
+    def value_from_datadict(self, data, files, name):
+        return data.get(name, '')
+
+
 # ── UserProfile ───────────────────────────────────────────────────────────────
 
 @admin.register(UserProfile)
@@ -300,6 +409,8 @@ class UserProfileAdmin(admin.ModelAdmin):
         for field_name in ('imap_password', 'smtp_password'):
             if field_name in form.base_fields:
                 form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        if 'smtp_signature' in form.base_fields:
+            form.base_fields['smtp_signature'].widget = RichSignatureWidget()
         return form
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -423,6 +534,7 @@ class UserProfileAdmin(admin.ModelAdmin):
                 ('smtp_use_tls', 'smtp_use_ssl'),
                 'smtp_user', 'smtp_password',
                 'smtp_from',
+                'smtp_signature',
             ),
             'classes': ('collapse',),
             'description': (
