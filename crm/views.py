@@ -247,6 +247,22 @@ def ai_compose_email_for_customer(request, customer_pk):
     })
 
 
+def _imap_save_sent(raw_bytes, imap_host, imap_port, imap_use_ssl,
+                    imap_user, imap_password, imap_sent_folder):
+    """Append a copy of the sent message to the IMAP Sent folder (best-effort)."""
+    import imaplib
+    folder = imap_sent_folder or 'INBOX.Sent'
+    try:
+        cls = imaplib.IMAP4_SSL if imap_use_ssl else imaplib.IMAP4
+        M = cls(imap_host, int(imap_port))
+        M.login(imap_user, imap_password)
+        M.append(folder, r'\Seen', None, raw_bytes)
+        M.logout()
+        logger.info("IMAP: saved sent copy to %s@%s/%s", imap_user, imap_host, folder)
+    except Exception as e:
+        logger.warning("IMAP save-sent failed (%s@%s): %s", imap_user, imap_host, e)
+
+
 @staff_member_required
 @require_POST
 def send_customer_email(request, customer_pk):
@@ -353,6 +369,22 @@ def send_customer_email(request, customer_pk):
         )
         msg.attach_alternative(html_body, 'text/html')
         msg.send()
+        # Save copy to IMAP Sent folder (best-effort, never blocks the response)
+        raw_bytes = msg.message().as_bytes()
+        if profile and getattr(profile, 'imap_enabled', False) and profile.imap_host and profile.imap_user:
+            _imap_save_sent(
+                raw_bytes,
+                profile.imap_host, profile.imap_port, profile.imap_use_ssl,
+                profile.imap_user, profile.imap_password,
+                getattr(profile, 'imap_sent_folder', 'INBOX.Sent'),
+            )
+        elif ns.imap_enabled and ns.imap_host and ns.imap_user:
+            _imap_save_sent(
+                raw_bytes,
+                ns.imap_host, ns.imap_port, ns.imap_use_ssl,
+                ns.imap_user, ns.imap_password,
+                getattr(ns, 'imap_sent_folder', 'INBOX.Sent'),
+            )
     except Exception as e:
         logger.exception("CRM send_customer_email error: %s", e)
         return JsonResponse({'error': f'Помилка відправки: {e}'}, status=500)
