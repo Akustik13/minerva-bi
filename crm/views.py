@@ -251,12 +251,14 @@ def _imap_save_sent(raw_bytes, imap_host, imap_port, imap_use_ssl,
                     imap_user, imap_password, imap_sent_folder):
     """Append a copy of the sent message to the IMAP Sent folder (best-effort)."""
     import imaplib
-    folder = imap_sent_folder or 'INBOX.Sent'
+    folder = (imap_sent_folder or 'INBOX.Sent').strip().strip('"')
+    # IMAP requires double-quotes around folder names that contain spaces or non-ASCII
+    quoted_folder = f'"{folder}"'
     try:
         cls = imaplib.IMAP4_SSL if imap_use_ssl else imaplib.IMAP4
         M = cls(imap_host, int(imap_port))
         M.login(imap_user, imap_password)
-        M.append(folder, r'\Seen', None, raw_bytes)
+        M.append(quoted_folder, r'\Seen', None, raw_bytes)
         M.logout()
         logger.info("IMAP: saved sent copy to %s@%s/%s", imap_user, imap_host, folder)
     except Exception as e:
