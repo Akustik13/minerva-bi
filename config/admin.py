@@ -215,6 +215,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 ("email_use_tls", "email_use_ssl"),
                 "email_host_user", "email_host_password",
                 "email_from", "email_to",
+                "email_signature_template",
             ),
             "description": (
                 "Gmail: host=smtp.gmail.com, port=587, TLS=✓. "

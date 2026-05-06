@@ -248,6 +248,82 @@ def ai_compose_email_for_customer(request, customer_pk):
 
 
 @staff_member_required
+@require_POST
+def send_customer_email(request, customer_pk):
+    """POST: Надіслати email клієнту безпосередньо з CRM-картки."""
+    import html as _html
+    from django.core.mail import EmailMultiAlternatives, get_connection
+    from django.shortcuts import get_object_or_404
+    from config.models import NotificationSettings
+    from crm.models import Customer, CustomerTimeline
+
+    customer = get_object_or_404(Customer, pk=customer_pk)
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    to_raw    = (data.get('to') or '').strip()
+    cc_raw    = (data.get('cc') or '').strip()
+    subject   = (data.get('subject') or '').strip()
+    body_text = (data.get('body') or '').strip()
+
+    if not to_raw or not body_text:
+        return JsonResponse({'error': 'Вкажіть отримувача та текст листа'}, status=400)
+
+    to_list = [e.strip() for e in to_raw.split(',') if e.strip()]
+    cc_list = [e.strip() for e in cc_raw.split(',') if e.strip()]
+
+    ns = NotificationSettings.get()
+    if not ns.email_enabled or not ns.email_host_user:
+        return JsonResponse(
+            {'error': 'SMTP не налаштований. Перевірте Config → Notifications.'}, status=400
+        )
+
+    user_name = request.user.get_full_name() or request.user.username
+    sig_tpl   = (ns.email_signature_template or 'З повагою,\n{name}').replace('{name}', user_name)
+    full_body = body_text + '\n\n' + sig_tpl
+
+    html_body = (
+        '<pre style="font-family:inherit;font-size:14px;line-height:1.6;white-space:pre-wrap">'
+        + _html.escape(full_body) + '</pre>'
+    )
+    from_email = (ns.email_from or ns.email_host_user).strip()
+
+    try:
+        connection = get_connection(
+            backend='django.core.mail.backends.smtp.EmailBackend',
+            host=ns.email_host, port=ns.email_port,
+            username=ns.email_host_user, password=ns.email_host_password,
+            use_tls=ns.email_use_tls, use_ssl=ns.email_use_ssl,
+            fail_silently=False,
+        )
+        msg = EmailMultiAlternatives(
+            subject=subject or f'Лист клієнту {customer.name}',
+            body=full_body,
+            from_email=from_email,
+            to=to_list,
+            cc=cc_list or None,
+            connection=connection,
+        )
+        msg.attach_alternative(html_body, 'text/html')
+        msg.send()
+    except Exception as e:
+        logger.exception("CRM send_customer_email error: %s", e)
+        return JsonResponse({'error': f'Помилка відправки: {e}'}, status=500)
+
+    CustomerTimeline.objects.create(
+        customer=customer,
+        user=request.user,
+        event_type='email_out',
+        title=subject or f'Лист клієнту {customer.name}',
+        body=full_body,
+        ai_summary='',
+    )
+    return JsonResponse({'ok': True})
+
+
+@staff_member_required
 def customer_timeline_json(request, customer_pk):
     """GET: хронологія клієнта | POST: додати нотатку/нагадування."""
     from crm.models import CustomerTimeline, Customer

@@ -18,4 +18,7 @@ urlpatterns = [
     path('customer/<int:customer_pk>/ai-strategy/apply/',
          views.ai_apply_strategy,
          name='crm_ai_strategy_apply'),
+    path('customer/<int:customer_pk>/send-email/',
+         views.send_customer_email,
+         name='crm_send_email'),
 ]

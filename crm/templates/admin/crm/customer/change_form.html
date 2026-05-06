@@ -159,6 +159,40 @@
                        background:transparent;color:var(--text);cursor:pointer">
           🔄 Ще варіант
         </button>
+        <button type="button" onclick="toggleSendPanel()"
+                style="padding:6px 14px;border-radius:6px;font-size:12px;
+                       border:1px solid var(--accent);
+                       background:transparent;color:var(--accent);cursor:pointer">
+          📤 Надіслати
+        </button>
+      </div>
+      <div id="email-send-panel" style="display:none;margin-top:12px;padding:12px;
+           border-radius:8px;background:var(--bg-input);border:1px solid var(--border-strong)">
+        <div style="display:grid;grid-template-columns:52px 1fr;gap:6px;align-items:center">
+          <label style="font-size:12px;color:var(--text-muted);text-align:right;padding-right:4px">Кому:</label>
+          <input id="email-to" type="text"
+                 style="padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);
+                        background:var(--bg-card);color:var(--text);font-size:13px;width:100%;box-sizing:border-box"
+                 placeholder="email@example.com">
+          <label style="font-size:12px;color:var(--text-muted);text-align:right;padding-right:4px">Копія:</label>
+          <input id="email-cc" type="text"
+                 style="padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);
+                        background:var(--bg-card);color:var(--text);font-size:13px;width:100%;box-sizing:border-box"
+                 placeholder="email1, email2 (через кому)">
+          <label style="font-size:12px;color:var(--text-muted);text-align:right;padding-right:4px">Тема:</label>
+          <input id="email-subject" type="text"
+                 style="padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);
+                        background:var(--bg-card);color:var(--text);font-size:13px;width:100%;box-sizing:border-box"
+                 placeholder="Тема листа">
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;align-items:center">
+          <button type="button" id="btn-send-email" onclick="sendEmailToCustomer()"
+                  style="padding:7px 18px;border-radius:6px;font-size:13px;font-weight:600;
+                         border:none;background:var(--accent);color:#fff;cursor:pointer">
+            📤 Надіслати
+          </button>
+          <span id="email-send-status" style="font-size:12px;color:var(--text-muted)"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -280,6 +314,7 @@
 
 <script>
 const CUSTOMER_PK = '{{ original.pk }}';
+const CUSTOMER_EMAIL = '{{ original.email|default:"" }}';
 const CSRF = (document.cookie.split(';').find(c=>c.trim().startsWith('csrftoken='))||'=').split('=')[1];
 
 const EVENT_COLORS = {
@@ -359,6 +394,51 @@ async function generateEmail() {
 function copyEmail() {
   navigator.clipboard.writeText(document.getElementById('email-result').textContent)
     .then(()=>{ const b=event.target; b.textContent='✓ Скопійовано'; setTimeout(()=>b.textContent='📋 Копіювати',2000); });
+}
+
+function toggleSendPanel() {
+  const panel = document.getElementById('email-send-panel');
+  const open  = panel.style.display !== 'none';
+  panel.style.display = open ? 'none' : 'block';
+  if (!open) {
+    const toField = document.getElementById('email-to');
+    if (!toField.value) toField.value = CUSTOMER_EMAIL;
+    const bodyText = document.getElementById('email-result').textContent || '';
+    const subjectField = document.getElementById('email-subject');
+    if (!subjectField.value) {
+      const m = bodyText.match(/^(?:Тема|Subject|Betreff)\s*:\s*(.+)/im);
+      subjectField.value = m ? m[1].trim() : '';
+    }
+  }
+}
+
+async function sendEmailToCustomer() {
+  const btn    = document.getElementById('btn-send-email');
+  const status = document.getElementById('email-send-status');
+  const body   = document.getElementById('email-result').textContent || '';
+  const to     = document.getElementById('email-to').value.trim();
+  const cc     = document.getElementById('email-cc').value.trim();
+  const subj   = document.getElementById('email-subject').value.trim();
+  if (!to)   { status.style.color='var(--err)'; status.textContent='⚠️ Вкажіть отримувача'; return; }
+  if (!body) { status.style.color='var(--err)'; status.textContent='⚠️ Текст листа порожній'; return; }
+  btn.disabled = true; status.style.color='var(--text-muted)'; status.textContent='Відправляю…';
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/send-email/`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify({to, cc, subject: subj, body}),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      status.style.color = 'var(--ok)'; status.textContent = '✓ Надіслано';
+      loadTimeline();
+    } else {
+      status.style.color = 'var(--err)'; status.textContent = '⚠️ ' + (d.error || 'Помилка');
+    }
+  } catch(e) {
+    status.style.color = 'var(--err)'; status.textContent = "⚠️ Помилка зв'язку";
+  }
+  btn.disabled = false;
 }
 
 const PREVIEW_LEN = 280;

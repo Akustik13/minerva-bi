@@ -345,6 +345,15 @@ class NotificationSettings(models.Model):
         "Отримувачі (To)", blank=True,
         help_text="Email-адреси через кому: admin@example.com, boss@company.com",
     )
+    email_signature_template = models.TextField(
+        "Шаблон підпису",
+        blank=True,
+        default="З повагою,\n{name}",
+        help_text=(
+            "Підпис, що автоматично додається до листів з CRM. "
+            "{name} замінюється на ім'я поточного користувача."
+        ),
+    )
 
     # ── IMAP (читання пошти) ──────────────────────────────────────────────────
     imap_enabled = models.BooleanField(
