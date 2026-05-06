@@ -294,6 +294,14 @@ class UserProfileAdmin(admin.ModelAdmin):
     search_fields = ('user__username', 'user__email', 'user__first_name', 'user__last_name')
     readonly_fields = ('effective_access_detail', 'denied_models_panel', 'module_operations_panel')
 
+    def get_form(self, request, obj=None, **kwargs):
+        from django.forms import PasswordInput
+        form = super().get_form(request, obj, **kwargs)
+        for field_name in ('imap_password', 'smtp_password'):
+            if field_name in form.base_fields:
+                form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        return form
+
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == 'bundle':
             kwargs['queryset']    = ModuleBundle.objects.all().order_by('name')
@@ -407,6 +415,22 @@ class UserProfileAdmin(admin.ModelAdmin):
                 'Листи цього юзера будуть читатися з його особистого ящика. '
                 'ionos: host=imap.ionos.de, port=993, SSL=✓, Sent=INBOX.Sent. '
                 'Команда: <code>python manage.py fetch_emails</code>'
+            ),
+        }),
+        ('📤 Особистий SMTP (відповіді клієнтам з CRM)', {
+            'fields': (
+                ('smtp_host', 'smtp_port'),
+                ('smtp_use_tls', 'smtp_use_ssl'),
+                'smtp_user', 'smtp_password',
+                'smtp_from',
+            ),
+            'classes': ('collapse',),
+            'description': (
+                'Якщо заповнено — листи з CRM (кнопка 📤 Надіслати) відправляються '
+                'з особистого ящика цього користувача. '
+                'Якщо порожньо — використовується глобальний SMTP (Config → Notifications). '
+                'ionos: host=smtp.ionos.de, port=587, TLS=✓. '
+                'Gmail: host=smtp.gmail.com, port=587, TLS=✓, потрібен App Password.'
             ),
         }),
         ('🤖 AI-асистент', {

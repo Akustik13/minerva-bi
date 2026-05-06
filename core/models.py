@@ -236,6 +236,34 @@ class UserProfile(models.Model):
         help_text='ionos: INBOX.Sent | Gmail: [Gmail]/Sent Mail',
     )
 
+    # ── Особистий SMTP (відповіді клієнтам з CRM) ────────────────────────────
+    smtp_host = models.CharField(
+        max_length=255, blank=True, verbose_name='SMTP Host',
+        help_text='ionos: smtp.ionos.de | Gmail: smtp.gmail.com',
+    )
+    smtp_port = models.PositiveSmallIntegerField(
+        default=587, verbose_name='SMTP Port',
+        help_text='TLS: 587 | SSL: 465',
+    )
+    smtp_use_tls = models.BooleanField(
+        default=True, verbose_name='TLS (STARTTLS)',
+        help_text='Зазвичай порт 587. Вимкни якщо використовуєш SSL (порт 465).',
+    )
+    smtp_use_ssl = models.BooleanField(
+        default=False, verbose_name='SSL',
+        help_text='Зазвичай порт 465. Несумісне з TLS — увімкни лише одне.',
+    )
+    smtp_user = models.CharField(
+        max_length=255, blank=True, verbose_name='SMTP Login (email)',
+    )
+    smtp_password = models.CharField(
+        max_length=255, blank=True, verbose_name='SMTP Password',
+    )
+    smtp_from = models.CharField(
+        max_length=255, blank=True, verbose_name='Від кого (From)',
+        help_text='Ім\'я та email: "Іван Петренко <ivan@example.com>". Якщо порожньо — використовується SMTP Login.',
+    )
+
     class Meta:
         verbose_name        = 'Профіль користувача'
         verbose_name_plural = 'Профілі користувачів'

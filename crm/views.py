@@ -275,9 +275,36 @@ def send_customer_email(request, customer_pk):
     cc_list = [e.strip() for e in cc_raw.split(',') if e.strip()]
 
     ns = NotificationSettings.get()
-    if not ns.email_enabled or not ns.email_host_user:
+
+    # Вибір SMTP: особистий профіль юзера → глобальний (NotificationSettings)
+    profile = getattr(request.user, 'profile', None)
+    if profile and profile.smtp_host and profile.smtp_user:
+        smtp_params = dict(
+            host=profile.smtp_host,
+            port=profile.smtp_port,
+            username=profile.smtp_user,
+            password=profile.smtp_password,
+            use_tls=profile.smtp_use_tls,
+            use_ssl=profile.smtp_use_ssl,
+        )
+        from_email = (profile.smtp_from or profile.smtp_user).strip()
+        smtp_source = 'personal'
+    elif ns.email_enabled and ns.email_host_user:
+        smtp_params = dict(
+            host=ns.email_host,
+            port=ns.email_port,
+            username=ns.email_host_user,
+            password=ns.email_host_password,
+            use_tls=ns.email_use_tls,
+            use_ssl=ns.email_use_ssl,
+        )
+        from_email = (ns.email_from or ns.email_host_user).strip()
+        smtp_source = 'global'
+    else:
         return JsonResponse(
-            {'error': 'SMTP не налаштований. Перевірте Config → Notifications.'}, status=400
+            {'error': 'SMTP не налаштований. Заповніть особистий SMTP у профілі '
+                      'або увімкніть глобальний (Config → Notifications).'},
+            status=400,
         )
 
     user_name = request.user.get_full_name() or request.user.username
@@ -288,14 +315,11 @@ def send_customer_email(request, customer_pk):
         '<pre style="font-family:inherit;font-size:14px;line-height:1.6;white-space:pre-wrap">'
         + _html.escape(full_body) + '</pre>'
     )
-    from_email = (ns.email_from or ns.email_host_user).strip()
 
     try:
         connection = get_connection(
             backend='django.core.mail.backends.smtp.EmailBackend',
-            host=ns.email_host, port=ns.email_port,
-            username=ns.email_host_user, password=ns.email_host_password,
-            use_tls=ns.email_use_tls, use_ssl=ns.email_use_ssl,
+            **smtp_params,
             fail_silently=False,
         )
         msg = EmailMultiAlternatives(
@@ -320,7 +344,7 @@ def send_customer_email(request, customer_pk):
         body=full_body,
         ai_summary='',
     )
-    return JsonResponse({'ok': True})
+    return JsonResponse({'ok': True, 'smtp': smtp_source})
 
 
 @staff_member_required
