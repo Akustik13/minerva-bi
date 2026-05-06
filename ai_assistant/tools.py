@@ -490,9 +490,14 @@ def _compose_email(inp, profile):
         "purpose":     inp.get('purpose', 'follow_up'),
         "language":    inp.get('language', 'uk'),
         "instruction": (
-            f"Склади лист клієнту {name} з метою: {inp.get('purpose', 'follow_up')}. "
+            f"Склади email клієнту {name} з метою: {inp.get('purpose', 'follow_up')}. "
             f"Мова: {inp.get('language', 'uk')}. Тон: професійний але дружній. "
-            "Поверни тему та текст листа."
+            "Відповідай СТРОГО у такому форматі (без відхилень):\n\n"
+            "**📧 SUBJECT:** (тема листа одним рядком)\n\n"
+            "**📧 TEXT:**\n\n"
+            "(текст листа)\n\n"
+            "---\n\n"
+            f"**📧 Sending to:** {customer_data.get('email', '')}\n"
         ),
     }
 
