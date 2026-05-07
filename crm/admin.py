@@ -471,13 +471,17 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             if not order.email and not order.client:
                 stats["skipped"] += 1
                 continue
-            contact = getattr(order, 'contact_name', '') or ''
-            client  = order.client or ''
-            if contact and client:
-                # B2B: ключ за назвою компанії — як у signals.py
-                key       = Customer.generate_key('b2b', client)
-                cust_name    = contact
-                cust_company = client
+            ship_company = getattr(order, 'ship_company', '') or ''
+            contact      = getattr(order, 'contact_name', '') or ''
+            client       = order.client or ''
+            is_b2b = bool(ship_company) or (
+                contact and client and contact.lower() != client.lower()
+            )
+            if is_b2b:
+                company_name = ship_company or client
+                key          = Customer.generate_key('b2b', company_name)
+                cust_name    = contact or client
+                cust_company = company_name
             else:
                 key = Customer.generate_key(
                     order.email or order.client,
@@ -518,10 +522,10 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 if not customer.phone and order.phone:
                     customer.phone = order.phone
                     updated = True
-                # Виправити company/name якщо contact_name став відомий
-                if contact and not customer.company:
-                    customer.name    = contact
-                    customer.company = client
+                # Виправити company/name якщо стало відомо що B2B
+                if is_b2b and not customer.company:
+                    customer.name    = contact or client
+                    customer.company = ship_company or client
                     updated = True
                 if updated:
                     customer.save()

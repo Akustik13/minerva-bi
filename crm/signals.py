@@ -24,19 +24,26 @@ def auto_sync_customer(sender, instance, created, **kwargs):
 
     from crm.models import Customer
 
-    contact = getattr(instance, 'contact_name', '') or ''
-    client  = instance.client or ''
+    ship_company = getattr(instance, 'ship_company', '') or ''
+    contact      = getattr(instance, 'contact_name', '') or ''
+    client       = instance.client or ''
 
-    if contact and client:
-        # B2B: ключ за назвою компанії — всі контакти однієї компанії → 1 запис
-        key              = Customer.generate_key('b2b', client)
+    # B2B якщо: явно вказана компанія-отримувач (ship_company) АБО
+    # контакт і клієнт різні (ручне введення: "Acme Corp" / "John Smith")
+    is_b2b = bool(ship_company) or (
+        contact and client and contact.lower() != client.lower()
+    )
+
+    if is_b2b:
+        company_name     = ship_company or client
+        key              = Customer.generate_key('b2b', company_name)
         customer_name    = contact or client
-        customer_company = client
+        customer_company = company_name
     else:
-        # B2C або невідомо: ключ за email + ім'ям
+        # B2C: ключ за email + ім'ям
         key = Customer.generate_key(
-            instance.email or instance.client,
-            instance.client or instance.email
+            instance.email or client,
+            client or instance.email
         )
         customer_name    = client or (instance.email.split('@')[0] if instance.email else '')
         customer_company = ''
@@ -49,8 +56,9 @@ def auto_sync_customer(sender, instance, created, **kwargs):
     customer = Customer.objects.filter(external_key=key).first()
 
     # Fallback для B2B: знайти за назвою компанії (для старих записів зі старим ключем)
-    if customer is None and contact and client:
-        customer = Customer.objects.filter(company__iexact=client).first()
+    if customer is None and is_b2b:
+        company_name = ship_company or client
+        customer = Customer.objects.filter(company__iexact=company_name).first()
         if customer:
             # Переводимо існуючий запис на новий B2B-ключ
             customer.external_key = key
@@ -70,8 +78,8 @@ def auto_sync_customer(sender, instance, created, **kwargs):
             addr_state=(instance.addr_state or '')[:2],
             source=instance.source,
         )
-    elif contact and client and not customer.company:
-        customer.company = client
+    elif is_b2b and not customer.company:
+        customer.company = ship_company or client
         customer.save(update_fields=['company'])
 
     # Оновлюємо SalesOrder з customer_key
