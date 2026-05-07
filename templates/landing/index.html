@@ -4,488 +4,431 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{{ company_name }} — Business Intelligence</title>
+<title>{{ company_name }} — Business Intelligence System</title>
 <meta name="description" content="{{ company_tagline }}">
-<link rel="manifest" href="/manifest.json">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+
 :root {
   --gold:       #c9a84c;
   --gold-light: #e8d5a3;
   --gold-dark:  #8b6914;
   --bg:         #080b0f;
   --bg2:        #0d1117;
-  --bg3:        #111820;
   --surface:    rgba(201,168,76,0.04);
-  --border:     rgba(201,168,76,0.18);
-  --border-s:   rgba(201,168,76,0.35);
+  --border:     rgba(201,168,76,0.15);
   --text:       #f5edd1;
-  --muted:      rgba(245,237,209,0.55);
+  --muted:      rgba(245,237,209,0.65);
   --dim:        rgba(201,168,76,0.35);
-  --ok:         #4ade80;
-  --err:        #e05a5a;
-  --r:          10px;
 }
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
 html { scroll-behavior:smooth; }
 body {
+  font-family:'Crimson Pro', Georgia, serif;
   background:var(--bg);
   color:var(--text);
-  font-family:'Crimson Pro', Georgia, serif;
-  font-size:16px; line-height:1.6;
+  min-height:100vh;
   overflow-x:hidden;
 }
 
-/* ── Language visibility ── */
+/* ── Language ── */
 [data-li] { display:none; }
 
-/* ── Stars canvas ── */
-#stars-canvas { position:fixed; inset:0; z-index:0; pointer-events:none; }
+/* ── Stars ── */
+.stars { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.star {
+  position:absolute; background:#fff; border-radius:50%;
+  animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s);
+}
+@keyframes twinkle {
+  0%,100% { opacity:var(--min,.1); transform:scale(1); }
+  50%      { opacity:var(--max,.7); transform:scale(1.3); }
+}
 
-/* ── Global glow ── */
+/* ── Glow ── */
 .glow-bg {
   position:fixed; inset:0; z-index:0; pointer-events:none;
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(201,168,76,0.08) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 30% at 85% 95%, rgba(139,105,20,0.05) 0%, transparent 50%);
+    radial-gradient(ellipse 60% 50% at 50% -10%, rgba(201,168,76,0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 30% at 80% 80%, rgba(139,105,20,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 30% 40% at 10% 60%, rgba(201,168,76,0.05) 0%, transparent 50%);
 }
-
-/* ── Top shimmer line ── */
 .line-top {
   position:fixed; top:0; left:0; right:0; height:1px; z-index:200;
   background:linear-gradient(90deg, transparent, var(--gold), transparent);
-  animation:shimmer 5s ease-in-out infinite;
+  animation:shimmer 4s ease-in-out infinite;
 }
-@keyframes shimmer { 0%,100%{opacity:.25} 50%{opacity:.9} }
+@keyframes shimmer { 0%,100%{opacity:.4} 50%{opacity:1} }
 
-/* ── NAV ── */
-nav {
-  position:fixed; top:0; left:0; right:0; z-index:100;
-  background:rgba(8,11,15,0.88);
-  backdrop-filter:blur(14px);
-  border-bottom:1px solid var(--border);
+/* ── Header ── */
+header {
+  position:fixed; top:0; left:0; right:0; z-index:50;
+  padding:16px 48px;
   display:flex; align-items:center; justify-content:space-between;
-  padding:0 40px; height:64px;
+  background:linear-gradient(to bottom, rgba(8,11,15,0.95), rgba(8,11,15,0));
 }
-.nav-logo {
-  display:flex; align-items:center; gap:12px;
+.logo-small {
+  display:flex; align-items:center; gap:10px;
   text-decoration:none;
+  animation:fadeInDown .8s ease both;
 }
-.nav-logo-owl {
-  font-size:24px;
-  filter:drop-shadow(0 0 8px rgba(201,168,76,0.5));
-}
-.nav-logo-text {
-  font-family:'Cinzel', serif;
-  font-size:16px; font-weight:700; letter-spacing:4px; text-transform:uppercase;
+.logo-small span {
+  font-family:'Cinzel', serif; font-size:16px; font-weight:700;
   background:linear-gradient(135deg, var(--gold-light), var(--gold));
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  background-clip:text;
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  letter-spacing:3px;
 }
-.nav-right { display:flex; align-items:center; gap:16px; }
+.header-nav { display:flex; align-items:center; gap:10px; animation:fadeInDown .8s ease .2s both; }
 .li-btns { display:flex; gap:4px; }
 .li-btns button {
   background:transparent; border:1px solid var(--border);
   color:var(--muted); padding:4px 10px; border-radius:4px;
-  font-family:'Cinzel', serif; font-size:10px; letter-spacing:1px;
+  font-family:'Cinzel', serif; font-size:9px; letter-spacing:1px;
   cursor:pointer; transition:.2s;
 }
 .li-btns button.active,
 .li-btns button:hover { border-color:var(--gold); color:var(--gold); }
-.btn-nav-login {
-  font-family:'Cinzel', serif; font-size:10px;
-  font-weight:600; letter-spacing:2.5px; text-transform:uppercase;
-  color:var(--bg); border:none; border-radius:5px;
-  padding:9px 22px; cursor:pointer;
-  background:linear-gradient(90deg, #8b6914 0%, #c9a84c 55%, #e8c85a 100%);
-  text-decoration:none;
-  transition:transform .2s, box-shadow .3s;
-  box-shadow:0 3px 14px rgba(201,168,76,0.3);
+.nav-btn {
+  padding:8px 22px; border-radius:4px;
+  font-family:'Cinzel', serif; font-size:10px; font-weight:600;
+  letter-spacing:2px; text-transform:uppercase;
+  text-decoration:none; border:1px solid var(--border);
+  color:var(--gold-light); background:transparent;
+  transition:all .3s; cursor:pointer;
 }
-.btn-nav-login:hover { transform:translateY(-1px); box-shadow:0 5px 22px rgba(201,168,76,0.45); }
-
-@media(max-width:600px) {
-  nav { padding:0 20px; }
-  .li-btns { display:none; }
-  .nav-logo-text { font-size:13px; }
+.nav-btn:hover { background:rgba(201,168,76,0.1); border-color:var(--gold); box-shadow:0 0 20px rgba(201,168,76,0.2); }
+.nav-btn.primary {
+  background:linear-gradient(135deg, rgba(201,168,76,0.2), rgba(201,168,76,0.1));
+  border-color:var(--gold);
 }
+.nav-btn.primary:hover { background:linear-gradient(135deg, rgba(201,168,76,0.35), rgba(201,168,76,0.2)); box-shadow:0 0 30px rgba(201,168,76,0.35); }
 
-/* ── HERO ── */
+/* ── Hero ── */
 .hero {
   position:relative; z-index:10;
   min-height:100vh;
   display:flex; flex-direction:column;
   align-items:center; justify-content:center;
   text-align:center;
-  padding:100px 24px 80px;
+  padding:120px 40px 80px;
 }
 
-/* Велика сова */
-.hero-owl-wrap {
-  position:relative;
-  width:140px; height:140px;
-  margin:0 auto 48px;
-  display:flex; align-items:center; justify-content:center;
+/* ── Owl ── */
+.owl-container {
+  position:relative; margin-bottom:40px;
+  animation:riseUp 1.2s cubic-bezier(.16,1,.3,1) both;
 }
-.hero-ring1 {
-  position:absolute; inset:-20px;
-  border:1px solid rgba(201,168,76,0.2);
-  border-radius:50%;
-  animation:spin 28s linear infinite;
-}
-.hero-ring1::before,
-.hero-ring1::after {
-  content:'✦'; position:absolute;
-  font-size:11px; color:var(--gold);
-}
-.hero-ring1::before { top:-7px; left:50%; transform:translateX(-50%); }
-.hero-ring1::after  { bottom:-7px; left:50%; transform:translateX(-50%); }
-.hero-ring2 {
-  position:absolute; inset:-44px;
-  border:1px solid rgba(201,168,76,0.1);
-  border-radius:50%;
-  animation:spin 46s linear infinite reverse;
-}
-.hero-ring2::before {
-  content:'◆'; position:absolute;
-  top:50%; right:-8px; transform:translateY(-50%);
-  font-size:10px; color:rgba(201,168,76,0.4);
-}
-.hero-ring3 {
-  position:absolute; inset:-68px;
-  border:1px solid rgba(201,168,76,0.05);
-  border-radius:50%;
-  animation:spin 70s linear infinite;
-}
-@keyframes spin { to { transform:rotate(360deg); } }
-.hero-owl-icon {
-  font-size:72px;
-  filter:drop-shadow(0 0 30px rgba(201,168,76,0.6));
-  animation:float 7s ease-in-out infinite;
-  line-height:1;
+.owl-svg {
+  width:160px; height:160px;
+  filter:drop-shadow(0 0 40px rgba(201,168,76,0.5))
+         drop-shadow(0 0 80px rgba(201,168,76,0.2))
+         drop-shadow(0 4px 20px rgba(0,0,0,0.6));
+  animation:float 6s ease-in-out infinite;
+  display:block;
 }
 @keyframes float {
-  0%,100% { transform:translateY(0); }
-  50%      { transform:translateY(-12px); }
+  0%,100% { transform:translateY(0) rotate(-.5deg); }
+  50%      { transform:translateY(-15px) rotate(.5deg); }
 }
+.owl-ring {
+  position:absolute; inset:-20px;
+  border:1px solid rgba(201,168,76,0.25);
+  border-radius:50%;
+  animation:rotateSlow 20s linear infinite;
+  box-shadow:0 0 30px rgba(201,168,76,0.15);
+}
+.owl-ring::before {
+  content:'✦'; position:absolute; top:-6px; left:50%; transform:translateX(-50%);
+  font-size:12px; color:var(--gold);
+}
+.owl-ring2 {
+  position:absolute; inset:-40px;
+  border:1px solid rgba(201,168,76,0.15);
+  border-radius:50%;
+  animation:rotateSlow 35s linear infinite reverse;
+}
+@keyframes rotateSlow { to { transform:rotate(360deg); } }
 
-.hero-title {
-  font-family:'Cinzel Decorative', 'Cinzel', serif;
-  font-size:clamp(36px,7vw,80px);
-  font-weight:700;
-  letter-spacing:8px; text-transform:uppercase;
-  line-height:1;
-  background:linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 50%, #a07820 100%);
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  background-clip:text;
-  margin-bottom:12px;
-}
-.hero-subtitle {
-  font-family:'Cinzel', serif;
-  font-size:clamp(10px,1.5vw,13px);
+/* ── Hero text ── */
+.eyebrow {
+  font-family:'Cinzel', serif; font-size:12px; font-weight:600;
   letter-spacing:5px; text-transform:uppercase;
-  color:rgba(201,168,76,0.45);
-  margin-bottom:28px;
+  color:var(--gold-light); margin-bottom:20px;
+  animation:fadeIn 1s ease .4s both;
+  text-shadow:0 0 15px rgba(201,168,76,0.6),0 2px 4px rgba(0,0,0,0.8),
+              -1px -1px 0 rgba(0,0,0,0.5),1px 1px 0 rgba(0,0,0,0.5);
+}
+.eyebrow::before,.eyebrow::after { content:'—'; margin:0 12px; opacity:.6; }
+h1 {
+  font-family:'Cinzel', serif;
+  font-size:clamp(48px,8vw,96px);
+  font-weight:900; line-height:.95;
+  letter-spacing:-1px; margin-bottom:24px;
+  animation:riseUp 1s cubic-bezier(.16,1,.3,1) .3s both;
+}
+h1 .line1 {
+  display:block;
+  background:linear-gradient(135deg, #f5edd1, var(--gold-light), var(--gold));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  filter:drop-shadow(0 0 30px rgba(201,168,76,0.4));
+}
+h1 .line2 {
+  display:block; font-size:55%;
+  color:rgba(245,237,209,0.45); font-weight:400;
+  letter-spacing:8px; margin-top:8px;
+  text-shadow:0 0 20px rgba(201,168,76,0.4),0 2px 6px rgba(0,0,0,0.7);
+}
+.tagline {
+  font-size:clamp(17px,2vw,21px);
+  color:var(--muted); font-style:italic;
+  max-width:560px; line-height:1.7; margin-bottom:16px;
+  animation:fadeIn 1s ease .6s both;
+  text-shadow:0 1px 4px rgba(0,0,0,0.8),0 0 10px rgba(0,0,0,0.5);
+}
+.tagline em { color:var(--gold-light); font-style:normal; font-weight:600; text-shadow:0 0 15px rgba(201,168,76,0.5); }
+.latin-quote {
+  font-family:'Cinzel', serif; font-size:12px;
+  color:rgba(201,168,76,0.5); letter-spacing:3px;
+  margin-bottom:52px;
+  animation:fadeIn 1s ease .8s both;
+  text-shadow:0 1px 3px rgba(0,0,0,0.7);
 }
 
-/* Орнаментальна лінія під заголовком */
-.hero-sep {
-  display:flex; align-items:center; gap:16px;
-  justify-content:center; margin-bottom:28px;
-}
-.hero-sep-line { width:80px; height:1px; background:linear-gradient(to right, transparent, var(--border)); }
-.hero-sep-line.r { background:linear-gradient(to left, transparent, var(--border)); }
-.hero-sep-icon { font-size:14px; color:var(--dim); }
-
-.hero-tagline {
-  font-family:'Crimson Pro', Georgia, serif;
-  font-size:clamp(16px,2.2vw,22px);
-  font-style:italic;
-  color:var(--muted);
-  max-width:580px;
-  margin:0 auto 40px;
-  line-height:1.7;
-}
-.hero-btns {
+/* ── CTA ── */
+.cta-group {
   display:flex; gap:16px; flex-wrap:wrap; justify-content:center;
+  animation:riseUp .8s ease 1s both;
 }
-.btn-hero-primary {
-  font-family:'Cinzel', serif; font-size:11px;
-  font-weight:600; letter-spacing:2.5px; text-transform:uppercase;
-  color:var(--bg); border:none; border-radius:6px;
-  padding:14px 36px; cursor:pointer;
-  background:linear-gradient(90deg, #7a5810 0%, #a8792a 25%, #c9a84c 55%, #d4a83a 80%, #e8c85a 100%);
-  text-decoration:none;
-  transition:transform .2s, box-shadow .3s;
-  box-shadow:0 4px 20px rgba(201,168,76,0.3);
+.cta-main {
   position:relative; overflow:hidden;
+  padding:16px 44px; border-radius:4px;
+  font-family:'Cinzel', serif; font-size:13px; font-weight:700;
+  letter-spacing:4px; text-transform:uppercase;
+  text-decoration:none; color:var(--bg);
+  background:linear-gradient(90deg, #7a5810 0%, #a8792a 25%, #c9a84c 55%, #d4a83a 80%, #e8c85a 100%);
+  border:none; cursor:pointer;
+  transition:transform .2s, box-shadow .4s;
+  box-shadow:0 3px 14px rgba(0,0,0,0.5),0 0 8px rgba(201,168,76,0.12);
 }
-.btn-hero-primary::before {
+.cta-main::before {
   content:''; position:absolute;
-  top:0; left:-100%; width:60%; height:100%;
-  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-  transform:skewX(-20deg); transition:left .5s;
+  top:0; left:-75%; width:50%; height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,245,200,0.10) 40%,rgba(255,255,255,0.28) 50%,rgba(255,245,200,0.10) 60%,transparent);
+  transform:skewX(-18deg); opacity:0;
 }
-.btn-hero-primary:hover { transform:translateY(-2px); box-shadow:0 8px 32px rgba(201,168,76,0.45); }
-.btn-hero-primary:hover::before { left:150%; }
-.btn-hero-outline {
-  font-family:'Cinzel', serif; font-size:11px;
-  font-weight:600; letter-spacing:2.5px; text-transform:uppercase;
-  color:var(--gold); border:1px solid var(--border);
-  border-radius:6px; padding:14px 36px;
-  text-decoration:none;
-  transition:border-color .25s, color .25s, background .25s;
+.cta-main:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(201,168,76,0.45),0 3px 12px rgba(0,0,0,0.55); }
+.cta-main:hover::before { opacity:1; animation:btnShimmer 3.5s ease-in-out infinite; }
+@keyframes btnShimmer { 0%{left:-75%} 70%{left:125%} 100%{left:125%} }
+.cta-sec {
+  padding:16px 32px; border-radius:4px;
+  font-family:'Cinzel', serif; font-size:11px; font-weight:600;
+  letter-spacing:2px; text-transform:uppercase;
+  text-decoration:none; color:var(--gold-light);
+  border:1px solid var(--border); background:transparent; transition:all .3s;
 }
-.btn-hero-outline:hover { border-color:var(--gold); background:rgba(201,168,76,0.07); }
+.cta-sec:hover { border-color:var(--gold); background:rgba(201,168,76,0.08); box-shadow:0 0 25px rgba(201,168,76,0.2); }
 
-/* Scroll hint */
-.scroll-hint {
-  margin-top:64px;
-  font-family:'Cinzel', serif; font-size:9px;
-  letter-spacing:3px; text-transform:uppercase;
-  color:rgba(201,168,76,0.3);
-  display:flex; flex-direction:column; align-items:center; gap:10px;
+/* ── Divider ── */
+.divider {
+  display:flex; align-items:center; justify-content:center;
+  padding:50px 40px; gap:20px; position:relative; z-index:10;
 }
-.scroll-hint-arrow {
-  width:1px; height:40px;
-  background:linear-gradient(to bottom, var(--gold), transparent);
-  animation:scrollPulse 2.5s ease-in-out infinite;
-}
-@keyframes scrollPulse { 0%,100%{opacity:.2;transform:scaleY(.7)} 50%{opacity:.7;transform:scaleY(1)} }
+.divider-line { flex:1; height:1px; max-width:200px; background:linear-gradient(to right, transparent, var(--border), transparent); }
+.divider-icon { font-size:16px; color:var(--gold); opacity:.5; }
 
-/* ── SECTION BASE ── */
-section { position:relative; z-index:10; padding:90px 24px; }
-.container { max-width:1100px; margin:0 auto; }
-.section-ornament {
-  display:flex; align-items:center; gap:16px;
-  justify-content:center; margin-bottom:20px;
+/* ── Modules (marble style) ── */
+.modules {
+  position:relative; z-index:10;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:20px; padding:0 40px 60px; max-width:1200px; margin:0 auto;
 }
-.section-ornament-line { flex:1; max-width:120px; height:1px;
-  background:linear-gradient(to right, transparent, var(--border)); }
-.section-ornament-line.r { background:linear-gradient(to left, transparent, var(--border)); }
-.section-ornament-sym { font-size:14px; color:var(--dim); }
-.section-tag {
-  font-family:'Cinzel', serif; font-size:10px;
-  font-weight:600; letter-spacing:3px; text-transform:uppercase;
-  color:rgba(201,168,76,0.5); margin-bottom:14px; text-align:center;
+.module {
+  padding:32px 28px; border-radius:4px;
+  position:relative; overflow:hidden;
+  display:flex; flex-direction:column; gap:14px;
+  transition:transform .35s cubic-bezier(.16,1,.3,1), box-shadow .35s ease;
+  cursor:default;
+  background:
+    repeating-linear-gradient(118deg,transparent 0px,transparent 38px,rgba(201,168,76,0.06) 38px,rgba(201,168,76,0.06) 39px),
+    repeating-linear-gradient(47deg,transparent 0px,transparent 62px,rgba(232,213,163,0.04) 62px,rgba(232,213,163,0.04) 63px),
+    linear-gradient(160deg,#111720 0%,#0e1520 30%,#131c28 55%,#0d1219 80%,#111820 100%);
+  border:1px solid transparent;
+  background-clip:padding-box;
+  box-shadow:inset 0 0 0 1px rgba(201,168,76,0.30),inset 0 1px 0 rgba(232,213,163,0.20),
+             0 2px 12px rgba(0,0,0,0.5),0 1px 3px rgba(0,0,0,0.8);
+}
+.module::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,transparent,rgba(201,168,76,0.5) 20%,rgba(232,213,163,0.9) 50%,rgba(201,168,76,0.5) 80%,transparent);
+  opacity:.7; transition:opacity .35s;
+}
+.module::after {
+  content:''; position:absolute; inset:0;
+  background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(201,168,76,0.06) 0%,transparent 70%);
+  pointer-events:none;
+}
+.module:hover { transform:translateY(-5px); box-shadow:inset 0 0 0 1px rgba(201,168,76,0.65),inset 0 1px 0 rgba(232,213,163,0.35),0 12px 40px rgba(0,0,0,0.6),0 0 30px rgba(201,168,76,0.18); }
+.module:hover::before { opacity:1; }
+.module-icon { font-size:28px; line-height:1; filter:drop-shadow(0 0 8px rgba(201,168,76,0.5)); }
+.module-name {
+  font-family:'Cinzel', serif; font-size:16px; font-weight:700;
+  letter-spacing:2px; text-transform:uppercase;
+  background:linear-gradient(135deg,#f5e6b8 0%,#e0c45a 40%,#c9a84c 70%,#a8892f 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+  filter:drop-shadow(0 1px 4px rgba(0,0,0,0.8));
+}
+.module-desc {
+  font-size:14px; line-height:1.65;
+  color:rgba(220,205,170,0.72);
+  text-shadow:0 1px 3px rgba(0,0,0,0.7);
+}
+
+/* ── Pricing ── */
+.pricing-section { position:relative; z-index:10; padding:0 40px 80px; }
+.pricing-inner { max-width:1000px; margin:0 auto; }
+.section-eyebrow {
+  font-family:'Cinzel', serif; font-size:10px; font-weight:600;
+  letter-spacing:5px; text-transform:uppercase;
+  color:var(--gold-light); margin-bottom:14px; text-align:center;
+  text-shadow:0 0 15px rgba(201,168,76,0.4),0 2px 4px rgba(0,0,0,0.7);
 }
 .section-title {
-  font-family:'Cinzel', serif;
-  font-size:clamp(22px,3.5vw,36px); font-weight:700;
-  line-height:1.25; margin-bottom:14px; text-align:center;
-  background:linear-gradient(135deg, var(--gold-light), var(--gold));
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  background-clip:text;
+  font-family:'Cinzel', serif; font-size:clamp(24px,4vw,36px); font-weight:700;
+  text-align:center; margin-bottom:14px;
+  background:linear-gradient(135deg,#f5edd1,var(--gold-light),var(--gold));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
 }
 .section-sub {
-  font-family:'Crimson Pro', serif; font-size:17px; font-style:italic;
-  color:var(--muted); max-width:580px; line-height:1.7;
-  margin:0 auto 50px; text-align:center;
+  font-size:17px; font-style:italic; color:var(--muted);
+  text-align:center; margin-bottom:50px; line-height:1.7;
+  text-shadow:0 1px 4px rgba(0,0,0,0.6);
 }
-
-/* ── ORNAMENTAL DIVIDER ── */
-.ornamental-divider {
-  position:relative; z-index:10;
-  padding:20px 0;
-  display:flex; align-items:center; justify-content:center; gap:20px;
-}
-.div-line {
-  flex:1; height:1px;
-  background:linear-gradient(90deg, transparent, var(--border), transparent);
-}
-.div-center {
-  display:flex; align-items:center; gap:12px;
-  color:var(--dim); font-size:16px;
-}
-.div-center::before,
-.div-center::after { content:'—'; color:rgba(201,168,76,0.2); }
-
-/* ── FEATURES ── */
-.features-bg { background:var(--bg2); }
-.features-grid {
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
-  gap:24px;
-}
-.feat {
-  background:rgba(201,168,76,0.03);
-  border:1px solid var(--border);
-  border-radius:var(--r);
-  padding:32px 28px;
-  transition:.3s;
-  position:relative; overflow:hidden;
-}
-.feat::before {
-  content:''; position:absolute;
-  top:0; left:0; right:0; height:1px;
-  background:linear-gradient(90deg, transparent, rgba(201,168,76,0.3), transparent);
-  opacity:0; transition:.3s;
-}
-.feat:hover { border-color:var(--border-s); transform:translateY(-3px);
-              box-shadow:0 8px 30px rgba(201,168,76,0.08); }
-.feat:hover::before { opacity:1; }
-.feat-icon { font-size:30px; margin-bottom:18px; }
-.feat h3 {
-  font-family:'Cinzel', serif; font-size:14px;
-  font-weight:600; letter-spacing:1px;
-  color:var(--gold-light); margin-bottom:10px;
-}
-.feat p { font-size:14px; color:var(--muted); line-height:1.7; }
-
-/* ── PRICING ── */
 .pricing-grid {
-  display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-  gap:24px; align-items:start;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:20px; align-items:start;
 }
 .plan {
-  background:rgba(201,168,76,0.03);
-  border:1px solid var(--border);
-  border-radius:var(--r);
-  padding:36px 30px;
-  position:relative;
-  transition:.3s;
+  background:linear-gradient(160deg,#111720,#0d1219);
+  box-shadow:inset 0 0 0 1px rgba(201,168,76,0.25),0 4px 20px rgba(0,0,0,0.5);
+  border-radius:4px; padding:32px 26px; position:relative;
+  transition:box-shadow .3s,transform .3s;
 }
-.plan:hover { border-color:var(--border-s); }
-.plan.featured {
-  border-color:rgba(201,168,76,0.4);
-  background:linear-gradient(160deg, rgba(201,168,76,0.07) 0%, rgba(201,168,76,0.02) 100%);
-  transform:scale(1.03);
-}
+.plan:hover { transform:translateY(-4px); box-shadow:inset 0 0 0 1px rgba(201,168,76,0.5),0 12px 40px rgba(0,0,0,0.5),0 0 30px rgba(201,168,76,0.1); }
+.plan.featured { box-shadow:inset 0 0 0 1px rgba(201,168,76,0.5),0 4px 30px rgba(0,0,0,0.5),0 0 30px rgba(201,168,76,0.12); }
 .plan-badge {
-  position:absolute; top:-14px; left:50%; transform:translateX(-50%);
-  font-family:'Cinzel', serif; font-size:10px; font-weight:700;
-  letter-spacing:2px; text-transform:uppercase;
-  background:linear-gradient(90deg, #8b6914, #c9a84c, #e8c85a);
-  color:var(--bg); padding:5px 18px; border-radius:20px; white-space:nowrap;
+  position:absolute; top:-13px; left:50%; transform:translateX(-50%);
+  font-family:'Cinzel', serif; font-size:9px; font-weight:700; letter-spacing:2px;
+  background:linear-gradient(90deg,#8b6914,#c9a84c,#e8c85a);
+  color:var(--bg); padding:4px 16px; border-radius:20px; white-space:nowrap;
 }
 .plan-name {
-  font-family:'Cinzel', serif; font-size:14px; font-weight:700;
-  letter-spacing:2px; text-transform:uppercase;
-  color:rgba(201,168,76,0.6); margin-bottom:12px;
+  font-family:'Cinzel', serif; font-size:12px; letter-spacing:3px; text-transform:uppercase;
+  color:rgba(201,168,76,0.5); margin-bottom:10px;
 }
 .plan-price {
-  font-family:'Cinzel Decorative', serif;
-  font-size:42px; font-weight:700;
-  background:linear-gradient(135deg, var(--gold-light), var(--gold));
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  background-clip:text; line-height:1;
+  font-family:'Cinzel', serif; font-size:38px; font-weight:700; line-height:1;
+  background:linear-gradient(135deg,var(--gold-light),var(--gold));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
 }
-.plan-price-sub { font-family:'Cinzel', serif; font-size:11px; color:var(--muted); margin-top:4px; }
-.plan-sep { height:1px; background:var(--border); margin:20px 0; }
+.plan-price-note { font-family:'Cinzel', serif; font-size:10px; color:var(--muted); margin:4px 0 16px; letter-spacing:1px; }
+.plan-sep { height:1px; background:var(--border); margin:16px 0; }
 .plan-features { list-style:none; }
 .plan-features li {
-  font-family:'Crimson Pro', serif; font-size:15px;
-  color:var(--muted); padding:7px 0;
-  border-bottom:1px solid rgba(201,168,76,0.07);
-  display:flex; align-items:flex-start; gap:10px;
+  font-size:14px; color:var(--muted); padding:6px 0;
+  border-bottom:1px solid rgba(201,168,76,0.06);
+  display:flex; align-items:flex-start; gap:8px;
 }
 .plan-features li:last-child { border:none; }
-.plan-features li::before { content:'✦'; color:var(--gold); font-size:10px; margin-top:4px; flex-shrink:0; }
+.plan-features li::before { content:'✦'; color:var(--gold); font-size:9px; margin-top:4px; flex-shrink:0; }
 .plan-cta {
-  display:block; margin-top:24px; padding:12px 20px;
-  border-radius:6px; text-align:center;
-  font-family:'Cinzel', serif; font-size:10px;
-  font-weight:600; letter-spacing:2px; text-transform:uppercase;
+  display:block; margin-top:20px; padding:11px;
+  border-radius:4px; text-align:center;
+  font-family:'Cinzel', serif; font-size:9px; font-weight:700;
+  letter-spacing:3px; text-transform:uppercase;
   text-decoration:none; transition:.25s;
   border:1px solid var(--border); color:var(--gold);
 }
-.plan-cta:hover { border-color:var(--gold); background:rgba(201,168,76,0.07); }
-.plan-cta-featured {
-  background:linear-gradient(90deg, #7a5810, #c9a84c, #e8c85a);
+.plan-cta:hover { border-color:var(--gold); background:rgba(201,168,76,0.08); }
+.plan-cta-gold {
+  background:linear-gradient(90deg,#7a5810,#c9a84c,#e8c85a);
   color:var(--bg); border-color:transparent;
+  box-shadow:0 3px 14px rgba(0,0,0,0.4);
 }
-.plan-cta-featured:hover { box-shadow:0 4px 20px rgba(201,168,76,0.4); border-color:transparent; background:linear-gradient(90deg, #8b6914, #d4a83a, #f0d070); }
+.plan-cta-gold:hover { box-shadow:0 5px 20px rgba(201,168,76,0.35); border-color:transparent; }
 
-/* ── CONTACT ── */
-.contact-bg { background:var(--bg2); }
-.cf-wrap { max-width:560px; margin:0 auto; }
-.cf { display:flex; flex-direction:column; gap:14px; }
-.cf input, .cf textarea {
+/* ── Contact ── */
+.contact-section { position:relative; z-index:10; padding:0 40px 80px; }
+.contact-inner { max-width:560px; margin:0 auto; }
+.cf { display:flex; flex-direction:column; gap:12px; margin-top:36px; }
+.cf input,.cf textarea {
   background:rgba(201,168,76,0.04);
-  border:1px solid var(--border);
-  border-radius:6px;
-  color:var(--text);
-  padding:13px 16px;
+  border:1px solid var(--border); border-radius:4px;
+  color:var(--text); padding:12px 16px;
   font-family:'Crimson Pro', serif; font-size:16px;
   transition:.25s; width:100%; outline:none;
 }
-.cf input:focus, .cf textarea:focus {
-  border-color:rgba(201,168,76,0.5);
-  box-shadow:0 0 16px rgba(201,168,76,0.08);
-}
-.cf input::placeholder, .cf textarea::placeholder { color:rgba(245,237,209,0.25); }
-.cf textarea { min-height:130px; resize:vertical; }
+.cf input:focus,.cf textarea:focus { border-color:rgba(201,168,76,0.5); box-shadow:0 0 16px rgba(201,168,76,0.08); }
+.cf input::placeholder,.cf textarea::placeholder { color:rgba(245,237,209,0.2); }
+.cf textarea { min-height:120px; resize:vertical; }
 .cf button {
-  font-family:'Cinzel', serif; font-size:11px;
-  font-weight:600; letter-spacing:2.5px; text-transform:uppercase;
-  color:var(--bg); border:none; border-radius:6px;
-  padding:14px; cursor:pointer;
-  background:linear-gradient(90deg, #7a5810 0%, #a8792a 25%, #c9a84c 55%, #e8c85a 100%);
-  transition:transform .2s, box-shadow .3s;
-  box-shadow:0 4px 20px rgba(201,168,76,0.25);
+  font-family:'Cinzel', serif; font-size:10px; font-weight:700;
+  letter-spacing:3px; text-transform:uppercase;
+  color:var(--bg); border:none; border-radius:4px; padding:14px;
+  cursor:pointer;
+  background:linear-gradient(90deg,#7a5810,#c9a84c,#e8c85a);
+  transition:transform .2s,box-shadow .3s;
+  box-shadow:0 3px 14px rgba(0,0,0,0.4);
 }
-.cf button:hover { transform:translateY(-1px); box-shadow:0 6px 28px rgba(201,168,76,0.4); }
-.cf-msg {
-  margin-top:12px; padding:12px 16px; border-radius:6px;
-  font-size:15px; text-align:center;
-}
-.cf-msg.ok  { background:rgba(74,222,128,0.08); color:var(--ok); border:1px solid rgba(74,222,128,0.25); }
-.cf-msg.err { background:rgba(224,90,90,0.08); color:var(--err); border:1px solid rgba(224,90,90,0.2); }
+.cf button:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(201,168,76,0.35); }
+.cf-msg { margin-top:10px; padding:10px 14px; border-radius:4px; font-size:14px; text-align:center; }
+.cf-msg.ok  { background:rgba(74,222,128,0.08); color:#4ade80; border:1px solid rgba(74,222,128,0.22); }
+.cf-msg.err { background:rgba(224,90,90,0.08); color:#e05a5a; border:1px solid rgba(224,90,90,0.2); }
 
-/* ── FOOTER ── */
+/* ── Footer ── */
 footer {
   position:relative; z-index:10;
-  background:var(--bg2);
+  padding:70px 40px 50px; text-align:center;
   border-top:1px solid var(--border);
-  padding:50px 24px 28px;
+  max-width:800px; margin:0 auto;
 }
-.footer-inner { max-width:1100px; margin:0 auto; }
-.footer-top {
-  display:flex; flex-wrap:wrap; gap:40px;
-  justify-content:space-between; margin-bottom:36px;
+footer blockquote {
+  font-size:19px; line-height:1.85; font-style:italic;
+  color:var(--muted); margin-bottom:20px;
+  text-shadow:0 1px 4px rgba(0,0,0,0.7);
 }
-.footer-brand .footer-owl { font-size:32px; margin-bottom:8px; }
-.footer-brand-name {
-  font-family:'Cinzel', serif; font-size:18px; font-weight:700;
-  letter-spacing:4px; text-transform:uppercase;
-  background:linear-gradient(135deg, var(--gold-light), var(--gold));
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  background-clip:text;
+footer blockquote em { color:var(--gold-light); font-style:normal; text-shadow:0 0 12px rgba(201,168,76,0.4); }
+footer cite {
+  display:block; font-size:12px; font-style:normal;
+  letter-spacing:3px; color:rgba(201,168,76,0.45);
 }
-.footer-tagline { font-size:13px; font-style:italic; color:var(--muted); margin-top:6px; }
-.footer-col h4 {
-  font-family:'Cinzel', serif; font-size:9px;
-  letter-spacing:3px; text-transform:uppercase;
-  color:var(--dim); margin-bottom:16px;
-}
-.footer-links { display:flex; flex-direction:column; gap:10px; }
-.footer-links a {
-  font-family:'Crimson Pro', serif; font-size:14px;
-  color:var(--muted); text-decoration:none; transition:.2s;
-}
-.footer-links a:hover { color:var(--gold-light); }
 .footer-bottom {
-  border-top:1px solid var(--border); padding-top:22px;
-  display:flex; flex-wrap:wrap; gap:10px;
-  justify-content:space-between;
+  margin-top:48px; padding-top:24px;
+  border-top:1px solid var(--border);
   font-family:'Cinzel', serif; font-size:9px;
   letter-spacing:2px; color:rgba(201,168,76,0.3);
+  display:flex; flex-wrap:wrap; gap:8px; justify-content:center; align-items:center;
 }
+.footer-bottom a { color:rgba(201,168,76,0.4); text-decoration:none; }
+.footer-bottom a:hover { color:var(--gold-light); }
 
-/* ── RESPONSIVE ── */
+/* ── Animations ── */
+@keyframes riseUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn  { from{opacity:0} to{opacity:1} }
+@keyframes fadeInDown { from{opacity:0;transform:translateY(-10px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Responsive ── */
 @media(max-width:768px) {
+  .modules { grid-template-columns:1fr; padding:0 20px 60px; }
+  header { padding:14px 20px; }
   .hero { padding:90px 20px 60px; }
-  .hero-owl-wrap { width:110px; height:110px; }
-  .hero-ring3 { display:none; }
-  .plan.featured { transform:none; }
-  .footer-top { flex-direction:column; gap:28px; }
-  .footer-bottom { flex-direction:column; align-items:center; }
+  .pricing-section,.contact-section { padding:0 20px 60px; }
+  .li-btns { display:none; }
+  footer { padding:50px 20px 40px; }
 }
-@media(max-width:500px) {
+@media(max-width:480px) {
+  .cta-group { flex-direction:column; align-items:center; }
+  .cta-main,.cta-sec { width:100%; text-align:center; }
   .pricing-grid { grid-template-columns:1fr; }
-  .hero-btns { flex-direction:column; align-items:center; }
-  .btn-hero-primary, .btn-hero-outline { width:100%; text-align:center; }
 }
 </style>
 </head>
@@ -493,158 +436,117 @@ footer {
 
 <div class="line-top"></div>
 <div class="glow-bg"></div>
-<canvas id="stars-canvas"></canvas>
+<div class="stars" id="stars"></div>
 
-<!-- NAV -->
-<nav>
-  <a href="/" class="nav-logo">
-    <span class="nav-logo-owl">🦉</span>
-    <span class="nav-logo-text">{{ company_name }}</span>
+<!-- Header -->
+<header>
+  <a href="/" class="logo-small">
+    <span>{{ company_name }}</span>
   </a>
-  <div class="nav-right">
+  <div class="header-nav">
     <div class="li-btns">
       <button onclick="setLang('uk')" data-lang="uk">УКР</button>
       <button onclick="setLang('de')" data-lang="de">DE</button>
       <button onclick="setLang('en')" data-lang="en">EN</button>
     </div>
-    <a href="/admin/login/" class="btn-nav-login">
+    <a href="/admin/login/" class="nav-btn primary">
       <span data-li="uk">Увійти</span>
       <span data-li="de">Anmelden</span>
       <span data-li="en">Login</span>
     </a>
   </div>
-</nav>
+</header>
 
-<!-- HERO -->
+<!-- Hero -->
 <section class="hero">
-  <div class="hero-owl-wrap">
-    <div class="hero-ring3"></div>
-    <div class="hero-ring2"></div>
-    <div class="hero-ring1"></div>
-    <div class="hero-owl-icon">🦉</div>
+  <div class="owl-container">
+    <div class="owl-ring2"></div>
+    <div class="owl-ring"></div>
+    {% include "includes/owl.html" %}
   </div>
 
-  <h1 class="hero-title">Minerva</h1>
-  <p class="hero-subtitle">Business Intelligence System</p>
+  <p class="eyebrow">Business Intelligence System</p>
 
-  <div class="hero-sep">
-    <div class="hero-sep-line"></div>
-    <div class="hero-sep-icon">✦</div>
-    <div class="hero-sep-line r"></div>
-  </div>
+  <h1>
+    <span class="line1">Minerva</span>
+    <span class="line2">SAPIENTIA · VISIO · IMPERIUM</span>
+  </h1>
 
-  <p class="hero-tagline">
-    <span data-li="uk">{{ company_tagline }}. CRM, продажі, склад, доставка — все в одній системі.</span>
-    <span data-li="de">{{ company_tagline }}. CRM, Verkauf, Lager, Versand — alles in einem System.</span>
-    <span data-li="en">{{ company_tagline }}. CRM, sales, inventory, shipping — all in one system.</span>
+  <p class="tagline">
+    <span data-li="uk">Система що бачить крізь дані. Передбачає потреби складу,<br>розуміє <em>поведінку клієнтів</em> і дає сигнали коли потрібно діяти.</span>
+    <span data-li="de">Das System, das durch Daten sieht. Prognostiziert Lagerbedarf,<br>versteht <em>das Kundenverhalten</em> und gibt Signale, wenn Handlungsbedarf besteht.</span>
+    <span data-li="en">The system that sees through data. Anticipates inventory needs,<br>understands <em>customer behavior</em> and signals when action is needed.</span>
   </p>
 
-  <div class="hero-btns">
-    <a href="/register/" class="btn-hero-primary">
-      <span data-li="uk">Спробувати безкоштовно →</span>
-      <span data-li="de">Kostenlos testen →</span>
-      <span data-li="en">Start free trial →</span>
+  <p class="latin-quote">NOCTUA MINERVAE · СОВА МІНЕРВИ ЗЛІТАЄ В СУТІНКИ</p>
+
+  <div class="cta-group">
+    <a href="/register/" class="cta-main">
+      <span data-li="uk">🏛️ &nbsp;Спробувати безкоштовно</span>
+      <span data-li="de">🏛️ &nbsp;Kostenlos testen</span>
+      <span data-li="en">🏛️ &nbsp;Start free trial</span>
     </a>
-    <a href="/admin/login/" class="btn-hero-outline">
+    <a href="/admin/login/" class="cta-sec">
       <span data-li="uk">Увійти до системи</span>
       <span data-li="de">Anmelden</span>
       <span data-li="en">Login</span>
     </a>
   </div>
-
-  <div class="scroll-hint">
-    <span data-li="uk">Можливості</span>
-    <span data-li="de">Funktionen</span>
-    <span data-li="en">Features</span>
-    <div class="scroll-hint-arrow"></div>
-  </div>
 </section>
 
-<!-- ORNAMENTAL DIVIDER -->
-<div class="ornamental-divider">
-  <div class="div-line"></div>
-  <div class="div-center">✦ ✦ ✦</div>
-  <div class="div-line"></div>
+<!-- Divider -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-icon">✦</div>
+  <div class="divider-line"></div>
 </div>
 
-<!-- FEATURES -->
-<section id="features" class="features-bg">
-  <div class="container">
-    <div class="section-ornament">
-      <div class="section-ornament-line"></div>
-      <div class="section-ornament-sym">🦉</div>
-      <div class="section-ornament-line r"></div>
-    </div>
-    <p class="section-tag">
-      <span data-li="uk">Можливості</span>
-      <span data-li="de">Funktionen</span>
-      <span data-li="en">Features</span>
-    </p>
-    <h2 class="section-title">
-      <span data-li="uk">Мудрість системи — у деталях</span>
-      <span data-li="de">Die Weisheit des Systems steckt im Detail</span>
-      <span data-li="en">The wisdom of the system is in the details</span>
-    </h2>
-    <p class="section-sub">
-      <span data-li="uk">Minerva — повна ERP/BI система для малого бізнесу без зайвої складності.</span>
-      <span data-li="de">Minerva — vollständiges ERP/BI-System für kleine Unternehmen, ohne unnötige Komplexität.</span>
-      <span data-li="en">Minerva — complete ERP/BI system for small business without unnecessary complexity.</span>
-    </p>
-
-    <div class="features-grid">
-      <div class="feat">
-        <div class="feat-icon">🧠</div>
-        <h3><span data-li="uk">AI Асистент Мінерва</span><span data-li="de">KI-Assistent Minerva</span><span data-li="en">AI Assistant Minerva</span></h3>
-        <p><span data-li="uk">Богиня мудрості аналізує ваш бізнес, прогнозує продажі і пише листи клієнтам.</span><span data-li="de">Die Göttin der Weisheit analysiert Ihr Geschäft, prognostiziert Verkäufe und schreibt Kundenbriefe.</span><span data-li="en">The goddess of wisdom analyses your business, forecasts sales and writes customer emails.</span></p>
-      </div>
-      <div class="feat">
-        <div class="feat-icon">📊</div>
-        <h3><span data-li="uk">CRM з RFM аналізом</span><span data-li="de">CRM mit RFM-Analyse</span><span data-li="en">CRM with RFM Analysis</span></h3>
-        <p><span data-li="uk">Повна хронологія клієнта, сегментація, адаптивні стратегії утримання.</span><span data-li="de">Vollständige Kundenchronologie, Segmentierung, adaptive Bindungsstrategien.</span><span data-li="en">Full customer history, segmentation, adaptive retention strategies.</span></p>
-      </div>
-      <div class="feat">
-        <div class="feat-icon">🛒</div>
-        <h3><span data-li="uk">Управління замовленнями</span><span data-li="de">Auftragsverwaltung</span><span data-li="en">Order Management</span></h3>
-        <p><span data-li="uk">Від нового замовлення до відправки — в одному інтерфейсі.</span><span data-li="de">Vom neuen Auftrag bis zum Versand — in einer Oberfläche.</span><span data-li="en">From new order to shipping — in one interface.</span></p>
-      </div>
-      <div class="feat">
-        <div class="feat-icon">📦</div>
-        <h3><span data-li="uk">Склад і логістика</span><span data-li="de">Lager &amp; Logistik</span><span data-li="en">Inventory &amp; Logistics</span></h3>
-        <p><span data-li="uk">Контроль залишків, інтеграція з UPS, Jumingo, Nova Poshta.</span><span data-li="de">Bestandskontrolle, Integration mit UPS, Jumingo, Nova Poshta.</span><span data-li="en">Stock control, integration with UPS, Jumingo, Nova Poshta.</span></p>
-      </div>
-      <div class="feat">
-        <div class="feat-icon">💰</div>
-        <h3><span data-li="uk">Фінанси і аналітика</span><span data-li="de">Finanzen &amp; Analytik</span><span data-li="en">Finance &amp; Analytics</span></h3>
-        <p><span data-li="uk">Рахунки, дебіторка, звіти і дашборд в реальному часі.</span><span data-li="de">Rechnungen, Forderungen, Berichte und Echtzeit-Dashboard.</span><span data-li="en">Invoices, receivables, reports and real-time dashboard.</span></p>
-      </div>
-      <div class="feat">
-        <div class="feat-icon">🔌</div>
-        <h3><span data-li="uk">Інтеграції</span><span data-li="de">Integrationen</span><span data-li="en">Integrations</span></h3>
-        <p><span data-li="uk">DigiKey, Shopify, WooCommerce, Etsy — все в одному місці.</span><span data-li="de">DigiKey, Shopify, WooCommerce, Etsy — alles an einem Ort.</span><span data-li="en">DigiKey, Shopify, WooCommerce, Etsy — all in one place.</span></p>
-      </div>
-    </div>
+<!-- Feature modules -->
+<div class="modules" id="features">
+  <div class="module">
+    <span class="module-icon">🧠</span>
+    <span class="module-name"><span data-li="uk">AI Асистент</span><span data-li="de">KI-Assistent</span><span data-li="en">AI Assistant</span></span>
+    <span class="module-desc"><span data-li="uk">Claude AI аналізує клієнтів, прогнозує продажі, пише листи і відповідає на бізнес-питання в реальному часі.</span><span data-li="de">Claude AI analysiert Kunden, prognostiziert Verkäufe und beantwortet Geschäftsfragen in Echtzeit.</span><span data-li="en">Claude AI analyses customers, forecasts sales, writes emails and answers business questions in real time.</span></span>
   </div>
-</section>
-
-<!-- ORNAMENTAL DIVIDER 2 -->
-<div class="ornamental-divider">
-  <div class="div-line"></div>
-  <div class="div-center">✦ ✦ ✦</div>
-  <div class="div-line"></div>
+  <div class="module">
+    <span class="module-icon">👥</span>
+    <span class="module-name">CRM &amp; RFM</span>
+    <span class="module-desc"><span data-li="uk">Повна хронологія клієнта, автоматична RFM-сегментація: Champions, Loyal, At Risk. Адаптивні стратегії утримання.</span><span data-li="de">Vollständige Kundenhistorie, automatisches RFM-Scoring: Champions, Loyal, At Risk. Adaptive Bindungsstrategien.</span><span data-li="en">Full customer history, automatic RFM scoring: Champions, Loyal, At Risk. Adaptive retention strategies.</span></span>
+  </div>
+  <div class="module">
+    <span class="module-icon">🛒</span>
+    <span class="module-name"><span data-li="uk">Продажі</span><span data-li="de">Verkauf</span><span data-li="en">Sales</span></span>
+    <span class="module-desc"><span data-li="uk">Замовлення, рахунки-фактури, Excel-імпорт, статуси, дедлайни доставки. Від нового замовлення до відправки.</span><span data-li="de">Bestellungen, Rechnungen, Excel-Import, Status, Lieferfristen — vom Auftrag bis zum Versand.</span><span data-li="en">Orders, invoices, Excel import, statuses, shipping deadlines — from order to shipment.</span></span>
+  </div>
+  <div class="module">
+    <span class="module-icon">📦</span>
+    <span class="module-name"><span data-li="uk">Склад</span><span data-li="de">Lager</span><span data-li="en">Inventory</span></span>
+    <span class="module-desc"><span data-li="uk">Управління запасами, reorder points, постачальники. Система попереджає коли товар закінчується.</span><span data-li="de">Bestandsverwaltung, Nachbestellpunkte, Lieferanten. Das System warnt, wenn Waren zur Neige gehen.</span><span data-li="en">Inventory management, reorder points, suppliers. The system alerts when stock runs low.</span></span>
+  </div>
+  <div class="module">
+    <span class="module-icon">🚚</span>
+    <span class="module-name"><span data-li="uk">Доставка</span><span data-li="de">Versand</span><span data-li="en">Shipping</span></span>
+    <span class="module-desc"><span data-li="uk">DHL, UPS, Jumingo API. DYMO-етикетки, CN23 митні декларації, PDF-рахунки. Трекінг в одному вікні.</span><span data-li="de">DHL, UPS, Jumingo API. DYMO-Labels, CN23-Zollerklärungen, PDF-Rechnungen. Tracking in einem Fenster.</span><span data-li="en">DHL, UPS, Jumingo API. DYMO labels, CN23 customs, PDF invoices. Tracking in one window.</span></span>
+  </div>
+  <div class="module">
+    <span class="module-icon">📊</span>
+    <span class="module-name"><span data-li="uk">Аналітика</span><span data-li="de">Analytik</span><span data-li="en">Analytics</span></span>
+    <span class="module-desc"><span data-li="uk">Дашборд продажів, Revenue, ABC-аналіз, KPI. Фільтри по джерелах і категоріях. Сигнали коли потрібна дія.</span><span data-li="de">Umsatz-Dashboard, Revenue, ABC-Analyse, KPIs. Filter nach Quellen und Kategorien. Signale bei Handlungsbedarf.</span><span data-li="en">Sales dashboard, Revenue, ABC analysis, KPIs. Filters by source and category. Signals when action needed.</span></span>
+  </div>
 </div>
 
-<!-- PRICING -->
-<section id="pricing">
-  <div class="container">
-    <div class="section-ornament">
-      <div class="section-ornament-line"></div>
-      <div class="section-ornament-sym">✦</div>
-      <div class="section-ornament-line r"></div>
-    </div>
-    <p class="section-tag">
-      <span data-li="uk">Тарифи</span>
-      <span data-li="de">Tarife</span>
-      <span data-li="en">Pricing</span>
+<!-- Divider -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-icon">✦</div>
+  <div class="divider-line"></div>
+</div>
+
+<!-- Pricing -->
+<div class="pricing-section" id="pricing">
+  <div class="pricing-inner">
+    <p class="section-eyebrow">
+      <span data-li="uk">Тарифи</span><span data-li="de">Tarife</span><span data-li="en">Pricing</span>
     </p>
     <h2 class="section-title">
       <span data-li="uk">Прозорі ціни</span>
@@ -652,85 +554,60 @@ footer {
       <span data-li="en">Transparent pricing</span>
     </h2>
     <p class="section-sub">
-      <span data-li="uk">Оберіть план, що відповідає масштабу вашого бізнесу.</span>
-      <span data-li="de">Wählen Sie den Plan, der zur Größe Ihres Unternehmens passt.</span>
-      <span data-li="en">Choose the plan that fits the scale of your business.</span>
+      <span data-li="uk">Minerva — ваш особистий аналітик. Без прихованих комісій.</span>
+      <span data-li="de">Minerva — Ihr persönlicher Analyst. Ohne versteckte Gebühren.</span>
+      <span data-li="en">Minerva — your personal analyst. No hidden fees.</span>
     </p>
 
     <div class="pricing-grid">
-      <!-- Free -->
       <div class="plan">
-        <div class="plan-name">
-          <span data-li="uk">Безкоштовно</span>
-          <span data-li="de">Kostenlos</span>
-          <span data-li="en">Free</span>
-        </div>
-        <div class="plan-price">0</div>
-        <div class="plan-price-sub">
-          <span data-li="uk">назавжди</span>
-          <span data-li="de">für immer</span>
-          <span data-li="en">forever</span>
-        </div>
+        <div class="plan-name"><span data-li="uk">Безкоштовно</span><span data-li="de">Kostenlos</span><span data-li="en">Free</span></div>
+        <div class="plan-price">€0</div>
+        <div class="plan-price-note"><span data-li="uk">НАЗАВЖДИ</span><span data-li="de">FÜR IMMER</span><span data-li="en">FOREVER</span></div>
         <div class="plan-sep"></div>
         <ul class="plan-features">
           <li><span data-li="uk">CRM до 50 клієнтів</span><span data-li="de">CRM bis 50 Kunden</span><span data-li="en">CRM up to 50 customers</span></li>
           <li><span data-li="uk">Замовлення до 100/міс</span><span data-li="de">Aufträge bis 100/Mo</span><span data-li="en">Orders up to 100/mo</span></li>
-          <li><span data-li="uk">Дашборд</span><span data-li="de">Dashboard</span><span data-li="en">Dashboard</span></li>
-          <li><span data-li="uk">Email підтримка</span><span data-li="de">E-Mail Support</span><span data-li="en">Email support</span></li>
+          <li><span data-li="uk">Дашборд аналітики</span><span data-li="de">Analytics-Dashboard</span><span data-li="en">Analytics dashboard</span></li>
+          <li><span data-li="uk">Email підтримка</span><span data-li="de">E-Mail-Support</span><span data-li="en">Email support</span></li>
         </ul>
         <a href="/register/?package=free" class="plan-cta">
-          <span data-li="uk">Спробувати безкоштовно</span>
+          <span data-li="uk">Почати безкоштовно</span>
           <span data-li="de">Kostenlos starten</span>
           <span data-li="en">Start free</span>
         </a>
       </div>
 
-      <!-- Starter (featured) -->
       <div class="plan featured">
-        <div class="plan-badge">
-          <span data-li="uk">✦ Популярний</span>
-          <span data-li="de">✦ Beliebt</span>
-          <span data-li="en">✦ Popular</span>
-        </div>
+        <div class="plan-badge">✦ POPULAR</div>
         <div class="plan-name">Starter</div>
-        <div class="plan-price">30<span style="font-size:20px;color:var(--muted);-webkit-text-fill-color:var(--muted)">€</span></div>
-        <div class="plan-price-sub">
-          <span data-li="uk">/ місяць</span>
-          <span data-li="de">/ Monat</span>
-          <span data-li="en">/ month</span>
-        </div>
+        <div class="plan-price">€30</div>
+        <div class="plan-price-note"><span data-li="uk">/ МІСЯЦЬ</span><span data-li="de">/ MONAT</span><span data-li="en">/ MONTH</span></div>
         <div class="plan-sep"></div>
         <ul class="plan-features">
-          <li><span data-li="uk">Все з Безкоштовного</span><span data-li="de">Alles aus Free</span><span data-li="en">Everything from Free</span></li>
           <li><span data-li="uk">Необмежений CRM</span><span data-li="de">Unbegrenztes CRM</span><span data-li="en">Unlimited CRM</span></li>
           <li><span data-li="uk">AI Асистент Мінерва</span><span data-li="de">KI-Assistent Minerva</span><span data-li="en">AI Assistant Minerva</span></li>
           <li><span data-li="uk">Доставка та етикетки</span><span data-li="de">Versand &amp; Labels</span><span data-li="en">Shipping &amp; labels</span></li>
           <li><span data-li="uk">Стратегії CRM</span><span data-li="de">CRM-Strategien</span><span data-li="en">CRM strategies</span></li>
           <li><span data-li="uk">Пріоритетна підтримка</span><span data-li="de">Prioritätssupport</span><span data-li="en">Priority support</span></li>
         </ul>
-        <a href="/register/?package=starter" class="plan-cta plan-cta-featured">
+        <a href="/register/?package=starter" class="plan-cta plan-cta-gold">
           <span data-li="uk">Почати →</span>
           <span data-li="de">Starten →</span>
           <span data-li="en">Get started →</span>
         </a>
       </div>
 
-      <!-- Business -->
       <div class="plan">
         <div class="plan-name">Business</div>
-        <div class="plan-price">60<span style="font-size:20px;color:var(--muted);-webkit-text-fill-color:var(--muted)">€</span></div>
-        <div class="plan-price-sub">
-          <span data-li="uk">/ місяць</span>
-          <span data-li="de">/ Monat</span>
-          <span data-li="en">/ month</span>
-        </div>
+        <div class="plan-price">€60</div>
+        <div class="plan-price-note"><span data-li="uk">/ МІСЯЦЬ</span><span data-li="de">/ MONAT</span><span data-li="en">/ MONTH</span></div>
         <div class="plan-sep"></div>
         <ul class="plan-features">
           <li><span data-li="uk">Все зі Starter</span><span data-li="de">Alles aus Starter</span><span data-li="en">Everything from Starter</span></li>
           <li><span data-li="uk">Бухгалтерія та фінанси</span><span data-li="de">Buchhaltung &amp; Finanzen</span><span data-li="en">Accounting &amp; finance</span></li>
-          <li><span data-li="uk">Всі інтеграції</span><span data-li="de">Alle Integrationen</span><span data-li="en">All integrations</span></li>
-          <li><span data-li="uk">API доступ</span><span data-li="de">API-Zugang</span><span data-li="en">API access</span></li>
-          <li><span data-li="uk">Авто-імпорт</span><span data-li="de">Auto-Import</span><span data-li="en">Auto-import</span></li>
+          <li><span data-li="uk">REST API доступ</span><span data-li="de">REST API-Zugang</span><span data-li="en">REST API access</span></li>
+          <li><span data-li="uk">Авто-імпорт даних</span><span data-li="de">Auto-Datenimport</span><span data-li="en">Auto data import</span></li>
           <li><span data-li="uk">Telegram брифінг</span><span data-li="de">Telegram-Briefing</span><span data-li="en">Telegram briefing</span></li>
         </ul>
         <a href="#contact" class="plan-cta">
@@ -741,27 +618,20 @@ footer {
       </div>
     </div>
   </div>
-</section>
-
-<!-- ORNAMENTAL DIVIDER 3 -->
-<div class="ornamental-divider">
-  <div class="div-line"></div>
-  <div class="div-center">✦ ✦ ✦</div>
-  <div class="div-line"></div>
 </div>
 
-<!-- CONTACT -->
-<section id="contact" class="contact-bg">
-  <div class="container">
-    <div class="section-ornament">
-      <div class="section-ornament-line"></div>
-      <div class="section-ornament-sym">✦</div>
-      <div class="section-ornament-line r"></div>
-    </div>
-    <p class="section-tag">
-      <span data-li="uk">Контакт</span>
-      <span data-li="de">Kontakt</span>
-      <span data-li="en">Contact</span>
+<!-- Divider -->
+<div class="divider">
+  <div class="divider-line"></div>
+  <div class="divider-icon">✦</div>
+  <div class="divider-line"></div>
+</div>
+
+<!-- Contact -->
+<div class="contact-section" id="contact">
+  <div class="contact-inner" style="text-align:center">
+    <p class="section-eyebrow">
+      <span data-li="uk">Контакт</span><span data-li="de">Kontakt</span><span data-li="en">Contact</span>
     </p>
     <h2 class="section-title">
       <span data-li="uk">Зв'яжіться з нами</span>
@@ -774,90 +644,92 @@ footer {
       <span data-li="en">Demo, questions, custom terms — write to us.</span>
     </p>
 
-    <div class="cf-wrap">
-      {% if contact_success %}
-      <div class="cf-msg ok">
-        <span data-li="uk">✦ Дякуємо! Зв'яжемось найближчим часом.</span>
-        <span data-li="de">✦ Danke! Wir melden uns in Kürze.</span>
-        <span data-li="en">✦ Thank you! We'll be in touch soon.</span>
-      </div>
-      {% endif %}
-      {% if contact_error %}
-      <div class="cf-msg err">
-        <span data-li="uk">Помилка надсилання. Напишіть напряму:
-          {% if company_email %}<a href="mailto:{{ company_email }}" style="color:var(--err)">{{ company_email }}</a>{% endif %}
-        </span>
-        <span data-li="de">Fehler beim Senden. Schreiben Sie direkt an: {{ company_email }}</span>
-        <span data-li="en">Send error. Contact us directly: {{ company_email }}</span>
-      </div>
-      {% endif %}
-
-      <form class="cf" method="post" action="/contact/">
-        {% csrf_token %}
-        <input type="text" name="name" placeholder="Name / Ім'я" required>
-        <input type="email" name="email" placeholder="E-Mail" required>
-        <input type="text" name="company" placeholder="Company / Firma / Компанія">
-        <textarea name="message" placeholder="Message / Nachricht / Повідомлення"></textarea>
-        <button type="submit">
-          <span data-li="uk">Надіслати</span>
-          <span data-li="de">Senden</span>
-          <span data-li="en">Send</span>
-        </button>
-      </form>
+    {% if contact_success %}
+    <div class="cf-msg ok">
+      <span data-li="uk">✦ Дякуємо! Зв'яжемось найближчим часом.</span>
+      <span data-li="de">✦ Danke! Wir melden uns in Kürze.</span>
+      <span data-li="en">✦ Thank you! We'll be in touch soon.</span>
     </div>
+    {% endif %}
+    {% if contact_error %}
+    <div class="cf-msg err">
+      <span data-li="uk">Помилка надсилання. Напишіть напряму: {% if company_email %}<a href="mailto:{{ company_email }}" style="color:#e05a5a">{{ company_email }}</a>{% endif %}</span>
+      <span data-li="de">Sendefehler. Schreiben Sie direkt an: {{ company_email }}</span>
+      <span data-li="en">Send error. Contact us directly: {{ company_email }}</span>
+    </div>
+    {% endif %}
+
+    <form class="cf" method="post" action="/contact/" style="text-align:left">
+      {% csrf_token %}
+      <input type="text"  name="name"    placeholder="Name / Ім'я" required>
+      <input type="email" name="email"   placeholder="E-Mail" required>
+      <input type="text"  name="company" placeholder="Company / Firma / Компанія">
+      <textarea name="message" placeholder="Message / Nachricht / Повідомлення"></textarea>
+      <button type="submit">
+        <span data-li="uk">Надіслати</span>
+        <span data-li="de">Senden</span>
+        <span data-li="en">Send</span>
+      </button>
+    </form>
   </div>
-</section>
+</div>
 
-<!-- FOOTER -->
+<!-- Footer -->
 <footer>
-  <div class="footer-inner">
-    <div class="footer-top">
-      <div class="footer-brand">
-        <div class="footer-owl">🦉</div>
-        <div class="footer-brand-name">{{ company_name }}</div>
-        <div class="footer-tagline">{{ company_tagline }}</div>
-      </div>
-      <div class="footer-col">
-        <h4><span data-li="uk">Система</span><span data-li="de">System</span><span data-li="en">System</span></h4>
-        <div class="footer-links">
-          <a href="/admin/login/">
-            <span data-li="uk">Увійти</span><span data-li="de">Anmelden</span><span data-li="en">Login</span>
-          </a>
-          <a href="#features">
-            <span data-li="uk">Можливості</span><span data-li="de">Funktionen</span><span data-li="en">Features</span>
-          </a>
-          <a href="#pricing">
-            <span data-li="uk">Тарифи</span><span data-li="de">Tarife</span><span data-li="en">Pricing</span>
-          </a>
-          <a href="#contact">
-            <span data-li="uk">Контакт</span><span data-li="de">Kontakt</span><span data-li="en">Contact</span>
-          </a>
-        </div>
-      </div>
-      <div class="footer-col">
-        <h4><span data-li="uk">Контакт</span><span data-li="de">Kontakt</span><span data-li="en">Contact</span></h4>
-        <div class="footer-links">
-          {% if company_email %}
-          <a href="mailto:{{ company_email }}">{{ company_email }}</a>
-          {% endif %}
-          {% if company_phone %}
-          <a href="tel:{{ company_phone }}">{{ company_phone }}</a>
-          {% endif %}
-          {% if company_telegram %}
-          <a href="https://t.me/{{ company_telegram|cut:'@' }}" target="_blank">Telegram: {{ company_telegram }}</a>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-    <div class="footer-bottom">
-      <span>© 2026 {{ company_name }}</span>
-      <span>Minerva Business Intelligence System</span>
-    </div>
+  <blockquote>
+    «<span data-li="uk">Сова Мінерви починає свій політ лише <em>в сутінках</em> —<br>мудрість приходить тоді, коли день вже прожито і дані зібрані.</span><span data-li="de">Die Eule der Minerva beginnt ihren Flug erst <em>in der Dämmerung</em> —<br>Weisheit kommt, wenn der Tag gelebt und die Daten gesammelt sind.</span><span data-li="en">Minerva's owl begins its flight only <em>at dusk</em> —<br>wisdom comes when the day is lived and the data is gathered.</span>»
+  </blockquote>
+  <cite>— Г. Гегель, адаптовано для Minerva ERP</cite>
+  <div class="footer-bottom">
+    <span>MINERVA BUSINESS INTELLIGENCE SYSTEM</span>
+    <span>·</span>
+    <span>SAPIENTIA ET VERITAS</span>
+    <span>·</span>
+    {% if company_email %}<a href="mailto:{{ company_email }}">{{ company_email }}</a>{% endif %}
+    {% if company_telegram %}
+    <span>·</span>
+    <a href="https://t.me/{{ company_telegram|cut:'@' }}" target="_blank">Telegram</a>
+    {% endif %}
+    <span>·</span>
+    <span>© 2026 {{ company_name }}</span>
   </div>
 </footer>
 
 <script>
-// ── Language switcher ──────────────────────────────────────────────────────
+// Stars
+(function(){
+  var c = document.getElementById('stars');
+  for(var i=0;i<140;i++){
+    var s=document.createElement('div');
+    s.className='star';
+    var sz=Math.random()*2+0.5;
+    s.style.cssText=[
+      'width:'+sz+'px','height:'+sz+'px',
+      'left:'+Math.random()*100+'%',
+      'top:'+Math.random()*100+'%',
+      '--d:'+(2+Math.random()*4)+'s',
+      '--delay:-'+(Math.random()*5)+'s',
+      '--min:'+(0.05+Math.random()*0.15),
+      '--max:'+(0.4+Math.random()*0.5)
+    ].join(';');
+    c.appendChild(s);
+  }
+})();
+
+// Module scroll animation
+var mods = document.querySelectorAll('.module');
+if(window.IntersectionObserver){
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e,i){
+      if(e.isIntersecting){
+        setTimeout(function(){ e.target.style.cssText+=';animation:riseUp .5s ease both'; },i*60);
+      }
+    });
+  },{threshold:.1});
+  mods.forEach(function(m){ io.observe(m); });
+}
+
+// Language switcher
 var _LANG = localStorage.getItem('mv-lang') || 'uk';
 
 function setLang(l) {
@@ -867,59 +739,19 @@ function setLang(l) {
 }
 
 function applyLang() {
-  document.querySelectorAll('[data-li]').forEach(function(el) {
+  document.querySelectorAll('[data-li]').forEach(function(el){
     el.style.display = (el.dataset.li === _LANG) ? '' : 'none';
   });
-  document.querySelectorAll('.li-btns button').forEach(function(b) {
+  document.querySelectorAll('.li-btns button').forEach(function(b){
     b.classList.toggle('active', b.dataset.lang === _LANG);
   });
 }
 
-// ── Stars canvas ──────────────────────────────────────────────────────────
-var canvas = document.getElementById('stars-canvas');
-var ctx    = canvas.getContext('2d');
-var stars  = [];
-
-function resize() {
-  canvas.width  = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-resize();
-window.addEventListener('resize', resize);
-
-function createStars(n) {
-  stars = [];
-  for (var i = 0; i < n; i++) {
-    stars.push({
-      x:     Math.random() * canvas.width,
-      y:     Math.random() * canvas.height,
-      r:     Math.random() * 1.3 + 0.2,
-      speed: Math.random() * 0.01 + 0.004,
-      phase: Math.random() * Math.PI * 2,
-    });
-  }
-}
-createStars(200);
-
-function drawStars(t) {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  stars.forEach(function(s) {
-    var a = 0.08 + 0.6 * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase));
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255,255,255,' + a + ')';
-    ctx.fill();
-  });
-  requestAnimationFrame(drawStars);
-}
-requestAnimationFrame(drawStars);
-
-// ── Init ──────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function(){
   applyLang();
   {% if contact_success %}
-  var el = document.getElementById('contact');
-  if (el) el.scrollIntoView({ behavior: 'smooth' });
+  var el=document.getElementById('contact');
+  if(el) el.scrollIntoView({behavior:'smooth'});
   {% endif %}
 });
 </script>

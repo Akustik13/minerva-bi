@@ -4,56 +4,267 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{% block title %}Minerva{% endblock %}</title>
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#080a0f;--bg2:#0e1018;--bg3:#141720;--border:rgba(255,255,255,0.08);
---accent:#00d4aa;--accent2:#4f8fff;--text:#dde2ec;--muted:#6b7280;--err:#ff6b6b;}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;
-min-height:100vh;display:flex;flex-direction:column;align-items:center;
-justify-content:center;padding:24px;}
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;
-padding:40px;width:100%;max-width:480px;}
-.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:20px;
-color:var(--text);text-decoration:none;display:flex;align-items:center;
-gap:10px;margin-bottom:32px;}
-.logo-icon{width:32px;height:32px;border-radius:8px;
-background:linear-gradient(135deg,var(--accent),var(--accent2));
-display:flex;align-items:center;justify-content:center;font-size:16px;}
-h2{font-family:'Syne',sans-serif;font-size:24px;font-weight:700;
-margin-bottom:8px;letter-spacing:-0.5px;}
-.sub{color:var(--muted);font-size:14px;margin-bottom:28px;line-height:1.5;}
-label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;
-margin-top:16px;color:var(--text);}
-input,select,textarea{width:100%;padding:10px 14px;border-radius:8px;
-border:1px solid var(--border);background:var(--bg3);color:var(--text);
-font-family:'DM Sans',sans-serif;font-size:14px;outline:none;transition:.2s;}
-input:focus,select:focus{border-color:var(--accent);}
-.btn{display:block;width:100%;padding:13px;margin-top:24px;border:none;
-border-radius:8px;background:var(--accent);color:#080a0f;font-family:'DM Sans',sans-serif;
-font-size:15px;font-weight:500;cursor:pointer;transition:.2s;}
-.btn:hover{opacity:.85;}
-.btn-o{background:transparent;color:var(--text);border:1px solid var(--border);
-margin-top:12px;}
-.btn-o:hover{border-color:rgba(255,255,255,.25);}
-.err{color:var(--err);font-size:13px;margin-top:4px;}
-.link{color:var(--accent);text-decoration:none;}
-.hint{font-size:12px;color:var(--muted);margin-top:4px;}
-.check-row{display:flex;gap:10px;align-items:flex-start;margin-top:16px;}
-.check-row input{width:18px;flex-shrink:0;margin-top:2px;}
-.check-row label{margin:0;font-size:13px;color:var(--muted);}
-.divider{border:none;border-top:1px solid var(--border);margin:24px 0;}
-.pkg-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:8px;}
-.pkg{border:1px solid var(--border);border-radius:10px;padding:14px 10px;
-cursor:pointer;transition:.2s;text-align:center;}
-.pkg:hover{border-color:var(--accent);}
-.pkg.selected{border-color:var(--accent);background:rgba(0,212,170,.06);}
-.pkg-name{font-weight:600;font-size:14px;margin-bottom:4px;}
-.pkg-price{color:var(--accent);font-size:13px;}
-.pkg-desc{color:var(--muted);font-size:11px;margin-top:4px;}
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+
+:root {
+  --gold:       #c9a84c;
+  --gold-light: #e8d5a3;
+  --gold-dark:  #8b6914;
+  --bg:         #080b0f;
+  --bg2:        #0d1117;
+  --bg3:        #111820;
+  --border:     rgba(201,168,76,0.15);
+  --border-s:   rgba(201,168,76,0.35);
+  --text:       #f5edd1;
+  --muted:      rgba(245,237,209,0.55);
+  --err:        #e05a5a;
+  --ok:         #4ade80;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body {
+  min-height:100%;
+  font-family:'Crimson Pro', Georgia, serif;
+  background:var(--bg); color:var(--text);
+  font-size:16px; line-height:1.6;
+}
+body {
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:flex-start;
+  padding:40px 20px 60px;
+}
+
+/* ── Stars ── */
+.stars { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.star {
+  position:absolute; background:#fff; border-radius:50%;
+  animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s);
+}
+@keyframes twinkle {
+  0%,100% { opacity:var(--min,.08); transform:scale(1); }
+  50%      { opacity:var(--max,.6); transform:scale(1.3); }
+}
+
+/* ── Glow ── */
+.glow-bg {
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 60% 50% at 50% -10%, rgba(201,168,76,0.1) 0%, transparent 65%),
+    radial-gradient(ellipse 30% 40% at 80% 80%, rgba(139,105,20,0.06) 0%, transparent 55%);
+}
+.line-top {
+  position:fixed; top:0; left:0; right:0; height:1px; z-index:100;
+  background:linear-gradient(90deg, transparent, var(--gold), transparent);
+  animation:shimmer 4s ease-in-out infinite;
+}
+@keyframes shimmer { 0%,100%{opacity:.35} 50%{opacity:.9} }
+
+/* ── Back link ── */
+.back-link {
+  position:fixed; top:20px; left:24px; z-index:100;
+  text-decoration:none; color:rgba(201,168,76,0.4);
+  font-family:'Cinzel', serif; font-size:9px; letter-spacing:2px;
+  transition:color .2s;
+}
+.back-link:hover { color:var(--gold-light); }
+
+/* ── Card ── */
+.card {
+  position:relative; z-index:10;
+  width:100%; max-width:500px;
+  margin-top:20px;
+  animation:riseUp .8s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes riseUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── Logo/brand ── */
+.logo {
+  display:flex; align-items:center; gap:10px;
+  text-decoration:none; margin-bottom:28px;
+}
+.logo-icon {
+  font-size:22px;
+  filter:drop-shadow(0 0 10px rgba(201,168,76,0.5));
+}
+.logo-name {
+  font-family:'Cinzel', serif; font-size:16px; font-weight:700;
+  letter-spacing:4px; text-transform:uppercase;
+  background:linear-gradient(135deg, var(--gold-light), var(--gold));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+
+/* ── Headings ── */
+h2 {
+  font-family:'Cinzel', serif; font-size:20px; font-weight:700;
+  letter-spacing:1px; margin-bottom:8px;
+  background:linear-gradient(135deg, var(--gold-light), var(--gold));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.sub {
+  font-family:'Crimson Pro', serif; font-size:15px; font-style:italic;
+  color:var(--muted); margin-bottom:28px; line-height:1.6;
+}
+
+/* ── Sep ── */
+.sep { display:flex; align-items:center; gap:12px; margin-bottom:24px; }
+.sep-line { flex:1; height:1px; background:linear-gradient(to right, transparent, var(--border), transparent); }
+.sep-sym { font-size:11px; color:var(--border-s); }
+
+/* ── Form elements ── */
+label {
+  display:block;
+  font-family:'Cinzel', serif; font-size:9px;
+  letter-spacing:2px; text-transform:uppercase;
+  color:rgba(201,168,76,0.55); margin-bottom:6px; margin-top:16px;
+}
+label:first-of-type { margin-top:0; }
+input, select, textarea {
+  width:100%; padding:11px 14px;
+  background:rgba(201,168,76,0.04);
+  border:1px solid var(--border); border-radius:4px;
+  color:var(--text);
+  font-family:'Crimson Pro', serif; font-size:16px;
+  outline:none; transition:.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color:rgba(201,168,76,0.5);
+  box-shadow:0 0 16px rgba(201,168,76,0.07);
+}
+input::placeholder, textarea::placeholder { color:rgba(245,237,209,0.2); }
+select { cursor:pointer; }
+select option { background:var(--bg2); color:var(--text); }
+
+/* ── Buttons ── */
+.btn {
+  display:block; width:100%; padding:13px;
+  margin-top:22px; border:none; border-radius:4px;
+  font-family:'Cinzel', serif; font-size:11px;
+  font-weight:700; letter-spacing:3px; text-transform:uppercase;
+  color:var(--bg); cursor:pointer;
+  background:linear-gradient(90deg, #7a5810 0%, #a8792a 25%, #c9a84c 55%, #d4a83a 80%, #e8c85a 100%);
+  transition:transform .2s, box-shadow .3s;
+  box-shadow:0 3px 14px rgba(0,0,0,0.45), 0 0 8px rgba(201,168,76,0.1);
+  position:relative; overflow:hidden;
+}
+.btn::before {
+  content:''; position:absolute;
+  top:0; left:-75%; width:50%; height:100%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);
+  transform:skewX(-18deg); opacity:0;
+}
+.btn:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(201,168,76,0.35); }
+.btn:hover::before { opacity:1; animation:btnShimmer 3s ease-in-out infinite; }
+@keyframes btnShimmer { 0%{left:-75%} 70%{left:125%} 100%{left:125%} }
+.btn-o {
+  background:transparent; color:var(--muted);
+  border:1px solid var(--border); padding:11px;
+  box-shadow:none;
+}
+.btn-o:hover { border-color:rgba(201,168,76,0.4); color:var(--gold-light); transform:none; box-shadow:none; }
+
+/* ── Error / info messages ── */
+.err {
+  color:var(--err); font-size:13px; margin-top:5px;
+  font-family:'Crimson Pro', serif;
+}
+.cf-msg {
+  padding:10px 14px; border-radius:4px; font-size:14px;
+  margin-bottom:14px; text-align:center;
+}
+.cf-msg.ok  { background:rgba(74,222,128,0.08); color:var(--ok); border:1px solid rgba(74,222,128,0.22); }
+.cf-msg.err-box { background:rgba(224,90,90,0.07); color:var(--err); border:1px solid rgba(224,90,90,0.2); }
+
+/* ── Divider hr ── */
+.divider {
+  height:1px; border:none; margin:24px 0;
+  background:linear-gradient(to right, transparent, var(--border), transparent);
+}
+
+/* ── Package grid ── */
+.pkg-grid {
+  display:grid; grid-template-columns:repeat(3,1fr);
+  gap:10px; margin-top:8px;
+}
+.pkg {
+  border:1px solid var(--border); border-radius:4px;
+  padding:14px 10px; cursor:pointer; transition:.2s; text-align:center;
+  background:rgba(201,168,76,0.02);
+}
+.pkg:hover { border-color:rgba(201,168,76,0.4); }
+.pkg.selected {
+  border-color:var(--gold);
+  background:rgba(201,168,76,0.07);
+  box-shadow:0 0 14px rgba(201,168,76,0.1);
+}
+.pkg-name {
+  font-family:'Cinzel', serif; font-size:11px; font-weight:700;
+  letter-spacing:1px; margin-bottom:5px;
+  color:var(--gold-light);
+}
+.pkg-price {
+  font-family:'Cinzel', serif; font-size:10px;
+  color:var(--gold); letter-spacing:.5px;
+}
+
+/* ── Checkbox row ── */
+.check-row {
+  display:flex; gap:10px; align-items:flex-start; margin-top:16px;
+}
+.check-row input { width:16px; flex-shrink:0; margin-top:3px; accent-color:var(--gold); }
+.check-row label {
+  margin:0; font-family:'Crimson Pro', serif;
+  font-size:13px; letter-spacing:0; text-transform:none;
+  color:var(--muted);
+}
+.check-row label a { color:rgba(201,168,76,0.6); text-decoration:none; }
+.check-row label a:hover { color:var(--gold-light); }
+
+/* ── Hint / footer text ── */
+.hint { font-size:12px; color:var(--muted); margin-top:4px; font-family:'Crimson Pro',serif; }
+.link { color:rgba(201,168,76,0.6); text-decoration:none; }
+.link:hover { color:var(--gold-light); }
+.footer-text {
+  text-align:center; margin-top:20px;
+  font-family:'Crimson Pro', serif; font-size:14px; color:var(--muted);
+}
+
+/* ── Responsive ── */
+@media(max-width:560px) {
+  body { padding:30px 16px 50px; }
+  .card { margin-top:14px; }
+  .pkg-grid { grid-template-columns:1fr 1fr; }
+}
 </style>
 </head>
 <body>
+
+<div class="line-top"></div>
+<div class="glow-bg"></div>
+<div class="stars" id="pub-stars"></div>
+
+<a href="/" class="back-link">← MINERVA</a>
+
 {% block body %}{% endblock %}
+
+<script>
+(function(){
+  var c=document.getElementById('pub-stars');
+  for(var i=0;i<80;i++){
+    var s=document.createElement('div');
+    s.className='star';
+    var sz=Math.random()*1.8+0.3;
+    s.style.cssText=[
+      'width:'+sz+'px','height:'+sz+'px',
+      'left:'+Math.random()*100+'%',
+      'top:'+Math.random()*100+'%',
+      '--d:'+(2+Math.random()*4)+'s',
+      '--delay:-'+(Math.random()*5)+'s',
+      '--min:'+(0.04+Math.random()*0.1),
+      '--max:'+(0.3+Math.random()*0.45)
+    ].join(';');
+    c.appendChild(s);
+  }
+})();
+</script>
 </body>
 </html>

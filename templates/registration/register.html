@@ -1,41 +1,70 @@
 {% extends "registration/base_public.html" %}
-{% block title %}Реєстрація — {{ company_name }}{% endblock %}
+{% block title %}
+  <span data-li="uk">Реєстрація</span><span data-li="de">Registrierung</span><span data-li="en">Register</span> — Minerva
+{% endblock %}
 {% block body %}
 <div class="card">
+
   <a href="/" class="logo">
-    <div class="logo-icon">⬡</div>{{ company_name }}
+    <span class="logo-icon">🦉</span>
+    <span class="logo-name">Minerva</span>
   </a>
-  <h2>Створити акаунт</h2>
-  <p class="sub">Пробний доступ 30 днів — безкоштовно, без прив'язки картки</p>
+
+  <h2>
+    <span data-li="uk">Створити акаунт</span>
+    <span data-li="de">Konto erstellen</span>
+    <span data-li="en">Create account</span>
+  </h2>
+  <p class="sub">
+    <span data-li="uk">Пробний доступ 30 днів — безкоштовно, без прив'язки картки</span>
+    <span data-li="de">30 Tage Testzugang — kostenlos, keine Karte erforderlich</span>
+    <span data-li="en">30-day trial — free, no credit card required</span>
+  </p>
+
+  <div class="sep"><div class="sep-line"></div><div class="sep-sym">✦</div><div class="sep-line"></div></div>
 
   {% if form.non_field_errors %}
-  <div class="err" style="margin-bottom:12px">
-    {% for e in form.non_field_errors %}{{ e }}{% endfor %}
-  </div>
+  <div class="cf-msg err-box">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
   {% endif %}
 
   <form method="post">
     {% csrf_token %}
 
-    <label>Назва компанії *</label>
+    <label>
+      <span data-li="uk">Назва компанії *</span>
+      <span data-li="de">Firmenname *</span>
+      <span data-li="en">Company name *</span>
+    </label>
     <input type="text" name="company_name" required
            value="{{ form.company_name.value|default:'' }}"
            placeholder="Müller GmbH">
     {% if form.company_name.errors %}<div class="err">{{ form.company_name.errors.0 }}</div>{% endif %}
 
-    <label>Країна</label>
+    <label>
+      <span data-li="uk">Країна</span>
+      <span data-li="de">Land</span>
+      <span data-li="en">Country</span>
+    </label>
     <select name="company_country">
-      {% for val, label in form.fields.company_country.choices %}
-      <option value="{{ val }}"{% if form.company_country.value == val %} selected{% endif %}>{{ label }}</option>
+      {% for val, lbl in form.fields.company_country.choices %}
+      <option value="{{ val }}"{% if form.company_country.value == val %} selected{% endif %}>{{ lbl }}</option>
       {% endfor %}
     </select>
 
-    <label>Телефон</label>
+    <label>
+      <span data-li="uk">Телефон</span>
+      <span data-li="de">Telefon</span>
+      <span data-li="en">Phone</span>
+    </label>
     <input type="tel" name="contact_phone"
            value="{{ form.contact_phone.value|default:'' }}"
            placeholder="+49 123 456789">
 
-    <label>Ваше ім'я *</label>
+    <label>
+      <span data-li="uk">Ваше ім'я *</span>
+      <span data-li="de">Ihr Name *</span>
+      <span data-li="en">Your name *</span>
+    </label>
     <input type="text" name="owner_name" required
            value="{{ form.owner_name.value|default:'' }}"
            placeholder="Hans Müller">
@@ -47,31 +76,41 @@
            placeholder="hans@firma.de">
     {% if form.email.errors %}<div class="err">{{ form.email.errors.0 }}</div>{% endif %}
 
-    <label>Пароль *</label>
+    <label>
+      <span data-li="uk">Пароль *</span>
+      <span data-li="de">Passwort *</span>
+      <span data-li="en">Password *</span>
+    </label>
     <input type="password" name="password1" required placeholder="Мінімум 8 символів">
     {% if form.password1.errors %}<div class="err">{{ form.password1.errors.0 }}</div>{% endif %}
 
-    <label>Підтвердіть пароль *</label>
-    <input type="password" name="password2" required>
+    <label>
+      <span data-li="uk">Підтвердіть пароль *</span>
+      <span data-li="de">Passwort bestätigen *</span>
+      <span data-li="en">Confirm password *</span>
+    </label>
+    <input type="password" name="password2" required placeholder="••••••••">
     {% if form.password2.errors %}<div class="err">{{ form.password2.errors.0 }}</div>{% endif %}
 
     <hr class="divider">
 
-    <label>Оберіть пакет</label>
+    <label>
+      <span data-li="uk">Оберіть пакет</span>
+      <span data-li="de">Paket wählen</span>
+      <span data-li="en">Choose plan</span>
+    </label>
     <div class="pkg-grid" id="pkg-grid">
       {% for val, lbl in form.fields.package.choices %}
-      <label class="pkg {% if form.package.value == val or forloop.counter == 2 and not form.package.value %}selected{% endif %}"
-             style="cursor:pointer">
+      <label class="pkg {% if form.package.value == val or forloop.counter == 2 and not form.package.value %}selected{% endif %}">
         <input type="radio" name="package" value="{{ val }}"
                style="display:none"
-               {% if form.package.value == val %}checked
-               {% elif forloop.counter == 2 and not form.package.value %}checked{% endif %}>
+               {% if form.package.value == val %}checked{% elif forloop.counter == 2 and not form.package.value %}checked{% endif %}>
         <div class="pkg-name">{% if val == 'free' %}Free{% elif val == 'starter' %}Starter{% elif val == 'business' %}Business{% else %}Custom{% endif %}</div>
         <div class="pkg-price">
-          {% if val == 'free' %}Безкоштовно
-          {% elif val == 'starter' %}€30/міс
-          {% elif val == 'business' %}€60/міс
-          {% else %}Від €300{% endif %}
+          {% if val == 'free' %}€0
+          {% elif val == 'starter' %}€30/mo
+          {% elif val == 'business' %}€60/mo
+          {% else %}€300+{% endif %}
         </div>
       </label>
       {% endfor %}
@@ -80,21 +119,36 @@
     <div class="check-row" style="margin-top:20px">
       <input type="checkbox" name="agree_terms" id="terms" required>
       <label for="terms">
-        Я погоджуюсь з <a href="#" class="link">умовами використання</a>
-        та обробкою персональних даних
+        <span data-li="uk">Я погоджуюсь з <a href="#" class="link">умовами використання</a> та обробкою персональних даних</span>
+        <span data-li="de">Ich stimme den <a href="#" class="link">Nutzungsbedingungen</a> und der Datenverarbeitung zu</span>
+        <span data-li="en">I agree to the <a href="#" class="link">terms of use</a> and data processing</span>
       </label>
     </div>
     {% if form.agree_terms.errors %}<div class="err">{{ form.agree_terms.errors.0 }}</div>{% endif %}
 
-    <button type="submit" class="btn">Зареєструватись →</button>
+    <button type="submit" class="btn">
+      <span data-li="uk">Зареєструватись →</span>
+      <span data-li="de">Registrieren →</span>
+      <span data-li="en">Register →</span>
+    </button>
   </form>
 
-  <div style="text-align:center;margin-top:20px;font-size:13px;color:var(--muted)">
-    Вже є акаунт? <a href="/admin/login/" class="link">Увійти</a>
+  <div class="footer-text">
+    <span data-li="uk">Вже є акаунт? <a href="/admin/login/" class="link">Увійти</a></span>
+    <span data-li="de">Haben Sie schon ein Konto? <a href="/admin/login/" class="link">Anmelden</a></span>
+    <span data-li="en">Already have an account? <a href="/admin/login/" class="link">Login</a></span>
   </div>
+
 </div>
 
 <script>
+// Language
+var _LANG = localStorage.getItem('mv-lang') || 'uk';
+document.querySelectorAll('[data-li]').forEach(function(el){
+  el.style.display = (el.dataset.li === _LANG) ? '' : 'none';
+});
+
+// Package selection
 document.querySelectorAll('.pkg input[type=radio]').forEach(function(r){
   r.addEventListener('change', function(){
     document.querySelectorAll('.pkg').forEach(function(p){ p.classList.remove('selected'); });
