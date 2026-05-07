@@ -513,11 +513,15 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         "action_set_status_processing",
         "action_set_status_shipped",
         "action_set_status_cancelled",
-        # Валюта замовлення + рядків (shipping_currency не змінюється)
+        # Валюта продажу
         "action_set_currency_usd",
         "action_set_currency_eur",
         "action_set_currency_gbp",
         "action_set_currency_custom",
+        # Валюта доставки
+        "action_set_shipping_currency_usd",
+        "action_set_shipping_currency_eur",
+        "action_set_shipping_currency_gbp",
         # Тип документа
         "action_set_doctype_sale",
         "action_set_doctype_sample",
