@@ -956,11 +956,13 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     street     = " ".join(filter(None, [addr.get("street1", ""), addr.get("street2", "").strip()]))
     phone      = addr.get("phoneNumber", "")
     email      = customer.get("customerEmail", "")
-    company    = addr.get("companyName", "")
+    company    = addr.get("companyName", "") or ""
     first      = customer.get("firstName", "")
     last       = customer.get("lastName", "")
     client     = company or f"{first} {last}".strip()
     contact    = f"{first} {last}".strip()
+    ship_name_str    = f"{addr.get('firstName', '')} {addr.get('lastName', '')}".strip()
+    ship_company_str = company
 
     shipping_address_raw = "\n".join(filter(None, [
         company,
@@ -1005,12 +1007,15 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
                 email=email,
                 client=client,
                 phone=phone,
+                ship_name=ship_name_str,
+                ship_company=ship_company_str,
+                ship_phone=phone,
                 shipping_address=shipping_address_raw,
                 total_price=order.get("totalPrice"),
                 currency=currency,
                 addr_street=street,
                 addr_city=addr.get("city", ""),
-                addr_state=addr.get("state", ""),
+                addr_state=addr.get("state", "") if addr_country in ("US", "CA") else "",
                 addr_zip=addr.get("postalCode", ""),
                 addr_country=addr_country,
                 lieferschein_nr=po_number,
@@ -1051,6 +1056,11 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     _check("phone",        phone)
     _check("email",        email)
     _check("shipping_address", shipping_address_raw)
+    # Отримувач посилки
+    if ship_name_str:
+        _check("ship_name", ship_name_str)
+    if ship_company_str:
+        _check("ship_company", ship_company_str)
 
     # Дати
     _check("order_date",       order_date)

@@ -30,7 +30,7 @@ def auto_sync_customer(sender, instance, created, **kwargs):
     if contact and client:
         # B2B: ключ за назвою компанії — всі контакти однієї компанії → 1 запис
         key              = Customer.generate_key('b2b', client)
-        customer_name    = client
+        customer_name    = contact or client
         customer_company = client
     else:
         # B2C або невідомо: ключ за email + ім'ям
@@ -67,6 +67,7 @@ def auto_sync_customer(sender, instance, created, **kwargs):
             addr_street=instance.addr_street or '',
             addr_city=instance.addr_city or '',
             addr_zip=instance.addr_zip or '',
+            addr_state=(instance.addr_state or '')[:2],
             source=instance.source,
         )
     elif contact and client and not customer.company:

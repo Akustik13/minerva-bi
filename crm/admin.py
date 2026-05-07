@@ -471,16 +471,18 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             if not order.email and not order.client:
                 stats["skipped"] += 1
                 continue
-            key = Customer.generate_key(
-                order.email or order.client,
-                order.client or order.email,
-            )
             contact = getattr(order, 'contact_name', '') or ''
             client  = order.client or ''
-            if contact:
+            if contact and client:
+                # B2B: ключ за назвою компанії — як у signals.py
+                key       = Customer.generate_key('b2b', client)
                 cust_name    = contact
                 cust_company = client
             else:
+                key = Customer.generate_key(
+                    order.email or order.client,
+                    order.client or order.email,
+                )
                 cust_name    = client or (order.email.split("@")[0] if order.email else "Unknown")
                 cust_company = ''
 
@@ -495,7 +497,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                     "addr_street":  order.addr_street or "",
                     "addr_city":    order.addr_city or "",
                     "addr_zip":     order.addr_zip or "",
-                    "addr_state":   order.addr_state or "",
+                    "addr_state":   (order.addr_state or "")[:2],
                     "shipping_address": order.shipping_address or "",
                     "source": order.source,
                 },
@@ -508,7 +510,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                     customer.addr_street = order.addr_street
                     customer.addr_city   = order.addr_city
                     customer.addr_zip    = order.addr_zip
-                    customer.addr_state  = order.addr_state or ""
+                    customer.addr_state  = (order.addr_state or "")[:2]
                     updated = True
                 elif not customer.shipping_address and order.shipping_address:
                     customer.shipping_address = order.shipping_address
