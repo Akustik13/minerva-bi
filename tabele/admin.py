@@ -167,3 +167,57 @@ admin.site.each_context = types.MethodType(_each_context, admin.site)
 admin.site.site_header = '🏛️ Minerva Business Intelligence'
 admin.site.site_title = 'Minerva Admin'
 admin.site.index_title = 'Панель управління'
+
+# ── Global ModelAdmin permission patch ────────────────────────────────────────
+# Many admin classes extend admin.ModelAdmin without AuditableMixin/MinervaAdminMixin.
+# Django's default has_view/change/add_permission check model-level auth permissions
+# (e.g. "accounting.change_companysettings") which are never assigned to staff users.
+# Minerva controls access via ModuleAccessMiddleware + UserProfile.allowed_modules,
+# so we replace the base-class defaults to use Minerva's operations system.
+# Subclasses that define their own overrides (AuditableMixin, AuditLogAdmin, etc.)
+# are NOT affected — Python MRO uses the most-specific definition.
+
+def _mv_has_module_permission(self, request):
+    u = request.user
+    return bool(u and u.is_active and u.is_staff)
+
+
+def _mv_has_view_permission(self, request, obj=None):
+    u = request.user
+    if not (u and u.is_active and u.is_staff):
+        return False
+    try:
+        denied = u.profile.denied_models or []
+        if denied and f'{self.opts.app_label}:{self.opts.object_name}' in denied:
+            return False
+    except Exception:
+        pass
+    return True
+
+
+def _mv_has_change_permission(self, request, obj=None):
+    u = request.user
+    if not (u and u.is_active and u.is_staff):
+        return False
+    try:
+        from core.utils import user_has_operation
+        return user_has_operation(u, self.opts.app_label, 'change')
+    except Exception:
+        return True
+
+
+def _mv_has_add_permission(self, request):
+    u = request.user
+    if not (u and u.is_active and u.is_staff):
+        return False
+    try:
+        from core.utils import user_has_operation
+        return user_has_operation(u, self.opts.app_label, 'add')
+    except Exception:
+        return True
+
+
+admin.ModelAdmin.has_module_permission = _mv_has_module_permission
+admin.ModelAdmin.has_view_permission   = _mv_has_view_permission
+admin.ModelAdmin.has_change_permission = _mv_has_change_permission
+admin.ModelAdmin.has_add_permission    = _mv_has_add_permission
