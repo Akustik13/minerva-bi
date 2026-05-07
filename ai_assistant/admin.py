@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from core.mixins import AuditableMixin
 from .models import AIConversation, AIMessage, AIBudgetLog
 
 
@@ -17,7 +18,7 @@ class AIMessageInline(admin.TabularInline):
 
 
 @admin.register(AIConversation)
-class AIConversationAdmin(admin.ModelAdmin):
+class AIConversationAdmin(AuditableMixin, admin.ModelAdmin):
     list_display = ('__str__', 'channel', 'total_cost_usd', 'messages_count', 'last_message_at', 'is_active')
     list_filter = ('channel', 'is_active')
     search_fields = ('user_profile__user__username', 'telegram_chat_id')
@@ -34,7 +35,7 @@ class AIConversationAdmin(admin.ModelAdmin):
 
 
 @admin.register(AIBudgetLog)
-class AIBudgetLogAdmin(admin.ModelAdmin):
+class AIBudgetLogAdmin(AuditableMixin, admin.ModelAdmin):
     list_display = ('__str__', 'total_requests', 'total_input_tokens',
                     'total_output_tokens', 'total_cost_usd', 'alert_sent')
     readonly_fields = ('year', 'month', 'total_requests', 'total_input_tokens',
@@ -45,9 +46,7 @@ class AIBudgetLogAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         from core.utils import is_minerva_admin
-        if is_minerva_admin(request.user):
-            return True
-        return super().has_change_permission(request, obj)
+        return is_minerva_admin(request.user)
 
     def has_delete_permission(self, request, obj=None):
         from core.utils import is_minerva_admin

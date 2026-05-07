@@ -207,6 +207,15 @@ class AuditLogAdmin(admin.ModelAdmin):
     )
     date_hierarchy  = 'timestamp'
 
+    def has_module_permission(self, request):
+        return request.user.is_active and request.user.is_staff
+
+    def has_view_permission(self, request, obj=None):
+        if not (request.user.is_active and request.user.is_staff):
+            return False
+        from core.utils import user_can
+        return user_can(request.user, 'view_audit')
+
     def has_add_permission(self, request):
         return False
 
