@@ -152,10 +152,11 @@ class SystemSettingsAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
-        from core.utils import is_minerva_admin
+        from core.utils import is_minerva_admin, user_has_operation
         if is_minerva_admin(request.user):
             return True
-        return super().has_change_permission(request, obj)
+        return (request.user.is_active and request.user.is_staff
+                and user_has_operation(request.user, 'config', 'change'))
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -194,10 +195,11 @@ class DocumentSettingsAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
-        from core.utils import is_minerva_admin
+        from core.utils import is_minerva_admin, user_has_operation
         if is_minerva_admin(request.user):
             return True
-        return super().has_change_permission(request, obj)
+        return (request.user.is_active and request.user.is_staff
+                and user_has_operation(request.user, 'config', 'change'))
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -594,10 +596,11 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
-        from core.utils import is_minerva_admin
+        from core.utils import is_minerva_admin, user_has_operation
         if is_minerva_admin(request.user):
             return True
-        return super().has_change_permission(request, obj)
+        return (request.user.is_active and request.user.is_staff
+                and user_has_operation(request.user, 'config', 'change'))
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -725,10 +728,11 @@ class ThemeSettingsAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
-        from core.utils import is_minerva_admin
+        from core.utils import is_minerva_admin, user_has_operation
         if is_minerva_admin(request.user):
             return True
-        return super().has_change_permission(request, obj)
+        return (request.user.is_active and request.user.is_staff
+                and user_has_operation(request.user, 'config', 'change'))
 
     def has_delete_permission(self, request, obj=None):
         return False
@@ -935,10 +939,11 @@ class BriefingSettingsAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
-        from core.utils import is_minerva_admin
+        from core.utils import is_minerva_admin, user_has_operation
         if is_minerva_admin(request.user):
             return True
-        return super().has_change_permission(request, obj)
+        return (request.user.is_active and request.user.is_staff
+                and user_has_operation(request.user, 'config', 'change'))
 
     def has_delete_permission(self, request, obj=None):
         return False
