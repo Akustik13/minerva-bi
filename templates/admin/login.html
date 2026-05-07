@@ -1,12 +1,328 @@
-{% extends "admin/login.html" %}
 {% load i18n %}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minerva — Вхід до системи</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700&family=Cinzel:wght@400;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+:root {
+  --gold:       #c9a84c;
+  --gold-light: #e8d5a3;
+  --gold-dark:  #8b6914;
+  --bg:         #080b0f;
+  --bg2:        #0d1117;
+  --surface:    rgba(201,168,76,0.04);
+  --border:     rgba(201,168,76,0.18);
+  --text:       #f5edd1;
+  --muted:      rgba(245,237,209,0.6);
+  --err:        #e05a5a;
+}
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  height: 100%;
+  font-family: 'Crimson Pro', Georgia, serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
 
-{% block content %}
-{{ block.super }}
-<p style="text-align:center;margin-top:12px;font-size:13px;">
-  <a href="{% url 'password_reset' %}"
-     style="color:var(--body-quiet-color,#9aafbe);text-decoration:none;">
-    {% trans "Забули пароль?" %}
-  </a>
-</p>
-{% endblock %}
+/* Зоряне небо */
+#stars-canvas { position:fixed; inset:0; z-index:0; pointer-events:none; }
+
+/* Золоте сяяння */
+.glow-bg {
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 60% at 50% -5%, rgba(201,168,76,0.1) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 30% at 80% 90%, rgba(139,105,20,0.07) 0%, transparent 55%);
+}
+
+/* Горизонтальна лінія */
+.line-top {
+  position:fixed; top:0; left:0; right:0; height:1px; z-index:100;
+  background:linear-gradient(90deg, transparent, var(--gold), transparent);
+  animation: shimmer 4s ease-in-out infinite;
+}
+@keyframes shimmer { 0%,100%{opacity:.3} 50%{opacity:1} }
+
+/* Центральний контейнер */
+.page {
+  position:relative; z-index:10;
+  min-height:100vh;
+  display:flex; align-items:center; justify-content:center;
+  padding:40px 20px;
+}
+
+/* Картка входу */
+.card {
+  width:100%; max-width:400px;
+  text-align:center;
+  animation: riseUp .9s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes riseUp {
+  from { opacity:0; transform:translateY(32px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* Сова (мала) */
+.owl-wrap {
+  position:relative; width:90px; height:90px;
+  margin:0 auto 28px;
+  display:flex; align-items:center; justify-content:center;
+}
+.owl-ring {
+  position:absolute; inset:-12px;
+  border:1px solid rgba(201,168,76,0.22);
+  border-radius:50%;
+  animation:spin 22s linear infinite;
+}
+.owl-ring::before {
+  content:'✦'; position:absolute;
+  top:-6px; left:50%; transform:translateX(-50%);
+  font-size:10px; color:var(--gold);
+}
+.owl-ring2 {
+  position:absolute; inset:-24px;
+  border:1px solid rgba(201,168,76,0.1);
+  border-radius:50%;
+  animation:spin 38s linear infinite reverse;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.owl-icon {
+  font-size:46px;
+  filter:drop-shadow(0 0 20px rgba(201,168,76,0.5));
+  animation:float 6s ease-in-out infinite;
+  line-height:1;
+}
+@keyframes float {
+  0%,100% { transform:translateY(0); }
+  50%      { transform:translateY(-8px); }
+}
+
+/* Заголовок */
+.brand {
+  font-family:'Cinzel', serif;
+  font-size:28px; font-weight:700;
+  letter-spacing:5px; text-transform:uppercase;
+  background:linear-gradient(135deg, var(--gold-light), var(--gold));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text;
+  margin-bottom:6px;
+}
+.brand-sub {
+  font-family:'Cinzel', serif;
+  font-size:10px; letter-spacing:4px;
+  color:rgba(201,168,76,0.5); text-transform:uppercase;
+  margin-bottom:36px;
+}
+
+/* Розділювач */
+.sep { display:flex; align-items:center; gap:14px; margin-bottom:30px; }
+.sep-line { flex:1; height:1px; background:linear-gradient(to right, transparent, var(--border), transparent); }
+.sep-icon { font-size:12px; color:rgba(201,168,76,0.4); }
+
+/* Форма */
+.form-group { margin-bottom:16px; text-align:left; }
+.form-group label {
+  display:block;
+  font-family:'Cinzel', serif; font-size:10px;
+  letter-spacing:2px; text-transform:uppercase;
+  color:rgba(201,168,76,0.6); margin-bottom:8px;
+}
+.form-group input {
+  width:100%; padding:13px 16px;
+  background:rgba(201,168,76,0.04);
+  border:1px solid var(--border);
+  border-radius:6px;
+  color:var(--text);
+  font-family:'Crimson Pro', serif; font-size:16px;
+  outline:none;
+  transition:border-color .25s, box-shadow .25s;
+}
+.form-group input:focus {
+  border-color:rgba(201,168,76,0.5);
+  box-shadow:0 0 20px rgba(201,168,76,0.1);
+}
+.form-group input::placeholder { color:rgba(245,237,209,0.25); }
+
+/* Помилки */
+.errors {
+  background:rgba(224,90,90,0.08);
+  border:1px solid rgba(224,90,90,0.25);
+  border-radius:6px; padding:12px 16px;
+  margin-bottom:16px;
+  font-size:14px; color:var(--err);
+  text-align:left;
+}
+.notice {
+  background:rgba(201,168,76,0.06);
+  border:1px solid var(--border);
+  border-radius:6px; padding:12px 16px;
+  margin-bottom:16px;
+  font-size:14px; color:var(--muted);
+  text-align:center;
+}
+
+/* Кнопка входу */
+.btn-login {
+  width:100%; padding:14px;
+  margin-top:8px;
+  font-family:'Cinzel', serif; font-size:12px;
+  font-weight:600; letter-spacing:3px; text-transform:uppercase;
+  color:var(--bg); border:none; border-radius:6px; cursor:pointer;
+  background:linear-gradient(90deg, #7a5810 0%, #a8792a 25%, #c9a84c 55%, #d4a83a 80%, #e8c85a 100%);
+  transition:transform .2s, box-shadow .3s;
+  box-shadow:0 4px 20px rgba(201,168,76,0.25);
+  position:relative; overflow:hidden;
+}
+.btn-login::before {
+  content:''; position:absolute;
+  top:0; left:-100%; width:60%; height:100%;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transform:skewX(-20deg);
+  transition:left .5s;
+}
+.btn-login:hover { transform:translateY(-1px); box-shadow:0 6px 30px rgba(201,168,76,0.4); }
+.btn-login:hover::before { left:150%; }
+.btn-login:active { transform:translateY(0); }
+
+/* Посилання */
+.link-row {
+  margin-top:20px;
+  font-family:'Cinzel', serif; font-size:10px;
+  letter-spacing:1.5px; color:rgba(201,168,76,0.45);
+}
+.link-row a {
+  color:rgba(201,168,76,0.6); text-decoration:none;
+  transition:color .2s;
+}
+.link-row a:hover { color:var(--gold-light); }
+
+/* Назад на лендінг */
+.back-link {
+  position:fixed; top:24px; left:32px; z-index:100;
+  display:flex; align-items:center; gap:8px;
+  text-decoration:none; color:rgba(201,168,76,0.45);
+  font-family:'Cinzel', serif; font-size:10px; letter-spacing:2px;
+  transition:color .2s;
+}
+.back-link:hover { color:var(--gold-light); }
+
+@media(max-width:480px) {
+  .back-link { top:16px; left:16px; }
+  .card { max-width:100%; }
+}
+</style>
+</head>
+<body>
+
+<div class="line-top"></div>
+<div class="glow-bg"></div>
+<canvas id="stars-canvas"></canvas>
+
+<a href="/" class="back-link">← MINERVA</a>
+
+<div class="page">
+  <div class="card">
+
+    <div class="owl-wrap">
+      <div class="owl-ring2"></div>
+      <div class="owl-ring"></div>
+      <div class="owl-icon">🦉</div>
+    </div>
+
+    <div class="brand">Minerva</div>
+    <div class="brand-sub">Business Intelligence</div>
+
+    <div class="sep">
+      <div class="sep-line"></div>
+      <div class="sep-icon">✦</div>
+      <div class="sep-line"></div>
+    </div>
+
+    {% if form.errors %}
+    <div class="errors">
+      {% for field in form %}
+        {% for error in field.errors %}{{ error }}<br>{% endfor %}
+      {% endfor %}
+      {% for error in form.non_field_errors %}{{ error }}<br>{% endfor %}
+    </div>
+    {% endif %}
+
+    {% if next %}
+    <div class="notice">Увійдіть, щоб продовжити</div>
+    {% endif %}
+
+    <form method="post" action="{% url 'admin:login' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+
+      <div class="form-group">
+        <label for="id_username">Логін</label>
+        <input type="text" id="id_username" name="username"
+               value="{{ form.username.value|default:'' }}"
+               autocomplete="username" autofocus
+               placeholder="ваш логін">
+      </div>
+
+      <div class="form-group">
+        <label for="id_password">Пароль</label>
+        <input type="password" id="id_password" name="password"
+               autocomplete="current-password"
+               placeholder="••••••••">
+      </div>
+
+      <button type="submit" class="btn-login">Увійти до системи</button>
+    </form>
+
+    <div class="link-row">
+      <a href="{% url 'password_reset' %}">Забули пароль?</a>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('stars-canvas');
+const ctx    = canvas.getContext('2d');
+let stars    = [];
+
+function resize() {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+function createStars(n) {
+  stars = [];
+  for (let i = 0; i < n; i++) {
+    stars.push({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      r: Math.random() * 1.2 + 0.2,
+      speed: Math.random() * 0.012 + 0.005,
+      phase: Math.random() * Math.PI * 2,
+    });
+  }
+}
+createStars(140);
+
+function drawStars(t) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  stars.forEach(function(s) {
+    var a = 0.1 + 0.65 * (0.5 + 0.5 * Math.sin(t * s.speed + s.phase));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,' + a + ')';
+    ctx.fill();
+  });
+  requestAnimationFrame(drawStars);
+}
+requestAnimationFrame(drawStars);
+</script>
+
+</body>
+</html>
