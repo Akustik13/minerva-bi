@@ -1,0 +1,269 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.fd-header {
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  margin-bottom:20px;
+}
+.fd-back {
+  padding:6px 14px; border-radius:6px; text-decoration:none;
+  font-size:13px; font-weight:600; color:var(--text);
+  border:1px solid var(--border-strong); background:var(--bg-card);
+  transition:background .12s;
+}
+.fd-back:hover { background:var(--bg-hover,#1e2d40); }
+.fd-title { font-size:20px; font-weight:800; color:var(--text); }
+
+.fd-summary {
+  display:flex; gap:12px; flex-wrap:wrap; align-items:center;
+  margin-bottom:20px;
+}
+.fd-stat {
+  padding:10px 20px; border-radius:8px;
+  background:var(--bg-card); border:1px solid var(--border-strong);
+  text-align:center; min-width:110px;
+}
+.fd-stat-val { font-size:24px; font-weight:800; color:var(--text); }
+.fd-stat-lbl { font-size:11px; color:var(--text-muted); text-transform:uppercase;
+               letter-spacing:.05em; margin-top:2px; }
+
+/* Merge-all button */
+.fd-merge-all-form { margin-left:auto; }
+.fd-merge-all-btn {
+  display:inline-flex; align-items:center; gap:8px;
+  padding:10px 22px; border-radius:8px;
+  font-size:14px; font-weight:700; cursor:pointer;
+  background:linear-gradient(135deg,#6a1b9a,#8e24aa);
+  color:#fff; border:none;
+  box-shadow:0 2px 10px rgba(106,27,154,.35);
+  transition:opacity .15s, transform .1s;
+}
+.fd-merge-all-btn:hover { opacity:.92; transform:translateY(-1px); }
+
+.fd-hint {
+  font-size:13px; color:var(--text-muted); margin-bottom:20px;
+  line-height:1.6;
+}
+
+/* Group card */
+.fd-group {
+  background:var(--bg-card);
+  border:1px solid var(--border-strong);
+  border-left:4px solid #6a1b9a;
+  border-radius:10px;
+  margin-bottom:14px;
+  overflow:hidden;
+}
+.fd-group-hd {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 16px;
+  background:rgba(106,27,154,.06);
+  border-bottom:1px solid var(--border-strong);
+}
+.fd-group-key {
+  font-size:15px; font-weight:800; color:var(--text); flex:1; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.fd-group-cnt {
+  font-size:12px; font-weight:700; padding:2px 10px; border-radius:12px;
+  background:rgba(106,27,154,.18); color:#ce93d8;
+  white-space:nowrap; flex-shrink:0;
+}
+.fd-hd-btns { display:flex; gap:8px; flex-shrink:0; }
+.fd-auto-btn {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 14px; border-radius:6px; cursor:pointer;
+  font-size:12px; font-weight:700; white-space:nowrap;
+  background:#2e7d32; color:#fff; border:none;
+  transition:background .12s;
+}
+.fd-auto-btn:hover { background:#388e3c; }
+.fd-manual-btn {
+  display:inline-flex; align-items:center; gap:5px;
+  padding:5px 14px; border-radius:6px; text-decoration:none;
+  font-size:12px; font-weight:700; white-space:nowrap;
+  background:var(--bg-card); color:var(--text-muted) !important;
+  border:1px solid var(--border-strong);
+  transition:background .12s, color .12s;
+}
+.fd-manual-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text) !important; }
+
+/* Member cards */
+.fd-members {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(250px, 1fr));
+}
+.fd-member {
+  padding:12px 16px;
+  border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border);
+  position:relative;
+}
+.fd-member-winner {
+  background:rgba(46,125,50,.05);
+  border-left:3px solid #43a047;
+}
+.fd-winner-badge {
+  position:absolute; top:8px; right:10px;
+  font-size:10px; font-weight:800; padding:2px 8px; border-radius:10px;
+  background:rgba(46,125,50,.18); color:#66bb6a;
+  text-transform:uppercase; letter-spacing:.04em;
+}
+.fd-mem-name {
+  font-size:14px; font-weight:700; color:var(--text); text-decoration:none;
+  display:block; margin-bottom:4px; padding-right:60px;
+}
+.fd-mem-name:hover { color:#42a5f5; }
+.fd-mem-sub { font-size:11px; color:var(--text-muted); margin-bottom:6px; }
+.fd-mem-row {
+  display:flex; gap:6px; align-items:center; flex-wrap:wrap;
+  font-size:11px; color:var(--text-muted); margin-bottom:3px;
+}
+.fd-mem-badge {
+  font-size:10px; font-weight:700; padding:1px 7px; border-radius:10px;
+  white-space:nowrap;
+}
+.fd-orders-pill {
+  font-size:11px; font-weight:800; padding:2px 9px; border-radius:10px;
+  background:rgba(21,101,192,.14); color:#64b5f6; white-space:nowrap;
+}
+.fd-orders-pill.best { background:rgba(46,125,50,.18); color:#66bb6a; }
+.fd-open-link {
+  display:inline-flex; align-items:center; gap:4px; margin-top:8px;
+  padding:3px 9px; border-radius:5px; text-decoration:none;
+  font-size:11px; font-weight:600;
+  background:rgba(21,101,192,.1); color:#64b5f6;
+  border:1px solid rgba(21,101,192,.22); transition:background .12s;
+}
+.fd-open-link:hover { background:rgba(21,101,192,.2); }
+
+.fd-empty {
+  text-align:center; padding:60px 24px;
+  color:var(--text-muted); font-size:16px;
+}
+.fd-empty-icon { font-size:48px; display:block; margin-bottom:12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="fd-header">
+  <a href="{% url 'admin:crm_customer_changelist' %}" class="fd-back">← Клієнти</a>
+  <span class="fd-title">🔍 Знайдені дублікати клієнтів</span>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div class="messagelist"><div class="{{ msg.tags }}">{{ msg }}</div></div>
+{% endfor %}
+{% endif %}
+
+{% if total_groups %}
+<div class="fd-summary">
+  <div class="fd-stat">
+    <div class="fd-stat-val">{{ total_groups }}</div>
+    <div class="fd-stat-lbl">Груп</div>
+  </div>
+  <div class="fd-stat">
+    <div class="fd-stat-val">{{ total_dupes }}</div>
+    <div class="fd-stat-lbl">Зайвих</div>
+  </div>
+
+  {# ── Merge All button ─────────────────────────────── #}
+  <div class="fd-merge-all-form">
+    <form method="post" action="{{ merge_all_url }}"
+          onsubmit="return confirm('Злити всі {{ total_groups }} груп дублікатів автоматично?\n\nПереможець обирається за кількістю замовлень.\nЦю дію неможливо скасувати!')">
+      {% csrf_token %}
+      <button type="submit" class="fd-merge-all-btn">
+        ⚡ Злити всі {{ total_groups }} груп автоматично
+      </button>
+    </form>
+  </div>
+</div>
+
+<p class="fd-hint">
+  Групування по нормалізованій назві компанії (GmbH, KG, LLC тощо ігноруються).<br>
+  <strong>Зелений запис</strong> — авто-обраний переможець (найбільше замовлень, при рівних — старший запис).
+  Кнопка <strong>⚡ Авто-злити</strong> зливає одну групу. <strong>Перевір</strong> перед масовою операцією.
+</p>
+
+{% for grp in duplicate_groups %}
+<div class="fd-group">
+
+  {# ── Group header ───────────────────────────────────── #}
+  <div class="fd-group-hd">
+    <span class="fd-group-key">
+      {{ grp.members.0.company|default:grp.members.0.name }}
+    </span>
+    <span class="fd-group-cnt">{{ grp.members|length }} записи</span>
+    <div class="fd-hd-btns">
+      {# Auto-merge this group #}
+      <form method="post" action="{% url 'admin:crm_customer_merge' %}"
+            style="display:inline"
+            onsubmit="return confirm('Авто-злити цю групу? Переможець — запис #{{ grp.winner_pk }}.')">
+        {% csrf_token %}
+        <input type="hidden" name="ids"    value="{{ grp.ids_str }}">
+        <input type="hidden" name="winner" value="{{ grp.winner_pk }}">
+        <button type="submit" class="fd-auto-btn">⚡ Авто-злити</button>
+      </form>
+      {# Manual merge link #}
+      <a href="{% url 'admin:crm_customer_merge' %}?ids={{ grp.ids_str }}"
+         class="fd-manual-btn">✋ Вручну</a>
+    </div>
+  </div>
+
+  {# ── Member cards ───────────────────────────────────── #}
+  <div class="fd-members">
+    {% for customer in grp.members %}
+    <div class="fd-member{% if customer.pk == grp.winner_pk %} fd-member-winner{% endif %}">
+      {% if customer.pk == grp.winner_pk %}
+        <span class="fd-winner-badge">✓ переможець</span>
+      {% endif %}
+
+      <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="fd-mem-name">
+        {% if customer.company %}{{ customer.company }}{% else %}{{ customer.name }}{% endif %}
+      </a>
+      {% if customer.company and customer.name %}
+        <div class="fd-mem-sub">👤 {{ customer.name }}</div>
+      {% endif %}
+
+      <div class="fd-mem-row">
+        {% if customer.country %}<span>🌍 {{ customer.country }}</span>{% endif %}
+        {% if customer.email %}<span>{{ customer.email }}</span>{% endif %}
+      </div>
+
+      <div class="fd-mem-row">
+        {% if customer.status == 'active' %}
+          <span class="fd-mem-badge" style="background:#43a047;color:#fff">Активний</span>
+        {% elif customer.status == 'vip' %}
+          <span class="fd-mem-badge" style="background:#f9a825;color:#000">⭐ VIP</span>
+        {% elif customer.status == 'inactive' %}
+          <span class="fd-mem-badge" style="background:#78909c;color:#fff">Неактивний</span>
+        {% elif customer.status == 'blocked' %}
+          <span class="fd-mem-badge" style="background:#e53935;color:#fff">🚫 Заблок.</span>
+        {% endif %}
+        <span class="fd-orders-pill{% if customer.pk == grp.winner_pk %} best{% endif %}">
+          {{ customer.merge_orders }} замовл.
+        </span>
+        <span style="font-size:10px;color:var(--text-muted)">#{{ customer.pk }}</span>
+      </div>
+
+      <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="fd-open-link">
+        ✏️ Відкрити
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+
+</div>
+{% endfor %}
+
+{% else %}
+<div class="fd-empty">
+  <span class="fd-empty-icon">✅</span>
+  Дублікатів не знайдено — база клієнтів чиста!
+</div>
+{% endif %}
+
+{% endblock %}

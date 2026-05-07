@@ -241,8 +241,8 @@
           </div>
         </div>
 
-        <div class="merge-orders-badge {% if customer._merge_orders %}has-orders{% endif %}">
-          🛒 {{ customer._merge_orders }} замовлень
+        <div class="merge-orders-badge {% if customer.merge_orders %}has-orders{% endif %}">
+          🛒 {{ customer.merge_orders }} замовлень
         </div>
 
         <div class="merge-fields">
@@ -368,7 +368,7 @@ var customerNames = {
 };
 var totalOrders = {
   {% for c in customers %}
-  {{ c.pk }}: {{ c._merge_orders }},
+  {{ c.pk }}: {{ c.merge_orders }},
   {% endfor %}
 };
 

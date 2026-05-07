@@ -1,4 +1,6 @@
 from __future__ import annotations
+import re as _re
+from collections import defaultdict
 from decimal import Decimal
 from django.contrib import admin, messages
 from django.db import transaction
@@ -11,6 +13,113 @@ from django.utils.safestring import mark_safe
 from .models import Customer, CustomerNote, CustomerTimeline
 from sales.models import SalesOrder, SalesOrderLine
 from core.mixins import AuditableMixin
+
+# ── Duplicate detection helpers ───────────────────────────────────────────────
+_LEGAL_SUFFIXES = _re.compile(
+    r'\b(gmbh\s*&?\s*co\.?\s*kg|gmbh\s*&\s*co|gmbh|ag|kg|ohg|eg|ug|gbr|'
+    r'llc|ltd\.?|inc\.?|corp\.?|s\.?a\.?|s\.?r\.?l\.?|b\.?v\.?|nv|'
+    r'pty\.?\s*ltd|plc|kft|as|ab|oy|sp\.?\s*z\.?\s*o\.?\s*o\.?)\b',
+    _re.IGNORECASE,
+)
+
+def _normalize_co(name: str) -> str:
+    if not name:
+        return ""
+    n = name.strip().lower()
+    n = _LEGAL_SUFFIXES.sub("", n)
+    n = _re.sub(r'[&.,\-/]', ' ', n)
+    return _re.sub(r'\s+', ' ', n).strip()
+
+def _build_duplicate_groups(order_counts: dict) -> list[dict]:
+    """Return list of dicts: {members, winner_pk, ids_str} for all duplicate groups."""
+    all_customers = list(
+        Customer.objects.only(
+            "pk", "name", "company", "email", "phone",
+            "country", "status", "segment", "external_key",
+        ).order_by("company", "name")
+    )
+    groups: dict = defaultdict(list)
+    for c in all_customers:
+        key = _normalize_co(c.company or c.name)
+        if key:
+            groups[key].append(c)
+
+    raw_groups = [
+        sorted(members, key=lambda c: c.pk)
+        for members in groups.values()
+        if len(members) >= 2
+    ]
+    raw_groups.sort(key=lambda g: (-len(g), g[0].company or g[0].name or ""))
+
+    # Annotate order counts on customer objects
+    for c in all_customers:
+        c.merge_orders = order_counts.get(c.external_key, 0)
+
+    result = []
+    for members in raw_groups:
+        # Winner = most orders; tie-break = oldest (lowest pk)
+        winner = max(members, key=lambda c: (c.merge_orders, -c.pk))
+        result.append({
+            "members": members,
+            "winner_pk": winner.pk,
+            "ids_str": ",".join(str(c.pk) for c in members),
+        })
+    return result
+
+def _fetch_order_counts(customers) -> dict:
+    all_keys = [c.external_key for c in customers if c.external_key]
+    if not all_keys:
+        return {}
+    return {
+        row["customer_key"]: row["cnt"]
+        for row in SalesOrder.objects
+        .filter(customer_key__in=all_keys)
+        .values("customer_key")
+        .annotate(cnt=Count("id"))
+    }
+
+def _do_merge(winner_id: int, all_ids: list[int]) -> dict:
+    """Atomically merge losers into winner. Returns stats dict."""
+    from strategy.models import CustomerStrategy
+    customers = list(Customer.objects.filter(pk__in=all_ids))
+    winner = next((c for c in customers if c.pk == winner_id), None)
+    if not winner:
+        raise ValueError(f"Winner pk={winner_id} not found")
+    losers = [c for c in customers if c.pk != winner_id]
+    loser_pks = [c.pk for c in losers]
+    loser_keys = [c.external_key for c in losers]
+
+    with transaction.atomic():
+        orders_moved = SalesOrder.objects.filter(
+            customer_key__in=loser_keys
+        ).update(customer_key=winner.external_key)
+
+        notes_moved = CustomerNote.objects.filter(
+            customer__pk__in=loser_pks
+        ).update(customer=winner)
+        CustomerTimeline.objects.filter(customer__pk__in=loser_pks).update(customer=winner)
+        CustomerStrategy.objects.filter(customer__pk__in=loser_pks).update(customer=winner)
+
+        changed = False
+        extra_notes = []
+        for loser in losers:
+            for field in ("email", "phone", "company", "country",
+                          "addr_street", "addr_city", "addr_zip", "shipping_address", "source"):
+                if not getattr(winner, field) and getattr(loser, field):
+                    setattr(winner, field, getattr(loser, field))
+                    changed = True
+            if loser.notes:
+                extra_notes.append(loser.notes)
+        if extra_notes:
+            sep = "\n\n---\n"
+            winner.notes = (winner.notes + sep if winner.notes else "") + sep.join(extra_notes)
+            changed = True
+        if changed:
+            winner.save()
+
+        Customer.objects.filter(pk__in=loser_pks).delete()
+
+    return {"orders": orders_moved, "notes": notes_moved, "deleted": len(loser_pks), "winner": winner}
 
 
 class CustomerNoteInline(admin.TabularInline):
@@ -252,6 +361,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         "avg_order_display", "last_order_display",
         "repeat_badge", "rfm_display", "strategy_btn",
     )
+    list_display_links = ("display_name",)
     list_filter = ("segment", "status", "country", RepeatCustomerFilter, RFMSegmentFilter, FavoriteFilter)
     search_fields = ("name", "email", "company", "phone", "addr_city", "addr_street", "external_key")
     # Зберігаємо фільтри між сесіями
@@ -351,6 +461,16 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.delete_doc_view_customer),
                 name="crm_customer_delete_doc",
             ),
+            path(
+                "find-duplicates/",
+                self.admin_site.admin_view(self.find_duplicates_view),
+                name="crm_customer_find_duplicates",
+            ),
+            path(
+                "find-duplicates/merge-all/",
+                self.admin_site.admin_view(self.merge_all_view),
+                name="crm_customer_merge_all",
+            ),
         ]
         return custom + urls
 
@@ -385,7 +505,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             ).values("customer_key").annotate(cnt=Count("id"))
         }
         for c in customers:
-            c._merge_orders = order_counts.get(c.external_key, 0)
+            c.merge_orders = order_counts.get(c.external_key, 0)
 
         # Detect overlapping order_numbers across customers (same source+number = impossible due
         # to unique_together, but same order_number different source = warn user)
@@ -489,6 +609,83 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             "duplicate_order_numbers": duplicate_order_numbers,
         }
         return render(request, "admin/crm/customer/merge.html", context)
+
+    # ── Find Duplicates view ──────────────────────────────────────────────────
+
+    def find_duplicates_view(self, request):
+        """Автоматичний пошук дублікатів клієнтів за назвою компанії."""
+        all_customers = list(
+            Customer.objects.only(
+                "pk", "name", "company", "email", "phone",
+                "country", "status", "segment", "external_key",
+            )
+        )
+        order_counts = _fetch_order_counts(all_customers)
+        duplicate_groups = _build_duplicate_groups(order_counts)
+
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "🔍 Знайдені дублікати клієнтів",
+            "opts": Customer._meta,
+            "duplicate_groups": duplicate_groups,
+            "total_groups": len(duplicate_groups),
+            "total_dupes": sum(len(g["members"]) - 1 for g in duplicate_groups),
+            "merge_all_url": "merge-all/",
+        }
+        return render(request, "admin/crm/customer/find_duplicates.html", context)
+
+    # ── Merge All view ────────────────────────────────────────────────────────
+
+    def merge_all_view(self, request):
+        """POST: авто-злити всі знайдені групи дублікатів."""
+        if request.method != "POST":
+            return redirect("admin:crm_customer_find_duplicates")
+
+        all_customers = list(
+            Customer.objects.only("pk", "name", "company", "external_key")
+        )
+        order_counts = _fetch_order_counts(all_customers)
+        duplicate_groups = _build_duplicate_groups(order_counts)
+
+        if not duplicate_groups:
+            self.message_user(request, "Дублікатів не знайдено.", messages.INFO)
+            return redirect("admin:crm_customer_find_duplicates")
+
+        merged = 0
+        deleted = 0
+        orders_total = 0
+        errors = []
+
+        for grp in duplicate_groups:
+            ids = [c.pk for c in grp["members"]]
+            winner_pk = grp["winner_pk"]
+            try:
+                stats = _do_merge(winner_pk, ids)
+                merged += 1
+                deleted += stats["deleted"]
+                orders_total += stats["orders"]
+            except Exception as exc:
+                winner_obj = next((c for c in grp["members"] if c.pk == winner_pk), None)
+                label = winner_obj.company or winner_obj.name if winner_obj else str(winner_pk)
+                errors.append(f"«{label}»: {exc}")
+
+        if errors:
+            self.message_user(
+                request,
+                f"⚠️ Злито {merged} груп, видалено {deleted} дублікатів, "
+                f"перенесено {orders_total} замовлень. "
+                f"Помилки ({len(errors)}): {'; '.join(errors[:3])}",
+                messages.WARNING,
+            )
+        else:
+            self.message_user(
+                request,
+                f"✅ Злито {merged} груп дублікатів. "
+                f"Видалено {deleted} зайвих записів, "
+                f"перенесено {orders_total} замовлень.",
+                messages.SUCCESS,
+            )
+        return redirect("admin:crm_customer_find_duplicates")
 
     def assign_strategy_view(self, request, pk):
         """One-click: рекомендує шаблон → створює CustomerStrategy → відкриває canvas."""
