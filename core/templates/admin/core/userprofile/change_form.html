@@ -13,6 +13,9 @@
   var ROLE_OPERATIONS  = {{ mv_role_operations|default:"{}"|safe }};
   var ALL_OPS          = {{ mv_all_ops|default:"[]"|safe }};
   var OP_LABELS        = {{ mv_op_labels|default:"{}"|safe }};
+  var ROLE_CAN         = {{ mv_role_can|default:"{}"|safe }};
+  /* modules always accessible regardless of allow-list (mirrors Python ALWAYS set) */
+  var ALWAYS_MODULES   = ['core', 'auth', 'faq', 'admin', 'authtoken', 'dashboard'];
 
   /* ── Module checkboxes sync ────────────────────────────────────────────── */
   function toPks(appLabels) {
@@ -35,6 +38,7 @@
     } else if (roleSel) {
       setCheckboxes(toPks(ROLE_MODULES[roleSel.value] || []));
     }
+    buildConflicts();
   }
 
   /* ── Denied models panel ───────────────────────────────────────────────── */
@@ -84,6 +88,7 @@
       badge.textContent = n + '\u00a0забор.';
       badge.style.display = n ? 'inline' : 'none';
     }
+    buildConflicts();
   };
 
   function buildDeniedPanel() {
@@ -401,6 +406,135 @@
     }
   }
 
+  /* ── Conflicts panel ───────────────────────────────────────────────────── */
+  function getCanEffective(fieldName, role) {
+    /* NullBooleanSelect renders as <select> with values 'unknown'/'true'/'false' */
+    var sel = document.querySelector('select[name="' + fieldName + '"]');
+    if (sel) {
+      if (sel.value === 'true')  return true;
+      if (sel.value === 'false') return false;
+    }
+    /* null/unknown → fall back to role default */
+    var rc = ROLE_CAN[role] || {};
+    return !!rc[fieldName.replace('can_', '')];
+  }
+
+  function getEffectiveMods() {
+    /* mirrors UserProfile.get_allowed_modules() priority */
+    var overrideCbs = document.querySelectorAll('input[name="modules_override"]');
+    var checkedPks  = [];
+    overrideCbs.forEach(function (cb) { if (cb.checked) checkedPks.push(cb.value); });
+    if (checkedPks.length) {
+      var apps = [];
+      Object.keys(MODULE_PK_MAP).forEach(function (al) {
+        if (checkedPks.indexOf(MODULE_PK_MAP[al]) !== -1) apps.push(al);
+      });
+      return apps;
+    }
+    var bundleSel = document.querySelector('select[name="bundle"]');
+    if (bundleSel && bundleSel.value && BUNDLE_MODULES[bundleSel.value]) {
+      return BUNDLE_MODULES[bundleSel.value];
+    }
+    var roleSel = document.querySelector('select[name="role"]');
+    var role = roleSel ? roleSel.value : '';
+    return ROLE_MODULES[role] || [];
+  }
+
+  function buildConflicts() {
+    var roleSel  = document.querySelector('select[name="role"]');
+    var role     = roleSel ? roleSel.value : '';
+    var denied   = getDenied();
+    var effMods  = getEffectiveMods();
+    var isAll    = (effMods === '__all__');
+
+    var errors = [];
+    var infos  = [];
+
+    /* 1. can_view_audit but AuditLog denied */
+    if (getCanEffective('can_view_audit', role) && denied.indexOf('core:AuditLog') !== -1) {
+      errors.push('Журнал аудиту увімкнено (<code>can_view_audit</code>), але <code>core:AuditLog</code> заблоковано — сторінка журналу буде недоступна.');
+    }
+
+    /* 2. can_manage_users but UserProfile / User denied */
+    if (getCanEffective('can_manage_users', role)) {
+      if (denied.indexOf('core:UserProfile') !== -1) {
+        errors.push('Управління юзерами увімкнено (<code>can_manage_users</code>), але <code>core:UserProfile</code> заблоковано.');
+      }
+      if (denied.indexOf('auth:User') !== -1) {
+        errors.push('Управління юзерами увімкнено (<code>can_manage_users</code>), але <code>auth:User</code> заблоковано.');
+      }
+    }
+
+    /* 3. Module allowed but ALL its models are denied */
+    var allowedApps = isAll ? Object.keys(MODULE_PK_MAP) : effMods;
+    if (Array.isArray(allowedApps)) {
+      allowedApps.forEach(function (al) {
+        var models = APP_MODELS[al] || [];
+        if (!models.length) return;
+        var allDenied = models.every(function (m) {
+          return denied.indexOf(al + ':' + m.object_name) !== -1;
+        });
+        if (allDenied) {
+          errors.push('Модуль <b>' + (MODULE_NAMES[al] || al) + '</b> дозволено, але всі підрозділи заблоковано — фактичний доступ відсутній.');
+        }
+      });
+    }
+
+    /* 4. Model denied but its module is not in allowed list (redundant rule) */
+    denied.forEach(function (entry) {
+      var al = entry.split(':')[0];
+      if (ALWAYS_MODULES.indexOf(al) !== -1) return; /* always-on modules: denying is valid */
+      var inAllowed = isAll || (Array.isArray(effMods) && effMods.indexOf(al) !== -1);
+      if (!inAllowed) {
+        infos.push('<code>' + entry + '</code> — модуль <b>' + (MODULE_NAMES[al] || al) + '</b> вже відключено, заборона підрозділу надлишкова.');
+      }
+    });
+
+    /* Render */
+    var existing = document.getElementById('mv-conflicts-panel');
+    if (existing) existing.remove();
+    if (!errors.length && !infos.length) return;
+
+    var panel = document.createElement('div');
+    panel.id = 'mv-conflicts-panel';
+    panel.style.cssText = 'margin:0 0 16px;border-radius:8px;overflow:hidden;border:1px solid var(--border-strong)';
+
+    function makeSection(items, bgHdr, colorHdr, bgBody, leftBorder, title) {
+      var hdr = document.createElement('div');
+      hdr.style.cssText = 'padding:8px 14px;background:' + bgHdr + ';color:' + colorHdr
+        + ';font-size:12px;font-weight:700';
+      hdr.innerHTML = title + ' (' + items.length + ')';
+      panel.appendChild(hdr);
+      var body = document.createElement('div');
+      body.style.cssText = 'padding:8px 14px;background:' + bgBody
+        + ';display:flex;flex-direction:column;gap:5px';
+      items.forEach(function (msg) {
+        var row = document.createElement('div');
+        row.style.cssText = 'font-size:12px;color:' + colorHdr
+          + ';line-height:1.5;padding:5px 8px;background:rgba(0,0,0,.15)'
+          + ';border-radius:4px;border-left:3px solid ' + leftBorder;
+        row.innerHTML = msg;
+        body.appendChild(row);
+      });
+      panel.appendChild(body);
+    }
+
+    if (errors.length) {
+      makeSection(errors, '#7c3d0c', '#ffd0a0', '#3d2008', '#f97316', '⚠️ Суперечності в налаштуваннях');
+    }
+    if (infos.length) {
+      makeSection(infos,
+        'var(--bg-hover)', 'var(--text-dim)', 'var(--bg-input)',
+        'var(--border-strong)', 'ℹ️ Надлишкові правила');
+    }
+
+    /* insert before first fieldset in #content-main */
+    var cm    = document.getElementById('content-main');
+    var first = cm ? cm.querySelector('.module') : null;
+    if (first) first.parentNode.insertBefore(panel, first);
+    else if (cm) cm.insertBefore(panel, cm.firstChild);
+  }
+
   /* ── Init ──────────────────────────────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', function () {
     var bundleSel = document.querySelector('select[name="bundle"]');
@@ -433,6 +567,16 @@
     /* Build panels */
     buildDeniedPanel();
     buildOpsPanel();
+    buildConflicts();
+
+    /* Re-run conflicts on any relevant change */
+    ['can_delete','can_export','can_import','can_view_audit','can_manage_users'].forEach(function (f) {
+      var sel = document.querySelector('select[name="' + f + '"]');
+      if (sel) sel.addEventListener('change', buildConflicts);
+    });
+    document.querySelectorAll('input[name="modules_override"]').forEach(function (cb) {
+      cb.addEventListener('change', buildConflicts);
+    });
   });
 })();
 </script>

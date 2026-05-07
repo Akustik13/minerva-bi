@@ -461,6 +461,18 @@ class UserProfileAdmin(admin.ModelAdmin):
         for role, ops in ROLE_OPERATIONS.items():
             role_operations_js[role] = ops  # keep '__all__' string, JS handles it
 
+        # role → can_* defaults for conflict detection in JS
+        role_can = {
+            role: {
+                'delete':       perms.get('can_delete',       False),
+                'export':       perms.get('can_export',        False),
+                'import':       perms.get('can_import',        False),
+                'view_audit':   perms.get('can_view_audit',    False),
+                'manage_users': perms.get('can_manage_users',  False),
+            }
+            for role, perms in ROLE_PERMISSIONS.items()
+        }
+
         extra['mv_module_pk_map']    = json.dumps(module_pk_map,       ensure_ascii=False)
         extra['mv_module_names']     = json.dumps(module_names,        ensure_ascii=False)
         extra['mv_role_modules']     = json.dumps(role_modules,        ensure_ascii=False)
@@ -469,6 +481,7 @@ class UserProfileAdmin(admin.ModelAdmin):
         extra['mv_role_operations']  = json.dumps(role_operations_js,  ensure_ascii=False)
         extra['mv_all_ops']          = json.dumps(ALL_OPS,             ensure_ascii=False)
         extra['mv_op_labels']        = json.dumps(OP_LABELS,           ensure_ascii=False)
+        extra['mv_role_can']         = json.dumps(role_can,            ensure_ascii=False)
         extra['mv_changelist_url']   = '../'
         return super().changeform_view(request, object_id, form_url, extra)
 
