@@ -510,11 +510,25 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 stats["customers_created"] += 1
             else:
                 updated = False
-                if not customer.addr_street and order.addr_street:
+                # Адреса: оновлюємо якщо Customer порожній АБО містить явно невірні дані
+                _bad_city   = (customer.addr_city or "").lower().startswith("email:") or "@" in (customer.addr_city or "")
+                _bad_street = (customer.addr_street or "").lower() in (
+                    (customer.company or "").lower(),
+                    (customer.name or "").lower(),
+                )
+                if (not customer.addr_street or _bad_street or _bad_city) and order.addr_street:
                     customer.addr_street = order.addr_street
                     customer.addr_city   = order.addr_city
                     customer.addr_zip    = order.addr_zip
                     customer.addr_state  = (order.addr_state or "")[:2]
+                    updated = True
+                elif _bad_city and not order.addr_street:
+                    # Місто містить email — очищаємо навіть без нової адреси
+                    customer.addr_city = ""
+                    updated = True
+                elif _bad_street and not order.addr_street:
+                    # Вулиця = назва компанії — очищаємо
+                    customer.addr_street = ""
                     updated = True
                 elif not customer.shipping_address and order.shipping_address:
                     customer.shipping_address = order.shipping_address
