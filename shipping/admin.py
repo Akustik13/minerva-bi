@@ -847,7 +847,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     inlines = [ShipmentPackageInline, TrackingAttemptLogInline]
     list_display  = (
         "id_badge", "order_link", "carrier_badge", "status_col",
-        "recipient_name", "recipient_country_flag", "weight_kg",
+        "recipient_col", "recipient_country_flag", "weight_kg",
         "price_col", "tracking_badge", "label_badge", "created_at_fmt",
     )
     list_filter   = ("status", "carrier", "carrier__carrier_type", "recipient_country")
@@ -913,6 +913,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     change_list_template = "admin/shipping/shipment_changelist.html"
 
     def changelist_view(self, request, extra_context=None):
+        self._crm_cache = {}   # reset per-request CRM customer cache
         extra_context = extra_context or {}
         from django.db.models import Count
         counts = dict(
@@ -4951,6 +4952,52 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     def created_at_fmt(self, obj):
         return obj.created_at.strftime("%d.%m.%Y %H:%M")
     created_at_fmt.short_description = "Створено"
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('order', 'carrier')
+
+    def recipient_col(self, obj):
+        """Company (clickable CRM link) with contact name below it."""
+        from django.urls import reverse as _rev
+        company = obj.recipient_company or ''
+        name    = obj.recipient_name or ''
+        top_text = company or name
+        sub_text = name if (company and name and company.lower() != name.lower()) else ''
+
+        # CRM link via order.customer_key (order is select_related, no extra query)
+        crm_url = None
+        ck = ''
+        if obj.order_id and obj.order:
+            ck = obj.order.customer_key or ''
+        if ck:
+            if ck not in self._crm_cache:
+                from crm.models import Customer as _Cust
+                c = _Cust.objects.filter(external_key=ck).values('pk').first()
+                self._crm_cache[ck] = c['pk'] if c else None
+            cust_pk = self._crm_cache.get(ck)
+            if cust_pk:
+                crm_url = _rev('admin:crm_customer_change', args=[cust_pk])
+
+        if top_text:
+            if crm_url:
+                top = format_html(
+                    '<a href="{}" style="color:var(--link-fg);font-weight:600;'
+                    'text-decoration:none" title="Відкрити в CRM">{}</a>',
+                    crm_url, top_text,
+                )
+            else:
+                top = format_html('<span style="font-weight:600">{}</span>', top_text)
+        else:
+            return format_html('<span style="color:var(--text-dim)">—</span>')
+
+        if sub_text:
+            return format_html(
+                '{}<br><span style="font-size:11px;color:var(--text-dim,#607d8b)">{}</span>',
+                top, sub_text,
+            )
+        return top
+    recipient_col.short_description = "Отримувач"
+    recipient_col.admin_order_field = "recipient_company"
 
     # ── Order Tracking overview ───────────────────────────────────────────────
 
