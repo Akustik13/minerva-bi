@@ -562,11 +562,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Actions: Валюта продажу ───────────────────────────────────────────────
 
     def _apply_currency(self, request, queryset, code: str):
-        """Оновлює валюту на замовленнях і всіх їх рядках."""
+        """Оновлює валюту тільки в рядках замовлень (SalesOrderLine).
+        SalesOrder.currency і shipping_currency НЕ змінюються."""
         from .models import SalesOrderLine
-        n = queryset.update(currency=code)
-        SalesOrderLine.objects.filter(order__in=queryset).update(currency=code)
-        self.message_user(request, f"💱 Валюта → {code} встановлено для {n} замовлень (і їх рядків).")
+        n = SalesOrderLine.objects.filter(order__in=queryset).update(currency=code)
+        self.message_user(request, f"💱 Валюта рядків → {code} оновлено ({n} рядків).")
 
     def action_set_currency_usd(self, request, queryset):
         self._apply_currency(request, queryset, "USD")

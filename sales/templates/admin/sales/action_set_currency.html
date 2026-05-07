@@ -59,8 +59,9 @@
 
 <div class="mv-action-box">
   <h2>💱 Змінити валюту замовлення</h2>
-  <p>Буде оновлено <strong style="color:var(--text,#c9d8e4)">{{ queryset.count }}</strong> замовлень
-     та всі їх рядки (SalesOrderLine).</p>
+  <p>Буде оновлено рядки <strong style="color:var(--text,#c9d8e4)">{{ queryset.count }}</strong> замовлень
+     (тільки <b>SalesOrderLine.currency</b>).<br>
+     <span style="color:var(--text-dim)">Валюта замовлення і вартість доставки — не змінюються.</span></p>
 
   <form method="post">
     {% csrf_token %}
