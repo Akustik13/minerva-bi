@@ -517,6 +517,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         "action_set_currency_usd",
         "action_set_currency_eur",
         "action_set_currency_gbp",
+        "action_set_currency_custom",
         # Валюта доставки
         "action_set_shipping_currency_usd",
         "action_set_shipping_currency_eur",
@@ -560,20 +561,45 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     # ── Actions: Валюта продажу ───────────────────────────────────────────────
 
+    def _apply_currency(self, request, queryset, code: str):
+        """Оновлює валюту на замовленнях і всіх їх рядках."""
+        from .models import SalesOrderLine
+        n = queryset.update(currency=code)
+        SalesOrderLine.objects.filter(order__in=queryset).update(currency=code)
+        self.message_user(request, f"💱 Валюта → {code} встановлено для {n} замовлень (і їх рядків).")
+
     def action_set_currency_usd(self, request, queryset):
-        n = queryset.update(currency="USD")
-        self.message_user(request, f"💵 Валюта продажу → USD для {n} замовлень.")
-    action_set_currency_usd.short_description = "💵 Валюта продажу → USD"
+        self._apply_currency(request, queryset, "USD")
+    action_set_currency_usd.short_description = "💵 Валюта → USD"
 
     def action_set_currency_eur(self, request, queryset):
-        n = queryset.update(currency="EUR")
-        self.message_user(request, f"💶 Валюта продажу → EUR для {n} замовлень.")
-    action_set_currency_eur.short_description = "💶 Валюта продажу → EUR"
+        self._apply_currency(request, queryset, "EUR")
+    action_set_currency_eur.short_description = "💶 Валюта → EUR"
 
     def action_set_currency_gbp(self, request, queryset):
-        n = queryset.update(currency="GBP")
-        self.message_user(request, f"💷 Валюта продажу → GBP для {n} замовлень.")
-    action_set_currency_gbp.short_description = "💷 Валюта продажу → GBP"
+        self._apply_currency(request, queryset, "GBP")
+    action_set_currency_gbp.short_description = "💷 Валюта → GBP"
+
+    def action_set_currency_custom(self, request, queryset):
+        """Встановлює довільну валюту (NZD, AUD, CAD тощо) через проміжну форму."""
+        from django.contrib.admin import helpers
+
+        if "apply" in request.POST:
+            code = request.POST.get("currency_code", "").strip().upper()
+            if code:
+                self._apply_currency(request, queryset, code)
+            return None
+
+        return render(
+            request,
+            "admin/sales/action_set_currency.html",
+            {
+                "queryset": queryset,
+                "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
+                **self.admin_site.each_context(request),
+            },
+        )
+    action_set_currency_custom.short_description = "💱 Валюта → інша (NZD, AUD, CAD…)"
 
     # ── Actions: Валюта доставки ──────────────────────────────────────────────
 

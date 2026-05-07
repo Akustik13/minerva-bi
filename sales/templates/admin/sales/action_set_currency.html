@@ -1,0 +1,110 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Змінити валюту | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:sales_salesorder_changelist' %}">Sales orders</a>
+  &rsaquo; Змінити валюту
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+  .mv-action-box {
+    max-width: 520px;
+    background: var(--bg-card,#1a2535); border: 1px solid var(--border-strong,#243347);
+    border-radius: 10px; padding: 28px 32px;
+    margin: 28px 0;
+  }
+  .mv-action-box h2 { font-size:16px; font-weight:700; color:var(--text,#c9d8e4); margin:0 0 6px; }
+  .mv-action-box p  { font-size:13px; color:var(--text-dim,#607d8b); margin:0 0 20px; }
+  .mv-action-box label {
+    display:block; font-size:12px; color:var(--text-muted,#9aafbe);
+    font-weight:600; margin-bottom:6px;
+    text-transform:uppercase; letter-spacing:.04em;
+  }
+  .mv-action-box select,
+  .mv-action-box input[type=text] {
+    width:100%; padding:8px 12px;
+    background:var(--bg-input,#111c26); border:1px solid var(--border,#2a3f52);
+    color:var(--text,#c9d8e4); border-radius:6px;
+    font-size:14px; margin-bottom:20px;
+  }
+  .mv-action-box .mv-orders-list {
+    background:var(--bg-input,#111c26); border:1px solid var(--border,#2a3f52);
+    border-radius:6px; padding:10px 14px;
+    max-height:160px; overflow-y:auto;
+    margin-bottom:20px;
+  }
+  .mv-action-box .mv-orders-list div { font-size:12px; color:var(--text-dim,#7d8590); padding:2px 0; }
+  .mv-action-box .hint { font-size:11px; color:var(--text-dim,#607d8b); margin-top:-14px; margin-bottom:18px; }
+  .btn-apply {
+    background:#2196f3; color:#fff; border:none;
+    padding:9px 22px; border-radius:6px;
+    font-size:13px; font-weight:700; cursor:pointer;
+    transition:background .15s;
+  }
+  .btn-apply:hover { background:#1976d2; }
+  .btn-cancel {
+    background:transparent; color:var(--text-dim,#607d8b); border:1px solid var(--border,#2a3f52);
+    padding:9px 22px; border-radius:6px;
+    font-size:13px; font-weight:700; cursor:pointer;
+    margin-left:10px; text-decoration:none; display:inline-block;
+  }
+</style>
+
+<div class="mv-action-box">
+  <h2>💱 Змінити валюту замовлення</h2>
+  <p>Буде оновлено <strong style="color:var(--text,#c9d8e4)">{{ queryset.count }}</strong> замовлень
+     та всі їх рядки (SalesOrderLine).</p>
+
+  <form method="post">
+    {% csrf_token %}
+    {% for order in queryset %}
+    <input type="hidden" name="{{ action_checkbox_name }}" value="{{ order.pk }}">
+    {% endfor %}
+    <input type="hidden" name="action" value="action_set_currency_custom">
+    <input type="hidden" name="apply" value="1">
+
+    <div class="mv-orders-list">
+      {% for order in queryset %}
+      <div>{{ order.source }}:{{ order.order_number }} — поточна: <b>{{ order.currency }}</b></div>
+      {% endfor %}
+    </div>
+
+    <label for="id_currency_code">Нова валюта (ISO 4217)</label>
+    <input type="text" name="currency_code" id="id_currency_code"
+           placeholder="USD / EUR / GBP / NZD / AUD / CAD …"
+           maxlength="8" autocomplete="off" style="text-transform:uppercase"
+           list="mv-currency-list">
+    <datalist id="mv-currency-list">
+      <option value="USD">
+      <option value="EUR">
+      <option value="GBP">
+      <option value="NZD">
+      <option value="AUD">
+      <option value="CAD">
+      <option value="CHF">
+      <option value="JPY">
+      <option value="SGD">
+    </datalist>
+    <p class="hint">Введи або вибери код валюти. Зміна торкнеться замовлення і всіх рядків.</p>
+
+    <button type="submit" class="btn-apply">✅ Застосувати</button>
+    <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-cancel">Скасувати</a>
+  </form>
+</div>
+
+<script>
+  // Автоматично переводимо у верхній регістр
+  document.getElementById('id_currency_code').addEventListener('input', function() {
+    const pos = this.selectionStart;
+    this.value = this.value.toUpperCase();
+    this.setSelectionRange(pos, pos);
+  });
+</script>
+{% endblock %}
