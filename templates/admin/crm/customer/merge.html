@@ -1,0 +1,384 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Злиття клієнтів — {{ block.super }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.merge-wrap {
+  max-width: 1100px;
+  padding: 24px 0;
+}
+
+/* ── Breadcrumb ── */
+.merge-breadcrumb {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-bottom: 24px;
+}
+.merge-breadcrumb a { color: var(--link-fg); text-decoration: none; }
+.merge-breadcrumb a:hover { text-decoration: underline; }
+
+/* ── Title row ── */
+.merge-title-row {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 28px;
+  flex-wrap: wrap; gap: 12px;
+}
+.merge-title { font-size: 22px; font-weight: 700; color: var(--text); }
+.merge-subtitle {
+  font-size: 13px; color: var(--text-dim); margin-top: 4px;
+}
+
+/* ── Instruction banner ── */
+.merge-hint {
+  background: rgba(201,168,76,0.08);
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 8px;
+  padding: 14px 18px;
+  margin-bottom: 24px;
+  font-size: 14px;
+  color: var(--text);
+  display: flex; gap: 10px; align-items: flex-start;
+}
+.merge-hint-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── Grid of customer cards ── */
+.merge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.merge-card {
+  background: var(--bg-card, #1a2535);
+  border: 2px solid var(--border-strong, #243347);
+  border-radius: 10px;
+  padding: 20px;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s;
+  position: relative;
+}
+.merge-card:hover {
+  border-color: var(--link-fg, #58a6ff);
+  box-shadow: 0 0 0 3px rgba(88,166,255,0.12);
+}
+.merge-card.selected {
+  border-color: var(--ok, #4ade80);
+  box-shadow: 0 0 0 3px rgba(74,222,128,0.15);
+}
+.merge-card.selected .merge-card-badge { display: block; }
+.merge-card-badge {
+  display: none;
+  position: absolute; top: -11px; right: 14px;
+  background: var(--ok, #4ade80);
+  color: #0a0e1a;
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+  padding: 2px 12px; border-radius: 20px;
+}
+.merge-card-radio { display: none; }
+
+/* Card header */
+.merge-card-header {
+  display: flex; align-items: flex-start; gap: 12px;
+  margin-bottom: 14px;
+}
+.merge-card-avatar {
+  width: 44px; height: 44px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--link-fg, #58a6ff), var(--accent, #a78bfa));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  color: #fff;
+}
+.merge-card-name { font-size: 16px; font-weight: 700; color: var(--text); word-break: break-word; }
+.merge-card-company { font-size: 13px; color: var(--text-dim); margin-top: 2px; }
+
+/* Orders badge */
+.merge-orders-badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: rgba(88,166,255,0.12);
+  border: 1px solid rgba(88,166,255,0.25);
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 12px; font-weight: 600;
+  color: var(--link-fg, #58a6ff);
+  margin-bottom: 14px;
+}
+.merge-orders-badge.has-orders {
+  background: rgba(74,222,128,0.1);
+  border-color: rgba(74,222,128,0.25);
+  color: var(--ok, #4ade80);
+}
+
+/* Field table */
+.merge-fields {
+  border-top: 1px solid var(--border-strong, #243347);
+  padding-top: 12px;
+}
+.merge-field {
+  display: grid; grid-template-columns: 90px 1fr;
+  gap: 4px 10px;
+  padding: 4px 0;
+  font-size: 13px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.merge-field:last-child { border: none; }
+.merge-field-key {
+  color: var(--text-dim); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .5px;
+  padding-top: 1px;
+}
+.merge-field-val { color: var(--text); word-break: break-all; }
+.merge-field-val.empty { color: var(--text-dim); font-style: italic; }
+
+/* ── Merge actions ── */
+.merge-actions {
+  background: var(--bg-card, #1a2535);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 10px;
+  padding: 20px 24px;
+  display: flex; align-items: center; gap: 16px;
+  flex-wrap: wrap;
+}
+.merge-actions-text { flex: 1; font-size: 14px; color: var(--text-dim); }
+.merge-actions-text strong { color: var(--text); }
+.btn-merge-submit {
+  background: linear-gradient(135deg, #4ade80, #22c55e);
+  color: #0a0e1a; border: none; border-radius: 6px;
+  padding: 10px 28px;
+  font-size: 14px; font-weight: 700; letter-spacing: .5px;
+  cursor: pointer; transition: opacity .2s, transform .15s;
+}
+.btn-merge-submit:hover { opacity: .88; transform: translateY(-1px); }
+.btn-merge-submit:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+.btn-merge-cancel {
+  background: transparent;
+  border: 1px solid var(--border-strong, #243347);
+  color: var(--text-dim); border-radius: 6px;
+  padding: 10px 20px; font-size: 14px;
+  cursor: pointer; text-decoration: none;
+  transition: border-color .2s, color .2s;
+  display: inline-block;
+}
+.btn-merge-cancel:hover { border-color: var(--err, #f87171); color: var(--err, #f87171); }
+
+/* ── What will happen block ── */
+.merge-preview {
+  margin-bottom: 24px;
+  background: var(--bg-card, #1a2535);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.merge-preview-title {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
+}
+.merge-preview-list { list-style: none; }
+.merge-preview-list li {
+  font-size: 13px; color: var(--text-dim);
+  padding: 4px 0;
+  display: flex; gap: 8px; align-items: flex-start;
+}
+.merge-preview-list li::before { content: '→'; color: var(--ok, #4ade80); flex-shrink: 0; }
+
+/* ── Winner label ── */
+.winner-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--ok, #4ade80);
+  margin-top: 10px;
+  display: flex; align-items: center; gap: 5px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="merge-wrap">
+
+  <div class="merge-breadcrumb">
+    <a href="{% url 'admin:crm_customer_changelist' %}">Клієнти</a>
+    &rsaquo; Злиття дублікатів
+  </div>
+
+  <div class="merge-title-row">
+    <div>
+      <div class="merge-title">🔀 Злиття дублікатів клієнта</div>
+      <div class="merge-subtitle">Оберіть основного клієнта — всі замовлення та дані будуть перенесені до нього</div>
+    </div>
+  </div>
+
+  <div class="merge-hint">
+    <span class="merge-hint-icon">💡</span>
+    <div>
+      <strong>Як працює злиття:</strong> клацніть на картку клієнта, якого хочете залишити (він стане основним).
+      Всі <strong>замовлення, нотатки та стратегії</strong> з інших клієнтів будуть перенесені до нього.
+      Порожні поля основного клієнта заповняться даними з дублікатів. Дублікати будуть видалені.
+    </div>
+  </div>
+
+  <form method="post" id="merge-form">
+    {% csrf_token %}
+    <input type="hidden" name="ids" value="{{ ids_str }}">
+    <input type="hidden" name="winner" id="winner-input" value="">
+
+    <!-- Customer cards -->
+    <div class="merge-grid">
+      {% for customer in customers %}
+      <div class="merge-card" onclick="selectWinner({{ customer.pk }}, this)" data-pk="{{ customer.pk }}">
+        <div class="merge-card-badge">✓ ОСНОВНИЙ</div>
+
+        <div class="merge-card-header">
+          <div class="merge-card-avatar">
+            {% if customer.company %}🏢{% else %}👤{% endif %}
+          </div>
+          <div>
+            <div class="merge-card-name">{{ customer.name }}</div>
+            {% if customer.company %}
+            <div class="merge-card-company">{{ customer.company }}</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="merge-orders-badge {% if customer._merge_orders %}has-orders{% endif %}">
+          🛒 {{ customer._merge_orders }} замовлень
+        </div>
+
+        <div class="merge-fields">
+          {% if customer.email %}
+          <div class="merge-field">
+            <span class="merge-field-key">Email</span>
+            <span class="merge-field-val">{{ customer.email }}</span>
+          </div>
+          {% endif %}
+          {% if customer.phone %}
+          <div class="merge-field">
+            <span class="merge-field-key">Телефон</span>
+            <span class="merge-field-val">{{ customer.phone }}</span>
+          </div>
+          {% endif %}
+          {% if customer.addr_city or customer.addr_street %}
+          <div class="merge-field">
+            <span class="merge-field-key">Місто</span>
+            <span class="merge-field-val">{{ customer.addr_zip }} {{ customer.addr_city }}</span>
+          </div>
+          {% endif %}
+          {% if customer.country %}
+          <div class="merge-field">
+            <span class="merge-field-key">Країна</span>
+            <span class="merge-field-val">{{ customer.country }}</span>
+          </div>
+          {% endif %}
+          {% if customer.segment %}
+          <div class="merge-field">
+            <span class="merge-field-key">Сегмент</span>
+            <span class="merge-field-val">{{ customer.get_segment_display }}</span>
+          </div>
+          {% endif %}
+          {% if customer.status %}
+          <div class="merge-field">
+            <span class="merge-field-key">Статус</span>
+            <span class="merge-field-val">{{ customer.get_status_display }}</span>
+          </div>
+          {% endif %}
+          {% if customer.source %}
+          <div class="merge-field">
+            <span class="merge-field-key">Джерело</span>
+            <span class="merge-field-val">{{ customer.source }}</span>
+          </div>
+          {% endif %}
+          <div class="merge-field">
+            <span class="merge-field-key">ID / ключ</span>
+            <span class="merge-field-val" style="font-family:monospace;font-size:11px">
+              #{{ customer.pk }} · {{ customer.external_key|slice:":12" }}…
+            </span>
+          </div>
+          <div class="merge-field">
+            <span class="merge-field-key">Створено</span>
+            <span class="merge-field-val">{{ customer.created_at|date:"d.m.Y" }}</span>
+          </div>
+        </div>
+
+        <div class="winner-label" id="winner-label-{{ customer.pk }}" style="display:none">
+          ✓ Буде збережено як основний
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- What will happen -->
+    <div class="merge-preview">
+      <div class="merge-preview-title">📋 Що відбудеться після злиття:</div>
+      <ul class="merge-preview-list">
+        <li>Всі замовлення (SalesOrder) перенесуться до основного клієнта</li>
+        <li>Нотатки (CustomerNote) та таймлайн перенесуться до основного клієнта</li>
+        <li>Активні CRM-стратегії перенесуться до основного клієнта</li>
+        <li>Порожні поля (email, телефон, адреса) основного клієнта заповняться даними з дублікатів</li>
+        <li>Нотатки з дублікатів будуть дописані в поле «Примітки» основного клієнта</li>
+        <li>Клієнти-дублікати будуть <strong style="color:var(--err,#f87171)">назавжди видалені</strong></li>
+      </ul>
+    </div>
+
+    <!-- Actions bar -->
+    <div class="merge-actions">
+      <div class="merge-actions-text" id="merge-status-text">
+        👆 Клацніть на картку клієнта, якого хочете залишити
+      </div>
+      <a href="{% url 'admin:crm_customer_changelist' %}" class="btn-merge-cancel">Скасувати</a>
+      <button type="submit" class="btn-merge-submit" id="merge-submit-btn" disabled>
+        🔀 Виконати злиття
+      </button>
+    </div>
+
+  </form>
+</div>
+
+<script>
+var selectedPk = null;
+var customerNames = {
+  {% for c in customers %}
+  {{ c.pk }}: "{{ c.company|default:c.name|escapejs }}",
+  {% endfor %}
+};
+var totalOrders = {
+  {% for c in customers %}
+  {{ c.pk }}: {{ c._merge_orders }},
+  {% endfor %}
+};
+
+function selectWinner(pk, card) {
+  // Reset all
+  document.querySelectorAll('.merge-card').forEach(function(c) {
+    c.classList.remove('selected');
+  });
+  document.querySelectorAll('[id^="winner-label-"]').forEach(function(l) {
+    l.style.display = 'none';
+  });
+
+  // Select clicked
+  card.classList.add('selected');
+  document.getElementById('winner-label-' + pk).style.display = 'flex';
+  document.getElementById('winner-input').value = pk;
+  selectedPk = pk;
+
+  // Count orders to move
+  var ordersToMove = 0;
+  for (var id in totalOrders) {
+    if (parseInt(id) !== pk) ordersToMove += totalOrders[id];
+  }
+
+  var losers = [];
+  for (var id in customerNames) {
+    if (parseInt(id) !== pk) losers.push(customerNames[id]);
+  }
+
+  document.getElementById('merge-status-text').innerHTML =
+    '✅ Основний: <strong>' + customerNames[pk] + '</strong> — ' +
+    'буде видалено: ' + losers.join(', ') +
+    (ordersToMove > 0 ? ' · перенесено замовлень: <strong>' + ordersToMove + '</strong>' : '');
+
+  document.getElementById('merge-submit-btn').disabled = false;
+}
+</script>
+{% endblock %}

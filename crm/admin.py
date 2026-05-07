@@ -1,8 +1,9 @@
 from __future__ import annotations
 from decimal import Decimal
 from django.contrib import admin, messages
+from django.db import transaction
 from django.db.models import Sum, Count, Max
-from django.shortcuts import redirect, get_object_or_404
+from django.shortcuts import redirect, get_object_or_404, render
 from django.urls import path
 from django.utils.html import format_html
 from django.utils.http import urlencode
@@ -167,6 +168,8 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
     change_form_template = "admin/crm/customer/change_form.html"
 
     actions = [
+        # Злиття дублікатів
+        "action_merge_customers",
         # Статус
         "action_set_status_active",
         "action_set_status_inactive",
@@ -179,6 +182,19 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         "action_set_segment_reseller",
         "action_set_segment_other",
     ]
+
+    def action_merge_customers(self, request, queryset):
+        ids = list(queryset.values_list("pk", flat=True))
+        if len(ids) < 2:
+            self.message_user(request, "⚠️ Оберіть мінімум 2 клієнтів для злиття.", messages.WARNING)
+            return
+        if len(ids) > 10:
+            self.message_user(request, "⚠️ Максимум 10 клієнтів за раз.", messages.WARNING)
+            return
+        return redirect(
+            f"merge/?ids={','.join(str(i) for i in ids)}"
+        )
+    action_merge_customers.short_description = "🔀 Злити дублікатів в одного клієнта"
 
     # ── Actions: Статус ───────────────────────────────────────────────────────
 
@@ -296,6 +312,11 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
         urls = super().get_urls()
         custom = [
             path(
+                "merge/",
+                self.admin_site.admin_view(self.merge_view),
+                name="crm_customer_merge",
+            ),
+            path(
                 "sync-crm/",
                 self.admin_site.admin_view(self.sync_view),
                 name="crm_customer_sync",
@@ -332,6 +353,116 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             ),
         ]
         return custom + urls
+
+    # ── Merge view ────────────────────────────────────────────────────────────
+
+    def merge_view(self, request):
+        """GET: preview злиття. POST: виконати злиття."""
+        from strategy.models import CustomerStrategy
+
+        # --- Parse IDs ---
+        raw = request.GET.get("ids", "") or request.POST.get("ids", "")
+        try:
+            ids = [int(x) for x in raw.split(",") if x.strip()]
+        except ValueError:
+            ids = []
+
+        if len(ids) < 2:
+            self.message_user(request, "⚠️ Потрібно мінімум 2 клієнти.", messages.WARNING)
+            return redirect("admin:crm_customer_changelist")
+
+        customers = list(Customer.objects.filter(pk__in=ids))
+        if len(customers) < 2:
+            self.message_user(request, "⚠️ Клієнтів не знайдено.", messages.WARNING)
+            return redirect("admin:crm_customer_changelist")
+
+        # Annotate order count for each customer
+        order_counts = {
+            row["customer_key"]: row["cnt"]
+            for row in SalesOrder.objects.filter(
+                customer_key__in=[c.external_key for c in customers]
+            ).values("customer_key").annotate(cnt=Count("id"))
+        }
+        for c in customers:
+            c._merge_orders = order_counts.get(c.external_key, 0)
+
+        # --- POST: perform merge ---
+        if request.method == "POST":
+            winner_id = request.POST.get("winner")
+            try:
+                winner_id = int(winner_id)
+            except (TypeError, ValueError):
+                self.message_user(request, "⚠️ Оберіть основного клієнта.", messages.WARNING)
+                return redirect(f"?ids={raw}")
+
+            try:
+                winner = next(c for c in customers if c.pk == winner_id)
+            except StopIteration:
+                self.message_user(request, "⚠️ Помилка: клієнт-переможець не знайдений.", messages.ERROR)
+                return redirect("admin:crm_customer_changelist")
+
+            losers = [c for c in customers if c.pk != winner_id]
+            loser_pks = [c.pk for c in losers]
+            loser_keys = [c.external_key for c in losers]
+
+            with transaction.atomic():
+                # 1. Перепризначити замовлення
+                orders_moved = SalesOrder.objects.filter(
+                    customer_key__in=loser_keys
+                ).update(customer_key=winner.external_key)
+
+                # 2. Перепризначити нотатки, таймлайн, стратегії
+                notes_moved = CustomerNote.objects.filter(
+                    customer__pk__in=loser_pks
+                ).update(customer=winner)
+                CustomerTimeline.objects.filter(
+                    customer__pk__in=loser_pks
+                ).update(customer=winner)
+                CustomerStrategy.objects.filter(
+                    customer__pk__in=loser_pks
+                ).update(customer=winner)
+
+                # 3. Заповнити порожні поля переможця даними від дублікатів
+                changed = False
+                extra_notes = []
+                for loser in losers:
+                    for field in ("email", "phone", "company", "country",
+                                  "addr_street", "addr_city", "addr_zip",
+                                  "shipping_address", "source"):
+                        if not getattr(winner, field) and getattr(loser, field):
+                            setattr(winner, field, getattr(loser, field))
+                            changed = True
+                    if loser.notes:
+                        extra_notes.append(loser.notes)
+
+                if extra_notes:
+                    sep = "\n\n---\n"
+                    winner.notes = (winner.notes + sep if winner.notes else "") + sep.join(extra_notes)
+                    changed = True
+
+                if changed:
+                    winner.save()
+
+                # 4. Видалити дублікати
+                Customer.objects.filter(pk__in=loser_pks).delete()
+
+            self.message_user(
+                request,
+                f"✅ Злито {len(losers)} дублікат(и) → «{winner}». "
+                f"Замовлень перенесено: {orders_moved}. Нотаток: {notes_moved}.",
+                messages.SUCCESS,
+            )
+            return redirect(f"../{ winner.pk }/change/")
+
+        # --- GET: preview ---
+        context = {
+            **self.admin_site.each_context(request),
+            "title": "🔀 Злиття дублікатів клієнта",
+            "customers": customers,
+            "ids_str": raw,
+            "opts": Customer._meta,
+        }
+        return render(request, "admin/crm/customer/merge.html", context)
 
     def assign_strategy_view(self, request, pk):
         """One-click: рекомендує шаблон → створює CustomerStrategy → відкриває canvas."""
