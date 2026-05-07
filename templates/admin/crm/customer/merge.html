@@ -307,6 +307,31 @@
       {% endfor %}
     </div>
 
+    <!-- Duplicate order numbers warning -->
+    {% if duplicate_order_numbers %}
+    <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.35);border-radius:10px;padding:16px 20px;margin-bottom:20px">
+      <div style="font-size:14px;font-weight:700;color:#fbbf24;margin-bottom:10px">
+        ⚠️ Однакові номери замовлень у різних клієнтів ({{ duplicate_order_numbers|length }} шт.)
+      </div>
+      <p style="font-size:13px;color:var(--text-dim);margin-bottom:10px">
+        Ці номери замовлень зустрічаються в обох клієнтів. Скоріш за все — один і той самий рахунок
+        був імпортований двічі з різними даними клієнта. Після злиття обидва записи залишаться у переможця —
+        перевірте їх вручну та видаліть зайвий.
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        {% for num in duplicate_order_numbers %}
+        <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ num }}"
+           target="_blank"
+           style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);
+                  border-radius:5px;padding:3px 10px;font-size:12px;
+                  color:#fbbf24;text-decoration:none;font-family:monospace">
+          {{ num }} ↗
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- What will happen -->
     <div class="merge-preview">
       <div class="merge-preview-title">📋 Що відбудеться після злиття:</div>

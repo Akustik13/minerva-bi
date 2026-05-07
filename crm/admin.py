@@ -377,14 +377,32 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             return redirect("admin:crm_customer_changelist")
 
         # Annotate order count for each customer
+        all_keys = [c.external_key for c in customers]
         order_counts = {
             row["customer_key"]: row["cnt"]
             for row in SalesOrder.objects.filter(
-                customer_key__in=[c.external_key for c in customers]
+                customer_key__in=all_keys
             ).values("customer_key").annotate(cnt=Count("id"))
         }
         for c in customers:
             c._merge_orders = order_counts.get(c.external_key, 0)
+
+        # Detect overlapping order_numbers across customers (same source+number = impossible due
+        # to unique_together, but same order_number different source = warn user)
+        all_orders = (
+            SalesOrder.objects
+            .filter(customer_key__in=all_keys)
+            .values("customer_key", "order_number", "source", "order_date")
+            .order_by("order_number")
+        )
+        # Group by order_number: if the same number appears for 2+ different customer_keys → flag
+        from collections import defaultdict
+        num_to_keys: dict = defaultdict(set)
+        for o in all_orders:
+            num_to_keys[o["order_number"]].add(o["customer_key"])
+        duplicate_order_numbers = sorted(
+            num for num, keys in num_to_keys.items() if len(keys) > 1
+        )
 
         # --- POST: perform merge ---
         if request.method == "POST":
@@ -446,11 +464,18 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
                 # 4. Видалити дублікати
                 Customer.objects.filter(pk__in=loser_pks).delete()
 
+            dup_warn = ""
+            if duplicate_order_numbers:
+                dup_warn = (
+                    f" ⚠️ Увага: {len(duplicate_order_numbers)} номерів замовлень "
+                    f"({', '.join(duplicate_order_numbers[:5])}{'…' if len(duplicate_order_numbers) > 5 else ''}) "
+                    f"зустрічались у кількох клієнтів — перевірте замовлення на дублікати."
+                )
             self.message_user(
                 request,
                 f"✅ Злито {len(losers)} дублікат(и) → «{winner}». "
-                f"Замовлень перенесено: {orders_moved}. Нотаток: {notes_moved}.",
-                messages.SUCCESS,
+                f"Замовлень перенесено: {orders_moved}. Нотаток: {notes_moved}.{dup_warn}",
+                messages.SUCCESS if not dup_warn else messages.WARNING,
             )
             return redirect(f"../{ winner.pk }/change/")
 
@@ -461,6 +486,7 @@ class CustomerAdmin(AuditableMixin, admin.ModelAdmin):
             "customers": customers,
             "ids_str": raw,
             "opts": Customer._meta,
+            "duplicate_order_numbers": duplicate_order_numbers,
         }
         return render(request, "admin/crm/customer/merge.html", context)
 
