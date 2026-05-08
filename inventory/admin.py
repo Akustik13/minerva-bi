@@ -400,7 +400,7 @@ class LocationAdmin(admin.ModelAdmin):
 @admin.register(InventoryTransaction)
 class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
     list_display  = ("tx_type_badge", "signed_qty", "balance_col", "product_link", "location",
-                     "ref_doc", "tx_date", "created_at", "performer_col")
+                     "ref_doc_link", "tx_date", "created_at", "performer_col")
     search_fields = ("product__sku", "ref_doc", "external_key")
     list_filter   = ("tx_type", "location__code", "product__category")
     date_hierarchy = "created_at"
@@ -434,6 +434,46 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         if not getattr(obj, "external_key", None):
             obj.external_key = f"manual:{uuid.uuid4()}"
         super().save_model(request, obj, form, change)
+
+    def changelist_view(self, request, extra_context=None):
+        self._ref_link_cache = None
+        return super().changelist_view(request, extra_context)
+
+    @admin.display(description="Ref Doc", ordering="ref_doc")
+    def ref_doc_link(self, obj):
+        ref = obj.ref_doc
+        if not ref:
+            return '—'
+
+        if self._ref_link_cache is None:
+            from sales.models import SalesOrder
+            so_map = {
+                f"SO-{o.source}:{o.order_number}": o.pk
+                for o in SalesOrder.objects.only('pk', 'source', 'order_number')
+            }
+            po_map = {
+                f"PO-{o.code}": o.pk
+                for o in PurchaseOrder.objects.filter(code__isnull=False).only('pk', 'code')
+            }
+            self._ref_link_cache = {'so': so_map, 'po': po_map}
+
+        if ref.startswith('SO-') and ref in self._ref_link_cache['so']:
+            pk = self._ref_link_cache['so'][ref]
+            url = reverse('admin:sales_salesorder_change', args=[pk])
+            return format_html(
+                '<a href="{}" style="color:var(--link-fg);font-size:11px">{}</a>',
+                url, ref[3:],
+            )
+
+        if ref.startswith('PO-') and ref in self._ref_link_cache['po']:
+            pk = self._ref_link_cache['po'][ref]
+            url = reverse('admin:inventory_purchaseorder_change', args=[pk])
+            return format_html(
+                '<a href="{}" style="color:var(--link-fg);font-size:11px">{}</a>',
+                url, ref[3:],
+            )
+
+        return format_html('<span style="font-size:11px;opacity:.75">{}</span>', ref)
 
     def get_queryset(self, request):
         return (
