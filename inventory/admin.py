@@ -33,8 +33,12 @@ from shipping.models import ProductPackaging
 # ── Утиліти ────────────────────────────────────────────────────────────────────
 
 def _get_stock(product):
+    """Physical on-hand stock — excludes RESERVED transactions."""
     result = InventoryTransaction.objects.filter(
-        product=product).aggregate(total=Sum('qty'))
+        product=product,
+    ).exclude(
+        tx_type=InventoryTransaction.TxType.RESERVED,
+    ).aggregate(total=Sum('qty'))
     return float(result['total'] or 0)
 
 
@@ -151,6 +155,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             since_3m = (timezone.now() - timedelta(days=90)).date()
             stock_subq = (
                 InventoryTransaction.objects.filter(product=OuterRef('pk'))
+                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
                 .values('product').annotate(t=Sum('qty')).values('t')
             )
             sales_subq = (
@@ -488,17 +493,23 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         return format_html('<span style="font-size:11px;opacity:.75">{}</span>', ref)
 
     def get_queryset(self, request):
+        from django.db.models import Case, When, Value, DecimalField as _DF
         return (
             super().get_queryset(request)
             .select_related('product', 'performed_by')
             .annotate(running_balance=Window(
-                expression=Sum('qty'),
+                expression=Sum(Case(
+                    When(tx_type=InventoryTransaction.TxType.RESERVED,
+                         then=Value(Decimal('0'))),
+                    default='qty',
+                    output_field=_DF(max_digits=18, decimal_places=3),
+                )),
                 partition_by=['product_id'],
                 order_by=['tx_date', 'pk'],
             ))
         )
 
-    @admin.display(description="Залишок")
+    @admin.display(description="На руках")
     def balance_col(self, obj):
         val = getattr(obj, 'running_balance', None)
         if val is None:
@@ -615,6 +626,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             since_3m = (timezone.now() - timedelta(days=90)).date()
             stock_subq = (
                 InventoryTransaction.objects.filter(product=OuterRef('pk'))
+                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
                 .values('product').annotate(t=Sum('qty')).values('t')
             )
             reserved_subq = (
@@ -736,8 +748,18 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         }
         color, msg = status_cfg.get(d['status'], ('#607d8b', '—'))
 
+        on_hand = int(d['stock'])
+        reserved = int(abs(getattr(obj, '_reserved_total', None) or 0))
+        available = on_hand - reserved
+        avail_color = '#f44336' if available <= 0 else ('#ff9800' if available < 5 else '#4caf50')
+        avail_html = f"<b style='color:{avail_color}'>{available} шт.</b>"
         rows = [
-            ("На складі зараз", f"<b>{int(d['stock'])} шт.</b>"),
+            ("На руках (фізично)", f"<b>{on_hand} шт.</b>"),
+        ]
+        if reserved:
+            rows.append(("🔒 Зарезервовано", f"<span style='color:#FFB300;font-weight:700'>−{reserved} шт.</span>"))
+        rows += [
+            ("✅ Доступно до продажу", avail_html),
             ("Середні продажі", f"{d['monthly']}/міс (останні 3 міс)" if d['monthly'] else "—"),
             ("Вистачить на", f"{d['months_left']} міс" if d['months_left'] is not None else "—"),
             ("Рекомендовано замовити", f"<b style='color:#2196f3'>{d['reorder_qty']} шт.</b>" if d['reorder_qty'] else "Не потрібно"),

@@ -34,6 +34,7 @@ def _get_critical_stock():
         ):
             stock = float(
                 InventoryTransaction.objects.filter(product=p)
+                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
                 .aggregate(t=Sum('qty'))['t'] or 0
             )
             sold = float(
