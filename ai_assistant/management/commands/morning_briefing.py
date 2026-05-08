@@ -98,12 +98,28 @@ class Command(BaseCommand):
         if bs.include_new_emails:
             try:
                 from crm.models import CustomerTimeline
-                new_emails = CustomerTimeline.objects.filter(
-                    event_type='email_in',
-                    created_at__date=today,
-                ).count()
-                if new_emails:
-                    data_lines.append(f"- Нових листів від клієнтів сьогодні: {new_emails}")
+                incoming = (CustomerTimeline.objects
+                            .filter(event_type='email_in', created_at__date=today)
+                            .select_related('customer')
+                            .order_by('-created_at')[:10])
+                if incoming:
+                    senders = []
+                    seen = set()
+                    for ev in incoming:
+                        label = (ev.customer.company or ev.customer.name
+                                 if ev.customer else ev.title[:40])
+                        if label not in seen:
+                            seen.add(label)
+                            senders.append(label)
+                        if len(senders) >= 3:
+                            break
+                    extra = len(incoming) - len(senders)
+                    sender_str = ', '.join(senders)
+                    if extra > 0:
+                        sender_str += f' та ще {extra}'
+                    data_lines.append(
+                        f"- Нових листів від клієнтів: {len(incoming)} ({sender_str})"
+                    )
             except Exception:
                 pass
 
