@@ -404,8 +404,8 @@ class LocationAdmin(admin.ModelAdmin):
 
 @admin.register(InventoryTransaction)
 class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
-    list_display  = ("tx_type_badge", "signed_qty", "balance_col", "product_link", "location",
-                     "ref_doc_link", "tx_date", "created_at", "performer_col")
+    list_display  = ("date_col", "tx_type_badge", "product_link", "qty_col",
+                     "balance_col", "ref_doc_link", "location", "performer_col")
     search_fields = ("product__sku", "ref_doc", "external_key")
     list_filter   = ("tx_type", "location__code", "product__category")
     date_hierarchy = "created_at"
@@ -429,6 +429,17 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         'Reserved':   ('🔒', '#FFB300',           'rgba(255,179,0,.13)',   'Резерв'),
     }
 
+    @admin.display(description="Дата", ordering="tx_date")
+    def date_col(self, obj):
+        from django.utils.formats import date_format
+        d = obj.tx_date
+        if not d:
+            return '—'
+        return format_html(
+            '<span style="font-size:12px;white-space:nowrap;color:var(--text)">{}</span>',
+            date_format(d, 'd.m.Y'),
+        )
+
     @admin.display(description="Тип", ordering="tx_type")
     def tx_type_badge(self, obj):
         icon, color, bg, label = self._TX_META.get(obj.tx_type, ('•', 'var(--text-dim)', 'transparent', obj.tx_type))
@@ -439,13 +450,25 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             bg, color, icon, label,
         )
 
-    def signed_qty(self, obj):
+    @admin.display(description="К-сть", ordering="qty")
+    def qty_col(self, obj):
         try:
             q = Decimal(str(obj.qty))
-            return f"+{q}" if q > 0 else str(q)
         except Exception:
             return obj.qty
-    signed_qty.short_description = "Qty"
+        n = int(q) if q == int(q) else float(q)
+        is_reserved = obj.tx_type == InventoryTransaction.TxType.RESERVED
+        is_incoming = obj.tx_type == InventoryTransaction.TxType.INCOMING
+        if is_reserved:
+            sign, color = '−', '#FFB300'
+        elif is_incoming:
+            sign, color = '+', 'var(--ok,#3fb950)'
+        else:
+            sign, color = ('−' if q < 0 else '+'), ('var(--err,#f85149)' if q < 0 else 'var(--ok,#3fb950)')
+        return format_html(
+            '<span style="font-family:monospace;font-weight:700;font-size:13px;color:{}">{}{}</span>',
+            color, sign, abs(n),
+        )
 
     def save_model(self, request, obj, form, change):
         if not getattr(obj, "external_key", None):
@@ -456,7 +479,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         self._ref_link_cache = None
         return super().changelist_view(request, extra_context)
 
-    @admin.display(description="Ref Doc", ordering="ref_doc")
+    @admin.display(description="📄 Документ", ordering="ref_doc")
     def ref_doc_link(self, obj):
         ref = obj.ref_doc
         if not ref:
@@ -516,10 +539,21 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             return '—'
         n = int(val)
         color = 'var(--ok,#3fb950)' if n > 0 else ('var(--err,#f85149)' if n < 0 else 'var(--text-dim)')
-        return format_html(
+        balance_html = format_html(
             '<span style="font-weight:700;color:{};font-family:monospace">{}</span>',
             color, n,
         )
+        if obj.tx_type == InventoryTransaction.TxType.RESERVED:
+            try:
+                r = int(abs(Decimal(str(obj.qty))))
+            except Exception:
+                r = 0
+            return format_html(
+                '{} <span style="font-size:10px;color:#FFB300;font-weight:600" '
+                'title="Фізично не змінилось — товар зарезервований">🔒 −{}</span>',
+                balance_html, r,
+            )
+        return balance_html
 
     @admin.display(description="Товар")
     def product_link(self, obj):
