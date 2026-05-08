@@ -799,9 +799,13 @@ def notify_new_order(order):
     lines_data = []
     try:
         from django.db.models import Sum
-        from inventory.models import InventoryTransaction
+        from inventory.models import InventoryTransaction, Product as _Product
         for line in order.lines.select_related('product').all():
-            if not line.product:
+            product = line.product
+            # Fallback: match by SKU when FK is not set
+            if not product and line.sku_raw:
+                product = _Product.objects.filter(sku=line.sku_raw).first()
+            if not product:
                 lines_data.append({
                     'sku': line.sku_raw or '—', 'name': '—',
                     'qty': line.qty, 'in_stock': None, 'stock': 0,
@@ -812,16 +816,16 @@ def notify_new_order(order):
                 })
                 continue
             stock = (
-                InventoryTransaction.objects.filter(product=line.product)
+                InventoryTransaction.objects.filter(product=product)
                 .aggregate(t=Sum('qty'))['t'] or 0
             )
             lines_data.append({
-                'sku':        line.product.sku,
-                'name':       line.product.name,
+                'sku':        product.sku,
+                'name':       product.name,
                 'qty':        line.qty,
                 'stock':      int(stock),
                 'in_stock':   stock >= line.qty,
-                'datasheet':  line.product.datasheet_url or '',
+                'datasheet':  getattr(product, 'datasheet_url', '') or '',
                 'unit_price': float(line.unit_price or 0),
                 'line_total': float(line.total_price or (
                     (line.unit_price or 0) * (line.qty or 0)
