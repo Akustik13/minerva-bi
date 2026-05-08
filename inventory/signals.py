@@ -214,8 +214,12 @@ def _salesorder_post_save(sender, instance, created, **kwargs):
         if deduct_on == InventorySettings.DeductOn.SHIPPED and not use_reservation:
             should_deduct = True
 
-    if just_delivered and deduct_on == InventorySettings.DeductOn.DELIVERED and not use_reservation:
-        should_deduct = True
+    if just_delivered:
+        if use_reservation:
+            # Safety net: convert any reservations not yet released on shipped
+            should_convert_reserv = True
+        if deduct_on == InventorySettings.DeductOn.DELIVERED and not use_reservation:
+            should_deduct = True
 
     if not should_deduct and not should_convert_reserv:
         return

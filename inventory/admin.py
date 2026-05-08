@@ -404,6 +404,18 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
     search_fields = ("product__sku", "ref_doc", "external_key")
     list_filter   = ("tx_type", "location__code", "product__category")
     date_hierarchy = "created_at"
+    actions       = ["release_reservations"]
+
+    @admin.action(description="🔓 Конвертувати вибрані резерви → Списання")
+    def release_reservations(self, request, queryset):
+        updated = queryset.filter(
+            tx_type=InventoryTransaction.TxType.RESERVED
+        ).update(tx_type=InventoryTransaction.TxType.OUTGOING)
+        self.message_user(
+            request,
+            f"Конвертовано {updated} резерв(ів) → Відвантаження.",
+            messages.SUCCESS if updated else messages.WARNING,
+        )
 
     _TX_META = {
         'Incoming':   ('▲', 'var(--ok,#3fb950)',  'rgba(63,185,80,.13)',   'Прихід'),
