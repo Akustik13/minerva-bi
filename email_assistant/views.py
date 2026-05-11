@@ -18,10 +18,11 @@ def _get_account(request):
             .order_by('-is_primary').first())
 
 
-def _ctx(**kwargs):
-    """Merge is_nav_sidebar_enabled into any render context."""
-    kwargs.setdefault('is_nav_sidebar_enabled', True)
-    return kwargs
+def _ctx(request, ctx: dict) -> dict:
+    """Inject is_nav_sidebar_enabled based on user's EmailSettings."""
+    from email_assistant.models import EmailSettings
+    ctx['is_nav_sidebar_enabled'] = EmailSettings.get_for_user(request.user).show_admin_sidebar
+    return ctx
 
 
 def _get_signature(account) -> str:
@@ -138,7 +139,7 @@ def inbox_view(request):
 
     account = _get_account(request)
     if not account:
-        return render(request, 'email_assistant/no_account.html', {'title': 'Email Асистент', 'is_nav_sidebar_enabled': True})
+        return render(request, 'email_assistant/no_account.html', _ctx(request, {'title': 'Email Асистент'}))
 
     folder   = request.GET.get('folder', 'inbox')
     q        = request.GET.get('q', '').strip()
@@ -157,7 +158,7 @@ def inbox_view(request):
         is_read=False, is_deleted=False
     ).count()
 
-    return render(request, 'email_assistant/inbox.html', {
+    return render(request, 'email_assistant/inbox.html', _ctx(request, {
         'title':                 'Email Асистент',
         'account':               account,
         'emails':                emails,
@@ -173,9 +174,8 @@ def inbox_view(request):
         'page_range':            _page_range(page, max(1, (total + per_page - 1) // per_page)),
         'unread_count':          unread_count,
         'crm_contacts':          json.dumps(_crm_contacts()),
-        'sync_interval_minutes':  max(1, account.sync_interval_minutes),
-        'is_nav_sidebar_enabled': True,
-    })
+        'sync_interval_minutes': max(1, account.sync_interval_minutes),
+    }))
 
 
 @staff_member_required
@@ -192,14 +192,13 @@ def thread_view(request, thread_pk):
         thread.has_unread = False
         thread.save(update_fields=['has_unread'])
 
-    return render(request, 'email_assistant/thread.html', {
-        'title':           thread.subject,
-        'account':         account,
-        'thread':          thread,
-        'emails':          emails,
-        'last_msg':        emails[-1] if emails else None,
-        'is_nav_sidebar_enabled': True,
-    })
+    return render(request, 'email_assistant/thread.html', _ctx(request, {
+        'title':    thread.subject,
+        'account':  account,
+        'thread':   thread,
+        'emails':   emails,
+        'last_msg': emails[-1] if emails else None,
+    }))
 
 
 @staff_member_required
@@ -213,14 +212,13 @@ def message_view(request, message_pk):
         msg.is_read = True
         msg.save(update_fields=['is_read'])
 
-    return render(request, 'email_assistant/thread.html', {
-        'title':           msg.subject,
-        'account':         account,
-        'thread':          msg.thread,
-        'emails':          [msg],
-        'last_msg':        msg,
-        'is_nav_sidebar_enabled': True,
-    })
+    return render(request, 'email_assistant/thread.html', _ctx(request, {
+        'title':    msg.subject,
+        'account':  account,
+        'thread':   msg.thread,
+        'emails':   [msg],
+        'last_msg': msg,
+    }))
 
 
 @staff_member_required
@@ -250,14 +248,13 @@ def thread_preview_view(request, thread_pk):
             except Exception as e:
                 logger.warning('mark_seen failed: %s', e)
 
-    return render(request, 'email_assistant/preview.html', {
+    return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
         'thread':          thread,
         'emails':          emails,
         'last_msg':        emails[-1] if emails else None,
         'reply_signature': _get_signature(account),
-        'is_nav_sidebar_enabled': True,
-    })
+    }))
 
 
 @staff_member_required
@@ -281,14 +278,13 @@ def message_preview_view(request, message_pk):
             except Exception as e:
                 logger.warning('mark_seen failed: %s', e)
 
-    return render(request, 'email_assistant/preview.html', {
+    return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
         'thread':          msg.thread,
         'emails':          [msg],
         'last_msg':        msg,
         'reply_signature': _get_signature(account),
-        'is_nav_sidebar_enabled': True,
-    })
+    }))
 
 
 @staff_member_required
@@ -344,15 +340,14 @@ def compose_view(request):
 
     sig = _get_signature(account)
 
-    return render(request, 'email_assistant/compose.html', {
-        'title':           'Новий лист' if not reply_to else 'Відповідь',
-        'account':         account,
-        'reply_to':        reply_to,
-        'initial':         initial,
-        'signature':       sig,
-        'crm_contacts':    json.dumps(_crm_contacts()),
-        'is_nav_sidebar_enabled': True,
-    })
+    return render(request, 'email_assistant/compose.html', _ctx(request, {
+        'title':        'Новий лист' if not reply_to else 'Відповідь',
+        'account':      account,
+        'reply_to':     reply_to,
+        'initial':      initial,
+        'signature':    sig,
+        'crm_contacts': json.dumps(_crm_contacts()),
+    }))
 
 
 def _handle_send(request, account, reply_to=None):

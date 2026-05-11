@@ -208,6 +208,9 @@ class EmailSettingsAdmin(admin.ModelAdmin):
             'fields': ('auto_signature', 'signature_position', 'signature'),
             'classes': ('collapse',),
         }),
+        ("🖥️ Інтерфейс", {
+            'fields': ('show_admin_sidebar',),
+        }),
         ("📬 Читання та синхронізація", {
             'fields': ('mark_read_on_server', 'spam_folder'),
         }),

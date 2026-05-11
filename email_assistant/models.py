@@ -209,6 +209,9 @@ class EmailSettings(models.Model):
         max_length=200, blank=True, default='Spam',
         verbose_name='Папка спаму на сервері',
         help_text='IONOS: Spam | Gmail: [Gmail]/Spam')
+    show_admin_sidebar = models.BooleanField(
+        default=True, verbose_name='Показувати панель навігації Minerva',
+        help_text='Відображати ліве меню системи на сторінках Email асистента')
 
     class Meta:
         verbose_name = 'Налаштування Email асистента'

@@ -1055,8 +1055,14 @@ document.addEventListener('DOMContentLoaded', function(){
     var m = el.className.match(/\bapp-(\S+)/);
     if (m) { mods[m[1]] = el; el.remove(); }
   });
-  /* On non-admin pages (e.g. /email/) sidebar_enabled=False → mods is empty */
+  /* On non-admin pages (e.g. /email/) mods is empty */
   var modsAvailable = Object.keys(mods).length > 0;
+
+  /* Remove Django's toggle button and clear any remaining default sidebar content
+     (filter input, "no permissions" text) before we build our own groups. */
+  var _tnb = document.getElementById('toggle-nav-sidebar');
+  if (_tnb) _tnb.remove();
+  while (sidebar.firstChild) sidebar.removeChild(sidebar.firstChild);
 
   /* Add 🧠 AI row to bots module */
   if (mods['bots']) {
