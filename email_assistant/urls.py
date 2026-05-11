@@ -33,4 +33,6 @@ urlpatterns = [
     path('imap-folders/',                                views.list_imap_folders_view,  name='imap_folders'),
     path('sync-imap-folder/',                            views.sync_imap_folder_view,   name='sync_imap_folder'),
     path('sync-all-folders/',                            views.sync_all_folders_view,   name='sync_all_folders'),
+    # Scheduled send
+    path('schedule/',                                    views.schedule_email_api,      name='schedule_email'),
 ]

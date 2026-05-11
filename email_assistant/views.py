@@ -415,36 +415,27 @@ def send_api(request):
 @staff_member_required
 def ai_suggest_reply(request, message_pk):
     from email_assistant.models import EmailMessage
-    from ai_assistant.service import chat
+    from email_assistant.ai_helper import generate_reply
 
     account = _get_account(request)
     msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
     profile = getattr(request.user, 'profile', None)
 
-    context = msg.body_text[:3000]
+    thread_messages = [msg]
     if msg.thread:
-        parts = [f'Від: {m.from_email}\n{m.body_text[:500]}'
-                 for m in msg.thread.messages.order_by('sent_at')[:8]]
-        context = '\n\n---\n'.join(parts)
+        thread_messages = list(msg.thread.messages.order_by('sent_at')[:10])
 
-    user_prompt = (request.GET.get('prompt') or '').strip()
-    instruction = f'\nІнструкція: {user_prompt}\n' if user_prompt else ''
-    prompt = (
-        f'Прочитай цю переписку і склади відповідь від імені {account.from_header}.'
-        f'{instruction}\n\n'
-        f'ПЕРЕПИСКА:\n{context}\n\nНапиши ТІЛЬКИ текст відповіді, без пояснень.'
-    )
-
-    reply = chat(prompt, profile=profile, channel='system_briefing')
-    msg.ai_reply_draft = reply or ''
+    reply = generate_reply(thread_messages, account, profile)
+    msg.ai_reply_draft = reply
     msg.save(update_fields=['ai_reply_draft'])
-    return JsonResponse({'ok': True, 'reply': reply or ''})
+    return JsonResponse({'ok': bool(reply), 'reply': reply,
+                         'error': '' if reply else 'AI не повернув відповідь'})
 
 
 @staff_member_required
 def ai_translate(request, message_pk):
     from email_assistant.models import EmailMessage, EmailSettings
-    from ai_assistant.service import chat
+    from email_assistant.ai_helper import translate_email
 
     account  = _get_account(request)
     msg      = get_object_or_404(EmailMessage, pk=message_pk, account=account)
@@ -452,15 +443,13 @@ def ai_translate(request, message_pk):
     target   = request.GET.get('lang', settings.ai_translate_to or 'uk')
     profile  = getattr(request.user, 'profile', None)
 
-    lang_names = {'uk': 'українську', 'de': 'німецьку', 'en': 'англійську'}
-    prompt = (f'Перекладі цей лист на {lang_names.get(target, target)}. '
-              f'Поверни ТІЛЬКИ переклад без пояснень.\n\n{msg.body_text[:3000]}')
-
-    translation = chat(prompt, profile=profile, channel='system_briefing')
-    msg.ai_translated   = translation or ''
-    msg.ai_translate_to = target
-    msg.save(update_fields=['ai_translated', 'ai_translate_to'])
-    return JsonResponse({'ok': True, 'translation': translation or ''})
+    translation = translate_email(msg.body_text or '', target, profile)
+    if translation:
+        msg.ai_translated   = translation
+        msg.ai_translate_to = target
+        msg.save(update_fields=['ai_translated', 'ai_translate_to'])
+    return JsonResponse({'ok': bool(translation), 'translation': translation,
+                         'lang': target})
 
 
 @staff_member_required
@@ -739,3 +728,57 @@ def unarchive_thread_view(request, thread_pk):
     thread.is_archived = False
     thread.save(update_fields=['is_archived'])
     return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_POST
+def schedule_email_api(request):
+    """Schedule an email for future delivery."""
+    import json as _json
+    from django.utils.dateparse import parse_datetime
+    from django.utils import timezone
+    from email_assistant.models import ScheduledEmail
+
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+
+    to_raw       = data.get('to', '').strip()
+    subject      = data.get('subject', '').strip()
+    body         = data.get('body', '')
+    body_html    = data.get('body_html', '')
+    scheduled_at = data.get('scheduled_at', '')
+
+    if not to_raw or not subject or not scheduled_at:
+        return JsonResponse({'ok': False,
+                             'error': 'Вкажіть отримувача, тему і час відправки'})
+
+    dt = parse_datetime(scheduled_at)
+    if not dt:
+        return JsonResponse({'ok': False, 'error': 'Невірний формат дати'})
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt)
+    if dt <= timezone.now():
+        return JsonResponse({'ok': False,
+                             'error': 'Час відправки має бути в майбутньому'})
+
+    to_list   = [e.strip() for e in to_raw.split(',') if e.strip()]
+    cc_list   = [e.strip() for e in data.get('cc', '').split(',') if e.strip()]
+
+    scheduled = ScheduledEmail.objects.create(
+        account=account, subject=subject,
+        to_emails=to_list, cc_emails=cc_list,
+        body=body, body_html=body_html,
+        scheduled_at=dt, trigger='manual',
+    )
+
+    return JsonResponse({
+        'ok':          True,
+        'id':          scheduled.pk,
+        'scheduled_at': dt.strftime('%d.%m.%Y %H:%M'),
+    })

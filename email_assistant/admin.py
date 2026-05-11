@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
 from django.utils.html import format_html
-from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings
+from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings, ScheduledEmail
 
 logger = logging.getLogger('email_assistant')
 
@@ -268,6 +268,28 @@ class EmailThreadAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(account__user=request.user)
+
+
+@admin.register(ScheduledEmail)
+class ScheduledEmailAdmin(admin.ModelAdmin):
+    list_display    = ('subject_col', 'account', 'to_col', 'status', 'scheduled_at', 'sent_at')
+    list_filter     = ('status', 'trigger', 'account')
+    search_fields   = ('subject',)
+    readonly_fields = ('sent_at', 'error_msg', 'created_at')
+
+    def subject_col(self, obj):
+        return obj.subject[:60]
+    subject_col.short_description = 'Тема'
+
+    def to_col(self, obj):
+        return ', '.join(obj.to_emails[:2])
+    to_col.short_description = 'Кому'
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

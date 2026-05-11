@@ -51,7 +51,8 @@ ROLE_DEFAULTS = {
         'can_manage_users': True,
     },
     'manager': {
-        'modules': ['crm', 'strategy', 'sales', 'shipping', 'dashboard', 'tasks', 'faq', 'labels_app'],
+        'modules': ['crm', 'strategy', 'sales', 'shipping', 'dashboard', 'tasks',
+                    'email_assistant', 'calendar_app', 'faq', 'labels_app'],
         'can_delete': False,
         'can_export': True,
         'can_import': False,
@@ -59,7 +60,8 @@ ROLE_DEFAULTS = {
         'can_manage_users': False,
     },
     'warehouse': {
-        'modules': ['inventory', 'shipping', 'labels_app', 'dashboard', 'faq'],
+        'modules': ['inventory', 'shipping', 'labels_app', 'dashboard', 'tasks',
+                    'calendar_app', 'faq'],
         'can_delete': False,
         'can_export': False,
         'can_import': True,

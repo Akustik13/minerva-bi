@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'autoimport',       # 🔄 Авто-імпорт по розкладу
     'ai_assistant',     # 🏛️ Minerva AI
     'email_assistant',  # 📧 Email Асистент
+    'calendar_app',     # 📅 Календар
     'bots',             # 🤖 Боти та AI
     'faq',              # ❓ FAQ та підтримка
     'labels_app',       # 🏷️ Етикетки

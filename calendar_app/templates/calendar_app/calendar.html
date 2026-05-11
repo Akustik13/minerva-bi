@@ -1,0 +1,130 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Календар — Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+{% block messages %}{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.cal-wrap{max-width:1100px;margin:0 auto;padding:16px}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.cal-nav{display:flex;align-items:center;gap:10px}
+.cal-nav a{padding:5px 14px;border-radius:6px;border:1px solid var(--border-strong);
+  color:var(--text-muted);text-decoration:none;font-size:13px;transition:background .1s}
+.cal-nav a:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.cal-title{font-size:20px;font-weight:600;color:var(--text)}
+.cal-grid{width:100%;border-collapse:collapse;margin-bottom:24px}
+.cal-grid th{padding:8px 4px;text-align:center;font-size:12px;font-weight:500;
+  color:var(--text-muted);border-bottom:1px solid var(--border-strong)}
+.cal-grid td{width:14.28%;vertical-align:top;border:1px solid var(--border-strong);
+  min-height:72px;padding:6px;font-size:12px}
+.cal-grid td.other-month{background:var(--bg-input);opacity:.5}
+.cal-grid td.today{background:rgba(26,115,232,.1)}
+.cal-day-num{font-size:12px;color:var(--text-muted);margin-bottom:3px}
+td.today .cal-day-num{color:#1a73e8;font-weight:700}
+.cal-chip{display:block;padding:2px 6px;border-radius:4px;margin-bottom:2px;
+  font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip-deadline        {background:rgba(229,57,53,.18);color:#ef5350}
+.chip-meeting         {background:rgba(30,136,229,.18);color:#42a5f5}
+.chip-reminder        {background:rgba(255,160,0,.18);color:#ffa726}
+.chip-email_follow_up {background:rgba(56,142,60,.18);color:#66bb6a}
+.chip-other           {background:rgba(120,120,120,.18);color:var(--text-muted)}
+.cal-list-title{font-size:14px;font-weight:600;color:var(--text);
+  padding-top:16px;border-top:1px solid var(--border-strong);margin-bottom:10px}
+.cal-event-row{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;
+  border-radius:8px;background:var(--bg-card);border:1px solid var(--border-strong);
+  margin-bottom:8px;transition:opacity .3s}
+.cal-event-title{font-size:13px;color:var(--text);font-weight:500}
+.cal-event-meta{font-size:11px;color:var(--text-muted);margin-top:2px}
+.cal-done-btn{margin-left:auto;border:none;background:none;cursor:pointer;
+  color:var(--text-dim);font-size:16px;padding:2px 6px;border-radius:4px;
+  flex-shrink:0;transition:color .1s}
+.cal-done-btn:hover{color:var(--ok,#2e7d32)}
+.type-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cal-wrap">
+  <div class="cal-header">
+    <div class="cal-nav">
+      <a href="?year={{ prev_year }}&month={{ prev_month }}">← Попередній</a>
+      <span class="cal-title">{{ month_name }} {{ year }}</span>
+      <a href="?year={{ next_year }}&month={{ next_month }}">Наступний →</a>
+    </div>
+    <a href="/admin/calendar_app/calendarevent/add/"
+       style="padding:7px 18px;border-radius:8px;font-size:13px;font-weight:600;
+              background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff;
+              text-decoration:none">+ Додати подію</a>
+  </div>
+
+  <table class="cal-grid">
+    <thead>
+      <tr>
+        {% for wd in weekdays %}<th>{{ wd }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for week in weeks_data %}
+      <tr>
+        {% for cell in week %}
+        <td class="{% if cell.other %}other-month{% endif %}{% if cell.is_today %} today{% endif %}">
+          {% if not cell.other %}
+          <div class="cal-day-num">{{ cell.day }}</div>
+          {% for ev in cell.events %}
+          <span class="cal-chip chip-{{ ev.event_type }}" title="{{ ev.title }}">
+            {{ ev.title|truncatechars:18 }}
+          </span>
+          {% endfor %}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if events %}
+  <div class="cal-list-title">📋 Всі події місяця ({{ events|length }})</div>
+  {% for ev in events %}
+  <div class="cal-event-row" id="ev-{{ ev.pk }}">
+    <span class="type-icon">
+      {% if ev.event_type == 'deadline' %}⏰
+      {% elif ev.event_type == 'meeting' %}🤝
+      {% elif ev.event_type == 'reminder' %}🔔
+      {% elif ev.event_type == 'email_follow_up' %}📧
+      {% else %}📌{% endif %}
+    </span>
+    <div style="flex:1;min-width:0">
+      <div class="cal-event-title">{{ ev.title }}</div>
+      <div class="cal-event-meta">
+        {{ ev.start_at|date:"d.m H:i" }}
+        {% if ev.crm_customer %} · {{ ev.crm_customer }}{% endif %}
+        {% if ev.description %} · {{ ev.description|truncatechars:60 }}{% endif %}
+      </div>
+    </div>
+    <button class="cal-done-btn" title="Позначити виконаним"
+            onclick="markDone({{ ev.pk }}, this)">✓</button>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div style="text-align:center;padding:40px;color:var(--text-muted);font-size:14px">
+    📭 Подій у цьому місяці немає
+  </div>
+  {% endif %}
+</div>
+
+<script>
+const CSRF = document.cookie.split(';').find(c=>c.trim().startsWith('csrftoken='))?.split('=')[1]||'';
+async function markDone(pk, btn) {
+  try {
+    const r = await fetch('/calendar/event/' + pk + '/done/', {
+      method: 'POST', headers: {'X-CSRFToken': CSRF}
+    });
+    if ((await r.json()).ok) {
+      const row = document.getElementById('ev-' + pk);
+      if (row) { row.style.opacity = '.3'; setTimeout(() => row.remove(), 400); }
+    }
+  } catch(e) { console.error(e); }
+}
+</script>
+{% endblock %}

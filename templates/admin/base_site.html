@@ -1002,7 +1002,14 @@ document.addEventListener('DOMContentLoaded', function(){
       links: [
         { href: '/email/',          label: '📥 Вхідні',   app: 'email_assistant' },
         { href: '/email/compose/',  label: '✏️ Написати', app: 'email_assistant' },
-        { href: '/admin/email_assistant/emailaccount/', label: '⚙️ Акаунти', app: 'email_assistant', model: 'EmailAccount' },
+        { href: '/admin/email_assistant/emailaccount/', label: '⚙️ Акаунти',          app: 'email_assistant', model: 'EmailAccount' },
+        { href: '/admin/email_assistant/scheduledemail/', label: '⏳ Заплановані',     app: 'email_assistant', model: 'ScheduledEmail' },
+      ]
+    },
+    { id: 'calendar', label: '📅 Календар', href: '/calendar/', apps: ['calendar_app'],
+      links: [
+        { href: '/calendar/',                               label: '📅 Мій календар',  app: 'calendar_app' },
+        { href: '/admin/calendar_app/calendarevent/add/',   label: '+ Нова подія',     app: 'calendar_app', model: 'CalendarEvent' },
       ]
     },
     { id: 'bots',       label: '🧠 Боти та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
@@ -1101,6 +1108,8 @@ document.addEventListener('DOMContentLoaded', function(){
     '/dashboard/ai/':         'ai',
     '/email/':                'email',
     '/admin/email_assistant/': 'email',
+    '/calendar/':              'calendar',
+    '/admin/calendar_app/':    'calendar',
     '/admin/sales/':     'sales',
     '/admin/accounting/':'accounting',
     '/admin/shipping/':  'shipping',

@@ -223,3 +223,45 @@ class EmailSettings(models.Model):
     def get_for_user(cls, user):
         obj, _ = cls.objects.get_or_create(user=user)
         return obj
+
+
+class ScheduledEmail(models.Model):
+    """Email planned for future delivery."""
+
+    STATUS_PENDING   = 'pending'
+    STATUS_SENT      = 'sent'
+    STATUS_FAILED    = 'failed'
+    STATUS_CANCELLED = 'cancelled'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING,   '⏳ Очікує'),
+        (STATUS_SENT,      '✓ Надіслано'),
+        (STATUS_FAILED,    '✗ Помилка'),
+        (STATUS_CANCELLED, '✗ Скасовано'),
+    ]
+
+    account      = models.ForeignKey(EmailAccount, on_delete=models.CASCADE,
+                                     related_name='scheduled_emails',
+                                     verbose_name='Акаунт')
+    subject      = models.CharField(max_length=500, verbose_name='Тема')
+    to_emails    = models.JSONField(default=list, verbose_name='Отримувачі')
+    cc_emails    = models.JSONField(default=list, verbose_name='Копія')
+    body         = models.TextField(blank=True, verbose_name='Текст')
+    body_html    = models.TextField(blank=True, verbose_name='HTML')
+    scheduled_at = models.DateTimeField(verbose_name='Час відправки', db_index=True)
+    status       = models.CharField(max_length=20, choices=STATUS_CHOICES,
+                                    default=STATUS_PENDING, db_index=True,
+                                    verbose_name='Статус')
+    sent_at      = models.DateTimeField(null=True, blank=True, verbose_name='Надіслано о')
+    error_msg    = models.TextField(blank=True, verbose_name='Помилка')
+    trigger      = models.CharField(max_length=50, default='manual', verbose_name='Тригер')
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Запланований лист'
+        verbose_name_plural = 'Заплановані листи'
+        ordering            = ['scheduled_at']
+
+    def __str__(self):
+        recipients = ', '.join(self.to_emails[:2])
+        return f'{self.subject[:50]} → {recipients} ({self.scheduled_at:%d.%m.Y %H:%M})'
