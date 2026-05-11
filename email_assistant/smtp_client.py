@@ -1,10 +1,9 @@
 """email_assistant/smtp_client.py — відправка листів через SMTP."""
+import email.utils
 import logging
 import smtplib
-from email.mime.base import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email import encoders
+from email.message import EmailMessage
+from email.policy import SMTP as SMTP_POLICY
 
 logger = logging.getLogger('email_assistant')
 
@@ -22,22 +21,12 @@ class SMTPClient:
         attachments = attachments or []
 
         try:
-            if attachments:
-                msg = MIMEMultipart('mixed')
-                alt = MIMEMultipart('alternative')
-                if body_text:
-                    alt.attach(MIMEText(body_text, 'plain', 'utf-8'))
-                if body_html:
-                    alt.attach(MIMEText(body_html, 'html', 'utf-8'))
-                msg.attach(alt)
-            else:
-                msg = MIMEMultipart('alternative')
-                if body_text:
-                    msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
-                if body_html:
-                    msg.attach(MIMEText(body_html, 'html', 'utf-8'))
+            msg = EmailMessage()
 
-            msg['From']    = self.account.from_header
+            # formataddr() handles non-ASCII display names via RFC 2047
+            msg['From'] = email.utils.formataddr(
+                (self.account.display_name or '', self.account.email_address)
+            )
             msg['To']      = ', '.join(to_emails)
             msg['Subject'] = subject
             if cc_emails:
@@ -47,38 +36,43 @@ class SMTPClient:
                 msg['In-Reply-To'] = reply_to_message.message_id
                 msg['References']  = reply_to_message.message_id
 
-            # Підпис
+            # Append signature before setting content
             settings = getattr(self.account.user, 'email_settings', None)
             if settings and settings.signature:
-                sig_text = f'\n\n--\n{settings.signature}'
-                if not attachments:
-                    for part in msg.get_payload():
-                        if part.get_content_type() == 'text/plain':
-                            current = part.get_payload(decode=True).decode('utf-8', errors='replace')
-                            part.set_payload(current + sig_text, charset='utf-8')
-                            break
+                body_text = f'{body_text}\n\n--\n{settings.signature}'
+
+            # set_content() + add_alternative() use proper CTE so no line exceeds 998 chars
+            msg.set_content(body_text, charset='utf-8')
+            if body_html:
+                msg.add_alternative(body_html, subtype='html', charset='utf-8')
 
             for att in attachments:
                 ct = att.get('content_type', 'application/octet-stream')
                 maintype, subtype = ct.split('/', 1)
-                part = MIMEBase(maintype, subtype)
-                part.set_payload(att['content'])
-                encoders.encode_base64(part)
-                part.add_header('Content-Disposition', 'attachment', filename=att['name'])
-                msg.attach(part)
+                msg.add_attachment(
+                    att['content'],
+                    maintype=maintype,
+                    subtype=subtype,
+                    filename=att['name'],
+                )
 
             all_recipients = to_emails + cc_emails + bcc_emails
 
             if self.account.smtp_use_ssl:
-                server = smtplib.SMTP_SSL(self.account.smtp_host, self.account.smtp_port)
+                conn = smtplib.SMTP_SSL(self.account.smtp_host, self.account.smtp_port)
             else:
-                server = smtplib.SMTP(self.account.smtp_host, self.account.smtp_port)
+                conn = smtplib.SMTP(self.account.smtp_host, self.account.smtp_port)
                 if self.account.smtp_use_tls:
-                    server.starttls()
+                    conn.starttls()
 
-            server.login(self.account.smtp_username, self.account.smtp_password)
-            server.sendmail(self.account.email_address, all_recipients, msg.as_bytes())
-            server.quit()
+            conn.login(self.account.smtp_username, self.account.smtp_password)
+            # SMTP_POLICY ensures max_line_length=998 and proper folding/CTE
+            conn.sendmail(
+                self.account.email_address,
+                all_recipients,
+                msg.as_bytes(policy=SMTP_POLICY),
+            )
+            conn.quit()
 
             logger.info('Email sent: %s → %s', subject[:50], to_emails)
             return {'ok': True}
