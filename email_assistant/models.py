@@ -41,6 +41,13 @@ class EmailAccount(models.Model):
         blank=True, default='',
         verbose_name='Підпис листа',
         help_text="Підпис для цього акаунту. {name} = ваше ім'я. Якщо порожньо — береться з профілю.")
+    signature_position = models.CharField(
+        max_length=20, default='after_reply',
+        choices=[
+            ('after_reply', 'Після мого тексту (перед цитатою)'),
+            ('end',         'В кінці (після цитати)'),
+        ],
+        verbose_name='Позиція підпису')
 
     # Sync state
     last_sync_at  = models.DateTimeField(null=True, blank=True, verbose_name='Остання синхронізація')

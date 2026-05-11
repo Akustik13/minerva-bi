@@ -196,16 +196,19 @@ async function sendEmail() {
   var sig    = document.getElementById('em-sig');
   var btn    = document.querySelector('.em-send-btn');
 
-  // HTML body: signature BEFORE the quoted block (if any)
+  // HTML body: signature position from account setting
+  var SIG_POS = '{{ account.signature_position|default:"after_reply" }}';
   var quoteEl = editor.querySelector('pre');
+  var HR = '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0">';
   var htmlBody;
-  if (quoteEl && sig) {
-    var beforeQuote = editor.innerHTML.substring(0, editor.innerHTML.indexOf(quoteEl.outerHTML));
-    var sigHtml = '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0">' + sig.innerHTML + '<br>';
-    htmlBody = beforeQuote + sigHtml + quoteEl.outerHTML;
+  if (sig && quoteEl && SIG_POS === 'after_reply') {
+    // Sig before quote
+    var quoteHtml = quoteEl.outerHTML;
+    var beforeQuote = editor.innerHTML.substring(0, editor.innerHTML.indexOf(quoteHtml));
+    htmlBody = beforeQuote + HR + sig.innerHTML + '<br>' + quoteHtml;
   } else {
     htmlBody = editor.innerHTML;
-    if (sig) htmlBody += '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0">' + sig.innerHTML;
+    if (sig) htmlBody += HR + sig.innerHTML;
   }
 
   // Plain text fallback (no sig — SMTPClient appends stripped-HTML sig on backend)

@@ -17,8 +17,8 @@ class EmailAccountAdmin(admin.ModelAdmin):
             'fields': ('user', 'email_address', 'display_name', 'is_primary', 'is_active'),
         }),
         ("✍️ Підпис", {
-            'fields': ('signature',),
-            'description': "HTML підпис для листів з цього акаунту. {name} = повне ім'я. Замінює підпис у профілі.",
+            'fields': ('signature', 'signature_position'),
+            'description': "HTML підпис. {name} = повне ім'я. Замінює підпис у профілі.",
         }),
         ("📥 IMAP (читання)", {
             'fields': ('imap_host', 'imap_port', 'imap_use_ssl',
