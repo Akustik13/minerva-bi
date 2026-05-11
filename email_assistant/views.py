@@ -18,6 +18,20 @@ def _get_account(request):
             .order_by('-is_primary').first())
 
 
+def _get_signature(account) -> str:
+    """Return rendered HTML signature for an account (account-level > UserProfile)."""
+    try:
+        sig = (account.signature or '').strip()
+        if not sig:
+            sig = (account.user.profile.smtp_signature or '').strip()
+        if sig:
+            name = (account.user.get_full_name() or account.display_name or account.user.username)
+            sig = sig.replace('{name}', name)
+        return sig
+    except Exception:
+        return ''
+
+
 def _crm_contacts() -> list:
     try:
         from crm.models import Customer
@@ -196,10 +210,11 @@ def thread_preview_view(request, thread_pk):
                 logger.warning('mark_seen failed: %s', e)
 
     return render(request, 'email_assistant/preview.html', {
-        'account':  account,
-        'thread':   thread,
-        'emails':   emails,
-        'last_msg': emails[-1] if emails else None,
+        'account':        account,
+        'thread':         thread,
+        'emails':         emails,
+        'last_msg':       emails[-1] if emails else None,
+        'reply_signature': _get_signature(account),
     })
 
 
@@ -225,10 +240,11 @@ def message_preview_view(request, message_pk):
                 logger.warning('mark_seen failed: %s', e)
 
     return render(request, 'email_assistant/preview.html', {
-        'account':  account,
-        'thread':   msg.thread,
-        'emails':   [msg],
-        'last_msg': msg,
+        'account':        account,
+        'thread':         msg.thread,
+        'emails':         [msg],
+        'last_msg':       msg,
+        'reply_signature': _get_signature(account),
     })
 
 
@@ -283,17 +299,7 @@ def compose_view(request):
     if request.method == 'POST':
         return _handle_send(request, account, reply_to)
 
-    # Signature: account-level takes priority over UserProfile
-    sig = ''
-    try:
-        sig = (account.signature or '').strip()
-        if not sig:
-            sig = (account.user.profile.smtp_signature or '').strip()
-        if sig:
-            name = (account.user.get_full_name() or account.display_name or account.user.username)
-            sig = sig.replace('{name}', name)
-    except Exception:
-        pass
+    sig = _get_signature(account)
 
     return render(request, 'email_assistant/compose.html', {
         'title':        'Новий лист' if not reply_to else 'Відповідь',
@@ -312,7 +318,8 @@ def _handle_send(request, account, reply_to=None):
     to_raw  = request.POST.get('to', '')
     cc_raw  = request.POST.get('cc', '')
     subject = request.POST.get('subject', '')
-    body    = request.POST.get('body', '')
+    body      = request.POST.get('body', '')
+    body_html = request.POST.get('body_html', '').strip()
 
     to_list = [e.strip() for e in to_raw.split(',') if e.strip()]
     cc_list = [e.strip() for e in cc_raw.split(',') if e.strip()]
@@ -328,6 +335,7 @@ def _handle_send(request, account, reply_to=None):
 
     result = SMTPClient(account).send(
         to_emails=to_list, subject=subject, body_text=body,
+        body_html=body_html or '',
         cc_emails=cc_list, reply_to_message=reply_to, attachments=attachments,
     )
 

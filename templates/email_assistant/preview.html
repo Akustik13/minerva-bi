@@ -18,7 +18,7 @@
 .em-card-to{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
 .em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:400px;overflow-y:auto}
-.em-body-iframe{width:100%;border:none;display:block;min-height:80px;max-height:560px;overflow:hidden}
+.em-body-iframe{width:100%;border:none;display:block;min-height:120px;max-height:720px;overflow:hidden}
 .em-card-atts{padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
 .em-att-chip{font-size:11px;padding:3px 9px;border-radius:5px;background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text-muted)}
 .em-ai-box{display:none;padding:12px 14px;border-top:1px solid var(--border);background:rgba(0,212,170,.04)}
@@ -154,6 +154,9 @@
     </div>
     <div class="em-reply-editor" id="pv-reply-editor" contenteditable="true"
          placeholder="Текст відповіді..."></div>
+    {% if reply_signature %}
+    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:12px" id="pv-reply-sig">{{ reply_signature|safe }}</div>
+    {% endif %}
     <div class="em-reply-footer">
       <button class="em-reply-send" onclick="pvSendReply({{ last.pk }}, '{{ last.from_email|escapejs }}', '{{ last.subject|escapejs }}')">
         Відправити →
@@ -192,13 +195,20 @@ window.fmt = fmt; window.fmtBlock = fmtBlock;
 
 window.pvSendReply = async function(pk, fromEmail, subj) {
   var editor = document.getElementById('pv-reply-editor');
-  var body   = editor.innerText.trim();
+  var sig    = document.getElementById('pv-reply-sig');
   var status = document.getElementById('pv-reply-status');
-  if (!body) { status.textContent = 'Введіть текст'; return; }
+  var textBody = (editor.innerText || editor.textContent).trim();
+  if (!textBody) { status.textContent = 'Введіть текст'; return; }
+
+  var htmlBody = editor.innerHTML;
+  if (sig) htmlBody += '<br><hr style="border:none;border-top:1px solid #ccc;margin:10px 0">' + sig.innerHTML;
+  var plainBody = textBody + (sig ? '\n\n--\n' + (sig.innerText || sig.textContent) : '');
+
   status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
   var fd = new FormData();
   fd.append('reply_to_pk', pk);
-  fd.append('body', body);
+  fd.append('body',      plainBody);
+  fd.append('body_html', htmlBody);
   fd.append('subject', subj.startsWith('Re:') ? subj : 'Re: ' + subj);
   fd.append('to', fromEmail);
   try {

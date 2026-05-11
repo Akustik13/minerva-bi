@@ -155,7 +155,16 @@
         {% for fkey,flabel,ficon in folders %}{% if folder == fkey %}{{ ficon }} {{ flabel }}{% endif %}{% endfor %}
         {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
       </span>
-      <span class="em-p2-count">{{ total }}</span>
+      <span class="em-p2-count" style="display:flex;align-items:center;gap:6px">
+        <span>{{ total }}</span>
+        <select id="sort-sel" onchange="sortRows(this.value)"
+                style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text-muted);cursor:pointer;max-width:90px">
+          <option value="date-desc">Дата ↓</option>
+          <option value="date-asc">Дата ↑</option>
+          <option value="sender">Від A-Z</option>
+          <option value="subject">Тема A-Z</option>
+        </select>
+      </span>
     </div>
 
     <div class="em-p2-list" id="em-p2-list">
@@ -169,6 +178,9 @@
            id="row-{{ msg.pk }}"
            data-pk="{{ msg.pk }}"
            data-tpk="{{ tpk }}"
+           data-ts="{{ msg.sent_at|date:'U' }}"
+           data-sender="{{ msg.sender_display|lower|escapejs }}"
+           data-subject="{{ msg.subject|lower|escapejs }}"
            onclick="previewMsg({{ msg.pk }}, {{ tpk }}, this)">
 
         <button class="em-star-btn{% if msg.is_starred %} starred{% endif %}"
@@ -373,6 +385,20 @@ async function syncNow(btn, full) {
   } catch(e) { st.textContent = '✗ Помилка'; }
   finally { btn.disabled = false; btn.textContent = orig; }
 }
+
+/* ── Sort rows ── */
+window.sortRows = function(key) {
+  var list = document.getElementById('em-p2-list');
+  var rows = Array.from(list.querySelectorAll('.em-row'));
+  rows.sort(function(a, b) {
+    if (key === 'date-desc') return (b.dataset.ts || 0) - (a.dataset.ts || 0);
+    if (key === 'date-asc')  return (a.dataset.ts || 0) - (b.dataset.ts || 0);
+    if (key === 'sender')    return (a.dataset.sender || '').localeCompare(b.dataset.sender || '');
+    if (key === 'subject')   return (a.dataset.subject || '').localeCompare(b.dataset.subject || '');
+    return 0;
+  });
+  rows.forEach(function(r) { list.appendChild(r); });
+};
 
 /* ── IMAP server folders ── */
 (function(){
