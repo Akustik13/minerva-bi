@@ -4,6 +4,7 @@ import logging
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.http import require_POST
 from django.utils import timezone
 
@@ -232,6 +233,7 @@ def message_preview_view(request, message_pk):
 
 
 @staff_member_required
+@xframe_options_exempt
 def message_html_view(request, message_pk):
     """Serve raw HTML email body for sandboxed iframe display."""
     from email_assistant.models import EmailMessage
