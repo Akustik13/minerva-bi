@@ -1204,6 +1204,21 @@ document.addEventListener('DOMContentLoaded', function(){
     sidebar.appendChild(group);
   });
 
+  /* ── Email unread badge ── */
+  (function(){
+    var inboxLink = document.querySelector('a.mg-link[href="/email/"]');
+    if (!inboxLink) return;
+    fetch('/email/unread-count/', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (!d.count) return;
+        inboxLink.innerHTML = inboxLink.textContent +
+          ' <span style="background:var(--accent,#58a6ff);color:#fff;border-radius:10px;' +
+          'font-size:10px;padding:1px 7px;font-weight:700;margin-left:4px">' + d.count + '</span>';
+      })
+      .catch(function(){});
+  })();
+
   /* ── Drag-and-drop handlers ── */
   sidebar.addEventListener('mousedown', function(e){
     _fromHandle = !!e.target.closest('.mg-handle');

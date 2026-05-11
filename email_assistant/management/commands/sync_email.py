@@ -13,6 +13,7 @@ class Command(BaseCommand):
         parser.add_argument('--user',    metavar='USERNAME', help='Тільки для цього юзера')
         parser.add_argument('--account', type=int,           help='Тільки для цього EmailAccount pk')
         parser.add_argument('--dry-run', action='store_true', help='Показати без збереження')
+        parser.add_argument('--all',     action='store_true', help='Повна синхронізація (ігнорує last_seen_uid, days_back=3650)')
 
     def handle(self, *args, **options):
         from email_assistant.models import EmailAccount
@@ -27,11 +28,12 @@ class Command(BaseCommand):
             self.stdout.write('Немає активних email акаунтів')
             return
 
+        sync_all = options.get('all', False)
         total_new = total_err = 0
         for account in qs:
             self.stdout.write(f'--- {account.user.username} / {account.email_address} ---')
             try:
-                new, err = self._sync_account(account, options['dry_run'])
+                new, err = self._sync_account(account, options['dry_run'], sync_all=sync_all)
                 total_new += new
                 total_err += err
                 self.stdout.write(f'  +{new} нових, {err} помилок')
@@ -42,11 +44,12 @@ class Command(BaseCommand):
 
         self.stdout.write(f'\nРезультат: +{total_new} нових листів, {total_err} помилок')
 
-    def _sync_account(self, account, dry_run: bool):
+    def _sync_account(self, account, dry_run: bool, sync_all: bool = False):
         from email_assistant.models import EmailMessage, EmailThread
         from email_assistant.imap_client import IMAPClient
 
         created = errors = 0
+        days_back = 3650 if sync_all else account.sync_days_back
 
         with IMAPClient(account) as client:
             for folder, folder_type in [
@@ -56,10 +59,12 @@ class Command(BaseCommand):
                 if not folder:
                     continue
 
-                since_uid = account.last_seen_uid if folder_type == EmailMessage.FOLDER_INBOX else 0
+                since_uid = 0 if sync_all else (
+                    account.last_seen_uid if folder_type == EmailMessage.FOLDER_INBOX else 0
+                )
                 messages  = client.fetch_messages(
                     folder=folder,
-                    days_back=account.sync_days_back,
+                    days_back=days_back,
                     since_uid=since_uid,
                 )
 
@@ -112,6 +117,9 @@ class Command(BaseCommand):
                         if crm_customer:
                             self._sync_to_crm(em, crm_customer, account)
 
+                        if folder_type == EmailMessage.FOLDER_INBOX and not msg_data['is_read']:
+                            self._notify_new_email(em, account)
+
                         created += 1
 
                     except Exception as e:
@@ -162,6 +170,25 @@ class Command(BaseCommand):
         except Exception:
             pass
         return None
+
+    def _notify_new_email(self, email_msg, account):
+        """Send Telegram notification for a new unread inbox email."""
+        try:
+            from dashboard.notifications import _send_telegram, _get_ns
+            ns = _get_ns()
+            if not ns or not getattr(ns, 'telegram_bot_token', None) or not getattr(ns, 'telegram_chat_id', None):
+                return
+            sender = email_msg.from_name or email_msg.from_email
+            subj   = email_msg.subject or '(без теми)'
+            text = (
+                f'📧 <b>Новий лист</b>\n'
+                f'Від: {sender}\n'
+                f'Тема: {subj}\n'
+                f'Акаунт: {account.email_address}'
+            )
+            _send_telegram(ns, text)
+        except Exception as e:
+            logger.warning('Telegram email notify failed: %s', e)
 
     def _sync_to_crm(self, email_msg, customer, account):
         try:

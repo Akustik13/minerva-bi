@@ -36,12 +36,20 @@ class SMTPClient:
                 msg['In-Reply-To'] = reply_to_message.message_id
                 msg['References']  = reply_to_message.message_id
 
-            # Append signature before setting content
-            settings = getattr(self.account.user, 'email_settings', None)
-            if settings and settings.signature:
-                body_text = f'{body_text}\n\n--\n{settings.signature}'
+            # Signature from UserProfile.smtp_signature ({name} placeholder)
+            try:
+                profile = self.account.user.profile
+                sig = (profile.smtp_signature or '').strip()
+                if sig:
+                    name = (self.account.user.get_full_name()
+                            or self.account.display_name
+                            or self.account.user.username)
+                    sig = sig.replace('{name}', name)
+                    body_text = f'{body_text}\n\n--\n{sig}'
+            except Exception:
+                pass
 
-            # set_content() + add_alternative() use proper CTE so no line exceeds 998 chars
+            # set_content() + add_alternative() use proper CTE → no line > 998 chars
             msg.set_content(body_text, charset='utf-8')
             if body_html:
                 msg.add_alternative(body_html, subtype='html', charset='utf-8')
@@ -57,6 +65,7 @@ class SMTPClient:
                 )
 
             all_recipients = to_emails + cc_emails + bcc_emails
+            msg_bytes = msg.as_bytes(policy=SMTP_POLICY)
 
             if self.account.smtp_use_ssl:
                 conn = smtplib.SMTP_SSL(self.account.smtp_host, self.account.smtp_port)
@@ -66,13 +75,16 @@ class SMTPClient:
                     conn.starttls()
 
             conn.login(self.account.smtp_username, self.account.smtp_password)
-            # SMTP_POLICY ensures max_line_length=998 and proper folding/CTE
-            conn.sendmail(
-                self.account.email_address,
-                all_recipients,
-                msg.as_bytes(policy=SMTP_POLICY),
-            )
+            conn.sendmail(self.account.email_address, all_recipients, msg_bytes)
             conn.quit()
+
+            # Save copy to IMAP Sent folder
+            try:
+                from email_assistant.imap_client import IMAPClient
+                with IMAPClient(self.account) as imap:
+                    imap.append_to_sent(msg_bytes)
+            except Exception as e:
+                logger.warning('Could not save to IMAP sent: %s', e)
 
             logger.info('Email sent: %s → %s', subject[:50], to_emails)
             return {'ok': True}

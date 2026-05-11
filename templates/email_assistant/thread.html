@@ -87,6 +87,14 @@
       <button class="em-btn" onclick="aiTranslate({{ msg.pk }})">🌐 Перекласти UA</button>
       <a href="{% url 'email_assistant:compose' %}?reply_to={{ msg.pk }}" class="em-btn">↩ Відповісти</a>
       <a href="{% url 'email_assistant:compose' %}?forward={{ msg.pk }}" class="em-btn">→ Переслати</a>
+      {% if thread %}
+        {% if thread.is_archived %}
+        <button class="em-btn" onclick="unarchiveThread({{ thread.pk }}, this)">📤 З архіву</button>
+        {% else %}
+        <button class="em-btn" onclick="archiveThread({{ thread.pk }}, this)">📦 В архів</button>
+        {% endif %}
+      {% endif %}
+      <button class="em-btn" style="color:var(--err,#e53935)" onclick="deleteMsg({{ msg.pk }}, this)">🗑️ Видалити</button>
     </div>
 
     <div class="em-ai-result" id="ai-box-{{ msg.pk }}">
@@ -171,5 +179,36 @@ async function sendQuickReply() {
 }
 
 function saveDraft() { alert('Чернетки — наступний крок.'); }
+
+async function deleteMsg(pk, btn) {
+  if (!confirm('Видалити цей лист?')) return;
+  btn.textContent = '⏳';
+  try {
+    const r = await fetch(`/email/message/${pk}/delete/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    const d = await r.json();
+    if (d.ok) { btn.closest('.em-msg-card').remove(); }
+    else alert('Помилка: ' + d.error);
+  } catch { btn.textContent = '🗑️ Видалити'; }
+}
+
+async function archiveThread(threadPk, btn) {
+  btn.textContent = '⏳';
+  try {
+    const r = await fetch(`/email/thread/${threadPk}/archive/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    const d = await r.json();
+    if (d.ok) location.href = '/email/';
+    else alert('Помилка: ' + d.error);
+  } catch { btn.textContent = '📦 В архів'; }
+}
+
+async function unarchiveThread(threadPk, btn) {
+  btn.textContent = '⏳';
+  try {
+    const r = await fetch(`/email/thread/${threadPk}/unarchive/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    const d = await r.json();
+    if (d.ok) location.reload();
+    else alert('Помилка: ' + d.error);
+  } catch { btn.textContent = '📤 З архіву'; }
+}
 </script>
 {% endblock %}

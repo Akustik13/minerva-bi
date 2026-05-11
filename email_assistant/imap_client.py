@@ -2,6 +2,7 @@
 import email as email_lib
 import imaplib
 import logging
+import time
 from datetime import datetime, timedelta, timezone as dt_tz
 from email.header import decode_header
 from email.utils import parseaddr, parsedate_to_datetime
@@ -170,3 +171,67 @@ class IMAPClient:
                 logger.error('Error fetching uid %s: %s', uid, e)
 
         return messages
+
+    def _select_writable(self, folder: str) -> str | None:
+        """Select a folder in read-write mode. Returns the folder name on success."""
+        candidates = [folder, f'"{folder}"']
+        if any(k in folder.lower() for k in ('sent', 'gesendet', 'gesend')):
+            candidates += [
+                'Gesendete Objekte', '"Gesendete Objekte"',
+                'Sent', 'INBOX.Sent', '[Gmail]/Sent Mail', 'Sent Items',
+            ]
+        for c in candidates:
+            try:
+                status, _ = self.conn.select(c)  # writable (no readonly)
+                if status == 'OK':
+                    return c
+            except Exception:
+                continue
+        return None
+
+    def append_to_sent(self, msg_bytes: bytes) -> bool:
+        """Save sent message to the IMAP Sent folder via APPEND."""
+        folder = self.account.imap_folder_sent
+        if not folder:
+            return False
+        selected = self._select_writable(folder)
+        if not selected:
+            logger.warning('Cannot select sent folder for append: %s', folder)
+            return False
+        try:
+            self.conn.append(
+                selected,
+                '(\\Seen)',
+                imaplib.Time2Internaldate(time.time()),
+                msg_bytes,
+            )
+            return True
+        except Exception as e:
+            logger.warning('IMAP append to sent failed: %s', e)
+            return False
+
+    def move_to_trash(self, folder: str, uid: int) -> bool:
+        """Move a message to Trash folder. Falls back to marking \\Deleted."""
+        try:
+            self._select_writable(folder)
+            uid_str = str(uid).encode()
+            trash_candidates = [
+                'Trash', '[Gmail]/Trash', 'INBOX.Trash',
+                'Deleted Items', 'Deleted Messages',
+            ]
+            for trash in trash_candidates:
+                try:
+                    ok, _ = self.conn.uid('COPY', uid_str, trash)
+                    if ok == 'OK':
+                        self.conn.uid('STORE', uid_str, '+FLAGS', '(\\Deleted)')
+                        self.conn.expunge()
+                        return True
+                except Exception:
+                    continue
+            # Fallback: just mark deleted
+            self.conn.uid('STORE', uid_str, '+FLAGS', '(\\Deleted)')
+            self.conn.expunge()
+            return True
+        except Exception as e:
+            logger.warning('IMAP move_to_trash failed uid=%s: %s', uid, e)
+            return False

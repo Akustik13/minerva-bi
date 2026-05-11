@@ -40,7 +40,27 @@ def inbox_view(request):
     page     = max(1, int(request.GET.get('page', 1)))
     per_page = 25
 
-    qs    = EmailMessage.objects.filter(account=account, folder=folder, is_deleted=False).order_by('-sent_at')
+    if folder == 'archived':
+        from email_assistant.models import EmailThread
+        archived_thread_ids = EmailThread.objects.filter(
+            account=account, is_archived=True
+        ).values_list('id', flat=True)
+        qs = EmailMessage.objects.filter(
+            account=account, thread_id__in=archived_thread_ids, is_deleted=False
+        ).order_by('-sent_at')
+    elif folder == 'inbox':
+        from email_assistant.models import EmailThread
+        archived_thread_ids = EmailThread.objects.filter(
+            account=account, is_archived=True
+        ).values_list('id', flat=True)
+        qs = EmailMessage.objects.filter(
+            account=account, folder='inbox', is_deleted=False
+        ).exclude(thread_id__in=archived_thread_ids).order_by('-sent_at')
+    else:
+        qs = EmailMessage.objects.filter(
+            account=account, folder=folder, is_deleted=False
+        ).order_by('-sent_at')
+
     total = qs.count()
     start = (page - 1) * per_page
     msgs  = list(qs[start:start + per_page])
@@ -48,10 +68,10 @@ def inbox_view(request):
     unread_count = EmailMessage.objects.filter(account=account, folder='inbox', is_read=False, is_deleted=False).count()
 
     folders = [
-        ('inbox', 'Вхідні',    '📥'),
-        ('sent',  'Надіслані', '📤'),
-        ('draft', 'Чернетки',  '📝'),
-        ('trash', 'Кошик',     '🗑️'),
+        ('inbox',    'Вхідні',    '📥'),
+        ('sent',     'Надіслані', '📤'),
+        ('archived', 'Архів',     '📦'),
+        ('trash',    'Кошик',     '🗑️'),
     ]
 
     return render(request, 'email_assistant/inbox.html', {
@@ -266,11 +286,92 @@ def sync_now(request):
     if not account:
         return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
 
+    full = request.POST.get('full') == '1'
     from django.core.management import call_command
     from io import StringIO
     out = StringIO()
     try:
-        call_command('sync_email', account=account.pk, stdout=out, stderr=out)
+        kwargs = {'account': account.pk, 'stdout': out, 'stderr': out}
+        if full:
+            kwargs['all'] = True
+        call_command('sync_email', **kwargs)
         return JsonResponse({'ok': True, 'output': out.getvalue()})
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)})
+
+
+@staff_member_required
+def unread_count_view(request):
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'count': 0})
+    count = EmailMessage.objects.filter(
+        account=account, folder='inbox', is_read=False, is_deleted=False
+    ).count()
+    return JsonResponse({'count': count})
+
+
+@staff_member_required
+@require_POST
+def delete_message_view(request, message_pk):
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+
+    if msg.folder == EmailMessage.FOLDER_TRASH:
+        msg.is_deleted = True
+        msg.save(update_fields=['is_deleted'])
+    else:
+        old_folder = msg.folder
+        msg.folder = EmailMessage.FOLDER_TRASH
+        msg.save(update_fields=['folder'])
+        # Mirror to IMAP
+        if msg.imap_uid:
+            try:
+                from email_assistant.imap_client import IMAPClient
+                folder_map = {
+                    EmailMessage.FOLDER_INBOX: account.imap_folder_inbox,
+                    EmailMessage.FOLDER_SENT:  account.imap_folder_sent,
+                }
+                imap_folder = folder_map.get(old_folder, account.imap_folder_inbox)
+                with IMAPClient(account) as imap:
+                    imap.move_to_trash(imap_folder, msg.imap_uid)
+            except Exception as e:
+                logger.warning('IMAP delete failed: %s', e)
+
+    return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_POST
+def restore_message_view(request, message_pk):
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    msg.folder = EmailMessage.FOLDER_INBOX
+    msg.is_deleted = False
+    msg.save(update_fields=['folder', 'is_deleted'])
+    return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_POST
+def archive_thread_view(request, thread_pk):
+    from email_assistant.models import EmailThread
+    account = _get_account(request)
+    thread = get_object_or_404(EmailThread, pk=thread_pk, account=account)
+    thread.is_archived = True
+    thread.save(update_fields=['is_archived'])
+    return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_POST
+def unarchive_thread_view(request, thread_pk):
+    from email_assistant.models import EmailThread
+    account = _get_account(request)
+    thread = get_object_or_404(EmailThread, pk=thread_pk, account=account)
+    thread.is_archived = False
+    thread.save(update_fields=['is_archived'])
+    return JsonResponse({'ok': True})
