@@ -1,6 +1,7 @@
 {% extends "admin/base_site.html" %}
 {% block title %}{{ title }} — Minerva{% endblock %}
 {% block content_title %}{% endblock %}
+{% block messages %}{% endblock %}
 
 {% block extrahead %}{{ block.super }}
 <style>
@@ -16,12 +17,17 @@
 .em-btn { padding:5px 13px; border-radius:6px; font-size:12px; cursor:pointer; border:1px solid var(--border-strong); background:none; color:var(--text-muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px; transition:background .1s; }
 .em-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
 .em-btn.ai { background:rgba(0,212,170,.1); color:#00d4aa; border-color:rgba(0,212,170,.3); }
+.em-btn.danger { color:var(--err,#e53935); }
 .em-ai-result { display:none; padding:14px 16px; border-top:1px solid var(--border); background:rgba(0,212,170,.04); }
 .em-ai-label { font-size:11px; font-weight:700; color:#00d4aa; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
 .em-ai-text { font-size:13px; line-height:1.7; white-space:pre-wrap; color:var(--text); }
 .em-reply-box { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:10px; padding:16px; margin-top:8px; }
-.em-textarea { width:100%; padding:10px 12px; border-radius:7px; border:1px solid var(--border-strong); background:var(--bg-input); color:var(--text); font-size:14px; line-height:1.6; resize:vertical; outline:none; font-family:inherit; min-height:100px; box-sizing:border-box; }
-.em-textarea:focus { border-color:var(--accent,#58a6ff); }
+.em-toolbar { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
+.em-tb-btn { border:none; background:none; cursor:pointer; color:var(--text-muted); padding:3px 8px; border-radius:4px; font-size:13px; font-weight:500; transition:background .1s; line-height:1.4; }
+.em-tb-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
+.em-reply-editor { min-height:100px; padding:10px 12px; border-radius:7px; border:1px solid var(--border-strong); background:var(--bg-input); color:var(--text); font-size:14px; line-height:1.6; outline:none; word-break:break-word; }
+.em-reply-editor:focus { border-color:var(--accent,#58a6ff); }
+.em-reply-editor[placeholder]:empty::before { content:attr(placeholder); color:var(--text-dim); pointer-events:none; }
 .em-send-btn { padding:8px 20px; border-radius:7px; font-size:13px; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; border:none; cursor:pointer; font-weight:600; transition:opacity .15s; }
 .em-send-btn:hover { opacity:.88; }
 </style>
@@ -50,8 +56,8 @@
     {% endif %}
   </div>
 
-  {% for msg in messages %}
-  <div class="em-msg-card">
+  {% for msg in emails %}
+  <div class="em-msg-card" id="card-{{ msg.pk }}">
     <div class="em-msg-head">
       <div style="display:flex;align-items:center;gap:10px;min-width:0">
         <div class="em-avatar">{{ msg.sender_display|first|upper }}</div>
@@ -76,7 +82,7 @@
     <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
       {% for att in msg.attachments %}
       <span style="font-size:11px;padding:3px 9px;border-radius:5px;background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text-muted)">
-        📎 {{ att.name }} ({{ att.size|filesizeformat }})
+        📎 {{ att.name }}
       </span>
       {% endfor %}
     </div>
@@ -89,12 +95,12 @@
       <a href="{% url 'email_assistant:compose' %}?forward={{ msg.pk }}" class="em-btn">→ Переслати</a>
       {% if thread %}
         {% if thread.is_archived %}
-        <button class="em-btn" onclick="unarchiveThread({{ thread.pk }}, this)">📤 З архіву</button>
+        <button class="em-btn" onclick="unarchiveThread({{ thread.pk }})">📤 З архіву</button>
         {% else %}
-        <button class="em-btn" onclick="archiveThread({{ thread.pk }}, this)">📦 В архів</button>
+        <button class="em-btn" onclick="archiveThread({{ thread.pk }})">📦 В архів</button>
         {% endif %}
       {% endif %}
-      <button class="em-btn" style="color:var(--err,#e53935)" onclick="deleteMsg({{ msg.pk }}, this)">🗑️ Видалити</button>
+      <button class="em-btn danger" onclick="deleteMsg({{ msg.pk }})">🗑️ Видалити</button>
     </div>
 
     <div class="em-ai-result" id="ai-box-{{ msg.pk }}">
@@ -111,12 +117,21 @@
   {% if last_msg %}
   <div class="em-reply-box">
     <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Відповісти</div>
-    <textarea id="quick-reply" class="em-textarea" placeholder="Текст відповіді..."></textarea>
+    <div class="em-toolbar">
+      <button class="em-tb-btn" onmousedown="return fmt('bold')" title="Жирний"><b>B</b></button>
+      <button class="em-tb-btn" onmousedown="return fmt('italic')" title="Курсив"><i>I</i></button>
+      <button class="em-tb-btn" onmousedown="return fmt('underline')" title="Підкреслений"><u>U</u></button>
+      <button class="em-tb-btn" onmousedown="return fmt('strikeThrough')" title="Закреслений"><s>S</s></button>
+      <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
+      <button class="em-tb-btn" onmousedown="return fmt('insertUnorderedList')">≡</button>
+      <button class="em-tb-btn" onmousedown="return fmt('removeFormat')" title="Очистити">✕</button>
+    </div>
+    <div id="quick-reply" class="em-reply-editor" contenteditable="true"
+         placeholder="Текст відповіді..."></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
-      <button class="em-btn" style="font-size:13px;padding:7px 16px" onclick="saveDraft()">Зберегти чернетку</button>
       <button class="em-send-btn" onclick="sendQuickReply()">Відправити →</button>
     </div>
-    <div id="reply-status" style="font-size:12px;margin-top:6px;height:16px"></div>
+    <div id="reply-status" style="font-size:12px;margin-top:6px;min-height:16px"></div>
   </div>
   {% endif %}
 </div>
@@ -127,26 +142,29 @@ const LAST_PK = {{ last_msg.pk|default:'null' }};
 const LAST_FROM = '{{ last_msg.from_email|default:''|escapejs }}';
 const SUBJ    = '{{ title|escapejs }}';
 
+function fmt(cmd) {
+  document.execCommand(cmd, false, null);
+  return false;
+}
+
 async function aiReply(pk) {
-  const box  = document.getElementById('ai-box-' + pk);
-  const text = document.getElementById('ai-text-' + pk);
-  box.style.display = 'block';
-  text.textContent  = '⏳ Мінерва думає...';
+  var box = document.getElementById('ai-box-' + pk);
+  var text = document.getElementById('ai-text-' + pk);
+  box.style.display = 'block'; text.textContent = '⏳ Мінерва думає...';
   try {
-    const r = await fetch(`/email/message/${pk}/ai-reply/`);
-    const d = await r.json();
+    var r = await fetch('/email/message/' + pk + '/ai-reply/');
+    var d = await r.json();
     text.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
   } catch { text.textContent = '⚠️ Помилка'; }
 }
 
 async function aiTranslate(pk) {
-  const box  = document.getElementById('ai-box-' + pk);
-  const text = document.getElementById('ai-text-' + pk);
-  box.style.display = 'block';
-  text.textContent  = '⏳ Перекладаю...';
+  var box = document.getElementById('ai-box-' + pk);
+  var text = document.getElementById('ai-text-' + pk);
+  box.style.display = 'block'; text.textContent = '⏳ Перекладаю...';
   try {
-    const r = await fetch(`/email/message/${pk}/ai-translate/?lang=uk`);
-    const d = await r.json();
+    var r = await fetch('/email/message/' + pk + '/ai-translate/?lang=uk');
+    var d = await r.json();
     text.textContent = d.ok ? d.translation : '⚠️ ' + d.error;
   } catch { text.textContent = '⚠️ Помилка'; }
 }
@@ -155,60 +173,48 @@ function copyAI(pk) {
   navigator.clipboard.writeText(document.getElementById('ai-text-' + pk).textContent);
 }
 function useAsReply(pk) {
-  document.getElementById('quick-reply').value = document.getElementById('ai-text-' + pk).textContent;
-  document.getElementById('quick-reply').scrollIntoView({behavior:'smooth'});
+  var ed = document.getElementById('quick-reply');
+  ed.innerText = document.getElementById('ai-text-' + pk).textContent;
+  ed.scrollIntoView({behavior:'smooth'});
 }
 
 async function sendQuickReply() {
-  const body   = document.getElementById('quick-reply').value.trim();
-  const status = document.getElementById('reply-status');
-  if (!body) { status.textContent = 'Введіть текст'; status.style.color = '#e53935'; return; }
+  var editor = document.getElementById('quick-reply');
+  var body   = editor.innerText.trim();
+  var status = document.getElementById('reply-status');
+  if (!body) { status.textContent = 'Введіть текст'; status.style.color = 'var(--err,#e53935)'; return; }
   status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
-  const form = new FormData();
+  var form = new FormData();
   form.append('reply_to_pk', LAST_PK);
   form.append('body', body);
   form.append('subject', SUBJ.startsWith('Re:') ? SUBJ : 'Re: ' + SUBJ);
   form.append('to', LAST_FROM);
   try {
-    const r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:form});
-    const d = await r.json();
+    var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:form});
+    var d = await r.json();
     status.textContent = d.ok ? '✓ Відправлено' : '✗ ' + d.error;
-    status.style.color = d.ok ? '#2e7d32' : '#e53935';
-    if (d.ok) { document.getElementById('quick-reply').value = ''; setTimeout(() => location.reload(), 800); }
-  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = '#e53935'; }
+    status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
+    if (d.ok) { editor.innerHTML = ''; setTimeout(function(){ location.reload(); }, 800); }
+  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)'; }
 }
 
-function saveDraft() { alert('Чернетки — наступний крок.'); }
-
-async function deleteMsg(pk, btn) {
-  if (!confirm('Видалити цей лист?')) return;
-  btn.textContent = '⏳';
-  try {
-    const r = await fetch(`/email/message/${pk}/delete/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    const d = await r.json();
-    if (d.ok) { btn.closest('.em-msg-card').remove(); }
-    else alert('Помилка: ' + d.error);
-  } catch { btn.textContent = '🗑️ Видалити'; }
+async function deleteMsg(pk) {
+  if (!confirm('Видалити лист?')) return;
+  var r = await fetch('/email/message/' + pk + '/delete/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) { var c = document.getElementById('card-' + pk); if (c) c.remove(); }
 }
 
-async function archiveThread(threadPk, btn) {
-  btn.textContent = '⏳';
-  try {
-    const r = await fetch(`/email/thread/${threadPk}/archive/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    const d = await r.json();
-    if (d.ok) location.href = '/email/';
-    else alert('Помилка: ' + d.error);
-  } catch { btn.textContent = '📦 В архів'; }
+async function archiveThread(tpk) {
+  var r = await fetch('/email/thread/' + tpk + '/archive/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) location.href = '/email/';
 }
 
-async function unarchiveThread(threadPk, btn) {
-  btn.textContent = '⏳';
-  try {
-    const r = await fetch(`/email/thread/${threadPk}/unarchive/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    const d = await r.json();
-    if (d.ok) location.reload();
-    else alert('Помилка: ' + d.error);
-  } catch { btn.textContent = '📤 З архіву'; }
+async function unarchiveThread(tpk) {
+  var r = await fetch('/email/thread/' + tpk + '/unarchive/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) location.reload();
 }
 </script>
 {% endblock %}

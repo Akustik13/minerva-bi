@@ -1,168 +1,336 @@
 {% extends "admin/base_site.html" %}
-{% block title %}{{ title }} — Minerva{% endblock %}
+{% block title %}Email Асистент — Minerva{% endblock %}
 {% block content_title %}{% endblock %}
+{% block messages %}{% endblock %}
 
 {% block extrahead %}{{ block.super }}
 <style>
-.em-wrap { display:flex; height:calc(100vh - 110px); border:1px solid var(--border-strong); border-radius:12px; overflow:hidden; background:var(--bg-card); }
-.em-sidebar { width:190px; flex-shrink:0; border-right:1px solid var(--border-strong); padding:12px 0; background:var(--bg-input); display:flex; flex-direction:column; }
-.em-folder { display:flex; align-items:center; justify-content:space-between; padding:8px 16px; font-size:13px; text-decoration:none; cursor:pointer; transition:background .1s; }
-.em-folder:hover { background:var(--bg-hover,#1e2d40); }
-.em-folder.active { color:var(--accent,#58a6ff); background:rgba(88,166,255,.08); font-weight:600; }
-.em-folder:not(.active) { color:var(--text-muted); }
-.em-badge { background:var(--accent,#58a6ff); color:#fff; border-radius:10px; font-size:10px; padding:1px 7px; font-weight:700; }
-.em-list { flex:1; overflow-y:auto; }
-.em-row { display:flex; align-items:flex-start; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); text-decoration:none; transition:background .1s; position:relative; }
-.em-row:hover { background:var(--bg-hover,#1e2d40); }
-.em-row.unread { background:rgba(88,166,255,.04); }
-.em-avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,#1565c0,#42a5f5); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; color:#fff; }
-.em-sender { font-size:13px; font-weight:400; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:170px; }
-.em-row.unread .em-sender { font-weight:700; color:var(--text); }
-.em-subject { font-size:13px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.em-row.unread .em-subject { color:var(--text); font-weight:600; }
-.em-preview { font-size:11px; color:var(--text-dim,#607d8b); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.em-date { font-size:11px; color:var(--text-muted); flex-shrink:0; white-space:nowrap; }
-.em-compose-btn { display:flex; align-items:center; gap:6px; margin:0 10px 14px; padding:8px 14px; border-radius:8px; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; text-decoration:none; font-size:13px; font-weight:600; transition:opacity .15s; }
-.em-compose-btn:hover { opacity:.88; color:#fff; }
-.em-sync-btn { display:flex; align-items:center; gap:6px; margin:0 10px 4px; padding:6px 12px; border-radius:6px; border:1px solid var(--border-strong); background:none; cursor:pointer; color:var(--text-muted); font-size:12px; width:calc(100% - 20px); transition:background .1s; }
-.em-sync-btn:hover { background:var(--bg-hover,#1e2d40); }
-.em-empty { display:flex; align-items:center; justify-content:center; height:200px; color:var(--text-muted); font-size:14px; flex-direction:column; gap:8px; }
-/* Row action buttons — appear on hover */
-.em-row-actions { position:absolute; right:12px; top:50%; transform:translateY(-50%); display:none; gap:4px; background:var(--bg-card); border:1px solid var(--border-strong); border-radius:7px; padding:3px 4px; box-shadow:0 2px 8px rgba(0,0,0,.3); z-index:10; }
-.em-row:hover .em-row-actions { display:flex; }
-.em-row-actions button { border:none; background:none; cursor:pointer; color:var(--text-muted); padding:4px 7px; border-radius:5px; font-size:13px; line-height:1; transition:background .1s; }
-.em-row-actions button:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
+/* ── Layout ── */
+.em-app{display:flex;height:calc(100vh - 112px);overflow:hidden;border:1px solid var(--border-strong);border-radius:12px;background:var(--bg-card)}
+
+/* ── Panel 1 — folders ── */
+.em-p1{width:220px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);background:var(--bg-input);transition:width .2s}
+.em-p1.collapsed{width:52px}
+.em-p1-top{display:flex;align-items:center;gap:6px;padding:10px 10px 6px;border-bottom:1px solid var(--border)}
+.em-compose-btn{flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:var(--accent,#58a6ff);color:#fff;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .15s}
+.em-compose-btn:hover{opacity:.85;color:#fff}
+.em-p1.collapsed .em-compose-btn{flex:none;padding:8px;justify-content:center}
+.em-p1.collapsed .em-compose-label{display:none}
+.em-p1-toggle{border:none;background:none;cursor:pointer;color:var(--text-muted);padding:6px 4px;border-radius:5px;font-size:14px;flex-shrink:0;line-height:1;transition:color .1s}
+.em-p1-toggle:hover{color:var(--text);background:var(--bg-hover,#1e2d40)}
+
+/* ── Search ── */
+.em-search{padding:8px 10px 4px;display:flex;gap:4px}
+.em-search-inp{flex:1;padding:6px 10px;border-radius:7px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;outline:none;min-width:0}
+.em-search-inp:focus{border-color:var(--accent,#58a6ff)}
+.em-p1.collapsed .em-search{display:none}
+
+/* ── Folder links ── */
+.em-folders{flex:1;overflow-y:auto;padding:4px 0}
+.em-folder-link{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;text-decoration:none;color:var(--text-muted);white-space:nowrap;overflow:hidden;transition:background .1s,color .1s;border-left:3px solid transparent}
+.em-folder-link:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.em-folder-link.active{color:var(--accent,#58a6ff);background:rgba(88,166,255,.08);border-left-color:var(--accent,#58a6ff);font-weight:600}
+.em-folder-icon{font-size:15px;flex-shrink:0}
+.em-folder-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.em-badge{background:var(--accent,#58a6ff);color:#fff;border-radius:10px;font-size:10px;padding:1px 7px;font-weight:700;flex-shrink:0}
+.em-p1.collapsed .em-folder-label,.em-p1.collapsed .em-badge{display:none}
+.em-p1.collapsed .em-folder-link{padding:10px;justify-content:center}
+
+/* ── Sync buttons ── */
+.em-sync-area{padding:8px 10px;border-top:1px solid var(--border-strong);display:flex;flex-direction:column;gap:4px}
+.em-p1.collapsed .em-sync-area{display:none}
+.em-sync-btn{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;transition:background .1s}
+.em-sync-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+#sync-status{font-size:11px;color:var(--text-dim);line-height:1.4;min-height:14px}
+
+/* ── Panel 2 — message list ── */
+.em-p2{width:320px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);overflow:hidden}
+.em-p2-header{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
+.em-p2-title{font-size:13px;font-weight:600;color:var(--text)}
+.em-p2-count{font-size:11px;color:var(--text-muted)}
+.em-p2-list{flex:1;overflow-y:auto}
+
+/* ── Message row ── */
+.em-row{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;position:relative;min-width:0}
+.em-row:hover{background:var(--bg-hover,#1e2d40)}
+.em-row.active{background:rgba(88,166,255,.1);border-left:3px solid var(--accent,#58a6ff)}
+.em-row.unread{background:rgba(88,166,255,.04)}
+.em-row.unread .em-row-sender,.em-row.unread .em-row-subj{font-weight:700;color:var(--text)}
+.em-star-btn{border:none;background:none;cursor:pointer;font-size:14px;padding:2px;flex-shrink:0;line-height:1;color:var(--text-dim);transition:color .1s}
+.em-star-btn:hover,.em-star-btn.starred{color:#f5c518}
+/* No yellow on light theme */
+[data-theme="light"] .em-star-btn:hover,[data-theme="light"] .em-star-btn.starred{color:#e6a817}
+.em-avatar{width:32px;height:32px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#1565c0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#fff}
+.em-row-body{flex:1;min-width:0}
+.em-row-top{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px}
+.em-row-sender{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+.em-row-date{font-size:10px;color:var(--text-muted);flex-shrink:0;white-space:nowrap}
+.em-row-subj{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.em-row-prev{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Row hover actions */
+.em-row-act{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:none;gap:2px;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:5}
+.em-row:hover .em-row-act{display:flex}
+.em-row-act button{border:none;background:none;cursor:pointer;color:var(--text-muted);padding:3px 6px;border-radius:4px;font-size:12px;line-height:1;transition:background .1s}
+.em-row-act button:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+
+/* ── Panel 3 — preview ── */
+.em-p3{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.em-p3-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);font-size:14px;gap:10px}
+.em-p3-empty span{font-size:48px}
+.em-p3-content{flex:1;overflow-y:auto;padding:0}
+
+/* Pagination */
+.em-pagination{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0}
+.em-page-link{color:var(--accent,#58a6ff);text-decoration:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border-strong)}
+.em-page-link:hover{background:var(--bg-hover,#1e2d40)}
+
+/* Quick search highlight */
+.em-empty-list{display:flex;align-items:center;justify-content:center;height:120px;color:var(--text-muted);font-size:13px}
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="em-wrap">
+<div class="em-app" id="em-app">
 
-  <!-- Sidebar -->
-  <div class="em-sidebar">
-    <a href="{% url 'email_assistant:compose' %}" class="em-compose-btn">✏️ Написати</a>
+  <!-- ═══ Panel 1: Folders ═══ -->
+  <div class="em-p1" id="em-p1">
+    <div class="em-p1-top">
+      <a href="{% url 'email_assistant:compose' %}" class="em-compose-btn" title="Написати лист">
+        <span>✏️</span><span class="em-compose-label">Написати</span>
+      </a>
+      <button class="em-p1-toggle" id="p1-toggle" onclick="toggleP1()" title="Згорнути/розгорнути">◀</button>
+    </div>
 
-    {% for f, label, icon in folders %}
-    <a href="?folder={{ f }}" class="em-folder{% if folder == f %} active{% endif %}">
-      <span>{{ icon }} {{ label }}</span>
-      {% if f == 'inbox' and unread_count %}
-        <span class="em-badge">{{ unread_count }}</span>
-      {% endif %}
-    </a>
-    {% endfor %}
+    <form class="em-search" method="get" action="">
+      <input type="hidden" name="folder" value="{{ folder }}">
+      <input class="em-search-inp" type="search" name="q" value="{{ q }}" placeholder="🔍 Пошук..." id="em-q">
+    </form>
 
-    <div style="margin-top:auto;padding:10px 10px 4px;border-top:1px solid var(--border-strong)">
-      <button class="em-sync-btn" onclick="syncNow(this, false)">🔄 Синхронізувати</button>
-      <button class="em-sync-btn" onclick="syncNow(this, true)" title="Завантажити всі листи з початку">📥 Завантажити все</button>
-      <div id="sync-status" style="font-size:11px;color:var(--text-dim);padding:4px 4px 0;line-height:1.4">
-        {% if account.last_sync_at %}Остання: {{ account.last_sync_at|date:"d.m H:i" }}{% endif %}
-      </div>
+    <div class="em-folders">
+      {% for fkey, flabel, ficon in folders %}
+      <a href="?folder={{ fkey }}{% if q %}&q={{ q }}{% endif %}"
+         class="em-folder-link{% if folder == fkey %} active{% endif %}"
+         title="{{ flabel }}">
+        <span class="em-folder-icon">{{ ficon }}</span>
+        <span class="em-folder-label">{{ flabel }}</span>
+        {% if fkey == 'inbox' and unread_count %}
+          <span class="em-badge">{{ unread_count }}</span>
+        {% endif %}
+      </a>
+      {% endfor %}
+    </div>
+
+    <div class="em-sync-area">
+      <button class="em-sync-btn" onclick="syncNow(this,false)" title="Завантажити нові листи">
+        🔄 Синхронізувати
+      </button>
+      <button class="em-sync-btn" onclick="syncNow(this,true)" title="Завантажити всі листи з початку">
+        📥 Завантажити все
+      </button>
+      <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
     </div>
   </div>
 
-  <!-- List -->
-  <div class="em-list">
-    {% if not messages %}
-    <div class="em-empty">
-      <span style="font-size:40px">📭</span>
-      Листів немає
+  <!-- ═══ Panel 2: Message list ═══ -->
+  <div class="em-p2">
+    <div class="em-p2-header">
+      <span class="em-p2-title">
+        {% for fkey,flabel,ficon in folders %}{% if folder == fkey %}{{ flabel }}{% endif %}{% endfor %}
+        {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
+      </span>
+      <span class="em-p2-count">{{ total }}</span>
     </div>
-    {% endif %}
 
-    {% for msg in messages %}
-    {% with target=msg.thread %}
-    <div class="em-row{% if not msg.is_read %} unread{% endif %}"
-         style="cursor:pointer"
-         onclick="if(!event.target.closest('.em-row-actions')) location.href='{% if target %}{% url 'email_assistant:thread' target.pk %}{% else %}{% url 'email_assistant:message' msg.pk %}{% endif %}'">
-      <div class="em-avatar">{{ msg.sender_display|first|upper }}</div>
-      <div style="flex:1;min-width:0;padding-right:80px">
-        <div style="display:flex;justify-content:space-between;gap:8px">
-          <span class="em-sender">{{ msg.sender_display }}</span>
-          <span class="em-date">{{ msg.sent_at|date:"d.m H:i" }}</span>
-        </div>
-        <div class="em-subject">{{ msg.subject|default:"(без теми)" }}</div>
-        <div class="em-preview">{{ msg.body_text|truncatechars:80 }}</div>
-      </div>
-      {% if msg.has_attachments %}
-      <span style="color:var(--text-dim);font-size:14px;flex-shrink:0;margin-top:2px;margin-right:60px">📎</span>
+    <div class="em-p2-list" id="em-p2-list">
+      {% if not emails %}
+      <div class="em-empty-list">📭 Листів немає</div>
       {% endif %}
 
-      <!-- Row action buttons -->
-      <div class="em-row-actions">
-        {% if folder == 'trash' %}
-          <button onclick="restoreMsg({{ msg.pk }}, this)" title="Відновити">↩️</button>
-        {% elif folder == 'inbox' %}
-          {% if target %}
-          <button onclick="archiveThread({{ target.pk }}, this)" title="В архів">📦</button>
+      {% for msg in emails %}
+      {% with tpk=msg.thread.pk|default:0 %}
+      <div class="em-row{% if not msg.is_read %} unread{% endif %}"
+           id="row-{{ msg.pk }}"
+           data-pk="{{ msg.pk }}"
+           data-tpk="{{ tpk }}"
+           onclick="previewMsg({{ msg.pk }}, {{ tpk }}, this)">
+
+        <button class="em-star-btn{% if msg.is_starred %} starred{% endif %}"
+                onclick="toggleStar(event,{{ msg.pk }},this)"
+                title="Позначити важливим">
+          {% if msg.is_starred %}⭐{% else %}☆{% endif %}
+        </button>
+
+        <div class="em-avatar">{{ msg.sender_display|first|upper }}</div>
+
+        <div class="em-row-body">
+          <div class="em-row-top">
+            <span class="em-row-sender">{{ msg.sender_display|truncatechars:22 }}</span>
+            <span class="em-row-date">{{ msg.sent_at|date:"d.m H:i" }}</span>
+          </div>
+          <div class="em-row-subj">{{ msg.subject|default:"(без теми)"|truncatechars:40 }}</div>
+          <div class="em-row-prev">{{ msg.body_text|truncatechars:55 }}</div>
+        </div>
+
+        {% if msg.has_attachments %}<span style="font-size:12px;color:var(--text-dim);flex-shrink:0">📎</span>{% endif %}
+
+        <!-- Hover actions -->
+        <div class="em-row-act">
+          {% if folder == 'trash' %}
+            <button onclick="restoreMsg(event,{{ msg.pk }})" title="Відновити">↩️</button>
+          {% elif folder == 'archived' %}
+            <button onclick="unarchiveThread(event,{{ tpk }})" title="З архіву">📤</button>
+          {% else %}
+            {% if tpk %}<button onclick="archiveThread(event,{{ tpk }})" title="В архів">📦</button>{% endif %}
+            <button onclick="deleteMsg(event,{{ msg.pk }})" title="Видалити">🗑️</button>
           {% endif %}
-          <button onclick="deleteMsg({{ msg.pk }}, this)" title="Видалити">🗑️</button>
-        {% else %}
-          <button onclick="deleteMsg({{ msg.pk }}, this)" title="Видалити">🗑️</button>
-        {% endif %}
+          <a href="{% if tpk %}{% url 'email_assistant:thread' tpk %}{% else %}{% url 'email_assistant:message' msg.pk %}{% endif %}"
+             onclick="event.stopPropagation()"
+             style="font-size:12px;padding:3px 6px;border-radius:4px;color:var(--text-muted);text-decoration:none"
+             title="Відкрити окремо" target="_blank">↗</a>
+        </div>
       </div>
+      {% endwith %}
+      {% endfor %}
     </div>
-    {% endwith %}
-    {% endfor %}
 
     {% if has_prev or has_next %}
-    <div style="display:flex;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border)">
-      {% if has_prev %}<a href="?folder={{ folder }}&page={{ page|add:'-1' }}" style="color:var(--accent,#58a6ff);text-decoration:none;font-size:13px">← Попередні</a>{% else %}<span></span>{% endif %}
-      <span style="font-size:12px;color:var(--text-muted)">{{ page }} / {{ total }}</span>
-      {% if has_next %}<a href="?folder={{ folder }}&page={{ page|add:'1' }}" style="color:var(--accent,#58a6ff);text-decoration:none;font-size:13px">Наступні →</a>{% endif %}
+    <div class="em-pagination">
+      {% if has_prev %}
+      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'-1' }}{% if q %}&q={{ q }}{% endif %}">← Назад</a>
+      {% else %}<span></span>{% endif %}
+      <span style="font-size:11px;color:var(--text-muted)">{{ page }}</span>
+      {% if has_next %}
+      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'1' }}{% if q %}&q={{ q }}{% endif %}">Далі →</a>
+      {% else %}<span></span>{% endif %}
     </div>
     {% endif %}
   </div>
+
+  <!-- ═══ Panel 3: Preview ═══ -->
+  <div class="em-p3" id="em-p3">
+    <div class="em-p3-empty" id="em-p3-empty">
+      <span>📩</span>
+      Виберіть лист для перегляду
+    </div>
+    <div class="em-p3-content" id="em-p3-content" style="display:none"></div>
+  </div>
+
 </div>
 
 <script>
 const CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 
+/* ── Panel 1 collapse ── */
+(function(){
+  var p1  = document.getElementById('em-p1');
+  var btn = document.getElementById('p1-toggle');
+  var collapsed = localStorage.getItem('em-p1-col') === '1';
+  if (collapsed) { p1.classList.add('collapsed'); btn.textContent = '▶'; }
+  window.toggleP1 = function() {
+    collapsed = !collapsed;
+    p1.classList.toggle('collapsed', collapsed);
+    btn.textContent = collapsed ? '▶' : '◀';
+    localStorage.setItem('em-p1-col', collapsed ? '1' : '0');
+  };
+})();
+
+/* ── Preview panel ── */
+var _activeRow = null;
+async function previewMsg(pk, tpk, rowEl) {
+  if (_activeRow) _activeRow.classList.remove('active');
+  _activeRow = rowEl;
+  rowEl.classList.add('active');
+  rowEl.classList.remove('unread');
+
+  document.getElementById('em-p3-empty').style.display = 'none';
+  var cont = document.getElementById('em-p3-content');
+  cont.style.display = 'block';
+  cont.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:13px">⏳ Завантажую...</div>';
+
+  var url = tpk ? '/email/thread/' + tpk + '/preview/' : '/email/message/' + pk + '/preview/';
+  try {
+    var r = await fetch(url, {credentials:'same-origin'});
+    cont.innerHTML = await r.text();
+    cont.scrollTop = 0;
+    // Re-attach inline CSRF for forms in preview
+    cont.querySelectorAll('[data-csrf]').forEach(function(el){ el.value = CSRF; });
+  } catch(e) {
+    cont.innerHTML = '<div style="padding:24px;color:var(--err)">⚠️ Помилка завантаження</div>';
+  }
+}
+
+/* ── Star toggle ── */
+async function toggleStar(ev, pk, btn) {
+  ev.stopPropagation();
+  var r = await fetch('/email/message/' + pk + '/star/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) {
+    btn.classList.toggle('starred', d.starred);
+    btn.textContent = d.starred ? '⭐' : '☆';
+  }
+}
+
+/* ── Row actions ── */
+async function deleteMsg(ev, pk) {
+  ev.stopPropagation();
+  var r = await fetch('/email/message/' + pk + '/delete/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) {
+    var row = document.getElementById('row-' + pk);
+    if (row) row.remove();
+    if (_activeRow === row) { _activeRow = null; resetPreview(); }
+  }
+}
+
+async function restoreMsg(ev, pk) {
+  ev.stopPropagation();
+  var r = await fetch('/email/message/' + pk + '/restore/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) { var row = document.getElementById('row-' + pk); if (row) row.remove(); }
+}
+
+async function archiveThread(ev, tpk) {
+  ev.stopPropagation();
+  var r = await fetch('/email/thread/' + tpk + '/archive/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) {
+    document.querySelectorAll('[data-tpk="' + tpk + '"]').forEach(function(el){ el.remove(); });
+    resetPreview();
+  }
+}
+
+async function unarchiveThread(ev, tpk) {
+  ev.stopPropagation();
+  var r = await fetch('/email/thread/' + tpk + '/unarchive/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) { document.querySelectorAll('[data-tpk="' + tpk + '"]').forEach(function(el){ el.remove(); }); }
+}
+
+function resetPreview() {
+  document.getElementById('em-p3-empty').style.display = '';
+  document.getElementById('em-p3-content').style.display = 'none';
+  document.getElementById('em-p3-content').innerHTML = '';
+}
+
+/* ── Sync ── */
 async function syncNow(btn, full) {
-  const status = document.getElementById('sync-status');
+  var st = document.getElementById('sync-status');
   btn.disabled = true;
-  btn.textContent = '⏳ Синхронізую...';
-  status.textContent = '';
-  const body = new FormData();
+  var orig = btn.textContent;
+  btn.textContent = '⏳...';
+  st.textContent = '';
+  var body = new FormData();
   if (full) body.append('full', '1');
   try {
-    const r = await fetch('{% url "email_assistant:sync_now" %}', {
-      method: 'POST', headers: {'X-CSRFToken': CSRF}, body,
+    var r = await fetch('{% url "email_assistant:sync_now" %}', {
+      method:'POST', headers:{'X-CSRFToken':CSRF}, body
     });
-    const d = await r.json();
-    status.textContent = d.ok ? '✓ Готово' : '✗ ' + d.error;
-    if (d.ok) setTimeout(() => location.reload(), 600);
-  } catch(e) { status.textContent = '✗ Помилка'; }
-  finally { btn.disabled = false; btn.textContent = full ? '📥 Завантажити все' : '🔄 Синхронізувати'; }
-}
-
-async function deleteMsg(pk, btn) {
-  btn.textContent = '⏳';
-  try {
-    const r = await fetch(`/email/message/${pk}/delete/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    const d = await r.json();
-    if (d.ok) btn.closest('.em-row').remove();
-    else alert('Помилка: ' + d.error);
-  } catch { btn.textContent = '🗑️'; }
-}
-
-async function restoreMsg(pk, btn) {
-  btn.textContent = '⏳';
-  try {
-    const r = await fetch(`/email/message/${pk}/restore/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    const d = await r.json();
-    if (d.ok) btn.closest('.em-row').remove();
-    else alert('Помилка: ' + d.error);
-  } catch { btn.textContent = '↩️'; }
-}
-
-async function archiveThread(threadPk, btn) {
-  btn.textContent = '⏳';
-  try {
-    const r = await fetch(`/email/thread/${threadPk}/archive/`, {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    const d = await r.json();
-    if (d.ok) btn.closest('.em-row').remove();
-    else alert('Помилка: ' + d.error);
-  } catch { btn.textContent = '📦'; }
+    var d = await r.json();
+    st.textContent = d.ok ? '✓ Готово' : '✗ ' + d.error;
+    if (d.ok) setTimeout(function(){ location.reload(); }, 700);
+  } catch(e) { st.textContent = '✗ Помилка'; }
+  finally { btn.disabled = false; btn.textContent = orig; }
 }
 </script>
 {% endblock %}

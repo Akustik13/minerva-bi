@@ -1,16 +1,24 @@
 {% extends "admin/base_site.html" %}
 {% block title %}{{ title }} — Minerva{% endblock %}
 {% block content_title %}{% endblock %}
+{% block messages %}{% endblock %}
 
 {% block extrahead %}{{ block.super }}
 <style>
-.em-compose { max-width:720px; margin:0 auto; }
+.em-compose { max-width:760px; margin:0 auto; }
 .em-compose-card { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:12px; overflow:hidden; }
-.em-field { display:flex; align-items:center; gap:12px; padding:11px 18px; border-bottom:1px solid var(--border); }
+.em-field { display:flex; align-items:center; gap:12px; padding:10px 18px; border-bottom:1px solid var(--border); }
 .em-field-label { font-size:12px; font-weight:700; color:var(--text-muted); width:44px; flex-shrink:0; }
 .em-field input { flex:1; border:none; background:none; font-size:14px; color:var(--text); outline:none; }
-.em-body-area { padding:16px 18px; }
-.em-body-area textarea { width:100%; min-height:280px; border:none; background:none; color:var(--text); font-size:14px; line-height:1.7; resize:vertical; outline:none; font-family:inherit; box-sizing:border-box; }
+.em-body-area { padding:12px 18px 8px; }
+/* Formatting toolbar */
+.em-toolbar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid var(--border); }
+.em-tb-btn { border:none; background:none; cursor:pointer; color:var(--text-muted); padding:3px 8px; border-radius:4px; font-size:13px; font-weight:500; transition:background .1s; line-height:1.4; }
+.em-tb-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
+.em-tb-sep { width:1px; background:var(--border-strong); margin:2px 4px; align-self:stretch; }
+.em-body-editor { min-height:260px; max-height:600px; overflow-y:auto; padding:10px 0; outline:none; font-size:14px; line-height:1.7; color:var(--text); word-break:break-word; }
+.em-body-editor[placeholder]:empty::before { content:attr(placeholder); color:var(--text-dim); pointer-events:none; }
+.em-sig-div { margin-top:12px; padding-top:10px; border-top:1px dashed var(--border-strong); color:var(--text-muted); font-size:13px; }
 .em-footer { padding:12px 18px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--bg-input); }
 .em-send-btn { padding:9px 24px; border-radius:7px; font-size:13px; font-weight:700; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; border:none; cursor:pointer; transition:opacity .15s; }
 .em-send-btn:hover { opacity:.88; }
@@ -19,8 +27,7 @@
 #suggestions { display:none; position:fixed; background:var(--bg-card); border:1px solid var(--border-strong); border-radius:8px; max-height:220px; overflow-y:auto; z-index:9000; min-width:280px; box-shadow:0 8px 24px rgba(0,0,0,.3); }
 .sugg-item { padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border); }
 .sugg-item:hover { background:var(--bg-hover,#1e2d40); }
-.sugg-item strong { color:var(--text); }
-.sugg-item span { color:var(--text-muted); font-size:12px; }
+.sugg-item strong { color:var(--text); } .sugg-item span { color:var(--text-muted); font-size:12px; }
 </style>
 {% endblock %}
 
@@ -50,10 +57,48 @@
         <input type="text" name="subject" value="{{ initial.subject|default:'' }}"
                placeholder="Тема листа" style="font-weight:500">
       </div>
+
+      <!-- Body with formatting toolbar -->
       <div class="em-body-area">
-        <textarea name="body" placeholder="Текст листа...">{{ initial.quote|default:'' }}</textarea>
+        <div class="em-toolbar">
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('bold')" title="Жирний"><b>B</b></button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('italic')" title="Курсив"><i>I</i></button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('underline')" title="Підкреслений"><u>U</u></button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('strikeThrough')" title="Закреслений"><s>S</s></button>
+          <span class="em-tb-sep"></span>
+          <select onchange="fmtVal('fontSize', this.value); this.value=''" style="padding:3px 6px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;cursor:pointer" title="Розмір шрифту">
+            <option value="">Розмір</option>
+            <option value="1">8px</option><option value="2">10px</option>
+            <option value="3">12px</option><option value="4">14px</option>
+            <option value="5">18px</option><option value="6">24px</option>
+          </select>
+          <select onchange="fmtVal('fontName', this.value); this.value=''" style="padding:3px 6px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;cursor:pointer" title="Шрифт">
+            <option value="">Шрифт</option>
+            <option value="Arial">Arial</option>
+            <option value="Times New Roman">Times New Roman</option>
+            <option value="Courier New">Courier New</option>
+            <option value="Georgia">Georgia</option>
+          </select>
+          <input type="color" id="txt-color" onchange="fmtVal('foreColor', this.value)" title="Колір тексту"
+                 style="width:28px;height:26px;border-radius:4px;border:1px solid var(--border-strong);padding:1px;cursor:pointer;background:var(--bg-input)">
+          <span class="em-tb-sep"></span>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('insertUnorderedList')" title="Список">≡</button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('insertOrderedList')" title="Нумерований список">1.</button>
+          <span class="em-tb-sep"></span>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('removeFormat')" title="Очистити форматування">✕ Очистити</button>
+        </div>
+
+        <div id="body-editor" class="em-body-editor" contenteditable="true"
+             placeholder="Текст листа...">{% if initial.quote %}{{ initial.quote }}{% endif %}</div>
+        {% if signature %}
+        <div class="em-sig-div" id="em-sig">{{ signature }}</div>
+        {% endif %}
       </div>
-      <div style="padding:10px 18px;border-top:1px solid var(--border)">
+
+      <!-- Hidden textarea synced from editor -->
+      <textarea name="body" id="body-hidden" style="display:none"></textarea>
+
+      <div style="padding:8px 18px;border-top:1px solid var(--border)">
         <label style="font-size:12px;color:var(--text-muted);cursor:pointer">
           📎 Додати вкладення
           <input type="file" name="attachments" multiple style="display:none" onchange="showFiles(this)">
@@ -63,13 +108,7 @@
       <div class="em-footer">
         <button type="button" class="em-send-btn" onclick="sendEmail()">Відправити →</button>
         <button type="button" class="em-sec-btn" onclick="saveDraft()">💾 Зберегти</button>
-        <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
-          <input type="datetime-local" id="schedule-time"
-                 style="padding:6px 10px;border-radius:6px;font-size:12px;
-                        border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text)">
-          <button type="button" class="em-sec-btn" onclick="scheduleEmail()" style="font-size:12px;padding:6px 12px">⏰ Запланувати</button>
-        </div>
-        <div id="send-status" style="font-size:12px;width:100%;margin-top:2px"></div>
+        <div id="send-status" style="font-size:12px;margin-top:2px;width:100%"></div>
       </div>
     </form>
   </div>
@@ -83,19 +122,28 @@ const CONTACTS = {{ crm_contacts|safe }};
 const toField  = document.getElementById('to-field');
 const suggBox  = document.getElementById('suggestions');
 
+function fmt(cmd) {
+  document.execCommand(cmd, false, null);
+  document.getElementById('body-editor').focus();
+  return false;
+}
+function fmtVal(cmd, val) {
+  document.execCommand(cmd, false, val);
+  document.getElementById('body-editor').focus();
+}
+
 toField.addEventListener('input', () => {
-  const q = toField.value.split(',').pop().trim().toLowerCase();
+  var q = toField.value.split(',').pop().trim().toLowerCase();
   if (q.length < 2) { suggBox.style.display = 'none'; return; }
-  const hits = CONTACTS.filter(c =>
+  var hits = CONTACTS.filter(c =>
     c.email.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
   ).slice(0, 8);
   if (!hits.length) { suggBox.style.display = 'none'; return; }
   suggBox.innerHTML = hits.map(c =>
-    `<div class="sugg-item" onclick="selectContact('${c.email.replace(/'/g,"\\'")}')">
-      <strong>${c.name}</strong> <span>${c.email}</span>
-    </div>`
+    '<div class="sugg-item" onclick="selectContact(\'' + c.email.replace(/'/g,"\\'") + '\')">' +
+    '<strong>' + c.name + '</strong> <span>' + c.email + '</span></div>'
   ).join('');
-  const rect = toField.getBoundingClientRect();
+  var rect = toField.getBoundingClientRect();
   suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
   suggBox.style.left = rect.left + 'px';
   suggBox.style.width = Math.max(280, rect.width) + 'px';
@@ -103,40 +151,40 @@ toField.addEventListener('input', () => {
 });
 
 function selectContact(email) {
-  const parts = toField.value.split(',');
+  var parts = toField.value.split(',');
   parts[parts.length - 1] = email;
   toField.value = parts.join(', ') + ', ';
-  suggBox.style.display = 'none';
-  toField.focus();
+  suggBox.style.display = 'none'; toField.focus();
 }
-document.addEventListener('click', e => {
-  if (!suggBox.contains(e.target) && e.target !== toField)
-    suggBox.style.display = 'none';
+document.addEventListener('click', function(e){
+  if (!suggBox.contains(e.target) && e.target !== toField) suggBox.style.display = 'none';
 });
 
 function showFiles(input) {
   document.getElementById('files-list').textContent =
-    Array.from(input.files).map(f => `📎 ${f.name} (${(f.size/1024).toFixed(1)} KB)`).join('  ');
+    Array.from(input.files).map(function(f){ return '📎 ' + f.name + ' (' + (f.size/1024).toFixed(1) + ' KB)'; }).join('  ');
 }
 
 async function sendEmail() {
-  const status = document.getElementById('send-status');
+  // Sync contenteditable → hidden textarea
+  var editor = document.getElementById('body-editor');
+  var sig    = document.getElementById('em-sig');
+  var fullBody = editor.innerText;
+  if (sig) fullBody += '\n\n--\n' + sig.innerText;
+  document.getElementById('body-hidden').value = fullBody;
+
+  var status = document.getElementById('send-status');
   status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
-  const data = new FormData(document.getElementById('compose-form'));
+  var data = new FormData(document.getElementById('compose-form'));
   try {
-    const r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:data});
-    const d = await r.json();
+    var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:data});
+    var d = await r.json();
     status.textContent = d.ok ? '✓ Відправлено!' : '✗ ' + d.error;
-    status.style.color = d.ok ? '#2e7d32' : '#e53935';
-    if (d.ok) setTimeout(() => window.location = '/email/', 1000);
-  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = '#e53935'; }
+    status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
+    if (d.ok) setTimeout(function(){ window.location = '/email/'; }, 1000);
+  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)'; }
 }
 
 function saveDraft() { alert('Чернетки — наступний крок.'); }
-function scheduleEmail() {
-  const t = document.getElementById('schedule-time').value;
-  if (!t) { alert('Вкажіть час відправки'); return; }
-  alert('Запланована відправка — наступний крок.');
-}
 </script>
 {% endblock %}

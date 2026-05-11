@@ -28,6 +28,51 @@ def _crm_contacts() -> list:
         return []
 
 
+def _build_qs(account, folder, q=''):
+    from email_assistant.models import EmailMessage, EmailThread
+
+    if folder == 'starred':
+        qs = EmailMessage.objects.filter(account=account, is_starred=True, is_deleted=False)
+    elif folder == 'archived':
+        archived_ids = EmailThread.objects.filter(
+            account=account, is_archived=True
+        ).values_list('id', flat=True)
+        qs = EmailMessage.objects.filter(
+            account=account, thread_id__in=archived_ids, is_deleted=False
+        )
+    elif folder == 'inbox':
+        archived_ids = EmailThread.objects.filter(
+            account=account, is_archived=True
+        ).values_list('id', flat=True)
+        qs = EmailMessage.objects.filter(
+            account=account, folder='inbox', is_deleted=False
+        ).exclude(thread_id__in=archived_ids)
+    else:
+        qs = EmailMessage.objects.filter(
+            account=account, folder=folder, is_deleted=False
+        )
+
+    if q:
+        from django.db.models import Q
+        qs = qs.filter(
+            Q(subject__icontains=q) |
+            Q(from_email__icontains=q) |
+            Q(from_name__icontains=q) |
+            Q(body_text__icontains=q)
+        )
+
+    return qs.order_by('-sent_at')
+
+
+FOLDERS = [
+    ('inbox',    '📥 Вхідні',    'inbox'),
+    ('sent',     '📤 Надіслані', 'sent'),
+    ('starred',  '⭐ Важливі',   'starred'),
+    ('archived', '📦 Архів',     'archived'),
+    ('trash',    '🗑️ Кошик',     'trash'),
+]
+
+
 @staff_member_required
 def inbox_view(request):
     from email_assistant.models import EmailMessage
@@ -37,68 +82,47 @@ def inbox_view(request):
         return render(request, 'email_assistant/no_account.html', {'title': 'Email Асистент'})
 
     folder   = request.GET.get('folder', 'inbox')
+    q        = request.GET.get('q', '').strip()
     page     = max(1, int(request.GET.get('page', 1)))
-    per_page = 25
+    per_page = 30
 
-    if folder == 'archived':
-        from email_assistant.models import EmailThread
-        archived_thread_ids = EmailThread.objects.filter(
-            account=account, is_archived=True
-        ).values_list('id', flat=True)
-        qs = EmailMessage.objects.filter(
-            account=account, thread_id__in=archived_thread_ids, is_deleted=False
-        ).order_by('-sent_at')
-    elif folder == 'inbox':
-        from email_assistant.models import EmailThread
-        archived_thread_ids = EmailThread.objects.filter(
-            account=account, is_archived=True
-        ).values_list('id', flat=True)
-        qs = EmailMessage.objects.filter(
-            account=account, folder='inbox', is_deleted=False
-        ).exclude(thread_id__in=archived_thread_ids).order_by('-sent_at')
-    else:
-        qs = EmailMessage.objects.filter(
-            account=account, folder=folder, is_deleted=False
-        ).order_by('-sent_at')
-
+    qs    = _build_qs(account, folder, q)
     total = qs.count()
     start = (page - 1) * per_page
-    msgs  = list(qs[start:start + per_page])
+    # rename key to `emails` to avoid shadowing Django messages framework
+    emails = list(qs.select_related('thread')[start:start + per_page])
 
-    unread_count = EmailMessage.objects.filter(account=account, folder='inbox', is_read=False, is_deleted=False).count()
-
-    folders = [
-        ('inbox',    'Вхідні',    '📥'),
-        ('sent',     'Надіслані', '📤'),
-        ('archived', 'Архів',     '📦'),
-        ('trash',    'Кошик',     '🗑️'),
-    ]
+    unread_count = EmailMessage.objects.filter(
+        account=account, folder='inbox', is_read=False, is_deleted=False
+    ).count()
 
     return render(request, 'email_assistant/inbox.html', {
         'title':        'Email Асистент',
         'account':      account,
-        'messages':     msgs,
+        'emails':       emails,
         'folder':       folder,
-        'folders':      folders,
+        'folders':      FOLDERS,
+        'q':            q,
         'page':         page,
         'total':        total,
         'per_page':     per_page,
         'has_prev':     page > 1,
         'has_next':     start + per_page < total,
         'unread_count': unread_count,
+        'crm_contacts': json.dumps(_crm_contacts()),
     })
 
 
 @staff_member_required
 def thread_view(request, thread_pk):
+    """Full-page standalone thread view (open separately)."""
     from email_assistant.models import EmailThread
 
     account = _get_account(request)
     thread  = get_object_or_404(EmailThread, pk=thread_pk, account=account)
-    msgs    = list(thread.messages.filter(is_deleted=False).order_by('sent_at'))
+    emails  = list(thread.messages.filter(is_deleted=False).order_by('sent_at'))
 
-    unread = [m for m in msgs if not m.is_read]
-    if unread:
+    if any(not m.is_read for m in emails):
         thread.messages.filter(is_read=False).update(is_read=True)
         thread.has_unread = False
         thread.save(update_fields=['has_unread'])
@@ -107,14 +131,14 @@ def thread_view(request, thread_pk):
         'title':    thread.subject,
         'account':  account,
         'thread':   thread,
-        'messages': msgs,
-        'last_msg': msgs[-1] if msgs else None,
+        'emails':   emails,
+        'last_msg': emails[-1] if emails else None,
     })
 
 
 @staff_member_required
 def message_view(request, message_pk):
-    """Окремий лист (якщо немає thread)."""
+    """Full-page standalone single message view."""
     from email_assistant.models import EmailMessage
 
     account = _get_account(request)
@@ -127,7 +151,48 @@ def message_view(request, message_pk):
         'title':    msg.subject,
         'account':  account,
         'thread':   msg.thread,
-        'messages': [msg],
+        'emails':   [msg],
+        'last_msg': msg,
+    })
+
+
+@staff_member_required
+def thread_preview_view(request, thread_pk):
+    """AJAX: HTML fragment loaded into panel-3 of 3-panel inbox."""
+    from email_assistant.models import EmailThread
+
+    account = _get_account(request)
+    thread  = get_object_or_404(EmailThread, pk=thread_pk, account=account)
+    emails  = list(thread.messages.filter(is_deleted=False).order_by('sent_at'))
+
+    if any(not m.is_read for m in emails):
+        thread.messages.filter(is_read=False).update(is_read=True)
+        thread.has_unread = False
+        thread.save(update_fields=['has_unread'])
+
+    return render(request, 'email_assistant/preview.html', {
+        'account':  account,
+        'thread':   thread,
+        'emails':   emails,
+        'last_msg': emails[-1] if emails else None,
+    })
+
+
+@staff_member_required
+def message_preview_view(request, message_pk):
+    """AJAX: HTML fragment for a single message in panel-3."""
+    from email_assistant.models import EmailMessage
+
+    account = _get_account(request)
+    msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    if not msg.is_read:
+        msg.is_read = True
+        msg.save(update_fields=['is_read'])
+
+    return render(request, 'email_assistant/preview.html', {
+        'account':  account,
+        'thread':   msg.thread,
+        'emails':   [msg],
         'last_msg': msg,
     })
 
@@ -165,11 +230,22 @@ def compose_view(request):
     if request.method == 'POST':
         return _handle_send(request, account, reply_to)
 
+    # Signature
+    sig = ''
+    try:
+        sig = (account.user.profile.smtp_signature or '').strip()
+        if sig:
+            name = (account.user.get_full_name() or account.display_name or account.user.username)
+            sig = sig.replace('{name}', name)
+    except Exception:
+        pass
+
     return render(request, 'email_assistant/compose.html', {
         'title':        'Новий лист' if not reply_to else 'Відповідь',
         'account':      account,
         'reply_to':     reply_to,
         'initial':      initial,
+        'signature':    sig,
         'crm_contacts': json.dumps(_crm_contacts()),
     })
 
@@ -314,6 +390,17 @@ def unread_count_view(request):
 
 @staff_member_required
 @require_POST
+def toggle_star_view(request, message_pk):
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    msg.is_starred = not msg.is_starred
+    msg.save(update_fields=['is_starred'])
+    return JsonResponse({'ok': True, 'starred': msg.is_starred})
+
+
+@staff_member_required
+@require_POST
 def delete_message_view(request, message_pk):
     from email_assistant.models import EmailMessage
     account = _get_account(request)
@@ -326,7 +413,6 @@ def delete_message_view(request, message_pk):
         old_folder = msg.folder
         msg.folder = EmailMessage.FOLDER_TRASH
         msg.save(update_fields=['folder'])
-        # Mirror to IMAP
         if msg.imap_uid:
             try:
                 from email_assistant.imap_client import IMAPClient
