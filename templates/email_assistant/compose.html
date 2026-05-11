@@ -1,0 +1,142 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} — Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.em-compose { max-width:720px; margin:0 auto; }
+.em-compose-card { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:12px; overflow:hidden; }
+.em-field { display:flex; align-items:center; gap:12px; padding:11px 18px; border-bottom:1px solid var(--border); }
+.em-field-label { font-size:12px; font-weight:700; color:var(--text-muted); width:44px; flex-shrink:0; }
+.em-field input { flex:1; border:none; background:none; font-size:14px; color:var(--text); outline:none; }
+.em-body-area { padding:16px 18px; }
+.em-body-area textarea { width:100%; min-height:280px; border:none; background:none; color:var(--text); font-size:14px; line-height:1.7; resize:vertical; outline:none; font-family:inherit; box-sizing:border-box; }
+.em-footer { padding:12px 18px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--bg-input); }
+.em-send-btn { padding:9px 24px; border-radius:7px; font-size:13px; font-weight:700; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; border:none; cursor:pointer; transition:opacity .15s; }
+.em-send-btn:hover { opacity:.88; }
+.em-sec-btn { padding:8px 16px; border-radius:7px; font-size:13px; border:1px solid var(--border-strong); background:none; cursor:pointer; color:var(--text-muted); transition:background .1s; }
+.em-sec-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
+#suggestions { display:none; position:fixed; background:var(--bg-card); border:1px solid var(--border-strong); border-radius:8px; max-height:220px; overflow-y:auto; z-index:9000; min-width:280px; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+.sugg-item { padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border); }
+.sugg-item:hover { background:var(--bg-hover,#1e2d40); }
+.sugg-item strong { color:var(--text); }
+.sugg-item span { color:var(--text-muted); font-size:12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="em-compose">
+  <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
+    <a href="{% url 'email_assistant:inbox' %}" style="color:var(--text-muted);text-decoration:none;font-size:13px">← Вхідні</a>
+    <h2 style="font-size:18px;color:var(--text)">{{ title }}</h2>
+  </div>
+
+  <div class="em-compose-card">
+    <form id="compose-form" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      <div class="em-field">
+        <span class="em-field-label">Кому</span>
+        <input type="text" name="to" id="to-field"
+               value="{{ initial.to|default:'' }}"
+               placeholder="email@example.com, ..." autocomplete="off">
+      </div>
+      <div class="em-field">
+        <span class="em-field-label">CC</span>
+        <input type="text" name="cc" placeholder="Копія...">
+      </div>
+      <div class="em-field">
+        <span class="em-field-label">Тема</span>
+        <input type="text" name="subject" value="{{ initial.subject|default:'' }}"
+               placeholder="Тема листа" style="font-weight:500">
+      </div>
+      <div class="em-body-area">
+        <textarea name="body" placeholder="Текст листа...">{{ initial.quote|default:'' }}</textarea>
+      </div>
+      <div style="padding:10px 18px;border-top:1px solid var(--border)">
+        <label style="font-size:12px;color:var(--text-muted);cursor:pointer">
+          📎 Додати вкладення
+          <input type="file" name="attachments" multiple style="display:none" onchange="showFiles(this)">
+        </label>
+        <div id="files-list" style="font-size:12px;color:var(--text-muted);margin-top:4px"></div>
+      </div>
+      <div class="em-footer">
+        <button type="button" class="em-send-btn" onclick="sendEmail()">Відправити →</button>
+        <button type="button" class="em-sec-btn" onclick="saveDraft()">💾 Зберегти</button>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:6px">
+          <input type="datetime-local" id="schedule-time"
+                 style="padding:6px 10px;border-radius:6px;font-size:12px;
+                        border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text)">
+          <button type="button" class="em-sec-btn" onclick="scheduleEmail()" style="font-size:12px;padding:6px 12px">⏰ Запланувати</button>
+        </div>
+        <div id="send-status" style="font-size:12px;width:100%;margin-top:2px"></div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="suggestions"></div>
+
+<script>
+const CSRF     = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+const CONTACTS = {{ crm_contacts|safe }};
+const toField  = document.getElementById('to-field');
+const suggBox  = document.getElementById('suggestions');
+
+toField.addEventListener('input', () => {
+  const q = toField.value.split(',').pop().trim().toLowerCase();
+  if (q.length < 2) { suggBox.style.display = 'none'; return; }
+  const hits = CONTACTS.filter(c =>
+    c.email.toLowerCase().includes(q) || c.name.toLowerCase().includes(q)
+  ).slice(0, 8);
+  if (!hits.length) { suggBox.style.display = 'none'; return; }
+  suggBox.innerHTML = hits.map(c =>
+    `<div class="sugg-item" onclick="selectContact('${c.email.replace(/'/g,"\\'")}')">
+      <strong>${c.name}</strong> <span>${c.email}</span>
+    </div>`
+  ).join('');
+  const rect = toField.getBoundingClientRect();
+  suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
+  suggBox.style.left = rect.left + 'px';
+  suggBox.style.width = Math.max(280, rect.width) + 'px';
+  suggBox.style.display = 'block';
+});
+
+function selectContact(email) {
+  const parts = toField.value.split(',');
+  parts[parts.length - 1] = email;
+  toField.value = parts.join(', ') + ', ';
+  suggBox.style.display = 'none';
+  toField.focus();
+}
+document.addEventListener('click', e => {
+  if (!suggBox.contains(e.target) && e.target !== toField)
+    suggBox.style.display = 'none';
+});
+
+function showFiles(input) {
+  document.getElementById('files-list').textContent =
+    Array.from(input.files).map(f => `📎 ${f.name} (${(f.size/1024).toFixed(1)} KB)`).join('  ');
+}
+
+async function sendEmail() {
+  const status = document.getElementById('send-status');
+  status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
+  const data = new FormData(document.getElementById('compose-form'));
+  try {
+    const r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:data});
+    const d = await r.json();
+    status.textContent = d.ok ? '✓ Відправлено!' : '✗ ' + d.error;
+    status.style.color = d.ok ? '#2e7d32' : '#e53935';
+    if (d.ok) setTimeout(() => window.location = '/email/', 1000);
+  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = '#e53935'; }
+}
+
+function saveDraft() { alert('Чернетки — наступний крок.'); }
+function scheduleEmail() {
+  const t = document.getElementById('schedule-time').value;
+  if (!t) { alert('Вкажіть час відправки'); return; }
+  alert('Запланована відправка — наступний крок.');
+}
+</script>
+{% endblock %}

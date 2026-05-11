@@ -1,0 +1,175 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} — Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.em-thread-wrap { max-width:820px; margin:0 auto; padding-bottom:40px; }
+.em-hd { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; gap:16px; }
+.em-back { color:var(--text-muted); text-decoration:none; font-size:13px; display:inline-flex; align-items:center; gap:4px; }
+.em-back:hover { color:var(--text); }
+.em-msg-card { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:10px; margin-bottom:14px; overflow:hidden; }
+.em-msg-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--bg-input); }
+.em-avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#1565c0,#42a5f5); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#fff; flex-shrink:0; }
+.em-body { padding:16px; font-size:14px; line-height:1.7; color:var(--text); white-space:pre-wrap; word-break:break-word; }
+.em-actions { padding:10px 16px; border-top:1px solid var(--border); background:var(--bg-input); display:flex; gap:8px; flex-wrap:wrap; }
+.em-btn { padding:5px 13px; border-radius:6px; font-size:12px; cursor:pointer; border:1px solid var(--border-strong); background:none; color:var(--text-muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px; transition:background .1s; }
+.em-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
+.em-btn.ai { background:rgba(0,212,170,.1); color:#00d4aa; border-color:rgba(0,212,170,.3); }
+.em-ai-result { display:none; padding:14px 16px; border-top:1px solid var(--border); background:rgba(0,212,170,.04); }
+.em-ai-label { font-size:11px; font-weight:700; color:#00d4aa; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
+.em-ai-text { font-size:13px; line-height:1.7; white-space:pre-wrap; color:var(--text); }
+.em-reply-box { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:10px; padding:16px; margin-top:8px; }
+.em-textarea { width:100%; padding:10px 12px; border-radius:7px; border:1px solid var(--border-strong); background:var(--bg-input); color:var(--text); font-size:14px; line-height:1.6; resize:vertical; outline:none; font-family:inherit; min-height:100px; box-sizing:border-box; }
+.em-textarea:focus { border-color:var(--accent,#58a6ff); }
+.em-send-btn { padding:8px 20px; border-radius:7px; font-size:13px; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; border:none; cursor:pointer; font-weight:600; transition:opacity .15s; }
+.em-send-btn:hover { opacity:.88; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="em-thread-wrap">
+
+  <div class="em-hd">
+    <div>
+      <a href="{% url 'email_assistant:inbox' %}" class="em-back">← Вхідні</a>
+      <h2 style="font-size:18px;margin-top:6px;color:var(--text)">{{ title }}</h2>
+      {% if thread and thread.crm_customer %}
+      <a href="/admin/crm/customer/{{ thread.crm_customer.pk }}/change/"
+         style="font-size:12px;color:var(--accent,#58a6ff);text-decoration:none">
+        👤 {{ thread.crm_customer.name }}
+      </a>
+      {% endif %}
+    </div>
+    {% if last_msg %}
+    <a href="{% url 'email_assistant:compose' %}?reply_to={{ last_msg.pk }}"
+       style="padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,#1565c0,#1a73e8);
+              color:#fff;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">
+      ↩ Відповісти
+    </a>
+    {% endif %}
+  </div>
+
+  {% for msg in messages %}
+  <div class="em-msg-card">
+    <div class="em-msg-head">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <div class="em-avatar">{{ msg.sender_display|first|upper }}</div>
+        <div style="min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--text)">{{ msg.sender_display }}</div>
+          <div style="font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            {{ msg.from_email }}{% if msg.to_emails %} → {{ msg.to_emails|join:", " }}{% endif %}
+          </div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+        {% if msg.has_attachments %}
+        <span title="{{ msg.attachments|length }} вкладень" style="font-size:14px">📎</span>
+        {% endif %}
+        <span style="font-size:12px;color:var(--text-muted)">{{ msg.sent_at|date:"d.m.Y H:i" }}</span>
+      </div>
+    </div>
+
+    <div class="em-body">{{ msg.body_text }}</div>
+
+    {% if msg.attachments %}
+    <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
+      {% for att in msg.attachments %}
+      <span style="font-size:11px;padding:3px 9px;border-radius:5px;background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text-muted)">
+        📎 {{ att.name }} ({{ att.size|filesizeformat }})
+      </span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="em-actions">
+      <button class="em-btn ai" onclick="aiReply({{ msg.pk }})">🏛️ AI відповідь</button>
+      <button class="em-btn" onclick="aiTranslate({{ msg.pk }})">🌐 Перекласти UA</button>
+      <a href="{% url 'email_assistant:compose' %}?reply_to={{ msg.pk }}" class="em-btn">↩ Відповісти</a>
+      <a href="{% url 'email_assistant:compose' %}?forward={{ msg.pk }}" class="em-btn">→ Переслати</a>
+    </div>
+
+    <div class="em-ai-result" id="ai-box-{{ msg.pk }}">
+      <div class="em-ai-label">🏛️ Мінерва пропонує</div>
+      <div class="em-ai-text" id="ai-text-{{ msg.pk }}"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="em-btn" onclick="copyAI({{ msg.pk }})">📋 Копіювати</button>
+        <button class="em-btn ai" onclick="useAsReply({{ msg.pk }})">Вставити у відповідь →</button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if last_msg %}
+  <div class="em-reply-box">
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Відповісти</div>
+    <textarea id="quick-reply" class="em-textarea" placeholder="Текст відповіді..."></textarea>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
+      <button class="em-btn" style="font-size:13px;padding:7px 16px" onclick="saveDraft()">Зберегти чернетку</button>
+      <button class="em-send-btn" onclick="sendQuickReply()">Відправити →</button>
+    </div>
+    <div id="reply-status" style="font-size:12px;margin-top:6px;height:16px"></div>
+  </div>
+  {% endif %}
+</div>
+
+<script>
+const CSRF    = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+const LAST_PK = {{ last_msg.pk|default:'null' }};
+const LAST_FROM = '{{ last_msg.from_email|default:''|escapejs }}';
+const SUBJ    = '{{ title|escapejs }}';
+
+async function aiReply(pk) {
+  const box  = document.getElementById('ai-box-' + pk);
+  const text = document.getElementById('ai-text-' + pk);
+  box.style.display = 'block';
+  text.textContent  = '⏳ Мінерва думає...';
+  try {
+    const r = await fetch(`/email/message/${pk}/ai-reply/`);
+    const d = await r.json();
+    text.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
+  } catch { text.textContent = '⚠️ Помилка'; }
+}
+
+async function aiTranslate(pk) {
+  const box  = document.getElementById('ai-box-' + pk);
+  const text = document.getElementById('ai-text-' + pk);
+  box.style.display = 'block';
+  text.textContent  = '⏳ Перекладаю...';
+  try {
+    const r = await fetch(`/email/message/${pk}/ai-translate/?lang=uk`);
+    const d = await r.json();
+    text.textContent = d.ok ? d.translation : '⚠️ ' + d.error;
+  } catch { text.textContent = '⚠️ Помилка'; }
+}
+
+function copyAI(pk) {
+  navigator.clipboard.writeText(document.getElementById('ai-text-' + pk).textContent);
+}
+function useAsReply(pk) {
+  document.getElementById('quick-reply').value = document.getElementById('ai-text-' + pk).textContent;
+  document.getElementById('quick-reply').scrollIntoView({behavior:'smooth'});
+}
+
+async function sendQuickReply() {
+  const body   = document.getElementById('quick-reply').value.trim();
+  const status = document.getElementById('reply-status');
+  if (!body) { status.textContent = 'Введіть текст'; status.style.color = '#e53935'; return; }
+  status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
+  const form = new FormData();
+  form.append('reply_to_pk', LAST_PK);
+  form.append('body', body);
+  form.append('subject', SUBJ.startsWith('Re:') ? SUBJ : 'Re: ' + SUBJ);
+  form.append('to', LAST_FROM);
+  try {
+    const r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:form});
+    const d = await r.json();
+    status.textContent = d.ok ? '✓ Відправлено' : '✗ ' + d.error;
+    status.style.color = d.ok ? '#2e7d32' : '#e53935';
+    if (d.ok) { document.getElementById('quick-reply').value = ''; setTimeout(() => location.reload(), 800); }
+  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = '#e53935'; }
+}
+
+function saveDraft() { alert('Чернетки — наступний крок.'); }
+</script>
+{% endblock %}

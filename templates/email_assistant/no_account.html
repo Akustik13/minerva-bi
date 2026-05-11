@@ -1,0 +1,16 @@
+{% extends "admin/base_site.html" %}
+{% block content %}
+<div style="max-width:500px;margin:60px auto;text-align:center">
+  <div style="font-size:48px;margin-bottom:16px">📧</div>
+  <h2 style="font-size:22px;margin-bottom:12px">Email акаунт не налаштований</h2>
+  <p style="color:var(--text-muted);margin-bottom:24px">
+    Додайте IMAP/SMTP акаунт щоб почати користуватись Email Асистентом.
+  </p>
+  <a href="/admin/email_assistant/emailaccount/add/"
+     style="display:inline-block;padding:10px 24px;border-radius:8px;
+            background:var(--primary,#1a73e8);color:#fff;text-decoration:none;
+            font-size:14px;font-weight:600">
+    ➕ Додати акаунт
+  </a>
+</div>
+{% endblock %}

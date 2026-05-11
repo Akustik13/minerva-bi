@@ -1,0 +1,114 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} — Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.em-wrap { display:flex; height:calc(100vh - 110px); border:1px solid var(--border-strong); border-radius:12px; overflow:hidden; background:var(--bg-card); }
+.em-sidebar { width:190px; flex-shrink:0; border-right:1px solid var(--border-strong); padding:12px 0; background:var(--bg-input); display:flex; flex-direction:column; }
+.em-folder { display:flex; align-items:center; justify-content:space-between; padding:8px 16px; font-size:13px; text-decoration:none; cursor:pointer; transition:background .1s; }
+.em-folder:hover { background:var(--bg-hover,#1e2d40); }
+.em-folder.active { color:var(--accent,#58a6ff); background:rgba(88,166,255,.08); font-weight:600; }
+.em-folder:not(.active) { color:var(--text-muted); }
+.em-badge { background:var(--accent,#58a6ff); color:#fff; border-radius:10px; font-size:10px; padding:1px 7px; font-weight:700; }
+.em-list { flex:1; overflow-y:auto; }
+.em-row { display:flex; align-items:flex-start; gap:12px; padding:12px 16px; border-bottom:1px solid var(--border); text-decoration:none; transition:background .1s; }
+.em-row:hover { background:var(--bg-hover,#1e2d40); }
+.em-row.unread { background:rgba(88,166,255,.04); }
+.em-avatar { width:36px; height:36px; border-radius:50%; flex-shrink:0; background:linear-gradient(135deg,#1565c0,#42a5f5); display:flex; align-items:center; justify-content:center; font-size:15px; font-weight:800; color:#fff; }
+.em-sender { font-size:13px; font-weight:400; color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:170px; }
+.em-row.unread .em-sender { font-weight:700; color:var(--text); }
+.em-subject { font-size:13px; color:var(--text-muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.em-row.unread .em-subject { color:var(--text); font-weight:600; }
+.em-preview { font-size:11px; color:var(--text-dim,#607d8b); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.em-date { font-size:11px; color:var(--text-muted); flex-shrink:0; white-space:nowrap; }
+.em-compose-btn { display:flex; align-items:center; gap:6px; margin:0 10px 14px; padding:8px 14px; border-radius:8px; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; text-decoration:none; font-size:13px; font-weight:600; transition:opacity .15s; }
+.em-compose-btn:hover { opacity:.88; color:#fff; }
+.em-sync-btn { display:flex; align-items:center; gap:6px; margin:0 10px; padding:6px 12px; border-radius:6px; border:1px solid var(--border-strong); background:none; cursor:pointer; color:var(--text-muted); font-size:12px; width:calc(100% - 20px); transition:background .1s; }
+.em-sync-btn:hover { background:var(--bg-hover,#1e2d40); }
+.em-empty { display:flex; align-items:center; justify-content:center; height:200px; color:var(--text-muted); font-size:14px; flex-direction:column; gap:8px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="em-wrap">
+
+  <!-- Sidebar -->
+  <div class="em-sidebar">
+    <a href="{% url 'email_assistant:compose' %}" class="em-compose-btn">✏️ Написати</a>
+
+    {% for f, label, icon in folders %}
+    <a href="?folder={{ f }}" class="em-folder{% if folder == f %} active{% endif %}">
+      <span>{{ icon }} {{ label }}</span>
+      {% if f == 'inbox' and unread_count %}
+        <span class="em-badge">{{ unread_count }}</span>
+      {% endif %}
+    </a>
+    {% endfor %}
+
+    <div style="margin-top:auto;padding:10px 10px 4px;border-top:1px solid var(--border-strong)">
+      <button class="em-sync-btn" onclick="syncNow(this)">🔄 Синхронізувати</button>
+      <div id="sync-status" style="font-size:11px;color:var(--text-dim);padding:4px 4px 0;line-height:1.4">
+        {% if account.last_sync_at %}Остання: {{ account.last_sync_at|date:"d.m H:i" }}{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- List -->
+  <div class="em-list">
+    {% if not messages %}
+    <div class="em-empty">
+      <span style="font-size:40px">📭</span>
+      Листів немає
+    </div>
+    {% endif %}
+
+    {% for msg in messages %}
+    {% with target=msg.thread %}
+    <a href="{% if target %}{% url 'email_assistant:thread' target.pk %}{% else %}{% url 'email_assistant:message' msg.pk %}{% endif %}"
+       class="em-row{% if not msg.is_read %} unread{% endif %}">
+      <div class="em-avatar">{{ msg.sender_display|first|upper }}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;gap:8px">
+          <span class="em-sender">{{ msg.sender_display }}</span>
+          <span class="em-date">{{ msg.sent_at|date:"d.m H:i" }}</span>
+        </div>
+        <div class="em-subject">{{ msg.subject|default:"(без теми)" }}</div>
+        <div class="em-preview">{{ msg.body_text|truncatechars:80 }}</div>
+      </div>
+      {% if msg.has_attachments %}
+      <span style="color:var(--text-dim);font-size:14px;flex-shrink:0;margin-top:2px">📎</span>
+      {% endif %}
+    </a>
+    {% endwith %}
+    {% endfor %}
+
+    {% if has_prev or has_next %}
+    <div style="display:flex;justify-content:space-between;padding:12px 16px;border-top:1px solid var(--border)">
+      {% if has_prev %}<a href="?folder={{ folder }}&page={{ page|add:'-1' }}" style="color:var(--accent,#58a6ff);text-decoration:none;font-size:13px">← Попередні</a>{% else %}<span></span>{% endif %}
+      <span style="font-size:12px;color:var(--text-muted)">{{ page }} / {{ total|divisibleby:per_page|yesno:"," }}{{ total }}</span>
+      {% if has_next %}<a href="?folder={{ folder }}&page={{ page|add:'1' }}" style="color:var(--accent,#58a6ff);text-decoration:none;font-size:13px">Наступні →</a>{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+const CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+async function syncNow(btn) {
+  const status = document.getElementById('sync-status');
+  btn.disabled = true;
+  btn.textContent = '⏳ Синхронізую...';
+  status.textContent = '';
+  try {
+    const r = await fetch('{% url "email_assistant:sync_now" %}', {
+      method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    const d = await r.json();
+    status.textContent = d.ok ? '✓ Готово' : '✗ ' + d.error;
+    if (d.ok) setTimeout(() => location.reload(), 600);
+  } catch(e) { status.textContent = '✗ Помилка'; }
+  finally { btn.disabled = false; btn.textContent = '🔄 Синхронізувати'; }
+}
+</script>
+{% endblock %}

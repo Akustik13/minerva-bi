@@ -10,6 +10,7 @@
 
 TRACK_INTERVAL="${TRACK_INTERVAL:-300}"
 REMINDER_INTERVAL="${REMINDER_INTERVAL:-900}"
+EMAIL_SYNC_INTERVAL="${EMAIL_SYNC_INTERVAL:-300}"
 BRIEFING_HOUR="${BRIEFING_HOUR:-08}"
 
 echo "⏳ Waiting for PostgreSQL..."
@@ -23,9 +24,11 @@ echo "   sync_digikey_orders interval controlled by DigiKeyConfig in DB"
 echo "   send_digest         time/frequency controlled by NotificationSettings in DB"
 echo "   morning_briefing    daily at ${BRIEFING_HOUR}:00"
 echo "   send_reminders      every ${REMINDER_INTERVAL}s"
+echo "   sync_email          every ${EMAIL_SYNC_INTERVAL}s"
 
 LAST_TRACK=0
 LAST_REMINDER=0
+LAST_EMAIL_SYNC=0
 last_briefing_day=""
 
 while true; do
@@ -52,6 +55,12 @@ while true; do
     echo "[$(date '+%H:%M:%S')] Running morning_briefing..."
     python manage.py morning_briefing 2>&1 || true
     last_briefing_day=$current_day
+  fi
+
+  # ── Email синхронізація — кожні EMAIL_SYNC_INTERVAL секунд ──
+  if [ $((NOW - LAST_EMAIL_SYNC)) -ge "$EMAIL_SYNC_INTERVAL" ]; then
+    python manage.py sync_email 2>&1 || true
+    LAST_EMAIL_SYNC=$(date +%s)
   fi
 
   # ── Нагадування — кожні REMINDER_INTERVAL секунд ────────

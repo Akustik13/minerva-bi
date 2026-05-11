@@ -33,8 +33,9 @@ def _get_app_list(self, request, app_label=None):
         'inventory',  # 📦 Управління складом
         'tasks',      # 📋 Задачі та нагадування
         'autoimport',    # 🔄 Авто-імпорт
-        'ai_assistant',  # 🏛️ Minerva AI
-        'bots',          # 🤖 Боти та AI
+        'ai_assistant',     # 🏛️ Minerva AI
+        'email_assistant',  # 📧 Email Асистент
+        'bots',             # 🤖 Боти та AI
         'api',        # 🔑 API Ключі
         'config',     # ⚙️ Конфігурація
         'auth',       # 🔐 Аутентифікація та авторизація
@@ -47,7 +48,8 @@ def _get_app_list(self, request, app_label=None):
     model_order = {
         'core':     ['auditlog', 'userprofile', 'modulebundle', 'moduleregistry'],
         'strategy': ['aisettings', 'strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
-        'ai_assistant': ['aiconversation', 'aibudgetlog'],
+        'ai_assistant':    ['aiconversation', 'aibudgetlog'],
+        'email_assistant': ['emailaccount', 'emailsettings', 'emailmessage', 'emailthread'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',
                       'inventorytransaction', 'reorderproxy', 'supplier',

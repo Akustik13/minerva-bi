@@ -987,6 +987,13 @@ document.addEventListener('DOMContentLoaded', function(){
         { href: '/ai/diagnostic/',                       label: '🔧 Діагностика',       app: 'ai_assistant' },
       ]
     },
+    { id: 'email', label: '📧 Email', href: '/email/', apps: ['email_assistant'],
+      links: [
+        { href: '/email/',          label: '📥 Вхідні',   app: 'email_assistant' },
+        { href: '/email/compose/',  label: '✏️ Написати', app: 'email_assistant' },
+        { href: '/admin/email_assistant/emailaccount/', label: '⚙️ Акаунти', app: 'email_assistant', model: 'EmailAccount' },
+      ]
+    },
     { id: 'bots',       label: '🧠 Боти та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
     {
       id: 'system', label: '⚙️ Система',
@@ -1073,6 +1080,8 @@ document.addEventListener('DOMContentLoaded', function(){
     '/ai/':                   'ai',
     '/admin/ai_assistant/':   'ai',
     '/dashboard/ai/':         'ai',
+    '/email/':                'email',
+    '/admin/email_assistant/': 'email',
     '/admin/sales/':     'sales',
     '/admin/accounting/':'accounting',
     '/admin/shipping/':  'shipping',
