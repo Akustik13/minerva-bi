@@ -90,7 +90,9 @@ def _build_qs(account, folder, q=''):
             account=account, is_archived=True
         ).values_list('id', flat=True)
         qs = EmailMessage.objects.filter(
-            account=account, folder='inbox', imap_folder_name='', is_deleted=False
+            account=account, folder='inbox',
+            imap_folder_name__in=['', account.imap_folder_inbox],
+            is_deleted=False
         ).exclude(thread_id__in=archived_ids)
     elif folder not in _STANDARD_FOLDERS:
         # Custom IMAP folder (e.g. "Meine Order")
@@ -144,7 +146,9 @@ def inbox_view(request):
     emails = list(qs.select_related('thread')[start:start + per_page])
 
     unread_count = EmailMessage.objects.filter(
-        account=account, folder='inbox', is_read=False, is_deleted=False
+        account=account, folder='inbox',
+        imap_folder_name__in=['', account.imap_folder_inbox],
+        is_read=False, is_deleted=False
     ).count()
 
     return render(request, 'email_assistant/inbox.html', {
