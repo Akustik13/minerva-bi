@@ -93,6 +93,8 @@
             } else if (d.type === 'folder_start') {
               st.textContent = '⏳ ' + d.folder;
               addLine('  ⏳ ' + d.folder + '…');
+            } else if (d.type === 'folder_progress') {
+              replaceLast('  ⏳ ' + d.folder + '… оброблено ' + d.scanned + ', нових +' + d.created);
             } else if (d.type === 'folder_done') {
               replaceLast('  ✓ ' + d.folder + ': +' + d.created + ' нових');
             } else if (d.type === 'folder_error') {

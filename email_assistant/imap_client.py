@@ -72,9 +72,11 @@ class IMAPClient:
 
     def connect(self):
         if self.account.imap_use_ssl:
-            self.conn = imaplib.IMAP4_SSL(self.account.imap_host, self.account.imap_port)
+            self.conn = imaplib.IMAP4_SSL(self.account.imap_host, self.account.imap_port,
+                                          timeout=90)
         else:
-            self.conn = imaplib.IMAP4(self.account.imap_host, self.account.imap_port)
+            self.conn = imaplib.IMAP4(self.account.imap_host, self.account.imap_port,
+                                      timeout=90)
             self.conn.starttls()
         self.conn.login(self.account.imap_username, self.account.imap_password)
         return self

@@ -119,7 +119,11 @@ class EmailAccountAdmin(admin.ModelAdmin):
                 try:
                     with IMAPClient(account) as imap:
                         messages = imap.fetch_messages(folder=name, days_back=3650, since_uid=0)
-                    for msg_data in messages:
+                    for i, msg_data in enumerate(messages):
+                        # Heartbeat every 25 messages so nginx proxy doesn't time out
+                        if i > 0 and i % 25 == 0:
+                            yield _ev({'type': 'folder_progress', 'folder': name,
+                                       'created': created, 'scanned': i})
                         if EmailMessage.objects.filter(
                                 account=account, imap_uid=msg_data['uid'],
                                 imap_folder_name=name).exists():
@@ -150,8 +154,10 @@ class EmailAccountAdmin(admin.ModelAdmin):
                         created += 1
                     total_extra += created
                     yield _ev({'type': 'folder_done', 'folder': name, 'created': created})
-                except Exception as e:
+                except BaseException as e:
                     yield _ev({'type': 'folder_error', 'folder': name, 'error': str(e)})
+                    if isinstance(e, (SystemExit, KeyboardInterrupt)):
+                        raise
 
             yield _ev({'type': 'done', 'inbox_new': inbox_new, 'extra_new': total_extra})
 
@@ -160,7 +166,10 @@ class EmailAccountAdmin(admin.ModelAdmin):
         except EmailAccount.DoesNotExist:
             return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
 
-        return StreamingHttpResponse(generate(account), content_type='application/x-ndjson')
+        resp = StreamingHttpResponse(generate(account), content_type='application/x-ndjson')
+        resp['X-Accel-Buffering'] = 'no'   # disable nginx proxy buffering
+        resp['Cache-Control'] = 'no-cache'
+        return resp
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
