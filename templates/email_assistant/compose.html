@@ -91,14 +91,9 @@
           <button type="button" class="em-tb-btn" onmousedown="return fmt('removeFormat')">✕ Очистити</button>
         </div>
 
-        <!-- Body editor -->
+        <!-- Body editor — signature injected at correct position (after_reply = before quote, end = after quote) -->
         <div id="body-editor" class="em-body-editor" contenteditable="true"
-             placeholder="Текст листа...">{% if initial.quote %}<br><br><pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}</div>
-
-        <!-- Signature (rendered as HTML, separated visually) -->
-        {% if signature %}
-        <div class="em-sig-div" id="em-sig">{{ signature|safe }}</div>
-        {% endif %}
+             placeholder="Текст листа...">{% if signature and account.signature_position == 'after_reply' and initial.quote %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div><br><br><pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% elif initial.quote %}<br><br><pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% if signature %}<br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% else %}{% if signature %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% endif %}</div>
       </div>
 
       <!-- Hidden fields synced before send -->
@@ -193,26 +188,16 @@ function showFiles(input) {
 
 async function sendEmail() {
   var editor = document.getElementById('body-editor');
-  var sig    = document.getElementById('em-sig');
   var btn    = document.querySelector('.em-send-btn');
 
-  // HTML body: signature position from account setting
-  var SIG_POS = '{{ account.signature_position|default:"after_reply" }}';
-  var quoteEl = editor.querySelector('pre');
-  var HR = '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0">';
-  var htmlBody;
-  if (sig && quoteEl && SIG_POS === 'after_reply') {
-    // Sig before quote
-    var quoteHtml = quoteEl.outerHTML;
-    var beforeQuote = editor.innerHTML.substring(0, editor.innerHTML.indexOf(quoteHtml));
-    htmlBody = beforeQuote + HR + sig.innerHTML + '<br>' + quoteHtml;
-  } else {
-    htmlBody = editor.innerHTML;
-    if (sig) htmlBody += HR + sig.innerHTML;
-  }
+  // HTML body: sig already injected at correct position inside editor
+  var htmlBody = editor.innerHTML;
 
-  // Plain text fallback (no sig — SMTPClient appends stripped-HTML sig on backend)
+  // Plain text: temporarily hide sig div so innerText excludes it (backend adds sig to plain text)
+  var sigEl = editor.querySelector('.em-sig-in');
+  if (sigEl) sigEl.style.display = 'none';
   var textBody = editor.innerText || editor.textContent;
+  if (sigEl) sigEl.style.display = '';
 
   document.getElementById('body-hidden').value      = textBody;
   document.getElementById('body-html-hidden').value = htmlBody;

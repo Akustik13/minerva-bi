@@ -45,51 +45,74 @@
     ta.parentNode.insertBefore(wrap, ta.nextSibling);
   });
 
-  // Sync All widget button
+  // Sync All widget button — streams NDJSON progress
   window.doSyncAll = async function(pk) {
     var btn = document.getElementById('sync-all-btn');
     var st  = document.getElementById('sync-all-status');
     var log = document.getElementById('sync-all-log');
     btn.disabled = true; btn.style.opacity = '.5';
-    st.textContent = '⏳ Синхронізую всі папки...'; st.style.color = 'var(--text-muted)';
-    if (log) log.style.display = 'none';
+    st.textContent = '⏳ Запускаю синхронізацію…'; st.style.color = 'var(--text-muted)';
+    log.textContent = ''; log.style.display = 'block';
+
+    function addLine(text) {
+      log.textContent += text + '\n';
+      log.scrollTop = log.scrollHeight;
+    }
+    function replaceLast(text) {
+      var t = log.textContent;
+      var i = t.lastIndexOf('\n', t.length - 2);
+      log.textContent = (i >= 0 ? t.substring(0, i + 1) : '') + text + '\n';
+      log.scrollTop = log.scrollHeight;
+    }
+
     var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
     try {
       var r = await fetch('/admin/email_assistant/emailaccount/' + pk + '/sync-all/', {
         method: 'POST', headers: {'X-CSRFToken': csrf},
       });
-      var d = await r.json();
-      if (d.ok) {
-        var lines = [];
-        // Parse main sync output for counts
-        var out = d.output || '';
-        var newMatch = out.match(/\+(\d+) нових/);
-        var totalNew = newMatch ? parseInt(newMatch[1]) : 0;
-        lines.push('📥 Вхідні + Надіслані: +' + totalNew + ' нових листів');
-
-        // Custom IMAP folders
-        var folders = d.folders || [];
-        var folderTotal = 0;
-        folders.forEach(function(f){
-          var n = f.created || 0;
-          folderTotal += n;
-          lines.push('📂 ' + f.folder + ': ' + (f.error ? '⚠️ ' + f.error : '+' + n + ' нових'));
-        });
-        if (folders.length) lines.push('Всього папок: ' + folders.length + ', нових: ' + folderTotal);
-
-        st.textContent = '✓ Готово — всього нових: ' + (totalNew + folderTotal);
-        st.style.color = 'var(--ok,#2e7d32)';
-        if (log && lines.length) {
-          log.textContent = lines.join('\n');
-          log.style.display = 'block';
+      var reader = r.body.getReader();
+      var decoder = new TextDecoder();
+      var buf = '';
+      while (true) {
+        var chunk = await reader.read();
+        if (chunk.done) break;
+        buf += decoder.decode(chunk.value, {stream: true});
+        var lines = buf.split('\n');
+        buf = lines.pop();
+        for (var i = 0; i < lines.length; i++) {
+          var raw = lines[i].trim();
+          if (!raw) continue;
+          try {
+            var d = JSON.parse(raw);
+            if (d.type === 'step') {
+              st.textContent = d.msg; addLine(d.msg);
+            } else if (d.type === 'inbox_done') {
+              replaceLast('📥 Вхідні/Надіслані: +' + d.created + ' нових');
+            } else if (d.type === 'folders_found') {
+              addLine('📂 Додаткових папок: ' + d.count + (d.names && d.names.length ? ' (' + d.names.join(', ') + ')' : ''));
+            } else if (d.type === 'folder_start') {
+              st.textContent = '⏳ ' + d.folder;
+              addLine('  ⏳ ' + d.folder + '…');
+            } else if (d.type === 'folder_done') {
+              replaceLast('  ✓ ' + d.folder + ': +' + d.created + ' нових');
+            } else if (d.type === 'folder_error') {
+              replaceLast('  ⚠️ ' + d.folder + ': ' + d.error);
+            } else if (d.type === 'error') {
+              addLine('⚠️ Помилка: ' + d.msg);
+              st.textContent = '✗ ' + d.msg; st.style.color = 'var(--err,#e53935)';
+            } else if (d.type === 'done') {
+              var total = (d.inbox_new || 0) + (d.extra_new || 0);
+              addLine('');
+              addLine('✅ Готово. Всього нових листів: ' + total);
+              st.textContent = '✓ Синхронізовано, нових: ' + total;
+              st.style.color = 'var(--ok,#2e7d32)';
+            }
+          } catch(e) {}
         }
-      } else {
-        st.textContent = '✗ ' + d.error;
-        st.style.color = 'var(--err,#e53935)';
       }
     } catch(e) {
-      st.textContent = '✗ Помилка мережі';
-      st.style.color = 'var(--err,#e53935)';
+      st.textContent = '✗ Помилка мережі'; st.style.color = 'var(--err,#e53935)';
+      addLine('⚠️ ' + e.message);
     }
     btn.disabled = false; btn.style.opacity = '1';
   };

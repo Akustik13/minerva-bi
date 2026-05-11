@@ -66,38 +66,55 @@ class EmailAccountAdmin(admin.ModelAdmin):
         return custom + urls
 
     def _sync_all_view(self, request, pk):
-        """Admin AJAX: full historical sync for one account (all folders)."""
+        """Admin AJAX: full historical sync — streams NDJSON progress lines."""
+        import json as _json
+        from django.http import StreamingHttpResponse
         from django.core.management import call_command
         from io import StringIO
         from email_assistant.imap_client import IMAPClient
         from email_assistant.models import EmailThread
 
-        try:
-            account = EmailAccount.objects.get(pk=pk)
-        except EmailAccount.DoesNotExist:
-            return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+        def _ev(d):
+            return _json.dumps(d, ensure_ascii=False) + '\n'
 
-        out = StringIO()
-        try:
-            call_command('sync_email', account=account.pk, stdout=out, stderr=out, **{'all': True})
-        except Exception as e:
-            return JsonResponse({'ok': False, 'error': str(e)})
+        def generate(account):
+            yield _ev({'type': 'step', 'msg': '🔄 Підключаюсь до IMAP…'})
 
-        folder_results = []
-        try:
-            with IMAPClient(account) as imap:
-                imap_folders = imap.list_folders()
+            # 1. Sync inbox + sent via management command
+            yield _ev({'type': 'step', 'msg': '📥 Синхронізую Вхідні та Надіслані…'})
+            out = StringIO()
+            try:
+                call_command('sync_email', account=account.pk,
+                             stdout=out, stderr=out, **{'all': True})
+                output = out.getvalue()
+                import re as _re
+                m = _re.search(r'\+(\d+)', output)
+                inbox_new = int(m.group(1)) if m else 0
+                yield _ev({'type': 'inbox_done', 'created': inbox_new, 'detail': output[:300]})
+            except Exception as e:
+                yield _ev({'type': 'error', 'msg': f'sync_email: {e}'})
+                return
 
-            standard_server = {
-                account.imap_folder_inbox.lower(),
-                account.imap_folder_sent.lower(),
-            }
-            for f in imap_folders:
-                if not f.get('selectable'):
-                    continue
+            # 2. List all IMAP folders
+            yield _ev({'type': 'step', 'msg': '📂 Отримую список папок…'})
+            try:
+                with IMAPClient(account) as imap:
+                    imap_folders = imap.list_folders()
+            except Exception as e:
+                yield _ev({'type': 'error', 'msg': f'list_folders: {e}'})
+                return
+
+            standard = {account.imap_folder_inbox.lower(), account.imap_folder_sent.lower()}
+            extra = [f for f in imap_folders
+                     if f.get('selectable') and f['name'].lower() not in standard]
+            yield _ev({'type': 'folders_found', 'count': len(extra),
+                       'names': [f['name'] for f in extra]})
+
+            # 3. Sync each custom folder
+            total_extra = 0
+            for f in extra:
                 name = f['name']
-                if name.lower() in standard_server:
-                    continue
+                yield _ev({'type': 'folder_start', 'folder': name})
                 created = 0
                 try:
                     with IMAPClient(account) as imap:
@@ -131,13 +148,19 @@ class EmailAccountAdmin(admin.ModelAdmin):
                             is_read=msg_data['is_read'], sent_at=msg_data['sent_at'],
                         )
                         created += 1
-                    folder_results.append({'folder': name, 'created': created})
+                    total_extra += created
+                    yield _ev({'type': 'folder_done', 'folder': name, 'created': created})
                 except Exception as e:
-                    folder_results.append({'folder': name, 'error': str(e)})
-        except Exception as e:
-            pass
+                    yield _ev({'type': 'folder_error', 'folder': name, 'error': str(e)})
 
-        return JsonResponse({'ok': True, 'output': out.getvalue(), 'folders': folder_results})
+            yield _ev({'type': 'done', 'inbox_new': inbox_new, 'extra_new': total_extra})
+
+        try:
+            account = EmailAccount.objects.get(pk=pk)
+        except EmailAccount.DoesNotExist:
+            return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+
+        return StreamingHttpResponse(generate(account), content_type='application/x-ndjson')
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
