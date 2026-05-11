@@ -936,7 +936,7 @@ document.addEventListener('DOMContentLoaded', function(){
   /* Called after mods is built. Hides links whose app is not allowed or model is denied. */
   function _linkAllowed(lnk) {
     if (!lnk.app) return true;
-    if (!mods[lnk.app]) return false;                       // app absent from user's admin
+    if (modsAvailable && !mods[lnk.app]) return false;      // app absent from user's admin (skip on non-admin pages)
     if (!_moduleAllowed(lnk.app)) return false;             // app not in user's allowed_modules
     if (lnk.model && DENIED_MODELS.indexOf(lnk.app + ':' + lnk.model) !== -1) return false;
     return true;
@@ -1044,6 +1044,8 @@ document.addEventListener('DOMContentLoaded', function(){
     var m = el.className.match(/\bapp-(\S+)/);
     if (m) { mods[m[1]] = el; el.remove(); }
   });
+  /* On non-admin pages (e.g. /email/) sidebar_enabled=False → mods is empty */
+  var modsAvailable = Object.keys(mods).length > 0;
 
   /* Add 🧠 AI row to bots module */
   if (mods['bots']) {
@@ -1137,7 +1139,7 @@ document.addEventListener('DOMContentLoaded', function(){
   GROUPS.forEach(function(grp){
     if (grp.adminOnly && USER_ROLE !== 'superadmin') return;
     if (grp.roles && grp.roles.indexOf(USER_ROLE) === -1) return;
-    var appsFound    = (grp.apps || []).filter(function(a){ return mods[a] && _moduleAllowed(a); });
+    var appsFound    = (grp.apps || []).filter(function(a){ return (modsAvailable ? !!mods[a] : true) && _moduleAllowed(a); });
     var linksToShow  = (grp.links || []).filter(_linkAllowed);
     if (!linksToShow.length && !appsFound.length) return;
 
@@ -1428,6 +1430,8 @@ document.addEventListener('DOMContentLoaded', function(){
 {% endblock %}
 
 {% block usertools %}{{ block.super }}{% endblock %}
+
+{% block nav-sidebar %}<nav id="nav-sidebar" class="sticky">{% if sidebar_enabled %}{% include "admin/nav_sidebar.html" %}{% endif %}</nav>{% endblock %}
 
 {% block footer %}
 <style>
