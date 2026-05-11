@@ -14,6 +14,10 @@ class EmailAccountAdmin(admin.ModelAdmin):
         ("👤 Акаунт", {
             'fields': ('user', 'email_address', 'display_name', 'is_primary', 'is_active'),
         }),
+        ("✍️ Підпис", {
+            'fields': ('signature',),
+            'description': "HTML підпис для листів з цього акаунту. {name} = повне ім'я. Замінює підпис у профілі.",
+        }),
         ("📥 IMAP (читання)", {
             'fields': ('imap_host', 'imap_port', 'imap_use_ssl',
                        'imap_username', 'imap_password',
@@ -52,16 +56,24 @@ class EmailAccountAdmin(admin.ModelAdmin):
 
 @admin.register(EmailSettings)
 class EmailSettingsAdmin(admin.ModelAdmin):
-    list_display = ('user', 'ai_auto_suggest_reply', 'sync_to_crm_timeline', 'ai_translate_to')
+    list_display = ('user', 'ai_auto_suggest_reply', 'sync_to_crm_timeline', 'mark_read_on_server', 'telegram_notify_new')
     fieldsets = (
         ("🤖 AI функції", {
             'fields': ('ai_auto_suggest_reply', 'ai_auto_translate', 'ai_translate_to'),
         }),
+        ("✍️ Підпис (застарілий — використовуй підпис акаунту)", {
+            'fields': ('auto_signature', 'signature_position', 'signature'),
+            'classes': ('collapse',),
+        }),
+        ("📬 Читання та синхронізація", {
+            'fields': ('mark_read_on_server', 'spam_folder'),
+        }),
         ("🔗 CRM синхронізація", {
             'fields': ('sync_to_crm_timeline',),
         }),
-        ("✍️ Підпис", {
-            'fields': ('signature',),
+        ("📱 Telegram сповіщення", {
+            'fields': ('telegram_notify_new', 'telegram_quiet_from', 'telegram_quiet_to'),
+            'description': 'Тихий режим: якщо quiet_from < quiet_to — блокує в цьому проміжку. Якщо quiet_from > quiet_to — блокує через північ.',
         }),
     )
 

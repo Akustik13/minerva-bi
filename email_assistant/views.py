@@ -2,7 +2,7 @@
 import json
 import logging
 from django.contrib.admin.views.decorators import staff_member_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.utils import timezone
@@ -28,10 +28,15 @@ def _crm_contacts() -> list:
         return []
 
 
+_STANDARD_FOLDERS = {'inbox', 'sent', 'starred', 'spam', 'archived', 'trash'}
+
+
 def _build_qs(account, folder, q=''):
     from email_assistant.models import EmailMessage, EmailThread
 
-    if folder == 'starred':
+    if folder == 'spam':
+        qs = EmailMessage.objects.filter(account=account, is_spam=True, is_deleted=False)
+    elif folder == 'starred':
         qs = EmailMessage.objects.filter(account=account, is_starred=True, is_deleted=False)
     elif folder == 'archived':
         archived_ids = EmailThread.objects.filter(
@@ -45,8 +50,13 @@ def _build_qs(account, folder, q=''):
             account=account, is_archived=True
         ).values_list('id', flat=True)
         qs = EmailMessage.objects.filter(
-            account=account, folder='inbox', is_deleted=False
+            account=account, folder='inbox', imap_folder_name='', is_deleted=False
         ).exclude(thread_id__in=archived_ids)
+    elif folder not in _STANDARD_FOLDERS:
+        # Custom IMAP folder (e.g. "Meine Order")
+        qs = EmailMessage.objects.filter(
+            account=account, imap_folder_name=folder, is_deleted=False
+        )
     else:
         qs = EmailMessage.objects.filter(
             account=account, folder=folder, is_deleted=False
@@ -65,11 +75,12 @@ def _build_qs(account, folder, q=''):
 
 
 FOLDERS = [
-    ('inbox',    '📥 Вхідні',    'inbox'),
-    ('sent',     '📤 Надіслані', 'sent'),
-    ('starred',  '⭐ Важливі',   'starred'),
-    ('archived', '📦 Архів',     'archived'),
-    ('trash',    '🗑️ Кошик',     'trash'),
+    ('inbox',    'Вхідні',    '📥'),
+    ('sent',     'Надіслані', '📤'),
+    ('starred',  'Важливі',   '⭐'),
+    ('spam',     'Спам',      '🚫'),
+    ('archived', 'Архів',     '📦'),
+    ('trash',    'Кошик',     '🗑️'),
 ]
 
 
@@ -159,16 +170,29 @@ def message_view(request, message_pk):
 @staff_member_required
 def thread_preview_view(request, thread_pk):
     """AJAX: HTML fragment loaded into panel-3 of 3-panel inbox."""
-    from email_assistant.models import EmailThread
+    from email_assistant.models import EmailThread, EmailSettings
 
     account = _get_account(request)
     thread  = get_object_or_404(EmailThread, pk=thread_pk, account=account)
     emails  = list(thread.messages.filter(is_deleted=False).order_by('sent_at'))
 
-    if any(not m.is_read for m in emails):
+    unread = [m for m in emails if not m.is_read]
+    if unread:
         thread.messages.filter(is_read=False).update(is_read=True)
         thread.has_unread = False
         thread.save(update_fields=['has_unread'])
+
+        es = EmailSettings.get_for_user(request.user)
+        if es.mark_read_on_server:
+            try:
+                from email_assistant.imap_client import IMAPClient
+                with IMAPClient(account) as imap:
+                    for m in unread:
+                        if m.imap_uid:
+                            f = account.imap_folder_inbox if m.folder == 'inbox' else account.imap_folder_sent
+                            imap.mark_seen(f, m.imap_uid)
+            except Exception as e:
+                logger.warning('mark_seen failed: %s', e)
 
     return render(request, 'email_assistant/preview.html', {
         'account':  account,
@@ -181,7 +205,7 @@ def thread_preview_view(request, thread_pk):
 @staff_member_required
 def message_preview_view(request, message_pk):
     """AJAX: HTML fragment for a single message in panel-3."""
-    from email_assistant.models import EmailMessage
+    from email_assistant.models import EmailMessage, EmailSettings
 
     account = _get_account(request)
     msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
@@ -189,12 +213,39 @@ def message_preview_view(request, message_pk):
         msg.is_read = True
         msg.save(update_fields=['is_read'])
 
+        es = EmailSettings.get_for_user(request.user)
+        if es.mark_read_on_server and msg.imap_uid:
+            try:
+                from email_assistant.imap_client import IMAPClient
+                f = account.imap_folder_inbox if msg.folder == 'inbox' else account.imap_folder_sent
+                with IMAPClient(account) as imap:
+                    imap.mark_seen(f, msg.imap_uid)
+            except Exception as e:
+                logger.warning('mark_seen failed: %s', e)
+
     return render(request, 'email_assistant/preview.html', {
         'account':  account,
         'thread':   msg.thread,
         'emails':   [msg],
         'last_msg': msg,
     })
+
+
+@staff_member_required
+def message_html_view(request, message_pk):
+    """Serve raw HTML email body for sandboxed iframe display."""
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    if msg.body_html:
+        return HttpResponse(msg.body_html, content_type='text/html; charset=utf-8')
+    import html as html_mod
+    txt = html_mod.escape(msg.body_text or '(Лист порожній)')
+    return HttpResponse(
+        f'<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:14px;line-height:1.7;'
+        f'white-space:pre-wrap;padding:12px;margin:0">{txt}</body></html>',
+        content_type='text/html; charset=utf-8',
+    )
 
 
 @staff_member_required
@@ -230,10 +281,12 @@ def compose_view(request):
     if request.method == 'POST':
         return _handle_send(request, account, reply_to)
 
-    # Signature
+    # Signature: account-level takes priority over UserProfile
     sig = ''
     try:
-        sig = (account.user.profile.smtp_signature or '').strip()
+        sig = (account.signature or '').strip()
+        if not sig:
+            sig = (account.user.profile.smtp_signature or '').strip()
         if sig:
             name = (account.user.get_full_name() or account.display_name or account.user.username)
             sig = sig.replace('{name}', name)
@@ -322,8 +375,11 @@ def ai_suggest_reply(request, message_pk):
                  for m in msg.thread.messages.order_by('sent_at')[:8]]
         context = '\n\n---\n'.join(parts)
 
+    user_prompt = (request.GET.get('prompt') or '').strip()
+    instruction = f'\nІнструкція: {user_prompt}\n' if user_prompt else ''
     prompt = (
-        f'Прочитай цю переписку і склади відповідь від імені {account.from_header}.\n\n'
+        f'Прочитай цю переписку і склади відповідь від імені {account.from_header}.'
+        f'{instruction}\n\n'
         f'ПЕРЕПИСКА:\n{context}\n\nНапиши ТІЛЬКИ текст відповіді, без пояснень.'
     )
 
@@ -373,6 +429,87 @@ def sync_now(request):
         call_command('sync_email', **kwargs)
         return JsonResponse({'ok': True, 'output': out.getvalue()})
     except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+
+
+@staff_member_required
+def list_imap_folders_view(request):
+    """Return JSON list of IMAP folders from the server."""
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'folders': []})
+    try:
+        from email_assistant.imap_client import IMAPClient
+        with IMAPClient(account) as imap:
+            folders = imap.list_folders()
+        return JsonResponse({'folders': folders})
+    except Exception as e:
+        logger.warning('list_imap_folders failed: %s', e)
+        return JsonResponse({'folders': [], 'error': str(e)})
+
+
+@staff_member_required
+@require_POST
+def sync_imap_folder_view(request):
+    """Sync messages from a specific IMAP folder name into DB, then return count."""
+    from email_assistant.models import EmailMessage, EmailThread
+
+    account    = _get_account(request)
+    imap_folder = request.POST.get('imap_folder', '').strip()
+    if not account or not imap_folder:
+        return JsonResponse({'ok': False, 'error': 'Параметри відсутні'})
+
+    try:
+        from email_assistant.imap_client import IMAPClient
+        created = 0
+        with IMAPClient(account) as client:
+            messages = client.fetch_messages(
+                folder=imap_folder, days_back=account.sync_days_back, since_uid=0,
+            )
+            for msg_data in messages:
+                if EmailMessage.objects.filter(
+                        account=account,
+                        imap_uid=msg_data['uid'],
+                        imap_folder_name=imap_folder).exists():
+                    continue
+                # Thread grouping
+                thread_key = (msg_data.get('in_reply_to') or
+                              msg_data.get('message_id') or msg_data['subject'])
+                thread = EmailThread.objects.filter(account=account, thread_id=thread_key[:500]).first()
+                if not thread:
+                    thread = EmailThread.objects.create(
+                        account=account,
+                        thread_id=thread_key[:500] if thread_key else '',
+                        subject=msg_data['subject'][:500],
+                        participants=[msg_data['from_email']] + msg_data['to_emails'],
+                    )
+                EmailMessage.objects.create(
+                    account=account,
+                    thread=thread,
+                    imap_uid=msg_data['uid'],
+                    imap_folder_name=imap_folder,
+                    message_id=msg_data['message_id'],
+                    in_reply_to=msg_data['in_reply_to'],
+                    folder=EmailMessage.FOLDER_INBOX,
+                    subject=msg_data['subject'],
+                    from_email=msg_data['from_email'],
+                    from_name=msg_data['from_name'],
+                    to_emails=msg_data['to_emails'],
+                    cc_emails=msg_data['cc_emails'],
+                    body_text=msg_data['body_text'],
+                    body_html=msg_data['body_html'],
+                    attachments=msg_data['attachments'],
+                    is_read=msg_data['is_read'],
+                    sent_at=msg_data['sent_at'],
+                )
+                created += 1
+
+        count = EmailMessage.objects.filter(
+            account=account, imap_folder_name=imap_folder, is_deleted=False,
+        ).count()
+        return JsonResponse({'ok': True, 'created': created, 'total': count})
+    except Exception as e:
+        logger.error('sync_imap_folder %s: %s', imap_folder, e)
         return JsonResponse({'ok': False, 'error': str(e)})
 
 
@@ -439,6 +576,18 @@ def restore_message_view(request, message_pk):
     msg.is_deleted = False
     msg.save(update_fields=['folder', 'is_deleted'])
     return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_POST
+def toggle_spam_view(request, message_pk):
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    msg.is_spam = not msg.is_spam
+    msg.folder  = EmailMessage.FOLDER_SPAM if msg.is_spam else EmailMessage.FOLDER_INBOX
+    msg.save(update_fields=['is_spam', 'folder'])
+    return JsonResponse({'ok': True, 'spam': msg.is_spam})
 
 
 @staff_member_required

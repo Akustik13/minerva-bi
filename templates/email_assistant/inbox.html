@@ -12,7 +12,7 @@
 .em-p1{width:220px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);background:var(--bg-input);transition:width .2s}
 .em-p1.collapsed{width:52px}
 .em-p1-top{display:flex;align-items:center;gap:6px;padding:10px 10px 6px;border-bottom:1px solid var(--border)}
-.em-compose-btn{flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:var(--accent,#58a6ff);color:#fff;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .15s}
+.em-compose-btn{flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .15s}
 .em-compose-btn:hover{opacity:.85;color:#fff}
 .em-p1.collapsed .em-compose-btn{flex:none;padding:8px;justify-content:center}
 .em-p1.collapsed .em-compose-label{display:none}
@@ -22,17 +22,17 @@
 /* ── Search ── */
 .em-search{padding:8px 10px 4px;display:flex;gap:4px}
 .em-search-inp{flex:1;padding:6px 10px;border-radius:7px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;outline:none;min-width:0}
-.em-search-inp:focus{border-color:var(--accent,#58a6ff)}
+.em-search-inp:focus{border-color:#1a73e8}
 .em-p1.collapsed .em-search{display:none}
 
 /* ── Folder links ── */
 .em-folders{flex:1;overflow-y:auto;padding:4px 0}
 .em-folder-link{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:13px;text-decoration:none;color:var(--text-muted);white-space:nowrap;overflow:hidden;transition:background .1s,color .1s;border-left:3px solid transparent}
 .em-folder-link:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
-.em-folder-link.active{color:var(--accent,#58a6ff);background:rgba(88,166,255,.08);border-left-color:var(--accent,#58a6ff);font-weight:600}
+.em-folder-link.active{color:#1a73e8;background:rgba(26,115,232,.1);border-left-color:#1a73e8;font-weight:600}
 .em-folder-icon{font-size:15px;flex-shrink:0}
 .em-folder-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
-.em-badge{background:var(--accent,#58a6ff);color:#fff;border-radius:10px;font-size:10px;padding:1px 7px;font-weight:700;flex-shrink:0}
+.em-badge{background:#1a73e8;color:#fff;border-radius:10px;font-size:10px;padding:1px 7px;font-weight:700;flex-shrink:0}
 .em-p1.collapsed .em-folder-label,.em-p1.collapsed .em-badge{display:none}
 .em-p1.collapsed .em-folder-link{padding:10px;justify-content:center}
 
@@ -42,6 +42,16 @@
 .em-sync-btn{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;transition:background .1s}
 .em-sync-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 #sync-status{font-size:11px;color:var(--text-dim);line-height:1.4;min-height:14px}
+
+/* ── Server folders ── */
+.em-folders-divider{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);padding:8px 12px 4px;user-select:none}
+.em-p1.collapsed .em-folders-divider{display:none}
+.em-server-folder{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12px;text-decoration:none;color:var(--text-muted);white-space:nowrap;overflow:hidden;cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;background:none;border-top:none;border-right:none;border-bottom:none;width:100%;text-align:left}
+.em-server-folder:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.em-server-folder.active{color:#1a73e8;background:rgba(26,115,232,.1);border-left-color:#1a73e8;font-weight:600}
+.em-sf-sync{font-size:10px;color:var(--text-dim);margin-left:auto;flex-shrink:0}
+.em-p1.collapsed .em-server-folder span.em-sf-label{display:none}
+.em-p1.collapsed .em-server-folder{padding:8px;justify-content:center}
 
 /* ── Panel 2 — message list ── */
 .em-p2{width:320px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);overflow:hidden}
@@ -53,7 +63,7 @@
 /* ── Message row ── */
 .em-row{display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .1s;position:relative;min-width:0}
 .em-row:hover{background:var(--bg-hover,#1e2d40)}
-.em-row.active{background:rgba(88,166,255,.1);border-left:3px solid var(--accent,#58a6ff)}
+.em-row.active{background:rgba(26,115,232,.1);border-left:3px solid #1a73e8}
 .em-row.unread{background:rgba(88,166,255,.04)}
 .em-row.unread .em-row-sender,.em-row.unread .em-row-subj{font-weight:700;color:var(--text)}
 .em-star-btn{border:none;background:none;cursor:pointer;font-size:14px;padding:2px;flex-shrink:0;line-height:1;color:var(--text-dim);transition:color .1s}
@@ -82,7 +92,7 @@
 
 /* Pagination */
 .em-pagination{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0}
-.em-page-link{color:var(--accent,#58a6ff);text-decoration:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border-strong)}
+.em-page-link{color:var(--link-fg,#1a73e8);text-decoration:none;font-size:12px;padding:4px 8px;border-radius:5px;border:1px solid var(--border-strong)}
 .em-page-link:hover{background:var(--bg-hover,#1e2d40)}
 
 /* Quick search highlight */
@@ -121,13 +131,16 @@
       {% endfor %}
     </div>
 
+    <!-- Server folders (loaded via AJAX) -->
+    <div id="em-server-folders"></div>
+
     <div class="em-sync-area">
       <button class="em-sync-btn" onclick="syncNow(this,false)" title="Завантажити нові листи">
         🔄 Синхронізувати
       </button>
-      <button class="em-sync-btn" onclick="syncNow(this,true)" title="Завантажити всі листи з початку">
-        📥 Завантажити все
-      </button>
+      <a href="/admin/email_assistant/emailaccount/{{ account.pk }}/change/" class="em-sync-btn" style="text-decoration:none;justify-content:center">
+        ⚙️ Налаштування
+      </a>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
     </div>
   </div>
@@ -136,7 +149,7 @@
   <div class="em-p2">
     <div class="em-p2-header">
       <span class="em-p2-title">
-        {% for fkey,flabel,ficon in folders %}{% if folder == fkey %}{{ flabel }}{% endif %}{% endfor %}
+        {% for fkey,flabel,ficon in folders %}{% if folder == fkey %}{{ ficon }} {{ flabel }}{% endif %}{% endfor %}
         {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
       </span>
       <span class="em-p2-count">{{ total }}</span>
@@ -332,5 +345,101 @@ async function syncNow(btn, full) {
   } catch(e) { st.textContent = '✗ Помилка'; }
   finally { btn.disabled = false; btn.textContent = orig; }
 }
+
+/* ── IMAP server folders ── */
+(function(){
+  // Skip standard IMAP folders already shown
+  var SKIP = new Set(['INBOX', 'Gesendete Objekte', 'Sent', 'Sent Items', '[Gmail]/Sent Mail',
+                      'Trash', 'INBOX.Trash', '[Gmail]/Trash', 'Deleted Items',
+                      'Spam', 'Junk', '[Gmail]/Spam', 'INBOX.Spam',
+                      'Drafts', 'INBOX.Drafts', '[Gmail]/Drafts']);
+  var currentFolder = '{{ folder|escapejs }}';
+
+  async function loadServerFolders() {
+    var wrap = document.getElementById('em-server-folders');
+    if (!wrap) return;
+    try {
+      var r = await fetch('/email/imap-folders/', {credentials:'same-origin'});
+      var d = await r.json();
+      if (!d.folders || !d.folders.length) return;
+      var extra = d.folders.filter(function(f){ return f.selectable && !SKIP.has(f.name); });
+      if (!extra.length) return;
+      var html = '<div class="em-folders-divider">Папки сервера</div>';
+      extra.forEach(function(f){
+        var indent = f.level > 0 ? 'padding-left:' + (12 + f.level * 14) + 'px;' : '';
+        var active = (currentFolder === f.name) ? ' active' : '';
+        html += '<button class="em-server-folder' + active + '" style="' + indent + '" '
+              + 'onclick="openServerFolder(' + JSON.stringify(f.name) + ',this)">'
+              + '<span style="font-size:13px;flex-shrink:0">📁</span>'
+              + '<span class="em-sf-label" style="flex:1;overflow:hidden;text-overflow:ellipsis">'
+              + f.name.replace(/.*[\/\.]/, '') + '</span>'
+              + '</button>';
+      });
+      wrap.innerHTML = html;
+    } catch(e) {}
+  }
+
+  window.openServerFolder = async function(folderName, btn) {
+    // Mark active
+    document.querySelectorAll('.em-server-folder').forEach(function(b){ b.classList.remove('active'); });
+    btn.classList.add('active');
+
+    // Show loading in P2
+    var list = document.getElementById('em-p2-list');
+    list.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:13px">⏳ Синхронізую ' + folderName + '...</div>';
+
+    // Reset P3
+    document.getElementById('em-p3-empty').style.display = '';
+    document.getElementById('em-p3-content').style.display = 'none';
+    document.getElementById('em-p3-content').innerHTML = '';
+
+    // Sync the folder first
+    var fd = new FormData();
+    fd.append('imap_folder', folderName);
+    try {
+      await fetch('/email/sync-imap-folder/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
+    } catch(e) {}
+
+    // Navigate to show messages from this folder
+    window.location.href = '?folder=' + encodeURIComponent(folderName);
+  };
+
+  loadServerFolders();
+})();
+
+/* ── Browser push notifications ── */
+(function(){
+  var lastCount = {{ unread_count }};
+
+  if ('Notification' in window && Notification.permission === 'default') {
+    // Request permission after first user interaction
+    document.addEventListener('click', function askOnce() {
+      Notification.requestPermission();
+      document.removeEventListener('click', askOnce);
+    }, {once: true});
+  }
+
+  function updateBadge(count) {
+    var badge = document.querySelector('#em-p2-list ~ * .em-badge, .em-badge');
+    document.querySelectorAll('.em-badge').forEach(function(b){ b.textContent = count > 0 ? count : ''; });
+  }
+
+  setInterval(async function() {
+    try {
+      var r = await fetch('/email/unread-count/', {credentials:'same-origin'});
+      var d = await r.json();
+      var n = d.count || 0;
+      if (n > lastCount && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('📧 Minerva — новий лист', {
+          body: 'У вас ' + n + ' непрочитаних листів',
+          icon: '/static/icons/icon-192.png',
+          tag:  'email-unread',
+        });
+      }
+      updateBadge(n);
+      lastCount = n;
+    } catch(e) {}
+  }, 60000);
+})();
 </script>
 {% endblock %}

@@ -5,28 +5,33 @@
 
 {% block extrahead %}{{ block.super }}
 <style>
-.em-thread-wrap { max-width:820px; margin:0 auto; padding-bottom:40px; }
+.em-thread-wrap { max-width:860px; margin:0 auto; padding-bottom:40px; }
 .em-hd { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; gap:16px; }
 .em-back { color:var(--text-muted); text-decoration:none; font-size:13px; display:inline-flex; align-items:center; gap:4px; }
 .em-back:hover { color:var(--text); }
 .em-msg-card { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:10px; margin-bottom:14px; overflow:hidden; }
 .em-msg-head { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--border); background:var(--bg-input); }
 .em-avatar { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#1565c0,#42a5f5); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; color:#fff; flex-shrink:0; }
-.em-body { padding:16px; font-size:14px; line-height:1.7; color:var(--text); white-space:pre-wrap; word-break:break-word; }
+.em-body { padding:0; font-size:14px; line-height:1.7; color:var(--text); word-break:break-word; }
+.em-body-text { padding:16px; white-space:pre-wrap; }
+.em-body-iframe { width:100%; border:none; display:block; min-height:80px; max-height:600px; }
 .em-actions { padding:10px 16px; border-top:1px solid var(--border); background:var(--bg-input); display:flex; gap:8px; flex-wrap:wrap; }
 .em-btn { padding:5px 13px; border-radius:6px; font-size:12px; cursor:pointer; border:1px solid var(--border-strong); background:none; color:var(--text-muted); text-decoration:none; display:inline-flex; align-items:center; gap:4px; transition:background .1s; }
 .em-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
 .em-btn.ai { background:rgba(0,212,170,.1); color:#00d4aa; border-color:rgba(0,212,170,.3); }
 .em-btn.danger { color:var(--err,#e53935); }
+.em-btn.spam-on { background:rgba(229,57,53,.1); color:var(--err,#e53935); border-color:rgba(229,57,53,.3); }
 .em-ai-result { display:none; padding:14px 16px; border-top:1px solid var(--border); background:rgba(0,212,170,.04); }
 .em-ai-label { font-size:11px; font-weight:700; color:#00d4aa; text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
 .em-ai-text { font-size:13px; line-height:1.7; white-space:pre-wrap; color:var(--text); }
+.em-ai-prompt-inp { flex:1; padding:5px 9px; border-radius:6px; border:1px solid var(--border-strong); background:var(--bg-input); color:var(--text); font-size:12px; outline:none; }
+.em-ai-prompt-inp:focus { border-color:#1a73e8; }
 .em-reply-box { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:10px; padding:16px; margin-top:8px; }
 .em-toolbar { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
 .em-tb-btn { border:none; background:none; cursor:pointer; color:var(--text-muted); padding:3px 8px; border-radius:4px; font-size:13px; font-weight:500; transition:background .1s; line-height:1.4; }
 .em-tb-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
 .em-reply-editor { min-height:100px; padding:10px 12px; border-radius:7px; border:1px solid var(--border-strong); background:var(--bg-input); color:var(--text); font-size:14px; line-height:1.6; outline:none; word-break:break-word; }
-.em-reply-editor:focus { border-color:var(--accent,#58a6ff); }
+.em-reply-editor:focus { border-color:#1a73e8; }
 .em-reply-editor[placeholder]:empty::before { content:attr(placeholder); color:var(--text-dim); pointer-events:none; }
 .em-send-btn { padding:8px 20px; border-radius:7px; font-size:13px; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; border:none; cursor:pointer; font-weight:600; transition:opacity .15s; }
 .em-send-btn:hover { opacity:.88; }
@@ -42,18 +47,11 @@
       <h2 style="font-size:18px;margin-top:6px;color:var(--text)">{{ title }}</h2>
       {% if thread and thread.crm_customer %}
       <a href="/admin/crm/customer/{{ thread.crm_customer.pk }}/change/"
-         style="font-size:12px;color:var(--accent,#58a6ff);text-decoration:none">
+         style="font-size:12px;color:var(--link-fg,#1a73e8);text-decoration:none">
         👤 {{ thread.crm_customer.name }}
       </a>
       {% endif %}
     </div>
-    {% if last_msg %}
-    <a href="{% url 'email_assistant:compose' %}?reply_to={{ last_msg.pk }}"
-       style="padding:8px 16px;border-radius:8px;background:linear-gradient(135deg,#1565c0,#1a73e8);
-              color:#fff;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">
-      ↩ Відповісти
-    </a>
-    {% endif %}
   </div>
 
   {% for msg in emails %}
@@ -76,7 +74,17 @@
       </div>
     </div>
 
-    <div class="em-body">{{ msg.body_text }}</div>
+    <!-- Body: iframe for HTML emails, pre-wrap for plain text -->
+    <div class="em-body">
+      {% if msg.body_html %}
+      <iframe src="/email/message/{{ msg.pk }}/html/"
+              class="em-body-iframe"
+              sandbox="allow-same-origin allow-popups"
+              onload="autoResizeIframe(this)"></iframe>
+      {% else %}
+      <div class="em-body-text">{{ msg.body_text }}</div>
+      {% endif %}
+    </div>
 
     {% if msg.attachments %}
     <div style="padding:8px 16px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap">
@@ -95,16 +103,27 @@
       <a href="{% url 'email_assistant:compose' %}?forward={{ msg.pk }}" class="em-btn">→ Переслати</a>
       {% if thread %}
         {% if thread.is_archived %}
-        <button class="em-btn" onclick="unarchiveThread({{ thread.pk }})">📤 З архіву</button>
+        <button class="em-btn" onclick="archiveThread({{ thread.pk }},false)">📤 З архіву</button>
         {% else %}
-        <button class="em-btn" onclick="archiveThread({{ thread.pk }})">📦 В архів</button>
+        <button class="em-btn" onclick="archiveThread({{ thread.pk }},true)">📦 В архів</button>
         {% endif %}
       {% endif %}
+      <button class="em-btn{% if msg.is_spam %} spam-on{% endif %}"
+              id="spam-btn-{{ msg.pk }}"
+              onclick="toggleSpam({{ msg.pk }}, this)">
+        {% if msg.is_spam %}✓ Спам{% else %}🚫 Спам{% endif %}
+      </button>
       <button class="em-btn danger" onclick="deleteMsg({{ msg.pk }})">🗑️ Видалити</button>
     </div>
 
     <div class="em-ai-result" id="ai-box-{{ msg.pk }}">
       <div class="em-ai-label">🏛️ Мінерва пропонує</div>
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <input class="em-ai-prompt-inp" type="text"
+               id="ai-prompt-{{ msg.pk }}"
+               placeholder="Що відповісти? (залиш порожнім для авто-відповіді)">
+        <button class="em-btn ai" onclick="aiGenerate({{ msg.pk }})">Генерувати →</button>
+      </div>
       <div class="em-ai-text" id="ai-text-{{ msg.pk }}"></div>
       <div style="display:flex;gap:8px;margin-top:10px">
         <button class="em-btn" onclick="copyAI({{ msg.pk }})">📋 Копіювати</button>
@@ -147,12 +166,28 @@ function fmt(cmd) {
   return false;
 }
 
-async function aiReply(pk) {
-  var box = document.getElementById('ai-box-' + pk);
-  var text = document.getElementById('ai-text-' + pk);
-  box.style.display = 'block'; text.textContent = '⏳ Мінерва думає...';
+function autoResizeIframe(f) {
   try {
-    var r = await fetch('/email/message/' + pk + '/ai-reply/');
+    var h = f.contentDocument.documentElement.scrollHeight || f.contentDocument.body.scrollHeight;
+    f.style.height = Math.min(h + 20, 600) + 'px';
+  } catch(e) {}
+}
+
+function aiReply(pk) {
+  var box = document.getElementById('ai-box-' + pk);
+  box.style.display = 'block';
+  var inp = document.getElementById('ai-prompt-' + pk);
+  if (inp) inp.focus();
+}
+
+async function aiGenerate(pk) {
+  var text  = document.getElementById('ai-text-' + pk);
+  var inp   = document.getElementById('ai-prompt-' + pk);
+  var query = inp ? encodeURIComponent(inp.value.trim()) : '';
+  text.textContent = '⏳ Мінерва думає...';
+  var url = '/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : '');
+  try {
+    var r = await fetch(url);
     var d = await r.json();
     text.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
   } catch { text.textContent = '⚠️ Помилка'; }
@@ -176,6 +211,15 @@ function useAsReply(pk) {
   var ed = document.getElementById('quick-reply');
   ed.innerText = document.getElementById('ai-text-' + pk).textContent;
   ed.scrollIntoView({behavior:'smooth'});
+}
+
+async function toggleSpam(pk, btn) {
+  var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) {
+    btn.textContent = d.spam ? '✓ Спам' : '🚫 Спам';
+    btn.classList.toggle('spam-on', d.spam);
+  }
 }
 
 async function sendQuickReply() {
@@ -205,16 +249,11 @@ async function deleteMsg(pk) {
   if (d.ok) { var c = document.getElementById('card-' + pk); if (c) c.remove(); }
 }
 
-async function archiveThread(tpk) {
-  var r = await fetch('/email/thread/' + tpk + '/archive/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+async function archiveThread(tpk, archive) {
+  var url = '/email/thread/' + tpk + (archive ? '/archive/' : '/unarchive/');
+  var r = await fetch(url, {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
-  if (d.ok) location.href = '/email/';
-}
-
-async function unarchiveThread(tpk) {
-  var r = await fetch('/email/thread/' + tpk + '/unarchive/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
-  var d = await r.json();
-  if (d.ok) location.reload();
+  if (d.ok) { archive ? location.href = '/email/' : location.reload(); }
 }
 </script>
 {% endblock %}

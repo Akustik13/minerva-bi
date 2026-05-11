@@ -92,6 +92,32 @@ class IMAPClient:
     def __exit__(self, *args):
         self.disconnect()
 
+    def list_folders(self) -> list:
+        """Return list of dicts {name, selectable, level} for all IMAP folders."""
+        import re
+        try:
+            _, data = self.conn.list()
+        except Exception as e:
+            logger.warning('IMAP list() failed: %s', e)
+            return []
+        folders = []
+        for item in data:
+            if not item:
+                continue
+            if isinstance(item, bytes):
+                item = item.decode('utf-8', errors='replace')
+            # Format: (\flags) "delimiter" "folder_name" or (\flags) "delimiter" folder_name
+            m = re.match(r'\(([^)]*)\)\s+"([^"]+)"\s+(.+)', item.strip())
+            if not m:
+                continue
+            flags_str = m.group(1)
+            delimiter = m.group(2)
+            raw_name  = m.group(3).strip().strip('"')
+            noselect  = 'Noselect' in flags_str or 'noselect' in flags_str
+            level     = raw_name.count(delimiter) if delimiter else 0
+            folders.append({'name': raw_name, 'selectable': not noselect, 'level': level})
+        return folders
+
     def select_folder(self, folder: str) -> bool:
         candidates = [folder, f'"{folder}"']
         if any(k in folder.lower() for k in ('sent', 'gesendet', 'gesend')):
@@ -208,6 +234,16 @@ class IMAPClient:
             return True
         except Exception as e:
             logger.warning('IMAP append to sent failed: %s', e)
+            return False
+
+    def mark_seen(self, folder: str, uid: int) -> bool:
+        """Mark a message as \\Seen on the IMAP server."""
+        try:
+            self._select_writable(folder)
+            self.conn.uid('STORE', str(uid).encode(), '+FLAGS', '(\\Seen)')
+            return True
+        except Exception as e:
+            logger.warning('IMAP mark_seen failed uid=%s: %s', uid, e)
             return False
 
     def move_to_trash(self, folder: str, uid: int) -> bool:

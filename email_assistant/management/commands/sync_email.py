@@ -174,10 +174,28 @@ class Command(BaseCommand):
     def _notify_new_email(self, email_msg, account):
         """Send Telegram notification for a new unread inbox email."""
         try:
-            from dashboard.notifications import _send_telegram, _get_ns
-            ns = _get_ns()
-            if not ns or not getattr(ns, 'telegram_bot_token', None) or not getattr(ns, 'telegram_chat_id', None):
+            from email_assistant.models import EmailSettings
+            es = EmailSettings.get_for_user(account.user)
+            if not es.telegram_notify_new:
                 return
+
+            # Quiet hours check
+            if es.telegram_quiet_from and es.telegram_quiet_to:
+                from django.utils import timezone as tz
+                now_time = tz.localtime().time()
+                qf, qt = es.telegram_quiet_from, es.telegram_quiet_to
+                if qf < qt:
+                    if qf <= now_time < qt:
+                        return
+                else:  # wraps midnight
+                    if now_time >= qf or now_time < qt:
+                        return
+
+            from dashboard.notifications import _get_ns
+            ns = _get_ns()
+            if not ns or not getattr(ns, 'telegram_bot_token', None):
+                return
+
             sender = email_msg.from_name or email_msg.from_email
             subj   = email_msg.subject or '(без теми)'
             text = (
@@ -186,9 +204,34 @@ class Command(BaseCommand):
                 f'Тема: {subj}\n'
                 f'Акаунт: {account.email_address}'
             )
-            _send_telegram(ns, text)
+
+            # Prefer private user Telegram over general channel
+            try:
+                profile = account.user.profile
+                tid = getattr(profile, 'telegram_id', None)
+                if tid:
+                    self._send_telegram_private(ns.telegram_bot_token, tid, text)
+                    return
+            except Exception:
+                pass
+
+            # Fallback: general channel
+            if getattr(ns, 'telegram_chat_id', None):
+                from dashboard.notifications import _send_telegram
+                _send_telegram(ns, text)
+
         except Exception as e:
             logger.warning('Telegram email notify failed: %s', e)
+
+    def _send_telegram_private(self, token, chat_id, text):
+        import urllib.request, urllib.parse
+        data = urllib.parse.urlencode({
+            'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML',
+        }).encode()
+        urllib.request.urlopen(
+            urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage', data=data),
+            timeout=5,
+        )
 
     def _sync_to_crm(self, email_msg, customer, account):
         try:

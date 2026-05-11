@@ -8,6 +8,7 @@
 .em-pv-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .em-pv-btn.ai{background:rgba(0,212,170,.08);color:#00d4aa;border-color:rgba(0,212,170,.3)}
 .em-pv-btn.danger{color:var(--err,#e53935)}
+.em-pv-btn.spam-on{background:rgba(229,57,53,.1);color:var(--err,#e53935);border-color:rgba(229,57,53,.3)}
 .em-msgs{flex:1;overflow-y:auto;padding:12px 18px;display:flex;flex-direction:column;gap:12px}
 .em-card{border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;background:var(--bg-card)}
 .em-card-hd{padding:10px 14px;background:var(--bg-input);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
@@ -15,20 +16,23 @@
 .em-card-from{font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .em-card-date{font-size:11px;color:var(--text-muted);flex-shrink:0}
 .em-card-to{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.em-card-body{padding:14px 16px;font-size:13px;line-height:1.75;color:var(--text);white-space:pre-wrap;word-break:break-word;max-height:400px;overflow-y:auto}
+.em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
+.em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:400px;overflow-y:auto}
+.em-body-iframe{width:100%;border:none;display:block;min-height:80px;max-height:560px;overflow:hidden}
 .em-card-atts{padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
 .em-att-chip{font-size:11px;padding:3px 9px;border-radius:5px;background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text-muted)}
 .em-ai-box{display:none;padding:12px 14px;border-top:1px solid var(--border);background:rgba(0,212,170,.04)}
 .em-ai-lbl{font-size:10px;font-weight:700;color:#00d4aa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 .em-ai-txt{font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text)}
+.em-ai-prompt-inp{flex:1;padding:5px 9px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;outline:none}
+.em-ai-prompt-inp:focus{border-color:#1a73e8}
 /* Reply box */
 .em-reply{flex-shrink:0;border-top:1px solid var(--border-strong);padding:12px 18px;background:var(--bg-input)}
 .em-reply-toolbar{display:flex;gap:3px;margin-bottom:6px;flex-wrap:wrap}
 .em-tb-btn{border:none;background:none;cursor:pointer;color:var(--text-muted);padding:3px 7px;border-radius:4px;font-size:13px;font-weight:500;transition:background .1s;line-height:1.4}
 .em-tb-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
-.em-reply-area{position:relative}
 .em-reply-editor{min-height:80px;max-height:200px;overflow-y:auto;padding:8px 10px;border-radius:7px;border:1px solid var(--border-strong);background:var(--bg-card);color:var(--text);font-size:13px;line-height:1.6;outline:none;word-break:break-word}
-.em-reply-editor:focus{border-color:var(--accent,#58a6ff)}
+.em-reply-editor:focus{border-color:#1a73e8}
 .em-reply-editor[placeholder]:empty::before{content:attr(placeholder);color:var(--text-dim);pointer-events:none}
 .em-reply-footer{display:flex;align-items:center;gap:8px;margin-top:8px}
 .em-reply-send{padding:7px 20px;border-radius:7px;font-size:13px;font-weight:600;background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff;border:none;cursor:pointer;transition:opacity .15s}
@@ -45,7 +49,7 @@
     <div class="em-pv-meta">
       {% if thread and thread.crm_customer %}
       <a href="/admin/crm/customer/{{ thread.crm_customer.pk }}/change/"
-         style="font-size:12px;color:var(--accent,#58a6ff);text-decoration:none">
+         style="font-size:12px;color:var(--link-fg,#1a73e8);text-decoration:none">
         👤 {{ thread.crm_customer.name }}
       </a>
       {% endif %}
@@ -84,7 +88,18 @@
         </div>
       </div>
 
-      <div class="em-card-body">{{ msg.body_text }}</div>
+      <!-- Email body: iframe for HTML, pre for plain text -->
+      <div class="em-card-body">
+        {% if msg.body_html %}
+        <iframe src="/email/message/{{ msg.pk }}/html/"
+                class="em-body-iframe"
+                id="pv-iframe-{{ msg.pk }}"
+                sandbox="allow-same-origin allow-popups"
+                onload="emResizeIframe(this)"></iframe>
+        {% else %}
+        <div class="em-card-body-text">{{ msg.body_text }}</div>
+        {% endif %}
+      </div>
 
       {% if msg.attachments %}
       <div class="em-card-atts">
@@ -94,15 +109,27 @@
       </div>
       {% endif %}
 
-      <!-- Action buttons per message -->
+      <!-- Per-message actions -->
       <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap">
         <button class="em-pv-btn ai" onclick="pvAiReply({{ msg.pk }})">🏛️ AI відповідь</button>
         <button class="em-pv-btn" onclick="pvAiTranslate({{ msg.pk }})">🌐 Перекласти</button>
+        <button class="em-pv-btn{% if msg.is_spam %} spam-on{% endif %}"
+                id="pv-spam-btn-{{ msg.pk }}"
+                onclick="pvToggleSpam({{ msg.pk }}, this)">
+          {% if msg.is_spam %}✓ Спам{% else %}🚫 Спам{% endif %}
+        </button>
         <button class="em-pv-btn danger" onclick="pvDelete({{ msg.pk }})">🗑️ Видалити</button>
       </div>
 
+      <!-- AI box (prompt + result) -->
       <div class="em-ai-box" id="pv-ai-{{ msg.pk }}">
         <div class="em-ai-lbl">🏛️ Minerva пропонує</div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <input class="em-ai-prompt-inp" type="text"
+                 id="pv-ai-prompt-{{ msg.pk }}"
+                 placeholder="Що відповісти? (залиш порожнім для авто-відповіді)">
+          <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">Генерувати →</button>
+        </div>
         <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 Копіювати</button>
@@ -143,6 +170,14 @@
 (function(){
 var CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 
+function emResizeIframe(f) {
+  try {
+    var h = f.contentDocument.documentElement.scrollHeight || f.contentDocument.body.scrollHeight;
+    f.style.height = Math.min(h + 20, 560) + 'px';
+  } catch(e) {}
+}
+window.emResizeIframe = emResizeIframe;
+
 function fmt(e, cmd) {
   e.preventDefault();
   document.execCommand(cmd, false, null);
@@ -175,12 +210,21 @@ window.pvSendReply = async function(pk, fromEmail, subj) {
   } catch { status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)'; }
 };
 
-window.pvAiReply = async function(pk) {
+window.pvAiReply = function(pk) {
   var box = document.getElementById('pv-ai-' + pk);
-  var txt = document.getElementById('pv-ai-txt-' + pk);
-  box.style.display = 'block'; txt.textContent = '⏳ Minerva думає...';
+  box.style.display = 'block';
+  var inp = document.getElementById('pv-ai-prompt-' + pk);
+  if (inp) inp.focus();
+};
+
+window.pvAiGenerate = async function(pk) {
+  var txt   = document.getElementById('pv-ai-txt-' + pk);
+  var inp   = document.getElementById('pv-ai-prompt-' + pk);
+  var query = inp ? encodeURIComponent(inp.value.trim()) : '';
+  txt.textContent = '⏳ Minerva думає...';
+  var url = '/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : '');
   try {
-    var r = await fetch('/email/message/' + pk + '/ai-reply/');
+    var r = await fetch(url);
     var d = await r.json();
     txt.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
   } catch { txt.textContent = '⚠️ Помилка'; }
@@ -206,6 +250,15 @@ window.pvUseAsReply = function(pk) {
   var txt = document.getElementById('pv-ai-txt-' + pk);
   var ed  = document.getElementById('pv-reply-editor');
   if (txt && ed) { ed.innerText = txt.textContent; ed.focus(); }
+};
+
+window.pvToggleSpam = async function(pk, btn) {
+  var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok) {
+    btn.textContent = d.spam ? '✓ Спам' : '🚫 Спам';
+    btn.classList.toggle('spam-on', d.spam);
+  }
 };
 
 window.pvDelete = async function(pk) {

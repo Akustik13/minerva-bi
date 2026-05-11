@@ -1,0 +1,48 @@
+{% extends "admin/change_form.html" %}
+{% block after_field_sets %}
+{{ block.super }}
+<script>
+(function(){
+  document.addEventListener('DOMContentLoaded', function(){
+    var ta = document.querySelector('textarea[name="signature"]');
+    if (!ta) return;
+    ta.style.display = 'none';
+
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'border:1px solid var(--border-strong,#2a3f55);border-radius:8px;overflow:hidden;margin-top:4px';
+
+    var toolbar = document.createElement('div');
+    toolbar.style.cssText = 'display:flex;gap:3px;flex-wrap:wrap;padding:6px 8px;border-bottom:1px solid var(--border-strong,#2a3f55);background:var(--bg-input,#141f2b)';
+    toolbar.innerHTML = [
+      ['bold','<b>B</b>','Жирний'],
+      ['italic','<i>I</i>','Курсив'],
+      ['underline','<u>U</u>','Підкреслений'],
+      ['strikeThrough','<s>S</s>','Закреслений'],
+    ].map(function(x){
+      return '<button type="button" title="'+x[2]+'" style="border:none;background:none;cursor:pointer;color:var(--text-muted,#9aafbe);padding:3px 8px;border-radius:4px;font-size:13px;font-weight:500;line-height:1.4" onmousedown="return mvFmtAcc(\''+x[0]+'\')">' + x[1] + '</button>';
+    }).join('') +
+    '<span style="width:1px;background:var(--border-strong,#2a3f55);margin:2px 4px;align-self:stretch"></span>' +
+    '<select onchange="mvFmtVAcc(\'fontSize\',this.value);this.value=\'\'" style="padding:2px 5px;border-radius:4px;border:1px solid var(--border-strong,#2a3f55);background:var(--bg-input,#141f2b);color:var(--text-muted,#9aafbe);font-size:12px;cursor:pointer"><option value="">Розмір</option><option value="1">8</option><option value="2">10</option><option value="3">12</option><option value="4">14</option><option value="5">18</option><option value="6">24</option></select>' +
+    '<select onchange="mvFmtVAcc(\'fontName\',this.value);this.value=\'\'" style="padding:2px 5px;border-radius:4px;border:1px solid var(--border-strong,#2a3f55);background:var(--bg-input,#141f2b);color:var(--text-muted,#9aafbe);font-size:12px;cursor:pointer"><option value="">Шрифт</option><option value="Arial">Arial</option><option value="Times New Roman">Times</option><option value="Courier New">Courier</option><option value="Georgia">Georgia</option></select>' +
+    '<input type="color" onchange="mvFmtVAcc(\'foreColor\',this.value)" title="Колір" style="width:26px;height:24px;border-radius:4px;border:1px solid var(--border-strong,#2a3f55);padding:1px;cursor:pointer;background:var(--bg-input,#141f2b)">' +
+    '<span style="width:1px;background:var(--border-strong,#2a3f55);margin:2px 4px;align-self:stretch"></span>' +
+    '<button type="button" style="border:none;background:none;cursor:pointer;color:var(--text-muted,#9aafbe);padding:3px 8px;border-radius:4px;font-size:12px" onmousedown="return mvFmtAcc(\'removeFormat\')">✕ Очистити</button>';
+
+    var editor = document.createElement('div');
+    editor.contentEditable = 'true';
+    editor.style.cssText = 'min-height:100px;padding:10px 12px;font-size:13px;line-height:1.7;color:var(--text,#c9d8e4);outline:none;background:var(--bg-card,#1a2535);word-break:break-word';
+    editor.innerHTML = ta.value || '';
+
+    window.mvFmtAcc  = function(cmd){ document.execCommand(cmd,false,null); editor.focus(); return false; };
+    window.mvFmtVAcc = function(cmd,val){ document.execCommand(cmd,false,val); editor.focus(); };
+
+    ta.form && ta.form.addEventListener('submit', function(){ ta.value = editor.innerHTML; });
+    editor.addEventListener('input', function(){ ta.value = editor.innerHTML; });
+
+    wrap.appendChild(toolbar);
+    wrap.appendChild(editor);
+    ta.parentNode.insertBefore(wrap, ta.nextSibling);
+  });
+})();
+</script>
+{% endblock %}

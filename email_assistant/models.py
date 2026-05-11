@@ -36,6 +36,12 @@ class EmailAccount(models.Model):
     smtp_username = models.CharField(max_length=200, verbose_name='SMTP логін')
     smtp_password = models.CharField(max_length=500, verbose_name='SMTP пароль')
 
+    # Per-account signature (overrides UserProfile.smtp_signature if set)
+    signature = models.TextField(
+        blank=True, default='',
+        verbose_name='Підпис листа',
+        help_text="Підпис для цього акаунту. {name} = ваше ім'я. Якщо порожньо — береться з профілю.")
+
     # Sync state
     last_sync_at  = models.DateTimeField(null=True, blank=True, verbose_name='Остання синхронізація')
     sync_days_back = models.PositiveIntegerField(default=30, verbose_name='Синхронізувати за N днів')
@@ -115,9 +121,13 @@ class EmailMessage(models.Model):
     bcc_emails  = models.JSONField(default=list)
     body_text   = models.TextField(blank=True)
     body_html   = models.TextField(blank=True)
+    imap_folder_name = models.CharField(max_length=200, blank=True, default='', db_index=True,
+        verbose_name='Папка IMAP',
+        help_text='Оригінальна назва папки на IMAP-сервері (напр. "Meine Order")')
     is_read     = models.BooleanField(default=False)
     is_starred  = models.BooleanField(default=False)
     is_deleted  = models.BooleanField(default=False)
+    is_spam     = models.BooleanField(default=False, db_index=True, verbose_name='Спам')
     attachments = models.JSONField(default=list)
     ai_summary      = models.TextField(blank=True)
     ai_reply_draft  = models.TextField(blank=True)
@@ -173,7 +183,21 @@ class EmailSettings(models.Model):
     sync_to_crm_timeline = models.BooleanField(
         default=True, verbose_name='Синхронізувати з CRM хронологією',
         help_text='Листи від/до CRM клієнтів додаються в CustomerTimeline')
-    signature = models.TextField(blank=True, verbose_name='Підпис')
+    signature = models.TextField(blank=True, verbose_name='Підпис (застарілий — використовуй підпис акаунту)')
+    auto_signature = models.BooleanField(default=True, verbose_name='Автоматично вставляти підпис')
+    signature_position = models.CharField(
+        max_length=20, default='after_reply',
+        choices=[('after_reply', 'Після мого тексту'), ('end', 'В кінці')],
+        verbose_name='Позиція підпису')
+    mark_read_on_server = models.BooleanField(
+        default=True, verbose_name='Помічати прочитані на IMAP-сервері')
+    telegram_notify_new = models.BooleanField(default=True, verbose_name='Telegram: нові листи')
+    telegram_quiet_from = models.TimeField(null=True, blank=True, verbose_name='Тихий режим з')
+    telegram_quiet_to   = models.TimeField(null=True, blank=True, verbose_name='Тихий режим до')
+    spam_folder = models.CharField(
+        max_length=200, blank=True, default='Spam',
+        verbose_name='Папка спаму на сервері',
+        help_text='IONOS: Spam | Gmail: [Gmail]/Spam')
 
     class Meta:
         verbose_name = 'Налаштування Email асистента'

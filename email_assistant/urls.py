@@ -22,8 +22,14 @@ urlpatterns = [
     path('message/<int:message_pk>/ai-translate/',       views.ai_translate,         name='ai_translate'),
     # Actions
     path('message/<int:message_pk>/star/',               views.toggle_star_view,     name='toggle_star'),
+    path('message/<int:message_pk>/spam/',               views.toggle_spam_view,     name='toggle_spam'),
     path('message/<int:message_pk>/delete/',             views.delete_message_view,  name='delete_message'),
     path('message/<int:message_pk>/restore/',            views.restore_message_view, name='restore_message'),
     path('thread/<int:thread_pk>/archive/',              views.archive_thread_view,  name='archive_thread'),
     path('thread/<int:thread_pk>/unarchive/',            views.unarchive_thread_view, name='unarchive_thread'),
+    # HTML body for iframe
+    path('message/<int:message_pk>/html/',               views.message_html_view,    name='message_html'),
+    # IMAP custom folders
+    path('imap-folders/',                                views.list_imap_folders_view, name='imap_folders'),
+    path('sync-imap-folder/',                            views.sync_imap_folder_view,  name='sync_imap_folder'),
 ]

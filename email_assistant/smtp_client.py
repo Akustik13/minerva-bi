@@ -36,10 +36,11 @@ class SMTPClient:
                 msg['In-Reply-To'] = reply_to_message.message_id
                 msg['References']  = reply_to_message.message_id
 
-            # Signature from UserProfile.smtp_signature ({name} placeholder)
+            # Account signature > UserProfile.smtp_signature ({name} placeholder)
             try:
-                profile = self.account.user.profile
-                sig = (profile.smtp_signature or '').strip()
+                sig = (self.account.signature or '').strip()
+                if not sig:
+                    sig = (self.account.user.profile.smtp_signature or '').strip()
                 if sig:
                     name = (self.account.user.get_full_name()
                             or self.account.display_name
