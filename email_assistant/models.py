@@ -45,6 +45,10 @@ class EmailAccount(models.Model):
     # Sync state
     last_sync_at  = models.DateTimeField(null=True, blank=True, verbose_name='Остання синхронізація')
     sync_days_back = models.PositiveIntegerField(default=30, verbose_name='Синхронізувати за N днів')
+    sync_interval_minutes = models.PositiveIntegerField(
+        default=2,
+        verbose_name='Автооновлення кожні N хвилин',
+        help_text='Як часто браузер перевіряє нові листи (мін. 1).')
     last_seen_uid  = models.PositiveIntegerField(default=0, verbose_name='Останній UID')
     created_at     = models.DateTimeField(auto_now_add=True)
 

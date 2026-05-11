@@ -226,7 +226,9 @@ async function sendQuickReply() {
   var editor = document.getElementById('quick-reply');
   var body   = editor.innerText.trim();
   var status = document.getElementById('reply-status');
+  var btn    = document.querySelector('.em-send-btn');
   if (!body) { status.textContent = 'Введіть текст'; status.style.color = 'var(--err,#e53935)'; return; }
+  if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
   status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
   var form = new FormData();
   form.append('reply_to_pk', LAST_PK);
@@ -239,7 +241,11 @@ async function sendQuickReply() {
     status.textContent = d.ok ? '✓ Відправлено' : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
     if (d.ok) { editor.innerHTML = ''; setTimeout(function(){ location.reload(); }, 800); }
-  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)'; }
+    else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  } catch {
+    status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  }
 }
 
 async function deleteMsg(pk) {

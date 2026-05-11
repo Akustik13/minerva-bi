@@ -12,8 +12,8 @@
 .em-p1{width:220px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);background:var(--bg-input);transition:width .2s}
 .em-p1.collapsed{width:52px}
 .em-p1-top{display:flex;align-items:center;gap:6px;padding:10px 10px 6px;border-bottom:1px solid var(--border)}
-.em-compose-btn{flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .15s}
-.em-compose-btn:hover{opacity:.85;color:#fff}
+.em-compose-btn{flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff !important;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .15s}
+.em-compose-btn:hover,.em-compose-btn:visited,.em-compose-btn:active{opacity:.85;color:#fff !important}
 .em-p1.collapsed .em-compose-btn{flex:none;padding:8px;justify-content:center}
 .em-p1.collapsed .em-compose-label{display:none}
 .em-p1-toggle{border:none;background:none;cursor:pointer;color:var(--text-muted);padding:6px 4px;border-radius:5px;font-size:14px;flex-shrink:0;line-height:1;transition:color .1s}
@@ -288,7 +288,8 @@ async function previewMsg(pk, tpk, rowEl) {
 
   document.getElementById('em-p3-empty').style.display = 'none';
   var cont = document.getElementById('em-p3-content');
-  cont.style.display = 'block';
+  cont.style.display = 'flex';
+  cont.style.flexDirection = 'column';
   cont.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:13px">⏳ Завантажую...</div>';
 
   var url = tpk ? '/email/thread/' + tpk + '/preview/' : '/email/message/' + pk + '/preview/';
@@ -461,12 +462,13 @@ window.sortRows = function(key) {
   loadServerFolders();
 })();
 
-/* ── Browser push notifications ── */
+/* ── Auto-sync + browser push notifications ── */
 (function(){
   var lastCount = {{ unread_count }};
+  var INTERVAL_MS = {{ sync_interval_minutes }} * 60 * 1000;
+  var CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 
   if ('Notification' in window && Notification.permission === 'default') {
-    // Request permission after first user interaction
     document.addEventListener('click', function askOnce() {
       Notification.requestPermission();
       document.removeEventListener('click', askOnce);
@@ -474,12 +476,15 @@ window.sortRows = function(key) {
   }
 
   function updateBadge(count) {
-    var badge = document.querySelector('#em-p2-list ~ * .em-badge, .em-badge');
     document.querySelectorAll('.em-badge').forEach(function(b){ b.textContent = count > 0 ? count : ''; });
   }
 
-  setInterval(async function() {
+  async function tick() {
     try {
+      // Trigger a background sync on the server
+      fetch('/email/sync/', {method:'POST', headers:{'X-CSRFToken':CSRF}, credentials:'same-origin'})
+        .catch(function(){});
+      // Check unread count
       var r = await fetch('/email/unread-count/', {credentials:'same-origin'});
       var d = await r.json();
       var n = d.count || 0;
@@ -493,7 +498,9 @@ window.sortRows = function(key) {
       updateBadge(n);
       lastCount = n;
     } catch(e) {}
-  }, 60000);
+  }
+
+  setInterval(tick, INTERVAL_MS);
 })();
 </script>
 {% endblock %}

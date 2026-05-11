@@ -30,6 +30,7 @@ urlpatterns = [
     # HTML body for iframe
     path('message/<int:message_pk>/html/',               views.message_html_view,    name='message_html'),
     # IMAP custom folders
-    path('imap-folders/',                                views.list_imap_folders_view, name='imap_folders'),
-    path('sync-imap-folder/',                            views.sync_imap_folder_view,  name='sync_imap_folder'),
+    path('imap-folders/',                                views.list_imap_folders_view,  name='imap_folders'),
+    path('sync-imap-folder/',                            views.sync_imap_folder_view,   name='sync_imap_folder'),
+    path('sync-all-folders/',                            views.sync_all_folders_view,   name='sync_all_folders'),
 ]

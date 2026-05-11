@@ -18,7 +18,7 @@
 .em-card-to{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
 .em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:400px;overflow-y:auto}
-.em-body-iframe{width:100%;border:none;display:block;min-height:120px;max-height:720px;overflow:hidden}
+.em-body-iframe{width:100%;border:none;display:block;min-height:120px;max-height:900px;overflow:hidden}
 .em-card-atts{padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
 .em-att-chip{font-size:11px;padding:3px 9px;border-radius:5px;background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text-muted)}
 .em-ai-box{display:none;padding:12px 14px;border-top:1px solid var(--border);background:rgba(0,212,170,.04)}
@@ -27,7 +27,10 @@
 .em-ai-prompt-inp{flex:1;padding:5px 9px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;outline:none}
 .em-ai-prompt-inp:focus{border-color:#1a73e8}
 /* Reply box */
-.em-reply{flex-shrink:0;border-top:1px solid var(--border-strong);padding:12px 18px;background:var(--bg-input)}
+.em-reply{flex-shrink:0;border-top:1px solid var(--border-strong);background:var(--bg-input)}
+.em-reply-toggle-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);user-select:none;transition:color .1s}
+.em-reply-toggle-hd:hover{color:var(--text)}
+#pv-reply-body{padding:10px 18px 12px}
 .em-reply-toolbar{display:flex;gap:3px;margin-bottom:6px;flex-wrap:wrap}
 .em-tb-btn{border:none;background:none;cursor:pointer;color:var(--text-muted);padding:3px 7px;border-radius:4px;font-size:13px;font-weight:500;transition:background .1s;line-height:1.4}
 .em-tb-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
@@ -140,28 +143,37 @@
     {% endfor %}
   </div>
 
-  <!-- Quick reply -->
+  <!-- Quick reply (collapsed by default) -->
   {% if last %}
-  <div class="em-reply">
-    <div class="em-reply-toolbar">
-      <button class="em-tb-btn" onmousedown="return fmt(event,'bold')" title="Жирний"><b>B</b></button>
-      <button class="em-tb-btn" onmousedown="return fmt(event,'italic')" title="Курсив"><i>I</i></button>
-      <button class="em-tb-btn" onmousedown="return fmt(event,'underline')" title="Підкреслений"><u>U</u></button>
-      <button class="em-tb-btn" onmousedown="return fmt(event,'strikeThrough')" title="Закреслений"><s>S</s></button>
-      <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
-      <button class="em-tb-btn" onmousedown="return fmtBlock(event,'insertUnorderedList')" title="Список">≡</button>
-      <button class="em-tb-btn" onmousedown="return fmt(event,'removeFormat')" title="Очистити">✕</button>
+  <div class="em-reply" id="pv-reply-wrap">
+    <!-- Toggle header — always visible -->
+    <div class="em-reply-toggle-hd" onclick="pvToggleReply()" id="pv-reply-hd"
+         title="Натисни щоб відповісти">
+      <span>↩ Відповісти</span>
+      <span id="pv-reply-arrow" style="transition:transform .15s">▲</span>
     </div>
-    <div class="em-reply-editor" id="pv-reply-editor" contenteditable="true"
-         placeholder="Текст відповіді..."></div>
-    {% if reply_signature %}
-    <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:12px" id="pv-reply-sig">{{ reply_signature|safe }}</div>
-    {% endif %}
-    <div class="em-reply-footer">
-      <button class="em-reply-send" onclick="pvSendReply({{ last.pk }}, '{{ last.from_email|escapejs }}', '{{ last.subject|escapejs }}')">
-        Відправити →
-      </button>
-      <span class="em-reply-status" id="pv-reply-status"></span>
+    <!-- Collapsible body -->
+    <div id="pv-reply-body" style="display:none">
+      <div class="em-reply-toolbar">
+        <button class="em-tb-btn" onmousedown="return fmt(event,'bold')" title="Жирний"><b>B</b></button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'italic')" title="Курсив"><i>I</i></button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'underline')" title="Підкреслений"><u>U</u></button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'strikeThrough')" title="Закреслений"><s>S</s></button>
+        <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
+        <button class="em-tb-btn" onmousedown="return fmtBlock(event,'insertUnorderedList')" title="Список">≡</button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'removeFormat')" title="Очистити">✕</button>
+      </div>
+      <div class="em-reply-editor" id="pv-reply-editor" contenteditable="true"
+           placeholder="Текст відповіді..."></div>
+      {% if reply_signature %}
+      <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:12px" id="pv-reply-sig">{{ reply_signature|safe }}</div>
+      {% endif %}
+      <div class="em-reply-footer">
+        <button class="em-reply-send" onclick="pvSendReply({{ last.pk }}, '{{ last.from_email|escapejs }}', '{{ last.subject|escapejs }}')">
+          Відправити →
+        </button>
+        <span class="em-reply-status" id="pv-reply-status"></span>
+      </div>
     </div>
   </div>
   {% endif %}
@@ -193,10 +205,23 @@ function fmtBlock(e, cmd) {
 }
 window.fmt = fmt; window.fmtBlock = fmtBlock;
 
+window.pvToggleReply = function() {
+  var body  = document.getElementById('pv-reply-body');
+  var arrow = document.getElementById('pv-reply-arrow');
+  var open  = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.style.transform = open ? 'rotate(180deg)' : '';
+  if (!open) {
+    var ed = document.getElementById('pv-reply-editor');
+    if (ed) setTimeout(function(){ ed.focus(); }, 50);
+  }
+};
+
 window.pvSendReply = async function(pk, fromEmail, subj) {
   var editor = document.getElementById('pv-reply-editor');
   var sig    = document.getElementById('pv-reply-sig');
   var status = document.getElementById('pv-reply-status');
+  var btn    = document.querySelector('.em-reply-send');
   var textBody = (editor.innerText || editor.textContent).trim();
   if (!textBody) { status.textContent = 'Введіть текст'; return; }
 
@@ -204,6 +229,7 @@ window.pvSendReply = async function(pk, fromEmail, subj) {
   if (sig) htmlBody += '<br><hr style="border:none;border-top:1px solid #ccc;margin:10px 0">' + sig.innerHTML;
   var plainBody = textBody + (sig ? '\n\n--\n' + (sig.innerText || sig.textContent) : '');
 
+  if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
   status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
   var fd = new FormData();
   fd.append('reply_to_pk', pk);
@@ -217,7 +243,11 @@ window.pvSendReply = async function(pk, fromEmail, subj) {
     status.textContent  = d.ok ? '✓ Відправлено' : '✗ ' + d.error;
     status.style.color  = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
     if (d.ok) editor.innerHTML = '';
-  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)'; }
+    else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  } catch {
+    status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  }
 };
 
 window.pvAiReply = function(pk) {
@@ -259,7 +289,13 @@ window.pvCopyAI = function(pk) {
 window.pvUseAsReply = function(pk) {
   var txt = document.getElementById('pv-ai-txt-' + pk);
   var ed  = document.getElementById('pv-reply-editor');
-  if (txt && ed) { ed.innerText = txt.textContent; ed.focus(); }
+  if (!txt || !ed) return;
+  // Auto-open reply box if collapsed
+  var body = document.getElementById('pv-reply-body');
+  if (body && body.style.display === 'none') pvToggleReply();
+  ed.innerText = txt.textContent;
+  ed.scrollIntoView({behavior:'smooth'});
+  ed.focus();
 };
 
 window.pvToggleSpam = async function(pk, btn) {

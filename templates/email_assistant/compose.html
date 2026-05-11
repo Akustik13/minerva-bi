@@ -194,6 +194,7 @@ function showFiles(input) {
 async function sendEmail() {
   var editor = document.getElementById('body-editor');
   var sig    = document.getElementById('em-sig');
+  var btn    = document.querySelector('.em-send-btn');
 
   // HTML body (preserves formatting)
   var htmlBody = editor.innerHTML;
@@ -207,6 +208,7 @@ async function sendEmail() {
   document.getElementById('body-html-hidden').value = htmlBody;
 
   var status = document.getElementById('send-status');
+  if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
   status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
   var data = new FormData(document.getElementById('compose-form'));
   try {
@@ -215,7 +217,11 @@ async function sendEmail() {
     status.textContent = d.ok ? '✓ Відправлено!' : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
     if (d.ok) setTimeout(function(){ window.location = '/email/'; }, 1000);
-  } catch { status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)'; }
+    else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  } catch {
+    status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';
+    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+  }
 }
 
 function saveDraft() { alert('Чернетки — наступний крок.'); }

@@ -123,19 +123,20 @@ def inbox_view(request):
     ).count()
 
     return render(request, 'email_assistant/inbox.html', {
-        'title':        'Email Асистент',
-        'account':      account,
-        'emails':       emails,
-        'folder':       folder,
-        'folders':      FOLDERS,
-        'q':            q,
-        'page':         page,
-        'total':        total,
-        'per_page':     per_page,
-        'has_prev':     page > 1,
-        'has_next':     start + per_page < total,
-        'unread_count': unread_count,
-        'crm_contacts': json.dumps(_crm_contacts()),
+        'title':                 'Email Асистент',
+        'account':               account,
+        'emails':                emails,
+        'folder':                folder,
+        'folders':               FOLDERS,
+        'q':                     q,
+        'page':                  page,
+        'total':                 total,
+        'per_page':              per_page,
+        'has_prev':              page > 1,
+        'has_next':              start + per_page < total,
+        'unread_count':          unread_count,
+        'crm_contacts':          json.dumps(_crm_contacts()),
+        'sync_interval_minutes': max(1, account.sync_interval_minutes),
     })
 
 
@@ -340,13 +341,16 @@ def _handle_send(request, account, reply_to=None):
     )
 
     if result['ok']:
-        thread = reply_to.thread if reply_to else None
-        EmailMessage.objects.create(
-            account=account, thread=thread, folder='sent',
-            subject=subject, from_email=account.email_address,
-            from_name=account.display_name, to_emails=to_list, cc_emails=cc_list,
-            body_text=body, is_read=True, sent_at=timezone.now(),
-        )
+        try:
+            thread = reply_to.thread if reply_to else None
+            EmailMessage.objects.create(
+                account=account, thread=thread, folder='sent',
+                subject=subject, from_email=account.email_address,
+                from_name=account.display_name, to_emails=to_list, cc_emails=cc_list,
+                body_text=body, is_read=True, sent_at=timezone.now(),
+            )
+        except Exception as e:
+            logger.warning('store sent message: %s', e)
 
     return JsonResponse(result)
 
@@ -521,6 +525,83 @@ def sync_imap_folder_view(request):
     except Exception as e:
         logger.error('sync_imap_folder %s: %s', imap_folder, e)
         return JsonResponse({'ok': False, 'error': str(e)})
+
+
+@staff_member_required
+@require_POST
+def sync_all_folders_view(request):
+    """Full historical sync: inbox+sent (all time) + all IMAP custom folders."""
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+
+    from django.core.management import call_command
+    from io import StringIO
+    out = StringIO()
+    try:
+        call_command('sync_email', account=account.pk, stdout=out, stderr=out, **{'all': True})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+
+    # Now also sync every selectable IMAP folder
+    folder_results = []
+    try:
+        from email_assistant.imap_client import IMAPClient
+        from email_assistant.models import EmailMessage, EmailThread
+        with IMAPClient(account) as imap:
+            imap_folders = imap.list_folders()
+
+        standard_server = {
+            account.imap_folder_inbox.lower(),
+            account.imap_folder_sent.lower(),
+        }
+        for f in imap_folders:
+            if not f.get('selectable'):
+                continue
+            name = f['name']
+            if name.lower() in standard_server:
+                continue
+            created = 0
+            try:
+                with IMAPClient(account) as imap:
+                    messages = imap.fetch_messages(folder=name, days_back=3650, since_uid=0)
+                for msg_data in messages:
+                    if EmailMessage.objects.filter(
+                            account=account, imap_uid=msg_data['uid'],
+                            imap_folder_name=name).exists():
+                        continue
+                    thread_key = (msg_data.get('in_reply_to') or
+                                  msg_data.get('message_id') or msg_data['subject'])
+                    thread = EmailThread.objects.filter(
+                        account=account, thread_id=thread_key[:500]).first()
+                    if not thread:
+                        thread = EmailThread.objects.create(
+                            account=account,
+                            thread_id=thread_key[:500] if thread_key else '',
+                            subject=msg_data['subject'][:500],
+                            participants=[msg_data['from_email']] + msg_data['to_emails'],
+                        )
+                    EmailMessage.objects.create(
+                        account=account, thread=thread,
+                        imap_uid=msg_data['uid'], imap_folder_name=name,
+                        message_id=msg_data['message_id'],
+                        in_reply_to=msg_data['in_reply_to'],
+                        folder=EmailMessage.FOLDER_INBOX,
+                        subject=msg_data['subject'], from_email=msg_data['from_email'],
+                        from_name=msg_data['from_name'], to_emails=msg_data['to_emails'],
+                        cc_emails=msg_data['cc_emails'], body_text=msg_data['body_text'],
+                        body_html=msg_data['body_html'], attachments=msg_data['attachments'],
+                        is_read=msg_data['is_read'], sent_at=msg_data['sent_at'],
+                    )
+                    created += 1
+                folder_results.append({'folder': name, 'created': created})
+            except Exception as e:
+                folder_results.append({'folder': name, 'error': str(e)})
+                logger.warning('sync_all_folders %s: %s', name, e)
+    except Exception as e:
+        logger.warning('imap list_folders in sync_all: %s', e)
+
+    return JsonResponse({'ok': True, 'output': out.getvalue(), 'folders': folder_results})
 
 
 @staff_member_required

@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.http import JsonResponse
+from django.urls import path
 from django.utils.html import format_html
 from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings
 
@@ -21,7 +23,8 @@ class EmailAccountAdmin(admin.ModelAdmin):
         ("📥 IMAP (читання)", {
             'fields': ('imap_host', 'imap_port', 'imap_use_ssl',
                        'imap_username', 'imap_password',
-                       'imap_folder_inbox', 'imap_folder_sent', 'sync_days_back'),
+                       'imap_folder_inbox', 'imap_folder_sent',
+                       'sync_days_back', 'sync_interval_minutes'),
             'description': 'IONOS: host=imap.ionos.de, port=993, SSL=✓',
         }),
         ("📤 SMTP (відправка)", {
@@ -34,6 +37,89 @@ class EmailAccountAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path('<int:pk>/sync-all/',
+                 self.admin_site.admin_view(self._sync_all_view),
+                 name='emailaccount_sync_all'),
+        ]
+        return custom + urls
+
+    def _sync_all_view(self, request, pk):
+        """Admin AJAX: full historical sync for one account (all folders)."""
+        from django.core.management import call_command
+        from io import StringIO
+        from email_assistant.imap_client import IMAPClient
+        from email_assistant.models import EmailThread
+
+        try:
+            account = EmailAccount.objects.get(pk=pk)
+        except EmailAccount.DoesNotExist:
+            return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+
+        out = StringIO()
+        try:
+            call_command('sync_email', account=account.pk, stdout=out, stderr=out, **{'all': True})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+
+        folder_results = []
+        try:
+            with IMAPClient(account) as imap:
+                imap_folders = imap.list_folders()
+
+            standard_server = {
+                account.imap_folder_inbox.lower(),
+                account.imap_folder_sent.lower(),
+            }
+            for f in imap_folders:
+                if not f.get('selectable'):
+                    continue
+                name = f['name']
+                if name.lower() in standard_server:
+                    continue
+                created = 0
+                try:
+                    with IMAPClient(account) as imap:
+                        messages = imap.fetch_messages(folder=name, days_back=3650, since_uid=0)
+                    for msg_data in messages:
+                        if EmailMessage.objects.filter(
+                                account=account, imap_uid=msg_data['uid'],
+                                imap_folder_name=name).exists():
+                            continue
+                        thread_key = (msg_data.get('in_reply_to') or
+                                      msg_data.get('message_id') or msg_data['subject'])
+                        thread = EmailThread.objects.filter(
+                            account=account, thread_id=thread_key[:500]).first()
+                        if not thread:
+                            thread = EmailThread.objects.create(
+                                account=account,
+                                thread_id=thread_key[:500] if thread_key else '',
+                                subject=msg_data['subject'][:500],
+                                participants=[msg_data['from_email']] + msg_data['to_emails'],
+                            )
+                        EmailMessage.objects.create(
+                            account=account, thread=thread,
+                            imap_uid=msg_data['uid'], imap_folder_name=name,
+                            message_id=msg_data['message_id'],
+                            in_reply_to=msg_data['in_reply_to'],
+                            folder=EmailMessage.FOLDER_INBOX,
+                            subject=msg_data['subject'], from_email=msg_data['from_email'],
+                            from_name=msg_data['from_name'], to_emails=msg_data['to_emails'],
+                            cc_emails=msg_data['cc_emails'], body_text=msg_data['body_text'],
+                            body_html=msg_data['body_html'], attachments=msg_data['attachments'],
+                            is_read=msg_data['is_read'], sent_at=msg_data['sent_at'],
+                        )
+                        created += 1
+                    folder_results.append({'folder': name, 'created': created})
+                except Exception as e:
+                    folder_results.append({'folder': name, 'error': str(e)})
+        except Exception as e:
+            pass
+
+        return JsonResponse({'ok': True, 'output': out.getvalue(), 'folders': folder_results})
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
