@@ -46,6 +46,31 @@ def _crm_contacts() -> list:
 _STANDARD_FOLDERS = {'inbox', 'sent', 'starred', 'spam', 'archived', 'trash'}
 
 
+def _page_range(page, total_pages):
+    """Return list of page numbers/None (None = ellipsis) for smart pagination."""
+    if total_pages <= 7:
+        return list(range(1, total_pages + 1))
+    pages = []
+    shown = set()
+
+    def add(p):
+        if 1 <= p <= total_pages and p not in shown:
+            pages.append(p)
+            shown.add(p)
+
+    for p in [1, 2]:
+        add(p)
+    if page - 2 > 3:
+        pages.append(None)  # ellipsis
+    for p in range(max(1, page - 1), min(total_pages, page + 1) + 1):
+        add(p)
+    if page + 2 < total_pages - 1:
+        pages.append(None)  # ellipsis
+    for p in [total_pages - 1, total_pages]:
+        add(p)
+    return pages
+
+
 def _build_qs(account, folder, q=''):
     from email_assistant.models import EmailMessage, EmailThread
 
@@ -134,6 +159,8 @@ def inbox_view(request):
         'per_page':              per_page,
         'has_prev':              page > 1,
         'has_next':              start + per_page < total,
+        'total_pages':           max(1, (total + per_page - 1) // per_page),
+        'page_range':            _page_range(page, max(1, (total + per_page - 1) // per_page)),
         'unread_count':          unread_count,
         'crm_contacts':          json.dumps(_crm_contacts()),
         'sync_interval_minutes': max(1, account.sync_interval_minutes),

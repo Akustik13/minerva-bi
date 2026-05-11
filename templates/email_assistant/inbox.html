@@ -39,9 +39,10 @@
 /* ── Sync buttons ── */
 .em-sync-area{padding:8px 10px;border-top:1px solid var(--border-strong);display:flex;flex-direction:column;gap:4px}
 .em-p1.collapsed .em-sync-area{display:none}
-.em-sync-btn{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;transition:background .1s}
+.em-sync-btn{width:100%;padding:6px 10px;border-radius:6px;border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);font-size:12px;display:flex;align-items:center;gap:6px;transition:background .1s;box-sizing:border-box;overflow:hidden;white-space:nowrap}
 .em-sync-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 #sync-status{font-size:11px;color:var(--text-dim);line-height:1.4;min-height:14px}
+#sync-countdown{font-size:10px;color:var(--text-dim);text-align:center;padding:2px 0}
 
 /* ── Server folders ── */
 .em-folders-divider{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);padding:8px 12px 4px;user-select:none}
@@ -141,10 +142,12 @@
       <button class="em-sync-btn" onclick="syncNow(this,false)" title="Завантажити нові листи">
         🔄 Синхронізувати
       </button>
-      <a href="/admin/email_assistant/emailaccount/{{ account.pk }}/change/" class="em-sync-btn" style="text-decoration:none;justify-content:center">
+      <a href="/admin/email_assistant/emailaccount/{{ account.pk }}/change/"
+         class="em-sync-btn" style="text-decoration:none;justify-content:center">
         ⚙️ Налаштування
       </a>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
+      <div id="sync-countdown"></div>
     </div>
   </div>
 
@@ -222,12 +225,26 @@
       {% endfor %}
     </div>
 
-    {% if has_prev or has_next %}
+    {% if total_pages > 1 %}
     <div class="em-pagination">
       {% if has_prev %}
       <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'-1' }}{% if q %}&q={{ q }}{% endif %}">← Назад</a>
       {% else %}<span></span>{% endif %}
-      <span style="font-size:11px;color:var(--text-muted)">{{ page }}</span>
+
+      <!-- Smart page numbers from server-computed page_range -->
+      <span style="display:flex;gap:3px;align-items:center;font-size:12px">
+        {% for p in page_range %}
+          {% if p == None %}
+            <span style="color:var(--text-dim);padding:0 2px">…</span>
+          {% elif p == page %}
+            <span style="padding:2px 8px;border-radius:4px;background:#1a73e8;color:#fff;font-weight:700;font-size:12px">{{ p }}</span>
+          {% else %}
+            <a class="em-page-link" style="padding:2px 8px"
+               href="?folder={{ folder }}&page={{ p }}{% if q %}&q={{ q }}{% endif %}">{{ p }}</a>
+          {% endif %}
+        {% endfor %}
+      </span>
+
       {% if has_next %}
       <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'1' }}{% if q %}&q={{ q }}{% endif %}">Далі →</a>
       {% else %}<span></span>{% endif %}
@@ -488,10 +505,8 @@ window.sortRows = function(key) {
 
   async function tick() {
     try {
-      // Trigger a background sync on the server
       fetch('/email/sync/', {method:'POST', headers:{'X-CSRFToken':CSRF}, credentials:'same-origin'})
         .catch(function(){});
-      // Check unread count
       var r = await fetch('/email/unread-count/', {credentials:'same-origin'});
       var d = await r.json();
       var n = d.count || 0;
@@ -505,6 +520,22 @@ window.sortRows = function(key) {
       updateBadge(n);
       lastCount = n;
     } catch(e) {}
+    resetCountdown();
+  }
+
+  // Countdown to next sync
+  var countdownSec = Math.round(INTERVAL_MS / 1000);
+  var cdEl = document.getElementById('sync-countdown');
+  function resetCountdown() { countdownSec = Math.round(INTERVAL_MS / 1000); }
+  function fmtCountdown(s) {
+    var m = Math.floor(s / 60), ss = s % 60;
+    return '⏱ оновлення через ' + m + ':' + (ss < 10 ? '0' : '') + ss;
+  }
+  if (cdEl) {
+    setInterval(function() {
+      countdownSec = Math.max(0, countdownSec - 1);
+      cdEl.textContent = fmtCountdown(countdownSec);
+    }, 1000);
   }
 
   setInterval(tick, INTERVAL_MS);
