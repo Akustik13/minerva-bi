@@ -1,8 +1,11 @@
+import logging
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
 from django.utils.html import format_html
 from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings
+
+logger = logging.getLogger('email_assistant')
 
 
 @admin.register(EmailAccount)
@@ -155,7 +158,11 @@ class EmailAccountAdmin(admin.ModelAdmin):
                     total_extra += created
                     yield _ev({'type': 'folder_done', 'folder': name, 'created': created})
                 except BaseException as e:
-                    yield _ev({'type': 'folder_error', 'folder': name, 'error': str(e)})
+                    import traceback as _tb
+                    tb = _tb.format_exc()
+                    logger.error('sync-all folder %s failed:\n%s', name, tb)
+                    yield _ev({'type': 'folder_error', 'folder': name,
+                               'error': str(e), 'traceback': tb[-500:]})
                     if isinstance(e, (SystemExit, KeyboardInterrupt)):
                         raise
 

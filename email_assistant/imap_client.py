@@ -136,7 +136,8 @@ class IMAPClient:
                 continue
         return False
 
-    def fetch_messages(self, folder: str = 'INBOX', days_back: int = 30, since_uid: int = 0) -> list:
+    def fetch_messages(self, folder: str = 'INBOX', days_back: int = 30,
+                       since_uid: int = 0, limit: int = 200) -> list:
         if not self.select_folder(folder):
             logger.warning('Cannot select folder: %s', folder)
             return []
@@ -150,21 +151,43 @@ class IMAPClient:
         if since_uid > 0:
             uids = [u for u in uids if int(u) > since_uid]
 
+        uids = uids[-limit:]
+        if not uids:
+            return []
+
+        # Batch-fetch all UIDs in a single IMAP FETCH command (dramatically faster)
+        uid_set = b','.join(uids)
+        try:
+            _, raw_data = self.conn.uid('fetch', uid_set, '(RFC822 FLAGS)')
+        except Exception as e:
+            logger.error('IMAP batch fetch failed for %s: %s', folder, e)
+            return []
+
+        if not raw_data:
+            return []
+
+        # imaplib returns alternating (header_bytes, body_bytes) + b')' items
         messages = []
-        for uid_bytes in uids[-100:]:
-            uid = int(uid_bytes)
+        i = 0
+        while i < len(raw_data):
+            item = raw_data[i]
+            i += 1
+            if not isinstance(item, tuple) or len(item) < 2:
+                continue
+            header_part = item[0]
+            raw_body    = item[1]
+            if not raw_body:
+                continue
             try:
-                _, msg_data = self.conn.uid('fetch', uid_bytes, '(RFC822 FLAGS)')
-                if not msg_data or not msg_data[0]:
-                    continue
+                import re as _re
+                uid_match = _re.search(rb'UID\s+(\d+)', header_part)
+                uid = int(uid_match.group(1)) if uid_match else 0
+                flags_str = header_part.decode('ascii', errors='replace')
 
-                raw   = msg_data[0][1]
-                msg   = email_lib.message_from_bytes(raw)
-                flags = str(msg_data[0][0])
-
-                subject    = _decode_str(msg.get('Subject', ''))
+                msg     = email_lib.message_from_bytes(raw_body)
+                subject = _decode_str(msg.get('Subject', ''))
                 from_name, from_email = parseaddr(msg.get('From', ''))
-                from_name  = _decode_str(from_name)
+                from_name = _decode_str(from_name)
 
                 to_raw  = msg.get('To', '')
                 cc_raw  = msg.get('Cc', '')
@@ -192,11 +215,11 @@ class IMAPClient:
                     'body_text':   text_body,
                     'body_html':   html_body,
                     'attachments': _get_attachments(msg),
-                    'is_read':     '\\Seen' in flags,
+                    'is_read':     '\\Seen' in flags_str,
                     'sent_at':     sent_at,
                 })
             except Exception as e:
-                logger.error('Error fetching uid %s: %s', uid, e)
+                logger.error('Error parsing batch message: %s', e)
 
         return messages
 

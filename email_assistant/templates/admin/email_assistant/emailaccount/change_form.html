@@ -99,6 +99,7 @@
               replaceLast('  ✓ ' + d.folder + ': +' + d.created + ' нових');
             } else if (d.type === 'folder_error') {
               replaceLast('  ⚠️ ' + d.folder + ': ' + d.error);
+              if (d.traceback) addLine('    ' + d.traceback.replace(/\n/g, '\n    '));
             } else if (d.type === 'error') {
               addLine('⚠️ Помилка: ' + d.msg);
               st.textContent = '✗ ' + d.msg; st.style.color = 'var(--err,#e53935)';
