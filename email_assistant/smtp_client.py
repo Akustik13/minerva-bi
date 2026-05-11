@@ -37,16 +37,23 @@ class SMTPClient:
                 msg['References']  = reply_to_message.message_id
 
             # Account signature > UserProfile.smtp_signature ({name} placeholder)
+            # Appended to plain-text body only (HTML body already contains sig from frontend)
             try:
-                sig = (self.account.signature or '').strip()
-                if not sig:
-                    sig = (self.account.user.profile.smtp_signature or '').strip()
-                if sig:
+                sig_html = (self.account.signature or '').strip()
+                if not sig_html:
+                    sig_html = (self.account.user.profile.smtp_signature or '').strip()
+                if sig_html:
                     name = (self.account.user.get_full_name()
                             or self.account.display_name
                             or self.account.user.username)
-                    sig = sig.replace('{name}', name)
-                    body_text = f'{body_text}\n\n--\n{sig}'
+                    sig_html = sig_html.replace('{name}', name)
+                    # Strip HTML tags for plain-text version
+                    import re as _re, html as _html
+                    sig_plain = _re.sub(r'<br\s*/?>', '\n', sig_html, flags=_re.IGNORECASE)
+                    sig_plain = _re.sub(r'<p[^>]*>', '\n', sig_plain, flags=_re.IGNORECASE)
+                    sig_plain = _re.sub(r'<[^>]+>', '', sig_plain)
+                    sig_plain = _html.unescape(sig_plain).strip()
+                    body_text = f'{body_text}\n\n--\n{sig_plain}'
             except Exception:
                 pass
 

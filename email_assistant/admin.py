@@ -10,7 +10,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
     list_display  = ('email_address', 'user', 'display_name', 'is_primary', 'is_active', 'last_sync_col')
     list_filter   = ('is_active', 'is_primary')
     search_fields = ('email_address', 'user__username', 'display_name')
-    readonly_fields = ('last_sync_at', 'last_seen_uid')
+    readonly_fields = ('last_sync_at', 'last_seen_uid', 'sync_all_widget')
 
     fieldsets = (
         ("👤 Акаунт", {
@@ -24,7 +24,8 @@ class EmailAccountAdmin(admin.ModelAdmin):
             'fields': ('imap_host', 'imap_port', 'imap_use_ssl',
                        'imap_username', 'imap_password',
                        'imap_folder_inbox', 'imap_folder_sent',
-                       'sync_days_back', 'sync_interval_minutes'),
+                       'sync_days_back', 'sync_interval_minutes',
+                       'sync_all_widget'),
             'description': 'IONOS: host=imap.ionos.de, port=993, SSL=✓',
         }),
         ("📤 SMTP (відправка)", {
@@ -37,6 +38,23 @@ class EmailAccountAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    def sync_all_widget(self, obj):
+        if not obj or not obj.pk:
+            return '—'
+        return format_html(
+            '<button type="button" id="sync-all-btn" '
+            'style="padding:7px 18px;border-radius:6px;font-size:12px;font-weight:600;'
+            'background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff;'
+            'border:none;cursor:pointer;transition:opacity .15s" '
+            'onclick="doSyncAll({})">🔄 Синхронізувати все (всі папки, вся історія)</button>'
+            '<span id="sync-all-status" style="font-size:12px;margin-left:10px;color:var(--text-muted)"></span>'
+            '<pre id="sync-all-log" style="display:none;margin-top:8px;padding:8px;'
+            'background:var(--bg-input);border-radius:6px;font-size:11px;'
+            'color:var(--text-muted);max-height:200px;overflow-y:auto;white-space:pre-wrap"></pre>',
+            obj.pk,
+        )
+    sync_all_widget.short_description = 'Синхронізувати все'
 
     def get_urls(self):
         urls = super().get_urls()

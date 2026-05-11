@@ -227,7 +227,8 @@ window.pvSendReply = async function(pk, fromEmail, subj) {
 
   var htmlBody = editor.innerHTML;
   if (sig) htmlBody += '<br><hr style="border:none;border-top:1px solid #ccc;margin:10px 0">' + sig.innerHTML;
-  var plainBody = textBody + (sig ? '\n\n--\n' + (sig.innerText || sig.textContent) : '');
+  // Plain text body: no sig here — SMTPClient appends stripped-HTML sig on backend
+  var plainBody = textBody;
 
   if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
   status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';

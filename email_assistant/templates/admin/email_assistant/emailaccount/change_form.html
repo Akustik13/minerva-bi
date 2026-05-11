@@ -1,21 +1,5 @@
 {% extends "admin/change_form.html" %}
 
-{% block object-tools-items %}
-{{ block.super }}
-{% if object.pk %}
-<li>
-  <button type="button" id="sync-all-btn"
-          style="padding:6px 16px;border-radius:6px;font-size:12px;font-weight:600;
-                 background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff;
-                 border:none;cursor:pointer;transition:opacity .15s"
-          onclick="doSyncAll({{ object.pk }})">
-    🔄 Синхронізувати все
-  </button>
-  <span id="sync-all-status" style="font-size:12px;margin-left:8px;color:var(--text-muted)"></span>
-</li>
-{% endif %}
-{% endblock %}
-
 {% block after_field_sets %}
 {{ block.super }}
 <script>
@@ -61,12 +45,14 @@
     ta.parentNode.insertBefore(wrap, ta.nextSibling);
   });
 
-  // Sync All button
+  // Sync All widget button
   window.doSyncAll = async function(pk) {
     var btn = document.getElementById('sync-all-btn');
     var st  = document.getElementById('sync-all-status');
+    var log = document.getElementById('sync-all-log');
     btn.disabled = true; btn.style.opacity = '.5';
-    st.textContent = '⏳ Синхронізую...'; st.style.color = 'var(--text-muted)';
+    st.textContent = '⏳ Синхронізую всі папки...'; st.style.color = 'var(--text-muted)';
+    if (log) log.style.display = 'none';
     var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
     try {
       var r = await fetch('/admin/email_assistant/emailaccount/' + pk + '/sync-all/', {
@@ -74,11 +60,29 @@
       });
       var d = await r.json();
       if (d.ok) {
-        var folders = (d.folders || []).map(function(f){
-          return f.folder + (f.error ? ' ⚠️' : ' +' + (f.created||0));
-        }).join(', ');
-        st.textContent = '✓ Готово' + (folders ? ' | ' + folders : '');
+        var lines = [];
+        // Parse main sync output for counts
+        var out = d.output || '';
+        var newMatch = out.match(/\+(\d+) нових/);
+        var totalNew = newMatch ? parseInt(newMatch[1]) : 0;
+        lines.push('📥 Вхідні + Надіслані: +' + totalNew + ' нових листів');
+
+        // Custom IMAP folders
+        var folders = d.folders || [];
+        var folderTotal = 0;
+        folders.forEach(function(f){
+          var n = f.created || 0;
+          folderTotal += n;
+          lines.push('📂 ' + f.folder + ': ' + (f.error ? '⚠️ ' + f.error : '+' + n + ' нових'));
+        });
+        if (folders.length) lines.push('Всього папок: ' + folders.length + ', нових: ' + folderTotal);
+
+        st.textContent = '✓ Готово — всього нових: ' + (totalNew + folderTotal);
         st.style.color = 'var(--ok,#2e7d32)';
+        if (log && lines.length) {
+          log.textContent = lines.join('\n');
+          log.style.display = 'block';
+        }
       } else {
         st.textContent = '✗ ' + d.error;
         st.style.color = 'var(--err,#e53935)';
