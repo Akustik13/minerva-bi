@@ -53,7 +53,20 @@ class SMTPClient:
                     sig_plain = _re.sub(r'<p[^>]*>', '\n', sig_plain, flags=_re.IGNORECASE)
                     sig_plain = _re.sub(r'<[^>]+>', '', sig_plain)
                     sig_plain = _html.unescape(sig_plain).strip()
-                    body_text = f'{body_text}\n\n--\n{sig_plain}'
+                    # Insert sig before quoted original message (if present)
+                    quote_markers = ['\n--- Оригінальний лист ---', '\n--- Переслано ---']
+                    insert_at = None
+                    for marker in quote_markers:
+                        idx = body_text.find(marker)
+                        if idx != -1:
+                            insert_at = idx
+                            break
+                    if insert_at is not None:
+                        body_text = (body_text[:insert_at]
+                                     + f'\n\n--\n{sig_plain}'
+                                     + body_text[insert_at:])
+                    else:
+                        body_text = f'{body_text}\n\n--\n{sig_plain}'
             except Exception:
                 pass
 

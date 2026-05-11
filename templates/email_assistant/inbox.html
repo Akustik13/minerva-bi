@@ -54,7 +54,7 @@
 .em-p1.collapsed .em-server-folder{padding:8px;justify-content:center}
 
 /* ── Panel 2 — message list ── */
-.em-p2{width:280px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);overflow:hidden;transition:width .2s}
+.em-p2{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);overflow:hidden;transition:width .2s}
 .em-p2.collapsed{width:0;border-right:none}
 .em-p2-header{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
 .em-p2-title{font-size:13px;font-weight:600;color:var(--text)}
@@ -298,6 +298,13 @@ async function previewMsg(pk, tpk, rowEl) {
     cont.innerHTML = await r.text();
     cont.scrollTop = 0;
     cont.querySelectorAll('[data-csrf]').forEach(function(el){ el.value = CSRF; });
+    // Re-execute inline scripts (innerHTML doesn't run them automatically)
+    cont.querySelectorAll('script').forEach(function(oldSc) {
+      var newSc = document.createElement('script');
+      newSc.textContent = oldSc.textContent;
+      document.head.appendChild(newSc);
+      document.head.removeChild(newSc);
+    });
   } catch(e) {
     cont.innerHTML = '<div style="padding:24px;color:var(--err)">⚠️ Помилка завантаження</div>';
   }

@@ -196,9 +196,17 @@ async function sendEmail() {
   var sig    = document.getElementById('em-sig');
   var btn    = document.querySelector('.em-send-btn');
 
-  // HTML body (preserves formatting)
-  var htmlBody = editor.innerHTML;
-  if (sig) htmlBody += '<br><hr style="border:none;border-top:1px solid #ccc;margin:12px 0">' + sig.innerHTML;
+  // HTML body: signature BEFORE the quoted block (if any)
+  var quoteEl = editor.querySelector('pre');
+  var htmlBody;
+  if (quoteEl && sig) {
+    var beforeQuote = editor.innerHTML.substring(0, editor.innerHTML.indexOf(quoteEl.outerHTML));
+    var sigHtml = '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0">' + sig.innerHTML + '<br>';
+    htmlBody = beforeQuote + sigHtml + quoteEl.outerHTML;
+  } else {
+    htmlBody = editor.innerHTML;
+    if (sig) htmlBody += '<hr style="border:none;border-top:1px solid #ccc;margin:12px 0">' + sig.innerHTML;
+  }
 
   // Plain text fallback (no sig — SMTPClient appends stripped-HTML sig on backend)
   var textBody = editor.innerText || editor.textContent;
