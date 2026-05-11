@@ -9,15 +9,38 @@
 .em-pv-btn.ai{background:rgba(0,212,170,.08);color:#00d4aa;border-color:rgba(0,212,170,.3)}
 .em-pv-btn.danger{color:var(--err,#e53935)}
 .em-pv-btn.spam-on{background:rgba(229,57,53,.1);color:var(--err,#e53935);border-color:rgba(229,57,53,.3)}
-.em-msgs{flex:1;overflow-y:auto;padding:12px 18px;display:flex;flex-direction:column;gap:12px;min-height:0}
-.em-card{border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;background:var(--bg-card)}
-.em-card-hd{padding:10px 14px;background:var(--bg-input);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
-.em-card-av{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#1565c0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#fff;flex-shrink:0}
-.em-card-from{font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.em-card-date{font-size:11px;color:var(--text-muted);flex-shrink:0}
-.em-card-to{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.em-msgs{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;min-height:0}
+/* Card */
+.em-card{border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;background:var(--bg-card);transition:box-shadow .15s}
+.em-card.expanded{box-shadow:0 2px 12px rgba(0,0,0,.18)}
+/* Card header — clickable, always visible */
+.em-card-hd{padding:9px 12px;background:var(--bg-input);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;min-height:48px}
+.em-card-hd:hover{background:var(--bg-hover,#1e2d40)}
+.em-card.expanded .em-card-hd{border-bottom:1px solid var(--border);cursor:default}
+.em-card.expanded .em-card-hd:hover{background:var(--bg-input)}
+.em-card-av{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#1565c0,#42a5f5);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#fff;flex-shrink:0}
+.em-card-info{flex:1;min-width:0}
+.em-card-row1{display:flex;align-items:baseline;gap:6px}
+.em-card-from{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.em-card-snippet{font-size:12px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.em-card-to-line{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none}
+.em-card.expanded .em-card-snippet{display:none}
+.em-card.expanded .em-card-to-line{display:block}
+.em-card-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.em-card-date{font-size:11px;color:var(--text-muted);white-space:nowrap}
+/* Action buttons in header */
+.em-card-actions{display:flex;gap:3px;align-items:center}
+.em-hd-btn{border:none;background:none;cursor:pointer;color:var(--text-dim);padding:4px 6px;border-radius:5px;font-size:12px;line-height:1;transition:background .1s,color .1s;white-space:nowrap}
+.em-hd-btn:hover{background:var(--bg-card);color:var(--text)}
+.em-hd-btn.ai{color:rgba(0,212,170,.7)}
+.em-hd-btn.ai:hover{color:#00d4aa;background:rgba(0,212,170,.1)}
+.em-hd-btn.danger:hover{color:var(--err,#e53935)}
+.em-hd-btn.spam-on{color:var(--err,#e53935)}
+/* Collapsible content */
+.em-card-collapse{display:none}
+.em-card.expanded .em-card-collapse{display:block}
 .em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
-.em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:400px;overflow-y:auto}
+.em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:500px;overflow-y:auto}
 .em-body-iframe{width:100%;border:none;display:block;min-height:120px;max-height:900px;overflow:hidden}
 .em-card-atts{padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap}
 .em-att-chip{font-size:11px;padding:3px 9px;border-radius:5px;background:var(--bg-input);border:1px solid var(--border-strong);color:var(--text-muted)}
@@ -75,71 +98,79 @@
     </div>
   </div>
 
-  <!-- Messages -->
+  <!-- Messages (Gmail-style: collapsed except last) -->
   <div class="em-msgs">
     {% for msg in emails %}
-    <div class="em-card" id="pv-card-{{ msg.pk }}">
-      <div class="em-card-hd">
+    {% with is_last=forloop.last %}
+    <div class="em-card{% if is_last %} expanded{% endif %}" id="pv-card-{{ msg.pk }}">
+
+      <!-- Header: always visible, clickable to expand/collapse -->
+      <div class="em-card-hd" onclick="pvToggleCard({{ msg.pk }}, event)">
         <div class="em-card-av">{{ msg.sender_display|first|upper }}</div>
-        <div style="flex:1;min-width:0">
-          <div class="em-card-from">{{ msg.from_name|default:msg.from_email }}</div>
-          <div class="em-card-to">{{ msg.from_email }}{% if msg.to_emails %} → {{ msg.to_emails|join:", " }}{% endif %}</div>
+        <div class="em-card-info">
+          <div class="em-card-row1">
+            <span class="em-card-from">{{ msg.from_name|default:msg.from_email }}</span>
+            <span class="em-card-snippet">{{ msg.body_text|truncatechars:60 }}</span>
+          </div>
+          <div class="em-card-to-line">
+            {{ msg.from_email }}{% if msg.to_emails %} → {{ msg.to_emails|join:", " }}{% endif %}
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          {% if msg.has_attachments %}<span style="font-size:13px">📎</span>{% endif %}
+        <div class="em-card-right">
+          {% if msg.has_attachments %}<span style="font-size:12px;color:var(--text-dim)">📎</span>{% endif %}
           <span class="em-card-date">{{ msg.sent_at|date:"d.m.Y H:i" }}</span>
+          <!-- Action buttons always in header -->
+          <div class="em-card-actions" onclick="event.stopPropagation()">
+            <button class="em-hd-btn ai" onclick="pvAiReply({{ msg.pk }})" title="AI відповідь">🏛️</button>
+            <button class="em-hd-btn" onclick="pvAiTranslate({{ msg.pk }})" title="Перекласти UA">🌐</button>
+            <button class="em-hd-btn{% if msg.is_spam %} spam-on{% endif %}"
+                    id="pv-spam-btn-{{ msg.pk }}"
+                    onclick="pvToggleSpam({{ msg.pk }}, this)" title="Спам">🚫</button>
+            <button class="em-hd-btn danger" onclick="pvDelete({{ msg.pk }})" title="Видалити">🗑️</button>
+          </div>
         </div>
       </div>
 
-      <!-- Email body: iframe for HTML, pre for plain text -->
-      <div class="em-card-body">
-        {% if msg.body_html %}
-        <iframe src="/email/message/{{ msg.pk }}/html/"
-                class="em-body-iframe"
-                id="pv-iframe-{{ msg.pk }}"
-                sandbox="allow-same-origin allow-popups"
-                onload="emResizeIframe(this)"></iframe>
-        {% else %}
-        <div class="em-card-body-text">{{ msg.body_text }}</div>
+      <!-- Collapsible body -->
+      <div class="em-card-collapse" id="pv-collapse-{{ msg.pk }}">
+        <div class="em-card-body">
+          {% if msg.body_html %}
+          <iframe src="/email/message/{{ msg.pk }}/html/"
+                  class="em-body-iframe"
+                  id="pv-iframe-{{ msg.pk }}"
+                  sandbox="allow-same-origin allow-popups"
+                  onload="emResizeIframe(this)"></iframe>
+          {% else %}
+          <div class="em-card-body-text">{{ msg.body_text }}</div>
+          {% endif %}
+        </div>
+
+        {% if msg.attachments %}
+        <div class="em-card-atts">
+          {% for att in msg.attachments %}
+          <span class="em-att-chip">📎 {{ att.name }}</span>
+          {% endfor %}
+        </div>
         {% endif %}
-      </div>
 
-      {% if msg.attachments %}
-      <div class="em-card-atts">
-        {% for att in msg.attachments %}
-        <span class="em-att-chip">📎 {{ att.name }}</span>
-        {% endfor %}
-      </div>
-      {% endif %}
-
-      <!-- Per-message actions -->
-      <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap">
-        <button class="em-pv-btn ai" onclick="pvAiReply({{ msg.pk }})">🏛️ AI відповідь</button>
-        <button class="em-pv-btn" onclick="pvAiTranslate({{ msg.pk }})">🌐 Перекласти</button>
-        <button class="em-pv-btn{% if msg.is_spam %} spam-on{% endif %}"
-                id="pv-spam-btn-{{ msg.pk }}"
-                onclick="pvToggleSpam({{ msg.pk }}, this)">
-          {% if msg.is_spam %}✓ Спам{% else %}🚫 Спам{% endif %}
-        </button>
-        <button class="em-pv-btn danger" onclick="pvDelete({{ msg.pk }})">🗑️ Видалити</button>
-      </div>
-
-      <!-- AI box (prompt + result) -->
-      <div class="em-ai-box" id="pv-ai-{{ msg.pk }}">
-        <div class="em-ai-lbl">🏛️ Minerva пропонує</div>
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <input class="em-ai-prompt-inp" type="text"
-                 id="pv-ai-prompt-{{ msg.pk }}"
-                 placeholder="Що відповісти? (залиш порожнім для авто-відповіді)">
-          <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">Генерувати →</button>
-        </div>
-        <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 Копіювати</button>
-          <button class="em-pv-btn ai" onclick="pvUseAsReply({{ msg.pk }})">Вставити у відповідь →</button>
+        <!-- AI box (prompt + result) -->
+        <div class="em-ai-box" id="pv-ai-{{ msg.pk }}">
+          <div class="em-ai-lbl">🏛️ Minerva пропонує</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px">
+            <input class="em-ai-prompt-inp" type="text"
+                   id="pv-ai-prompt-{{ msg.pk }}"
+                   placeholder="Що відповісти? (залиш порожнім для авто-відповіді)">
+            <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">Генерувати →</button>
+          </div>
+          <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 Копіювати</button>
+            <button class="em-pv-btn ai" onclick="pvUseAsReply({{ msg.pk }})">Вставити у відповідь →</button>
+          </div>
         </div>
       </div>
     </div>
+    {% endwith %}
     {% endfor %}
   </div>
 
@@ -205,6 +236,21 @@ function fmtBlock(e, cmd) {
 }
 window.fmt = fmt; window.fmtBlock = fmtBlock;
 
+window.pvToggleCard = function(pk, e) {
+  if (e && e.target && e.target.closest('.em-card-actions')) return;
+  var card = document.getElementById('pv-card-' + pk);
+  if (!card) return;
+  var wasExpanded = card.classList.contains('expanded');
+  card.classList.toggle('expanded', !wasExpanded);
+  // Load iframe lazily when first expanded
+  if (!wasExpanded) {
+    var iframe = document.getElementById('pv-iframe-' + pk);
+    if (iframe && !iframe.src) {
+      iframe.src = '/email/message/' + pk + '/html/';
+    }
+  }
+};
+
 window.pvToggleReply = function() {
   var body  = document.getElementById('pv-reply-body');
   var arrow = document.getElementById('pv-reply-arrow');
@@ -252,10 +298,13 @@ window.pvSendReply = async function(pk, fromEmail, subj) {
 };
 
 window.pvAiReply = function(pk) {
+  // Expand card first if collapsed
+  var card = document.getElementById('pv-card-' + pk);
+  if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
   var box = document.getElementById('pv-ai-' + pk);
-  box.style.display = 'block';
+  if (box) box.style.display = 'block';
   var inp = document.getElementById('pv-ai-prompt-' + pk);
-  if (inp) inp.focus();
+  if (inp) { setTimeout(function(){ inp.focus(); }, 50); }
 };
 
 window.pvAiGenerate = async function(pk) {
