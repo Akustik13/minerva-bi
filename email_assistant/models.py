@@ -151,7 +151,7 @@ class EmailMessage(models.Model):
         verbose_name = 'Email лист'
         verbose_name_plural = 'Email листи'
         ordering = ['-sent_at']
-        unique_together = [('account', 'imap_uid', 'folder')]
+        unique_together = [('account', 'imap_uid', 'imap_folder_name')]
 
     def __str__(self):
         return f'{self.subject[:60]} ({self.from_email})'

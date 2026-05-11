@@ -73,7 +73,7 @@ class Command(BaseCommand):
                         if EmailMessage.objects.filter(
                                 account=account,
                                 imap_uid=msg_data['uid'],
-                                folder=folder_type).exists():
+                                imap_folder_name=folder).exists():
                             continue
 
                         if dry_run:
@@ -92,6 +92,7 @@ class Command(BaseCommand):
                             account=account,
                             thread=thread,
                             imap_uid=msg_data['uid'],
+                            imap_folder_name=folder,
                             message_id=msg_data['message_id'],
                             in_reply_to=msg_data['in_reply_to'],
                             folder=folder_type,
