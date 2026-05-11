@@ -532,7 +532,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             ))
         )
 
-    @admin.display(description="На руках")
+    @admin.display(description="Залишок після")
     def balance_col(self, obj):
         val = getattr(obj, 'running_balance', None)
         if val is None:
