@@ -1,9 +1,44 @@
+import json
 import logging
+from django import forms
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
 from django.utils.html import format_html
 from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings, ScheduledEmail
+
+
+class ScheduledEmailComposeForm(forms.ModelForm):
+    to_raw = forms.CharField(
+        required=True, label='Кому',
+        widget=forms.TextInput(attrs={'autocomplete': 'off', 'id': 'se-to'}))
+    cc_raw = forms.CharField(
+        required=False, label='CC',
+        widget=forms.TextInput(attrs={'autocomplete': 'off', 'id': 'se-cc'}))
+
+    class Meta:
+        model = ScheduledEmail
+        fields = ('account', 'subject', 'to_raw', 'cc_raw',
+                  'body', 'body_html', 'scheduled_at', 'status', 'trigger')
+        widgets = {
+            'body':      forms.HiddenInput(attrs={'id': 'se-body'}),
+            'body_html': forms.HiddenInput(attrs={'id': 'se-body-html'}),
+            'status':    forms.HiddenInput(),
+            'trigger':   forms.HiddenInput(),
+            'scheduled_at': forms.DateTimeInput(
+                format='%Y-%m-%dT%H:%M',
+                attrs={'type': 'datetime-local', 'id': 'se-scheduled-at'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        inst = self.instance
+        if inst and inst.pk:
+            self.initial['to_raw'] = ', '.join(inst.to_emails or [])
+            self.initial['cc_raw'] = ', '.join(inst.cc_emails or [])
+        if not (inst and inst.pk):
+            self.initial.setdefault('status', ScheduledEmail.STATUS_PENDING)
+            self.initial.setdefault('trigger', 'manual')
 
 logger = logging.getLogger('email_assistant')
 
@@ -287,6 +322,9 @@ class EmailThreadAdmin(admin.ModelAdmin):
 
 @admin.register(ScheduledEmail)
 class ScheduledEmailAdmin(admin.ModelAdmin):
+    form                = ScheduledEmailComposeForm
+    change_form_template = 'admin/email_assistant/scheduledemail/change_form.html'
+
     list_display    = ('subject_col', 'account', 'to_col', 'status', 'scheduled_at', 'sent_at')
     list_filter     = ('status', 'trigger', 'account')
     search_fields   = ('subject',)
@@ -305,3 +343,39 @@ class ScheduledEmailAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         return qs.filter(account__user=request.user)
+
+    def save_model(self, request, obj, form, change):
+        to_raw = form.cleaned_data.get('to_raw', '')
+        cc_raw = form.cleaned_data.get('cc_raw', '')
+        obj.to_emails = [e.strip() for e in to_raw.split(',') if e.strip()]
+        obj.cc_emails = [e.strip() for e in cc_raw.split(',') if e.strip()]
+        if not change:
+            obj.status  = ScheduledEmail.STATUS_PENDING
+            obj.trigger = 'manual'
+        super().save_model(request, obj, form, change)
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        from email_assistant.views import _crm_contacts
+        extra_context = extra_context or {}
+
+        accounts = EmailAccount.objects.filter(is_active=True)
+        if not request.user.is_superuser:
+            accounts = accounts.filter(user=request.user)
+
+        extra_context['crm_contacts_json'] = json.dumps(_crm_contacts(request.user))
+        extra_context['account_sigs_json'] = json.dumps({
+            str(a.pk): {
+                'signature':    a.signature or '',
+                'display_name': a.display_name or a.email_address,
+                'email':        a.email_address,
+            }
+            for a in accounts
+        })
+        if object_id:
+            try:
+                obj = ScheduledEmail.objects.get(pk=object_id)
+                extra_context['existing_body_html'] = json.dumps(obj.body_html or '')
+                extra_context['existing_body_text'] = json.dumps(obj.body or '')
+            except ScheduledEmail.DoesNotExist:
+                pass
+        return super().changeform_view(request, object_id, form_url, extra_context)

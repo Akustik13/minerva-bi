@@ -1,0 +1,409 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+/* ── Compose-like wrapper ─────────────────────────── */
+.se-wrap { max-width:860px; margin:0 auto 32px; }
+.se-card {
+  background:var(--bg-card,#161b22);
+  border:1px solid var(--border-strong,#2a3f52);
+  border-radius:12px; overflow:hidden;
+}
+
+/* Field rows */
+.se-field {
+  display:flex; align-items:center; gap:12px;
+  padding:10px 18px;
+  border-bottom:1px solid var(--border,rgba(255,255,255,.07));
+}
+.se-field-label {
+  font-size:12px; font-weight:700;
+  color:var(--text-muted,#9aafbe);
+  width:68px; flex-shrink:0;
+}
+.se-field input[type="text"],
+.se-field input[type="email"],
+.se-field select {
+  flex:1; border:none; background:none;
+  font-size:14px; color:var(--text,#e6edf3);
+  outline:none; padding:0;
+}
+.se-field select {
+  padding:2px 4px;
+  border-radius:4px;
+  border:1px solid var(--border-strong,#2a3f52) !important;
+  background:var(--bg-input,#111c26) !important;
+  cursor:pointer;
+}
+.se-field select option { background:var(--bg-card,#161b22); }
+
+/* Toolbar */
+.se-body-area { padding:10px 18px 8px; }
+.se-toolbar {
+  display:flex; gap:4px; flex-wrap:wrap;
+  margin-bottom:6px; padding-bottom:6px;
+  border-bottom:1px solid var(--border,rgba(255,255,255,.07));
+}
+.se-tb-btn {
+  border:none; background:none; cursor:pointer;
+  color:var(--text-muted,#9aafbe);
+  padding:3px 8px; border-radius:4px;
+  font-size:13px; font-weight:500;
+  transition:background .1s; line-height:1.4;
+}
+.se-tb-btn:hover {
+  background:var(--bg-hover,#1e2d40);
+  color:var(--text,#e6edf3);
+}
+
+/* Body editor */
+.se-body-editor {
+  min-height:280px; overflow-y:auto;
+  padding:10px 0; outline:none;
+  font-size:14px; line-height:1.7;
+  color:var(--text,#e6edf3); word-break:break-word;
+}
+.se-body-editor[placeholder]:empty::before {
+  content:attr(placeholder);
+  color:var(--text-dim,#607d8b);
+  pointer-events:none;
+}
+.se-sig-div {
+  margin-top:14px; padding-top:12px;
+  border-top:1px dashed var(--border-strong,#2a3f52);
+  font-size:13px; color:var(--text-muted,#9aafbe);
+}
+
+/* Footer */
+.se-footer {
+  padding:14px 18px;
+  border-top:1px solid var(--border,rgba(255,255,255,.07));
+  background:var(--bg-input,#111c26);
+  display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+.se-footer label {
+  font-size:12px; color:var(--text-muted,#9aafbe); margin:0;
+}
+.se-footer input[type="datetime-local"] {
+  padding:7px 12px; border-radius:6px;
+  border:1px solid var(--border-strong,#2a3f52);
+  background:var(--bg-card,#161b22);
+  color:var(--text,#e6edf3);
+  font-size:13px; outline:none;
+  color-scheme:dark;
+}
+.se-footer input[type="datetime-local"]:focus {
+  border-color:var(--accent,#58a6ff);
+}
+.se-save-btn {
+  padding:9px 26px; border-radius:7px;
+  font-size:13px; font-weight:700;
+  background:linear-gradient(135deg,#1565c0,#1a73e8);
+  color:#fff; border:none; cursor:pointer;
+  transition:opacity .15s;
+}
+.se-save-btn:hover { opacity:.88; }
+
+/* Status badge */
+.se-status-row {
+  padding:8px 18px 10px;
+  border-top:1px solid var(--border,rgba(255,255,255,.07));
+  display:flex; gap:14px; align-items:center; flex-wrap:wrap;
+}
+.se-status-select {
+  padding:4px 10px; border-radius:6px; font-size:12px;
+  border:1px solid var(--border-strong,#2a3f52);
+  background:var(--bg-input,#111c26);
+  color:var(--text,#e6edf3); cursor:pointer;
+}
+
+/* Autocomplete */
+#se-suggestions {
+  display:none; position:fixed;
+  background:var(--bg-card,#161b22);
+  border:1px solid var(--border-strong,#2a3f52);
+  border-radius:8px; max-height:220px; overflow-y:auto;
+  z-index:9999; min-width:280px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+}
+.se-sugg-item {
+  padding:9px 14px; cursor:pointer;
+  font-size:13px;
+  border-bottom:1px solid var(--border,rgba(255,255,255,.07));
+}
+.se-sugg-item:hover { background:var(--bg-hover,#1e2d40); }
+.se-sugg-item strong { color:var(--text,#e6edf3); }
+.se-sugg-item span   { color:var(--text-muted,#9aafbe); font-size:12px; }
+
+/* Errors */
+.se-errors {
+  padding:10px 18px; color:var(--err,#e53935);
+  font-size:13px; border-bottom:1px solid var(--border,rgba(255,255,255,.07));
+}
+.se-sep { width:1px; background:var(--border-strong,#2a3f52); margin:2px 4px; align-self:stretch; }
+
+/* Hide default Django admin fieldsets */
+#scheduledemail_form > div.form-row,
+#scheduledemail_form > fieldset,
+.form-row { display:none !important; }
+.se-card .se-field, .se-card .se-body-area,
+.se-card .se-footer, .se-card .se-status-row,
+.se-card .se-errors { display:flex !important; }
+.se-card .se-body-area, .se-card .se-errors { display:block !important; }
+</style>
+{% endblock %}
+
+{% block field_sets %}
+{% with adminform.form as form %}
+<div class="se-wrap">
+  <div class="se-card">
+
+    {# ── Errors ── #}
+    {% if form.errors %}
+    <div class="se-errors">
+      {% for field, errs in form.errors.items %}
+        {% for e in errs %}<div>{{ field }}: {{ e }}</div>{% endfor %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {# ── Account ── #}
+    <div class="se-field">
+      <span class="se-field-label">Акаунт</span>
+      {{ form.account }}
+    </div>
+
+    {# ── To ── #}
+    <div class="se-field">
+      <span class="se-field-label">Кому</span>
+      {{ form.to_raw }}
+    </div>
+
+    {# ── CC ── #}
+    <div class="se-field">
+      <span class="se-field-label">CC</span>
+      {{ form.cc_raw }}
+    </div>
+
+    {# ── Subject ── #}
+    <div class="se-field">
+      <span class="se-field-label">Тема</span>
+      {{ form.subject }}
+    </div>
+
+    {# ── Body editor ── #}
+    <div class="se-body-area">
+      <div class="se-toolbar">
+        <button type="button" class="se-tb-btn" onmousedown="return sfmt('bold')"><b>B</b></button>
+        <button type="button" class="se-tb-btn" onmousedown="return sfmt('italic')"><i>I</i></button>
+        <button type="button" class="se-tb-btn" onmousedown="return sfmt('underline')"><u>U</u></button>
+        <button type="button" class="se-tb-btn" onmousedown="return sfmt('strikeThrough')"><s>S</s></button>
+        <span class="se-sep"></span>
+        <select onchange="sfmtV('fontSize',this.value);this.value=''"
+                style="padding:3px 6px;border-radius:4px;border:1px solid var(--border-strong,#2a3f52);background:var(--bg-input,#111c26);color:var(--text,#e6edf3);font-size:12px;cursor:pointer">
+          <option value="">Розмір</option>
+          <option value="1">8</option><option value="2">10</option><option value="3">12</option>
+          <option value="4">14</option><option value="5">18</option><option value="6">24</option>
+        </select>
+        <select onchange="sfmtV('fontName',this.value);this.value=''"
+                style="padding:3px 6px;border-radius:4px;border:1px solid var(--border-strong,#2a3f52);background:var(--bg-input,#111c26);color:var(--text,#e6edf3);font-size:12px;cursor:pointer">
+          <option value="">Шрифт</option>
+          <option>Arial</option><option>Times New Roman</option>
+          <option>Courier New</option><option>Georgia</option>
+        </select>
+        <input type="color" onchange="sfmtV('foreColor',this.value)"
+               title="Колір тексту"
+               style="width:28px;height:26px;border-radius:4px;border:1px solid var(--border-strong,#2a3f52);padding:1px;cursor:pointer;background:var(--bg-input,#111c26)">
+        <span class="se-sep"></span>
+        <button type="button" class="se-tb-btn" onmousedown="return sfmt('insertUnorderedList')">≡</button>
+        <button type="button" class="se-tb-btn" onmousedown="return sfmt('insertOrderedList')">1.</button>
+        <span class="se-sep"></span>
+        <button type="button" class="se-tb-btn" onmousedown="return sfmt('removeFormat')">✕ Очистити</button>
+      </div>
+
+      <div id="se-body-editor" class="se-body-editor" contenteditable="true"
+           placeholder="Текст листа..."></div>
+    </div>
+
+    {# ── Hidden body fields (synced from editor) ── #}
+    {{ form.body }}
+    {{ form.body_html }}
+    {{ form.status }}
+    {{ form.trigger }}
+
+    {# ── Status (for editing existing) ── #}
+    {% if original %}
+    <div class="se-status-row">
+      <span style="font-size:12px;color:var(--text-muted,#9aafbe)">Статус:</span>
+      <select name="_status_vis"
+              class="se-status-select" id="se-status-sel">
+        {% for val, label in form.fields.status.choices %}
+          <option value="{{ val }}"
+            {% if form.initial.status == val or original.status == val %}selected{% endif %}>
+            {{ label }}
+          </option>
+        {% endfor %}
+      </select>
+      <span style="font-size:12px;color:var(--text-muted,#9aafbe);margin-left:12px">
+        Тригер: {{ original.trigger }}
+      </span>
+      {% if original.sent_at %}
+        <span style="font-size:12px;color:var(--ok,#2e7d32)">Надіслано: {{ original.sent_at|date:"d.m.Y H:i" }}</span>
+      {% endif %}
+      {% if original.error_msg %}
+        <span style="font-size:12px;color:var(--err,#e53935)">✗ {{ original.error_msg|truncatechars:80 }}</span>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {# ── Footer: datetime + save ── #}
+    <div class="se-footer">
+      <label>⏰ Відправити:</label>
+      {{ form.scheduled_at }}
+      <button type="submit" name="_save" class="se-save-btn"
+              onclick="seSyncBody()">💾 Зберегти</button>
+      {% if original %}
+      <a href="../" style="font-size:12px;color:var(--text-muted,#9aafbe);margin-left:8px">← Список</a>
+      {% endif %}
+    </div>
+
+  </div>{# .se-card #}
+</div>{# .se-wrap #}
+{% endwith %}
+
+<div id="se-suggestions"></div>
+
+<script>
+(function(){
+  var CSRF     = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  var CONTACTS = {{ crm_contacts_json|safe }};
+  var ACC_SIGS = {{ account_sigs_json|safe }};
+
+  var editor   = document.getElementById('se-body-editor');
+  var toField  = document.getElementById('se-to');
+  var ccField  = document.getElementById('se-cc');
+  var accSel   = document.querySelector('[name="account"]');
+  var suggBox  = document.getElementById('se-suggestions');
+  var _suggTarget = null;
+
+  /* ── Auto-signature on load ── */
+  function injectSig(sig) {
+    if (!sig || !sig.trim()) return;
+    var sigHtml =
+      '<br><br><div class="se-sig-div">-- <br>' + sig.replace(/\n/g,'<br>') + '</div>';
+    // Only inject if editor is empty or has no sig
+    if (!editor.querySelector('.se-sig-div')) {
+      editor.innerHTML = (editor.innerHTML || '') + sigHtml;
+    }
+  }
+
+  {% if original %}
+  // Editing: restore body (pre-encoded as JSON strings by changeform_view)
+  var existingHtml = {{ existing_body_html|default:'""'|safe }};
+  var existingText = {{ existing_body_text|default:'""'|safe }};
+  if (existingHtml) {
+    editor.innerHTML = existingHtml;
+  } else if (existingText) {
+    editor.innerText = existingText;
+  }
+  {% else %}
+  // New: inject sig from selected account
+  function applyAccountSig() {
+    var pk = accSel ? accSel.value : '';
+    var info = ACC_SIGS[pk];
+    if (info && info.signature) {
+      editor.innerHTML = '';
+      injectSig(info.signature);
+    }
+  }
+  if (accSel) {
+    accSel.addEventListener('change', function(){
+      editor.innerHTML = '';
+      applyAccountSig();
+    });
+    applyAccountSig();
+  }
+  {% endif %}
+
+  /* ── Formatting ── */
+  window.sfmt = function(cmd) {
+    document.execCommand(cmd, false, null);
+    editor.focus(); return false;
+  };
+  window.sfmtV = function(cmd, val) {
+    document.execCommand(cmd, false, val); editor.focus();
+  };
+
+  /* ── Autocomplete (To + CC) ── */
+  function setupAC(field) {
+    field.addEventListener('input', function(){
+      var q = field.value.split(',').pop().trim().toLowerCase();
+      if (q.length < 1) { suggBox.style.display = 'none'; return; }
+      var hits = CONTACTS.filter(function(c){
+        return c.email.toLowerCase().includes(q) || (c.name||'').toLowerCase().includes(q);
+      }).slice(0,10);
+      if (!hits.length) { suggBox.style.display='none'; return; }
+      _suggTarget = field;
+      suggBox.innerHTML = hits.map(function(c){
+        return '<div class="se-sugg-item" onclick="seSelectContact(\'' +
+          c.email.replace(/'/g,"\\'") + '\')">' +
+          '<strong>' + _esc(c.name||c.email) + '</strong>' +
+          (c.name ? ' <span>' + _esc(c.email) + '</span>' : '') + '</div>';
+      }).join('');
+      var rect = field.getBoundingClientRect();
+      suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
+      suggBox.style.left = rect.left + 'px';
+      suggBox.style.width = Math.max(280, rect.width) + 'px';
+      suggBox.style.display = 'block';
+    });
+  }
+  if (toField) setupAC(toField);
+  if (ccField) setupAC(ccField);
+
+  window.seSelectContact = function(email) {
+    if (!_suggTarget) return;
+    var parts = _suggTarget.value.split(',');
+    parts[parts.length-1] = email;
+    _suggTarget.value = parts.join(', ') + ', ';
+    suggBox.style.display = 'none'; _suggTarget.focus();
+  };
+  document.addEventListener('click', function(e){
+    if (!suggBox.contains(e.target) && e.target !== toField && e.target !== ccField)
+      suggBox.style.display = 'none';
+  });
+  function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  /* ── Sync editor → hidden fields before submit ── */
+  window.seSyncBody = function() {
+    var htmlBody = editor.innerHTML;
+    var sigEl    = editor.querySelector('.se-sig-div');
+    if (sigEl) sigEl.style.display = 'none';
+    var textBody = editor.innerText || editor.textContent;
+    if (sigEl) sigEl.style.display = '';
+
+    document.getElementById('se-body').value      = textBody;
+    document.getElementById('se-body-html').value = htmlBody;
+
+    // Status: if editing, update status hidden to match select
+    var statusSel = document.getElementById('se-status-sel');
+    var statusHid = document.querySelector('[name="status"]');
+    if (statusSel && statusHid) statusHid.value = statusSel.value;
+  };
+
+  // Also sync on form submit (safety)
+  var form = document.getElementById('scheduledemail_form');
+  if (form) form.addEventListener('submit', function(){ window.seSyncBody(); });
+
+  // Move cursor to start of editor
+  editor.focus();
+  try {
+    var sel = window.getSelection(), range = document.createRange();
+    range.setStart(editor, 0); range.collapse(true);
+    sel.removeAllRanges(); sel.addRange(range);
+  } catch(e){}
+})();
+</script>
+{% endblock %}
+
+{% block submit_buttons_bottom %}{% endblock %}
