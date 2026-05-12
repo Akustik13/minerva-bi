@@ -48,7 +48,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
     list_display  = ('email_address', 'user', 'display_name', 'is_primary', 'is_active', 'last_sync_col')
     list_filter   = ('is_active', 'is_primary')
     search_fields = ('email_address', 'user__username', 'display_name')
-    readonly_fields = ('last_sync_at', 'last_seen_uid', 'sync_all_widget')
+    readonly_fields = ('last_sync_at', 'last_seen_uid', 'sync_all_widget', 'export_import_widget')
 
     fieldsets = (
         ("👤 Акаунт", {
@@ -63,6 +63,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
                        'imap_username', 'imap_password',
                        'imap_folder_inbox', 'imap_folder_sent',
                        'sync_days_back', 'sync_interval_minutes',
+                       'sync_limit', 'sync_no_limit',
                        'sync_all_widget'),
             'description': 'IONOS: host=imap.ionos.de, port=993, SSL=✓',
         }),
@@ -73,6 +74,11 @@ class EmailAccountAdmin(admin.ModelAdmin):
         }),
         ("📊 Статус", {
             'fields': ('last_sync_at', 'last_seen_uid'),
+            'classes': ('collapse',),
+        }),
+        ("💾 Експорт / Імпорт", {
+            'fields': ('export_import_widget',),
+            'description': 'Зберегти листи на ПК або завантажити листи з файлу.',
             'classes': ('collapse',),
         }),
     )
@@ -93,6 +99,31 @@ class EmailAccountAdmin(admin.ModelAdmin):
             obj.pk,
         )
     sync_all_widget.short_description = 'Синхронізувати все'
+
+    def export_import_widget(self, obj):
+        if not obj or not obj.pk:
+            return '—'
+        export_url = f'/email/export/'
+        return format_html(
+            '<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start">'
+            '<a href="{}" target="_blank" '
+            'style="padding:7px 14px;border-radius:6px;font-size:12px;font-weight:600;'
+            'background:linear-gradient(135deg,#2e7d32,#388e3c);color:#fff;'
+            'text-decoration:none;display:inline-block">📥 Завантажити листи (.zip)</a>'
+            '<label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--text-muted)">'
+            '<span>📤 Завантажити з ПК (.eml або .zip):</span>'
+            '<input type="file" id="eml-import-file" accept=".eml,.zip" '
+            'style="font-size:12px">'
+            '<button type="button" onclick="doImportEmails()"'
+            'style="padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;'
+            'background:var(--bg-card);color:var(--text);border:1px solid var(--border-strong);cursor:pointer;width:fit-content">'
+            '📤 Імпортувати</button>'
+            '</label>'
+            '<span id="import-status" style="font-size:12px;color:var(--text-muted);align-self:center"></span>'
+            '</div>',
+            export_url,
+        )
+    export_import_widget.short_description = 'Листи'
 
     def get_urls(self):
         urls = super().get_urls()
@@ -173,8 +204,11 @@ class EmailAccountAdmin(admin.ModelAdmin):
                 yield _ev({'type': 'folder_start', 'folder': name})
                 created = 0
                 try:
+                    _lim = None if account.sync_no_limit else account.sync_limit
                     with IMAPClient(account) as imap:
-                        messages = imap.fetch_messages(folder=name, days_back=3650, since_uid=0)
+                        messages = imap.fetch_messages(folder=name,
+                                                       days_back=account.sync_days_back,
+                                                       since_uid=0, limit=_lim)
                     for i, msg_data in enumerate(messages):
                         # Heartbeat every 25 messages so nginx proxy doesn't time out
                         if i > 0 and i % 25 == 0:
@@ -216,8 +250,6 @@ class EmailAccountAdmin(admin.ModelAdmin):
                     logger.error('sync-all folder %s failed:\n%s', name, tb)
                     yield _ev({'type': 'folder_error', 'folder': name,
                                'error': str(e), 'traceback': tb[-500:]})
-                    if isinstance(e, (SystemExit, KeyboardInterrupt)):
-                        raise
 
             yield _ev({'type': 'done', 'inbox_new': inbox_new, 'extra_new': total_extra})
 

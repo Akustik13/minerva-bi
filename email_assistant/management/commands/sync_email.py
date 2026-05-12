@@ -50,6 +50,7 @@ class Command(BaseCommand):
 
         created = errors = 0
         days_back = 3650 if sync_all else account.sync_days_back
+        limit = None if account.sync_no_limit else account.sync_limit
 
         with IMAPClient(account) as client:
             for folder, folder_type in [
@@ -66,6 +67,7 @@ class Command(BaseCommand):
                     folder=folder,
                     days_back=days_back,
                     since_uid=since_uid,
+                    limit=limit,
                 )
 
                 for msg_data in messages:

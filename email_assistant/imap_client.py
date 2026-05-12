@@ -137,7 +137,7 @@ class IMAPClient:
         return False
 
     def fetch_messages(self, folder: str = 'INBOX', days_back: int = 30,
-                       since_uid: int = 0, limit: int = 200) -> list:
+                       since_uid: int = 0, limit=200) -> list:
         if not self.select_folder(folder):
             logger.warning('Cannot select folder: %s', folder)
             return []
@@ -151,7 +151,8 @@ class IMAPClient:
         if since_uid > 0:
             uids = [u for u in uids if int(u) > since_uid]
 
-        uids = uids[-limit:]
+        if limit is not None:
+            uids = uids[-limit:]
         if not uids:
             return []
 
@@ -259,6 +260,33 @@ class IMAPClient:
             return True
         except Exception as e:
             logger.warning('IMAP append to sent failed: %s', e)
+            return False
+
+    def create_folder(self, name: str) -> bool:
+        """Create a new IMAP folder."""
+        try:
+            status, _ = self.conn.create(name)
+            return status == 'OK'
+        except Exception as e:
+            logger.warning('IMAP create_folder %s: %s', name, e)
+            return False
+
+    def rename_folder(self, old_name: str, new_name: str) -> bool:
+        """Rename an IMAP folder."""
+        try:
+            status, _ = self.conn.rename(old_name, new_name)
+            return status == 'OK'
+        except Exception as e:
+            logger.warning('IMAP rename_folder %s→%s: %s', old_name, new_name, e)
+            return False
+
+    def delete_folder(self, name: str) -> bool:
+        """Delete an IMAP folder (must be empty on most servers)."""
+        try:
+            status, _ = self.conn.delete(name)
+            return status == 'OK'
+        except Exception as e:
+            logger.warning('IMAP delete_folder %s: %s', name, e)
             return False
 
     def mark_seen(self, folder: str, uid: int) -> bool:

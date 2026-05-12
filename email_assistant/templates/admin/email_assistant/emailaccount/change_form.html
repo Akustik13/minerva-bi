@@ -119,6 +119,35 @@
     }
     btn.disabled = false; btn.style.opacity = '1';
   };
+
+  // Import emails from .eml / .zip
+  window.doImportEmails = async function() {
+    var fileInp = document.getElementById('eml-import-file');
+    var st = document.getElementById('import-status');
+    if (!fileInp || !fileInp.files.length) {
+      if (st) { st.textContent = '⚠️ Виберіть файл'; st.style.color = 'var(--warn,#e6a817)'; }
+      return;
+    }
+    var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+    var fd = new FormData();
+    fd.append('file', fileInp.files[0]);
+    if (st) { st.textContent = '⏳ Імпортую…'; st.style.color = 'var(--text-muted)'; }
+    try {
+      var r = await fetch('/email/import/', {method:'POST', headers:{'X-CSRFToken':csrf}, body:fd});
+      var d = await r.json();
+      if (st) {
+        if (d.ok) {
+          st.textContent = '✓ Імпортовано: ' + d.created + ' листів';
+          st.style.color = 'var(--ok,#2e7d32)';
+        } else {
+          st.textContent = '✗ ' + (d.error || 'Помилка');
+          st.style.color = 'var(--err,#e53935)';
+        }
+      }
+    } catch(e) {
+      if (st) { st.textContent = '✗ Помилка мережі'; st.style.color = 'var(--err,#e53935)'; }
+    }
+  };
 })();
 </script>
 {% endblock %}

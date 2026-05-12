@@ -52,6 +52,12 @@ class EmailAccount(models.Model):
     # Sync state
     last_sync_at  = models.DateTimeField(null=True, blank=True, verbose_name='Остання синхронізація')
     sync_days_back = models.PositiveIntegerField(default=30, verbose_name='Синхронізувати за N днів')
+    sync_limit = models.PositiveIntegerField(
+        default=200, verbose_name='Ліміт листів на папку',
+        help_text='Скільки листів максимум завантажувати на одну папку за раз.')
+    sync_no_limit = models.BooleanField(
+        default=False, verbose_name='Без ліміту',
+        help_text='Якщо увімкнено — завантажує всі листи (ігнорує ліміт). Може бути повільно для великих папок.')
     sync_interval_minutes = models.PositiveIntegerField(
         default=2,
         verbose_name='Автооновлення кожні N хвилин',

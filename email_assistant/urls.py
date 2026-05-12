@@ -33,6 +33,13 @@ urlpatterns = [
     path('imap-folders/',                                views.list_imap_folders_view,  name='imap_folders'),
     path('sync-imap-folder/',                            views.sync_imap_folder_view,   name='sync_imap_folder'),
     path('sync-all-folders/',                            views.sync_all_folders_view,   name='sync_all_folders'),
+    # IMAP folder management
+    path('imap-folder/create/',                          views.imap_create_folder_view, name='imap_create_folder'),
+    path('imap-folder/rename/',                          views.imap_rename_folder_view, name='imap_rename_folder'),
+    path('imap-folder/delete/',                          views.imap_delete_folder_view, name='imap_delete_folder'),
+    # Email export / import
+    path('export/',                                      views.export_emails_view,      name='export_emails'),
+    path('import/',                                      views.import_emails_view,      name='import_emails'),
     # Scheduled send
     path('schedule/',                                    views.schedule_email_api,      name='schedule_email'),
     # AI compose

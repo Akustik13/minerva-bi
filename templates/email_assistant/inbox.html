@@ -45,14 +45,33 @@
 #sync-countdown{font-size:10px;color:var(--text-dim);text-align:center;padding:2px 0}
 
 /* ── Server folders ── */
-.em-folders-divider{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);padding:8px 12px 4px;user-select:none}
+.em-folders-divider{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--text-dim);padding:8px 12px 4px;user-select:none;display:flex;align-items:center;justify-content:space-between}
+.em-folders-divider-add{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:13px;padding:0 4px;border-radius:3px;line-height:1;transition:color .1s}
+.em-folders-divider-add:hover{color:var(--text);background:var(--bg-hover,#1e2d40)}
 .em-p1.collapsed .em-folders-divider{display:none}
-.em-server-folder{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12px;text-decoration:none;color:var(--text-muted);white-space:nowrap;overflow:hidden;cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;background:none;border-top:none;border-right:none;border-bottom:none;width:100%;text-align:left}
+.em-server-folder{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12px;text-decoration:none;color:var(--text-muted);white-space:nowrap;overflow:hidden;cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;background:none;border-top:none;border-right:none;border-bottom:none;width:100%;text-align:left;position:relative}
 .em-server-folder:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .em-server-folder.active{color:#1a73e8;background:rgba(26,115,232,.1);border-left-color:#1a73e8;font-weight:600}
 .em-sf-sync{font-size:10px;color:var(--text-dim);margin-left:auto;flex-shrink:0}
+.em-sf-gear{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:11px;padding:1px 3px;border-radius:3px;line-height:1;display:none;flex-shrink:0;transition:color .1s}
+.em-server-folder:hover .em-sf-gear{display:inline-flex}
+.em-sf-gear:hover{color:var(--text);background:var(--bg-card)}
 .em-p1.collapsed .em-server-folder span.em-sf-label{display:none}
 .em-p1.collapsed .em-server-folder{padding:8px;justify-content:center}
+/* Folder management modal */
+#em-folder-modal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center}
+#em-folder-modal.open{display:flex}
+#em-folder-box{background:var(--bg-card);border:1px solid var(--border-strong);border-radius:12px;padding:20px 24px;min-width:300px;max-width:90vw}
+#em-folder-box h4{margin:0 0 14px;color:var(--text);font-size:14px}
+.em-folder-modal-inp{width:100%;padding:7px 10px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:13px;box-sizing:border-box;margin-bottom:10px;outline:none}
+.em-folder-modal-inp:focus{border-color:#1a73e8}
+.em-folder-modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.em-folder-modal-btn{padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:none;transition:opacity .1s}
+.em-folder-modal-btn:hover{opacity:.85}
+.em-folder-modal-ok{background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff}
+.em-folder-modal-del{background:linear-gradient(135deg,#b71c1c,#d32f2f);color:#fff}
+.em-folder-modal-cancel{background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border-strong)}
+#em-folder-modal-err{color:var(--err,#e53935);font-size:11px;min-height:14px;margin-bottom:6px}
 
 /* ── Panel 2 — message list ── */
 .em-p2{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);overflow:hidden;transition:width .2s}
@@ -264,6 +283,16 @@
 
 </div>
 
+<!-- Folder management modal -->
+<div id="em-folder-modal">
+  <div id="em-folder-box">
+    <h4 id="em-folder-modal-title">Нова папка</h4>
+    <input type="text" id="em-folder-modal-inp" class="em-folder-modal-inp" placeholder="Назва папки">
+    <div id="em-folder-modal-err"></div>
+    <div class="em-folder-modal-btns" id="em-folder-modal-btns"></div>
+  </div>
+</div>
+
 <script>
 const CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 
@@ -425,14 +454,103 @@ window.sortRows = function(key) {
   rows.forEach(function(r) { list.appendChild(r); });
 };
 
-/* ── IMAP server folders ── */
+/* ── IMAP server folders + folder management ── */
 (function(){
-  // Skip standard IMAP folders already shown
   var SKIP = new Set(['INBOX', 'Gesendete Objekte', 'Sent', 'Sent Items', '[Gmail]/Sent Mail',
                       'Trash', 'INBOX.Trash', '[Gmail]/Trash', 'Deleted Items',
                       'Spam', 'Junk', '[Gmail]/Spam', 'INBOX.Spam',
                       'Drafts', 'INBOX.Drafts', '[Gmail]/Drafts']);
   var currentFolder = '{{ folder|escapejs }}';
+  var _modal = document.getElementById('em-folder-modal');
+  var _modalTitle = document.getElementById('em-folder-modal-title');
+  var _modalInp   = document.getElementById('em-folder-modal-inp');
+  var _modalErr   = document.getElementById('em-folder-modal-err');
+  var _modalBtns  = document.getElementById('em-folder-modal-btns');
+
+  function _closeModal() {
+    _modal.classList.remove('open');
+    _modalInp.value = '';
+    _modalInp.style.display = '';
+    _modalErr.textContent = '';
+  }
+  _modal.addEventListener('click', function(e){ if (e.target === _modal) _closeModal(); });
+  document.addEventListener('keydown', function(e){ if (e.key === 'Escape') _closeModal(); });
+
+  function _showModal(title, placeholder, btns) {
+    _modalTitle.textContent = title;
+    _modalInp.placeholder   = placeholder;
+    _modalErr.textContent   = '';
+    _modalBtns.innerHTML    = '';
+    btns.forEach(function(b){
+      var el = document.createElement('button');
+      el.className = 'em-folder-modal-btn ' + b.cls;
+      el.textContent = b.label;
+      el.onclick = b.action;
+      _modalBtns.appendChild(el);
+    });
+    var cancel = document.createElement('button');
+    cancel.className = 'em-folder-modal-btn em-folder-modal-cancel';
+    cancel.textContent = 'Скасувати';
+    cancel.onclick = _closeModal;
+    _modalBtns.appendChild(cancel);
+    _modal.classList.add('open');
+    setTimeout(function(){ _modalInp.focus(); }, 50);
+  }
+
+  async function _apiPost(url, data) {
+    var fd = new FormData();
+    Object.keys(data).forEach(function(k){ fd.append(k, data[k]); });
+    var r = await fetch(url, {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
+    return r.json();
+  }
+
+  window.showCreateFolder = function() {
+    _showModal('Нова папка', 'Назва нової папки', [{
+      label: '✓ Створити', cls: 'em-folder-modal-ok',
+      action: async function() {
+        var name = _modalInp.value.trim();
+        if (!name) { _modalErr.textContent = 'Введіть назву'; return; }
+        _modalErr.textContent = '⏳ Створюю…';
+        try {
+          var d = await _apiPost('/email/imap-folder/create/', {name: name});
+          if (d.ok) { _closeModal(); loadServerFolders(); }
+          else _modalErr.textContent = d.error || 'Помилка';
+        } catch(e) { _modalErr.textContent = 'Помилка мережі'; }
+      }
+    }]);
+  };
+
+  window.showRenameFolder = function(oldName) {
+    _modalInp.value = oldName;
+    _showModal('Перейменувати папку', 'Нова назва', [{
+      label: '✓ Перейменувати', cls: 'em-folder-modal-ok',
+      action: async function() {
+        var newName = _modalInp.value.trim();
+        if (!newName) { _modalErr.textContent = 'Введіть нову назву'; return; }
+        _modalErr.textContent = '⏳ Перейменовую…';
+        try {
+          var d = await _apiPost('/email/imap-folder/rename/', {old_name: oldName, new_name: newName});
+          if (d.ok) { _closeModal(); loadServerFolders(); if (currentFolder === oldName) location.href = '?folder=' + encodeURIComponent(newName); }
+          else _modalErr.textContent = d.error || 'Помилка';
+        } catch(e) { _modalErr.textContent = 'Помилка мережі'; }
+      }
+    }]);
+  };
+
+  window.showDeleteFolder = function(name) {
+    _modalInp.style.display = 'none';
+    _showModal('Видалити папку «' + name + '»?', '', [{
+      label: '🗑️ Видалити', cls: 'em-folder-modal-del',
+      action: async function() {
+        _modalErr.textContent = '⏳ Видаляю…';
+        try {
+          var d = await _apiPost('/email/imap-folder/delete/', {name: name});
+          if (d.ok) { _closeModal(); loadServerFolders(); if (currentFolder === name) location.href = '?folder=inbox'; }
+          else _modalErr.textContent = d.error || 'Помилка';
+        } catch(e) { _modalErr.textContent = 'Помилка мережі'; }
+      }
+    }]);
+  };
 
   async function loadServerFolders() {
     var wrap = document.getElementById('em-server-folders');
@@ -440,46 +558,65 @@ window.sortRows = function(key) {
     try {
       var r = await fetch('/email/imap-folders/', {credentials:'same-origin'});
       var d = await r.json();
-      if (!d.folders || !d.folders.length) return;
-      var extra = d.folders.filter(function(f){ return f.selectable && !SKIP.has(f.name); });
-      if (!extra.length) return;
-      var html = '<div class="em-folders-divider">Папки сервера</div>';
-      extra.forEach(function(f){
-        var indent = f.level > 0 ? 'padding-left:' + (12 + f.level * 14) + 'px;' : '';
-        var active = (currentFolder === f.name) ? ' active' : '';
-        html += '<button class="em-server-folder' + active + '" style="' + indent + '" '
-              + 'onclick="openServerFolder(' + JSON.stringify(f.name) + ',this)">'
-              + '<span style="font-size:13px;flex-shrink:0">📁</span>'
-              + '<span class="em-sf-label" style="flex:1;overflow:hidden;text-overflow:ellipsis">'
-              + f.name.replace(/.*[\/\.]/, '') + '</span>'
-              + '</button>';
-      });
+      var extra = (d.folders || []).filter(function(f){ return f.selectable && !SKIP.has(f.name); });
+      var html = '<div class="em-folders-divider"><span>Папки сервера</span>'
+               + '<button class="em-folders-divider-add" onclick="showCreateFolder()" title="Нова папка">+</button>'
+               + '</div>';
+      if (extra.length) {
+        extra.forEach(function(f){
+          var indent = f.level > 0 ? 'padding-left:' + (12 + f.level * 14) + 'px;' : '';
+          var active = (currentFolder === f.name) ? ' active' : '';
+          var label  = f.name.replace(/.*[\/\.]/, '');
+          html += '<button class="em-server-folder' + active + '" style="' + indent + '" '
+                + 'onclick="openServerFolder(' + JSON.stringify(f.name) + ',this)">'
+                + '<span style="font-size:13px;flex-shrink:0">📁</span>'
+                + '<span class="em-sf-label" style="flex:1;overflow:hidden;text-overflow:ellipsis">' + label + '</span>'
+                + '<span class="em-sf-gear" onclick="event.stopPropagation();showFolderMenu(event,' + JSON.stringify(f.name) + ')" title="Керування">⚙️</span>'
+                + '</button>';
+        });
+      }
       wrap.innerHTML = html;
     } catch(e) {}
   }
 
-  window.openServerFolder = async function(folderName, btn) {
-    // Mark active
-    document.querySelectorAll('.em-server-folder').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
+  // Gear dropdown: rename / delete
+  var _activeMenu = null;
+  window.showFolderMenu = function(ev, name) {
+    if (_activeMenu) { _activeMenu.remove(); _activeMenu = null; }
+    var menu = document.createElement('div');
+    menu.style.cssText = 'position:fixed;z-index:10000;background:var(--bg-card);border:1px solid var(--border-strong);'
+                       + 'border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);overflow:hidden;min-width:140px;font-size:12px';
+    var rect = ev.target.getBoundingClientRect();
+    menu.style.top  = (rect.bottom + 4) + 'px';
+    menu.style.left = Math.min(rect.left, window.innerWidth - 160) + 'px';
+    function addItem(icon, label, action) {
+      var li = document.createElement('div');
+      li.style.cssText = 'padding:8px 12px;cursor:pointer;color:var(--text);display:flex;align-items:center;gap:8px;transition:background .1s';
+      li.innerHTML = '<span>' + icon + '</span><span>' + label + '</span>';
+      li.onmouseenter = function(){ li.style.background = 'var(--bg-hover,#1e2d40)'; };
+      li.onmouseleave = function(){ li.style.background = ''; };
+      li.onclick = function(){ menu.remove(); _activeMenu = null; action(); };
+      menu.appendChild(li);
+    }
+    addItem('✏️', 'Перейменувати', function(){ showRenameFolder(name); });
+    addItem('🗑️', 'Видалити', function(){ showDeleteFolder(name); });
+    document.body.appendChild(menu);
+    _activeMenu = menu;
+    function away(e){ if (!menu.contains(e.target)){ menu.remove(); _activeMenu = null; document.removeEventListener('click', away); } }
+    setTimeout(function(){ document.addEventListener('click', away); }, 0);
+  };
 
-    // Show loading in P2
+  window.openServerFolder = async function(folderName, btn) {
+    document.querySelectorAll('.em-server-folder').forEach(function(b){ b.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
     var list = document.getElementById('em-p2-list');
     list.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:13px">⏳ Синхронізую ' + folderName + '...</div>';
-
-    // Reset P3
     document.getElementById('em-p3-empty').style.display = '';
     document.getElementById('em-p3-content').style.display = 'none';
     document.getElementById('em-p3-content').innerHTML = '';
-
-    // Sync the folder first
     var fd = new FormData();
     fd.append('imap_folder', folderName);
-    try {
-      await fetch('/email/sync-imap-folder/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
-    } catch(e) {}
-
-    // Navigate to show messages from this folder
+    try { await fetch('/email/sync-imap-folder/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd}); } catch(e) {}
     window.location.href = '?folder=' + encodeURIComponent(folderName);
   };
 

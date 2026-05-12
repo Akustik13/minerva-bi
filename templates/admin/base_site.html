@@ -1204,7 +1204,7 @@ document.addEventListener('DOMContentLoaded', function(){
   GROUPS.forEach(function(grp){
     if (grp.adminOnly && USER_ROLE !== 'superadmin') return;
     if (grp.roles && grp.roles.indexOf(USER_ROLE) === -1) return;
-    var appsFound    = (grp.apps || []).filter(function(a){ return (modsAvailable ? !!mods[a] : true) && _moduleAllowed(a); });
+    var appsFound    = (grp.apps || []).filter(function(a){ return !!mods[a] && _moduleAllowed(a); });
     var linksToShow  = (grp.links || []).filter(_linkAllowed);
     if (!linksToShow.length && !appsFound.length) return;
 

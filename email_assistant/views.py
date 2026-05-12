@@ -541,9 +541,10 @@ def sync_imap_folder_view(request):
     try:
         from email_assistant.imap_client import IMAPClient
         created = 0
+        _lim = None if account.sync_no_limit else account.sync_limit
         with IMAPClient(account) as client:
             messages = client.fetch_messages(
-                folder=imap_folder, days_back=account.sync_days_back, since_uid=0,
+                folder=imap_folder, days_back=account.sync_days_back, since_uid=0, limit=_lim,
             )
             for msg_data in messages:
                 if EmailMessage.objects.filter(
@@ -628,8 +629,11 @@ def sync_all_folders_view(request):
                 continue
             created = 0
             try:
+                _lim = None if account.sync_no_limit else account.sync_limit
                 with IMAPClient(account) as imap:
-                    messages = imap.fetch_messages(folder=name, days_back=3650, since_uid=0)
+                    messages = imap.fetch_messages(folder=name,
+                                                   days_back=account.sync_days_back,
+                                                   since_uid=0, limit=_lim)
                 for msg_data in messages:
                     if EmailMessage.objects.filter(
                             account=account, imap_uid=msg_data['uid'],
@@ -863,3 +867,210 @@ def schedule_email_api(request):
         'id':          scheduled.pk,
         'scheduled_at': dt.strftime('%d.%m.%Y %H:%M'),
     })
+
+
+# ── IMAP folder management ──────────────────────────────────────────────────
+
+@staff_member_required
+@require_POST
+def imap_create_folder_view(request):
+    account = _get_account(request)
+    name = request.POST.get('name', '').strip()
+    if not account or not name:
+        return JsonResponse({'ok': False, 'error': 'Вкажіть назву папки'})
+    try:
+        from email_assistant.imap_client import IMAPClient
+        with IMAPClient(account) as imap:
+            ok = imap.create_folder(name)
+        if ok:
+            return JsonResponse({'ok': True})
+        return JsonResponse({'ok': False, 'error': 'Сервер відхилив запит'})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+
+
+@staff_member_required
+@require_POST
+def imap_rename_folder_view(request):
+    account = _get_account(request)
+    old_name = request.POST.get('old_name', '').strip()
+    new_name = request.POST.get('new_name', '').strip()
+    if not account or not old_name or not new_name:
+        return JsonResponse({'ok': False, 'error': 'Вкажіть стару і нову назву'})
+    try:
+        from email_assistant.imap_client import IMAPClient
+        with IMAPClient(account) as imap:
+            ok = imap.rename_folder(old_name, new_name)
+        if ok:
+            from email_assistant.models import EmailMessage
+            EmailMessage.objects.filter(
+                account=account, imap_folder_name=old_name
+            ).update(imap_folder_name=new_name)
+            return JsonResponse({'ok': True})
+        return JsonResponse({'ok': False, 'error': 'Сервер відхилив запит'})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+
+
+@staff_member_required
+@require_POST
+def imap_delete_folder_view(request):
+    account = _get_account(request)
+    name = request.POST.get('name', '').strip()
+    if not account or not name:
+        return JsonResponse({'ok': False, 'error': 'Вкажіть назву папки'})
+    try:
+        from email_assistant.imap_client import IMAPClient
+        with IMAPClient(account) as imap:
+            ok = imap.delete_folder(name)
+        if ok:
+            from email_assistant.models import EmailMessage
+            EmailMessage.objects.filter(
+                account=account, imap_folder_name=name
+            ).update(imap_folder_name='')
+            return JsonResponse({'ok': True})
+        return JsonResponse({'ok': False, 'error': 'Сервер відхилив запит'})
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': str(e)})
+
+
+# ── Email export / import ───────────────────────────────────────────────────
+
+@staff_member_required
+def export_emails_view(request):
+    """Download all emails as .eml files in a zip archive."""
+    import zipfile, io, email as email_lib
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    from email_assistant.models import EmailMessage
+
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+
+    folder_filter = request.GET.get('folder')
+    qs = EmailMessage.objects.filter(account=account, is_deleted=False)
+    if folder_filter:
+        qs = qs.filter(imap_folder_name=folder_filter)
+    qs = qs.order_by('-sent_at')[:500]
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for msg in qs:
+            if msg.body_html:
+                eml = MIMEMultipart('alternative')
+                eml.attach(MIMEText(msg.body_text or '', 'plain', 'utf-8'))
+                eml.attach(MIMEText(msg.body_html, 'html', 'utf-8'))
+            else:
+                eml = MIMEText(msg.body_text or '', 'plain', 'utf-8')
+            eml['Subject'] = msg.subject or '(no subject)'
+            eml['From']    = msg.from_email or ''
+            eml['To']      = ', '.join(msg.to_emails or [])
+            if msg.cc_emails:
+                eml['Cc'] = ', '.join(msg.cc_emails)
+            if msg.message_id:
+                eml['Message-ID'] = msg.message_id
+            if msg.sent_at:
+                from email.utils import format_datetime
+                eml['Date'] = format_datetime(msg.sent_at)
+            safe = ''.join(c for c in (msg.subject or 'email')[:40] if c.isalnum() or c in ' -_')
+            fname = f"{msg.pk}_{safe}.eml"
+            zf.writestr(fname, eml.as_string())
+
+    buf.seek(0)
+    resp = HttpResponse(buf.read(), content_type='application/zip')
+    resp['Content-Disposition'] = 'attachment; filename="emails_export.zip"'
+    return resp
+
+
+@staff_member_required
+@require_POST
+def import_emails_view(request):
+    """Import .eml files (or .zip of .emls) into the account."""
+    import zipfile, io, email as email_lib
+    from email.utils import parseaddr, parsedate_to_datetime
+    from email.header import decode_header as _dh
+    from email_assistant.models import EmailMessage, EmailThread
+
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+
+    def _ds(raw):
+        if not raw:
+            return ''
+        parts = _dh(raw)
+        result = []
+        for chunk, enc in parts:
+            if isinstance(chunk, bytes):
+                result.append(chunk.decode(enc or 'utf-8', errors='replace'))
+            else:
+                result.append(str(chunk))
+        return ' '.join(result).strip()
+
+    def _save_eml(raw_bytes):
+        try:
+            msg = email_lib.message_from_bytes(raw_bytes)
+            msg_id = (msg.get('Message-ID') or '').strip()
+            subject = _ds(msg.get('Subject', ''))
+            from_name, from_email = parseaddr(msg.get('From', ''))
+            from_name  = _ds(from_name)
+            from_email = from_email.lower()
+            to_raw     = msg.get('To', '')
+            to_list    = [e for _, e in [parseaddr(a) for a in to_raw.split(',') if a.strip()] if e]
+            try:
+                from django.utils import timezone as tz
+                from datetime import timezone as dt_tz
+                sent_at = parsedate_to_datetime(msg.get('Date', ''))
+                if sent_at.tzinfo is None:
+                    sent_at = sent_at.replace(tzinfo=dt_tz.utc)
+            except Exception:
+                from django.utils import timezone as tz
+                sent_at = tz.now()
+            if msg_id and EmailMessage.objects.filter(account=account, message_id=msg_id).exists():
+                return False
+            from email_assistant.imap_client import _get_body
+            text_body, html_body = _get_body(msg)
+            thread_key = msg.get('In-Reply-To', '').strip() or msg_id or subject
+            thread = EmailThread.objects.filter(account=account, thread_id=thread_key[:500]).first()
+            if not thread:
+                thread = EmailThread.objects.create(
+                    account=account, thread_id=thread_key[:500] if thread_key else '',
+                    subject=subject[:500], participants=[from_email] + to_list,
+                )
+            EmailMessage.objects.create(
+                account=account, thread=thread, folder='inbox',
+                message_id=msg_id, subject=subject,
+                from_email=from_email, from_name=from_name,
+                to_emails=to_list, body_text=text_body, body_html=html_body,
+                is_read=True, sent_at=sent_at,
+            )
+            return True
+        except Exception as e:
+            logger.warning('import_eml failed: %s', e)
+            return False
+
+    uploaded = request.FILES.get('file')
+    if not uploaded:
+        return JsonResponse({'ok': False, 'error': 'Файл не вибрано'})
+
+    created = 0
+    name = uploaded.name.lower()
+    raw = uploaded.read()
+
+    if name.endswith('.zip'):
+        try:
+            with zipfile.ZipFile(io.BytesIO(raw)) as zf:
+                for fname in zf.namelist():
+                    if fname.lower().endswith('.eml'):
+                        if _save_eml(zf.read(fname)):
+                            created += 1
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': f'Помилка zip: {e}'})
+    elif name.endswith('.eml'):
+        if _save_eml(raw):
+            created = 1
+    else:
+        return JsonResponse({'ok': False, 'error': 'Підтримуються файли .eml або .zip'})
+
+    return JsonResponse({'ok': True, 'created': created})
