@@ -2,6 +2,16 @@
 from django.db import migrations, models
 
 
+def empty_to_null(apps, schema_editor):
+    UserProfile = apps.get_model('core', 'UserProfile')
+    UserProfile.objects.filter(allowed_modules=[]).update(allowed_modules=None)
+
+
+def null_to_empty(apps, schema_editor):
+    UserProfile = apps.get_model('core', 'UserProfile')
+    UserProfile.objects.filter(allowed_modules__isnull=True).update(allowed_modules=[])
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -18,17 +28,5 @@ class Migration(migrations.Migration):
                 help_text='None = авто (роль/пакет). [] = заблокувати все крім ядра. [...] = явний список.',
             ),
         ),
-        # Data migration: convert [] → None so existing users use role defaults
-        migrations.RunSQL(
-            sql="""
-                UPDATE core_userprofile
-                SET allowed_modules = NULL
-                WHERE allowed_modules::text = '[]';
-            """,
-            reverse_sql="""
-                UPDATE core_userprofile
-                SET allowed_modules = '[]'
-                WHERE allowed_modules IS NULL;
-            """,
-        ),
+        migrations.RunPython(empty_to_null, reverse_code=null_to_empty),
     ]
