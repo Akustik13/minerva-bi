@@ -49,15 +49,26 @@
 .em-folders-divider-add{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:13px;padding:0 4px;border-radius:3px;line-height:1;transition:color .1s}
 .em-folders-divider-add:hover{color:var(--text);background:var(--bg-hover,#1e2d40)}
 .em-p1.collapsed .em-folders-divider{display:none}
-.em-server-folder{display:flex;align-items:center;gap:6px;padding:6px 12px;font-size:12px;text-decoration:none;color:var(--text-muted);white-space:nowrap;overflow:hidden;cursor:pointer;transition:background .1s,color .1s;border-left:3px solid transparent;background:none;border-top:none;border-right:none;border-bottom:none;width:100%;text-align:left;position:relative}
+/* em-server-folder is now a <div> wrapper — NOT a <button> */
+.em-server-folder{display:flex;align-items:center;border-left:3px solid transparent;position:relative;font-size:12px;color:var(--text-muted);transition:background .1s,color .1s}
 .em-server-folder:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .em-server-folder.active{color:#1a73e8;background:rgba(26,115,232,.1);border-left-color:#1a73e8;font-weight:600}
-.em-sf-sync{font-size:10px;color:var(--text-dim);margin-left:auto;flex-shrink:0}
-.em-sf-gear{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:11px;padding:1px 3px;border-radius:3px;line-height:1;display:none;flex-shrink:0;transition:color .1s}
-.em-server-folder:hover .em-sf-gear{display:inline-flex}
-.em-sf-gear:hover{color:var(--text);background:var(--bg-card)}
-.em-p1.collapsed .em-server-folder span.em-sf-label{display:none}
-.em-p1.collapsed .em-server-folder{padding:8px;justify-content:center}
+/* clickable label part */
+.em-sf-main{display:flex;align-items:center;gap:6px;flex:1;padding:6px 4px 6px 12px;cursor:pointer;min-width:0;overflow:hidden;white-space:nowrap}
+/* gear button — only shown on row hover */
+.em-sf-gear{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:11px;padding:4px 6px;line-height:1;flex-shrink:0;opacity:0;transition:opacity .1s,color .1s}
+.em-server-folder:hover .em-sf-gear{opacity:1}
+.em-sf-gear:hover{color:var(--text);background:var(--bg-card);border-radius:3px}
+.em-p1.collapsed .em-sf-main .em-sf-label{display:none}
+.em-p1.collapsed .em-sf-main{padding:8px;justify-content:center}
+.em-p1.collapsed .em-sf-gear{display:none}
+
+/* ── Panel 2 search ── */
+.em-p2-search-row{padding:5px 10px 4px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
+.em-p2-search-inp{flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:11px;outline:none;min-width:0}
+.em-p2-search-inp:focus{border-color:#1a73e8}
+.em-p2-group-btn{border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);padding:4px 7px;border-radius:6px;font-size:12px;flex-shrink:0;transition:background .1s,color .1s;line-height:1}
+.em-p2-group-btn:hover,.em-p2-group-btn.on{background:rgba(26,115,232,.15);color:#1a73e8;border-color:#1a73e8}
 /* Folder management modal */
 #em-folder-modal{display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.5);align-items:center;justify-content:center}
 #em-folder-modal.open{display:flex}
@@ -171,10 +182,11 @@
   </div>
 
   <!-- ═══ Panel 2: Message list ═══ -->
-  <div class="em-p2">
+  <div class="em-p2" id="em-p2">
     <div class="em-p2-header">
       <span class="em-p2-title">
         {% for fkey,flabel,ficon in folders %}{% if folder == fkey %}{{ ficon }} {{ flabel }}{% endif %}{% endfor %}
+        {% if not folder in "inbox sent starred spam archived trash" %}📁 {{ folder }}{% endif %}
         {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
       </span>
       <span class="em-p2-count" style="display:flex;align-items:center;gap:6px">
@@ -187,6 +199,14 @@
           <option value="subject">Тема A-Z</option>
         </select>
       </span>
+    </div>
+    <!-- Quick local filter + thread grouping -->
+    <div class="em-p2-search-row">
+      <input class="em-p2-search-inp" type="search" id="em-p2-q"
+             placeholder="🔍 Фільтр по відправнику, темі…"
+             oninput="filterP2(this.value)" autocomplete="off">
+      <button class="em-p2-group-btn" id="em-group-btn"
+              onclick="toggleGrouping()" title="Групувати по гілці листування">⎘</button>
     </div>
 
     <div class="em-p2-list" id="em-p2-list">
@@ -314,12 +334,16 @@ const CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 (function(){
   var p2  = document.getElementById('em-p2');
   var btn = document.getElementById('p2-toggle');
+  if (!p2 || !btn) return;
   var collapsed = localStorage.getItem('em-p2-col') === '1';
-  if (collapsed) { p2.classList.add('collapsed'); btn.textContent = '▶'; }
+  function applyP2(c) {
+    p2.classList.toggle('collapsed', c);
+    btn.textContent = c ? '▶' : '◀';
+  }
+  applyP2(collapsed);
   window.toggleP2 = function() {
     collapsed = !collapsed;
-    p2.classList.toggle('collapsed', collapsed);
-    btn.textContent = collapsed ? '▶' : '◀';
+    applyP2(collapsed);
     localStorage.setItem('em-p2-col', collapsed ? '1' : '0');
   };
 })();
@@ -355,15 +379,9 @@ async function previewMsg(pk, tpk, rowEl) {
     cont.innerHTML = '<div style="padding:24px;color:var(--err)">⚠️ Помилка завантаження</div>';
   }
 
-  // Auto-collapse P2 on small screens for more reading space
-  if (window.innerWidth < 1400 && localStorage.getItem('em-p2-col') !== '0') {
-    var p2 = document.getElementById('em-p2');
-    var btn = document.getElementById('p2-toggle');
-    if (!p2.classList.contains('collapsed')) {
-      p2.classList.add('collapsed');
-      btn.textContent = '▶';
-      localStorage.setItem('em-p2-col', '1');
-    }
+  // Auto-collapse P2 on small screens only when no explicit preference saved
+  if (window.innerWidth < 1200 && !localStorage.getItem('em-p2-col')) {
+    window.toggleP2 && window.toggleP2();
   }
 }
 
@@ -453,6 +471,44 @@ window.sortRows = function(key) {
   });
   rows.forEach(function(r) { list.appendChild(r); });
 };
+
+/* ── Panel 2 local filter ── */
+var _p2Filter = '';
+var _p2Grouping = false;
+
+window.filterP2 = function(q) {
+  _p2Filter = (q || '').toLowerCase().trim();
+  _applyP2Visibility();
+};
+
+window.toggleGrouping = function() {
+  _p2Grouping = !_p2Grouping;
+  var btn = document.getElementById('em-group-btn');
+  if (btn) btn.classList.toggle('on', _p2Grouping);
+  _applyP2Visibility();
+};
+
+function _applyP2Visibility() {
+  var rows  = document.querySelectorAll('#em-p2-list .em-row');
+  var seen  = {};
+  rows.forEach(function(row) {
+    // 1. text filter
+    var sender  = (row.dataset.sender  || '').toLowerCase();
+    var subject = (row.dataset.subject || '').toLowerCase();
+    var pass = !_p2Filter || sender.indexOf(_p2Filter) >= 0 || subject.indexOf(_p2Filter) >= 0;
+
+    // 2. thread grouping — hide duplicates, keep first (=newest) per thread
+    if (pass && _p2Grouping) {
+      var tpk = row.dataset.tpk;
+      if (tpk && tpk !== '0') {
+        if (seen[tpk]) { pass = false; }
+        else { seen[tpk] = true; }
+      }
+    }
+
+    row.style.display = pass ? '' : 'none';
+  });
+}
 
 /* ── IMAP server folders + folder management ── */
 (function(){
@@ -564,15 +620,19 @@ window.sortRows = function(key) {
                + '</div>';
       if (extra.length) {
         extra.forEach(function(f){
-          var indent = f.level > 0 ? 'padding-left:' + (12 + f.level * 14) + 'px;' : '';
-          var active = (currentFolder === f.name) ? ' active' : '';
-          var label  = f.name.replace(/.*[\/\.]/, '');
-          html += '<button class="em-server-folder' + active + '" style="' + indent + '" '
-                + 'onclick="openServerFolder(' + JSON.stringify(f.name) + ',this)">'
+          var paddingLeft = 12 + (f.level > 0 ? f.level * 14 : 0);
+          var active  = (currentFolder === f.name) ? ' active' : '';
+          var label   = f.name.replace(/.*[\/\.]/, '');
+          var nameJ   = JSON.stringify(f.name);
+          // Use <div> + inner <div> for click — avoids nested-button issues
+          html += '<div class="em-server-folder' + active + '">'
+                + '<div class="em-sf-main" style="padding-left:' + paddingLeft + 'px" '
+                + 'onclick="openServerFolder(' + nameJ + ',this.parentNode)">'
                 + '<span style="font-size:13px;flex-shrink:0">📁</span>'
-                + '<span class="em-sf-label" style="flex:1;overflow:hidden;text-overflow:ellipsis">' + label + '</span>'
-                + '<span class="em-sf-gear" onclick="event.stopPropagation();showFolderMenu(event,' + JSON.stringify(f.name) + ')" title="Керування">⚙️</span>'
-                + '</button>';
+                + '<span class="em-sf-label">' + label + '</span>'
+                + '</div>'
+                + '<button class="em-sf-gear" onclick="showFolderMenu(event,' + nameJ + ')" title="Керування">⚙️</button>'
+                + '</div>';
         });
       }
       wrap.innerHTML = html;
@@ -606,17 +666,11 @@ window.sortRows = function(key) {
     setTimeout(function(){ document.addEventListener('click', away); }, 0);
   };
 
-  window.openServerFolder = async function(folderName, btn) {
-    document.querySelectorAll('.em-server-folder').forEach(function(b){ b.classList.remove('active'); });
-    if (btn) btn.classList.add('active');
-    var list = document.getElementById('em-p2-list');
-    list.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:13px">⏳ Синхронізую ' + folderName + '...</div>';
-    document.getElementById('em-p3-empty').style.display = '';
-    document.getElementById('em-p3-content').style.display = 'none';
-    document.getElementById('em-p3-content').innerHTML = '';
+  window.openServerFolder = function(folderName, btn) {
+    // fire background sync (don't wait — navigate immediately)
     var fd = new FormData();
     fd.append('imap_folder', folderName);
-    try { await fetch('/email/sync-imap-folder/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd}); } catch(e) {}
+    fetch('/email/sync-imap-folder/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd}).catch(function(){});
     window.location.href = '?folder=' + encodeURIComponent(folderName);
   };
 

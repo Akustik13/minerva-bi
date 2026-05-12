@@ -187,106 +187,135 @@ class EmailAccountAdmin(admin.ModelAdmin):
             return True
 
         def generate(account):
-            yield _ev({'type': 'step', 'msg': '🔄 Перевіряю підключення до IMAP…'})
+            import time as _time
+            _T0 = _time.time()
 
-            try:
-                with IMAPClient(account) as _chk:
-                    pass
-            except Exception as e:
-                yield _ev({'type': 'error',
-                           'msg': f'Помилка автентифікації IMAP: {_imap_err(e)}. '
-                                  'Перевірте логін/пароль та налаштування сервера.'})
-                return
+            def _budget_ok():
+                return _time.time() - _T0 < 820  # 820s, ~80s buffer before 900s gunicorn limit
 
-            _lim = None if account.sync_no_limit else account.sync_limit
-
-            # 1. Sync inbox + sent — open one connection per folder, fetch in 50-msg chunks
-            yield _ev({'type': 'step', 'msg': '📥 Синхронізую Вхідні та Надіслані…'})
-            inbox_new = 0
-            for _fname, _ftype in [
-                (account.imap_folder_inbox, EmailMessage.FOLDER_INBOX),
-                (account.imap_folder_sent,  EmailMessage.FOLDER_SENT),
-            ]:
-                if not _fname:
-                    continue
-                yield _ev({'type': 'inbox_folder_start', 'folder': _fname})
-                try:
-                    with IMAPClient(account) as _imap:
-                        _uids = _imap.search_uids(_fname, days_back=3650, limit=_lim)
-                        _total = len(_uids)
-                        yield _ev({'type': 'inbox_folder_info', 'folder': _fname, 'total': _total})
-                        _created = 0
-                        _scanned = 0
-                        for _m in _imap.fetch_by_uids_iter(_uids, chunk_size=50):
-                            _scanned += 1
-                            try:
-                                if _save_msg(account, _m, _fname, _ftype):
-                                    _created += 1
-                            except Exception:
-                                pass
-                            if _scanned % 50 == 0:
-                                yield _ev({'type': 'inbox_progress', 'folder': _fname,
-                                           'scanned': _scanned, 'created': _created,
-                                           'total': _total})
-                    inbox_new += _created
-                    yield _ev({'type': 'inbox_folder_done', 'folder': _fname,
-                               'created': _created, 'total': _total})
-                except BaseException as _e:
-                    _emsg = ('Таймаут gunicorn — папка велика.' if isinstance(_e, SystemExit)
-                             else _imap_err(_e) or type(_e).__name__)
-                    yield _ev({'type': 'folder_error', 'folder': _fname,
-                               'error': _emsg, 'traceback': ''})
-
-            # 2. List all IMAP folders
-            yield _ev({'type': 'step', 'msg': '📂 Отримую список папок…'})
-            try:
-                with IMAPClient(account) as imap:
-                    imap_folders = imap.list_folders()
-            except Exception as e:
-                yield _ev({'type': 'error', 'msg': f'list_folders: {_imap_err(e)}'})
-                return
-
-            standard = {account.imap_folder_inbox.lower(), account.imap_folder_sent.lower()}
-            extra = [f for f in imap_folders
-                     if f.get('selectable') and f['name'].lower() not in standard]
-            yield _ev({'type': 'folders_found', 'count': len(extra),
-                       'names': [f['name'] for f in extra]})
-
-            # 3. Sync each extra folder in chunks
+            inbox_new  = 0
             total_extra = 0
-            for f in extra:
-                name = f['name']
-                yield _ev({'type': 'folder_start', 'folder': name})
+            try:
+                yield _ev({'type': 'step', 'msg': '🔄 Перевіряю підключення до IMAP…'})
+
+                try:
+                    with IMAPClient(account) as _chk:
+                        pass
+                except Exception as e:
+                    yield _ev({'type': 'error',
+                               'msg': f'Помилка автентифікації IMAP: {_imap_err(e)}. '
+                                      'Перевірте логін/пароль та налаштування сервера.'})
+                    return
+
+                _lim = None if account.sync_no_limit else account.sync_limit
+
+                # 1. Sync inbox + sent — one open connection per folder, 50-msg chunks
+                yield _ev({'type': 'step', 'msg': '📥 Синхронізую Вхідні та Надіслані…'})
+                for _fname, _ftype in [
+                    (account.imap_folder_inbox, EmailMessage.FOLDER_INBOX),
+                    (account.imap_folder_sent,  EmailMessage.FOLDER_SENT),
+                ]:
+                    if not _fname:
+                        continue
+                    if not _budget_ok():
+                        yield _ev({'type': 'folder_error', 'folder': _fname,
+                                   'error': 'Ліміт часу вичерпано — пропущено'})
+                        continue
+                    yield _ev({'type': 'inbox_folder_start', 'folder': _fname})
+                    try:
+                        with IMAPClient(account) as _imap:
+                            _uids = _imap.search_uids(_fname, days_back=3650, limit=_lim)
+                            _total = len(_uids)
+                            yield _ev({'type': 'inbox_folder_info', 'folder': _fname, 'total': _total})
+                            _created = 0
+                            _scanned = 0
+                            for _m in _imap.fetch_by_uids_iter(_uids, chunk_size=50):
+                                if not _budget_ok():
+                                    yield _ev({'type': 'inbox_progress', 'folder': _fname,
+                                               'scanned': _scanned, 'created': _created,
+                                               'total': _total})
+                                    yield _ev({'type': 'folder_error', 'folder': _fname,
+                                               'error': f'Ліміт часу. Синхронізовано {_scanned}/{_total}. Повторіть ще раз.'})
+                                    break
+                                _scanned += 1
+                                try:
+                                    if _save_msg(account, _m, _fname, _ftype):
+                                        _created += 1
+                                except Exception:
+                                    pass
+                                if _scanned % 50 == 0:
+                                    yield _ev({'type': 'inbox_progress', 'folder': _fname,
+                                               'scanned': _scanned, 'created': _created,
+                                               'total': _total})
+                        inbox_new += _created
+                        yield _ev({'type': 'inbox_folder_done', 'folder': _fname,
+                                   'created': _created, 'total': _total})
+                    except BaseException as _e:
+                        _emsg = ('Таймаут gunicorn — папка велика.' if isinstance(_e, SystemExit)
+                                 else _imap_err(_e) or type(_e).__name__)
+                        yield _ev({'type': 'folder_error', 'folder': _fname,
+                                   'error': _emsg, 'traceback': ''})
+
+                # 2. List all IMAP folders
+                yield _ev({'type': 'step', 'msg': '📂 Отримую список папок…'})
                 try:
                     with IMAPClient(account) as imap:
-                        _uids = imap.search_uids(name, days_back=account.sync_days_back,
-                                                 limit=_lim)
-                        total_f = len(_uids)
-                        yield _ev({'type': 'folder_info', 'folder': name, 'total': total_f})
-                        created = 0
-                        scanned = 0
-                        for msg_data in imap.fetch_by_uids_iter(_uids, chunk_size=50):
-                            scanned += 1
-                            try:
-                                if _save_msg(account, msg_data, name, EmailMessage.FOLDER_INBOX):
-                                    created += 1
-                            except Exception:
-                                pass
-                            if scanned % 50 == 0:
-                                yield _ev({'type': 'folder_progress', 'folder': name,
-                                           'scanned': scanned, 'created': created,
-                                           'total': total_f})
-                    total_extra += created
-                    yield _ev({'type': 'folder_done', 'folder': name,
-                               'created': created, 'total': total_f})
-                except BaseException as e:
-                    import traceback as _tb
-                    tb = _tb.format_exc()
-                    logger.error('sync-all folder %s failed:\n%s', name, tb)
-                    err = ('Таймаут gunicorn — папка велика, sync перервано.' if isinstance(e, SystemExit)
-                           else _imap_err(e) or type(e).__name__)
-                    yield _ev({'type': 'folder_error', 'folder': name,
-                               'error': err, 'traceback': tb[-400:]})
+                        imap_folders = imap.list_folders()
+                except Exception as e:
+                    yield _ev({'type': 'error', 'msg': f'list_folders: {_imap_err(e)}'})
+                    return
+
+                standard = {account.imap_folder_inbox.lower(), account.imap_folder_sent.lower()}
+                extra = [f for f in imap_folders
+                         if f.get('selectable') and f['name'].lower() not in standard]
+                yield _ev({'type': 'folders_found', 'count': len(extra),
+                           'names': [f['name'] for f in extra]})
+
+                # 3. Sync each extra folder in chunks
+                for f in extra:
+                    name = f['name']
+                    if not _budget_ok():
+                        yield _ev({'type': 'folder_error', 'folder': name,
+                                   'error': 'Ліміт часу вичерпано — пропущено'})
+                        continue
+                    yield _ev({'type': 'folder_start', 'folder': name})
+                    try:
+                        with IMAPClient(account) as imap:
+                            _uids = imap.search_uids(name, days_back=account.sync_days_back,
+                                                     limit=_lim)
+                            total_f = len(_uids)
+                            yield _ev({'type': 'folder_info', 'folder': name, 'total': total_f})
+                            created = 0
+                            scanned = 0
+                            for msg_data in imap.fetch_by_uids_iter(_uids, chunk_size=50):
+                                if not _budget_ok():
+                                    yield _ev({'type': 'folder_error', 'folder': name,
+                                               'error': f'Ліміт часу. Синхронізовано {scanned}/{total_f}.'})
+                                    break
+                                scanned += 1
+                                try:
+                                    if _save_msg(account, msg_data, name, EmailMessage.FOLDER_INBOX):
+                                        created += 1
+                                except Exception:
+                                    pass
+                                if scanned % 50 == 0:
+                                    yield _ev({'type': 'folder_progress', 'folder': name,
+                                               'scanned': scanned, 'created': created,
+                                               'total': total_f})
+                        total_extra += created
+                        yield _ev({'type': 'folder_done', 'folder': name,
+                                   'created': created, 'total': total_f})
+                    except BaseException as e:
+                        import traceback as _tb
+                        tb = _tb.format_exc()
+                        logger.error('sync-all folder %s failed:\n%s', name, tb)
+                        err = ('Ліміт gunicorn.' if isinstance(e, SystemExit)
+                               else _imap_err(e) or type(e).__name__)
+                        yield _ev({'type': 'folder_error', 'folder': name,
+                                   'error': err, 'traceback': tb[-400:]})
+
+            except BaseException as _top_e:
+                logger.error('generate() top-level crash: %s', _top_e)
 
             yield _ev({'type': 'done', 'inbox_new': inbox_new, 'extra_new': total_extra})
 
