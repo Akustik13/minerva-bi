@@ -35,4 +35,9 @@ urlpatterns = [
     path('sync-all-folders/',                            views.sync_all_folders_view,   name='sync_all_folders'),
     # Scheduled send
     path('schedule/',                                    views.schedule_email_api,      name='schedule_email'),
+    # AI compose
+    path('ai-generate/',                                 views.ai_generate_email,       name='ai_generate'),
+    path('ai-grammar/',                                  views.ai_grammar_check,        name='ai_grammar'),
+    # CRM contacts for autocomplete
+    path('crm-contacts/',                                views.crm_contacts_view,       name='crm_contacts'),
 ]

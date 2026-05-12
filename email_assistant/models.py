@@ -282,3 +282,22 @@ class ScheduledEmail(models.Model):
     def __str__(self):
         recipients = ', '.join(self.to_emails[:2])
         return f'{self.subject[:50]} → {recipients} ({self.scheduled_at:%d.%m.Y %H:%M})'
+
+
+class EmailContact(models.Model):
+    """Address book: auto-populated from sent/scheduled messages."""
+    user       = models.ForeignKey(User, on_delete=models.CASCADE,
+                                   related_name='email_contacts')
+    email      = models.EmailField()
+    name       = models.CharField(max_length=200, blank=True)
+    use_count  = models.PositiveIntegerField(default=1)
+    last_used_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together     = [('user', 'email')]
+        ordering            = ['-use_count', '-last_used_at']
+        verbose_name        = 'Контакт адресної книги'
+        verbose_name_plural = 'Адресна книга'
+
+    def __str__(self):
+        return f'{self.name} <{self.email}>' if self.name else self.email

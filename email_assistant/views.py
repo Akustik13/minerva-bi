@@ -39,15 +39,52 @@ def _get_signature(account) -> str:
         return ''
 
 
-def _crm_contacts() -> list:
+def _crm_contacts(user=None) -> list:
+    """Merge CRM customers + user's EmailContact address book."""
+    contacts = {}
     try:
         from crm.models import Customer
-        return [
-            {'email': c['email'], 'name': c['name']}
-            for c in Customer.objects.exclude(email='').values('email', 'name')[:300]
-        ]
+        for c in Customer.objects.exclude(email='').values('email', 'name')[:300]:
+            contacts[c['email'].lower()] = {
+                'email': c['email'], 'name': c['name'] or c['email']}
     except Exception:
-        return []
+        pass
+    if user and user.is_authenticated:
+        try:
+            from email_assistant.models import EmailContact
+            for ec in EmailContact.objects.filter(user=user).values('email', 'name')[:300]:
+                key = ec['email'].lower()
+                if key not in contacts:
+                    contacts[key] = {'email': ec['email'], 'name': ec['name'] or ec['email']}
+        except Exception:
+            pass
+    return list(contacts.values())
+
+
+def _save_contacts(user, recipients: list):
+    """Upsert EmailContact for every successfully used recipient address."""
+    from email_assistant.models import EmailContact
+    for raw in recipients:
+        raw = (raw or '').strip()
+        if not raw or '@' not in raw:
+            continue
+        name, email = '', raw
+        if '<' in raw and '>' in raw:
+            name  = raw.split('<')[0].strip().strip('"\'')
+            email = raw.split('<')[1].rstrip('>')
+        email = email.lower().strip()
+        if not email:
+            continue
+        try:
+            obj, created = EmailContact.objects.get_or_create(
+                user=user, email=email, defaults={'name': name})
+            if not created:
+                if name and not obj.name:
+                    obj.name = name
+                obj.use_count += 1
+                obj.save(update_fields=['use_count', 'name', 'last_used_at'])
+        except Exception:
+            pass
 
 
 _STANDARD_FOLDERS = {'inbox', 'sent', 'starred', 'spam', 'archived', 'trash'}
@@ -173,7 +210,7 @@ def inbox_view(request):
         'total_pages':           max(1, (total + per_page - 1) // per_page),
         'page_range':            _page_range(page, max(1, (total + per_page - 1) // per_page)),
         'unread_count':          unread_count,
-        'crm_contacts':          json.dumps(_crm_contacts()),
+        'crm_contacts':          json.dumps(_crm_contacts(request.user)),
         'sync_interval_minutes': max(1, account.sync_interval_minutes),
     }))
 
@@ -346,7 +383,7 @@ def compose_view(request):
         'reply_to':     reply_to,
         'initial':      initial,
         'signature':    sig,
-        'crm_contacts': json.dumps(_crm_contacts()),
+        'crm_contacts': json.dumps(_crm_contacts(request.user)),
     }))
 
 
@@ -389,6 +426,7 @@ def _handle_send(request, account, reply_to=None):
             )
         except Exception as e:
             logger.warning('store sent message: %s', e)
+        _save_contacts(request.user, to_list + cc_list)
 
     return JsonResponse(result)
 
@@ -732,6 +770,48 @@ def unarchive_thread_view(request, thread_pk):
 
 @staff_member_required
 @require_POST
+def ai_grammar_check(request):
+    """Check and fix grammar in email body."""
+    import json as _json
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+    text    = data.get('text', '').strip()
+    profile = getattr(request.user, 'profile', None)
+    from email_assistant.ai_helper import check_grammar
+    return JsonResponse(check_grammar(text, profile))
+
+
+@staff_member_required
+def crm_contacts_view(request):
+    """Return merged CRM + address-book contacts as JSON."""
+    return JsonResponse({'contacts': _crm_contacts(request.user)})
+
+
+@staff_member_required
+@require_POST
+def ai_generate_email(request):
+    """Generate email subject + body from a natural-language prompt."""
+    import json as _json
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+
+    prompt = data.get('prompt', '').strip()
+    if not prompt:
+        return JsonResponse({'ok': False, 'error': 'Введіть опис листа'})
+
+    account = _get_account(request)
+    profile = getattr(request.user, 'profile', None)
+
+    from email_assistant.ai_helper import generate_from_prompt
+    return JsonResponse(generate_from_prompt(prompt, account, profile))
+
+
+@staff_member_required
+@require_POST
 def schedule_email_api(request):
     """Schedule an email for future delivery."""
     import json as _json
@@ -776,6 +856,7 @@ def schedule_email_api(request):
         body=body, body_html=body_html,
         scheduled_at=dt, trigger='manual',
     )
+    _save_contacts(request.user, to_list + cc_list)
 
     return JsonResponse({
         'ok':          True,

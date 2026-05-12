@@ -14,19 +14,81 @@
 .em-toolbar { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:6px; padding-bottom:6px; border-bottom:1px solid var(--border); }
 .em-tb-btn { border:none; background:none; cursor:pointer; color:var(--text-muted); padding:3px 8px; border-radius:4px; font-size:13px; font-weight:500; transition:background .1s; line-height:1.4; }
 .em-tb-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
+.em-tb-btn.active { background:var(--accent-subtle); color:var(--accent); }
 .em-tb-sep { width:1px; background:var(--border-strong); margin:2px 4px; align-self:stretch; }
-.em-body-editor { min-height:380px; overflow-y:auto; padding:10px 0; outline:none; font-size:14px; line-height:1.7; color:var(--text); word-break:break-word; }
+.em-body-editor { min-height:340px; overflow-y:auto; padding:10px 0; outline:none; font-size:14px; line-height:1.7; color:var(--text); word-break:break-word; }
 .em-body-editor[placeholder]:empty::before { content:attr(placeholder); color:var(--text-dim); pointer-events:none; }
 .em-sig-div { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border-strong); font-size:13px; }
 .em-footer { padding:12px 18px; border-top:1px solid var(--border); display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--bg-input); }
 .em-send-btn { padding:9px 24px; border-radius:7px; font-size:13px; font-weight:700; background:linear-gradient(135deg,#1565c0,#1a73e8); color:#fff; border:none; cursor:pointer; transition:opacity .15s; }
 .em-send-btn:hover { opacity:.88; }
+.em-send-btn.scheduled { background:linear-gradient(135deg,#1b5e20,#2e7d32); }
 .em-sec-btn { padding:8px 16px; border-radius:7px; font-size:13px; border:1px solid var(--border-strong); background:none; cursor:pointer; color:var(--text-muted); transition:background .1s; }
 .em-sec-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); }
+.em-sec-btn.active { border-color:var(--accent); color:var(--accent); }
 .em-att-btn { padding:7px 14px; border-radius:7px; font-size:13px; border:1px solid var(--border-strong); background:none; cursor:pointer; color:var(--text-muted); transition:background .1s; display:inline-flex; align-items:center; gap:6px; }
 .em-att-btn:hover { background:var(--bg-hover,#1e2d40); color:var(--text); border-color:#1a73e8; }
 .em-att-list { font-size:12px; color:var(--text-muted); margin-top:6px; display:flex; flex-wrap:wrap; gap:6px; }
 .em-att-chip { padding:3px 10px; border-radius:12px; background:var(--bg-input); border:1px solid var(--border-strong); display:inline-flex; align-items:center; gap:4px; }
+/* AI panel */
+#ai-panel {
+  padding:12px 18px;
+  background:var(--bg-input);
+  border-bottom:1px solid var(--border);
+}
+#ai-panel .ai-panel-head { font-size:12px; font-weight:700; color:var(--accent); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+#ai-panel textarea {
+  width:100%; box-sizing:border-box;
+  padding:8px 12px; border-radius:7px;
+  border:1px solid var(--border-strong);
+  background:var(--bg-card); color:var(--text);
+  font-size:13px; resize:vertical; min-height:56px;
+  outline:none; font-family:inherit;
+}
+#ai-panel textarea:focus { border-color:var(--accent); }
+#ai-panel .ai-panel-row { display:flex; gap:8px; align-items:flex-start; }
+.ai-gen-btn { padding:8px 18px; border-radius:7px; font-size:13px; font-weight:600;
+  background:var(--accent); color:#fff; border:none; cursor:pointer; white-space:nowrap; transition:opacity .15s; }
+.ai-gen-btn:hover { opacity:.85; }
+.ai-gen-btn:disabled { opacity:.5; cursor:not-allowed; }
+/* Schedule row */
+#schedule-row {
+  width:100%;
+  display:flex; align-items:center; gap:10px;
+  padding-top:8px;
+  border-top:1px solid var(--border);
+}
+#schedule-dt {
+  padding:6px 10px; border-radius:6px;
+  border:1px solid var(--accent);
+  background:var(--bg-card); color:var(--text);
+  font-size:13px; outline:none;
+  color-scheme:dark;
+}
+/* Grammar panel */
+#grammar-panel {
+  position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+  width:min(660px,92vw); max-height:50vh;
+  background:var(--bg-card); border:1px solid var(--accent);
+  border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.55);
+  display:flex; flex-direction:column; z-index:9500;
+  overflow:hidden;
+}
+#grammar-panel-head {
+  padding:10px 16px; background:var(--accent-subtle);
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:13px; font-weight:700; color:var(--accent);
+}
+#grammar-result {
+  flex:1; overflow-y:auto; padding:14px 16px;
+  font-size:13px; line-height:1.7; color:var(--text);
+  white-space:pre-wrap; word-break:break-word;
+}
+#grammar-actions {
+  padding:10px 16px; border-top:1px solid var(--border);
+  display:flex; gap:10px; background:var(--bg-input);
+}
+/* Autocomplete */
 #suggestions { display:none; position:fixed; background:var(--bg-card); border:1px solid var(--border-strong); border-radius:8px; max-height:220px; overflow-y:auto; z-index:9000; min-width:280px; box-shadow:0 8px 24px rgba(0,0,0,.3); }
 .sugg-item { padding:9px 14px; cursor:pointer; font-size:13px; border-bottom:1px solid var(--border); }
 .sugg-item:hover { background:var(--bg-hover,#1e2d40); }
@@ -53,12 +115,26 @@
       </div>
       <div class="em-field">
         <span class="em-field-label">CC</span>
-        <input type="text" name="cc" placeholder="Копія...">
+        <input type="text" name="cc" id="cc-field" placeholder="Копія..." autocomplete="off">
       </div>
       <div class="em-field">
         <span class="em-field-label">Тема</span>
-        <input type="text" name="subject" value="{{ initial.subject|default:'' }}"
+        <input type="text" name="subject" id="subject-field"
+               value="{{ initial.subject|default:'' }}"
                placeholder="Тема листа" style="font-weight:500">
+      </div>
+
+      <!-- ══ AI generation panel ══ -->
+      <div id="ai-panel" style="display:none">
+        <div class="ai-panel-head">✨ AI генерація листа</div>
+        <div class="ai-panel-row">
+          <textarea id="ai-prompt-input"
+            placeholder="Опишіть лист: кому, з якого приводу, яким тоном, що треба вказати..."></textarea>
+          <button type="button" class="ai-gen-btn" id="ai-gen-btn" onclick="aiGenerate()">
+            ✨ Генерувати
+          </button>
+        </div>
+        <div id="ai-gen-status" style="font-size:12px;margin-top:5px;min-height:16px"></div>
       </div>
 
       <!-- Body with formatting toolbar -->
@@ -89,14 +165,17 @@
           <button type="button" class="em-tb-btn" onmousedown="return fmt('insertOrderedList')">1.</button>
           <span class="em-tb-sep"></span>
           <button type="button" class="em-tb-btn" onmousedown="return fmt('removeFormat')">✕ Очистити</button>
+          <span class="em-tb-sep"></span>
+          <button type="button" class="em-tb-btn" id="ai-toggle-btn"
+                  onclick="toggleAiPanel()" title="AI генерація">✨ AI</button>
+          <button type="button" class="em-tb-btn" id="grammar-btn"
+                  onclick="checkGrammar()" title="Перевірити граматику">✓ Граматика</button>
         </div>
 
-        <!-- Body editor — signature injected at correct position (after_reply = before quote, end = after quote) -->
         <div id="body-editor" class="em-body-editor" contenteditable="true"
              placeholder="Текст листа...">{% if signature and account.signature_position == 'after_reply' and initial.quote %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div><br><br><pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% elif initial.quote %}<br><br><pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% if signature %}<br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% else %}{% if signature %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% endif %}</div>
       </div>
 
-      <!-- Hidden fields synced before send -->
       <textarea name="body"      id="body-hidden"      style="display:none"></textarea>
       <textarea name="body_html" id="body-html-hidden" style="display:none"></textarea>
 
@@ -110,37 +189,65 @@
         <div id="files-list" class="em-att-list"></div>
       </div>
 
+      <!-- Footer -->
       <div class="em-footer">
-        <button type="button" class="em-send-btn" onclick="sendEmail()">Відправити →</button>
+        <button type="button" class="em-send-btn" id="send-btn" onclick="sendOrSchedule()">
+          Відправити →
+        </button>
+        <button type="button" class="em-sec-btn" id="schedule-toggle-btn"
+                onclick="toggleSchedule()" title="Відправити пізніше">
+          ⏰ Пізніше
+        </button>
         <button type="button" class="em-sec-btn" onclick="saveDraft()">💾 Зберегти</button>
-        <div id="send-status" style="font-size:12px;color:var(--text-muted);width:100%"></div>
+        <div id="send-status" style="font-size:12px;color:var(--text-muted);flex:1"></div>
+
+        <!-- Schedule row -->
+        <div id="schedule-row" style="display:none">
+          <input type="datetime-local" id="schedule-dt">
+          <span style="font-size:12px;color:var(--text-muted)">Відправити о цей час</span>
+        </div>
       </div>
     </form>
   </div>
 </div>
 
+<div id="grammar-panel" style="display:none">
+  <div id="grammar-panel-head">
+    <span>✓ Перевірка граматики — виправлена версія</span>
+    <button type="button" onclick="dismissGrammar()"
+            style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:16px">✕</button>
+  </div>
+  <div id="grammar-result"></div>
+  <div id="grammar-actions">
+    <button type="button" class="em-send-btn" onclick="applyGrammar()"
+            style="padding:7px 18px;font-size:12px">✓ Замінити текст</button>
+    <button type="button" class="em-sec-btn" onclick="dismissGrammar()"
+            style="padding:7px 14px;font-size:12px">Відхилити</button>
+    <span id="grammar-msg" style="font-size:12px;color:var(--text-muted);align-self:center"></span>
+  </div>
+</div>
 <div id="suggestions"></div>
 
 <script>
 const CSRF     = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 const CONTACTS = {{ crm_contacts|safe }};
 const toField  = document.getElementById('to-field');
+const ccField  = document.getElementById('cc-field');
 const suggBox  = document.getElementById('suggestions');
+var _suggTarget = null;
 
-// Move cursor to start of body editor on load (before quote)
+// Move cursor to start of body editor on load
 document.addEventListener('DOMContentLoaded', function(){
   var ed = document.getElementById('body-editor');
   if (ed) {
     ed.focus();
-    var sel = window.getSelection();
-    var range = document.createRange();
-    range.setStart(ed, 0);
-    range.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(range);
+    var sel = window.getSelection(), range = document.createRange();
+    range.setStart(ed, 0); range.collapse(true);
+    sel.removeAllRanges(); sel.addRange(range);
   }
 });
 
+/* ── Formatting ── */
 function fmt(cmd) {
   document.execCommand(cmd, false, null);
   document.getElementById('body-editor').focus();
@@ -151,59 +258,155 @@ function fmtVal(cmd, val) {
   document.getElementById('body-editor').focus();
 }
 
-toField.addEventListener('input', function() {
-  var q = toField.value.split(',').pop().trim().toLowerCase();
-  if (q.length < 2) { suggBox.style.display = 'none'; return; }
-  var hits = CONTACTS.filter(function(c){
-    return c.email.toLowerCase().includes(q) || c.name.toLowerCase().includes(q);
-  }).slice(0, 8);
-  if (!hits.length) { suggBox.style.display = 'none'; return; }
-  suggBox.innerHTML = hits.map(function(c){
-    return '<div class="sugg-item" onclick="selectContact(\'' + c.email.replace(/'/g,"\\'") + '\')">' +
-           '<strong>' + c.name + '</strong> <span>' + c.email + '</span></div>';
-  }).join('');
-  var rect = toField.getBoundingClientRect();
-  suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
-  suggBox.style.left = rect.left + 'px';
-  suggBox.style.width = Math.max(280, rect.width) + 'px';
-  suggBox.style.display = 'block';
-});
+/* ── CRM / Address-book autocomplete ── */
+function _setupAutocomplete(field) {
+  field.addEventListener('input', function() {
+    var q = field.value.split(',').pop().trim().toLowerCase();
+    if (q.length < 1) { suggBox.style.display = 'none'; return; }
+    var hits = CONTACTS.filter(function(c){
+      return c.email.toLowerCase().includes(q) || (c.name||'').toLowerCase().includes(q);
+    }).slice(0, 10);
+    if (!hits.length) { suggBox.style.display = 'none'; return; }
+    _suggTarget = field;
+    suggBox.innerHTML = hits.map(function(c){
+      return '<div class="sugg-item" onclick="selectContact(\'' +
+        c.email.replace(/'/g,"\\'") + '\',\'' +
+        (c.name||'').replace(/'/g,"\\'") + '\')">' +
+        '<strong>' + _esc(c.name || c.email) + '</strong>' +
+        (c.name ? ' <span>' + _esc(c.email) + '</span>' : '') +
+        '</div>';
+    }).join('');
+    var rect = field.getBoundingClientRect();
+    suggBox.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
+    suggBox.style.left = rect.left + 'px';
+    suggBox.style.width = Math.max(280, rect.width) + 'px';
+    suggBox.style.display = 'block';
+  });
+}
+_setupAutocomplete(toField);
+_setupAutocomplete(ccField);
 
-function selectContact(email) {
-  var parts = toField.value.split(',');
+function selectContact(email, name) {
+  if (!_suggTarget) return;
+  var parts = _suggTarget.value.split(',');
   parts[parts.length - 1] = email;
-  toField.value = parts.join(', ') + ', ';
-  suggBox.style.display = 'none'; toField.focus();
+  _suggTarget.value = parts.join(', ') + ', ';
+  suggBox.style.display = 'none'; _suggTarget.focus();
 }
 document.addEventListener('click', function(e){
-  if (!suggBox.contains(e.target) && e.target !== toField) suggBox.style.display = 'none';
+  if (!suggBox.contains(e.target) && e.target !== toField && e.target !== ccField)
+    suggBox.style.display = 'none';
 });
+function _esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
+/* ── Attachments ── */
 function showFiles(input) {
   var list = document.getElementById('files-list');
   list.innerHTML = Array.from(input.files).map(function(f){
-    return '<span class="em-att-chip">📎 ' + f.name + ' <span style="color:var(--text-dim)">(' + (f.size/1024).toFixed(0) + ' KB)</span></span>';
+    return '<span class="em-att-chip">📎 ' + f.name +
+           ' <span style="color:var(--text-dim)">(' + (f.size/1024).toFixed(0) + ' KB)</span></span>';
   }).join('');
 }
 
-async function sendEmail() {
+/* ── Schedule toggle ── */
+var _scheduleOn = false;
+function toggleSchedule() {
+  _scheduleOn = !_scheduleOn;
+  var row = document.getElementById('schedule-row');
+  var btn = document.getElementById('schedule-toggle-btn');
+  var sendBtn = document.getElementById('send-btn');
+  row.style.display = _scheduleOn ? 'flex' : 'none';
+  btn.classList.toggle('active', _scheduleOn);
+  sendBtn.textContent = _scheduleOn ? '⏰ Запланувати' : 'Відправити →';
+  sendBtn.classList.toggle('scheduled', _scheduleOn);
+  if (_scheduleOn) {
+    // Set default: +1 hour rounded to next 15 min
+    var d = new Date(Date.now() + 3600000);
+    d.setMinutes(Math.ceil(d.getMinutes()/15)*15, 0, 0);
+    document.getElementById('schedule-dt').value =
+      d.getFullYear()+'-'+_pad(d.getMonth()+1)+'-'+_pad(d.getDate())+'T'+
+      _pad(d.getHours())+':'+_pad(d.getMinutes());
+  }
+}
+function _pad(n){ return n < 10 ? '0'+n : n; }
+
+/* ── AI panel toggle ── */
+var _aiPanelOpen = false;
+function toggleAiPanel() {
+  _aiPanelOpen = !_aiPanelOpen;
+  document.getElementById('ai-panel').style.display = _aiPanelOpen ? 'block' : 'none';
+  document.getElementById('ai-toggle-btn').classList.toggle('active', _aiPanelOpen);
+  if (_aiPanelOpen) document.getElementById('ai-prompt-input').focus();
+}
+
+/* ── AI generate ── */
+async function aiGenerate() {
+  var prompt = document.getElementById('ai-prompt-input').value.trim();
+  if (!prompt) {
+    document.getElementById('ai-gen-status').textContent = 'Введіть опис листа';
+    document.getElementById('ai-gen-status').style.color = 'var(--err,#e53935)';
+    return;
+  }
+  var btn = document.getElementById('ai-gen-btn');
+  var status = document.getElementById('ai-gen-status');
+  btn.disabled = true; btn.textContent = '⏳ Генерую...';
+  status.textContent = 'Minerva AI генерує...'; status.style.color = 'var(--text-muted)';
+  try {
+    var r = await fetch('/email/ai-generate/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({prompt: prompt}),
+    });
+    var d = await r.json();
+    if (d.ok) {
+      // Fill subject if empty
+      var subjField = document.getElementById('subject-field');
+      if (d.subject && !subjField.value) subjField.value = d.subject;
+      // Fill body editor (replace content)
+      var editor = document.getElementById('body-editor');
+      editor.focus();
+      document.execCommand('selectAll', false, null);
+      document.execCommand('insertText', false, d.body || '');
+      status.textContent = '✓ Готово! Відредагуйте за потребою.';
+      status.style.color = 'var(--ok,#2e7d32)';
+    } else {
+      status.textContent = '✗ ' + (d.error || 'Помилка AI');
+      status.style.color = 'var(--err,#e53935)';
+    }
+  } catch {
+    status.textContent = '✗ Помилка мережі';
+    status.style.color = 'var(--err,#e53935)';
+  }
+  btn.disabled = false; btn.textContent = '✨ Генерувати';
+}
+
+/* ── Send / Schedule ── */
+function _getBodyPayload() {
   var editor = document.getElementById('body-editor');
-  var btn    = document.querySelector('.em-send-btn');
-
-  // HTML body: sig already injected at correct position inside editor
   var htmlBody = editor.innerHTML;
-
-  // Plain text: temporarily hide sig div so innerText excludes it (backend adds sig to plain text)
   var sigEl = editor.querySelector('.em-sig-in');
   if (sigEl) sigEl.style.display = 'none';
   var textBody = editor.innerText || editor.textContent;
   if (sigEl) sigEl.style.display = '';
-
   document.getElementById('body-hidden').value      = textBody;
   document.getElementById('body-html-hidden').value = htmlBody;
+  return {text: textBody, html: htmlBody};
+}
 
+async function sendOrSchedule() {
+  var dtVal = _scheduleOn ? document.getElementById('schedule-dt').value : '';
+  if (dtVal) {
+    await scheduleEmail(dtVal);
+  } else {
+    await sendNow();
+  }
+}
+
+async function sendNow() {
+  _getBodyPayload();
+  var btn    = document.getElementById('send-btn');
   var status = document.getElementById('send-status');
-  if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
+  btn.disabled = true; btn.style.opacity = '.5';
   status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
   var data = new FormData(document.getElementById('compose-form'));
   try {
@@ -212,13 +415,107 @@ async function sendEmail() {
     status.textContent = d.ok ? '✓ Відправлено!' : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
     if (d.ok) setTimeout(function(){ window.location = '/email/'; }, 1000);
-    else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    else { btn.disabled = false; btn.style.opacity = '1'; }
   } catch {
     status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';
-    if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+    btn.disabled = false; btn.style.opacity = '1';
   }
 }
 
-function saveDraft() { alert('Чернетки — наступний крок.'); }
+async function scheduleEmail(dtVal) {
+  var body = _getBodyPayload();
+  var status = document.getElementById('send-status');
+  var btn    = document.getElementById('send-btn');
+  btn.disabled = true; btn.style.opacity = '.5';
+  status.textContent = 'Планую відправку...'; status.style.color = 'var(--text-muted)';
+  try {
+    var r = await fetch('/email/schedule/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        to:           document.getElementById('to-field').value,
+        cc:           document.getElementById('cc-field').value,
+        subject:      document.getElementById('subject-field').value,
+        body:         body.text,
+        body_html:    body.html,
+        scheduled_at: dtVal,
+      }),
+    });
+    var d = await r.json();
+    if (d.ok) {
+      status.textContent = '✓ Заплановано на ' + d.scheduled_at;
+      status.style.color = 'var(--ok,#2e7d32)';
+      setTimeout(function(){ window.location = '/email/'; }, 1500);
+    } else {
+      status.textContent = '✗ ' + (d.error || 'Помилка');
+      status.style.color = 'var(--err,#e53935)';
+      btn.disabled = false; btn.style.opacity = '1';
+    }
+  } catch {
+    status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';
+    btn.disabled = false; btn.style.opacity = '1';
+  }
+}
+
+/* ── Grammar check ── */
+var _grammarCorrected = '';
+async function checkGrammar() {
+  var editor = document.getElementById('body-editor');
+  var text = editor.innerText || editor.textContent;
+  if (!text.trim()) {
+    alert('Введіть текст листа перед перевіркою граматики.');
+    return;
+  }
+  var btn = document.getElementById('grammar-btn');
+  btn.disabled = true; btn.textContent = '⏳ Перевіряю...';
+  try {
+    var r = await fetch('/email/ai-grammar/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({text: text}),
+    });
+    var d = await r.json();
+    if (d.ok) {
+      _grammarCorrected = d.corrected;
+      document.getElementById('grammar-result').textContent = d.corrected;
+      document.getElementById('grammar-msg').textContent =
+        d.changed ? 'Знайдено виправлення' : 'Помилок не знайдено';
+      document.getElementById('grammar-panel').style.display = 'flex';
+    } else {
+      alert('✗ ' + (d.error || 'Помилка перевірки'));
+    }
+  } catch {
+    alert('✗ Помилка мережі');
+  }
+  btn.disabled = false; btn.textContent = '✓ Граматика';
+}
+function applyGrammar() {
+  if (!_grammarCorrected) return;
+  var editor = document.getElementById('body-editor');
+  editor.focus();
+  document.execCommand('selectAll', false, null);
+  document.execCommand('insertText', false, _grammarCorrected);
+  dismissGrammar();
+}
+function dismissGrammar() {
+  document.getElementById('grammar-panel').style.display = 'none';
+  _grammarCorrected = '';
+}
+
+function saveDraft() {
+  var body = _getBodyPayload();
+  var status = document.getElementById('send-status');
+  status.textContent = 'Зберігаю чернетку...'; status.style.color = 'var(--text-muted)';
+  fetch('/email/send/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': CSRF},
+    body: new FormData(document.getElementById('compose-form')),
+  }).then(function(r){ return r.json(); }).then(function(d){
+    status.textContent = d.ok ? '💾 Збережено' : ('✗ ' + d.error);
+    status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
+  }).catch(function(){
+    status.textContent = '✗ Помилка'; status.style.color = 'var(--err,#e53935)';
+  });
+}
 </script>
 {% endblock %}

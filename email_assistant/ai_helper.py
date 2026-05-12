@@ -73,6 +73,71 @@ def summarize_thread(messages: list, user_profile=None) -> str:
         return ''
 
 
+def check_grammar(body_text: str, user_profile=None) -> dict:
+    """
+    Check and fix grammar/spelling in email body.
+    Returns {"ok": True, "corrected": "...", "changed": bool}
+    """
+    from ai_assistant.service import chat
+
+    if not body_text or not body_text.strip():
+        return {'ok': False, 'error': 'Текст порожній'}
+
+    prompt = (
+        'Перевір граматику, орфографію та пунктуацію цього тексту.\n'
+        'Виправ всі помилки. Збережи стиль, тон та форматування.\n'
+        'Поверни ТІЛЬКИ виправлений текст, без коментарів і пояснень.\n'
+        'Якщо тексту не потрібні виправлення — поверни його без змін.\n\n'
+        f'{body_text[:4000]}'
+    )
+
+    try:
+        corrected = chat(prompt, profile=user_profile, channel='system_briefing') or ''
+        corrected = corrected.strip()
+        return {
+            'ok':       True,
+            'corrected': corrected,
+            'changed':  corrected != body_text.strip(),
+        }
+    except Exception as e:
+        logger.error('AI check_grammar error: %s', e)
+    return {'ok': False, 'error': 'AI не зміг перевірити граматику'}
+
+
+def generate_from_prompt(prompt: str, account=None, user_profile=None) -> dict:
+    """
+    Generate email subject + body from a natural-language description.
+    Returns {"ok": True, "subject": "...", "body": "..."} or {"ok": False, "error": "..."}
+    """
+    import json
+    from ai_assistant.service import chat
+
+    header = f'Ти пишеш від імені {account.from_header}.\n' if account else ''
+    full_prompt = (
+        f'{header}'
+        f'Склади email за цим описом.\n'
+        f'Поверни ТІЛЬКИ JSON (без markdown, без пояснень):\n'
+        f'{{"subject": "тема листа", "body": "текст листа"}}\n\n'
+        f'Опис: {prompt[:1000]}'
+    )
+
+    try:
+        raw = chat(full_prompt, profile=user_profile, channel='system_briefing') or ''
+        raw = raw.strip()
+        if raw.startswith('```'):
+            raw = raw.split('```', 2)[1]
+            if raw.startswith('json'):
+                raw = raw[4:]
+        result = json.loads(raw)
+        if isinstance(result, dict) and 'body' in result:
+            return {'ok': True,
+                    'subject': result.get('subject', ''),
+                    'body':    result.get('body', '')}
+    except Exception as e:
+        logger.error('AI generate_from_prompt error: %s', e)
+    return {'ok': False, 'error': 'AI не зміг згенерувати лист'}
+
+
 def extract_deadlines(body_text: str, user_profile=None) -> list:
     """
     Extract dates/deadlines from email body.
