@@ -2,7 +2,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 
 @staff_member_required
@@ -105,3 +105,66 @@ def event_done(request, pk):
     event.is_done = True
     event.save(update_fields=['is_done'])
     return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_GET
+def pending_push_view(request):
+    """Return events whose push reminder is due; mark them push_sent=True."""
+    from datetime import timedelta
+    from calendar_app.models import CalendarEvent, CalendarSettings
+
+    cfg = CalendarSettings.for_user(request.user)
+    if not cfg.notify_push:
+        return JsonResponse({'events': []})
+
+    now = timezone.now()
+    candidates = (CalendarEvent.objects
+                  .filter(user=request.user, is_done=False, push_sent=False)
+                  .only('pk', 'title', 'event_type', 'start_at', 'remind_minutes_before'))
+
+    due = []
+    pks = []
+    for ev in candidates:
+        if ev.start_at - timedelta(minutes=ev.remind_minutes_before) <= now:
+            due.append({
+                'id':    ev.pk,
+                'title': ev.title,
+                'type':  ev.event_type,
+                'start': ev.start_at.strftime('%d.%m.%Y %H:%M'),
+            })
+            pks.append(ev.pk)
+
+    if pks:
+        CalendarEvent.objects.filter(pk__in=pks).update(push_sent=True)
+
+    return JsonResponse({'events': due})
+
+
+@staff_member_required
+def settings_view(request):
+    from calendar_app.models import CalendarSettings
+
+    cfg = CalendarSettings.for_user(request.user)
+    saved = False
+
+    if request.method == 'POST':
+        cfg.notify_telegram = request.POST.get('notify_telegram') == '1'
+        cfg.notify_email    = request.POST.get('notify_email') == '1'
+        cfg.notify_push     = request.POST.get('notify_push') == '1'
+        try:
+            mins = int(request.POST.get('default_remind_minutes', 60))
+            cfg.default_remind_minutes = max(1, min(10080, mins))
+        except (ValueError, TypeError):
+            pass
+        cfg.email_to         = request.POST.get('email_to', '').strip()
+        cfg.telegram_chat_id = request.POST.get('telegram_chat_id', '').strip()
+        cfg.save()
+        saved = True
+
+    return render(request, 'calendar_app/cal_settings.html', {
+        'title': 'Налаштування сповіщень календаря',
+        'cfg':   cfg,
+        'saved': saved,
+        'is_nav_sidebar_enabled': True,
+    })

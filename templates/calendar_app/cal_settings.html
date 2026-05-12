@@ -1,0 +1,183 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+.cal-settings-wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 24px 0;
+}
+.cal-settings-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  padding: 28px 32px;
+}
+.cal-settings-card h2 {
+  margin: 0 0 24px;
+  font-size: 18px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cal-field {
+  margin-bottom: 18px;
+}
+.cal-field label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+}
+.cal-field label input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.cal-field-row {
+  margin-bottom: 18px;
+}
+.cal-field-row label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.cal-field-row input[type="number"],
+.cal-field-row input[type="email"],
+.cal-field-row input[type="text"] {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.cal-field-row input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.cal-field-row .cal-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.cal-section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+  color: var(--text-dim);
+  margin: 22px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.cal-save-btn {
+  display: inline-block;
+  padding: 9px 24px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity .15s;
+}
+.cal-save-btn:hover { opacity: .85; }
+.cal-saved-msg {
+  display: inline-block;
+  margin-left: 14px;
+  color: var(--ok);
+  font-size: 13px;
+  vertical-align: middle;
+}
+.cal-back-link {
+  display: inline-block;
+  margin-bottom: 16px;
+  color: var(--link-fg);
+  text-decoration: none;
+  font-size: 13px;
+}
+.cal-back-link:hover { text-decoration: underline; }
+</style>
+
+<div class="cal-settings-wrap">
+  <a href="/calendar/" class="cal-back-link">← Назад до календаря</a>
+
+  <div class="cal-settings-card">
+    <h2>🔔 Налаштування сповіщень календаря</h2>
+
+    <form method="post">
+      {% csrf_token %}
+
+      <p class="cal-section-title">Канали сповіщень</p>
+
+      <div class="cal-field">
+        <label>
+          <input type="checkbox" name="notify_push" value="1"
+                 {% if cfg.notify_push %}checked{% endif %}>
+          🖥️ Push у браузері (спливаючі повідомлення в системі)
+        </label>
+      </div>
+
+      <div class="cal-field">
+        <label>
+          <input type="checkbox" name="notify_email" value="1"
+                 {% if cfg.notify_email %}checked{% endif %}>
+          📧 Сповіщення на Email
+        </label>
+      </div>
+
+      <div class="cal-field">
+        <label>
+          <input type="checkbox" name="notify_telegram" value="1"
+                 {% if cfg.notify_telegram %}checked{% endif %}>
+          ✈️ Telegram повідомлення
+        </label>
+      </div>
+
+      <p class="cal-section-title">Час нагадування</p>
+
+      <div class="cal-field-row">
+        <label>За скільки хвилин нагадувати (за замовчуванням)</label>
+        <input type="number" name="default_remind_minutes" min="1" max="10080"
+               value="{{ cfg.default_remind_minutes }}">
+        <div class="cal-hint">Цей час застосовується до нових подій. Для окремої події можна задати своє значення.</div>
+      </div>
+
+      <p class="cal-section-title">Адреси для сповіщень (необов'язково)</p>
+
+      <div class="cal-field-row">
+        <label>Email для сповіщень</label>
+        <input type="email" name="email_to" value="{{ cfg.email_to }}"
+               placeholder="Залиш порожнім — використається системний email">
+      </div>
+
+      <div class="cal-field-row">
+        <label>Telegram Chat ID</label>
+        <input type="text" name="telegram_chat_id" value="{{ cfg.telegram_chat_id }}"
+               placeholder="Залиш порожнім — використається UserProfile або системний">
+        <div class="cal-hint">Свій Chat ID можна дізнатись у боті @userinfobot</div>
+      </div>
+
+      <div style="margin-top: 24px;">
+        <button type="submit" class="cal-save-btn">💾 Зберегти</button>
+        {% if saved %}
+          <span class="cal-saved-msg">✓ Збережено</span>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

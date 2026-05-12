@@ -45,6 +45,7 @@ class CalendarEvent(models.Model):
     remind_minutes_before = models.PositiveIntegerField(
         default=60, verbose_name='Нагадати за N хвилин')
     remind_sent = models.BooleanField(default=False)
+    push_sent   = models.BooleanField(default=False)
 
     is_done    = models.BooleanField(default=False, verbose_name='Виконано', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -56,3 +57,35 @@ class CalendarEvent(models.Model):
 
     def __str__(self):
         return f'{self.title} ({self.start_at:%d.%m.Y %H:%M})'
+
+
+class CalendarSettings(models.Model):
+    """Per-user notification preferences for calendar reminders."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE,
+                                related_name='calendar_settings')
+
+    notify_telegram = models.BooleanField(default=False, verbose_name='Telegram')
+    notify_email    = models.BooleanField(default=True,  verbose_name='Email')
+    notify_push     = models.BooleanField(default=True,  verbose_name='Push у браузері')
+
+    default_remind_minutes = models.PositiveIntegerField(
+        default=60, verbose_name='Нагадувати за N хвилин (за замовчуванням)')
+
+    # Optional overrides — leave blank to use system NotificationSettings values
+    email_to         = models.EmailField(blank=True, verbose_name='Email для сповіщень',
+                                         help_text='Порожньо → використовується системний email')
+    telegram_chat_id = models.CharField(max_length=50, blank=True,
+                                        verbose_name='Telegram Chat ID',
+                                        help_text='Порожньо → UserProfile.telegram_id або системний')
+
+    class Meta:
+        verbose_name        = 'Налаштування сповіщень календаря'
+        verbose_name_plural = 'Налаштування сповіщень календаря'
+
+    def __str__(self):
+        return f'Налаштування — {self.user}'
+
+    @classmethod
+    def for_user(cls, user):
+        obj, _ = cls.objects.get_or_create(user=user)
+        return obj

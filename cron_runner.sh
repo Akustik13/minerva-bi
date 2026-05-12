@@ -12,6 +12,7 @@ TRACK_INTERVAL="${TRACK_INTERVAL:-300}"
 REMINDER_INTERVAL="${REMINDER_INTERVAL:-900}"
 EMAIL_SYNC_INTERVAL="${EMAIL_SYNC_INTERVAL:-300}"
 SCHEDULED_INTERVAL="${SCHEDULED_INTERVAL:-120}"
+CALENDAR_REMINDER_INTERVAL="${CALENDAR_REMINDER_INTERVAL:-120}"
 BRIEFING_HOUR="${BRIEFING_HOUR:-08}"
 
 echo "⏳ Waiting for PostgreSQL..."
@@ -24,13 +25,15 @@ echo "   track_shipments     every ${TRACK_INTERVAL}s"
 echo "   sync_digikey_orders interval controlled by DigiKeyConfig in DB"
 echo "   send_digest         time/frequency controlled by NotificationSettings in DB"
 echo "   morning_briefing    daily at ${BRIEFING_HOUR}:00"
-echo "   send_reminders      every ${REMINDER_INTERVAL}s"
-echo "   sync_email          every ${EMAIL_SYNC_INTERVAL}s"
+echo "   send_reminders          every ${REMINDER_INTERVAL}s"
+echo "   sync_email              every ${EMAIL_SYNC_INTERVAL}s"
+echo "   send_calendar_reminders every ${CALENDAR_REMINDER_INTERVAL}s"
 
 LAST_TRACK=0
 LAST_REMINDER=0
 LAST_EMAIL_SYNC=0
 LAST_SCHEDULED=0
+LAST_CALENDAR=0
 last_briefing_day=""
 
 while true; do
@@ -77,6 +80,12 @@ while true; do
     python manage.py fetch_emails 2>&1 || true
     python manage.py auto_advance_strategies 2>&1 || true
     LAST_REMINDER=$(date +%s)
+  fi
+
+  # ── Календарні нагадування — кожні CALENDAR_REMINDER_INTERVAL секунд ──
+  if [ $((NOW - LAST_CALENDAR)) -ge "$CALENDAR_REMINDER_INTERVAL" ]; then
+    python manage.py send_calendar_reminders 2>&1 || true
+    LAST_CALENDAR=$(date +%s)
   fi
 
   sleep 60

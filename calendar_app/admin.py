@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import CalendarEvent
+from .models import CalendarEvent, CalendarSettings
 
 
 @admin.register(CalendarEvent)
@@ -22,7 +22,7 @@ class CalendarEventAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
         ('🔔 Нагадування', {
-            'fields': ('remind_minutes_before', 'remind_sent'),
+            'fields': ('remind_minutes_before', 'remind_sent', 'push_sent'),
         }),
         ('Статус', {
             'fields': ('is_done', 'created_at'),
@@ -34,3 +34,36 @@ class CalendarEventAdmin(admin.ModelAdmin):
         if request.user.is_superuser:
             return qs
         return qs.filter(user=request.user)
+
+
+@admin.register(CalendarSettings)
+class CalendarSettingsAdmin(admin.ModelAdmin):
+    list_display = ('user', 'notify_telegram', 'notify_email', 'notify_push',
+                    'default_remind_minutes')
+    readonly_fields = ('user',)
+
+    fieldsets = (
+        ('👤 Користувач', {
+            'fields': ('user',),
+        }),
+        ('🔔 Канали сповіщень', {
+            'fields': ('notify_telegram', 'notify_email', 'notify_push'),
+        }),
+        ('⏱ Час нагадування', {
+            'fields': ('default_remind_minutes',),
+        }),
+        ('📬 Адреси (необов\'язково)', {
+            'fields': ('email_to', 'telegram_chat_id'),
+            'classes': ('collapse',),
+            'description': 'Залиш порожнім — використаються системні значення з Налаштування → Сповіщення',
+        }),
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(user=request.user)
+
+    def has_add_permission(self, request):
+        return False  # created automatically via for_user()
