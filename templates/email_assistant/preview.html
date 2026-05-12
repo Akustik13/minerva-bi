@@ -43,11 +43,21 @@
 .em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:500px;overflow-y:auto}
 .em-body-iframe{width:100%;border:none;display:block;min-height:120px;max-height:900px;overflow:hidden}
 .em-card-atts{padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
-.em-att-item{display:inline-flex;align-items:center;gap:0;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);overflow:hidden;font-size:11px}
+.em-att-item{display:inline-flex;align-items:center;gap:0;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);overflow:hidden;font-size:11px;position:relative}
 .em-att-name{padding:4px 9px;color:var(--text-muted);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
 .em-att-sep{width:1px;background:var(--border-strong);align-self:stretch}
 .em-att-btn{padding:4px 8px;color:var(--text-muted);text-decoration:none;display:flex;align-items:center;transition:background .1s,color .1s;cursor:pointer;white-space:nowrap}
 .em-att-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+/* ── Attachment hover preview ── */
+#em-att-tip{position:fixed;z-index:99999;pointer-events:none;display:none;
+  background:var(--bg-card);border:1px solid var(--border-strong);
+  border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.45);
+  max-width:260px;overflow:hidden;transition:opacity .12s}
+#em-att-tip img{display:block;max-width:260px;max-height:200px;object-fit:contain;background:#0d1520}
+#em-att-tip .att-tip-info{padding:9px 12px;display:flex;flex-direction:column;gap:3px}
+#em-att-tip .att-tip-name{font-size:12px;font-weight:600;color:var(--text);word-break:break-all}
+#em-att-tip .att-tip-meta{font-size:11px;color:var(--text-muted)}
+#em-att-tip .att-tip-icon{font-size:36px;text-align:center;padding:14px 0 6px}
 .em-ai-box{display:none;padding:12px 14px;border-top:1px solid var(--border);background:rgba(0,212,170,.04)}
 .em-ai-lbl{font-size:10px;font-weight:700;color:#00d4aa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
 .em-ai-txt{font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text)}
@@ -69,6 +79,9 @@
 .em-reply-send:hover{opacity:.88}
 .em-reply-status{font-size:12px;color:var(--text-muted)}
 </style>
+
+<!-- Attachment hover preview tooltip (singleton, shared across all cards) -->
+<div id="em-att-tip"></div>
 
 {% with last=last_msg %}
 <div class="em-pv">
@@ -152,19 +165,28 @@
         {% if msg.attachments %}
         <div class="em-card-atts">
           {% for att in msg.attachments %}
-          <div class="em-att-item">
+          <div class="em-att-item"
+               data-att-url="/email/message/{{ msg.pk }}/attachment/{{ forloop.counter0 }}/"
+               data-att-name="{{ att.name|escapejs }}"
+               data-att-ct="{{ att.content_type|default:''|escapejs }}"
+               data-att-size="{{ att.size|default:0 }}"
+               onmouseenter="attTipShow(event,this)"
+               onmousemove="attTipMove(event)"
+               onmouseleave="attTipHide()">
             <span class="em-att-name" title="{{ att.name }}">📎 {{ att.name }}</span>
             {% if att.size %}<span style="padding:4px 6px 4px 0;font-size:10px;color:var(--text-dim)">{{ att.size|filesizeformat }}</span>{% endif %}
             <span class="em-att-sep"></span>
             <a class="em-att-btn"
                href="/email/message/{{ msg.pk }}/attachment/{{ forloop.counter0 }}/"
                target="_blank"
-               title="Переглянути">👁</a>
+               title="Переглянути"
+               onmouseenter="attTipHide()">👁</a>
             <span class="em-att-sep"></span>
             <a class="em-att-btn"
                href="/email/message/{{ msg.pk }}/attachment/{{ forloop.counter0 }}/?download=1"
                download="{{ att.name }}"
-               title="Завантажити">⬇</a>
+               title="Завантажити"
+               onmouseenter="attTipHide()">⬇</a>
           </div>
           {% endfor %}
         </div>
@@ -394,6 +416,79 @@ window.pvUnarchive = async function(tpk) {
   var r = await fetch('/email/thread/' + tpk + '/unarchive/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
   if (d.ok) window.history.back();
+};
+
+/* ── Attachment hover preview ── */
+var _tip     = document.getElementById('em-att-tip');
+var _tipTimer = null;
+var _tipLoaded = null; // url of last loaded image so we don't reload
+
+function _fmtSize(bytes) {
+  bytes = parseInt(bytes) || 0;
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+function _tipIcon(ct) {
+  if (!ct) return '📎';
+  if (ct.startsWith('image/'))       return '🖼️';
+  if (ct === 'application/pdf')      return '📄';
+  if (ct.includes('word'))           return '📝';
+  if (ct.includes('excel') || ct.includes('spreadsheet')) return '📊';
+  if (ct.includes('zip') || ct.includes('compressed'))    return '🗜️';
+  return '📎';
+}
+
+window.attTipShow = function(ev, el) {
+  clearTimeout(_tipTimer);
+  var url  = el.dataset.attUrl;
+  var name = el.dataset.attName;
+  var ct   = el.dataset.attCt || '';
+  var size = _fmtSize(el.dataset.attSize);
+  var isImg = ct.startsWith('image/');
+
+  var html = '';
+  if (isImg) {
+    if (_tipLoaded !== url) {
+      html += '<img src="' + url + '" alt="" onerror="this.style.display=\'none\'">';
+      _tipLoaded = url;
+    } else if (_tip.querySelector('img')) {
+      // already loaded — just reuse
+      _tipTimer = setTimeout(function(){ _tip.style.display = 'block'; }, 80);
+      return;
+    } else {
+      html += '<img src="' + url + '" alt="">';
+    }
+  } else {
+    html += '<div class="att-tip-icon">' + _tipIcon(ct) + '</div>';
+  }
+  html += '<div class="att-tip-info">'
+        + '<div class="att-tip-name">' + name.replace(/</g,'&lt;') + '</div>'
+        + '<div class="att-tip-meta">' + (ct || 'файл') + (size ? ' · ' + size : '') + '</div>'
+        + '</div>';
+
+  _tip.innerHTML = html;
+  _tip.style.display = 'block';
+  attTipMove(ev);
+};
+
+window.attTipMove = function(ev) {
+  if (!_tip || _tip.style.display === 'none') return;
+  var x = ev.clientX + 14;
+  var y = ev.clientY + 14;
+  var tw = _tip.offsetWidth  || 260;
+  var th = _tip.offsetHeight || 100;
+  if (x + tw > window.innerWidth  - 8) x = ev.clientX - tw - 10;
+  if (y + th > window.innerHeight - 8) y = ev.clientY - th - 10;
+  _tip.style.left = Math.max(4, x) + 'px';
+  _tip.style.top  = Math.max(4, y) + 'px';
+};
+
+window.attTipHide = function() {
+  clearTimeout(_tipTimer);
+  if (_tip) _tip.style.display = 'none';
 };
 })();
 </script>
