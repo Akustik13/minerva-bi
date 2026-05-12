@@ -225,9 +225,11 @@ class EmailAccountAdmin(admin.ModelAdmin):
                     inbox_new += _created
                     yield _ev({'type': 'inbox_folder_done', 'folder': _fname,
                                'created': _created, 'total': _total})
-                except Exception as _e:
+                except BaseException as _e:
+                    _emsg = ('Таймаут gunicorn — папка велика.' if isinstance(_e, SystemExit)
+                             else _imap_err(_e) or type(_e).__name__)
                     yield _ev({'type': 'folder_error', 'folder': _fname,
-                               'error': _imap_err(_e), 'traceback': ''})
+                               'error': _emsg, 'traceback': ''})
 
             # 2. List all IMAP folders
             yield _ev({'type': 'step', 'msg': '📂 Отримую список папок…'})
@@ -273,8 +275,12 @@ class EmailAccountAdmin(admin.ModelAdmin):
                     import traceback as _tb
                     tb = _tb.format_exc()
                     logger.error('sync-all folder %s failed:\n%s', name, tb)
+                    if isinstance(e, SystemExit):
+                        err_msg = 'Таймаут gunicorn — папка велика, sync перервано. Збільшіть ліміт листів або повторіть.'
+                    else:
+                        err_msg = _imap_err(e) or type(e).__name__
                     yield _ev({'type': 'folder_error', 'folder': name,
-                               'error': str(e), 'traceback': tb[-500:]})
+                               'error': err_msg, 'traceback': tb[-400:]})
 
             yield _ev({'type': 'done', 'inbox_new': inbox_new, 'extra_new': total_extra})
 
