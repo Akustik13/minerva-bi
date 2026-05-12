@@ -2,6 +2,7 @@
 import email as email_lib
 import imaplib
 import logging
+import re
 import time
 from datetime import datetime, timedelta, timezone as dt_tz
 from email.header import decode_header
@@ -63,6 +64,49 @@ def _get_attachments(msg) -> list:
                     'size':         len(part.get_payload(decode=True) or b''),
                 })
     return attachments
+
+
+def _get_attachments_raw(msg) -> list:
+    """Like _get_attachments but includes '_data': bytes for each attachment."""
+    attachments = []
+    for part in msg.walk():
+        cd = str(part.get('Content-Disposition', ''))
+        if 'attachment' in cd or ('inline' in cd and part.get_filename()):
+            filename = _decode_str(part.get_filename(''))
+            if filename:
+                data = part.get_payload(decode=True) or b''
+                attachments.append({
+                    'name':         filename,
+                    'content_type': part.get_content_type(),
+                    'size':         len(data),
+                    '_data':        data,
+                })
+    return attachments
+
+
+def persist_attachments(account_pk, imap_uid, folder_name, attachments: list) -> list:
+    """Save attachment binaries to media/email_attachments/. Returns cleaned list (no _data)."""
+    import os, hashlib
+    from django.conf import settings
+    folder_hash = hashlib.md5(folder_name.encode()).hexdigest()[:8]
+    rel_dir = f'email_attachments/{account_pk}/{imap_uid}_{folder_hash}'
+    saved = []
+    for i, att in enumerate(attachments):
+        data = att.pop('_data', None)
+        clean = {'name': att['name'], 'content_type': att['content_type'], 'size': att['size']}
+        if data:
+            try:
+                abs_dir = os.path.join(settings.MEDIA_ROOT, rel_dir)
+                os.makedirs(abs_dir, exist_ok=True)
+                safe = ''.join(c for c in att['name'] if c.isalnum() or c in '.-_ ')[:80].strip() or 'file'
+                abs_path = os.path.join(abs_dir, f'{i}_{safe}')
+                with open(abs_path, 'wb') as fh:
+                    fh.write(data)
+                clean['file_path'] = f'{rel_dir}/{i}_{safe}'
+            except Exception as ex:
+                logger.warning('save attachment %s: %s', att['name'], ex)
+        saved.append(clean)
+    return saved
 
 
 class IMAPClient:
@@ -136,93 +180,102 @@ class IMAPClient:
                 continue
         return False
 
-    def fetch_messages(self, folder: str = 'INBOX', days_back: int = 30,
-                       since_uid: int = 0, limit=200) -> list:
+    def search_uids(self, folder: str, days_back: int = 30,
+                    since_uid: int = 0, limit=None) -> list:
+        """SEARCH only — fast, no body download. Returns list of UID bytes."""
         if not self.select_folder(folder):
             logger.warning('Cannot select folder: %s', folder)
             return []
-
         since = (datetime.now() - timedelta(days=days_back)).strftime('%d-%b-%Y')
         _, data = self.conn.uid('search', None, f'SINCE {since}')
         if not data or not data[0]:
             return []
-
         uids = data[0].split()
         if since_uid > 0:
             uids = [u for u in uids if int(u) > since_uid]
-
         if limit is not None:
             uids = uids[-limit:]
+        return uids
+
+    def _parse_one_message(self, header_part: bytes, raw_body: bytes) -> 'dict | None':
+        """Parse a single (header, body) pair from an IMAP FETCH response."""
+        try:
+            uid_match = re.search(rb'UID\s+(\d+)', header_part)
+            uid       = int(uid_match.group(1)) if uid_match else 0
+            flags_str = header_part.decode('ascii', errors='replace')
+
+            msg       = email_lib.message_from_bytes(raw_body)
+            subject   = _decode_str(msg.get('Subject', ''))
+            from_name, from_email = parseaddr(msg.get('From', ''))
+            from_name = _decode_str(from_name)
+
+            to_raw  = msg.get('To', '')
+            cc_raw  = msg.get('Cc', '')
+            to_list = [e for _, e in [parseaddr(a) for a in to_raw.split(',') if a.strip()] if e]
+            cc_list = [e for _, e in [parseaddr(a) for a in cc_raw.split(',') if a.strip()] if e]
+
+            try:
+                sent_at = parsedate_to_datetime(msg.get('Date', ''))
+                if sent_at.tzinfo is None:
+                    sent_at = sent_at.replace(tzinfo=dt_tz.utc)
+            except Exception:
+                sent_at = timezone.now()
+
+            text_body, html_body = _get_body(msg)
+
+            return {
+                'uid':         uid,
+                'message_id':  msg.get('Message-ID', '').strip(),
+                'in_reply_to': msg.get('In-Reply-To', '').strip(),
+                'subject':     subject,
+                'from_email':  from_email.lower(),
+                'from_name':   from_name,
+                'to_emails':   to_list,
+                'cc_emails':   cc_list,
+                'body_text':   text_body,
+                'body_html':   html_body,
+                'attachments': _get_attachments_raw(msg),
+                'is_read':     '\\Seen' in flags_str,
+                'sent_at':     sent_at,
+            }
+        except Exception as e:
+            logger.error('Error parsing message: %s', e)
+            return None
+
+    def fetch_by_uids_iter(self, uids: list, chunk_size: int = 50):
+        """Generator: fetch in chunks of chunk_size. Yields message dicts with _data in attachments."""
+        for start in range(0, len(uids), chunk_size):
+            chunk   = uids[start:start + chunk_size]
+            uid_set = b','.join(chunk)
+            try:
+                _, raw_data = self.conn.uid('fetch', uid_set, '(RFC822 FLAGS)')
+            except Exception as e:
+                logger.error('IMAP chunk fetch [%d:%d] failed: %s', start, start + chunk_size, e)
+                continue
+            if not raw_data:
+                continue
+            i = 0
+            while i < len(raw_data):
+                item = raw_data[i]
+                i += 1
+                if not isinstance(item, tuple) or len(item) < 2:
+                    continue
+                parsed = self._parse_one_message(item[0], item[1])
+                if parsed:
+                    yield parsed
+
+    def fetch_messages(self, folder: str = 'INBOX', days_back: int = 30,
+                       since_uid: int = 0, limit=200) -> list:
+        """Fetch messages as a list. Attachment _data is stripped (use fetch_by_uids_iter for raw)."""
+        uids = self.search_uids(folder, days_back, since_uid, limit)
         if not uids:
             return []
-
-        # Batch-fetch all UIDs in a single IMAP FETCH command (dramatically faster)
-        uid_set = b','.join(uids)
-        try:
-            _, raw_data = self.conn.uid('fetch', uid_set, '(RFC822 FLAGS)')
-        except Exception as e:
-            logger.error('IMAP batch fetch failed for %s: %s', folder, e)
-            return []
-
-        if not raw_data:
-            return []
-
-        # imaplib returns alternating (header_bytes, body_bytes) + b')' items
-        messages = []
-        i = 0
-        while i < len(raw_data):
-            item = raw_data[i]
-            i += 1
-            if not isinstance(item, tuple) or len(item) < 2:
-                continue
-            header_part = item[0]
-            raw_body    = item[1]
-            if not raw_body:
-                continue
-            try:
-                import re as _re
-                uid_match = _re.search(rb'UID\s+(\d+)', header_part)
-                uid = int(uid_match.group(1)) if uid_match else 0
-                flags_str = header_part.decode('ascii', errors='replace')
-
-                msg     = email_lib.message_from_bytes(raw_body)
-                subject = _decode_str(msg.get('Subject', ''))
-                from_name, from_email = parseaddr(msg.get('From', ''))
-                from_name = _decode_str(from_name)
-
-                to_raw  = msg.get('To', '')
-                cc_raw  = msg.get('Cc', '')
-                to_list = [e for _, e in [parseaddr(a) for a in to_raw.split(',') if a.strip()] if e]
-                cc_list = [e for _, e in [parseaddr(a) for a in cc_raw.split(',') if a.strip()] if e]
-
-                try:
-                    sent_at = parsedate_to_datetime(msg.get('Date', ''))
-                    if sent_at.tzinfo is None:
-                        sent_at = sent_at.replace(tzinfo=dt_tz.utc)
-                except Exception:
-                    sent_at = timezone.now()
-
-                text_body, html_body = _get_body(msg)
-
-                messages.append({
-                    'uid':         uid,
-                    'message_id':  msg.get('Message-ID', '').strip(),
-                    'in_reply_to': msg.get('In-Reply-To', '').strip(),
-                    'subject':     subject,
-                    'from_email':  from_email.lower(),
-                    'from_name':   from_name,
-                    'to_emails':   to_list,
-                    'cc_emails':   cc_list,
-                    'body_text':   text_body,
-                    'body_html':   html_body,
-                    'attachments': _get_attachments(msg),
-                    'is_read':     '\\Seen' in flags_str,
-                    'sent_at':     sent_at,
-                })
-            except Exception as e:
-                logger.error('Error parsing batch message: %s', e)
-
-        return messages
+        result = []
+        for m in self.fetch_by_uids_iter(uids):
+            for att in m.get('attachments', []):
+                att.pop('_data', None)
+            result.append(m)
+        return result
 
     def _select_writable(self, folder: str) -> str | None:
         """Select a folder in read-write mode. Returns the folder name on success."""

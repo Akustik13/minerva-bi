@@ -158,6 +158,10 @@ class EmailAccountAdmin(admin.ModelAdmin):
                     account=account, imap_uid=msg_data['uid'],
                     imap_folder_name=folder_name).exists():
                 return False
+            from email_assistant.imap_client import persist_attachments
+            saved_atts = persist_attachments(
+                account.pk, msg_data['uid'], folder_name,
+                msg_data.get('attachments', []))
             tk = (msg_data.get('in_reply_to') or
                   msg_data.get('message_id') or msg_data['subject'])
             thread = EmailThread.objects.filter(
@@ -177,7 +181,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
                 subject=msg_data['subject'], from_email=msg_data['from_email'],
                 from_name=msg_data['from_name'], to_emails=msg_data['to_emails'],
                 cc_emails=msg_data['cc_emails'], body_text=msg_data['body_text'],
-                body_html=msg_data['body_html'], attachments=msg_data['attachments'],
+                body_html=msg_data['body_html'], attachments=saved_atts,
                 is_read=msg_data['is_read'], sent_at=msg_data['sent_at'],
             )
             return True
@@ -196,7 +200,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
 
             _lim = None if account.sync_no_limit else account.sync_limit
 
-            # 1. Sync inbox + sent with per-message progress
+            # 1. Sync inbox + sent — open one connection per folder, fetch in 50-msg chunks
             yield _ev({'type': 'step', 'msg': '📥 Синхронізую Вхідні та Надіслані…'})
             inbox_new = 0
             for _fname, _ftype in [
@@ -208,20 +212,22 @@ class EmailAccountAdmin(admin.ModelAdmin):
                 yield _ev({'type': 'inbox_folder_start', 'folder': _fname})
                 try:
                     with IMAPClient(account) as _imap:
-                        _msgs = _imap.fetch_messages(
-                            folder=_fname, days_back=3650, since_uid=0, limit=_lim)
-                    _total = len(_msgs)
-                    yield _ev({'type': 'inbox_folder_info', 'folder': _fname, 'total': _total})
-                    _created = 0
-                    for _i, _m in enumerate(_msgs):
-                        if _i % 20 == 0 and _i > 0:
-                            yield _ev({'type': 'inbox_progress', 'folder': _fname,
-                                       'scanned': _i, 'created': _created, 'total': _total})
-                        try:
-                            if _save_msg(account, _m, _fname, _ftype):
-                                _created += 1
-                        except Exception:
-                            pass
+                        _uids = _imap.search_uids(_fname, days_back=3650, limit=_lim)
+                        _total = len(_uids)
+                        yield _ev({'type': 'inbox_folder_info', 'folder': _fname, 'total': _total})
+                        _created = 0
+                        _scanned = 0
+                        for _m in _imap.fetch_by_uids_iter(_uids, chunk_size=50):
+                            _scanned += 1
+                            try:
+                                if _save_msg(account, _m, _fname, _ftype):
+                                    _created += 1
+                            except Exception:
+                                pass
+                            if _scanned % 50 == 0:
+                                yield _ev({'type': 'inbox_progress', 'folder': _fname,
+                                           'scanned': _scanned, 'created': _created,
+                                           'total': _total})
                     inbox_new += _created
                     yield _ev({'type': 'inbox_folder_done', 'folder': _fname,
                                'created': _created, 'total': _total})
@@ -246,28 +252,30 @@ class EmailAccountAdmin(admin.ModelAdmin):
             yield _ev({'type': 'folders_found', 'count': len(extra),
                        'names': [f['name'] for f in extra]})
 
-            # 3. Sync each custom folder
+            # 3. Sync each extra folder in chunks
             total_extra = 0
             for f in extra:
                 name = f['name']
                 yield _ev({'type': 'folder_start', 'folder': name})
-                created = 0
                 try:
                     with IMAPClient(account) as imap:
-                        messages = imap.fetch_messages(folder=name,
-                                                       days_back=account.sync_days_back,
-                                                       since_uid=0, limit=_lim)
-                    total_f = len(messages)
-                    yield _ev({'type': 'folder_info', 'folder': name, 'total': total_f})
-                    for i, msg_data in enumerate(messages):
-                        if i % 20 == 0 and i > 0:
-                            yield _ev({'type': 'folder_progress', 'folder': name,
-                                       'created': created, 'scanned': i, 'total': total_f})
-                        try:
-                            if _save_msg(account, msg_data, name, EmailMessage.FOLDER_INBOX):
-                                created += 1
-                        except Exception:
-                            pass
+                        _uids = imap.search_uids(name, days_back=account.sync_days_back,
+                                                 limit=_lim)
+                        total_f = len(_uids)
+                        yield _ev({'type': 'folder_info', 'folder': name, 'total': total_f})
+                        created = 0
+                        scanned = 0
+                        for msg_data in imap.fetch_by_uids_iter(_uids, chunk_size=50):
+                            scanned += 1
+                            try:
+                                if _save_msg(account, msg_data, name, EmailMessage.FOLDER_INBOX):
+                                    created += 1
+                            except Exception:
+                                pass
+                            if scanned % 50 == 0:
+                                yield _ev({'type': 'folder_progress', 'folder': name,
+                                           'scanned': scanned, 'created': created,
+                                           'total': total_f})
                     total_extra += created
                     yield _ev({'type': 'folder_done', 'folder': name,
                                'created': created, 'total': total_f})
@@ -275,12 +283,10 @@ class EmailAccountAdmin(admin.ModelAdmin):
                     import traceback as _tb
                     tb = _tb.format_exc()
                     logger.error('sync-all folder %s failed:\n%s', name, tb)
-                    if isinstance(e, SystemExit):
-                        err_msg = 'Таймаут gunicorn — папка велика, sync перервано. Збільшіть ліміт листів або повторіть.'
-                    else:
-                        err_msg = _imap_err(e) or type(e).__name__
+                    err = ('Таймаут gunicorn — папка велика, sync перервано.' if isinstance(e, SystemExit)
+                           else _imap_err(e) or type(e).__name__)
                     yield _ev({'type': 'folder_error', 'folder': name,
-                               'error': err_msg, 'traceback': tb[-400:]})
+                               'error': err, 'traceback': tb[-400:]})
 
             yield _ev({'type': 'done', 'inbox_new': inbox_new, 'extra_new': total_extra})
 

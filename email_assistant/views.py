@@ -563,6 +563,10 @@ def sync_imap_folder_view(request):
                         subject=msg_data['subject'][:500],
                         participants=[msg_data['from_email']] + msg_data['to_emails'],
                     )
+                from email_assistant.imap_client import persist_attachments
+                saved_atts = persist_attachments(
+                    account.pk, msg_data['uid'], imap_folder,
+                    msg_data.get('attachments', []))
                 EmailMessage.objects.create(
                     account=account,
                     thread=thread,
@@ -578,7 +582,7 @@ def sync_imap_folder_view(request):
                     cc_emails=msg_data['cc_emails'],
                     body_text=msg_data['body_text'],
                     body_html=msg_data['body_html'],
-                    attachments=msg_data['attachments'],
+                    attachments=saved_atts,
                     is_read=msg_data['is_read'],
                     sent_at=msg_data['sent_at'],
                 )
@@ -867,6 +871,82 @@ def schedule_email_api(request):
         'id':          scheduled.pk,
         'scheduled_at': dt.strftime('%d.%m.%Y %H:%M'),
     })
+
+
+# ── Attachment serving ─────────────────────────────────────────────────────
+
+def _is_previewable(content_type: str) -> bool:
+    return (content_type.startswith('image/') or
+            content_type == 'application/pdf' or
+            content_type.startswith('text/'))
+
+
+@staff_member_required
+def attachment_download_view(request, message_pk, index):
+    """Serve an email attachment: from saved file or fetched live from IMAP."""
+    import os
+    from django.conf import settings
+    from email_assistant.models import EmailMessage
+
+    account = _get_account(request)
+    msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    atts    = msg.attachments or []
+    if index >= len(atts):
+        return HttpResponse('Вкладення не знайдено', status=404)
+
+    att          = atts[index]
+    name         = att.get('name', 'attachment')
+    content_type = att.get('content_type', 'application/octet-stream')
+    force_dl     = request.GET.get('download') == '1'
+
+    # Try saved file first
+    file_path = att.get('file_path', '')
+    if file_path:
+        abs_path = os.path.join(settings.MEDIA_ROOT, file_path)
+        if os.path.exists(abs_path):
+            with open(abs_path, 'rb') as fh:
+                data = fh.read()
+            disp = 'attachment' if force_dl else ('inline' if _is_previewable(content_type) else 'attachment')
+            resp = HttpResponse(data, content_type=content_type)
+            resp['Content-Disposition'] = f'{disp}; filename="{name}"'
+            return resp
+
+    # Fall back: fetch from IMAP using stored UID
+    imap_uid    = msg.imap_uid
+    imap_folder = msg.imap_folder_name or account.imap_folder_inbox
+    if imap_uid:
+        try:
+            import email as email_lib
+            from email_assistant.imap_client import IMAPClient, _get_attachments_raw, persist_attachments
+            data = None
+            with IMAPClient(account) as imap:
+                imap.select_folder(imap_folder)
+                _, raw_data = imap.conn.uid('fetch', str(imap_uid).encode(), '(RFC822)')
+                if raw_data and isinstance(raw_data[0], tuple):
+                    parsed_msg = email_lib.message_from_bytes(raw_data[0][1])
+                    parts = _get_attachments_raw(parsed_msg)
+                    if index < len(parts):
+                        data = parts[index].get('_data', b'')
+                        # Cache to disk for next request
+                        try:
+                            saved = persist_attachments(account.pk, imap_uid, imap_folder,
+                                                        [dict(parts[index])])
+                            if saved and saved[0].get('file_path'):
+                                att_list = list(msg.attachments)
+                                att_list[index] = {**att_list[index], 'file_path': saved[0]['file_path']}
+                                msg.attachments = att_list
+                                msg.save(update_fields=['attachments'])
+                        except Exception:
+                            pass
+            if data:
+                disp = 'attachment' if force_dl else ('inline' if _is_previewable(content_type) else 'attachment')
+                resp = HttpResponse(data, content_type=content_type)
+                resp['Content-Disposition'] = f'{disp}; filename="{name}"'
+                return resp
+        except Exception as e:
+            logger.warning('attachment IMAP fetch msg=%s idx=%s: %s', message_pk, index, e)
+
+    return HttpResponse('Файл не знайдено. Пересинхронізуйте пошту.', status=404)
 
 
 # ── IMAP folder management ──────────────────────────────────────────────────

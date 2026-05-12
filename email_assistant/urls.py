@@ -29,6 +29,8 @@ urlpatterns = [
     path('thread/<int:thread_pk>/unarchive/',            views.unarchive_thread_view, name='unarchive_thread'),
     # HTML body for iframe
     path('message/<int:message_pk>/html/',               views.message_html_view,    name='message_html'),
+    # Attachments
+    path('message/<int:message_pk>/attachment/<int:index>/', views.attachment_download_view, name='email_attachment'),
     # IMAP custom folders
     path('imap-folders/',                                views.list_imap_folders_view,  name='imap_folders'),
     path('sync-imap-folder/',                            views.sync_imap_folder_view,   name='sync_imap_folder'),
