@@ -1,7 +1,8 @@
 {% extends "admin/change_form.html" %}
-{% load i18n %}
+{% load i18n static %}
 
 {% block extrahead %}{{ block.super }}
+<script src="{% static 'admin/js/mv_datetime_picker.js' %}"></script>
 <style>
 /* ── Compose-like wrapper ─────────────────────────── */
 .se-wrap { max-width:860px; margin:0 auto 32px; }
@@ -402,6 +403,10 @@
     range.setStart(editor, 0); range.collapse(true);
     sel.removeAllRanges(); sel.addRange(range);
   } catch(e){}
+
+  // Initialize datetime picker for scheduled_at field
+  var _seSchedInp = document.getElementById('se-scheduled-at');
+  if (_seSchedInp && window.MvDatePicker) new MvDatePicker(_seSchedInp, {});
 })();
 </script>
 {% endblock %}

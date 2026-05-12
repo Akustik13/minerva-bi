@@ -1,9 +1,11 @@
 {% extends "admin/base_site.html" %}
+{% load static %}
 {% block title %}{{ title }} — Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 {% block messages %}{% endblock %}
 
 {% block extrahead %}{{ block.super }}
+<script src="{% static 'admin/js/mv_datetime_picker.js' %}"></script>
 <style>
 .em-compose { max-width:860px; margin:0 auto; }
 .em-compose-card { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:12px; overflow:hidden; }
@@ -236,7 +238,6 @@ const ccField  = document.getElementById('cc-field');
 const suggBox  = document.getElementById('suggestions');
 var _suggTarget = null;
 
-// Move cursor to start of body editor on load
 document.addEventListener('DOMContentLoaded', function(){
   var ed = document.getElementById('body-editor');
   if (ed) {
@@ -245,6 +246,8 @@ document.addEventListener('DOMContentLoaded', function(){
     range.setStart(ed, 0); range.collapse(true);
     sel.removeAllRanges(); sel.addRange(range);
   }
+  var dtInp = document.getElementById('schedule-dt');
+  if (dtInp && window.MvDatePicker) _schedulePicker = new MvDatePicker(dtInp, {});
 });
 
 /* ── Formatting ── */
@@ -310,6 +313,7 @@ function showFiles(input) {
 
 /* ── Schedule toggle ── */
 var _scheduleOn = false;
+var _schedulePicker = null;
 function toggleSchedule() {
   _scheduleOn = !_scheduleOn;
   var row = document.getElementById('schedule-row');
@@ -320,12 +324,12 @@ function toggleSchedule() {
   sendBtn.textContent = _scheduleOn ? '⏰ Запланувати' : 'Відправити →';
   sendBtn.classList.toggle('scheduled', _scheduleOn);
   if (_scheduleOn) {
-    // Set default: +1 hour rounded to next 15 min
     var d = new Date(Date.now() + 3600000);
     d.setMinutes(Math.ceil(d.getMinutes()/15)*15, 0, 0);
-    document.getElementById('schedule-dt').value =
-      d.getFullYear()+'-'+_pad(d.getMonth()+1)+'-'+_pad(d.getDate())+'T'+
+    var vs = d.getFullYear()+'-'+_pad(d.getMonth()+1)+'-'+_pad(d.getDate())+'T'+
       _pad(d.getHours())+':'+_pad(d.getMinutes());
+    if (_schedulePicker) _schedulePicker.setValue(vs);
+    else document.getElementById('schedule-dt').value = vs;
   }
 }
 function _pad(n){ return n < 10 ? '0'+n : n; }
