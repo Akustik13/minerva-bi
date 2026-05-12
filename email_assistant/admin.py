@@ -115,8 +115,26 @@ class EmailAccountAdmin(admin.ModelAdmin):
         def _ev(d):
             return _json.dumps(d, ensure_ascii=False) + '\n'
 
+        def _imap_err(e):
+            """Strip b'...' bytes notation from imaplib error messages."""
+            msg = str(e)
+            if (msg.startswith("b'") and msg.endswith("'")) or \
+               (msg.startswith('b"') and msg.endswith('"')):
+                msg = msg[2:-1]
+            return msg
+
         def generate(account):
-            yield _ev({'type': 'step', 'msg': '🔄 Підключаюсь до IMAP…'})
+            yield _ev({'type': 'step', 'msg': '🔄 Перевіряю підключення до IMAP…'})
+
+            # Quick auth check before running the full sync command
+            try:
+                with IMAPClient(account) as _chk:
+                    pass
+            except Exception as e:
+                yield _ev({'type': 'error',
+                           'msg': f'Помилка автентифікації IMAP: {_imap_err(e)}. '
+                                  'Перевірте логін/пароль та налаштування сервера.'})
+                return
 
             # 1. Sync inbox + sent via management command
             yield _ev({'type': 'step', 'msg': '📥 Синхронізую Вхідні та Надіслані…'})
@@ -130,7 +148,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
                 inbox_new = int(m.group(1)) if m else 0
                 yield _ev({'type': 'inbox_done', 'created': inbox_new, 'detail': output[:300]})
             except Exception as e:
-                yield _ev({'type': 'error', 'msg': f'sync_email: {e}'})
+                yield _ev({'type': 'error', 'msg': f'sync_email: {_imap_err(e)}'})
                 return
 
             # 2. List all IMAP folders
@@ -139,7 +157,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
                 with IMAPClient(account) as imap:
                     imap_folders = imap.list_folders()
             except Exception as e:
-                yield _ev({'type': 'error', 'msg': f'list_folders: {e}'})
+                yield _ev({'type': 'error', 'msg': f'list_folders: {_imap_err(e)}'})
                 return
 
             standard = {account.imap_folder_inbox.lower(), account.imap_folder_sent.lower()}

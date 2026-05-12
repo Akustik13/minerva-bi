@@ -1263,8 +1263,10 @@ document.addEventListener('DOMContentLoaded', function(){
     });
 
     appsFound.forEach(function(name){
-      if (appsFound.length > 1) makeModCollapsible(mods[name]);
-      content.appendChild(mods[name]);
+      var modEl = mods[name];
+      if (!modEl) return;  // not rendered on non-admin pages — skip
+      if (appsFound.length > 1) makeModCollapsible(modEl);
+      content.appendChild(modEl);
     });
 
     group.appendChild(content);
