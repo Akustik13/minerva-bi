@@ -138,8 +138,6 @@ class EmailAccountAdmin(admin.ModelAdmin):
         """Admin AJAX: full historical sync — streams NDJSON progress lines."""
         import json as _json
         from django.http import StreamingHttpResponse
-        from django.core.management import call_command
-        from io import StringIO
         from email_assistant.imap_client import IMAPClient
         from email_assistant.models import EmailThread
 
@@ -154,10 +152,39 @@ class EmailAccountAdmin(admin.ModelAdmin):
                 msg = msg[2:-1]
             return msg
 
+        def _save_msg(account, msg_data, folder_name, folder_type):
+            """Save one message to DB. Returns True if created, False if duplicate."""
+            if EmailMessage.objects.filter(
+                    account=account, imap_uid=msg_data['uid'],
+                    imap_folder_name=folder_name).exists():
+                return False
+            tk = (msg_data.get('in_reply_to') or
+                  msg_data.get('message_id') or msg_data['subject'])
+            thread = EmailThread.objects.filter(
+                account=account, thread_id=tk[:500]).first()
+            if not thread:
+                thread = EmailThread.objects.create(
+                    account=account,
+                    thread_id=tk[:500] if tk else '',
+                    subject=msg_data['subject'][:500],
+                    participants=[msg_data['from_email']] + msg_data['to_emails'],
+                )
+            EmailMessage.objects.create(
+                account=account, thread=thread,
+                imap_uid=msg_data['uid'], imap_folder_name=folder_name,
+                message_id=msg_data['message_id'], in_reply_to=msg_data['in_reply_to'],
+                folder=folder_type,
+                subject=msg_data['subject'], from_email=msg_data['from_email'],
+                from_name=msg_data['from_name'], to_emails=msg_data['to_emails'],
+                cc_emails=msg_data['cc_emails'], body_text=msg_data['body_text'],
+                body_html=msg_data['body_html'], attachments=msg_data['attachments'],
+                is_read=msg_data['is_read'], sent_at=msg_data['sent_at'],
+            )
+            return True
+
         def generate(account):
             yield _ev({'type': 'step', 'msg': '🔄 Перевіряю підключення до IMAP…'})
 
-            # Quick auth check before running the full sync command
             try:
                 with IMAPClient(account) as _chk:
                     pass
@@ -167,20 +194,40 @@ class EmailAccountAdmin(admin.ModelAdmin):
                                   'Перевірте логін/пароль та налаштування сервера.'})
                 return
 
-            # 1. Sync inbox + sent via management command
+            _lim = None if account.sync_no_limit else account.sync_limit
+
+            # 1. Sync inbox + sent with per-message progress
             yield _ev({'type': 'step', 'msg': '📥 Синхронізую Вхідні та Надіслані…'})
-            out = StringIO()
-            try:
-                call_command('sync_email', account=account.pk,
-                             stdout=out, stderr=out, **{'all': True})
-                output = out.getvalue()
-                import re as _re
-                m = _re.search(r'\+(\d+)', output)
-                inbox_new = int(m.group(1)) if m else 0
-                yield _ev({'type': 'inbox_done', 'created': inbox_new, 'detail': output[:300]})
-            except Exception as e:
-                yield _ev({'type': 'error', 'msg': f'sync_email: {_imap_err(e)}'})
-                return
+            inbox_new = 0
+            for _fname, _ftype in [
+                (account.imap_folder_inbox, EmailMessage.FOLDER_INBOX),
+                (account.imap_folder_sent,  EmailMessage.FOLDER_SENT),
+            ]:
+                if not _fname:
+                    continue
+                yield _ev({'type': 'inbox_folder_start', 'folder': _fname})
+                try:
+                    with IMAPClient(account) as _imap:
+                        _msgs = _imap.fetch_messages(
+                            folder=_fname, days_back=3650, since_uid=0, limit=_lim)
+                    _total = len(_msgs)
+                    yield _ev({'type': 'inbox_folder_info', 'folder': _fname, 'total': _total})
+                    _created = 0
+                    for _i, _m in enumerate(_msgs):
+                        if _i % 20 == 0 and _i > 0:
+                            yield _ev({'type': 'inbox_progress', 'folder': _fname,
+                                       'scanned': _i, 'created': _created, 'total': _total})
+                        try:
+                            if _save_msg(account, _m, _fname, _ftype):
+                                _created += 1
+                        except Exception:
+                            pass
+                    inbox_new += _created
+                    yield _ev({'type': 'inbox_folder_done', 'folder': _fname,
+                               'created': _created, 'total': _total})
+                except Exception as _e:
+                    yield _ev({'type': 'folder_error', 'folder': _fname,
+                               'error': _imap_err(_e), 'traceback': ''})
 
             # 2. List all IMAP folders
             yield _ev({'type': 'step', 'msg': '📂 Отримую список папок…'})
@@ -204,46 +251,24 @@ class EmailAccountAdmin(admin.ModelAdmin):
                 yield _ev({'type': 'folder_start', 'folder': name})
                 created = 0
                 try:
-                    _lim = None if account.sync_no_limit else account.sync_limit
                     with IMAPClient(account) as imap:
                         messages = imap.fetch_messages(folder=name,
                                                        days_back=account.sync_days_back,
                                                        since_uid=0, limit=_lim)
+                    total_f = len(messages)
+                    yield _ev({'type': 'folder_info', 'folder': name, 'total': total_f})
                     for i, msg_data in enumerate(messages):
-                        # Heartbeat every 25 messages so nginx proxy doesn't time out
-                        if i > 0 and i % 25 == 0:
+                        if i % 20 == 0 and i > 0:
                             yield _ev({'type': 'folder_progress', 'folder': name,
-                                       'created': created, 'scanned': i})
-                        if EmailMessage.objects.filter(
-                                account=account, imap_uid=msg_data['uid'],
-                                imap_folder_name=name).exists():
-                            continue
-                        thread_key = (msg_data.get('in_reply_to') or
-                                      msg_data.get('message_id') or msg_data['subject'])
-                        thread = EmailThread.objects.filter(
-                            account=account, thread_id=thread_key[:500]).first()
-                        if not thread:
-                            thread = EmailThread.objects.create(
-                                account=account,
-                                thread_id=thread_key[:500] if thread_key else '',
-                                subject=msg_data['subject'][:500],
-                                participants=[msg_data['from_email']] + msg_data['to_emails'],
-                            )
-                        EmailMessage.objects.create(
-                            account=account, thread=thread,
-                            imap_uid=msg_data['uid'], imap_folder_name=name,
-                            message_id=msg_data['message_id'],
-                            in_reply_to=msg_data['in_reply_to'],
-                            folder=EmailMessage.FOLDER_INBOX,
-                            subject=msg_data['subject'], from_email=msg_data['from_email'],
-                            from_name=msg_data['from_name'], to_emails=msg_data['to_emails'],
-                            cc_emails=msg_data['cc_emails'], body_text=msg_data['body_text'],
-                            body_html=msg_data['body_html'], attachments=msg_data['attachments'],
-                            is_read=msg_data['is_read'], sent_at=msg_data['sent_at'],
-                        )
-                        created += 1
+                                       'created': created, 'scanned': i, 'total': total_f})
+                        try:
+                            if _save_msg(account, msg_data, name, EmailMessage.FOLDER_INBOX):
+                                created += 1
+                        except Exception:
+                            pass
                     total_extra += created
-                    yield _ev({'type': 'folder_done', 'folder': name, 'created': created})
+                    yield _ev({'type': 'folder_done', 'folder': name,
+                               'created': created, 'total': total_f})
                 except BaseException as e:
                     import traceback as _tb
                     tb = _tb.format_exc()

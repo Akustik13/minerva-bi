@@ -86,17 +86,30 @@
             var d = JSON.parse(raw);
             if (d.type === 'step') {
               st.textContent = d.msg; addLine(d.msg);
-            } else if (d.type === 'inbox_done') {
-              replaceLast('📥 Вхідні/Надіслані: +' + d.created + ' нових');
+            } else if (d.type === 'inbox_folder_start') {
+              st.textContent = '⏳ Завантажую ' + d.folder + '…';
+              addLine('  ⏳ ' + d.folder + ': завантажую з сервера…');
+            } else if (d.type === 'inbox_folder_info') {
+              replaceLast('  ⏳ ' + d.folder + ': знайдено ' + d.total + ' листів, зберігаю…');
+              st.textContent = '⏳ ' + d.folder + ': ' + d.total + ' листів';
+            } else if (d.type === 'inbox_progress') {
+              replaceLast('  ⏳ ' + d.folder + ': ' + d.scanned + '/' + d.total + ', нових +' + d.created);
+              st.textContent = '⏳ ' + d.folder + ': ' + d.scanned + '/' + d.total;
+            } else if (d.type === 'inbox_folder_done') {
+              replaceLast('  ✓ ' + d.folder + ': +' + d.created + ' нових (' + d.total + ' перевірено)');
             } else if (d.type === 'folders_found') {
               addLine('📂 Додаткових папок: ' + d.count + (d.names && d.names.length ? ' (' + d.names.join(', ') + ')' : ''));
             } else if (d.type === 'folder_start') {
-              st.textContent = '⏳ ' + d.folder;
-              addLine('  ⏳ ' + d.folder + '…');
+              st.textContent = '⏳ Завантажую ' + d.folder + '…';
+              addLine('  ⏳ ' + d.folder + ': завантажую з сервера…');
+            } else if (d.type === 'folder_info') {
+              replaceLast('  ⏳ ' + d.folder + ': знайдено ' + d.total + ' листів, зберігаю…');
+              st.textContent = '⏳ ' + d.folder + ': ' + d.total + ' листів';
             } else if (d.type === 'folder_progress') {
-              replaceLast('  ⏳ ' + d.folder + '… оброблено ' + d.scanned + ', нових +' + d.created);
+              replaceLast('  ⏳ ' + d.folder + ': ' + d.scanned + '/' + (d.total||'?') + ', нових +' + d.created);
+              st.textContent = '⏳ ' + d.folder + ': ' + d.scanned + '/' + (d.total||'?');
             } else if (d.type === 'folder_done') {
-              replaceLast('  ✓ ' + d.folder + ': +' + d.created + ' нових');
+              replaceLast('  ✓ ' + d.folder + ': +' + d.created + ' нових (' + (d.total||0) + ' перевірено)');
             } else if (d.type === 'folder_error') {
               replaceLast('  ⚠️ ' + d.folder + ': ' + d.error);
               if (d.traceback) addLine('    ' + d.traceback.replace(/\n/g, '\n    '));
