@@ -294,7 +294,10 @@ class EmailContact(models.Model):
     last_used_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together     = [('user', 'email')]
+        constraints         = [
+            models.UniqueConstraint(fields=['user', 'email'],
+                                    name='unique_user_email_contact'),
+        ]
         ordering            = ['-use_count', '-last_used_at']
         verbose_name        = 'Контакт адресної книги'
         verbose_name_plural = 'Адресна книга'
