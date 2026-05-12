@@ -121,6 +121,9 @@ class Command(BaseCommand):
                         if folder_type == EmailMessage.FOLDER_INBOX and not msg_data['is_read']:
                             self._notify_new_email(em, account)
 
+                        if folder_type == EmailMessage.FOLDER_INBOX:
+                            self._post_process_inbox(em, account, thread)
+
                         created += 1
 
                     except Exception as e:
@@ -233,6 +236,96 @@ class Command(BaseCommand):
             urllib.request.Request(f'https://api.telegram.org/bot{token}/sendMessage', data=data),
             timeout=5,
         )
+
+    def _post_process_inbox(self, em, account, thread):
+        """Run deadline detection + auto-reply for a freshly saved inbox message."""
+        from email_assistant.models import EmailSettings
+        es = EmailSettings.get_for_user(account.user)
+
+        if es.deadline_detection:
+            self._detect_deadlines(em, account)
+
+        if es.auto_reply_enabled:
+            self._auto_reply(em, account, es, thread)
+
+    def _detect_deadlines(self, em, account):
+        """Extract deadlines from email body and create CalendarEvent records."""
+        from email_assistant import ai_helper
+        from calendar_app.models import CalendarEvent
+        from django.utils.dateparse import parse_datetime
+        from django.utils import timezone
+
+        try:
+            profile = account.user.profile
+        except Exception:
+            profile = None
+
+        deadlines = ai_helper.extract_deadlines(em.body_text or '', profile)
+        for d in deadlines:
+            try:
+                dt = parse_datetime(d.get('date', ''))
+                if dt is None:
+                    continue
+                if timezone.is_naive(dt):
+                    dt = timezone.make_aware(dt)
+                if CalendarEvent.objects.filter(
+                        user=account.user, email_message=em,
+                        start_at=dt).exists():
+                    continue
+                CalendarEvent.objects.create(
+                    user=account.user,
+                    title=d.get('title', 'Дедлайн з листа')[:300],
+                    description=d.get('description', '')[:500],
+                    event_type=CalendarEvent.TYPE_DEADLINE,
+                    start_at=dt,
+                    email_message=em,
+                    remind_minutes_before=60,
+                )
+                logger.info('Calendar event created from email uid=%s: %s', em.imap_uid, d.get('title'))
+            except Exception as exc:
+                logger.error('deadline create error: %s', exc)
+
+    def _auto_reply(self, em, account, es, thread):
+        """Generate AI reply for inbox message; save as draft or schedule to send."""
+        from email_assistant import ai_helper
+        from email_assistant.models import EmailDraft, ScheduledEmail
+        from django.utils import timezone
+
+        try:
+            profile = account.user.profile
+        except Exception:
+            profile = None
+
+        msgs = list(thread.messages.order_by('sent_at')) if thread else [em]
+        reply_text = ai_helper.generate_reply(msgs, account, profile)
+        if not reply_text:
+            return
+
+        subject = em.subject or ''
+        if not subject.lower().startswith('re:'):
+            subject = f'Re: {subject}'
+
+        to_emails = [em.from_email] if em.from_email else []
+
+        if es.auto_reply_mode == 'draft':
+            EmailDraft.objects.create(
+                account=account,
+                reply_to=em,
+                subject=subject,
+                to_emails=to_emails,
+                body=reply_text,
+            )
+            logger.info('Auto-reply draft created for uid=%s', em.imap_uid)
+        else:
+            ScheduledEmail.objects.create(
+                account=account,
+                subject=subject,
+                to_emails=to_emails,
+                body=reply_text,
+                scheduled_at=timezone.now(),
+                trigger='auto_reply',
+            )
+            logger.info('Auto-reply scheduled for uid=%s', em.imap_uid)
 
     def _sync_to_crm(self, email_msg, customer, account):
         try:

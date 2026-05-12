@@ -202,7 +202,16 @@ class EmailSettingsAdmin(admin.ModelAdmin):
     list_display = ('user', 'ai_auto_suggest_reply', 'sync_to_crm_timeline', 'mark_read_on_server', 'telegram_notify_new')
     fieldsets = (
         ("🤖 AI функції", {
-            'fields': ('ai_auto_suggest_reply', 'ai_auto_translate', 'ai_translate_to'),
+            'fields': ('ai_auto_suggest_reply', 'ai_auto_translate', 'ai_translate_to',
+                       'deadline_detection'),
+        }),
+        ("🔄 Автовідповідь", {
+            'fields': ('auto_reply_enabled', 'auto_reply_mode', 'auto_reply_prompt'),
+            'description': 'Minerva AI генерує відповідь автоматично при отриманні нового листа.',
+        }),
+        ("🛒 Тригер: нове замовлення", {
+            'fields': ('order_trigger_enabled',),
+            'description': 'При створенні нового замовлення AI генерує чернетку листа клієнту.',
         }),
         ("✍️ Підпис (застарілий — використовуй підпис акаунту)", {
             'fields': ('auto_signature', 'signature_position', 'signature'),

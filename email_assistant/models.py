@@ -213,6 +213,23 @@ class EmailSettings(models.Model):
         default=True, verbose_name='Показувати панель навігації Minerva',
         help_text='Відображати ліве меню системи на сторінках Email асистента')
 
+    # Auto-reply
+    auto_reply_enabled = models.BooleanField(
+        default=False, verbose_name='Автовідповідь',
+        help_text='Minerva AI автоматично генерує відповідь на вхідні листи')
+    auto_reply_mode = models.CharField(
+        max_length=10, default='draft',
+        choices=[('draft', 'Зберегти як чернетку'), ('send', 'Надіслати одразу')],
+        verbose_name='Режим автовідповіді')
+    auto_reply_prompt = models.TextField(
+        blank=True, verbose_name='Інструкція для AI (автовідповідь)',
+        help_text='Порожньо — стандартна інструкція генерації відповіді')
+
+    # Order trigger
+    order_trigger_enabled = models.BooleanField(
+        default=False, verbose_name='Нове замовлення → чернетка листа',
+        help_text='При кожному новому замовленні AI генерує чернетку листа клієнту')
+
     class Meta:
         verbose_name = 'Налаштування Email асистента'
 
