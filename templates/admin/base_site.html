@@ -940,20 +940,10 @@
 
 /* ── Sidebar groups ── */
 document.addEventListener('DOMContentLoaded', function(){
-  /* Django 5.x: #nav-sidebar IS the container.
-     On non-admin pages (e.g. /email/) sidebar_enabled=False → no #nav-sidebar rendered.
-     Create it dynamically so the sidebar still appears. */
+  /* Django renders #nav-sidebar only when is_nav_sidebar_enabled=True.
+     If absent — sidebar is disabled by user setting; do nothing. */
   var sidebar = document.getElementById('nav-sidebar');
-  if (!sidebar) {
-    sidebar = document.createElement('nav');
-    sidebar.id = 'nav-sidebar';
-    sidebar.className = 'sticky';
-    var _main = document.getElementById('main');
-    if (_main && _main.parentNode) {
-      _main.parentNode.insertBefore(sidebar, _main);
-    }
-    if (!sidebar.parentNode) return; // nowhere to attach — give up
-  }
+  if (!sidebar) return;
 
   /* ── Drag-and-drop order persistence ── */
   var _ORDER_KEY = 'mg-order';
