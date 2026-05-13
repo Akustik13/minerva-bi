@@ -1329,7 +1329,19 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
-    
+
+    def save_formset(self, request, form, formset, change):
+        super().save_formset(request, form, formset, change)
+        from django.contrib import messages
+        for f in formset.forms:
+            instance = getattr(f, 'instance', None)
+            msg = getattr(instance, '_inventory_correction_msg', None)
+            if msg:
+                messages.warning(
+                    request,
+                    f'⚠️ Склад автоматично скориговано: {msg}',
+                )
+
     def get_form(self, request, obj=None, **kwargs):
         """Підставляє збережений шлях із session або settings; динамічні джерела."""
         from django.conf import settings as _s

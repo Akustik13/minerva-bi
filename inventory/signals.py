@@ -162,10 +162,17 @@ def setup_sales_signals():
         weak=False,
     )
 
-    # ── POST-SAVE SalesOrderLine: CREATION mode ───────────────────────────────
+    # ── PRE-SAVE SalesOrderLine: capture old state for correction detection ──────
+    pre_save.connect(
+        _capture_salesorderline_old_state,
+        sender=SalesOrderLine,
+        dispatch_uid="inventory_capture_salesorderline_state",
+        weak=False,
+    )
+
+    # ── POST-SAVE SalesOrderLine: CREATION mode + SKU/QTY change correction ─────
     # При deduct_on='creation' списуємо КОЖЕН рядок одразу після збереження.
-    # Це обходить проблему порожнього instance.lines.all() при першому збереженні
-    # батьківського SalesOrder через Django Admin inline.
+    # Також обробляє зміни SKU / кількості в існуючих рядках (авто-коригування).
     post_save.connect(
         _salesorderline_post_save,
         sender=SalesOrderLine,
@@ -273,17 +280,118 @@ def _salesorder_post_save(sender, instance, created, **kwargs):
             )
 
 
+def _capture_salesorderline_old_state(sender, instance, **kwargs):
+    """Зберігаємо попередній product_id і qty для detection змін у post_save."""
+    if instance.pk:
+        try:
+            old = sender.objects.get(pk=instance.pk)
+            instance._old_product_id = old.product_id
+            instance._old_qty        = old.qty
+        except sender.DoesNotExist:
+            instance._old_product_id = None
+            instance._old_qty        = None
+    else:
+        instance._old_product_id = None
+        instance._old_qty        = None
+
+
+def _correct_salesorderline_tx(line, old_product_id, old_qty, order, location):
+    """
+    При зміні SKU або кількості в рядку замовлення:
+    1. Знаходить існуючі транзакції для цього рядка
+    2. Створює Adjustment-транзакцію (+qty) для старого товару (повернення)
+    3. Видаляє старі транзакції рядка
+    4. Створює нову транзакцію (-qty) для нового товару
+
+    Повертає опис коригування або None якщо нічого не змінювалось.
+    """
+    from inventory.models import Product
+
+    prefix = f"so:{order.source}:{order.order_number}:line:{line.pk}:"
+    existing = list(InventoryTransaction.objects.filter(external_key__startswith=prefix))
+    if not existing:
+        return None  # Не було транзакцій — нічого коригувати
+
+    settings = InventorySettings.get()
+    use_reservation = getattr(settings, 'use_reservation', False)
+
+    try:
+        performer = None
+        try:
+            from core.utils import get_current_user
+            performer = get_current_user()
+        except Exception:
+            pass
+
+        old_product = None
+        if old_product_id:
+            try:
+                old_product = Product.objects.get(pk=old_product_id)
+            except Product.DoesNotExist:
+                pass
+
+        reversal_qty = abs(old_qty or Decimal("0"))
+        if old_product and reversal_qty > 0:
+            InventoryTransaction.objects.create(
+                external_key=f"so-adj:{order.source}:{order.order_number}:line:{line.pk}:rev:{uuid.uuid4()}",
+                tx_type=InventoryTransaction.TxType.ADJUSTMENT,
+                qty=reversal_qty,
+                product=old_product,
+                location=location,
+                ref_doc=(f"Коригування зміни SKU: {old_product.sku}"
+                         f" → {line.product.sku if line.product else '?'}"
+                         f" | SO-{order.source}:{order.order_number}"),
+                tx_date=timezone.now(),
+                performed_by=performer,
+            )
+
+        # Remove old line transactions
+        for tx in existing:
+            tx.delete()
+
+        # Create new deduction for current product
+        if line.product_id and line.qty > 0:
+            tx_type = (InventoryTransaction.TxType.RESERVED
+                       if use_reservation
+                       else InventoryTransaction.TxType.OUTGOING)
+            InventoryTransaction.objects.create(
+                external_key=f"so:{order.source}:{order.order_number}:line:{line.pk}:{uuid.uuid4()}",
+                tx_type=tx_type,
+                qty=-abs(line.qty),
+                product=line.product,
+                location=location,
+                ref_doc=f"SO-{order.source}:{order.order_number}",
+                tx_date=order.order_date or timezone.now(),
+                performed_by=performer,
+            )
+
+        msg = (f"SKU {old_product.sku if old_product else '?'}"
+               f" → {line.product.sku if line.product else '?'}, "
+               f"qty {old_qty} → {line.qty}")
+        logger.info(
+            "Inventory: corrected line %s of order %s:%s — %s",
+            line.pk, order.source, order.order_number, msg,
+        )
+        return msg
+
+    except Exception as e:
+        logger.error(
+            "Inventory: correction failed for line %s order %s:%s — %s",
+            line.pk, order.source, order.order_number, e,
+        )
+        return None
+
+
 def _salesorderline_post_save(sender, instance, created, **kwargs):
     """
     CREATION mode / Reservation: транзакція при збереженні рядка замовлення.
 
     - deduct_on='creation' + use_reservation=False → OUTGOING одразу
     - use_reservation=True (будь-який deduct_on)    → RESERVED (бронювання)
-    Тільки для нових рядків.
-    """
-    if not created:
-        return
 
+    Для нових рядків (created=True): стандартне списання/бронювання.
+    Для оновлених (created=False): перевіряє зміну SKU/кількості й авто-коригує склад.
+    """
     order = instance.order
     if not order.affects_stock:
         return
@@ -295,22 +403,46 @@ def _salesorderline_post_save(sender, instance, created, **kwargs):
 
     use_reservation = getattr(settings, 'use_reservation', False)
 
-    # Спрацьовуємо якщо: режим CREATION або увімкнено бронювання
-    if not use_reservation and settings.deduct_on != InventorySettings.DeductOn.CREATION:
+    if created:
+        # ── Нова позиція ───────────────────────────────────────────────────────
+        if not use_reservation and settings.deduct_on != InventorySettings.DeductOn.CREATION:
+            return
+        if instance.qty <= 0:
+            return
+        tx_type = (InventoryTransaction.TxType.RESERVED
+                   if use_reservation
+                   else InventoryTransaction.TxType.OUTGOING)
+        try:
+            location = _get_or_create_location(settings)
+            _deduct_line(instance, order, location, tx_type=tx_type)
+        except Exception as e:
+            logger.error(
+                "Inventory: failed to create %s transaction for line %s order %s:%s — %s",
+                tx_type, instance.pk, order.source, order.order_number, e,
+            )
         return
 
-    if instance.qty <= 0:
-        return
+    # ── Оновлення існуючого рядка: перевіряємо чи змінився SKU або qty ────────
+    old_product_id = getattr(instance, '_old_product_id', None)
+    old_qty        = getattr(instance, '_old_qty', None)
 
-    tx_type = (InventoryTransaction.TxType.RESERVED
-               if use_reservation
-               else InventoryTransaction.TxType.OUTGOING)
+    if old_product_id is None:
+        return  # pre_save не захопив стан — нічого робити
+
+    product_changed = (old_product_id != instance.product_id)
+    qty_changed     = (old_qty is not None and old_qty != instance.qty)
+
+    if not product_changed and not qty_changed:
+        return
 
     try:
         location = _get_or_create_location(settings)
-        _deduct_line(instance, order, location, tx_type=tx_type)
+        correction = _correct_salesorderline_tx(instance, old_product_id, old_qty, order, location)
+        if correction:
+            # Store the correction message on the instance so admin can display it
+            instance._inventory_correction_msg = correction
     except Exception as e:
         logger.error(
-            "Inventory: failed to create %s transaction for line %s order %s:%s — %s",
-            tx_type, instance.pk, order.source, order.order_number, e,
+            "Inventory: SKU-change correction failed for line %s order %s:%s — %s",
+            instance.pk, order.source, order.order_number, e,
         )
