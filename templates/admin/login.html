@@ -7,312 +7,125 @@
 <title>Minerva — Вхід</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
-
-:root {
-  --gold:       #c9a84c;
-  --gold-light: #e8d5a3;
-  --gold-dark:  #8b6914;
-  --bg:         #080b0f;
-  --bg2:        #0d1117;
-  --border:     rgba(201,168,76,0.15);
-  --text:       #f5edd1;
-  --muted:      rgba(245,237,209,0.65);
-  --err:        #e05a5a;
-}
-*,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
-html,body {
-  height:100%;
-  font-family:'Crimson Pro', Georgia, serif;
-  background:var(--bg);
-  color:var(--text);
-  overflow:hidden;
-}
-
-/* ── Зірки ── */
-.stars { position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
-.star {
-  position:absolute; background:#fff; border-radius:50%;
-  animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s);
-}
-@keyframes twinkle {
-  0%,100% { opacity:var(--min,.1); transform:scale(1); }
-  50%      { opacity:var(--max,.7); transform:scale(1.3); }
-}
-
-/* ── Glow ── */
-.glow-bg {
-  position:fixed; inset:0; z-index:0; pointer-events:none;
-  background:
-    radial-gradient(ellipse 60% 50% at 50% -10%, rgba(201,168,76,0.12) 0%, transparent 70%),
-    radial-gradient(ellipse 40% 30% at 80% 80%, rgba(139,105,20,0.08) 0%, transparent 60%);
-}
-.line-top {
-  position:fixed; top:0; left:0; right:0; height:1px; z-index:100;
-  background:linear-gradient(90deg, transparent, var(--gold), transparent);
-  animation:shimmer 4s ease-in-out infinite;
-}
-@keyframes shimmer { 0%,100%{opacity:.4} 50%{opacity:1} }
-
-/* ── Layout ── */
-.page {
-  position:relative; z-index:10;
-  min-height:100vh;
-  display:flex; align-items:center; justify-content:center;
-  padding:40px 20px;
-}
-.card {
-  width:100%; max-width:420px;
-  text-align:center;
-  animation:riseUp .9s cubic-bezier(.16,1,.3,1) both;
-}
-@keyframes riseUp {
-  from { opacity:0; transform:translateY(30px); }
-  to   { opacity:1; transform:translateY(0); }
-}
-
-/* ── Owl SVG container ── */
+:root{--gold:#c9a84c;--gold-light:#e8d5a3;--gold-dark:#8b6914;--bg:#080b0f;--bg2:#0d1117;--border:rgba(201,168,76,0.15);--text:#f5edd1;--muted:rgba(245,237,209,0.65);--err:#e05a5a;}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;font-family:'Crimson Pro',Georgia,serif;background:var(--bg);color:var(--text);overflow:hidden;}
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s);}
+@keyframes twinkle{0%,100%{opacity:var(--min,.1);transform:scale(1);}50%{opacity:var(--max,.7);transform:scale(1.3);}}
+.glow-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 60% 50% at 50% -10%,rgba(201,168,76,.12) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 80% 80%,rgba(139,105,20,.08) 0%,transparent 60%);}
+.line-top{position:fixed;top:0;left:0;right:0;height:1px;z-index:100;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:shimmer 4s ease-in-out infinite;}
+@keyframes shimmer{0%,100%{opacity:.4}50%{opacity:1}}
+.page{position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;}
+.card{width:100%;max-width:420px;text-align:center;animation:riseUp .9s cubic-bezier(.16,1,.3,1) both;}
+@keyframes riseUp{from{opacity:0;transform:translateY(30px);}to{opacity:1;transform:translateY(0);}}
+/* ── Реалістична SVG Сова ── */
 .owl-container {
-  position:relative;
-  width:120px; height:120px;
-  margin:0 auto 32px;
-  display:flex; align-items:center; justify-content:center;
+  position: relative; margin-bottom: 40px;
+  animation: riseUp 1.2s cubic-bezier(.16,1,.3,1) both;
 }
-.owl-container .owl-ring {
-  position:absolute; inset:-18px;
-  border:1px solid rgba(201,168,76,0.25);
-  border-radius:50%;
-  animation:rotateSlow 22s linear infinite;
-  box-shadow:0 0 20px rgba(201,168,76,0.1);
-}
-.owl-container .owl-ring::before {
-  content:'✦'; position:absolute;
-  top:-7px; left:50%; transform:translateX(-50%);
-  font-size:12px; color:var(--gold);
-}
-.owl-container .owl-ring2 {
-  position:absolute; inset:-36px;
-  border:1px solid rgba(201,168,76,0.12);
-  border-radius:50%;
-  animation:rotateSlow 38s linear infinite reverse;
-}
-@keyframes rotateSlow { to { transform:rotate(360deg); } }
 .owl-svg {
-  width:120px; height:120px;
-  filter:drop-shadow(0 0 30px rgba(201,168,76,0.5))
-         drop-shadow(0 2px 12px rgba(0,0,0,0.6));
-  animation:float 6s ease-in-out infinite;
+  width: 120px; height: 120px;
+  filter: drop-shadow(0 0 40px rgba(201,168,76,0.5))
+          drop-shadow(0 0 80px rgba(201,168,76,0.2))
+          drop-shadow(0 4px 20px rgba(0,0,0,0.6));
+  animation: float 6s ease-in-out infinite;
 }
 @keyframes float {
-  0%,100% { transform:translateY(0) rotate(-.5deg); }
-  50%      { transform:translateY(-12px) rotate(.5deg); }
+  0%,100% { transform: translateY(0) rotate(-0.5deg); }
+  50%      { transform: translateY(-15px) rotate(0.5deg); }
 }
-
-/* ── Brand ── */
-.eyebrow {
-  font-family:'Cinzel', serif; font-size:10px; font-weight:600;
-  letter-spacing:5px; text-transform:uppercase;
-  color:var(--gold-light); margin-bottom:10px;
-  text-shadow:0 0 15px rgba(201,168,76,0.5),0 2px 4px rgba(0,0,0,0.8);
+.owl-ring {
+  position: absolute; inset: -16px;
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 50%;
+  animation: rotateSlow 20s linear infinite;
+  box-shadow: 0 0 30px rgba(201,168,76,0.15);
 }
-.brand-title {
-  font-family:'Cinzel', serif;
-  font-size:38px; font-weight:900; line-height:1;
-  letter-spacing:2px;
-  background:linear-gradient(135deg, #f5edd1, var(--gold-light), var(--gold));
-  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
-  background-clip:text;
-  filter:drop-shadow(0 0 20px rgba(201,168,76,0.3));
-  margin-bottom:6px;
+.owl-ring::before {
+  content: '✦'; position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: var(--gold);
 }
-.brand-sub {
-  font-family:'Cinzel', serif; font-size:9px;
-  letter-spacing:5px; text-transform:uppercase;
-  color:rgba(201,168,76,0.4); margin-bottom:32px;
+@keyframes rotateSlow { to { transform: rotate(360deg); } }
+.owl-ring2 {
+  position: absolute; inset: -32px;
+  border: 1px solid rgba(201,168,76,0.15);
+  border-radius: 50%;
+  animation: rotateSlow 35s linear infinite reverse;
 }
-
-/* ── Divider ── */
-.sep { display:flex; align-items:center; gap:14px; margin-bottom:28px; }
-.sep-line { flex:1; height:1px; background:linear-gradient(to right, transparent, var(--border), transparent); }
-.sep-sym { font-size:12px; color:rgba(201,168,76,0.35); }
-
-/* ── Form ── */
-.form-group { margin-bottom:14px; text-align:left; }
-.form-group label {
-  display:block;
-  font-family:'Cinzel', serif; font-size:9px;
-  letter-spacing:2px; text-transform:uppercase;
-  color:rgba(201,168,76,0.55); margin-bottom:7px;
-}
-.form-group input {
-  width:100%; padding:13px 16px;
-  background:rgba(201,168,76,0.04);
-  border:1px solid var(--border);
-  border-radius:4px;
-  color:var(--text);
-  font-family:'Crimson Pro', serif; font-size:16px;
-  outline:none;
-  transition:border-color .25s, box-shadow .25s;
-}
-.form-group input:focus {
-  border-color:rgba(201,168,76,0.5);
-  box-shadow:0 0 20px rgba(201,168,76,0.08);
-}
-.form-group input::placeholder { color:rgba(245,237,209,0.2); }
-
-/* ── Errors ── */
-.errors {
-  background:rgba(224,90,90,0.07);
-  border:1px solid rgba(224,90,90,0.22);
-  border-radius:4px; padding:10px 14px;
-  margin-bottom:14px; font-size:14px; color:var(--err); text-align:left;
-}
-.notice {
-  background:rgba(201,168,76,0.05);
-  border:1px solid var(--border);
-  border-radius:4px; padding:10px 14px;
-  margin-bottom:14px; font-size:14px; color:var(--muted); text-align:center;
-  font-family:'Cinzel', serif; font-size:10px; letter-spacing:1px;
-}
-
-/* ── Button ── */
-.btn-login {
-  width:100%; padding:14px;
-  margin-top:6px;
-  font-family:'Cinzel', serif; font-size:11px;
-  font-weight:700; letter-spacing:4px; text-transform:uppercase;
-  color:var(--bg); border:none; border-radius:4px; cursor:pointer;
-  background:linear-gradient(90deg, #7a5810 0%, #a8792a 25%, #c9a84c 55%, #d4a83a 80%, #e8c85a 100%);
-  position:relative; overflow:hidden;
-  transition:transform .2s, box-shadow .3s;
-  box-shadow:0 3px 14px rgba(0,0,0,0.5), 0 0 8px rgba(201,168,76,0.1);
-}
-.btn-login::before {
-  content:''; position:absolute;
-  top:0; left:-75%; width:50%; height:100%;
-  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.22), transparent);
-  transform:skewX(-18deg); opacity:0; transition:opacity .3s;
-}
-.btn-login:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(201,168,76,0.4); }
-.btn-login:hover::before { opacity:1; animation:btnShimmer 3.5s ease-in-out infinite; }
-@keyframes btnShimmer { 0%{left:-75%} 70%{left:125%} 100%{left:125%} }
-
-/* ── Forgot link ── */
-.link-row {
-  margin-top:18px;
-  font-family:'Cinzel', serif; font-size:9px;
-  letter-spacing:2px; color:rgba(201,168,76,0.4);
-}
-.link-row a {
-  color:rgba(201,168,76,0.5); text-decoration:none;
-  transition:color .2s;
-}
-.link-row a:hover { color:var(--gold-light); }
-
-/* ── Back ── */
-.back-link {
-  position:fixed; top:22px; left:28px; z-index:100;
-  text-decoration:none; color:rgba(201,168,76,0.4);
-  font-family:'Cinzel', serif; font-size:9px; letter-spacing:2px;
-  transition:color .2s;
-}
-.back-link:hover { color:var(--gold-light); }
-
-@media(max-width:480px) {
-  .back-link { top:14px; left:14px; }
-  .owl-svg { width:90px; height:90px; }
-  .owl-container { width:90px; height:90px; }
-}
+.owl-container{margin-bottom:28px;}
+.owl-toggle{cursor:pointer;position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center;}
+.eyebrow{font-family:'Cinzel',serif;font-size:9px;font-weight:600;letter-spacing:5px;text-transform:uppercase;color:var(--gold-light);margin-bottom:10px;text-shadow:0 0 15px rgba(201,168,76,.5),0 2px 4px rgba(0,0,0,.8);}
+.brand-title{font-family:'Cinzel',serif;font-size:38px;font-weight:900;line-height:1;letter-spacing:2px;background:linear-gradient(135deg,#f5edd1,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(201,168,76,.3));margin-bottom:6px;}
+.brand-sub{font-family:'Cinzel',serif;font-size:9px;letter-spacing:5px;text-transform:uppercase;color:rgba(201,168,76,.4);margin-bottom:30px;}
+.sep{display:flex;align-items:center;gap:14px;margin-bottom:24px;}
+.sep-line{flex:1;height:1px;background:linear-gradient(to right,transparent,var(--border),transparent);}
+.sep-sym{font-size:11px;color:rgba(201,168,76,.35);}
+.form-group{margin-bottom:14px;text-align:left;}
+.form-group label{display:block;font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,.55);margin-bottom:7px;}
+.form-group input{width:100%;padding:13px 16px;background:rgba(201,168,76,.04);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Crimson Pro',serif;font-size:16px;outline:none;transition:border-color .25s,box-shadow .25s;}
+.form-group input:focus{border-color:rgba(201,168,76,.5);box-shadow:0 0 20px rgba(201,168,76,.08);}
+.form-group input::placeholder{color:rgba(245,237,209,.2);}
+.errors{background:rgba(224,90,90,.07);border:1px solid rgba(224,90,90,.22);border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:14px;color:var(--err);text-align:left;}
+.notice{background:rgba(201,168,76,.05);border:1px solid var(--border);border-radius:4px;padding:10px 14px;margin-bottom:14px;font-family:'Cinzel',serif;font-size:10px;letter-spacing:1px;color:var(--muted);text-align:center;}
+.btn-login{width:100%;padding:14px;margin-top:6px;font-family:'Cinzel',serif;font-size:10px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--bg);border:none;border-radius:4px;cursor:pointer;background:linear-gradient(90deg,#7a5810 0%,#a8792a 25%,#c9a84c 55%,#d4a83a 80%,#e8c85a 100%);position:relative;overflow:hidden;transition:transform .2s,box-shadow .3s;box-shadow:0 3px 14px rgba(0,0,0,.5),0 0 8px rgba(201,168,76,.1);}
+.btn-login::before{content:'';position:absolute;top:0;left:-75%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);transform:skewX(-18deg);opacity:0;transition:opacity .3s;}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(201,168,76,.4);}
+.btn-login:hover::before{opacity:1;animation:btnShimmer 3.5s ease-in-out infinite;}
+@keyframes btnShimmer{0%{left:-75%}70%{left:125%}100%{left:125%}}
+.link-row{margin-top:18px;font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;color:rgba(201,168,76,.4);}
+.link-row a{color:rgba(201,168,76,.5);text-decoration:none;transition:color .2s;}
+.link-row a:hover{color:var(--gold-light);}
+.back-link{position:fixed;top:22px;left:28px;z-index:100;text-decoration:none;color:rgba(201,168,76,.4);font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;transition:color .2s;}
+.back-link:hover{color:var(--gold-light);}
+@media(max-width:480px){.back-link{top:14px;left:14px;}.owl-svg{width:90px;height:90px;}.owl-container{width:90px;height:90px;}}
 </style>
 </head>
 <body>
-
 <div class="line-top"></div>
 <div class="glow-bg"></div>
 <div class="stars" id="stars"></div>
-
 <a href="/" class="back-link">← MINERVA</a>
-
 <div class="page">
   <div class="card">
-
     <div class="owl-container">
       <div class="owl-ring2"></div>
       <div class="owl-ring"></div>
       {% include "includes/owl.html" %}
     </div>
-
     <p class="eyebrow">Business Intelligence System</p>
     <h1 class="brand-title">Minerva</h1>
     <p class="brand-sub">SAPIENTIA · VISIO · IMPERIUM</p>
-
-    <div class="sep">
-      <div class="sep-line"></div>
-      <div class="sep-sym">✦</div>
-      <div class="sep-line"></div>
-    </div>
-
+    <div class="sep"><div class="sep-line"></div><div class="sep-sym">✦</div><div class="sep-line"></div></div>
     {% if form.errors %}
     <div class="errors">
-      {% for field in form %}
-        {% for error in field.errors %}{{ error }}<br>{% endfor %}
-      {% endfor %}
+      {% for field in form %}{% for error in field.errors %}{{ error }}<br>{% endfor %}{% endfor %}
       {% for error in form.non_field_errors %}{{ error }}<br>{% endfor %}
     </div>
     {% endif %}
-
-    {% if next %}
-    <div class="notice">УВІЙДІТЬ ЩОБ ПРОДОВЖИТИ</div>
-    {% endif %}
-
+    {% if next %}<div class="notice">УВІЙДІТЬ ЩОБ ПРОДОВЖИТИ</div>{% endif %}
     <form method="post" action="{% url 'admin:login' %}">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ next }}">
-
       <div class="form-group">
         <label for="id_username">Логін</label>
-        <input type="text" id="id_username" name="username"
-               value="{{ form.username.value|default:'' }}"
-               autocomplete="username" autofocus
-               placeholder="ваш логін">
+        <input type="text" id="id_username" name="username" value="{{ form.username.value|default:'' }}" autocomplete="username" autofocus placeholder="ваш логін">
       </div>
-
       <div class="form-group">
         <label for="id_password">Пароль</label>
-        <input type="password" id="id_password" name="password"
-               autocomplete="current-password"
-               placeholder="••••••••">
+        <input type="password" id="id_password" name="password" autocomplete="current-password" placeholder="••••••••">
       </div>
-
       <button type="submit" class="btn-login">Увійти до системи</button>
     </form>
-
     <div class="link-row">
       <a href="{% url 'password_reset' %}">Забули пароль?</a>
+      &nbsp;·&nbsp;
+      <a href="/register/">Реєстрація</a>
     </div>
-
   </div>
 </div>
-
 <script>
-(function(){
-  var c = document.getElementById('stars');
-  for(var i=0;i<100;i++){
-    var s=document.createElement('div');
-    s.className='star';
-    var sz=Math.random()*2+0.4;
-    s.style.cssText=[
-      'width:'+sz+'px','height:'+sz+'px',
-      'left:'+Math.random()*100+'%',
-      'top:'+Math.random()*100+'%',
-      '--d:'+(2+Math.random()*4)+'s',
-      '--delay:-'+(Math.random()*5)+'s',
-      '--min:'+(0.05+Math.random()*0.1),
-      '--max:'+(0.35+Math.random()*0.5)
-    ].join(';');
-    c.appendChild(s);
-  }
-})();
+(function(){var c=document.getElementById('stars');for(var i=0;i<100;i++){var s=document.createElement('div');s.className='star';var sz=Math.random()*2+0.4;s.style.cssText=['width:'+sz+'px','height:'+sz+'px','left:'+Math.random()*100+'%','top:'+Math.random()*100+'%','--d:'+(2+Math.random()*4)+'s','--delay:-'+(Math.random()*5)+'s','--min:'+(0.05+Math.random()*.1),'--max:'+(0.35+Math.random()*.5)].join(';');c.appendChild(s);}})();
 </script>
-
 </body>
 </html>

@@ -3,157 +3,205 @@
   <span data-li="uk">Реєстрація</span><span data-li="de">Registrierung</span><span data-li="en">Register</span> — Minerva
 {% endblock %}
 {% block body %}
-<div class="card">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+:root{--gold:#c9a84c;--gold-light:#e8d5a3;--gold-dark:#8b6914;--bg:#080b0f;--border:rgba(201,168,76,0.15);--text:#f5edd1;--muted:rgba(245,237,209,0.65);--err:#e05a5a;}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s);}
+@keyframes twinkle{0%,100%{opacity:var(--min,.1);}50%{opacity:var(--max,.7);}}
+.glow-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 60% 50% at 50% -10%,rgba(201,168,76,.12) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 80% 80%,rgba(139,105,20,.08) 0%,transparent 60%);}
+.line-top{position:fixed;top:0;left:0;right:0;height:1px;z-index:100;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:shimmer 4s ease-in-out infinite;}
+@keyframes shimmer{0%,100%{opacity:.4}50%{opacity:1}}
+.reg-page{position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;}
+.reg-card{width:100%;max-width:520px;background:repeating-linear-gradient(118deg,transparent 0,transparent 60px,rgba(201,168,76,.03) 60px,rgba(201,168,76,.03) 61px),linear-gradient(160deg,#0f1520 0%,#0b1018 50%,#101820 100%);border:1px solid var(--border);border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 60px rgba(201,168,76,.06);padding:44px 40px 40px;animation:riseUp .9s cubic-bezier(.16,1,.3,1) both;position:relative;overflow:hidden;}
+.reg-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(201,168,76,.5),rgba(232,213,163,.9),rgba(201,168,76,.5),transparent);}
+@keyframes riseUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+/* ── Реалістична SVG Сова ── */
+.owl-container {
+  position: relative; margin-bottom: 40px;
+  animation: riseUp 1.2s cubic-bezier(.16,1,.3,1) both;
+}
+.owl-svg {
+  width: 100px; height: 100px;
+  filter: drop-shadow(0 0 40px rgba(201,168,76,0.5))
+          drop-shadow(0 0 80px rgba(201,168,76,0.2))
+          drop-shadow(0 4px 20px rgba(0,0,0,0.6));
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes float {
+  0%,100% { transform: translateY(0) rotate(-0.5deg); }
+  50%      { transform: translateY(-10px) rotate(0.5deg); }
+}
+.owl-ring {
+  position: absolute; inset: -14px;
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 50%;
+  animation: rotateSlow 20s linear infinite;
+  box-shadow: 0 0 30px rgba(201,168,76,0.15);
+}
+.owl-ring::before {
+  content: '✦'; position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+  font-size: 12px; color: var(--gold);
+}
+@keyframes rotateSlow { to { transform: rotate(360deg); } }
+.owl-ring2 {
+  position: absolute; inset: -28px;
+  border: 1px solid rgba(201,168,76,0.15);
+  border-radius: 50%;
+  animation: rotateSlow 35s linear infinite reverse;
+}
+.owl-container{margin:0 auto 24px;width:100px;height:100px;}
+.owl-toggle{cursor:pointer;position:relative;width:100px;height:100px;display:flex;align-items:center;justify-content:center;}
+.back-link{display:inline-flex;align-items:center;gap:6px;margin-bottom:24px;font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,.45);text-decoration:none;transition:color .2s;}
+.back-link:hover{color:var(--gold-light);}
+.reg-brand{text-align:center;margin-bottom:24px;}
+.reg-title{font-family:'Cinzel',serif;font-size:28px;font-weight:900;line-height:1;background:linear-gradient(135deg,#f5edd1,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(201,168,76,.3));margin-bottom:4px;}
+.reg-sub-title{font-family:'Cinzel',serif;font-size:8px;letter-spacing:4px;color:rgba(201,168,76,.4);}
+.reg-trial{margin-top:10px;font-size:13px;font-style:italic;color:var(--muted);}
+.reg-trial em{color:var(--gold-light);font-style:normal;}
+.sep{display:flex;align-items:center;gap:12px;margin:18px 0;}
+.sep-line{flex:1;height:1px;background:linear-gradient(to right,transparent,var(--border),transparent);}
+.sep-sym{font-size:10px;color:rgba(201,168,76,.3);}
+label{display:block;font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,.55);margin-bottom:7px;margin-top:16px;}
+label:first-of-type{margin-top:0;}
+input[type=text],input[type=email],input[type=tel],input[type=password],select{width:100%;padding:12px 15px;background:rgba(201,168,76,.04);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'Crimson Pro',serif;font-size:15px;outline:none;transition:border-color .25s,box-shadow .25s;-webkit-appearance:none;appearance:none;}
+input:focus,select:focus{border-color:rgba(201,168,76,.5);box-shadow:0 0 18px rgba(201,168,76,.08);}
+input::placeholder{color:rgba(245,237,209,.2);}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(201,168,76,0.4)'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer;}
+select option{background:#0d1117;color:var(--text);}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;}
+.two-col>div{display:flex;flex-direction:column;}
+.err{font-size:12px;color:var(--err);margin-top:4px;}
+.err-box{background:rgba(224,90,90,.07);border:1px solid rgba(224,90,90,.22);border-radius:4px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:var(--err);}
+.pkg-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px;}
+.pkg{padding:14px 8px;border-radius:4px;text-align:center;cursor:pointer;border:1px solid var(--border);background:rgba(201,168,76,.03);transition:all .2s;}
+.pkg:hover{border-color:rgba(201,168,76,.4);background:rgba(201,168,76,.07);}
+.pkg.selected{border-color:var(--gold);background:rgba(201,168,76,.1);box-shadow:0 0 16px rgba(201,168,76,.15);}
+.pkg-name{font-family:'Cinzel',serif;font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold-light);margin-bottom:4px;}
+.pkg-price{font-family:'Cinzel',serif;font-size:14px;font-weight:700;color:var(--gold);}
+.check-row{display:flex;align-items:flex-start;gap:10px;margin-top:20px;}
+.check-row input[type=checkbox]{width:16px;height:16px;min-width:16px;border:1px solid var(--border);background:rgba(201,168,76,.04);border-radius:2px;accent-color:var(--gold);cursor:pointer;margin-top:2px;}
+.check-row label{font-family:'Crimson Pro',serif;font-size:13px;color:var(--muted);letter-spacing:0;text-transform:none;margin-top:0;line-height:1.5;}
+.link{color:rgba(201,168,76,.6);text-decoration:none;transition:color .2s;}
+.link:hover{color:var(--gold-light);}
+.divider{height:1px;background:var(--border);margin:24px 0;}
+.btn-submit{display:block;width:100%;padding:14px;margin-top:20px;font-family:'Cinzel',serif;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--bg);border:none;border-radius:4px;cursor:pointer;background:linear-gradient(90deg,#7a5810 0%,#a8792a 25%,#c9a84c 55%,#d4a83a 80%,#e8c85a 100%);position:relative;overflow:hidden;transition:transform .2s,box-shadow .3s;box-shadow:0 3px 14px rgba(0,0,0,.5);}
+.btn-submit::before{content:'';position:absolute;top:0;left:-75%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.22),transparent);transform:skewX(-18deg);opacity:0;}
+.btn-submit:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(201,168,76,.4);}
+.btn-submit:hover::before{opacity:1;animation:shine 3.5s ease-in-out infinite;}
+@keyframes shine{0%{left:-75%}70%{left:125%}100%{left:125%}}
+.footer-text{text-align:center;margin-top:20px;font-family:'Cinzel',serif;font-size:9px;letter-spacing:2px;color:rgba(201,168,76,.4);}
+.footer-text a{color:rgba(201,168,76,.5);text-decoration:none;transition:color .2s;}
+.footer-text a:hover{color:var(--gold-light);}
+@media(max-width:540px){.reg-card{padding:36px 24px 32px;}.reg-card::before{} .pkg-grid{grid-template-columns:repeat(2,1fr);}.two-col{grid-template-columns:1fr;}}
+</style>
 
-  <a href="/" class="logo">
-    <span class="logo-icon">🦉</span>
-    <span class="logo-name">Minerva</span>
-  </a>
+<div class="line-top"></div>
+<div class="glow-bg"></div>
+<div class="stars" id="reg-stars"></div>
 
-  <h2>
-    <span data-li="uk">Створити акаунт</span>
-    <span data-li="de">Konto erstellen</span>
-    <span data-li="en">Create account</span>
-  </h2>
-  <p class="sub">
-    <span data-li="uk">Пробний доступ 30 днів — безкоштовно, без прив'язки картки</span>
-    <span data-li="de">30 Tage Testzugang — kostenlos, keine Karte erforderlich</span>
-    <span data-li="en">30-day trial — free, no credit card required</span>
-  </p>
+<div class="reg-page">
+  <div class="reg-card">
+    <a href="/" class="back-link">← MINERVA</a>
+    <div class="reg-brand">
+      <div class="owl-container">
+        <div class="owl-ring2"></div>
+        <div class="owl-ring"></div>
+        {% include "includes/owl.html" %}
+      </div>
+      <div class="reg-title">Minerva</div>
+      <div class="reg-sub-title">SAPIENTIA · VISIO · IMPERIUM</div>
+      <p class="reg-trial">
+        <span data-li="uk">Пробний доступ <em>30 днів</em> — безкоштовно, без прив'язки картки</span>
+        <span data-li="de" style="display:none"><em>30 Tage</em> Testzugang — kostenlos, keine Karte</span>
+        <span data-li="en" style="display:none"><em>30-day</em> trial — free, no credit card required</span>
+      </p>
+    </div>
+    <div class="sep"><div class="sep-line"></div><div class="sep-sym">✦</div><div class="sep-line"></div></div>
 
-  <div class="sep"><div class="sep-line"></div><div class="sep-sym">✦</div><div class="sep-line"></div></div>
+    {% if form.non_field_errors %}
+    <div class="err-box">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
+    {% endif %}
 
-  {% if form.non_field_errors %}
-  <div class="cf-msg err-box">{% for e in form.non_field_errors %}{{ e }}{% endfor %}</div>
-  {% endif %}
-
-  <form method="post">
-    {% csrf_token %}
-
-    <label>
-      <span data-li="uk">Назва компанії *</span>
-      <span data-li="de">Firmenname *</span>
-      <span data-li="en">Company name *</span>
-    </label>
-    <input type="text" name="company_name" required
-           value="{{ form.company_name.value|default:'' }}"
-           placeholder="Müller GmbH">
-    {% if form.company_name.errors %}<div class="err">{{ form.company_name.errors.0 }}</div>{% endif %}
-
-    <label>
-      <span data-li="uk">Країна</span>
-      <span data-li="de">Land</span>
-      <span data-li="en">Country</span>
-    </label>
-    <select name="company_country">
-      {% for val, lbl in form.fields.company_country.choices %}
-      <option value="{{ val }}"{% if form.company_country.value == val %} selected{% endif %}>{{ lbl }}</option>
-      {% endfor %}
-    </select>
-
-    <label>
-      <span data-li="uk">Телефон</span>
-      <span data-li="de">Telefon</span>
-      <span data-li="en">Phone</span>
-    </label>
-    <input type="tel" name="contact_phone"
-           value="{{ form.contact_phone.value|default:'' }}"
-           placeholder="+49 123 456789">
-
-    <label>
-      <span data-li="uk">Ваше ім'я *</span>
-      <span data-li="de">Ihr Name *</span>
-      <span data-li="en">Your name *</span>
-    </label>
-    <input type="text" name="owner_name" required
-           value="{{ form.owner_name.value|default:'' }}"
-           placeholder="Hans Müller">
-    {% if form.owner_name.errors %}<div class="err">{{ form.owner_name.errors.0 }}</div>{% endif %}
-
-    <label>Email *</label>
-    <input type="email" name="email" required
-           value="{{ form.email.value|default:'' }}"
-           placeholder="hans@firma.de">
-    {% if form.email.errors %}<div class="err">{{ form.email.errors.0 }}</div>{% endif %}
-
-    <label>
-      <span data-li="uk">Пароль *</span>
-      <span data-li="de">Passwort *</span>
-      <span data-li="en">Password *</span>
-    </label>
-    <input type="password" name="password1" required placeholder="Мінімум 8 символів">
-    {% if form.password1.errors %}<div class="err">{{ form.password1.errors.0 }}</div>{% endif %}
-
-    <label>
-      <span data-li="uk">Підтвердіть пароль *</span>
-      <span data-li="de">Passwort bestätigen *</span>
-      <span data-li="en">Confirm password *</span>
-    </label>
-    <input type="password" name="password2" required placeholder="••••••••">
-    {% if form.password2.errors %}<div class="err">{{ form.password2.errors.0 }}</div>{% endif %}
-
-    <hr class="divider">
-
-    <label>
-      <span data-li="uk">Оберіть пакет</span>
-      <span data-li="de">Paket wählen</span>
-      <span data-li="en">Choose plan</span>
-    </label>
-    <div class="pkg-grid" id="pkg-grid">
-      {% for val, lbl in form.fields.package.choices %}
-      <label class="pkg {% if form.package.value == val or forloop.counter == 2 and not form.package.value %}selected{% endif %}">
-        <input type="radio" name="package" value="{{ val }}"
-               style="display:none"
-               {% if form.package.value == val %}checked{% elif forloop.counter == 2 and not form.package.value %}checked{% endif %}>
-        <div class="pkg-name">{% if val == 'free' %}Free{% elif val == 'starter' %}Starter{% elif val == 'business' %}Business{% else %}Custom{% endif %}</div>
-        <div class="pkg-price">
-          {% if val == 'free' %}€0
-          {% elif val == 'starter' %}€30/mo
-          {% elif val == 'business' %}€60/mo
-          {% else %}€300+{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <div class="two-col">
+        <div>
+          <label><span data-li="uk">Назва компанії *</span><span data-li="de" style="display:none">Firmenname *</span><span data-li="en" style="display:none">Company name *</span></label>
+          <input type="text" name="company_name" required value="{{ form.company_name.value|default:'' }}" placeholder="Müller GmbH">
+          {% if form.company_name.errors %}<div class="err">{{ form.company_name.errors.0 }}</div>{% endif %}
         </div>
-      </label>
-      {% endfor %}
+        <div>
+          <label><span data-li="uk">Країна</span><span data-li="de" style="display:none">Land</span><span data-li="en" style="display:none">Country</span></label>
+          <select name="company_country">{% for val, lbl in form.fields.company_country.choices %}<option value="{{ val }}"{% if form.company_country.value == val %} selected{% endif %}>{{ lbl }}</option>{% endfor %}</select>
+        </div>
+      </div>
+      <div class="two-col">
+        <div>
+          <label><span data-li="uk">Ваше ім'я *</span><span data-li="de" style="display:none">Ihr Name *</span><span data-li="en" style="display:none">Your name *</span></label>
+          <input type="text" name="owner_name" required value="{{ form.owner_name.value|default:'' }}" placeholder="Hans Müller">
+          {% if form.owner_name.errors %}<div class="err">{{ form.owner_name.errors.0 }}</div>{% endif %}
+        </div>
+        <div>
+          <label><span data-li="uk">Телефон</span><span data-li="de" style="display:none">Telefon</span><span data-li="en" style="display:none">Phone</span></label>
+          <input type="tel" name="contact_phone" value="{{ form.contact_phone.value|default:'' }}" placeholder="+49 123 456789">
+        </div>
+      </div>
+      <label>Email *</label>
+      <input type="email" name="email" required value="{{ form.email.value|default:'' }}" placeholder="hans@firma.de">
+      {% if form.email.errors %}<div class="err">{{ form.email.errors.0 }}</div>{% endif %}
+      <div class="two-col">
+        <div>
+          <label><span data-li="uk">Пароль *</span><span data-li="de" style="display:none">Passwort *</span><span data-li="en" style="display:none">Password *</span></label>
+          <input type="password" name="password1" required placeholder="min. 8 символів">
+          {% if form.password1.errors %}<div class="err">{{ form.password1.errors.0 }}</div>{% endif %}
+        </div>
+        <div>
+          <label><span data-li="uk">Підтвердіть *</span><span data-li="de" style="display:none">Bestätigen *</span><span data-li="en" style="display:none">Confirm *</span></label>
+          <input type="password" name="password2" required placeholder="••••••••">
+          {% if form.password2.errors %}<div class="err">{{ form.password2.errors.0 }}</div>{% endif %}
+        </div>
+      </div>
+      <div class="divider"></div>
+      <label><span data-li="uk">Оберіть пакет</span><span data-li="de" style="display:none">Paket wählen</span><span data-li="en" style="display:none">Choose plan</span></label>
+      <div class="pkg-grid" id="pkg-grid">
+        {% for val, lbl in form.fields.package.choices %}
+        <label class="pkg {% if form.package.value == val or forloop.counter == 2 and not form.package.value %}selected{% endif %}">
+          <input type="radio" name="package" value="{{ val }}" style="display:none" {% if form.package.value == val %}checked{% elif forloop.counter == 2 and not form.package.value %}checked{% endif %}>
+          <div class="pkg-name">{% if val == 'free' %}Free{% elif val == 'starter' %}Starter{% elif val == 'business' %}Business{% else %}Custom{% endif %}</div>
+          <div class="pkg-price">{% if val == 'free' %}€0{% elif val == 'starter' %}€30{% elif val == 'business' %}€60{% else %}€300+{% endif %}</div>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="check-row">
+        <input type="checkbox" name="agree_terms" id="terms" required>
+        <label for="terms" style="font-family:'Crimson Pro',serif;font-size:13px;color:var(--muted);letter-spacing:0;text-transform:none;margin-top:0;">
+          <span data-li="uk">Я погоджуюсь з <a href="#" class="link">умовами використання</a> та обробкою персональних даних</span>
+          <span data-li="de" style="display:none">Ich stimme den <a href="#" class="link">Nutzungsbedingungen</a> zu</span>
+          <span data-li="en" style="display:none">I agree to the <a href="#" class="link">terms of use</a> and data processing</span>
+        </label>
+      </div>
+      {% if form.agree_terms.errors %}<div class="err">{{ form.agree_terms.errors.0 }}</div>{% endif %}
+      <button type="submit" class="btn-submit">
+        <span data-li="uk">Зареєструватись →</span>
+        <span data-li="de" style="display:none">Registrieren →</span>
+        <span data-li="en" style="display:none">Register →</span>
+      </button>
+    </form>
+    <div class="footer-text">
+      <span data-li="uk">Вже є акаунт? <a href="/admin/login/">Увійти</a></span>
+      <span data-li="de" style="display:none">Haben Sie ein Konto? <a href="/admin/login/">Anmelden</a></span>
+      <span data-li="en" style="display:none">Have an account? <a href="/admin/login/">Login</a></span>
     </div>
-
-    <div class="check-row" style="margin-top:20px">
-      <input type="checkbox" name="agree_terms" id="terms" required>
-      <label for="terms">
-        <span data-li="uk">Я погоджуюсь з <a href="#" class="link">умовами використання</a> та обробкою персональних даних</span>
-        <span data-li="de">Ich stimme den <a href="#" class="link">Nutzungsbedingungen</a> und der Datenverarbeitung zu</span>
-        <span data-li="en">I agree to the <a href="#" class="link">terms of use</a> and data processing</span>
-      </label>
-    </div>
-    {% if form.agree_terms.errors %}<div class="err">{{ form.agree_terms.errors.0 }}</div>{% endif %}
-
-    <button type="submit" class="btn">
-      <span data-li="uk">Зареєструватись →</span>
-      <span data-li="de">Registrieren →</span>
-      <span data-li="en">Register →</span>
-    </button>
-  </form>
-
-  <div class="footer-text">
-    <span data-li="uk">Вже є акаунт? <a href="/admin/login/" class="link">Увійти</a></span>
-    <span data-li="de">Haben Sie schon ein Konto? <a href="/admin/login/" class="link">Anmelden</a></span>
-    <span data-li="en">Already have an account? <a href="/admin/login/" class="link">Login</a></span>
   </div>
-
 </div>
 
 <script>
-// Language
-var _LANG = localStorage.getItem('mv-lang') || 'uk';
-document.querySelectorAll('[data-li]').forEach(function(el){
-  el.style.display = (el.dataset.li === _LANG) ? '' : 'none';
-});
-
-// Package selection
-document.querySelectorAll('.pkg input[type=radio]').forEach(function(r){
-  r.addEventListener('change', function(){
-    document.querySelectorAll('.pkg').forEach(function(p){ p.classList.remove('selected'); });
-    r.closest('.pkg').classList.add('selected');
-  });
-});
+(function(){var c=document.getElementById('reg-stars');for(var i=0;i<90;i++){var s=document.createElement('div');s.className='star';var sz=Math.random()*2+0.4;s.style.cssText=['width:'+sz+'px','height:'+sz+'px','left:'+Math.random()*100+'%','top:'+Math.random()*100+'%','--d:'+(2+Math.random()*4)+'s','--delay:-'+(Math.random()*5)+'s','--min:'+(0.05+Math.random()*.1),'--max:'+(0.3+Math.random()*.4)].join(';');c.appendChild(s);}})();
+var _LANG=localStorage.getItem('mv-lang')||'uk';
+document.querySelectorAll('[data-li]').forEach(function(el){el.style.display=(el.dataset.li===_LANG)?'':'none';});
+document.querySelectorAll('.pkg input[type=radio]').forEach(function(r){r.addEventListener('change',function(){document.querySelectorAll('.pkg').forEach(function(p){p.classList.remove('selected');});r.closest('.pkg').classList.add('selected');});});
 </script>
 {% endblock %}

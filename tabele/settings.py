@@ -177,6 +177,32 @@ BACKUP_DOCKER_EXE = os.getenv(
     r"C:\Program Files\Docker\Docker\resources\bin\docker.exe"
 )
 
+# ── Logging ──────────────────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'simple': {'format': '[%(levelname)s] %(name)s: %(message)s'},
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'WARNING',
+    },
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': 'INFO', 'propagate': False},
+        # Minerva apps — show errors in console
+        'email_assistant': {'handlers': ['console'], 'level': 'DEBUG' if DEBUG else 'WARNING', 'propagate': False},
+        'bots':            {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        'ai_assistant':    {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+    },
+}
+
 # ── Django REST Framework ─────────────────────────────────────────────────────
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

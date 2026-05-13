@@ -122,6 +122,11 @@ class IMAPClient:
             self.conn = imaplib.IMAP4(self.account.imap_host, self.account.imap_port,
                                       timeout=90)
             self.conn.starttls()
+        # ensure the timeout applies to all operations, not just initial connect
+        try:
+            self.conn.sock.settimeout(90)
+        except Exception:
+            pass
         self.conn.login(self.account.imap_username, self.account.imap_password)
         return self
 
@@ -315,32 +320,44 @@ class IMAPClient:
             logger.warning('IMAP append to sent failed: %s', e)
             return False
 
-    def create_folder(self, name: str) -> bool:
-        """Create a new IMAP folder."""
+    def create_folder(self, name: str):
+        """Create a new IMAP folder. Returns True on success or error string."""
         try:
-            status, _ = self.conn.create(name)
-            return status == 'OK'
+            status, data = self.conn.create(name)
+            if status == 'OK':
+                return True
+            msg = (data[0].decode() if data and data[0] else '') or 'NO'
+            logger.warning('IMAP create_folder %s: %s %s', name, status, msg)
+            return msg or status
         except Exception as e:
             logger.warning('IMAP create_folder %s: %s', name, e)
-            return False
+            return str(e)
 
-    def rename_folder(self, old_name: str, new_name: str) -> bool:
-        """Rename an IMAP folder."""
+    def rename_folder(self, old_name: str, new_name: str):
+        """Rename an IMAP folder. Returns True on success or error string."""
         try:
-            status, _ = self.conn.rename(old_name, new_name)
-            return status == 'OK'
+            status, data = self.conn.rename(old_name, new_name)
+            if status == 'OK':
+                return True
+            msg = (data[0].decode() if data and data[0] else '') or 'NO'
+            logger.warning('IMAP rename_folder %s→%s: %s %s', old_name, new_name, status, msg)
+            return msg or status
         except Exception as e:
             logger.warning('IMAP rename_folder %s→%s: %s', old_name, new_name, e)
-            return False
+            return str(e)
 
-    def delete_folder(self, name: str) -> bool:
-        """Delete an IMAP folder (must be empty on most servers)."""
+    def delete_folder(self, name: str):
+        """Delete an IMAP folder. Returns True on success or error string."""
         try:
-            status, _ = self.conn.delete(name)
-            return status == 'OK'
+            status, data = self.conn.delete(name)
+            if status == 'OK':
+                return True
+            msg = (data[0].decode() if data and data[0] else '') or 'NO'
+            logger.warning('IMAP delete_folder %s: %s %s', name, status, msg)
+            return msg or status
         except Exception as e:
             logger.warning('IMAP delete_folder %s: %s', name, e)
-            return False
+            return str(e)
 
     def mark_seen(self, folder: str, uid: int) -> bool:
         """Mark a message as \\Seen on the IMAP server."""

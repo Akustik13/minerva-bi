@@ -55,13 +55,14 @@
 .em-server-folder.active{color:#1a73e8;background:rgba(26,115,232,.1);border-left-color:#1a73e8;font-weight:600}
 /* clickable label part */
 .em-sf-main{display:flex;align-items:center;gap:6px;flex:1;padding:6px 4px 6px 12px;cursor:pointer;min-width:0;overflow:hidden;white-space:nowrap}
-/* gear button — only shown on row hover */
-.em-sf-gear{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:11px;padding:4px 6px;line-height:1;flex-shrink:0;opacity:0;transition:opacity .1s,color .1s}
-.em-server-folder:hover .em-sf-gear{opacity:1}
-.em-sf-gear:hover{color:var(--text);background:var(--bg-card);border-radius:3px}
+/* action buttons — only shown on row hover */
+.em-sf-action{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:11px;padding:3px 5px;line-height:1;flex-shrink:0;opacity:0;border-radius:3px;transition:opacity .1s,color .1s,background .1s}
+.em-server-folder:hover .em-sf-action{opacity:1}
+.em-sf-action:hover{color:var(--text);background:var(--bg-hover,#1e2d40)}
+.em-sf-del:hover{color:var(--err,#e53935) !important}
 .em-p1.collapsed .em-sf-main .em-sf-label{display:none}
 .em-p1.collapsed .em-sf-main{padding:8px;justify-content:center}
-.em-p1.collapsed .em-sf-gear{display:none}
+.em-p1.collapsed .em-sf-action{display:none}
 
 /* ── Panel 2 search ── */
 .em-p2-search-row{padding:5px 10px 4px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
@@ -627,11 +628,12 @@ function _applyP2Visibility() {
           // Use <div> + inner <div> for click — avoids nested-button issues
           html += '<div class="em-server-folder' + active + '">'
                 + '<div class="em-sf-main" style="padding-left:' + paddingLeft + 'px" '
-                + 'onclick="openServerFolder(' + nameJ + ',this.parentNode)">'
+                + 'onclick="openServerFolder(' + nameJ + ')">'
                 + '<span style="font-size:13px;flex-shrink:0">📁</span>'
                 + '<span class="em-sf-label">' + label + '</span>'
                 + '</div>'
-                + '<button class="em-sf-gear" onclick="showFolderMenu(event,' + nameJ + ')" title="Керування">⚙️</button>'
+                + '<button class="em-sf-action" onclick="event.stopPropagation();showRenameFolder(' + nameJ + ')" title="Перейменувати">✏️</button>'
+                + '<button class="em-sf-action em-sf-del" onclick="event.stopPropagation();showDeleteFolder(' + nameJ + ')" title="Видалити">🗑️</button>'
                 + '</div>';
         });
       }
@@ -639,34 +641,7 @@ function _applyP2Visibility() {
     } catch(e) {}
   }
 
-  // Gear dropdown: rename / delete
-  var _activeMenu = null;
-  window.showFolderMenu = function(ev, name) {
-    if (_activeMenu) { _activeMenu.remove(); _activeMenu = null; }
-    var menu = document.createElement('div');
-    menu.style.cssText = 'position:fixed;z-index:10000;background:var(--bg-card);border:1px solid var(--border-strong);'
-                       + 'border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.4);overflow:hidden;min-width:140px;font-size:12px';
-    var rect = ev.target.getBoundingClientRect();
-    menu.style.top  = (rect.bottom + 4) + 'px';
-    menu.style.left = Math.min(rect.left, window.innerWidth - 160) + 'px';
-    function addItem(icon, label, action) {
-      var li = document.createElement('div');
-      li.style.cssText = 'padding:8px 12px;cursor:pointer;color:var(--text);display:flex;align-items:center;gap:8px;transition:background .1s';
-      li.innerHTML = '<span>' + icon + '</span><span>' + label + '</span>';
-      li.onmouseenter = function(){ li.style.background = 'var(--bg-hover,#1e2d40)'; };
-      li.onmouseleave = function(){ li.style.background = ''; };
-      li.onclick = function(){ menu.remove(); _activeMenu = null; action(); };
-      menu.appendChild(li);
-    }
-    addItem('✏️', 'Перейменувати', function(){ showRenameFolder(name); });
-    addItem('🗑️', 'Видалити', function(){ showDeleteFolder(name); });
-    document.body.appendChild(menu);
-    _activeMenu = menu;
-    function away(e){ if (!menu.contains(e.target)){ menu.remove(); _activeMenu = null; document.removeEventListener('click', away); } }
-    setTimeout(function(){ document.addEventListener('click', away); }, 0);
-  };
-
-  window.openServerFolder = function(folderName, btn) {
+  window.openServerFolder = function(folderName) {
     // fire background sync (don't wait — navigate immediately)
     var fd = new FormData();
     fd.append('imap_folder', folderName);

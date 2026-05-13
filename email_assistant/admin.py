@@ -251,6 +251,8 @@ class EmailAccountAdmin(admin.ModelAdmin):
                         yield _ev({'type': 'inbox_folder_done', 'folder': _fname,
                                    'created': _created, 'total': _total})
                     except BaseException as _e:
+                        if isinstance(_e, (GeneratorExit, KeyboardInterrupt)):
+                            raise
                         _emsg = ('Таймаут gunicorn — папка велика.' if isinstance(_e, SystemExit)
                                  else _imap_err(_e) or type(_e).__name__)
                         yield _ev({'type': 'folder_error', 'folder': _fname,
@@ -306,6 +308,8 @@ class EmailAccountAdmin(admin.ModelAdmin):
                         yield _ev({'type': 'folder_done', 'folder': name,
                                    'created': created, 'total': total_f})
                     except BaseException as e:
+                        if isinstance(e, (GeneratorExit, KeyboardInterrupt)):
+                            raise
                         import traceback as _tb
                         tb = _tb.format_exc()
                         logger.error('sync-all folder %s failed:\n%s', name, tb)
@@ -314,10 +318,15 @@ class EmailAccountAdmin(admin.ModelAdmin):
                         yield _ev({'type': 'folder_error', 'folder': name,
                                    'error': err, 'traceback': tb[-400:]})
 
+            except (GeneratorExit, KeyboardInterrupt):
+                return  # stream closed or process interrupted — do NOT yield
             except BaseException as _top_e:
-                logger.error('generate() top-level crash: %s', _top_e)
+                logger.error('generate() top-level crash: %s', _top_e, exc_info=True)
 
-            yield _ev({'type': 'done', 'inbox_new': inbox_new, 'extra_new': total_extra})
+            try:
+                yield _ev({'type': 'done', 'inbox_new': inbox_new, 'extra_new': total_extra})
+            except Exception:
+                pass
 
         try:
             account = EmailAccount.objects.get(pk=pk)

@@ -961,10 +961,10 @@ def imap_create_folder_view(request):
     try:
         from email_assistant.imap_client import IMAPClient
         with IMAPClient(account) as imap:
-            ok = imap.create_folder(name)
-        if ok:
+            result = imap.create_folder(name)
+        if result is True:
             return JsonResponse({'ok': True})
-        return JsonResponse({'ok': False, 'error': 'Сервер відхилив запит'})
+        return JsonResponse({'ok': False, 'error': str(result) if result else 'Сервер відхилив запит'})
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)})
 
@@ -980,14 +980,14 @@ def imap_rename_folder_view(request):
     try:
         from email_assistant.imap_client import IMAPClient
         with IMAPClient(account) as imap:
-            ok = imap.rename_folder(old_name, new_name)
-        if ok:
+            result = imap.rename_folder(old_name, new_name)
+        if result is True:
             from email_assistant.models import EmailMessage
             EmailMessage.objects.filter(
                 account=account, imap_folder_name=old_name
             ).update(imap_folder_name=new_name)
             return JsonResponse({'ok': True})
-        return JsonResponse({'ok': False, 'error': 'Сервер відхилив запит'})
+        return JsonResponse({'ok': False, 'error': str(result) if result else 'Сервер відхилив запит'})
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)})
 
@@ -1002,14 +1002,14 @@ def imap_delete_folder_view(request):
     try:
         from email_assistant.imap_client import IMAPClient
         with IMAPClient(account) as imap:
-            ok = imap.delete_folder(name)
-        if ok:
+            result = imap.delete_folder(name)
+        if result is True:
             from email_assistant.models import EmailMessage
             EmailMessage.objects.filter(
                 account=account, imap_folder_name=name
             ).update(imap_folder_name='')
             return JsonResponse({'ok': True})
-        return JsonResponse({'ok': False, 'error': 'Сервер відхилив запит'})
+        return JsonResponse({'ok': False, 'error': str(result) if result else 'Сервер відхилив запит'})
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)})
 

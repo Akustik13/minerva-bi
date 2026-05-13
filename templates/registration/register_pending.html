@@ -1,16 +1,195 @@
 {% extends "registration/base_public.html" %}
-{% block title %}Перевірте email — {{ company_name }}{% endblock %}
+{% block title %}
+  <span data-li="uk">Перевірте email</span>
+  <span data-li="de">E-Mail prüfen</span>
+  <span data-li="en">Check your email</span>
+  — {{ company_name }}
+{% endblock %}
 {% block body %}
-<div class="card" style="text-align:center">
-  <div style="font-size:56px;margin-bottom:20px">📧</div>
-  <h2>Перевірте пошту</h2>
-  <p class="sub" style="margin-bottom:24px">
-    Ми надіслали посилання для підтвердження на вашу email адресу.<br>
-    Перевірте папку «Спам» якщо лист не прийшов протягом 5 хвилин.
-  </p>
-  <a href="/" class="btn btn-o" style="display:inline-block;
-     text-decoration:none;padding:12px 28px;width:auto;margin-top:0">
-    ← На головну
-  </a>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+:root{--gold:#c9a84c;--gold-light:#e8d5a3;--gold-dark:#8b6914;--bg:#080b0f;--border:rgba(201,168,76,0.15);--text:#f5edd1;--muted:rgba(245,237,209,0.65);}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Crimson Pro',Georgia,serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s);}
+@keyframes twinkle{0%,100%{opacity:var(--min,.1);}50%{opacity:var(--max,.7);}}
+.glow-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 60% 50% at 50% -10%,rgba(201,168,76,.12) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 80% 80%,rgba(139,105,20,.08) 0%,transparent 60%);}
+.line-top{position:fixed;top:0;left:0;right:0;height:1px;z-index:100;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:shimmer 4s ease-in-out infinite;}
+@keyframes shimmer{0%,100%{opacity:.4}50%{opacity:1}}
+.page{position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;}
+.card{
+  width:100%;max-width:460px;text-align:center;
+  background:linear-gradient(160deg,#0f1520 0%,#0b1018 50%,#101820 100%);
+  border:1px solid var(--border);border-radius:4px;
+  box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 60px rgba(201,168,76,.06);
+  padding:52px 44px 48px;
+  animation:riseUp .9s cubic-bezier(.16,1,.3,1) both;
+  position:relative;overflow:hidden;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(201,168,76,.5),rgba(232,213,163,.9),rgba(201,168,76,.5),transparent);
+}
+@keyframes riseUp{from{opacity:0;transform:translateY(28px);}to{opacity:1;transform:translateY(0);}}
+
+/* Pulse envelope */
+.env-wrap{
+  position:relative;width:96px;height:96px;
+  margin:0 auto 32px;
+  display:flex;align-items:center;justify-content:center;
+}
+.env-emoji{
+  font-size:52px;line-height:1;position:relative;z-index:2;
+  filter:drop-shadow(0 0 24px rgba(201,168,76,.5));
+  animation:pulse 3s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.08);}}
+.env-ring{
+  position:absolute;inset:-16px;border-radius:50%;
+  border:1px solid rgba(201,168,76,.2);
+  animation:spin 18s linear infinite;
+}
+.env-ring::before{content:'✦';position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--gold);}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+.eyebrow{
+  font-family:'Cinzel',serif;font-size:9px;letter-spacing:4px;text-transform:uppercase;
+  color:rgba(201,168,76,.5);margin-bottom:14px;
+}
+h2{
+  font-family:'Cinzel',serif;font-size:24px;font-weight:700;
+  background:linear-gradient(135deg,#f5edd1,var(--gold-light),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 15px rgba(201,168,76,.3));
+  margin-bottom:18px;letter-spacing:2px;
+}
+.sep{display:flex;align-items:center;gap:12px;margin:18px 0;}
+.sep-line{flex:1;height:1px;background:linear-gradient(to right,transparent,var(--border),transparent);}
+.sep-sym{font-size:10px;color:rgba(201,168,76,.3);}
+p{font-size:15px;line-height:1.8;color:var(--muted);margin-bottom:10px;}
+.company-name{
+  font-family:'Cinzel',serif;font-size:13px;letter-spacing:2px;
+  color:var(--gold-light);margin:8px 0 20px;
+  text-shadow:0 0 12px rgba(201,168,76,.3);
+}
+.steps{
+  list-style:none;margin:20px 0 28px;text-align:left;display:flex;flex-direction:column;gap:10px;
+}
+.steps li{
+  display:flex;align-items:flex-start;gap:12px;
+  font-size:14px;color:var(--muted);line-height:1.5;
+}
+.step-num{
+  width:22px;height:22px;min-width:22px;border-radius:50%;
+  border:1px solid rgba(201,168,76,.35);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Cinzel',serif;font-size:9px;color:var(--gold);
+  margin-top:1px;
+}
+.back-btn{
+  display:inline-block;padding:12px 32px;border-radius:4px;
+  font-family:'Cinzel',serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;
+  text-decoration:none;color:var(--gold-light);
+  border:1px solid var(--border);background:transparent;
+  transition:all .3s;
+}
+.back-btn:hover{border-color:var(--gold);background:rgba(201,168,76,.08);box-shadow:0 0 20px rgba(201,168,76,.15);}
+</style>
+
+<div class="line-top"></div>
+<div class="glow-bg"></div>
+<div class="stars" id="pnd-stars"></div>
+
+<div class="page">
+  <div class="card">
+
+    <div class="env-wrap">
+      <div class="env-ring"></div>
+      <span class="env-emoji">📧</span>
+    </div>
+
+    <p class="eyebrow">
+      <span data-li="uk">MINERVA · ПІДТВЕРДЖЕННЯ</span>
+      <span data-li="de" style="display:none">MINERVA · BESTÄTIGUNG</span>
+      <span data-li="en" style="display:none">MINERVA · VERIFICATION</span>
+    </p>
+    <h2>
+      <span data-li="uk">Перевірте пошту</span>
+      <span data-li="de" style="display:none">E-Mail prüfen</span>
+      <span data-li="en" style="display:none">Check your inbox</span>
+    </h2>
+
+    <div class="sep"><div class="sep-line"></div><div class="sep-sym">✦</div><div class="sep-line"></div></div>
+
+    {% if company_name %}
+    <div class="company-name">{{ company_name }}</div>
+    {% endif %}
+
+    <p>
+      <span data-li="uk">Ми надіслали посилання для підтвердження на вашу адресу електронної пошти.</span>
+      <span data-li="de" style="display:none">Wir haben einen Bestätigungslink an Ihre E-Mail-Adresse gesendet.</span>
+      <span data-li="en" style="display:none">We've sent a confirmation link to your email address.</span>
+    </p>
+
+    <ul class="steps">
+      <li>
+        <div class="step-num">1</div>
+        <span>
+          <span data-li="uk">Відкрийте лист від <strong style="color:var(--gold-light)">Minerva</strong></span>
+          <span data-li="de" style="display:none">Öffnen Sie die E-Mail von <strong style="color:var(--gold-light)">Minerva</strong></span>
+          <span data-li="en" style="display:none">Open the email from <strong style="color:var(--gold-light)">Minerva</strong></span>
+        </span>
+      </li>
+      <li>
+        <div class="step-num">2</div>
+        <span>
+          <span data-li="uk">Натисніть кнопку підтвердження</span>
+          <span data-li="de" style="display:none">Klicken Sie auf den Bestätigungsbutton</span>
+          <span data-li="en" style="display:none">Click the confirmation button</span>
+        </span>
+      </li>
+      <li>
+        <div class="step-num">3</div>
+        <span>
+          <span data-li="uk">Увійдіть в систему і почніть роботу</span>
+          <span data-li="de" style="display:none">Melden Sie sich an und starten Sie</span>
+          <span data-li="en" style="display:none">Log in and start using Minerva</span>
+        </span>
+      </li>
+    </ul>
+
+    <p style="font-size:12px;color:rgba(245,237,209,.4);">
+      <span data-li="uk">Не отримали? Перевірте папку «Спам» або зачекайте 5 хвилин.</span>
+      <span data-li="de" style="display:none">Nichts erhalten? Prüfen Sie den Spam-Ordner oder warten Sie 5 Minuten.</span>
+      <span data-li="en" style="display:none">Didn't receive it? Check your spam folder or wait 5 minutes.</span>
+    </p>
+
+    <div style="margin-top:28px;">
+      <a href="/" class="back-btn">
+        <span data-li="uk">← На головну</span>
+        <span data-li="de" style="display:none">← Zur Startseite</span>
+        <span data-li="en" style="display:none">← Back to home</span>
+      </a>
+    </div>
+
+  </div>
 </div>
+
+<script>
+(function(){
+  var c=document.getElementById('pnd-stars');
+  for(var i=0;i<80;i++){
+    var s=document.createElement('div');s.className='star';
+    var sz=Math.random()*2+0.4;
+    s.style.cssText=['width:'+sz+'px','height:'+sz+'px','left:'+Math.random()*100+'%','top:'+Math.random()*100+'%','--d:'+(2+Math.random()*4)+'s','--delay:-'+(Math.random()*5)+'s','--min:'+(0.05+Math.random()*.1),'--max:'+(0.3+Math.random()*.4)].join(';');
+    c.appendChild(s);
+  }
+})();
+var _LANG=localStorage.getItem('mv-lang')||'uk';
+document.querySelectorAll('[data-li]').forEach(function(el){
+  el.style.display=(el.dataset.li===_LANG)?'':'none';
+});
+</script>
 {% endblock %}

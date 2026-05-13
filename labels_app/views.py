@@ -156,7 +156,7 @@ def upload_label(request):
 
 @staff_member_required
 def list_labels(request):
-    """Список всіх доступних етикеток — HTML-сторінка."""
+    """Список всіх доступних етикеток — HTML-сторінка або JSON (?json=1)."""
     LABELS_DIR.mkdir(parents=True, exist_ok=True)
     labels = []
     for f in sorted(LABELS_DIR.glob('*.dymo')):
@@ -167,4 +167,6 @@ def list_labels(request):
             'size_kb': round(f.stat().st_size / 1024, 1),
             'modified_fmt': datetime.fromtimestamp(mtime).strftime('%d.%m.%Y %H:%M'),
         })
+    if request.GET.get('json'):
+        return JsonResponse({'labels': labels})
     return render(request, 'labels/list.html', {'labels': labels})

@@ -1755,6 +1755,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '<th style="padding:10px;text-align:center">К-сть</th>'
             '<th style="padding:10px;text-align:left">Дія</th>'
             '</tr></thead><tbody>' + ''.join(rows) + '</tbody></table>'
+            '<div style="margin-top:12px">'
+            '<button type="button" onclick="svShowAllLabels()" '
+            'style="background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4);'
+            'border:1px solid var(--border-color,#333);padding:8px 18px;'
+            'border-radius:7px;cursor:pointer;font-size:13px;font-weight:600">'
+            '📂 Переглянути всі етикетки</button>'
+            '</div>'
             '''
 <script>
 // ── DYMO open helper (shared with changelist; define only if not already loaded) ──
@@ -1841,6 +1848,87 @@ if (!window.svDymoOpen) {
     };
   })();
 }
+window.svDownloadSelected=function(btn){
+  var sku=btn.dataset.sku;
+  var inp=btn.previousElementSibling;
+  var q=(inp?parseInt(inp.value):1)||1;
+  window.svDymoDownload('/labels/serve/'+encodeURIComponent(sku)+'/?qty='+q,sku);
+};
+window.svShowAllLabels=function(){
+  var existing=document.getElementById('sv-dymo-modal');
+  if(existing)existing.remove();
+  var m=document.createElement('div');
+  m.id='sv-dymo-modal';
+  m.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center';
+  var inner=document.createElement('div');
+  inner.style.cssText='background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:22px 26px;max-width:580px;width:95%;max-height:80vh;display:flex;flex-direction:column';
+  inner.innerHTML=(
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+    +'<span style="font-weight:700;font-size:15px;color:var(--text,#c9d8e4)">📂 Всі етикетки DYMO</span>'
+    +'<button type="button" id="sv-lbl-close" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted,#9aafbe);padding:0 4px">✕</button>'
+    +'</div>'
+    +'<input id="sv-lbl-search" type="text" placeholder="Пошук по SKU…" '
+    +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-color,#333);'
+    +'color:var(--text,#c9d8e4);padding:8px 12px;border-radius:6px;font-size:13px;width:100%;box-sizing:border-box;margin-bottom:12px">'
+    +'<div id="sv-lbl-list" style="overflow-y:auto;flex:1;font-size:13px">'
+    +'<span style="color:var(--text-muted,#9aafbe)">⏳ Завантаження...</span>'
+    +'</div>'
+    +'<div style="margin-top:10px;font-size:11px;color:var(--text-dim,#607d8b)">Вкажіть к-сть і натисніть ⬇️ щоб завантажити</div>'
+  );
+  m.appendChild(inner);
+  document.body.appendChild(m);
+  m.onclick=function(e){if(e.target===m)m.remove();};
+  inner.querySelector('#sv-lbl-close').onclick=function(){m.remove();};
+  fetch('/labels/list/?json=1')
+  .then(function(r){return r.json();})
+  .then(function(data){
+    var labels=data.labels||[];
+    var listEl=document.getElementById('sv-lbl-list');
+    var searchEl=document.getElementById('sv-lbl-search');
+    if(!listEl)return;
+    function renderList(filter){
+      var fl=filter?labels.filter(function(l){return l.sku.toLowerCase().indexOf(filter.toLowerCase())>=0;}):labels;
+      if(!fl.length){listEl.innerHTML='<span style="color:var(--text-muted,#9aafbe)">Нічого не знайдено</span>';return;}
+      listEl.innerHTML='';
+      fl.forEach(function(l){
+        var row=document.createElement('div');
+        row.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border-bottom:1px solid rgba(128,128,128,0.12);gap:8px';
+        var info=document.createElement('div');
+        info.style.cssText='flex:1;min-width:0';
+        var skuSpan=document.createElement('span');
+        skuSpan.style.cssText='font-weight:600;color:var(--text,#c9d8e4);word-break:break-all';
+        skuSpan.textContent=l.sku;
+        var metaSpan=document.createElement('span');
+        metaSpan.style.cssText='margin-left:8px;font-size:11px;color:var(--text-dim,#607d8b)';
+        metaSpan.textContent=l.size_kb+' KB · '+l.modified_fmt;
+        info.appendChild(skuSpan);
+        info.appendChild(metaSpan);
+        var actions=document.createElement('div');
+        actions.style.cssText='display:flex;align-items:center;gap:6px;flex-shrink:0';
+        var qtyInput=document.createElement('input');
+        qtyInput.type='number';qtyInput.min='1';qtyInput.max='999';qtyInput.value='1';
+        qtyInput.style.cssText='width:52px;background:var(--bg-input,#141f2b);border:1px solid var(--border-color,#333);color:var(--text,#c9d8e4);padding:4px 6px;border-radius:5px;font-size:12px;text-align:center';
+        var dlBtn=document.createElement('button');
+        dlBtn.type='button';
+        dlBtn.dataset.sku=l.sku;
+        dlBtn.textContent='⬇️ Завантажити';
+        dlBtn.style.cssText='background:#1565c0;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap';
+        dlBtn.onclick=function(){window.svDownloadSelected(this);};
+        actions.appendChild(qtyInput);
+        actions.appendChild(dlBtn);
+        row.appendChild(info);
+        row.appendChild(actions);
+        listEl.appendChild(row);
+      });
+    }
+    renderList('');
+    if(searchEl)searchEl.addEventListener('input',function(){renderList(this.value);});
+  })
+  .catch(function(e){
+    var el=document.getElementById('sv-lbl-list');
+    if(el)el.textContent='Помилка: '+e;
+  });
+};
 (function() {
   function uploadDymo(input) {
     var sku = input.dataset.sku;
