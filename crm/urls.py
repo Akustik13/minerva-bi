@@ -21,4 +21,7 @@ urlpatterns = [
     path('customer/<int:customer_pk>/send-email/',
          views.send_customer_email,
          name='crm_send_email'),
+    path('customer/<int:customer_pk>/reset-ai/',
+         views.reset_customer_ai_context,
+         name='crm_reset_ai'),
 ]

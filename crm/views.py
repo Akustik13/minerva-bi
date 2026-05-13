@@ -43,6 +43,52 @@ def _parse_strategy_response(text: str) -> dict | None:
     return None
 
 
+def _gather_email_context(customer) -> list:
+    """Pull recent EmailMessage records for this customer directly from email_assistant."""
+    try:
+        from email_assistant.models import EmailMessage
+        from django.db.models import Q
+        if not getattr(customer, 'email', ''):
+            return []
+        qs = (EmailMessage.objects
+              .filter(Q(from_email__iexact=customer.email) | Q(to_emails__icontains=customer.email))
+              .exclude(folder='draft')
+              .order_by('-sent_at')[:10])
+        return [
+            {
+                'direction': 'in' if m.folder == 'inbox' else 'out',
+                'subject':   m.subject,
+                'date':      m.sent_at.strftime('%d.%m.%Y') if m.sent_at else '?',
+                'snippet':   (m.body_text or '')[:200],
+            }
+            for m in qs
+        ]
+    except Exception:
+        return []
+
+
+def _gather_strategy_context(customer) -> list:
+    """Pull active/recent CustomerStrategy steps for this customer."""
+    try:
+        from strategy.models import CustomerStrategy
+        strategies = (CustomerStrategy.objects
+                      .filter(customer=customer)
+                      .select_related('current_step', 'template')
+                      .order_by('-started_at')[:3])
+        result = []
+        for s in strategies:
+            result.append({
+                'name':         s.name,
+                'status':       s.status,
+                'behavior':     s.template.behavior_type if s.template else '',
+                'current_step': s.current_step.title if s.current_step else None,
+                'started_at':   s.started_at.strftime('%d.%m.%Y') if s.started_at else '?',
+            })
+        return result
+    except Exception:
+        return []
+
+
 def _fetch_customer_shipments(customer) -> list:
     """Відправлення клієнта через його замовлення (прямий запит, без tools)."""
     try:
@@ -124,6 +170,14 @@ def ai_customer_analysis(request, customer_pk):
     if 'shipments' in include:
         shipments_data = _fetch_customer_shipments(customer)
 
+    # Direct EmailMessage context (always included when 'emails' in scope)
+    email_messages_data = []
+    if 'emails' in include:
+        email_messages_data = _gather_email_context(customer)
+
+    # Strategy context
+    strategy_data = _gather_strategy_context(customer)
+
     # Будуємо промпт динамічно — тільки з наявних блоків
     parts = [f"Проаналізуй клієнта {customer.name} і дай конкретні рекомендації.\n"]
     if customer_data:
@@ -131,7 +185,11 @@ def ai_customer_analysis(request, customer_pk):
     if orders_data:
         parts.append(f"Останні замовлення: {json.dumps(orders_data, ensure_ascii=False, default=str)}")
     if emails_data:
-        parts.append(f"Листування: {json.dumps(emails_data, ensure_ascii=False, default=str)}")
+        parts.append(f"Листування (CRM tool): {json.dumps(emails_data, ensure_ascii=False, default=str)}")
+    if email_messages_data:
+        parts.append(f"Email переписка (Email асистент): {json.dumps(email_messages_data, ensure_ascii=False, default=str)}")
+    if strategy_data:
+        parts.append(f"Активні CRM стратегії: {json.dumps(strategy_data, ensure_ascii=False, default=str)}")
     if shipments_data:
         parts.append(f"Відправлення та доставки: {json.dumps(shipments_data, ensure_ascii=False, default=str)}")
 
@@ -169,6 +227,7 @@ def ai_customer_analysis(request, customer_pk):
     try:
         from ai_assistant.service import chat
         analysis = chat(prompt, profile=profile, channel='crm_analysis',
+                        telegram_chat_id=f'crm_customer_{customer_pk}',
                         enable_web_search=use_web_search)
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -206,11 +265,13 @@ def ai_compose_email_for_customer(request, customer_pk):
     except Customer.DoesNotExist:
         return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
 
-    data         = json.loads(request.body or '{}')
-    purpose      = data.get('purpose', 'follow_up')
-    lang         = data.get('language', 'uk')
-    extra_prompt = data.get('extra_prompt', '').strip()
-    profile      = getattr(request.user, 'profile', None)
+    data             = json.loads(request.body or '{}')
+    purpose          = data.get('purpose', 'follow_up')
+    lang             = data.get('language', 'uk')
+    extra_prompt     = data.get('extra_prompt', '').strip()
+    strategy_context = data.get('strategy_context', '').strip()
+    step_title       = data.get('step_title', '').strip()
+    profile          = getattr(request.user, 'profile', None)
 
     try:
         from ai_assistant.tools import execute_tool
@@ -230,12 +291,17 @@ def ai_compose_email_for_customer(request, customer_pk):
     if not instruction:
         return JsonResponse({'ok': False, 'error': 'Помилка генерації'})
 
+    if step_title:
+        instruction += f'\n\nЦей лист є кроком CRM стратегії: "{step_title}".'
+    if strategy_context:
+        instruction += f'\nКонтекст стратегії: {strategy_context}'
     if extra_prompt:
         instruction += f'\n\nДодаткові вказівки від менеджера: {extra_prompt}'
 
     try:
         from ai_assistant.service import chat
-        email_text = chat(instruction, profile=profile, channel='crm_email')
+        email_text = chat(instruction, profile=profile, channel='crm_email',
+                          telegram_chat_id=f'crm_customer_{customer_pk}')
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
@@ -664,3 +730,15 @@ def ai_apply_strategy(request, customer_pk):
         'strategy_id': cs.pk,
         'strategy_url': f'/admin/strategy/customerstrategy/{cs.pk}/change/',
     })
+
+
+@staff_member_required
+@require_POST
+def reset_customer_ai_context(request, customer_pk):
+    """POST: Clear per-customer AI conversation history for this customer."""
+    from ai_assistant.service import reset_conversation
+    profile = getattr(request.user, 'profile', None)
+    chat_id = f'crm_customer_{customer_pk}'
+    for channel in ('crm_analysis', 'crm_email'):
+        reset_conversation(profile, channel=channel, telegram_chat_id=chat_id)
+    return JsonResponse({'ok': True})

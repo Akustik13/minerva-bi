@@ -4,10 +4,30 @@ import logging
 logger = logging.getLogger('email_assistant')
 
 
+def _call_ai_direct(prompt: str, max_tokens: int = 1024) -> str:
+    """Direct Anthropic API call — isolated per-request, no conversation history, no tools."""
+    try:
+        import anthropic
+        from strategy.models import AISettings
+        s = AISettings.get()
+        if not s.anthropic_api_key:
+            return ''
+        client = anthropic.Anthropic(api_key=s.anthropic_api_key)
+        from ai_assistant.router import choose_model
+        model = choose_model(prompt)
+        response = client.messages.create(
+            model=model,
+            max_tokens=max_tokens,
+            messages=[{'role': 'user', 'content': prompt}],
+        )
+        return ''.join(b.text for b in response.content if hasattr(b, 'text'))
+    except Exception as e:
+        logger.error('_call_ai_direct error: %s', e)
+        return ''
+
+
 def generate_reply(thread_messages: list, account, user_profile=None) -> str:
     """Generate a reply draft based on thread context."""
-    from ai_assistant.service import chat
-
     context_parts = []
     for msg in thread_messages[-8:]:
         direction = '← ОТРИМАНО' if msg.folder == 'inbox' else '→ НАДІСЛАНО'
@@ -24,18 +44,11 @@ def generate_reply(thread_messages: list, account, user_profile=None) -> str:
         f'Без теми, без підпису, тільки текст тіла листа.\n\n'
         f'ПЕРЕПИСКА:\n{context}\n\nВідповідь:'
     )
-
-    try:
-        return chat(prompt, profile=user_profile, channel='system_briefing') or ''
-    except Exception as e:
-        logger.error('AI reply generation error: %s', e)
-        return ''
+    return _call_ai_direct(prompt) or ''
 
 
 def translate_email(text: str, target_lang: str, user_profile=None) -> str:
     """Translate email body to target language."""
-    from ai_assistant.service import chat
-
     lang_names = {
         'uk': 'українську',
         'de': 'німецьку',
@@ -49,37 +62,20 @@ def translate_email(text: str, target_lang: str, user_profile=None) -> str:
         f'Поверни ТІЛЬКИ переклад, збережи форматування.\n\n'
         f'{text[:4000]}'
     )
-
-    try:
-        return chat(prompt, profile=user_profile, channel='system_briefing') or ''
-    except Exception as e:
-        logger.error('AI translate error: %s', e)
-        return ''
+    return _call_ai_direct(prompt) or ''
 
 
 def summarize_thread(messages: list, user_profile=None) -> str:
     """Return a 2-3 sentence summary of an email thread."""
-    from ai_assistant.service import chat
-
     context = '\n\n'.join(
         f'{m.from_email}: {(m.body_text or "")[:300]}' for m in messages[-6:]
     )
     prompt = f'Зроби стислий підсумок цієї переписки (2-3 речення):\n\n{context}'
-
-    try:
-        return chat(prompt, profile=user_profile, channel='system_briefing') or ''
-    except Exception as e:
-        logger.error('AI summarize error: %s', e)
-        return ''
+    return _call_ai_direct(prompt) or ''
 
 
 def check_grammar(body_text: str, user_profile=None) -> dict:
-    """
-    Check and fix grammar/spelling in email body.
-    Returns {"ok": True, "corrected": "...", "changed": bool}
-    """
-    from ai_assistant.service import chat
-
+    """Check and fix grammar/spelling in email body."""
     if not body_text or not body_text.strip():
         return {'ok': False, 'error': 'Текст порожній'}
 
@@ -90,27 +86,15 @@ def check_grammar(body_text: str, user_profile=None) -> dict:
         'Якщо тексту не потрібні виправлення — поверни його без змін.\n\n'
         f'{body_text[:4000]}'
     )
-
-    try:
-        corrected = chat(prompt, profile=user_profile, channel='system_briefing') or ''
-        corrected = corrected.strip()
-        return {
-            'ok':       True,
-            'corrected': corrected,
-            'changed':  corrected != body_text.strip(),
-        }
-    except Exception as e:
-        logger.error('AI check_grammar error: %s', e)
+    corrected = (_call_ai_direct(prompt) or '').strip()
+    if corrected:
+        return {'ok': True, 'corrected': corrected, 'changed': corrected != body_text.strip()}
     return {'ok': False, 'error': 'AI не зміг перевірити граматику'}
 
 
 def generate_from_prompt(prompt: str, account=None, user_profile=None) -> dict:
-    """
-    Generate email subject + body from a natural-language description.
-    Returns {"ok": True, "subject": "...", "body": "..."} or {"ok": False, "error": "..."}
-    """
+    """Generate email subject + body from a natural-language description."""
     import json
-    from ai_assistant.service import chat
 
     header = f'Ти пишеш від імені {account.from_header}.\n' if account else ''
     full_prompt = (
@@ -122,30 +106,22 @@ def generate_from_prompt(prompt: str, account=None, user_profile=None) -> dict:
     )
 
     try:
-        raw = chat(full_prompt, profile=user_profile, channel='system_briefing') or ''
-        raw = raw.strip()
+        raw = (_call_ai_direct(full_prompt) or '').strip()
         if raw.startswith('```'):
             raw = raw.split('```', 2)[1]
             if raw.startswith('json'):
                 raw = raw[4:]
         result = json.loads(raw)
         if isinstance(result, dict) and 'body' in result:
-            return {'ok': True,
-                    'subject': result.get('subject', ''),
-                    'body':    result.get('body', '')}
+            return {'ok': True, 'subject': result.get('subject', ''), 'body': result.get('body', '')}
     except Exception as e:
         logger.error('AI generate_from_prompt error: %s', e)
     return {'ok': False, 'error': 'AI не зміг згенерувати лист'}
 
 
 def extract_deadlines(body_text: str, user_profile=None) -> list:
-    """
-    Extract dates/deadlines from email body.
-    Returns list of dicts: [{"title": str, "date": "YYYY-MM-DD HH:MM", "description": str}]
-    Returns [] if nothing found or on error.
-    """
+    """Extract dates/deadlines from email body."""
     import json
-    from ai_assistant.service import chat
 
     if not body_text or not body_text.strip():
         return []
@@ -163,9 +139,7 @@ def extract_deadlines(body_text: str, user_profile=None) -> list:
     )
 
     try:
-        raw = chat(prompt, profile=user_profile, channel='system_briefing') or ''
-        raw = raw.strip()
-        # Strip markdown code fences if present
+        raw = (_call_ai_direct(prompt) or '').strip()
         if raw.startswith('```'):
             raw = raw.split('```')[1]
             if raw.startswith('json'):
@@ -180,8 +154,6 @@ def extract_deadlines(body_text: str, user_profile=None) -> list:
 
 def generate_order_draft(order, customer, account, user_profile=None) -> str:
     """Generate a draft email body for a new sales order."""
-    from ai_assistant.service import chat
-
     lines_text = ''
     try:
         lines = order.lines.all()[:10]
@@ -201,9 +173,4 @@ def generate_order_draft(order, customer, account, user_profile=None) -> str:
         f'Статус: {order.get_status_display() if hasattr(order, "get_status_display") else order.status}\n'
         f'Позиції:\n{lines_text or "(немає даних)"}'
     )
-
-    try:
-        return chat(prompt, profile=user_profile, channel='system_briefing') or ''
-    except Exception as e:
-        logger.error('AI order draft error: %s', e)
-        return ''
+    return _call_ai_direct(prompt) or ''

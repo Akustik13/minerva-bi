@@ -63,7 +63,7 @@
     <div style="padding:12px 16px;border-bottom:1px solid var(--border-strong);
                 display:flex;align-items:center;justify-content:space-between">
       <div style="font-weight:600;font-size:14px;color:var(--text)">🏛️ Minerva AI</div>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" onclick="runAnalysis()" id="btn-analysis"
                 style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
                        background:rgba(0,212,170,.12);color:#00d4aa;
@@ -75,6 +75,13 @@
                        background:rgba(79,143,255,.12);color:#4f8fff;
                        border:1px solid rgba(79,143,255,.3);cursor:pointer">
           ✉️ Написати лист
+        </button>
+        <button type="button" onclick="resetAiContext()" id="btn-reset-ai"
+                title="Скинути пам'ять AI для цього клієнта — нова розмова почнеться з чистого аркуша"
+                style="padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;
+                       background:transparent;color:var(--text-dim);
+                       border:1px solid var(--border-strong);cursor:pointer">
+          🔄
         </button>
       </div>
     </div>
@@ -797,6 +804,15 @@ function _renderStrategy(s) {
   const steps = (s.steps||[]).map((st, i) => {
     const icon = STEP_TYPE_ICONS[st.step_type] || '▸';
     const delay = st.delay_days > 0 ? ` (+${st.delay_days}д)` : ' (одразу)';
+    const title_esc = (st.title||'').replace(/'/g, "\\'");
+    const desc_esc  = (st.description||'').replace(/'/g, "\\'");
+    const composeBtn = st.step_type === 'email'
+      ? `<button type="button"
+           onclick="composeForStrategy('${title_esc}','${desc_esc}')"
+           style="margin-top:4px;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;
+                  border:1px solid rgba(79,143,255,.4);background:rgba(79,143,255,.1);
+                  color:#4f8fff">✉️ Написати лист по кроку</button>`
+      : '';
     return `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border-strong)">
       <div style="flex-shrink:0;font-size:13px;color:var(--text-dim);width:20px;text-align:right">${i+1}</div>
       <div style="flex:1;min-width:0">
@@ -804,6 +820,7 @@ function _renderStrategy(s) {
           <span style="font-size:11px;color:var(--text-dim)">(${st.step_type}${delay})</span>
         </div>
         ${st.description ? `<div style="font-size:12px;color:var(--text-dim);margin-top:2px">${st.description}</div>` : ''}
+        ${composeBtn}
       </div>
     </div>`;
   }).join('');
@@ -854,6 +871,81 @@ async function applyStrategy() {
     el.textContent = '⚠️ ' + (d.error||'Помилка');
   }
 }
+
+async function resetAiContext() {
+  const btn = document.getElementById('btn-reset-ai');
+  const origText = btn.textContent;
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    await fetch(`/crm/customer/${CUSTOMER_PK}/reset-ai/`, {
+      method: 'POST', headers: {'X-CSRFToken': CSRF},
+    });
+    btn.textContent = '✓';
+    setTimeout(() => { btn.disabled = false; btn.textContent = origText; }, 1500);
+  } catch(e) {
+    btn.disabled = false; btn.textContent = origText;
+  }
+}
+
+// Called from the strategy card "✉️ Написати лист по кроку" button
+window.composeForStrategy = function(stepTitle, stepDescription) {
+  const composer = document.getElementById('email-composer');
+  composer.style.display = 'block';
+  composer.scrollIntoView({behavior: 'smooth', block: 'start'});
+  const promptEl = document.getElementById('email-prompt');
+  if (promptEl) {
+    promptEl.value = `Крок стратегії: "${stepTitle}".\n${stepDescription || ''}`.trim();
+  }
+  // Store strategy context for the request
+  window._strategyStepTitle = stepTitle;
+  window._strategyStepDescription = stepDescription || '';
+};
+
+// Override generateEmail to include strategy context when available
+window.generateEmail = async function() {
+  const aiSection      = document.getElementById('ai-response-section');
+  const aiBody         = document.getElementById('ai-response-body');
+  const composeSection = document.getElementById('email-compose-section');
+  const editor         = document.getElementById('email-body-editor');
+  aiSection.style.display      = 'block';
+  composeSection.style.display = 'none';
+  aiBody.style.display         = 'block';
+  aiBody.textContent           = 'Генерую лист...';
+  document.getElementById('btn-toggle-ai').textContent = '▾ Згорнути';
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-email/`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+      body: JSON.stringify({
+        purpose:          document.getElementById('email-purpose').value,
+        language:         document.getElementById('email-lang').value,
+        extra_prompt:     document.getElementById('email-prompt').value.trim(),
+        strategy_context: window._strategyStepDescription || '',
+        step_title:       window._strategyStepTitle || '',
+      }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      aiBody.textContent = d.email;
+      editor.innerText   = _extractBody(d.email);
+      _showSigInCompose();
+      const toField = document.getElementById('email-to');
+      if (!toField.value) toField.value = CUSTOMER_EMAIL;
+      const subj = document.getElementById('email-subject');
+      if (!subj.value && window._strategyStepTitle)
+        subj.value = window._strategyStepTitle;
+      else if (!subj.value) subj.value = _extractSubject(d.email);
+      composeSection.style.display = 'block';
+      // Clear strategy context after use
+      window._strategyStepTitle = '';
+      window._strategyStepDescription = '';
+    } else {
+      aiBody.textContent = '⚠️ ' + (d.error || 'Помилка');
+    }
+  } catch(e) {
+    aiBody.textContent = "⚠️ Помилка з'єднання";
+  }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
   _applyScopeUI();

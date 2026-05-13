@@ -1,4 +1,4 @@
-"""email_assistant/signals.py — cross-app triggers for email draft generation."""
+"""email_assistant/signals.py — cross-app triggers for email events."""
 import logging
 
 from django.db.models.signals import post_save
@@ -16,7 +16,6 @@ def order_email_draft(sender, instance, created, **kwargs):
     try:
         from email_assistant.models import EmailAccount, EmailDraft, EmailSettings
 
-        # Find account: prefer one belonging to order creator
         order_user = getattr(instance, 'user', None)
         account = None
         if order_user:
@@ -26,15 +25,13 @@ def order_email_draft(sender, instance, created, **kwargs):
         if not account:
             return
 
-        # Check if feature is enabled for that account's user
         es = EmailSettings.get_for_user(account.user)
         if not es.order_trigger_enabled:
             return
 
-        # Find customer — SalesOrder.crm_customer is a property (external_key or email lookup)
         customer = None
         try:
-            customer = instance.crm_customer  # property defined on SalesOrder
+            customer = instance.crm_customer
         except Exception:
             pass
 
@@ -64,3 +61,80 @@ def order_email_draft(sender, instance, created, **kwargs):
 
     except Exception as exc:
         logger.error('order_email_draft signal error: %s', exc)
+
+
+@receiver(post_save, sender='email_assistant.EmailMessage')
+def on_email_received(sender, instance, created, **kwargs):
+    """When a new inbox email arrives, try to auto-advance the customer's active strategy."""
+    if not created or instance.folder != 'inbox':
+        return
+    try:
+        _try_advance_strategy(instance)
+    except Exception as exc:
+        logger.error('on_email_received strategy advance error: %s', exc)
+
+
+def _classify_sentiment(text: str) -> str:
+    """Keyword-based sentiment classification for strategy branching."""
+    t = text.lower()
+    pos = ['yes', 'ok', 'agree', 'great', 'sure', 'interested', 'зголошуюсь',
+           'погоджуюсь', 'добре', 'так', 'цікаво', 'чудово', 'готовий', 'дякую', 'дякуємо']
+    neg = ['no', 'not interested', 'cancel', 'stop', 'unsubscribe', 'ні', 'відмовляюсь',
+           'не цікаво', 'скасуй', 'відпишіть', 'більше не надсилайте']
+    p = sum(1 for k in pos if k in t)
+    n = sum(1 for k in neg if k in t)
+    if p > n:
+        return 'positive'
+    if n > p:
+        return 'negative'
+    return 'neutral'
+
+
+def _try_advance_strategy(msg):
+    """Find CRM customer by sender email and advance their active strategy if current step is 'email'."""
+    from crm.models import Customer
+    from strategy.models import CustomerStrategy
+
+    email_addr = (msg.from_email or '').lower().strip()
+    if not email_addr:
+        return
+
+    customer = Customer.objects.filter(email__iexact=email_addr).first()
+    if not customer:
+        return
+
+    strategy = (CustomerStrategy.objects
+                .filter(customer=customer, status=CustomerStrategy.Status.ACTIVE)
+                .select_related('current_step')
+                .first())
+    if not strategy or not strategy.current_step:
+        return
+
+    current_step = strategy.current_step
+    if current_step.step_type != 'email':
+        return
+    if current_step.outcome != 'pending':
+        return
+
+    text = (msg.body_text or '')[:500]
+    sentiment = _classify_sentiment(text)
+    outcome = 'done_pos' if sentiment in ('positive', 'neutral') else 'done_neg'
+
+    current_step.outcome = outcome
+    current_step.save(update_fields=['outcome'])
+
+    try:
+        from crm.models import CustomerTimeline
+        CustomerTimeline.objects.create(
+            customer=customer,
+            event_type='email_in',
+            title=f'Відповідь на крок стратегії: {current_step.title}',
+            body=text[:200],
+        )
+    except Exception:
+        pass
+
+    from strategy.services.engine import advance_step
+    advance_step(current_step, outcome, '', None)
+    logger.info('Strategy %s advanced for customer %s after email reply (outcome=%s)',
+                strategy.pk, customer.name, outcome)
