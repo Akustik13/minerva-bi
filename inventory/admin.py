@@ -409,18 +409,36 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
     search_fields = ("product__sku", "ref_doc", "external_key")
     list_filter   = ("tx_type", "location__code", "product__category")
     date_hierarchy = "created_at"
-    actions       = ["release_reservations"]
+    actions = [
+        "mark_as_reserved",
+        "release_reservations",
+        "mark_as_incoming",
+        "mark_as_adjustment",
+    ]
 
-    @admin.action(description="🔓 Конвертувати вибрані резерви → Списання")
+    @admin.action(description="🔒 Змінити тип → Резерв")
+    def mark_as_reserved(self, request, queryset):
+        updated = queryset.update(tx_type=InventoryTransaction.TxType.RESERVED)
+        self.message_user(request, f"Змінено {updated} транзакцій → Резерв.",
+                          messages.SUCCESS if updated else messages.WARNING)
+
+    @admin.action(description="🔓 Змінити тип → Списання (Outgoing)")
     def release_reservations(self, request, queryset):
-        updated = queryset.filter(
-            tx_type=InventoryTransaction.TxType.RESERVED
-        ).update(tx_type=InventoryTransaction.TxType.OUTGOING)
-        self.message_user(
-            request,
-            f"Конвертовано {updated} резерв(ів) → Відвантаження.",
-            messages.SUCCESS if updated else messages.WARNING,
-        )
+        updated = queryset.update(tx_type=InventoryTransaction.TxType.OUTGOING)
+        self.message_user(request, f"Змінено {updated} транзакцій → Списання.",
+                          messages.SUCCESS if updated else messages.WARNING)
+
+    @admin.action(description="▲ Змінити тип → Прихід (Incoming)")
+    def mark_as_incoming(self, request, queryset):
+        updated = queryset.update(tx_type=InventoryTransaction.TxType.INCOMING)
+        self.message_user(request, f"Змінено {updated} транзакцій → Прихід.",
+                          messages.SUCCESS if updated else messages.WARNING)
+
+    @admin.action(description="⇄ Змінити тип → Коригування (Adjustment)")
+    def mark_as_adjustment(self, request, queryset):
+        updated = queryset.update(tx_type=InventoryTransaction.TxType.ADJUSTMENT)
+        self.message_user(request, f"Змінено {updated} транзакцій → Коригування.",
+                          messages.SUCCESS if updated else messages.WARNING)
 
     _TX_META = {
         'Incoming':   ('▲', 'var(--ok,#3fb950)',  'rgba(63,185,80,.13)',   'Прихід'),
