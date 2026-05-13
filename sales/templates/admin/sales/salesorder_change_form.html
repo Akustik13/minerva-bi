@@ -10,6 +10,16 @@
         💰 Рахунок
       </a>
     </li>
+    {% if original.affects_stock %}
+    <li>
+      <button type="button" id="sv-sync-inv-btn"
+              onclick="svSyncInventory({{ original.pk }})"
+              style="background:#e65100;color:#fff;padding:6px 14px;border-radius:6px;
+                     font-weight:bold;border:none;cursor:pointer;font-size:13px;white-space:nowrap">
+        🔄 Синхронізувати склад
+      </button>
+    </li>
+    {% endif %}
   {% endif %}
   {% if digikey_confirm_url %}
     <li>
@@ -653,6 +663,69 @@ document.addEventListener('DOMContentLoaded',function(){
     });
   });
 });
+</script>
+
+<script>
+/* ── Синхронізація складу ── */
+(function(){
+  var _CSRF = (document.cookie.split(';').find(function(c){return c.trim().startsWith('csrftoken=');})||'=').split('=')[1];
+
+  window.svSyncInventory = function(pk) {
+    var btn = document.getElementById('sv-sync-inv-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Перевіряю...'; }
+
+    fetch('/admin/sales/salesorder/' + pk + '/sync-inventory/')
+      .then(function(r){ return r.json(); })
+      .then(function(data) {
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 Синхронізувати склад'; }
+        if (!data.ok) {
+          alert('⚠️ Помилка: ' + (data.error || 'невідома'));
+          return;
+        }
+        var mm = data.mismatches || [];
+        if (!mm.length) {
+          alert('✅ Розбіжностей не знайдено — склад відповідає рядкам замовлення.');
+          return;
+        }
+        // Будуємо текст підтвердження
+        var lines = mm.map(function(m) {
+          var parts = [];
+          if (m.product_diff) parts.push('SKU: ' + m.tx_sku + ' → ' + m.line_sku);
+          if (m.qty_diff)     parts.push('к-сть: ' + m.tx_qty + ' → ' + m.line_qty);
+          return '• ' + parts.join(', ');
+        });
+        var msg = 'Знайдено ' + mm.length + ' розбіжност' + (mm.length === 1 ? 'ь' : 'і') + ':\n\n'
+          + lines.join('\n')
+          + '\n\nВиконати автокоригування складу?';
+        if (!confirm(msg)) return;
+
+        // POST — виправляємо
+        if (btn) { btn.disabled = true; btn.textContent = '⏳ Коригую...'; }
+        fetch('/admin/sales/salesorder/' + pk + '/sync-inventory/', {
+          method: 'POST',
+          headers: { 'X-CSRFToken': _CSRF }
+        })
+          .then(function(r){ return r.json(); })
+          .then(function(res) {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 Синхронізувати склад'; }
+            if (res.ok) {
+              alert('✅ ' + res.message);
+            } else {
+              var errTxt = (res.errors || []).join('\n') || res.error || 'невідома';
+              alert('⚠️ Помилка коригування:\n' + errTxt);
+            }
+          })
+          .catch(function(e) {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 Синхронізувати склад'; }
+            alert('⚠️ Помилка зʼєднання: ' + e);
+          });
+      })
+      .catch(function(e) {
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 Синхронізувати склад'; }
+        alert('⚠️ Помилка зʼєднання: ' + e);
+      });
+  };
+})();
 </script>
 {% endblock %}
 

@@ -1914,6 +1914,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/note/',
                  self.admin_site.admin_view(self.set_note_view),
                  name='sales_salesorder_note'),
+            # AJAX: inventory sync (GET=preview, POST=apply)
+            path('<int:pk>/sync-inventory/',
+                 self.admin_site.admin_view(self.sync_inventory_view),
+                 name='sales_salesorder_sync_inventory'),
         ]
         return custom_urls + urls
 
@@ -1935,6 +1939,151 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         order.internal_note = (data.get('note') or '').strip()[:500]
         order.save(update_fields=['internal_note'])
         return JsonResponse({'ok': True, 'note': order.internal_note})
+
+    def sync_inventory_view(self, request, pk):
+        """
+        GET  → повертає список розбіжностей між рядками замовлення і транзакціями складу.
+        POST → виправляє розбіжності (Adjustment reversal + нова транзакція).
+        """
+        from django.http import JsonResponse
+        from inventory.models import InventoryTransaction, InventorySettings, Location
+
+        order = get_object_or_404(SalesOrder, pk=pk)
+
+        if not order.affects_stock:
+            return JsonResponse({'ok': False, 'error': 'Замовлення не впливає на склад (affects_stock=False)'})
+
+        lines = list(order.lines.select_related('product').all())
+        if not lines:
+            return JsonResponse({'ok': False, 'error': 'Замовлення не має рядків'})
+
+        # Збираємо всі транзакції цього замовлення одним запитом
+        prefix = f"so:{order.source}:{order.order_number}:line:"
+        all_txs = list(InventoryTransaction.objects.filter(
+            external_key__startswith=prefix
+        ).select_related('product'))
+        # Групуємо: line_pk → [tx, ...]
+        tx_by_line: dict = {}
+        for tx in all_txs:
+            # external_key format: so:{src}:{num}:line:{line_pk}:{uuid}
+            parts = tx.external_key.split(':')
+            try:
+                line_pk = int(parts[4])
+            except (IndexError, ValueError):
+                continue
+            tx_by_line.setdefault(line_pk, []).append(tx)
+
+        mismatches = []
+        for line in lines:
+            txs = tx_by_line.get(line.pk, [])
+            if not txs:
+                # Немає транзакції — можливо списання ще не відбулось (deduct_on=shipped/delivered і ще не відправлено)
+                continue
+            for tx in txs:
+                tx_product_id = tx.product_id
+                tx_qty        = abs(tx.qty)
+                line_qty      = abs(line.qty)
+                product_mismatch = (tx_product_id != line.product_id)
+                qty_mismatch     = (tx_qty != line_qty)
+                if product_mismatch or qty_mismatch:
+                    mismatches.append({
+                        'line_pk':      line.pk,
+                        'line_sku':     line.product.sku if line.product else '?',
+                        'line_qty':     float(line_qty),
+                        'tx_sku':       tx.product.sku if tx.product else '?',
+                        'tx_qty':       float(tx_qty),
+                        'tx_type':      tx.tx_type,
+                        'tx_pk':        tx.pk,
+                        'product_diff': product_mismatch,
+                        'qty_diff':     qty_mismatch,
+                    })
+
+        if request.method == 'GET':
+            return JsonResponse({'ok': True, 'mismatches': mismatches, 'order': str(order)})
+
+        # ── POST: виправляємо ──────────────────────────────────────────────────
+        from django.utils import timezone as tz
+        if not mismatches:
+            return JsonResponse({'ok': True, 'fixed': 0, 'message': 'Розбіжностей не знайдено'})
+
+        try:
+            settings = InventorySettings.get()
+            loc_code = settings.default_location or "MAIN"
+            location, _ = Location.objects.get_or_create(
+                code=loc_code, defaults={"name": "Основний склад"})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': f'Помилка отримання локації: {e}'})
+
+        performer = request.user if request.user.is_authenticated else None
+
+        use_reservation = getattr(settings, 'use_reservation', False)
+        out_type = (InventoryTransaction.TxType.RESERVED if use_reservation
+                    else InventoryTransaction.TxType.OUTGOING)
+
+        # Build line lookup and tx_product_id lookup from collected data
+        line_by_pk = {l.pk: l for l in lines}
+        tx_product_by_line = {}
+        for tx in all_txs:
+            parts = tx.external_key.split(':')
+            try:
+                line_pk = int(parts[4])
+                tx_product_by_line.setdefault(line_pk, tx.product_id)
+            except (IndexError, ValueError):
+                pass
+
+        fixed = 0
+        errors = []
+        for m in mismatches:
+            line_pk = m['line_pk']
+            line_obj = line_by_pk.get(line_pk)
+            if not line_obj:
+                continue
+            try:
+                old_product_id = tx_product_by_line.get(line_pk)
+                old_qty = Decimal(str(m['tx_qty']))
+
+                # 1. Reversal Adjustment для старого товару (+qty)
+                if old_product_id and old_qty > 0:
+                    InventoryTransaction.objects.create(
+                        external_key=f"so-adj:{order.source}:{order.order_number}:line:{line_pk}:rev:{uuid.uuid4()}",
+                        tx_type=InventoryTransaction.TxType.ADJUSTMENT,
+                        qty=old_qty,
+                        product_id=old_product_id,
+                        location=location,
+                        ref_doc=(f"Sync: {m['tx_sku']} → {m['line_sku']}"
+                                 f" | SO-{order.source}:{order.order_number}"),
+                        tx_date=tz.now(),
+                        performed_by=performer,
+                    )
+
+                # 2. Видаляємо старі транзакції рядка
+                InventoryTransaction.objects.filter(
+                    external_key__startswith=f"so:{order.source}:{order.order_number}:line:{line_pk}:"
+                ).delete()
+
+                # 3. Нова транзакція для правильного товару (-qty)
+                if line_obj.product_id and line_obj.qty > 0:
+                    InventoryTransaction.objects.create(
+                        external_key=f"so:{order.source}:{order.order_number}:line:{line_pk}:{uuid.uuid4()}",
+                        tx_type=out_type,
+                        qty=-abs(line_obj.qty),
+                        product=line_obj.product,
+                        location=location,
+                        ref_doc=f"SO-{order.source}:{order.order_number}",
+                        tx_date=order.order_date or tz.now(),
+                        performed_by=performer,
+                    )
+                fixed += 1
+            except Exception as e:
+                errors.append(f"Рядок {line_pk}: {e}")
+
+        if errors:
+            return JsonResponse({'ok': False, 'fixed': fixed, 'errors': errors})
+        return JsonResponse({
+            'ok': True,
+            'fixed': fixed,
+            'message': f'Скориговано {fixed} транзакцій',
+        })
 
     # ── PDF document views ─────────────────────────────────────────────────────
 
