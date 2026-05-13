@@ -42,6 +42,27 @@
 .em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
 .em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:500px;overflow-y:auto}
 .em-body-iframe{width:100%;border:none;display:block;min-height:200px;overflow:hidden}
+/* ── Fullscreen card (multi-message thread) ── */
+.em-msgs{position:relative}
+.em-msgs.has-expanded{overflow:hidden}
+.em-msgs.has-expanded .em-card.expanded{
+  position:absolute;top:0;left:0;right:0;bottom:0;z-index:5;
+  display:flex;flex-direction:column;overflow:hidden;border-radius:0;
+}
+.em-msgs.has-expanded .em-card.expanded .em-card-hd{cursor:pointer}
+.em-msgs.has-expanded .em-card.expanded .em-card-hd:hover{background:var(--bg-hover,#1e2d40)}
+.em-msgs.has-expanded .em-card.expanded .em-card-collapse{
+  flex:1;display:flex;flex-direction:column;overflow-y:auto;min-height:0;
+}
+.em-msgs.has-expanded .em-card.expanded .em-card-body{
+  flex:1;display:flex;flex-direction:column;min-height:0;
+}
+.em-msgs.has-expanded .em-card.expanded .em-body-iframe{
+  flex:1;min-height:100px;height:auto!important;
+}
+.em-msgs.has-expanded .em-card.expanded .em-card-body-text{
+  max-height:none;flex:1;overflow-y:auto;
+}
 .em-card-atts{padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 .em-att-item{display:inline-flex;align-items:center;gap:0;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);overflow:hidden;font-size:11px;position:relative}
 .em-att-name{padding:4px 9px;color:var(--text-muted);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
@@ -256,6 +277,11 @@
 var CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 
 function emResizeIframe(f) {
+  var msgs = f.closest ? f.closest('.em-msgs') : null;
+  if (msgs && msgs.classList.contains('has-expanded')) {
+    f.style.height = ''; // CSS flex handles height in fullscreen
+    return;
+  }
   try {
     var h = f.contentDocument.documentElement.scrollHeight || f.contentDocument.body.scrollHeight;
     var maxH = Math.max(400, window.innerHeight - 180);
@@ -282,8 +308,30 @@ window.pvToggleCard = function(pk, e) {
   if (e && e.target && e.target.closest('.em-card-actions')) return;
   var card = document.getElementById('pv-card-' + pk);
   if (!card) return;
+  var msgs = card.closest('.em-msgs');
+  var multiCard = msgs && msgs.querySelectorAll('.em-card').length > 1;
   var wasExpanded = card.classList.contains('expanded');
+
+  // Collapse all other expanded cards
+  if (msgs) {
+    msgs.querySelectorAll('.em-card.expanded').forEach(function(c) {
+      if (c !== card) c.classList.remove('expanded');
+    });
+  }
+
   card.classList.toggle('expanded', !wasExpanded);
+
+  // Toggle fullscreen mode on the msgs container
+  if (msgs && multiCard) {
+    var anyExpanded = !!msgs.querySelector('.em-card.expanded');
+    msgs.classList.toggle('has-expanded', anyExpanded);
+    // Clear JS-set iframe height so CSS flex takes over in fullscreen
+    if (anyExpanded && !wasExpanded) {
+      var fr = document.getElementById('pv-iframe-' + pk);
+      if (fr) fr.style.height = '';
+    }
+  }
+
   // Load iframe lazily when first expanded
   if (!wasExpanded) {
     var iframe = document.getElementById('pv-iframe-' + pk);
@@ -493,5 +541,15 @@ window.attTipHide = function() {
   clearTimeout(_tipTimer);
   if (_tip) _tip.style.display = 'none';
 };
+
+// Init fullscreen mode if last card is already expanded in a multi-card thread
+(function() {
+  var msgs = document.querySelector('.em-msgs');
+  if (!msgs) return;
+  if (msgs.querySelectorAll('.em-card').length > 1 && msgs.querySelector('.em-card.expanded')) {
+    msgs.classList.add('has-expanded');
+  }
+})();
+
 })();
 </script>
