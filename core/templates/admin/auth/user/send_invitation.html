@@ -1,0 +1,155 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Надіслати запрошення — {{ user_obj.username }}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Головна</a> ›
+  <a href="{% url 'admin:auth_user_changelist' %}">Користувачі</a> ›
+  <a href="{% url 'admin:auth_user_change' user_obj.pk %}">{{ user_obj.username }}</a> ›
+  Надіслати запрошення
+</div>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:860px">
+
+  <!-- Form panel -->
+  <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#3d4f61);
+              border-radius:12px;padding:28px;margin-bottom:24px">
+
+    <h2 style="margin:0 0 22px;color:var(--text,#c9d8e4);font-size:18px;font-weight:700">
+      📨 Надіслати запрошення
+    </h2>
+
+    <!-- User summary -->
+    <div style="display:flex;align-items:center;gap:16px;padding:16px 20px;
+                background:var(--bg-hover,#1e2d40);border:1px solid var(--border-strong,#3d4f61);
+                border-radius:8px;margin-bottom:24px">
+      <div style="flex:1">
+        <div style="font-weight:700;color:var(--text,#c9d8e4);font-size:15px">
+          👤 {{ user_obj.username }}
+          {% if user_obj.first_name %}
+            <span style="color:var(--text-muted,#9aafbe);font-weight:400;font-size:13px">
+              ({{ user_obj.first_name }} {{ user_obj.last_name }})
+            </span>
+          {% endif %}
+        </div>
+        <div style="margin-top:6px;font-size:13px">
+          📧&nbsp;
+          {% if user_obj.email %}
+            <strong style="color:var(--link-fg,#58a6ff)">{{ user_obj.email }}</strong>
+          {% else %}
+            <span style="color:var(--err,#f85149);font-weight:600">
+              ⚠️ Email не вказано — запрошення не надіслати!
+            </span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% if user_obj.email %}
+    <form method="post" id="inv-form">
+      {% csrf_token %}
+
+      <div style="margin-bottom:20px">
+        <label style="display:block;font-size:13px;font-weight:600;
+                      color:var(--text,#c9d8e4);margin-bottom:7px">
+          🔑 Тимчасовий пароль
+        </label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" name="password" id="inv-pwd"
+                 value="{{ default_password }}"
+                 style="flex:1;padding:10px 14px;border-radius:8px;font-family:monospace;
+                        font-size:15px;font-weight:700;letter-spacing:1.5px;
+                        background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);
+                        border:1px solid var(--border-strong,#3d4f61);outline:none">
+          <button type="button" onclick="mvInvRegenPwd()"
+                  style="padding:10px 16px;border-radius:8px;cursor:pointer;font-size:13px;
+                         border:1px solid var(--border-strong,#3d4f61);
+                         background:var(--bg-hover,#1e2d40);color:var(--text-muted,#9aafbe);
+                         white-space:nowrap">
+            🔄 Згенерувати
+          </button>
+        </div>
+        <div style="font-size:12px;color:var(--text-dim,#607d8b);margin-top:6px">
+          Цей пароль буде встановлено для користувача і вказано в листі.
+          Рекомендуємо попросити змінити після першого входу.
+        </div>
+      </div>
+
+      <div style="margin-bottom:28px">
+        <label style="display:block;font-size:13px;font-weight:600;
+                      color:var(--text,#c9d8e4);margin-bottom:7px">
+          🌐 URL системи (посилання в листі)
+        </label>
+        <input type="url" name="system_url" id="inv-url"
+               value="{{ system_url }}"
+               style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:8px;
+                      font-size:13px;background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);
+                      border:1px solid var(--border-strong,#3d4f61);outline:none">
+      </div>
+
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <button type="submit"
+                style="padding:13px 36px;border-radius:8px;background:#58a6ff;color:#fff;
+                       border:none;font-size:15px;font-weight:700;cursor:pointer;
+                       box-shadow:0 4px 14px rgba(88,166,255,.35)">
+          📨 Надіслати запрошення
+        </button>
+        <a href="{% url 'admin:auth_user_change' user_obj.pk %}"
+           style="padding:13px 24px;border-radius:8px;text-decoration:none;font-size:14px;
+                  background:var(--bg-hover,#1e2d40);color:var(--text-muted,#9aafbe);
+                  border:1px solid var(--border-strong,#3d4f61)">
+          ← Назад
+        </a>
+      </div>
+    </form>
+    {% else %}
+    <a href="{% url 'admin:auth_user_change' user_obj.pk %}"
+       style="display:inline-block;padding:12px 24px;border-radius:8px;text-decoration:none;
+              font-size:14px;background:var(--bg-hover,#1e2d40);color:var(--text-muted,#9aafbe);
+              border:1px solid var(--border-strong,#3d4f61)">
+      ← Назад — додайте email користувачу
+    </a>
+    {% endif %}
+
+  </div>
+
+  <!-- Email preview -->
+  <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#3d4f61);
+              border-radius:12px;padding:20px">
+    <div style="font-size:12px;font-weight:600;color:var(--text-dim,#607d8b);
+                letter-spacing:1px;text-transform:uppercase;margin-bottom:14px">
+      📩 Попередній перегляд листа
+    </div>
+    <iframe id="inv-preview"
+            style="width:100%;height:720px;border:none;border-radius:8px;background:#0d1117"
+            scrolling="auto">
+    </iframe>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var previewHtml = {{ preview_html|escapejs }};
+
+  function loadPreview() {
+    var iframe = document.getElementById('inv-preview');
+    iframe.srcdoc = previewHtml;
+  }
+  loadPreview();
+
+  window.mvInvRegenPwd = function () {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#';
+    var pwd = '';
+    for (var i = 0; i < 13; i++) {
+      pwd += chars[Math.floor(Math.random() * chars.length)];
+    }
+    document.getElementById('inv-pwd').value = pwd;
+  };
+})();
+</script>
+{% endblock %}

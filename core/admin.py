@@ -9,6 +9,144 @@ from django.utils.html import format_html, mark_safe
 from .models import AuditLog, UserProfile, ModuleBundle, ModuleRegistry, TenantAccount
 
 
+# ── Invitation System helpers ─────────────────────────────────────────────────
+
+_ROLE_CAPS = {
+    'superadmin': {
+        'label': 'Суперадміністратор', 'color': '#f85149',
+        'desc': 'Повний доступ до всіх функцій системи.',
+        'caps': ['Управління всіма модулями', 'Налаштування системи',
+                 'Управління користувачами та правами',
+                 'Журнал аудиту', 'Імпорт, експорт та видалення'],
+    },
+    'admin': {
+        'label': 'Адміністратор', 'color': '#ff9800',
+        'desc': 'Адміністративний доступ до всіх модулів.',
+        'caps': ['Продажі та клієнти', 'Склад та закупівлі',
+                 'Фінансова аналітика та звіти', 'Інтеграції', 'Імпорт та експорт'],
+    },
+    'manager': {
+        'label': 'Менеджер', 'color': '#58a6ff',
+        'desc': 'Доступ до CRM, продажів, відправлень та завдань.',
+        'caps': ['CRM та клієнти (RFM, стратегії)', 'Продажі та замовлення',
+                 'Відправлення та доставка', 'Email-асистент', 'Завдання та дедлайни'],
+    },
+    'warehouse': {
+        'label': 'Складський працівник', 'color': '#3fb950',
+        'desc': 'Доступ до складських операцій та відправлень.',
+        'caps': ['Складські транзакції та інвентаризація',
+                 'Прийом товарів (закупівлі)', 'Відправлення та трекінг', 'Друк етикеток DYMO'],
+    },
+    'accountant': {
+        'label': 'Бухгалтер', 'color': '#c9a84c',
+        'desc': 'Доступ до продажів, бухгалтерії та складу.',
+        'caps': ['Рахунки-фактури та рахунки', 'Бухгалтерський облік',
+                 'Склад (тільки перегляд)', 'Аналітика та звіти', 'Експорт даних'],
+    },
+    'ai': {
+        'label': 'AI-фахівець', 'color': '#a78bfa',
+        'desc': 'Доступ до CRM та AI-функцій.',
+        'caps': ['CRM та клієнти', 'AI-аналіз клієнтів', 'Стратегії утримання'],
+    },
+    'readonly': {
+        'label': 'Тільки перегляд', 'color': '#607d8b',
+        'desc': 'Тільки перегляд дашборду та довідника.',
+        'caps': ['Аналітика (тільки перегляд)', 'FAQ та підтримка'],
+    },
+}
+
+
+def _build_invitation_html(user, password, company, system_url):
+    """Branded HTML invitation email — inline styles only, no external resources."""
+    import html as _h
+    try:
+        role = user.profile.role
+    except Exception:
+        role = 'readonly'
+    ri    = _ROLE_CAPS.get(role, _ROLE_CAPS['readonly'])
+    first = _h.escape(user.first_name or user.username)
+    co    = _h.escape(company)
+    c     = ri['color']
+    uname = _h.escape(user.username)
+    pwd   = _h.escape(password)
+    surl  = _h.escape(system_url)
+    label = _h.escape(ri['label'])
+    desc  = _h.escape(ri['desc'])
+    caps  = ''.join(
+        f'<li style="padding:5px 0;display:flex;align-items:flex-start;gap:10px">'
+        f'<span style="color:#4caf50;flex-shrink:0;margin-top:1px">&#10003;</span>'
+        f'<span style="color:#c9d1d9;font-size:14px">{_h.escape(cap)}</span></li>'
+        for cap in ri['caps']
+    )
+    return f"""<!DOCTYPE html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Запрошення до {co}</title>
+</head>
+<body style="margin:0;padding:0;background:#0d1117;font-family:Arial,sans-serif">
+<div style="max-width:600px;margin:0 auto;padding:24px 16px">
+
+<div style="background:linear-gradient(135deg,#1a2535,#0d1a2e);border-radius:16px 16px 0 0;padding:36px 40px;text-align:center;border-bottom:3px solid {c}">
+  <div style="display:inline-block;width:50px;height:50px;background:{c};border-radius:13px;line-height:50px;font-size:26px;font-weight:800;color:#fff;margin-bottom:12px;box-shadow:0 4px 14px {c}55">M</div>
+  <div style="font-size:24px;font-weight:700;color:#e6edf3;letter-spacing:.5px">Minerva BI</div>
+  <div style="font-size:11px;color:#607d8b;letter-spacing:2px;text-transform:uppercase;margin-top:5px">Business Intelligence System</div>
+</div>
+
+<div style="background:#161b22;padding:40px;border:1px solid #21262d;border-top:none">
+
+  <div style="text-align:center;margin-bottom:34px">
+    <div style="font-size:46px;margin-bottom:14px">&#127881;</div>
+    <h1 style="margin:0 0 10px;font-size:26px;font-weight:700;color:#e6edf3;line-height:1.3">&#1042;&#1072;&#1089; &#1079;&#1072;&#1087;&#1088;&#1086;&#1096;&#1077;&#1085;&#1086; &#1076;&#1086; &#1089;&#1080;&#1089;&#1090;&#1077;&#1084;&#1080;!</h1>
+    <p style="margin:0;font-size:15px;color:#8b949e;line-height:1.8">
+      &#1055;&#1088;&#1080;&#1074;&#1110;&#1090;, <strong style="color:#e6edf3">{first}</strong>!<br>
+      <strong style="color:{c}">{co}</strong> &#1079;&#1072;&#1087;&#1088;&#1086;&#1096;&#1091;&#1108; &#1074;&#1072;&#1089; &#1076;&#1086; Minerva BI &#8212;<br>
+      &#1089;&#1080;&#1089;&#1090;&#1077;&#1084;&#1080; &#1091;&#1087;&#1088;&#1072;&#1074;&#1083;&#1110;&#1085;&#1085;&#1103; &#1073;&#1110;&#1079;&#1085;&#1077;&#1089;&#1086;&#1084;.</p>
+  </div>
+
+  <div style="background:#0d1117;border:1px solid #30363d;border-radius:12px;padding:26px;margin-bottom:28px">
+    <div style="font-size:11px;font-weight:700;color:#8b949e;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:18px">&#128273; &#1042;&#1072;&#1096;&#1110; &#1086;&#1073;&#1083;&#1110;&#1082;&#1086;&#1074;&#1110; &#1076;&#1072;&#1085;&#1110;</div>
+    <table style="width:100%;border-collapse:collapse">
+      <tr>
+        <td style="padding:11px 0;border-bottom:1px solid #21262d;width:80px;font-size:12px;color:#8b949e;vertical-align:middle">&#1051;&#1086;&#1075;&#1110;&#1085;</td>
+        <td style="padding:11px 0;border-bottom:1px solid #21262d">
+          <code style="font-size:18px;font-weight:700;color:#58a6ff;background:#1f2937;padding:5px 14px;border-radius:7px">{uname}</code>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:11px 0 0;font-size:12px;color:#8b949e;vertical-align:middle">&#1055;&#1072;&#1088;&#1086;&#1083;&#1100;</td>
+        <td style="padding:11px 0 0">
+          <code style="font-size:18px;font-weight:700;color:#3fb950;background:#1f2937;padding:5px 14px;border-radius:7px;letter-spacing:1.5px">{pwd}</code>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <div style="margin-bottom:22px">
+    <div style="display:inline-block;background:{c}22;color:{c};border:1px solid {c}44;padding:6px 16px;border-radius:20px;font-size:13px;font-weight:700;margin-bottom:9px">&#9881;&#65039; {label}</div>
+    <div style="font-size:14px;color:#8b949e">{desc}</div>
+  </div>
+
+  <div style="background:#0d1117;border:1px solid #21262d;border-radius:10px;padding:22px;margin-bottom:34px">
+    <div style="font-size:11px;font-weight:700;color:#8b949e;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:13px">&#1065;&#1086; &#1074;&#1080; &#1084;&#1086;&#1078;&#1077;&#1090;&#1077; &#1088;&#1086;&#1073;&#1080;&#1090;&#1080; &#1074; &#1089;&#1080;&#1089;&#1090;&#1077;&#1084;&#1110;:</div>
+    <ul style="margin:0;padding:0;list-style:none">{caps}</ul>
+  </div>
+
+  <div style="text-align:center;margin-bottom:26px">
+    <a href="{surl}" style="display:inline-block;background:{c};color:#fff;text-decoration:none;padding:17px 56px;border-radius:11px;font-size:16px;font-weight:700;letter-spacing:.5px;box-shadow:0 5px 18px {c}55">&#10148; &#1059;&#1074;&#1110;&#1081;&#1090;&#1080; &#1074; &#1089;&#1080;&#1089;&#1090;&#1077;&#1084;&#1091;</a>
+    <div style="margin-top:11px;font-size:12px;color:#6e7681">{surl}</div>
+  </div>
+
+</div>
+
+<div style="background:#0d1117;border:1px solid #21262d;border-top:none;border-radius:0 0 16px 16px;padding:18px 40px;text-align:center">
+  <div style="font-size:12px;color:#6e7681;margin-bottom:5px">&#9888;&#65039; &#1056;&#1077;&#1082;&#1086;&#1084;&#1077;&#1085;&#1076;&#1091;&#1108;&#1084;&#1086; &#1079;&#1084;&#1110;&#1085;&#1080;&#1090;&#1080; &#1087;&#1072;&#1088;&#1086;&#1083;&#1100; &#1087;&#1110;&#1089;&#1083;&#1103; &#1087;&#1077;&#1088;&#1096;&#1086;&#1075;&#1086; &#1074;&#1093;&#1086;&#1076;&#1091; &#1074; &#1089;&#1080;&#1089;&#1090;&#1077;&#1084;&#1091;</div>
+  <div style="font-size:11px;color:#484f58">Minerva BI &copy; {co} &middot; &#1040;&#1074;&#1090;&#1086;&#1084;&#1072;&#1090;&#1080;&#1095;&#1085;&#1077; &#1087;&#1086;&#1074;&#1110;&#1076;&#1086;&#1084;&#1083;&#1077;&#1085;&#1085;&#1103;</div>
+</div>
+
+</div>
+</body></html>"""
+
+
 # ── Custom User Admin (replaces Django default) ───────────────────────────────
 
 admin.site.unregister(User)
@@ -26,6 +164,7 @@ class MinervaUserAdmin(_DjangoUserAdmin):
     list_display_links = ('username',)
     list_filter   = ('is_active', 'is_staff', 'is_superuser')
     search_fields = ('username', 'email', 'first_name', 'last_name')
+    actions       = ['send_invitation_action']
 
     fieldsets = (
         ('👤 Обліковий запис', {
@@ -139,6 +278,137 @@ class MinervaUserAdmin(_DjangoUserAdmin):
                 '<a href="{}" style="color:var(--err,#f85149);font-size:11px;font-weight:600">'
                 '⚠️ Немає профілю</a>', url
             )
+
+    # ── Invitation ────────────────────────────────────────────────────────────
+
+    def get_urls(self):
+        from django.urls import path
+        return [
+            path(
+                '<int:pk>/send-invitation/',
+                self.admin_site.admin_view(self.send_invitation_view),
+                name='auth_user_send_invitation',
+            ),
+        ] + super().get_urls()
+
+    @admin.action(description='📨 Надіслати запрошення')
+    def send_invitation_action(self, request, queryset):
+        if not request.user.is_superuser:
+            self.message_user(request, '⛔ Тільки суперадміністратор може надсилати запрошення.', level='warning')
+            return
+        users = list(queryset.select_related('profile'))
+        if len(users) == 1:
+            from django.http import HttpResponseRedirect
+            return HttpResponseRedirect(
+                reverse('admin:auth_user_send_invitation', args=[users[0].pk])
+            )
+        import secrets
+        try:
+            from config.models import SystemSettings
+            company = (SystemSettings.objects.filter(pk=1)
+                       .values_list('company_name', flat=True).first() or 'Minerva BI')
+        except Exception:
+            company = 'Minerva BI'
+        system_url = request.build_absolute_uri('/admin/')
+        sent, errors = [], []
+        for user in users:
+            if not user.email:
+                errors.append(f'{user.username} (немає email)')
+                continue
+            result = self._do_send_invitation(user, secrets.token_urlsafe(10), company, system_url)
+            (sent if result['ok'] else errors).append(
+                user.username if result['ok'] else f"{user.username}: {result['error']}"
+            )
+        if sent:
+            self.message_user(request, f'📨 Запрошення надіслано: {", ".join(sent)}.')
+        if errors:
+            self.message_user(request, f'⚠️ Помилки: {"; ".join(errors)}.', level='warning')
+
+    def send_invitation_view(self, request, pk):
+        import secrets
+        from django.shortcuts import render, redirect
+        from django.contrib import messages
+
+        if not request.user.is_superuser:
+            messages.error(request, '⛔ Доступ заборонено.')
+            return redirect('admin:auth_user_changelist')
+
+        try:
+            user = User.objects.select_related('profile').get(pk=pk)
+        except User.DoesNotExist:
+            messages.error(request, 'Користувача не знайдено.')
+            return redirect('admin:auth_user_changelist')
+
+        try:
+            from config.models import SystemSettings
+            company = (SystemSettings.objects.filter(pk=1)
+                       .values_list('company_name', flat=True).first() or 'Minerva BI')
+        except Exception:
+            company = 'Minerva BI'
+
+        system_url       = request.build_absolute_uri('/admin/')
+        default_password = secrets.token_urlsafe(10)
+
+        if request.method == 'POST':
+            password = request.POST.get('password', '').strip() or default_password
+            sys_url  = request.POST.get('system_url', '').strip() or system_url
+            result   = self._do_send_invitation(user, password, company, sys_url)
+            if result['ok']:
+                messages.success(request, f'📨 Запрошення надіслано на {user.email}.')
+            else:
+                messages.error(request, f'❌ Помилка надсилання: {result["error"]}')
+            return redirect('admin:auth_user_change', pk)
+
+        preview_html = _build_invitation_html(user, default_password, company, system_url)
+        context = {
+            **self.admin_site.each_context(request),
+            'title':            f'Запрошення — {user.username}',
+            'user_obj':         user,
+            'default_password': default_password,
+            'system_url':       system_url,
+            'preview_html':     preview_html,
+            'opts':             User._meta,
+        }
+        return render(request, 'admin/auth/user/send_invitation.html', context)
+
+    def _do_send_invitation(self, user, password, company, system_url):
+        """Set user password and send branded invitation email. Returns {'ok': bool, 'error': str}."""
+        if not user.email:
+            return {'ok': False, 'error': 'У користувача немає email-адреси'}
+
+        user.set_password(password)
+        user.save(update_fields=['password'])
+
+        html_body = _build_invitation_html(user, password, company, system_url)
+        subject   = f'🎉 Запрошення до {company} — Minerva BI'
+        plain     = f'Запрошення до Minerva BI. Логін: {user.username}, Пароль: {password}. URL: {system_url}'
+
+        try:
+            from config.models import NotificationSettings
+            ns = NotificationSettings.objects.filter(pk=1).first()
+            if not ns or not ns.email_host:
+                return {'ok': False, 'error': 'SMTP не налаштований (Config → Notifications → Email)'}
+            from django.core.mail import EmailMultiAlternatives, get_connection
+            conn = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=ns.email_host,
+                port=ns.email_port,
+                username=ns.email_host_user,
+                password=ns.email_host_password,
+                use_tls=ns.email_use_tls,
+                use_ssl=getattr(ns, 'email_use_ssl', False),
+                fail_silently=False,
+            )
+            from_email = (getattr(ns, 'email_from', '') or ns.email_host_user or 'noreply@minerva.local').strip()
+            msg = EmailMultiAlternatives(
+                subject=subject, body=plain, from_email=from_email,
+                to=[user.email], connection=conn,
+            )
+            msg.attach_alternative(html_body, 'text/html')
+            msg.send()
+            return {'ok': True}
+        except Exception as e:
+            return {'ok': False, 'error': str(e)}
 
 
 # ── UserProfile custom form ───────────────────────────────────────────────────
