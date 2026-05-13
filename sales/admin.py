@@ -1764,95 +1764,96 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '</div>'
             '''
 <script>
-// ── DYMO open helper (shared with changelist; define only if not already loaded) ──
-if (!window.svDymoOpen) {
-  (function(){
-    var _fwL=false,_fwLg=false,_fwCb=[];
-    function _loadFW(cb){
-      if(_fwL&&window.dymo&&window.dymo.label){cb(null);return;}
-      _fwCb.push(cb);if(_fwLg)return;_fwLg=true;
-      var s=document.createElement('script');
-      s.src='https://labelwriter.com/software/dls/sdk/js/DYMO.Label.Framework.latest.js';
-      s.onload=function(){_fwL=true;_fwLg=false;_fwCb.forEach(function(f){f(null);});_fwCb=[];};
-      s.onerror=function(){_fwLg=false;_fwCb.forEach(function(f){f('SDK error');});_fwCb=[];};
-      document.head.appendChild(s);
-    }
-    function _modal(html){
-      var m=document.getElementById('sv-dymo-modal')||document.createElement('div');
-      m.id='sv-dymo-modal';
-      m.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
-      m.innerHTML=html;if(!m.parentNode)document.body.appendChild(m);
-      m.onclick=function(e){if(e.target===m)m.remove();};
-    }
-    window.svDymoDownload=function(url,sku){
-      var a=document.createElement('a');a.href=url;a.download=(sku||'label')+'.dymo';
-      document.body.appendChild(a);a.click();document.body.removeChild(a);
-    };
-    window.svDymoError=function(url,sku,msg){
-      _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:24px 28px;max-width:440px;width:90%">'
-        +'<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text,#c9d8e4)">⚠️ DYMO недоступний</div>'
-        +'<div style="font-size:13px;color:var(--text-muted,#9aafbe);margin-bottom:18px;line-height:1.6">'+msg+'</div>'
-        +'<div style="display:flex;gap:10px">'
-        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
-          +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">⬇️ Завантажити файл</button>'
-        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
-          +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 12px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
-        +'</div></div>');
-    };
-    window.svDymoPrint=function(url,sku,qty){
-      var ctrl=new AbortController();
-      var t=setTimeout(function(){ctrl.abort();},2500);
-      fetch('http://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected',{mode:'no-cors',signal:ctrl.signal})
-      .then(function(){
-        clearTimeout(t);
-        _loadFW(function(err){
-          if(err){window.svDymoError(url,sku,'Помилка завантаження DYMO SDK: '+err);return;}
-          fetch(url).then(function(r){return r.text();}).then(function(xml){
-            try{
-              var printers=window.dymo.label.framework.getLabelWriterPrinters();
-              if(!printers||!printers.length){window.svDymoError(url,sku,'Принтер DYMO не знайдено. Перевірте підключення принтера і що DYMO Label Software запущено.');return;}
-              var label=window.dymo.label.framework.openLabelXml(xml);
-              label.print(printers[0].name);
-            }catch(e){window.svDymoError(url,sku,'Помилка DYMO SDK: '+(e.message||e));}
-          }).catch(function(e){window.svDymoError(url,sku,'Помилка завантаження мітки: '+e);});
-        });
-      })
-      .catch(function(){
-        clearTimeout(t);
-        window.svDymoError(url,sku,
-          'DYMO Label Software не запущено або не встановлено на цьому ПК.<br><br>'
-          +'<b>Що зробити:</b><br>'
-          +'① Встановіть <a href="https://www.dymo.com/label-makers-printers/label-software.html" target="_blank" style="color:#64b5f6">DYMO Label Software</a><br>'
-          +'② Запустіть програму перед друком<br>'
-          +'③ Спробуйте ще раз — або завантажте файл нижче'
-        );
+// ── DYMO helpers (always defined; SDK loading state persisted on window) ──
+(function(){
+  if(!window._svDymoFwCb)window._svDymoFwCb=[];
+  function _loadFW(cb){
+    if(window._svDymoFwL&&window.dymo&&window.dymo.label){cb(null);return;}
+    window._svDymoFwCb.push(cb);if(window._svDymoFwLg)return;window._svDymoFwLg=true;
+    var s=document.createElement('script');
+    s.src='https://labelwriter.com/software/dls/sdk/js/DYMO.Label.Framework.latest.js';
+    s.onload=function(){window._svDymoFwL=true;window._svDymoFwLg=false;window._svDymoFwCb.forEach(function(f){f(null);});window._svDymoFwCb=[];};
+    s.onerror=function(){window._svDymoFwLg=false;window._svDymoFwCb.forEach(function(f){f('SDK error');});window._svDymoFwCb=[];};
+    document.head.appendChild(s);
+  }
+  function _modal(html){
+    var m=document.getElementById('sv-dymo-modal')||document.createElement('div');
+    m.id='sv-dymo-modal';
+    m.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center';
+    m.innerHTML=html;if(!m.parentNode)document.body.appendChild(m);
+    m.onclick=function(e){if(e.target===m)m.remove();};
+  }
+  window.svDymoDownload=function(url,sku){
+    var a=document.createElement('a');a.href=url;a.download=(sku||'label')+'.dymo';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+  };
+  window.svDymoError=function(url,sku,msg){
+    _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:24px 28px;max-width:440px;width:90%">'
+      +'<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text,#c9d8e4)">⚠️ DYMO недоступний</div>'
+      +'<div style="font-size:13px;color:var(--text-muted,#9aafbe);margin-bottom:18px;line-height:1.6">'+msg+'</div>'
+      +'<div style="display:flex;gap:10px">'
+      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
+        +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">⬇️ Завантажити файл</button>'
+      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
+        +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 12px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
+      +'</div></div>');
+  };
+  window.svDymoPrint=function(url,sku,qty){
+    var ctrl=new AbortController();
+    var t=setTimeout(function(){ctrl.abort();},2500);
+    fetch('http://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected',{mode:'no-cors',signal:ctrl.signal})
+    .then(function(){
+      clearTimeout(t);
+      _loadFW(function(err){
+        if(err){window.svDymoError(url,sku,'Помилка завантаження DYMO SDK: '+err);return;}
+        fetch(url).then(function(r){return r.text();}).then(function(xml){
+          try{
+            var printers=window.dymo.label.framework.getLabelWriterPrinters();
+            if(!printers||!printers.length){window.svDymoError(url,sku,'Принтер DYMO не знайдено. Перевірте підключення принтера і що DYMO Label Software запущено.');return;}
+            var label=window.dymo.label.framework.openLabelXml(xml);
+            label.print(printers[0].name);
+          }catch(e){window.svDymoError(url,sku,'Помилка DYMO SDK: '+(e.message||e));}
+        }).catch(function(e){window.svDymoError(url,sku,'Помилка завантаження мітки: '+e);});
       });
-    };
-    window.svDymoAsk=function(url,sku,qty){
-      _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:22px 26px;max-width:360px;width:90%">'
-        +'<div style="font-weight:700;font-size:15px;margin-bottom:14px;color:var(--text,#c9d8e4)">🖨️ Мітка: '+sku+'</div>'
-        +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
-        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoPrint(\''+url+'\',\''+sku+'\','+qty+')" '
-          +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">🖨️ Через DYMO</button>'
-        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
-          +'style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted,#9aafbe)">⬇️ Завантажити</button>'
-        +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
-          +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
-        +'</div></div>');
-    };
-    window.svDymoOpen=function(url,sku,qty,mode){
-      mode=mode||(typeof window.SV_DYMO_MODE!=='undefined'?window.SV_DYMO_MODE:'download');
-      if(mode==='print') window.svDymoPrint(url,sku,qty);
-      else if(mode==='ask') window.svDymoAsk(url,sku,qty);
-      else window.svDymoDownload(url,sku);
-    };
-  })();
-}
+    })
+    .catch(function(){
+      clearTimeout(t);
+      window.svDymoError(url,sku,
+        'DYMO Label Software не запущено або не встановлено на цьому ПК.<br><br>'
+        +'<b>Що зробити:</b><br>'
+        +'① Встановіть <a href="https://www.dymo.com/label-makers-printers/label-software.html" target="_blank" style="color:#64b5f6">DYMO Label Software</a><br>'
+        +'② Запустіть програму перед друком<br>'
+        +'③ Спробуйте ще раз — або завантажте файл нижче'
+      );
+    });
+  };
+  window.svDymoAsk=function(url,sku,qty){
+    _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:22px 26px;max-width:360px;width:90%">'
+      +'<div style="font-weight:700;font-size:15px;margin-bottom:14px;color:var(--text,#c9d8e4)">🖨️ Мітка: '+sku+'</div>'
+      +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
+      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoPrint(\''+url+'\',\''+sku+'\','+qty+')" '
+        +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">🖨️ Через DYMO</button>'
+      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
+        +'style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted,#9aafbe)">⬇️ Завантажити</button>'
+      +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
+        +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
+      +'</div></div>');
+  };
+  window.svDymoOpen=function(url,sku,qty,mode){
+    mode=mode||(typeof window.SV_DYMO_MODE!=='undefined'?window.SV_DYMO_MODE:'download');
+    if(mode==='print') window.svDymoPrint(url,sku,qty);
+    else if(mode==='ask') window.svDymoAsk(url,sku,qty);
+    else window.svDymoDownload(url,sku);
+  };
+})();
 window.svDownloadSelected=function(btn){
   var sku=btn.dataset.sku;
   var inp=btn.previousElementSibling;
   var q=(inp?parseInt(inp.value):1)||1;
-  window.svDymoDownload('/labels/serve/'+encodeURIComponent(sku)+'/?qty='+q,sku);
+  var a=document.createElement('a');
+  a.href='/labels/serve/'+encodeURIComponent(sku)+'/?qty='+q;
+  a.download=sku+'.dymo';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
 };
 window.svShowAllLabels=function(){
   var existing=document.getElementById('sv-dymo-modal');
