@@ -332,7 +332,10 @@ def message_html_view(request, message_pk):
     account = _get_account(request)
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
     if msg.body_html:
-        return HttpResponse(msg.body_html, content_type='text/html; charset=utf-8')
+        html = msg.body_html
+        if 'cid:' in html.lower():
+            html = _resolve_cid_images(msg, html)
+        return HttpResponse(html, content_type='text/html; charset=utf-8')
     import html as html_mod
     txt = html_mod.escape(msg.body_text or '(Лист порожній)')
     return HttpResponse(
@@ -340,6 +343,63 @@ def message_html_view(request, message_pk):
         f'white-space:pre-wrap;padding:12px;margin:0">{txt}</body></html>',
         content_type='text/html; charset=utf-8',
     )
+
+
+def _resolve_cid_images(msg_obj, html: str) -> str:
+    """Replace cid: img references with real URLs or base64 data URIs."""
+    import re, base64
+    cid_pattern = re.compile(r'cid:([^\s"\'<>&]+)', re.IGNORECASE)
+
+    # Phase 1: stored attachments with content_id field
+    remaining = {m.group(1).lower() for m in cid_pattern.finditer(html)}
+    for i, att in enumerate(msg_obj.attachments or []):
+        raw_cid = att.get('content_id', '').strip('<>')
+        if not raw_cid:
+            continue
+        key = raw_cid.lower()
+        if key in remaining:
+            html = re.sub(r'(?i)cid:' + re.escape(raw_cid),
+                          f'/email/message/{msg_obj.pk}/attachment/{i}/', html)
+            remaining.discard(key)
+    if not remaining:
+        return html
+
+    # Phase 2: IMAP fallback — fetch raw email, extract CID parts as base64 data URIs
+    try:
+        import email as email_lib
+        from email_assistant.imap_client import IMAPClient
+        imap_uid = msg_obj.imap_uid
+        if not imap_uid:
+            return html
+        account = msg_obj.account
+        imap_folder = msg_obj.imap_folder_name or account.imap_folder_inbox
+        cid_map = {}
+        with IMAPClient(account) as imap:
+            imap.select_folder(imap_folder)
+            _, raw_data = imap.conn.uid('fetch', str(imap_uid).encode(), '(RFC822)')
+        if raw_data and isinstance(raw_data[0], tuple):
+            parsed = email_lib.message_from_bytes(raw_data[0][1])
+            for part in parsed.walk():
+                part_cid = str(part.get('Content-ID', '')).strip().strip('<>').lower()
+                if part_cid and part.get_content_maintype() == 'image':
+                    data = part.get_payload(decode=True)
+                    if data:
+                        ct = part.get_content_type()
+                        cid_map[part_cid] = f'data:{ct};base64,{base64.b64encode(data).decode()}'
+        if cid_map:
+            html_new = cid_pattern.sub(
+                lambda m: cid_map.get(m.group(1).lower(), m.group(0)), html)
+            if html_new != html:
+                html = html_new
+                # Cache: avoid IMAP on subsequent views
+                try:
+                    msg_obj.body_html = html
+                    msg_obj.save(update_fields=['body_html'])
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning('CID resolve failed msg=%s: %s', msg_obj.pk, e)
+    return html
 
 
 @staff_member_required

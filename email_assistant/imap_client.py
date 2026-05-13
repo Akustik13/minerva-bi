@@ -71,6 +71,8 @@ def _get_attachments_raw(msg) -> list:
     attachments = []
     for part in msg.walk():
         cd = str(part.get('Content-Disposition', ''))
+        cid = str(part.get('Content-ID', '')).strip().strip('<>')
+        ct_main = part.get_content_maintype()
         if 'attachment' in cd or ('inline' in cd and part.get_filename()):
             filename = _decode_str(part.get_filename(''))
             if filename:
@@ -80,7 +82,20 @@ def _get_attachments_raw(msg) -> list:
                     'content_type': part.get_content_type(),
                     'size':         len(data),
                     '_data':        data,
+                    'content_id':   cid,
                 })
+        elif cid and ct_main == 'image':
+            # Inline CID image (embedded in HTML body)
+            filename = _decode_str(part.get_filename('') or '') or f'img_{cid[:16]}'
+            data = part.get_payload(decode=True) or b''
+            attachments.append({
+                'name':         filename,
+                'content_type': part.get_content_type(),
+                'size':         len(data),
+                '_data':        data,
+                'content_id':   cid,
+                'is_inline':    True,
+            })
     return attachments
 
 
