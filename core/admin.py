@@ -387,7 +387,7 @@ class MinervaUserAdmin(_DjangoUserAdmin):
                        .values_list('company_name', flat=True).first() or 'Minerva BI')
         except Exception:
             company = 'Minerva BI'
-        system_url = request.build_absolute_uri('/admin/')
+        system_url = 'https://sevskiy.minerva-bi.com/admin/'
         sent, errors = [], []
         for user in users:
             if not user.email:
