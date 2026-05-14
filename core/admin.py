@@ -82,7 +82,7 @@ def _build_invitation_html(user, password, company, system_url):
     )
 
     owl = (
-        '<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg" width="88" height="97" style="display:block">'
+        '<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg" width="100" height="110" style="display:block">'
         '<defs>'
         '<linearGradient id="mvG" x1="0%" y1="0%" x2="0%" y2="100%">'
         '<stop offset="0%" stop-color="#e8d5a3"/><stop offset="50%" stop-color="#c9a84c"/><stop offset="100%" stop-color="#8b6914"/>'
