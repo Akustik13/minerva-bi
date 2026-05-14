@@ -76,9 +76,9 @@ def _build_invitation_html(user, password, company, system_url):
     label = _h.escape(ri['label'])
     desc  = _h.escape(ri['desc'])
     caps  = ''.join(
-        f'<tr><td style="padding:8px 0;border-bottom:1px solid rgba(201,168,76,0.1)">'
+        f'<tr><td style="padding:9px 0;border-bottom:1px solid rgba(201,168,76,0.1)">'
         f'<span style="color:#c9a84c;margin-right:10px">&#10003;</span>'
-        f'<span style="color:rgba(245,237,209,0.72);font-size:14px">{_h.escape(cap)}</span>'
+        f'<span style="font-family:Crimson Pro,Georgia,serif;color:rgba(245,237,209,0.65);font-size:16px">{_h.escape(cap)}</span>'
         f'</td></tr>'
         for cap in ri['caps']
     )
@@ -109,114 +109,114 @@ def _build_invitation_html(user, password, company, system_url):
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Minerva BI &mdash; Запрошення</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
 <style>
 @keyframes rotateSlow{{to{{transform:rotate(360deg);}}}}
 @keyframes rotateSlowR{{to{{transform:rotate(-360deg);}}}}
 @keyframes float{{0%,100%{{transform:translateY(0) rotate(-.5deg);}}50%{{transform:translateY(-10px) rotate(.5deg);}}}}
-@keyframes shimmer{{0%,100%{{opacity:.35;}}50%{{opacity:1;}}}}
+@keyframes shimmer{{0%,100%{{opacity:.4;}}50%{{opacity:1;}}}}
 .mv-float{{animation:float 6s ease-in-out infinite;}}
 .mv-r1{{animation:rotateSlow 20s linear infinite;}}
 .mv-r2{{animation:rotateSlowR 35s linear infinite;}}
 .mv-shim{{animation:shimmer 4s ease-in-out infinite;}}
 </style>
 </head>
-<body style="margin:0;padding:0;background:#080b0f;font-family:Arial,sans-serif">
+<body style="margin:0;padding:0;background:#080b0f;font-family:'Crimson Pro',Georgia,serif;color:#f5edd1">
 <div style="max-width:600px;margin:0 auto;padding:24px 16px">
 
 <!-- HEADER -->
-<div style="position:relative;background:#080b0f;border-radius:16px 16px 0 0;overflow:hidden;padding:52px 40px 38px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.2)">
-  <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(201,168,76,0.1) 0%,transparent 70%);pointer-events:none"></div>
+<div style="position:relative;background:#080b0f;border-radius:16px 16px 0 0;overflow:hidden;padding:52px 40px 38px;text-align:center;border-bottom:1px solid rgba(201,168,76,0.15)">
+  <div style="position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(201,168,76,0.12) 0%,transparent 70%);pointer-events:none"></div>
   <div class="mv-shim" style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,#c9a84c,transparent)"></div>
 
   <div style="position:relative;display:inline-block;margin-bottom:26px">
-    <div class="mv-r2" style="position:absolute;top:-22px;left:-22px;right:-22px;bottom:-22px;border:1px solid rgba(201,168,76,0.1);border-radius:50%"></div>
-    <div class="mv-r1" style="position:absolute;top:-11px;left:-11px;right:-11px;bottom:-11px;border:1px solid rgba(201,168,76,0.28);border-radius:50%">
+    <div class="mv-r2" style="position:absolute;top:-22px;left:-22px;right:-22px;bottom:-22px;border:1px solid rgba(201,168,76,0.15);border-radius:50%"></div>
+    <div class="mv-r1" style="position:absolute;top:-11px;left:-11px;right:-11px;bottom:-11px;border:1px solid rgba(201,168,76,0.25);border-radius:50%">
       <span style="position:absolute;top:-8px;left:50%;transform:translateX(-50%);font-size:12px;color:#c9a84c">&#10022;</span>
     </div>
-    <div class="mv-float" style="filter:drop-shadow(0 0 30px rgba(201,168,76,0.5)) drop-shadow(0 0 60px rgba(201,168,76,0.18))">
+    <div class="mv-float" style="filter:drop-shadow(0 0 40px rgba(201,168,76,0.5)) drop-shadow(0 0 80px rgba(201,168,76,0.2)) drop-shadow(0 4px 20px rgba(0,0,0,0.6))">
       {owl}
     </div>
   </div>
 
-  <div style="font-family:Cinzel,Georgia,serif;font-size:38px;font-weight:900;letter-spacing:4px;color:#c9a84c;background:linear-gradient(135deg,#f5edd1,#e8d5a3,#c9a84c,#8b6914);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 18px rgba(201,168,76,0.3));margin-bottom:7px">MINERVA</div>
-  <div style="font-family:Cinzel,Georgia,serif;font-size:9px;letter-spacing:5px;text-transform:uppercase;color:rgba(201,168,76,0.38);margin-bottom:22px">SAPIENTIA &middot; VISIO &middot; IMPERIUM</div>
+  <div style="font-family:'Cinzel',Georgia,serif;font-size:38px;font-weight:900;letter-spacing:4px;background:linear-gradient(135deg,#f5edd1,#e8d5a3,#c9a84c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 30px rgba(201,168,76,0.4));margin-bottom:7px">MINERVA</div>
+  <div style="font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:5px;text-transform:uppercase;color:rgba(201,168,76,0.5);margin-bottom:22px">SAPIENTIA &middot; VISIO &middot; IMPERIUM</div>
 
   <div style="display:flex;align-items:center;gap:14px;max-width:220px;margin:0 auto">
     <div style="flex:1;height:1px;background:linear-gradient(to right,transparent,rgba(201,168,76,0.22))"></div>
-    <span style="color:rgba(201,168,76,0.38);font-size:12px">&#10022;</span>
+    <span style="color:rgba(201,168,76,0.5);font-size:14px">&#10022;</span>
     <div style="flex:1;height:1px;background:linear-gradient(to left,transparent,rgba(201,168,76,0.22))"></div>
   </div>
 </div>
 
 <!-- BODY -->
-<div style="background:#0d1117;padding:44px 40px;border:1px solid rgba(201,168,76,0.1);border-top:none">
+<div style="background:#0d1117;padding:44px 40px;border:1px solid rgba(201,168,76,0.15);border-top:none">
 
   <div style="text-align:center;margin-bottom:36px">
-    <div style="font-family:Cinzel,Georgia,serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(201,168,76,0.55);margin-bottom:14px">&#10070; ДОСТУП НАДАНО &#10070;</div>
-    <h1 style="margin:0 0 14px;font-size:22px;font-weight:600;color:#f5edd1;line-height:1.4;font-family:Cinzel,Georgia,serif">Ласкаво просимо, {first}</h1>
-    <p style="margin:0;font-size:15px;color:rgba(245,237,209,0.6);line-height:1.85">
-      <strong style="color:rgba(201,168,76,0.85)">{co}</strong> надає вам доступ до Minerva BI &mdash;<br>
+    <div style="font-family:'Cinzel',Georgia,serif;font-size:12px;font-weight:600;letter-spacing:5px;text-transform:uppercase;color:#e8d5a3;margin-bottom:14px;text-shadow:0 0 15px rgba(201,168,76,0.6),0 2px 4px rgba(0,0,0,0.8)">&#10022; ДОСТУП НАДАНО &#10022;</div>
+    <h1 style="margin:0 0 14px;font-size:24px;font-weight:700;line-height:1.3;font-family:'Cinzel',Georgia,serif;background:linear-gradient(135deg,#f5edd1,#e8d5a3,#c9a84c);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">Ласкаво просимо, {first}</h1>
+    <p style="margin:0;font-family:'Crimson Pro',Georgia,serif;font-size:18px;font-style:italic;color:rgba(245,237,209,0.65);line-height:1.7;letter-spacing:0.2px">
+      <em style="color:#e8d5a3;font-style:normal;font-weight:600">{co}</em> надає вам доступ до Minerva BI &mdash;<br>
       системи управління бізнесом нового покоління.
     </p>
   </div>
 
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px">
-    <div style="flex:1;height:1px;background:rgba(201,168,76,0.12)"></div>
-    <span style="color:rgba(201,168,76,0.28);font-size:10px">&#10022;</span>
-    <div style="flex:1;height:1px;background:rgba(201,168,76,0.12)"></div>
+    <div style="flex:1;height:1px;background:rgba(201,168,76,0.15)"></div>
+    <span style="color:rgba(201,168,76,0.5);font-size:14px">&#10022;</span>
+    <div style="flex:1;height:1px;background:rgba(201,168,76,0.15)"></div>
   </div>
 
-  <div style="background:#080b0f;border:1px solid rgba(201,168,76,0.22);border-radius:8px;padding:24px;margin-bottom:28px">
-    <div style="font-family:Cinzel,Georgia,serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.5);margin-bottom:18px">&#128273; Ваші облікові дані</div>
+  <div style="background:#080b0f;border:1px solid rgba(201,168,76,0.22);border-radius:4px;padding:24px;margin-bottom:28px">
+    <div style="font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.5);margin-bottom:18px">&#128273; Ваші облікові дані</div>
     <table style="width:100%;border-collapse:collapse">
       <tr>
-        <td style="padding:11px 0;border-bottom:1px solid rgba(201,168,76,0.1);width:90px;font-family:Cinzel,Georgia,serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.5);vertical-align:middle">ЛОГІН</td>
+        <td style="padding:11px 0;border-bottom:1px solid rgba(201,168,76,0.1);width:90px;font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.5);vertical-align:middle">ЛОГІН</td>
         <td style="padding:11px 0;border-bottom:1px solid rgba(201,168,76,0.1)">
-          <code style="font-size:17px;font-weight:700;color:#58a6ff;background:rgba(88,166,255,0.08);padding:5px 14px;border-radius:6px;border:1px solid rgba(88,166,255,0.18)">{uname}</code>
+          <code style="font-size:17px;font-weight:700;color:#58a6ff;background:rgba(88,166,255,0.08);padding:5px 14px;border-radius:4px;border:1px solid rgba(88,166,255,0.18)">{uname}</code>
         </td>
       </tr>
       <tr>
-        <td style="padding:11px 0;font-family:Cinzel,Georgia,serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.5);vertical-align:middle">ПАРОЛЬ</td>
+        <td style="padding:11px 0;font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.5);vertical-align:middle">ПАРОЛЬ</td>
         <td style="padding:11px 0">
-          <code style="font-size:17px;font-weight:700;color:#c9a84c;background:rgba(201,168,76,0.08);padding:5px 14px;border-radius:6px;border:1px solid rgba(201,168,76,0.22);letter-spacing:2px">{pwd}</code>
+          <code style="font-size:17px;font-weight:700;color:#c9a84c;background:rgba(201,168,76,0.08);padding:5px 14px;border-radius:4px;border:1px solid rgba(201,168,76,0.22);letter-spacing:2px">{pwd}</code>
         </td>
       </tr>
     </table>
   </div>
 
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:28px">
-    <div style="flex:1;height:1px;background:rgba(201,168,76,0.12)"></div>
-    <span style="color:rgba(201,168,76,0.28);font-size:10px">&#10022;</span>
-    <div style="flex:1;height:1px;background:rgba(201,168,76,0.12)"></div>
+    <div style="flex:1;height:1px;background:rgba(201,168,76,0.15)"></div>
+    <span style="color:rgba(201,168,76,0.5);font-size:14px">&#10022;</span>
+    <div style="flex:1;height:1px;background:rgba(201,168,76,0.15)"></div>
   </div>
 
   <div style="text-align:center;margin-bottom:24px">
-    <div style="display:inline-block;background:{c}22;color:{c};border:1px solid {c}44;padding:8px 22px;border-radius:20px;font-family:Cinzel,Georgia,serif;font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:10px">&#9881;&#65039; {label}</div>
-    <div style="font-size:14px;color:rgba(245,237,209,0.5)">{desc}</div>
+    <div style="display:inline-block;background:{c}22;color:{c};border:1px solid {c}44;padding:8px 22px;border-radius:4px;font-family:'Cinzel',Georgia,serif;font-size:12px;font-weight:700;letter-spacing:2px;margin-bottom:12px">{label}</div>
+    <div style="font-family:'Crimson Pro',Georgia,serif;font-size:16px;font-style:italic;color:rgba(245,237,209,0.65);line-height:1.6">{desc}</div>
   </div>
 
-  <div style="background:rgba(201,168,76,0.03);border:1px solid rgba(201,168,76,0.1);border-radius:8px;padding:20px;margin-bottom:36px">
-    <div style="font-family:Cinzel,Georgia,serif;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:rgba(201,168,76,0.42);margin-bottom:14px">Ваші можливості в системі</div>
+  <div style="background:rgba(201,168,76,0.04);border:1px solid rgba(201,168,76,0.15);border-radius:4px;padding:20px;margin-bottom:36px">
+    <div style="font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(201,168,76,0.5);margin-bottom:14px">Ваші можливості в системі</div>
     <table style="width:100%;border-collapse:collapse">{caps}</table>
   </div>
 
   <div style="text-align:center;margin-bottom:24px">
-    <a href="{surl}" style="display:inline-block;padding:16px 56px;border-radius:4px;background:linear-gradient(90deg,#7a5810,#a8792a,#c9a84c,#d4a83a,#e8c85a);color:#080b0f;text-decoration:none;font-family:Cinzel,Georgia,serif;font-size:11px;font-weight:700;letter-spacing:4px;text-transform:uppercase;box-shadow:0 4px 20px rgba(201,168,76,0.35)">Увійти до Minerva</a>
-    <div style="margin-top:12px;font-size:11px;color:rgba(245,237,209,0.25)">{surl}</div>
+    <a href="{surl}" style="display:inline-block;padding:16px 56px;border-radius:4px;background:linear-gradient(90deg,#7a5810 0%,#a8792a 25%,#c9a84c 55%,#d4a83a 80%,#e8c85a 100%);color:#080b0f;text-decoration:none;font-family:'Cinzel Decorative','Cinzel',Georgia,serif;font-size:13px;font-weight:700;letter-spacing:4px;text-transform:uppercase;box-shadow:0 3px 14px rgba(0,0,0,0.5),0 0 8px rgba(201,168,76,0.1)">Увійти до Minerva</a>
+    <div style="margin-top:12px;font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.5)">{surl}</div>
   </div>
 
 </div>
 
 <!-- FOOTER -->
-<div style="background:#080b0f;border:1px solid rgba(201,168,76,0.1);border-top:none;border-radius:0 0 16px 16px;padding:18px 40px;text-align:center">
+<div style="background:#080b0f;border:1px solid rgba(201,168,76,0.15);border-top:none;border-radius:0 0 16px 16px;padding:20px 40px;text-align:center">
   <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-    <div style="flex:1;height:1px;background:rgba(201,168,76,0.07)"></div>
-    <span style="color:rgba(201,168,76,0.18);font-size:10px">&#10022;</span>
-    <div style="flex:1;height:1px;background:rgba(201,168,76,0.07)"></div>
+    <div style="flex:1;height:1px;background:rgba(201,168,76,0.1)"></div>
+    <span style="color:rgba(201,168,76,0.5);font-size:14px">&#10022;</span>
+    <div style="flex:1;height:1px;background:rgba(201,168,76,0.1)"></div>
   </div>
-  <div style="font-size:12px;color:rgba(245,237,209,0.28);margin-bottom:5px">&#9888;&#65039; Рекомендуємо змінити пароль після першого входу в систему</div>
-  <div style="font-family:Cinzel,Georgia,serif;font-size:9px;letter-spacing:2px;color:rgba(201,168,76,0.18);text-transform:uppercase">Minerva BI &middot; {co}</div>
+  <div style="font-family:'Crimson Pro',Georgia,serif;font-size:14px;font-style:italic;color:rgba(245,237,209,0.5);margin-bottom:8px">Рекомендуємо змінити пароль після першого входу в систему</div>
+  <div style="font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:3px;color:rgba(201,168,76,0.5);text-transform:uppercase">Minerva BI &middot; {co}</div>
 </div>
 
 </div>
