@@ -203,7 +203,6 @@ def _build_invitation_html(user, password, company, system_url):
 
   <div style="text-align:center;margin-bottom:24px">
     <a href="{surl}" style="display:inline-block;padding:16px 56px;border-radius:4px;background:linear-gradient(90deg,#7a5810 0%,#a8792a 25%,#c9a84c 55%,#d4a83a 80%,#e8c85a 100%);color:#080b0f;text-decoration:none;font-family:'Cinzel Decorative','Cinzel',Georgia,serif;font-size:13px;font-weight:700;letter-spacing:4px;text-transform:uppercase;box-shadow:0 3px 14px rgba(0,0,0,0.5),0 0 8px rgba(201,168,76,0.1)">Увійти до системи</a>
-    <div style="margin-top:12px;font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:1px;color:rgba(201,168,76,0.5)">{surl}</div>
   </div>
 
 </div>
