@@ -59,6 +59,8 @@ _ROLE_CAPS = {
 def _build_invitation_html(user, password, company, system_url):
     """Minerva-branded invitation email: owl + rotating rings, Cinzel typography, gold palette."""
     import html as _h
+    import os
+    from django.conf import settings as _dj_settings
 
     try:
         role = user.profile.role
@@ -81,34 +83,25 @@ def _build_invitation_html(user, password, company, system_url):
         for cap in ri['caps']
     )
 
-    owl = (
-        '<svg viewBox="0 0 100 110" xmlns="http://www.w3.org/2000/svg" width="100" height="110" style="display:block">'
-        '<defs>'
-        '<linearGradient id="mvG" x1="0%" y1="0%" x2="0%" y2="100%">'
-        '<stop offset="0%" stop-color="#e8d5a3"/><stop offset="50%" stop-color="#c9a84c"/><stop offset="100%" stop-color="#8b6914"/>'
-        '</linearGradient></defs>'
-        '<path d="M33,25 L28,7 L37,21" fill="none" stroke="url(#mvG)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>'
-        '<path d="M67,25 L72,7 L63,21" fill="none" stroke="url(#mvG)" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>'
-        '<circle cx="50" cy="38" r="21" fill="none" stroke="url(#mvG)" stroke-width="2.2"/>'
-        '<circle cx="40" cy="36" r="8.5" fill="none" stroke="url(#mvG)" stroke-width="1.8"/>'
-        '<circle cx="40" cy="36" r="3.5" fill="#c9a84c" opacity="0.7"/>'
-        '<circle cx="38" cy="34" r="1.5" fill="#e8d5a3" opacity="0.6"/>'
-        '<circle cx="60" cy="36" r="8.5" fill="none" stroke="url(#mvG)" stroke-width="1.8"/>'
-        '<circle cx="60" cy="36" r="3.5" fill="#c9a84c" opacity="0.7"/>'
-        '<circle cx="58" cy="34" r="1.5" fill="#e8d5a3" opacity="0.6"/>'
-        '<path d="M46,44 L50,52 L54,44" fill="none" stroke="url(#mvG)" stroke-width="2" stroke-linejoin="round"/>'
-        '<path d="M29,57 Q23,77 28,97 Q38,102 50,102 Q62,102 72,97 Q77,77 71,57 Q62,51 50,51 Q38,51 29,57 Z" fill="none" stroke="url(#mvG)" stroke-width="2.2"/>'
-        '<path d="M30,63 Q22,75 24,89" fill="none" stroke="url(#mvG)" stroke-width="1.4" opacity="0.55"/>'
-        '<path d="M70,63 Q78,75 76,89" fill="none" stroke="url(#mvG)" stroke-width="1.4" opacity="0.55"/>'
-        '<line x1="50" y1="56" x2="50" y2="97" stroke="url(#mvG)" stroke-width="1.2" opacity="0.4"/>'
-        '<path d="M37,101 L34,109" stroke="url(#mvG)" stroke-width="1.8" stroke-linecap="round"/>'
-        '<path d="M37,101 L37,110" stroke="url(#mvG)" stroke-width="1.8" stroke-linecap="round"/>'
-        '<path d="M37,101 L41,109" stroke="url(#mvG)" stroke-width="1.8" stroke-linecap="round"/>'
-        '<path d="M63,101 L59,109" stroke="url(#mvG)" stroke-width="1.8" stroke-linecap="round"/>'
-        '<path d="M63,101 L63,110" stroke="url(#mvG)" stroke-width="1.8" stroke-linecap="round"/>'
-        '<path d="M63,101 L67,109" stroke="url(#mvG)" stroke-width="1.8" stroke-linecap="round"/>'
-        '</svg>'
-    )
+    # Load real owl SVG from includes/owl.html
+    owl = ''
+    try:
+        owl_path = os.path.join(_dj_settings.BASE_DIR, 'templates', 'includes', 'owl.html')
+        with open(owl_path, 'r', encoding='utf-8') as _f:
+            owl = _f.read().strip()
+        # Replace the CSS class with inline size — animation handled by .mv-float wrapper
+        owl = owl.replace(
+            'class="owl-svg"',
+            'width="120" height="120" style="display:block"',
+        )
+    except Exception:
+        # Fallback minimal owl if file not found
+        owl = (
+            '<svg viewBox="0 0 82 113" xmlns="http://www.w3.org/2000/svg"'
+            ' width="120" height="120" style="display:block">'
+            '<circle cx="41" cy="40" r="30" fill="none" stroke="#c9a84c" stroke-width="2"/>'
+            '</svg>'
+        )
 
     return f"""<!DOCTYPE html>
 <html lang="uk"><head>
