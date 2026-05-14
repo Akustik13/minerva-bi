@@ -134,7 +134,7 @@
 
 <script>
 (function () {
-  var previewHtml = {{ preview_html|escapejs }};
+  var previewHtml = "{{ preview_html|escapejs }}";
 
   function loadPreview() {
     var iframe = document.getElementById('inv-preview');
