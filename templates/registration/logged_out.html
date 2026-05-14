@@ -1,0 +1,173 @@
+{% load i18n %}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Minerva — Вихід</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap');
+:root{--gold:#c9a84c;--gold-light:#e8d5a3;--gold-dark:#8b6914;--bg:#080b0f;--bg2:#0d1117;--border:rgba(201,168,76,0.15);--text:#f5edd1;--muted:rgba(245,237,209,0.65);}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;font-family:'Crimson Pro',Georgia,serif;background:var(--bg);color:var(--text);overflow:hidden;}
+.stars{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.star{position:absolute;background:#fff;border-radius:50%;animation:twinkle var(--d,3s) ease-in-out infinite var(--delay,0s);}
+@keyframes twinkle{0%,100%{opacity:var(--min,.1);transform:scale(1);}50%{opacity:var(--max,.7);transform:scale(1.3);}}
+.glow-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background:radial-gradient(ellipse 60% 50% at 50% -10%,rgba(201,168,76,.12) 0%,transparent 70%),radial-gradient(ellipse 40% 30% at 80% 80%,rgba(139,105,20,.08) 0%,transparent 60%);}
+.line-top{position:fixed;top:0;left:0;right:0;height:1px;z-index:100;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:shimmer 4s ease-in-out infinite;}
+@keyframes shimmer{0%,100%{opacity:.4}50%{opacity:1}}
+.page{position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 20px;}
+.card{width:100%;max-width:420px;text-align:center;animation:riseUp .9s cubic-bezier(.16,1,.3,1) both;}
+@keyframes riseUp{from{opacity:0;transform:translateY(30px);}to{opacity:1;transform:translateY(0);}}
+.owl-container{position:relative;margin-bottom:28px;}
+.owl-svg{width:120px;height:120px;filter:drop-shadow(0 0 40px rgba(201,168,76,0.5)) drop-shadow(0 0 80px rgba(201,168,76,0.2)) drop-shadow(0 4px 20px rgba(0,0,0,0.6));animation:float 6s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0) rotate(-0.5deg);}50%{transform:translateY(-15px) rotate(0.5deg);}}
+.owl-ring{position:absolute;inset:-16px;border:1px solid rgba(201,168,76,0.25);border-radius:50%;animation:rotateSlow 20s linear infinite;box-shadow:0 0 30px rgba(201,168,76,0.15);}
+.owl-ring::before{content:'✦';position:absolute;top:-6px;left:50%;transform:translateX(-50%);font-size:12px;color:var(--gold);}
+@keyframes rotateSlow{to{transform:rotate(360deg);}}
+.owl-ring2{position:absolute;inset:-32px;border:1px solid rgba(201,168,76,0.15);border-radius:50%;animation:rotateSlow 35s linear infinite reverse;}
+.owl-toggle{cursor:default;position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center;}
+.eyebrow{font-family:'Cinzel',serif;font-size:9px;font-weight:600;letter-spacing:5px;text-transform:uppercase;color:var(--gold-light);margin-bottom:10px;text-shadow:0 0 15px rgba(201,168,76,.5),0 2px 4px rgba(0,0,0,.8);}
+.brand-title{font-family:'Cinzel',serif;font-size:38px;font-weight:900;line-height:1;letter-spacing:2px;background:linear-gradient(135deg,#f5edd1,var(--gold-light),var(--gold));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 20px rgba(201,168,76,.3));margin-bottom:6px;}
+.brand-sub{font-family:'Cinzel',serif;font-size:9px;letter-spacing:5px;text-transform:uppercase;color:rgba(201,168,76,.4);margin-bottom:28px;}
+.sep{display:flex;align-items:center;gap:14px;margin-bottom:24px;}
+.sep-line{flex:1;height:1px;background:linear-gradient(to right,transparent,var(--border),transparent);}
+.sep-sym{font-size:11px;color:rgba(201,168,76,.35);}
+
+/* Status block */
+.status-block{
+  background:rgba(201,168,76,0.04);
+  border:1px solid rgba(201,168,76,0.15);
+  border-radius:8px;
+  padding:20px 24px;
+  margin-bottom:24px;
+}
+.status-label{
+  font-family:'Cinzel',serif;
+  font-size:9px;
+  letter-spacing:3px;
+  text-transform:uppercase;
+  color:rgba(201,168,76,0.45);
+  margin-bottom:8px;
+}
+.status-text{
+  font-family:'Cinzel',serif;
+  font-size:15px;
+  font-weight:600;
+  color:var(--gold-light);
+  letter-spacing:.5px;
+}
+
+/* Philosophical quote */
+.quote-block{
+  margin-bottom:28px;
+  padding:0 8px;
+}
+.quote-text{
+  font-family:'Crimson Pro',Georgia,serif;
+  font-size:17px;
+  font-style:italic;
+  font-weight:300;
+  color:rgba(245,237,209,0.55);
+  line-height:1.7;
+  letter-spacing:.2px;
+}
+.quote-source{
+  margin-top:10px;
+  font-family:'Cinzel',serif;
+  font-size:9px;
+  letter-spacing:2px;
+  text-transform:uppercase;
+  color:rgba(201,168,76,0.3);
+}
+
+/* Button */
+.btn-login{
+  display:inline-block;
+  width:100%;
+  padding:14px;
+  font-family:'Cinzel',serif;
+  font-size:10px;
+  font-weight:700;
+  letter-spacing:4px;
+  text-transform:uppercase;
+  color:var(--bg);
+  border:none;
+  border-radius:4px;
+  cursor:pointer;
+  text-decoration:none;
+  background:linear-gradient(90deg,#7a5810 0%,#a8792a 25%,#c9a84c 55%,#d4a83a 80%,#e8c85a 100%);
+  position:relative;
+  overflow:hidden;
+  transition:transform .2s,box-shadow .3s;
+  box-shadow:0 3px 14px rgba(0,0,0,.5),0 0 8px rgba(201,168,76,.1);
+}
+.btn-login:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(201,168,76,.4);}
+@media(max-width:480px){.owl-svg{width:90px;height:90px;}.owl-container{width:90px;height:90px;}}
+</style>
+</head>
+<body>
+<div class="line-top"></div>
+<div class="glow-bg"></div>
+<div class="stars" id="stars"></div>
+
+<div class="page">
+  <div class="card">
+
+    <div class="owl-container">
+      <div class="owl-toggle">
+        <div class="owl-ring2"></div>
+        <div class="owl-ring"></div>
+        {% include "includes/owl.html" %}
+      </div>
+    </div>
+
+    <p class="eyebrow">Business Intelligence System</p>
+    <h1 class="brand-title">Minerva</h1>
+    <p class="brand-sub">SAPIENTIA &middot; VISIO &middot; IMPERIUM</p>
+
+    <div class="sep">
+      <div class="sep-line"></div>
+      <div class="sep-sym">✦</div>
+      <div class="sep-line"></div>
+    </div>
+
+    <div class="status-block">
+      <div class="status-label">Сеанс завершено</div>
+      <div class="status-text">Ви вийшли з системи</div>
+    </div>
+
+    <div class="quote-block">
+      <div class="quote-text">
+        «Мудрість — це не те, що ти накопичив.<br>
+        Це те, що ти зробив із тим, що маєш.»
+      </div>
+      <div class="quote-source">— Minerva Principia</div>
+    </div>
+
+    <a href="{% url 'admin:login' %}" class="btn-login">Увійти знову</a>
+
+  </div>
+</div>
+
+<script>
+(function(){
+  var c=document.getElementById('stars');
+  for(var i=0;i<100;i++){
+    var s=document.createElement('div');
+    s.className='star';
+    var sz=Math.random()*2+0.4;
+    s.style.cssText=[
+      'width:'+sz+'px','height:'+sz+'px',
+      'left:'+Math.random()*100+'%','top:'+Math.random()*100+'%',
+      '--d:'+(2+Math.random()*4)+'s',
+      '--delay:-'+(Math.random()*5)+'s',
+      '--min:'+(0.05+Math.random()*.1),
+      '--max:'+(0.35+Math.random()*.5)
+    ].join(';');
+    c.appendChild(s);
+  }
+})();
+</script>
+</body>
+</html>
