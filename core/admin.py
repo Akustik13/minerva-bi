@@ -215,8 +215,11 @@ def _build_invitation_html(user, password, company, system_url):
     <span style="color:rgba(201,168,76,0.5);font-size:14px">&#10022;</span>
     <div style="flex:1;height:1px;background:rgba(201,168,76,0.1)"></div>
   </div>
-  <div style="font-family:'Crimson Pro',Georgia,serif;font-size:14px;font-style:italic;color:rgba(245,237,209,0.5);margin-bottom:8px">Рекомендуємо змінити пароль після першого входу в систему</div>
-  <div style="font-family:'Cinzel',Georgia,serif;font-size:10px;letter-spacing:3px;color:rgba(201,168,76,0.5);text-transform:uppercase">Minerva BI &middot; {co}</div>
+  <div style="font-family:'Crimson Pro',Georgia,serif;font-size:14px;font-style:italic;color:rgba(245,237,209,0.5);margin-bottom:10px">Рекомендуємо змінити пароль після першого входу в систему</div>
+  <div style="margin-bottom:10px">
+    <a href="https://minerva-bi.com" style="font-family:'Cinzel',Georgia,serif;font-size:11px;letter-spacing:3px;color:#e8d5a3;text-decoration:none;border-bottom:1px solid rgba(201,168,76,0.35)">minerva-bi.com</a>
+  </div>
+  <div style="font-family:'Cinzel',Georgia,serif;font-size:9px;letter-spacing:3px;color:rgba(201,168,76,0.4);text-transform:uppercase">Minerva BI &middot; {co}</div>
 </div>
 
 </div>
