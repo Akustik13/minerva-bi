@@ -536,6 +536,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
     search_fields = ("product__sku", "ref_doc", "external_key")
     list_filter   = ("tx_type", "location__code", "product__category")
     date_hierarchy = "created_at"
+    autocomplete_fields = ("product", "location")
     actions = [
         "mark_as_reserved",
         "release_reservations",
@@ -617,16 +618,12 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
 
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)
-        # Performed by — current user
-        initial.setdefault('performed_by', request.user.pk)
-        # External key — pre-generate so the field isn't empty
-        initial.setdefault('external_key', f'manual:{uuid.uuid4()}')
-        # tx_date — now
-        initial.setdefault('tx_date', timezone.now().strftime('%Y-%m-%d %H:%M:%S'))
-        # Product — from URL ?product=PK
-        product_pk = request.GET.get('product') or initial.get('product')
-        if product_pk:
-            try:
+        try:
+            initial.setdefault('performed_by', request.user.pk)
+            initial.setdefault('external_key', f'manual:{uuid.uuid4()}')
+            initial.setdefault('tx_date', timezone.now())
+            product_pk = request.GET.get('product') or initial.get('product')
+            if product_pk:
                 last_tx = (
                     InventoryTransaction.objects
                     .filter(product_id=product_pk)
@@ -636,14 +633,12 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
                 )
                 if last_tx and last_tx['location_id']:
                     initial.setdefault('location', last_tx['location_id'])
-            except Exception:
-                pass
-        # Fallback location — first available
-        if 'location' not in initial:
-            from .models import Location as _Loc
-            first_loc = _Loc.objects.values_list('pk', flat=True).first()
-            if first_loc:
-                initial['location'] = first_loc
+            if 'location' not in initial:
+                first_loc = Location.objects.values_list('pk', flat=True).first()
+                if first_loc:
+                    initial['location'] = first_loc
+        except Exception:
+            pass
         return initial
 
     def save_model(self, request, obj, form, change):
