@@ -131,7 +131,7 @@ class Command(BaseCommand):
                         or raw_prog_class == "completed"
                     )
 
-                    if is_cached_delivered:
+                    if is_cached_delivered and cfg.trust_cached_tracking:
                         # Форсово оновлюємо на основі кешованих даних
                         shipment.status = "delivered"
                         shipment.carrier_delayed = False

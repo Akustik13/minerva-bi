@@ -5272,6 +5272,12 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
       data["order"]["number"]                       ← Jumingo order number
     """
     from .services.jumingo import SHIPMENT_STATUS_MAP
+    try:
+        from shipping.models import ShippingSettings as _SS
+        _ss = _SS.get()
+        lock_delivered = _ss.order_status_lock_delivered
+    except Exception:
+        lock_delivered = True  # безпечне значення за замовчуванням
 
     # Статуси Jumingo tracking.progress.class → Minerva
     PROGRESS_CLASS_MAP = {
@@ -5557,7 +5563,9 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
             order.shipped_at = timezone.now().date()
             order_changed = True
             update_fields.append("shipped_at")
-    elif shipment.status == "in_transit" and order.status not in ("shipped", "delivered"):
+    elif shipment.status == "in_transit" and order.status not in (
+        ("shipped", "delivered") if lock_delivered else ("shipped",)
+    ):
         order.status = "shipped"
         if not order.shipped_at:
             order.shipped_at = timezone.now().date()
@@ -5733,12 +5741,23 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             ),
         }),
         ("⚙️ Пріоритет та захист статусу", {
-            "fields": ("prefer_tracking_number", "status_upgrade_only"),
+            "fields": (
+                "prefer_tracking_number",
+                "status_upgrade_only",
+                "order_status_lock_delivered",
+                "trust_cached_tracking",
+            ),
             "description": (
                 "<b>Пріоритет трекінг-номера:</b> якщо посилка має трекінг-номер, "
                 "система спочатку запитує пряму API (DHL/UPS), потім Jumingo.<br>"
-                "<b>Тільки підвищувати статус:</b> блокує ситуацію коли API повертає "
-                "застарілий статус і посилка «відкочується» назад."
+                "<b>Тільки підвищувати статус відправлення:</b> блокує відкат "
+                "статусу посилки назад (наприклад «Доставлено» → «В дорозі»).<br>"
+                "<b>Блокувати статус після «Доставлено»:</b> захищає замовлення — "
+                "трекінг не зможе знизити статус з «Доставлено» назад до «Відправлено».<br>"
+                "<b>Довіряти кешу при збої API:</b> якщо API недоступний, "
+                "система використає останній збережений статус. "
+                "<span style='color:#f85149;font-weight:700'>Небезпечно</span> — "
+                "старий кеш «Доставлено» може хибно закрити замовлення яке ще в дорозі."
             ),
         }),
         ("📋 Правила трекінгу", {
