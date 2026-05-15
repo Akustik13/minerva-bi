@@ -410,9 +410,9 @@ window.dlDocFile = function(url, name) {
 
 <script>
 /* ── Packaging auto-fill from recommendation ── */
-window.mvApplyPackaging = function(btn) {
+window.mvApplyPackaging = function(sourceBtn) {
   var recs;
-  try { recs = JSON.parse(btn.dataset.packRecs); } catch(e) { return; }
+  try { recs = JSON.parse(sourceBtn.dataset.packRecs); } catch(e) { return; }
   if (!recs || !recs.length) return;
 
   var prefix = 'orderpackaging_set';
@@ -447,11 +447,36 @@ window.mvApplyPackaging = function(btn) {
       if (qtyInp) { qtyInp.value = rec.qty_boxes; qtyInp.dispatchEvent(new Event('change', {bubbles:true})); }
       if (wgtInp && rec.weight_g) { wgtInp.value = rec.weight_g; wgtInp.dispatchEvent(new Event('change', {bubbles:true})); }
     }
-    btn.textContent = '✅ Застосовано — перевір та збережи';
-    btn.style.background = '#2e7d32';
-    btn.disabled = true;
+    /* Update both buttons (panel + inline) */
+    [sourceBtn, document.getElementById('mv-pack-inline-btn')].forEach(function(b) {
+      if (!b) return;
+      b.textContent = '✅ Застосовано — перевір та збережи';
+      b.style.background = '#2e7d32';
+      b.disabled = true;
+    });
   }, 150);
 };
+
+/* Inject recommendation button next to "Додати ще" in the packaging inline */
+document.addEventListener('DOMContentLoaded', function() {
+  var panelBtn = document.getElementById('mv-pack-apply-btn');
+  if (!panelBtn) return;  /* No recommendation — nothing to inject */
+
+  var addRowTd = document.querySelector('#orderpackaging_set-group .add-row td');
+  if (!addRowTd) return;
+
+  var inlineBtn = document.createElement('button');
+  inlineBtn.type = 'button';
+  inlineBtn.id   = 'mv-pack-inline-btn';
+  inlineBtn.textContent = '📦 З рекомендацій';
+  inlineBtn.style.cssText = (
+    'margin-left:14px;background:#1565c0;color:#fff;border:none;' +
+    'border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;' +
+    'cursor:pointer;vertical-align:middle'
+  );
+  inlineBtn.onclick = function() { mvApplyPackaging(panelBtn); };
+  addRowTd.appendChild(inlineBtn);
+});
 
 (function(){
   var _dirty = false;
