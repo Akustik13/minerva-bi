@@ -122,6 +122,7 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
 @admin.register(Carrier)
 class CarrierAdmin(admin.ModelAdmin):
     change_form_template = 'admin/shipping/carrier_change_form.html'
+    search_fields = ("name", "carrier_type")
     list_display  = ("name", "carrier_type_badge", "is_active", "is_default",
                      "sender_name", "sender_country", "has_credentials")
     list_filter   = ("carrier_type", "is_active", "is_default")

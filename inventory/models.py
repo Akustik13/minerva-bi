@@ -374,3 +374,57 @@ class InventorySettings(models.Model):
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
+
+
+class IncomingShipment(models.Model):
+    """Відстеження вхідних відправлень від постачальників."""
+
+    class Status(models.TextChoices):
+        PENDING    = 'pending',    'Очікує відправлення'
+        IN_TRANSIT = 'in_transit', 'В дорозі'
+        CUSTOMS    = 'customs',    'На митниці'
+        ARRIVED    = 'arrived',    'Прибув на склад'
+        DELIVERED  = 'delivered',  'Отримано'
+        EXCEPTION  = 'exception',  'Проблема'
+
+    purchase_order       = models.ForeignKey(
+        PurchaseOrder, on_delete=models.CASCADE,
+        related_name='incoming_shipments',
+        verbose_name='Замовлення (PO)', null=True, blank=True,
+    )
+    carrier              = models.ForeignKey(
+        'shipping.Carrier', on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name='Перевізник (API)',
+    )
+    carrier_name         = models.CharField('Перевізник', max_length=100, blank=True, default='')
+    tracking_number      = models.CharField('Номер відстеження', max_length=255, blank=True, default='')
+    tracking_url         = models.URLField('Посилання трекінгу', blank=True, default='')
+    status               = models.CharField('Статус', max_length=20,
+                                            choices=Status.choices, default=Status.PENDING)
+    carrier_status_label = models.CharField('Статус від перевізника', max_length=255, blank=True, default='')
+    origin_country       = models.CharField('Країна відправлення', max_length=3, blank=True, default='')
+    origin_city          = models.CharField('Місто відправлення', max_length=100, blank=True, default='')
+    expected_date        = models.DateField('Очікувана дата', null=True, blank=True)
+    shipped_date         = models.DateField('Відправлено', null=True, blank=True)
+    received_date        = models.DateField('Отримано', null=True, blank=True)
+    notes                = models.TextField('Нотатки', blank=True, default='')
+    tracking_events      = models.JSONField('Події трекінгу', default=list, blank=True)
+    last_tracked_at      = models.DateTimeField('Останній трекінг', null=True, blank=True)
+    created_at           = models.DateTimeField(auto_now_add=True)
+    updated_at           = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'Вхідне відправлення'
+        verbose_name_plural = 'Вхідні відправлення'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        parts = []
+        name = self.carrier_name or (self.carrier.name if self.carrier_id else '')
+        if name:
+            parts.append(name)
+        if self.tracking_number:
+            parts.append(self.tracking_number)
+        if self.purchase_order_id:
+            parts.append(f'← {self.purchase_order}')
+        return ' '.join(parts) or f'#{self.pk}'

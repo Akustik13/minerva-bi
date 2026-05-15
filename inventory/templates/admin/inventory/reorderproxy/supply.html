@@ -258,9 +258,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     {% endif %}
         <!-- expand -->
         <td>
-          {% if row.reservations or row.po_detail %}
-          <button class="sv-expand-btn" id="exp-{{ p.pk }}" title="Деталі" onclick="event.stopPropagation()">▶</button>
-          {% endif %}
+          <button class="sv-expand-btn" id="exp-{{ p.pk }}" title="Деталі та рухи" onclick="event.stopPropagation()">▶</button>
         </td>
         <!-- SKU / Name -->
         <td>
@@ -355,7 +353,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">№ ЗАМ.</td>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">К-СТЬ</td>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">СТАТУС</td>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ДАТА</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ТЕРМІН ВІДГРУЗКИ</td>
                   </tr>
                   {% for res in row.reservations %}
                   <tr>
@@ -373,7 +371,15 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                         <span class="sv-badge sv-badge-ord">{{ res.status }}</span>
                       {% endif %}
                     </td>
-                    <td style="font-size:11px;color:var(--text-dim)">{{ res.order_date|date:"d.m.Y" }}</td>
+                    <td style="font-size:11px">
+                      {% if res.shipping_deadline %}
+                        {% with dl=res.shipping_deadline %}
+                          <span style="color:#ffb300;font-weight:600">🚚 {{ dl|date:"d.m.Y" }}</span>
+                        {% endwith %}
+                      {% else %}
+                        <span style="color:var(--text-dim)">—</span>
+                      {% endif %}
+                    </td>
                   </tr>
                   {% endfor %}
                 </table>
@@ -424,6 +430,15 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
               </div>
 
             </div><!-- grid -->
+
+            <!-- History -->
+            <div class="sv-detail-section" style="margin-top:12px">
+              <h4>📜 Історія руху товару</h4>
+              <div id="hist-{{ p.pk }}" class="sv-history-panel">
+                <span style="color:var(--text-dim);font-size:12px">Натисніть ▶ щоб завантажити...</span>
+              </div>
+            </div>
+
           </div>
         </td>
       </tr>
@@ -532,12 +547,25 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   }
 
   /* ── Expand / collapse detail ── */
+  var _histLoaded = {};
   window.svToggleDetail = function(pk) {
     var det = document.getElementById('det-' + pk);
     var btn = document.getElementById('exp-' + pk);
     if (!det) return;
     var open = det.classList.toggle('open');
     if (btn) btn.classList.toggle('open', open);
+    if (open && !_histLoaded[pk]) {
+      _histLoaded[pk] = true;
+      var panel = document.getElementById('hist-' + pk);
+      if (panel) {
+        panel.innerHTML = '<span style="color:var(--text-dim);font-size:12px">⏳ Завантаження...</span>';
+        fetch('/admin/inventory/reorderproxy/supply/history/' + pk + '/', {
+          headers: {'X-Requested-With': 'XMLHttpRequest'}
+        }).then(function(r){ return r.text(); })
+          .then(function(html){ panel.innerHTML = html; })
+          .catch(function(){ panel.innerHTML = '<span style="color:#ef5350">Помилка завантаження</span>'; });
+      }
+    }
   };
 
   /* ── Sort ── */

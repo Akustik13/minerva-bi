@@ -25,7 +25,7 @@ from .models import (
     Product, ProductAlias, Location,
     InventoryTransaction, ProductComponent,
     Supplier, PurchaseOrder, PurchaseOrderLine,
-    ProductCategory, InventorySettings,
+    ProductCategory, InventorySettings, IncomingShipment,
 )
 from shipping.models import ProductPackaging
 
@@ -150,6 +150,9 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         return [
             path('supply/', self.admin_site.admin_view(self.supply_view),
                  name='inventory_reorderproxy_supply'),
+            path('supply/history/<int:product_pk>/',
+                 self.admin_site.admin_view(self.supply_history_view),
+                 name='inventory_reorderproxy_supply_history'),
         ] + super().get_urls()
 
     def supply_view(self, request):
@@ -199,11 +202,12 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 reserved_map[pk] += float(l.qty)
                 o = l.order
                 reservations_detail[pk].append({
-                    'order_number': o.order_number,
-                    'order_pk':     o.pk,
-                    'qty':          float(l.qty),
-                    'client':       o.client or o.ship_name or o.email or f'#{o.order_number}',
-                    'status':       o.get_status_display(),
+                    'order_number':     o.order_number,
+                    'order_pk':         o.pk,
+                    'qty':              float(l.qty),
+                    'client':           o.client or o.ship_name or o.email or f'#{o.order_number}',
+                    'status':           o.get_status_display(),
+                    'shipping_deadline': o.shipping_deadline,
                     'status_raw':   o.status,
                     'order_date':   o.order_date,
                 })
@@ -271,6 +275,69 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'opts':     ReorderProxy._meta,
         }
         return render(request, 'admin/inventory/reorderproxy/supply.html', context)
+
+    def supply_history_view(self, request, product_pk):
+        """AJAX: return HTML fragment with last 30 transactions for a product."""
+        from django.http import HttpResponse
+        from django.utils.html import escape
+        try:
+            txs = (InventoryTransaction.objects
+                   .filter(product_id=product_pk)
+                   .select_related('performed_by', 'location')
+                   .order_by('-tx_date')[:30])
+            TYPE_ICON = {
+                'Incoming':   ('⬇️', '#66bb6a'),
+                'Outgoing':   ('⬆️', '#ef5350'),
+                'Adjustment': ('🔧', '#ff9800'),
+                'Reserved':   ('📌', '#9c27b0'),
+            }
+            rows_html = []
+            for tx in txs:
+                icon, color = TYPE_ICON.get(tx.tx_type, ('•', '#607d8b'))
+                qty_sign = '+' if tx.qty > 0 else ''
+                performer = tx.performed_by.get_full_name() or tx.performed_by.username \
+                            if tx.performed_by_id else '—'
+                rows_html.append(
+                    f'<tr>'
+                    f'<td style="color:var(--text-dim);font-size:11px;white-space:nowrap;padding:4px 8px">'
+                    f'{tx.tx_date.strftime("%d.%m.%Y %H:%M")}</td>'
+                    f'<td style="padding:4px 8px">'
+                    f'<span style="color:{color}">{icon} {escape(tx.tx_type)}</span></td>'
+                    f'<td style="text-align:right;font-weight:700;color:{color};padding:4px 8px">'
+                    f'{qty_sign}{tx.qty:g}</td>'
+                    f'<td style="font-size:11px;padding:4px 8px">{escape(performer)}</td>'
+                    f'<td style="font-size:11px;color:var(--text-dim);padding:4px 8px">'
+                    f'{escape(tx.ref_doc or "—")}</td>'
+                    f'<td style="font-size:11px;color:var(--text-dim);padding:4px 8px">'
+                    f'{escape(tx.location.code if tx.location_id else "—")}</td>'
+                    f'</tr>'
+                )
+            if not rows_html:
+                body = '<tr><td colspan="6" style="color:var(--text-dim);padding:8px">Рухів немає</td></tr>'
+            else:
+                body = ''.join(rows_html)
+            html = (
+                '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+                '<thead><tr>'
+                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
+                'padding:4px 8px;border-bottom:1px solid var(--border)">ДАТА</th>'
+                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
+                'padding:4px 8px;border-bottom:1px solid var(--border)">ТИП</th>'
+                '<th style="text-align:right;color:var(--text-dim);font-size:10px;'
+                'padding:4px 8px;border-bottom:1px solid var(--border)">К-СТЬ</th>'
+                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
+                'padding:4px 8px;border-bottom:1px solid var(--border)">ВИКОНАВЕЦЬ</th>'
+                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
+                'padding:4px 8px;border-bottom:1px solid var(--border)">ДОКУМЕНТ</th>'
+                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
+                'padding:4px 8px;border-bottom:1px solid var(--border)">МІСЦЕ</th>'
+                '</tr></thead>'
+                f'<tbody>{body}</tbody>'
+                '</table>'
+            )
+        except Exception as exc:
+            html = f'<p style="color:#ef5350">Помилка: {escape(str(exc))}</p>'
+        return HttpResponse(html)
 
     def get_queryset(self, request):
         from django.db.models import OuterRef, Subquery, ExpressionWrapper, DecimalField, Value
@@ -1993,6 +2060,14 @@ class PurchaseOrderLineInline(admin.TabularInline):
     fields = ("product", "description", "qty_ordered",
               "qty_received", "unit_price", "currency", "notes")
 
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        # qty_received is editable only when PO is already partial or received
+        if obj is None or obj.status not in ('partial', 'received'):
+            if 'qty_received' not in ro:
+                ro.append('qty_received')
+        return ro
+
     def get_extra(self, request, obj=None, **kwargs):
         if obj is None and request.GET.get('product'):
             return 1
@@ -2084,6 +2159,190 @@ class PurchaseOrderLineAdmin(admin.ModelAdmin):
                      "qty_ordered", "qty_received", "unit_price")
     list_filter   = ("purchase_order__supplier", "purchase_order__status")
     search_fields = ("purchase_order__code", "product__sku", "description")
+
+
+# ── Incoming Shipments ─────────────────────────────────────────────────────────
+
+@admin.register(IncomingShipment)
+class IncomingShipmentAdmin(admin.ModelAdmin):
+    list_display  = ('tracking_col', 'carrier_col', 'status_badge', 'po_link',
+                     'origin_col', 'expected_date', 'last_tracked_at', 'refresh_btn')
+    list_filter   = ('status',)
+    search_fields = ('tracking_number', 'carrier_name', 'purchase_order__code',
+                     'carrier__name')
+    readonly_fields = ('last_tracked_at', 'updated_at', 'created_at',
+                       'events_panel', 'refresh_inline_btn')
+    autocomplete_fields = ('purchase_order', 'carrier')
+    fieldsets = (
+        ('📦 Відправлення', {
+            'fields': (('purchase_order', 'carrier'),
+                       ('carrier_name', 'tracking_number', 'tracking_url'),
+                       ('status', 'carrier_status_label')),
+        }),
+        ('🌍 Маршрут', {
+            'fields': (('origin_country', 'origin_city'),
+                       ('shipped_date', 'expected_date', 'received_date')),
+        }),
+        ('🔄 Трекінг', {
+            'fields': ('refresh_inline_btn', 'events_panel', 'last_tracked_at'),
+        }),
+        ('📝 Інше', {
+            'fields': ('notes', 'created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+
+    _STATUS_META = {
+        'pending':    ('🕐', '#607d8b', 'Очікує відправлення'),
+        'in_transit': ('🚚', '#ff9800', 'В дорозі'),
+        'customs':    ('🏛️', '#9c27b0', 'На митниці'),
+        'arrived':    ('📦', '#2196f3', 'Прибув на склад'),
+        'delivered':  ('✅', '#4caf50', 'Отримано'),
+        'exception':  ('❌', '#f44336', 'Проблема'),
+    }
+
+    def get_urls(self):
+        from django.urls import path
+        return [
+            path('<int:pk>/refresh/',
+                 self.admin_site.admin_view(self.refresh_view),
+                 name='inventory_incomingshipment_refresh'),
+        ] + super().get_urls()
+
+    def refresh_view(self, request, pk):
+        from django.shortcuts import redirect
+        from django.contrib import messages as msg
+        try:
+            ship = IncomingShipment.objects.get(pk=pk)
+            from inventory.services.incoming_tracking import refresh_tracking
+            changed, log = refresh_tracking(ship)
+            level = msg.SUCCESS if not log.startswith('Помилка') else msg.WARNING
+            msg.add_message(request, level,
+                            f'{"✅ Оновлено" if changed else "ℹ️ Без змін"}: {log}')
+        except IncomingShipment.DoesNotExist:
+            msg.add_message(request, msg.ERROR, 'Відправлення не знайдено')
+        except Exception as e:
+            msg.add_message(request, msg.ERROR, f'Помилка: {e}')
+        return redirect(request.META.get('HTTP_REFERER',
+                        f'/admin/inventory/incomingshipment/{pk}/change/'))
+
+    @admin.action(description='🔄 Оновити трекінг')
+    def refresh_selected(self, request, queryset):
+        from inventory.services.incoming_tracking import refresh_tracking
+        updated = 0
+        for ship in queryset:
+            try:
+                changed, _ = refresh_tracking(ship)
+                if changed:
+                    updated += 1
+            except Exception:
+                pass
+        self.message_user(request, f'Оновлено: {updated} з {queryset.count()}.')
+
+    actions = ['refresh_selected']
+
+    @admin.display(description='Відстеження')
+    def tracking_col(self, obj):
+        num = obj.tracking_number or '—'
+        if obj.tracking_url:
+            return format_html(
+                '<a href="{}" target="_blank" style="font-family:monospace;font-weight:700;'
+                'color:var(--link-fg)">{}</a>', obj.tracking_url, num)
+        return format_html('<span style="font-family:monospace;font-weight:700">{}</span>', num)
+
+    @admin.display(description='Перевізник')
+    def carrier_col(self, obj):
+        name = obj.carrier_name or (obj.carrier.name if obj.carrier_id else '—')
+        return format_html('<span style="font-weight:600">{}</span>', name)
+
+    @admin.display(description='Статус')
+    def status_badge(self, obj):
+        icon, color, label = self._STATUS_META.get(
+            obj.status, ('•', '#607d8b', obj.get_status_display()))
+        sublabel = obj.carrier_status_label
+        html = format_html(
+            '<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;'
+            'border-radius:12px;font-size:11px;font-weight:700;white-space:nowrap;'
+            'background:{}22;color:{};border:1px solid {}44">{} {}</span>',
+            color, color, color, icon, label)
+        if sublabel:
+            html = html + format_html(
+                '<br><span style="font-size:10px;color:var(--text-dim)">{}</span>', sublabel)
+        return html
+
+    @admin.display(description='PO')
+    def po_link(self, obj):
+        if not obj.purchase_order_id:
+            return '—'
+        url = reverse('admin:inventory_purchaseorder_change', args=[obj.purchase_order_id])
+        return format_html(
+            '<a href="{}" style="color:var(--link-fg);font-weight:600">{}</a>',
+            url, obj.purchase_order)
+
+    @admin.display(description='Звідки')
+    def origin_col(self, obj):
+        parts = [obj.origin_city, obj.origin_country]
+        return ', '.join(p for p in parts if p) or '—'
+
+    @admin.display(description='')
+    def refresh_btn(self, obj):
+        url = reverse('admin:inventory_incomingshipment_refresh', args=[obj.pk])
+        return format_html(
+            '<a href="{}" style="display:inline-block;padding:3px 9px;border-radius:5px;'
+            'font-size:11px;font-weight:600;background:#1565c0;color:#fff !important;'
+            'text-decoration:none;white-space:nowrap">🔄 Трекінг</a>', url)
+
+    @admin.display(description='')
+    def refresh_inline_btn(self, obj):
+        if not obj.pk:
+            return '—'
+        url = reverse('admin:inventory_incomingshipment_refresh', args=[obj.pk])
+        lbl = f'Оновлено: {obj.last_tracked_at.strftime("%d.m.%Y %H:%M")}' \
+              if obj.last_tracked_at else 'Ще не оновлювався'
+        return format_html(
+            '<a href="{}" style="display:inline-block;padding:5px 16px;border-radius:6px;'
+            'background:#1565c0;color:#fff !important;font-weight:700;text-decoration:none">'
+            '🔄 Оновити трекінг</a> '
+            '<span style="color:var(--text-dim);font-size:12px;margin-left:10px">{}</span>',
+            url, lbl)
+    refresh_inline_btn.short_description = ''
+
+    @admin.display(description='Трекінг події')
+    def events_panel(self, obj):
+        events = obj.tracking_events
+        if not events:
+            return format_html(
+                '<p style="color:var(--text-dim);font-size:13px">'
+                'Ще немає даних. Натисніть «Оновити трекінг».</p>')
+        rows = []
+        for ev in events[:40]:
+            ts   = ev.get('ts') or ev.get('timestamp') or ev.get('datetime', '')
+            desc = ev.get('desc') or ev.get('description') or ev.get('status', '')
+            loc  = ev.get('location', '')
+            sc   = ev.get('status_code', '')
+            icon, color, _ = self._STATUS_META.get(
+                {'transit': 'in_transit', 'delivered': 'delivered',
+                 'pre-transit': 'pending', 'failure': 'exception'}.get(sc, ''),
+                ('📍', '#607d8b', ''))
+            rows.append(format_html(
+                '<tr>'
+                '<td style="color:var(--text-dim);font-size:11px;white-space:nowrap;'
+                'padding:4px 8px">{}</td>'
+                '<td style="padding:4px 8px">{} {}</td>'
+                '<td style="color:var(--text-dim);font-size:11px;padding:4px 8px">{}</td>'
+                '</tr>',
+                ts[:16] if len(ts) > 10 else ts, icon, desc, loc))
+        return format_html(
+            '<table style="width:100%;border-collapse:collapse;font-size:12px">'
+            '<thead><tr>'
+            '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
+            'padding:4px 8px;border-bottom:1px solid var(--border)">Час</th>'
+            '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
+            'padding:4px 8px;border-bottom:1px solid var(--border)">Подія</th>'
+            '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
+            'padding:4px 8px;border-bottom:1px solid var(--border)">Локація</th>'
+            '</tr></thead><tbody>{}</tbody></table>',
+            mark_safe(''.join(str(r) for r in rows)))
 
 
 # ── Inject inventory stats into inventory app_index context ────────────────────

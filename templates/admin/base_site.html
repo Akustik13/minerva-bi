@@ -1011,7 +1011,9 @@ document.addEventListener('DOMContentLoaded', function(){
     },
     { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'],
       links: [
-        { href: '/admin/inventory/inventorysettings/', label: '⚙️ Налаштування складу', app: 'inventory' },
+        { href: '/admin/inventory/reorderproxy/supply/', label: '📋 Огляд складу',        app: 'inventory' },
+        { href: '/admin/inventory/incomingshipment/',    label: '🚢 Трекінг приходу',     app: 'inventory' },
+        { href: '/admin/inventory/inventorysettings/',   label: '⚙️ Налаштування складу', app: 'inventory' },
       ]
     },
     { id: 'tasks',      label: '📋 Задачі',       apps: ['tasks'] },
