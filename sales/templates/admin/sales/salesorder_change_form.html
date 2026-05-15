@@ -409,6 +409,50 @@ window.dlDocFile = function(url, name) {
 </style>
 
 <script>
+/* ── Packaging auto-fill from recommendation ── */
+window.mvApplyPackaging = function(btn) {
+  var recs;
+  try { recs = JSON.parse(btn.dataset.packRecs); } catch(e) { return; }
+  if (!recs || !recs.length) return;
+
+  var prefix = 'orderpackaging_set';
+  var totalEl = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+  var initEl  = document.getElementById('id_' + prefix + '-INITIAL_FORMS');
+  if (!totalEl || !initEl) {
+    alert('⚠️ Inline «Фактична упаковка» не знайдено на сторінці.');
+    return;
+  }
+  var initForms  = parseInt(initEl.value)  || 0;
+  var totalForms = parseInt(totalEl.value) || 0;
+  var freeSlots  = totalForms - initForms;
+  var rowsNeeded = recs.length - freeSlots;
+
+  /* Add rows by clicking "Додати ще" */
+  var addLink = document.querySelector('#' + prefix + '-group .add-row a');
+  for (var i = 0; i < rowsNeeded; i++) {
+    if (addLink) addLink.click();
+  }
+
+  /* Fill after DOM settles */
+  setTimeout(function() {
+    var total = parseInt(document.getElementById('id_' + prefix + '-TOTAL_FORMS').value) || 0;
+    for (var r = 0; r < recs.length; r++) {
+      var idx = initForms + r;
+      if (idx >= total) break;
+      var rec = recs[r];
+      var pkgSel = document.getElementById('id_' + prefix + '-' + idx + '-packaging');
+      var qtyInp = document.getElementById('id_' + prefix + '-' + idx + '-qty_boxes');
+      var wgtInp = document.getElementById('id_' + prefix + '-' + idx + '-actual_weight_g');
+      if (pkgSel) { pkgSel.value = String(rec.pk); pkgSel.dispatchEvent(new Event('change', {bubbles:true})); }
+      if (qtyInp) { qtyInp.value = rec.qty_boxes; qtyInp.dispatchEvent(new Event('change', {bubbles:true})); }
+      if (wgtInp && rec.weight_g) { wgtInp.value = rec.weight_g; wgtInp.dispatchEvent(new Event('change', {bubbles:true})); }
+    }
+    btn.textContent = '✅ Застосовано — перевір та збережи';
+    btn.style.background = '#2e7d32';
+    btn.disabled = true;
+  }, 150);
+};
+
 (function(){
   var _dirty = false;
 
@@ -427,9 +471,28 @@ window.dlDocFile = function(url, name) {
     }
   });
 
+  function _packagingOk() {
+    /* Returns true if packaging is confirmed or no recommendation exists */
+    var totalEl = document.getElementById('id_orderpackaging_set-TOTAL_FORMS');
+    if (!totalEl) return true;  /* Inline not present — pass */
+    var total = parseInt(totalEl.value) || 0;
+    if (total > 0) return true; /* Has rows (saved or just added) */
+    /* No rows: warn only if there's an unapplied recommendation button */
+    var applyBtn = document.getElementById('mv-pack-apply-btn');
+    if (!applyBtn || applyBtn.disabled) return true; /* No recommendation or already applied */
+    return confirm(
+      '📦 Упаковку не зафіксовано!\n\n' +
+      'Система знайшла рекомендацію, але вона ще не застосована до «Фактична упаковка».\n\n' +
+      '→ Натисни «🤖 Застосувати рекомендацію» в блоці «📦 Пакування» і збережи перед створенням відправлення.\n\n' +
+      'Продовжити без фіксації упаковки?'
+    );
+  }
+
   window.mvShipClick = function(e) {
     e.preventDefault();
     var shipUrl = document.getElementById('mv-ship-btn').dataset.href;
+
+    if (!_packagingOk()) return;
 
     if (!_dirty) {
       window.location.href = shipUrl;

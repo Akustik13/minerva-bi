@@ -690,7 +690,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                        "order_number", "order_date", "is_flagged", "internal_note")
         }),
         ("👤 Клієнт (білінг)", {
-            "fields": ("client", "contact_name", "email", "phone"),
+            "fields": ("crm_link", "client", "contact_name", "email", "phone"),
             "description": "Дані особи, яка зробила замовлення (білінговий контакт).",
         }),
         ("🚚 Доставка", {
@@ -742,7 +742,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     readonly_fields = ['stock_summary', 'label_buttons_detail',
                        'documents_list', 'upload_widget', 'doc_buttons', 'packaging_panel',
-                       'status_source']
+                       'status_source', 'crm_link']
     
     def _docs_panel_html(self, obj):
         """Inner HTML for the documents panel (used by documents_list and doc_list_view)."""
@@ -1118,10 +1118,15 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             )
             return best, True
 
+        import json as _json, html as _html
+        from collections import defaultdict
+
         rows_html = []
         total_weight_g = 0
         has_missing_weight = False
         best_box = None
+        # agg[packaging_id] = {"pk": id, "qty_boxes": N, "weight_g": M}
+        agg = defaultdict(lambda: {"pk": 0, "qty_boxes": 0, "weight_g": 0})
 
         for line in lines:
             product = line.product
@@ -1157,9 +1162,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     weight_str = f'{line_weight} г'
                     if best_box is None:
                         best_box = rec.packaging
+                    # Accumulate for auto-fill
+                    pkg_id = rec.packaging_id
+                    agg[pkg_id]["pk"] = pkg_id
+                    agg[pkg_id]["qty_boxes"] += boxes_needed
+                    agg[pkg_id]["weight_g"] += float(line_weight)
                 else:
                     weight_str = '<span style="color:#ff9800">⚠️ не вказана</span>'
                     has_missing_weight = True
+                    # Still track packaging even without weight
+                    pkg_id = rec.packaging_id
+                    agg[pkg_id]["pk"] = pkg_id
+                    agg[pkg_id]["qty_boxes"] += boxes_needed
                 rows_html.append(
                     f'<tr>'
                     f'<td style="color:#9aafbe;font-family:monospace">{product.sku}</td>'
@@ -1212,12 +1226,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         else:
             summary = '<div style="color:#607d8b;font-size:12px">Заповни поле «Вага нетто (г/шт)» у картці товару для розрахунку</div>'
 
-        # Зафіксована упаковка
+        # Зафіксована упаковка (existing OrderPackaging records)
         fixed = ''
+        has_existing = False
         try:
             from shipping.models import OrderPackaging
             used = OrderPackaging.objects.filter(order=obj).select_related('packaging')
             if used.exists():
+                has_existing = True
                 fixed_items = ', '.join(
                     f'{u.packaging} ×{u.qty_boxes}'
                     + (f' ({u.actual_weight_g} г)' if u.actual_weight_g else '')
@@ -1232,7 +1248,29 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception:
             pass
 
-        return mark_safe(table + summary + fixed)
+        # Кнопка авто-заповнення (тільки якщо є рекомендації і немає зафіксованих)
+        apply_btn_html = ''
+        if agg and not has_existing:
+            recs_list = [{"pk": v["pk"], "qty_boxes": v["qty_boxes"], "weight_g": round(v["weight_g"])}
+                         for v in agg.values() if v["pk"]]
+            if recs_list:
+                recs_attr = _html.escape(_json.dumps(recs_list), quote=True)
+                apply_btn_html = (
+                    '<div style="margin-top:10px;padding:8px 12px;background:#0d1f35;'
+                    'border-radius:6px;border-left:3px solid #1565c0;font-size:12px;'
+                    'display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+                    '<button type="button" id="mv-pack-apply-btn" '
+                    f'data-pack-recs="{recs_attr}" '
+                    'onclick="mvApplyPackaging(this)" '
+                    'style="background:#1565c0;color:#fff;border:none;border-radius:6px;'
+                    'padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer">'
+                    '🤖 Застосувати рекомендацію</button>'
+                    '<span style="color:#607d8b">'
+                    'Заповнить поля «📦 Фактична упаковка» нижче автоматично</span>'
+                    '</div>'
+                )
+
+        return mark_safe(table + summary + fixed + apply_btn_html)
 
     packaging_panel.short_description = '📦 Рекомендована упаковка'
 
@@ -1528,6 +1566,29 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             segment,
         )
     customer_link_display.short_description = "Клієнт"
+
+    def crm_link(self, obj):
+        """Посилання на картку клієнта в CRM (для форми редагування)."""
+        if not obj.pk:
+            return "—"
+        from crm.models import Customer
+        customer = None
+        if obj.customer_key:
+            customer = Customer.objects.filter(external_key=obj.customer_key).first()
+        if not customer and obj.email:
+            customer = Customer.objects.filter(email=obj.email).first()
+        if not customer and obj.client:
+            customer = Customer.objects.filter(name__iexact=obj.client).first()
+        if not customer:
+            return format_html('<span style="color:var(--text-dim)">⚠️ Клієнта не знайдено в CRM</span>')
+        url = reverse('admin:crm_customer_change', args=[customer.pk])
+        name = customer.company or customer.name or customer.email or f"#{customer.pk}"
+        return format_html(
+            '<a href="{}" target="_blank" style="color:var(--link-fg);font-weight:600">'
+            '👤 {}</a>',
+            url, name,
+        )
+    crm_link.short_description = "Картка CRM"
 
     def order_date_fmt(self, obj):
         if not obj.order_date:

@@ -338,6 +338,33 @@ class EmailAccountAdmin(admin.ModelAdmin):
         resp['Cache-Control'] = 'no-cache'
         return resp
 
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(user=request.user)
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and not request.user.is_superuser:
+            return obj.user_id == request.user.pk
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and not request.user.is_superuser:
+            return obj.user_id == request.user.pk
+        return super().has_delete_permission(request, obj)
+
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if not request.user.is_superuser and 'user' not in ro:
+            ro.append('user')
+        return ro
+
+    def save_model(self, request, obj, form, change):
+        if not request.user.is_superuser and not change:
+            obj.user = request.user
+        super().save_model(request, obj, form, change)
+
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         for f in ('imap_password', 'smtp_password'):
@@ -351,10 +378,6 @@ class EmailAccountAdmin(admin.ModelAdmin):
         from django.utils.formats import date_format
         return date_format(obj.last_sync_at, 'd.m.Y H:i')
     last_sync_col.short_description = 'Остання синхронізація'
-
-    def has_module_perms(self, request):
-        return request.user.is_superuser or getattr(
-            getattr(request.user, 'profile', None), 'role', '') in ('superadmin', 'admin')
 
 
 @admin.register(EmailSettings)
@@ -391,6 +414,33 @@ class EmailSettingsAdmin(admin.ModelAdmin):
             'description': 'Тихий режим: якщо quiet_from < quiet_to — блокує в цьому проміжку. Якщо quiet_from > quiet_to — блокує через північ.',
         }),
     )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(user=request.user)
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and not request.user.is_superuser:
+            return obj.user_id == request.user.pk
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and not request.user.is_superuser:
+            return obj.user_id == request.user.pk
+        return super().has_delete_permission(request, obj)
+
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if not request.user.is_superuser and 'user' not in ro:
+            ro.append('user')
+        return ro
+
+    def save_model(self, request, obj, form, change):
+        if not request.user.is_superuser and not change:
+            obj.user = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(EmailMessage)
