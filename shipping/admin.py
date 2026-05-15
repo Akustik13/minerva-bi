@@ -1603,17 +1603,35 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         missing_weight = False
         no_packaging   = False
 
+        def _pick_rec(product, qty):
+            r = (
+                ProductPackaging.objects
+                .filter(product=product, is_default=True)
+                .select_related('packaging').first()
+            )
+            if r:
+                return r
+            all_r = list(
+                ProductPackaging.objects.filter(product=product)
+                .select_related('packaging').all()
+            )
+            if not all_r:
+                return None
+            qty_f = float(qty)
+            return min(
+                all_r,
+                key=lambda x: (
+                    int(-(-qty_f // x.qty_per_box)) if x.qty_per_box > 0 else 9999,
+                    -x.qty_per_box,
+                )
+            )
+
         for line in lines:
             product = line.product
             if not product:
                 continue
 
-            rec = (
-                ProductPackaging.objects
-                .filter(product=product, is_default=True)
-                .select_related('packaging')
-                .first()
-            )
+            rec = _pick_rec(product, line.qty)
 
             if rec:
                 boxes_needed = max(1, -(-line.qty // rec.qty_per_box))
@@ -2630,12 +2648,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             note = f"Авто зі відправлення #{shipment.pk}"
             if num_skus > 1:
                 note += " (вага ≈ — мультипродуктове замовлення)"
+            # Mark as default only if no other ProductPackaging exists for this product
+            is_first = not ProductPackaging.objects.filter(product=line.product).exists()
             ProductPackaging.objects.create(
                 product=line.product,
                 packaging=material,
                 qty_per_box=qty_int,
                 estimated_weight_g=weight_g,
-                is_default=qty_int == 1,
+                is_default=is_first,
                 notes=note,
             )
             created.append({

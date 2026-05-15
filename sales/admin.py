@@ -1095,6 +1095,29 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         except ImportError:
             return mark_safe('<span style="color:#607d8b">— модуль shipping недоступний</span>')
 
+        def _pick_rec(product, qty):
+            """Return (rec, auto_selected). Prefers is_default; falls back to best fit."""
+            rec = ProductPackaging.objects.filter(
+                product=product, is_default=True
+            ).select_related('packaging').first()
+            if rec:
+                return rec, False
+            all_recs = list(
+                ProductPackaging.objects.filter(product=product)
+                .select_related('packaging').all()
+            )
+            if not all_recs:
+                return None, False
+            qty_f = float(qty)
+            best = min(
+                all_recs,
+                key=lambda r: (
+                    int(-(-qty_f // r.qty_per_box)) if r.qty_per_box > 0 else 9999,
+                    -r.qty_per_box,
+                )
+            )
+            return best, True
+
         rows_html = []
         total_weight_g = 0
         has_missing_weight = False
@@ -1111,13 +1134,23 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 )
                 continue
 
-            rec = ProductPackaging.objects.filter(
-                product=product, is_default=True
-            ).select_related('packaging').first()
+            rec, auto_selected = _pick_rec(product, line.qty)
 
             if rec:
                 box_str = str(rec.packaging)
                 boxes_needed = max(1, int(-(-float(line.qty) // rec.qty_per_box)))  # ceil
+                auto_badge = (
+                    ' <span title="Підібрано автоматично зі списку упаковок товару" '
+                    'style="font-size:10px;background:#1e3a24;color:#81c784;padding:1px 6px;'
+                    'border-radius:4px;border:1px solid #2e7d32">🤖 Авто</span>'
+                    if auto_selected else ''
+                )
+                notes_hint = ''
+                if auto_selected and rec.notes:
+                    notes_hint = (
+                        f' <span style="font-size:10px;color:#607d8b" '
+                        f'title="{rec.notes}">({rec.notes[:40]}{"…" if len(rec.notes)>40 else ""})</span>'
+                    )
                 if rec.estimated_weight_g:
                     line_weight = rec.estimated_weight_g * boxes_needed
                     total_weight_g += line_weight
@@ -1131,7 +1164,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     f'<tr>'
                     f'<td style="color:#9aafbe;font-family:monospace">{product.sku}</td>'
                     f'<td style="color:#c9d8e4;text-align:center">{line.qty}</td>'
-                    f'<td style="color:#80cbc4">{box_str} × {boxes_needed}</td>'
+                    f'<td style="color:#80cbc4">{box_str} × {boxes_needed}{auto_badge}{notes_hint}</td>'
                     f'<td style="color:#aed581">{weight_str}</td>'
                     f'</tr>'
                 )
