@@ -357,6 +357,46 @@ class MinervaUserAdmin(_DjangoUserAdmin):
                 '⚠️ Немає профілю</a>', url
             )
 
+    # ── Access control ────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _user_is_admin(request):
+        if request.user.is_superuser:
+            return True
+        role = getattr(getattr(request.user, 'profile', None), 'role', '')
+        return role in ('superadmin', 'admin')
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if self._user_is_admin(request):
+            return qs
+        # Non-admin: own account + accounts they created
+        from django.db.models import Q
+        return qs.filter(
+            Q(pk=request.user.pk) |
+            Q(profile__created_by=request.user)
+        )
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and not self._user_is_admin(request):
+            return obj.pk == request.user.pk
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if not self._user_is_admin(request):
+            return False  # Non-admins cannot delete any user
+        return super().has_delete_permission(request, obj)
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if not change and not self._user_is_admin(request):
+            # Record who created this user (profile auto-created via signal)
+            try:
+                obj.profile.created_by = request.user
+                obj.profile.save(update_fields=['created_by'])
+            except Exception:
+                pass
+
     # ── Invitation ────────────────────────────────────────────────────────────
 
     def get_urls(self):

@@ -207,6 +207,11 @@ class UserProfile(models.Model):
         default='dark', verbose_name='Тема',
     )
     created_at         = models.DateTimeField(auto_now_add=True, verbose_name='Дата створення')
+    created_by         = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='created_profiles', verbose_name='Створив',
+        help_text='Адміністратор, який створив цього користувача',
+    )
 
     # ── Особиста пошта (IMAP) ─────────────────────────────────
     imap_enabled = models.BooleanField(
