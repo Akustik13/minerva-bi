@@ -368,9 +368,18 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
         # Respect sync_order_status flag: if disabled, never touch status
         config_allows_status = _config_sync_status()
         if config_allows_status and _status_can_advance(sale.status, minerva_status):
+            old_status = sale.status
             sale.status = minerva_status
-            sale.save(update_fields=["status"])
+            sale.status_source = "DigiKey API"
+            sale.save(update_fields=["status", "status_source"])
             stats["updated"] += 1
+            stats.setdefault("changes", []).append({
+                "order":      sale.order_number,
+                "client":     sale.client or "—",
+                "old_status": old_status,
+                "new_status": minerva_status,
+                "extra":      "DigiKey API",
+            })
         else:
             stats["skipped"] += 1
 
@@ -831,13 +840,16 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
         if _status_can_advance(sale.status, minerva_status):
             old_status = sale.status
             sale.status = minerva_status
-            sale.save(update_fields=["status"])
+            sale.status_source = "DigiKey Marketplace"
+            sale._skip_status_notification = True  # summary covers it via notify_sync_result
+            sale.save(update_fields=["status", "status_source"])
             stats["updated"] += 1
             stats["changes"].append({
                 "order":      order_number,
                 "client":     client,
                 "old_status": old_status,
                 "new_status": minerva_status,
+                "extra":      "DigiKey Marketplace",
             })
         else:
             stats["skipped"] += 1

@@ -80,6 +80,10 @@ class SalesOrder(models.Model):
         ("cancelled",  "Скасовано"),
     ]
     status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default="received")
+    status_source   = models.CharField(
+        "Джерело статусу", max_length=100, blank=True, default="",
+        help_text="Яке API або дія останньо змінила статус замовлення (заповнюється автоматично)"
+    )
     total_price     = models.DecimalField(max_digits=18, decimal_places=2, null=True, blank=True)
     currency        = models.CharField(max_length=8, blank=True, default="USD", verbose_name="Валюта продажу")
     shipping_cost   = models.DecimalField("Вартість доставки", max_digits=10, decimal_places=2, default=0)

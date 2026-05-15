@@ -131,6 +131,10 @@ def _notify_order_events(sender, instance, created, **kwargs):
         if created:
             notify_new_order(instance)
         else:
+            # Batch syncs (DigiKey Marketplace, auto-tracking) set this flag and
+            # handle their own notification via notify_sync_result — skip here.
+            if getattr(instance, '_skip_status_notification', False):
+                return
             old_status = getattr(instance, '_old_status', None)
             if old_status and old_status != instance.status:
                 notify_status_change(instance, old_status, instance.status)

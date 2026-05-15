@@ -583,12 +583,15 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
                     old_lbl = STATUS_UA.get(ch.get("old_status",""), ch.get("old_status","?"))
                     new_lbl = STATUS_UA.get(ch.get("new_status",""), ch.get("new_status","?"))
                     tracking = ch.get("tracking","")
+                    extra    = ch.get("extra","")
                     line = (
                         f'<code>{ch.get("order","—")}</code> {ch.get("client","")}\n'
                         f'  {old_lbl} → <b>{new_lbl}</b>'
                     )
                     if tracking:
                         line += f'\n  🔍 <code>{tracking}</code>'
+                    if extra:
+                        line += f'\n  🔌 <i>{extra}</i>'
                     lines.append(line)
                 if len(changes) > 20:
                     lines.append(f'<i>... і ще {len(changes)-20}</i>')
@@ -1085,6 +1088,9 @@ def notify_status_change(order, old_status, new_status):
                 f'Клієнт: {client}',
                 f'Статус: {old_label} → <b>{new_label}</b>',
             ]
+            src = getattr(order, 'status_source', '') or ''
+            if src:
+                lines.append(f'🔌 Джерело: <i>{src}</i>')
             if is_dk_manual:
                 lines.append('✋ Підтверджено вручну на DigiKey')
             if new_status == 'shipped' and order.tracking_number:

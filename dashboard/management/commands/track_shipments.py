@@ -168,6 +168,7 @@ class Command(BaseCommand):
                         "old_status": old_status,
                         "new_status": shipment.status,
                         "tracking":   shipment.tracking_number or "",
+                        "extra":      f"[{tracker_used.upper()}]",
                     })
                     self.stdout.write(self.style.SUCCESS(
                         f"  ✅ {label} [{tracker_used}]"

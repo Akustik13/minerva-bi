@@ -5582,6 +5582,15 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
             update_fields.append("delivered_at")
 
     if order_changed:
+        if "status" in update_fields:
+            _carr = shipment.carrier
+            if _carr:
+                ct = (getattr(_carr, 'carrier_type', '') or '').upper() or 'Перевізник'
+                order.status_source = f"{ct} Трекінг"
+            else:
+                order.status_source = "Авто-трекінг"
+            update_fields.append("status_source")
+            order._skip_status_notification = True  # covered by notify_sync_result
         order.save(update_fields=update_fields)
 
     return changed

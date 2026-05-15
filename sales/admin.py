@@ -686,7 +686,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     fieldsets = (
         ("📦 Замовлення", {
-            "fields": ("source", "status", "document_type", "affects_stock",
+            "fields": ("source", "status", "status_source", "document_type", "affects_stock",
                        "order_number", "order_date", "is_flagged", "internal_note")
         }),
         ("👤 Клієнт (білінг)", {
@@ -741,7 +741,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     )
 
     readonly_fields = ['stock_summary', 'label_buttons_detail',
-                       'documents_list', 'upload_widget', 'doc_buttons', 'packaging_panel']
+                       'documents_list', 'upload_widget', 'doc_buttons', 'packaging_panel',
+                       'status_source']
     
     def _docs_panel_html(self, obj):
         """Inner HTML for the documents panel (used by documents_list and doc_list_view)."""
