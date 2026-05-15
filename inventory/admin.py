@@ -615,6 +615,37 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             color, sign, abs(n),
         )
 
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        # Performed by — current user
+        initial.setdefault('performed_by', request.user.pk)
+        # External key — pre-generate so the field isn't empty
+        initial.setdefault('external_key', f'manual:{uuid.uuid4()}')
+        # tx_date — now
+        initial.setdefault('tx_date', timezone.now().strftime('%Y-%m-%d %H:%M:%S'))
+        # Product — from URL ?product=PK
+        product_pk = request.GET.get('product') or initial.get('product')
+        if product_pk:
+            try:
+                last_tx = (
+                    InventoryTransaction.objects
+                    .filter(product_id=product_pk)
+                    .order_by('-id')
+                    .values('location_id')
+                    .first()
+                )
+                if last_tx and last_tx['location_id']:
+                    initial.setdefault('location', last_tx['location_id'])
+            except Exception:
+                pass
+        # Fallback location — first available
+        if 'location' not in initial:
+            from .models import Location as _Loc
+            first_loc = _Loc.objects.values_list('pk', flat=True).first()
+            if first_loc:
+                initial['location'] = first_loc
+        return initial
+
     def save_model(self, request, obj, form, change):
         if not getattr(obj, "external_key", None):
             obj.external_key = f"manual:{uuid.uuid4()}"
@@ -1957,6 +1988,33 @@ class PurchaseOrderLineInline(admin.TabularInline):
     fields = ("product", "description", "qty_ordered",
               "qty_received", "unit_price", "currency", "notes")
 
+    def get_extra(self, request, obj=None, **kwargs):
+        if obj is None and request.GET.get('product'):
+            return 1
+        return 0
+
+    def get_formset(self, request, obj=None, **kwargs):
+        FormSet = super().get_formset(request, obj, **kwargs)
+        if obj is not None:
+            return FormSet
+        try:
+            product_pk = int(request.GET.get('product', ''))
+        except (ValueError, TypeError):
+            return FormSet
+        try:
+            product_obj = Product.objects.get(pk=product_pk)
+            desc = product_obj.name or ''
+        except Product.DoesNotExist:
+            desc = ''
+
+        class PrefillFormSet(FormSet):
+            def __init__(self, *args, _pk=product_pk, _desc=desc, **kw):
+                if 'initial' not in kw:
+                    kw['initial'] = [{'product': _pk, 'description': _desc}]
+                super().__init__(*args, **kw)
+        PrefillFormSet.__name__ = FormSet.__name__
+        return PrefillFormSet
+
 
 @admin.register(Supplier)
 class SupplierAdmin(admin.ModelAdmin):
@@ -1989,6 +2047,12 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     inlines       = (PurchaseOrderLineInline,)
     readonly_fields = ("code", "created_at")
     preserve_filters = True
+
+    def get_changeform_initial_data(self, request):
+        initial = super().get_changeform_initial_data(request)
+        initial.setdefault('order_date', timezone.now().date())
+        initial.setdefault('status', 'draft')
+        return initial
 
     def status_badge(self, obj):
         colors = {
