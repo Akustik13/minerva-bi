@@ -1,278 +1,567 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block title %}Резервації та прихід — Minerva{% endblock %}
+{% block title %}Склад — огляд залишків{% endblock %}
 
 {% block extrahead %}
 {{ block.super }}
 <style>
-.sp-wrap { padding: 20px 28px; }
-.sp-breadcrumb {
-  font-size: 12px; color: var(--text-dim); margin-bottom: 16px;
-}
-.sp-breadcrumb a { color: var(--link-fg); text-decoration: none; }
-.sp-breadcrumb a:hover { text-decoration: underline; }
+#content-main { max-width: none !important; }
 
-.sp-title {
-  font-size: 20px; font-weight: 700; color: var(--text);
-  margin: 0 0 4px;
+.sv-wrap { padding: 16px 24px 60px; }
+
+/* ── Breadcrumb ── */
+.sv-bc { font-size: 12px; color: var(--text-dim); margin-bottom: 14px; }
+.sv-bc a { color: var(--link-fg); text-decoration: none; }
+.sv-bc a:hover { text-decoration: underline; }
+
+/* ── Page header ── */
+.sv-hdr { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; flex-wrap: wrap; }
+.sv-hdr h1 { font-size: 20px; font-weight: 800; color: var(--text); margin: 0; flex: 1; }
+
+/* ── Summary chips ── */
+.sv-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.sv-chip {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 20px; padding: 4px 13px; font-size: 12px; font-weight: 600;
+  color: var(--text-muted); white-space: nowrap;
 }
-.sp-subtitle {
-  font-size: 13px; color: var(--text-muted); margin: 0 0 20px;
+.sv-chip span { font-weight: 800; color: var(--text); margin-left: 4px; }
+
+/* ── Filter bar ── */
+.sv-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.sv-filter-btn {
+  padding: 5px 13px; border-radius: 6px; border: 1px solid var(--border-strong);
+  background: var(--bg-card-2); color: var(--text-muted);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all .15s;
 }
-.sp-empty {
-  padding: 48px; text-align: center;
-  color: var(--text-dim); font-size: 15px;
-  background: var(--bg-card); border-radius: 8px;
-  border: 1px solid var(--border-strong);
+.sv-filter-btn:hover { border-color: #2196f3; color: var(--text); }
+.sv-filter-btn.active { background: #1565c0; border-color: #1565c0; color: #fff; }
+
+/* ── Search ── */
+.sv-search-wrap { margin-bottom: 12px; }
+.sv-search {
+  width: 280px; max-width: 100%; padding: 7px 12px;
+  background: var(--bg-input); border: 1px solid var(--border-strong);
+  border-radius: 7px; color: var(--text); font-size: 13px;
+  outline: none;
 }
+.sv-search:focus { border-color: #2196f3; }
 
 /* ── Table ── */
-.sp-table {
-  width: 100%; border-collapse: collapse;
-  font-size: 13px; background: var(--bg-card);
-  border: 1px solid var(--border-strong); border-radius: 8px;
-  overflow: hidden;
-}
-.sp-table th {
-  background: var(--bg-input); color: var(--text-muted);
-  font-weight: 600; font-size: 11px; letter-spacing: .5px;
-  padding: 9px 12px; text-align: left;
-  border-bottom: 1px solid var(--border-strong);
-}
-.sp-table td {
-  padding: 8px 12px; vertical-align: middle;
-  border-bottom: 1px solid rgba(128,128,128,.08);
-  color: var(--text);
-}
-
-/* Product header row */
-.sp-prod-row td {
-  background: rgba(33,150,243,.06);
-  border-top: 2px solid rgba(33,150,243,.25);
-  border-bottom: 1px solid rgba(33,150,243,.12);
-  font-weight: 600;
-}
-.sp-prod-sku {
-  font-family: monospace; font-size: 13px;
-  color: var(--text); font-weight: 700;
-}
-.sp-prod-name { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
-
-/* Sub-rows */
-.sp-sub-row td { background: transparent; padding: 6px 12px 6px 24px; }
-.sp-sub-row:last-of-type td { border-bottom: none; }
-
-/* Type badge */
-.sp-badge {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  font-size: 11px; font-weight: 600; white-space: nowrap;
-}
-.sp-badge-res  { background: rgba(244,67,54,.12);  color: #ef5350; border: 1px solid rgba(244,67,54,.25); }
-.sp-badge-inc  { background: rgba(76,175,80,.12);  color: #66bb6a; border: 1px solid rgba(76,175,80,.25); }
-
-/* Stock qty coloring */
-.sp-stock-ok   { color: #66bb6a; font-weight: 700; }
-.sp-stock-warn { color: #ffa726; font-weight: 700; }
-.sp-stock-crit { color: #ef5350; font-weight: 700; }
-
-/* Status pill */
-.sp-status {
-  display: inline-block; padding: 2px 8px; border-radius: 10px;
-  font-size: 11px; font-weight: 600;
-}
-.sp-status-received   { background: rgba(33,150,243,.15); color: #64b5f6; }
-.sp-status-processing { background: rgba(255,152,0,.15);  color: #ffa726; }
-.sp-status-draft      { background: rgba(96,125,139,.15); color: #90a4ae; }
-.sp-status-ordered    { background: rgba(33,150,243,.15); color: #64b5f6; }
-.sp-status-partial    { background: rgba(255,152,0,.15);  color: #ffa726; }
-
-/* Action button */
-.sp-btn {
-  display: inline-block; padding: 4px 12px;
-  border-radius: 6px; font-size: 12px; font-weight: 600;
-  text-decoration: none; white-space: nowrap;
-  background: #1565c0; color: #fff;
-  border: none; cursor: pointer;
-}
-.sp-btn:hover { opacity: .85; }
-
-/* Summary bar */
-.sp-summary {
-  display: flex; gap: 24px; flex-wrap: wrap;
-  margin-bottom: 18px;
-}
-.sp-stat {
+.sv-table-wrap { overflow-x: auto; }
+.sv-table {
+  width: 100%; border-collapse: collapse; font-size: 13px;
   background: var(--bg-card); border: 1px solid var(--border-strong);
-  border-radius: 8px; padding: 10px 18px; text-align: center;
-  min-width: 90px;
+  border-radius: 8px; overflow: hidden;
 }
-.sp-stat-val { font-size: 22px; font-weight: 700; color: var(--text); }
-.sp-stat-lbl { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.sv-table th {
+  background: var(--bg-input); color: var(--text-muted);
+  font-weight: 700; font-size: 11px; letter-spacing: .4px; text-transform: uppercase;
+  padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border-strong);
+  white-space: nowrap; cursor: pointer; user-select: none;
+}
+.sv-table th:hover { color: var(--text); }
+.sv-table th.sort-asc::after { content: ' ↑'; }
+.sv-table th.sort-desc::after { content: ' ↓'; }
+.sv-table td {
+  padding: 7px 10px; border-bottom: 1px solid rgba(128,128,128,.07);
+  color: var(--text); vertical-align: middle;
+}
+.sv-table tr.sv-main-row:hover td { background: var(--bg-hover); cursor: pointer; }
+.sv-table tr.sv-main-row td:last-child { cursor: default; }
 
-/* Legend */
-.sp-legend {
-  display: flex; gap: 18px; margin-bottom: 14px; flex-wrap: wrap;
-  font-size: 12px; color: var(--text-muted);
+/* ── SKU cell ── */
+.sv-sku { font-family: monospace; font-size: 13px; font-weight: 700; color: var(--text); }
+.sv-name { font-size: 11px; color: var(--text-dim); margin-top: 1px;
+           max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sv-cat { font-size: 10px; color: var(--text-dim); }
+
+/* ── Stock numbers ── */
+.sv-num { font-weight: 700; font-size: 14px; }
+.sv-ok   { color: #66bb6a; }
+.sv-warn { color: #ffa726; }
+.sv-crit { color: #ef5350; }
+.sv-zero { color: #ef5350; }
+.sv-dim  { color: var(--text-dim); font-weight: 400; }
+.sv-pos  { color: #66bb6a; font-weight: 700; }
+.sv-neg  { color: #ef5350; font-weight: 700; }
+
+/* ── Status badge ── */
+.sv-badge {
+  display: inline-block; padding: 2px 7px; border-radius: 10px;
+  font-size: 10px; font-weight: 700; white-space: nowrap;
 }
+.sv-badge-res { background: rgba(244,67,54,.12); color: #ef5350; border: 1px solid rgba(244,67,54,.22); }
+.sv-badge-inc { background: rgba(76,175,80,.12); color: #66bb6a; border: 1px solid rgba(76,175,80,.22); }
+.sv-badge-ord { background: rgba(33,150,243,.12); color: #64b5f6; border: 1px solid rgba(33,150,243,.22); }
+.sv-badge-prc { background: rgba(255,152,0,.12); color: #ffa726; border: 1px solid rgba(255,152,0,.22); }
+
+/* ── Last tx cell ── */
+.sv-tx { font-size: 11px; }
+.sv-tx-type { font-weight: 600; }
+.sv-tx-date { color: var(--text-dim); margin-left: 4px; }
+.sv-tx-ref  { font-size: 10px; color: var(--text-dim); display: block; }
+
+/* ── Action buttons ── */
+.sv-actions { display: flex; gap: 5px; flex-wrap: nowrap; }
+.sv-btn {
+  display: inline-flex; align-items: center; padding: 4px 9px;
+  border-radius: 5px; font-size: 11px; font-weight: 600;
+  text-decoration: none; white-space: nowrap; border: none; cursor: pointer;
+  transition: opacity .15s;
+}
+.sv-btn:hover { opacity: .8; }
+.sv-btn-po     { background: #1565c0; color: #fff; }
+.sv-btn-rx     { background: #2e7d32; color: #fff; }
+.sv-btn-tx     { background: #6a1b9a; color: #fff; }
+
+/* ── Expand toggle ── */
+.sv-expand-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 14px; padding: 0 4px;
+  transition: transform .15s, color .15s;
+}
+.sv-expand-btn.open { transform: rotate(90deg); color: var(--link-fg); }
+
+/* ── Detail sub-panel ── */
+.sv-detail-row { display: none; }
+.sv-detail-row.open { display: table-row; }
+.sv-detail-cell {
+  padding: 0 0 6px 32px !important;
+  background: var(--bg-input) !important;
+  border-bottom: 2px solid var(--border-strong) !important;
+}
+.sv-detail-inner { padding: 10px 12px; }
+.sv-detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 900px) { .sv-detail-grid { grid-template-columns: 1fr; } }
+
+.sv-detail-section h4 {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+  color: var(--text-muted); margin: 0 0 8px; padding-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.sv-sub-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.sv-sub-table td { padding: 4px 6px; border-bottom: 1px solid rgba(128,128,128,.06); }
+.sv-sub-table tr:last-child td { border-bottom: none; }
+.sv-sub-empty { color: var(--text-dim); font-size: 12px; padding: 4px 0; }
+
+/* ── State row highlighting ── */
+tr.sv-main-row[data-state="empty"] td:nth-child(4) { background: rgba(244,67,54,.04); }
+tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,54,.04); }
+
+/* ── Empty state ── */
+.sv-empty {
+  text-align: center; padding: 60px 20px;
+  color: var(--text-dim); font-size: 15px;
+}
+
+/* ── Zebra ── */
+.sv-table tbody tr.sv-main-row:nth-child(4n+1) td,
+.sv-table tbody tr.sv-main-row:nth-child(4n+2) td { background: var(--bg-card); }
+.sv-table tbody tr.sv-main-row:nth-child(4n+3) td,
+.sv-table tbody tr.sv-main-row:nth-child(4n+4) td { background: var(--bg-card-2); }
+.sv-table tbody tr.sv-main-row:hover td { background: var(--bg-hover) !important; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="sp-wrap">
+<div class="sv-wrap">
 
-  <div class="sp-breadcrumb">
+  <div class="sv-bc">
     <a href="/admin/">Головна</a> ›
     <a href="/admin/inventory/">Склад</a> ›
-    <a href="/admin/inventory/reorderproxy/">Аналіз запасів</a> ›
-    Резервації та прихід
+    Залишки та рух товарів
   </div>
 
-  <h1 class="sp-title">📋 Резервації та прихід товарів</h1>
-  <p class="sp-subtitle">Активні замовлення (не відвантажено) та відкриті PO з очікуваним приходом</p>
+  <div class="sv-hdr">
+    <h1>📦 Склад — залишки та рух товарів</h1>
+    <a href="/admin/inventory/inventorytransaction/add/" class="sv-btn sv-btn-tx">+ Транзакція</a>
+    <a href="/admin/inventory/purchaseorder/add/" class="sv-btn sv-btn-po">+ Замовлення (PO)</a>
+  </div>
 
   {% if rows %}
+  {% with total=rows|length %}
 
-  <!-- Summary -->
-  <div class="sp-summary">
-    <div class="sp-stat">
-      <div class="sp-stat-val">{{ rows|length }}</div>
-      <div class="sp-stat-lbl">товарів</div>
-    </div>
-    {% with total_res=0 total_inc=0 %}
-    <div class="sp-stat">
-      <div class="sp-stat-val" style="color:#ef5350">
-        {% for r in rows %}{% for x in r.reservations %}{% if forloop.first and forloop.parentloop.first %}{% endif %}{% endfor %}{% endfor %}
-        {% comment %}Count via template tag workaround{% endcomment %}
-        {{ rows|length }}+
-      </div>
-      <div class="sp-stat-lbl">📋 Позицій резерв</div>
-    </div>
-    {% endwith %}
+  <!-- Summary chips -->
+  <div class="sv-chips" id="sv-chips">
+    <div class="sv-chip">Товарів: <span>{{ total }}</span></div>
+    <div class="sv-chip" id="chip-empty">Відсутні: <span id="cnt-empty">0</span></div>
+    <div class="sv-chip" id="chip-crit">Критичні: <span id="cnt-crit">0</span></div>
+    <div class="sv-chip" id="chip-res">В резерві: <span id="cnt-res">0</span></div>
+    <div class="sv-chip" id="chip-inc">З приходом: <span id="cnt-inc">0</span></div>
   </div>
 
-  <!-- Legend -->
-  <div class="sp-legend">
-    <span><span class="sp-badge sp-badge-res">📋 Резерв</span> — замовлення отримано/в обробці, товар ще не відправлено</span>
-    <span><span class="sp-badge sp-badge-inc">📦 Прихід</span> — відкрите закупівельне замовлення (PO), товар очікується</span>
+  <!-- Filters -->
+  <div class="sv-filters">
+    <button class="sv-filter-btn active" onclick="svFilter('all', this)">📋 Всі</button>
+    <button class="sv-filter-btn" onclick="svFilter('empty', this)">🚫 Відсутні</button>
+    <button class="sv-filter-btn" onclick="svFilter('critical', this)">⚠️ Критичні</button>
+    <button class="sv-filter-btn" onclick="svFilter('reserved', this)">📋 В резерві</button>
+    <button class="sv-filter-btn" onclick="svFilter('incoming', this)">📦 Очікується</button>
   </div>
 
-  <table class="sp-table">
+  <!-- Search -->
+  <div class="sv-search-wrap">
+    <input class="sv-search" type="text" id="sv-search"
+           placeholder="🔍 Пошук по SKU або назві..." oninput="svSearch(this.value)">
+  </div>
+
+  <!-- Table -->
+  <div class="sv-table-wrap">
+  <table class="sv-table" id="sv-table">
     <thead>
       <tr>
-        <th style="width:160px">SKU / Назва</th>
-        <th style="width:90px;text-align:center">На складі</th>
-        <th style="width:90px">Тип</th>
-        <th>Деталі (замовник / постачальник)</th>
-        <th style="width:80px;text-align:right">К-сть</th>
-        <th style="width:110px">Статус / Дата</th>
-        <th style="width:80px">Дія</th>
+        <th style="width:28px"></th>
+        <th onclick="svSort('sku')" id="th-sku">SKU / Назва</th>
+        <th onclick="svSort('cat')">Категорія</th>
+        <th onclick="svSort('stock')" style="text-align:right">На складі</th>
+        <th onclick="svSort('reserved')" style="text-align:right">Резерв</th>
+        <th onclick="svSort('avail')" style="text-align:right">Доступно</th>
+        <th onclick="svSort('incoming')" style="text-align:right">Очікується</th>
+        <th>Остання операція</th>
+        <th style="width:120px">Дія</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="sv-tbody">
     {% for row in rows %}
-      {% with product=row.product stock=row.stock reservations=row.reservations incoming=row.incoming %}
-
-      {# ── Product header row ── #}
-      <tr class="sp-prod-row">
-        <td>
-          <div class="sp-prod-sku">
-            <a href="/admin/inventory/product/{{ product.pk }}/change/"
-               style="color:var(--text);text-decoration:none">{{ product.sku }}</a>
-          </div>
-          <div class="sp-prod-name">{{ product.name|truncatechars:50 }}</div>
-        </td>
-        <td style="text-align:center">
-          {% if stock <= 0 %}
-            <span class="sp-stock-crit">🚫 0</span>
-          {% elif stock < 5 %}
-            <span class="sp-stock-warn">⚠️ {{ stock|floatformat:"0" }}</span>
-          {% else %}
-            <span class="sp-stock-ok">{{ stock|floatformat:"0" }}</span>
-          {% endif %}
-        </td>
-        <td colspan="3" style="color:var(--text-dim);font-size:12px">
-          {% if reservations %}📋 {{ reservations|length }} резерв.{% endif %}
-          {% if reservations and incoming %} · {% endif %}
-          {% if incoming %}📦 {{ incoming|length }} PO{% endif %}
-        </td>
-        <td>
-          <a href="/admin/inventory/purchaseorder/add/?product={{ product.pk }}"
-             class="sp-btn">+ PO</a>
-        </td>
-      </tr>
-
-      {# ── Reservation sub-rows ── #}
-      {% for res in reservations %}
-      <tr class="sp-sub-row">
-        <td></td>
-        <td></td>
-        <td><span class="sp-badge sp-badge-res">📋 Резерв</span></td>
-        <td>
-          <a href="/admin/sales/salesorder/{{ res.order_pk }}/change/"
-             style="color:var(--link-fg);font-weight:600;text-decoration:none"
-             target="_blank">
-            {{ res.client|truncatechars:35 }}
-          </a>
-          <span style="font-size:11px;color:var(--text-dim);margin-left:6px">
-            #{{ res.order_number }}
-          </span>
-          {% if res.order_date %}
-          <span style="font-size:11px;color:var(--text-dim);margin-left:6px">
-            · {{ res.order_date|date:"d.m.Y" }}
-          </span>
-          {% endif %}
-        </td>
-        <td style="text-align:right;font-weight:700;color:#ef5350">
-          {{ res.qty|floatformat:"0" }}
-        </td>
-        <td>
-          <span class="sp-status sp-status-{{ res.status_raw }}">{{ res.status }}</span>
-        </td>
-        <td></td>
-      </tr>
-      {% endfor %}
-
-      {# ── Incoming PO sub-rows ── #}
-      {% for inc in incoming %}
-      <tr class="sp-sub-row">
-        <td></td>
-        <td></td>
-        <td><span class="sp-badge sp-badge-inc">📦 Прихід</span></td>
-        <td>
-          <a href="/admin/inventory/purchaseorder/{{ inc.po_pk }}/change/"
-             style="color:var(--link-fg);font-weight:600;text-decoration:none"
-             target="_blank">
-            {{ inc.supplier|truncatechars:35 }}
-          </a>
-          <span style="font-size:11px;color:var(--text-dim);margin-left:6px">
-            {{ inc.po_str }}
-          </span>
-        </td>
-        <td style="text-align:right;font-weight:700;color:#66bb6a">
-          {{ inc.qty|floatformat:"0" }}
-        </td>
-        <td>
-          {% if inc.expected_date %}
-            <span style="color:#ffb300;font-size:12px">📅 {{ inc.expected_date|date:"d.m.Y" }}</span>
-          {% else %}
-            <span style="color:var(--text-dim);font-size:12px">— дата не вказана</span>
-          {% endif %}
-        </td>
-        <td></td>
-      </tr>
-      {% endfor %}
-
+    {% with p=row.product stock=row.stock reserved=row.reserved net=row.net_avail incoming=row.incoming last_tx=row.last_tx %}
+    {# Determine state for filtering #}
+    {% if stock <= 0 %}{% with state="empty" %}
+      <tr class="sv-main-row" data-pk="{{ p.pk }}" data-state="{{ state }}"
+          data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
+          data-cat="{{ p.category.name|default:''|lower }}"
+          data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
+          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
+    {% elif stock <= p.reorder_point and p.reorder_point > 0 %}{% with state="critical" %}
+      <tr class="sv-main-row" data-pk="{{ p.pk }}" data-state="{{ state }}"
+          data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
+          data-cat="{{ p.category.name|default:''|lower }}"
+          data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
+          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          onclick="svToggleDetail({{ p.pk }})">
+      {% endwith %}
+    {% else %}{% with state="ok" %}
+      <tr class="sv-main-row" data-pk="{{ p.pk }}" data-state="{{ state }}"
+          data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
+          data-cat="{{ p.category.name|default:''|lower }}"
+          data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
+          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          onclick="svToggleDetail({{ p.pk }})">
+      {% endwith %}
+    {% endif %}
+        <!-- expand -->
+        <td>
+          {% if row.reservations or row.po_detail %}
+          <button class="sv-expand-btn" id="exp-{{ p.pk }}" title="Деталі" onclick="event.stopPropagation()">▶</button>
+          {% endif %}
+        </td>
+        <!-- SKU / Name -->
+        <td>
+          <div class="sv-sku">
+            <a href="/admin/inventory/product/{{ p.pk }}/change/"
+               style="color:var(--text);text-decoration:none"
+               onclick="event.stopPropagation()">{{ p.sku }}</a>
+          </div>
+          <div class="sv-name">{{ p.name }}</div>
+        </td>
+        <!-- Category -->
+        <td class="sv-cat">{{ p.category.name|default:"—" }}</td>
+        <!-- Stock -->
+        <td style="text-align:right">
+          {% if stock <= 0 %}
+            <span class="sv-num sv-zero">🚫 {{ stock|floatformat:"0" }}</span>
+          {% elif stock <= p.reorder_point and p.reorder_point > 0 %}
+            <span class="sv-num sv-crit">⚠️ {{ stock|floatformat:"0" }}</span>
+          {% elif stock < p.reorder_point|add:10 and p.reorder_point > 0 %}
+            <span class="sv-num sv-warn">{{ stock|floatformat:"0" }}</span>
+          {% else %}
+            <span class="sv-num sv-ok">{{ stock|floatformat:"0" }}</span>
+          {% endif %}
+        </td>
+        <!-- Reserved -->
+        <td style="text-align:right">
+          {% if reserved > 0 %}
+            <span class="sv-num" style="color:#ef5350">{{ reserved|floatformat:"0" }}</span>
+          {% else %}
+            <span class="sv-dim">—</span>
+          {% endif %}
+        </td>
+        <!-- Net available -->
+        <td style="text-align:right">
+          {% if net < 0 %}
+            <span class="sv-neg">{{ net|floatformat:"0" }}</span>
+          {% elif net == 0 %}
+            <span class="sv-dim">0</span>
+          {% else %}
+            <span class="sv-pos">{{ net|floatformat:"0" }}</span>
+          {% endif %}
+        </td>
+        <!-- Incoming -->
+        <td style="text-align:right">
+          {% if incoming > 0 %}
+            <span class="sv-num" style="color:#66bb6a">+{{ incoming|floatformat:"0" }}</span>
+          {% else %}
+            <span class="sv-dim">—</span>
+          {% endif %}
+        </td>
+        <!-- Last tx -->
+        <td>
+          {% if last_tx %}
+          <div class="sv-tx">
+            {% if last_tx.tx_type == "Incoming" %}<span class="sv-tx-type" style="color:#66bb6a">📥 Прихід</span>
+            {% elif last_tx.tx_type == "Outgoing" %}<span class="sv-tx-type" style="color:#ef5350">📤 Витрата</span>
+            {% elif last_tx.tx_type == "Adjustment" %}<span class="sv-tx-type" style="color:#7c4dff">⚖️ Коригування</span>
+            {% else %}<span class="sv-tx-type" style="color:var(--text-dim)">{{ last_tx.tx_type }}</span>
+            {% endif %}
+            <span class="sv-num" style="font-size:11px"> {{ last_tx.qty|floatformat:"0" }}</span>
+            <span class="sv-tx-date">{{ last_tx.tx_date|date:"d.m.Y" }}</span>
+            {% if last_tx.ref_doc %}<span class="sv-tx-ref">{{ last_tx.ref_doc|truncatechars:30 }}</span>{% endif %}
+          </div>
+          {% else %}
+            <span class="sv-dim" style="font-size:12px">—</span>
+          {% endif %}
+        </td>
+        <!-- Actions -->
+        <td onclick="event.stopPropagation()">
+          <div class="sv-actions">
+            <a href="/admin/inventory/purchaseorder/add/?product={{ p.pk }}"
+               class="sv-btn sv-btn-po" title="Створити замовлення постачальнику">+ PO</a>
+            <a href="/admin/inventory/inventorytransaction/add/?product={{ p.pk }}"
+               class="sv-btn sv-btn-rx" title="Зареєструвати прихід/витрату">+ Рух</a>
+          </div>
+        </td>
+      </tr>
+
+      <!-- Detail row -->
+      <tr class="sv-detail-row" id="det-{{ p.pk }}">
+        <td class="sv-detail-cell" colspan="9">
+          <div class="sv-detail-inner">
+            <div class="sv-detail-grid">
+
+              <!-- Reservations -->
+              <div class="sv-detail-section">
+                <h4>📋 Резервації (незакриті замовлення)</h4>
+                {% if row.reservations %}
+                <table class="sv-sub-table">
+                  <tr>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ЗАМОВНИК</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">№ ЗАМ.</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">К-СТЬ</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">СТАТУС</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ДАТА</td>
+                  </tr>
+                  {% for res in row.reservations %}
+                  <tr>
+                    <td>
+                      <a href="/admin/sales/salesorder/{{ res.order_pk }}/change/"
+                         style="color:var(--link-fg);font-weight:600;text-decoration:none"
+                         target="_blank">{{ res.client|truncatechars:30 }}</a>
+                    </td>
+                    <td style="font-family:monospace;font-size:11px">{{ res.order_number }}</td>
+                    <td style="text-align:right;font-weight:700;color:#ef5350">{{ res.qty|floatformat:"0" }}</td>
+                    <td>
+                      {% if res.status_raw == "received" or res.status_raw == "processing" %}
+                        <span class="sv-badge sv-badge-prc">{{ res.status }}</span>
+                      {% else %}
+                        <span class="sv-badge sv-badge-ord">{{ res.status }}</span>
+                      {% endif %}
+                    </td>
+                    <td style="font-size:11px;color:var(--text-dim)">{{ res.order_date|date:"d.m.Y" }}</td>
+                  </tr>
+                  {% endfor %}
+                </table>
+                {% else %}
+                <p class="sv-sub-empty">Немає активних замовлень</p>
+                {% endif %}
+              </div>
+
+              <!-- Incoming POs -->
+              <div class="sv-detail-section">
+                <h4>📦 Очікуваний прихід (відкриті PO)</h4>
+                {% if row.po_detail %}
+                <table class="sv-sub-table">
+                  <tr>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ПОСТАЧАЛЬНИК</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">PO</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">ЗАЛИШОК</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ДАТА ПРИХОДУ</td>
+                    <td></td>
+                  </tr>
+                  {% for inc in row.po_detail %}
+                  <tr>
+                    <td style="font-weight:600">{{ inc.supplier|truncatechars:25 }}</td>
+                    <td style="font-family:monospace;font-size:11px">
+                      <a href="/admin/inventory/purchaseorder/{{ inc.po_pk }}/change/"
+                         style="color:var(--link-fg);text-decoration:none" target="_blank">
+                        {{ inc.po_str }}</a>
+                    </td>
+                    <td style="text-align:right;font-weight:700;color:#66bb6a">+{{ inc.qty|floatformat:"0" }}</td>
+                    <td style="font-size:11px">
+                      {% if inc.expected_date %}
+                        <span style="color:#ffb300">📅 {{ inc.expected_date|date:"d.m.Y" }}</span>
+                      {% else %}
+                        <span style="color:var(--text-dim)">—</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <a href="/admin/inventory/purchaseorder/{{ inc.po_pk }}/change/"
+                         class="sv-btn sv-btn-rx" style="font-size:10px;padding:2px 7px"
+                         target="_blank">✓ Отримати</a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </table>
+                {% else %}
+                <p class="sv-sub-empty">Немає відкритих замовлень</p>
+                {% endif %}
+              </div>
+
+            </div><!-- grid -->
+          </div>
+        </td>
+      </tr>
+
+    {% endwith %}
     {% endfor %}
     </tbody>
   </table>
+  </div><!-- sv-table-wrap -->
 
-  {% else %}
-  <div class="sp-empty">
-    ✅ Немає активних резервацій та відкритих замовлень на закупівлю
+  <div id="sv-no-results" style="display:none" class="sv-empty">
+    🔍 Нічого не знайдено
   </div>
+
+  {% endwith %}
+  {% else %}
+  <div class="sv-empty">✅ Немає активних товарів на складі</div>
   {% endif %}
 
 </div>
+
+<script>
+(function() {
+  /* ── Counts for chips ── */
+  var rows = document.querySelectorAll('.sv-main-row');
+  var cntEmpty = 0, cntCrit = 0, cntRes = 0, cntInc = 0;
+  rows.forEach(function(r) {
+    var stock    = parseFloat(r.dataset.stock    || 0);
+    var reorder  = parseFloat(r.dataset.reorder  || 0);
+    var reserved = parseFloat(r.dataset.reserved || 0);
+    var incoming = parseFloat(r.dataset.incoming || 0);
+    if (stock <= 0)                            cntEmpty++;
+    if (stock <= reorder && reorder > 0)       cntCrit++;
+    if (reserved > 0)                          cntRes++;
+    if (incoming > 0)                          cntInc++;
+  });
+  document.getElementById('cnt-empty').textContent = cntEmpty;
+  document.getElementById('cnt-crit').textContent  = cntCrit;
+  document.getElementById('cnt-res').textContent   = cntRes;
+  document.getElementById('cnt-inc').textContent   = cntInc;
+
+  /* ── Filter ── */
+  var activeFilter = 'all';
+  var activeSearch = '';
+
+  window.svFilter = function(f, btn) {
+    activeFilter = f;
+    document.querySelectorAll('.sv-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    applyVisibility();
+  };
+
+  window.svSearch = function(q) {
+    activeSearch = q.toLowerCase().trim();
+    applyVisibility();
+  };
+
+  function rowMatches(r) {
+    var stock    = parseFloat(r.dataset.stock    || 0);
+    var reorder  = parseFloat(r.dataset.reorder  || 0);
+    var reserved = parseFloat(r.dataset.reserved || 0);
+    var incoming = parseFloat(r.dataset.incoming || 0);
+
+    var filterOk = true;
+    if      (activeFilter === 'empty')    filterOk = stock <= 0;
+    else if (activeFilter === 'critical') filterOk = stock <= reorder && reorder > 0;
+    else if (activeFilter === 'reserved') filterOk = reserved > 0;
+    else if (activeFilter === 'incoming') filterOk = incoming > 0;
+
+    var searchOk = true;
+    if (activeSearch) {
+      searchOk = (r.dataset.sku || '').indexOf(activeSearch) !== -1 ||
+                 (r.dataset.name || '').indexOf(activeSearch) !== -1 ||
+                 (r.dataset.cat || '').indexOf(activeSearch) !== -1;
+    }
+    return filterOk && searchOk;
+  }
+
+  function applyVisibility() {
+    var anyVisible = false;
+    rows.forEach(function(r) {
+      var pk = r.dataset.pk;
+      var detRow = pk ? document.getElementById('det-' + pk) : null;
+      var show = rowMatches(r);
+      r.style.display = show ? '' : 'none';
+      if (detRow) { detRow.style.display = 'none'; detRow.classList.remove('open'); }
+      var btn = pk ? document.getElementById('exp-' + pk) : null;
+      if (btn) btn.classList.remove('open');
+      if (show) anyVisible = true;
+    });
+    var noRes = document.getElementById('sv-no-results');
+    if (noRes) noRes.style.display = anyVisible ? 'none' : 'block';
+  }
+
+  /* ── Expand / collapse detail ── */
+  window.svToggleDetail = function(pk, row) {
+    var det = document.getElementById('det-' + pk);
+    var btn = document.getElementById('exp-' + pk);
+    if (!det) return;
+    var open = det.classList.toggle('open');
+    if (btn) btn.classList.toggle('open', open);
+  };
+
+  /* ── Sort ── */
+  var sortCol = 'sku', sortDir = 1;
+  window.svSort = function(col) {
+    if (sortCol === col) sortDir = -sortDir;
+    else { sortCol = col; sortDir = 1; }
+    document.querySelectorAll('.sv-table th').forEach(function(th) {
+      th.classList.remove('sort-asc','sort-desc');
+    });
+    // Update tbody order
+    var tbody = document.getElementById('sv-tbody');
+    var allRows = [];
+    var mainRows = Array.from(tbody.querySelectorAll('tr.sv-main-row'));
+    mainRows.forEach(function(mr) {
+      var det = mr.nextElementSibling;
+      allRows.push({main: mr, det: det && det.classList.contains('sv-detail-row') ? det : null});
+    });
+    allRows.sort(function(a, b) {
+      var av = getSortVal(a.main, col);
+      var bv = getSortVal(b.main, col);
+      if (av < bv) return -sortDir;
+      if (av > bv) return sortDir;
+      return 0;
+    });
+    allRows.forEach(function(pair) {
+      tbody.appendChild(pair.main);
+      if (pair.det) tbody.appendChild(pair.det);
+    });
+  };
+
+  function getSortVal(row, col) {
+    if (col === 'sku')      return (row.dataset.sku || '');
+    if (col === 'cat')      return (row.dataset.cat || '');
+    if (col === 'stock')    return parseFloat(row.dataset.stock    || 0);
+    if (col === 'reserved') return parseFloat(row.dataset.reserved || 0);
+    if (col === 'avail')    return parseFloat(row.dataset.avail    || 0);
+    if (col === 'incoming') return parseFloat(row.dataset.incoming || 0);
+    return 0;
+  }
+})();
+</script>
 {% endblock %}

@@ -153,73 +153,79 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         ] + super().get_urls()
 
     def supply_view(self, request):
-        """Огляд резервацій та очікуваного приходу по товарах."""
+        """Повний огляд складу: залишки, резерви, прихід, остання операція."""
         from django.shortcuts import render
-        from django.db.models import Sum, Q
+        from django.db.models import Sum, Max
         from collections import defaultdict
 
         DONE_STATUSES = {'shipped', 'delivered', 'cancelled'}
+        PO_ACTIVE = ['draft', 'ordered', 'partial']
 
-        try:
-            from sales.models import SalesOrderLine
-            pending_lines = list(
-                SalesOrderLine.objects
-                .filter(product__is_active=True, order__affects_stock=True)
-                .exclude(order__status__in=DONE_STATUSES)
-                .select_related('product', 'order')
-                .order_by('product__sku', 'order__order_date')
-            )
-        except Exception:
-            pending_lines = []
-
-        po_lines = list(
-            PurchaseOrderLine.objects
-            .filter(product__is_active=True,
-                    purchase_order__status__in=['draft', 'ordered', 'partial'])
-            .select_related('product', 'purchase_order', 'purchase_order__supplier')
-            .order_by('product__sku', 'purchase_order__expected_date')
+        # All active products
+        products = list(
+            Product.objects.filter(is_active=True)
+            .select_related('category')
+            .order_by('sku')
         )
-
-        product_pks = set()
-        product_pks.update(l.product_id for l in pending_lines)
-        product_pks.update(l.product_id for l in po_lines)
-
-        stock_map = {}
-        if product_pks:
-            for s in (InventoryTransaction.objects
-                      .filter(product_id__in=product_pks)
-                      .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
-                      .values('product_id').annotate(t=Sum('qty'))):
-                stock_map[s['product_id']] = float(s['t'] or 0)
-
-        data = {}  # pk → {product, stock, reservations, incoming}
-
-        for l in pending_lines:
-            pk = l.product_id
-            if pk not in data:
-                data[pk] = {'product': l.product, 'stock': stock_map.get(pk, 0),
-                            'reservations': [], 'incoming': []}
-            o = l.order
-            data[pk]['reservations'].append({
-                'order_number': o.order_number,
-                'order_pk':     o.pk,
-                'qty':          float(l.qty),
-                'client':       o.client or o.ship_name or o.email or f'#{o.order_number}',
-                'status':       o.get_status_display(),
-                'status_raw':   o.status,
-                'order_date':   o.order_date,
+        if not products:
+            return render(request, 'admin/inventory/reorderproxy/supply.html', {
+                **self.admin_site.each_context(request),
+                'title': 'Склад — огляд залишків та руху',
+                'subtitle': None,
+                'rows': [],
+                'opts': ReorderProxy._meta,
             })
 
-        for l in po_lines:
-            pk = l.product_id
+        product_pks = [p.pk for p in products]
+
+        # Stock map
+        stock_map = defaultdict(float)
+        for s in (InventoryTransaction.objects
+                  .filter(product_id__in=product_pks)
+                  .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
+                  .values('product_id').annotate(t=Sum('qty'))):
+            stock_map[s['product_id']] = float(s['t'] or 0)
+
+        # Reserved qty + details
+        reserved_map = defaultdict(float)
+        reservations_detail = defaultdict(list)
+        try:
+            from sales.models import SalesOrderLine
+            for l in (SalesOrderLine.objects
+                      .filter(product_id__in=product_pks, order__affects_stock=True)
+                      .exclude(order__status__in=DONE_STATUSES)
+                      .select_related('order')
+                      .order_by('product_id', 'order__order_date')):
+                pk = l.product_id
+                reserved_map[pk] += float(l.qty)
+                o = l.order
+                reservations_detail[pk].append({
+                    'order_number': o.order_number,
+                    'order_pk':     o.pk,
+                    'qty':          float(l.qty),
+                    'client':       o.client or o.ship_name or o.email or f'#{o.order_number}',
+                    'status':       o.get_status_display(),
+                    'status_raw':   o.status,
+                    'order_date':   o.order_date,
+                })
+        except Exception:
+            pass
+
+        # Incoming PO qty + details
+        incoming_map = defaultdict(float)
+        incoming_detail = defaultdict(list)
+        for l in (PurchaseOrderLine.objects
+                  .filter(product_id__in=product_pks,
+                          purchase_order__status__in=PO_ACTIVE)
+                  .select_related('purchase_order', 'purchase_order__supplier')
+                  .order_by('product_id', 'purchase_order__expected_date')):
             remaining = float(l.qty_ordered) - float(l.qty_received)
             if remaining <= 0:
                 continue
-            if pk not in data:
-                data[pk] = {'product': l.product, 'stock': stock_map.get(pk, 0),
-                            'reservations': [], 'incoming': []}
+            pk = l.product_id
+            incoming_map[pk] += remaining
             po = l.purchase_order
-            data[pk]['incoming'].append({
+            incoming_detail[pk].append({
                 'po_pk':         po.pk,
                 'po_str':        str(po),
                 'supplier':      str(po.supplier) if po.supplier_id else '—',
@@ -227,17 +233,43 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'expected_date': po.expected_date,
             })
 
-        rows = sorted(
-            [v for v in data.values() if v['product']],
-            key=lambda x: x['product'].sku,
+        # Last transaction per product (by max id = most recently recorded)
+        last_id_map = dict(
+            InventoryTransaction.objects.filter(product_id__in=product_pks)
+            .values('product_id').annotate(lid=Max('id'))
+            .values_list('product_id', 'lid')
         )
+        last_tx_map = {}
+        if last_id_map:
+            for tx in InventoryTransaction.objects.filter(
+                id__in=last_id_map.values()
+            ).values('product_id', 'tx_type', 'qty', 'tx_date', 'ref_doc'):
+                last_tx_map[tx['product_id']] = tx
+
+        # Build rows (all products)
+        rows = []
+        for p in products:
+            pk = p.pk
+            stock    = stock_map[pk]
+            reserved = reserved_map[pk]
+            incoming = incoming_map[pk]
+            rows.append({
+                'product':      p,
+                'stock':        stock,
+                'reserved':     reserved,
+                'net_avail':    stock - reserved,
+                'incoming':     incoming,
+                'last_tx':      last_tx_map.get(pk),
+                'reservations': reservations_detail[pk],
+                'po_detail':    incoming_detail[pk],
+            })
 
         context = {
             **self.admin_site.each_context(request),
-            'title':   'Резервації та прихід товарів',
+            'title':    'Склад — огляд залишків та руху',
             'subtitle': None,
-            'rows':    rows,
-            'opts':    ReorderProxy._meta,
+            'rows':     rows,
+            'opts':     ReorderProxy._meta,
         }
         return render(request, 'admin/inventory/reorderproxy/supply.html', context)
 
