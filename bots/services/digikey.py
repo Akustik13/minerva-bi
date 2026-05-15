@@ -45,24 +45,15 @@ def _status_can_advance(current: str, new: str) -> bool:
     return _STATUS_PRIORITY.get(new, 0) > _STATUS_PRIORITY.get(current, 0)
 
 
-def _carrier_has_priority(sale) -> bool:
-    """
-    Returns True if ShippingSettings.status_conflict_priority == 'carrier'
-    AND the order has at least one active (non-delivered) shipment.
-    In that case the marketplace should NOT override with 'delivered'.
-    """
+def _config_sync_status() -> bool:
+    """Return True if DigiKeyConfig.sync_order_status is enabled."""
     try:
-        from shipping.models import ShippingSettings
-        cfg = ShippingSettings.get()
-        if cfg.status_conflict_priority != "carrier":
-            return False
-        from shipping.models import Shipment
-        return Shipment.objects.filter(
-            order=sale,
-            status__in=["submitted", "label_ready", "in_transit"],
-        ).exists()
+        from bots.models import DigiKeyConfig
+        return DigiKeyConfig.objects.filter(pk=1).values_list(
+            "sync_order_status", flat=True
+        ).first() or False
     except Exception:
-        return False
+        return True  # safe default: allow status sync
 
 
 # ── DigiKey order status → Minerva status ────────────────────────────────────
@@ -374,16 +365,12 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
         stats["created"] += 1
         _create_lines(sale, so, so_currency, stats)
     else:
-        # Only advance status (never downgrade: DigiKey may lag behind our shipment)
-        if _status_can_advance(sale.status, minerva_status):
-            # Check conflict priority: if "carrier" mode and order has active shipment
-            # (not delivered), do NOT let marketplace override with "delivered"
-            if minerva_status == "delivered" and _carrier_has_priority(sale):
-                stats["skipped"] += 1
-            else:
-                sale.status = minerva_status
-                sale.save(update_fields=["status"])
-                stats["updated"] += 1
+        # Respect sync_order_status flag: if disabled, never touch status
+        config_allows_status = _config_sync_status()
+        if config_allows_status and _status_can_advance(sale.status, minerva_status):
+            sale.status = minerva_status
+            sale.save(update_fields=["status"])
+            stats["updated"] += 1
         else:
             stats["skipped"] += 1
 

@@ -39,6 +39,15 @@ class DigiKeyConfig(models.Model):
         "Інтервал синхронізації (хвилин)", default=30,
         help_text="Рекомендовано: 15–60 хв"
     )
+    sync_order_status = models.BooleanField(
+        "Оновлювати статус замовлення при синхронізації", default=True,
+        help_text=(
+            "Якщо увімкнено — статус замовлення оновлюється зі статусу DigiKey "
+            "(тільки якщо новий статус вищий за поточний). "
+            "Вимкніть якщо статус керується трекінгом перевізника (UPS/DHL) "
+            "або виставляється вручну."
+        ),
+    )
     use_sandbox = models.BooleanField(
         "Sandbox режим (тестовий)", default=True,
         help_text="sandbox-api.digikey.com — для тестування без реальних замовлень"

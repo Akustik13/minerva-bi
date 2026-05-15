@@ -135,8 +135,14 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         ("⏰ Синхронізація", {
             "fields": (
                 "sync_enabled", "sync_interval_minutes", "use_sandbox",
+                "sync_order_status",
                 "auto_confirm_mode",
                 "last_synced_at",
+            ),
+            "description": (
+                "<b>Оновлювати статус замовлення:</b> вимкніть якщо статус "
+                "керується трекінгом перевізника (UPS/DHL) або виставляється вручну. "
+                "Зазвичай вмикають поки трекінг-номер ще не отримано."
             ),
         }),
         ("🔌 Дії", {
