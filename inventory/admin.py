@@ -1476,10 +1476,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             'Reserved':   ('🔒', 'orange', 'Резерв'),
         }
         rows = []
-        running = 0.0
-        for tx in reversed(txs):   # chronological for running total
-            running += float(tx.qty)
-        running_total = running
+        # Actual current stock = sum of ALL transactions for this product
+        # (not just the displayed 500 — avoids wrong balance when older txs exist)
+        from django.db.models import Sum as _SumQty
+        _actual = (InventoryTransaction.objects
+                   .filter(product=obj)
+                   .aggregate(s=_SumQty('qty'))['s'])
+        running_total = float(_actual or 0)
 
         # Re-iterate in display order (newest first) with running balance
         balance = running_total
@@ -2060,14 +2063,6 @@ class PurchaseOrderLineInline(admin.TabularInline):
     fields = ("product", "description", "qty_ordered",
               "qty_received", "unit_price", "currency", "notes")
 
-    def get_readonly_fields(self, request, obj=None):
-        ro = list(super().get_readonly_fields(request, obj))
-        # qty_received is editable only when PO is already partial or received
-        if obj is None or obj.status not in ('partial', 'received'):
-            if 'qty_received' not in ro:
-                ro.append('qty_received')
-        return ro
-
     def get_extra(self, request, obj=None, **kwargs):
         if obj is None and request.GET.get('product'):
             return 1
@@ -2127,6 +2122,9 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
     inlines       = (PurchaseOrderLineInline,)
     readonly_fields = ("code", "created_at")
     preserve_filters = True
+
+    class Media:
+        js = ('admin/js/po_qty_received.js',)
 
     def get_changeform_initial_data(self, request):
         initial = super().get_changeform_initial_data(request)

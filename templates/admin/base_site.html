@@ -447,6 +447,14 @@
 }
 .mg-group.collapsed .mg-arrow   { transform: rotate(-90deg); }
 .mg-group.collapsed .mg-content { display: none; }
+.mg-arrow-btn {
+  background: none; border: none; cursor: pointer; padding: 3px 5px;
+  color: var(--sb-arrow); flex-shrink: 0;
+  font-size: 9px; line-height: 1; border-radius: 3px;
+  transition: color .15s, background .15s;
+}
+.mg-arrow-btn:hover { color: var(--sb-text-muted); background: var(--sb-link-hover-bg); }
+.mg-group.collapsed .mg-arrow-btn { transform: rotate(-90deg); }
 
 /* ── Group header link (for groups with single href) ── */
 .mg-header-link {
@@ -853,6 +861,88 @@
 <script>window.MV_HAS_CUSTOM_THEME = true;</script>
 {% endif %}
 
+<script>
+/* ── MV_GROUPS: global navigation definition ── */
+window.MV_GROUPS = [
+  { id:'analytics', icon:'📊', label:'📊 Аналітика', href:'/dashboard/',
+    links:[
+      { href:'/dashboard/',           icon:'📊', label:'Дашборд' },
+      { href:'/dashboard/signals/',   icon:'🚨', label:'Сигнали', id:'signals-link' },
+      { href:'/dashboard/trends/',    icon:'📈', label:'Тенденції' },
+      { href:'/dashboard/analytics/', icon:'🔍', label:'Аналітика' },
+    ], apps:[] },
+  { id:'crm', icon:'👥', label:'👥 CRM',
+    links:[
+      { href:'/admin/crm/customer/',                 icon:'👤', label:'Клієнти',    app:'crm',      model:'Customer' },
+      { href:'/admin/strategy/customerstrategy/',    icon:'🎯', label:'Стратегії',  app:'strategy', model:'CustomerStrategy' },
+      { href:'/admin/strategy/strategytemplate/',    icon:'📋', label:'Шаблони',    app:'strategy', model:'StrategyTemplate' },
+    ], apps:['crm','strategy'] },
+  { id:'sales', icon:'🛒', label:'🛒 Продажі', apps:['sales'] },
+  { id:'accounting', icon:'💰', label:'💰 Бухгалтерія', apps:['accounting'] },
+  { id:'shipping', icon:'🚚', label:'🚚 Доставка',
+    links:[
+      { href:'/admin/shipping/shipment/',                  icon:'📦', label:'Відправлення',     app:'shipping', model:'Shipment' },
+      { href:'/admin/shipping/shipment/create/blank/',     icon:'✉️', label:'Нове відправлення', app:'shipping' },
+      { href:'/admin/shipping/addressbook/',               icon:'📖', label:'Адресна книга',     app:'shipping' },
+      { href:'/admin/shipping/shipment/add-tracking/',     icon:'📡', label:'Додати трекінг',    app:'shipping' },
+      { href:'/admin/shipping/carrier/',                   icon:'🚛', label:'Перевізники',       app:'shipping', model:'Carrier' },
+    ], apps:['shipping'] },
+  { id:'inventory', icon:'📦', label:'📦 Склад',
+    links:[
+      { href:'/admin/inventory/product/',                  icon:'🔩', label:'Товари',            app:'inventory', model:'Product' },
+      { href:'/admin/inventory/reorderproxy/supply/',      icon:'📋', label:'Огляд складу',      app:'inventory' },
+      { href:'/admin/inventory/inventorytransaction/',     icon:'↕️', label:'Транзакції',         app:'inventory', model:'InventoryTransaction' },
+      { href:'/admin/inventory/purchaseorder/',            icon:'🗒️', label:'Закупівлі (PO)',    app:'inventory', model:'PurchaseOrder' },
+      { href:'/admin/inventory/incomingshipment/',         icon:'🚢', label:'Трекінг приходу',   app:'inventory' },
+      { href:'/admin/inventory/supplier/',                 icon:'🏭', label:'Постачальники',      app:'inventory', model:'Supplier' },
+      { href:'/admin/inventory/inventorysettings/',        icon:'⚙️', label:'Налаштування',       app:'inventory' },
+    ], apps:['inventory'] },
+  { id:'tasks', icon:'✅', label:'✅ Задачі', apps:['tasks'] },
+  { id:'ai', icon:'🏛️', label:'🏛️ Minerva AI', href:'/dashboard/ai/',
+    links:[
+      { href:'/ai/',                                       icon:'💬', label:'WebChat',            app:'ai_assistant' },
+      { href:'/admin/ai_assistant/aiconversation/',        icon:'📜', label:'Розмови',            app:'ai_assistant', model:'AIConversation' },
+      { href:'/admin/ai_assistant/aibudgetlog/',           icon:'💰', label:'Бюджет AI',          app:'ai_assistant', model:'AIBudgetLog' },
+      { href:'/admin/strategy/aisettings/',                icon:'⚙️', label:'Налаштування AI',    app:'strategy',     model:'AISettings' },
+      { href:'/ai/diagnostic/',                            icon:'🔧', label:'Діагностика',        app:'ai_assistant' },
+    ], apps:['ai_assistant'] },
+  { id:'email', icon:'📧', label:'📧 Email', href:'/email/',
+    links:[
+      { href:'/email/',                                         icon:'📥', label:'Вхідні',        app:'email_assistant' },
+      { href:'/email/compose/',                                 icon:'✏️', label:'Написати',      app:'email_assistant' },
+      { href:'/admin/email_assistant/emailaccount/',            icon:'⚙️', label:'Акаунти',       app:'email_assistant', model:'EmailAccount' },
+      { href:'/admin/email_assistant/scheduledemail/',          icon:'⏳', label:'Заплановані',   app:'email_assistant', model:'ScheduledEmail' },
+    ], apps:['email_assistant'] },
+  { id:'calendar', icon:'📅', label:'📅 Календар', href:'/calendar/',
+    links:[
+      { href:'/calendar/',                                      icon:'📅', label:'Мій календар',  app:'calendar_app' },
+      { href:'/admin/calendar_app/calendarevent/add/',          icon:'➕', label:'Нова подія',     app:'calendar_app', model:'CalendarEvent' },
+      { href:'/calendar/settings/',                             icon:'🔔', label:'Сповіщення',    app:'calendar_app' },
+    ], apps:['calendar_app'] },
+  { id:'bots', icon:'🤖', label:'🤖 Боти та API', href:'/dashboard/bots/', apps:['bots','api'] },
+  { id:'system', icon:'⚙️', label:'⚙️ Система', href:'/dashboard/system/',
+    links:[
+      { href:'/admin/config/integrations/',          icon:'🔌', label:'Інтеграції',          app:'config' },
+      { href:'/admin/autoimport/autoimportprofile/', icon:'🔄', label:'Авто-імпорт',         app:'autoimport' },
+      { href:'/dashboard/import/',                   icon:'📥', label:'Імпорт даних',        app:'config' },
+      { href:'/dashboard/help/',                     icon:'📖', label:'Довідник',            app:'config' },
+      { href:'/core/my-settings/',                   icon:'👤', label:'Мої налаштування' },
+      { href:'/admin/backup/',                       icon:'💾', label:'Резервні копії',      app:'backup' },
+      { href:'/admin/auth/user/',                    icon:'👥', label:'Користувачі',         app:'auth', model:'User' },
+    ], apps:['autoimport','config','backup','auth'] },
+  { id:'security', icon:'🔐', label:'🔐 Безпека',
+    links:[
+      { href:'/admin/core/auditlog/',        icon:'📋', label:'Журнал аудиту',     app:'core', model:'AuditLog' },
+      { href:'/admin/core/userprofile/',     icon:'👤', label:'Ролі користувачів', app:'core', model:'UserProfile' },
+      { href:'/admin/core/moduleregistry/',  icon:'🧩', label:'Реєстр модулів',    app:'core', model:'ModuleRegistry' },
+    ], apps:['core'] },
+  { id:'vendor', icon:'🏢', label:'🏢 Вендор', adminOnly:true,
+    links:[
+      { href:'/admin/core/tenantaccount/', icon:'👥', label:'Клієнти системи' },
+    ], apps:[] },
+];
+</script>
+
 <button id="mob-menu-btn" aria-label="Меню">☰</button>
 <div id="sidebar-overlay"></div>
 <div id="mtip-float"></div>
@@ -980,99 +1070,7 @@ document.addEventListener('DOMContentLoaded', function(){
     return true;
   }
 
-  var GROUPS = [
-    {
-      id: 'analytics', label: '📊 Аналітика',
-      href: '/dashboard/',
-      links: [
-        { href: '/dashboard/signals/', label: '🚨 Сигнали',          id: 'signals-link' },
-        { href: '/dashboard/trends/',  label: '📈 Тенденції',         id: 'trends-link' },
-        { href: '/core/my-settings/',  label: '⚙️ Мої налаштування' },
-      ],
-      apps: []
-    },
-    {
-      id: 'crm', label: '👥 CRM',
-      apps: ['crm', 'strategy'],
-      links: [
-        { href: '/admin/crm/customer/',                  label: '👤 Клієнти',   app: 'crm',      model: 'Customer' },
-        { href: '/admin/strategy/customerstrategy/',     label: '🎯 Стратегії', app: 'strategy', model: 'CustomerStrategy' },
-        { href: '/admin/strategy/strategytemplate/',     label: '📋 Шаблони',   app: 'strategy', model: 'StrategyTemplate' },
-      ],
-    },
-    { id: 'sales',      label: '🛒 Продажі',      apps: ['sales'] },
-    { id: 'accounting', label: '💰 Бухгалтерія',  apps: ['accounting'] },
-    { id: 'shipping',   label: '🚚 Доставка',     apps: ['shipping'],
-      links: [
-        { href: '/admin/shipping/shipment/create/blank/', label: '✉️ Нове відправлення', app: 'shipping' },
-        { href: '/admin/shipping/addressbook/',           label: '📖 Адресна книга',      app: 'shipping' },
-        { href: '/admin/shipping/shipment/add-tracking/', label: '📦 Додати трекінг',     app: 'shipping' },
-      ]
-    },
-    { id: 'inventory',  label: '📦 Склад',        apps: ['inventory'],
-      links: [
-        { href: '/admin/inventory/reorderproxy/supply/', label: '📋 Огляд складу',        app: 'inventory' },
-        { href: '/admin/inventory/incomingshipment/',    label: '🚢 Трекінг приходу',     app: 'inventory' },
-        { href: '/admin/inventory/inventorysettings/',   label: '⚙️ Налаштування складу', app: 'inventory' },
-      ]
-    },
-    { id: 'tasks',      label: '📋 Задачі',       apps: ['tasks'] },
-    { id: 'ai',         label: '🏛️ Minerva AI',   href: '/dashboard/ai/',   apps: ['ai_assistant'],
-      links: [
-        { href: '/dashboard/ai/',                        label: '🏛️ Огляд AI',          app: 'ai_assistant' },
-        { href: '/ai/',                                  label: '💬 WebChat',            app: 'ai_assistant' },
-        { href: '/admin/ai_assistant/aiconversation/',   label: '📜 Розмови',           app: 'ai_assistant', model: 'AIConversation' },
-        { href: '/admin/ai_assistant/aibudgetlog/',      label: '💰 Бюджет',            app: 'ai_assistant', model: 'AIBudgetLog' },
-        { href: '/admin/strategy/aisettings/',           label: '⚙️ Налаштування AI',   app: 'strategy',     model: 'AISettings' },
-        { href: '/ai/diagnostic/',                       label: '🔧 Діагностика',       app: 'ai_assistant' },
-      ]
-    },
-    { id: 'email', label: '📧 Email', href: '/email/', apps: ['email_assistant'],
-      links: [
-        { href: '/email/',          label: '📥 Вхідні',   app: 'email_assistant' },
-        { href: '/email/compose/',  label: '✏️ Написати', app: 'email_assistant' },
-        { href: '/admin/email_assistant/emailaccount/', label: '⚙️ Акаунти',          app: 'email_assistant', model: 'EmailAccount' },
-        { href: '/admin/email_assistant/scheduledemail/', label: '⏳ Заплановані',     app: 'email_assistant', model: 'ScheduledEmail' },
-      ]
-    },
-    { id: 'calendar', label: '📅 Календар', href: '/calendar/', apps: ['calendar_app'],
-      links: [
-        { href: '/calendar/',                                label: '📅 Мій календар',  app: 'calendar_app' },
-        { href: '/admin/calendar_app/calendarevent/add/',    label: '+ Нова подія',     app: 'calendar_app', model: 'CalendarEvent' },
-        { href: '/calendar/settings/',                       label: '🔔 Сповіщення',    app: 'calendar_app' },
-      ]
-    },
-    { id: 'bots',       label: '🧠 Боти та APIs',  href: '/dashboard/bots/', apps: ['bots', 'api'] },
-    {
-      id: 'system', label: '⚙️ Система',
-      href: '/dashboard/system/',
-      links: [
-        { href: '/admin/config/integrations/',          label: '🔌 Інтеграції',   app: 'config' },
-        { href: '/admin/autoimport/autoimportprofile/', label: '🔄 Авто-імпорт',  app: 'autoimport' },
-        { href: '/dashboard/import/',                   label: '📥 Імпорт даних', app: 'config' },
-        { href: '/dashboard/help/',                     label: '📖 Довідник',     app: 'config' },
-      ],
-      apps: ['autoimport', 'config', 'backup', 'auth']
-    },
-    {
-      id: 'security', label: '🔐 Безпека',
-      links: [
-        { href: '/admin/core/auditlog/',       label: '📋 Журнал аудиту',     app: 'core', model: 'AuditLog' },
-        { href: '/admin/core/userprofile/',    label: '👤 Ролі користувачів', app: 'core', model: 'UserProfile' },
-        { href: '/admin/core/moduleregistry/', label: '🧩 Реєстр модулів',    app: 'core', model: 'ModuleRegistry' },
-      ],
-      apps: ['core']
-    },
-    {
-      id: 'vendor', label: '🏢 Вендор',
-      adminOnly: true,
-      links: [
-        { href: '/admin/core/tenantaccount/', label: '👥 Клієнти системи' },
-        { href: '/admin/core/auditlog/',      label: '📋 Журнал аудиту' },
-      ],
-      apps: []
-    },
-  ];
+  var GROUPS = window.MV_GROUPS;
 
   /* Sort GROUPS by saved order */
   var _savedOrder = _loadOrder();
@@ -1216,28 +1214,24 @@ document.addEventListener('DOMContentLoaded', function(){
     var hdr = document.createElement('div');
     hdr.className = 'mg-header';
 
-    var labelHtml = grp.label;
-    if (grp.href) {
-      labelHtml = '<a href="' + grp.href + '" class="mg-header-link">' + grp.label + '</a>';
-    } else if (!linksToShow.length && appsFound.length === 1) {
-      var capLink = mods[appsFound[0]].querySelector('caption a');
-      if (capLink) {
-        labelHtml = '<a href="' + capLink.href + '" class="mg-header-link">' + grp.label + '</a>';
-        var innerCap = mods[appsFound[0]].querySelector('caption');
-        if (innerCap) innerCap.style.display = 'none';
-      }
-    }
+    // Label always navigates to home launchpad with ?g=<id> filter
+    var navHref = grp.href ? grp.href : ('/admin/?g=' + grp.id);
+    var labelHtml = '<a href="' + navHref + '" class="mg-header-link">' + grp.label + '</a>';
 
     hdr.innerHTML =
       '<span class="mg-handle" title="Перетягнути">⠿</span>' +
       '<span class="mg-label">' + labelHtml + '</span>' +
-      '<span class="mg-arrow">▼</span>';
+      '<button class="mg-arrow mg-arrow-btn" title="Розгорнути/Згорнути">▼</button>';
 
-    hdr.addEventListener('click', function(e){
-      if (e.target.closest('.mg-header-link')) return;
-      if (e.target.closest('.mg-handle')) return;
+    // Arrow button only toggles collapse (not the whole header)
+    hdr.querySelector('.mg-arrow-btn').addEventListener('click', function(e){
+      e.preventDefault(); e.stopPropagation();
       var c = group.classList.toggle('collapsed');
       localStorage.setItem('mg-' + grp.id, c ? '1' : '0');
+    });
+    // Clicking the handle doesn't navigate
+    hdr.addEventListener('click', function(e){
+      if (e.target.closest('.mg-handle')) return;
     });
     group.appendChild(hdr);
 
@@ -1254,12 +1248,15 @@ document.addEventListener('DOMContentLoaded', function(){
       content.appendChild(a);
     });
 
-    appsFound.forEach(function(name){
-      var modEl = mods[name];
-      if (!modEl) return;  // not rendered on non-admin pages — skip
-      if (appsFound.length > 1) makeModCollapsible(modEl);
-      content.appendChild(modEl);
-    });
+    // Only show full app modules in sidebar if no curated links (avoids duplicates)
+    if (!linksToShow.length) {
+      appsFound.forEach(function(name){
+        var modEl = mods[name];
+        if (!modEl) return;
+        if (appsFound.length > 1) makeModCollapsible(modEl);
+        content.appendChild(modEl);
+      });
+    }
 
     group.appendChild(content);
     sidebar.appendChild(group);
@@ -1479,7 +1476,7 @@ document.addEventListener('DOMContentLoaded', function(){
     letter-spacing: 1.2px; text-transform: uppercase; display: block;
   }
 </style>
-<a href="/" class="minerva-brand">
+<a href="/admin/" class="minerva-brand">
   <span class="minerva-logo">🏛️</span>
   <span class="minerva-text">
     <span class="minerva-name">Minerva</span>
@@ -1945,4 +1942,32 @@ window.addEventListener('appinstalled', function() {
 })();
 </script>
 {% endif %}
+
+<script>
+/* ── Unsaved changes warning ── */
+(function(){
+  var _dirty = false;
+  document.addEventListener('DOMContentLoaded', function(){
+    var forms = document.querySelectorAll('#content-main form, #content form');
+    forms.forEach(function(form){
+      form.addEventListener('change', function(){ _dirty = true; });
+      form.addEventListener('input',  function(){ _dirty = true; });
+      form.addEventListener('submit', function(){ _dirty = false; });
+    });
+    /* Any save/continue/add-another button also clears the flag */
+    document.querySelectorAll(
+      '[name=_save],[name=_continue],[name=_addanother],[name=_saveasnew]'
+    ).forEach(function(btn){ btn.addEventListener('click', function(){ _dirty = false; }); });
+    /* Delete confirm links */
+    document.querySelectorAll('a.deletelink, .submit-row a[href*=delete]')
+      .forEach(function(a){ a.addEventListener('click', function(){ _dirty = false; }); });
+  });
+  window.addEventListener('beforeunload', function(e){
+    if (!_dirty) return;
+    e.preventDefault();
+    e.returnValue = 'Є незбережені зміни. Покинути сторінку?';
+    return e.returnValue;
+  });
+})();
+</script>
 {% endblock footer %}

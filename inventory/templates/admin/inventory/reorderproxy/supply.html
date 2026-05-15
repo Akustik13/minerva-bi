@@ -258,7 +258,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     {% endif %}
         <!-- expand -->
         <td>
-          <button class="sv-expand-btn" id="exp-{{ p.pk }}" title="Деталі та рухи" onclick="event.stopPropagation()">▶</button>
+          <button class="sv-expand-btn" id="exp-{{ p.pk }}" title="Деталі та рухи" onclick="event.stopPropagation();svToggleDetail({{ p.pk }})">▶</button>
         </td>
         <!-- SKU / Name -->
         <td>

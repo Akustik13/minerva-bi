@@ -1,310 +1,281 @@
 {% extends "admin/base_site.html" %}
 {% load i18n log %}
 
-{% block title %}Minerva — Панель управління{% endblock %}
+{% block title %}Minerva — Панель керування{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block content %}
 <style>
-/* ════════════════════════════════════════════════════════
-   Minerva Tile Dashboard  (SAP Fiori-inspired)
-   ════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════
+   SAP Fiori Launchpad — Minerva
+   ═══════════════════════════════════════════════════ */
 #content-main { max-width: none !important; }
 #content { padding-bottom: 0 !important; }
 
-.mv-dash { padding: 16px 20px 40px; }
+.lp-wrap { padding: 0 24px 48px; }
 
-/* ── Вітальний рядок ──────────────────────────────────── */
-.mv-welcome {
+/* ── Top bar ── */
+.lp-topbar {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 24px; padding-bottom: 14px;
-  border-bottom: 1px solid #1e2a35;
+  padding: 18px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
 }
-.mv-welcome-title {
-  font-size: 20px; font-weight: 700; color: #c9d8e4; margin: 0;
+.lp-title { font-size: 22px; font-weight: 700; color: var(--text); margin: 0; }
+.lp-sub { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+.lp-date { font-size: 12px; color: var(--text-dim); text-align: right; line-height: 1.5; }
+
+/* ── Section ── */
+.lp-section { margin-bottom: 32px; }
+.lp-section-hdr {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 12px; padding-bottom: 8px;
+  border-bottom: 2px solid var(--border-strong);
 }
-.mv-welcome-sub { font-size: 12px; color: #607d8b; margin-top: 2px; }
-.mv-welcome-date { font-size: 12px; color: #607d8b; text-align: right; }
-
-/* ── Секція ───────────────────────────────────────────── */
-.mv-section { margin-bottom: 24px; }
-
-.mv-section-hdr {
-  display: flex; align-items: center; gap: 8px;
-  margin: 0 0 10px; padding-bottom: 7px;
-  border-bottom: 2px solid var(--sec-accent, #2a4a6a);
-  font-size: 12px; font-weight: 700; color: #9aafbe;
-  letter-spacing: 0.04em; text-transform: uppercase;
+.lp-section-icon { font-size: 18px; line-height: 1; }
+.lp-section-label {
+  font-size: 13px; font-weight: 700; color: var(--text-muted);
+  letter-spacing: 0.05em; text-transform: uppercase; flex: 1;
 }
-.mv-section-hdr-icon { font-size: 15px; }
+.lp-section-link {
+  font-size: 11px; color: var(--link-fg); text-decoration: none;
+  padding: 3px 10px; border: 1px solid var(--border-2);
+  border-radius: 12px; transition: background .15s, color .15s;
+}
+.lp-section-link:hover { background: var(--accent-subtle); }
 
-/* ── Сітка плиток ─────────────────────────────────────── */
-.mv-grid {
+/* ── Tile grid ── */
+.lp-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(152px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 10px;
 }
 
-/* ── Плитка ───────────────────────────────────────────── */
-.mv-tile {
+/* ── Tile ── */
+.lp-tile {
   position: relative;
-  background: #1a2535;
-  border: 1px solid #243347;
-  border-top: 3px solid var(--tile-accent, #2a4a6a);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--lp-accent, var(--border-strong));
   border-radius: 8px;
-  padding: 13px 12px 11px;
+  padding: 14px 12px 12px;
   text-decoration: none !important;
   display: flex; flex-direction: column;
-  min-height: 95px;
-  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
-}
-.mv-tile:hover {
-  border-color: var(--tile-accent, #2196f3);
-  border-top-color: var(--tile-accent, #2196f3);
-  box-shadow: 0 6px 24px rgba(0,0,0,.45);
-  transform: translateY(-2px);
-  background: #1e2d40;
-}
-.mv-tile-icon { font-size: 20px; line-height: 1; margin-bottom: 7px; }
-.mv-tile-name {
-  font-size: 12.5px; font-weight: 600;
-  color: #c9d8e4; line-height: 1.35; flex: 1;
-}
-.mv-tile-sub { font-size: 10px; color: #607d8b; margin-top: 5px; }
-
-/* Кнопка "Додати" у куті плитки */
-.mv-tile-plus {
-  position: absolute; top: 8px; right: 8px;
-  width: 19px; height: 19px;
-  background: rgba(255,255,255,.07); border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
-  color: rgba(255,255,255,.25); font-size: 13px; line-height: 1;
+  min-height: 90px;
   cursor: pointer;
+  transition: border-color .15s, box-shadow .15s, transform .1s, background .15s;
+}
+.lp-tile:hover {
+  border-top-color: var(--lp-accent, var(--accent));
+  border-color: var(--lp-accent, var(--accent));
+  box-shadow: 0 4px 18px rgba(0,0,0,.35);
+  transform: translateY(-2px);
+  background: var(--bg-hover);
+}
+.lp-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
+.lp-tile-name {
+  font-size: 12px; font-weight: 600; color: var(--text);
+  line-height: 1.35; flex: 1;
+}
+.lp-tile-sub { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+
+/* ── Back button (for filtered view) ── */
+.lp-back {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px 6px 10px;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 20px; color: var(--text-muted); font-size: 12px;
+  font-weight: 600; text-decoration: none;
+  cursor: pointer; margin-bottom: 20px;
   transition: background .15s, color .15s;
 }
-.mv-tile-plus:hover {
-  background: var(--tile-accent, #2196f3);
-  color: #fff;
-}
+.lp-back:hover { background: var(--bg-hover); color: var(--text); }
 
-/* Аналітика плитки — трохи більші */
-.mv-tile-analytics {
-  min-height: 80px;
-  justify-content: center; align-items: flex-start;
-}
-
-/* ── Недавні дії ──────────────────────────────────────── */
-.mv-recent-grid {
+/* ── Recent activity ── */
+.lp-recent-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 8px;
 }
-.mv-recent-card {
-  background: #141f2b; border: 1px solid #1e2d3d;
+.lp-recent-card {
+  background: var(--bg-card-2); border: 1px solid var(--border);
   border-radius: 7px; padding: 9px 11px;
   display: flex; gap: 9px; align-items: flex-start;
 }
-.mv-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
-.mv-recent-body { min-width: 0; }
-.mv-recent-body a {
-  font-size: 12px; font-weight: 600;
-  color: #58a6ff; text-decoration: none;
+.lp-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
+.lp-recent-body { min-width: 0; }
+.lp-recent-body a {
+  font-size: 12px; font-weight: 600; color: var(--link-fg);
+  text-decoration: none; display: block;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.lp-recent-body a:hover { text-decoration: underline; }
+.lp-recent-obj {
+  font-size: 11px; color: var(--text-muted);
   display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.mv-recent-body a:hover { text-decoration: underline; }
-.mv-recent-obj {
-  font-size: 12px; color: #8aa0b0;
-  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.mv-recent-model { font-size: 10px; color: #3a5570; display: block; margin-top: 2px; }
+.lp-recent-model { font-size: 10px; color: var(--text-dim); display: block; margin-top: 2px; }
+.lp-empty { color: var(--text-dim); font-size: 13px; padding: 8px 0; }
 
-/* Порожній стан */
-.mv-empty { color: #607d8b; font-size: 13px; padding: 10px 0; }
+/* ── Group accent colors ── */
+.lp-accent-analytics { --lp-accent: #c9a84c; }
+.lp-accent-crm        { --lp-accent: #2196f3; }
+.lp-accent-sales      { --lp-accent: #4caf50; }
+.lp-accent-accounting { --lp-accent: #8bc34a; }
+.lp-accent-shipping   { --lp-accent: #00bcd4; }
+.lp-accent-inventory  { --lp-accent: #ff9800; }
+.lp-accent-tasks      { --lp-accent: #9c27b0; }
+.lp-accent-ai         { --lp-accent: #c9a84c; }
+.lp-accent-email      { --lp-accent: #e91e63; }
+.lp-accent-calendar   { --lp-accent: #3f51b5; }
+.lp-accent-bots       { --lp-accent: #00bcd4; }
+.lp-accent-system     { --lp-accent: #607d8b; }
+.lp-accent-security   { --lp-accent: #f44336; }
+.lp-accent-vendor     { --lp-accent: #795548; }
 </style>
 
-<div class="mv-dash">
-
-  <!-- ── Вітання ──────────────────────────────────────── -->
-  <div class="mv-welcome">
+<div class="lp-wrap" id="lp-wrap">
+  <div id="lp-topbar" class="lp-topbar">
     <div>
-      <h1 class="mv-welcome-title">🏛️ Minerva Business Intelligence</h1>
-      <div class="mv-welcome-sub">Система управління бізнесом</div>
+      <h1 class="lp-title" id="lp-title">🏛️ Minerva Business Intelligence</h1>
+      <div class="lp-sub" id="lp-sub">Система управління бізнесом</div>
     </div>
-    <div class="mv-welcome-date" id="mv-date"></div>
+    <div class="lp-date" id="lp-date"></div>
   </div>
-
-  <!-- ── Аналітика (фіксований блок) ─────────────────── -->
-  <section class="mv-section" style="--sec-accent:#c9a84c">
-    <h2 class="mv-section-hdr">
-      <span class="mv-section-hdr-icon">📊</span> Аналітика
-    </h2>
-    <div class="mv-grid">
-      <a href="/dashboard/" class="mv-tile mv-tile-analytics" style="--tile-accent:#c9a84c">
-        <span class="mv-tile-icon">📊</span>
-        <span class="mv-tile-name">Статистика</span>
-        <span class="mv-tile-sub">Продажі, KPI, графіки</span>
-      </a>
-      <a href="/dashboard/signals/" class="mv-tile mv-tile-analytics" style="--tile-accent:#f44336">
-        <span class="mv-tile-icon">🚨</span>
-        <span class="mv-tile-name">Сигнали</span>
-        <span class="mv-tile-sub">Попередження системи</span>
-      </a>
-    </div>
-  </section>
-
-  <!-- ── Блоки з app_list ──────────────────────────────── -->
-  {% if app_list %}
-    {% for app in app_list %}
-    <section class="mv-section" data-sec="{{ app.app_label }}">
-      <h2 class="mv-section-hdr">
-        <span class="mv-section-hdr-icon" data-sec-icon="{{ app.app_label }}"></span>
-        {{ app.name }}
-      </h2>
-      {% if app.models %}
-      <div class="mv-grid">
-        {% if app.app_label == 'bots' %}
-        <a href="/admin/bots/bot/ai-info/" class="mv-tile mv-tile-analytics" style="--tile-accent:#00bcd4">
-          <span class="mv-tile-icon">🧠</span>
-          <span class="mv-tile-name">AI (Штучний інтелект)</span>
-          <span class="mv-tile-sub">Плани та майбутні функції</span>
-        </a>
-        {% endif %}
-        {% if app.app_label == 'faq' %}
-        <a href="/dashboard/help/" class="mv-tile mv-tile-analytics" style="--tile-accent:#607d8b">
-          <span class="mv-tile-icon">📖</span>
-          <span class="mv-tile-name">Довідник</span>
-          <span class="mv-tile-sub">Документація системи</span>
-        </a>
-        {% endif %}
-        {% for model in app.models %}
-        <a href="{% if model.admin_url %}{{ model.admin_url }}{% else %}#{% endif %}"
-           class="mv-tile"
-           data-app="{{ app.app_label }}"
-           data-mdl="{{ model.object_name|lower }}">
-          <span class="mv-tile-icon" data-tile-icon="{{ app.app_label }}-{{ model.object_name|lower }}">📄</span>
-          <span class="mv-tile-name">{{ model.name }}</span>
-          {% if model.add_url %}
-          <span class="mv-tile-plus" data-add="{{ model.add_url }}" title="{% trans 'Add' %}">＋</span>
-          {% endif %}
-        </a>
-        {% endfor %}
-      </div>
-      {% endif %}
-    </section>
-    {% endfor %}
-  {% endif %}
-
-  <!-- ── Недавні дії (внизу) ──────────────────────────── -->
-  <section class="mv-section" style="--sec-accent:#3a5570; margin-top:8px;">
-    <h2 class="mv-section-hdr">
-      <span class="mv-section-hdr-icon">🕐</span> Недавні дії
-    </h2>
-    {% get_admin_log 12 as admin_log for_user user %}
-    {% if admin_log %}
-    <div class="mv-recent-grid">
-      {% for entry in admin_log %}
-      <div class="mv-recent-card">
-        <span class="mv-recent-ico">
-          {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
-        </span>
-        <div class="mv-recent-body">
-          {% if entry.get_admin_url %}
-          <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
-          {% else %}
-          <span class="mv-recent-obj">{{ entry.object_repr }}</span>
-          {% endif %}
-          <span class="mv-recent-model">{{ entry.content_type }}</span>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <p class="mv-empty">Немає недавніх дій</p>
-    {% endif %}
-  </section>
-
-</div><!-- .mv-dash -->
+  <div id="lp-content"></div>
+</div>
 
 <script>
-/* ── Дата у вітальному блоці ── */
 (function(){
-  var d = new Date();
-  var days = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
-  var months = ['січня','лютого','березня','квітня','травня','червня',
-                'липня','серпня','вересня','жовтня','листопада','грудня'];
-  var el = document.getElementById('mv-date');
-  if (el) el.innerHTML =
-    days[d.getDay()] + '<br><strong style="color:#9aafbe;font-size:14px">' +
-    d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + '</strong>';
+  /* ── Date display ── */
+  var dateEl = document.getElementById('lp-date');
+  if (dateEl) {
+    var d = new Date();
+    var days = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
+    var months = ['січня','лютого','березня','квітня','травня','червня',
+                  'липня','серпня','вересня','жовтня','листопада','грудня'];
+    dateEl.innerHTML = days[d.getDay()] + '<br><strong style="color:var(--text-muted);font-size:13px">' +
+      d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + '</strong>';
+  }
+
+  /* ── Build launchpad from MV_GROUPS ── */
+  function buildLaunchpad() {
+    var groups = window.MV_GROUPS || [];
+    var params = new URLSearchParams(window.location.search);
+    var filterG = params.get('g') || null;
+    var container = document.getElementById('lp-content');
+    if (!container) return;
+
+    var USER_ROLE = '{{ user_role|default:"" }}';
+
+    /* Render a group section */
+    function renderGroup(grp) {
+      var links = grp.links || [];
+      var accentCls = 'lp-accent-' + grp.id;
+      var tilesHtml = links.map(function(lnk){
+        return '<a href="' + lnk.href + '" class="lp-tile ' + accentCls + '">' +
+          '<span class="lp-tile-icon">' + (lnk.icon || '📄') + '</span>' +
+          '<span class="lp-tile-name">' + lnk.label + '</span>' +
+          '</a>';
+      }).join('');
+      /* If group has apps but no links, show a single tile linking to the group or admin */
+      if (!links.length) {
+        var fallbackHref = grp.href || ('/admin/?g=' + grp.id);
+        tilesHtml = '<a href="' + fallbackHref + '" class="lp-tile ' + accentCls + '">' +
+          '<span class="lp-tile-icon">' + (grp.icon || '📄') + '</span>' +
+          '<span class="lp-tile-name">Відкрити</span>' +
+          '</a>';
+      }
+      var groupLink = grp.href ? '<a href="' + grp.href + '" class="lp-section-link">Перейти →</a>' : '';
+      /* Strip leading emoji from label for section header text */
+      var sectionLabel = grp.label.replace(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2B00}-\u{2BFF}️\s]+/u, '') || grp.label;
+      return '<section class="lp-section" id="lp-g-' + grp.id + '">' +
+        '<div class="lp-section-hdr">' +
+          '<span class="lp-section-icon">' + (grp.icon || '📄') + '</span>' +
+          '<span class="lp-section-label">' + sectionLabel + '</span>' +
+          groupLink +
+        '</div>' +
+        '<div class="lp-grid">' + tilesHtml + '</div>' +
+        '</section>';
+    }
+
+    var html = '';
+
+    if (filterG) {
+      /* Filtered view — show only one group */
+      var grp = groups.filter(function(g){ return g.id === filterG; })[0];
+      document.getElementById('lp-title').textContent = (grp ? grp.label : '?') + ' — Плитки';
+      document.getElementById('lp-sub').textContent = 'Розділ меню';
+      html += '<a href="/admin/" class="lp-back">← Всі розділи</a>';
+      if (grp) {
+        html += renderGroup(grp);
+      }
+    } else {
+      /* Full launchpad */
+      groups.forEach(function(grp){
+        if (grp.adminOnly && USER_ROLE !== 'superadmin') return;
+        html += renderGroup(grp);
+      });
+    }
+
+    container.innerHTML = html;
+  }
+
+  /* Run after MV_GROUPS is available */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', buildLaunchpad);
+  } else {
+    buildLaunchpad();
+  }
+
 })();
+</script>
 
-/* ── Іконки для секцій ── */
-var SEC_ICONS = {
-  crm:'👥', sales:'🛒', inventory:'📦',
-  bots:'🧠', auth:'🔐', backup:'💾', faq:'❓'
-};
-
-/* ── Акцентні кольори для секцій ── */
-var SEC_ACCENT = {
-  crm:'#2196f3', sales:'#4caf50', inventory:'#ff9800',
-  bots:'#00bcd4', auth:'#607d8b',
-  backup:'#795548', faq:'#607d8b'
-};
-
-/* ── Іконки плиток (app-modelname) ── */
-var TILE_ICONS = {
-  /* CRM */
-  'crm-customer':'👤',
-  /* Sales */
-  'sales-salesorder':'📋', 'sales-salesorderline':'📝',
-  'sales-salessource':'🏷️', 'sales-salescategory':'🗂️',
-  /* Inventory */
-  'inventory-product':             '🔩',  /* Товар (компонент/деталь) */
-  'inventory-productcategory':     '🗂️',  /* Категорія товарів */
-  'inventory-productalias':        '🏷️',  /* Псевдонім / аліас SKU */
-  'inventory-location':            '📍',  /* Місце зберігання */
-  'inventory-inventorytransaction':'↕️',  /* Транзакція складу */
-  'inventory-reorderproxy':        '📉',  /* Аналіз запасів / reorder */
-  'inventory-supplier':            '🏭',  /* Постачальник */
-  'inventory-purchaseorder':       '📋',  /* Замовлення постачальнику */
-  'inventory-purchaseorderline':   '📝',  /* Позиція замовлення */
-  /* Auth */
-  'auth-user':'👤', 'auth-group':'👥',
-  /* Backup */
-  'backup-backupplaceholder':'💾', 'backup-backupsettings':'⚙️',
-  /* Bots */
-  'bots-bot':'🤖', 'bots-novaposhtabot':'📮', 'bots-botlog':'📋',
-  /* FAQ */
-  'faq-faqplaceholder':'❓',
-};
-
-/* Застосовуємо іконки та кольори до секцій */
-document.querySelectorAll('.mv-section[data-sec]').forEach(function(sec){
-  var app = sec.dataset.sec;
-  var iconEl = sec.querySelector('[data-sec-icon]');
-  if (iconEl) iconEl.textContent = SEC_ICONS[app] || '📄';
-  var accent = SEC_ACCENT[app] || '#2a4a6a';
-  sec.style.setProperty('--sec-accent', accent);
-  sec.querySelectorAll('.mv-tile').forEach(function(tile){
-    tile.style.setProperty('--tile-accent', accent);
-  });
-});
-
-/* Застосовуємо іконки до плиток */
-document.querySelectorAll('[data-tile-icon]').forEach(function(el){
-  var key = el.dataset.tileIcon;
-  var app = el.closest('[data-app]');
-  el.textContent = TILE_ICONS[key]
-    || (app && SEC_ICONS[app.dataset.app])
-    || '📄';
-});
-
-/* Кнопка "Додати" (без вкладеного <a>) */
-document.querySelectorAll('.mv-tile-plus').forEach(function(btn){
-  btn.addEventListener('click', function(e){
-    e.preventDefault(); e.stopPropagation();
-    window.location.href = btn.dataset.add;
-  });
+<!-- Recent activity (server-side) -->
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('g')) return; /* skip recent in filtered view */
+  var container = document.getElementById('lp-content');
+  if (!container) return;
+  var recData = document.getElementById('lp-recent-data');
+  if (!recData) return;
+  var recDiv = document.createElement('section');
+  recDiv.className = 'lp-section';
+  recDiv.style.setProperty('--lp-accent', 'var(--border-strong)');
+  recDiv.innerHTML =
+    '<div class="lp-section-hdr">' +
+      '<span class="lp-section-icon">🕐</span>' +
+      '<span class="lp-section-label">Недавні дії</span>' +
+    '</div>' +
+    recData.innerHTML;
+  container.appendChild(recDiv);
 });
 </script>
+
+{% get_admin_log 12 as admin_log for_user user %}
+<div id="lp-recent-data" style="display:none">
+  {% if admin_log %}
+  <div class="lp-recent-grid">
+    {% for entry in admin_log %}
+    <div class="lp-recent-card">
+      <span class="lp-recent-ico">
+        {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
+      </span>
+      <div class="lp-recent-body">
+        {% if entry.get_admin_url %}
+        <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+        {% else %}
+        <span class="lp-recent-obj">{{ entry.object_repr }}</span>
+        {% endif %}
+        <span class="lp-recent-model">{{ entry.content_type }}</span>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="lp-empty">Немає недавніх дій</p>
+  {% endif %}
+</div>
+
 {% endblock %}
