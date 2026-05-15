@@ -215,12 +215,12 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
       <tr>
         <th style="width:28px"></th>
         <th onclick="svSort('sku')" id="th-sku">SKU / Назва</th>
-        <th onclick="svSort('cat')">Категорія</th>
-        <th onclick="svSort('stock')" style="text-align:right">На складі</th>
-        <th onclick="svSort('reserved')" style="text-align:right">Резерв</th>
-        <th onclick="svSort('avail')" style="text-align:right">Доступно</th>
-        <th onclick="svSort('incoming')" style="text-align:right">Очікується</th>
-        <th>Остання операція</th>
+        <th onclick="svSort('cat')" id="th-cat">Категорія</th>
+        <th onclick="svSort('stock')" id="th-stock" style="text-align:right">На складі</th>
+        <th onclick="svSort('reserved')" id="th-reserved" style="text-align:right">Резерв</th>
+        <th onclick="svSort('avail')" id="th-avail" style="text-align:right">Доступно</th>
+        <th onclick="svSort('incoming')" id="th-incoming" style="text-align:right">Очікується</th>
+        <th onclick="svSort('lastdate')" id="th-lastdate">Остання операція</th>
         <th style="width:120px">Дія</th>
       </tr>
     </thead>
@@ -234,6 +234,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% elif stock <= p.reorder_point and p.reorder_point > 0 %}{% with state="critical" %}
@@ -242,6 +243,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% else %}{% with state="ok" %}
@@ -250,6 +252,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% endif %}
@@ -444,6 +447,16 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
 
 <script>
 (function() {
+  var LS_KEY = 'mv_sv_supply';
+
+  /* ── Persist state ── */
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(LS_KEY)) || {}; } catch(e) { return {}; }
+  }
+  function saveState(s) {
+    try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e) {}
+  }
+
   /* ── Counts for chips ── */
   var rows = document.querySelectorAll('.sv-main-row');
   var cntEmpty = 0, cntCrit = 0, cntRes = 0, cntInc = 0;
@@ -452,10 +465,10 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     var reorder  = parseFloat(r.dataset.reorder  || 0);
     var reserved = parseFloat(r.dataset.reserved || 0);
     var incoming = parseFloat(r.dataset.incoming || 0);
-    if (stock <= 0)                            cntEmpty++;
-    if (stock <= reorder && reorder > 0)       cntCrit++;
-    if (reserved > 0)                          cntRes++;
-    if (incoming > 0)                          cntInc++;
+    if (stock <= 0)                        cntEmpty++;
+    if (stock <= reorder && reorder > 0)   cntCrit++;
+    if (reserved > 0)                      cntRes++;
+    if (incoming > 0)                      cntInc++;
   });
   document.getElementById('cnt-empty').textContent = cntEmpty;
   document.getElementById('cnt-crit').textContent  = cntCrit;
@@ -463,18 +476,23 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   document.getElementById('cnt-inc').textContent   = cntInc;
 
   /* ── Filter ── */
-  var activeFilter = 'all';
-  var activeSearch = '';
+  var st = loadState();
+  var activeFilter = st.filter || 'all';
+  var activeSearch = st.search || '';
+  var sortCol      = st.sortCol || 'lastdate';
+  var sortDir      = st.sortDir !== undefined ? st.sortDir : -1;
 
   window.svFilter = function(f, btn) {
     activeFilter = f;
     document.querySelectorAll('.sv-filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
+    saveState({filter: activeFilter, search: activeSearch, sortCol: sortCol, sortDir: sortDir});
     applyVisibility();
   };
 
   window.svSearch = function(q) {
     activeSearch = q.toLowerCase().trim();
+    saveState({filter: activeFilter, search: activeSearch, sortCol: sortCol, sortDir: sortDir});
     applyVisibility();
   };
 
@@ -483,13 +501,11 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     var reorder  = parseFloat(r.dataset.reorder  || 0);
     var reserved = parseFloat(r.dataset.reserved || 0);
     var incoming = parseFloat(r.dataset.incoming || 0);
-
     var filterOk = true;
     if      (activeFilter === 'empty')    filterOk = stock <= 0;
     else if (activeFilter === 'critical') filterOk = stock <= reorder && reorder > 0;
     else if (activeFilter === 'reserved') filterOk = reserved > 0;
     else if (activeFilter === 'incoming') filterOk = incoming > 0;
-
     var searchOk = true;
     if (activeSearch) {
       searchOk = (r.dataset.sku || '').indexOf(activeSearch) !== -1 ||
@@ -516,7 +532,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   }
 
   /* ── Expand / collapse detail ── */
-  window.svToggleDetail = function(pk, row) {
+  window.svToggleDetail = function(pk) {
     var det = document.getElementById('det-' + pk);
     var btn = document.getElementById('exp-' + pk);
     if (!det) return;
@@ -525,32 +541,41 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   };
 
   /* ── Sort ── */
-  var sortCol = 'sku', sortDir = 1;
-  window.svSort = function(col) {
-    if (sortCol === col) sortDir = -sortDir;
-    else { sortCol = col; sortDir = 1; }
+  var TH_MAP = {sku:'th-sku', cat:'th-cat', stock:'th-stock',
+                reserved:'th-reserved', avail:'th-avail',
+                incoming:'th-incoming', lastdate:'th-lastdate'};
+
+  function applySort() {
     document.querySelectorAll('.sv-table th').forEach(function(th) {
       th.classList.remove('sort-asc','sort-desc');
     });
-    // Update tbody order
+    var thEl = TH_MAP[sortCol] ? document.getElementById(TH_MAP[sortCol]) : null;
+    if (thEl) thEl.classList.add(sortDir === 1 ? 'sort-asc' : 'sort-desc');
+
     var tbody = document.getElementById('sv-tbody');
-    var allRows = [];
     var mainRows = Array.from(tbody.querySelectorAll('tr.sv-main-row'));
-    mainRows.forEach(function(mr) {
+    var pairs = mainRows.map(function(mr) {
       var det = mr.nextElementSibling;
-      allRows.push({main: mr, det: det && det.classList.contains('sv-detail-row') ? det : null});
+      return {main: mr, det: det && det.classList.contains('sv-detail-row') ? det : null};
     });
-    allRows.sort(function(a, b) {
-      var av = getSortVal(a.main, col);
-      var bv = getSortVal(b.main, col);
+    pairs.sort(function(a, b) {
+      var av = getSortVal(a.main, sortCol);
+      var bv = getSortVal(b.main, sortCol);
       if (av < bv) return -sortDir;
       if (av > bv) return sortDir;
       return 0;
     });
-    allRows.forEach(function(pair) {
-      tbody.appendChild(pair.main);
-      if (pair.det) tbody.appendChild(pair.det);
+    pairs.forEach(function(p) {
+      tbody.appendChild(p.main);
+      if (p.det) tbody.appendChild(p.det);
     });
+  }
+
+  window.svSort = function(col) {
+    if (sortCol === col) sortDir = -sortDir;
+    else { sortCol = col; sortDir = col === 'lastdate' ? -1 : 1; }
+    saveState({filter: activeFilter, search: activeSearch, sortCol: sortCol, sortDir: sortDir});
+    applySort();
   };
 
   function getSortVal(row, col) {
@@ -560,8 +585,27 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     if (col === 'reserved') return parseFloat(row.dataset.reserved || 0);
     if (col === 'avail')    return parseFloat(row.dataset.avail    || 0);
     if (col === 'incoming') return parseFloat(row.dataset.incoming || 0);
+    if (col === 'lastdate') return parseFloat(row.dataset.lastdate || 0);
     return 0;
   }
+
+  /* ── Init: restore saved state ── */
+  // Restore filter button
+  document.querySelectorAll('.sv-filter-btn').forEach(function(btn) {
+    btn.classList.remove('active');
+    if (btn.getAttribute('onclick').indexOf("'" + activeFilter + "'") !== -1) {
+      btn.classList.add('active');
+    }
+  });
+  // Restore search
+  if (activeSearch) {
+    var inp = document.getElementById('sv-search');
+    if (inp) inp.value = activeSearch;
+  }
+  // Apply sort (default: lastdate desc)
+  applySort();
+  // Apply filter/search
+  applyVisibility();
 })();
 </script>
 {% endblock %}
