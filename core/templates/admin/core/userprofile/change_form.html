@@ -288,6 +288,19 @@
     grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px;'
       + (isOverride ? '' : 'opacity:0.4;pointer-events:none');
 
+    /* helper: sync select-all checkbox state for a module */
+    function updateModuleSelAll(selAllCb, opCbs) {
+      var total   = opCbs.length;
+      var checked = Array.from(opCbs).filter(function (c) { return c.checked; }).length;
+      if (checked === 0) {
+        selAllCb.checked = false; selAllCb.indeterminate = false;
+      } else if (checked === total) {
+        selAllCb.checked = true;  selAllCb.indeterminate = false;
+      } else {
+        selAllCb.checked = false; selAllCb.indeterminate = true;
+      }
+    }
+
     apps.forEach(function (al) {
       var appName     = MODULE_NAMES[al] || al;
       var roleAppOps  = (roleOps === '__all__') ? ALL_OPS.slice() : (roleOps[al] || []);
@@ -304,13 +317,37 @@
       var nameSpan = document.createElement('span');
       nameSpan.textContent = appName;
 
+      /* right side: select-all + role badge */
+      var hdrRight = document.createElement('div');
+      hdrRight.style.cssText = 'display:flex;align-items:center;gap:8px';
+
+      /* "Вибрати все" checkbox */
+      var selAllLbl = document.createElement('label');
+      selAllLbl.style.cssText = 'display:inline-flex;align-items:center;gap:3px;cursor:pointer;'
+        + 'font-size:10px;font-weight:400;color:var(--text-muted);user-select:none;'
+        + 'padding:1px 5px;border-radius:3px;border:1px solid var(--border-strong);'
+        + 'background:var(--bg-card)';
+      selAllLbl.title = 'Вибрати / зняти всі операції для цього модуля';
+
+      var selAllCb = document.createElement('input');
+      selAllCb.type = 'checkbox';
+      selAllCb.style.cssText = 'width:11px;height:11px;cursor:pointer;flex-shrink:0;margin:0;accent-color:var(--link-fg,#58a6ff)';
+
+      var selAllText = document.createElement('span');
+      selAllText.textContent = 'Всі';
+
+      selAllLbl.appendChild(selAllCb);
+      selAllLbl.appendChild(selAllText);
+
       var defBadge = document.createElement('span');
       defBadge.style.cssText = 'font-size:10px;font-weight:400;color:var(--text-dim)';
       defBadge.textContent = roleAppOps === '__all__' ? 'роль: всі'
         : 'роль: ' + (roleAppOps.length ? roleAppOps.join(', ') : 'немає');
 
+      hdrRight.appendChild(selAllLbl);
+      hdrRight.appendChild(defBadge);
       hdr.appendChild(nameSpan);
-      hdr.appendChild(defBadge);
+      hdr.appendChild(hdrRight);
 
       /* ops row */
       var body = document.createElement('div');
@@ -343,12 +380,33 @@
         cb.addEventListener('change', function () {
           lbl.style.borderColor = this.checked ? 'var(--accent,#58a6ff)' : 'var(--border-strong)';
           lbl.style.background  = this.checked ? 'rgba(88,166,255,.12)' : 'var(--bg-card)';
+          updateModuleSelAll(selAllCb, body.querySelectorAll('input[data-ops-op]'));
           syncOpsFromCheckboxes();
         });
 
         lbl.appendChild(cb);
         lbl.appendChild(opText);
         body.appendChild(lbl);
+      });
+
+      /* wire select-all after body is populated */
+      var opCbs = body.querySelectorAll('input[data-ops-op]');
+      updateModuleSelAll(selAllCb, opCbs);   // set initial state
+
+      selAllCb.addEventListener('change', function () {
+        var newVal = this.checked;
+        this.indeterminate = false;
+        opCbs.forEach(function (opCb) {
+          if (opCb.checked !== newVal) {
+            opCb.checked = newVal;
+            var opLbl = opCb.parentElement;
+            if (opLbl) {
+              opLbl.style.borderColor = newVal ? 'var(--accent,#58a6ff)' : 'var(--border-strong)';
+              opLbl.style.background  = newVal ? 'rgba(88,166,255,.12)' : 'var(--bg-card)';
+            }
+          }
+        });
+        syncOpsFromCheckboxes();
       });
 
       card.appendChild(hdr);
