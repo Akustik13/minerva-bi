@@ -1214,9 +1214,8 @@ document.addEventListener('DOMContentLoaded', function(){
     var hdr = document.createElement('div');
     hdr.className = 'mg-header';
 
-    // Label always navigates to home launchpad with ?g=<id> filter
-    var navHref = grp.href ? grp.href : ('/admin/?g=' + grp.id);
-    var labelHtml = '<a href="' + navHref + '" class="mg-header-link">' + grp.label + '</a>';
+    // Label always navigates to the launchpad filtered by this group
+    var labelHtml = '<a href="/admin/?g=' + grp.id + '" class="mg-header-link">' + grp.label + '</a>';
 
     hdr.innerHTML =
       '<span class="mg-handle" title="Перетягнути">⠿</span>' +
@@ -1248,15 +1247,13 @@ document.addEventListener('DOMContentLoaded', function(){
       content.appendChild(a);
     });
 
-    // Only show full app modules in sidebar if no curated links (avoids duplicates)
-    if (!linksToShow.length) {
-      appsFound.forEach(function(name){
-        var modEl = mods[name];
-        if (!modEl) return;
-        if (appsFound.length > 1) makeModCollapsible(modEl);
-        content.appendChild(modEl);
-      });
-    }
+    // Always append full app modules below curated links so nothing disappears
+    appsFound.forEach(function(name){
+      var modEl = mods[name];
+      if (!modEl) return;
+      if (appsFound.length > 1) makeModCollapsible(modEl);
+      content.appendChild(modEl);
+    });
 
     group.appendChild(content);
     sidebar.appendChild(group);

@@ -552,6 +552,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     var det = document.getElementById('det-' + pk);
     var btn = document.getElementById('exp-' + pk);
     if (!det) return;
+    det.style.display = '';          // clear inline style set by applyVisibility
     var open = det.classList.toggle('open');
     if (btn) btn.classList.toggle('open', open);
     if (open && !_histLoaded[pk]) {
