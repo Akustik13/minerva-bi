@@ -898,7 +898,7 @@ window.MV_GROUPS = [
       { href:'/admin/inventory/inventorysettings/',        icon:'⚙️', label:'Налаштування',       app:'inventory' },
     ], apps:['inventory'] },
   { id:'tasks', icon:'✅', label:'✅ Задачі', apps:['tasks'] },
-  { id:'ai', icon:'🏛️', label:'🏛️ Minerva AI', href:'/dashboard/ai/',
+  { id:'ai', icon:'🏛️', label:'🏛️ Minerva AI', href:'/ai/',
     links:[
       { href:'/ai/',                                       icon:'💬', label:'WebChat',            app:'ai_assistant' },
       { href:'/admin/ai_assistant/aiconversation/',        icon:'📜', label:'Розмови',            app:'ai_assistant', model:'AIConversation' },
@@ -919,7 +919,7 @@ window.MV_GROUPS = [
       { href:'/admin/calendar_app/calendarevent/add/',          icon:'➕', label:'Нова подія',     app:'calendar_app', model:'CalendarEvent' },
       { href:'/calendar/settings/',                             icon:'🔔', label:'Сповіщення',    app:'calendar_app' },
     ], apps:['calendar_app'] },
-  { id:'bots', icon:'🤖', label:'🤖 Боти та API', href:'/dashboard/bots/', apps:['bots','api'] },
+  { id:'bots', icon:'🤖', label:'🤖 Боти та API', apps:['bots','api'] },
   { id:'system', icon:'⚙️', label:'⚙️ Система', href:'/dashboard/system/',
     links:[
       { href:'/admin/config/integrations/',          icon:'🔌', label:'Інтеграції',          app:'config' },
@@ -1214,8 +1214,10 @@ document.addEventListener('DOMContentLoaded', function(){
     var hdr = document.createElement('div');
     hdr.className = 'mg-header';
 
-    // Label always navigates to the launchpad filtered by this group
-    var labelHtml = '<a href="/admin/?g=' + grp.id + '" class="mg-header-link">' + grp.label + '</a>';
+    // grp.href → explicit URL; else first app → /admin/<app>/; fallback → launchpad filter
+    var navHref = grp.href ? grp.href
+                : (grp.apps && grp.apps.length ? '/admin/' + grp.apps[0] + '/' : '/admin/?g=' + grp.id);
+    var labelHtml = '<a href="' + navHref + '" class="mg-header-link">' + grp.label + '</a>';
 
     hdr.innerHTML =
       '<span class="mg-handle" title="Перетягнути">⠿</span>' +
