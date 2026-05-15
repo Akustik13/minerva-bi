@@ -231,7 +231,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     {% if stock <= 0 %}{% with state="empty" %}
       <tr class="sv-main-row" data-pk="{{ p.pk }}" data-state="{{ state }}"
           data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
-          data-cat="{{ p.category.name|default:''|lower }}"
+          data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           onclick="svToggleDetail({{ p.pk }})">
@@ -239,7 +239,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     {% elif stock <= p.reorder_point and p.reorder_point > 0 %}{% with state="critical" %}
       <tr class="sv-main-row" data-pk="{{ p.pk }}" data-state="{{ state }}"
           data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
-          data-cat="{{ p.category.name|default:''|lower }}"
+          data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           onclick="svToggleDetail({{ p.pk }})">
@@ -247,7 +247,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     {% else %}{% with state="ok" %}
       <tr class="sv-main-row" data-pk="{{ p.pk }}" data-state="{{ state }}"
           data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
-          data-cat="{{ p.category.name|default:''|lower }}"
+          data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           onclick="svToggleDetail({{ p.pk }})">
@@ -269,7 +269,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           <div class="sv-name">{{ p.name }}</div>
         </td>
         <!-- Category -->
-        <td class="sv-cat">{{ p.category.name|default:"—" }}</td>
+        <td class="sv-cat">{{ p.category|default:"—" }}</td>
         <!-- Stock -->
         <td style="text-align:right">
           {% if stock <= 0 %}

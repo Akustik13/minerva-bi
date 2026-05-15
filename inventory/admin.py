@@ -164,7 +164,6 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         # All active products
         products = list(
             Product.objects.filter(is_active=True)
-            .select_related('category')
             .order_by('sku')
         )
         if not products:
