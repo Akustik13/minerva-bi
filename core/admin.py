@@ -15,45 +15,75 @@ _ROLE_CAPS = {
     'superadmin': {
         'label': 'Суперадміністратор', 'color': '#f85149',
         'desc': 'Повний доступ до всіх функцій системи.',
-        'caps': ['Управління всіма модулями', 'Налаштування системи',
-                 'Управління користувачами та правами',
-                 'Журнал аудиту', 'Імпорт, експорт та видалення'],
     },
     'admin': {
         'label': 'Адміністратор', 'color': '#ff9800',
         'desc': 'Адміністративний доступ до всіх модулів.',
-        'caps': ['Продажі та клієнти', 'Склад та закупівлі',
-                 'Фінансова аналітика та звіти', 'Інтеграції', 'Імпорт та експорт'],
     },
     'manager': {
         'label': 'Менеджер', 'color': '#58a6ff',
         'desc': 'Доступ до CRM, продажів, відправлень та завдань.',
-        'caps': ['CRM та клієнти (RFM, стратегії)', 'Продажі та замовлення',
-                 'Відправлення та доставка', 'Email-асистент', 'Завдання та дедлайни'],
     },
     'warehouse': {
         'label': 'Складський працівник', 'color': '#3fb950',
         'desc': 'Доступ до складських операцій та відправлень.',
-        'caps': ['Складські транзакції та інвентаризація',
-                 'Прийом товарів (закупівлі)', 'Відправлення та трекінг', 'Друк етикеток DYMO'],
     },
     'accountant': {
         'label': 'Бухгалтер', 'color': '#c9a84c',
         'desc': 'Доступ до продажів, бухгалтерії та складу.',
-        'caps': ['Рахунки-фактури та рахунки', 'Бухгалтерський облік',
-                 'Склад (тільки перегляд)', 'Аналітика та звіти', 'Експорт даних'],
     },
     'ai': {
         'label': 'AI-фахівець', 'color': '#a78bfa',
         'desc': 'Доступ до CRM та AI-функцій.',
-        'caps': ['CRM та клієнти', 'AI-аналіз клієнтів', 'Стратегії утримання'],
     },
     'readonly': {
         'label': 'Тільки перегляд', 'color': '#607d8b',
         'desc': 'Тільки перегляд дашборду та довідника.',
-        'caps': ['Аналітика (тільки перегляд)', 'FAQ та підтримка'],
     },
 }
+
+# app_label → human-readable capability for the invitation email
+_MODULE_CAPS = {
+    'dashboard':       'Аналітика та дашборд',
+    'crm':             'CRM та клієнти (RFM-аналіз)',
+    'strategy':        'Стратегії утримання клієнтів',
+    'sales':           'Продажі та замовлення',
+    'accounting':      'Рахунки-фактури та бухгалтерія',
+    'shipping':        'Відправлення та трекінг',
+    'inventory':       'Склад та закупівлі',
+    'tasks':           'Завдання та дедлайни',
+    'autoimport':      'Автоімпорт даних (Excel)',
+    'ai_assistant':    'AI-асистент (Minerva AI)',
+    'email_assistant': 'Email-асистент',
+    'bots':            'Боти та автоматизація',
+    'api':             'REST API',
+    'labels_app':      'Друк етикеток DYMO',
+    'config':          'Налаштування системи',
+    'backup':          'Резервне копіювання',
+    'auth':            'Управління користувачами',
+    'core':            'Безпека та журнал аудиту',
+    'faq':             'FAQ та підтримка',
+}
+
+# Ordered display sequence (controls order in email)
+_MODULE_ORDER = [
+    'dashboard', 'crm', 'strategy', 'sales', 'accounting', 'shipping',
+    'inventory', 'tasks', 'autoimport', 'email_assistant', 'ai_assistant',
+    'bots', 'api', 'labels_app', 'config', 'backup', 'auth', 'core', 'faq',
+]
+
+
+def _caps_for_user(profile):
+    """Return list of capability strings based on actual allowed modules."""
+    try:
+        allowed = profile.get_allowed_modules()
+    except Exception:
+        allowed = []
+    if allowed == '__all__':
+        # All-access: show all known modules in order
+        return [_MODULE_CAPS[m] for m in _MODULE_ORDER if m in _MODULE_CAPS]
+    # Specific module list: show in canonical order, skip unknown
+    return [_MODULE_CAPS[m] for m in _MODULE_ORDER if m in allowed and m in _MODULE_CAPS]
 
 
 def _build_invitation_html(user, password, company, system_url):
@@ -63,9 +93,11 @@ def _build_invitation_html(user, password, company, system_url):
     from django.conf import settings as _dj_settings
 
     try:
-        role = user.profile.role
+        profile = user.profile
+        role    = profile.role
     except Exception:
-        role = 'readonly'
+        profile = None
+        role    = 'readonly'
     ri    = _ROLE_CAPS.get(role, _ROLE_CAPS['readonly'])
     first = _h.escape(user.first_name or user.username)
     co    = _h.escape(company)
@@ -75,12 +107,15 @@ def _build_invitation_html(user, password, company, system_url):
     surl  = _h.escape(system_url)
     label = _h.escape(ri['label'])
     desc  = _h.escape(ri['desc'])
+
+    # Build capabilities from actual allowed modules, not hardcoded role list
+    caps_list = _caps_for_user(profile) if profile else ['FAQ та підтримка']
     caps  = ''.join(
         f'<tr><td style="padding:9px 0;border-bottom:1px solid rgba(201,168,76,0.1)">'
         f'<span style="color:#c9a84c;margin-right:10px">&#10003;</span>'
         f'<span style="font-family:Crimson Pro,Georgia,serif;color:rgba(245,237,209,0.65);font-size:16px">{_h.escape(cap)}</span>'
         f'</td></tr>'
-        for cap in ri['caps']
+        for cap in caps_list
     )
 
     # Load real owl SVG from includes/owl.html
