@@ -641,7 +641,17 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             pass
         return initial
 
+    def get_readonly_fields(self, request, obj=None):
+        ro = list(super().get_readonly_fields(request, obj))
+        if not request.user.is_superuser:
+            for f in ('performed_by', 'external_key'):
+                if f not in ro:
+                    ro.append(f)
+        return ro
+
     def save_model(self, request, obj, form, change):
+        if not change:
+            obj.performed_by = request.user
         if not getattr(obj, "external_key", None):
             obj.external_key = f"manual:{uuid.uuid4()}"
         super().save_model(request, obj, form, change)
