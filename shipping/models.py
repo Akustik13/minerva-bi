@@ -539,6 +539,26 @@ class ShippingSettings(models.Model):
             "Рекомендовано: увімкнено."
         ),
     )
+    STATUS_PRIORITY_CARRIER     = "carrier"
+    STATUS_PRIORITY_MARKETPLACE = "marketplace"
+    STATUS_PRIORITY_HIGHEST     = "highest"
+    STATUS_CONFLICT_CHOICES = [
+        ("highest",     "Вищий статус — найбільш просунутий (поточна поведінка)"),
+        ("carrier",     "Перевізник (UPS/DHL) — якщо відправлення активне, не ставити «Доставлено» з маркетплейсу"),
+        ("marketplace", "Маркетплейс (DigiKey) — завжди вірити статусу замовлення"),
+    ]
+    status_conflict_priority = models.CharField(
+        "Пріоритет при конфлікті статусів", max_length=20,
+        choices=STATUS_CONFLICT_CHOICES, default="highest",
+        help_text=(
+            "Що робити якщо різні джерела показують різний статус. "
+            "Наприклад: DigiKey каже «Доставлено», а UPS — «В дорозі».<br>"
+            "<b>Вищий статус</b> — беремо найбільш просунутий (DigiKey виграє).<br>"
+            "<b>Перевізник</b> — поки відправлення активне (UPS/DHL не delivered), "
+            "маркетплейс не може встановити «Доставлено».<br>"
+            "<b>Маркетплейс</b> — статус DigiKey/маркетплейсу завжди в пріоритеті."
+        ),
+    )
 
     @classmethod
     def get(cls):

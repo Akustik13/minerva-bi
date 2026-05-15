@@ -5742,12 +5742,16 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
         }),
         ("⚙️ Пріоритет та захист статусу", {
             "fields": (
+                "status_conflict_priority",
                 "prefer_tracking_number",
                 "status_upgrade_only",
                 "order_status_lock_delivered",
                 "trust_cached_tracking",
             ),
             "description": (
+                "<b>Пріоритет при конфлікті статусів:</b> що робити якщо DigiKey каже «Доставлено», "
+                "а UPS — «В дорозі». <em>Перевізник</em> = не довіряти маркетплейсу поки "
+                "є активне відправлення.<br>"
                 "<b>Пріоритет трекінг-номера:</b> якщо посилка має трекінг-номер, "
                 "система спочатку запитує пряму API (DHL/UPS), потім Jumingo.<br>"
                 "<b>Тільки підвищувати статус відправлення:</b> блокує відкат "

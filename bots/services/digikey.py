@@ -45,6 +45,26 @@ def _status_can_advance(current: str, new: str) -> bool:
     return _STATUS_PRIORITY.get(new, 0) > _STATUS_PRIORITY.get(current, 0)
 
 
+def _carrier_has_priority(sale) -> bool:
+    """
+    Returns True if ShippingSettings.status_conflict_priority == 'carrier'
+    AND the order has at least one active (non-delivered) shipment.
+    In that case the marketplace should NOT override with 'delivered'.
+    """
+    try:
+        from shipping.models import ShippingSettings
+        cfg = ShippingSettings.get()
+        if cfg.status_conflict_priority != "carrier":
+            return False
+        from shipping.models import Shipment
+        return Shipment.objects.filter(
+            order=sale,
+            status__in=["submitted", "label_ready", "in_transit"],
+        ).exists()
+    except Exception:
+        return False
+
+
 # ── DigiKey order status → Minerva status ────────────────────────────────────
 
 DIGIKEY_STATUS_MAP = {
@@ -356,9 +376,14 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
     else:
         # Only advance status (never downgrade: DigiKey may lag behind our shipment)
         if _status_can_advance(sale.status, minerva_status):
-            sale.status = minerva_status
-            sale.save(update_fields=["status"])
-            stats["updated"] += 1
+            # Check conflict priority: if "carrier" mode and order has active shipment
+            # (not delivered), do NOT let marketplace override with "delivered"
+            if minerva_status == "delivered" and _carrier_has_priority(sale):
+                stats["skipped"] += 1
+            else:
+                sale.status = minerva_status
+                sale.save(update_fields=["status"])
+                stats["updated"] += 1
         else:
             stats["skipped"] += 1
 
