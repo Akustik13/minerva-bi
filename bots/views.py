@@ -141,3 +141,41 @@ def digikey_webhook(request):
 
     threading.Thread(target=_sync, daemon=True).start()
     return HttpResponse("OK", status=200)
+
+
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import get_object_or_404
+
+
+@staff_member_required
+def digikey_packlist(request, order_pk):
+    """
+    GET /bots/digikey/packlist/<order_pk>/
+    Завантажує PDF пакувального листа з DigiKey API і повертає браузеру.
+    """
+    from sales.models import SalesOrder
+    from bots.models import DigiKeyConfig
+    from bots.services.digikey import get_packlist_pdf, DigiKeyAPIError
+
+    order = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
+    config = DigiKeyConfig.get()
+
+    try:
+        pdf_bytes = get_packlist_pdf(config, order.order_number)
+    except DigiKeyAPIError as e:
+        return HttpResponse(
+            f"<h3>DigiKey Pack List — помилка</h3><pre>{e}</pre>",
+            content_type="text/html; charset=utf-8",
+            status=502,
+        )
+    except Exception as e:
+        return HttpResponse(
+            f"<h3>Помилка</h3><pre>{type(e).__name__}: {e}</pre>",
+            content_type="text/html; charset=utf-8",
+            status=500,
+        )
+
+    filename = f"packlist_{order.order_number}.pdf"
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response

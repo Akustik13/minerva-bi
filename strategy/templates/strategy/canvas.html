@@ -187,6 +187,31 @@
   padding: 6px 8px; font-size: 12px; margin-bottom: 8px;
 }
 .cv-log-form textarea { min-height: 56px; resize: vertical; }
+
+/* ── Step logs (completed step history) ── */
+.cv-step-logs {
+  margin-top: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.cv-log-entry {
+  background: var(--bg-input);
+  border-left: 3px solid var(--border-strong);
+  border-radius: 0 5px 5px 0;
+  padding: 6px 10px;
+}
+.cv-log-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 3px;
+}
+.cv-log-who  { font-size: 11px; font-weight: 700; color: var(--text-muted); }
+.cv-log-time { font-size: 10px; color: var(--text-dim); }
+.cv-log-notes {
+  font-size: 12px; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+  line-height: 1.5;
+}
 .cv-btn {
   display: inline-block;
   background: var(--accent); color: #fff;
@@ -428,9 +453,29 @@
         </div>
         {% endif %}
 
-        {% if step.outcome_notes %}
-        <div style="margin-top:8px;font-size:12px;color:var(--text-muted);font-style:italic">{{ step.outcome_notes }}</div>
+        {% with logs=step.logs.all %}
+        {% if logs %}
+        <div class="cv-step-logs">
+          {% for log in logs %}
+          <div class="cv-log-entry">
+            <div class="cv-log-header">
+              <span class="cv-log-who">{% if log.logged_by %}{{ log.logged_by.get_full_name|default:log.logged_by.username }}{% else %}Система{% endif %}</span>
+              <span class="cv-log-time">{{ log.logged_at|date:"d.m.Y H:i" }}</span>
+            </div>
+            {% if log.notes %}
+            <div class="cv-log-notes">{{ log.notes }}</div>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% elif step.outcome_notes %}
+        <div class="cv-step-logs">
+          <div class="cv-log-entry">
+            <div class="cv-log-notes">{{ step.outcome_notes }}</div>
+          </div>
+        </div>
         {% endif %}
+        {% endwith %}
 
       </div>
       {% endwith %}

@@ -15,7 +15,12 @@ def canvas_view(request, pk):
         CustomerStrategy.objects.select_related("customer", "template", "current_step"),
         pk=pk,
     )
-    steps = list(strategy.steps.select_related("template_step").order_by("scheduled_at"))
+    steps = list(
+        strategy.steps
+        .select_related("template_step")
+        .prefetch_related("logs__logged_by")
+        .order_by("scheduled_at")
+    )
 
     # Auto-initialize: if an active strategy was created via admin (no start_strategy()
     # call), create the first CustomerStep so list + canvas are immediately actionable.

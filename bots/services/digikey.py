@@ -28,6 +28,7 @@ ORDERS_PATH          = "/orderstatus/v4/orders"
 MARKETPLACE_PATH     = "/Sales/Marketplace2/Orders/v1/orders"
 PO_SEARCH_PATH       = "/OrderManagement/v1/SalesOrders/Search/PoNumber"
 KEYWORD_SEARCH_PATH  = "/products/v4/search/keyword"
+PACKLIST_PATH        = "/packinglist/v1/salesorderid"
 
 # ── Status priority (higher = more advanced; never downgrade) ─────────────────
 
@@ -1314,3 +1315,56 @@ def test_connection(config) -> dict:
         return {"ok": False, "message": f"❌ Помилка API: {e}"}
     except Exception as e:
         return {"ok": False, "message": f"❌ {type(e).__name__}: {e}"}
+
+
+# ── Pack List ─────────────────────────────────────────────────────────────────
+
+def get_packlist_pdf(config, sales_order_id: str) -> bytes:
+    """
+    GET /packinglist/v1/salesorderid/{salesOrderId}?includePdf=true
+    Повертає PDF пакувального листа для DigiKey SalesOrderId.
+    Використовує marketplace (3-legged) токен; якщо недоступний — client credentials.
+    """
+    import requests as req
+
+    # Try marketplace token first (3-legged), fall back to client credentials
+    try:
+        token = get_marketplace_token(config)
+    except Exception:
+        token = get_token(config)
+
+    headers = {
+        "Authorization":       f"Bearer {token}",
+        "X-DIGIKEY-Client-Id": config.client_id,
+        "Accept":              "application/json",
+    }
+    url = f"https://api.digikey.com{PACKLIST_PATH}/{sales_order_id}"
+
+    from tabele.api_logger import logged_request
+    resp = logged_request(
+        'digikey', 'get_packlist_pdf', 'GET', url, req.get,
+        headers=headers,
+        params={"includePdf": "true"},
+        timeout=30,
+    )
+    try:
+        resp.raise_for_status()
+    except req.HTTPError as e:
+        body = {}
+        try:
+            body = e.response.json()
+        except Exception:
+            pass
+        raise DigiKeyAPIError(
+            f"PackList API {e.response.status_code}: {body.get('detail') or body.get('message') or body}"
+        ) from e
+
+    data = resp.json()
+    # Response contains base64-encoded PDF in "PdfDocument" or "Document" field
+    import base64
+    pdf_b64 = data.get("PdfDocument") or data.get("Document") or data.get("PackingListPdf") or ""
+    if not pdf_b64:
+        raise DigiKeyAPIError(
+            f"Pack List API повернув відповідь без PDF. Поля: {list(data.keys())}"
+        )
+    return base64.b64decode(pdf_b64)

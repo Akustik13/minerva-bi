@@ -1392,6 +1392,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     "admin:bots_digikeyconfig_confirm_order",
                     args=[obj.order_number],
                 )
+            if obj and obj.source == "digikey":
+                extra_context["digikey_packlist_url"] = f"/bots/digikey/packlist/{obj.pk}/"
             # Auto-sync shipping fields from active shipment (GET only)
             if obj and request.method == "GET":
                 _sync_order_from_active_shipment(obj)
