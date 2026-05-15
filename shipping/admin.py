@@ -5557,7 +5557,7 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
             order.shipped_at = timezone.now().date()
             order_changed = True
             update_fields.append("shipped_at")
-    elif shipment.status == "in_transit" and order.status != "shipped":
+    elif shipment.status == "in_transit" and order.status not in ("shipped", "delivered"):
         order.status = "shipped"
         if not order.shipped_at:
             order.shipped_at = timezone.now().date()
