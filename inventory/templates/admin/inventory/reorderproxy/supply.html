@@ -1,0 +1,278 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Резервації та прихід — Minerva{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.sp-wrap { padding: 20px 28px; }
+.sp-breadcrumb {
+  font-size: 12px; color: var(--text-dim); margin-bottom: 16px;
+}
+.sp-breadcrumb a { color: var(--link-fg); text-decoration: none; }
+.sp-breadcrumb a:hover { text-decoration: underline; }
+
+.sp-title {
+  font-size: 20px; font-weight: 700; color: var(--text);
+  margin: 0 0 4px;
+}
+.sp-subtitle {
+  font-size: 13px; color: var(--text-muted); margin: 0 0 20px;
+}
+.sp-empty {
+  padding: 48px; text-align: center;
+  color: var(--text-dim); font-size: 15px;
+  background: var(--bg-card); border-radius: 8px;
+  border: 1px solid var(--border-strong);
+}
+
+/* ── Table ── */
+.sp-table {
+  width: 100%; border-collapse: collapse;
+  font-size: 13px; background: var(--bg-card);
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  overflow: hidden;
+}
+.sp-table th {
+  background: var(--bg-input); color: var(--text-muted);
+  font-weight: 600; font-size: 11px; letter-spacing: .5px;
+  padding: 9px 12px; text-align: left;
+  border-bottom: 1px solid var(--border-strong);
+}
+.sp-table td {
+  padding: 8px 12px; vertical-align: middle;
+  border-bottom: 1px solid rgba(128,128,128,.08);
+  color: var(--text);
+}
+
+/* Product header row */
+.sp-prod-row td {
+  background: rgba(33,150,243,.06);
+  border-top: 2px solid rgba(33,150,243,.25);
+  border-bottom: 1px solid rgba(33,150,243,.12);
+  font-weight: 600;
+}
+.sp-prod-sku {
+  font-family: monospace; font-size: 13px;
+  color: var(--text); font-weight: 700;
+}
+.sp-prod-name { color: var(--text-muted); font-size: 12px; margin-top: 2px; }
+
+/* Sub-rows */
+.sp-sub-row td { background: transparent; padding: 6px 12px 6px 24px; }
+.sp-sub-row:last-of-type td { border-bottom: none; }
+
+/* Type badge */
+.sp-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.sp-badge-res  { background: rgba(244,67,54,.12);  color: #ef5350; border: 1px solid rgba(244,67,54,.25); }
+.sp-badge-inc  { background: rgba(76,175,80,.12);  color: #66bb6a; border: 1px solid rgba(76,175,80,.25); }
+
+/* Stock qty coloring */
+.sp-stock-ok   { color: #66bb6a; font-weight: 700; }
+.sp-stock-warn { color: #ffa726; font-weight: 700; }
+.sp-stock-crit { color: #ef5350; font-weight: 700; }
+
+/* Status pill */
+.sp-status {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
+}
+.sp-status-received   { background: rgba(33,150,243,.15); color: #64b5f6; }
+.sp-status-processing { background: rgba(255,152,0,.15);  color: #ffa726; }
+.sp-status-draft      { background: rgba(96,125,139,.15); color: #90a4ae; }
+.sp-status-ordered    { background: rgba(33,150,243,.15); color: #64b5f6; }
+.sp-status-partial    { background: rgba(255,152,0,.15);  color: #ffa726; }
+
+/* Action button */
+.sp-btn {
+  display: inline-block; padding: 4px 12px;
+  border-radius: 6px; font-size: 12px; font-weight: 600;
+  text-decoration: none; white-space: nowrap;
+  background: #1565c0; color: #fff;
+  border: none; cursor: pointer;
+}
+.sp-btn:hover { opacity: .85; }
+
+/* Summary bar */
+.sp-summary {
+  display: flex; gap: 24px; flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.sp-stat {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 8px; padding: 10px 18px; text-align: center;
+  min-width: 90px;
+}
+.sp-stat-val { font-size: 22px; font-weight: 700; color: var(--text); }
+.sp-stat-lbl { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+/* Legend */
+.sp-legend {
+  display: flex; gap: 18px; margin-bottom: 14px; flex-wrap: wrap;
+  font-size: 12px; color: var(--text-muted);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sp-wrap">
+
+  <div class="sp-breadcrumb">
+    <a href="/admin/">Головна</a> ›
+    <a href="/admin/inventory/">Склад</a> ›
+    <a href="/admin/inventory/reorderproxy/">Аналіз запасів</a> ›
+    Резервації та прихід
+  </div>
+
+  <h1 class="sp-title">📋 Резервації та прихід товарів</h1>
+  <p class="sp-subtitle">Активні замовлення (не відвантажено) та відкриті PO з очікуваним приходом</p>
+
+  {% if rows %}
+
+  <!-- Summary -->
+  <div class="sp-summary">
+    <div class="sp-stat">
+      <div class="sp-stat-val">{{ rows|length }}</div>
+      <div class="sp-stat-lbl">товарів</div>
+    </div>
+    {% with total_res=0 total_inc=0 %}
+    <div class="sp-stat">
+      <div class="sp-stat-val" style="color:#ef5350">
+        {% for r in rows %}{% for x in r.reservations %}{% if forloop.first and forloop.parentloop.first %}{% endif %}{% endfor %}{% endfor %}
+        {% comment %}Count via template tag workaround{% endcomment %}
+        {{ rows|length }}+
+      </div>
+      <div class="sp-stat-lbl">📋 Позицій резерв</div>
+    </div>
+    {% endwith %}
+  </div>
+
+  <!-- Legend -->
+  <div class="sp-legend">
+    <span><span class="sp-badge sp-badge-res">📋 Резерв</span> — замовлення отримано/в обробці, товар ще не відправлено</span>
+    <span><span class="sp-badge sp-badge-inc">📦 Прихід</span> — відкрите закупівельне замовлення (PO), товар очікується</span>
+  </div>
+
+  <table class="sp-table">
+    <thead>
+      <tr>
+        <th style="width:160px">SKU / Назва</th>
+        <th style="width:90px;text-align:center">На складі</th>
+        <th style="width:90px">Тип</th>
+        <th>Деталі (замовник / постачальник)</th>
+        <th style="width:80px;text-align:right">К-сть</th>
+        <th style="width:110px">Статус / Дата</th>
+        <th style="width:80px">Дія</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+      {% with product=row.product stock=row.stock reservations=row.reservations incoming=row.incoming %}
+
+      {# ── Product header row ── #}
+      <tr class="sp-prod-row">
+        <td>
+          <div class="sp-prod-sku">
+            <a href="/admin/inventory/product/{{ product.pk }}/change/"
+               style="color:var(--text);text-decoration:none">{{ product.sku }}</a>
+          </div>
+          <div class="sp-prod-name">{{ product.name|truncatechars:50 }}</div>
+        </td>
+        <td style="text-align:center">
+          {% if stock <= 0 %}
+            <span class="sp-stock-crit">🚫 0</span>
+          {% elif stock < 5 %}
+            <span class="sp-stock-warn">⚠️ {{ stock|floatformat:"0" }}</span>
+          {% else %}
+            <span class="sp-stock-ok">{{ stock|floatformat:"0" }}</span>
+          {% endif %}
+        </td>
+        <td colspan="3" style="color:var(--text-dim);font-size:12px">
+          {% if reservations %}📋 {{ reservations|length }} резерв.{% endif %}
+          {% if reservations and incoming %} · {% endif %}
+          {% if incoming %}📦 {{ incoming|length }} PO{% endif %}
+        </td>
+        <td>
+          <a href="/admin/inventory/purchaseorder/add/?product={{ product.pk }}"
+             class="sp-btn">+ PO</a>
+        </td>
+      </tr>
+
+      {# ── Reservation sub-rows ── #}
+      {% for res in reservations %}
+      <tr class="sp-sub-row">
+        <td></td>
+        <td></td>
+        <td><span class="sp-badge sp-badge-res">📋 Резерв</span></td>
+        <td>
+          <a href="/admin/sales/salesorder/{{ res.order_pk }}/change/"
+             style="color:var(--link-fg);font-weight:600;text-decoration:none"
+             target="_blank">
+            {{ res.client|truncatechars:35 }}
+          </a>
+          <span style="font-size:11px;color:var(--text-dim);margin-left:6px">
+            #{{ res.order_number }}
+          </span>
+          {% if res.order_date %}
+          <span style="font-size:11px;color:var(--text-dim);margin-left:6px">
+            · {{ res.order_date|date:"d.m.Y" }}
+          </span>
+          {% endif %}
+        </td>
+        <td style="text-align:right;font-weight:700;color:#ef5350">
+          {{ res.qty|floatformat:"0" }}
+        </td>
+        <td>
+          <span class="sp-status sp-status-{{ res.status_raw }}">{{ res.status }}</span>
+        </td>
+        <td></td>
+      </tr>
+      {% endfor %}
+
+      {# ── Incoming PO sub-rows ── #}
+      {% for inc in incoming %}
+      <tr class="sp-sub-row">
+        <td></td>
+        <td></td>
+        <td><span class="sp-badge sp-badge-inc">📦 Прихід</span></td>
+        <td>
+          <a href="/admin/inventory/purchaseorder/{{ inc.po_pk }}/change/"
+             style="color:var(--link-fg);font-weight:600;text-decoration:none"
+             target="_blank">
+            {{ inc.supplier|truncatechars:35 }}
+          </a>
+          <span style="font-size:11px;color:var(--text-dim);margin-left:6px">
+            {{ inc.po_str }}
+          </span>
+        </td>
+        <td style="text-align:right;font-weight:700;color:#66bb6a">
+          {{ inc.qty|floatformat:"0" }}
+        </td>
+        <td>
+          {% if inc.expected_date %}
+            <span style="color:#ffb300;font-size:12px">📅 {{ inc.expected_date|date:"d.m.Y" }}</span>
+          {% else %}
+            <span style="color:var(--text-dim);font-size:12px">— дата не вказана</span>
+          {% endif %}
+        </td>
+        <td></td>
+      </tr>
+      {% endfor %}
+
+      {% endwith %}
+    {% endfor %}
+    </tbody>
+  </table>
+
+  {% else %}
+  <div class="sp-empty">
+    ✅ Немає активних резервацій та відкритих замовлень на закупівлю
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

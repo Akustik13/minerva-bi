@@ -145,6 +145,102 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None): return False
     def has_delete_permission(self, request, obj=None): return False
 
+    def get_urls(self):
+        from django.urls import path
+        return [
+            path('supply/', self.admin_site.admin_view(self.supply_view),
+                 name='inventory_reorderproxy_supply'),
+        ] + super().get_urls()
+
+    def supply_view(self, request):
+        """Огляд резервацій та очікуваного приходу по товарах."""
+        from django.shortcuts import render
+        from django.db.models import Sum, Q
+        from collections import defaultdict
+
+        DONE_STATUSES = {'shipped', 'delivered', 'cancelled'}
+
+        try:
+            from sales.models import SalesOrderLine
+            pending_lines = list(
+                SalesOrderLine.objects
+                .filter(product__is_active=True, order__affects_stock=True)
+                .exclude(order__status__in=DONE_STATUSES)
+                .select_related('product', 'order')
+                .order_by('product__sku', 'order__order_date')
+            )
+        except Exception:
+            pending_lines = []
+
+        po_lines = list(
+            PurchaseOrderLine.objects
+            .filter(product__is_active=True,
+                    purchase_order__status__in=['draft', 'ordered', 'partial'])
+            .select_related('product', 'purchase_order', 'purchase_order__supplier')
+            .order_by('product__sku', 'purchase_order__expected_date')
+        )
+
+        product_pks = set()
+        product_pks.update(l.product_id for l in pending_lines)
+        product_pks.update(l.product_id for l in po_lines)
+
+        stock_map = {}
+        if product_pks:
+            for s in (InventoryTransaction.objects
+                      .filter(product_id__in=product_pks)
+                      .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
+                      .values('product_id').annotate(t=Sum('qty'))):
+                stock_map[s['product_id']] = float(s['t'] or 0)
+
+        data = {}  # pk → {product, stock, reservations, incoming}
+
+        for l in pending_lines:
+            pk = l.product_id
+            if pk not in data:
+                data[pk] = {'product': l.product, 'stock': stock_map.get(pk, 0),
+                            'reservations': [], 'incoming': []}
+            o = l.order
+            data[pk]['reservations'].append({
+                'order_number': o.order_number,
+                'order_pk':     o.pk,
+                'qty':          float(l.qty),
+                'client':       o.client or o.ship_name or o.email or f'#{o.order_number}',
+                'status':       o.get_status_display(),
+                'status_raw':   o.status,
+                'order_date':   o.order_date,
+            })
+
+        for l in po_lines:
+            pk = l.product_id
+            remaining = float(l.qty_ordered) - float(l.qty_received)
+            if remaining <= 0:
+                continue
+            if pk not in data:
+                data[pk] = {'product': l.product, 'stock': stock_map.get(pk, 0),
+                            'reservations': [], 'incoming': []}
+            po = l.purchase_order
+            data[pk]['incoming'].append({
+                'po_pk':         po.pk,
+                'po_str':        str(po),
+                'supplier':      str(po.supplier) if po.supplier_id else '—',
+                'qty':           remaining,
+                'expected_date': po.expected_date,
+            })
+
+        rows = sorted(
+            [v for v in data.values() if v['product']],
+            key=lambda x: x['product'].sku,
+        )
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title':   'Резервації та прихід товарів',
+            'subtitle': None,
+            'rows':    rows,
+            'opts':    ReorderProxy._meta,
+        }
+        return render(request, 'admin/inventory/reorderproxy/supply.html', context)
+
     def get_queryset(self, request):
         from django.db.models import OuterRef, Subquery, ExpressionWrapper, DecimalField, Value
         from django.db.models.functions import Coalesce
