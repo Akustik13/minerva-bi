@@ -1067,5 +1067,19 @@ document.addEventListener('DOMContentLoaded', () => {
   if (CUSTOMER_PK && CUSTOMER_PK !== 'None') loadTimeline();
 });
 </script>
+
+<div style="margin:16px 0;padding:14px 16px;border:1px solid var(--border-strong);
+            border-radius:10px;background:var(--bg-card)">
+  <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">
+    📄 Документи клієнта
+  </div>
+  <div id="doc-templates-list"
+       style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>
+  <div id="doc-gen-status"></div>
+  <div id="docs-list"></div>
+</div>
+
+<script src="/static/admin/js/document_widget.js"></script>
+<script>DocumentWidget.init('crm', '{{ original.pk }}');</script>
 {% endif %}
 {% endblock %}

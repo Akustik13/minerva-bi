@@ -23,6 +23,7 @@ MODULES = [
     {'app_label': 'bots',         'name': 'AI та Боти',           'tier': 'premium',  'order': 60},
     {'app_label': 'api',        'name': 'REST API',             'tier': 'premium',  'order': 61},
     {'app_label': 'autoimport', 'name': 'Авто-імпорт',         'tier': 'premium',  'order': 62},
+    {'app_label': 'documents',  'name': 'Документи',            'tier': 'standard', 'order': 63},
     {'app_label': 'backup',     'name': 'Резервне копіювання',  'tier': 'standard', 'order': 70},
 ]
 

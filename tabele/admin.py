@@ -34,6 +34,7 @@ def _get_app_list(self, request, app_label=None):
         'ai_assistant',     # 🏛️ Minerva AI
         'email_assistant',  # 📧 Email Асистент
         'bots',             # 🤖 Боти та AI
+        'documents',        # 📄 Документи
         'api',        # 🔑 API Ключі
         'config',     # ⚙️ Конфігурація
         'auth',       # 🔐 Аутентифікація та авторизація
@@ -55,7 +56,8 @@ def _get_app_list(self, request, app_label=None):
         'shipping': ['carrier', 'shippingsettings', 'packagingmaterial', 'shipment', 'orderpackaging'],
         'config':   ['systemsettings', 'documentsettings', 'notificationsettings', 'themesettings'],
         'api':      ['apikey'],
-        'bots':     ['digikeyconfig', 'bot', 'botlog'],
+        'bots':      ['digikeyconfig', 'bot', 'botlog'],
+        'documents': ['documenttemplate', 'generateddocument'],
     }
 
     # Моделі що реєструються в admin але не показуються в сайдбарі

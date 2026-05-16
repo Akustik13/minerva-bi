@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'email_assistant',  # 📧 Email Асистент
     'calendar_app',     # 📅 Календар
     'bots',             # 🤖 Боти та AI
+    'documents',        # 📄 Документи
     'faq',              # ❓ FAQ та підтримка
     'labels_app',       # 🏷️ Етикетки
     'backup',           # 💾 Резервне копіювання

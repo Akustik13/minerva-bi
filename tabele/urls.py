@@ -112,6 +112,7 @@ urlpatterns = [
     path("email/", include("email_assistant.urls")),
     path("calendar/", include("calendar_app.urls")),
     path("bots/", include("bots.urls")),
+    path("documents/", include("documents.urls")),
     path("api/v1/", include("api.urls")),
     path("api-auth/", include("rest_framework.urls")),
 ] + [

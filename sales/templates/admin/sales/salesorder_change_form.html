@@ -864,4 +864,32 @@ document.addEventListener('DOMContentLoaded',function(){
   {% endwith %}
 </div>
 {% endif %}
+
+{% if original and original.pk %}
+<div style="margin:20px 0;padding:16px;border:1px solid var(--border-strong);
+            border-radius:10px;background:var(--bg-card)">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:14px;font-weight:600;color:var(--text)">📄 Генерація документів</div>
+    <a href="/admin/documents/documenttemplate/add/"
+       style="font-size:11px;color:var(--link-fg)">+ Новий шаблон</a>
+  </div>
+
+  <div id="doc-templates-list"
+       style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <span style="font-size:12px;color:var(--text-dim)">Завантаження...</span>
+  </div>
+
+  <div id="doc-gen-status"></div>
+
+  <div style="margin-top:14px;border-top:1px solid var(--border-strong);padding-top:12px">
+    <div style="font-size:12px;font-weight:600;color:var(--text-dim);margin-bottom:6px">
+      📁 Збережені документи
+    </div>
+    <div id="docs-list"></div>
+  </div>
+</div>
+
+<script src="/static/admin/js/document_widget.js"></script>
+<script>DocumentWidget.init('sales', '{{ original.pk }}');</script>
+{% endif %}
 {% endblock %}
