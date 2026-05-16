@@ -86,17 +86,6 @@ class DigiKeyConfig(models.Model):
         ),
     )
 
-    # ── Адреса постачальника (для Packing List) ───────────────────────────────
-    supplier_name    = models.CharField("Назва компанії",    max_length=200, blank=True, default="",
-                                        help_text="Відображається у верхньому лівому куті Pack List")
-    supplier_street  = models.CharField("Вулиця, будинок",  max_length=200, blank=True, default="")
-    supplier_city    = models.CharField("Місто",             max_length=100, blank=True, default="")
-    supplier_state   = models.CharField("Штат / регіон",    max_length=100, blank=True, default="",
-                                        help_text="Необов'язково. Напр. Bavaria")
-    supplier_zip     = models.CharField("Поштовий індекс",  max_length=20,  blank=True, default="")
-    supplier_country = models.CharField("Країна (ISO 2)",   max_length=2,   blank=True, default="",
-                                        help_text="Напр. DE / US / UA")
-
     # ── Публічний URL сайту ───────────────────────────────────────────────────
     public_base_url = models.CharField(
         "Публічний URL сайту", max_length=200, blank=True, default="",

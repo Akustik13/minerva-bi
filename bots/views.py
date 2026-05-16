@@ -181,14 +181,20 @@ def digikey_packlist(request, order_pk):
             status=502,
         )
 
-    # ── Supplier address from DigiKeyConfig ──────────────────────────────────
-    city_parts = [p for p in [config.supplier_city, config.supplier_state, config.supplier_zip] if p]
-    supplier = {
-        "name":     config.supplier_name or "",
-        "street":   config.supplier_street or "",
-        "city_zip": ", ".join(city_parts),
-        "country":  config.supplier_country or "",
-    }
+    # ── Supplier address from AccountingSettings (our registered data) ─────────
+    supplier = {"name": "Supplier", "street": "", "city_zip": "", "country": ""}
+    try:
+        from accounting.models import CompanySettings
+        cs = CompanySettings.get()
+        city_zip = " ".join(filter(None, [cs.addr_zip, cs.addr_city])).strip()
+        supplier = {
+            "name":     cs.name or "",
+            "street":   cs.addr_street or "",
+            "city_zip": city_zip,
+            "country":  cs.addr_country or "",
+        }
+    except Exception:
+        pass
 
     # ── Generate PDF ──────────────────────────────────────────────────────────
     try:
