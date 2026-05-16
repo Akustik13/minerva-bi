@@ -151,24 +151,64 @@ from django.shortcuts import get_object_or_404
 def digikey_packlist(request, order_pk):
     """
     GET /bots/digikey/packlist/<order_pk>/
-    Генерує PDF пакувального листа з даних замовлення Minerva.
+    Генерує PDF пакувального листа у форматі DigiKey, використовуючи
+    живі дані з Marketplace API (не з локальної БД).
     """
     from sales.models import SalesOrder
-    from sales.doc_generators import generate_packing_list
+    from bots.models import DigiKeyConfig
 
-    order = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
+    order  = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
+    config = DigiKeyConfig.get()
 
+    # ── Fetch live order data from DigiKey Marketplace API ────────────────────
+    api_order = {}
+    fetch_error = None
     try:
-        buf = generate_packing_list(order)
+        from bots.services.digikey import get_marketplace_token, _fetch_marketplace_order
+        token     = get_marketplace_token(config)
+        api_order = _fetch_marketplace_order(config, order.order_number, token)
+    except Exception as e:
+        fetch_error = str(e)
+
+    if not api_order:
+        return HttpResponse(
+            f"<h3>Не вдалося отримати дані замовлення з DigiKey API</h3>"
+            f"<p>Order: <b>{order.order_number}</b></p>"
+            f"<pre>{fetch_error or 'Порожня відповідь API'}</pre>"
+            f"<p>Переконайся що Marketplace авторизований "
+            f"(<a href='/admin/bots/digikeyconfig/1/change/'>DigiKey Config</a>).</p>",
+            content_type="text/html; charset=utf-8",
+            status=502,
+        )
+
+    # ── Supplier address from AccountingSettings (our registered data) ─────────
+    supplier = {"name": "Supplier", "street": "", "city_zip": "", "country": ""}
+    try:
+        from accounting.models import CompanySettings
+        cs = CompanySettings.get()
+        city_zip = " ".join(filter(None, [cs.addr_zip, cs.addr_city])).strip()
+        supplier = {
+            "name":     cs.name or "",
+            "street":   cs.addr_street or "",
+            "city_zip": city_zip,
+            "country":  cs.addr_country or "",
+        }
+    except Exception:
+        pass
+
+    # ── Generate PDF ──────────────────────────────────────────────────────────
+    try:
+        from bots.services.digikey_pdf import generate_digikey_packing_list
+        buf       = generate_digikey_packing_list(api_order, supplier)
         pdf_bytes = buf.getvalue()
     except Exception as e:
         return HttpResponse(
-            f"<h3>Помилка генерації Pack List</h3><pre>{type(e).__name__}: {e}</pre>",
+            f"<h3>Помилка генерації PDF</h3><pre>{type(e).__name__}: {e}</pre>",
             content_type="text/html; charset=utf-8",
             status=500,
         )
 
-    filename = f"packlist_{order.order_number}.pdf"
+    filename = f"DigiKey_PackList_{order.order_number}.pdf"
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
