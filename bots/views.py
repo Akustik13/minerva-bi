@@ -218,11 +218,21 @@ def digikey_ship_order(request, order_pk):
 
         return redirect(f"/admin/sales/salesorder/{order_pk}/change/")
 
-    # GET — показати форму
+    # GET — показати форму; підтягуємо список carriers з DigiKey API
+    carriers = []
+    has_token = bool(config.marketplace_access_token)
+    if has_token:
+        try:
+            from bots.services.digikey import get_shipping_carriers
+            carriers = get_shipping_carriers(config)
+        except Exception:
+            carriers = []
+
     from django.template.response import TemplateResponse
     return TemplateResponse(request, "admin/bots/digikey_ship_order.html", {
-        "title": f"Відправити #{order.order_number} на DigiKey",
-        "order": order,
-        "config": config,
-        "has_token": bool(config.marketplace_access_token),
+        "title":     f"Відправити #{order.order_number} на DigiKey",
+        "order":     order,
+        "config":    config,
+        "has_token": has_token,
+        "carriers":  carriers,
     })

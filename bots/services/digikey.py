@@ -1234,15 +1234,35 @@ MARKETPLACE_CONFIRM_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/acce
 
 
 def _fetch_marketplace_order(config, order_id: str, token: str) -> dict:
-    """GET /Sales/Marketplace2/Orders/v1/orders/{orderId} — для отримання orderDetailId."""
+    """GET /Sales/Marketplace2/Orders/v1/orders?BusinessIds={orderId}
+    Документований спосіб отримати одне замовлення (GET /orders/{id} не існує в API)."""
     import requests as req
     from tabele.api_logger import logged_request
     resp = logged_request('digikey', 'fetch_marketplace_order', 'GET',
-                          f"{_base_url(config)}{MARKETPLACE_PATH}/{order_id}", req.get,
+                          f"{_base_url(config)}{MARKETPLACE_PATH}", req.get,
+                          headers=_headers(config, token),
+                          params={"BusinessIds": order_id, "Max": 1},
+                          timeout=15)
+    if resp.ok:
+        orders = resp.json().get("orders") or []
+        return orders[0] if orders else {}
+    logger.warning("_fetch_marketplace_order: %s → %s", order_id, resp.status_code)
+    return {}
+
+
+def get_shipping_carriers(config) -> list:
+    """GET /Sales/Marketplace2/Shipping/v1/shipping/carriers
+    Повертає список доступних перевізників з UUID та назвою."""
+    import requests as req
+    from tabele.api_logger import logged_request
+    token = get_marketplace_token(config)
+    url = f"{_base_url(config)}{MARKETPLACE_SHIPPING_PATH}/shipping/carriers"
+    resp = logged_request('digikey', 'get_shipping_carriers', 'GET', url, req.get,
                           headers=_headers(config, token), timeout=15)
     if resp.ok:
-        return resp.json()
-    return {}
+        return resp.json().get("shippingCarriers") or []
+    logger.warning("get_shipping_carriers: %s", resp.status_code)
+    return []
 
 
 def confirm_marketplace_order(config, order_id: str) -> dict:
@@ -1321,6 +1341,7 @@ def test_connection(config) -> dict:
 
 MARKETPLACE_SHIP_PATH           = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/ship"
 MARKETPLACE_INVOICE_NUMBER_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/supplierInvoiceNumber"
+MARKETPLACE_SHIPPING_PATH       = "/Sales/Marketplace2/Shipping/v1"
 
 
 def ship_marketplace_order(config, order_id: str, tracking_number: str,

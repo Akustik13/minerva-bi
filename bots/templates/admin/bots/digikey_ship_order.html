@@ -93,14 +93,26 @@
 
     <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
-        Carrier ID (UUID, необов'язково)
-        <span style="color:var(--text-muted);font-size:11px"> — UUID перевізника в системі DigiKey</span>
+        Перевізник (необов'язково)
       </label>
+      {% if carriers %}
+      <select name="carrier_id"
+              style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
+                     border:1px solid var(--border-strong);border-radius:4px;
+                     color:var(--text);font-size:13px;box-sizing:border-box">
+        <option value="">— не вказувати —</option>
+        {% for c in carriers %}
+        <option value="{{ c.id }}">{{ c.label }}{% if c.code %} ({{ c.code }}){% endif %}</option>
+        {% endfor %}
+      </select>
+      {% else %}
       <input type="text" name="carrier_id"
-             placeholder="3fa85f64-5717-4562-b3fc-2c963f66afa6"
+             placeholder="UUID перевізника (залиш порожнім якщо невідомо)"
              style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
                     border:1px solid var(--border-strong);border-radius:4px;
                     color:var(--text);font-family:monospace;font-size:13px;box-sizing:border-box">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Список перевізників недоступний (перевір авторизацію Marketplace)</div>
+      {% endif %}
     </div>
 
     <div style="margin-bottom:20px">
