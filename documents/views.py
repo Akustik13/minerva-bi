@@ -42,15 +42,42 @@ def generate_for_order(request, order_pk, template_pk=None):
             source_repr=f'Order #{ctx.get("order_number", order_pk)}',
             user=request.user,
         )
+
+        # Copy to media/orders/{source}/{order_number}/ so it shows in "Завантажені документи"
+        from django.conf import settings as _s
+        import shutil as _sh
+        from datetime import date as _date
+        from pathlib import Path as _P
+
+        source_slug  = order.source or 'manual'
+        order_number = order.order_number or str(order_pk)
+        dest_dir = _P(_s.MEDIA_ROOT) / 'orders' / source_slug / order_number
+        dest_dir.mkdir(parents=True, exist_ok=True)
+
+        copy_url = copy_filename = None
+        if doc.docx_file:
+            src_path = _P(doc.docx_file.path)
+            copy_filename = src_path.name
+            _sh.copy2(str(src_path), str(dest_dir / copy_filename))
+            copy_url = (
+                f'{_s.MEDIA_URL}orders/{source_slug}/{order_number}/{copy_filename}'
+            )
+
         return JsonResponse({
-            'ok':        True,
-            'doc_id':    doc.pk,
-            'status':    doc.status,
-            'docx_url':  f'/documents/download/{doc.pk}/docx/',
-            'has_pdf':   bool(doc.pdf_file),
-            'pdf_url':   f'/documents/download/{doc.pk}/pdf/' if doc.pdf_file else None,
-            'filename':  doc.docx_file.name.split('/')[-1] if doc.docx_file else '',
-            'file_size': doc.file_size_display(),
+            'ok':           True,
+            'doc_id':       doc.pk,
+            'status':       doc.status,
+            'docx_url':     f'/documents/download/{doc.pk}/docx/',
+            'has_pdf':      bool(doc.pdf_file),
+            'pdf_url':      f'/documents/download/{doc.pk}/pdf/' if doc.pdf_file else None,
+            'filename':     doc.docx_file.name.split('/')[-1] if doc.docx_file else '',
+            'file_size':    doc.file_size_display(),
+            # Local-save data (MinervaLocalSave.saveUrlToFolder)
+            'url':          copy_url,
+            'copy_filename': copy_filename,
+            'source_slug':  source_slug,
+            'date_str':     _date.today().strftime('%Y-%m-%d'),
+            'order_number': order_number,
         })
     except Exception as e:
         logger.error('generate_for_order %s: %s', order_pk, e)

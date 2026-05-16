@@ -1,18 +1,26 @@
 /**
  * document_widget.js
- * Універсальний віджет генерації документів для Admin сторінок.
+ * Universальний віджет генерації документів для Admin сторінок.
  */
 
 window.DocumentWidget = {
-  module:   null,
-  objectPk: null,
-  csrf:     null,
+  module:      null,
+  objectPk:    null,
+  csrf:        null,
+  sourceId:    '',
+  orderNumber: '',
+  sourceSlug:  'manual',
 
-  init(module, objectPk) {
+  init(module, objectPk, opts) {
     this.module   = module;
     this.objectPk = objectPk;
     this.csrf     = (document.cookie.split(';')
       .find(c => c.trim().startsWith('csrftoken=')) || '').split('=')[1] || '';
+    if (opts) {
+      this.sourceId    = opts.sourceId    || '';
+      this.orderNumber = opts.orderNumber || '';
+      this.sourceSlug  = opts.sourceSlug  || 'manual';
+    }
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', () => this._loadAll());
     } else {
@@ -29,7 +37,9 @@ window.DocumentWidget = {
     const el = document.getElementById(containerId);
     if (!el) return;
     try {
-      const r = await fetch(`/documents/templates/?module=${this.module}`);
+      let url = `/documents/templates/?module=${this.module}`;
+      if (this.sourceId) url += `&source_id=${this.sourceId}`;
+      const r = await fetch(url);
       const d = await r.json();
       if (!d.templates || !d.templates.length) {
         el.innerHTML =
@@ -41,15 +51,15 @@ window.DocumentWidget = {
       }
       el.innerHTML = d.templates.map(t =>
         `<button type="button"
-                 onclick="DocumentWidget.generate(${t.pk}, '${t.name.replace(/'/g,"\\\'")}')"
-                 title="${(t.description||'').replace(/"/g,'&quot;')}"
+                 onclick="DocumentWidget.generate(${t.pk}, '${t.name.replace(/'/g,"\\'")}')"
+                 title="${(t.description || '').replace(/"/g, '&quot;')}"
                  style="padding:6px 14px;border-radius:6px;font-size:12px;
                         border:1px solid var(--border-strong);background:none;
                         color:var(--text);cursor:pointer">
            📄 ${t.name}
          </button>`
       ).join('');
-    } catch(e) {
+    } catch (e) {
       el.innerHTML = '<span style="color:var(--err);font-size:12px">Помилка завантаження шаблонів</span>';
     }
   },
@@ -60,12 +70,10 @@ window.DocumentWidget = {
       `<span style="color:var(--text-dim)">⏳ Генерую "${templateName}"...</span>`;
 
     try {
-      const url = this.module === 'sales'
-        ? `/documents/order/${this.objectPk}/generate/${templatePk}/`
-        : `/documents/order/${this.objectPk}/generate/${templatePk}/`;
+      const url = `/documents/order/${this.objectPk}/generate/${templatePk}/`;
       const r = await fetch(url, {
         method: 'POST',
-        headers: {'X-CSRFToken': this.csrf},
+        headers: { 'X-CSRFToken': this.csrf },
       });
       const d = await r.json();
       if (d.ok) {
@@ -81,14 +89,39 @@ window.DocumentWidget = {
                     style="padding:5px 14px;border-radius:6px;font-size:12px;
                            background:var(--err);color:#fff;text-decoration:none">⬇ PDF</a>`
               : '') +
+            `<span id="dw-local-status" style="font-size:11px;color:var(--text-dim)"></span>` +
             `</div>`;
         }
         this.loadDocumentsList('docs-list');
+        // Also refresh the order upload-widget docs panel if present
+        if (typeof _refreshDocsPanel === 'function') {
+          _refreshDocsPanel(this.objectPk);
+        }
+        // Local save via MinervaLocalSave (File System Access API)
+        if (d.url && d.copy_filename && window.MinervaLocalSave && MinervaLocalSave.supported) {
+          const lsEl = document.getElementById('dw-local-status');
+          if (lsEl) lsEl.textContent = '💾 Збереження локально...';
+          const subs = (d.source_slug && d.date_str && d.order_number)
+            ? [d.source_slug, d.date_str, d.order_number] : null;
+          MinervaLocalSave.saveUrlToFolder(d.url, d.copy_filename, subs).then(res => {
+            if (!lsEl) return;
+            if (res.ok) {
+              lsEl.style.color = 'var(--ok)';
+              lsEl.textContent = '✅ ' + (res.path || 'збережено');
+            } else if (res.reason === 'no_handle') {
+              lsEl.style.color = 'var(--text-dim)';
+              lsEl.textContent = '📂 Папка не обрана';
+            } else {
+              lsEl.style.color = '#ff9800';
+              lsEl.textContent = '⚠️ ' + res.reason;
+            }
+          });
+        }
       } else {
         if (status) status.innerHTML =
           `<span style="color:var(--err);font-size:13px">✗ ${d.error}</span>`;
       }
-    } catch(e) {
+    } catch (e) {
       if (status) status.innerHTML =
         '<span style="color:var(--err);font-size:13px">✗ Помилка мережі</span>';
     }
@@ -128,7 +161,7 @@ window.DocumentWidget = {
                           background:none;cursor:pointer">✕</button>
          </div>`
       ).join('');
-    } catch(e) {}
+    } catch (e) {}
   },
 
   async deleteDoc(docId, btn) {
@@ -136,7 +169,7 @@ window.DocumentWidget = {
     try {
       const r = await fetch(`/documents/delete/${docId}/`, {
         method: 'POST',
-        headers: {'X-CSRFToken': this.csrf},
+        headers: { 'X-CSRFToken': this.csrf },
       });
       const d = await r.json();
       if (d.ok) {
@@ -144,7 +177,7 @@ window.DocumentWidget = {
       } else {
         alert('Помилка: ' + d.error);
       }
-    } catch(e) {
+    } catch (e) {
       alert('Помилка мережі');
     }
   },

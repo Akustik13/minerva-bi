@@ -734,6 +734,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             "fields": ("doc_buttons",),
             "description": "PDF генерується на льоту з даних замовлення",
         }),
+        ("📄 Word шаблони", {
+            "fields": ("doc_templates_panel",),
+            "description": "Генерація документів з Word (.docx) шаблонів — зберігається на сервер та локально",
+        }),
         ("📄 Документи замовлення", {
             "fields": ("documents_list", "upload_widget"),
             "description": "Завантаження документів: етикетки, декларації, чеки тощо. Автоматичне збереження на сервер та локально.",
@@ -741,8 +745,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     )
 
     readonly_fields = ['stock_summary', 'label_buttons_detail',
-                       'documents_list', 'upload_widget', 'doc_buttons', 'packaging_panel',
-                       'status_source', 'crm_link']
+                       'documents_list', 'upload_widget', 'doc_buttons', 'doc_templates_panel',
+                       'packaging_panel', 'status_source', 'crm_link']
     
     def _docs_panel_html(self, obj):
         """Inner HTML for the documents panel (used by documents_list and doc_list_view)."""
@@ -1094,6 +1098,42 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return mark_safe(js + ''.join(parts))
 
     doc_buttons.short_description = "📄 Генерація документів"
+
+    def doc_templates_panel(self, obj):
+        """Word шаблони — генерація docx документів із збереженням на сервер і локально."""
+        if not obj.pk:
+            return mark_safe('<em style="color:var(--text-dim)">Збережіть замовлення</em>')
+
+        source_id = ''
+        try:
+            from sales.models import SalesSource as _SS
+            src = _SS.objects.filter(slug=obj.source).first()
+            if src:
+                source_id = str(src.pk)
+        except Exception:
+            pass
+
+        source_slug  = (obj.source or 'manual').replace('"', '')
+        order_number = (obj.order_number or '').replace('"', '')
+
+        html = (
+            f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
+            f'<div id="doc-templates-list" style="display:flex;gap:8px;flex-wrap:wrap">'
+            f'<span style="font-size:12px;color:var(--text-dim)">⏳ Завантаження...</span>'
+            f'</div>'
+            f'<a href="/admin/documents/documenttemplate/add/" style="font-size:11px;color:var(--link-fg)">+ Шаблон</a>'
+            f'</div>'
+            f'<div id="doc-gen-status"></div>'
+            f'<div id="docs-list" style="margin-top:10px"></div>'
+            f'<script src="/static/admin/js/document_widget.js"></script>'
+            f'<script>'
+            f'DocumentWidget.init("sales","{obj.pk}",'
+            f'{{"sourceId":"{source_id}","orderNumber":"{order_number}","sourceSlug":"{source_slug}"}});'
+            f'</script>'
+        )
+        return mark_safe(html)
+
+    doc_templates_panel.short_description = "📄 Word шаблони"
 
     def packaging_panel(self, obj):
         """Рекомендована упаковка на основі товарів замовлення."""
