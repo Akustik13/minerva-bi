@@ -120,17 +120,31 @@
       <div style="margin-top:8px;font-size:12px;color:var(--text-dim)">PO: <span style="color:var(--text-muted)">{{ f.value }}</span></div>
       {% endif %}{% endfor %}
 
-      <!-- Confirm button for unconfirmed orders -->
-      {% if order.orderState == 'New' or order.orderState == 'PendingAcceptance' or order.orderState == 'AwaitingAcceptance' %}
-      <div style="margin-top:12px">
+      <!-- Action buttons -->
+      <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
+        {% if order.orderState == 'New' or order.orderState == 'PendingAcceptance' or order.orderState == 'AwaitingAcceptance' %}
         <a href="{% url 'admin:bots_digikeyconfig_confirm_order' order.id %}"
            onclick="return confirm('Підтвердити замовлення {% firstof order.orderId order.businessId order.id %}?')"
            style="display:inline-block;padding:7px 16px;background:var(--ok);color:#fff;
                   border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold">
-          ✅ Підтвердити замовлення
+          ✅ Підтвердити
         </a>
+        {% endif %}
+        {% if order.orderState == 'Accepted' or order.orderState == 'ShippingInProgress' or order.orderState == 'Shipped' %}
+        {% if order.minerva_pk %}
+        <a href="/bots/digikey/ship/{{ order.minerva_pk }}/"
+           style="display:inline-block;padding:7px 16px;background:#e65100;color:#fff;
+                  border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold">
+          📤 Відправити
+        </a>
+        <a href="/bots/digikey/packlist/{{ order.minerva_pk }}/" target="_blank"
+           style="display:inline-block;padding:7px 16px;background:#1565c0;color:#fff;
+                  border-radius:4px;text-decoration:none;font-size:13px;font-weight:bold">
+          📦 Pack List
+        </a>
+        {% endif %}
+        {% endif %}
       </div>
-      {% endif %}
 
     </div>
     {% endwith %}

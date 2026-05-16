@@ -76,6 +76,13 @@
                        border:1px solid rgba(79,143,255,.3);cursor:pointer">
           ✉️ Написати лист
         </button>
+        <button type="button" onclick="runStrategyAdvisor()" id="btn-strategy-advisor"
+                title="AI аналізує виконані кроки стратегії та дає рекомендацію щодо корегування"
+                style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
+                       background:rgba(147,112,219,.12);color:#9370db;
+                       border:1px solid rgba(147,112,219,.3);cursor:pointer">
+          🧭 Стратегія AI
+        </button>
         <button type="button" onclick="resetAiContext()" id="btn-reset-ai"
                 title="Скинути пам'ять AI для цього клієнта — нова розмова почнеться з чистого аркуша"
                 style="padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;
@@ -96,6 +103,25 @@
       <button type="button" id="sc-shipments" onclick="toggleScope('shipments')" class="scope-pill active">🚚 Доставка</button>
     </div>
 
+    <!-- Mailbox email picker -->
+    <div style="padding:6px 16px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text-dim)">📬 Листи зі скриньки:</span>
+        <button type="button" id="btn-load-mailbox" onclick="loadMailboxEmails()"
+                style="padding:3px 10px;border-radius:5px;font-size:11px;font-weight:600;
+                       border:1px solid var(--border-strong);background:transparent;
+                       color:var(--text-dim);cursor:pointer">
+          Завантажити
+        </button>
+        <span id="mailbox-status" style="font-size:11px;color:var(--text-muted)"></span>
+      </div>
+      <div id="mailbox-email-list"
+           style="display:none;margin-top:6px;max-height:180px;overflow-y:auto;
+                  border:1px solid var(--border);border-radius:4px;padding:4px 8px;
+                  background:var(--bg-input)">
+      </div>
+    </div>
+
     <div style="padding:6px 16px 10px;border-bottom:1px solid var(--border)">
       <textarea id="analysis-extra"
                 placeholder="На що акцентувати аналіз: конкретне питання, сфера інтересів, проблема... (необов'язково)"
@@ -109,6 +135,11 @@
     <div id="analysis-result"
          style="padding:14px 16px;font-size:13px;line-height:1.6;
                 color:var(--text);display:none">
+    </div>
+
+    <!-- Strategy Advisor result (appears when runStrategyAdvisor is clicked) -->
+    <div id="strategy-advisor-result" style="display:none;padding:14px 16px;
+         border-top:2px solid rgba(147,112,219,.4);font-size:13px;line-height:1.7;color:var(--text)">
     </div>
 
     <div id="email-composer"
@@ -440,17 +471,101 @@ function toggleScope(key) {
   try { localStorage.setItem(_SCOPE_KEY, JSON.stringify(_analysisScope)); } catch(e) {}
 }
 
+// ── Mailbox email picker ──────────────────────────────────────────────────────
+const _mailboxEmails = {};
+const _selectedMailboxIds = new Set();
+
+async function loadMailboxEmails() {
+  const btn = document.getElementById('btn-load-mailbox');
+  const list = document.getElementById('mailbox-email-list');
+  const status = document.getElementById('mailbox-status');
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/mailbox-emails/`);
+    const d = await r.json();
+    if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
+    const emails = d.emails || [];
+    if (!emails.length) { status.textContent = d.message || 'Листів не знайдено.'; return; }
+    emails.forEach(e => { _mailboxEmails[e.id] = e; });
+    list.innerHTML = emails.map(e => `
+      <label style="display:flex;gap:6px;align-items:flex-start;padding:4px 2px;
+             cursor:pointer;border-bottom:1px solid var(--border);font-size:12px">
+        <input type="checkbox" data-mid="${e.id}" onchange="toggleMailboxEmail(${e.id})"
+               style="margin-top:2px;flex-shrink:0">
+        <span>
+          <span style="color:${e.direction==='in'?'#4f8fff':'#9370db'}">
+            ${e.direction==='in'?'←':'→'}
+          </span>
+          <strong>${e.subject}</strong>
+          <span style="color:var(--text-muted)">${e.date}</span>
+          ${e.snippet ? '<br><span style="color:var(--text-dim)">'+e.snippet.substring(0,120)+'</span>' : ''}
+        </span>
+      </label>`).join('');
+    list.style.display = 'block';
+    updateMailboxStatus();
+  } catch(e) {
+    status.textContent = '⚠️ Помилка завантаження';
+  }
+  btn.disabled = false; btn.textContent = 'Оновити';
+}
+
+function toggleMailboxEmail(id) {
+  if (_selectedMailboxIds.has(id)) _selectedMailboxIds.delete(id);
+  else _selectedMailboxIds.add(id);
+  updateMailboxStatus();
+}
+
+function updateMailboxStatus() {
+  const s = document.getElementById('mailbox-status');
+  if (s) s.textContent = _selectedMailboxIds.size
+    ? `✅ Вибрано: ${_selectedMailboxIds.size} листів — додано до аналізу`
+    : '';
+}
+
+// ── Strategy Advisor ──────────────────────────────────────────────────────────
+
+async function runStrategyAdvisor() {
+  const btn = document.getElementById('btn-strategy-advisor');
+  const res = document.getElementById('strategy-advisor-result');
+  btn.disabled = true; btn.textContent = '⏳ Аналізую стратегію...';
+  res.style.display = 'block';
+  res.innerHTML = '<span style="color:rgba(147,112,219,.7)">🧭 Minerva аналізує прогрес стратегії...</span>';
+  document.getElementById('analysis-result').style.display = 'none';
+  try {
+    const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-strategy-advisor/`);
+    const d = await r.json();
+    if (d.ok) {
+      const link = d.strategy_url
+        ? `<a href="${d.strategy_url}" target="_blank" style="color:var(--link-fg);font-size:11px">→ Відкрити канвас</a>`
+        : '';
+      res.innerHTML = `<div style="margin-bottom:8px;display:flex;align-items:center;gap:8px">
+        <strong style="color:rgba(147,112,219,1)">🧭 ${d.strategy_name||'Стратегія'}</strong>${link}</div>`
+        + d.advice.replace(/\n/g,'<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
+      loadTimeline();
+    } else {
+      res.innerHTML = '<span style="color:var(--err)">⚠️ ' + (d.error||'Помилка') + '</span>';
+    }
+  } catch(e) {
+    res.innerHTML = '<span style="color:var(--err)">⚠️ Помилка з\'єднання</span>';
+  }
+  btn.disabled = false; btn.textContent = '🧭 Стратегія AI';
+}
+
 async function runAnalysis() {
   const btn = document.getElementById('btn-analysis');
   const res = document.getElementById('analysis-result');
   btn.disabled = true; btn.textContent = '⏳ Аналізую...';
   res.style.display = 'block';
+  document.getElementById('strategy-advisor-result').style.display = 'none';
   res.innerHTML = '<span style="color:var(--text-dim)">Мінерва аналізує клієнта...</span>';
 
   const include = Object.keys(_analysisScope).filter(k => _analysisScope[k]).join(',') || 'customer';
   const extraAnalysis = (document.getElementById('analysis-extra')?.value || '').trim();
+  const mailboxParam = _selectedMailboxIds.size
+    ? `&mailbox_ids=${[..._selectedMailboxIds].join(',')}` : '';
   const analysisUrl = `/crm/customer/${CUSTOMER_PK}/ai-analysis/?include=${include}`
-    + (extraAnalysis ? `&extra_prompt=${encodeURIComponent(extraAnalysis)}` : '');
+    + (extraAnalysis ? `&extra_prompt=${encodeURIComponent(extraAnalysis)}` : '')
+    + mailboxParam;
 
   try {
     const r = await fetch(analysisUrl);

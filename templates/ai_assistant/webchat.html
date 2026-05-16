@@ -118,8 +118,36 @@
     </div>
   </div>
 
+  <!-- Email context panel (hidden by default) -->
+  <div id="mv-email-panel" style="display:none;border-top:1px solid var(--border);
+       background:var(--bg-input);padding:10px 14px">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:12px;font-weight:600;color:var(--text)">📬 Листи зі скриньки</span>
+      <button id="mv-email-load-btn" onclick="mvLoadEmails()"
+              style="padding:3px 10px;border-radius:5px;font-size:11px;font-weight:600;
+                     border:1px solid var(--border-strong);background:transparent;
+                     color:var(--text-dim);cursor:pointer">Завантажити</button>
+      <span id="mv-email-sel-status" style="font-size:11px;color:var(--text-muted)"></span>
+    </div>
+    <div id="mv-email-list" style="max-height:160px;overflow-y:auto;font-size:12px;
+         border:1px solid var(--border);border-radius:4px;padding:4px 0;
+         background:var(--bg-card)">
+      <div style="padding:6px 10px;color:var(--text-muted);font-style:italic">Натисни «Завантажити»</div>
+    </div>
+    <div style="margin-top:6px;font-size:11px;color:var(--text-dim)">
+      Вибрані листи будуть додані до наступного повідомлення як контекст для AI.
+    </div>
+  </div>
+
   <div id="mv-chat-input-row">
     <textarea id="mv-chat-input" rows="2" placeholder="Напишіть питання…"></textarea>
+    <label id="mv-email-panel-label" title="Додати листи зі скриньки до аналізу"
+           onclick="mvToggleEmailPanel()"
+           style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);
+                  cursor:pointer;white-space:nowrap;user-select:none;padding:4px 8px;
+                  border:1px solid var(--border);border-radius:6px;transition:border-color .15s,color .15s">
+      📬
+    </label>
     <label id="mv-web-search-label" title="Шукати в інтернеті при відповіді">
       <input type="checkbox" id="mv-web-search-toggle">
       🌐
@@ -137,7 +165,83 @@ const sendBtn = document.getElementById('mv-send-btn');
 const typing = document.getElementById('mv-typing');
 const ME = '{{ profile.user.get_full_name|default:profile.user.username }}';
 
-// Web search toggle — persist in localStorage; default from server setting
+// ── Email context picker ───────────────────────────────────────────────────
+const _mvEmails = {};
+const _mvSelectedIds = new Set();
+let _mvEmailPanelOpen = false;
+
+function mvToggleEmailPanel() {
+  _mvEmailPanelOpen = !_mvEmailPanelOpen;
+  const panel = document.getElementById('mv-email-panel');
+  const lbl   = document.getElementById('mv-email-panel-label');
+  panel.style.display = _mvEmailPanelOpen ? 'block' : 'none';
+  lbl.style.borderColor = _mvEmailPanelOpen ? 'var(--accent)' : 'var(--border)';
+  lbl.style.color = _mvEmailPanelOpen ? 'var(--accent)' : 'var(--text-muted)';
+}
+
+async function mvLoadEmails() {
+  const btn    = document.getElementById('mv-email-load-btn');
+  const list   = document.getElementById('mv-email-list');
+  btn.disabled = true; btn.textContent = '⏳';
+  try {
+    const r = await fetch('{% url "ai_assistant:email_threads" %}');
+    const d = await r.json();
+    const emails = d.emails || [];
+    if (!emails.length) { list.innerHTML = '<div style="padding:6px 10px;color:var(--text-muted)">Листів не знайдено.</div>'; return; }
+    emails.forEach(e => { _mvEmails[e.id] = e; });
+    list.innerHTML = emails.map(e => `
+      <label style="display:flex;gap:6px;align-items:flex-start;padding:4px 10px;
+             cursor:pointer;border-bottom:1px solid var(--border)">
+        <input type="checkbox" data-mid="${e.id}" onchange="mvToggleEmail(${e.id})" style="margin-top:2px;flex-shrink:0">
+        <span>
+          <span style="color:${e.direction==='in'?'#4f8fff':'#9370db'}">${e.direction==='in'?'←':'→'}</span>
+          <strong style="color:var(--text)">${e.subject}</strong>
+          ${e.customer ? '<span style="color:var(--text-muted)"> · '+e.customer+'</span>' : ''}
+          <span style="color:var(--text-dim);font-size:11px"> ${e.date}</span>
+          ${e.snippet ? '<br><span style="color:var(--text-dim)">'+e.snippet.substring(0,100)+'</span>' : ''}
+        </span>
+      </label>`).join('');
+    mvUpdateEmailStatus();
+  } catch(err) {
+    list.innerHTML = '<div style="padding:6px 10px;color:var(--err)">⚠️ Помилка завантаження</div>';
+  }
+  btn.disabled = false; btn.textContent = 'Оновити';
+}
+
+function mvToggleEmail(id) {
+  if (_mvSelectedIds.has(id)) _mvSelectedIds.delete(id);
+  else _mvSelectedIds.add(id);
+  mvUpdateEmailStatus();
+}
+
+function mvUpdateEmailStatus() {
+  const s = document.getElementById('mv-email-sel-status');
+  const lbl = document.getElementById('mv-email-panel-label');
+  if (_mvSelectedIds.size) {
+    s.textContent = `✅ Вибрано: ${_mvSelectedIds.size}`;
+    lbl.textContent = '📬 ' + _mvSelectedIds.size;
+    lbl.style.color = 'var(--accent)';
+    lbl.style.borderColor = 'var(--accent)';
+  } else {
+    s.textContent = '';
+    lbl.textContent = '📬';
+    lbl.style.color = _mvEmailPanelOpen ? 'var(--accent)' : 'var(--text-muted)';
+    lbl.style.borderColor = _mvEmailPanelOpen ? 'var(--accent)' : 'var(--border)';
+  }
+}
+
+function mvGetEmailContext() {
+  if (!_mvSelectedIds.size) return '';
+  const lines = ['=== КОНТЕКСТ: ЛИСТИ ЗІ СКРИНЬКИ ==='];
+  for (const id of _mvSelectedIds) {
+    const e = _mvEmails[id];
+    if (e) lines.push(`[${e.direction==='in'?'← від клієнта':'→ до клієнта'}] ${e.date} | ${e.subject}\n${e.snippet||''}`);
+  }
+  lines.push('=== КІНЕЦЬ КОНТЕКСТУ ===');
+  return lines.join('\n\n');
+}
+
+// ── Web search toggle — persist in localStorage; default from server setting
 const wsToggle = document.getElementById('mv-web-search-toggle');
 const wsLabel  = document.getElementById('mv-web-search-label');
 const WS_KEY   = 'mv_chat_web_search';
@@ -190,7 +294,12 @@ async function send() {
   const text = input.value.trim();
   if (!text) return;
   input.value = '';
-  addMsg('user', text);
+
+  // Include selected email context as prefix
+  const emailCtx = mvGetEmailContext();
+  const fullMsg = emailCtx ? emailCtx + '\n\n' + text : text;
+  addMsg('user', text);   // show only user's text in chat bubble
+
   sendBtn.disabled = true;
   typing.classList.add('show');
   msgs.scrollTop = msgs.scrollHeight;
@@ -199,7 +308,7 @@ async function send() {
     const r = await fetch('{% url "ai_assistant:chat_api" %}', {
       method: 'POST',
       headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
-      body: JSON.stringify({message: text, web_search: wsToggle.checked}),
+      body: JSON.stringify({message: fullMsg, web_search: wsToggle.checked}),
     });
     const data = await r.json();
     addMsg('bot', data.reply || 'Помилка відповіді.');

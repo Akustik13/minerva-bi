@@ -1,0 +1,138 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<h1>📤 {{ title }}</h1>
+
+{% if not has_token %}
+<div style="background:var(--bg-card);border:1px solid var(--warn);border-radius:6px;padding:16px;margin-bottom:20px">
+  <strong style="color:var(--warn)">⚠️ Marketplace API не авторизовано.</strong>
+  <p style="color:var(--text);margin:8px 0 0">
+    Перейди до <a href="/admin/bots/digikeyconfig/1/change/" style="color:var(--link-fg)">DigiKey Config</a>
+    і натисни «Авторизувати Marketplace» перед відправленням.
+  </p>
+</div>
+{% endif %}
+
+<!-- Order summary -->
+<div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:16px;margin-bottom:20px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;font-size:13px">
+    <div>
+      <div style="color:var(--text-dim);margin-bottom:4px">Замовлення DigiKey</div>
+      <div style="color:var(--text);font-weight:700;font-family:monospace;font-size:15px">{{ order.order_number }}</div>
+    </div>
+    <div>
+      <div style="color:var(--text-dim);margin-bottom:4px">Клієнт</div>
+      <div style="color:var(--text)">{{ order.client|default:"—" }}</div>
+    </div>
+    <div>
+      <div style="color:var(--text-dim);margin-bottom:4px">Статус</div>
+      <div style="color:var(--text)">{{ order.get_status_display }}</div>
+    </div>
+    <div>
+      <div style="color:var(--text-dim);margin-bottom:4px">Дедлайн відправлення</div>
+      <div style="color:{% if order.shipping_deadline %}var(--err){% else %}var(--text-dim){% endif %}">
+        {{ order.shipping_deadline|default:"—" }}
+      </div>
+    </div>
+    {% if order.tracking_number %}
+    <div>
+      <div style="color:var(--text-dim);margin-bottom:4px">Поточний трек-номер</div>
+      <div style="color:var(--ok);font-family:monospace">{{ order.tracking_number }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Lines -->
+  {% for line in order.lines.all %}
+  {% if forloop.first %}
+  <div style="margin-top:16px">
+    <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px">Позиції замовлення:</div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong)">
+          <th style="padding:4px 8px;text-align:left">SKU</th>
+          <th style="padding:4px 8px;text-align:left">Назва</th>
+          <th style="padding:4px 8px;text-align:center">Кіл-ть</th>
+        </tr>
+      </thead>
+      <tbody>
+  {% endif %}
+        <tr style="border-bottom:1px solid var(--border);color:var(--text)">
+          <td style="padding:4px 8px;font-family:monospace">{{ line.sku_raw|default:line.product.sku }}</td>
+          <td style="padding:4px 8px">{{ line.product.name|default:"—" }}</td>
+          <td style="padding:4px 8px;text-align:center">{{ line.qty }}</td>
+        </tr>
+  {% if forloop.last %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% endfor %}
+</div>
+
+<!-- Ship form -->
+<form method="post" action="/bots/digikey/ship/{{ order.pk }}/">
+  {% csrf_token %}
+
+  <div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:20px;margin-bottom:16px">
+    <h3 style="color:var(--text);margin-top:0;margin-bottom:16px">Дані відправлення</h3>
+
+    <div style="margin-bottom:16px">
+      <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
+        Трек-номер <span style="color:var(--err)">*</span>
+      </label>
+      <input type="text" name="tracking_number"
+             value="{{ order.tracking_number|default:'' }}"
+             placeholder="np. 59000500000000000000, 1Z999AA10123456784"
+             required
+             style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
+                    border:1px solid var(--border-strong);border-radius:4px;
+                    color:var(--text);font-family:monospace;font-size:14px;box-sizing:border-box">
+    </div>
+
+    <div style="margin-bottom:16px">
+      <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
+        Carrier ID (UUID, необов'язково)
+        <span style="color:var(--text-muted);font-size:11px"> — UUID перевізника в системі DigiKey</span>
+      </label>
+      <input type="text" name="carrier_id"
+             placeholder="3fa85f64-5717-4562-b3fc-2c963f66afa6"
+             style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
+                    border:1px solid var(--border-strong);border-radius:4px;
+                    color:var(--text);font-family:monospace;font-size:13px;box-sizing:border-box">
+    </div>
+
+    <div style="margin-bottom:20px">
+      <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
+        Номер рахунку-фактури (необов'язково)
+      </label>
+      <input type="text" name="invoice_number"
+             placeholder="INV-2026-001"
+             style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
+                    border:1px solid var(--border-strong);border-radius:4px;
+                    color:var(--text);font-size:13px;box-sizing:border-box">
+    </div>
+
+    <div style="background:var(--bg-hover);border:1px solid var(--border);border-radius:4px;
+                padding:10px 14px;margin-bottom:20px;font-size:12px;color:var(--text-muted)">
+      ℹ️ Після підтвердження: DigiKey отримає трек-номер, статус замовлення зміниться на
+      <strong style="color:var(--text)">Відправлено</strong> і в Minerva, і на DigiKey.
+      Дія незворотна — переконайся що трек-номер правильний.
+    </div>
+
+    <div style="display:flex;gap:12px;align-items:center">
+      <button type="submit"
+              {% if not has_token %}disabled{% endif %}
+              onclick="return confirm('Підтвердити відправлення замовлення {{ order.order_number }} на DigiKey?\n\nТрек-номер буде передано до DigiKey Marketplace.')"
+              style="padding:10px 24px;background:{% if has_token %}#e65100{% else %}var(--text-dim){% endif %};
+                     color:#fff;border:none;border-radius:4px;font-weight:bold;font-size:14px;
+                     cursor:{% if has_token %}pointer{% else %}not-allowed{% endif %}">
+        📤 Підтвердити відправлення на DigiKey
+      </button>
+      <a href="/admin/sales/salesorder/{{ order.pk }}/change/"
+         style="color:var(--text-muted);text-decoration:none;font-size:13px">&larr; Скасувати</a>
+    </div>
+  </div>
+</form>
+{% endblock %}

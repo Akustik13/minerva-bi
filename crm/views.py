@@ -43,6 +43,44 @@ def _parse_strategy_response(text: str) -> dict | None:
     return None
 
 
+def _link_email_to_strategy(customer, subject: str, body_snippet: str, user) -> None:
+    """
+    Автоматично прив'язує відправлений email до активної стратегії клієнта.
+    Якщо поточний крок = 'email' → закриває крок і просуває стратегію.
+    Якщо поточний крок інший → додає замітку до нотаток стратегії.
+    """
+    from django.utils import timezone
+    try:
+        from strategy.models import CustomerStrategy, StepLog
+        strategy = (CustomerStrategy.objects
+                    .filter(customer=customer, status='active')
+                    .select_related('current_step')
+                    .first())
+        if not strategy or not strategy.current_step:
+            return
+        current_step = strategy.current_step
+        notes = f"📧 Email надіслано: {subject}"
+        if body_snippet:
+            notes += f"\n{body_snippet[:250]}"
+
+        if current_step.step_type == 'email':
+            # Email step — auto-complete, signal will advance strategy
+            StepLog.objects.create(
+                customer_step=current_step,
+                outcome='done_pos',
+                notes=notes,
+                logged_by=user,
+            )
+        else:
+            # Non-email step — add memo to strategy notes without advancing
+            ts = timezone.now().strftime('%d.%m %H:%M')
+            memo = f"[{ts}] {notes}"
+            strategy.notes = (strategy.notes + '\n' + memo if strategy.notes else memo)
+            strategy.save(update_fields=['notes'])
+    except Exception:
+        pass
+
+
 def _gather_email_context(customer) -> list:
     """Pull recent EmailMessage records for this customer directly from email_assistant."""
     try:
@@ -175,6 +213,24 @@ def ai_customer_analysis(request, customer_pk):
     if 'emails' in include:
         email_messages_data = _gather_email_context(customer)
 
+    # Manually selected mailbox emails (from picker UI)
+    mailbox_ids_raw = request.GET.get('mailbox_ids', '').strip()
+    selected_mailbox_data = []
+    if mailbox_ids_raw:
+        try:
+            from email_assistant.models import EmailMessage
+            ids = [int(x) for x in mailbox_ids_raw.split(',') if x.strip().isdigit()]
+            for m in EmailMessage.objects.filter(pk__in=ids).order_by('-sent_at')[:20]:
+                selected_mailbox_data.append({
+                    'direction': '← від клієнта' if m.folder == 'inbox' else '→ до клієнта',
+                    'subject': m.subject or '(без теми)',
+                    'date': m.sent_at.strftime('%d.%m.%Y %H:%M') if m.sent_at else '?',
+                    'from': m.from_email or '',
+                    'body': (m.body_text or '')[:600],
+                })
+        except Exception:
+            pass
+
     # Strategy context
     strategy_data = _gather_strategy_context(customer)
 
@@ -188,6 +244,12 @@ def ai_customer_analysis(request, customer_pk):
         parts.append(f"Листування (CRM tool): {json.dumps(emails_data, ensure_ascii=False, default=str)}")
     if email_messages_data:
         parts.append(f"Email переписка (Email асистент): {json.dumps(email_messages_data, ensure_ascii=False, default=str)}")
+    if selected_mailbox_data:
+        parts.append(f"Вибрані листи зі скриньки (повний текст):\n"
+                     + "\n---\n".join(
+                         f"[{e['direction']}] {e['date']} | Тема: {e['subject']}\nВід: {e['from']}\n{e['body']}"
+                         for e in selected_mailbox_data
+                     ))
     if strategy_data:
         parts.append(f"Активні CRM стратегії: {json.dumps(strategy_data, ensure_ascii=False, default=str)}")
     if shipments_data:
@@ -465,6 +527,8 @@ def send_customer_email(request, customer_pk):
         body=full_body,
         ai_summary='',
     )
+    # Auto-link to active strategy (best-effort, never blocks response)
+    _link_email_to_strategy(customer, subject or '', body_text[:300], request.user)
     return JsonResponse({'ok': True, 'smtp': smtp_source})
 
 
@@ -730,6 +794,123 @@ def ai_apply_strategy(request, customer_pk):
         'strategy_id': cs.pk,
         'strategy_url': f'/admin/strategy/customerstrategy/{cs.pk}/change/',
     })
+
+
+@staff_member_required
+def customer_mailbox_emails(request, customer_pk):
+    """GET: Повертає листи зі скриньки email_assistant для цього клієнта."""
+    from crm.models import Customer
+    try:
+        customer = Customer.objects.get(pk=customer_pk)
+    except Customer.DoesNotExist:
+        return JsonResponse({'error': 'Not found'}, status=404)
+
+    if not customer.email:
+        return JsonResponse({'emails': [], 'message': 'Клієнт не має email адреси.'})
+
+    try:
+        from email_assistant.models import EmailMessage
+        from django.db.models import Q
+        qs = (EmailMessage.objects
+              .filter(Q(from_email__iexact=customer.email) | Q(to_emails__icontains=customer.email))
+              .exclude(folder='draft')
+              .order_by('-sent_at')[:30])
+        emails = [
+            {
+                'id': m.pk,
+                'subject': m.subject or '(без теми)',
+                'date': m.sent_at.strftime('%d.%m.%Y %H:%M') if m.sent_at else '?',
+                'direction': 'in' if m.folder == 'inbox' else 'out',
+                'snippet': (m.body_text or m.ai_summary or '')[:250],
+                'from_email': m.from_email or '',
+            }
+            for m in qs
+        ]
+        return JsonResponse({'emails': emails})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@staff_member_required
+def ai_strategy_advisor(request, customer_pk):
+    """
+    GET: AI аналізує виконані кроки стратегії, листування та дає рекомендацію.
+    Повертає JSON { ok, advice, strategy_name }.
+    """
+    from crm.models import Customer
+
+    try:
+        customer = Customer.objects.get(pk=customer_pk)
+    except Customer.DoesNotExist:
+        return JsonResponse({'error': 'Клієнт не знайдений'}, status=404)
+
+    profile = getattr(request.user, 'profile', None)
+
+    try:
+        from strategy.models import CustomerStrategy
+        strategy = (CustomerStrategy.objects
+                    .filter(customer=customer, status__in=['active', 'paused'])
+                    .select_related('template', 'current_step')
+                    .prefetch_related('steps__logs__logged_by', 'steps__template_step')
+                    .order_by('-started_at')
+                    .first())
+    except Exception:
+        strategy = None
+
+    if not strategy:
+        return JsonResponse({'error': 'Активної стратегії не знайдено. Спочатку запустіть стратегію для клієнта.'}, status=400)
+
+    # Build steps summary
+    steps_summary = []
+    for step in strategy.steps.order_by('scheduled_at'):
+        entry = {
+            'title': step.title,
+            'type': step.step_type,
+            'outcome': step.outcome,
+        }
+        if step.scheduled_at:
+            entry['scheduled'] = step.scheduled_at.strftime('%d.%m.%Y')
+        if step.completed_at:
+            entry['completed'] = step.completed_at.strftime('%d.%m.%Y')
+        logs = [
+            {'notes': lg.notes, 'outcome': lg.outcome,
+             'by': lg.logged_by.get_full_name() if lg.logged_by else 'Система'}
+            for lg in step.logs.all()
+        ]
+        if logs:
+            entry['logs'] = logs
+        steps_summary.append(entry)
+
+    email_ctx = _gather_email_context(customer)
+
+    prompt = (
+        f"Ти — CRM-консультант для компанії Minerva. Проаналізуй виконання стратегії для клієнта '{customer.name}'.\n\n"
+        f"Стратегія: «{strategy.name}» "
+        f"(тип: {strategy.template.get_behavior_type_display() if strategy.template else 'н/д'}, "
+        f"статус: {strategy.get_status_display()})\n"
+        f"Запущена: {strategy.started_at.strftime('%d.%m.%Y') if strategy.started_at else '?'}\n"
+        f"Поточний крок: {strategy.current_step.title if strategy.current_step else '—'}\n\n"
+        f"Кроки та їх виконання:\n{json.dumps(steps_summary, ensure_ascii=False, default=str)}\n\n"
+        + (f"Остання переписка з клієнтом:\n{json.dumps(email_ctx, ensure_ascii=False, default=str)}\n\n" if email_ctx else "")
+        + "Дай відповідь УКРАЇНСЬКОЮ мовою за таким планом:\n"
+          "1. **Прогрес** — що виконано, що ні, чи є відхилення від плану\n"
+          "2. **Що спрацювало** — на основі результатів і нотаток\n"
+          "3. **Рекомендація** — чи потрібно скоригувати стратегію, що змінити\n"
+          "4. **Наступна дія** — конкретна дія сьогодні/цього тижня\n\n"
+          "Стисло (4-6 параграфів), практично, без зайвої теорії. Markdown дозволено."
+    )
+
+    try:
+        from ai_assistant.service import generate_structured
+        advice = generate_structured(prompt, profile=profile)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+    if not advice:
+        return JsonResponse({'error': 'Бюджет AI вичерпано або немає відповіді.'}, status=400)
+
+    return JsonResponse({'ok': True, 'advice': advice, 'strategy_name': strategy.name,
+                         'strategy_url': f'/strategy/{strategy.pk}/canvas/'})
 
 
 @staff_member_required

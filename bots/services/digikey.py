@@ -1317,6 +1317,92 @@ def test_connection(config) -> dict:
         return {"ok": False, "message": f"❌ {type(e).__name__}: {e}"}
 
 
+# ── Marketplace: підтвердження відправлення ───────────────────────────────────
+
+MARKETPLACE_SHIP_PATH           = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/ship"
+MARKETPLACE_INVOICE_NUMBER_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/supplierInvoiceNumber"
+
+
+def ship_marketplace_order(config, order_id: str, tracking_number: str,
+                            carrier_id: str = None,
+                            invoice_number: str = None) -> dict:
+    """
+    PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/ship
+    Підтверджує відправлення Marketplace замовлення та передає трек-номер на DigiKey.
+
+    Спочатку отримує деталі замовлення (GET) щоб дістати orderDetailId кожного рядка,
+    потім відправляє PUT з інформацією про відправлення.
+    Повертає {'ok': bool, 'message': str, 'raw': dict}.
+    """
+    import requests as req
+
+    token = get_marketplace_token(config)
+
+    order_data    = _fetch_marketplace_order(config, order_id, token)
+    order_details = order_data.get("orderDetails") or []
+
+    shipped_parts = []
+    for line in order_details:
+        detail_id = line.get("orderDetailId")
+        if detail_id:
+            shipped_parts.append({
+                "orderDetailId": detail_id,
+                "dkPartNumber":  line.get("productPartNumber") or line.get("supplierSku") or "",
+                "quantity":      line.get("adjustedQuantity") or line.get("quantity") or 1,
+            })
+
+    tracking_entry = {"shippingTrackingNumber": tracking_number, "shippedParts": shipped_parts}
+    if carrier_id:
+        tracking_entry["shippingCarrierId"] = carrier_id
+
+    payload = {"shippingTracking": [tracking_entry]}
+    if invoice_number:
+        payload["supplierInvoiceNumber"] = invoice_number
+
+    url = f"{_base_url(config)}{MARKETPLACE_SHIP_PATH.format(order_id=order_id)}"
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'ship_marketplace_order', 'PUT', url, req.put,
+                          headers=_headers(config, token), json=payload, timeout=20)
+    raw = {}
+    try:
+        raw = resp.json()
+    except Exception:
+        raw = {"text": resp.text[:500]}
+
+    if resp.ok:
+        return {"ok": True, "message": "✅ Відправлення підтверджено на DigiKey", "raw": raw}
+
+    detail = raw.get("detail") or raw.get("title") or raw.get("error") or resp.text[:300]
+    logger.error("DigiKey ship order %s: %s %s", order_id, resp.status_code, detail)
+    return {"ok": False, "message": f"❌ {resp.status_code}: {detail}", "raw": raw}
+
+
+def update_supplier_invoice_number(config, order_id: str, invoice_number: str) -> dict:
+    """
+    PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/supplierInvoiceNumber
+    Оновлює номер рахунку постачальника на DigiKey Marketplace.
+    """
+    import requests as req
+
+    token = get_marketplace_token(config)
+    url = f"{_base_url(config)}{MARKETPLACE_INVOICE_NUMBER_PATH.format(order_id=order_id)}"
+
+    from tabele.api_logger import logged_request
+    resp = logged_request('digikey', 'update_invoice_number', 'PUT', url, req.put,
+                          headers=_headers(config, token),
+                          params={"supplierInvoiceNumber": invoice_number}, timeout=15)
+    if resp.ok:
+        return {"ok": True, "message": "✅ Номер рахунку оновлено на DigiKey"}
+
+    raw = {}
+    try:
+        raw = resp.json()
+    except Exception:
+        pass
+    detail = raw.get("detail") or raw.get("title") or resp.text[:200]
+    return {"ok": False, "message": f"❌ {resp.status_code}: {detail}"}
+
+
 # ── Pack List ─────────────────────────────────────────────────────────────────
 
 def get_packlist_pdf(config, sales_order_id: str) -> bytes:

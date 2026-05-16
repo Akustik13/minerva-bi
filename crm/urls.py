@@ -24,4 +24,10 @@ urlpatterns = [
     path('customer/<int:customer_pk>/reset-ai/',
          views.reset_customer_ai_context,
          name='crm_reset_ai'),
+    path('customer/<int:customer_pk>/ai-strategy-advisor/',
+         views.ai_strategy_advisor,
+         name='crm_ai_strategy_advisor'),
+    path('customer/<int:customer_pk>/mailbox-emails/',
+         views.customer_mailbox_emails,
+         name='crm_mailbox_emails'),
 ]

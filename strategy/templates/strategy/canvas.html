@@ -426,12 +426,19 @@
             {% elif step.step_type == 'decision' %}🔀
             {% endif %}
           </div>
-          <div>
+          <div style="flex:1;min-width:0">
             <div class="cv-step-title">{{ step.title }}</div>
             <div class="cv-step-meta">
               {% if step.scheduled_at %}{{ step.scheduled_at|date:"d.m.Y" }}{% endif %}
               {% if step.completed_at %} · виконано {{ step.completed_at|date:"d.m.Y" }}{% endif %}
             </div>
+            {% if step.outcome != 'pending' and step.outcome_notes %}
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;
+                        white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+                        max-width:340px" title="{{ step.outcome_notes }}">
+              {{ step.outcome_notes|truncatechars:80 }}
+            </div>
+            {% endif %}
           </div>
           <span class="cv-outcome-pill op-{{ step.outcome }}">{{ step.get_outcome_display }}</span>
         </div>

@@ -42,6 +42,16 @@
       </a>
     </li>
   {% endif %}
+  {% if digikey_ship_url %}
+    <li>
+      <a href="{{ digikey_ship_url }}"
+         class="historylink"
+         style="background:#e65100;color:#fff;padding:6px 14px;border-radius:6px;
+                text-decoration:none;font-weight:bold;display:inline-block;white-space:nowrap">
+        📤 Відправити на DigiKey
+      </a>
+    </li>
+  {% endif %}
   {{ block.super }}
 {% endblock %}
 

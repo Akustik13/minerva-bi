@@ -360,10 +360,27 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         error = None
         raw_json = None
 
+        order_pk_map = {}  # businessId → Minerva SalesOrder.pk
+
         if config.marketplace_refresh_token or config.marketplace_access_token:
             try:
                 orders_data = get_marketplace_orders(config, offset=offset, max_results=20)
                 raw_json = json.dumps(orders_data, indent=2, ensure_ascii=False)
+
+                # Build businessId → Minerva SalesOrder.pk mapping for action buttons
+                biz_ids = [
+                    str(o.get("businessId") or o.get("id") or "")
+                    for o in (orders_data.get("orders") or [])
+                    if o.get("businessId") or o.get("id")
+                ]
+                if biz_ids:
+                    from sales.models import SalesOrder as _SO
+                    for so in _SO.objects.filter(source="digikey", order_number__in=biz_ids).values("order_number", "pk"):
+                        order_pk_map[so["order_number"]] = so["pk"]
+                # Attach minerva_pk directly to each order dict for easy template access
+                for o in orders_data.get("orders") or []:
+                    biz_id = str(o.get("businessId") or o.get("id") or "")
+                    o["minerva_pk"] = order_pk_map.get(biz_id)
             except DigiKeyAPIError as e:
                 error = str(e)
             except Exception as e:
@@ -377,6 +394,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             raw_json=raw_json,
             error=error,
             offset=offset,
+            order_pk_map=order_pk_map,
             not_authorized=not (config.marketplace_refresh_token or config.marketplace_access_token),
             oauth_start_url=reverse("admin:bots_digikeyconfig_oauth_start"),
         )

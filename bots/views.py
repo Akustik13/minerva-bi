@@ -151,26 +151,19 @@ from django.shortcuts import get_object_or_404
 def digikey_packlist(request, order_pk):
     """
     GET /bots/digikey/packlist/<order_pk>/
-    Завантажує PDF пакувального листа з DigiKey API і повертає браузеру.
+    Генерує PDF пакувального листа з даних замовлення Minerva.
     """
     from sales.models import SalesOrder
-    from bots.models import DigiKeyConfig
-    from bots.services.digikey import get_packlist_pdf, DigiKeyAPIError
+    from sales.doc_generators import generate_packing_list
 
     order = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
-    config = DigiKeyConfig.get()
 
     try:
-        pdf_bytes = get_packlist_pdf(config, order.order_number)
-    except DigiKeyAPIError as e:
-        return HttpResponse(
-            f"<h3>DigiKey Pack List — помилка</h3><pre>{e}</pre>",
-            content_type="text/html; charset=utf-8",
-            status=502,
-        )
+        buf = generate_packing_list(order)
+        pdf_bytes = buf.getvalue()
     except Exception as e:
         return HttpResponse(
-            f"<h3>Помилка</h3><pre>{type(e).__name__}: {e}</pre>",
+            f"<h3>Помилка генерації Pack List</h3><pre>{type(e).__name__}: {e}</pre>",
             content_type="text/html; charset=utf-8",
             status=500,
         )
@@ -179,3 +172,57 @@ def digikey_packlist(request, order_pk):
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
+
+
+@staff_member_required
+def digikey_ship_order(request, order_pk):
+    """
+    GET  /bots/digikey/ship/<order_pk>/  — форма підтвердження відправлення
+    POST                                 — виклик ShipOrder API → оновлення статусу
+    """
+    from django.contrib import messages as msg
+    from django.shortcuts import render, redirect
+    from sales.models import SalesOrder
+    from bots.models import DigiKeyConfig
+    from bots.services.digikey import ship_marketplace_order, DigiKeyAPIError
+
+    order  = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
+    config = DigiKeyConfig.get()
+
+    if request.method == "POST":
+        tracking  = request.POST.get("tracking_number", "").strip()
+        carrier   = request.POST.get("carrier_id", "").strip() or None
+        invoice   = request.POST.get("invoice_number", "").strip() or None
+
+        if not tracking:
+            msg.error(request, "Вкажіть трек-номер відправлення.")
+        else:
+            try:
+                result = ship_marketplace_order(config, order.order_number,
+                                                tracking, carrier, invoice)
+                if result["ok"]:
+                    update_fields = ["status", "status_source"]
+                    order.status        = "shipped"
+                    order.status_source = "DigiKey Marketplace"
+                    if tracking and not order.tracking_number:
+                        order.tracking_number = tracking
+                        update_fields.append("tracking_number")
+                    order.save(update_fields=update_fields)
+                    msg.success(request, result["message"])
+                else:
+                    msg.error(request, result["message"])
+            except DigiKeyAPIError as e:
+                msg.error(request, f"DigiKey API помилка: {e}")
+            except Exception as e:
+                msg.error(request, f"{type(e).__name__}: {e}")
+
+        return redirect(f"/admin/sales/salesorder/{order_pk}/change/")
+
+    # GET — показати форму
+    from django.template.response import TemplateResponse
+    return TemplateResponse(request, "admin/bots/digikey_ship_order.html", {
+        "title": f"Відправити #{order.order_number} на DigiKey",
+        "order": order,
+        "config": config,
+        "has_token": bool(config.marketplace_access_token),
+    })

@@ -96,6 +96,40 @@ def history_api(request):
     return JsonResponse({'messages': msgs})
 
 
+@login_required
+def email_threads_view(request):
+    """
+    GET /ai/emails/ — повертає список недавніх листів зі скриньки поточного юзера.
+    Використовується в webchat для додавання листів до контексту аналізу.
+    """
+    try:
+        from email_assistant.models import EmailMessage
+        qs = (EmailMessage.objects
+              .select_related('thread')
+              .exclude(folder='draft')
+              .order_by('-sent_at')[:40])
+
+        emails = []
+        for m in qs:
+            from_addr = m.from_email or ''
+            to_list   = m.to_emails or ''
+            # Customer name: try to find from from/to based on direction
+            customer_hint = from_addr if m.folder == 'inbox' else to_list.split(',')[0].strip()
+
+            emails.append({
+                'id':        m.pk,
+                'subject':   m.subject or '(без теми)',
+                'date':      m.sent_at.strftime('%d.%m.%Y %H:%M') if m.sent_at else '?',
+                'direction': 'in' if m.folder == 'inbox' else 'out',
+                'customer':  customer_hint[:40] if customer_hint else '',
+                'snippet':   (m.body_text or m.ai_summary or '')[:200],
+            })
+        return JsonResponse({'emails': emails})
+    except Exception as e:
+        logger.exception("email_threads_view error: %s", e)
+        return JsonResponse({'emails': [], 'error': str(e)})
+
+
 _DIAGNOSTIC_COMMANDS = [
     {
         'key':         'morning_briefing',
