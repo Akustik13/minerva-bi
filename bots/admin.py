@@ -121,6 +121,15 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "Скопіюй <b>Webhook URL</b> в DigiKey dev portal → My Apps → Webhooks."
             ),
         }),
+        ("🏢 Адреса постачальника (Packing List)", {
+            "fields": (
+                "supplier_name",
+                ("supplier_street",),
+                ("supplier_city", "supplier_state", "supplier_zip"),
+                "supplier_country",
+            ),
+            "description": "Відображається у верхньому лівому куті DigiKey Pack List як адреса відправника.",
+        }),
         ("🔑 DigiKey API Credentials", {
             "fields": ("client_id", "client_secret", "account_id"),
             "description": (

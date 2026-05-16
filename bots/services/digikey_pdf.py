@@ -10,7 +10,7 @@ from io import BytesIO
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
@@ -147,12 +147,13 @@ def generate_digikey_packing_list(api_order: dict, supplier: dict) -> BytesIO:
                 → our company address from AccountingSettings
     """
     buf = BytesIO()
-    W, _ = A4
+    PAGE_SIZE = landscape(A4)          # 29.7 × 21 cm horizontal
+    W, _ = PAGE_SIZE
     MARGIN  = 1.5 * cm
-    PAGE_W  = W - 2 * MARGIN          # ≈ 18.2 cm
+    PAGE_W  = W - 2 * MARGIN          # ≈ 26.7 cm
 
     doc = SimpleDocTemplate(
-        buf, pagesize=A4,
+        buf, pagesize=PAGE_SIZE,
         leftMargin=MARGIN, rightMargin=MARGIN,
         topMargin=MARGIN, bottomMargin=MARGIN,
     )
@@ -204,9 +205,9 @@ def generate_digikey_packing_list(api_order: dict, supplier: dict) -> BytesIO:
     story.append(Spacer(1, 0.8 * cm))
 
     # ── 2. Three-column row: [Sold To box] [Ship To box] [Order info] ─────────
-    BOX_H  = 3.6 * cm
-    BOX_W  = 5.8 * cm
-    INFO_W = PAGE_W - 2 * BOX_W - 0.8 * cm
+    BOX_H   = 3.6 * cm
+    BOX_W   = 7.5 * cm
+    INFO_W  = PAGE_W - 2 * BOX_W - 0.8 * cm
     LABEL_W = 0.45 * cm
 
     def _addr_box(label_text, addr_lines):
