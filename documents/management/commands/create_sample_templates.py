@@ -1,31 +1,37 @@
 """
-python manage.py create_sample_templates
+python manage.py create_sample_templates [--force]
 
-Створює 3 базові Word шаблони:
-- Packing List EN
-- Proforma Invoice EN
-- CN23 Customs Declaration EN
+Creates 3 sample Word templates using paragraph-level {% for %} loops
+(compatible with all docxtpl versions, no {%tr %} table-row tags).
 """
 from django.core.management.base import BaseCommand
 from io import BytesIO
 
 
 class Command(BaseCommand):
-    help = 'Створити 3 базові Word шаблони документів'
+    help = 'Create 3 sample Word document templates'
+
+    def add_arguments(self, parser):
+        parser.add_argument('--force', action='store_true',
+                            help='Delete existing samples and recreate')
 
     def handle(self, *args, **options):
         from docx import Document
-        from docx.shared import Pt
         from docx.enum.text import WD_ALIGN_PARAGRAPH
         from django.core.files.base import ContentFile
         from documents.models import DocumentTemplate
 
         A = WD_ALIGN_PARAGRAPH
+        force = options['force']
 
         def save(doc, name, doc_type):
             if DocumentTemplate.objects.filter(name=name).exists():
-                self.stdout.write(f'  Skip: {name}')
-                return
+                if force:
+                    DocumentTemplate.objects.filter(name=name).delete()
+                    self.stdout.write(f'  Deleted old: {name}')
+                else:
+                    self.stdout.write(f'  Skip (exists): {name}')
+                    return
             buf = BytesIO()
             doc.save(buf)
             buf.seek(0)
@@ -38,21 +44,21 @@ class Command(BaseCommand):
                 ContentFile(buf.getvalue()), save=True)
             self.stdout.write(f'  OK: {name}')
 
+        def add_kv(doc, label, var):
+            p = doc.add_paragraph()
+            p.add_run(f'{label} ').bold = True
+            p.add_run(var)
+
         # ── Packing List ──────────────────────────────────────────────────────
         doc = Document()
         h = doc.add_heading('PACKING LIST', 0)
         h.alignment = A.CENTER
         doc.add_paragraph('')
 
-        for label, var in [
-            ('Order №:', '{{order_number}}'),
-            ('Date:', '{{order_date}}'),
-            ('Tracking:', '{{tracking_number}}'),
-            ('Carrier:', '{{carrier_name}}'),
-        ]:
-            p = doc.add_paragraph()
-            p.add_run(f'{label} ').bold = True
-            p.add_run(var)
+        add_kv(doc, 'Order No:', '{{order_number}}')
+        add_kv(doc, 'Date:', '{{order_date}}')
+        add_kv(doc, 'Tracking:', '{{tracking_number}}')
+        add_kv(doc, 'Carrier:', '{{carrier_name}}')
 
         doc.add_paragraph('')
         tbl = doc.add_table(rows=1, cols=2)
@@ -66,28 +72,29 @@ class Command(BaseCommand):
 
         doc.add_paragraph('')
         doc.add_heading('Items', level=2)
-        tbl2 = doc.add_table(rows=2, cols=6)
+
+        # Header row
+        tbl2 = doc.add_table(rows=1, cols=5)
         tbl2.style = 'Table Grid'
-        for i, h in enumerate(['SKU', 'Description', 'Qty', 'Unit Price', 'Total', 'Weight']):
+        for i, h in enumerate(['SKU', 'Description', 'Qty', 'Unit Price', 'Total']):
             c = tbl2.rows[0].cells[i]
             c.text = h
             c.paragraphs[0].runs[0].bold = True
-        r = tbl2.rows[1]
-        r.cells[0].text = '{%tr for item in items %}{{item.sku}}'
-        r.cells[1].text = '{{item.name}}'
-        r.cells[2].text = '{{item.quantity}}'
-        r.cells[3].text = '{{item.unit_price}} {{currency}}'
-        r.cells[4].text = '{{item.total_price}} {{currency}}'
-        r.cells[5].text = '{{item.weight}} kg{%tr endfor %}'
+
+        # Items via paragraph loop (below the header table)
+        doc.add_paragraph(
+            '{% for item in items %}'
+            '{{item.sku}}  |  {{item.name}}  |  {{item.quantity}}'
+            '  |  {{item.unit_price}} {{currency}}'
+            '  |  {{item.total_price}} {{currency}}'
+            '{% endfor %}'
+        )
 
         doc.add_paragraph('')
-        for label, var in [
-            ('Total weight:', '{{total_weight}} kg'),
-            ('Total amount:', '{{total_amount}} {{currency}}'),
-        ]:
-            p = doc.add_paragraph()
-            p.add_run(f'{label} ').bold = True
-            p.add_run(var)
+        add_kv(doc, 'Total items:', '{{total_items}} pcs')
+        add_kv(doc, 'Total weight:', '{{total_weight}} kg')
+        add_kv(doc, 'Total amount:', '{{total_amount}} {{currency}}')
+        doc.add_paragraph('')
         doc.add_paragraph('{{notes}}')
         doc.add_paragraph('Generated: {{generated_date}}')
         save(doc, 'Packing List EN', 'packing_list')
@@ -98,14 +105,9 @@ class Command(BaseCommand):
         h.alignment = A.CENTER
         doc.add_paragraph('')
 
-        for label, var in [
-            ('Invoice №:', '{{invoice_number}}'),
-            ('Date:', '{{invoice_date}}'),
-            ('Due Date:', '{{due_date}}'),
-        ]:
-            p = doc.add_paragraph()
-            p.add_run(f'{label} ').bold = True
-            p.add_run(var)
+        add_kv(doc, 'Invoice No:', '{{invoice_number}}')
+        add_kv(doc, 'Date:', '{{invoice_date}}')
+        add_kv(doc, 'Due Date:', '{{due_date}}')
 
         doc.add_paragraph('')
         tbl = doc.add_table(rows=1, cols=2)
@@ -121,18 +123,20 @@ class Command(BaseCommand):
 
         doc.add_paragraph('')
         doc.add_heading('Items', level=2)
-        tbl2 = doc.add_table(rows=2, cols=5)
+
+        tbl2 = doc.add_table(rows=1, cols=4)
         tbl2.style = 'Table Grid'
-        for i, h in enumerate(['SKU', 'Description', 'Qty', 'Unit Price', 'Amount']):
+        for i, h in enumerate(['SKU', 'Description', 'Qty', 'Amount']):
             c = tbl2.rows[0].cells[i]
             c.text = h
             c.paragraphs[0].runs[0].bold = True
-        r = tbl2.rows[1]
-        r.cells[0].text = '{%tr for item in items %}{{item.sku}}'
-        r.cells[1].text = '{{item.name}}'
-        r.cells[2].text = '{{item.quantity}}'
-        r.cells[3].text = '{{item.unit_price}} {{currency}}'
-        r.cells[4].text = '{{item.total_price}} {{currency}}{%tr endfor %}'
+
+        doc.add_paragraph(
+            '{% for item in items %}'
+            '{{item.sku}}  |  {{item.name}}  |  {{item.quantity}}'
+            '  |  {{item.total_price}} {{currency}}'
+            '{% endfor %}'
+        )
 
         doc.add_paragraph('')
         tbl3 = doc.add_table(rows=3, cols=2)
@@ -147,9 +151,7 @@ class Command(BaseCommand):
             tbl3.rows[i].cells[1].text = val
 
         doc.add_paragraph('')
-        p = doc.add_paragraph()
-        p.add_run('Payment Terms: ').bold = True
-        p.add_run('{{payment_terms}}')
+        add_kv(doc, 'Payment Terms:', '{{payment_terms}}')
         doc.add_paragraph('{{proforma_notes}}')
         doc.add_paragraph('Generated: {{generated_date}}')
         save(doc, 'Proforma Invoice EN', 'proforma')
@@ -171,28 +173,25 @@ class Command(BaseCommand):
             '{{customer_city}}, {{customer_country}}\n{{customer_email}}')
 
         doc.add_paragraph('')
-        for label, var in [
-            ('Type of contents:', '{{customs_type}} — {{customs_reason}}'),
-            ('Country of origin:', '{{country_of_origin}}'),
-        ]:
-            p = doc.add_paragraph()
-            p.add_run(f'{label} ').bold = True
-            p.add_run(var)
+        add_kv(doc, 'Type of contents:', '{{customs_type}} - {{customs_reason}}')
+        add_kv(doc, 'Country of origin:', '{{country_of_origin}}')
 
         doc.add_paragraph('')
         doc.add_heading('Contents', level=2)
-        tbl2 = doc.add_table(rows=2, cols=5)
+
+        tbl2 = doc.add_table(rows=1, cols=4)
         tbl2.style = 'Table Grid'
-        for i, h in enumerate(['HS Code', 'Description', 'Qty', 'Value', 'Weight']):
+        for i, h in enumerate(['HS Code', 'Description', 'Qty', 'Value']):
             c = tbl2.rows[0].cells[i]
             c.text = h
             c.paragraphs[0].runs[0].bold = True
-        r = tbl2.rows[1]
-        r.cells[0].text = '{%tr for item in items %}{{item.hs_code}}'
-        r.cells[1].text = '{{item.name}}'
-        r.cells[2].text = '{{item.quantity}}'
-        r.cells[3].text = '{{item.total_price}} {{currency}}'
-        r.cells[4].text = '{{item.weight}} kg{%tr endfor %}'
+
+        doc.add_paragraph(
+            '{% for item in items %}'
+            '{{item.hs_code}}  |  {{item.name}}  |  {{item.quantity}}'
+            '  |  {{item.total_price}} {{currency}}  |  {{item.weight}} kg'
+            '{% endfor %}'
+        )
 
         doc.add_paragraph('')
         tbl3 = doc.add_table(rows=2, cols=2)
@@ -211,12 +210,8 @@ class Command(BaseCommand):
             'article or articles prohibited by legislation or by postal or '
             'customs regulations.')
         doc.add_paragraph('')
-        p = doc.add_paragraph()
-        p.add_run('Signature: ').bold = True
-        p.add_run('_________________________')
-        p = doc.add_paragraph()
-        p.add_run('Date: ').bold = True
-        p.add_run('{{invoice_date}}')
+        add_kv(doc, 'Signature:', '_________________________')
+        add_kv(doc, 'Date:', '{{invoice_date}}')
         doc.add_paragraph('Generated by Minerva BI: {{generated_date}}')
         save(doc, 'CN23 Customs Declaration EN', 'cn23')
 

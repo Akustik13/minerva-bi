@@ -875,6 +875,20 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         if not obj.pk:
             return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
 
+        # Check visibility toggle
+        try:
+            from config.models import DocumentSettings as _DS
+            if not _DS.get().show_auto_pdf_panel:
+                return mark_safe(
+                    '<em style="color:var(--text-dim,#607d8b);font-size:12px">'
+                    'Секцію вимкнено в '
+                    '<a href="/admin/config/documentsettings/1/change/" '
+                    'style="color:var(--link-fg)">Налаштуваннях документів</a>.'
+                    '</em>'
+                )
+        except Exception:
+            pass
+
         # Load DocumentSettings for pre-populating override fields
         try:
             from config.models import DocumentSettings, DOCUMENT_LANGUAGE_CHOICES, CN23_TYPE_CHOICES

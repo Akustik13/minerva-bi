@@ -189,6 +189,13 @@ class DocumentSettingsAdmin(admin.ModelAdmin):
                 "Опис використовується як fallback якщо товар не має назви для документів."
             ),
         }),
+        ("⚙️ Відображення", {
+            "fields": ("show_auto_pdf_panel",),
+            "description": (
+                "Керуй видимістю секції «Автоматичні документи» в картці замовлення. "
+                "Вимкни якщо використовуєш тільки Word шаблони (модуль Документи)."
+            ),
+        }),
     ]
 
     def has_add_permission(self, request):

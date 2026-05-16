@@ -5,10 +5,10 @@ from .models import DocumentTemplate, GeneratedDocument, TEMPLATE_VARIABLES_GUID
 
 @admin.register(DocumentTemplate)
 class DocumentTemplateAdmin(admin.ModelAdmin):
-    list_display  = ('name', 'doc_type_badge', 'module', 'language',
-                     'is_active', 'is_default', 'sort_order',
+    list_display  = ('name', 'doc_type_badge', 'module', 'source',
+                     'language', 'is_active', 'is_default', 'sort_order',
                      'download_template_link', 'created_at')
-    list_filter   = ('doc_type', 'module', 'language', 'is_active')
+    list_filter   = ('doc_type', 'module', 'source', 'language', 'is_active')
     list_editable = ('is_active', 'is_default', 'sort_order')
     search_fields = ('name', 'description')
     readonly_fields = ('variables_guide_display', 'created_at', 'updated_at')
@@ -16,7 +16,7 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     fieldsets = (
         ('📄 Основне', {
             'fields': (
-                'name', 'doc_type', 'module', 'language',
+                'name', 'doc_type', 'module', 'source', 'language',
                 'description', 'is_active', 'is_default', 'sort_order',
             ),
         }),

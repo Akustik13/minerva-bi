@@ -212,6 +212,16 @@ class DocumentSettings(models.Model):
         help_text="Підставляється у CN23 якщо у товарі немає назви для документів.",
     )
 
+    # ── Відображення секцій ───────────────────────────────────────────────────
+    show_auto_pdf_panel = models.BooleanField(
+        "Показувати «Автоматичні документи» в картці замовлення",
+        default=True,
+        help_text=(
+            "Секція з кнопками PDF (Packing List / Proforma / CN23). "
+            "Вимкни якщо використовуєш тільки Word шаблони (модуль Документи)."
+        ),
+    )
+
     class Meta:
         verbose_name = "Налаштування документів"
         verbose_name_plural = "Налаштування документів"

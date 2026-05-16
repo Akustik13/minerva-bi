@@ -22,6 +22,8 @@ MODULE_CHOICES = [
     ('any',      'Всі модулі'),
 ]
 
+
+
 DOC_TYPE_CHOICES = [
     ('packing_list', 'Packing List (Пакувальний лист)'),
     ('proforma',     'Proforma Invoice (Проформа)'),
@@ -169,6 +171,16 @@ class DocumentTemplate(models.Model):
         blank=True,
         verbose_name='Опис шаблону',
         help_text='Для чого використовується цей шаблон')
+
+    source = models.ForeignKey(
+        'sales.SalesSource',
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        verbose_name='Джерело замовлення',
+        help_text='Залиш порожнім — шаблон буде доступний для всіх джерел. '
+                  'Якщо вказано — кнопка з\'явиться тільки для замовлень цього джерела.',
+        related_name='document_templates',
+    )
 
     is_active = models.BooleanField(default=True, verbose_name='Активний')
     is_default = models.BooleanField(

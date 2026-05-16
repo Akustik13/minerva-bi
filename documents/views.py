@@ -59,13 +59,22 @@ def generate_for_order(request, order_pk, template_pk=None):
 
 @staff_member_required
 def list_templates(request):
-    """GET: Список шаблонів для модуля."""
+    """GET: Список шаблонів для модуля, з фільтрацією по source."""
     from documents.models import DocumentTemplate
-    module = request.GET.get('module', 'sales')
-    tpls   = (DocumentTemplate.objects
-              .filter(is_active=True)
-              .filter(Q(module=module) | Q(module='any'))
-              .order_by('-is_default', 'sort_order', 'name')
+    module    = request.GET.get('module', 'sales')
+    source_id = request.GET.get('source_id', '')
+
+    qs = (DocumentTemplate.objects
+          .filter(is_active=True)
+          .filter(Q(module=module) | Q(module='any')))
+
+    if source_id:
+        # Показуємо шаблони прив'язані до цього source + без прив'язки
+        qs = qs.filter(Q(source_id=source_id) | Q(source__isnull=True))
+    else:
+        qs = qs.filter(source__isnull=True)
+
+    tpls = (qs.order_by('-is_default', 'sort_order', 'name')
               .values('pk', 'name', 'doc_type', 'language', 'description'))
     return JsonResponse({'templates': list(tpls)})
 
