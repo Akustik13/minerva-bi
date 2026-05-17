@@ -312,18 +312,13 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 .aggregate(s=_Sum('qty'))['s'] or Decimal('0')
             )
 
-            # Compute semantic delta and running balance (ignores wrong historical sign)
+            # Balance uses raw qty (same formula as stock_qty → matches actual stock)
+            # Reserved transactions don't affect physical stock
             balance = Decimal(str(older))
             for tx in txs:
-                if tx.tx_type == InventoryTransaction.TxType.INCOMING:
-                    tx._delta = abs(tx.qty)
-                elif tx.tx_type == InventoryTransaction.TxType.OUTGOING:
-                    tx._delta = -abs(tx.qty)
-                elif tx.tx_type == InventoryTransaction.TxType.RESERVED:
-                    tx._delta = Decimal('0')
-                else:
-                    tx._delta = tx.qty  # Adjustment: signed as stored
-                balance += tx._delta
+                raw = tx.qty if tx.tx_type != InventoryTransaction.TxType.RESERVED else Decimal('0')
+                balance += raw
+                tx._raw = raw
                 tx._balance = balance
 
             txs.reverse()  # newest first for display
@@ -337,14 +332,22 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             rows_html = []
             for tx in txs:
                 icon, color = TYPE_ICON.get(tx.tx_type, ('•', '#607d8b'))
-                delta = tx._delta
                 bal   = tx._balance
-                if delta > 0:
-                    qty_str = f'<span style="color:#66bb6a">+{delta:g}</span>'
-                elif delta < 0:
-                    qty_str = f'<span style="color:#ef5350">{delta:g}</span>'
+                # Qty: semantic display like history_view (Incoming=+abs, Outgoing=−abs)
+                qty   = tx.qty
+                if tx.tx_type == InventoryTransaction.TxType.INCOMING:
+                    qty_disp = f'+{abs(qty):g}'
+                    qty_color = '#66bb6a'
+                elif tx.tx_type == InventoryTransaction.TxType.OUTGOING:
+                    qty_disp = f'−{abs(qty):g}'
+                    qty_color = '#ef5350'
                 else:
-                    qty_str = f'<span style="color:var(--text-dim)">0</span>'
+                    qty_disp = f'{qty:+g}'
+                    qty_color = '#66bb6a' if qty > 0 else ('#ef5350' if qty < 0 else 'var(--text-dim)')
+                # Warn if Outgoing has positive stored qty (corrupted data)
+                warn = (' <span title="Outgoing з позитивним qty — дані пошкоджені" '
+                        'style="color:#ff9800;cursor:help">⚠️</span>'
+                        if tx.tx_type == InventoryTransaction.TxType.OUTGOING and qty > 0 else '')
                 bal_color = '#66bb6a' if bal > 0 else ('#ef5350' if bal < 0 else 'var(--text-dim)')
                 performer = (tx.performed_by.get_full_name() or tx.performed_by.username
                              if tx.performed_by_id else '—')
@@ -354,7 +357,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                     f'{tx.tx_date.strftime("%d.%m.%Y %H:%M")}</td>'
                     f'<td style="padding:4px 8px">'
                     f'<span style="color:{color}">{icon} {escape(tx.tx_type)}</span></td>'
-                    f'<td style="text-align:right;font-weight:700;padding:4px 8px">{qty_str}</td>'
+                    f'<td style="text-align:right;font-weight:700;padding:4px 8px">'
+                    f'<span style="color:{qty_color}">{qty_disp}</span>{warn}</td>'
                     f'<td style="text-align:right;font-weight:800;color:{bal_color};'
                     f'padding:4px 8px;font-family:monospace">{int(bal):g}</td>'
                     f'<td style="font-size:11px;padding:4px 8px">{escape(performer)}</td>'
@@ -703,6 +707,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         "release_reservations",
         "mark_as_incoming",
         "mark_as_adjustment",
+        "fix_outgoing_sign",
     ]
 
     @admin.action(description="🔒 Змінити тип → Резерв")
@@ -728,6 +733,23 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         updated = queryset.update(tx_type=InventoryTransaction.TxType.ADJUSTMENT)
         self.message_user(request, f"Змінено {updated} транзакцій → Коригування.",
                           messages.SUCCESS if updated else messages.WARNING)
+
+    @admin.action(description="🔧 Виправити знак qty для Outgoing з позитивним qty (пошкоджені дані)")
+    def fix_outgoing_sign(self, request, queryset):
+        from django.db.models import F
+        corrupted = queryset.filter(
+            tx_type=InventoryTransaction.TxType.OUTGOING,
+            qty__gt=0,
+        )
+        count = corrupted.count()
+        if count == 0:
+            self.message_user(request, "Не знайдено пошкоджених рядків (Outgoing з qty > 0).",
+                              messages.WARNING)
+            return
+        corrupted.update(qty=F('qty') * -1)
+        self.message_user(request,
+                          f"Виправлено {count} транзакцій: qty змінено на від'ємне значення.",
+                          messages.SUCCESS)
 
     _TX_META = {
         'Incoming':   ('▲', 'var(--ok,#3fb950)',  'rgba(63,185,80,.13)',   'Прихід'),
