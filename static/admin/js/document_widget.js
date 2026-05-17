@@ -105,30 +105,48 @@ window.DocumentWidget = {
         if (d.url && d.copy_filename) savePairs.push([d.url, d.copy_filename]);
         if (d.pdf_copy_url && d.pdf_copy_filename) savePairs.push([d.pdf_copy_url, d.pdf_copy_filename]);
 
-        if (savePairs.length && window.MinervaLocalSave && MinervaLocalSave.supported) {
+        if (savePairs.length) {
           const lsEl = document.getElementById('dw-local-status');
-          if (lsEl) lsEl.textContent = '💾 Збереження локально...';
           const subs = (d.source_slug && d.date_str && d.order_number)
             ? [d.source_slug, d.date_str, d.order_number] : null;
 
-          Promise.all(savePairs.map(([fileUrl, fname]) =>
-            MinervaLocalSave.saveUrlToFolder(fileUrl, fname, subs)
-          )).then(results => {
-            if (!lsEl) return;
-            if (results.some(res => res.reason === 'no_handle')) {
+          if (!window.MinervaLocalSave || !MinervaLocalSave.supported) {
+            if (lsEl) {
               lsEl.style.color = 'var(--text-dim)';
-              lsEl.textContent = '📂 Папка не обрана';
-            } else {
-              const okCount = results.filter(res => res.ok).length;
-              if (okCount === results.length) {
-                lsEl.style.color = 'var(--ok)';
-                lsEl.textContent = `✅ Збережено локально (${okCount} файл${okCount > 1 ? 'и' : ''})`;
-              } else {
-                lsEl.style.color = '#ff9800';
-                lsEl.textContent = `⚠️ Локально: ${okCount}/${results.length}`;
-              }
+              lsEl.textContent = '— локальне збереження не підтримується (Firefox/Safari)';
             }
-          });
+          } else {
+            if (lsEl) lsEl.textContent = '💾 Збереження локально...';
+
+            const doLocalSave = () =>
+              Promise.all(savePairs.map(([fileUrl, fname]) =>
+                MinervaLocalSave.saveUrlToFolder(fileUrl, fname, subs)
+              )).then(results => {
+                if (!lsEl) return;
+                if (results.some(res => res.reason === 'no_handle')) {
+                  lsEl.innerHTML =
+                    '<span style="color:var(--text-dim)">📂 Папка не обрана — </span>' +
+                    '<button type="button" onclick="DocumentWidget._pickAndSave()" ' +
+                    'style="font-size:11px;padding:2px 8px;border-radius:4px;' +
+                    'border:1px solid var(--border-strong);background:none;' +
+                    'color:var(--link-fg);cursor:pointer">Вибрати папку</button>';
+                } else {
+                  const okCount = results.filter(res => res.ok).length;
+                  if (okCount === results.length) {
+                    lsEl.style.color = 'var(--ok)';
+                    lsEl.innerHTML = `✅ Збережено локально (${okCount} файл${okCount > 1 ? 'и' : ''})`;
+                  } else {
+                    lsEl.style.color = '#ff9800';
+                    lsEl.innerHTML = `⚠️ Локально: ${okCount}/${results.length}`;
+                  }
+                }
+              });
+
+            // Store pending save so _pickAndSave can retry after folder selection
+            DocumentWidget._pendingSavePairs = savePairs;
+            DocumentWidget._pendingSaveSubs  = subs;
+            doLocalSave();
+          }
         }
 
       } else {
@@ -176,6 +194,31 @@ window.DocumentWidget = {
          </div>`
       ).join('');
     } catch (e) {}
+  },
+
+  _pickAndSave() {
+    const lsEl = document.getElementById('dw-local-status');
+    if (!window.MinervaLocalSave) return;
+    MinervaLocalSave.pickFolder().then(handle => {
+      if (!handle) return;
+      const pairs = this._pendingSavePairs || [];
+      const subs  = this._pendingSaveSubs  || null;
+      if (!pairs.length) return;
+      if (lsEl) lsEl.textContent = '💾 Збереження...';
+      Promise.all(pairs.map(([fileUrl, fname]) =>
+        MinervaLocalSave.saveUrlToFolder(fileUrl, fname, subs)
+      )).then(results => {
+        if (!lsEl) return;
+        const okCount = results.filter(r => r.ok).length;
+        if (okCount === results.length) {
+          lsEl.style.color = 'var(--ok)';
+          lsEl.innerHTML = `✅ Збережено локально (${okCount} файл${okCount > 1 ? 'и' : ''})`;
+        } else {
+          lsEl.style.color = '#ff9800';
+          lsEl.innerHTML = `⚠️ Локально: ${okCount}/${results.length}`;
+        }
+      });
+    });
   },
 
   async deleteDoc(docId, btn) {

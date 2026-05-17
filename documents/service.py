@@ -95,7 +95,7 @@ def _convert_to_pdf(docx_path: str) -> bytes | None:
 
 def _command_exists(cmd: str) -> bool:
     try:
-        subprocess.run(['which', cmd], capture_output=True, timeout=3)
-        return True
+        result = subprocess.run(['which', cmd], capture_output=True, timeout=3)
+        return result.returncode == 0
     except Exception:
         return False
