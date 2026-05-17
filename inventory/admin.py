@@ -153,6 +153,9 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             path('supply/history/<int:product_pk>/',
                  self.admin_site.admin_view(self.supply_history_view),
                  name='inventory_reorderproxy_supply_history'),
+            path('supply/receive/',
+                 self.admin_site.admin_view(self.supply_receive_view),
+                 name='inventory_reorderproxy_supply_receive'),
         ] + super().get_urls()
 
     def supply_view(self, request):
@@ -229,6 +232,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             incoming_map[pk] += remaining
             po = l.purchase_order
             incoming_detail[pk].append({
+                'line_pk':       l.pk,
                 'po_pk':         po.pk,
                 'po_str':        str(po),
                 'supplier':      str(po.supplier) if po.supplier_id else '—',
@@ -256,15 +260,23 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             stock    = stock_map[pk]
             reserved = reserved_map[pk]
             incoming = incoming_map[pk]
+            po_items = incoming_detail[pk]
+            # Earliest expected date across open PO lines
+            earliest_date = None
+            for inc in po_items:
+                d = inc['expected_date']
+                if d and (earliest_date is None or d < earliest_date):
+                    earliest_date = d
             rows.append({
-                'product':      p,
-                'stock':        stock,
-                'reserved':     reserved,
-                'net_avail':    stock - reserved,
-                'incoming':     incoming,
-                'last_tx':      last_tx_map.get(pk),
-                'reservations': reservations_detail[pk],
-                'po_detail':    incoming_detail[pk],
+                'product':               p,
+                'stock':                 stock,
+                'reserved':              reserved,
+                'net_avail':             stock - reserved,
+                'incoming':              incoming,
+                'earliest_expected_date': earliest_date,
+                'last_tx':               last_tx_map.get(pk),
+                'reservations':          reservations_detail[pk],
+                'po_detail':             po_items,
             })
 
         context = {
@@ -338,6 +350,51 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         except Exception as exc:
             html = f'<p style="color:#ef5350">Помилка: {escape(str(exc))}</p>'
         return HttpResponse(html)
+
+    def supply_receive_view(self, request):
+        """AJAX POST: позначити отримання товару по рядку PO."""
+        import json
+        from django.http import JsonResponse
+        from django.utils import timezone
+
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+        try:
+            data = json.loads(request.body)
+            line_pk  = int(data['line_pk'])
+            qty_recv = Decimal(str(data['qty']))
+            if qty_recv <= 0:
+                raise ValueError('qty must be > 0')
+        except (KeyError, ValueError, Exception) as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+
+        line = get_object_or_404(PurchaseOrderLine, pk=line_pk)
+        po   = line.purchase_order
+
+        # Add to qty_received (cap at qty_ordered)
+        new_received = line.qty_received + qty_recv
+        if new_received > line.qty_ordered:
+            new_received = line.qty_ordered
+        line.qty_received = new_received
+        line.save()  # triggers update_inventory_on_purchase_receipt signal
+
+        # Update PO status
+        all_lines = list(po.lines.all())
+        total_ordered  = sum(l.qty_ordered  for l in all_lines)
+        total_received = sum(l.qty_received for l in all_lines)
+        if total_received >= total_ordered:
+            po.status = PurchaseOrder.Status.RECEIVED
+            if not po.received_date:
+                po.received_date = timezone.now().date()
+        elif total_received > 0:
+            po.status = PurchaseOrder.Status.PARTIAL
+        po.save(update_fields=['status', 'received_date'])
+
+        return JsonResponse({
+            'ok':          True,
+            'new_received': float(new_received),
+            'po_status':   po.status,
+        })
 
     def get_queryset(self, request):
         from django.db.models import OuterRef, Subquery, ExpressionWrapper, DecimalField, Value

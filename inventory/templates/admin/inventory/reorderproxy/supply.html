@@ -115,6 +115,7 @@
 .sv-btn:hover { opacity: .8; }
 .sv-btn-po     { background: #1565c0; color: #fff !important; }
 .sv-btn-rx     { background: #2e7d32; color: #fff !important; }
+.sv-btn-ok     { background: #2e7d32; color: #fff !important; border: none; cursor: pointer; }
 .sv-btn-tx     { background: #6a1b9a; color: #fff !important; }
 
 /* ── Expand toggle ── */
@@ -302,6 +303,9 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
         <td style="text-align:right">
           {% if incoming > 0 %}
             <span class="sv-num" style="color:#66bb6a">+{{ incoming|floatformat:"0" }}</span>
+            {% if row.earliest_expected_date %}
+              <div style="font-size:10px;color:#ffb300;white-space:nowrap;margin-top:1px">📅 {{ row.earliest_expected_date|date:"d.m" }}</div>
+            {% endif %}
           {% else %}
             <span class="sv-dim">—</span>
           {% endif %}
@@ -413,10 +417,38 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                         <span style="color:var(--text-dim)">—</span>
                       {% endif %}
                     </td>
-                    <td>
-                      <a href="/admin/inventory/purchaseorder/{{ inc.po_pk }}/change/"
-                         class="sv-btn sv-btn-rx" style="font-size:10px;padding:2px 7px"
-                         target="_blank">✓ Отримати</a>
+                    <td style="white-space:nowrap">
+                      <button type="button" class="sv-btn sv-btn-ok"
+                              style="font-size:10px;padding:3px 8px"
+                              onclick="svReceive({{ inc.line_pk }}, {{ inc.qty }})">
+                        ✓ Отримати
+                      </button>
+                      <button type="button" class="sv-btn"
+                              style="font-size:10px;padding:3px 7px;margin-left:3px"
+                              title="Ввести іншу кількість"
+                              onclick="svReceiveToggle({{ inc.line_pk }})">✏️</button>
+                      <div id="rcv-{{ inc.line_pk }}"
+                           style="display:none;margin-top:5px;display:none;
+                                  background:var(--bg-input);border:1px solid var(--border-strong);
+                                  border-radius:6px;padding:6px 8px">
+                        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Отримано шт:</div>
+                        <div style="display:flex;gap:5px;align-items:center">
+                          <input id="rcv-qty-{{ inc.line_pk }}" type="number"
+                                 value="{{ inc.qty|floatformat:'0' }}"
+                                 min="0.001" step="1"
+                                 style="width:64px;background:var(--bg-card);
+                                        border:1px solid var(--border-strong);
+                                        color:var(--text);border-radius:4px;
+                                        padding:4px 6px;font-size:12px">
+                          <button type="button" class="sv-btn sv-btn-ok"
+                                  style="font-size:11px;padding:3px 9px"
+                                  onclick="svReceiveCustom({{ inc.line_pk }})">✓</button>
+                          <button type="button"
+                                  style="background:none;border:none;color:var(--text-dim);
+                                         cursor:pointer;font-size:13px;padding:0 2px"
+                                  onclick="svReceiveToggle({{ inc.line_pk }})">✕</button>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                   {% endfor %}
@@ -632,6 +664,55 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   applySort();
   // Apply filter/search
   applyVisibility();
+})();
+
+/* ── Receive PO line ── */
+(function() {
+  var RECV_URL = '/admin/inventory/reorderproxy/supply/receive/';
+
+  function getCsrf() {
+    var c = document.cookie.split(';').find(function(s){ return s.trim().startsWith('csrftoken='); });
+    return c ? c.trim().split('=')[1] : '';
+  }
+
+  function doReceive(linePk, qty) {
+    var btn = document.querySelector('[onclick*="svReceive(' + linePk + ',"],' +
+                                     '[onclick*="svReceiveCustom(' + linePk + ')"]');
+    fetch(RECV_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+      body: JSON.stringify({ line_pk: linePk, qty: qty }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d.ok) {
+        location.reload();
+      } else {
+        alert('Помилка: ' + (d.error || '?'));
+      }
+    })
+    .catch(function() { alert('Помилка мережі'); });
+  }
+
+  window.svReceive = function(linePk, qty) {
+    if (!confirm('Отримати ' + qty + ' шт. по цьому рядку PO?')) return;
+    doReceive(linePk, qty);
+  };
+
+  window.svReceiveCustom = function(linePk) {
+    var inp = document.getElementById('rcv-qty-' + linePk);
+    if (!inp) return;
+    var qty = parseFloat(inp.value);
+    if (!qty || qty <= 0) { alert('Вкажіть кількість > 0'); return; }
+    if (!confirm('Отримати ' + qty + ' шт. по цьому рядку PO?')) return;
+    doReceive(linePk, qty);
+  };
+
+  window.svReceiveToggle = function(linePk) {
+    var panel = document.getElementById('rcv-' + linePk);
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'none' ? '' : 'none';
+  };
 })();
 </script>
 {% endblock %}
