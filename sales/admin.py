@@ -1839,6 +1839,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         from django.conf import settings
         import re as _re
 
+        if not obj.pk:
+            return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
+
         labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
         rows = []
         inputs_js = []
@@ -1936,6 +1939,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     def stock_summary(self, obj):
         from inventory.models import InventoryTransaction
+        if not obj.pk:
+            return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
         lines = obj.lines.all()
         if not lines:
             return "Немає позицій"
