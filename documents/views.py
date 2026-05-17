@@ -43,7 +43,8 @@ def generate_for_order(request, order_pk, template_pk=None):
             user=request.user,
         )
 
-        # Copy to media/orders/{source}/{order_number}/ so it shows in "Завантажені документи"
+        # Copy both .docx and .pdf to media/orders/{source}/{order_number}/
+        # so they appear in "Завантажені документи" panel immediately.
         from django.conf import settings as _s
         import shutil as _sh
         from datetime import date as _date
@@ -59,25 +60,37 @@ def generate_for_order(request, order_pk, template_pk=None):
             src_path = _P(doc.docx_file.path)
             copy_filename = src_path.name
             _sh.copy2(str(src_path), str(dest_dir / copy_filename))
-            copy_url = (
-                f'{_s.MEDIA_URL}orders/{source_slug}/{order_number}/{copy_filename}'
-            )
+            copy_url = f'{_s.MEDIA_URL}orders/{source_slug}/{order_number}/{copy_filename}'
+
+        pdf_copy_url = pdf_copy_filename = None
+        if doc.pdf_file:
+            try:
+                pdf_src = _P(doc.pdf_file.path)
+                pdf_copy_filename = pdf_src.name
+                _sh.copy2(str(pdf_src), str(dest_dir / pdf_copy_filename))
+                pdf_copy_url = (
+                    f'{_s.MEDIA_URL}orders/{source_slug}/{order_number}/{pdf_copy_filename}'
+                )
+            except Exception as e:
+                logger.warning('PDF copy failed: %s', e)
 
         return JsonResponse({
-            'ok':           True,
-            'doc_id':       doc.pk,
-            'status':       doc.status,
-            'docx_url':     f'/documents/download/{doc.pk}/docx/',
-            'has_pdf':      bool(doc.pdf_file),
-            'pdf_url':      f'/documents/download/{doc.pk}/pdf/' if doc.pdf_file else None,
-            'filename':     doc.docx_file.name.split('/')[-1] if doc.docx_file else '',
-            'file_size':    doc.file_size_display(),
-            # Local-save data (MinervaLocalSave.saveUrlToFolder)
-            'url':          copy_url,
-            'copy_filename': copy_filename,
-            'source_slug':  source_slug,
-            'date_str':     _date.today().strftime('%Y-%m-%d'),
-            'order_number': order_number,
+            'ok':              True,
+            'doc_id':          doc.pk,
+            'status':          doc.status,
+            'docx_url':        f'/documents/download/{doc.pk}/docx/',
+            'has_pdf':         bool(doc.pdf_file),
+            'pdf_url':         f'/documents/download/{doc.pk}/pdf/' if doc.pdf_file else None,
+            'filename':        doc.docx_file.name.split('/')[-1] if doc.docx_file else '',
+            'file_size':       doc.file_size_display(),
+            # For local save via MinervaLocalSave
+            'url':             copy_url,
+            'copy_filename':   copy_filename,
+            'pdf_copy_url':    pdf_copy_url,
+            'pdf_copy_filename': pdf_copy_filename,
+            'source_slug':     source_slug,
+            'date_str':        _date.today().strftime('%Y-%m-%d'),
+            'order_number':    order_number,
         })
     except Exception as e:
         logger.error('generate_for_order %s: %s', order_pk, e)
@@ -164,6 +177,24 @@ def delete_document(request, doc_pk):
     from documents.models import GeneratedDocument
     doc = get_object_or_404(GeneratedDocument, pk=doc_pk)
     try:
+        # Delete copies in media/orders/ so "Завантажені документи" updates correctly
+        if doc.source_module == 'sales' and doc.source_object_id:
+            try:
+                from sales.models import SalesOrder
+                from django.conf import settings
+                from pathlib import Path
+                order = SalesOrder.objects.get(pk=doc.source_object_id)
+                orders_dir = (Path(settings.MEDIA_ROOT) / 'orders'
+                              / (order.source or 'manual') / order.order_number)
+                for file_field in (doc.docx_file, doc.pdf_file):
+                    if file_field:
+                        fname = file_field.name.split('/')[-1]
+                        copy_path = orders_dir / fname
+                        if copy_path.exists():
+                            copy_path.unlink()
+            except Exception:
+                pass
+
         doc.delete_files()
         doc.delete()
         return JsonResponse({'ok': True})

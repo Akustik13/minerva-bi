@@ -76,6 +76,7 @@ window.DocumentWidget = {
         headers: { 'X-CSRFToken': this.csrf },
       });
       const d = await r.json();
+
       if (d.ok) {
         if (status) {
           status.innerHTML =
@@ -92,31 +93,44 @@ window.DocumentWidget = {
             `<span id="dw-local-status" style="font-size:11px;color:var(--text-dim)"></span>` +
             `</div>`;
         }
+
+        // Refresh both doc lists
         this.loadDocumentsList('docs-list');
-        // Also refresh the order upload-widget docs panel if present
         if (typeof _refreshDocsPanel === 'function') {
           _refreshDocsPanel(this.objectPk);
         }
+
         // Local save via MinervaLocalSave (File System Access API)
-        if (d.url && d.copy_filename && window.MinervaLocalSave && MinervaLocalSave.supported) {
+        const savePairs = [];
+        if (d.url && d.copy_filename) savePairs.push([d.url, d.copy_filename]);
+        if (d.pdf_copy_url && d.pdf_copy_filename) savePairs.push([d.pdf_copy_url, d.pdf_copy_filename]);
+
+        if (savePairs.length && window.MinervaLocalSave && MinervaLocalSave.supported) {
           const lsEl = document.getElementById('dw-local-status');
           if (lsEl) lsEl.textContent = '💾 Збереження локально...';
           const subs = (d.source_slug && d.date_str && d.order_number)
             ? [d.source_slug, d.date_str, d.order_number] : null;
-          MinervaLocalSave.saveUrlToFolder(d.url, d.copy_filename, subs).then(res => {
+
+          Promise.all(savePairs.map(([fileUrl, fname]) =>
+            MinervaLocalSave.saveUrlToFolder(fileUrl, fname, subs)
+          )).then(results => {
             if (!lsEl) return;
-            if (res.ok) {
-              lsEl.style.color = 'var(--ok)';
-              lsEl.textContent = '✅ ' + (res.path || 'збережено');
-            } else if (res.reason === 'no_handle') {
+            if (results.some(res => res.reason === 'no_handle')) {
               lsEl.style.color = 'var(--text-dim)';
               lsEl.textContent = '📂 Папка не обрана';
             } else {
-              lsEl.style.color = '#ff9800';
-              lsEl.textContent = '⚠️ ' + res.reason;
+              const okCount = results.filter(res => res.ok).length;
+              if (okCount === results.length) {
+                lsEl.style.color = 'var(--ok)';
+                lsEl.textContent = `✅ Збережено локально (${okCount} файл${okCount > 1 ? 'и' : ''})`;
+              } else {
+                lsEl.style.color = '#ff9800';
+                lsEl.textContent = `⚠️ Локально: ${okCount}/${results.length}`;
+              }
             }
           });
         }
+
       } else {
         if (status) status.innerHTML =
           `<span style="color:var(--err);font-size:13px">✗ ${d.error}</span>`;
@@ -174,6 +188,10 @@ window.DocumentWidget = {
       const d = await r.json();
       if (d.ok) {
         btn.closest('div[style]').remove();
+        // Refresh "Завантажені документи" panel (media/orders/ folder)
+        if (typeof _refreshDocsPanel === 'function') {
+          _refreshDocsPanel(this.objectPk);
+        }
       } else {
         alert('Помилка: ' + d.error);
       }
