@@ -334,6 +334,9 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                class="sv-btn sv-btn-po" title="Створити замовлення постачальнику">+ PO</a>
             <a href="/admin/inventory/inventorytransaction/add/?product={{ p.pk }}"
                class="sv-btn sv-btn-rx" title="Зареєструвати прихід/витрату">+ Рух</a>
+            <a href="/admin/inventory/product/{{ p.pk }}/set-stock/"
+               class="sv-btn" title="Встановити поточний залишок"
+               style="background:var(--bg-card-2);color:var(--text-muted)">⚖️</a>
           </div>
         </td>
       </tr>

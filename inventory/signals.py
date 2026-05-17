@@ -60,9 +60,14 @@ def update_inventory_on_purchase_receipt(sender, instance, created, **kwargs):
         defaults={"name": "Основний склад"}
     )
 
-    # delta > 0 = receipt (incoming), delta < 0 = return/correction (outgoing)
-    # qty must always be positive; tx_type determines direction
-    tx_type = InventoryTransaction.TxType.INCOMING if delta > 0 else InventoryTransaction.TxType.OUTGOING
+    # delta > 0 = receipt → INCOMING with positive qty
+    # delta < 0 = return/correction → OUTGOING with negative qty (reduces stock)
+    if delta > 0:
+        tx_type = InventoryTransaction.TxType.INCOMING
+        qty_val  = abs(delta)
+    else:
+        tx_type = InventoryTransaction.TxType.OUTGOING
+        qty_val  = -abs(delta)
 
     try:
         from core.utils import get_current_user
@@ -73,7 +78,7 @@ def update_inventory_on_purchase_receipt(sender, instance, created, **kwargs):
     InventoryTransaction.objects.create(
         external_key=f"po:{instance.purchase_order.code}:line:{instance.pk}:{uuid.uuid4()}",
         tx_type=tx_type,
-        qty=abs(delta),
+        qty=qty_val,
         product=instance.product,
         location=location,
         ref_doc=f"PO-{instance.purchase_order.code}",

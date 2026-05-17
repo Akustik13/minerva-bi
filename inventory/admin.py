@@ -292,11 +292,42 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         """AJAX: return HTML fragment with last 30 transactions for a product."""
         from django.http import HttpResponse
         from django.utils.html import escape
+        from django.db.models import Sum as _Sum
         try:
-            txs = (InventoryTransaction.objects
-                   .filter(product_id=product_pk)
-                   .select_related('performed_by', 'location')
-                   .order_by('-tx_date')[:30])
+            # Fetch oldest-first for running-balance computation, then reverse for display
+            txs = list(
+                InventoryTransaction.objects
+                .filter(product_id=product_pk)
+                .select_related('performed_by', 'location')
+                .order_by('tx_date', 'pk')[:30]
+            )
+
+            # Balance before this window (all older transactions, excluding Reserved)
+            tx_pks = [t.pk for t in txs]
+            older = (
+                InventoryTransaction.objects
+                .filter(product_id=product_pk)
+                .exclude(pk__in=tx_pks)
+                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
+                .aggregate(s=_Sum('qty'))['s'] or Decimal('0')
+            )
+
+            # Compute semantic delta and running balance (ignores wrong historical sign)
+            balance = Decimal(str(older))
+            for tx in txs:
+                if tx.tx_type == InventoryTransaction.TxType.INCOMING:
+                    tx._delta = abs(tx.qty)
+                elif tx.tx_type == InventoryTransaction.TxType.OUTGOING:
+                    tx._delta = -abs(tx.qty)
+                elif tx.tx_type == InventoryTransaction.TxType.RESERVED:
+                    tx._delta = Decimal('0')
+                else:
+                    tx._delta = tx.qty  # Adjustment: signed as stored
+                balance += tx._delta
+                tx._balance = balance
+
+            txs.reverse()  # newest first for display
+
             TYPE_ICON = {
                 'Incoming':   ('⬇️', '#66bb6a'),
                 'Outgoing':   ('⬆️', '#ef5350'),
@@ -306,17 +337,26 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             rows_html = []
             for tx in txs:
                 icon, color = TYPE_ICON.get(tx.tx_type, ('•', '#607d8b'))
-                qty_sign = '+' if tx.qty > 0 else ''
-                performer = tx.performed_by.get_full_name() or tx.performed_by.username \
-                            if tx.performed_by_id else '—'
+                delta = tx._delta
+                bal   = tx._balance
+                if delta > 0:
+                    qty_str = f'<span style="color:#66bb6a">+{delta:g}</span>'
+                elif delta < 0:
+                    qty_str = f'<span style="color:#ef5350">{delta:g}</span>'
+                else:
+                    qty_str = f'<span style="color:var(--text-dim)">0</span>'
+                bal_color = '#66bb6a' if bal > 0 else ('#ef5350' if bal < 0 else 'var(--text-dim)')
+                performer = (tx.performed_by.get_full_name() or tx.performed_by.username
+                             if tx.performed_by_id else '—')
                 rows_html.append(
                     f'<tr>'
                     f'<td style="color:var(--text-dim);font-size:11px;white-space:nowrap;padding:4px 8px">'
                     f'{tx.tx_date.strftime("%d.%m.%Y %H:%M")}</td>'
                     f'<td style="padding:4px 8px">'
                     f'<span style="color:{color}">{icon} {escape(tx.tx_type)}</span></td>'
-                    f'<td style="text-align:right;font-weight:700;color:{color};padding:4px 8px">'
-                    f'{qty_sign}{tx.qty:g}</td>'
+                    f'<td style="text-align:right;font-weight:700;padding:4px 8px">{qty_str}</td>'
+                    f'<td style="text-align:right;font-weight:800;color:{bal_color};'
+                    f'padding:4px 8px;font-family:monospace">{int(bal):g}</td>'
                     f'<td style="font-size:11px;padding:4px 8px">{escape(performer)}</td>'
                     f'<td style="font-size:11px;color:var(--text-dim);padding:4px 8px">'
                     f'{escape(tx.ref_doc or "—")}</td>'
@@ -325,24 +365,21 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                     f'</tr>'
                 )
             if not rows_html:
-                body = '<tr><td colspan="6" style="color:var(--text-dim);padding:8px">Рухів немає</td></tr>'
+                body = '<tr><td colspan="7" style="color:var(--text-dim);padding:8px">Рухів немає</td></tr>'
             else:
                 body = ''.join(rows_html)
+            TH = ('text-align:{};color:var(--text-dim);font-size:10px;'
+                  'padding:4px 8px;border-bottom:1px solid var(--border-strong)')
             html = (
                 '<table style="width:100%;border-collapse:collapse;font-size:12px">'
                 '<thead><tr>'
-                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
-                'padding:4px 8px;border-bottom:1px solid var(--border)">ДАТА</th>'
-                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
-                'padding:4px 8px;border-bottom:1px solid var(--border)">ТИП</th>'
-                '<th style="text-align:right;color:var(--text-dim);font-size:10px;'
-                'padding:4px 8px;border-bottom:1px solid var(--border)">К-СТЬ</th>'
-                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
-                'padding:4px 8px;border-bottom:1px solid var(--border)">ВИКОНАВЕЦЬ</th>'
-                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
-                'padding:4px 8px;border-bottom:1px solid var(--border)">ДОКУМЕНТ</th>'
-                '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
-                'padding:4px 8px;border-bottom:1px solid var(--border)">МІСЦЕ</th>'
+                f'<th style="{TH.format("left")}">ДАТА</th>'
+                f'<th style="{TH.format("left")}">ТИП</th>'
+                f'<th style="{TH.format("right")}">К-СТЬ</th>'
+                f'<th style="{TH.format("right")}">ЗАЛИШОК</th>'
+                f'<th style="{TH.format("left")}">ВИКОНАВЕЦЬ</th>'
+                f'<th style="{TH.format("left")}">ДОКУМЕНТ</th>'
+                f'<th style="{TH.format("left")}">МІСЦЕ</th>'
                 '</tr></thead>'
                 f'<tbody>{body}</tbody>'
                 '</table>'
@@ -767,11 +804,25 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
 
     def get_readonly_fields(self, request, obj=None):
         ro = list(super().get_readonly_fields(request, obj))
-        if not request.user.is_superuser:
-            for f in ('performed_by', 'external_key'):
-                if f not in ro:
-                    ro.append(f)
+        for f in ('performed_by', 'external_key'):
+            if f not in ro:
+                ro.append(f)
         return ro
+
+    def add_view(self, request, form_url='', extra_context=None):
+        product_pk = request.GET.get('product')
+        if product_pk:
+            try:
+                product = Product.objects.get(pk=product_pk)
+                url = reverse('admin:inventory_product_set_stock', args=[product_pk])
+                messages.info(request, format_html(
+                    '⚡ Швидка дія: <a href="{}" style="font-weight:bold">'
+                    '📦 Встановити поточний залишок для {}</a>',
+                    url, product.sku,
+                ))
+            except Exception:
+                pass
+        return super().add_view(request, form_url, extra_context)
 
     def save_model(self, request, obj, form, change):
         if not change:
