@@ -2069,6 +2069,25 @@ class PurchaseOrderLineInline(admin.TabularInline):
         return 0
 
     def get_formset(self, request, obj=None, **kwargs):
+        from django import forms as _forms
+        from decimal import Decimal as _D
+
+        class POLineForm(_forms.ModelForm):
+            qty_received = _forms.DecimalField(
+                max_digits=18, decimal_places=3,
+                required=False, initial=_D('0'), min_value=_D('0'),
+                label='Qty received',
+            )
+
+            def clean_qty_received(self):
+                v = self.cleaned_data.get('qty_received')
+                return _D('0') if v is None else v
+
+            class Meta:
+                model = PurchaseOrderLine
+                fields = '__all__'
+
+        kwargs.setdefault('form', POLineForm)
         FormSet = super().get_formset(request, obj, **kwargs)
         if obj is not None:
             return FormSet
@@ -2085,7 +2104,7 @@ class PurchaseOrderLineInline(admin.TabularInline):
         class PrefillFormSet(FormSet):
             def __init__(self, *args, _pk=product_pk, _desc=desc, **kw):
                 if 'initial' not in kw:
-                    kw['initial'] = [{'product': _pk, 'description': _desc}]
+                    kw['initial'] = [{'product': _pk, 'description': _desc, 'qty_received': _D('0')}]
                 super().__init__(*args, **kw)
         PrefillFormSet.__name__ = FormSet.__name__
         return PrefillFormSet

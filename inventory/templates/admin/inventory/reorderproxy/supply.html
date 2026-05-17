@@ -215,7 +215,6 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
       <tr>
         <th style="width:28px"></th>
         <th onclick="svSort('sku')" id="th-sku">SKU / Назва</th>
-        <th onclick="svSort('cat')" id="th-cat">Категорія</th>
         <th onclick="svSort('stock')" id="th-stock" style="text-align:right">На складі</th>
         <th onclick="svSort('reserved')" id="th-reserved" style="text-align:right">Резерв</th>
         <th onclick="svSort('avail')" id="th-avail" style="text-align:right">Доступно</th>
@@ -269,8 +268,6 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           </div>
           <div class="sv-name">{{ p.name }}</div>
         </td>
-        <!-- Category -->
-        <td class="sv-cat">{{ p.category|default:"—" }}</td>
         <!-- Stock -->
         <td style="text-align:right">
           {% if stock <= 0 %}
