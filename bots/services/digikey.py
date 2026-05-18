@@ -670,18 +670,34 @@ def _get_additional_field(fields: list, code: str, default=None):
 def _extract_tracking(order: dict) -> str:
     """Витягує трек-номер з відповіді DigiKey Marketplace.
 
-    DigiKey повертає трекінг у двох місцях:
-      1. order["shippingTracking"][0]["shippingTrackingNumber"]  ← основне (після /ship)
-      2. order["additionalFields"]["internal-tracking-number"]   ← резервне
+    Фактична назва поля: shippingTrackingInfoList (не shippingTracking).
+    Резервний варіант: additionalFields["internal-tracking-number"].
     """
-    for entry in order.get("shippingTracking") or []:
-        t = (entry.get("shippingTrackingNumber") or "").strip()
-        if t:
-            return t
+    for key in ("shippingTrackingInfoList", "shippingTracking"):
+        for entry in order.get(key) or []:
+            t = (entry.get("shippingTrackingNumber") or "").strip()
+            if t:
+                return t
     return (_get_additional_field(
         order.get("additionalFields") or [],
         "internal-tracking-number", ""
     ) or "").strip()
+
+
+def _extract_carrier(order: dict) -> str:
+    """Витягує назву перевізника з відповіді DigiKey Marketplace.
+
+    shippingMethodLabel буває null → беремо з shippingTrackingInfoList[0].shippingCarrierName.
+    """
+    label = (order.get("shippingMethodLabel") or "").strip()
+    if label:
+        return label
+    for key in ("shippingTrackingInfoList", "shippingTracking"):
+        for entry in order.get(key) or []:
+            name = (entry.get("shippingCarrierName") or "").strip()
+            if name:
+                return name
+    return (order.get("shippingMethodName") or "").strip()
 
 
 def sync_marketplace_orders(config) -> dict:
@@ -1006,16 +1022,16 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     currency   = (_cfg.locale_currency if _cfg and _cfg.locale_currency else None) or "USD"
     po_number  = _get_additional_field(add_fields, "customer-purchase-order-number", "")
     tracking   = _extract_tracking(order)
-    carrier    = order.get("shippingMethodLabel") or ""
+    carrier    = _extract_carrier(order)
 
-    # If bulk list didn't include shippingTracking, fetch individual order
+    # If bulk list didn't include shippingTrackingInfoList, fetch individual order
     if not tracking and dk_state in ("Shipped", "PartialShipped") and _cfg:
         try:
             detail = _fetch_marketplace_order(_cfg, order_number, get_marketplace_token(_cfg))
             if detail:
                 tracking = _extract_tracking(detail)
                 if not carrier:
-                    carrier = detail.get("shippingMethodLabel") or ""
+                    carrier = _extract_carrier(detail)
         except Exception:
             pass
 

@@ -2123,7 +2123,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         try:
             from bots.models import DigiKeyConfig
             from bots.services.digikey import (
-                _fetch_marketplace_order, _extract_tracking, get_marketplace_token,
+                _fetch_marketplace_order, _extract_tracking, _extract_carrier, get_marketplace_token,
             )
             config = DigiKeyConfig.get()
             token  = get_marketplace_token(config)
@@ -2132,7 +2132,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({"ok": False, "error": str(e)})
 
         tracking = _extract_tracking(data)
-        carrier  = (data.get("shippingMethodLabel") or "").strip()
+        carrier  = _extract_carrier(data)
 
         updated = []
         if tracking and tracking != order.tracking_number:
