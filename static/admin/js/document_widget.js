@@ -244,8 +244,9 @@ window.DocumentWidget = {
       const d   = await r.json();
 
       if (!d.ok) {
+        const icon = d.syntax_error ? '⚠️' : '✗';
         if (status) status.innerHTML =
-          `<span style="color:var(--err)">✗ ${d.error}</span>`;
+          `<span style="color:var(--err);font-size:13px">${icon} ${d.error}</span>`;
         return;
       }
 

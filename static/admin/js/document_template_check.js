@@ -14,8 +14,9 @@ async function checkDocTemplate(pk) {
     if (!resultEl) return;
 
     if (!d.ok) {
+      const icon = d.syntax_error ? '⚠️' : '✗';
       resultEl.innerHTML =
-        `<span style="color:var(--err);font-size:11px">✗ ${d.error}</span>`;
+        `<span style="color:var(--err);font-size:11px">${icon} ${d.error}</span>`;
       return;
     }
 

@@ -101,6 +101,8 @@ def generate_for_order(request, order_pk, template_pk=None):
                 'Відкрийте шаблон у Microsoft Word і збережіть через '
                 '«Зберегти як» → «Word документ (.docx)», потім завантажте знову.'
             )
+        elif 'Encountered unknown tag' in err or 'TemplateSyntaxError' in err:
+            err = _syntax_error_hint(err)
         elif 'is undefined' in err or 'UndefinedError' in err:
             var = err.split("'")[1] if "'" in err else err
             err = (
@@ -253,7 +255,8 @@ def _suggest(var_name):
 
 
 def _collect_undefined(template_path, context):
-    """Render template with a tracking Jinja2 env; return list of undefined var names."""
+    """Render template with a tracking Jinja2 env; return list of undefined var names.
+    Propagates TemplateSyntaxError so callers can report real syntax bugs."""
     from docxtpl import DocxTemplate
     import jinja2
 
@@ -283,8 +286,10 @@ def _collect_undefined(template_path, context):
     env = jinja2.Environment(undefined=_TrackUndef)
     try:
         tpl.render(context, jinja_env=env)
+    except jinja2.exceptions.TemplateSyntaxError:
+        raise  # real syntax bug — let the caller handle it
     except Exception:
-        pass
+        pass   # runtime errors (UndefinedError, etc.) are OK during tracking pass
     return collected
 
 
@@ -357,11 +362,33 @@ def _sample_context():
     }
 
 
+def _syntax_error_hint(err_str):
+    """Translate Jinja2 TemplateSyntaxError to a human-readable Ukrainian message."""
+    if 'Encountered unknown tag' in err_str:
+        try:
+            tag = err_str.split("'")[1]
+        except IndexError:
+            tag = '?'
+        return (
+            f'Синтаксична помилка: невідомий тег «{{% {tag} %}}». '
+            f'Можливо, замість «{{{{ {tag} }}}}» (подвійні дужки) вжито «{{% {tag} %}}» (відсоток). '
+            'Для виведення значень використовуй {{ }}, для циклів — {% %}. '
+            'Для таблиць: {%tr for item in items %} ... {%tr endfor %}.'
+        )
+    if 'Unexpected end of template' in err_str or 'unexpected end' in err_str.lower():
+        return (
+            'Синтаксична помилка: незакритий блок у шаблоні. '
+            'Перевір що кожен {% for %} має {% endfor %}, {% if %} — {% endif %}.'
+        )
+    return f'Синтаксична помилка в шаблоні: {err_str}'
+
+
 @staff_member_required
 def check_template(request, template_pk):
     """GET: Check template for undefined vars; return JSON with issues + suggestions."""
     from documents.models import DocumentTemplate
     from documents.generators import get_order_context
+    import jinja2
 
     template = get_object_or_404(DocumentTemplate, pk=template_pk)
     order_pk = request.GET.get('order_pk')
@@ -379,6 +406,8 @@ def check_template(request, template_pk):
                                else '— невідоме поле'),
             })
         return JsonResponse({'ok': True, 'issues': issues})
+    except jinja2.exceptions.TemplateSyntaxError as e:
+        return JsonResponse({'ok': False, 'syntax_error': True, 'error': _syntax_error_hint(str(e))})
     except Exception as e:
         logger.warning('check_template %s: %s', template_pk, e)
         return JsonResponse({'ok': False, 'error': str(e)})
