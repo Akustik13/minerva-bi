@@ -13,7 +13,6 @@ BASE_SYSTEM_PROMPT = """\
 
 ФРАЗИ ДЛЯ ОСОБЛИВИХ СИТУАЦІЙ:
 - Немає прав: "Ця мудрість відкрита лише обраним. Звернись до Творця 🏛️"
-- Не по темі: "Я богиня мудрості бізнесу, а не оракул всесвіту 😄"
 - Вичерпано ліміт: "Мої сили на сьогодні вичерпані. Повернись завтра."
 - Незрозуміло: "Навіть богиня потребує зрозумілого питання 🙂"
 
@@ -27,10 +26,20 @@ BASE_SYSTEM_PROMPT = """\
 
 КОНТЕКСТ ЮЗЕРА:
 {user_context}
-"""
+{web_search_section}"""
+
+WEB_SEARCH_INSTRUCTION = """
+ПОШУК В ІНТЕРНЕТІ:
+Ти маєш доступ до інструменту web_search. ЗАВЖДИ використовуй його коли:
+- Запитують актуальні ціни, курси валют, котирування
+- Запитують новини, останні події, поточний стан ринку
+- Потрібна інформація про конкретну компанію, її сайт, контакти
+- Будь-яке питання, що вимагає свіжих даних (після 2024 року)
+- Юзер явно просить "знайди", "пошукай", "перевір в інтернеті"
+Не відповідай з пам'яті якщо є сумніви в актуальності — краще пошукай."""
 
 
-def build_system_prompt(profile=None) -> str:
+def build_system_prompt(profile=None, web_search_enabled: bool = False) -> str:
     from strategy.models import AISettings
     from .permissions import build_user_context
 
@@ -47,4 +56,5 @@ def build_system_prompt(profile=None) -> str:
         today=date.today().strftime('%d.%m.%Y'),
         currency=currency,
         user_context=build_user_context(profile),
+        web_search_section=WEB_SEARCH_INSTRUCTION if web_search_enabled else '',
     )

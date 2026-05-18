@@ -73,7 +73,6 @@ def chat(
             return 'Твій денний ліміт вичерпано. Повернись завтра. 🏛️'
 
     conversation = _get_or_create_conversation(profile, channel, telegram_chat_id)
-    model = choose_model(user_text)
     tools = get_allowed_tools(profile)
     if enable_web_search is None:
         try:
@@ -85,7 +84,9 @@ def chat(
         _use_web_search = bool(enable_web_search)
     if _use_web_search:
         tools = [{"type": "web_search_20250305", "name": "web_search"}] + list(tools)
-    system_prompt = build_system_prompt(profile)
+    # Web search works best with Sonnet; force it when enabled
+    model = 'claude-sonnet-4-6' if _use_web_search else choose_model(user_text)
+    system_prompt = build_system_prompt(profile, web_search_enabled=_use_web_search)
 
     # Save user message
     user_msg = AIMessage.objects.create(
@@ -144,13 +145,12 @@ def chat(
             for block in assistant_content:
                 if block.type == 'tool_use':
                     if block.name == 'web_search':
-                        # Server-side managed tool — Anthropic handles the search.
-                        # We must return a tool_result to satisfy the API contract,
-                        # but the actual results are injected by Anthropic's infrastructure.
+                        # Server-side managed tool — Anthropic executes the search.
+                        # Empty list content signals "server-side"; Anthropic injects results.
                         tool_results.append({
                             'type': 'tool_result',
                             'tool_use_id': block.id,
-                            'content': '',
+                            'content': [],
                         })
                         continue
                     result = execute_tool(block.name, block.input, profile)
