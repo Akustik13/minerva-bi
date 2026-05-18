@@ -10,8 +10,46 @@ documents/models.py
 
 ДОСТУПНІ ЗМІННІ — повний перелік в TEMPLATE_VARIABLES_GUIDE нижче.
 """
+import os
+import zipfile
+
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.contrib.auth.models import User
+
+
+def _validate_docx(value):
+    """Перевіряє що файл є коректним .docx (ZIP з word/document.xml)."""
+    name = getattr(value, 'name', '') or ''
+    ext  = os.path.splitext(name)[1].lower()
+
+    if ext == '.doc':
+        raise ValidationError(
+            f'«{name}» — старий формат .doc. '
+            'Відкрийте у Word → «Зберегти як» → «Word документ (.docx)».'
+        )
+    if ext != '.docx':
+        raise ValidationError(
+            f'Потрібен файл .docx (Word 2007+). Завантажено: «{name}».'
+        )
+
+    try:
+        if hasattr(value, 'seek'):
+            value.seek(0)
+        with zipfile.ZipFile(value, 'r') as z:
+            if 'word/document.xml' not in z.namelist():
+                raise ValidationError(
+                    f'«{name}» не містить Word документа. '
+                    'Можливо, це тема або пошкоджений файл — '
+                    'відкрийте у Word та збережіть знову як .docx.'
+                )
+        if hasattr(value, 'seek'):
+            value.seek(0)
+    except zipfile.BadZipFile:
+        raise ValidationError(
+            f'«{name}» пошкоджений або не є Word документом (.docx). '
+            'Відкрийте у Word та збережіть знову.'
+        )
 
 
 # ── Константи ────────────────────────────────────────────────────────────────
@@ -100,7 +138,19 @@ TEMPLATE_VARIABLES_GUIDE = """
 {{gross_weight}}        → Вага брутто
 
 ── ТАБЛИЦЯ ТОВАРІВ (for loop) ─────────────────────────────────────────────
-{% for item in items %}
+Варіант А — таблиця Word (рядки, що повторюються):
+  У першій клітинці рядка-шаблону: {%tr for item in items %}
+  У останній клітинці того самого рядка: {%tr endfor %}
+  Між ними в клітинках: {{item.sku}}, {{item.name}}, тощо.
+
+Варіант Б — список поза таблицею:
+  {% for item in items %}
+  {{item.sku}} — {{item.name}} — {{item.quantity}} шт.
+  {% endfor %}
+
+ПОМИЛКА «item is undefined» означає що {{item.xxx}} вжито поза for-циклом.
+
+Поля item:
 {{item.sku}}            → Артикул / SKU товару
 {{item.name}}           → Назва товару
 {{item.quantity}}       → Кількість
@@ -109,7 +159,6 @@ TEMPLATE_VARIABLES_GUIDE = """
 {{item.weight}}         → Вага рядка (кг)
 {{item.hs_code}}        → Код ТН ЗЕД (для митниці)
 {{item.country}}        → Країна походження товару
-{% endfor %}
 
 ── МЕТА ───────────────────────────────────────────────────────────────────
 {{generated_date}}      → Дата і час генерації
@@ -161,6 +210,7 @@ class DocumentTemplate(models.Model):
 
     template_file = models.FileField(
         upload_to='document_templates/',
+        validators=[_validate_docx],
         verbose_name='Word шаблон (.docx)',
         help_text=(
             'Завантаж .docx файл з {{змінними}} в тексті. '

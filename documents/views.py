@@ -94,7 +94,22 @@ def generate_for_order(request, order_pk, template_pk=None):
         })
     except Exception as e:
         logger.error('generate_for_order %s: %s', order_pk, e)
-        return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+        err = str(e)
+        if 'is not a Word file' in err or 'themeManager' in err or 'BadZipFile' in err:
+            err = (
+                'Файл шаблону не є коректним Word документом (.docx). '
+                'Відкрийте шаблон у Microsoft Word і збережіть через '
+                '«Зберегти як» → «Word документ (.docx)», потім завантажте знову.'
+            )
+        elif 'is undefined' in err or 'UndefinedError' in err:
+            var = err.split("'")[1] if "'" in err else err
+            err = (
+                f'Помилка в шаблоні: змінна «{var}» не визначена. '
+                'Для таблиць: перший рядок для повтору має починатись з '
+                '{%tr for item in items %}, останній — {%tr endfor %}. '
+                'Або використовуй звичайний цикл поза таблицею.'
+            )
+        return JsonResponse({'ok': False, 'error': err}, status=500)
 
 
 @staff_member_required
