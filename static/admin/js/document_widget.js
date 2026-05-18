@@ -239,25 +239,29 @@ window.DocumentWidget = {
       `<span style="color:var(--text-dim)">🔍 Перевіряю «${templateName}»...</span>`;
 
     try {
-      const qs    = this.objectPk ? `?order_pk=${this.objectPk}` : '';
-      const dlUrl = `/documents/template/${templatePk}/check-download/${qs}`;
-      const r     = await fetch(`/documents/template/${templatePk}/check/${qs}`);
-      const d     = await r.json();
+      const qs     = this.objectPk ? `?order_pk=${this.objectPk}` : '';
+      const dlUrl  = `/documents/template/${templatePk}/check-download/${qs}`;
+      const fixUrl = `/documents/template/${templatePk}/auto-fix/${qs}`;
+      const r      = await fetch(`/documents/template/${templatePk}/check/${qs}`);
+      const d      = await r.json();
+
+      const _dlBtn  = (href, label, color) =>
+        `<a href="${href}" download style="display:inline-block;padding:5px 14px;border-radius:6px;
+           font-size:12px;border:1px solid ${color};color:${color};
+           text-decoration:none;white-space:nowrap">${label}</a>`;
 
       if (!d.ok) {
-        const icon   = d.syntax_error ? '⚠️' : '✗';
-        const dlLink = d.syntax_error
-          ? `<a href="${dlUrl}" download="check_${templateName}.docx"
-                style="display:inline-block;padding:5px 14px;border-radius:6px;font-size:12px;
-                       background:rgba(255,152,0,.15);border:1px solid #ff9800;
-                       color:#ff9800;text-decoration:none;margin-top:6px">
-               ⬇ .docx з підсвіченими помилками
-             </a>`
+        const icon = d.syntax_error ? '⚠️' : '✗';
+        const btns = d.syntax_error
+          ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+               ${_dlBtn(dlUrl, '⬇ З позначками', '#ff9800')}
+               ${_dlBtn(fixUrl, '🔧 Виправлений системою', 'var(--ok)')}
+             </div>`
           : '';
         if (status) status.innerHTML =
           `<div style="margin-top:4px">
              <div style="color:var(--err);font-size:13px">${icon} ${d.error}</div>
-             ${dlLink}
+             ${btns}
            </div>`;
         return;
       }
@@ -285,12 +289,10 @@ window.DocumentWidget = {
              ⚠️ Знайдено ${d.issues.length} невідом${d.issues.length === 1 ? 'е поле' : 'их полів'}:
            </div>
            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${rows}</div>
-           <a href="${dlUrl}" download="check_${templateName}.docx"
-              style="display:inline-block;padding:5px 14px;border-radius:6px;font-size:12px;
-                     background:rgba(255,152,0,.15);border:1px solid #ff9800;
-                     color:#ff9800;text-decoration:none">
-             ⬇ Завантажити .docx з позначками
-           </a>
+           <div style="display:flex;flex-wrap:wrap;gap:6px">
+             ${_dlBtn(dlUrl, '⬇ З позначками', '#ff9800')}
+             ${_dlBtn(fixUrl, '🔧 Виправлений системою', 'var(--ok)')}
+           </div>
          </div>`;
     } catch (e) {
       if (status) status.innerHTML =

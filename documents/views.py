@@ -452,6 +452,162 @@ def _redden_syntax_tags(docx_bytes):
     return out.read()
 
 
+def _auto_fix_field_errors(docx_bytes, issues):
+    """Patch docx: {{ unknown_var }} → {{ suggestion }} green+bold if suggestion exists,
+    else → ⚠️ [var] red+bold. Run-level XML patching, no rendering needed."""
+    import zipfile, re
+    from io import BytesIO
+
+    fix_map = {}
+    for issue in issues:
+        var = issue['var']
+        sug = issue.get('suggestion') or ''
+        if sug and sug != var:
+            fix_map[var] = (f'{{{{ {sug} }}}}', '2E7D32')   # green
+        else:
+            fix_map[var] = (f'⚠️ [{var}]', 'FF0000')         # red
+
+    if not fix_map:
+        return docx_bytes
+
+    def _patch_xml(xml):
+        def fix_run(m):
+            run = m.group(0)
+            all_text = ''.join(re.findall(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', run))
+            if '{{' not in all_text:
+                return run
+            chosen_color = [None]
+
+            def replace_var(vm):
+                var = vm.group(1).strip()
+                if var not in fix_map:
+                    return vm.group(0)
+                repl, color = fix_map[var]
+                chosen_color[0] = color
+                return repl
+
+            def fix_wt(wt_m):
+                attr = wt_m.group(1) or ''
+                inner = wt_m.group(2)
+                new_inner = re.sub(r'\{\{\s*([\w.]+)\s*\}\}', replace_var, inner)
+                if new_inner != inner and 'preserve' not in attr:
+                    attr = ' xml:space="preserve"'
+                return f'<w:t{attr}>{new_inner}</w:t>'
+
+            run = re.sub(r'<w:t(\s[^>]*)?>([^<]*)</w:t>', fix_wt, run)
+            c = chosen_color[0]
+            if c:
+                if '<w:rPr>' in run:
+                    if '<w:color' not in run:
+                        run = run.replace('<w:rPr>', f'<w:rPr><w:color w:val="{c}"/>', 1)
+                    if '<w:b/>' not in run and '<w:b ' not in run:
+                        run = run.replace('<w:rPr>', '<w:rPr><w:b/>', 1)
+                else:
+                    run = re.sub(r'(<w:t\b)',
+                                 f'<w:rPr><w:color w:val="{c}"/><w:b/></w:rPr>\\1',
+                                 run, count=1)
+            return run
+
+        return re.sub(r'<w:r\b[^>]*>.*?</w:r>', fix_run, xml, flags=re.DOTALL)
+
+    inp = BytesIO(docx_bytes)
+    out = BytesIO()
+    with zipfile.ZipFile(inp, 'r') as zin, \
+         zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename.endswith('.xml') and item.filename.startswith('word/'):
+                data = _patch_xml(data.decode('utf-8')).encode('utf-8')
+            zout.writestr(item, data)
+    out.seek(0)
+    return out.read()
+
+
+def _auto_fix_syntax_tags(docx_bytes):
+    """Replace {% varname %} → {{ varname }} green+bold at paragraph level.
+    Skips real Jinja2 block tags (for/endfor/if/etc.) and docxtpl row markers (tr/p/tc)."""
+    import zipfile, re
+    from io import BytesIO
+
+    _KEEP = frozenset({
+        'for', 'endfor', 'if', 'endif', 'else', 'elif',
+        'set', 'block', 'endblock', 'raw', 'endraw',
+        'with', 'endwith', 'macro', 'call', 'tr', 'p', 'tc',
+    })
+    TAG_RE = re.compile(r'\{%-?\s*([\w.]+)(?:\s[^%]*)?\s*-?%\}', re.DOTALL)
+
+    def _process_para(para_xml):
+        run_matches = list(re.finditer(r'<w:r\b[^>]*>.*?</w:r>', para_xml, re.DOTALL))
+        if not run_matches:
+            return para_xml
+        full_text = ''
+        char_to_idx = []
+        for idx, rm in enumerate(run_matches):
+            t = ''.join(re.findall(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', rm.group(0)))
+            char_to_idx.extend([idx] * len(t))
+            full_text += t
+        if '{%' not in full_text:
+            return para_xml
+
+        segments = []
+        last = 0
+        found_any = False
+        for m in TAG_RE.finditer(full_text):
+            tag_name = m.group(1).split('.')[0]
+            if tag_name in _KEEP:
+                continue
+            found_any = True
+            if m.start() > last:
+                segments.append((full_text[last:m.start()], False))
+            segments.append((f'{{{{ {m.group(1)} }}}}', True))
+            last = m.end()
+        if not found_any:
+            return para_xml
+        if last < len(full_text):
+            segments.append((full_text[last:], False))
+
+        first_rpr_m = re.search(r'<w:rPr>.*?</w:rPr>', run_matches[0].group(0), re.DOTALL)
+        base_rpr = first_rpr_m.group(0) if first_rpr_m else ''
+
+        new_runs = ''
+        for text, is_fixed in segments:
+            if not text:
+                continue
+            esc = (text.replace('&', '&amp;')
+                       .replace('<', '&lt;').replace('>', '&gt;'))
+            if is_fixed:
+                new_runs += (
+                    f'<w:r><w:rPr><w:color w:val="2E7D32"/><w:b/></w:rPr>'
+                    f'<w:t xml:space="preserve">{esc}</w:t></w:r>'
+                )
+            else:
+                new_runs += (
+                    f'<w:r>{base_rpr}'
+                    f'<w:t xml:space="preserve">{esc}</w:t></w:r>'
+                )
+
+        first_start = run_matches[0].start()
+        last_end = run_matches[-1].end()
+        return para_xml[:first_start] + new_runs + para_xml[last_end:]
+
+    def _patch_xml(xml):
+        return re.sub(r'<w:p\b[^>]*>.*?</w:p>',
+                      lambda m: _process_para(m.group(0)),
+                      xml, flags=re.DOTALL)
+
+    inp = BytesIO(docx_bytes)
+    out = BytesIO()
+    with zipfile.ZipFile(inp, 'r') as zin, \
+         zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename.endswith('.xml') and item.filename.startswith('word/'):
+                data = _patch_xml(data.decode('utf-8')).encode('utf-8')
+            zout.writestr(item, data)
+    out.seek(0)
+    return out.read()
+
+
 def _sample_context():
     """Minimal sample context with all standard variables."""
     return {
@@ -574,3 +730,46 @@ def check_template_download(request, template_pk):
     except Exception as e:
         logger.error('check_template_download %s: %s', template_pk, e)
         return HttpResponse(str(e), status=500)
+
+
+@staff_member_required
+def auto_fix_download(request, template_pk):
+    """GET: Download template with auto-applied fixes.
+    Field errors: {{ unknown }} → {{ suggestion }} green or ⚠️ [var] red.
+    Syntax errors: {% tag %} → {{ tag }} green (for non-Jinja2 tags).
+    """
+    from documents.models import DocumentTemplate
+    from documents.generators import get_order_context
+    from django.http import HttpResponse
+    import jinja2
+
+    template = get_object_or_404(DocumentTemplate, pk=template_pk)
+    order_pk = request.GET.get('order_pk')
+    safe_name = template.name.replace(' ', '_')[:30]
+
+    try:
+        with open(template.template_file.path, 'rb') as fh:
+            original_bytes = fh.read()
+    except Exception as e:
+        return HttpResponse(str(e), status=500)
+
+    try:
+        ctx = get_order_context(int(order_pk)) if order_pk else _sample_context()
+        issues_raw = _collect_undefined(template.template_file.path, ctx)
+        issues = [
+            {'var': var, 'suggestion': _suggest(var)}
+            for var in issues_raw
+        ]
+        patched = _auto_fix_field_errors(original_bytes, issues)
+    except jinja2.exceptions.TemplateSyntaxError:
+        patched = _auto_fix_syntax_tags(original_bytes)
+    except Exception as e:
+        logger.error('auto_fix_download %s: %s', template_pk, e)
+        return HttpResponse(str(e), status=500)
+
+    resp = HttpResponse(
+        patched,
+        content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    )
+    resp['Content-Disposition'] = f'attachment; filename="fixed_{safe_name}.docx"'
+    return resp

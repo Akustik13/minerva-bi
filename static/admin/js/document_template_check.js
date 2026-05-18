@@ -7,7 +7,8 @@ async function checkDocTemplate(pk) {
   const resultEl = document.getElementById('dtc-result-' + pk);
   if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-dim)">⏳</span>';
 
-  const dlUrl = `/documents/template/${pk}/check-download/`;
+  const dlUrl  = `/documents/template/${pk}/check-download/`;
+  const fixUrl = `/documents/template/${pk}/auto-fix/`;
 
   try {
     const r = await fetch(`/documents/template/${pk}/check/`);
@@ -18,13 +19,18 @@ async function checkDocTemplate(pk) {
     const dlBtn = `<a href="${dlUrl}" download
       style="display:inline-block;margin-top:5px;padding:3px 10px;border-radius:5px;
              font-size:10px;border:1px solid #ff9800;color:#ff9800;
-             text-decoration:none;white-space:nowrap">⬇ Завантажити з позначками</a>`;
+             text-decoration:none;white-space:nowrap">⬇ З позначками</a>`;
+
+    const fixBtn = `<a href="${fixUrl}" download
+      style="display:inline-block;margin-top:5px;margin-left:5px;padding:3px 10px;border-radius:5px;
+             font-size:10px;border:1px solid var(--ok);color:var(--ok);
+             text-decoration:none;white-space:nowrap">🔧 Виправлений системою</a>`;
 
     if (!d.ok) {
       const icon = d.syntax_error ? '⚠️' : '✗';
       resultEl.innerHTML =
         `<div style="font-size:11px;color:var(--err)">${icon} ${d.error}</div>` +
-        (d.syntax_error ? dlBtn : '');
+        (d.syntax_error ? `<div style="margin-top:4px">${dlBtn}${fixBtn}</div>` : '');
       return;
     }
 
@@ -50,7 +56,7 @@ async function checkDocTemplate(pk) {
         `⚠️ ${d.issues.length} невідом${d.issues.length === 1 ? 'е поле' : 'их полів'}` +
       `</div>` +
       `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:4px">${badges}${more}</div>` +
-      dlBtn;
+      `<div>${dlBtn}${fixBtn}</div>`;
 
   } catch (e) {
     if (resultEl) resultEl.innerHTML =
