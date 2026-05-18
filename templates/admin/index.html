@@ -12,21 +12,27 @@
 #content-main { max-width: none !important; }
 #content { padding-bottom: 0 !important; }
 
-.lp-wrap { padding: 0 24px 48px; }
+.lp-wrap { padding: 0 20px 48px; }
 
 /* ── Top bar ── */
 .lp-topbar {
   display: flex; align-items: center; justify-content: space-between;
   padding: 18px 0 16px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 .lp-title { font-size: 22px; font-weight: 700; color: var(--text); margin: 0; }
 .lp-sub { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
 .lp-date { font-size: 12px; color: var(--text-dim); text-align: right; line-height: 1.5; }
 
+/* ── Two-column layout ── */
+.lp-two-col {
+  display: flex; gap: 16px; align-items: flex-start;
+}
+.lp-main { flex: 1; min-width: 0; }
+
 /* ── Section ── */
-.lp-section { margin-bottom: 32px; }
+.lp-section { margin-bottom: 28px; }
 .lp-section-hdr {
   display: flex; align-items: center; gap: 10px;
   margin-bottom: 12px; padding-bottom: 8px;
@@ -73,48 +79,29 @@
   background: var(--bg-hover);
 }
 .lp-tile-icon { font-size: 22px; line-height: 1; margin-bottom: 8px; }
-.lp-tile-name {
-  font-size: 12px; font-weight: 600; color: var(--text);
-  line-height: 1.35; flex: 1;
-}
-.lp-tile-sub { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
+.lp-tile-name { font-size: 12px; font-weight: 600; color: var(--text); line-height: 1.35; flex: 1; }
+.lp-tile-sub  { font-size: 10px; color: var(--text-dim); margin-top: 4px; }
 
-/* ── Back button (for filtered view) ── */
+/* ── Back button ── */
 .lp-back {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 6px 14px 6px 10px;
   background: var(--bg-card); border: 1px solid var(--border-strong);
   border-radius: 20px; color: var(--text-muted); font-size: 12px;
-  font-weight: 600; text-decoration: none;
-  cursor: pointer; margin-bottom: 20px;
+  font-weight: 600; text-decoration: none; cursor: pointer; margin-bottom: 20px;
   transition: background .15s, color .15s;
 }
 .lp-back:hover { background: var(--bg-hover); color: var(--text); }
 
 /* ── Recent activity ── */
-.lp-recent-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 8px;
-}
-.lp-recent-card {
-  background: var(--bg-card-2); border: 1px solid var(--border);
-  border-radius: 7px; padding: 9px 11px;
-  display: flex; gap: 9px; align-items: flex-start;
-}
+.lp-recent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+.lp-recent-card { background: var(--bg-card-2); border: 1px solid var(--border); border-radius: 7px; padding: 9px 11px; display: flex; gap: 9px; align-items: flex-start; }
 .lp-recent-ico { font-size: 14px; flex-shrink: 0; line-height: 1.4; }
 .lp-recent-body { min-width: 0; }
-.lp-recent-body a {
-  font-size: 12px; font-weight: 600; color: var(--link-fg);
-  text-decoration: none; display: block;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.lp-recent-body a { font-size: 12px; font-weight: 600; color: var(--link-fg); text-decoration: none; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lp-recent-body a:hover { text-decoration: underline; }
-.lp-recent-obj {
-  font-size: 11px; color: var(--text-muted);
-  display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.lp-recent-model { font-size: 10px; color: var(--text-dim); display: block; margin-top: 2px; }
+.lp-recent-obj  { font-size: 11px; color: var(--text-muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-recent-model{ font-size: 10px; color: var(--text-dim); display: block; margin-top: 2px; }
 .lp-empty { color: var(--text-dim); font-size: 13px; padding: 8px 0; }
 
 /* ── Group accent colors ── */
@@ -132,6 +119,102 @@
 .lp-accent-system     { --lp-accent: #607d8b; }
 .lp-accent-security   { --lp-accent: #f44336; }
 .lp-accent-vendor     { --lp-accent: #795548; }
+
+/* ════════════════════════════════════════════════════
+   Widget Panel (right side)
+   ════════════════════════════════════════════════════ */
+.lp-widget-panel {
+  width: 264px; flex-shrink: 0;
+  position: sticky; top: 10px;
+  max-height: calc(100vh - 72px); overflow-y: auto;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 12px; scroll-behavior: smooth;
+}
+.lwp-header {
+  display: flex; align-items: center; gap: 5px;
+  padding: 11px 12px; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg-card); z-index: 1;
+  border-radius: 12px 12px 0 0;
+}
+.lwp-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; flex: 1; }
+.lwp-btn {
+  width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--bg-card-2); cursor: pointer; font-size: 12px;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.lwp-btn:hover { background: var(--bg-hover); }
+.lwp-btn.lwp-active { background: var(--accent-subtle,rgba(88,166,255,.1)); border-color: var(--accent); }
+
+.lwp-body { padding: 10px 10px 14px; display: flex; flex-direction: column; gap: 7px; }
+
+/* Data tile */
+.lwp-data-tile {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-card-2); border: 1px solid var(--border);
+  border-left: 3px solid var(--w-ac, var(--accent));
+  border-radius: 8px; padding: 9px 11px;
+  text-decoration: none !important;
+  transition: background .15s;
+}
+.lwp-data-tile:hover { background: var(--bg-hover); }
+.lwp-di { font-size: 18px; flex-shrink: 0; }
+.lwp-db { flex: 1; min-width: 0; }
+.lwp-dl { font-size: 10px; color: var(--text-dim); display: block; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lwp-dc { font-size: 24px; font-weight: 800; color: var(--w-ac, var(--text)); line-height: 1; font-family: monospace; }
+.lwp-dc.lwp-z { color: var(--text-dim); font-size: 20px; }
+
+/* Nav tiles 2-col */
+.lwp-nav-group { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+.lwp-nav-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 9px 6px 8px; background: var(--bg-card-2);
+  border: 1px solid var(--border); border-radius: 8px;
+  text-decoration: none !important;
+  transition: background .15s, border-color .15s;
+}
+.lwp-nav-tile:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.lwp-ni { font-size: 18px; }
+.lwp-nl { font-size: 10px; color: var(--text-muted); text-align: center; line-height: 1.3; }
+
+/* Edit mode */
+.lwp-edit-item {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--bg-card-2); border: 1px solid var(--border);
+  border-radius: 7px; padding: 7px 10px; user-select: none;
+  transition: background .15s; cursor: default;
+}
+.lwp-edit-item.lwp-drag-over { border-color: var(--accent); background: var(--accent-subtle,rgba(88,166,255,.08)); }
+.lwp-edit-item[draggable=true] { cursor: grab; }
+.lwp-dh { font-size: 14px; color: var(--text-dim); }
+.lwp-ei { font-size: 14px; }
+.lwp-el { flex: 1; font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lwp-rm {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 12px; padding: 2px 5px;
+  border-radius: 4px; line-height: 1;
+}
+.lwp-rm:hover { color: var(--err,#f44336); background: var(--bg-hover); }
+
+.lwp-sep { font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; letter-spacing: .05em; padding: 8px 0 5px; border-top: 1px solid var(--border); margin-top: 4px; }
+.lwp-cat-lbl { font-size: 10px; font-weight: 700; color: var(--text-dim); text-transform: uppercase; margin-bottom: 4px; }
+.lwp-cat-section { margin-bottom: 8px; }
+.lwp-tag {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: var(--bg-card-2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 3px 9px; margin: 2px 2px 2px 0;
+  font-size: 11px; color: var(--text-muted); cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.lwp-tag:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.lwp-tag.lwp-on { background: var(--accent-subtle,rgba(88,166,255,.1)); border-color: var(--accent); color: var(--text); }
+
+.lwp-ts { font-size: 10px; color: var(--text-dim); text-align: right; padding: 2px 2px 0; }
+
+@media (max-width: 900px) {
+  .lp-two-col { flex-direction: column-reverse; }
+  .lp-widget-panel { width: 100%; position: static; max-height: none; }
+}
 </style>
 
 <div class="lp-wrap" id="lp-wrap">
@@ -142,35 +225,52 @@
     </div>
     <div class="lp-date" id="lp-date"></div>
   </div>
-  <div id="lp-content"></div>
+
+  <div class="lp-two-col">
+    <!-- ── Launchpad ── -->
+    <div class="lp-main">
+      <div id="lp-content"></div>
+    </div>
+
+    <!-- ── Widget panel ── -->
+    <aside class="lp-widget-panel" id="lp-widget-panel">
+      <div class="lwp-header">
+        <span class="lwp-title">📌 Мій дашборд</span>
+        <button id="lwp-refresh-btn" class="lwp-btn" title="Оновити дані">🔄</button>
+        <button id="lwp-edit-btn"    class="lwp-btn" title="Налаштувати">✏️</button>
+      </div>
+      <div class="lwp-body" id="lwp-body">
+        <div style="color:var(--text-dim);font-size:12px;text-align:center;padding:20px 0">
+          Завантаження…
+        </div>
+      </div>
+    </aside>
+  </div>
 </div>
 
+<!-- ── Launchpad JS ── -->
 <script>
 (function(){
-  /* ── Date display ── */
   var dateEl = document.getElementById('lp-date');
   if (dateEl) {
     var d = new Date();
-    var days = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
+    var days   = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
     var months = ['січня','лютого','березня','квітня','травня','червня',
                   'липня','серпня','вересня','жовтня','листопада','грудня'];
     dateEl.innerHTML = days[d.getDay()] + '<br><strong style="color:var(--text-muted);font-size:13px">' +
       d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + '</strong>';
   }
 
-  /* ── Build launchpad from MV_GROUPS ── */
   function buildLaunchpad() {
-    var groups = window.MV_GROUPS || [];
-    var params = new URLSearchParams(window.location.search);
-    var filterG = params.get('g') || null;
+    var groups    = window.MV_GROUPS || [];
+    var params    = new URLSearchParams(window.location.search);
+    var filterG   = params.get('g') || null;
     var container = document.getElementById('lp-content');
     if (!container) return;
-
     var USER_ROLE = '{{ user_role|default:"" }}';
 
-    /* Render a group section */
     function renderGroup(grp) {
-      var links = grp.links || [];
+      var links     = grp.links || [];
       var accentCls = 'lp-accent-' + grp.id;
       var tilesHtml = links.map(function(lnk){
         return '<a href="' + lnk.href + '" class="lp-tile ' + accentCls + '">' +
@@ -178,68 +278,55 @@
           '<span class="lp-tile-name">' + lnk.label + '</span>' +
           '</a>';
       }).join('');
-      /* If group has apps but no links, show a single tile linking to the group or admin */
       if (!links.length) {
-        var fallbackHref = grp.href || ('/admin/?g=' + grp.id);
-        tilesHtml = '<a href="' + fallbackHref + '" class="lp-tile ' + accentCls + '">' +
+        var fb = grp.href || ('/admin/?g=' + grp.id);
+        tilesHtml = '<a href="' + fb + '" class="lp-tile ' + accentCls + '">' +
           '<span class="lp-tile-icon">' + (grp.icon || '📄') + '</span>' +
-          '<span class="lp-tile-name">Відкрити</span>' +
-          '</a>';
+          '<span class="lp-tile-name">Відкрити</span></a>';
       }
-      var groupLink = grp.href ? '<a href="' + grp.href + '" class="lp-section-link">Перейти →</a>' : '';
-      /* Strip leading emoji from label for section header text */
-      var sectionLabel = grp.label.replace(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2B00}-\u{2BFF}️\s]+/u, '') || grp.label;
+      var gl  = grp.href ? '<a href="' + grp.href + '" class="lp-section-link">Перейти →</a>' : '';
+      var lbl = grp.label.replace(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2B00}-\u{2BFF}️\s]+/u, '') || grp.label;
       return '<section class="lp-section" id="lp-g-' + grp.id + '">' +
         '<div class="lp-section-hdr">' +
           '<span class="lp-section-icon">' + (grp.icon || '📄') + '</span>' +
-          '<span class="lp-section-label">' + sectionLabel + '</span>' +
-          groupLink +
+          '<span class="lp-section-label">' + lbl + '</span>' + gl +
         '</div>' +
         '<div class="lp-grid">' + tilesHtml + '</div>' +
         '</section>';
     }
 
     var html = '';
-
     if (filterG) {
-      /* Filtered view — show only one group */
       var grp = groups.filter(function(g){ return g.id === filterG; })[0];
       document.getElementById('lp-title').textContent = (grp ? grp.label : '?') + ' — Плитки';
-      document.getElementById('lp-sub').textContent = 'Розділ меню';
+      document.getElementById('lp-sub').textContent   = 'Розділ меню';
       html += '<a href="/admin/" class="lp-back">← Всі розділи</a>';
-      if (grp) {
-        html += renderGroup(grp);
-      }
+      if (grp) html += renderGroup(grp);
     } else {
-      /* Full launchpad */
       groups.forEach(function(grp){
         if (grp.adminOnly && USER_ROLE !== 'superadmin') return;
         html += renderGroup(grp);
       });
     }
-
     container.innerHTML = html;
   }
 
-  /* Run after MV_GROUPS is available */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', buildLaunchpad);
   } else {
     buildLaunchpad();
   }
-
 })();
 </script>
 
-<!-- Recent activity (server-side) -->
+<!-- ── Recent activity ── -->
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   var params = new URLSearchParams(window.location.search);
-  if (params.get('g')) return; /* skip recent in filtered view */
+  if (params.get('g')) return;
   var container = document.getElementById('lp-content');
-  if (!container) return;
-  var recData = document.getElementById('lp-recent-data');
-  if (!recData) return;
+  var recData   = document.getElementById('lp-recent-data');
+  if (!container || !recData) return;
   var recDiv = document.createElement('section');
   recDiv.className = 'lp-section';
   recDiv.style.setProperty('--lp-accent', 'var(--border-strong)');
@@ -247,8 +334,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '<div class="lp-section-hdr">' +
       '<span class="lp-section-icon">🕐</span>' +
       '<span class="lp-section-label">Недавні дії</span>' +
-    '</div>' +
-    recData.innerHTML;
+    '</div>' + recData.innerHTML;
   container.appendChild(recDiv);
 });
 </script>
@@ -259,15 +345,10 @@ document.addEventListener('DOMContentLoaded', function(){
   <div class="lp-recent-grid">
     {% for entry in admin_log %}
     <div class="lp-recent-card">
-      <span class="lp-recent-ico">
-        {% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}
-      </span>
+      <span class="lp-recent-ico">{% if entry.is_addition %}➕{% elif entry.is_change %}✏️{% else %}🗑️{% endif %}</span>
       <div class="lp-recent-body">
-        {% if entry.get_admin_url %}
-        <a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
-        {% else %}
-        <span class="lp-recent-obj">{{ entry.object_repr }}</span>
-        {% endif %}
+        {% if entry.get_admin_url %}<a href="{{ entry.get_admin_url }}">{{ entry.object_repr }}</a>
+        {% else %}<span class="lp-recent-obj">{{ entry.object_repr }}</span>{% endif %}
         <span class="lp-recent-model">{{ entry.content_type }}</span>
       </div>
     </div>
@@ -277,5 +358,219 @@ document.addEventListener('DOMContentLoaded', function(){
   <p class="lp-empty">Немає недавніх дій</p>
   {% endif %}
 </div>
+
+<!-- ════════════════════════════════════════════════════
+     Widget Panel JS
+     Storage key: mv-wp-v1-{username}  (per user, per browser)
+     ════════════════════════════════════════════════════ -->
+<script>
+(function(){
+  /* ── Catalog of available widgets ─────────────────────────────────────────── */
+  var CAT = [
+    /* Data widgets — show live counts */
+    { id:'unread_emails',  t:'d', ic:'📧', lb:'Непрочитані листи',  hr:'/email/',                                           dk:'unread_emails',  ac:'#e91e63', cat:'Email' },
+    { id:'unread_threads', t:'d', ic:'📨', lb:'Непрочитані гілки',   hr:'/email/',                                           dk:'unread_threads', ac:'#e91e63', cat:'Email' },
+    { id:'new_orders',     t:'d', ic:'🛒', lb:'Нові замовлення',      hr:'/admin/sales/salesorder/?status=received',          dk:'new_orders',     ac:'#4caf50', cat:'Продажі' },
+    { id:'sales_today',    t:'d', ic:'💰', lb:'Замовлень сьогодні',   hr:'/admin/sales/salesorder/',                          dk:'sales_today',    ac:'#4caf50', cat:'Продажі' },
+    { id:'unshipped',      t:'d', ic:'📦', lb:'Не відправлено',       hr:'/admin/sales/salesorder/?status=received',          dk:'unshipped',      ac:'#ff9800', cat:'Продажі' },
+    { id:'in_transit',     t:'d', ic:'🚚', lb:'В дорозі',             hr:'/admin/shipping/shipment/?status=in_transit',       dk:'in_transit',     ac:'#00bcd4', cat:'Доставка' },
+    { id:'critical_stock', t:'d', ic:'⚠️', lb:'Критичний залишок',   hr:'/admin/inventory/reorderproxy/',                    dk:'critical_stock', ac:'#f44336', cat:'Склад' },
+    { id:'active_po',      t:'d', ic:'📋', lb:'Активних PO',          hr:'/admin/inventory/purchaseorder/',                   dk:'active_po',      ac:'#795548', cat:'Склад' },
+    { id:'tasks_pending',  t:'d', ic:'✅', lb:'Активні задачі',       hr:'/admin/tasks/task/',                                dk:'tasks_pending',  ac:'#9c27b0', cat:'Задачі' },
+    { id:'calendar_today', t:'d', ic:'📅', lb:'Подій сьогодні',       hr:'/calendar/',                                        dk:'calendar_today', ac:'#3f51b5', cat:'Календар' },
+    /* Nav widgets — quick-access links */
+    { id:'nav_dashboard',  t:'n', ic:'📊', lb:'Аналітика',            hr:'/dashboard/',                                       ac:'#c9a84c', cat:'Аналітика' },
+    { id:'nav_sales',      t:'n', ic:'🛒', lb:'Замовлення',           hr:'/admin/sales/salesorder/',                          ac:'#4caf50', cat:'Продажі' },
+    { id:'nav_crm',        t:'n', ic:'👥', lb:'CRM',                  hr:'/admin/crm/customer/',                              ac:'#2196f3', cat:'CRM' },
+    { id:'nav_email',      t:'n', ic:'📧', lb:'Email',                hr:'/email/',                                           ac:'#e91e63', cat:'Email' },
+    { id:'nav_calendar',   t:'n', ic:'📅', lb:'Календар',             hr:'/calendar/',                                        ac:'#3f51b5', cat:'Календар' },
+    { id:'nav_tasks',      t:'n', ic:'✅', lb:'Задачі',               hr:'/admin/tasks/task/',                                ac:'#9c27b0', cat:'Задачі' },
+    { id:'nav_inventory',  t:'n', ic:'📦', lb:'Склад',                hr:'/admin/inventory/',                                 ac:'#ff9800', cat:'Склад' },
+    { id:'nav_shipping',   t:'n', ic:'🚚', lb:'Відправлення',          hr:'/admin/shipping/shipment/',                        ac:'#00bcd4', cat:'Доставка' },
+    { id:'nav_supply',     t:'n', ic:'📋', lb:'Постачання',           hr:'/admin/inventory/reorderproxy/supply/',             ac:'#795548', cat:'Склад' },
+    { id:'nav_ai',         t:'n', ic:'🧠', lb:'AI Чат',               hr:'/ai/',                                              ac:'#bc8cff', cat:'AI' },
+    { id:'nav_documents',  t:'n', ic:'📄', lb:'Документи',            hr:'/admin/documents/generateddocument/',               ac:'#78909c', cat:'Документи' },
+  ];
+
+  var DEFAULT_ACTIVE = ['unread_emails','new_orders','unshipped','in_transit','critical_stock','tasks_pending'];
+  var SK = 'mv-wp-v1-{{ user.username }}';   /* per-user storage key */
+
+  var _liveData = {};
+  var _cfg;
+  var _editMode = false;
+  var _dragSrc  = null;
+
+  /* ── Config load / save ──────────────────────────────────────────────────── */
+  function cfgLoad() {
+    try { var r = localStorage.getItem(SK); if (r) { _cfg = JSON.parse(r); } } catch(e){}
+    if (!_cfg || !Array.isArray(_cfg.active)) { _cfg = { active: DEFAULT_ACTIVE.slice() }; }
+  }
+  function cfgSave() {
+    try { localStorage.setItem(SK, JSON.stringify(_cfg)); } catch(e){}
+  }
+  function byId(id) { return CAT.filter(function(w){ return w.id === id; })[0] || null; }
+
+  /* ── Data fetch ──────────────────────────────────────────────────────────── */
+  function doFetch(cb) {
+    fetch('/dashboard/api/widget-data/', { headers: {'X-Requested-With':'XMLHttpRequest'} })
+      .then(function(r){ return r.ok ? r.json() : {}; })
+      .then(function(d){ _liveData = d; render(); if(cb) cb(true); })
+      .catch(function(){ if(cb) cb(false); });
+  }
+
+  /* ── Render ──────────────────────────────────────────────────────────────── */
+  function render() {
+    var body = document.getElementById('lwp-body');
+    if (!body) return;
+    var widgets = _cfg.active.map(byId).filter(Boolean);
+    if (_editMode) { renderEdit(body, widgets); } else { renderNormal(body, widgets); }
+  }
+
+  function renderNormal(body, widgets) {
+    if (!widgets.length) {
+      body.innerHTML = '<p style="color:var(--text-dim);font-size:11px;text-align:center;padding:16px 8px">Немає віджетів.<br>Натисніть ✏️ для налаштування.</p>';
+      return;
+    }
+    var data  = widgets.filter(function(w){ return w.t === 'd'; });
+    var navs  = widgets.filter(function(w){ return w.t === 'n'; });
+    var html  = '';
+
+    data.forEach(function(w) {
+      var raw  = _liveData[w.dk];
+      var cnt  = (raw !== undefined && raw !== null) ? raw : '…';
+      var zero = cnt === 0;
+      html += '<a href="' + w.hr + '" class="lwp-data-tile" style="--w-ac:' + w.ac + '">' +
+        '<span class="lwp-di">' + w.ic + '</span>' +
+        '<span class="lwp-db">' +
+          '<span class="lwp-dl">' + w.lb + '</span>' +
+          '<span class="lwp-dc' + (zero ? ' lwp-z' : '') + '">' + cnt + '</span>' +
+        '</span></a>';
+    });
+
+    if (navs.length) {
+      html += '<div class="lwp-nav-group">';
+      navs.forEach(function(w) {
+        html += '<a href="' + w.hr + '" class="lwp-nav-tile">' +
+          '<span class="lwp-ni">' + w.ic + '</span>' +
+          '<span class="lwp-nl">' + w.lb + '</span>' +
+          '</a>';
+      });
+      html += '</div>';
+    }
+
+    if (Object.keys(_liveData).length) {
+      var n = new Date();
+      var t = n.getHours() + ':' + String(n.getMinutes()).padStart(2,'0');
+      html += '<div class="lwp-ts">оновлено ' + t + '</div>';
+    }
+    body.innerHTML = html;
+  }
+
+  function renderEdit(body, widgets) {
+    /* Active list */
+    var activeHtml = widgets.length
+      ? widgets.map(function(w, idx) {
+          return '<div class="lwp-edit-item" draggable="true" data-wid="' + w.id + '">' +
+            '<span class="lwp-dh" title="Перетягнути">⠿</span>' +
+            '<span class="lwp-ei">' + w.ic + '</span>' +
+            '<span class="lwp-el">' + w.lb + '</span>' +
+            '<button class="lwp-rm" onclick="wpRemove(\'' + w.id + '\')">✕</button>' +
+            '</div>';
+        }).join('')
+      : '<p style="color:var(--text-dim);font-size:11px;text-align:center">Немає активних віджетів</p>';
+
+    /* Catalog grouped */
+    var cats = {};
+    CAT.forEach(function(w) { if (!cats[w.cat]) cats[w.cat] = []; cats[w.cat].push(w); });
+    var catHtml = '';
+    Object.keys(cats).sort().forEach(function(cat) {
+      catHtml += '<div class="lwp-cat-section"><div class="lwp-cat-lbl">' + cat + '</div>';
+      cats[cat].forEach(function(w) {
+        var on = _cfg.active.indexOf(w.id) >= 0;
+        catHtml += '<button class="lwp-tag' + (on ? ' lwp-on' : '') + '" onclick="wpToggle(\'' + w.id + '\')">' +
+          w.ic + ' ' + w.lb + (on ? ' ✓' : '') + '</button>';
+      });
+      catHtml += '</div>';
+    });
+
+    body.innerHTML =
+      '<div id="lwp-active-list">' + activeHtml + '</div>' +
+      '<div class="lwp-sep">Каталог</div>' +
+      '<div style="padding-bottom:8px">' + catHtml + '</div>';
+
+    attachDnd();
+  }
+
+  /* ── Drag & Drop ─────────────────────────────────────────────────────────── */
+  function attachDnd() {
+    var items = document.querySelectorAll('.lwp-edit-item[draggable]');
+    items.forEach(function(el) {
+      el.addEventListener('dragstart', function(e) {
+        _dragSrc = el; e.dataTransfer.effectAllowed = 'move';
+        setTimeout(function(){ el.style.opacity = '0.35'; }, 0);
+      });
+      el.addEventListener('dragend', function() {
+        el.style.opacity = '';
+        document.querySelectorAll('.lwp-edit-item').forEach(function(i){ i.classList.remove('lwp-drag-over'); });
+      });
+      el.addEventListener('dragover', function(e) {
+        e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+        document.querySelectorAll('.lwp-edit-item').forEach(function(i){ i.classList.remove('lwp-drag-over'); });
+        el.classList.add('lwp-drag-over');
+      });
+      el.addEventListener('drop', function(e) {
+        e.preventDefault();
+        if (!_dragSrc || _dragSrc === el) return;
+        var si = _cfg.active.indexOf(_dragSrc.dataset.wid);
+        var ti = _cfg.active.indexOf(el.dataset.wid);
+        if (si < 0 || ti < 0) return;
+        _cfg.active.splice(si, 1);
+        _cfg.active.splice(ti, 0, _dragSrc.dataset.wid);
+        cfgSave(); render();
+      });
+    });
+  }
+
+  /* ── Global actions (called from inline onclick) ─────────────────────────── */
+  window.wpRemove = function(id) {
+    _cfg.active = _cfg.active.filter(function(i){ return i !== id; });
+    cfgSave(); render();
+  };
+  window.wpToggle = function(id) {
+    var idx = _cfg.active.indexOf(id);
+    if (idx >= 0) { _cfg.active.splice(idx, 1); } else { _cfg.active.push(id); }
+    cfgSave(); render();
+  };
+
+  function toggleEdit() {
+    _editMode = !_editMode;
+    var btn = document.getElementById('lwp-edit-btn');
+    if (btn) btn.classList.toggle('lwp-active', _editMode);
+    render();
+  }
+
+  /* ── Init ────────────────────────────────────────────────────────────────── */
+  function init() {
+    cfgLoad();
+    render();   /* show placeholder immediately */
+    doFetch();  /* load data → re-render */
+    setInterval(function(){ if (!_editMode) doFetch(); }, 120000); /* every 2 min */
+
+    document.getElementById('lwp-edit-btn').addEventListener('click', toggleEdit);
+
+    var rBtn = document.getElementById('lwp-refresh-btn');
+    rBtn.addEventListener('click', function(){
+      rBtn.textContent = '⏳';
+      doFetch(function(){ rBtn.textContent = '🔄'; });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>
 
 {% endblock %}

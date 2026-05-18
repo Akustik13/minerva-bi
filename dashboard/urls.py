@@ -131,6 +131,82 @@ download_import_template = staff_member_required(download_import_template)
 from .api_views import api_index, api_console, api_proxy
 from .views import trends_view
 
+
+def widget_data_api(request):
+    """Per-user widget data for the home dashboard panel."""
+    from django.http import JsonResponse
+    from datetime import date
+    from django.utils import timezone as _tz
+    data = {}
+    today = date.today()
+
+    try:
+        from email_assistant.models import EmailMessage, EmailThread
+        data['unread_emails'] = EmailMessage.objects.filter(
+            folder='inbox', is_read=False, is_deleted=False, is_spam=False
+        ).count()
+        data['unread_threads'] = EmailThread.objects.filter(
+            has_unread=True, is_archived=False
+        ).count()
+    except Exception:
+        data['unread_emails'] = 0
+        data['unread_threads'] = 0
+
+    try:
+        from sales.models import SalesOrder
+        data['new_orders'] = SalesOrder.objects.filter(
+            status__in=['received', 'processing']
+        ).count()
+        data['sales_today'] = SalesOrder.objects.filter(
+            order_date__date=today
+        ).count()
+        data['unshipped'] = SalesOrder.objects.filter(
+            affects_stock=True, shipped_at__isnull=True,
+            status__in=['received', 'processing']
+        ).count()
+    except Exception:
+        data['new_orders'] = 0
+        data['sales_today'] = 0
+        data['unshipped'] = 0
+
+    try:
+        from shipping.models import Shipment
+        data['in_transit'] = Shipment.objects.filter(status='in_transit').count()
+    except Exception:
+        data['in_transit'] = 0
+
+    try:
+        from inventory.admin import _get_inventory_stats
+        inv = _get_inventory_stats()
+        data['critical_stock'] = inv.get('critical', 0) if isinstance(inv.get('critical'), int) else 0
+        data['active_po'] = inv.get('active_po', 0) if isinstance(inv.get('active_po'), int) else 0
+    except Exception:
+        data['critical_stock'] = 0
+        data['active_po'] = 0
+
+    try:
+        from tasks.models import Task
+        data['tasks_pending'] = Task.objects.filter(
+            status__in=['pending', 'in_progress']
+        ).count()
+    except Exception:
+        data['tasks_pending'] = 0
+
+    try:
+        from calendar_app.models import CalendarEvent
+        now = _tz.now()
+        d_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        d_end   = now.replace(hour=23, minute=59, second=59, microsecond=999999)
+        data['calendar_today'] = CalendarEvent.objects.filter(
+            user=request.user, start_at__gte=d_start, start_at__lte=d_end,
+        ).count()
+    except Exception:
+        data['calendar_today'] = 0
+
+    return JsonResponse(data)
+widget_data_api = staff_member_required(widget_data_api)
+
+
 urlpatterns = [
     path("",           dashboard,       name="dashboard"),
     path("analytics/", analytics_index, name="analytics_index"),
@@ -144,7 +220,8 @@ urlpatterns = [
     path("signals-count/", signals_count, name="signals_count"),
     path("import-template/<str:name>/", download_import_template, name="import_template"),
     path("import/", import_hub, name="import_hub"),
-    path("api/",         api_index,   name="api_index"),
-    path("api/console/", api_console, name="api_console"),
-    path("api/proxy/",   api_proxy,   name="api_proxy"),
+    path("api/",              api_index,       name="api_index"),
+    path("api/console/",      api_console,     name="api_console"),
+    path("api/proxy/",        api_proxy,       name="api_proxy"),
+    path("api/widget-data/",  widget_data_api, name="widget_data_api"),
 ]
