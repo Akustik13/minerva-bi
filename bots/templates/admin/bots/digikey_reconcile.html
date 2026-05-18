@@ -86,6 +86,12 @@
     <div style="font-size:24px;color:var(--ok);font-weight:bold">{{ stats.lines_updated }}</div>
     <div style="color:var(--text-muted);font-size:12px">Рядків оновлено</div>
   </div>
+  {% if stats.tracking_synced %}
+  <div style="background:var(--bg-card);border:1px solid #2196f3;border-radius:6px;padding:14px 20px;text-align:center;min-width:120px">
+    <div style="font-size:24px;color:#2196f3;font-weight:bold">{{ stats.tracking_synced }}</div>
+    <div style="color:var(--text-muted);font-size:12px">Трек-номерів</div>
+  </div>
+  {% endif %}
   {% if stats.errors %}
   <div style="background:var(--bg-card);border:1px solid var(--err);border-radius:6px;padding:14px 20px;text-align:center;min-width:120px">
     <div style="font-size:24px;color:var(--err);font-weight:bold">{{ stats.errors|length }}</div>

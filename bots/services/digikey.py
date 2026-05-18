@@ -940,14 +940,15 @@ def reconcile_marketplace_orders(config, days_back: int = 365, dry_run: bool = F
     from inventory.models import Product
 
     stats = {
-        "checked":        0,
-        "updated":        0,
-        "added":          [],   # нові замовлення яких не було
-        "unchanged":      0,
-        "lines_updated":  0,
-        "unmatched_skus": [],
-        "errors":         [],
-        "changes":        [],   # список {order_number, field, old, new}
+        "checked":         0,
+        "updated":         0,
+        "added":           [],   # нові замовлення яких не було
+        "unchanged":       0,
+        "lines_updated":   0,
+        "tracking_synced": 0,    # замовлень де підтягнутий трек-номер
+        "unmatched_skus":  [],
+        "errors":          [],
+        "changes":         [],   # список {order_number, field, old, new}
     }
 
     from_dt = (
@@ -1006,6 +1007,17 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     po_number  = _get_additional_field(add_fields, "customer-purchase-order-number", "")
     tracking   = _extract_tracking(order)
     carrier    = order.get("shippingMethodLabel") or ""
+
+    # If bulk list didn't include shippingTracking, fetch individual order
+    if not tracking and dk_state in ("Shipped", "PartialShipped") and _cfg:
+        try:
+            detail = _fetch_marketplace_order(_cfg, order_number, get_marketplace_token(_cfg))
+            if detail:
+                tracking = _extract_tracking(detail)
+                if not carrier:
+                    carrier = detail.get("shippingMethodLabel") or ""
+        except Exception:
+            pass
 
     street     = " ".join(filter(None, [addr.get("street1", ""), addr.get("street2", "").strip()]))
     phone      = addr.get("phoneNumber", "")
@@ -1133,7 +1145,10 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     if carrier:
         _check("shipping_courier", carrier)
     if tracking:
+        was_empty = not sale.tracking_number
         _check("tracking_number", tracking)
+        if was_empty and "tracking_number" in update_fields:
+            stats["tracking_synced"] += 1
 
     if update_fields:
         if not dry_run:
