@@ -667,6 +667,23 @@ def _get_additional_field(fields: list, code: str, default=None):
     return default
 
 
+def _extract_tracking(order: dict) -> str:
+    """Витягує трек-номер з відповіді DigiKey Marketplace.
+
+    DigiKey повертає трекінг у двох місцях:
+      1. order["shippingTracking"][0]["shippingTrackingNumber"]  ← основне (після /ship)
+      2. order["additionalFields"]["internal-tracking-number"]   ← резервне
+    """
+    for entry in order.get("shippingTracking") or []:
+        t = (entry.get("shippingTrackingNumber") or "").strip()
+        if t:
+            return t
+    return (_get_additional_field(
+        order.get("additionalFields") or [],
+        "internal-tracking-number", ""
+    ) or "").strip()
+
+
 def sync_marketplace_orders(config) -> dict:
     """
     Синхронізує вхідні замовлення DigiKey Marketplace → Minerva SalesOrder.
@@ -840,13 +857,13 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
             _maybe_auto_confirm(config, order_number, sale, _change_entry)
     else:
         # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
+        update_fields = []
         if _status_can_advance(sale.status, minerva_status):
             old_status = sale.status
             sale.status = minerva_status
             sale.status_source = "DigiKey Marketplace"
-            sale._skip_status_notification = True  # summary covers it via notify_sync_result
-            sale.save(update_fields=["status", "status_source"])
-            stats["updated"] += 1
+            sale._skip_status_notification = True
+            update_fields += ["status", "status_source"]
             stats["changes"].append({
                 "order":      order_number,
                 "client":     client,
@@ -854,6 +871,16 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
                 "new_status": minerva_status,
                 "extra":      "DigiKey Marketplace",
             })
+
+        # Трекінг: підтягуємо з DigiKey якщо є і відрізняється від поточного
+        tracking = _extract_tracking(order)
+        if tracking and tracking != sale.tracking_number:
+            sale.tracking_number = tracking
+            update_fields.append("tracking_number")
+
+        if update_fields:
+            sale.save(update_fields=update_fields)
+            stats["updated"] += 1
         else:
             stats["skipped"] += 1
 
@@ -977,7 +1004,7 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
     new_status = MARKETPLACE_STATUS_MAP.get(dk_state, "received")
     currency   = (_cfg.locale_currency if _cfg and _cfg.locale_currency else None) or "USD"
     po_number  = _get_additional_field(add_fields, "customer-purchase-order-number", "")
-    tracking   = _get_additional_field(add_fields, "internal-tracking-number", "")
+    tracking   = _extract_tracking(order)
     carrier    = order.get("shippingMethodLabel") or ""
 
     street     = " ".join(filter(None, [addr.get("street1", ""), addr.get("street2", "").strip()]))
