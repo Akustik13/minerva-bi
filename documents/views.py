@@ -294,40 +294,91 @@ def _collect_undefined(template_path, context):
 
 
 def _render_validated_doc(template_path, context):
-    """Render template with unknown vars highlighted red (⚠️ name → suggestion)."""
-    from docxtpl import DocxTemplate, RichText
+    """Render template; undefined vars show as ⚠️ [var] highlighted red in .docx.
+    Works by rendering with a custom DebugUndefined that keeps {{ var }} as literal
+    text, then directly patching the ZIP XML to colour those runs red.
+    Raises jinja2.TemplateSyntaxError for real syntax bugs.
+    """
+    from docxtpl import DocxTemplate
+    import jinja2
     from io import BytesIO
 
-    issues_raw = _collect_undefined(template_path, context)
-
-    # Build enriched context: inject red RichText for each unknown top-level var
-    val_ctx = dict(context)
-    issues_out = []
-    for var in issues_raw:
-        suggestion = _suggest(var)
-        if suggestion and suggestion != var:
-            label = f'⚠️ [{var}]  →  правильно: {{{{{suggestion}}}}}'
-        else:
-            label = f'⚠️ [{var}]  — невідоме поле'
-        issues_out.append({'var': var, 'suggestion': suggestion, 'label': label})
-
-        # Inject red marker for simple (non-dotted) vars
-        parts = var.split('.')
-        if len(parts) == 1 and parts[0] not in val_ctx:
-            val_ctx[parts[0]] = RichText(label, color='FF0000', bold=True)
+    class _DebugUndef(jinja2.Undefined):
+        """Keeps undefined vars as {{ var }} text so we can find and colour them."""
+        def __str__(self):
+            return f'{{{{ {self._undefined_name or "?"} }}}}'
+        def __iter__(self): return iter([])
+        def __bool__(self):  return False
+        def __len__(self):   return 0
+        def __getattr__(self, name):
+            if name.startswith('_'):
+                raise AttributeError(name)
+            parent = self._undefined_name or ''
+            return _DebugUndef(name=f'{parent}.{name}' if parent else name)
 
     tpl = DocxTemplate(template_path)
+    env = jinja2.Environment(undefined=_DebugUndef)
     try:
-        tpl.render(val_ctx)
+        tpl.render(context, jinja_env=env)
+    except jinja2.exceptions.TemplateSyntaxError:
+        raise
     except Exception:
-        tpl2 = DocxTemplate(template_path)
-        tpl2.render(context)
-        tpl = tpl2
+        pass
 
     buf = BytesIO()
     tpl.save(buf)
     buf.seek(0)
-    return buf, issues_out
+    return BytesIO(_redden_undefined_runs(buf.read()))
+
+
+def _redden_undefined_runs(docx_bytes):
+    """Patch docx ZIP: colour any XML run containing {{ text red + bold + ⚠️ prefix."""
+    import zipfile, re
+    from io import BytesIO
+
+    def _patch_xml(xml):
+        def fix_run(m):
+            run = m.group(0)
+            all_text = ''.join(re.findall(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', run))
+            if '{{' not in all_text:
+                return run
+
+            # Replace {{ var }} text with ⚠️ [var] inside every w:t node
+            def fix_wt(wt_m):
+                attr  = wt_m.group(1) or ''
+                inner = wt_m.group(2)
+                inner = re.sub(r'\{\{\s*(.*?)\s*\}\}', r'⚠️ [\1]', inner)
+                if 'preserve' not in attr:
+                    attr = ' xml:space="preserve"'
+                return f'<w:t{attr}>{inner}</w:t>'
+
+            run = re.sub(r'<w:t(\s[^>]*)?>([^<]*)</w:t>', fix_wt, run)
+
+            # Inject red colour + bold into run properties
+            if '<w:rPr>' in run:
+                if '<w:color' not in run:
+                    run = run.replace('<w:rPr>', '<w:rPr><w:color w:val="FF0000"/>', 1)
+                if '<w:b/>' not in run and '<w:b ' not in run:
+                    run = run.replace('<w:rPr>', '<w:rPr><w:b/>', 1)
+            else:
+                run = re.sub(r'(<w:t\b)',
+                             r'<w:rPr><w:color w:val="FF0000"/><w:b/></w:rPr>\1',
+                             run, count=1)
+            return run
+
+        return re.sub(r'<w:r\b[^>]*>.*?</w:r>', fix_run, xml, flags=re.DOTALL)
+
+    inp = BytesIO(docx_bytes)
+    out = BytesIO()
+    with zipfile.ZipFile(inp, 'r') as zin, \
+         zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename.endswith('.xml') and item.filename.startswith('word/'):
+                data = _patch_xml(data.decode('utf-8')).encode('utf-8')
+            zout.writestr(item, data)
+    out.seek(0)
+    return out.read()
 
 
 def _sample_context():
@@ -419,13 +470,14 @@ def check_template_download(request, template_pk):
     from documents.models import DocumentTemplate
     from documents.generators import get_order_context
     from django.http import HttpResponse
+    import jinja2
 
     template = get_object_or_404(DocumentTemplate, pk=template_pk)
     order_pk = request.GET.get('order_pk')
 
     try:
         ctx = get_order_context(int(order_pk)) if order_pk else _sample_context()
-        buf, _ = _render_validated_doc(template.template_file.path, ctx)
+        buf = _render_validated_doc(template.template_file.path, ctx)
         safe_name = template.name.replace(' ', '_')[:30]
         resp = HttpResponse(
             buf.read(),
@@ -433,7 +485,12 @@ def check_template_download(request, template_pk):
         )
         resp['Content-Disposition'] = f'attachment; filename="check_{safe_name}.docx"'
         return resp
+    except jinja2.exceptions.TemplateSyntaxError as e:
+        return HttpResponse(
+            _syntax_error_hint(str(e)),
+            status=422,
+            content_type='text/plain; charset=utf-8',
+        )
     except Exception as e:
         logger.error('check_template_download %s: %s', template_pk, e)
-        from django.http import HttpResponse
         return HttpResponse(str(e), status=500)
