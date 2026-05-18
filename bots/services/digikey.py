@@ -1345,10 +1345,12 @@ MARKETPLACE_SHIPPING_PATH       = "/Sales/Marketplace2/Shipping/v1"
 MARKETPLACE_FILE_DOCS_PATH      = "/Sales/Marketplace2/FileDocuments/v1/fileDocument"
 
 
-def upload_vat_invoice(config, file_bytes: bytes, filename: str) -> dict:
+def upload_vat_invoice(config, file_bytes: bytes, filename: str,
+                       supplier_id: str = None) -> dict:
     """
     POST /Sales/Marketplace2/FileDocuments/v1/fileDocument (multipart/form-data)
     Завантажує файл рахунку VAT на DigiKey. Повертає {'ok': bool, 'file_id': str, 'message': str}.
+    supplier_id (UUID) береться з поля supplierId замовлення Marketplace.
     """
     import requests as req
     from tabele.api_logger import logged_request
@@ -1359,9 +1361,13 @@ def upload_vat_invoice(config, file_bytes: bytes, filename: str) -> dict:
         "X-DIGIKEY-Client-Id": config.client_id,
     }
     url = f"{_base_url(config)}{MARKETPLACE_FILE_DOCS_PATH}"
+    params = {}
+    if supplier_id:
+        params["supplierId"] = supplier_id
     resp = logged_request('digikey', 'upload_vat_invoice', 'POST', url, req.post,
                           headers=headers,
                           files={"File": (filename, file_bytes)},
+                          params=params,
                           timeout=30)
     raw = {}
     try:

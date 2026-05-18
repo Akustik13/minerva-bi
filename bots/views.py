@@ -254,9 +254,11 @@ def digikey_ship_order(request, order_pk):
         else:
             try:
                 # Optional VAT invoice file upload before shipping
-                vat_file = request.FILES.get("vat_invoice_file")
+                vat_file    = request.FILES.get("vat_invoice_file")
+                supplier_id = request.POST.get("supplier_id", "").strip() or None
                 if vat_file:
-                    up = upload_vat_invoice(config, vat_file.read(), vat_file.name)
+                    up = upload_vat_invoice(config, vat_file.read(), vat_file.name,
+                                            supplier_id=supplier_id)
                     if not up["ok"]:
                         msg.warning(request, f"Файл VAT не завантажено: {up['message']}")
 
@@ -299,8 +301,10 @@ def digikey_ship_order(request, order_pk):
         try:
             dk_order      = fetch_marketplace_order_data(config, order.order_number)
             order_details = dk_order.get("orderDetails") or []
+            supplier_id   = dk_order.get("supplierId", "")
         except Exception:
             order_details = []
+            supplier_id   = ""
 
     from django.template.response import TemplateResponse
     return TemplateResponse(request, "admin/bots/digikey_ship_order.html", {
@@ -310,4 +314,5 @@ def digikey_ship_order(request, order_pk):
         "has_token":     has_token,
         "carriers":      carriers,
         "order_details": order_details,
+        "supplier_id":   supplier_id,
     })

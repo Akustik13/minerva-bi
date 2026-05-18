@@ -84,6 +84,7 @@
 <!-- Ship form -->
 <form method="post" action="/bots/digikey/ship/{{ order.pk }}/" enctype="multipart/form-data">
   {% csrf_token %}
+  {% if supplier_id %}<input type="hidden" name="supplier_id" value="{{ supplier_id }}">{% endif %}
 
   <div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:20px;margin-bottom:16px">
     <h3 style="color:var(--text);margin-top:0;margin-bottom:16px">Дані відправлення</h3>
