@@ -294,15 +294,16 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         from django.utils.html import escape
         from django.db.models import Sum as _Sum
         try:
-            # Fetch oldest-first for running-balance computation, then reverse for display
+            # Fetch newest 30 (desc), then reverse to oldest-first for balance computation
             txs = list(
                 InventoryTransaction.objects
                 .filter(product_id=product_pk)
                 .select_related('performed_by', 'location')
-                .order_by('tx_date', 'pk')[:30]
+                .order_by('-tx_date', '-pk')[:30]
             )
+            txs.reverse()  # oldest-first for running-balance pass
 
-            # Balance before this window (all older transactions, excluding Reserved)
+            # Balance before this window (all transactions NOT in this window, excl. Reserved)
             tx_pks = [t.pk for t in txs]
             older = (
                 InventoryTransaction.objects
@@ -312,8 +313,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 .aggregate(s=_Sum('qty'))['s'] or Decimal('0')
             )
 
-            # Balance uses raw qty (same formula as stock_qty → matches actual stock)
-            # Reserved transactions don't affect physical stock
+            # Running balance forward through the window
             balance = Decimal(str(older))
             for tx in txs:
                 raw = tx.qty if tx.tx_type != InventoryTransaction.TxType.RESERVED else Decimal('0')
