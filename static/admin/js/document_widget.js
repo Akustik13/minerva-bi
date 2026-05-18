@@ -49,16 +49,28 @@ window.DocumentWidget = {
           'style="color:var(--link-fg)">+ Додати шаблон</a></span>';
         return;
       }
-      el.innerHTML = d.templates.map(t =>
-        `<button type="button"
-                 onclick="DocumentWidget.generate(${t.pk}, '${t.name.replace(/'/g,"\\'")}')"
-                 title="${(t.description || '').replace(/"/g, '&quot;')}"
-                 style="padding:6px 14px;border-radius:6px;font-size:12px;
-                        border:1px solid var(--border-strong);background:none;
-                        color:var(--text);cursor:pointer">
-           📄 ${t.name}
-         </button>`
-      ).join('');
+      el.innerHTML = d.templates.map(t => {
+        const safeName = t.name.replace(/'/g, "\\'");
+        const desc     = (t.description || '').replace(/"/g, '&quot;');
+        return (
+          `<span style="display:inline-flex;align-items:stretch;gap:0">` +
+          `<button type="button"
+                   onclick="DocumentWidget.generate(${t.pk},'${safeName}')"
+                   title="${desc}"
+                   style="padding:6px 14px;border-radius:6px 0 0 6px;font-size:12px;
+                          border:1px solid var(--border-strong);border-right:none;
+                          background:none;color:var(--text);cursor:pointer">
+             📄 ${t.name}
+           </button>` +
+          `<button type="button"
+                   onclick="DocumentWidget.checkTemplate(${t.pk},'${safeName}')"
+                   title="Перевірити шаблон"
+                   style="padding:6px 8px;border-radius:0 6px 6px 0;font-size:12px;
+                          border:1px solid var(--border-strong);background:none;
+                          color:var(--text-dim);cursor:pointer">🔍</button>` +
+          `</span>`
+        );
+      }).join('');
     } catch (e) {
       el.innerHTML = '<span style="color:var(--err);font-size:12px">Помилка завантаження шаблонів</span>';
     }
@@ -219,6 +231,59 @@ window.DocumentWidget = {
         }
       });
     });
+  },
+
+  async checkTemplate(templatePk, templateName) {
+    const status = document.getElementById('doc-gen-status');
+    if (status) status.innerHTML =
+      `<span style="color:var(--text-dim)">🔍 Перевіряю «${templateName}»...</span>`;
+
+    try {
+      const qs  = this.objectPk ? `?order_pk=${this.objectPk}` : '';
+      const r   = await fetch(`/documents/template/${templatePk}/check/${qs}`);
+      const d   = await r.json();
+
+      if (!d.ok) {
+        if (status) status.innerHTML =
+          `<span style="color:var(--err)">✗ ${d.error}</span>`;
+        return;
+      }
+
+      if (!d.issues || !d.issues.length) {
+        if (status) status.innerHTML =
+          `<span style="color:var(--ok);font-size:13px">✓ Шаблон коректний — всі поля визначені</span>`;
+        return;
+      }
+
+      // Build issues list
+      const dlUrl = `/documents/template/${templatePk}/check-download/${qs}`;
+      const rows  = d.issues.map(i => {
+        const varBadge = `<code style="background:rgba(244,67,54,.12);padding:1px 5px;
+          border-radius:3px;color:var(--err);font-size:11px">{{${i.var}}}</code>`;
+        const hint = i.suggestion && i.suggestion !== i.var
+          ? `<span style="color:var(--text-dim);font-size:11px"> → {{${i.suggestion}}}</span>`
+          : `<span style="color:var(--text-dim);font-size:11px"> — невідоме поле</span>`;
+        return `<span style="display:inline-flex;align-items:center;gap:3px;flex-wrap:nowrap">
+          ${varBadge}${hint}</span>`;
+      }).join(' &nbsp; ');
+
+      if (status) status.innerHTML =
+        `<div style="margin-top:6px">
+           <div style="font-size:12px;color:#ff9800;margin-bottom:6px">
+             ⚠️ Знайдено ${d.issues.length} невідом${d.issues.length === 1 ? 'е поле' : 'их полів'}:
+           </div>
+           <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${rows}</div>
+           <a href="${dlUrl}" download="check_${templateName}.docx"
+              style="display:inline-block;padding:5px 14px;border-radius:6px;font-size:12px;
+                     background:rgba(255,152,0,.15);border:1px solid #ff9800;
+                     color:#ff9800;text-decoration:none">
+             ⬇ Завантажити .docx з позначками
+           </a>
+         </div>`;
+    } catch (e) {
+      if (status) status.innerHTML =
+        '<span style="color:var(--err)">✗ Помилка перевірки</span>';
+    }
   },
 
   async deleteDoc(docId, btn) {

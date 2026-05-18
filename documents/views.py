@@ -215,3 +215,196 @@ def delete_document(request, doc_pk):
         return JsonResponse({'ok': True})
     except Exception as e:
         return JsonResponse({'ok': False, 'error': str(e)})
+
+
+# ── Template validation ───────────────────────────────────────────────────────
+
+# All top-level variables available in order context
+_KNOWN_TOP_VARS = {
+    'order_number', 'order_date', 'order_status', 'invoice_number', 'invoice_date', 'due_date',
+    'customer_name', 'customer_address', 'customer_city', 'customer_country',
+    'customer_email', 'customer_phone', 'customer_vat',
+    'shipper_name', 'shipper_address', 'shipper_city', 'shipper_country',
+    'shipper_email', 'shipper_phone', 'vat_number', 'eori_number',
+    'bank_name', 'bank_iban', 'bank_swift',
+    'tracking_number', 'carrier_name', 'shipping_date',
+    'currency', 'subtotal', 'vat_rate', 'vat_amount', 'total_amount', 'payment_terms',
+    'total_weight', 'total_items', 'items_count',
+    'customs_type', 'customs_reason', 'country_of_origin', 'declared_value', 'gross_weight',
+    'items', 'generated_date', 'generated_by', 'notes', 'proforma_notes',
+}
+
+_KNOWN_ITEM_VARS = {
+    'sku', 'name', 'quantity', 'unit_price', 'total_price', 'weight', 'hs_code', 'country',
+}
+
+
+def _suggest(var_name):
+    """Return the closest known variable name, or None."""
+    import difflib
+    if '.' in var_name:
+        root, field = var_name.split('.', 1)
+        if root == 'item':
+            m = difflib.get_close_matches(field, _KNOWN_ITEM_VARS, n=1, cutoff=0.55)
+            return f'item.{m[0]}' if m else None
+        return None
+    m = difflib.get_close_matches(var_name, _KNOWN_TOP_VARS, n=1, cutoff=0.55)
+    return m[0] if m else None
+
+
+def _collect_undefined(template_path, context):
+    """Render template with a tracking Jinja2 env; return list of undefined var names."""
+    from docxtpl import DocxTemplate
+    import jinja2
+
+    collected = []
+
+    class _TrackUndef(jinja2.Undefined):
+        def __str__(self):
+            n = self._undefined_name or '?'
+            if n not in collected:
+                collected.append(n)
+            return n
+
+        def __iter__(self): return iter([])
+        def __bool__(self):  return False
+        def __len__(self):   return 0
+
+        def __getattr__(self, name):
+            if name.startswith('_'):
+                raise AttributeError(name)
+            parent = self._undefined_name or ''
+            child  = f'{parent}.{name}' if parent else name
+            if child not in collected:
+                collected.append(child)
+            return _TrackUndef(name=child)
+
+    tpl = DocxTemplate(template_path)
+    env = jinja2.Environment(undefined=_TrackUndef)
+    try:
+        tpl.render(context, jinja_env=env)
+    except Exception:
+        pass
+    return collected
+
+
+def _render_validated_doc(template_path, context):
+    """Render template with unknown vars highlighted red (⚠️ name → suggestion)."""
+    from docxtpl import DocxTemplate, RichText
+    from io import BytesIO
+
+    issues_raw = _collect_undefined(template_path, context)
+
+    # Build enriched context: inject red RichText for each unknown top-level var
+    val_ctx = dict(context)
+    issues_out = []
+    for var in issues_raw:
+        suggestion = _suggest(var)
+        if suggestion and suggestion != var:
+            label = f'⚠️ [{var}]  →  правильно: {{{{{suggestion}}}}}'
+        else:
+            label = f'⚠️ [{var}]  — невідоме поле'
+        issues_out.append({'var': var, 'suggestion': suggestion, 'label': label})
+
+        # Inject red marker for simple (non-dotted) vars
+        parts = var.split('.')
+        if len(parts) == 1 and parts[0] not in val_ctx:
+            val_ctx[parts[0]] = RichText(label, color='FF0000', bold=True)
+
+    tpl = DocxTemplate(template_path)
+    try:
+        tpl.render(val_ctx)
+    except Exception:
+        tpl2 = DocxTemplate(template_path)
+        tpl2.render(context)
+        tpl = tpl2
+
+    buf = BytesIO()
+    tpl.save(buf)
+    buf.seek(0)
+    return buf, issues_out
+
+
+def _sample_context():
+    """Minimal sample context with all standard variables."""
+    return {
+        'order_number': 'DEMO-001', 'order_date': '01.05.2025',
+        'order_status': 'received',  'invoice_number': 'INV-DEMO-001',
+        'invoice_date': '01.05.2025', 'due_date': '31.05.2025',
+        'customer_name': 'Test GmbH',    'customer_address': 'Teststraße 1',
+        'customer_city': 'Berlin, 10115', 'customer_country': 'DE',
+        'customer_email': 'test@example.com', 'customer_phone': '+49 30 1234567',
+        'customer_vat': 'DE123456789',
+        'shipper_name': 'Our Co. GmbH',  'shipper_address': 'Main St. 5',
+        'shipper_city': '20095 Hamburg', 'shipper_country': 'DE',
+        'shipper_email': 'info@co.de',   'shipper_phone': '+49 40 1234567',
+        'vat_number': 'DE987654321',     'eori_number': 'DE1234567890123',
+        'bank_name': 'Deutsche Bank',    'bank_iban': 'DE89370400440532013000',
+        'bank_swift': 'DEUTDEDB',
+        'tracking_number': '1Z999AA1',   'carrier_name': 'UPS',
+        'shipping_date': '01.05.2025',   'currency': 'EUR',
+        'subtotal': '100.00',  'vat_rate': '19',
+        'vat_amount': '19.00', 'total_amount': '119.00',
+        'payment_terms': 'Payment within 30 days',
+        'total_weight': '0.500', 'total_items': '2', 'items_count': '1',
+        'customs_type': 'SALE', 'customs_reason': 'Commercial goods',
+        'country_of_origin': 'DE', 'declared_value': '100.00', 'gross_weight': '0.500',
+        'items': [{'sku': 'SKU-001', 'name': 'Test Product', 'quantity': 2,
+                   'unit_price': '50.00', 'total_price': '100.00',
+                   'weight': '0.250', 'hs_code': '8536.90', 'country': 'DE'}],
+        'generated_date': '01.05.2025 12:00', 'generated_by': 'Minerva BI',
+        'notes': '', 'proforma_notes': '',
+    }
+
+
+@staff_member_required
+def check_template(request, template_pk):
+    """GET: Check template for undefined vars; return JSON with issues + suggestions."""
+    from documents.models import DocumentTemplate
+    from documents.generators import get_order_context
+
+    template = get_object_or_404(DocumentTemplate, pk=template_pk)
+    order_pk = request.GET.get('order_pk')
+
+    try:
+        ctx = get_order_context(int(order_pk)) if order_pk else _sample_context()
+        issues_raw = _collect_undefined(template.template_file.path, ctx)
+        issues = []
+        for var in issues_raw:
+            suggestion = _suggest(var)
+            issues.append({
+                'var':        var,
+                'suggestion': suggestion,
+                'label':      (f'→ правильно: {{{{{suggestion}}}}}' if suggestion and suggestion != var
+                               else '— невідоме поле'),
+            })
+        return JsonResponse({'ok': True, 'issues': issues})
+    except Exception as e:
+        logger.warning('check_template %s: %s', template_pk, e)
+        return JsonResponse({'ok': False, 'error': str(e)})
+
+
+@staff_member_required
+def check_template_download(request, template_pk):
+    """GET: Download template with undefined vars highlighted red."""
+    from documents.models import DocumentTemplate
+    from documents.generators import get_order_context
+    from django.http import HttpResponse
+
+    template = get_object_or_404(DocumentTemplate, pk=template_pk)
+    order_pk = request.GET.get('order_pk')
+
+    try:
+        ctx = get_order_context(int(order_pk)) if order_pk else _sample_context()
+        buf, _ = _render_validated_doc(template.template_file.path, ctx)
+        safe_name = template.name.replace(' ', '_')[:30]
+        resp = HttpResponse(
+            buf.read(),
+            content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        )
+        resp['Content-Disposition'] = f'attachment; filename="check_{safe_name}.docx"'
+        return resp
+    except Exception as e:
+        logger.error('check_template_download %s: %s', template_pk, e)
+        from django.http import HttpResponse
+        return HttpResponse(str(e), status=500)
