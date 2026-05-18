@@ -226,7 +226,7 @@ def digikey_ship_order(request, order_pk):
     from bots.models import DigiKeyConfig
     from bots.services.digikey import (
         ship_marketplace_order, upload_vat_invoice,
-        fetch_marketplace_order_data, DigiKeyAPIError,
+        fetch_marketplace_order_data, link_vat_to_order, DigiKeyAPIError,
     )
 
     order  = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
@@ -254,12 +254,15 @@ def digikey_ship_order(request, order_pk):
         else:
             try:
                 # Optional VAT invoice file upload before shipping
+                vat_file_id = None
                 vat_file    = request.FILES.get("vat_invoice_file")
                 supplier_id = request.POST.get("supplier_id", "").strip() or None
                 if vat_file:
                     up = upload_vat_invoice(config, vat_file.read(), vat_file.name,
                                             supplier_id=supplier_id)
-                    if not up["ok"]:
+                    if up["ok"]:
+                        vat_file_id = up.get("file_id")
+                    else:
                         msg.warning(request, f"Файл VAT не завантажено: {up['message']}")
 
                 result = ship_marketplace_order(
@@ -269,6 +272,7 @@ def digikey_ship_order(request, order_pk):
                     invoice_number=invoice,
                     net_vat_invoice_amount=net_vat,
                     shipped_quantities=shipped_quantities or None,
+                    vat_file_id=vat_file_id,
                 )
                 if result["ok"]:
                     update_fields = ["status", "status_source"]
@@ -279,6 +283,19 @@ def digikey_ship_order(request, order_pk):
                         update_fields.append("tracking_number")
                     order.save(update_fields=update_fields)
                     msg.success(request, result["message"])
+
+                    # Спроба 3: прив'язати VAT файл через additionalFields (undocumented)
+                    if vat_file_id:
+                        lnk = link_vat_to_order(config, order.order_number, vat_file_id)
+                        if lnk["ok"]:
+                            msg.success(request, f"📎 {lnk['message']}")
+                        else:
+                            msg.warning(
+                                request,
+                                f"⚠️ Файл VAT завантажено на DigiKey (ID: {vat_file_id}), "
+                                f"але автоматично прив'язати не вдалося — додай вручну на сайті DigiKey. "
+                                f"({lnk['message']})"
+                            )
                 else:
                     msg.error(request, result["message"])
             except DigiKeyAPIError as e:

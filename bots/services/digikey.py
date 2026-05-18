@@ -1339,10 +1339,11 @@ def test_connection(config) -> dict:
 
 # ── Marketplace: підтвердження відправлення ───────────────────────────────────
 
-MARKETPLACE_SHIP_PATH           = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/ship"
-MARKETPLACE_INVOICE_NUMBER_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/supplierInvoiceNumber"
-MARKETPLACE_SHIPPING_PATH       = "/Sales/Marketplace2/Shipping/v1"
-MARKETPLACE_FILE_DOCS_PATH      = "/Sales/Marketplace2/FileDocuments/v1/fileDocument"
+MARKETPLACE_SHIP_PATH             = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/ship"
+MARKETPLACE_INVOICE_NUMBER_PATH   = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/supplierInvoiceNumber"
+MARKETPLACE_ADDITIONAL_FIELDS_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/additionalFields"
+MARKETPLACE_SHIPPING_PATH         = "/Sales/Marketplace2/Shipping/v1"
+MARKETPLACE_FILE_DOCS_PATH        = "/Sales/Marketplace2/FileDocuments/v1/fileDocument"
 
 
 def upload_vat_invoice(config, file_bytes: bytes, filename: str,
@@ -1382,6 +1383,49 @@ def upload_vat_invoice(config, file_bytes: bytes, filename: str,
     return {"ok": False, "file_id": None, "message": f"❌ Помилка завантаження файлу {resp.status_code}: {detail}", "raw": raw}
 
 
+def link_vat_to_order(config, order_id: str, file_id: str) -> dict:
+    """
+    Спроба прив'язати завантажений файл VAT до замовлення двома шляхами:
+    1. PUT /orders/{id}/additionalFields  з code="vatFileId"  (undocumented)
+    2. Якщо не вдалося — повідомлення про ручне додавання на сайті DigiKey.
+
+    Повертає {'ok': bool, 'method': str, 'message': str}.
+    """
+    import requests as req
+    from tabele.api_logger import logged_request
+
+    token = get_marketplace_token(config)
+    hdrs  = _headers(config, token)
+    url   = f"{_base_url(config)}{MARKETPLACE_ADDITIONAL_FIELDS_PATH.format(order_id=order_id)}"
+
+    payload = {
+        "additionalFields": [
+            {"code": "vatFileId", "type": "String", "value": file_id}
+        ]
+    }
+    resp = logged_request('digikey', 'link_vat_to_order', 'PUT', url, req.put,
+                          headers=hdrs, json=payload, timeout=15)
+    raw = {}
+    try:
+        raw = resp.json()
+    except Exception:
+        raw = {"text": resp.text[:300]}
+
+    if resp.ok:
+        errors = raw.get("errors") or []
+        if not errors or raw.get("errorCount", 0) == 0:
+            return {"ok": True, "method": "additionalFields", "message": "✅ Файл VAT прив'язано до замовлення"}
+        # partial errors
+        err_msg = "; ".join(e.get("errorMessage", "") for e in errors)
+        return {"ok": False, "method": "additionalFields",
+                "message": f"⚠️ additionalFields відхилено: {err_msg}"}
+
+    detail = raw.get("detail") or raw.get("title") or resp.text[:200]
+    logger.warning("link_vat_to_order %s: %s %s", order_id, resp.status_code, detail)
+    return {"ok": False, "method": "additionalFields",
+            "message": f"⚠️ {resp.status_code}: {detail}"}
+
+
 def fetch_marketplace_order_data(config, order_id: str) -> dict:
     """Публічна обгортка для _fetch_marketplace_order — повертає сирий dict замовлення з Marketplace API."""
     token = get_marketplace_token(config)
@@ -1392,16 +1436,16 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
                             carrier_id: str = None,
                             invoice_number: str = None,
                             net_vat_invoice_amount: float = None,
-                            shipped_quantities: dict = None) -> dict:
+                            shipped_quantities: dict = None,
+                            vat_file_id: str = None) -> dict:
     """
     PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/ship
     Підтверджує відправлення Marketplace замовлення та передає трек-номер на DigiKey.
 
-    Спочатку отримує деталі замовлення (GET) щоб дістати orderDetailId кожного рядка,
-    потім відправляє PUT з інформацією про відправлення.
-
     shipped_quantities: {orderDetailId: quantity} — перевизначає кількості по рядках.
     net_vat_invoice_amount: float — сума рахунку без ПДВ.
+    vat_file_id: str — ID файлу VAT (з upload_vat_invoice); спроба передати як
+                       supplierVATObjectId у tracking entry (undocumented path).
     Повертає {'ok': bool, 'message': str, 'raw': dict}.
     """
     import requests as req
@@ -1428,6 +1472,9 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     tracking_entry = {"shippingTrackingNumber": tracking_number, "shippedParts": shipped_parts}
     if carrier_id:
         tracking_entry["shippingCarrierId"] = carrier_id
+    if vat_file_id:
+        # Undocumented: supplierVATObjectId присутній у response моделі — спробуємо в request
+        tracking_entry["supplierVATObjectId"] = vat_file_id
 
     payload = {"shippingTracking": [tracking_entry]}
     if invoice_number:

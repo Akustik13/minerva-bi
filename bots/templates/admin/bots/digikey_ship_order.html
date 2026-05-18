@@ -201,9 +201,16 @@
       <input type="file" name="vat_invoice_file"
              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.png"
              style="color:var(--text);font-size:13px">
-      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
-        Підтримувані формати: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.
-        Файл буде завантажено на DigiKey окремо перед підтвердженням відправлення.
+      <div style="font-size:11px;color:var(--text-muted);margin-top:6px;
+                  background:var(--bg-hover);border-radius:4px;padding:8px 10px;
+                  border-left:3px solid #ff9800">
+        📎 Minerva завантажує файл на DigiKey і намагається прив'язати його автоматично
+        (варіант 3 — в розробці).
+        Якщо автоматичне прив'язування не вдасться — з'явиться попередження з ID файлу,
+        і ти зможеш додати його вручну на
+        <a href="https://marketplace.digikey.com" target="_blank"
+           style="color:var(--link-fg)">сайті DigiKey</a>.
+        <br>Підтримувані формати: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.
       </div>
     </div>
 
