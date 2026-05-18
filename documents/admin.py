@@ -7,11 +7,14 @@ from .models import DocumentTemplate, GeneratedDocument, TEMPLATE_VARIABLES_GUID
 class DocumentTemplateAdmin(admin.ModelAdmin):
     list_display  = ('name', 'doc_type_badge', 'module', 'source',
                      'language', 'is_active', 'is_default', 'sort_order',
-                     'download_template_link', 'created_at')
+                     'download_template_link', 'check_col', 'created_at')
     list_filter   = ('doc_type', 'module', 'source', 'language', 'is_active')
     list_editable = ('is_active', 'is_default', 'sort_order')
     search_fields = ('name', 'description')
     readonly_fields = ('variables_guide_display', 'created_at', 'updated_at')
+
+    class Media:
+        js = ('admin/js/document_template_check.js',)
 
     fieldsets = (
         ('📄 Основне', {
@@ -72,6 +75,20 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
             )
         return '—'
     download_template_link.short_description = 'Файл'
+
+    def check_col(self, obj):
+        if not obj.template_file:
+            return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
+        return format_html(
+            '<button type="button" onclick="checkDocTemplate({})" '
+            'style="padding:3px 10px;border-radius:5px;font-size:11px;'
+            'border:1px solid var(--border-strong);background:none;'
+            'color:var(--text);cursor:pointer;white-space:nowrap">🔍 Перевірити</button>'
+            '<span id="dtc-result-{}" style="display:inline-block;margin-left:6px;'
+            'vertical-align:middle"></span>',
+            obj.pk, obj.pk,
+        )
+    check_col.short_description = 'Перевірка'
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:
