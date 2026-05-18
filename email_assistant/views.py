@@ -402,8 +402,34 @@ def _resolve_cid_images(msg_obj, html: str) -> str:
     return html
 
 
+def _sanitize_quote_html(raw_html):
+    import re as _re
+    if not raw_html:
+        return ''
+    raw_html = _re.sub(r'<script[^>]*>.*?</script>', '', raw_html, flags=_re.IGNORECASE | _re.DOTALL)
+    raw_html = _re.sub(r'<style[^>]*>.*?</style>',   '', raw_html, flags=_re.IGNORECASE | _re.DOTALL)
+    raw_html = _re.sub(r'<link\b[^>]*/?>',           '', raw_html, flags=_re.IGNORECASE)
+    raw_html = _re.sub(r'<meta\b[^>]*/?>',           '', raw_html, flags=_re.IGNORECASE)
+    return raw_html.strip()
+
+
+def _build_quote_html(header_html, source_html, fallback_text):
+    import html as _html
+    inner = _sanitize_quote_html(source_html) if source_html else ''
+    if not inner:
+        inner = f'<pre style="white-space:pre-wrap;margin:0">{_html.escape(fallback_text[:4000])}</pre>'
+    return (
+        f'<div style="color:var(--text-dim);font-size:12px;margin:8px 0 4px">{header_html}</div>'
+        f'<blockquote style="border-left:3px solid var(--border-strong);padding:6px 12px;'
+        f'margin:0 0 0 4px;font-size:13px;background:rgba(128,128,128,.06);'
+        f'border-radius:0 4px 4px 0;color:var(--text-muted)">'
+        f'{inner}</blockquote>'
+    )
+
+
 @staff_member_required
 def compose_view(request):
+    import html as _html
     account     = _get_account(request)
     reply_to_pk = request.GET.get('reply_to')
     forward_pk  = request.GET.get('forward')
@@ -417,9 +443,14 @@ def compose_view(request):
         if not subj.lower().startswith('re:'):
             subj = f'Re: {subj}'
         initial = {
-            'to':      reply_to.from_email,
-            'subject': subj,
-            'quote':   f'\n\n--- Оригінальний лист ---\nВід: {reply_to.from_email}\n{reply_to.body_text[:2000]}',
+            'to':         reply_to.from_email,
+            'subject':    subj,
+            'quote':      f'\n\n--- Оригінальний лист ---\nВід: {reply_to.from_email}\n{reply_to.body_text[:2000]}',
+            'quote_html': _build_quote_html(
+                f'--- Оригінальний лист від {_html.escape(reply_to.from_email)} ---',
+                reply_to.body_html,
+                reply_to.body_text,
+            ),
         }
     elif forward_pk:
         from email_assistant.models import EmailMessage
@@ -427,9 +458,15 @@ def compose_view(request):
         subj = fwd.subject
         if not subj.lower().startswith('fwd:'):
             subj = f'Fwd: {subj}'
+        to_str = _html.escape(', '.join(fwd.to_emails))
         initial = {
-            'subject': subj,
-            'quote':   f'\n\n--- Переслано ---\nВід: {fwd.from_email}\nКому: {", ".join(fwd.to_emails)}\n{fwd.body_text[:2000]}',
+            'subject':    subj,
+            'quote':      f'\n\n--- Переслано ---\nВід: {fwd.from_email}\nКому: {", ".join(fwd.to_emails)}\n{fwd.body_text[:2000]}',
+            'quote_html': _build_quote_html(
+                f'--- Переслано від {_html.escape(fwd.from_email)} / Кому: {to_str} ---',
+                fwd.body_html,
+                fwd.body_text,
+            ),
         }
 
     if request.method == 'POST':
