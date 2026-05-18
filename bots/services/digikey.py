@@ -499,7 +499,9 @@ def build_authorize_url(config, redirect_uri: str) -> str:
 def exchange_code_for_tokens(config, code: str, redirect_uri: str) -> dict:
     """Обмінює authorization code на access_token + refresh_token."""
     import requests as req
-    base = _SANDBOX_BASE if config.use_sandbox else _PROD_BASE
+    # Authorization URL always uses _PROD_BASE, so token exchange must too.
+    # Sandbox flag applies only to API calls, not to OAuth endpoints.
+    base = _PROD_BASE
     resp = req.post(
         f"{base}{TOKEN_PATH}",
         data={

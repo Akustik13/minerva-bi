@@ -41,8 +41,16 @@ def digikey_oauth_callback(request):
     redirect_uri = request.session.pop("digikey_oauth_redirect_uri", None)
 
     if not redirect_uri:
-        # Fallback: побудувати URI знову
-        redirect_uri = request.build_absolute_uri("/bots/digikey/oauth-callback/")
+        # Fallback: use public_base_url from config (reliable behind reverse proxy)
+        base = (config.public_base_url or "").rstrip("/")
+        if base:
+            redirect_uri = f"{base}/bots/digikey/oauth-callback/"
+        else:
+            from django.conf import settings as _s
+            redirect_uri = (
+                getattr(_s, "DIGIKEY_OAUTH_REDIRECT_URI", "")
+                or request.build_absolute_uri("/bots/digikey/oauth-callback/")
+            )
 
     try:
         data       = exchange_code_for_tokens(config, code, redirect_uri)
