@@ -239,14 +239,26 @@ window.DocumentWidget = {
       `<span style="color:var(--text-dim)">🔍 Перевіряю «${templateName}»...</span>`;
 
     try {
-      const qs  = this.objectPk ? `?order_pk=${this.objectPk}` : '';
-      const r   = await fetch(`/documents/template/${templatePk}/check/${qs}`);
-      const d   = await r.json();
+      const qs    = this.objectPk ? `?order_pk=${this.objectPk}` : '';
+      const dlUrl = `/documents/template/${templatePk}/check-download/${qs}`;
+      const r     = await fetch(`/documents/template/${templatePk}/check/${qs}`);
+      const d     = await r.json();
 
       if (!d.ok) {
-        const icon = d.syntax_error ? '⚠️' : '✗';
+        const icon   = d.syntax_error ? '⚠️' : '✗';
+        const dlLink = d.syntax_error
+          ? `<a href="${dlUrl}" download="check_${templateName}.docx"
+                style="display:inline-block;padding:5px 14px;border-radius:6px;font-size:12px;
+                       background:rgba(255,152,0,.15);border:1px solid #ff9800;
+                       color:#ff9800;text-decoration:none;margin-top:6px">
+               ⬇ .docx з підсвіченими помилками
+             </a>`
+          : '';
         if (status) status.innerHTML =
-          `<span style="color:var(--err);font-size:13px">${icon} ${d.error}</span>`;
+          `<div style="margin-top:4px">
+             <div style="color:var(--err);font-size:13px">${icon} ${d.error}</div>
+             ${dlLink}
+           </div>`;
         return;
       }
 
@@ -257,7 +269,6 @@ window.DocumentWidget = {
       }
 
       // Build issues list
-      const dlUrl = `/documents/template/${templatePk}/check-download/${qs}`;
       const rows  = d.issues.map(i => {
         const varBadge = `<code style="background:rgba(244,67,54,.12);padding:1px 5px;
           border-radius:3px;color:var(--err);font-size:11px">{{${i.var}}}</code>`;

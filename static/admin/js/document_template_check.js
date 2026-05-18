@@ -14,9 +14,15 @@ async function checkDocTemplate(pk) {
     if (!resultEl) return;
 
     if (!d.ok) {
-      const icon = d.syntax_error ? '⚠️' : '✗';
+      const icon   = d.syntax_error ? '⚠️' : '✗';
+      const dlUrl  = `/documents/template/${pk}/check-download/`;
+      const dlLink = d.syntax_error
+        ? `<a href="${dlUrl}" download title="Завантажити .docx з підсвіченими помилками"
+              style="padding:2px 7px;border-radius:4px;font-size:10px;margin-left:6px;
+                     border:1px solid #ff9800;color:#ff9800;text-decoration:none">⬇ docx</a>`
+        : '';
       resultEl.innerHTML =
-        `<span style="color:var(--err);font-size:11px">${icon} ${d.error}</span>`;
+        `<span style="color:var(--err);font-size:11px">${icon} ${d.error}</span>${dlLink}`;
       return;
     }
 

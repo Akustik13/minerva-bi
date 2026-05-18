@@ -381,6 +381,77 @@ def _redden_undefined_runs(docx_bytes):
     return out.read()
 
 
+def _redden_syntax_tags(docx_bytes):
+    """Patch docx ZIP: colour {% %} tags red+bold without rendering the template.
+    Used when TemplateSyntaxError prevents normal rendering.
+    Works at paragraph level: concatenates all run texts, maps character positions
+    back to individual runs, then marks overlapping runs red in reverse order."""
+    import zipfile, re
+    from io import BytesIO
+
+    TAG_RE = re.compile(r'\{%-?\s*\S.*?-?%\}', re.DOTALL)
+
+    def _process_para(para_xml):
+        run_matches = list(re.finditer(r'<w:r\b[^>]*>.*?</w:r>', para_xml, re.DOTALL))
+        if not run_matches:
+            return para_xml
+
+        full_text = ''
+        char_to_idx = []
+        for idx, rm in enumerate(run_matches):
+            t = ''.join(re.findall(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', rm.group(0)))
+            char_to_idx.extend([idx] * len(t))
+            full_text += t
+
+        if '{%' not in full_text:
+            return para_xml
+
+        red_set = set()
+        for m in TAG_RE.finditer(full_text):
+            for p in range(m.start(), min(m.end(), len(char_to_idx))):
+                red_set.add(char_to_idx[p])
+
+        if not red_set:
+            return para_xml
+
+        result = para_xml
+        for rev_i, rm in enumerate(reversed(run_matches)):
+            actual = len(run_matches) - 1 - rev_i
+            if actual not in red_set:
+                continue
+            rx = rm.group(0)
+            if '<w:rPr>' in rx:
+                if '<w:color' not in rx:
+                    rx = rx.replace('<w:rPr>', '<w:rPr><w:color w:val="FF0000"/>', 1)
+                if '<w:b/>' not in rx and '<w:b ' not in rx:
+                    rx = rx.replace('<w:rPr>', '<w:rPr><w:b/>', 1)
+            else:
+                rx = re.sub(r'(<w:t\b)',
+                            r'<w:rPr><w:color w:val="FF0000"/><w:b/></w:rPr>\1',
+                            rx, count=1)
+            result = result[:rm.start()] + rx + result[rm.end():]
+        return result
+
+    def _patch_xml(xml):
+        return re.sub(
+            r'<w:p\b[^>]*>.*?</w:p>',
+            lambda m: _process_para(m.group(0)),
+            xml, flags=re.DOTALL,
+        )
+
+    inp = BytesIO(docx_bytes)
+    out = BytesIO()
+    with zipfile.ZipFile(inp, 'r') as zin, \
+         zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for item in zin.infolist():
+            data = zin.read(item.filename)
+            if item.filename.endswith('.xml') and item.filename.startswith('word/'):
+                data = _patch_xml(data.decode('utf-8')).encode('utf-8')
+            zout.writestr(item, data)
+    out.seek(0)
+    return out.read()
+
+
 def _sample_context():
     """Minimal sample context with all standard variables."""
     return {
@@ -485,12 +556,21 @@ def check_template_download(request, template_pk):
         )
         resp['Content-Disposition'] = f'attachment; filename="check_{safe_name}.docx"'
         return resp
-    except jinja2.exceptions.TemplateSyntaxError as e:
-        return HttpResponse(
-            _syntax_error_hint(str(e)),
-            status=422,
-            content_type='text/plain; charset=utf-8',
-        )
+    except jinja2.exceptions.TemplateSyntaxError:
+        # Render failed — highlight {% %} tags directly in the original file bytes
+        try:
+            with open(template.template_file.path, 'rb') as fh:
+                patched = _redden_syntax_tags(fh.read())
+            safe_name = template.name.replace(' ', '_')[:30]
+            resp = HttpResponse(
+                patched,
+                content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            )
+            resp['Content-Disposition'] = f'attachment; filename="check_{safe_name}.docx"'
+            return resp
+        except Exception as e2:
+            logger.error('check_template_download syntax fallback %s: %s', template_pk, e2)
+            return HttpResponse(str(e2), status=500)
     except Exception as e:
         logger.error('check_template_download %s: %s', template_pk, e)
         return HttpResponse(str(e), status=500)
