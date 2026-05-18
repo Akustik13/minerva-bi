@@ -2759,8 +2759,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     order.shipped_at = timezone.now().date()
                     order_fields.append("shipped_at")
             elif new_status == "label_ready" and order.status in ("received", "processing"):
-                order.status = "shipped"
-                order_fields.append("status")
+                # label_ready = наклейка надрукована, кур'єр ще не забрав → статус НЕ міняємо
                 if not order.shipped_at:
                     order.shipped_at = timezone.now().date()
                     order_fields.append("shipped_at")
@@ -3428,9 +3427,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if not order.shipping_courier:
                 order.shipping_courier = 'UPS'
                 order_fields.append('shipping_courier')
-            if order.status in ('received', 'processing'):
-                order.status = 'shipped'
-                order_fields.append('status')
+            # UPS label created ≠ package picked up → статус залишаємо processing
             if not order.shipped_at:
                 order.shipped_at = _date.today()
                 order_fields.append('shipped_at')
@@ -4680,9 +4677,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if not order.shipping_courier:
                 order.shipping_courier = "DHL"
                 order_fields.append("shipping_courier")
-            if order.status in ("received", "processing"):
-                order.status = "shipped"
-                order_fields.append("status")
+            # DHL label created ≠ package picked up → статус залишаємо processing
             if not order.shipped_at:
                 order.shipped_at = _date.today()
                 order_fields.append("shipped_at")
@@ -5575,11 +5570,8 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
             pass
 
     # Статус замовлення + shipped_at
+    # label_ready = наклейка надрукована, але кур'єр ще не забрав → статус НЕ міняємо
     if shipment.status == "label_ready":
-        if order.status in ("received", "processing"):
-            order.status = "shipped"
-            order_changed = True
-            update_fields.append("status")
         if not order.shipped_at:
             order.shipped_at = timezone.now().date()
             order_changed = True
