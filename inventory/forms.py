@@ -3,7 +3,7 @@ from django import forms
 
 class SetStockForm(forms.Form):
     target_stock = forms.DecimalField(
-        label="Target stock",
+        label="Фактичний залишок",
         max_digits=18,
         decimal_places=3,
         min_value=0,

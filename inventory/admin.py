@@ -412,10 +412,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         line = get_object_or_404(PurchaseOrderLine, pk=line_pk)
         po   = line.purchase_order
 
-        # Add to qty_received (cap at qty_ordered)
+        # Add to qty_received (allow over-delivery — real count takes priority over PO qty)
         new_received = line.qty_received + qty_recv
-        if new_received > line.qty_ordered:
-            new_received = line.qty_ordered
         line.qty_received = new_received
         line.save()  # triggers update_inventory_on_purchase_receipt signal
 
