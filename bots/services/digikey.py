@@ -1342,17 +1342,60 @@ def test_connection(config) -> dict:
 MARKETPLACE_SHIP_PATH           = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/ship"
 MARKETPLACE_INVOICE_NUMBER_PATH = "/Sales/Marketplace2/Orders/v1/orders/{order_id}/supplierInvoiceNumber"
 MARKETPLACE_SHIPPING_PATH       = "/Sales/Marketplace2/Shipping/v1"
+MARKETPLACE_FILE_DOCS_PATH      = "/Sales/Marketplace2/FileDocuments/v1/fileDocument"
+
+
+def upload_vat_invoice(config, file_bytes: bytes, filename: str) -> dict:
+    """
+    POST /Sales/Marketplace2/FileDocuments/v1/fileDocument (multipart/form-data)
+    Завантажує файл рахунку VAT на DigiKey. Повертає {'ok': bool, 'file_id': str, 'message': str}.
+    """
+    import requests as req
+    from tabele.api_logger import logged_request
+
+    token = get_marketplace_token(config)
+    headers = {
+        "Authorization":       f"Bearer {token}",
+        "X-DIGIKEY-Client-Id": config.client_id,
+    }
+    url = f"{_base_url(config)}{MARKETPLACE_FILE_DOCS_PATH}"
+    resp = logged_request('digikey', 'upload_vat_invoice', 'POST', url, req.post,
+                          headers=headers,
+                          files={"File": (filename, file_bytes)},
+                          timeout=30)
+    raw = {}
+    try:
+        raw = resp.json()
+    except Exception:
+        raw = {"text": resp.text[:300]}
+
+    if resp.ok:
+        return {"ok": True, "file_id": raw.get("id", ""), "message": "✅ Файл VAT завантажено", "raw": raw}
+
+    detail = raw.get("detail") or raw.get("title") or resp.text[:200]
+    return {"ok": False, "file_id": None, "message": f"❌ Помилка завантаження файлу {resp.status_code}: {detail}", "raw": raw}
+
+
+def fetch_marketplace_order_data(config, order_id: str) -> dict:
+    """Публічна обгортка для _fetch_marketplace_order — повертає сирий dict замовлення з Marketplace API."""
+    token = get_marketplace_token(config)
+    return _fetch_marketplace_order(config, order_id, token)
 
 
 def ship_marketplace_order(config, order_id: str, tracking_number: str,
                             carrier_id: str = None,
-                            invoice_number: str = None) -> dict:
+                            invoice_number: str = None,
+                            net_vat_invoice_amount: float = None,
+                            shipped_quantities: dict = None) -> dict:
     """
     PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/ship
     Підтверджує відправлення Marketplace замовлення та передає трек-номер на DigiKey.
 
     Спочатку отримує деталі замовлення (GET) щоб дістати orderDetailId кожного рядка,
     потім відправляє PUT з інформацією про відправлення.
+
+    shipped_quantities: {orderDetailId: quantity} — перевизначає кількості по рядках.
+    net_vat_invoice_amount: float — сума рахунку без ПДВ.
     Повертає {'ok': bool, 'message': str, 'raw': dict}.
     """
     import requests as req
@@ -1366,10 +1409,14 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     for line in order_details:
         detail_id = line.get("orderDetailId")
         if detail_id:
+            if shipped_quantities and detail_id in shipped_quantities:
+                qty = int(shipped_quantities[detail_id])
+            else:
+                qty = line.get("adjustedQuantity") or line.get("quantity") or 1
             shipped_parts.append({
                 "orderDetailId": detail_id,
                 "dkPartNumber":  line.get("productPartNumber") or line.get("supplierSku") or "",
-                "quantity":      line.get("adjustedQuantity") or line.get("quantity") or 1,
+                "quantity":      qty,
             })
 
     tracking_entry = {"shippingTrackingNumber": tracking_number, "shippedParts": shipped_parts}
@@ -1379,6 +1426,8 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     payload = {"shippingTracking": [tracking_entry]}
     if invoice_number:
         payload["supplierInvoiceNumber"] = invoice_number
+    if net_vat_invoice_amount is not None:
+        payload["netVatInvoiceAmount"] = float(net_vat_invoice_amount)
 
     url = f"{_base_url(config)}{MARKETPLACE_SHIP_PATH.format(order_id=order_id)}"
     from tabele.api_logger import logged_request

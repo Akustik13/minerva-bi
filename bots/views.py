@@ -224,22 +224,50 @@ def digikey_ship_order(request, order_pk):
     from django.shortcuts import render, redirect
     from sales.models import SalesOrder
     from bots.models import DigiKeyConfig
-    from bots.services.digikey import ship_marketplace_order, DigiKeyAPIError
+    from bots.services.digikey import (
+        ship_marketplace_order, upload_vat_invoice,
+        fetch_marketplace_order_data, DigiKeyAPIError,
+    )
 
     order  = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
     config = DigiKeyConfig.get()
 
     if request.method == "POST":
-        tracking  = request.POST.get("tracking_number", "").strip()
-        carrier   = request.POST.get("carrier_id", "").strip() or None
-        invoice   = request.POST.get("invoice_number", "").strip() or None
+        tracking        = request.POST.get("tracking_number", "").strip()
+        carrier         = request.POST.get("carrier_id", "").strip() or None
+        invoice         = request.POST.get("invoice_number", "").strip() or None
+        net_vat_raw     = request.POST.get("net_vat_invoice_amount", "").strip()
+        net_vat         = float(net_vat_raw.replace(",", ".")) if net_vat_raw else None
+
+        # Per-line shipped quantities: POST keys like "qty_<orderDetailId>"
+        shipped_quantities = {}
+        for key, val in request.POST.items():
+            if key.startswith("qty_") and val.strip():
+                detail_id = key[4:]
+                try:
+                    shipped_quantities[detail_id] = int(val)
+                except ValueError:
+                    pass
 
         if not tracking:
             msg.error(request, "Вкажіть трек-номер відправлення.")
         else:
             try:
-                result = ship_marketplace_order(config, order.order_number,
-                                                tracking, carrier, invoice)
+                # Optional VAT invoice file upload before shipping
+                vat_file = request.FILES.get("vat_invoice_file")
+                if vat_file:
+                    up = upload_vat_invoice(config, vat_file.read(), vat_file.name)
+                    if not up["ok"]:
+                        msg.warning(request, f"Файл VAT не завантажено: {up['message']}")
+
+                result = ship_marketplace_order(
+                    config, order.order_number,
+                    tracking_number=tracking,
+                    carrier_id=carrier,
+                    invoice_number=invoice,
+                    net_vat_invoice_amount=net_vat,
+                    shipped_quantities=shipped_quantities or None,
+                )
                 if result["ok"]:
                     update_fields = ["status", "status_source"]
                     order.status        = "shipped"
@@ -258,8 +286,9 @@ def digikey_ship_order(request, order_pk):
 
         return redirect(f"/admin/sales/salesorder/{order_pk}/change/")
 
-    # GET — показати форму; підтягуємо список carriers з DigiKey API
-    carriers = []
+    # GET — показати форму; підтягуємо список carriers і деталі замовлення з DigiKey API
+    carriers      = []
+    order_details = []
     has_token = bool(config.marketplace_access_token)
     if has_token:
         try:
@@ -267,12 +296,18 @@ def digikey_ship_order(request, order_pk):
             carriers = get_shipping_carriers(config)
         except Exception:
             carriers = []
+        try:
+            dk_order      = fetch_marketplace_order_data(config, order.order_number)
+            order_details = dk_order.get("orderDetails") or []
+        except Exception:
+            order_details = []
 
     from django.template.response import TemplateResponse
     return TemplateResponse(request, "admin/bots/digikey_ship_order.html", {
-        "title":     f"Відправити #{order.order_number} на DigiKey",
-        "order":     order,
-        "config":    config,
-        "has_token": has_token,
-        "carriers":  carriers,
+        "title":         f"Відправити #{order.order_number} на DigiKey",
+        "order":         order,
+        "config":        config,
+        "has_token":     has_token,
+        "carriers":      carriers,
+        "order_details": order_details,
     })

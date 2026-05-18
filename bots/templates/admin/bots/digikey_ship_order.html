@@ -43,41 +43,52 @@
     {% endif %}
   </div>
 
-  <!-- Lines -->
-  {% for line in order.lines.all %}
-  {% if forloop.first %}
+  <!-- Lines from DigiKey API (with orderDetailId) or local fallback -->
   <div style="margin-top:16px">
     <div style="color:var(--text-dim);font-size:12px;margin-bottom:8px">Позиції замовлення:</div>
     <table style="width:100%;border-collapse:collapse;font-size:12px">
       <thead>
         <tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong)">
-          <th style="padding:4px 8px;text-align:left">SKU</th>
+          <th style="padding:4px 8px;text-align:left">SKU / Part#</th>
           <th style="padding:4px 8px;text-align:left">Назва</th>
-          <th style="padding:4px 8px;text-align:center">Кіл-ть</th>
+          <th style="padding:4px 8px;text-align:center">Замовлено</th>
         </tr>
       </thead>
       <tbody>
-  {% endif %}
-        <tr style="border-bottom:1px solid var(--border);color:var(--text)">
-          <td style="padding:4px 8px;font-family:monospace">{{ line.sku_raw|default:line.product.sku }}</td>
-          <td style="padding:4px 8px">{{ line.product.name|default:"—" }}</td>
-          <td style="padding:4px 8px;text-align:center">{{ line.qty }}</td>
-        </tr>
-  {% if forloop.last %}
+        {% if order_details %}
+          {% for line in order_details %}
+          <tr style="border-bottom:1px solid var(--border);color:var(--text)">
+            <td style="padding:4px 8px;font-family:monospace">
+              {{ line.productPartNumber|default:line.supplierSku }}
+            </td>
+            <td style="padding:4px 8px">{{ line.productDescription|default:"—" }}</td>
+            <td style="padding:4px 8px;text-align:center">
+              {{ line.adjustedQuantity|default:line.quantity }}
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          {% for line in order.lines.all %}
+          <tr style="border-bottom:1px solid var(--border);color:var(--text)">
+            <td style="padding:4px 8px;font-family:monospace">{{ line.sku_raw|default:line.product.sku }}</td>
+            <td style="padding:4px 8px">{{ line.product.name|default:"—" }}</td>
+            <td style="padding:4px 8px;text-align:center">{{ line.qty }}</td>
+          </tr>
+          {% endfor %}
+        {% endif %}
       </tbody>
     </table>
   </div>
-  {% endif %}
-  {% endfor %}
 </div>
 
 <!-- Ship form -->
-<form method="post" action="/bots/digikey/ship/{{ order.pk }}/">
+<form method="post" action="/bots/digikey/ship/{{ order.pk }}/" enctype="multipart/form-data">
   {% csrf_token %}
 
   <div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:20px;margin-bottom:16px">
     <h3 style="color:var(--text);margin-top:0;margin-bottom:16px">Дані відправлення</h3>
 
+    <!-- Tracking number -->
     <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
         Трек-номер <span style="color:var(--err)">*</span>
@@ -91,6 +102,7 @@
                     color:var(--text);font-family:monospace;font-size:14px;box-sizing:border-box">
     </div>
 
+    <!-- Carrier -->
     <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
         Перевізник (необов'язково)
@@ -115,15 +127,83 @@
       {% endif %}
     </div>
 
-    <div style="margin-bottom:20px">
+    <!-- Per-line shipped quantities -->
+    {% if order_details %}
+    <div style="margin-bottom:16px">
+      <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:8px">
+        Кількість відправлених одиниць (за кожною позицією)
+      </label>
+      <table style="border-collapse:collapse;font-size:12px;width:100%;max-width:600px">
+        <thead>
+          <tr style="color:var(--text-dim);border-bottom:1px solid var(--border-strong)">
+            <th style="padding:4px 8px;text-align:left">Part#</th>
+            <th style="padding:4px 8px;text-align:center">Замовлено</th>
+            <th style="padding:4px 8px;text-align:center">Відправити</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in order_details %}
+          {% with detail_id=line.orderDetailId qty=line.adjustedQuantity|default:line.quantity %}
+          <tr style="border-bottom:1px solid var(--border);color:var(--text)">
+            <td style="padding:4px 8px;font-family:monospace">{{ line.productPartNumber|default:line.supplierSku }}</td>
+            <td style="padding:4px 8px;text-align:center">{{ qty }}</td>
+            <td style="padding:4px 8px;text-align:center">
+              <input type="number" name="qty_{{ detail_id }}"
+                     value="{{ qty }}" min="1"
+                     style="width:70px;padding:4px 6px;background:var(--bg-input);
+                            border:1px solid var(--border-strong);border-radius:4px;
+                            color:var(--text);font-size:13px;text-align:center">
+            </td>
+          </tr>
+          {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Змінюй тільки якщо відправляєш неповну кількість (часткове відправлення).
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Invoice number -->
+    <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
-        Номер рахунку-фактури (необов'язково)
+        Номер рахунку постачальника (Supplier Invoice Number)
       </label>
       <input type="text" name="invoice_number"
              placeholder="INV-2026-001"
              style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
                     border:1px solid var(--border-strong);border-radius:4px;
                     color:var(--text);font-size:13px;box-sizing:border-box">
+    </div>
+
+    <!-- Net VAT invoice amount -->
+    <div style="margin-bottom:16px">
+      <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
+        Сума рахунку без ПДВ (Net Invoice Amount)
+      </label>
+      <input type="number" name="net_vat_invoice_amount"
+             placeholder="0.00" min="0" step="0.01"
+             style="width:100%;max-width:200px;padding:8px 12px;background:var(--bg-input);
+                    border:1px solid var(--border-strong);border-radius:4px;
+                    color:var(--text);font-size:13px;box-sizing:border-box">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Чиста сума рахунку-фактури (без ПДВ), у валюті замовлення.
+      </div>
+    </div>
+
+    <!-- VAT Invoice file -->
+    <div style="margin-bottom:20px">
+      <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
+        Рахунок-фактура ПДВ (Supplier VAT Invoice)
+      </label>
+      <input type="file" name="vat_invoice_file"
+             accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.png"
+             style="color:var(--text);font-size:13px">
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        Підтримувані формати: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.
+        Файл буде завантажено на DigiKey окремо перед підтвердженням відправлення.
+      </div>
     </div>
 
     <div style="background:var(--bg-hover);border:1px solid var(--border);border-radius:4px;
