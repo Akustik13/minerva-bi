@@ -2532,14 +2532,31 @@ def _get_inventory_stats():
         # Total active products
         active_products = Product.objects.filter(is_active=True).count()
 
+        # Out of stock: active products with total stock <= 0
+        out_of_stock = (
+            Product.objects
+            .filter(is_active=True)
+            .annotate(stock=Coalesce(Subquery(stock_subq), Value(Decimal("0"))))
+            .filter(stock__lte=0)
+            .count()
+        )
+
+        # In-stock OK: active products that are neither critical nor out of stock
+        in_stock_ok = max(0, active_products - critical - out_of_stock)
+
         return {
-            "critical":       critical,
-            "active_po":      active_po,
-            "tx_today":       tx_today,
+            "critical":        critical,
+            "active_po":       active_po,
+            "tx_today":        tx_today,
             "active_products": active_products,
+            "out_of_stock":    out_of_stock,
+            "in_stock_ok":     in_stock_ok,
         }
     except Exception:
-        return {"critical": "—", "active_po": "—", "tx_today": "—", "active_products": "—"}
+        return {
+            "critical": "—", "active_po": "—", "tx_today": "—",
+            "active_products": "—", "out_of_stock": "—", "in_stock_ok": "—",
+        }
 
 
 _orig_inventory_app_index = admin.site.app_index

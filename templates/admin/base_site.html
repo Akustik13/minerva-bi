@@ -924,7 +924,14 @@ window.MV_GROUPS = [
       { href:'/admin/documents/documenttemplate/', icon:'📋', label:'Шаблони',   app:'documents', model:'DocumentTemplate' },
       { href:'/admin/documents/generateddocument/', icon:'📁', label:'Архів документів', app:'documents', model:'GeneratedDocument' },
     ], apps:['documents'] },
-  { id:'bots', icon:'🤖', label:'🤖 Боти та API', apps:['bots','api'] },
+  { id:'bots', icon:'🤖', label:'🤖 АПІ та скрипти', href:'/dashboard/bots/',
+    links:[
+      { href:'/admin/bots/digikeyconfig/', icon:'🛒', label:'DigiKey',        app:'bots', model:'DigiKeyConfig' },
+      { href:'/admin/bots/bot/',           icon:'🤖', label:'Боти та скрипти',app:'bots', model:'Bot' },
+      { href:'/admin/bots/botlog/',        icon:'📋', label:'Лог ботів',      app:'bots', model:'BotLog' },
+      { href:'/admin/api/apikey/',         icon:'🔑', label:'API Токени',     app:'api',  model:'APIKey' },
+      { href:'/dashboard/api/',            icon:'🔌', label:'API Документація' },
+    ], apps:['bots','api'] },
   { id:'system', icon:'⚙️', label:'⚙️ Система', href:'/dashboard/system/',
     links:[
       { href:'/admin/config/integrations/',          icon:'🔌', label:'Інтеграції',          app:'config' },
