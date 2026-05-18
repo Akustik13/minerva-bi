@@ -1713,6 +1713,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 content_type='application/pdf',
             )
             resp['Content-Disposition'] = f'inline; filename="{fname}"'
+            # Allow embedding in same-origin iframes (admin_view wrapper sets DENY by default)
+            resp['X-Frame-Options'] = 'SAMEORIGIN'
             return resp
         except Exception:
             raise Http404('File not found')

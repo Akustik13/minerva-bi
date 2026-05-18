@@ -160,34 +160,39 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
 
 /* ── Datasheet popup ── */
 #ds-popup {
-  display: none;
-  position: fixed;
-  z-index: 9999;
-  background: var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0,0,0,.45);
-  overflow: hidden;
-  width: 480px;
-  height: 620px;
-  pointer-events: auto;
-}
-#ds-popup iframe {
-  width: 100%; height: 100%;
-  border: none; display: block;
-  background: #fff;
+  display: none; position: fixed; z-index: 9999;
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,.45);
+  overflow: hidden; width: 480px; pointer-events: auto;
 }
 #ds-popup-hdr {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 6px 10px;
-  background: var(--bg-input);
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 10px; background: var(--bg-input);
   border-bottom: 1px solid var(--border-strong);
-  font-size: 11px; color: var(--text-muted);
+  font-size: 11px; color: var(--text-muted); flex-wrap: wrap;
 }
-#ds-popup-hdr a { color: var(--link-fg); text-decoration: none; font-weight: 600; }
+#ds-popup-label { font-family: monospace; color: var(--text); font-weight: 700; flex: 1; }
+#ds-popup-hdr a { color: var(--link-fg); text-decoration: none; font-weight: 600; white-space: nowrap; }
 #ds-popup-hdr a:hover { text-decoration: underline; }
-.ds-sku-trigger { cursor: default; }
-.ds-sku-trigger:hover { text-decoration: underline dotted; }
+.ds-src-toggle {
+  display: flex; gap: 3px; margin-left: auto;
+}
+.ds-src-btn {
+  padding: 2px 7px; border-radius: 3px; border: 1px solid var(--border-strong);
+  background: var(--bg-hover); color: var(--text-muted);
+  font-size: 10px; cursor: pointer; white-space: nowrap;
+}
+.ds-src-btn.active { background: #1565c0; color: #fff; border-color: #1565c0; }
+#ds-popup-body { position: relative; width: 100%; height: 580px; }
+#ds-popup-iframe { width: 100%; height: 100%; border: none; display: block; background: #fff; }
+#ds-popup-fallback {
+  display: none; position: absolute; inset: 0;
+  background: var(--bg-card); flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  font-size: 13px; color: var(--text-muted); text-align: center; padding: 20px;
+}
+#ds-popup-fallback.visible { display: flex; }
+#ds-popup-fallback a { color: var(--link-fg); font-weight: 600; }
 
 /* ── Zebra ── */
 .sv-table tbody tr.sv-main-row:nth-child(4n+1) td,
@@ -266,7 +271,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
-          data-ds="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% else %}{{ p.datasheet_url }}{% endif %}"
+          data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% elif stock <= p.reorder_point and p.reorder_point > 0 %}{% with state="critical" %}
@@ -276,7 +281,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
-          data-ds="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% else %}{{ p.datasheet_url }}{% endif %}"
+          data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% else %}{% with state="ok" %}
@@ -286,7 +291,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
-          data-ds="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% else %}{{ p.datasheet_url }}{% endif %}"
+          data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% endif %}
@@ -761,55 +766,114 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
 <!-- ── Datasheet hover popup ── -->
 <div id="ds-popup">
   <div id="ds-popup-hdr">
-    <span id="ds-popup-label" style="font-family:monospace;color:var(--text)"></span>
+    <span id="ds-popup-label"></span>
     <a id="ds-popup-open" href="#" target="_blank">↗ Відкрити</a>
+    <div class="ds-src-toggle">
+      <button class="ds-src-btn" id="ds-btn-ext" onclick="dsSrcSwitch('ext')" title="Зовнішній URL виробника">🌐 URL</button>
+      <button class="ds-src-btn" id="ds-btn-file" onclick="dsSrcSwitch('file')" title="Файл на сервері">📁 Файл</button>
+    </div>
   </div>
-  <iframe id="ds-popup-iframe" src="about:blank"></iframe>
+  <div id="ds-popup-body">
+    <iframe id="ds-popup-iframe" src="about:blank"></iframe>
+    <div id="ds-popup-fallback">
+      <div>😞 Не вдалося відобразити в iframe</div>
+      <div style="font-size:11px;color:var(--text-dim)">Деякі сайти забороняють вбудовування</div>
+      <a id="ds-fallback-link" href="#" target="_blank">↗ Відкрити в новій вкладці</a>
+    </div>
+  </div>
 </div>
 
 <script>
 (function() {
-  var popup   = document.getElementById('ds-popup');
-  var iframe  = document.getElementById('ds-popup-iframe');
-  var label   = document.getElementById('ds-popup-label');
-  var openLink= document.getElementById('ds-popup-open');
-  var hideTimer = null;
-  var currentUrl = '';
+  var LS_SRC = 'mv-ds-src';  // 'ext' | 'file'
+  var popup      = document.getElementById('ds-popup');
+  var iframe     = document.getElementById('ds-popup-iframe');
+  var label      = document.getElementById('ds-popup-label');
+  var openLink   = document.getElementById('ds-popup-open');
+  var fallback   = document.getElementById('ds-popup-fallback');
+  var fbLink     = document.getElementById('ds-fallback-link');
+  var btnExt     = document.getElementById('ds-btn-ext');
+  var btnFile    = document.getElementById('ds-btn-file');
+  var hideTimer  = null;
+  var currentTr  = null;
 
-  function showPopup(dsUrl, skuText, anchorEl) {
-    if (!dsUrl) return;
+  var pref = localStorage.getItem(LS_SRC) || 'ext';
+  updateBtnState();
+
+  function updateBtnState() {
+    btnExt.classList.toggle('active',  pref === 'ext');
+    btnFile.classList.toggle('active', pref === 'file');
+  }
+
+  window.dsSrcSwitch = function(src) {
+    pref = src;
+    localStorage.setItem(LS_SRC, pref);
+    updateBtnState();
+    if (currentTr) loadFromTr(currentTr);
+  };
+
+  function pickUrl(tr) {
+    var extUrl  = tr.dataset.dsExt  || '';
+    var fileUrl = tr.dataset.dsFile || '';
+    if (pref === 'ext')  return extUrl  || fileUrl;
+    if (pref === 'file') return fileUrl || extUrl;
+    return extUrl || fileUrl;
+  }
+
+  function loadFromTr(tr) {
+    var url = pickUrl(tr);
+    if (!url) return;
+    fallback.classList.remove('visible');
+    iframe.src = url;
+    openLink.href = url;
+    fbLink.href   = url;
+  }
+
+  function showPopup(tr, skuText, anchorEl) {
+    var url = pickUrl(tr);
+    if (!url) return;
     clearTimeout(hideTimer);
 
-    if (dsUrl !== currentUrl) {
-      currentUrl = dsUrl;
-      iframe.src = dsUrl;
-      label.textContent = skuText;
-      openLink.href = dsUrl;
-    }
+    currentTr = tr;
+    label.textContent = skuText;
+    loadFromTr(tr);
 
     var rect = anchorEl.getBoundingClientRect();
-    var pw = 480, ph = 620;
+    var pw = 480, ph = 640;
     var vw = window.innerWidth, vh = window.innerHeight;
-
     var left = rect.right + 12;
     if (left + pw > vw - 8) left = rect.left - pw - 12;
     if (left < 8) left = 8;
-
     var top = rect.top;
     if (top + ph > vh - 8) top = vh - ph - 8;
     if (top < 8) top = 8;
-
     popup.style.left = left + 'px';
     popup.style.top  = top  + 'px';
     popup.style.display = 'block';
   }
 
+  // Detect iframe load error → show fallback
+  iframe.addEventListener('load', function() {
+    try {
+      var doc = iframe.contentDocument || iframe.contentWindow.document;
+      // Chrome shows empty body on X-Frame-Options block
+      if (doc && doc.body && doc.body.innerHTML === '') {
+        fallback.classList.add('visible');
+      } else {
+        fallback.classList.remove('visible');
+      }
+    } catch(e) {
+      // Cross-origin: can't read — assume OK (external PDF)
+      fallback.classList.remove('visible');
+    }
+  });
+
   function scheduleHide() {
     hideTimer = setTimeout(function() {
       popup.style.display = 'none';
       iframe.src = 'about:blank';
-      currentUrl = '';
-    }, 250);
+      currentTr = null;
+    }, 280);
   }
 
   popup.addEventListener('mouseenter', function() { clearTimeout(hideTimer); });
@@ -818,12 +882,10 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   document.getElementById('sv-tbody').addEventListener('mouseover', function(e) {
     var trigger = e.target.closest('[data-ds-trigger]');
     if (!trigger) return;
-    var tr = trigger.closest('tr[data-ds]');
+    var tr = trigger.closest('tr[data-ds-ext], tr[data-ds-file]');
     if (!tr) return;
-    var dsUrl = tr.dataset.ds;
-    if (!dsUrl) return;
-    var skuText = trigger.textContent.trim();
-    showPopup(dsUrl, skuText, trigger);
+    if (!pickUrl(tr)) return;
+    showPopup(tr, trigger.textContent.trim(), trigger);
   });
 
   document.getElementById('sv-tbody').addEventListener('mouseout', function(e) {
