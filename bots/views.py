@@ -323,6 +323,13 @@ def digikey_ship_order(request, order_pk):
             order_details = []
             supplier_id   = ""
 
+    EU_COUNTRIES = {
+        "AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI",
+        "FR","GR","HR","HU","IE","IT","LT","LU","LV","MT",
+        "NL","PL","PT","RO","SE","SI","SK",
+    }
+    is_eu = (order.addr_country or "").upper() in EU_COUNTRIES
+
     from django.template.response import TemplateResponse
     return TemplateResponse(request, "admin/bots/digikey_ship_order.html", {
         "title":         f"Відправити #{order.order_number} на DigiKey",
@@ -332,4 +339,5 @@ def digikey_ship_order(request, order_pk):
         "carriers":      carriers,
         "order_details": order_details,
         "supplier_id":   supplier_id,
+        "is_eu":         is_eu,
     })

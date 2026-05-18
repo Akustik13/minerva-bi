@@ -178,10 +178,13 @@
                     color:var(--text);font-size:13px;box-sizing:border-box">
     </div>
 
-    <!-- Net VAT invoice amount -->
+    {% if is_eu %}
+    <!-- Net VAT invoice amount (EU only) -->
     <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
         Сума рахунку без ПДВ (Net Invoice Amount)
+        <span style="font-size:10px;background:rgba(33,150,243,.15);color:#42a5f5;
+                     padding:1px 6px;border-radius:3px;margin-left:4px">🇪🇺 ЄС</span>
       </label>
       <input type="number" name="net_vat_invoice_amount"
              placeholder="0.00" min="0" step="0.01"
@@ -193,10 +196,12 @@
       </div>
     </div>
 
-    <!-- VAT Invoice file -->
+    <!-- VAT Invoice file (EU only) -->
     <div style="margin-bottom:20px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
         Рахунок-фактура ПДВ (Supplier VAT Invoice)
+        <span style="font-size:10px;background:rgba(33,150,243,.15);color:#42a5f5;
+                     padding:1px 6px;border-radius:3px;margin-left:4px">🇪🇺 ЄС</span>
       </label>
       <input type="file" name="vat_invoice_file"
              accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.jpg,.png"
@@ -206,13 +211,19 @@
                   border-left:3px solid #ff9800">
         📎 Minerva завантажує файл на DigiKey і намагається прив'язати його автоматично
         (варіант 3 — в розробці).
-        Якщо автоматичне прив'язування не вдасться — з'явиться попередження з ID файлу,
-        і ти зможеш додати його вручну на
+        Якщо не вдасться — з'явиться попередження з ID файлу для ручного додавання на
         <a href="https://marketplace.digikey.com" target="_blank"
            style="color:var(--link-fg)">сайті DigiKey</a>.
         <br>Підтримувані формати: PDF, DOC, DOCX, XLS, XLSX, CSV, JPG, PNG.
       </div>
     </div>
+    {% else %}
+    <div style="font-size:12px;color:var(--text-muted);padding:8px 12px;
+                background:var(--bg-hover);border-radius:4px;margin-bottom:20px">
+      🌍 Замовлення не з ЄС ({{ order.addr_country|default:"невідома країна" }}) —
+      поля Рахунок-фактура ПДВ та Net Invoice Amount не застосовуються.
+    </div>
+    {% endif %}
 
     <div style="background:var(--bg-hover);border:1px solid var(--border);border-radius:4px;
                 padding:10px 14px;margin-bottom:20px;font-size:12px;color:var(--text-muted)">
