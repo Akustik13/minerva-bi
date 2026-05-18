@@ -52,11 +52,50 @@
       </a>
     </li>
   {% endif %}
+  {% if digikey_fetch_tracking_url %}
+    <li>
+      <button type="button" id="dk-fetch-tracking-btn"
+              onclick="dkFetchTracking('{{ digikey_fetch_tracking_url }}')"
+              style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
+                     font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
+        🔄 Трекінг з DigiKey
+      </button>
+    </li>
+  {% endif %}
   {{ block.super }}
 {% endblock %}
 
 {% block extrahead %}
 {{ block.super }}
+<script>
+function dkFetchTracking(url) {
+  const btn = document.getElementById('dk-fetch-tracking-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Запит...'; }
+  const csrf = (document.cookie.split(';').find(c => c.trim().startsWith('csrftoken=')) || '').split('=')[1] || '';
+  fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf } })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok && d.updated && d.updated.length) {
+        if (d.updated.includes('tracking_number')) {
+          const f = document.getElementById('id_tracking_number');
+          if (f) f.value = d.tracking_number;
+        }
+        if (d.updated.includes('shipping_courier')) {
+          const f = document.getElementById('id_shipping_courier');
+          if (f) f.value = d.shipping_courier;
+        }
+        if (btn) { btn.style.background = '#2e7d32'; btn.textContent = '✅ Оновлено — збережи форму'; }
+      } else if (d.ok) {
+        if (btn) { btn.style.background = '#555'; btn.textContent = '— DigiKey трекінг порожній'; btn.disabled = false; }
+      } else {
+        if (btn) { btn.style.background = '#c62828'; btn.textContent = '✗ ' + (d.error || 'Помилка'); btn.disabled = false; }
+      }
+    })
+    .catch(() => {
+      if (btn) { btn.style.background = '#c62828'; btn.textContent = '✗ Помилка мережі'; btn.disabled = false; }
+    });
+}
+</script>
 <script>
 /*
   upload_widget JS — два режими збереження локально:

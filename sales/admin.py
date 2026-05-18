@@ -1455,6 +1455,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["digikey_packlist_url"] = f"/bots/digikey/packlist/{obj.pk}/"
             if obj and obj.source == "digikey" and obj.status in ("processing", "shipped"):
                 extra_context["digikey_ship_url"] = f"/bots/digikey/ship/{obj.pk}/"
+            if obj and obj.source == "digikey":
+                extra_context["digikey_fetch_tracking_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-fetch-tracking/"
             # Auto-sync shipping fields from active shipment (GET only)
             if obj and request.method == "GET":
                 _sync_order_from_active_shipment(obj)
@@ -2081,6 +2083,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/sync-inventory/',
                  self.admin_site.admin_view(self.sync_inventory_view),
                  name='sales_salesorder_sync_inventory'),
+            # DigiKey: fetch tracking number from Marketplace API
+            path('<int:pk>/digikey-fetch-tracking/',
+                 self.admin_site.admin_view(self.digikey_fetch_tracking_view),
+                 name='sales_salesorder_digikey_fetch_tracking'),
         ]
         return custom_urls + urls
 
@@ -2102,6 +2108,49 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         order.internal_note = (data.get('note') or '').strip()[:500]
         order.save(update_fields=['internal_note'])
         return JsonResponse({'ok': True, 'note': order.internal_note})
+
+    def digikey_fetch_tracking_view(self, request, pk):
+        """POST /sales/salesorder/<pk>/digikey-fetch-tracking/
+        Підтягує tracking_number і shipping_courier з DigiKey Marketplace API."""
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+
+        if request.method != "POST":
+            return JsonResponse({"ok": False, "error": "POST only"}, status=405)
+
+        order = get_object_or_404(SalesOrder, pk=pk, source="digikey")
+
+        try:
+            from bots.models import DigiKeyConfig
+            from bots.services.digikey import (
+                _fetch_marketplace_order, _extract_tracking, get_marketplace_token,
+            )
+            config = DigiKeyConfig.get()
+            token  = get_marketplace_token(config)
+            data   = _fetch_marketplace_order(config, order.order_number, token)
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": str(e)})
+
+        tracking = _extract_tracking(data)
+        carrier  = (data.get("shippingMethodLabel") or "").strip()
+
+        updated = []
+        if tracking and tracking != order.tracking_number:
+            order.tracking_number = tracking
+            updated.append("tracking_number")
+        if carrier and carrier != order.shipping_courier:
+            order.shipping_courier = carrier
+            updated.append("shipping_courier")
+
+        if updated:
+            order.save(update_fields=updated)
+
+        return JsonResponse({
+            "ok":      True,
+            "updated": updated,
+            "tracking_number":  order.tracking_number,
+            "shipping_courier": order.shipping_courier,
+        })
 
     def sync_inventory_view(self, request, pk):
         """
