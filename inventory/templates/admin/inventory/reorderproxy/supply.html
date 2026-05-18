@@ -158,6 +158,37 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   color: var(--text-dim); font-size: 15px;
 }
 
+/* ── Datasheet popup ── */
+#ds-popup {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.45);
+  overflow: hidden;
+  width: 480px;
+  height: 620px;
+  pointer-events: auto;
+}
+#ds-popup iframe {
+  width: 100%; height: 100%;
+  border: none; display: block;
+  background: #fff;
+}
+#ds-popup-hdr {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--bg-input);
+  border-bottom: 1px solid var(--border-strong);
+  font-size: 11px; color: var(--text-muted);
+}
+#ds-popup-hdr a { color: var(--link-fg); text-decoration: none; font-weight: 600; }
+#ds-popup-hdr a:hover { text-decoration: underline; }
+.ds-sku-trigger { cursor: default; }
+.ds-sku-trigger:hover { text-decoration: underline dotted; }
+
 /* ── Zebra ── */
 .sv-table tbody tr.sv-main-row:nth-child(4n+1) td,
 .sv-table tbody tr.sv-main-row:nth-child(4n+2) td { background: var(--bg-card); }
@@ -235,6 +266,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
+          data-ds="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% else %}{{ p.datasheet_url }}{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% elif stock <= p.reorder_point and p.reorder_point > 0 %}{% with state="critical" %}
@@ -244,6 +276,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
+          data-ds="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% else %}{{ p.datasheet_url }}{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% else %}{% with state="ok" %}
@@ -253,6 +286,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
           data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
+          data-ds="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% else %}{{ p.datasheet_url }}{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
       {% endwith %}
     {% endif %}
@@ -265,7 +299,12 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           <div class="sv-sku">
             <a href="/admin/inventory/product/{{ p.pk }}/change/"
                style="color:var(--text);text-decoration:none"
-               onclick="event.stopPropagation()">{{ p.sku }}</a>
+               onclick="event.stopPropagation()"
+               data-ds-trigger data-pk="{{ p.pk }}">{{ p.sku }}</a>
+            {% if p.datasheet_file or p.datasheet_url %}
+            <span style="color:var(--text-dim);margin-left:4px;font-size:10px;cursor:default"
+                  title="Datasheet доступний — наведи для перегляду">📄</span>
+            {% endif %}
           </div>
           <div class="sv-name">{{ p.name }}</div>
         </td>
@@ -716,6 +755,82 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     if (!panel) return;
     panel.style.display = panel.style.display === 'none' ? '' : 'none';
   };
+})();
+</script>
+
+<!-- ── Datasheet hover popup ── -->
+<div id="ds-popup">
+  <div id="ds-popup-hdr">
+    <span id="ds-popup-label" style="font-family:monospace;color:var(--text)"></span>
+    <a id="ds-popup-open" href="#" target="_blank">↗ Відкрити</a>
+  </div>
+  <iframe id="ds-popup-iframe" src="about:blank"></iframe>
+</div>
+
+<script>
+(function() {
+  var popup   = document.getElementById('ds-popup');
+  var iframe  = document.getElementById('ds-popup-iframe');
+  var label   = document.getElementById('ds-popup-label');
+  var openLink= document.getElementById('ds-popup-open');
+  var hideTimer = null;
+  var currentUrl = '';
+
+  function showPopup(dsUrl, skuText, anchorEl) {
+    if (!dsUrl) return;
+    clearTimeout(hideTimer);
+
+    if (dsUrl !== currentUrl) {
+      currentUrl = dsUrl;
+      iframe.src = dsUrl;
+      label.textContent = skuText;
+      openLink.href = dsUrl;
+    }
+
+    var rect = anchorEl.getBoundingClientRect();
+    var pw = 480, ph = 620;
+    var vw = window.innerWidth, vh = window.innerHeight;
+
+    var left = rect.right + 12;
+    if (left + pw > vw - 8) left = rect.left - pw - 12;
+    if (left < 8) left = 8;
+
+    var top = rect.top;
+    if (top + ph > vh - 8) top = vh - ph - 8;
+    if (top < 8) top = 8;
+
+    popup.style.left = left + 'px';
+    popup.style.top  = top  + 'px';
+    popup.style.display = 'block';
+  }
+
+  function scheduleHide() {
+    hideTimer = setTimeout(function() {
+      popup.style.display = 'none';
+      iframe.src = 'about:blank';
+      currentUrl = '';
+    }, 250);
+  }
+
+  popup.addEventListener('mouseenter', function() { clearTimeout(hideTimer); });
+  popup.addEventListener('mouseleave', scheduleHide);
+
+  document.getElementById('sv-tbody').addEventListener('mouseover', function(e) {
+    var trigger = e.target.closest('[data-ds-trigger]');
+    if (!trigger) return;
+    var tr = trigger.closest('tr[data-ds]');
+    if (!tr) return;
+    var dsUrl = tr.dataset.ds;
+    if (!dsUrl) return;
+    var skuText = trigger.textContent.trim();
+    showPopup(dsUrl, skuText, trigger);
+  });
+
+  document.getElementById('sv-tbody').addEventListener('mouseout', function(e) {
+    var trigger = e.target.closest('[data-ds-trigger]');
+    if (!trigger) return;
+    if (!popup.contains(e.relatedTarget)) scheduleHide();
+  });
 })();
 </script>
 {% endblock %}
