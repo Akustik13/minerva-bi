@@ -1945,21 +1945,30 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                                 sku=sku, defaults=product_data)
                             stats["created"] += 1
 
-                        # Початковий залишок
+                        # Початковий залишок — записуємо ДЕЛЬТУ, а не сирий залишок
                         stock_raw = row_data.get("initial_stock")
                         if stock_raw is not None and str(stock_raw).strip() not in ("", "None"):
                             try:
-                                qty = Decimal(str(stock_raw).replace(",", "."))
-                                if location and qty != 0:
-                                    InventoryTransaction.objects.create(
-                                        external_key=f"excel:import:{sku}:{uuid.uuid4()}",
-                                        tx_type=InventoryTransaction.TxType.ADJUSTMENT,
-                                        qty=qty,
-                                        product=product,
-                                        location=location,
-                                        ref_doc="excel_import",
-                                        tx_date=timezone.now(),
+                                new_qty = Decimal(str(stock_raw).replace(",", "."))
+                                if location:
+                                    current = (
+                                        InventoryTransaction.objects
+                                        .filter(product=product, location=location)
+                                        .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
+                                        .aggregate(total=Sum('qty'))['total']
+                                        or Decimal('0')
                                     )
+                                    delta = new_qty - current
+                                    if delta != 0:
+                                        InventoryTransaction.objects.create(
+                                            external_key=f"excel:adjust:{sku}:{timezone.now().strftime('%Y%m%d%H%M%S')}",
+                                            tx_type=InventoryTransaction.TxType.ADJUSTMENT,
+                                            qty=delta,
+                                            product=product,
+                                            location=location,
+                                            ref_doc="excel_import",
+                                            tx_date=timezone.now(),
+                                        )
                             except (InvalidOperation, ValueError):
                                 stats["errors"].append(
                                     f"Рядок {row_num}: некоректний залишок '{stock_raw}' для SKU {sku}")
