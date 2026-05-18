@@ -15,6 +15,7 @@ LABELS_DIR = BASE_DIR / 'media' / 'labels'
 DIGIKEY_OAUTH_REDIRECT_URI = os.getenv("DIGIKEY_OAUTH_REDIRECT_URI", "")
 
 CSRF_TRUSTED_ORIGINS = [
+    'https://sevskiy.minerva-bi.com',
     'https://akustik.synology.me',
     'https://akustik.synology.me:81',
     'http://192.168.2.123:8000',
