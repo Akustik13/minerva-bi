@@ -1087,9 +1087,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     def stock_qty(self, obj):
         if hasattr(obj, '_stock_total'):
             return obj._stock_total
-        total = (InventoryTransaction.objects
-                 .filter(product=obj).aggregate(total=Sum("qty")).get("total"))
-        return total or Decimal("0")
+        return Decimal(str(_get_stock(obj)))
     stock_qty.short_description = "On stock"
 
     def reserved_qty(self, obj):
@@ -1740,7 +1738,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     qty=delta, product=product, location=location,
                     ref_doc="manual:set_stock", tx_date=timezone.now(),
                 )
-                messages.success(request, f"Було {current}, стало {target}. Adjustment: {delta}.")
+                sign = '+' if delta > 0 else ''
+                messages.success(request, f"✅ Залишок оновлено: {current} → {target} (коригування {sign}{delta}).")
                 return redirect(reverse("admin:inventory_product_change", args=[product.pk]))
         else:
             form = SetStockForm(initial={"target_stock": current})
