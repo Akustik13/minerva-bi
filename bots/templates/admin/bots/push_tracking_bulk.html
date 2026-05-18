@@ -1,0 +1,82 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>📦 Перенести трекінги недоставлених замовлень у відправлення</h1>
+
+{% if not is_post %}
+<div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:20px;max-width:600px;margin-bottom:20px">
+  <p style="color:var(--text);margin-top:0">
+    Знайдено <strong style="color:var(--accent)">{{ candidates|length }}</strong> замовлень зі статусом «Відправлено» і трекінг-номером без запису у відправленнях.
+  </p>
+  {% if candidates %}
+  <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:16px">
+    <thead>
+      <tr style="background:var(--bg-input);color:var(--text-muted)">
+        <th style="padding:6px 10px;text-align:left">Замовлення</th>
+        <th style="padding:6px 10px;text-align:left">Трекінг</th>
+        <th style="padding:6px 10px;text-align:left">Перевізник</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in candidates %}
+      <tr style="border-bottom:1px solid var(--border);color:var(--text)">
+        <td style="padding:5px 10px;font-family:monospace;color:var(--accent)">{{ o.order_number }}</td>
+        <td style="padding:5px 10px;font-family:monospace">{{ o.tracking_number }}</td>
+        <td style="padding:5px 10px;color:var(--text-muted)">{{ o.shipping_courier|default:"—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" style="background:var(--accent);color:#fff;padding:10px 24px;border:none;border-radius:4px;cursor:pointer;font-size:14px">
+      📦 Перенести всі у відправлення
+    </button>
+  </form>
+  {% else %}
+  <p style="color:var(--ok)">✅ Всі замовлення з трекінгом вже мають записи у відправленнях.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if is_post %}
+{% if results %}
+<div style="background:var(--bg-card);border:1px solid var(--ok);border-radius:6px;padding:16px;margin-bottom:16px">
+  <h3 style="color:var(--ok);margin-top:0">✅ Перенесено {{ results|length }} замовлень</h3>
+  <table style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead>
+      <tr style="background:var(--bg-input);color:var(--text-muted)">
+        <th style="padding:6px 10px;text-align:left">Замовлення</th>
+        <th style="padding:6px 10px;text-align:left">Трекінг</th>
+        <th style="padding:6px 10px;text-align:left">Результат</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in results %}
+      <tr style="border-bottom:1px solid var(--border);color:var(--text)">
+        <td style="padding:5px 10px;font-family:monospace;color:var(--accent)">{{ r.order }}</td>
+        <td style="padding:5px 10px;font-family:monospace">{{ r.tracking }}</td>
+        <td style="padding:5px 10px;color:{% if r.created %}var(--ok){% else %}var(--text-muted){% endif %}">
+          {% if r.created %}➕ Створено #{{ r.shipment_pk }}{% else %}🔄 Оновлено #{{ r.shipment_pk }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% if errors %}
+<div style="background:var(--bg-card);border:1px solid var(--err);border-radius:6px;padding:16px;margin-bottom:16px">
+  <h4 style="color:var(--err);margin-top:0">❌ Помилки ({{ errors|length }})</h4>
+  {% for e in errors %}<div style="color:var(--err);font-size:13px">• {{ e }}</div>{% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+<div style="margin-top:16px;display:flex;gap:12px">
+  <a href="/admin/shipping/shipment/" style="background:var(--accent);color:#fff;padding:8px 18px;border-radius:4px;text-decoration:none;font-size:13px">
+    🚚 Відкрити відправлення
+  </a>
+  <a href="/admin/bots/digikeyconfig/1/change/" style="color:var(--text-muted);text-decoration:none;padding:8px 0;font-size:13px">← Назад</a>
+</div>
+{% endblock %}

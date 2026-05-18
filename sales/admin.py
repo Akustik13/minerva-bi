@@ -2087,6 +2087,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/digikey-fetch-tracking/',
                  self.admin_site.admin_view(self.digikey_fetch_tracking_view),
                  name='sales_salesorder_digikey_fetch_tracking'),
+            # Push tracking to Shipment record
+            path('<int:pk>/push-to-shipping/',
+                 self.admin_site.admin_view(self.push_to_shipping_view),
+                 name='sales_salesorder_push_to_shipping'),
         ]
         return custom_urls + urls
 
@@ -2150,6 +2154,35 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             "updated": updated,
             "tracking_number":  order.tracking_number,
             "shipping_courier": order.shipping_courier,
+        })
+
+    def push_to_shipping_view(self, request, pk):
+        """POST — створює або оновлює Shipment запис для відстеження посилки."""
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+
+        if request.method != "POST":
+            return JsonResponse({"ok": False, "error": "POST only"}, status=405)
+
+        order = get_object_or_404(SalesOrder, pk=pk)
+        if not order.tracking_number:
+            return JsonResponse({"ok": False, "error": "Немає трекінг-номера"})
+
+        try:
+            from shipping.services.import_tracking import ensure_shipment_for_order
+            shipment, created = ensure_shipment_for_order(
+                order,
+                order.tracking_number,
+                order.shipping_courier or "",
+            )
+        except Exception as e:
+            return JsonResponse({"ok": False, "error": str(e)})
+
+        return JsonResponse({
+            "ok":      True,
+            "created": created,
+            "shipment_pk": shipment.pk,
+            "shipment_url": f"/admin/shipping/shipment/{shipment.pk}/change/",
         })
 
     def sync_inventory_view(self, request, pk):

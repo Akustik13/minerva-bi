@@ -62,12 +62,45 @@
       </button>
     </li>
   {% endif %}
+  {% if original and original.pk and original.tracking_number %}
+    <li>
+      <button type="button" id="push-to-shipping-btn"
+              onclick="pushToShipping('/admin/sales/salesorder/{{ original.pk }}/push-to-shipping/')"
+              style="background:var(--ok,#2e7d32);color:#fff;padding:6px 14px;border-radius:6px;
+                     font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
+        📦 Відстежувати
+      </button>
+    </li>
+  {% endif %}
   {{ block.super }}
 {% endblock %}
 
 {% block extrahead %}
 {{ block.super }}
 <script>
+function pushToShipping(url) {
+  const btn = document.getElementById('push-to-shipping-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Створення...'; }
+  const csrf = (document.cookie.split(';').find(c => c.trim().startsWith('csrftoken=')) || '').split('=')[1] || '';
+  fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf } })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        const label = d.created ? '✅ Створено' : '✅ Оновлено';
+        if (btn) {
+          btn.style.background = '#2e7d32';
+          btn.textContent = label;
+          btn.onclick = () => window.open(d.shipment_url, '_blank');
+          btn.disabled = false;
+        }
+      } else {
+        if (btn) { btn.style.background = '#c62828'; btn.textContent = '✗ ' + (d.error || 'Помилка'); btn.disabled = false; }
+      }
+    })
+    .catch(() => {
+      if (btn) { btn.style.background = '#c62828'; btn.textContent = '✗ Помилка мережі'; btn.disabled = false; }
+    });
+}
 function dkFetchTracking(url) {
   const btn = document.getElementById('dk-fetch-tracking-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Запит...'; }
