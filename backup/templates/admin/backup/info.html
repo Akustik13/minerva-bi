@@ -646,13 +646,13 @@
     <!-- Auto-backup note -->
     <div class="bk-note" style="margin-top: 20px;">
       <strong>ℹ️ Автоматичний запуск бекапу</strong><br>
-      Увімкнення цієї опції лише зберігає налаштування. Для реального автозапуску
-      додайте команду до планувальника:
-      <br><br>
-      <strong>Windows Task Scheduler:</strong><br>
-      <code>python C:\tabele_mvp\manage.py run_backup --type full</code><br><br>
-      <strong>Linux/Docker cron:</strong><br>
-      <code>0 3 * * * cd /app && python manage.py run_backup --type full</code>
+      Minerva запускає бекап автоматично у фоновому потоці сервера.
+      Після увімкнення та збереження — перший бекап виконається через ≈1 годину,
+      далі за розкладом (щодня або щотижня). Жодного Task Scheduler або cron налаштовувати не потрібно.<br><br>
+      <span style="color:var(--text-dim);font-size:12px">
+        Резервна опція (ручний запуск через термінал):<br>
+        <code>python manage.py run_backup --type full</code>
+      </span>
     </div>
   </div>
 

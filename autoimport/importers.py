@@ -665,6 +665,8 @@ def import_adjust(df: pd.DataFrame, dry_run: bool = False, column_map: dict = No
                     continue
                 current = InventoryTransaction.objects.filter(
                     product=product, location=location
+                ).exclude(
+                    tx_type=InventoryTransaction.TxType.RESERVED,
                 ).aggregate(total=Sum('qty'))['total'] or Decimal('0')
                 delta = new_qty - current
                 if delta == 0:
