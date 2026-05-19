@@ -1,7 +1,7 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block title %}Склад — огляд залишків{% endblock %}
+{% block title %}{% trans "Склад — огляд залишків" %}{% endblock %}
 
 {% block extrahead %}
 {{ block.super }}
@@ -207,15 +207,15 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
 <div class="sv-wrap">
 
   <div class="sv-bc">
-    <a href="/admin/">Головна</a> ›
-    <a href="/admin/inventory/">Склад</a> ›
-    Залишки та рух товарів
+    <a href="/admin/">{% trans "Головна" %}</a> ›
+    <a href="/admin/inventory/">{% trans "Склад" %}</a> ›
+    {% trans "Залишки та рух товарів" %}
   </div>
 
   <div class="sv-hdr">
-    <h1>📦 Склад — залишки та рух товарів</h1>
-    <a href="/admin/inventory/inventorytransaction/add/" class="sv-btn sv-btn-tx">+ Транзакція</a>
-    <a href="/admin/inventory/purchaseorder/add/" class="sv-btn sv-btn-po">+ Замовлення (PO)</a>
+    <h1>📦 {% trans "Склад — залишки та рух товарів" %}</h1>
+    <a href="/admin/inventory/inventorytransaction/add/" class="sv-btn sv-btn-tx">+ {% trans "Транзакція" %}</a>
+    <a href="/admin/inventory/purchaseorder/add/" class="sv-btn sv-btn-po">+ {% trans "Замовлення (PO)" %}</a>
   </div>
 
   {% if rows %}
@@ -223,26 +223,26 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
 
   <!-- Summary chips -->
   <div class="sv-chips" id="sv-chips">
-    <div class="sv-chip">Товарів: <span>{{ total }}</span></div>
-    <div class="sv-chip" id="chip-empty">Відсутні: <span id="cnt-empty">0</span></div>
-    <div class="sv-chip" id="chip-crit">Критичні: <span id="cnt-crit">0</span></div>
-    <div class="sv-chip" id="chip-res">В резерві: <span id="cnt-res">0</span></div>
-    <div class="sv-chip" id="chip-inc">З приходом: <span id="cnt-inc">0</span></div>
+    <div class="sv-chip">{% trans "Товарів:" %} <span>{{ total }}</span></div>
+    <div class="sv-chip" id="chip-empty">{% trans "Відсутні:" %} <span id="cnt-empty">0</span></div>
+    <div class="sv-chip" id="chip-crit">{% trans "Критичні:" %} <span id="cnt-crit">0</span></div>
+    <div class="sv-chip" id="chip-res">{% trans "В резерві:" %} <span id="cnt-res">0</span></div>
+    <div class="sv-chip" id="chip-inc">{% trans "З приходом:" %} <span id="cnt-inc">0</span></div>
   </div>
 
   <!-- Filters -->
   <div class="sv-filters">
-    <button class="sv-filter-btn active" onclick="svFilter('all', this)">📋 Всі</button>
-    <button class="sv-filter-btn" onclick="svFilter('empty', this)">🚫 Відсутні</button>
-    <button class="sv-filter-btn" onclick="svFilter('critical', this)">⚠️ Критичні</button>
-    <button class="sv-filter-btn" onclick="svFilter('reserved', this)">📋 В резерві</button>
-    <button class="sv-filter-btn" onclick="svFilter('incoming', this)">📦 Очікується</button>
+    <button class="sv-filter-btn active" onclick="svFilter('all', this)">📋 {% trans "Всі" %}</button>
+    <button class="sv-filter-btn" onclick="svFilter('empty', this)">🚫 {% trans "Відсутні" %}</button>
+    <button class="sv-filter-btn" onclick="svFilter('critical', this)">⚠️ {% trans "Критичні" %}</button>
+    <button class="sv-filter-btn" onclick="svFilter('reserved', this)">📋 {% trans "В резерві" %}</button>
+    <button class="sv-filter-btn" onclick="svFilter('incoming', this)">📦 {% trans "Очікується" %}</button>
   </div>
 
   <!-- Search -->
   <div class="sv-search-wrap">
     <input class="sv-search" type="text" id="sv-search"
-           placeholder="🔍 Пошук по SKU або назві..." oninput="svSearch(this.value)">
+           placeholder="{% trans "🔍 Пошук по SKU або назві..." %}" oninput="svSearch(this.value)">
   </div>
 
   <!-- Table -->
@@ -251,13 +251,13 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     <thead>
       <tr>
         <th style="width:28px"></th>
-        <th onclick="svSort('sku')" id="th-sku">SKU / Назва</th>
-        <th onclick="svSort('stock')" id="th-stock" style="text-align:right">На складі</th>
-        <th onclick="svSort('reserved')" id="th-reserved" style="text-align:right">Резерв</th>
-        <th onclick="svSort('avail')" id="th-avail" style="text-align:right">Доступно</th>
-        <th onclick="svSort('incoming')" id="th-incoming" style="text-align:right">Очікується</th>
-        <th onclick="svSort('lastdate')" id="th-lastdate">Остання операція</th>
-        <th style="width:120px">Дія</th>
+        <th onclick="svSort('sku')" id="th-sku">{% trans "SKU / Назва" %}</th>
+        <th onclick="svSort('stock')" id="th-stock" style="text-align:right">{% trans "На складі" %}</th>
+        <th onclick="svSort('reserved')" id="th-reserved" style="text-align:right">{% trans "Резерв" %}</th>
+        <th onclick="svSort('avail')" id="th-avail" style="text-align:right">{% trans "Доступно" %}</th>
+        <th onclick="svSort('incoming')" id="th-incoming" style="text-align:right">{% trans "Очікується" %}</th>
+        <th onclick="svSort('lastdate')" id="th-lastdate">{% trans "Остання операція" %}</th>
+        <th style="width:120px">{% trans "Дія" %}</th>
       </tr>
     </thead>
     <tbody id="sv-tbody">
@@ -297,7 +297,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     {% endif %}
         <!-- expand -->
         <td>
-          <button class="sv-expand-btn" id="exp-{{ p.pk }}" title="Деталі та рухи" onclick="event.stopPropagation();svToggleDetail({{ p.pk }})">▶</button>
+          <button class="sv-expand-btn" id="exp-{{ p.pk }}" title="{% trans "Деталі та рухи" %}" onclick="event.stopPropagation();svToggleDetail({{ p.pk }})">▶</button>
         </td>
         <!-- SKU / Name -->
         <td>
@@ -358,9 +358,9 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
         <td>
           {% if last_tx %}
           <div class="sv-tx">
-            {% if last_tx.tx_type == "Incoming" %}<span class="sv-tx-type" style="color:#66bb6a">📥 Прихід</span>
-            {% elif last_tx.tx_type == "Outgoing" %}<span class="sv-tx-type" style="color:#ef5350">📤 Витрата</span>
-            {% elif last_tx.tx_type == "Adjustment" %}<span class="sv-tx-type" style="color:#7c4dff">⚖️ Коригування</span>
+            {% if last_tx.tx_type == "Incoming" %}<span class="sv-tx-type" style="color:#66bb6a">📥 {% trans "Прихід" %}</span>
+            {% elif last_tx.tx_type == "Outgoing" %}<span class="sv-tx-type" style="color:#ef5350">📤 {% trans "Витрата" %}</span>
+            {% elif last_tx.tx_type == "Adjustment" %}<span class="sv-tx-type" style="color:#7c4dff">⚖️ {% trans "Коригування" %}</span>
             {% else %}<span class="sv-tx-type" style="color:var(--text-dim)">{{ last_tx.tx_type }}</span>
             {% endif %}
             <span class="sv-num" style="font-size:11px"> {{ last_tx.qty|floatformat:"0" }}</span>
@@ -375,11 +375,11 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
         <td onclick="event.stopPropagation()">
           <div class="sv-actions">
             <a href="/admin/inventory/purchaseorder/add/?product={{ p.pk }}"
-               class="sv-btn sv-btn-po" title="Створити замовлення постачальнику">+ PO</a>
+               class="sv-btn sv-btn-po" title="{% trans "Створити замовлення постачальнику" %}">+ PO</a>
             <a href="/admin/inventory/inventorytransaction/add/?product={{ p.pk }}"
-               class="sv-btn sv-btn-rx" title="Зареєструвати прихід/витрату">+ Рух</a>
+               class="sv-btn sv-btn-rx" title="{% trans "Зареєструвати прихід/витрату" %}">+ {% trans "Рух" %}</a>
             <a href="/admin/inventory/product/{{ p.pk }}/set-stock/"
-               class="sv-btn" title="Встановити поточний залишок"
+               class="sv-btn" title="{% trans "Встановити поточний залишок" %}"
                style="background:var(--bg-card-2);color:var(--text-muted)">⚖️</a>
           </div>
         </td>
@@ -393,15 +393,15 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
 
               <!-- Reservations -->
               <div class="sv-detail-section">
-                <h4>📋 Резервації (незакриті замовлення)</h4>
+                <h4>📋 {% trans "Резервації (незакриті замовлення)" %}</h4>
                 {% if row.reservations %}
                 <table class="sv-sub-table">
                   <tr>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ЗАМОВНИК</td>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">№ ЗАМ.</td>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">К-СТЬ</td>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">СТАТУС</td>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ТЕРМІН ВІДГРУЗКИ</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "ЗАМОВНИК" %}</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "№ ЗАМ." %}</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">{% trans "К-СТЬ" %}</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "СТАТУС" %}</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "ТЕРМІН ВІДГРУЗКИ" %}</td>
                   </tr>
                   {% for res in row.reservations %}
                   <tr>
@@ -432,20 +432,20 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                   {% endfor %}
                 </table>
                 {% else %}
-                <p class="sv-sub-empty">Немає активних замовлень</p>
+                <p class="sv-sub-empty">{% trans "Немає активних замовлень" %}</p>
                 {% endif %}
               </div>
 
               <!-- Incoming POs -->
               <div class="sv-detail-section">
-                <h4>📦 Очікуваний прихід (відкриті PO)</h4>
+                <h4>📦 {% trans "Очікуваний прихід (відкриті PO)" %}</h4>
                 {% if row.po_detail %}
                 <table class="sv-sub-table">
                   <tr>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ПОСТАЧАЛЬНИК</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "ПОСТАЧАЛЬНИК" %}</td>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">PO</td>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">ЗАЛИШОК</td>
-                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">ДАТА ПРИХОДУ</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700;text-align:right">{% trans "ЗАЛИШОК" %}</td>
+                    <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "ДАТА ПРИХОДУ" %}</td>
                     <td></td>
                   </tr>
                   {% for inc in row.po_detail %}
@@ -468,17 +468,17 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                       <button type="button" class="sv-btn sv-btn-ok"
                               style="font-size:10px;padding:3px 8px"
                               onclick="svReceive({{ inc.line_pk }}, {{ inc.qty }})">
-                        ✓ Отримати
+                        ✓ {% trans "Отримати" %}
                       </button>
                       <button type="button" class="sv-btn"
                               style="font-size:10px;padding:3px 7px;margin-left:3px"
-                              title="Ввести іншу кількість"
+                              title="{% trans "Ввести іншу кількість" %}"
                               onclick="svReceiveToggle({{ inc.line_pk }})">✏️</button>
                       <div id="rcv-{{ inc.line_pk }}"
                            style="display:none;margin-top:5px;display:none;
                                   background:var(--bg-input);border:1px solid var(--border-strong);
                                   border-radius:6px;padding:6px 8px">
-                        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">Отримано шт:</div>
+                        <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">{% trans "Отримано шт:" %}</div>
                         <div style="display:flex;gap:5px;align-items:center">
                           <input id="rcv-qty-{{ inc.line_pk }}" type="number"
                                  value="{{ inc.qty|floatformat:'0' }}"
@@ -501,7 +501,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                   {% endfor %}
                 </table>
                 {% else %}
-                <p class="sv-sub-empty">Немає відкритих замовлень</p>
+                <p class="sv-sub-empty">{% trans "Немає відкритих замовлень" %}</p>
                 {% endif %}
               </div>
 
@@ -509,9 +509,9 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
 
             <!-- History -->
             <div class="sv-detail-section" style="margin-top:12px">
-              <h4>📜 Історія руху товару</h4>
+              <h4>📜 {% trans "Історія руху товару" %}</h4>
               <div id="hist-{{ p.pk }}" class="sv-history-panel">
-                <span style="color:var(--text-dim);font-size:12px">Натисніть ▶ щоб завантажити...</span>
+                <span style="color:var(--text-dim);font-size:12px">{% trans "Натисніть ▶ щоб завантажити..." %}</span>
               </div>
             </div>
 
@@ -526,17 +526,27 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
   </div><!-- sv-table-wrap -->
 
   <div id="sv-no-results" style="display:none" class="sv-empty">
-    🔍 Нічого не знайдено
+    🔍 {% trans "Нічого не знайдено" %}
   </div>
 
   {% endwith %}
   {% else %}
-  <div class="sv-empty">✅ Немає активних товарів на складі</div>
+  <div class="sv-empty">✅ {% trans "Немає активних товарів на складі" %}</div>
   {% endif %}
 
 </div>
 
 <script>
+/* ── Supply page i18n strings ── */
+var _svi = {
+  loading:         '⏳ {% trans "Завантаження..." %}',
+  error_load:      '{% trans "Помилка завантаження" %}',
+  error_net:       '{% trans "Помилка мережі" %}',
+  error_prefix:    '{% trans "Помилка" %}',
+  confirm_pre:     '{% trans "Отримати" %}',
+  confirm_post:    '{% trans "шт. по цьому рядку PO?" %}',
+  error_qty:       '{% trans "Вкажіть кількість > 0" %}',
+};
 (function() {
   var LS_KEY = 'mv_sv_supply';
 
@@ -635,12 +645,12 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
       _histLoaded[pk] = true;
       var panel = document.getElementById('hist-' + pk);
       if (panel) {
-        panel.innerHTML = '<span style="color:var(--text-dim);font-size:12px">⏳ Завантаження...</span>';
+        panel.innerHTML = '<span style="color:var(--text-dim);font-size:12px">' + _svi.loading + '</span>';
         fetch('/admin/inventory/reorderproxy/supply/history/' + pk + '/', {
           headers: {'X-Requested-With': 'XMLHttpRequest'}
         }).then(function(r){ return r.text(); })
           .then(function(html){ panel.innerHTML = html; })
-          .catch(function(){ panel.innerHTML = '<span style="color:#ef5350">Помилка завантаження</span>'; });
+          .catch(function(){ panel.innerHTML = '<span style="color:#ef5350">' + _svi.error_load + '</span>'; });
       }
     }
   };
@@ -735,14 +745,14 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
       if (d.ok) {
         location.reload();
       } else {
-        alert('Помилка: ' + (d.error || '?'));
+        alert(_svi.error_prefix + ': ' + (d.error || '?'));
       }
     })
-    .catch(function() { alert('Помилка мережі'); });
+    .catch(function() { alert(_svi.error_net); });
   }
 
   window.svReceive = function(linePk, qty) {
-    if (!confirm('Отримати ' + qty + ' шт. по цьому рядку PO?')) return;
+    if (!confirm(_svi.confirm_pre + ' ' + qty + ' ' + _svi.confirm_post)) return;
     doReceive(linePk, qty);
   };
 
@@ -750,8 +760,8 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     var inp = document.getElementById('rcv-qty-' + linePk);
     if (!inp) return;
     var qty = parseFloat(inp.value);
-    if (!qty || qty <= 0) { alert('Вкажіть кількість > 0'); return; }
-    if (!confirm('Отримати ' + qty + ' шт. по цьому рядку PO?')) return;
+    if (!qty || qty <= 0) { alert(_svi.error_qty); return; }
+    if (!confirm(_svi.confirm_pre + ' ' + qty + ' ' + _svi.confirm_post)) return;
     doReceive(linePk, qty);
   };
 
@@ -767,18 +777,18 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
 <div id="ds-popup">
   <div id="ds-popup-hdr">
     <span id="ds-popup-label"></span>
-    <a id="ds-popup-open" href="#" target="_blank">↗ Відкрити</a>
+    <a id="ds-popup-open" href="#" target="_blank">↗ {% trans "Відкрити" %}</a>
     <div class="ds-src-toggle">
-      <button class="ds-src-btn" id="ds-btn-ext" onclick="dsSrcSwitch('ext')" title="Зовнішній URL виробника">🌐 URL</button>
-      <button class="ds-src-btn" id="ds-btn-file" onclick="dsSrcSwitch('file')" title="Файл на сервері">📁 Файл</button>
+      <button class="ds-src-btn" id="ds-btn-ext" onclick="dsSrcSwitch('ext')" title="{% trans "Зовнішній URL виробника" %}">🌐 URL</button>
+      <button class="ds-src-btn" id="ds-btn-file" onclick="dsSrcSwitch('file')" title="{% trans "Файл на сервері" %}">📁 {% trans "Файл" %}</button>
     </div>
   </div>
   <div id="ds-popup-body">
     <iframe id="ds-popup-iframe" src="about:blank"></iframe>
     <div id="ds-popup-fallback">
-      <div>😞 Не вдалося відобразити в iframe</div>
-      <div style="font-size:11px;color:var(--text-dim)">Деякі сайти забороняють вбудовування</div>
-      <a id="ds-fallback-link" href="#" target="_blank">↗ Відкрити в новій вкладці</a>
+      <div>😞 {% trans "Не вдалося відобразити в iframe" %}</div>
+      <div style="font-size:11px;color:var(--text-dim)">{% trans "Деякі сайти забороняють вбудовування" %}</div>
+      <a id="ds-fallback-link" href="#" target="_blank">↗ {% trans "Відкрити в новій вкладці" %}</a>
     </div>
   </div>
 </div>

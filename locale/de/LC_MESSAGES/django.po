@@ -112,3 +112,184 @@ msgstr "In Bearbeitung"
 
 msgid "Отримано"
 msgstr "Empfangen"
+
+# ── Supply page ──
+msgid "Склад — огляд залишків"
+msgstr "Lagerübersicht"
+
+msgid "Головна"
+msgstr "Startseite"
+
+msgid "Залишки та рух товарів"
+msgstr "Bestand & Bewegungen"
+
+msgid "Склад — залишки та рух товарів"
+msgstr "Lager — Bestand & Bewegungen"
+
+msgid "Транзакція"
+msgstr "Transaktion"
+
+msgid "Замовлення (PO)"
+msgstr "Bestellung (PO)"
+
+msgid "Товарів:"
+msgstr "Produkte:"
+
+msgid "Відсутні:"
+msgstr "Fehlend:"
+
+msgid "Критичні:"
+msgstr "Kritisch:"
+
+msgid "В резерві:"
+msgstr "Reserviert:"
+
+msgid "З приходом:"
+msgstr "Mit Eingang:"
+
+msgid "Всі"
+msgstr "Alle"
+
+msgid "Відсутні"
+msgstr "Fehlend"
+
+msgid "Критичні"
+msgstr "Kritisch"
+
+msgid "В резерві"
+msgstr "Reserviert"
+
+msgid "Очікується"
+msgstr "Eingang"
+
+msgid "🔍 Пошук по SKU або назві..."
+msgstr "🔍 Nach SKU oder Name suchen..."
+
+msgid "SKU / Назва"
+msgstr "SKU / Name"
+
+msgid "На складі"
+msgstr "Auf Lager"
+
+msgid "Резерв"
+msgstr "Reserviert"
+
+msgid "Доступно"
+msgstr "Verfügbar"
+
+msgid "Остання операція"
+msgstr "Letzte Operation"
+
+msgid "Дія"
+msgstr "Aktion"
+
+msgid "Деталі та рухи"
+msgstr "Details & Bewegungen"
+
+msgid "Прихід"
+msgstr "Eingang"
+
+msgid "Витрата"
+msgstr "Ausgang"
+
+msgid "Коригування"
+msgstr "Anpassung"
+
+msgid "Створити замовлення постачальнику"
+msgstr "Lieferantenbestellung erstellen"
+
+msgid "Зареєструвати прихід/витрату"
+msgstr "Eingang/Ausgang registrieren"
+
+msgid "Рух"
+msgstr "Bewegung"
+
+msgid "Встановити поточний залишок"
+msgstr "Aktuellen Bestand festlegen"
+
+msgid "Резервації (незакриті замовлення)"
+msgstr "Reservierungen (offene Bestellungen)"
+
+msgid "ЗАМОВНИК"
+msgstr "KUNDE"
+
+msgid "№ ЗАМ."
+msgstr "BEST. #"
+
+msgid "К-СТЬ"
+msgstr "ANZ."
+
+msgid "ТЕРМІН ВІДГРУЗКИ"
+msgstr "VERSANDFRIST"
+
+msgid "Немає активних замовлень"
+msgstr "Keine aktiven Bestellungen"
+
+msgid "Очікуваний прихід (відкриті PO)"
+msgstr "Erwartete Eingänge (offene PO)"
+
+msgid "ПОСТАЧАЛЬНИК"
+msgstr "LIEFERANT"
+
+msgid "ЗАЛИШОК"
+msgstr "BESTAND"
+
+msgid "ДАТА ПРИХОДУ"
+msgstr "EINGANGSDATUM"
+
+msgid "Отримати"
+msgstr "Empfangen"
+
+msgid "Ввести іншу кількість"
+msgstr "Andere Menge eingeben"
+
+msgid "Отримано шт:"
+msgstr "Empfangen Stk:"
+
+msgid "Немає відкритих замовлень"
+msgstr "Keine offenen Bestellungen"
+
+msgid "Історія руху товару"
+msgstr "Bewegungshistorie"
+
+msgid "Натисніть ▶ щоб завантажити..."
+msgstr "Klicken ▶ zum Laden..."
+
+msgid "Нічого не знайдено"
+msgstr "Nichts gefunden"
+
+msgid "Немає активних товарів на складі"
+msgstr "Keine aktiven Produkte im Lager"
+
+msgid "Завантаження..."
+msgstr "Laden..."
+
+msgid "Помилка завантаження"
+msgstr "Ladefehler"
+
+msgid "Помилка мережі"
+msgstr "Netzwerkfehler"
+
+msgid "шт. по цьому рядку PO?"
+msgstr "Stk. für diese PO-Zeile?"
+
+msgid "Вкажіть кількість > 0"
+msgstr "Menge > 0 eingeben"
+
+msgid "Зовнішній URL виробника"
+msgstr "Hersteller-URL"
+
+msgid "Файл на сервері"
+msgstr "Datei auf Server"
+
+msgid "Файл"
+msgstr "Datei"
+
+msgid "Не вдалося відобразити в iframe"
+msgstr "Konnte nicht im iframe angezeigt werden"
+
+msgid "Деякі сайти забороняють вбудовування"
+msgstr "Einige Seiten blockieren Einbettung"
+
+msgid "Відкрити в новій вкладці"
+msgstr "In neuem Tab öffnen"

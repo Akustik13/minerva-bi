@@ -113,3 +113,184 @@ msgstr "Processing"
 
 msgid "Отримано"
 msgstr "Received"
+
+# ── Supply (Inventory overview) page ──
+msgid "Склад — огляд залишків"
+msgstr "Inventory Overview"
+
+msgid "Головна"
+msgstr "Home"
+
+msgid "Залишки та рух товарів"
+msgstr "Stock & Movements"
+
+msgid "Склад — залишки та рух товарів"
+msgstr "Inventory — Stock & Movements"
+
+msgid "Транзакція"
+msgstr "Transaction"
+
+msgid "Замовлення (PO)"
+msgstr "Order (PO)"
+
+msgid "Товарів:"
+msgstr "Products:"
+
+msgid "Відсутні:"
+msgstr "Out of stock:"
+
+msgid "Критичні:"
+msgstr "Critical:"
+
+msgid "В резерві:"
+msgstr "Reserved:"
+
+msgid "З приходом:"
+msgstr "Incoming:"
+
+msgid "Всі"
+msgstr "All"
+
+msgid "Відсутні"
+msgstr "Out of stock"
+
+msgid "Критичні"
+msgstr "Critical"
+
+msgid "В резерві"
+msgstr "Reserved"
+
+msgid "Очікується"
+msgstr "Incoming"
+
+msgid "🔍 Пошук по SKU або назві..."
+msgstr "🔍 Search by SKU or name..."
+
+msgid "SKU / Назва"
+msgstr "SKU / Name"
+
+msgid "На складі"
+msgstr "In stock"
+
+msgid "Резерв"
+msgstr "Reserved"
+
+msgid "Доступно"
+msgstr "Available"
+
+msgid "Остання операція"
+msgstr "Last operation"
+
+msgid "Дія"
+msgstr "Action"
+
+msgid "Деталі та рухи"
+msgstr "Details & movements"
+
+msgid "Прихід"
+msgstr "Receipt"
+
+msgid "Витрата"
+msgstr "Outgoing"
+
+msgid "Коригування"
+msgstr "Adjustment"
+
+msgid "Створити замовлення постачальнику"
+msgstr "Create supplier order"
+
+msgid "Зареєструвати прихід/витрату"
+msgstr "Register receipt/outgoing"
+
+msgid "Рух"
+msgstr "Movement"
+
+msgid "Встановити поточний залишок"
+msgstr "Set current stock"
+
+msgid "Резервації (незакриті замовлення)"
+msgstr "Reservations (open orders)"
+
+msgid "ЗАМОВНИК"
+msgstr "CUSTOMER"
+
+msgid "№ ЗАМ."
+msgstr "ORDER #"
+
+msgid "К-СТЬ"
+msgstr "QTY"
+
+msgid "ТЕРМІН ВІДГРУЗКИ"
+msgstr "SHIP DEADLINE"
+
+msgid "Немає активних замовлень"
+msgstr "No active orders"
+
+msgid "Очікуваний прихід (відкриті PO)"
+msgstr "Expected arrivals (open PO)"
+
+msgid "ПОСТАЧАЛЬНИК"
+msgstr "SUPPLIER"
+
+msgid "ЗАЛИШОК"
+msgstr "BALANCE"
+
+msgid "ДАТА ПРИХОДУ"
+msgstr "ARRIVAL DATE"
+
+msgid "Отримати"
+msgstr "Receive"
+
+msgid "Ввести іншу кількість"
+msgstr "Enter different qty"
+
+msgid "Отримано шт:"
+msgstr "Received pcs:"
+
+msgid "Немає відкритих замовлень"
+msgstr "No open orders"
+
+msgid "Історія руху товару"
+msgstr "Movement history"
+
+msgid "Натисніть ▶ щоб завантажити..."
+msgstr "Click ▶ to load..."
+
+msgid "Нічого не знайдено"
+msgstr "Nothing found"
+
+msgid "Немає активних товарів на складі"
+msgstr "No active products in inventory"
+
+msgid "Завантаження..."
+msgstr "Loading..."
+
+msgid "Помилка завантаження"
+msgstr "Load error"
+
+msgid "Помилка мережі"
+msgstr "Network error"
+
+msgid "шт. по цьому рядку PO?"
+msgstr "pcs for this PO line?"
+
+msgid "Вкажіть кількість > 0"
+msgstr "Enter quantity > 0"
+
+msgid "Зовнішній URL виробника"
+msgstr "Manufacturer URL"
+
+msgid "Файл на сервері"
+msgstr "File on server"
+
+msgid "Файл"
+msgstr "File"
+
+msgid "Не вдалося відобразити в iframe"
+msgstr "Could not display in iframe"
+
+msgid "Деякі сайти забороняють вбудовування"
+msgstr "Some sites block embedding"
+
+msgid "Відкрити в новій вкладці"
+msgstr "Open in new tab"
