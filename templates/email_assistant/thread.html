@@ -1,4 +1,5 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 {% block title %}{{ title }} — Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 {% block messages %}{% endblock %}
@@ -43,7 +44,7 @@
 
   <div class="em-hd">
     <div>
-      <a href="{% url 'email_assistant:inbox' %}" class="em-back">← Вхідні</a>
+      <a href="{% url 'email_assistant:inbox' %}" class="em-back">← {% trans "Вхідні" %}</a>
       <h2 style="font-size:18px;margin-top:6px;color:var(--text)">{{ title }}</h2>
       {% if thread and thread.crm_customer %}
       <a href="/admin/crm/customer/{{ thread.crm_customer.pk }}/change/"
@@ -68,7 +69,7 @@
       </div>
       <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
         {% if msg.has_attachments %}
-        <span title="{{ msg.attachments|length }} вкладень" style="font-size:14px">📎</span>
+        <span title="{{ msg.attachments|length }} {% trans "вкладень" %}" style="font-size:14px">📎</span>
         {% endif %}
         <span style="font-size:12px;color:var(--text-muted)">{{ msg.sent_at|date:"d.m.Y H:i" }}</span>
       </div>
@@ -97,37 +98,37 @@
     {% endif %}
 
     <div class="em-actions">
-      <button class="em-btn ai" onclick="aiReply({{ msg.pk }})">🏛️ AI відповідь</button>
-      <button class="em-btn" onclick="aiTranslate({{ msg.pk }})">🌐 Перекласти UA</button>
-      <a href="{% url 'email_assistant:compose' %}?reply_to={{ msg.pk }}" class="em-btn">↩ Відповісти</a>
-      <a href="{% url 'email_assistant:compose' %}?forward={{ msg.pk }}" class="em-btn">→ Переслати</a>
+      <button class="em-btn ai" onclick="aiReply({{ msg.pk }})">🏛️ {% trans "AI відповідь" %}</button>
+      <button class="em-btn" onclick="aiTranslate({{ msg.pk }})">🌐 {% trans "Перекласти UA" %}</button>
+      <a href="{% url 'email_assistant:compose' %}?reply_to={{ msg.pk }}" class="em-btn">↩ {% trans "Відповісти" %}</a>
+      <a href="{% url 'email_assistant:compose' %}?forward={{ msg.pk }}" class="em-btn">→ {% trans "Переслати" %}</a>
       {% if thread %}
         {% if thread.is_archived %}
-        <button class="em-btn" onclick="archiveThread({{ thread.pk }},false)">📤 З архіву</button>
+        <button class="em-btn" onclick="archiveThread({{ thread.pk }},false)">📤 {% trans "З архіву" %}</button>
         {% else %}
-        <button class="em-btn" onclick="archiveThread({{ thread.pk }},true)">📦 В архів</button>
+        <button class="em-btn" onclick="archiveThread({{ thread.pk }},true)">📦 {% trans "В архів" %}</button>
         {% endif %}
       {% endif %}
       <button class="em-btn{% if msg.is_spam %} spam-on{% endif %}"
               id="spam-btn-{{ msg.pk }}"
               onclick="toggleSpam({{ msg.pk }}, this)">
-        {% if msg.is_spam %}✓ Спам{% else %}🚫 Спам{% endif %}
+        {% if msg.is_spam %}✓ {% trans "Спам" %}{% else %}🚫 {% trans "Спам" %}{% endif %}
       </button>
-      <button class="em-btn danger" onclick="deleteMsg({{ msg.pk }})">🗑️ Видалити</button>
+      <button class="em-btn danger" onclick="deleteMsg({{ msg.pk }})">🗑️ {% trans "Видалити" %}</button>
     </div>
 
     <div class="em-ai-result" id="ai-box-{{ msg.pk }}">
-      <div class="em-ai-label">🏛️ Мінерва пропонує</div>
+      <div class="em-ai-label">🏛️ {% trans "Мінерва пропонує" %}</div>
       <div style="display:flex;gap:6px;margin-bottom:8px">
         <input class="em-ai-prompt-inp" type="text"
                id="ai-prompt-{{ msg.pk }}"
-               placeholder="Що відповісти? (залиш порожнім для авто-відповіді)">
-        <button class="em-btn ai" onclick="aiGenerate({{ msg.pk }})">Генерувати →</button>
+               placeholder="{% trans "Що відповісти? (залиш порожнім для авто-відповіді)" %}">
+        <button class="em-btn ai" onclick="aiGenerate({{ msg.pk }})">{% trans "Генерувати" %} →</button>
       </div>
       <div class="em-ai-text" id="ai-text-{{ msg.pk }}"></div>
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="em-btn" onclick="copyAI({{ msg.pk }})">📋 Копіювати</button>
-        <button class="em-btn ai" onclick="useAsReply({{ msg.pk }})">Вставити у відповідь →</button>
+        <button class="em-btn" onclick="copyAI({{ msg.pk }})">📋 {% trans "Копіювати" %}</button>
+        <button class="em-btn ai" onclick="useAsReply({{ msg.pk }})">{% trans "Вставити у відповідь" %} →</button>
       </div>
     </div>
   </div>
@@ -135,20 +136,20 @@
 
   {% if last_msg %}
   <div class="em-reply-box">
-    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">Відповісти</div>
+    <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">{% trans "Відповісти" %}</div>
     <div class="em-toolbar">
-      <button class="em-tb-btn" onmousedown="return fmt('bold')" title="Жирний"><b>B</b></button>
-      <button class="em-tb-btn" onmousedown="return fmt('italic')" title="Курсив"><i>I</i></button>
-      <button class="em-tb-btn" onmousedown="return fmt('underline')" title="Підкреслений"><u>U</u></button>
-      <button class="em-tb-btn" onmousedown="return fmt('strikeThrough')" title="Закреслений"><s>S</s></button>
+      <button class="em-tb-btn" onmousedown="return fmt('bold')" title="{% trans "Жирний" %}"><b>B</b></button>
+      <button class="em-tb-btn" onmousedown="return fmt('italic')" title="{% trans "Курсив" %}"><i>I</i></button>
+      <button class="em-tb-btn" onmousedown="return fmt('underline')" title="{% trans "Підкреслений" %}"><u>U</u></button>
+      <button class="em-tb-btn" onmousedown="return fmt('strikeThrough')" title="{% trans "Закреслений" %}"><s>S</s></button>
       <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
       <button class="em-tb-btn" onmousedown="return fmt('insertUnorderedList')">≡</button>
-      <button class="em-tb-btn" onmousedown="return fmt('removeFormat')" title="Очистити">✕</button>
+      <button class="em-tb-btn" onmousedown="return fmt('removeFormat')" title="{% trans "Очистити" %}">✕</button>
     </div>
     <div id="quick-reply" class="em-reply-editor" contenteditable="true"
-         placeholder="Текст відповіді..."></div>
+         placeholder="{% trans "Текст відповіді..." %}"></div>
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px">
-      <button class="em-send-btn" onclick="sendQuickReply()">Відправити →</button>
+      <button class="em-send-btn" onclick="sendQuickReply()">{% trans "Відправити" %} →</button>
     </div>
     <div id="reply-status" style="font-size:12px;margin-top:6px;min-height:16px"></div>
   </div>
@@ -184,24 +185,24 @@ async function aiGenerate(pk) {
   var text  = document.getElementById('ai-text-' + pk);
   var inp   = document.getElementById('ai-prompt-' + pk);
   var query = inp ? encodeURIComponent(inp.value.trim()) : '';
-  text.textContent = '⏳ Мінерва думає...';
+  text.textContent = '⏳ {% trans "Мінерва думає..." %}';
   var url = '/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : '');
   try {
     var r = await fetch(url);
     var d = await r.json();
     text.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
-  } catch { text.textContent = '⚠️ Помилка'; }
+  } catch { text.textContent = '⚠️ {% trans "Помилка" %}'; }
 }
 
 async function aiTranslate(pk) {
   var box = document.getElementById('ai-box-' + pk);
   var text = document.getElementById('ai-text-' + pk);
-  box.style.display = 'block'; text.textContent = '⏳ Перекладаю...';
+  box.style.display = 'block'; text.textContent = '⏳ {% trans "Перекладаю..." %}';
   try {
     var r = await fetch('/email/message/' + pk + '/ai-translate/?lang=uk');
     var d = await r.json();
     text.textContent = d.ok ? d.translation : '⚠️ ' + d.error;
-  } catch { text.textContent = '⚠️ Помилка'; }
+  } catch { text.textContent = '⚠️ {% trans "Помилка" %}'; }
 }
 
 function copyAI(pk) {
@@ -217,7 +218,7 @@ async function toggleSpam(pk, btn) {
   var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
   if (d.ok) {
-    btn.textContent = d.spam ? '✓ Спам' : '🚫 Спам';
+    btn.textContent = d.spam ? '✓ {% trans "Спам" %}' : '🚫 {% trans "Спам" %}';
     btn.classList.toggle('spam-on', d.spam);
   }
 }
@@ -227,9 +228,9 @@ async function sendQuickReply() {
   var body   = editor.innerText.trim();
   var status = document.getElementById('reply-status');
   var btn    = document.querySelector('.em-send-btn');
-  if (!body) { status.textContent = 'Введіть текст'; status.style.color = 'var(--err,#e53935)'; return; }
+  if (!body) { status.textContent = '{% trans "Введіть текст" %}'; status.style.color = 'var(--err,#e53935)'; return; }
   if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
-  status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
+  status.textContent = '{% trans "Відправляю..." %}'; status.style.color = 'var(--text-muted)';
   var form = new FormData();
   form.append('reply_to_pk', LAST_PK);
   form.append('body', body);
@@ -238,18 +239,18 @@ async function sendQuickReply() {
   try {
     var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:form});
     var d = await r.json();
-    status.textContent = d.ok ? '✓ Відправлено' : '✗ ' + d.error;
+    status.textContent = d.ok ? '✓ {% trans "Відправлено" %}' : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
     if (d.ok) { editor.innerHTML = ''; setTimeout(function(){ location.reload(); }, 800); }
     else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   } catch {
-    status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';
+    status.textContent = '✗ {% trans "Помилка мережі" %}'; status.style.color = 'var(--err,#e53935)';
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
 }
 
 async function deleteMsg(pk) {
-  if (!confirm('Видалити лист?')) return;
+  if (!confirm('{% trans "Видалити лист?" %}')) return;
   var r = await fetch('/email/message/' + pk + '/delete/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
   if (d.ok) { var c = document.getElementById('card-' + pk); if (c) c.remove(); }

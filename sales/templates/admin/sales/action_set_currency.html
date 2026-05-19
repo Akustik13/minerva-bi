@@ -1,14 +1,14 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block title %}Змінити валюту | Minerva{% endblock %}
+{% block title %}{% trans "Змінити валюту" %} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
   &rsaquo; <a href="{% url 'admin:sales_salesorder_changelist' %}">Sales orders</a>
-  &rsaquo; Змінити валюту
+  &rsaquo; {% trans "Змінити валюту" %}
 </div>
 {% endblock %}
 
@@ -58,10 +58,10 @@
 </style>
 
 <div class="mv-action-box">
-  <h2>💱 Змінити валюту замовлення</h2>
-  <p>Буде оновлено рядки <strong style="color:var(--text,#c9d8e4)">{{ queryset.count }}</strong> замовлень
-     (тільки <b>SalesOrderLine.currency</b>).<br>
-     <span style="color:var(--text-dim)">Валюта замовлення і вартість доставки — не змінюються.</span></p>
+  <h2>💱 {% trans "Змінити валюту замовлення" %}</h2>
+  <p>{% blocktrans with count=queryset.count %}Буде оновлено рядки <strong style="color:var(--text,#c9d8e4)">{{ count }}</strong> замовлень{% endblocktrans %}
+     ({% trans "тільки" %} <b>SalesOrderLine.currency</b>).<br>
+     <span style="color:var(--text-dim)">{% trans "Валюта замовлення і вартість доставки — не змінюються." %}</span></p>
 
   <form method="post">
     {% csrf_token %}
@@ -73,11 +73,11 @@
 
     <div class="mv-orders-list">
       {% for order in queryset %}
-      <div>{{ order.source }}:{{ order.order_number }} — поточна: <b>{{ order.currency }}</b></div>
+      <div>{{ order.source }}:{{ order.order_number }} — {% trans "поточна" %}: <b>{{ order.currency }}</b></div>
       {% endfor %}
     </div>
 
-    <label for="id_currency_code">Нова валюта (ISO 4217)</label>
+    <label for="id_currency_code">{% trans "Нова валюта (ISO 4217)" %}</label>
     <input type="text" name="currency_code" id="id_currency_code"
            placeholder="USD / EUR / GBP / NZD / AUD / CAD …"
            maxlength="8" autocomplete="off" style="text-transform:uppercase"
@@ -93,10 +93,10 @@
       <option value="JPY">
       <option value="SGD">
     </datalist>
-    <p class="hint">Введи або вибери код валюти. Зміна торкнеться замовлення і всіх рядків.</p>
+    <p class="hint">{% trans "Введи або вибери код валюти. Зміна торкнеться замовлення і всіх рядків." %}</p>
 
-    <button type="submit" class="btn-apply">✅ Застосувати</button>
-    <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-cancel">Скасувати</a>
+    <button type="submit" class="btn-apply">✅ {% trans "Застосувати" %}</button>
+    <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-cancel">{% trans "Скасувати" %}</a>
   </form>
 </div>
 

@@ -1,11 +1,12 @@
 {% extends "admin/base_site.html" %}
-{% block title %}DHL Трекінг | Minerva{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "DHL Трекінг" %} | Minerva{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
-  &rsaquo; DHL Трекінг
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a>
+  &rsaquo; {% trans "DHL Трекінг" %}
 </div>
 {% endblock %}
 
@@ -102,7 +103,7 @@
 <div class="dtl-wrap">
 
   <div class="dtl-search">
-    <div class="dtl-search-title">🔍 DHL Express Трекінг</div>
+    <div class="dtl-search-title">🔍 {% trans "DHL Express Трекінг" %}</div>
     <div class="dtl-search-sub">
       MyDHL API · BasicAuth
       {% if dhl_carrier %} · {{ dhl_carrier.name }}{% if dhl_carrier.api_url == "test" %} (Sandbox){% endif %}{% endif %}
@@ -112,15 +113,15 @@
              value="{{ tracking_number }}"
              placeholder="1234567890"
              autofocus autocomplete="off" spellcheck="false">
-      <button class="dtl-btn" type="submit">Знайти</button>
+      <button class="dtl-btn" type="submit">{% trans "Знайти" %}</button>
     </form>
   </div>
 
   {% if no_key %}
   <div class="dtl-warn">
-    ⚠️ <b>DHL carrier не налаштовано.</b><br>
-    Перейди до <a href="{% url 'admin:shipping_carrier_changelist' %}">Перевізники</a>
-    → DHL → заповни <b>API Key</b> та <b>API Secret</b> (developer.dhl.com → MyDHL API).
+    ⚠️ <b>{% trans "DHL carrier не налаштовано." %}</b><br>
+    {% trans "Перейди до" %} <a href="{% url 'admin:shipping_carrier_changelist' %}">{% trans "Перевізники" %}</a>
+    → DHL → {% trans "заповни" %} <b>API Key</b> {% trans "та" %} <b>API Secret</b> (developer.dhl.com → MyDHL API).
   </div>
   {% endif %}
 
@@ -146,10 +147,10 @@
           {% elif st == 'transit' or st == 'in-transit' %}var(--warn)
           {% elif st == 'exception' or st == 'failure' %}var(--err)
           {% else %}var(--text-muted){% endif %}">
-          {% if st == "delivered" %}Доставлено
-          {% elif st == "transit" or st == "in-transit" %}В дорозі
-          {% elif st == "returned" %}Повернення
-          {% elif st == "exception" %}Виняток
+          {% if st == "delivered" %}{% trans "Доставлено" %}
+          {% elif st == "transit" or st == "in-transit" %}{% trans "В дорозі" %}
+          {% elif st == "returned" %}{% trans "Повернення" %}
+          {% elif st == "exception" %}{% trans "Виняток" %}
           {% else %}{{ st|default:"—" }}{% endif %}
         </div>
         {% if result.description %}
@@ -164,18 +165,18 @@
 
     <div>
       <div class="dtl-info-row">
-        <span class="dtl-info-key">Трекінг-номер</span>
+        <span class="dtl-info-key">{% trans "Трекінг-номер" %}</span>
         <span class="dtl-info-val dtl-mono">{{ tracking_number }}</span>
       </div>
       {% if result.estimated_delivery %}
       <div class="dtl-info-row">
-        <span class="dtl-info-key">Очікувана доставка</span>
+        <span class="dtl-info-key">{% trans "Очікувана доставка" %}</span>
         <span class="dtl-info-val" style="color:var(--ok);font-weight:700">{{ result.estimated_delivery }}</span>
       </div>
       {% endif %}
       {% if result.proof_of_delivery %}
       <div class="dtl-info-row">
-        <span class="dtl-info-key">Підпис отримувача</span>
+        <span class="dtl-info-key">{% trans "Підпис отримувача" %}</span>
         <span class="dtl-info-val">{{ result.proof_of_delivery }}</span>
       </div>
       {% endif %}
@@ -185,7 +186,7 @@
 
   {% if result.events %}
   <div class="dtl-card">
-    <div class="dtl-card-title">📍 Історія ({{ result.events|length }})</div>
+    <div class="dtl-card-title">📍 {% trans "Історія" %} ({{ result.events|length }})</div>
     <div class="dtl-events">
       {% for ev in result.events %}
       <div class="dtl-event">

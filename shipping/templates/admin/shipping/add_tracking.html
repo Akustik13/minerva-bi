@@ -1,13 +1,13 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block title %}Додати трекінг{% endblock %}
+{% block title %}{% trans "Додати трекінг" %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
-  &rsaquo; Додати трекінг
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a>
+  &rsaquo; {% trans "Додати трекінг" %}
 </div>
 {% endblock %}
 
@@ -39,87 +39,87 @@
 <div class="at-wrap">
   <div class="at-header">
     <div class="at-header-icon">📦</div>
-    <div><h2>Додати трекінг вручну</h2></div>
+    <div><h2>{% trans "Додати трекінг вручну" %}</h2></div>
   </div>
 
   <form method="post">
     {% csrf_token %}
 
     <!-- ── Трекінг + перевізник ── -->
-    <p class="at-section">📡 Трекінг</p>
+    <p class="at-section">📡 {% trans "Трекінг" %}</p>
     <div class="at-card">
       <div class="at-row">
-        <label class="at-label">Номер трекінгу *</label>
+        <label class="at-label">{% trans "Номер трекінгу" %} *</label>
         <input class="at-input" type="text" name="tracking_number" required
                placeholder="1Z999AA10123456784, JD014600006161234567…" autofocus>
       </div>
       <div class="at-cols">
         <div>
-          <label class="at-label">Перевізник</label>
+          <label class="at-label">{% trans "Перевізник" %}</label>
           <select class="at-input" name="carrier">
-            <option value="">— Не вибрано —</option>
+            <option value="">— {% trans "Не вибрано" %} —</option>
             {% for c in carriers %}
             <option value="{{ c.pk }}">{{ c.name }}</option>
             {% endfor %}
           </select>
         </div>
         <div>
-          <label class="at-label">Референс</label>
+          <label class="at-label">{% trans "Референс" %}</label>
           <input class="at-input" type="text" name="reference" placeholder="SO-12345…">
         </div>
       </div>
     </div>
 
     <!-- ── Замовлення ── -->
-    <p class="at-section">🛒 Замовлення (необов'язково)</p>
+    <p class="at-section">🛒 {% trans "Замовлення (необов'язково)" %}</p>
     <div class="at-card">
       <div class="at-row">
-        <label class="at-label">Пов'язати з замовленням</label>
+        <label class="at-label">{% trans "Пов'язати з замовленням" %}</label>
         <input class="at-input" type="text" id="at-order-search"
-               placeholder="Пошук за номером або клієнтом…"
+               placeholder="{% trans "Пошук за номером або клієнтом…" %}"
                oninput="atFilterOrders(this.value)" autocomplete="off">
         <select class="at-input" name="order" id="at-order-select" size="5"
                 style="height:auto;max-height:160px;margin-top:4px">
-          <option value="">— Без замовлення —</option>
+          <option value="">— {% trans "Без замовлення" %} —</option>
           {% for o in orders %}
           <option value="{{ o.pk }}" data-label="{{ o.order_number }} {{ o.client }}">
             {{ o.order_number }}{% if o.client %} — {{ o.client }}{% endif %}
           </option>
           {% endfor %}
         </select>
-        <p class="at-hint">Тільки замовлення що вже є в системі (останні 300). Можна залишити порожнім.</p>
+        <p class="at-hint">{% trans "Тільки замовлення що вже є в системі (останні 300). Можна залишити порожнім." %}</p>
       </div>
     </div>
 
     <!-- ── Отримувач ── -->
-    <p class="at-section">📬 Отримувач</p>
+    <p class="at-section">📬 {% trans "Отримувач" %}</p>
     <div class="at-card">
       <div class="at-row">
-        <label class="at-label">Ім'я отримувача</label>
+        <label class="at-label">{% trans "Ім'я отримувача" %}</label>
         <input class="at-input" type="text" name="recipient_name">
       </div>
       <div class="at-cols">
         <div>
-          <label class="at-label">Країна відправника (ISO 2)</label>
+          <label class="at-label">{% trans "Країна відправника (ISO 2)" %}</label>
           <input class="at-input" type="text" name="sender_country" maxlength="2" placeholder="CN" style="max-width:80px">
         </div>
         <div>
-          <label class="at-label">Країна отримувача (ISO 2)</label>
+          <label class="at-label">{% trans "Країна отримувача (ISO 2)" %}</label>
           <input class="at-input" type="text" name="recipient_country" maxlength="2" placeholder="DE" style="max-width:80px">
         </div>
       </div>
     </div>
 
     <!-- ── Вартість + етикетка ── -->
-    <p class="at-section">💰 Вартість та етикетка</p>
+    <p class="at-section">💰 {% trans "Вартість та етикетка" %}</p>
     <div class="at-card">
       <div class="at-cols at-row">
         <div>
-          <label class="at-label">Вартість доставки</label>
+          <label class="at-label">{% trans "Вартість доставки" %}</label>
           <input class="at-input" type="text" name="carrier_price" placeholder="12.50">
         </div>
         <div>
-          <label class="at-label">Валюта</label>
+          <label class="at-label">{% trans "Валюта" %}</label>
           <select class="at-input" name="carrier_currency">
             <option value="EUR" selected>EUR €</option>
             <option value="USD">USD $</option>
@@ -130,24 +130,24 @@
         </div>
       </div>
       <div class="at-row">
-        <label class="at-label">URL етикетки (PDF)</label>
+        <label class="at-label">{% trans "URL етикетки (PDF)" %}</label>
         <input class="at-input" type="url" name="label_url"
-               placeholder="https://… або /media/labels/…">
-        <p class="at-hint">Посилання на PDF-файл етикетки, якщо є.</p>
+               placeholder="https://… {% trans "або" %} /media/labels/…">
+        <p class="at-hint">{% trans "Посилання на PDF-файл етикетки, якщо є." %}</p>
       </div>
     </div>
 
     <!-- ── Нотатки ── -->
     <div class="at-card">
       <div class="at-row">
-        <label class="at-label">Нотатки</label>
+        <label class="at-label">{% trans "Нотатки" %}</label>
         <input class="at-input" type="text" name="notes">
       </div>
     </div>
 
     <div class="at-actions">
-      <button type="submit" class="at-btn-save">💾 Зберегти</button>
-      <a href="{{ cancel_url }}" class="at-btn-cancel">Скасувати</a>
+      <button type="submit" class="at-btn-save">💾 {% trans "Зберегти" %}</button>
+      <a href="{{ cancel_url }}" class="at-btn-cancel">{% trans "Скасувати" %}</a>
     </div>
   </form>
 </div>

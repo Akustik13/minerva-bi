@@ -181,23 +181,23 @@ select {
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Головна</a>
-  &rsaquo; <a href="{% url 'admin:app_list' app_label='inventory' %}">Склад</a>
-  &rsaquo; <a href="{% url 'admin:inventory_product_changelist' %}">Товари</a>
-  &rsaquo; Імпорт з Excel
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='inventory' %}">{% trans "Склад" %}</a>
+  &rsaquo; <a href="{% url 'admin:inventory_product_changelist' %}">{% trans "Товари" %}</a>
+  &rsaquo; {% trans "Імпорт з Excel" %}
 </div>
 {% endblock %}
 
 {% block content %}
-<h1>📥 Імпорт товарів з Excel</h1>
+<h1>📥 {% trans "Імпорт товарів з Excel" %}</h1>
 
 <!-- Step indicator -->
 <div class="ie-steps">
-  <span class="ie-step {% if step == 1 %}active{% elif step > 1 %}done{% endif %}">1. Файл</span>
+  <span class="ie-step {% if step == 1 %}active{% elif step > 1 %}done{% endif %}">1. {% trans "Файл" %}</span>
   <span class="ie-sep">›</span>
-  <span class="ie-step {% if step == 2 %}active{% elif step > 2 %}done{% endif %}">2. Маппінг</span>
+  <span class="ie-step {% if step == 2 %}active{% elif step > 2 %}done{% endif %}">2. {% trans "Маппінг" %}</span>
   <span class="ie-sep">›</span>
-  <span class="ie-step {% if step == 3 %}active{% endif %}">3. Результат</span>
+  <span class="ie-step {% if step == 3 %}active{% endif %}">3. {% trans "Результат" %}</span>
 </div>
 
 {% if messages %}
@@ -209,7 +209,7 @@ select {
 {# ═══════════════════════════════════════════════════════════ STEP 1 ══ #}
 {% if step == 1 %}
 <div class="ie-card">
-  <h2>📂 Оберіть файл Excel</h2>
+  <h2>📂 {% trans "Оберіть файл Excel" %}</h2>
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <input type="hidden" name="step" value="1">
@@ -226,17 +226,17 @@ select {
     </div>
 
     <div style="display:flex;gap:12px;align-items:center">
-      <button type="submit" class="btn-primary">🔍 Аналізувати файл →</button>
-      <a href="{% url 'admin:inventory_product_changelist' %}" class="btn-secondary">✕ Скасувати</a>
+      <button type="submit" class="btn-primary">🔍 {% trans "Аналізувати файл →" %}</button>
+      <a href="{% url 'admin:inventory_product_changelist' %}" class="btn-secondary">✕ {% trans "Скасувати" %}</a>
     </div>
   </form>
 </div>
 
 <div class="ie-card" style="opacity:.7">
-  <h2>ℹ️ Що можна імпортувати</h2>
+  <h2>ℹ️ {% trans "Що можна імпортувати" %}</h2>
   <table style="border-collapse:collapse;width:100%">
-    <tr><th style="text-align:left;padding:4px 12px;color:var(--link-fg);font-size:12px">Поле БД</th>
-        <th style="text-align:left;padding:4px 12px;color:var(--link-fg);font-size:12px">Опис</th></tr>
+    <tr><th style="text-align:left;padding:4px 12px;color:var(--link-fg);font-size:12px">{% trans "Поле БД" %}</th>
+        <th style="text-align:left;padding:4px 12px;color:var(--link-fg);font-size:12px">{% trans "Опис" %}</th></tr>
     {% for field, label in db_fields %}
     <tr>
       <td style="padding:5px 12px;font-size:12px;font-family:monospace;color:var(--text-muted)">{{ field }}</td>
@@ -258,7 +258,7 @@ select {
     <!-- Sheet selector -->
     <div style="margin-bottom:20px">
       <label style="font-weight:bold;display:block;margin-bottom:8px">
-        Лист (аркуш) Excel:
+        {% trans "Лист (аркуш) Excel:" %}
       </label>
       <select name="sheet_name" id="sheetSelect" style="max-width:360px"
               onchange="onSheetChange(this.value)">
@@ -273,19 +273,19 @@ select {
     <!-- Column mapping table -->
     <div style="margin-bottom:20px">
       <label style="font-weight:bold;display:block;margin-bottom:8px">
-        Маппінг колонок → поля бази даних:
+        {% trans "Маппінг колонок → поля бази даних:" %}
       </label>
       <div class="ie-hint" style="margin-bottom:10px">
-        Виберіть яке поле БД відповідає кожній колонці Excel. Колонки без призначення ігноруються.
+        {% trans "Виберіть яке поле БД відповідає кожній колонці Excel. Колонки без призначення ігноруються." %}
       </div>
       <div style="overflow-x:auto">
         <table class="map-table" id="mappingTable">
           <thead>
             <tr>
               <th style="width:40px">#</th>
-              <th>Колонка в Excel</th>
-              <th>Приклад значення</th>
-              <th>Поле бази даних</th>
+              <th>{% trans "Колонка в Excel" %}</th>
+              <th>{% trans "Приклад значення" %}</th>
+              <th>{% trans "Поле бази даних" %}</th>
             </tr>
           </thead>
           <tbody id="mappingBody">
@@ -298,21 +298,21 @@ select {
     <!-- Options -->
     <div class="ie-options">
       <div>
-        <label style="font-weight:bold;display:block;margin-bottom:6px">Конфлікт (SKU вже є):</label>
+        <label style="font-weight:bold;display:block;margin-bottom:6px">{% trans "Конфлікт (SKU вже є):" %}</label>
         <select name="conflict_mode" style="min-width:200px">
-          <option value="skip">⏭ Пропустити існуючі</option>
-          <option value="update">✏️ Оновити існуючі</option>
+          <option value="skip">⏭ {% trans "Пропустити існуючі" %}</option>
+          <option value="update">✏️ {% trans "Оновити існуючі" %}</option>
         </select>
       </div>
       <label style="margin-top:22px">
         <input type="checkbox" name="dry_run" value="1">
-        <span>🧪 Тестовий запуск (без збереження)</span>
+        <span>🧪 {% trans "Тестовий запуск (без збереження)" %}</span>
       </label>
     </div>
 
     <div style="margin-top:20px;display:flex;gap:12px;align-items:center">
-      <button type="submit" class="btn-primary">✅ Імпортувати →</button>
-      <a href="{% url 'admin:inventory_product_import_excel' %}" class="btn-secondary">← Назад</a>
+      <button type="submit" class="btn-primary">✅ {% trans "Імпортувати →" %}</button>
+      <a href="{% url 'admin:inventory_product_import_excel' %}" class="btn-secondary">← {% trans "Назад" %}</a>
     </div>
   </form>
 </div>
@@ -320,8 +320,9 @@ select {
 <script>
 // All sheet data from server
 const SHEET_DATA = {{ sheet_data_json|safe }};
+var _msgNoImport = '{% trans "— не імпортувати —" %}';
 const DB_FIELDS = [
-  ["--", "— не імпортувати —"],
+  ["--", _msgNoImport],
   {% for field, label in db_fields %}
   ["{{ field }}", "{{ label }}"],
   {% endfor %}
@@ -395,33 +396,33 @@ document.addEventListener("DOMContentLoaded", () => {
 {% elif step == 3 %}
 
 {% if dry_run %}
-  <div class="dry-run-badge">🧪 ТЕСТОВИЙ РЕЖИМ — дані НЕ збережено в базу</div>
+  <div class="dry-run-badge">🧪 {% trans "ТЕСТОВИЙ РЕЖИМ — дані НЕ збережено в базу" %}</div>
 {% endif %}
 
 <div class="stat-row">
   <div class="stat-box stat-created">
     <span class="num">{{ stats.created }}</span>
-    <span class="lbl">Створено</span>
+    <span class="lbl">{% trans "Створено" %}</span>
   </div>
   <div class="stat-box stat-updated">
     <span class="num">{{ stats.updated }}</span>
-    <span class="lbl">Оновлено</span>
+    <span class="lbl">{% trans "Оновлено" %}</span>
   </div>
   <div class="stat-box stat-skipped">
     <span class="num">{{ stats.skipped }}</span>
-    <span class="lbl">Пропущено</span>
+    <span class="lbl">{% trans "Пропущено" %}</span>
   </div>
   <div class="stat-box stat-errors">
     <span class="num">{{ stats.errors|length }}</span>
-    <span class="lbl">Помилок</span>
+    <span class="lbl">{% trans "Помилок" %}</span>
   </div>
 </div>
 
 {% if stats.errors %}
 <div class="ie-card">
-  <h2>❌ Помилки імпорту</h2>
+  <h2>❌ {% trans "Помилки імпорту" %}</h2>
   <table class="err-table">
-    <thead><tr><th>#</th><th>Опис помилки</th></tr></thead>
+    <thead><tr><th>#</th><th>{% trans "Опис помилки" %}</th></tr></thead>
     <tbody>
       {% for err in stats.errors %}
       <tr>
@@ -437,15 +438,15 @@ document.addEventListener("DOMContentLoaded", () => {
 <div style="display:flex;gap:12px;margin-top:20px">
   {% if dry_run %}
     <a href="{% url 'admin:inventory_product_import_excel' %}" class="btn-primary">
-      ✅ Запустити реальний імпорт
+      ✅ {% trans "Запустити реальний імпорт" %}
     </a>
   {% endif %}
   <a href="{% url 'admin:inventory_product_changelist' %}" class="btn-primary"
      style="background:#4caf50">
-    📦 До списку товарів
+    📦 {% trans "До списку товарів" %}
   </a>
   <a href="{% url 'admin:inventory_product_import_excel' %}" class="btn-secondary">
-    ← Імпортувати ще раз
+    ← {% trans "Імпортувати ще раз" %}
   </a>
 </div>
 

@@ -2,6 +2,7 @@
 shipping/admin.py — Адмін-панель модуля доставки
 """
 import logging
+from django.utils.translation import gettext_lazy as _
 
 from django.contrib import admin, messages
 from django.db import models
@@ -102,7 +103,7 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
             'border-radius:10px;font-size:11px">{}</span>',
             bg, obj.get_box_type_display(),
         )
-    type_badge.short_description = 'Тип'
+    type_badge.short_description = _('Тип')
 
     def dimensions_col(self, obj):
         return format_html(
@@ -110,11 +111,11 @@ class PackagingMaterialAdmin(admin.ModelAdmin):
             '{}×{}×{} см</span>',
             obj.length_cm, obj.width_cm, obj.height_cm,
         )
-    dimensions_col.short_description = 'Розміри (Д×Ш×В)'
+    dimensions_col.short_description = _('Розміри (Д×Ш×В)')
 
     def volume_col(self, obj):
         return format_html('<span style="color:#607d8b">{} см³</span>', obj.volume_cm3)
-    volume_col.short_description = 'Об\'єм'
+    volume_col.short_description = _('Об\'єм')
 
 
 # ── Carrier Admin ─────────────────────────────────────────────────────────────
@@ -173,13 +174,13 @@ class CarrierAdmin(admin.ModelAdmin):
             'border-radius:10px;font-size:11px;font-weight:700">{}</span>',
             color, text_color, obj.get_carrier_type_display()
         )
-    carrier_type_badge.short_description = "Тип"
+    carrier_type_badge.short_description = _("Тип")
 
     def has_credentials(self, obj):
         if obj.api_key:
             return format_html('<span style="color:#4caf50;font-weight:bold">✅ Так</span>')
         return format_html('<span style="color:#f44336">❌ Немає</span>')
-    has_credentials.short_description = "API ключ"
+    has_credentials.short_description = _("API ключ")
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}
@@ -838,7 +839,7 @@ class TrackingAttemptLogInline(admin.TabularInline):
         if not obj.error:
             return ""
         return obj.error[:80] + ("…" if len(obj.error) > 80 else "")
-    error_short.short_description = "Помилка"
+    error_short.short_description = _("Помилка")
 
 
 # ── Shipment Admin ────────────────────────────────────────────────────────────
@@ -4741,7 +4742,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     f'📡 DHL Трекінг</a>'
                 )
         return format_html("".join(btns) if btns else '<span style="color:#607d8b">—</span>')
-    action_buttons.short_description = "Дії"
+    action_buttons.short_description = _("Дії")
 
     def order_detail_panel(self, obj):
         if not obj.order_id:
@@ -4757,7 +4758,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             o.shipping_region or "—",
             o.shipping_address or "немає адреси",
         )
-    order_detail_panel.short_description = "Дані замовлення"
+    order_detail_panel.short_description = _("Дані замовлення")
 
     def customs_articles_panel(self, obj):
         import json as _json
@@ -4800,7 +4801,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             '</div>',
             inv_type, format_html(rows), total,
         )
-    customs_articles_panel.short_description = "Митні артикули"
+    customs_articles_panel.short_description = _("Митні артикули")
 
     # ── List columns ──────────────────────────────────────────────────────────
 
@@ -4811,7 +4812,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     def order_link(self, obj):
         url = reverse("admin:sales_salesorder_change", args=[obj.order_id])
         return format_html('<a href="{}">{}</a>', url, obj.order)
-    order_link.short_description = "Замовлення"
+    order_link.short_description = _("Замовлення")
 
     def carrier_badge(self, obj):
         colors = {
@@ -4825,7 +4826,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'border-radius:8px;font-size:11px;font-weight:700">{}</span>',
             color, text_color, obj.carrier.name
         )
-    carrier_badge.short_description = "Перевізник"
+    carrier_badge.short_description = _("Перевізник")
 
     def status_badge(self, obj):
         colors = {
@@ -4839,7 +4840,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             '<span style="color:{};font-weight:600;white-space:nowrap">{} {}</span>',
             color, icon, obj.get_status_display()
         )
-    status_badge.short_description = "Статус"
+    status_badge.short_description = _("Статус")
 
     def status_col(self, obj):
         colors = {
@@ -4875,7 +4876,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 main, sub
             )
         return main
-    status_col.short_description = "Статус"
+    status_col.short_description = _("Статус")
 
     def price_col(self, obj):
         if obj.carrier_price:
@@ -4884,7 +4885,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 obj.carrier_price, obj.carrier_currency or ""
             )
         return format_html('<span style="color:#607d8b">—</span>')
-    price_col.short_description = "Вартість"
+    price_col.short_description = _("Вартість")
 
     @staticmethod
     def _carrier_tracking_url(carrier_type, tn):
@@ -4935,7 +4936,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if prn:
             return format_html(mark_safe(_PRN + '{}</span>'), prn)
         return format_html('<span style="color:#607d8b">—</span>')
-    tracking_badge.short_description = "Трекінг"
+    tracking_badge.short_description = _("Трекінг")
 
     def label_badge(self, obj):
         if obj.label_url:
@@ -4945,7 +4946,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 '📄 PDF</a>', obj.label_url
             )
         return format_html('<span style="color:#607d8b">—</span>')
-    label_badge.short_description = "Етикетка"
+    label_badge.short_description = _("Етикетка")
 
     def recipient_country_flag(self, obj):
         from config.country_utils import country_flag_html
@@ -4962,12 +4963,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             '<span style="color:var(--text-dim,#607d8b)">→</span> {}</span>',
             mark_safe(s_html), mark_safe(r_html)
         )
-    recipient_country_flag.short_description = "Маршрут"
+    recipient_country_flag.short_description = _("Маршрут")
     recipient_country_flag.admin_order_field = "recipient_country"
 
     def created_at_fmt(self, obj):
         return obj.created_at.strftime("%d.%m.%Y %H:%M")
-    created_at_fmt.short_description = "Створено"
+    created_at_fmt.short_description = _("Створено")
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related('order', 'carrier')
@@ -5012,7 +5013,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 top, sub_text,
             )
         return top
-    recipient_col.short_description = "Отримувач"
+    recipient_col.short_description = _("Отримувач")
     recipient_col.admin_order_field = "recipient_company"
 
     # ── Order Tracking overview ───────────────────────────────────────────────
@@ -5724,7 +5725,7 @@ class TrackingAttemptLogAdmin(admin.ModelAdmin):
         if not obj.error:
             return ""
         return obj.error[:80] + ("…" if len(obj.error) > 80 else "")
-    error_short.short_description = "Помилка"
+    error_short.short_description = _("Помилка")
 
 
 @admin.register(ShippingSettings)
@@ -5812,7 +5813,7 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             '<span style="color:var(--text-muted,#888);font-size:12px">'
             'Ігнорує інтервал — оновить всі активні відправлення негайно</span>'
         )
-    tracking_actions.short_description = "Дії"
+    tracking_actions.short_description = _("Дії")
 
     def tracking_rules_panel(self, obj):
         from django.utils.safestring import mark_safe
@@ -5894,7 +5895,7 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             'border:1px solid var(--border-color,#333)">✏️ Редагувати правила</a>'
         )
         return mark_safe(html)
-    tracking_rules_panel.short_description = "Поточні правила"
+    tracking_rules_panel.short_description = _("Поточні правила")
 
     def tracking_log_link(self, obj):
         url = reverse("admin:shipping_trackingattemptlog_changelist")
@@ -6030,7 +6031,7 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
             '</script>',
             sync_url,
         )
-    packaging_sync_panel.short_description = "Синхронізація"
+    packaging_sync_panel.short_description = _("Синхронізація")
 
     def _sync_packaging(self, request, pk):
         """Аналізує відправлення, для товарів без ProductPackaging створює записи.

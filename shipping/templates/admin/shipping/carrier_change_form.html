@@ -1,10 +1,11 @@
 {% extends "admin/change_form.html" %}
+{% load i18n %}
 
 {% block object-tools-items %}
 {{ block.super }}
 {% if ups_carrier_pk %}
 <li>
-  <a href="/admin/shipping/carrier/{{ ups_carrier_pk }}/ups-log/" class="historylink" target="_blank">📋 UPS Лог</a>
+  <a href="/admin/shipping/carrier/{{ ups_carrier_pk }}/ups-log/" class="historylink" target="_blank">📋 UPS {% trans "Лог" %}</a>
 </li>
 <li>
   <a href="/admin/shipping/carrier/{{ ups_carrier_pk }}/ups-debug/" class="historylink" target="_blank">🔬 UPS Debug</a>
@@ -12,7 +13,7 @@
 {% endif %}
 {% if api_log_carrier_pk %}
 <li>
-  <a href="/admin/shipping/carrier/{{ api_log_carrier_pk }}/api-log/" class="historylink" target="_blank">📋 {{ api_log_carrier_type }} Лог</a>
+  <a href="/admin/shipping/carrier/{{ api_log_carrier_pk }}/api-log/" class="historylink" target="_blank">📋 {{ api_log_carrier_type }} {% trans "Лог" %}</a>
 </li>
 {% endif %}
 {% endblock %}

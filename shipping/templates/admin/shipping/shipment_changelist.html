@@ -1,4 +1,5 @@
 {% extends "admin/change_list.html" %}
+{% load i18n %}
 
 {% block search %}
 {{ block.super }}
@@ -11,7 +12,7 @@
             font-size:12px;font-weight:700;text-decoration:none;border:1px solid;
             {% if not sv_status_filter %}background:rgba(88,166,255,.18);color:#58a6ff;border-color:rgba(88,166,255,.5)
             {% else %}background:var(--bg-card,#1a2535);color:var(--text-muted);border-color:var(--border){% endif %}">
-    Всі&nbsp;<span style="background:rgba(128,128,128,.18);border-radius:10px;padding:1px 6px;font-size:10px">{{ sv_status_total }}</span>
+    {% trans "Всі" %}&nbsp;<span style="background:rgba(128,128,128,.18);border-radius:10px;padding:1px 6px;font-size:10px">{{ sv_status_total }}</span>
   </a>
 
   {% for item in sv_status_items %}{% if item.count or sv_status_filter == item.val %}
@@ -33,28 +34,28 @@
         <a href="{% url 'admin:shipping_shipment_quick_create' %}"
            style="background:#4caf50;color:#fff;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
-            ✈️ Нове відправлення
+            ✈️ {% trans "Нове відправлення" %}
         </a>
     </li>
     <li>
         <a href="{% url 'admin:shipping_order_tracking' %}"
            style="background:#2196f3;color:#fff;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
-            📡 Відслідковування
+            📡 {% trans "Відслідковування" %}
         </a>
     </li>
     <li>
         <a href="{% url 'admin:shipping_dhl_track_lookup' %}"
            style="background:#f9a825;color:#000;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
-            🔍 DHL Трекінг
+            🔍 {% trans "DHL Трекінг" %}
         </a>
     </li>
     <li>
         <a href="{% url 'admin:shipping_carrier_changelist' %}"
            style="background:#607d8b;color:white;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
-            ⚙️ Перевізники
+            ⚙️ {% trans "Перевізники" %}
         </a>
     </li>
 {% endblock %}

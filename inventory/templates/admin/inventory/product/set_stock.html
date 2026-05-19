@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load static %}
+{% load static i18n %}
 
 {% block extrastyle %}
 <style>
@@ -38,7 +38,7 @@
 {% endblock %}
 
 {% block content %}
-<h1>⚖️ Інвентаризація: {{ product.sku }}</h1>
+<h1>⚖️ {% trans "Інвентаризація:" %} {{ product.sku }}</h1>
 
 <div class="ss-info-box">
     <p style="margin:0 0 4px"><strong>SKU:</strong> {{ product.sku }}</p>
@@ -46,7 +46,7 @@
 </div>
 
 <div class="ss-info-box">
-    <div style="font-size:13px;color:var(--text-dim);margin-bottom:4px">Поточний залишок (за даними системи)</div>
+    <div style="font-size:13px;color:var(--text-dim);margin-bottom:4px">{% trans "Поточний залишок (за даними системи)" %}</div>
     <div class="ss-current">{{ current_stock }}</div>
 </div>
 
@@ -60,19 +60,18 @@
     <div style="margin:20px 0">
         <label for="id_target_stock"
                style="display:block;margin-bottom:8px;font-weight:600;color:var(--text)">
-            Фактично на складі після підрахунку:
+            {% trans "Фактично на складі після підрахунку:" %}
         </label>
         {{ form.target_stock }}
         <div class="ss-hint">
-            💡 Введи реальну кількість яку нарахували. Система сама розрахує різницю і запише коригування.
-            Наприклад: якщо в системі 26, а фізично 24 — вводь <strong>24</strong>.
+            💡 {% trans "Введи реальну кількість яку нарахували. Система сама розрахує різницю і запише коригування. Наприклад: якщо в системі 26, а фізично 24 — вводь" %} <strong>24</strong>.
         </div>
     </div>
 
     <div class="submit-row">
-        <input type="submit" value="⚖️ Зберегти залишок" class="default">
+        <input type="submit" value="⚖️ {% trans "Зберегти залишок" %}" class="default">
         <a href="{% url 'admin:inventory_product_change' product.pk %}" class="button">
-            ✕ Скасувати
+            ✕ {% trans "Скасувати" %}
         </a>
     </div>
 </form>

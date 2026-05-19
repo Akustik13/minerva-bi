@@ -1,13 +1,14 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 
 {% block title %}{{ title }} | Minerva{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
-  &rsaquo; <a href="{{ back_url }}">Чернетка #{{ shipment.pk }}</a>
-  &rsaquo; Підтвердити UPS
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a>
+  &rsaquo; <a href="{{ back_url }}">{% trans "Чернетка" %} #{{ shipment.pk }}</a>
+  &rsaquo; {% trans "Підтвердити UPS" %}
 </div>
 {% endblock %}
 
@@ -78,7 +79,7 @@
 
 <div class="uc-wrap">
   <h1 style="color:var(--text);font-size:20px;margin-bottom:20px">
-    🟤 Перевірте дані перед відправкою через UPS API
+    🟤 {% trans "Перевірте дані перед відправкою через UPS API" %}
   </h1>
 
   {% if messages %}
@@ -89,40 +90,40 @@
 
   {% if weight_warn %}
   <div class="warn-banner">
-    <b>⚖️ Розбіжність у вазі:</b>
-    Посилка: <b>{{ weight_warn.shipment_kg }} кг</b> ·
-    Митні артикули: <b>{{ weight_warn.customs_kg }} кг</b> ·
-    Різниця: <b>{{ weight_warn.diff_kg }} кг ({{ weight_warn.diff_pct }}%)</b><br>
-    Перевірте правильність вказаної ваги перед відправкою.
+    <b>⚖️ {% trans "Розбіжність у вазі" %}:</b>
+    {% trans "Посилка" %}: <b>{{ weight_warn.shipment_kg }} {% trans "кг" %}</b> ·
+    {% trans "Митні артикули" %}: <b>{{ weight_warn.customs_kg }} {% trans "кг" %}</b> ·
+    {% trans "Різниця" %}: <b>{{ weight_warn.diff_kg }} {% trans "кг" %} ({{ weight_warn.diff_pct }}%)</b><br>
+    {% trans "Перевірте правильність вказаної ваги перед відправкою." %}
   </div>
   {% endif %}
 
   <!-- Сервіс -->
   <div class="uc-card">
-    <div class="uc-head">🚚 Обраний сервіс UPS</div>
+    <div class="uc-head">🚚 {% trans "Обраний сервіс UPS" %}</div>
     <div class="uc-body">
       <div class="uc-row">
-        <span class="uc-lbl">Сервіс</span>
+        <span class="uc-lbl">{% trans "Сервіс" %}</span>
         <span class="uc-val accent">{{ service_name }}</span>
       </div>
       <div class="uc-row">
-        <span class="uc-lbl">Код</span>
+        <span class="uc-lbl">{% trans "Код" %}</span>
         <span class="uc-val" style="font-family:monospace">{{ service_code }}</span>
       </div>
       {% if shipment.carrier %}
       <div class="uc-row">
-        <span class="uc-lbl">Акаунт UPS</span>
+        <span class="uc-lbl">{% trans "Акаунт UPS" %}</span>
         <span class="uc-val">{{ shipment.carrier.name }}</span>
       </div>
       {% endif %}
       <div class="uc-row">
-        <span class="uc-lbl">Орієнтовна вартість</span>
+        <span class="uc-lbl">{% trans "Орієнтовна вартість" %}</span>
         <span class="uc-val ok">
           {% if rate_price %}
             {{ rate_price }} {{ rate_currency }}
-            {% if rate_source == 'negotiated' %}<span style="font-size:10px;background:rgba(76,175,80,.15);color:#81c784;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">договірний</span>{% endif %}
-            {% if rate_source == 'reference' %}<span style="font-size:10px;background:rgba(255,152,0,.12);color:#ffb74d;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">роздрібний</span>{% endif %}
-            {% if rate_ref and rate_ref != rate_price %}<div style="font-size:11px;color:var(--text-dim);font-weight:400;margin-top:2px">Роздрібний тариф: {{ rate_ref }} {{ rate_currency }}</div>{% endif %}
+            {% if rate_source == 'negotiated' %}<span style="font-size:10px;background:rgba(76,175,80,.15);color:#81c784;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">{% trans "договірний" %}</span>{% endif %}
+            {% if rate_source == 'reference' %}<span style="font-size:10px;background:rgba(255,152,0,.12);color:#ffb74d;padding:1px 6px;border-radius:8px;font-weight:600;margin-left:4px">{% trans "роздрібний" %}</span>{% endif %}
+            {% if rate_ref and rate_ref != rate_price %}<div style="font-size:11px;color:var(--text-dim);font-weight:400;margin-top:2px">{% trans "Роздрібний тариф" %}: {{ rate_ref }} {{ rate_currency }}</div>{% endif %}
           {% elif shipment.carrier_price %}
             {{ shipment.carrier_price }} {{ shipment.carrier_currency|default:"EUR" }}
           {% else %}—{% endif %}
@@ -134,7 +135,7 @@
       </div>
       {% if delivery_date %}
       <div class="uc-row">
-        <span class="uc-lbl">Орієнтовна доставка</span>
+        <span class="uc-lbl">{% trans "Орієнтовна доставка" %}</span>
         <span class="uc-val ok">📅 {{ delivery_date }}</span>
       </div>
       {% endif %}
@@ -145,22 +146,22 @@
   <div class="uc-2col">
 
     <div class="uc-card">
-      <div class="uc-head">📤 Відправник</div>
+      <div class="uc-head">📤 {% trans "Відправник" %}</div>
       <div class="uc-body">
         {% if shipper.company %}
-        <div class="uc-row"><span class="uc-lbl">Компанія</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Компанія" %}</span>
           <span class="uc-val">{{ shipper.company }}</span></div>
         {% endif %}
-        <div class="uc-row"><span class="uc-lbl">Ім'я</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Ім'я" %}</span>
           <span class="uc-val">{{ shipper.name|default:"—" }}</span></div>
-        <div class="uc-row"><span class="uc-lbl">Вулиця</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Вулиця" %}</span>
           <span class="uc-val">{{ shipper.address_line|default:"—" }}</span></div>
-        <div class="uc-row"><span class="uc-lbl">Місто / ZIP</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Місто / ZIP" %}</span>
           <span class="uc-val">{{ shipper.city|default:"—" }}, {{ shipper.postal|default:"" }}</span></div>
-        <div class="uc-row"><span class="uc-lbl">Країна</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Країна" %}</span>
           <span class="uc-val">{{ shipper.country|default:"DE" }}</span></div>
         {% if shipper.phone %}
-        <div class="uc-row"><span class="uc-lbl">Телефон</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Телефон" %}</span>
           <span class="uc-val">{{ shipper.phone }}</span></div>
         {% endif %}
         {% if shipper.email %}
@@ -171,28 +172,28 @@
     </div>
 
     <div class="uc-card">
-      <div class="uc-head">📥 Отримувач</div>
+      <div class="uc-head">📥 {% trans "Отримувач" %}</div>
       <div class="uc-body">
         {% if to_addr.company %}
-        <div class="uc-row"><span class="uc-lbl">Компанія</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Компанія" %}</span>
           <span class="uc-val">{{ to_addr.company }}</span></div>
         {% endif %}
-        <div class="uc-row"><span class="uc-lbl">Ім'я</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Ім'я" %}</span>
           <span class="uc-val">{{ to_addr.name|default:"—" }}</span></div>
-        <div class="uc-row"><span class="uc-lbl">Вулиця</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Вулиця" %}</span>
           <span class="uc-val">{{ to_addr.address_line|default:"—" }}</span></div>
-        <div class="uc-row"><span class="uc-lbl">Місто / ZIP</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Місто / ZIP" %}</span>
           <span class="uc-val">{{ to_addr.city|default:"—" }}, {{ to_addr.postal|default:"" }}</span></div>
         {% if to_addr.state %}
-        <div class="uc-row"><span class="uc-lbl">Штат / Регіон</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Штат / Регіон" %}</span>
           <span class="uc-val">{{ to_addr.state }}</span></div>
         {% endif %}
-        <div class="uc-row"><span class="uc-lbl">Країна</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Країна" %}</span>
           <span class="uc-val{% if is_intl %} accent{% endif %}">{{ to_addr.country|default:"—" }}
-            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> (міжнародне)</span>{% endif %}
+            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> ({% trans "міжнародне" %})</span>{% endif %}
           </span></div>
         {% if to_addr.phone %}
-        <div class="uc-row"><span class="uc-lbl">Телефон</span>
+        <div class="uc-row"><span class="uc-lbl">{% trans "Телефон" %}</span>
           <span class="uc-val">{{ to_addr.phone }}</span></div>
         {% endif %}
       </div>
@@ -202,16 +203,16 @@
 
   <!-- Коробки -->
   <div class="uc-card">
-    <div class="uc-head">📦 Коробки ({{ packages|length }} шт.)</div>
+    <div class="uc-head">📦 {% trans "Коробки" %} ({{ packages|length }} {% trans "шт." %})</div>
     <div class="uc-body" style="padding:0">
       <table class="uc-table">
         <thead>
           <tr>
             <th>#</th>
-            <th>Вага (кг)</th>
-            <th>Довжина (см)</th>
-            <th>Ширина (см)</th>
-            <th>Висота (см)</th>
+            <th>{% trans "Вага (кг)" %}</th>
+            <th>{% trans "Довжина (см)" %}</th>
+            <th>{% trans "Ширина (см)" %}</th>
+            <th>{% trans "Висота (см)" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -232,7 +233,7 @@
   <!-- Митна декларація -->
   {% if customs and is_intl %}
   <div class="uc-card">
-    <div class="uc-head">🛃 Митна декларація</div>
+    <div class="uc-head">🛃 {% trans "Митна декларація" %}</div>
     <div class="uc-body">
 
       {# ── Read-only params row ──────────────────────────────────────────── #}
@@ -248,13 +249,13 @@
         <div>
           <div style="font-size:11px;color:var(--text-dim);font-weight:700;
                       text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">
-            📦 Вага посилки (брутто)
+            📦 {% trans "Вага посилки (брутто)" %}
           </div>
           <div style="font-size:16px;font-weight:700;color:var(--text)">
-            {{ shipment.weight_kg|default:"—" }} кг
+            {{ shipment.weight_kg|default:"—" }} {% trans "кг" %}
           </div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
-            Брутто вага коробки з упакуванням
+            {% trans "Брутто вага коробки з упакуванням" %}
           </div>
         </div>
 
@@ -268,7 +269,7 @@
             {{ customs.terms_of_shipment|default:"DAP" }}
           </div>
           <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
-            Умови поставки
+            {% trans "Умови поставки" %}
           </div>
         </div>
 
@@ -276,7 +277,7 @@
         <div>
           <div style="font-size:11px;color:var(--text-dim);font-weight:700;
                       text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">
-            💱 Валюта / Тип
+            💱 {% trans "Валюта / Тип" %}
           </div>
           <div style="font-size:16px;font-weight:700;color:var(--text)">
             {{ customs.currency|default:"USD" }}
@@ -293,13 +294,13 @@
       <table class="uc-table">
         <thead>
           <tr>
-            <th>Опис товару</th>
-            <th style="text-align:center">К-сть</th>
-            <th style="text-align:right">Ціна/шт</th>
+            <th>{% trans "Опис товару" %}</th>
+            <th style="text-align:center">{% trans "К-сть" %}</th>
+            <th style="text-align:right">{% trans "Ціна/шт" %}</th>
             <th style="text-align:right">Total Value</th>
-            <th style="text-align:right">Вага нетто/шт</th>
-            <th>Походження</th>
-            <th>HS код</th>
+            <th style="text-align:right">{% trans "Вага нетто/шт" %}</th>
+            <th>{% trans "Походження" %}</th>
+            <th>{% trans "HS код" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -317,7 +318,7 @@
               {{ item.value|floatformat:2 }} {{ customs.currency|default:"USD" }}
             </td>
             <td style="text-align:right;color:var(--text-muted);font-family:monospace">
-              {{ item.weight_kg }} кг
+              {{ item.weight_kg }} {% trans "кг" %}
             </td>
             <td style="color:var(--text-muted)">{{ item.country|default:"—" }}</td>
             <td style="color:var(--text-dim);font-family:monospace;font-size:11px">{{ item.hs_code|default:"—" }}</td>
@@ -346,7 +347,7 @@
         </span>
       </div>
       <div class="uc-row">
-        <span class="uc-lbl">Опис</span>
+        <span class="uc-lbl">{% trans "Опис" %}</span>
         <span class="uc-val">{{ customs.description|default:"—" }}</span>
       </div>
       {% endif %}
@@ -357,25 +358,25 @@
 
   <!-- Спосіб відправки -->
   <div class="uc-card">
-    <div class="uc-head">🚐 Спосіб відправки</div>
+    <div class="uc-head">🚐 {% trans "Спосіб відправки" %}</div>
     <div class="uc-body">
       <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text)">
           <input type="radio" name="_pickup_type" value="pickup" id="pt_pickup" checked
                  onchange="document.getElementById('pickup-details').style.display=''">
-          🚐 Кур'єр забере (Abholung)
+          🚐 {% trans "Кур'єр забере (Abholung)" %}
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text)">
           <input type="radio" name="_pickup_type" value="dropoff" id="pt_dropoff"
                  onchange="document.getElementById('pickup-details').style.display='none'">
-          🏪 Занесу на відділення UPS сам
+          🏪 {% trans "Занесу на відділення UPS сам" %}
         </label>
       </div>
       <div id="pickup-details" style="background:var(--bg-input);border-radius:6px;padding:14px 16px">
         <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
           <div>
             <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
-                           letter-spacing:.04em;display:block;margin-bottom:5px">Дата забирання</label>
+                           letter-spacing:.04em;display:block;margin-bottom:5px">{% trans "Дата забирання" %}</label>
             <input type="date" id="inp_pickup_date" name="_pickup_date"
                    min="{{ pickup_min_date }}" value="{{ pickup_default_date }}"
                    style="background:var(--bg-card);border:1px solid var(--border-strong);
@@ -383,7 +384,7 @@
           </div>
           <div style="flex:1;min-width:280px">
             <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
-                           letter-spacing:.04em;display:block;margin-bottom:8px">Часове вікно забирання</label>
+                           letter-spacing:.04em;display:block;margin-bottom:8px">{% trans "Часове вікно забирання" %}</label>
             <div style="display:flex;justify-content:center;gap:10px;font-size:18px;font-weight:700;
                         color:var(--text);margin-bottom:14px">
               <span id="dr-from-lbl">11:00</span>
@@ -406,20 +407,20 @@
         </div>
         <div style="margin-top:14px">
           <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
-                         letter-spacing:.04em;display:block;margin-bottom:5px">Місце забирання</label>
+                         letter-spacing:.04em;display:block;margin-bottom:5px">{% trans "Місце забирання" %}</label>
           <select id="inp_pickup_point"
                   style="background:var(--bg-card);border:1px solid var(--border-strong);
                          color:var(--text);border-radius:4px;padding:7px 10px;font-size:13px;min-width:200px">
-            <option value="RECEPTION">Рецепшен</option>
-            <option value="SUITE" selected>Офіс / Suite</option>
-            <option value="MAILROOM">Поштовий відділ</option>
-            <option value="FLOOR">Склад / Поверх</option>
-            <option value="LOBBY">Лобі</option>
-            <option value="OTHER">Інше</option>
+            <option value="RECEPTION">{% trans "Рецепшен" %}</option>
+            <option value="SUITE" selected>{% trans "Офіс / Suite" %}</option>
+            <option value="MAILROOM">{% trans "Поштовий відділ" %}</option>
+            <option value="FLOOR">{% trans "Склад / Поверх" %}</option>
+            <option value="LOBBY">{% trans "Лобі" %}</option>
+            <option value="OTHER">{% trans "Інше" %}</option>
           </select>
         </div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">
-          ℹ️ Мінімум наступний робочий день. Після створення відправлення UPS отримає запит на забирання.
+          ℹ️ {% trans "Мінімум наступний робочий день. Після створення відправлення UPS отримає запит на забирання." %}
         </div>
       </div>
     </div>
@@ -427,14 +428,14 @@
 
   <!-- Підтвердження -->
   <div class="uc-card">
-    <div class="uc-head">⚠️ Підтвердження</div>
+    <div class="uc-head">⚠️ {% trans "Підтвердження" %}</div>
     <div class="uc-body">
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
-        Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
+        {% blocktrans %}Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
         Minerva викличе <b style="color:var(--text)">UPS REST API</b> і
         <b style="color:var(--text)">створить реальне відправлення</b> у системі UPS.
-        Буде списано кошти з акаунту <b>{{ shipment.carrier.connection_uuid|default:"UPS" }}</b>.
-        Скасувати можна через кнопку «Void» на сторінці відправлення.
+        Буде списано кошти з акаунту{% endblocktrans %} <b>{{ shipment.carrier.connection_uuid|default:"UPS" }}</b>.
+        {% trans "Скасувати можна через кнопку «Void» на сторінці відправлення." %}
       </p>
       <form method="post" action="{{ confirm_url }}" id="ups-confirm-form">
         {% csrf_token %}
@@ -462,29 +463,29 @@
   <!-- Кнопки -->
   <div class="uc-actions">
     <button type="submit" form="ups-confirm-form" class="btn-confirm"
-      onclick="return confirm('Відправити через UPS API?\n\nСервіс: {{ service_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі UPS і списано кошти з акаунту.')">
-      🟤 Підтвердити і відправити через UPS
+      onclick="return confirm('{% trans "Відправити через UPS API?" %}\n\n{% trans "Сервіс" %}: {{ service_name }}\n{% trans "Одержувач" %}: {{ to_addr.name }} ({{ to_addr.country }})\n\n{% trans "Після підтвердження відправлення буде створено в системі UPS і списано кошти з акаунту." %}')">
+      🟤 {% trans "Підтвердити і відправити через UPS" %}
     </button>
     <button type="button" class="btn-back" id="btn-dry-run" onclick="ucDryRun()">
-      🔍 Переглянути тіло запиту
+      🔍 {% trans "Переглянути тіло запиту" %}
     </button>
-    <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
+    <a href="{{ back_url }}" class="btn-back">← {% trans "Назад до чернетки" %}</a>
   </div>
 
   <!-- Debug JSON panel -->
   <div id="uc-dry-panel" style="display:none;margin-top:16px">
     <div class="uc-card">
       <div class="uc-head" style="justify-content:space-between">
-        <span>📋 UPS API Request Body (dry run — не відправляється)</span>
+        <span>📋 UPS API Request Body (dry run — {% trans "не відправляється" %})</span>
         <div style="display:flex;gap:8px">
-          <button onclick="ucCopyPayload()" style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;color:var(--text-muted)">📋 Копіювати</button>
+          <button onclick="ucCopyPayload()" style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:12px;color:var(--text-muted)">📋 {% trans "Копіювати" %}</button>
           <button onclick="document.getElementById('uc-dry-panel').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:16px;color:var(--text-dim)">✕</button>
         </div>
       </div>
       <div class="uc-body" style="padding:0">
         <pre id="uc-dry-json" style="margin:0;padding:14px 16px;font-size:12px;font-family:monospace;
              color:var(--text);background:var(--bg-input);overflow-x:auto;white-space:pre;
-             max-height:600px;overflow-y:auto;line-height:1.5">Завантаження…</pre>
+             max-height:600px;overflow-y:auto;line-height:1.5">{% trans "Завантаження…" %}</pre>
       </div>
     </div>
   </div>
@@ -493,12 +494,15 @@
 
 <script>
 var _ucDryPayload = '';
+var _msgLoading = '{% trans "Завантаження…" %}';
+var _msgError   = '{% trans "Помилка" %}';
+var _msgCopied  = '{% trans "Скопійовано" %}';
 
 function ucDryRun() {
   var panel = document.getElementById('uc-dry-panel');
   var pre   = document.getElementById('uc-dry-json');
   panel.style.display = '';
-  pre.textContent = 'Завантаження…';
+  pre.textContent = _msgLoading;
   var url = '{% url "admin:shipping_shipment_ups_dry_run" shipment.pk %}?service_code={{ service_code }}&terms_of_shipment={{ customs.terms_of_shipment|default:"DAP" }}';
   fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
     .then(function(r){ return r.json(); })
@@ -508,7 +512,7 @@ function ucDryRun() {
         pre.textContent = _ucDryPayload;
       } else {
         pre.style.color = '#f85149';
-        pre.textContent = '❌ ' + (d.error || 'Помилка');
+        pre.textContent = '❌ ' + (d.error || _msgError);
         _ucDryPayload = '';
       }
       panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
@@ -525,7 +529,7 @@ function ucCopyPayload() {
   navigator.clipboard.writeText(_ucDryPayload).then(function(){
     var btn = event.target;
     var old = btn.textContent;
-    btn.textContent = '✅ Скопійовано';
+    btn.textContent = '✅ ' + _msgCopied;
     setTimeout(function(){ btn.textContent = old; }, 1500);
   });
 }

@@ -1,15 +1,15 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block title %}Рух товару — {{ object.sku }}{% endblock %}
+{% block title %}{% trans "Рух товару" %} — {{ object.sku }}{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; <a href="{% url 'admin:inventory_product_changelist' %}">Товари</a>
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; <a href="{% url 'admin:inventory_product_changelist' %}">{% trans "Товари" %}</a>
   &rsaquo; <a href="{% url 'admin:inventory_product_change' object.pk %}">{{ object.sku }}</a>
-  &rsaquo; Рух товару
+  &rsaquo; {% trans "Рух товару" %}
 </div>
 {% endblock %}
 
@@ -104,16 +104,16 @@
   <div class="mv-header">
     <div class="mv-header-icon">📋</div>
     <div>
-      <h2>Рух товару — {{ object.sku }}</h2>
+      <h2>{% trans "Рух товару" %} — {{ object.sku }}</h2>
       <p>{{ object.name }}</p>
     </div>
   </div>
 
   <div class="mv-chips">
-    <span class="mv-chip mv-chip-stock">📦 Поточний залишок: <b>{{ current_stock }} шт</b></span>
-    <span class="mv-chip mv-chip-total">📊 Всього операцій: <b>{{ total }}</b></span>
+    <span class="mv-chip mv-chip-stock">📦 {% trans "Поточний залишок:" %} <b>{{ current_stock }} {% trans "шт" %}</b></span>
+    <span class="mv-chip mv-chip-total">📊 {% trans "Всього операцій:" %} <b>{{ total }}</b></span>
     {% if shown < total %}
-    <span class="mv-chip mv-chip-shown">Показано останні {{ shown }}</span>
+    <span class="mv-chip mv-chip-shown">{% blocktrans with shown=shown %}Показано останні {{ shown }}{% endblocktrans %}</span>
     {% endif %}
   </div>
 
@@ -122,14 +122,14 @@
     <table class="mv-table">
       <thead>
         <tr>
-          <th>Дата</th>
-          <th>Тип</th>
-          <th class="num">К-сть</th>
-          <th class="num">Залишок</th>
-          <th>Документ</th>
-          <th>Клієнт / Постачальник</th>
-          <th>Виконавець</th>
-          <th>Локація</th>
+          <th>{% trans "Дата" %}</th>
+          <th>{% trans "Тип" %}</th>
+          <th class="num">{% trans "К-сть" %}</th>
+          <th class="num">{% trans "Залишок" %}</th>
+          <th>{% trans "Документ" %}</th>
+          <th>{% trans "Клієнт / Постачальник" %}</th>
+          <th>{% trans "Виконавець" %}</th>
+          <th>{% trans "Локація" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -162,12 +162,12 @@
   {% else %}
   <div class="mv-empty">
     <div style="font-size:40px;margin-bottom:12px">📋</div>
-    Транзакцій для цього товару ще немає
+    {% trans "Транзакцій для цього товару ще немає" %}
   </div>
   {% endif %}
 
   <a class="mv-back" href="{% url 'admin:inventory_product_change' object.pk %}">
-    ← Повернутись до товару
+    ← {% trans "Повернутись до товару" %}
   </a>
 
 </div>

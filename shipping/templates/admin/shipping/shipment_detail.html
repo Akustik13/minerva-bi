@@ -1,11 +1,12 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 {% block title %}{{ title }} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a>
   &rsaquo; #{{ shipment.pk }} — {{ shipment.recipient_name }}
 </div>
 {% endblock %}
@@ -228,14 +229,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
         {% endif %}
       </div>
       <div class="sd-meta">
-        {{ shipment.carrier.name|default:"Без перевізника" }}
+        {{ shipment.carrier.name|default:"{% trans 'Без перевізника' %}" }}
         <span class="sd-dot">·</span>
-        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% else %}<span style="color:var(--text-muted)">Без замовлення</span>{% endif %}
+        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% else %}<span style="color:var(--text-muted)">{% trans "Без замовлення" %}</span>{% endif %}
         <span class="sd-dot">·</span>
-        Створено {{ shipment.created_at|date:"d.m.Y H:i" }}
+        {% trans "Створено" %} {{ shipment.created_at|date:"d.m.Y H:i" }}
         {% if shipment.submitted_at %}
         <span class="sd-dot">·</span>
-        Надіслано {{ shipment.submitted_at|date:"d.m.Y H:i" }}
+        {% trans "Надіслано" %} {{ shipment.submitted_at|date:"d.m.Y H:i" }}
         {% endif %}
       </div>
     </div>
@@ -257,11 +258,11 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   <div class="sd-error-block">
     <span style="font-size:20px;flex-shrink:0">❌</span>
     <div>
-      <div class="sd-error-title">Помилка при оформленні відправлення</div>
-      <div class="sd-error-msg">{{ shipment.error_message|default:"Невідома помилка" }}</div>
+      <div class="sd-error-title">{% trans "Помилка при оформленні відправлення" %}</div>
+      <div class="sd-error-msg">{{ shipment.error_message|default:"{% trans 'Невідома помилка' %}" }}</div>
       <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap">
         <a href="{% url 'admin:shipping_shipment_edit_draft' shipment.pk %}" class="sd-btn sd-btn-green" style="display:inline-block;width:auto;padding:8px 18px">
-          ✏️ Виправити і повторити
+          ✏️ {% trans "Виправити і повторити" %}
         </a>
         {% if raw_request or raw_response %}
         <a href="#debug" class="sd-btn sd-btn-ghost" style="display:inline-block;width:auto;padding:8px 18px">
@@ -274,13 +275,13 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
   {% elif shipment.status == "cancelled" %}
   <div class="sd-info-block" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
-    <span>🚫 Відправлення скасовано.</span>
+    <span>🚫 {% trans "Відправлення скасовано." %}</span>
     <form method="post" action="{% url 'admin:shipping_shipment_clone' shipment.pk %}" style="margin:0;flex-shrink:0">
       {% csrf_token %}
       <button type="submit"
-        onclick="return confirm('Створити нове відправлення на основі #{{ shipment.pk }}?\n\nВсі дані отримувача, параметри посилки і митна декларація будуть скопійовані.')"
+        onclick="return confirm('{% trans "Створити нове відправлення на основі" %} #{{ shipment.pk }}?\n\n{% trans "Всі дані отримувача, параметри посилки і митна декларація будуть скопійовані." %}')"
         class="sd-btn sd-btn-green" style="border:none;cursor:pointer;padding:8px 18px;display:inline-block">
-        🔁 Повторити відправлення
+        🔁 {% trans "Повторити відправлення" %}
       </button>
     </form>
   </div>
@@ -318,41 +319,41 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       {% with s_name=sv_sender.name s_company=sv_sender.company s_street=sv_sender.street s_city=sv_sender.city s_zip=sv_sender.zip s_country=sv_sender.country s_phone=sv_sender.phone s_email=sv_sender.email %}
       {% if s_name or s_street or s_country %}
       <div class="sd-card">
-        <div class="sd-card-title">📦 Відправник</div>
+        <div class="sd-card-title">📦 {% trans "Відправник" %}</div>
         <div class="sd-info-grid">
           {% if s_company %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Компанія</span>
+            <span class="sd-info-key">{% trans "Компанія" %}</span>
             <span class="sd-info-val">{{ s_company }}</span>
           </div>
           {% endif %}
           {% if s_name %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Ім'я</span>
+            <span class="sd-info-key">{% trans "Ім'я" %}</span>
             <span class="sd-info-val">{{ s_name }}</span>
           </div>
           {% endif %}
           {% if s_street %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Адреса</span>
+            <span class="sd-info-key">{% trans "Адреса" %}</span>
             <span class="sd-info-val">{{ s_street }}</span>
           </div>
           {% endif %}
           {% if s_city or s_zip %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Місто / Індекс</span>
+            <span class="sd-info-key">{% trans "Місто / Індекс" %}</span>
             <span class="sd-info-val">{{ s_city }}{% if s_zip %}, {{ s_zip }}{% endif %}</span>
           </div>
           {% endif %}
           {% if s_country %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Країна</span>
+            <span class="sd-info-key">{% trans "Країна" %}</span>
             <span class="sd-info-val sd-country">{{ s_country }}</span>
           </div>
           {% endif %}
           {% if s_phone %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Телефон</span>
+            <span class="sd-info-key">{% trans "Телефон" %}</span>
             <span class="sd-info-val">{{ s_phone }}</span>
           </div>
           {% endif %}
@@ -369,35 +370,35 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
       <!-- Отримувач -->
       <div class="sd-card">
-        <div class="sd-card-title">📬 Отримувач</div>
+        <div class="sd-card-title">📬 {% trans "Отримувач" %}</div>
         <div class="sd-info-grid">
           {% if shipment.recipient_company %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Компанія</span>
+            <span class="sd-info-key">{% trans "Компанія" %}</span>
             <span class="sd-info-val">{{ shipment.recipient_company }}</span>
           </div>
           {% endif %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Ім'я</span>
+            <span class="sd-info-key">{% trans "Ім'я" %}</span>
             <span class="sd-info-val">{{ shipment.recipient_name }}</span>
           </div>
           <div class="sd-info-row">
-            <span class="sd-info-key">Адреса</span>
+            <span class="sd-info-key">{% trans "Адреса" %}</span>
             <span class="sd-info-val">{{ shipment.recipient_street }}</span>
           </div>
           <div class="sd-info-row">
-            <span class="sd-info-key">Місто / Індекс</span>
+            <span class="sd-info-key">{% trans "Місто / Індекс" %}</span>
             <span class="sd-info-val">
               {{ shipment.recipient_city }}{% if shipment.recipient_state %} {{ shipment.recipient_state }}{% endif %}, {{ shipment.recipient_zip }}
             </span>
           </div>
           <div class="sd-info-row">
-            <span class="sd-info-key">Країна</span>
+            <span class="sd-info-key">{% trans "Країна" %}</span>
             <span class="sd-info-val sd-country">{{ shipment.recipient_country }}</span>
           </div>
           {% if shipment.recipient_phone %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Телефон</span>
+            <span class="sd-info-key">{% trans "Телефон" %}</span>
             <span class="sd-info-val">{{ shipment.recipient_phone }}</span>
           </div>
           {% endif %}
@@ -412,39 +413,39 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
       <!-- Параметри посилки -->
       <div class="sd-card">
-        <div class="sd-card-title">📐 Параметри посилки</div>
+        <div class="sd-card-title">📐 {% trans "Параметри посилки" %}</div>
         <div class="sd-info-grid">
           <div class="sd-info-row">
-            <span class="sd-info-key">Вага</span>
-            <span class="sd-info-val"><b>{{ shipment.weight_kg }} кг</b></span>
+            <span class="sd-info-key">{% trans "Вага" %}</span>
+            <span class="sd-info-val"><b>{{ shipment.weight_kg }} {% trans "кг" %}</b></span>
           </div>
           {% if shipment.length_cm or shipment.width_cm or shipment.height_cm %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Розміри (Д×Ш×В)</span>
-            <span class="sd-info-val sd-mono">{{ shipment.length_cm|default:"?" }}×{{ shipment.width_cm|default:"?" }}×{{ shipment.height_cm|default:"?" }} см</span>
+            <span class="sd-info-key">{% trans "Розміри (Д×Ш×В)" %}</span>
+            <span class="sd-info-val sd-mono">{{ shipment.length_cm|default:"?" }}×{{ shipment.width_cm|default:"?" }}×{{ shipment.height_cm|default:"?" }} {% trans "см" %}</span>
           </div>
           {% endif %}
           {% if shipment.description %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Опис вмісту</span>
+            <span class="sd-info-key">{% trans "Опис вмісту" %}</span>
             <span class="sd-info-val">{{ shipment.description }}</span>
           </div>
           {% endif %}
           {% if shipment.declared_value %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Задекларована вартість</span>
+            <span class="sd-info-key">{% trans "Задекларована вартість" %}</span>
             <span class="sd-info-val">{{ shipment.declared_value }} {{ shipment.declared_currency }}</span>
           </div>
           {% endif %}
           {% if shipment.export_reason %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Підстава вивозу</span>
+            <span class="sd-info-key">{% trans "Підстава вивозу" %}</span>
             <span class="sd-info-val">{{ shipment.export_reason }}</span>
           </div>
           {% endif %}
           {% if shipment.reference %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Референс</span>
+            <span class="sd-info-key">{% trans "Референс" %}</span>
             <span class="sd-info-val sd-mono">{{ shipment.reference }}</span>
           </div>
           {% endif %}
@@ -454,22 +455,22 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       <!-- UPS Забирання (Abholung) -->
       {% if pickup_info %}
       <div class="sd-card">
-        <div class="sd-card-title">🚐 Виклик кур'єра</div>
+        <div class="sd-card-title">🚐 {% trans "Виклик кур'єра" %}</div>
         <div class="sd-info-grid">
           <div class="sd-info-row">
-            <span class="sd-info-key">Номер PRN</span>
+            <span class="sd-info-key">{% trans "Номер PRN" %}</span>
             <span class="sd-info-val sd-mono" style="font-weight:700">{{ pickup_info.prn }}</span>
           </div>
           <div class="sd-info-row">
-            <span class="sd-info-key">Дата забирання</span>
+            <span class="sd-info-key">{% trans "Дата забирання" %}</span>
             <span class="sd-info-val">{{ pickup_info.date }}</span>
           </div>
           <div class="sd-info-row">
-            <span class="sd-info-key">Часове вікно</span>
+            <span class="sd-info-key">{% trans "Часове вікно" %}</span>
             <span class="sd-info-val">{{ pickup_info.ready }} — {{ pickup_info.close }}</span>
           </div>
           <div class="sd-info-row">
-            <span class="sd-info-key">Місце забирання</span>
+            <span class="sd-info-key">{% trans "Місце забирання" %}</span>
             <span class="sd-info-val">{{ pickup_info.point_label }}</span>
           </div>
         </div>
@@ -478,11 +479,11 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
       <!-- Результат від перевізника -->
       <div class="sd-card">
-        <div class="sd-card-title">🚚 Результат від перевізника</div>
+        <div class="sd-card-title">🚚 {% trans "Результат від перевізника" %}</div>
         <div class="sd-info-grid">
           {% if carrier_tracking %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Статус посилки</span>
+            <span class="sd-info-key">{% trans "Статус посилки" %}</span>
             <span class="sd-info-val">
               <span style="color:{{ carrier_tracking.color }};font-weight:700">
                 {{ carrier_tracking.icon }} {{ carrier_tracking.display }}
@@ -498,99 +499,99 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           {% endif %}
           {% if shipment.carrier_delayed %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Затримка</span>
+            <span class="sd-info-key">{% trans "Затримка" %}</span>
             <span class="sd-info-val">
               <span style="background:var(--err);color:#fff;font-weight:700;font-size:12px;padding:2px 10px;border-radius:12px">
-                🚨 Вспізнення підтверджено
+                🚨 {% trans "Вспізнення підтверджено" %}
               </span>
             </span>
           </div>
           {% endif %}
           {% if shipment.carrier_status_label %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Статус перевізника</span>
+            <span class="sd-info-key">{% trans "Статус перевізника" %}</span>
             <span class="sd-info-val" style="color:var(--text-muted)">{{ shipment.carrier_status_label }}</span>
           </div>
           {% endif %}
           {% if shipment.eta_from or shipment.eta_to %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Очікувана доставка</span>
+            <span class="sd-info-key">{% trans "Очікувана доставка" %}</span>
             <span class="sd-info-val" style="{% if shipment.carrier_delayed %}color:var(--warn);font-weight:600{% endif %}">
               {% if shipment.eta_from and shipment.eta_to %}
                 {{ shipment.eta_from|date:"d.m.y" }} – {{ shipment.eta_to|date:"d.m.y" }}
               {% elif shipment.eta_from %}
-                від {{ shipment.eta_from|date:"d.m.y" }}
+                {% trans "від" %} {{ shipment.eta_from|date:"d.m.y" }}
               {% else %}
-                до {{ shipment.eta_to|date:"d.m.y" }}
+                {% trans "до" %} {{ shipment.eta_to|date:"d.m.y" }}
               {% endif %}
             </span>
           </div>
           {% endif %}
           {% if shipment.delivered_at %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Доставлено</span>
+            <span class="sd-info-key">{% trans "Доставлено" %}</span>
             <span class="sd-info-val" style="color:var(--ok);font-weight:700">✅ {{ shipment.delivered_at|date:"d.m.Y H:i" }}</span>
           </div>
           {% endif %}
           {% if shipment.carrier_eta %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Орієнтовна доставка</span>
+            <span class="sd-info-key">{% trans "Орієнтовна доставка" %}</span>
             <span class="sd-info-val" style="font-weight:600;color:var(--ok)">📅 {{ shipment.carrier_eta|date:"d.m.Y" }}</span>
           </div>
           {% endif %}
           {% if shipment.tracking_number %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Трекінг-номер</span>
+            <span class="sd-info-key">{% trans "Трекінг-номер" %}</span>
             <span class="sd-info-val sd-tracking">{{ shipment.tracking_number }}</span>
           </div>
           {% endif %}
           {% if shipment.carrier_service %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Сервіс</span>
+            <span class="sd-info-key">{% trans "Сервіс" %}</span>
             <span class="sd-info-val">{{ shipment.carrier_service }}</span>
           </div>
           {% endif %}
           {% if shipment.carrier_price %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Вартість доставки</span>
+            <span class="sd-info-key">{% trans "Вартість доставки" %}</span>
             <span class="sd-info-val sd-price">{{ shipment.carrier_price }} {{ shipment.carrier_currency }}</span>
           </div>
           {% endif %}
           {% if shipment.label_url %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Етикетка</span>
+            <span class="sd-info-key">{% trans "Етикетка" %}</span>
             <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 Відкрити PDF</a>
+              <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 {% trans "Відкрити PDF" %}</a>
               <button type="button" class="sd-save-local-btn"
                 data-url="{{ shipment.label_url }}"
                 data-filename=""
-                title="Зберегти на ПК">💾</button>
+                title="{% trans 'Зберегти на ПК' %}">💾</button>
               <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
             </span>
           </div>
           {% endif %}
           {% if shipment.customs_url %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Митна декларація</span>
+            <span class="sd-info-key">{% trans "Митна декларація" %}</span>
             <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <a href="{{ shipment.customs_url }}" target="_blank" class="sd-label-link">🛃 Відкрити PDF</a>
+              <a href="{{ shipment.customs_url }}" target="_blank" class="sd-label-link">🛃 {% trans "Відкрити PDF" %}</a>
               <button type="button" class="sd-save-local-btn"
                 data-url="{{ shipment.customs_url }}"
                 data-filename=""
-                title="Зберегти на ПК">💾</button>
+                title="{% trans 'Зберегти на ПК' %}">💾</button>
               <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
             </span>
           </div>
           {% endif %}
           {% if shipment.carrier_shipment_id %}
           <div class="sd-info-row">
-            <span class="sd-info-key">ID відправлення</span>
+            <span class="sd-info-key">{% trans "ID відправлення" %}</span>
             <span class="sd-info-val sd-mono sd-small">{{ shipment.carrier_shipment_id|truncatechars:36 }}</span>
           </div>
           {% endif %}
           {% if shipment.selected_tariff_id %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Тариф ID</span>
+            <span class="sd-info-key">{% trans "Тариф ID" %}</span>
             <span class="sd-info-val sd-mono sd-small">{{ shipment.selected_tariff_id }}</span>
           </div>
           {% endif %}
@@ -602,12 +603,12 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           {% endif %}
           {% if shipment.error_message %}
           <div class="sd-info-row" style="align-items:flex-start">
-            <span class="sd-info-key" style="color:var(--err)">Помилка</span>
+            <span class="sd-info-key" style="color:var(--err)">{% trans "Помилка" %}</span>
             <span class="sd-info-val" style="color:var(--err);opacity:.8;font-family:monospace;font-size:11px;text-align:left">{{ shipment.error_message }}</span>
           </div>
           {% endif %}
           {% if not shipment.tracking_number and not shipment.carrier_service and not shipment.carrier_price and not shipment.carrier_shipment_id %}
-          <div style="color:var(--text-dim);font-size:13px;padding:6px 0">Дані від перевізника ще не отримано.</div>
+          <div style="color:var(--text-dim);font-size:13px;padding:6px 0">{% trans "Дані від перевізника ще не отримано." %}</div>
           {% endif %}
         </div>
       </div>
@@ -615,7 +616,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       <!-- Митна декларація / Комерційний інвойс -->
       {% if customs_display %}
       <div class="sd-card">
-        <div class="sd-card-title">🛃 Комерційний інвойс (передано в API)</div>
+        <div class="sd-card-title">🛃 {% trans "Комерційний інвойс (передано в API)" %}</div>
         <div>
           {# Метадані інвойсу #}
           <div style="display:flex;flex-wrap:wrap;gap:20px;font-size:12px;
@@ -634,10 +635,10 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               <thead>
                 <tr>
                   <th>Description</th>
-                  <th style="width:46px;text-align:center">Unit.Number (К-ть)</th>
-                  <th style="width:100px;text-align:right">Unit.Value (Ціна/шт)</th>
-                  <th style="width:110px;text-align:right">Сума рядка</th>
-                  <th style="width:90px;text-align:right">ProductWeight (загальна)</th>
+                  <th style="width:46px;text-align:center">Unit.Number ({% trans "К-ть" %})</th>
+                  <th style="width:100px;text-align:right">Unit.Value ({% trans "Ціна/шт" %})</th>
+                  <th style="width:110px;text-align:right">{% trans "Сума рядка" %}</th>
+                  <th style="width:90px;text-align:right">ProductWeight ({% trans "загальна" %})</th>
                   <th style="width:52px;text-align:center">OriginCountry</th>
                   <th style="width:110px">CommodityCode (HS)</th>
                 </tr>
@@ -651,9 +652,9 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                   <td style="text-align:right;font-weight:700;color:var(--ok);font-family:monospace">
                     {{ item.total_value }} {{ item.currency }}</td>
                   <td style="text-align:right;font-family:monospace">
-                    {{ item.weight_total }} кг
+                    {{ item.weight_total }} {% trans "кг" %}
                     {% if item.weight_auto %}
-                    <span style="font-size:10px;color:var(--text-dim)">(авто)</span>
+                    <span style="font-size:10px;color:var(--text-dim)">({% trans "авто" %})</span>
                     {% endif %}
                   </td>
                   <td class="cnt">{{ item.origin_country }}</td>
@@ -667,9 +668,9 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       </div>
       {% elif shipment.customs_articles %}
       <div class="sd-card">
-        <div class="sd-card-title">🛃 Митна декларація</div>
+        <div class="sd-card-title">🛃 {% trans "Митна декларація" %}</div>
         <div style="font-size:12px;color:var(--text-muted);padding:6px 0">
-          Немає артикулів для відображення.
+          {% trans "Немає артикулів для відображення." %}
         </div>
       </div>
       {% endif %}
@@ -677,18 +678,18 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       <!-- Технічні деталі API -->
       {% if raw_request or raw_response %}
       <details class="sd-card" id="debug" {% if shipment.status == "error" %}open{% endif %}>
-        <summary class="sd-card-title">🔍 Debug — API запит / відповідь</summary>
+        <summary class="sd-card-title">🔍 Debug — {% trans "API запит / відповідь" %}</summary>
         <div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
 
             {% if raw_request %}
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <span style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">📤 Request (надіслано)</span>
+                <span style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em">📤 Request ({% trans "надіслано" %})</span>
                 <button type="button" onclick="copyDebug('dbg-req',this)"
                   style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);
                          border:1px solid var(--border-strong);border-radius:4px;
-                         color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
+                         color:var(--text-muted);cursor:pointer">📋 {% trans "Копіювати" %}</button>
               </div>
               <pre class="sd-pre" id="dbg-req" style="max-height:420px;font-size:11px;color:#4fc3f7">{{ raw_request }}</pre>
             </div>
@@ -698,12 +699,12 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             <div>
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
                 <span style="font-size:11px;font-weight:700;{% if shipment.status == 'error' %}color:var(--err){% else %}color:var(--ok){% endif %};text-transform:uppercase;letter-spacing:.04em">
-                  {% if shipment.status == "error" %}❌{% else %}✅{% endif %} Response (отримано)
+                  {% if shipment.status == "error" %}❌{% else %}✅{% endif %} Response ({% trans "отримано" %})
                 </span>
                 <button type="button" onclick="copyDebug('dbg-res',this)"
                   style="font-size:11px;padding:2px 10px;background:var(--bg-card-2);
                          border:1px solid var(--border-strong);border-radius:4px;
-                         color:var(--text-muted);cursor:pointer">📋 Копіювати</button>
+                         color:var(--text-muted);cursor:pointer">📋 {% trans "Копіювати" %}</button>
               </div>
               <pre class="sd-pre" id="dbg-res" style="max-height:420px;font-size:11px;{% if shipment.status == 'error' %}color:#ef9a9a{% else %}color:#a5d6a7{% endif %}">{{ raw_response }}</pre>
             </div>
@@ -727,29 +728,29 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 
         <!-- Стан доставки -->
         <div class="sd-card">
-          <div class="sd-card-title">🚚 Стан доставки</div>
+          <div class="sd-card-title">🚚 {% trans "Стан доставки" %}</div>
           <div class="sd-info-grid">
             {% if shipment.tracking_number %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Трекінг</span>
+              <span class="sd-info-key">{% trans "Трекінг" %}</span>
               <span class="sd-info-val sd-tracking">{{ shipment.tracking_number }}</span>
             </div>
             {% endif %}
             {% if shipment.carrier_service %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Сервіс</span>
+              <span class="sd-info-key">{% trans "Сервіс" %}</span>
               <span class="sd-info-val">{{ shipment.carrier_service }}</span>
             </div>
             {% endif %}
             {% if shipment.carrier_price %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Вартість</span>
+              <span class="sd-info-key">{% trans "Вартість" %}</span>
               <span class="sd-info-val sd-price">{{ shipment.carrier_price }} {{ shipment.carrier_currency }}</span>
             </div>
             {% endif %}
             {% if shipment.carrier_shipment_id %}
             <div class="sd-info-row">
-              <span class="sd-info-key">ID перевізника</span>
+              <span class="sd-info-key">{% trans "ID перевізника" %}</span>
               <span class="sd-info-val sd-mono sd-small">{{ shipment.carrier_shipment_id|truncatechars:28 }}</span>
             </div>
             {% endif %}
@@ -761,32 +762,32 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             {% endif %}
             {% if shipment.carrier_eta %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Орієнтовна доставка</span>
+              <span class="sd-info-key">{% trans "Орієнтовна доставка" %}</span>
               <span class="sd-info-val" style="color:var(--ok);font-weight:700">📅 {{ shipment.carrier_eta }}</span>
             </div>
             {% endif %}
             {% if shipment.label_url %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Етикетка</span>
+              <span class="sd-info-key">{% trans "Етикетка" %}</span>
               <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 PDF</a>
                 <button type="button" class="sd-save-local-btn"
                   data-url="{{ shipment.label_url }}"
                   data-filename=""
-                  title="Зберегти на ПК">💾</button>
+                  title="{% trans 'Зберегти на ПК' %}">💾</button>
                 <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
               </span>
             </div>
             {% endif %}
             {% if shipment.customs_url %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Комерційний інвойс</span>
+              <span class="sd-info-key">{% trans "Комерційний інвойс" %}</span>
               <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <a href="{{ shipment.customs_url }}" target="_blank" class="sd-label-link">🧾 PDF</a>
                 <button type="button" class="sd-save-local-btn"
                   data-url="{{ shipment.customs_url }}"
                   data-filename=""
-                  title="Зберегти на ПК">💾</button>
+                  title="{% trans 'Зберегти на ПК' %}">💾</button>
                 <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
               </span>
             </div>
@@ -800,14 +801,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             </div>
             {% endif %}{% endwith %}{% endif %}
             {% if not shipment.tracking_number and not shipment.carrier_service and not shipment.carrier_price %}
-            <div style="color:var(--text-dim);font-size:13px;padding:4px 0">Дані від перевізника ще не отримано.</div>
+            <div style="color:var(--text-dim);font-size:13px;padding:4px 0">{% trans "Дані від перевізника ще не отримано." %}</div>
             {% endif %}
           </div>
 
           <!-- Дії -->
           {% if actions %}
           <div class="sd-divider">
-            <div class="sd-section-label">⚡ Дії</div>
+            <div class="sd-section-label">⚡ {% trans "Дії" %}</div>
             <div class="sd-actions">
               {% for a in actions %}
               {% if a.confirm %}
@@ -831,14 +832,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           <!-- Manual tracking number -->
           {% if not shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
           <div class="sd-divider">
-            <div class="sd-section-label">📝 Трекінг-номер</div>
+            <div class="sd-section-label">📝 {% trans "Трекінг-номер" %}</div>
             <form method="post" action="{% url 'admin:shipping_shipment_set_tracking' shipment.pk %}">
               {% csrf_token %}
               <div style="display:flex;gap:8px">
                 <input type="text" name="tracking_number"
-                  placeholder="Введіть трекінг-номер..."
+                  placeholder="{% trans 'Введіть трекінг-номер...' %}"
                   class="sd-field-input">
-                <button type="submit" class="sd-btn-save-sm">💾 Зберегти</button>
+                <button type="submit" class="sd-btn-save-sm">💾 {% trans "Зберегти" %}</button>
               </div>
             </form>
           </div>
@@ -850,7 +851,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             <div class="sd-section-label">🔗 Jumingo Shipment ID</div>
             {% if shipment.carrier_shipment_id %}
             <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;font-family:monospace;word-break:break-all">
-              Поточний: <span style="color:var(--accent)">{{ shipment.carrier_shipment_id }}</span>
+              {% trans "Поточний" %}: <span style="color:var(--accent)">{{ shipment.carrier_shipment_id }}</span>
             </div>
             {% endif %}
             <form method="post" action="{% url 'admin:shipping_shipment_set_jumingo_id' shipment.pk %}">
@@ -860,7 +861,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                   value="{{ shipment.carrier_shipment_id }}"
                   placeholder="s_xxxxxxxxxxxxxxxx..."
                   class="sd-field-input sd-mono">
-                <button type="submit" class="sd-btn-save-sm">💾 Зберегти</button>
+                <button type="submit" class="sd-btn-save-sm">💾 {% trans "Зберегти" %}</button>
               </div>
             </form>
           </div>
@@ -869,24 +870,24 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           <!-- DHL Cancel -->
           {% if shipment.carrier.carrier_type == "dhl" and shipment.tracking_number and shipment.status not in "cancelled,delivered" %}
           <div class="sd-divider">
-            <div class="sd-section-label" style="color:var(--err)">🗑️ Скасувати в DHL</div>
+            <div class="sd-section-label" style="color:var(--err)">🗑️ {% trans "Скасувати в DHL" %}</div>
             <form method="post" action="{% url 'admin:shipping_shipment_dhl_cancel' shipment.pk %}">
               {% csrf_token %}
               <button type="submit"
-                onclick="return confirm('Скасувати відправлення {{ shipment.tracking_number }} у DHL?\n\nЦе можливо тільки якщо кур\'єр ще не забрав посилку.\n\nПродовжити?')"
+                onclick="return confirm('{% trans "Скасувати відправлення" %} {{ shipment.tracking_number }} {% trans "у DHL?" %}\n\n{% trans "Це можливо тільки якщо кур\'єр ще не забрав посилку." %}\n\n{% trans "Продовжити?" %}')"
                 class="sd-btn-dhl-cancel">
-                🗑️ Скасувати в DHL API ({{ shipment.tracking_number }})
+                🗑️ {% trans "Скасувати в DHL API" %} ({{ shipment.tracking_number }})
               </button>
             </form>
             <div class="sd-section-note">
-              Викликає DELETE /shipments у DHL. Тільки до передачі кур'єру.
+              {% trans "Викликає DELETE /shipments у DHL. Тільки до передачі кур'єру." %}
             </div>
           </div>
           {% endif %}
 
           <!-- Ручна зміна статусу -->
           <div class="sd-divider">
-            <div class="sd-section-label">🔧 Статус вручну</div>
+            <div class="sd-section-label">🔧 {% trans "Статус вручну" %}</div>
             <form method="post" action="{% url 'admin:shipping_shipment_set_status' shipment.pk %}">
               {% csrf_token %}
               <select name="new_status" class="sd-select">
@@ -895,49 +896,49 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                 {% endfor %}
               </select>
               <button type="submit"
-                onclick="return confirm('Змінити статус вручну?\n\nЦе лише локальний запис у Minerva.\nAPI перевізника не викликається.')"
+                onclick="return confirm('{% trans "Змінити статус вручну?" %}\n\n{% trans "Це лише локальний запис у Minerva." %}\n{% trans "API перевізника не викликається." %}')"
                 class="sd-btn-status-apply">
-                Застосувати
+                {% trans "Застосувати" %}
               </button>
             </form>
             <div class="sd-section-note">
-              Використовуй якщо API перевізника показує застарілий статус.<br>
-              Синхронізує також SalesOrder.
+              {% trans "Використовуй якщо API перевізника показує застарілий статус." %}<br>
+              {% trans "Синхронізує також SalesOrder." %}
             </div>
           </div>
         </div>
 
         <!-- Дані замовлення -->
         <div class="sd-card">
-          <div class="sd-card-title">📋 Замовлення {{ order.order_number }}</div>
+          <div class="sd-card-title">📋 {% trans "Замовлення" %} {{ order.order_number }}</div>
           <div class="sd-info-grid">
             <div class="sd-info-row">
-              <span class="sd-info-key">Джерело</span>
+              <span class="sd-info-key">{% trans "Джерело" %}</span>
               <span class="sd-info-val">{{ order.source }}</span>
             </div>
             <div class="sd-info-row">
-              <span class="sd-info-key">Статус</span>
+              <span class="sd-info-key">{% trans "Статус" %}</span>
               <span class="sd-info-val">{{ order.get_status_display }}</span>
             </div>
             <div class="sd-info-row">
-              <span class="sd-info-key">Клієнт</span>
+              <span class="sd-info-key">{% trans "Клієнт" %}</span>
               <span class="sd-info-val">{{ order.client|default:"—" }}</span>
             </div>
             {% if order.shipping_courier %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Кур'єр</span>
+              <span class="sd-info-key">{% trans "Кур'єр" %}</span>
               <span class="sd-info-val">{{ order.shipping_courier }}</span>
             </div>
             {% endif %}
             {% if order.tracking_number %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Трекінг</span>
+              <span class="sd-info-key">{% trans "Трекінг" %}</span>
               <span class="sd-info-val sd-mono sd-small">{{ order.tracking_number|truncatechars:24 }}</span>
             </div>
             {% endif %}
             {% if order.shipping_cost %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Вартість дост.</span>
+              <span class="sd-info-key">{% trans "Вартість дост." %}</span>
               <span class="sd-info-val sd-price" style="font-size:13px">{{ order.shipping_cost }} {{ order.shipping_currency|default:"EUR" }}</span>
             </div>
             {% endif %}
@@ -954,10 +955,10 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   background:var(--bg-card-2);border:1px solid var(--warn,#e3b341);
   border-radius:8px;border-left:4px solid var(--warn,#e3b341)">
   <div style="font-weight:700;color:var(--warn,#e3b341);margin-bottom:10px;font-size:14px">
-    📦 Зберегти упаковку для товарів
+    📦 {% trans "Зберегти упаковку для товарів" %}
   </div>
   <p style="color:var(--text);font-size:13px;margin:0 0 10px">
-    Наступні товари не мають налаштованої упаковки. Перейняти параметри посилки ({% with pkg=shipment.packages.first %}{% if pkg %}{{pkg.length_cm}}×{{pkg.width_cm}}×{{pkg.height_cm}} см, {{pkg.weight_kg}} кг{% else %}{{shipment.length_cm}}×{{shipment.width_cm}}×{{shipment.height_cm}} см, {{shipment.weight_kg}} кг{% endif %}{% endwith %}) і зберегти як упаковку?
+    {% trans "Наступні товари не мають налаштованої упаковки. Перейняти параметри посилки" %} ({% with pkg=shipment.packages.first %}{% if pkg %}{{pkg.length_cm}}×{{pkg.width_cm}}×{{pkg.height_cm}} {% trans "см" %}, {{pkg.weight_kg}} {% trans "кг" %}{% else %}{{shipment.length_cm}}×{{shipment.width_cm}}×{{shipment.height_cm}} {% trans "см" %}, {{shipment.weight_kg}} {% trans "кг" %}{% endif %}{% endwith %}) {% trans "і зберегти як упаковку?" %}
   </p>
   <ul style="margin:0 0 12px;padding-left:20px;color:var(--text);font-size:13px">
     {% for item in suggest_packaging %}
@@ -970,7 +971,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
   <button type="button" id="savePkgBtn"
     style="background:var(--ok,#3fb950);color:#fff;border:none;padding:8px 20px;
     border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">
-    {% with cnt=suggest_packaging|length %}💾 Зберегти упаковку ({{ cnt }} {% if cnt == 1 %}товар{% elif cnt < 5 %}товари{% else %}товарів{% endif %}){% endwith %}
+    {% with cnt=suggest_packaging|length %}💾 {% trans "Зберегти упаковку" %} ({{ cnt }} {% if cnt == 1 %}{% trans "товар" %}{% elif cnt < 5 %}{% trans "товари" %}{% else %}{% trans "товарів" %}{% endif %}){% endwith %}
   </button>
   <span id="savePkgStatus" style="margin-left:12px;font-size:12px;color:var(--text)"></span>
 </div>
@@ -1019,7 +1020,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       ? [SOURCE, DATE_STR, ORDER_NUMBER] : null;
     var statusEl = btn.nextElementSibling;
     btn.disabled = true; btn.textContent = '⏳';
-    if (statusEl) { statusEl.textContent = 'Збереження…'; statusEl.style.color = 'var(--text-dim)'; }
+    if (statusEl) { statusEl.textContent = '{% trans "Збереження…" %}'; statusEl.style.color = 'var(--text-dim)'; }
 
     if (!window.MinervaLocalSave || !MinervaLocalSave.supported) {
       /* No local save support — just do server save */
@@ -1034,7 +1035,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
         if (statusEl) { statusEl.textContent = '✅ ' + r.path; statusEl.style.color = 'var(--ok)'; }
         doServerSave(statusEl);
       } else if (r.reason === 'no_handle') {
-        if (statusEl) statusEl.textContent = '📂 Оберіть папку…';
+        if (statusEl) statusEl.textContent = '📂 {% trans "Оберіть папку…" %}';
         MinervaLocalSave.pickFolder().then(function(h) { if (h) doSave(btn); });
       } else {
         if (statusEl) { statusEl.textContent = '⚠️ ' + r.reason; statusEl.style.color = 'var(--err)'; }
@@ -1057,7 +1058,7 @@ function copyDebug(id, btn) {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(function() {
       var orig = btn.textContent;
-      btn.textContent = '✅ Скопійовано';
+      btn.textContent = '✅ {% trans "Скопійовано" %}';
       setTimeout(function(){ btn.textContent = orig; }, 2000);
     });
   } else {
@@ -1067,7 +1068,7 @@ function copyDebug(id, btn) {
     document.execCommand('copy');
     document.body.removeChild(ta);
     var orig = btn.textContent;
-    btn.textContent = '✅ Скопійовано';
+    btn.textContent = '✅ {% trans "Скопійовано" %}';
     setTimeout(function(){ btn.textContent = orig; }, 2000);
   }
 }
@@ -1077,7 +1078,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var btn = document.getElementById('savePkgBtn');
   if (!btn) return;
   btn.addEventListener('click', function() {
-    btn.disabled = true; btn.textContent = '⏳ Збереження…';
+    btn.disabled = true; btn.textContent = '⏳ {% trans "Збереження…" %}';
     var csrf = document.querySelector('[name=csrfmiddlewaretoken]');
     fetch('{% url "admin:shipping_shipment_save_packaging" shipment.pk %}',
       { method: 'POST', headers: { 'X-CSRFToken': csrf ? csrf.value : '' } })
@@ -1085,7 +1086,7 @@ document.addEventListener('DOMContentLoaded', function() {
     .then(function(d) {
       var st = document.getElementById('savePkgStatus');
       if (d.ok) {
-        btn.textContent = '✅ Збережено';
+        btn.textContent = '✅ {% trans "Збережено" %}';
         btn.style.background = 'var(--text-dim)';
         if (st) st.textContent = d.msg;
         /* Приховуємо панель через 3с */
@@ -1094,14 +1095,14 @@ document.addEventListener('DOMContentLoaded', function() {
           if (panel) panel.style.display = 'none';
         }, 3000);
       } else {
-        btn.disabled = false; btn.textContent = '💾 Зберегти упаковку';
+        btn.disabled = false; btn.textContent = '💾 {% trans "Зберегти упаковку" %}';
         if (st) { st.textContent = '⚠️ ' + (d.error || d.msg); st.style.color = 'var(--err)'; }
       }
     })
     .catch(function(e) {
-      btn.disabled = false; btn.textContent = '💾 Зберегти упаковку';
+      btn.disabled = false; btn.textContent = '💾 {% trans "Зберегти упаковку" %}';
       var st = document.getElementById('savePkgStatus');
-      if (st) { st.textContent = '⚠️ Помилка: ' + e; st.style.color = 'var(--err)'; }
+      if (st) { st.textContent = '⚠️ {% trans "Помилка" %}: ' + e; st.style.color = 'var(--err)'; }
     });
   });
 });

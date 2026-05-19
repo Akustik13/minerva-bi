@@ -1,4 +1,5 @@
 {% extends "admin/change_list.html" %}
+{% load i18n %}
 
 {% block extrahead %}{{ block.super }}
 <style>
@@ -371,12 +372,13 @@ a.crm-btn-strat  {
 
 <script>
 /* ── Action dropdown grouping ─────────────────────────────── */
+var _msgSelectAction = '{% trans "Виберіть дію" %}';
 document.addEventListener('DOMContentLoaded', function () {
   var sel = document.querySelector('select[name="action"]');
   if (!sel) return;
   var GROUPS = [
-    { label:'🔄 Статус',  match:'Статус →' },
-    { label:'🏷️ Сегмент', match:'Сегмент →' },
+    { label:'🔄 {% trans "Статус" %}',  match:'{% trans "Статус" %} →' },
+    { label:'🏷️ {% trans "Сегмент" %}', match:'{% trans "Сегмент" %} →' },
   ];
   var allOpts = Array.from(sel.options);
   var placeholder = allOpts[0], remaining = allOpts.slice(1);
@@ -391,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function () {
     remaining = remaining.filter(function(o){ return matched.indexOf(o) === -1; });
   });
   if (remaining.length){
-    var og = document.createElement('optgroup'); og.label = '⚙️ Адмін';
+    var og = document.createElement('optgroup'); og.label = '⚙️ {% trans "Адмін" %}';
     remaining.forEach(function(o){ og.appendChild(o); });
     sel.appendChild(og);
   }
@@ -412,7 +414,7 @@ function crmInitActionBar() {
 
 function crmDoAction() {
   var dst = document.getElementById('crm-act-sel');
-  if (!dst || !dst.value) { alert('Виберіть дію'); return; }
+  if (!dst || !dst.value) { alert(_msgSelectAction); return; }
   var native = document.querySelector('select[name="action"]');
   if (native) native.value = dst.value;
   /* Click Django's native submit button to include name="index" */
@@ -432,14 +434,14 @@ function crmDoAction() {
 
 {# ── Quick filter bar ─────────────────────────────────────── #}
 <div class="crm-qf-bar">
-  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Статус:</span>
-  <a class="crm-qf-btn" id="cqf-all"      onclick="crmQFStatus('');return false" href="#">Всі</a>
-  <a class="crm-qf-btn" id="cqf-active"   onclick="crmQFStatus('active');return false" href="#">🟢 Активні{% if crm_status_counts.active %} <span class="crm-qf-cnt">{{ crm_status_counts.active }}</span>{% endif %}</a>
+  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">{% trans "Статус" %}:</span>
+  <a class="crm-qf-btn" id="cqf-all"      onclick="crmQFStatus('');return false" href="#">{% trans "Всі" %}</a>
+  <a class="crm-qf-btn" id="cqf-active"   onclick="crmQFStatus('active');return false" href="#">🟢 {% trans "Активні" %}{% if crm_status_counts.active %} <span class="crm-qf-cnt">{{ crm_status_counts.active }}</span>{% endif %}</a>
   <a class="crm-qf-btn" id="cqf-vip"      onclick="crmQFStatus('vip');return false" href="#">⭐ VIP{% if crm_status_counts.vip %} <span class="crm-qf-cnt">{{ crm_status_counts.vip }}</span>{% endif %}</a>
-  <a class="crm-qf-btn" id="cqf-inactive" onclick="crmQFStatus('inactive');return false" href="#">⚪ Неактивні{% if crm_status_counts.inactive %} <span class="crm-qf-cnt">{{ crm_status_counts.inactive }}</span>{% endif %}</a>
-  <a class="crm-qf-btn" id="cqf-blocked"  onclick="crmQFStatus('blocked');return false" href="#">🚫 Заблоковані{% if crm_status_counts.blocked %} <span class="crm-qf-cnt">{{ crm_status_counts.blocked }}</span>{% endif %}</a>
+  <a class="crm-qf-btn" id="cqf-inactive" onclick="crmQFStatus('inactive');return false" href="#">⚪ {% trans "Неактивні" %}{% if crm_status_counts.inactive %} <span class="crm-qf-cnt">{{ crm_status_counts.inactive }}</span>{% endif %}</a>
+  <a class="crm-qf-btn" id="cqf-blocked"  onclick="crmQFStatus('blocked');return false" href="#">🚫 {% trans "Заблоковані" %}{% if crm_status_counts.blocked %} <span class="crm-qf-cnt">{{ crm_status_counts.blocked }}</span>{% endif %}</a>
   <div class="crm-qf-sep"></div>
-  <a class="crm-qf-btn crm-qf-fav" id="cqf-favorites" onclick="crmQFFavorite();return false" href="#">⭐ Обрані{% if crm_count_favorites %} <span class="crm-qf-cnt">{{ crm_count_favorites }}</span>{% endif %}</a>
+  <a class="crm-qf-btn crm-qf-fav" id="cqf-favorites" onclick="crmQFFavorite();return false" href="#">⭐ {% trans "Обрані" %}{% if crm_count_favorites %} <span class="crm-qf-cnt">{{ crm_count_favorites }}</span>{% endif %}</a>
 </div>
 
 {# ── Combined toolbar (actions + view toggle) ─────────────── #}
@@ -447,21 +449,21 @@ function crmDoAction() {
   <div id="crm-card-controls">
     <label>
       <input type="checkbox" id="crm-sel-all" onchange="crmSelectAll(this.checked)">
-      Вибрати всі
+      {% trans "Вибрати всі" %}
     </label>
     <span class="crm-bar-sep">|</span>
-    <span style="font-size:12px;color:var(--text-muted)">Дія:</span>
+    <span style="font-size:12px;color:var(--text-muted)">{% trans "Дія" %}:</span>
     <select id="crm-act-sel" class="crm-act-sel">
       <option value="">---------</option>
     </select>
-    <button type="button" class="crm-act-go" onclick="crmDoAction()">Вперед →</button>
+    <button type="button" class="crm-act-go" onclick="crmDoAction()">{% trans "Вперед" %} →</button>
     <span class="crm-bar-sep">|</span>
-    <span id="crm-sel-count" style="font-size:12px;font-weight:700;color:#1976d2">Обрано 0 з {{ cl.result_list|length }}</span>
+    <span id="crm-sel-count" style="font-size:12px;font-weight:700;color:#1976d2">{% blocktrans with n=0 total=cl.result_list|length %}Обрано {{ n }} з {{ total }}{% endblocktrans %}</span>
   </div>
   <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-shrink:0">
-    <span style="font-size:11px;color:var(--text-muted)">Вигляд:</span>
-    <button class="crm-toggle-btn" id="crm-btn-table" onclick="crmSetView('table')">📋 Таблиця</button>
-    <button class="crm-toggle-btn" id="crm-btn-cards" onclick="crmSetView('cards')">🃏 Картки</button>
+    <span style="font-size:11px;color:var(--text-muted)">{% trans "Вигляд" %}:</span>
+    <button class="crm-toggle-btn" id="crm-btn-table" onclick="crmSetView('table')">📋 {% trans "Таблиця" %}</button>
+    <button class="crm-toggle-btn" id="crm-btn-cards" onclick="crmSetView('cards')">🃏 {% trans "Картки" %}</button>
   </div>
 </div>
 
@@ -477,7 +479,7 @@ function crmDoAction() {
   <div class="crm-hd">
 
     {# Checkbox — top-left #}
-    <label class="crm-cb-wrap" title="Вибрати">
+    <label class="crm-cb-wrap" title="{% trans "Вибрати" %}">
       <input type="checkbox" class="crm-card-cb" data-pk="{{ customer.pk }}"
              onchange="crmCardCheck(this)">
     </label>
@@ -528,18 +530,18 @@ function crmDoAction() {
         <button class="crm-fav-btn {% if customer.is_favorite %}crm-fav-on{% endif %}"
                 data-pk="{{ customer.pk }}"
                 onclick="crmFavorite({{ customer.pk }});return false"
-                title="{% if customer.is_favorite %}Зняти обраність{% else %}Позначити як обраний{% endif %}">{% if customer.is_favorite %}⭐{% else %}☆{% endif %}</button>
+                title="{% if customer.is_favorite %}{% trans "Зняти обраність" %}{% else %}{% trans "Позначити як обраний" %}{% endif %}">{% if customer.is_favorite %}⭐{% else %}☆{% endif %}</button>
         {# Status #}
-        {% if customer.status == 'active' %}    <span class="crm-badge" style="background:#43a047">Активний</span>
+        {% if customer.status == 'active' %}    <span class="crm-badge" style="background:#43a047">{% trans "Активний" %}</span>
         {% elif customer.status == 'vip' %}     <span class="crm-badge" style="background:#f9a825;color:#000">⭐ VIP</span>
-        {% elif customer.status == 'inactive' %}<span class="crm-badge" style="background:#78909c">Неактивний</span>
-        {% elif customer.status == 'blocked' %} <span class="crm-badge" style="background:#e53935">🚫 Заблоковано</span>
+        {% elif customer.status == 'inactive' %}<span class="crm-badge" style="background:#78909c">{% trans "Неактивний" %}</span>
+        {% elif customer.status == 'blocked' %} <span class="crm-badge" style="background:#e53935">🚫 {% trans "Заблоковано" %}</span>
         {% endif %}
         {# Segment / Тип #}
         {% if customer.segment == 'b2b' %}         <span class="crm-badge-seg" style="background:#1976d2">B2B</span>
         {% elif customer.segment == 'b2c' %}        <span class="crm-badge-seg" style="background:#388e3c">B2C</span>
-        {% elif customer.segment == 'distributor' %}<span class="crm-badge-seg" style="background:#f57c00">Дистриб'ютор</span>
-        {% elif customer.segment == 'reseller' %}   <span class="crm-badge-seg" style="background:#6a1b9a">Реселер</span>
+        {% elif customer.segment == 'distributor' %}<span class="crm-badge-seg" style="background:#f57c00">{% trans "Дистриб'ютор" %}</span>
+        {% elif customer.segment == 'reseller' %}   <span class="crm-badge-seg" style="background:#6a1b9a">{% trans "Реселер" %}</span>
         {% else %}                                  <span class="crm-badge-seg" style="background:#546e7a">{{ customer.get_segment_display }}</span>
         {% endif %}
       </div>
@@ -550,15 +552,15 @@ function crmDoAction() {
   <div class="crm-stats">
     <div class="crm-sc crm-sc-orders">
       <div class="crm-sc-val">{{ stats.count }}</div>
-      <div class="crm-sc-lbl">Замовлення</div>
+      <div class="crm-sc-lbl">{% trans "Замовлення" %}</div>
     </div>
     <div class="crm-sc crm-sc-rev">
       <div class="crm-sc-val">{{ stats.rev }}</div>
-      <div class="crm-sc-lbl">Виручка</div>
+      <div class="crm-sc-lbl">{% trans "Виручка" %}</div>
     </div>
     <div class="crm-sc crm-sc-avg">
       <div class="crm-sc-val">{{ stats.avg }}</div>
-      <div class="crm-sc-lbl">Сер. чек</div>
+      <div class="crm-sc-lbl">{% trans "Сер. чек" %}</div>
     </div>
   </div>
 
@@ -566,15 +568,15 @@ function crmDoAction() {
   {% if stats.last %}
   <div class="crm-recency {{ stats.recency_cls }}">
     <span class="crm-rec-dot"></span>
-    <span>Остання покупка:</span>
+    <span>{% trans "Остання покупка" %}:</span>
     <span class="crm-rec-date">{{ stats.last|date:"d.m.Y" }}</span>
     {% if stats.days is not None %}
-      <span style="color:var(--text-muted)">—&nbsp;{{ stats.days }}&nbsp;дн. тому</span>
+      <span style="color:var(--text-muted)">—&nbsp;{{ stats.days }}&nbsp;{% trans "дн. тому" %}</span>
       <span class="crm-rec-badge">
-        {% if stats.days <= 30 %}🟢 Свіжий
-        {% elif stats.days <= 90 %}🟡 Нормально
-        {% elif stats.days <= 365 %}🟠 Ризик
-        {% else %}🔴 Втрачений{% endif %}
+        {% if stats.days <= 30 %}🟢 {% trans "Свіжий" %}
+        {% elif stats.days <= 90 %}🟡 {% trans "Нормально" %}
+        {% elif stats.days <= 365 %}🟠 {% trans "Ризик" %}
+        {% else %}🔴 {% trans "Втрачений" %}{% endif %}
       </span>
     {% endif %}
   </div>
@@ -583,18 +585,18 @@ function crmDoAction() {
   {# ┌── TOP PRODUCTS ──────────────────────────────────────── #}
   {% if tops %}
   <div class="crm-tops">
-    <div class="crm-tops-hd">📦 Топ товари</div>
+    <div class="crm-tops-hd">📦 {% trans "Топ товари" %}</div>
     {% for prod in tops %}
     <div class="crm-top-row{% if forloop.counter > 3 %} crm-top-extra{% endif %}">
       <span class="crm-top-num">{{ forloop.counter }}</span>
       <span class="crm-top-sku">{{ prod.sku_raw|default:"—" }}</span>
-      <span class="crm-top-qty">× {{ prod.total_qty|default:0 }} шт</span>
+      <span class="crm-top-qty">× {{ prod.total_qty|default:0 }} {% trans "шт" %}</span>
       <span class="crm-top-rev">{{ stats.sym }}{{ prod.total_revenue|floatformat:0 }}</span>
     </div>
     {% endfor %}
     {% if tops|length > 3 %}
     <button class="crm-tops-more" onclick="crmToggleTops(this)">
-      ▼ +{{ tops|length|add:"-3" }} більше
+      ▼ +{{ tops|length|add:"-3" }} {% trans "більше" %}
     </button>
     {% endif %}
   </div>
@@ -628,9 +630,9 @@ function crmDoAction() {
     {# Header: badge + name + progress count + canvas link #}
     <div class="crm-strat-hd">
       {% if sdata.status == 'active' %}
-        <span class="crm-strat-badge crm-strat-badge-active">⚡ Активна</span>
+        <span class="crm-strat-badge crm-strat-badge-active">⚡ {% trans "Активна" %}</span>
       {% else %}
-        <span class="crm-strat-badge crm-strat-badge-paused">⏸ Призупинена</span>
+        <span class="crm-strat-badge crm-strat-badge-paused">⏸ {% trans "Призупинена" %}</span>
       {% endif %}
       <span class="crm-strat-name">{{ sdata.name }}</span>
       <span class="crm-strat-prog">{{ sdata.done }}/{{ sdata.total }}</span>
@@ -647,7 +649,7 @@ function crmDoAction() {
           <div class="crm-strat-step crm-step-cur">
             <span class="crm-step-dot">⚡</span>
             <span class="crm-step-lbl">{{ step.title|truncatechars:32 }}</span>
-            <span class="crm-step-tag">зараз</span>
+            <span class="crm-step-tag">{% trans "зараз" %}</span>
           </div>
         {% elif step.outcome == 'done_pos' %}
           <div class="crm-strat-step crm-step-done">
@@ -672,7 +674,7 @@ function crmDoAction() {
         {% endif %}
       {% endfor %}
       {% if sdata.extra > 0 %}
-        <div class="crm-strat-extra">+ ще {{ sdata.extra }} кроків…</div>
+        <div class="crm-strat-extra">+ {% trans "ще" %} {{ sdata.extra }} {% trans "кроків…" %}</div>
       {% endif %}
     </div>
   </div>
@@ -680,21 +682,21 @@ function crmDoAction() {
 
   {# ┌── FOOTER: actions ──────────────────────────────────── #}
   <div class="crm-ft">
-    <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="crm-btn crm-btn-open">⚙️ Відкрити</a>
-    <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ customer.email|default:customer.name }}" class="crm-btn crm-btn-orders">📋 Замовлення</a>
-    <a href="{% url 'admin:crm_customer_new_order' customer.pk %}" class="crm-btn crm-btn-order">➕ Нове</a>
+    <a href="{% url 'admin:crm_customer_change' customer.pk %}" class="crm-btn crm-btn-open">⚙️ {% trans "Відкрити" %}</a>
+    <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ customer.email|default:customer.name }}" class="crm-btn crm-btn-orders">📋 {% trans "Замовлення" %}</a>
+    <a href="{% url 'admin:crm_customer_new_order' customer.pk %}" class="crm-btn crm-btn-order">➕ {% trans "Нове" %}</a>
     {% if sdata %}
       <a href="/strategy/{{ sdata.pk }}/canvas/" class="crm-btn crm-btn-strat">🎯 Canvas</a>
     {% elif rfm.R > 3 and rfm.F == 1 %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#1976d2;color:#fff !important">🚀 Онбординг</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#1976d2;color:#fff !important">🚀 {% trans "Онбординг" %}</a>
     {% elif "At Risk" in rfm.segment or "Hibernating" in rfm.segment %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#e53935;color:#fff !important">🔄 Реактивація</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#e53935;color:#fff !important">🔄 {% trans "Реактивація" %}</a>
     {% elif "Potential" in rfm.segment or "Regular" in rfm.segment or "New" in rfm.segment %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#f57c00;color:#fff !important">📈 Нарощування</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#f57c00;color:#fff !important">📈 {% trans "Нарощування" %}</a>
     {% elif "Champion" in rfm.segment or "Loyal" in rfm.segment %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#7b1fa2;color:#fff !important">👑 Утримання</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn" style="background:#7b1fa2;color:#fff !important">👑 {% trans "Утримання" %}</a>
     {% else %}
-      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-strat">✏️ Вибрати</a>
+      <a href="/admin/crm/customer/{{ customer.pk }}/assign-strategy/" class="crm-btn crm-btn-strat">✏️ {% trans "Вибрати" %}</a>
     {% endif %}
   </div>
 
@@ -703,7 +705,7 @@ function crmDoAction() {
 {% endfor %}
 
 {% if not cl.result_list %}
-  <p style="color:var(--text-muted);padding:24px 0;text-align:center">Клієнтів не знайдено.</p>
+  <p style="color:var(--text-muted);padding:24px 0;text-align:center">{% trans "Клієнтів не знайдено." %}</p>
 {% endif %}
 </div>{# /crm-cards #}
 
@@ -740,23 +742,27 @@ function crmSelectAll(checked) {
   });
 }
 
+var _msgSelectedOf = '{% trans "Обрано" %}';
+var _msgOf         = '{% trans "з" %}';
 function crmUpdateCount() {
   var n = document.querySelectorAll('.crm-card-cb:checked').length;
   var t = document.querySelectorAll('.crm-card-cb').length;
   var el = document.getElementById('crm-sel-count');
-  if (el) el.textContent = 'Обрано ' + n + ' з ' + t;
+  if (el) el.textContent = _msgSelectedOf + ' ' + n + ' ' + _msgOf + ' ' + t;
   var sa = document.getElementById('crm-sel-all');
   if (sa) { sa.checked = (n === t && t > 0); sa.indeterminate = (n > 0 && n < t); }
 }
 
 /* ══ Top products expand ═══════════════════════════════════ */
 
+var _msgMore     = '{% trans "більше" %}';
+var _msgCollapse = '{% trans "Згорнути" %}';
 function crmToggleTops(btn) {
   var extras = btn.closest('.crm-tops').querySelectorAll('.crm-top-extra');
   var open = btn.dataset.open === '1';
   extras.forEach(function(r){ r.style.display = open ? 'none' : 'grid'; });
   btn.dataset.open = open ? '0' : '1';
-  btn.textContent  = open ? '▼ +' + extras.length + ' більше' : '▲ Згорнути';
+  btn.textContent  = open ? '▼ +' + extras.length + ' ' + _msgMore : '▲ ' + _msgCollapse;
 }
 
 /* ══ View toggle ═══════════════════════════════════════════ */
@@ -805,9 +811,11 @@ function crmFavorite(pk) {
     method: 'POST',
     headers: {'X-CSRFToken': csrf[1], 'X-Requested-With': 'XMLHttpRequest'},
   }).then(function(r){ return r.json(); }).then(function(d){
+    var _msgRemoveFav = '{% trans "Зняти обраність" %}';
+    var _msgAddFav    = '{% trans "Позначити як обраний" %}';
     document.querySelectorAll('.crm-fav-btn[data-pk="' + pk + '"]').forEach(function(btn){
       btn.classList.toggle('crm-fav-on', d.is_favorite);
-      btn.title = d.is_favorite ? 'Зняти обраність' : 'Позначити як обраний';
+      btn.title = d.is_favorite ? _msgRemoveFav : _msgAddFav;
       btn.textContent = d.is_favorite ? '⭐' : '☆';
     });
     var card = document.getElementById('crm-card-' + pk);
@@ -839,15 +847,15 @@ function crmFavorite(pk) {
         <a href="{% url 'admin:crm_customer_find_duplicates' %}"
            style="background:#6a1b9a;color:white;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
-            🔍 Знайти дублікати
+            🔍 {% trans "Знайти дублікати" %}
         </a>
     </li>
     <li>
         <a href="{% url 'admin:crm_customer_sync' %}"
            style="background:#1976d2;color:white;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block"
-           onclick="return confirm('Синхронізувати всіх клієнтів з замовлень? Це може зайняти кілька секунд.')">
-            🔄 Синхронізація CRM
+           onclick="return confirm('{% trans "Синхронізувати всіх клієнтів з замовлень? Це може зайняти кілька секунд." %}')">
+            🔄 {% trans "Синхронізація CRM" %}
         </a>
     </li>
 {% endblock %}

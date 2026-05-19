@@ -29,7 +29,7 @@
       <a href="mailto:{{ original.email }}"
          style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:4px;
                 text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap">
-        📧 Написати
+        📧 {% trans "Написати" %}
       </a>
     </li>
     {% endif %}
@@ -37,14 +37,14 @@
       <a href="{% url 'admin:sales_salesorder_changelist' %}?q={{ original.email|default:original.name }}"
          style="background:#1b5e20;color:#fff;padding:6px 14px;border-radius:4px;
                 text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap">
-        📋 Усі замовлення
+        📋 {% trans "Усі замовлення" %}
       </a>
     </li>
     <li>
       <a href="{% url 'admin:crm_customer_new_order' original.pk %}"
          style="background:#e65100;color:#fff;padding:6px 14px;border-radius:4px;
                 text-decoration:none;font-size:13px;font-weight:500;white-space:nowrap">
-        ➕ Нове замовлення
+        ➕ {% trans "Нове замовлення" %}
       </a>
     </li>
   {% endif %}
@@ -68,23 +68,23 @@
                 style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
                        background:rgba(0,212,170,.12);color:#00d4aa;
                        border:1px solid rgba(0,212,170,.3);cursor:pointer">
-          🔍 Аналіз клієнта
+          🔍 {% trans "Аналіз клієнта" %}
         </button>
         <button type="button" onclick="toggleEmailComposer()"
                 style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
                        background:rgba(79,143,255,.12);color:#4f8fff;
                        border:1px solid rgba(79,143,255,.3);cursor:pointer">
-          ✉️ Написати лист
+          ✉️ {% trans "Написати лист" %}
         </button>
         <button type="button" onclick="runStrategyAdvisor()" id="btn-strategy-advisor"
-                title="AI аналізує виконані кроки стратегії та дає рекомендацію щодо корегування"
+                title="{% trans "AI аналізує виконані кроки стратегії та дає рекомендацію щодо корегування" %}"
                 style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
                        background:rgba(147,112,219,.12);color:#9370db;
                        border:1px solid rgba(147,112,219,.3);cursor:pointer">
-          🧭 Стратегія AI
+          🧭 {% trans "Стратегія AI" %}
         </button>
         <button type="button" onclick="resetAiContext()" id="btn-reset-ai"
-                title="Скинути пам'ять AI для цього клієнта — нова розмова почнеться з чистого аркуша"
+                title="{% trans "Скинути пам'ять AI для цього клієнта — нова розмова почнеться з чистого аркуша" %}"
                 style="padding:6px 10px;border-radius:6px;font-size:12px;font-weight:600;
                        background:transparent;color:var(--text-dim);
                        border:1px solid var(--border-strong);cursor:pointer">
@@ -96,22 +96,22 @@
     <!-- Scope toggles: що включати в аналіз -->
     <div style="padding:8px 16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;
                 border-bottom:1px solid var(--border)">
-      <span style="font-size:11px;color:var(--text-dim);margin-right:2px">Аналізувати:</span>
-      <button type="button" id="sc-customer"  onclick="toggleScope('customer')"  class="scope-pill active">👤 Клієнт</button>
-      <button type="button" id="sc-orders"    onclick="toggleScope('orders')"    class="scope-pill active">📦 Замовлення</button>
-      <button type="button" id="sc-emails"    onclick="toggleScope('emails')"    class="scope-pill active">📧 Листування</button>
-      <button type="button" id="sc-shipments" onclick="toggleScope('shipments')" class="scope-pill active">🚚 Доставка</button>
+      <span style="font-size:11px;color:var(--text-dim);margin-right:2px">{% trans "Аналізувати" %}:</span>
+      <button type="button" id="sc-customer"  onclick="toggleScope('customer')"  class="scope-pill active">👤 {% trans "Клієнт" %}</button>
+      <button type="button" id="sc-orders"    onclick="toggleScope('orders')"    class="scope-pill active">📦 {% trans "Замовлення" %}</button>
+      <button type="button" id="sc-emails"    onclick="toggleScope('emails')"    class="scope-pill active">📧 {% trans "Листування" %}</button>
+      <button type="button" id="sc-shipments" onclick="toggleScope('shipments')" class="scope-pill active">🚚 {% trans "Доставка" %}</button>
     </div>
 
     <!-- Mailbox email picker -->
     <div style="padding:6px 16px;border-bottom:1px solid var(--border)">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--text-dim)">📬 Листи зі скриньки:</span>
+        <span style="font-size:11px;color:var(--text-dim)">📬 {% trans "Листи зі скриньки" %}:</span>
         <button type="button" id="btn-load-mailbox" onclick="loadMailboxEmails()"
                 style="padding:3px 10px;border-radius:5px;font-size:11px;font-weight:600;
                        border:1px solid var(--border-strong);background:transparent;
                        color:var(--text-dim);cursor:pointer">
-          Завантажити
+          {% trans "Завантажити" %}
         </button>
         <span id="mailbox-status" style="font-size:11px;color:var(--text-muted)"></span>
       </div>
@@ -124,7 +124,7 @@
 
     <div style="padding:6px 16px 10px;border-bottom:1px solid var(--border)">
       <textarea id="analysis-extra"
-                placeholder="На що акцентувати аналіз: конкретне питання, сфера інтересів, проблема... (необов'язково)"
+                placeholder="{% trans "На що акцентувати аналіз: конкретне питання, сфера інтересів, проблема... (необов'язково)" %}"
                 rows="2"
                 style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;
                        font-size:12px;border:1px solid var(--border-strong);
@@ -327,18 +327,18 @@
 
     <div style="padding:12px 16px;border-bottom:1px solid var(--border-strong);
                 display:flex;align-items:center;justify-content:space-between">
-      <div style="font-weight:600;font-size:14px;color:var(--text)">🧠 Адаптивна стратегія</div>
+      <div style="font-weight:600;font-size:14px;color:var(--text)">🧠 {% trans "Адаптивна стратегія" %}</div>
       <button type="button" id="btn-gen-strategy" onclick="generateStrategy()"
               style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
                      background:rgba(147,112,219,.15);color:#9370db;
                      border:1px solid rgba(147,112,219,.4);cursor:pointer">
-        Генерувати
+        {% trans "Генерувати" %}
       </button>
     </div>
 
     <div style="padding:6px 16px 10px;border-bottom:1px solid var(--border-strong)">
       <textarea id="strategy-extra"
-                placeholder="На що акцентувати стратегію: галузь, проблема клієнта, особливий підхід... (необов'язково)"
+                placeholder="{% trans "На що акцентувати стратегію: галузь, проблема клієнта, особливий підхід... (необов'язково)" %}"
                 rows="2"
                 style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;
                        font-size:12px;border:1px solid var(--border-strong);
@@ -361,7 +361,7 @@
                 cursor:pointer;user-select:none"
          onclick="toggleTimeline()">
       <div style="font-weight:600;font-size:14px;color:var(--text)">
-        📋 Хронологія клієнта
+        📋 {% trans "Хронологія клієнта" %}
         <span id="tl-chevron"
               style="font-size:11px;color:var(--text-dim);margin-left:6px;
                      transition:transform .2s">▾</span>
@@ -371,7 +371,7 @@
               style="padding:4px 10px;border-radius:5px;font-size:11px;
                      border:1px solid var(--border-strong);
                      background:transparent;cursor:pointer;color:var(--text-dim)">
-        Оновити
+        {% trans "Оновити" %}
       </button>
     </div>
 
@@ -384,25 +384,25 @@
                   style="padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;
                          border:1px solid var(--border-strong);background:transparent;
                          color:var(--text-dim);cursor:pointer">
-            📋 Нотатка
+            📋 {% trans "Нотатка" %}
           </button>
-          <button type="button" onclick="quickNote('call','📞 Дзвінок: ')"
+          <button type="button" onclick="quickNote('call','📞 {% trans "Дзвінок" %}: ')"
                   style="padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;
                          border:1px solid var(--border-strong);background:transparent;
                          color:var(--text-dim);cursor:pointer">
-            📞 Дзвінок
+            📞 {% trans "Дзвінок" %}
           </button>
-          <button type="button" onclick="quickNote('meeting','🤝 Зустріч: ')"
+          <button type="button" onclick="quickNote('meeting','🤝 {% trans "Зустріч" %}: ')"
                   style="padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;
                          border:1px solid var(--border-strong);background:transparent;
                          color:var(--text-dim);cursor:pointer">
-            🤝 Зустріч
+            🤝 {% trans "Зустріч" %}
           </button>
           <button type="button" onclick="quickNote('reminder','')"
                   style="padding:4px 10px;border-radius:5px;font-size:11px;font-weight:600;
                          border:1px solid var(--border-strong);background:transparent;
                          color:var(--text-dim);cursor:pointer">
-            🔔 Нагадування
+            🔔 {% trans "Нагадування" %}
           </button>
         </div>
         <!-- Input row -->

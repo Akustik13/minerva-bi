@@ -1,11 +1,12 @@
 {% extends "admin/base_site.html" %}
-{% block title %}FedEx Трекінг | Minerva{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "FedEx Трекінг" %} | Minerva{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
-  &rsaquo; FedEx Трекінг
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a>
+  &rsaquo; {% trans "FedEx Трекінг" %}
 </div>
 {% endblock %}
 
@@ -55,7 +56,7 @@
 <div class="utl-wrap">
 
   <div class="utl-search">
-    <div class="utl-search-title">🔍 FedEx Трекінг</div>
+    <div class="utl-search-title">🔍 {% trans "FedEx Трекінг" %}</div>
     <div class="utl-search-sub">
       FedEx REST API · OAuth 2.0
       {% if fedex_carrier %} · {{ fedex_carrier.name }}{% if fedex_carrier.api_url == "sandbox" %} (Sandbox){% endif %}{% endif %}
@@ -65,15 +66,15 @@
              value="{{ tracking_number }}"
              placeholder="274899172937"
              autofocus autocomplete="off" spellcheck="false">
-      <button class="utl-btn" type="submit">Знайти</button>
+      <button class="utl-btn" type="submit">{% trans "Знайти" %}</button>
     </form>
   </div>
 
   {% if no_key %}
   <div class="utl-warn">
-    ⚠️ <b>FedEx carrier не налаштовано.</b><br>
-    Перейди до <a href="{% url 'admin:shipping_carrier_changelist' %}">Перевізники</a>
-    → FedEx → заповни <b>Client ID</b> (API Key), <b>Client Secret</b> та <b>Account Number</b> (Connection UUID).
+    ⚠️ <b>{% trans "FedEx carrier не налаштовано." %}</b><br>
+    {% trans "Перейди до" %} <a href="{% url 'admin:shipping_carrier_changelist' %}">{% trans "Перевізники" %}</a>
+    → FedEx → {% trans "заповни" %} <b>Client ID</b> (API Key), <b>Client Secret</b> {% trans "та" %} <b>Account Number</b> (Connection UUID).
   </div>
   {% endif %}
 
@@ -97,11 +98,11 @@
           {% elif result.status == 'IT' or result.status == 'OD' %}var(--accent)
           {% elif result.status == 'EX' %}var(--err)
           {% else %}var(--text-muted){% endif %}">
-          {% if result.delivered %}Доставлено
-          {% elif result.status == "IT" %}В дорозі
-          {% elif result.status == "OD" %}В доставці
-          {% elif result.status == "PU" %}Прийнято
-          {% elif result.status == "EX" %}Виняток
+          {% if result.delivered %}{% trans "Доставлено" %}
+          {% elif result.status == "IT" %}{% trans "В дорозі" %}
+          {% elif result.status == "OD" %}{% trans "В доставці" %}
+          {% elif result.status == "PU" %}{% trans "Прийнято" %}
+          {% elif result.status == "EX" %}{% trans "Виняток" %}
           {% else %}{{ result.status_description|default:"—" }}{% endif %}
         </div>
         {% if result.status_description %}
@@ -114,12 +115,12 @@
     </div>
     <div>
       <div class="utl-info-row">
-        <span class="utl-info-key">Трекінг-номер</span>
+        <span class="utl-info-key">{% trans "Трекінг-номер" %}</span>
         <span class="utl-info-val utl-mono">{{ tracking_number }}</span>
       </div>
       {% if result.estimated_delivery %}
       <div class="utl-info-row">
-        <span class="utl-info-key">Очікувана доставка</span>
+        <span class="utl-info-key">{% trans "Очікувана доставка" %}</span>
         <span class="utl-info-val" style="color:var(--ok);font-weight:700">{{ result.estimated_delivery }}</span>
       </div>
       {% endif %}
@@ -128,7 +129,7 @@
 
   {% if result.events %}
   <div class="utl-card">
-    <div class="utl-card-title">📍 Історія ({{ result.events|length }})</div>
+    <div class="utl-card-title">📍 {% trans "Історія" %} ({{ result.events|length }})</div>
     <div class="utl-events">
       {% for ev in result.events %}
       <div class="utl-event">

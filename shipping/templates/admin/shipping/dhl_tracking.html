@@ -1,13 +1,14 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 {% block title %}{{ title }} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
-  <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a> &rsaquo;
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a> &rsaquo;
+  <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a> &rsaquo;
   <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}">{{ shipment }}</a> &rsaquo;
-  DHL Трекінг
+  {% trans "DHL Трекінг" %}
 </div>
 {% endblock %}
 
@@ -86,25 +87,25 @@
   <div class="dhl-hdr">
     <span class="badge-dhl">DHL</span>
     <div>
-      <h2>Трекінг відправлення</h2>
+      <h2>{% trans "Трекінг відправлення" %}</h2>
       <div class="dhl-meta">
-        Відправлення #{{ shipment.pk }} → {{ shipment.recipient_name }}
-        &nbsp;|&nbsp; Трекінг: <strong style="color:#ffcc00;font-family:monospace">{{ tracking_number }}</strong>
+        {% trans "Відправлення" %} #{{ shipment.pk }} → {{ shipment.recipient_name }}
+        &nbsp;|&nbsp; {% trans "Трекінг" %}: <strong style="color:#ffcc00;font-family:monospace">{{ tracking_number }}</strong>
       </div>
     </div>
   </div>
 
   {% if dhl_error %}
   <div class="dhl-error">
-    <strong>❌ Помилка DHL API:</strong><br>{{ dhl_error }}
+    <strong>❌ {% trans "Помилка DHL API" %}:</strong><br>{{ dhl_error }}
     {% if "401" in dhl_error or "403" in dhl_error %}
     <br><small style="color:#607d8b;margin-top:6px;display:block">
-      Перевірте API Key та Secret у налаштуваннях DHL Carrier.
+      {% trans "Перевірте API Key та Secret у налаштуваннях DHL Carrier." %}
     </small>
     {% endif %}
     {% if "404" in dhl_error %}
     <br><small style="color:#607d8b;margin-top:6px;display:block">
-      Трекінг-номер не знайдено. Перевірте номер або зачекайте — DHL оновлює дані з затримкою.
+      {% trans "Трекінг-номер не знайдено. Перевірте номер або зачекайте — DHL оновлює дані з затримкою." %}
     </small>
     {% endif %}
   </div>
@@ -136,10 +137,10 @@
     </div>
     <div class="dhl-status-meta">
       {% if result.estimated_delivery %}
-      <b>Очікувана доставка</b>{{ result.estimated_delivery }}
+      <b>{% trans "Очікувана доставка" %}</b>{{ result.estimated_delivery }}
       {% endif %}
       {% if result.proof_of_delivery %}
-      <b style="margin-top:6px">Підпис</b>{{ result.proof_of_delivery }}
+      <b style="margin-top:6px">{% trans "Підпис" %}</b>{{ result.proof_of_delivery }}
       {% endif %}
       {% if result.timestamp %}
       <span style="margin-top:6px;display:block">{{ result.timestamp|slice:":16"|default:"" }}</span>
@@ -151,7 +152,7 @@
   <!-- Timeline -->
   {% if events %}
   <h3 style="font-size:13px;color:#9aafbe;margin:0 0 14px;text-transform:uppercase;letter-spacing:.04em">
-    📋 Історія подій ({{ events|length }})
+    📋 {% trans "Історія подій" %} ({{ events|length }})
   </h3>
   <div class="dhl-timeline">
     {% for ev in events %}
@@ -165,13 +166,13 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="dhl-empty">⚠️ Подій трекінгу ще немає.</p>
+  <p class="dhl-empty">⚠️ {% trans "Подій трекінгу ще немає." %}</p>
   {% endif %}
 
   {% endif %}
 
   <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}" class="dhl-back">
-    ← Назад до відправлення
+    ← {% trans "Назад до відправлення" %}
   </a>
 </div>
 {% endblock %}

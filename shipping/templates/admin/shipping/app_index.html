@@ -1,13 +1,14 @@
 {% extends "admin/base_site.html" %}
 {% load i18n log %}
 
-{% block title %}🚚 Доставка | Minerva{% endblock %}
+
+{% block title %}🚚 {% trans "Доставка" %} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; Доставка
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; {% trans "Доставка" %}
 </div>
 {% endblock %}
 
@@ -131,10 +132,10 @@
   <div class="sh-header">
     <div class="sh-header-icon">🚚</div>
     <div>
-      <h1>Доставка</h1>
-      <p>Відправлення · Перевізники · Трекінг · Jumingo · DHL Express</p>
+      <h1>{% trans "Доставка" %}</h1>
+      <p>{% trans "Відправлення · Перевізники · Трекінг · Jumingo · DHL Express" %}</p>
     </div>
-    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ Налаштувати плитки</button>
+    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ {% trans "Налаштувати плитки" %}</button>
   </div>
 
   <!-- Stat strip -->
@@ -142,112 +143,112 @@
   <div class="sh-stats">
     <a href="/admin/shipping/shipment/?status=in_transit" class="sh-stat">
       <div class="sh-stat-val" style="color:#4caf50">{{ s.in_transit }}</div>
-      <div class="sh-stat-lbl">🚛 В дорозі</div>
+      <div class="sh-stat-lbl">🚛 {% trans "В дорозі" %}</div>
     </a>
     <a href="/admin/shipping/shipment/?status=submitted" class="sh-stat">
       <div class="sh-stat-val" style="color:#ff9800">{{ s.submitted }}</div>
-      <div class="sh-stat-lbl">📤 Очікують відправки</div>
+      <div class="sh-stat-lbl">📤 {% trans "Очікують відправки" %}</div>
     </a>
     <a href="/admin/shipping/shipment/?status=label_ready" class="sh-stat">
       <div class="sh-stat-val" style="color:#9c27b0">{{ s.label_ready }}</div>
-      <div class="sh-stat-lbl">🏷️ Мітка готова</div>
+      <div class="sh-stat-lbl">🏷️ {% trans "Мітка готова" %}</div>
     </a>
     <a href="/admin/shipping/shipment/?status=error" class="sh-stat">
       <div class="sh-stat-val" style="color:#f44336">{{ s.error }}</div>
-      <div class="sh-stat-lbl">⚠️ Помилки</div>
+      <div class="sh-stat-lbl">⚠️ {% trans "Помилки" %}</div>
     </a>
     <a href="/admin/shipping/shipment/?status=delivered" class="sh-stat">
       <div class="sh-stat-val" style="color:#2196f3">{{ s.delivered_month }}</div>
-      <div class="sh-stat-lbl">✅ Доставлено цього місяця</div>
+      <div class="sh-stat-lbl">✅ {% trans "Доставлено цього місяця" %}</div>
     </a>
   </div>
   {% endwith %}
 
   <!-- Трекінг -->
-  <div class="sh-section-hdr"><span>📡</span> Трекінг</div>
+  <div class="sh-section-hdr"><span>📡</span> {% trans "Трекінг" %}</div>
   <div class="sh-grid" data-grid-id="sh-tracking">
     <a href="{% url 'admin:shipping_order_tracking' %}" class="sh-tile" style="--ta:#2196f3" data-tile-id="order-tracking">
       <span class="sh-tile-icon">📡</span>
-      <span class="sh-tile-name">Відслідковування замовлень</span>
-      <span class="sh-tile-sub">Статус всіх відправлень</span>
-      {% if shipping_stats.active %}<span class="sh-tile-count has-count">активних: {{ shipping_stats.active }}</span>{% endif %}
+      <span class="sh-tile-name">{% trans "Відслідковування замовлень" %}</span>
+      <span class="sh-tile-sub">{% trans "Статус всіх відправлень" %}</span>
+      {% if shipping_stats.active %}<span class="sh-tile-count has-count">{% trans "активних:" %} {{ shipping_stats.active }}</span>{% endif %}
     </a>
     <a href="{% url 'admin:shipping_dhl_track_lookup' %}" class="sh-tile" style="--ta:#ffca28" data-tile-id="dhl-track">
       <span class="sh-tile-icon">🔍</span>
-      <span class="sh-tile-name">DHL Трекінг</span>
-      <span class="sh-tile-sub">Пошук за номером відправлення</span>
+      <span class="sh-tile-name">DHL {% trans "Трекінг" %}</span>
+      <span class="sh-tile-sub">{% trans "Пошук за номером відправлення" %}</span>
       <span class="sh-tile-badge" style="background:#ffca28;color:#222">DHL</span>
     </a>
   </div>
 
   <!-- Відправлення -->
-  <div class="sh-section-hdr"><span>📦</span> Відправлення</div>
+  <div class="sh-section-hdr"><span>📦</span> {% trans "Відправлення" %}</div>
   <div class="sh-grid" data-grid-id="sh-shipments">
     <a href="/admin/shipping/shipment/" class="sh-tile" style="--ta:#2196f3" data-tile-id="all-shipments">
       <span class="sh-tile-icon">📦</span>
-      <span class="sh-tile-name">Всі відправлення</span>
-      <span class="sh-tile-sub">Список · статуси · пошук</span>
+      <span class="sh-tile-name">{% trans "Всі відправлення" %}</span>
+      <span class="sh-tile-sub">{% trans "Список · статуси · пошук" %}</span>
     </a>
     <a href="/admin/shipping/shipment/?status=draft" class="sh-tile" style="--ta:#607d8b" data-tile-id="draft-shipments">
       <span class="sh-tile-icon">📝</span>
-      <span class="sh-tile-name">Чернетки</span>
-      <span class="sh-tile-sub">Непідтверджені</span>
-      {% with n=shipping_stats.draft %}{% if n %}<span class="sh-tile-count has-count">{{ n }} посилок</span>{% endif %}{% endwith %}
+      <span class="sh-tile-name">{% trans "Чернетки" %}</span>
+      <span class="sh-tile-sub">{% trans "Непідтверджені" %}</span>
+      {% with n=shipping_stats.draft %}{% if n %}<span class="sh-tile-count has-count">{{ n }} {% trans "посилок" %}</span>{% endif %}{% endwith %}
     </a>
     <a href="/admin/shipping/shipment/?status=submitted" class="sh-tile" style="--ta:#ff9800" data-tile-id="submitted-shipments">
       <span class="sh-tile-icon">📤</span>
-      <span class="sh-tile-name">Підтверджені</span>
-      <span class="sh-tile-sub">Очікують відправки</span>
-      {% with n=shipping_stats.submitted %}{% if n %}<span class="sh-tile-count has-count">{{ n }} посилок</span>{% endif %}{% endwith %}
+      <span class="sh-tile-name">{% trans "Підтверджені" %}</span>
+      <span class="sh-tile-sub">{% trans "Очікують відправки" %}</span>
+      {% with n=shipping_stats.submitted %}{% if n %}<span class="sh-tile-count has-count">{{ n }} {% trans "посилок" %}</span>{% endif %}{% endwith %}
     </a>
     <a href="/admin/shipping/shipment/?status=label_ready" class="sh-tile" style="--ta:#9c27b0" data-tile-id="label-shipments">
       <span class="sh-tile-icon">🏷️</span>
-      <span class="sh-tile-name">Мітка готова</span>
+      <span class="sh-tile-name">{% trans "Мітка готова" %}</span>
       <span class="sh-tile-sub">Label ready</span>
-      {% with n=shipping_stats.label_ready %}{% if n %}<span class="sh-tile-count has-count">{{ n }} посилок</span>{% endif %}{% endwith %}
+      {% with n=shipping_stats.label_ready %}{% if n %}<span class="sh-tile-count has-count">{{ n }} {% trans "посилок" %}</span>{% endif %}{% endwith %}
     </a>
     <a href="/admin/shipping/shipment/?status=in_transit" class="sh-tile" style="--ta:#4caf50" data-tile-id="transit-shipments">
       <span class="sh-tile-icon">🚛</span>
-      <span class="sh-tile-name">В дорозі</span>
+      <span class="sh-tile-name">{% trans "В дорозі" %}</span>
       <span class="sh-tile-sub">In transit</span>
-      {% with n=shipping_stats.in_transit %}{% if n %}<span class="sh-tile-count has-count">{{ n }} посилок</span>{% endif %}{% endwith %}
+      {% with n=shipping_stats.in_transit %}{% if n %}<span class="sh-tile-count has-count">{{ n }} {% trans "посилок" %}</span>{% endif %}{% endwith %}
     </a>
     <a href="/admin/shipping/shipment/?status=delivered" class="sh-tile" style="--ta:#4caf50" data-tile-id="delivered-shipments">
       <span class="sh-tile-icon">✅</span>
-      <span class="sh-tile-name">Доставлено</span>
+      <span class="sh-tile-name">{% trans "Доставлено" %}</span>
       <span class="sh-tile-sub">Delivered</span>
-      {% with n=shipping_stats.delivered %}{% if n %}<span class="sh-tile-count">всього: {{ n }}</span>{% endif %}{% endwith %}
+      {% with n=shipping_stats.delivered %}{% if n %}<span class="sh-tile-count">{% trans "всього:" %} {{ n }}</span>{% endif %}{% endwith %}
     </a>
     <a href="/admin/shipping/shipment/?status=error" class="sh-tile" style="--ta:#f44336" data-tile-id="error-shipments">
       <span class="sh-tile-icon">⚠️</span>
-      <span class="sh-tile-name">Помилка</span>
-      <span class="sh-tile-sub">Потребують уваги</span>
-      {% with n=shipping_stats.error %}{% if n %}<span class="sh-tile-count has-count">{{ n }} посилок</span>{% endif %}{% endwith %}
+      <span class="sh-tile-name">{% trans "Помилка" %}</span>
+      <span class="sh-tile-sub">{% trans "Потребують уваги" %}</span>
+      {% with n=shipping_stats.error %}{% if n %}<span class="sh-tile-count has-count">{{ n }} {% trans "посилок" %}</span>{% endif %}{% endwith %}
     </a>
   </div>
 
   <!-- Налаштування -->
-  <div class="sh-section-hdr"><span>⚙️</span> Налаштування</div>
+  <div class="sh-section-hdr"><span>⚙️</span> {% trans "Налаштування" %}</div>
   <div class="sh-grid" data-grid-id="sh-settings">
     <a href="/admin/shipping/carrier/" class="sh-tile" style="--ta:#00bcd4" data-tile-id="carriers">
       <span class="sh-tile-icon">🏢</span>
-      <span class="sh-tile-name">Перевізники</span>
+      <span class="sh-tile-name">{% trans "Перевізники" %}</span>
       <span class="sh-tile-sub">Jumingo · DHL · UPS · FedEx</span>
     </a>
     <a href="/admin/shipping/packagingmaterial/" class="sh-tile" style="--ta:#607d8b" data-tile-id="packaging">
       <span class="sh-tile-icon">📫</span>
-      <span class="sh-tile-name">Упаковка</span>
-      <span class="sh-tile-sub">Матеріали · розміри · вага</span>
+      <span class="sh-tile-name">{% trans "Упаковка" %}</span>
+      <span class="sh-tile-sub">{% trans "Матеріали · розміри · вага" %}</span>
     </a>
     <a href="/dashboard/help/#shipping" class="sh-tile" style="--ta:#607d8b" data-tile-id="help">
       <span class="sh-tile-icon">📖</span>
-      <span class="sh-tile-name">Довідник</span>
-      <span class="sh-tile-sub">Документація модуля Доставка</span>
+      <span class="sh-tile-name">{% trans "Довідник" %}</span>
+      <span class="sh-tile-sub">{% trans "Документація модуля Доставка" %}</span>
     </a>
   </div>
 
   <!-- Недавні дії -->
-  <div class="sh-section-hdr" style="margin-top:8px"><span>🕐</span> Недавні дії</div>
+  <div class="sh-section-hdr" style="margin-top:8px"><span>🕐</span> {% trans "Недавні дії" %}</div>
   {% get_admin_log 10 as admin_log for_user user %}
   {% if admin_log %}
   <div class="sh-recent-grid">
@@ -270,7 +271,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="sh-empty">Дій ще не виконано.</p>
+  <p class="sh-empty">{% trans "Дій ще не виконано." %}</p>
   {% endif %}
 
 </div>

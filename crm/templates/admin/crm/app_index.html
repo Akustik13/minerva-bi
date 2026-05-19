@@ -6,7 +6,7 @@
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
   &rsaquo; CRM
 </div>
 {% endblock %}
@@ -115,68 +115,68 @@
     <div class="crm-header-icon">👥</div>
     <div>
       <h1>CRM</h1>
-      <p>Клієнти · RFM-аналіз · Сегменти · Нотатки</p>
+      <p>{% trans "Клієнти · RFM-аналіз · Сегменти · Нотатки" %}</p>
     </div>
-    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ Налаштувати плитки</button>
+    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ {% trans "Налаштувати плитки" %}</button>
   </div>
 
   <!-- Stat strip -->
   <div class="crm-stats">
     <a href="/admin/crm/customer/" class="crm-stat">
       <div class="crm-stat-val" style="color:#9c27b0">{{ crm_stats.total }}</div>
-      <div class="crm-stat-lbl">👥 Всього клієнтів</div>
+      <div class="crm-stat-lbl">👥 {% trans "Всього клієнтів" %}</div>
     </a>
     <a href="/admin/crm/customer/?created_at__gte=month" class="crm-stat">
       <div class="crm-stat-val" style="color:#2196f3">{{ crm_stats.new_month }}</div>
-      <div class="crm-stat-lbl">🆕 Нових за місяць</div>
+      <div class="crm-stat-lbl">🆕 {% trans "Нових за місяць" %}</div>
     </a>
     <a href="/admin/crm/customer/?status=vip" class="crm-stat">
       <div class="crm-stat-val" style="color:#ff9800">{{ crm_stats.vip }}</div>
-      <div class="crm-stat-lbl">⭐ VIP клієнтів</div>
+      <div class="crm-stat-lbl">⭐ {% trans "VIP клієнтів" %}</div>
     </a>
     <a href="/admin/crm/customer/" class="crm-stat">
       <div class="crm-stat-val" style="color:#4caf50">{{ crm_stats.countries }}</div>
-      <div class="crm-stat-lbl">🌍 Країн</div>
+      <div class="crm-stat-lbl">🌍 {% trans "Країн" %}</div>
     </a>
   </div>
 
   <!-- Клієнти -->
-  <div class="crm-section-hdr"><span>👥</span> Клієнти</div>
+  <div class="crm-section-hdr"><span>👥</span> {% trans "Клієнти" %}</div>
   <div class="crm-grid" data-grid-id="crm-main">
     <a href="/admin/crm/customer/" class="crm-tile" style="--ta:#9c27b0" data-tile-id="all-customers">
       <span class="crm-tile-icon">👥</span>
-      <span class="crm-tile-name">Всі клієнти</span>
-      <span class="crm-tile-sub">Список · пошук · фільтри</span>
+      <span class="crm-tile-name">{% trans "Всі клієнти" %}</span>
+      <span class="crm-tile-sub">{% trans "Список · пошук · фільтри" %}</span>
     </a>
     <a href="/admin/crm/customer/add/" class="crm-tile" style="--ta:#4caf50" data-tile-id="add-customer">
       <span class="crm-tile-icon">➕</span>
-      <span class="crm-tile-name">Новий клієнт</span>
-      <span class="crm-tile-sub">Додати Customer</span>
+      <span class="crm-tile-name">{% trans "Новий клієнт" %}</span>
+      <span class="crm-tile-sub">{% trans "Додати Customer" %}</span>
     </a>
     <a href="/admin/crm/customer/?status=vip" class="crm-tile" style="--ta:#ff9800" data-tile-id="vip-customers">
       <span class="crm-tile-icon">⭐</span>
-      <span class="crm-tile-name">VIP клієнти</span>
-      <span class="crm-tile-sub">Пріоритетні клієнти</span>
+      <span class="crm-tile-name">{% trans "VIP клієнти" %}</span>
+      <span class="crm-tile-sub">{% trans "Пріоритетні клієнти" %}</span>
     </a>
     <a href="/admin/crm/customer/?status=active" class="crm-tile" style="--ta:#2196f3" data-tile-id="active-customers">
       <span class="crm-tile-icon">✅</span>
-      <span class="crm-tile-name">Активні</span>
-      <span class="crm-tile-sub">Статус: активний</span>
+      <span class="crm-tile-name">{% trans "Активні" %}</span>
+      <span class="crm-tile-sub">{% trans "Статус: активний" %}</span>
     </a>
     <a href="/admin/crm/customernote/" class="crm-tile" style="--ta:#607d8b" data-tile-id="notes">
       <span class="crm-tile-icon">📝</span>
-      <span class="crm-tile-name">Нотатки</span>
-      <span class="crm-tile-sub">Коментарі до клієнтів</span>
+      <span class="crm-tile-name">{% trans "Нотатки" %}</span>
+      <span class="crm-tile-sub">{% trans "Коментарі до клієнтів" %}</span>
     </a>
     <a href="/dashboard/help/#crm" class="crm-tile" style="--ta:#607d8b" data-tile-id="help">
       <span class="crm-tile-icon">📖</span>
-      <span class="crm-tile-name">Довідник</span>
-      <span class="crm-tile-sub">Документація модуля CRM</span>
+      <span class="crm-tile-name">{% trans "Довідник" %}</span>
+      <span class="crm-tile-sub">{% trans "Документація модуля CRM" %}</span>
     </a>
   </div>
 
   <!-- Недавні дії -->
-  <div class="crm-section-hdr" style="margin-top:8px"><span>🕐</span> Недавні дії</div>
+  <div class="crm-section-hdr" style="margin-top:8px"><span>🕐</span> {% trans "Недавні дії" %}</div>
   {% get_admin_log 10 as admin_log for_user user %}
   {% if admin_log %}
   <div class="crm-recent-grid">
@@ -199,7 +199,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="crm-empty">Дій ще не виконано.</p>
+  <p class="crm-empty">{% trans "Дій ще не виконано." %}</p>
   {% endif %}
 
 </div>

@@ -5,6 +5,7 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import path
 from django.utils.html import format_html
+from django.utils.translation import gettext_lazy as _
 from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings, ScheduledEmail
 
 
@@ -98,7 +99,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
             'color:var(--text-muted);max-height:200px;overflow-y:auto;white-space:pre-wrap"></pre>',
             obj.pk,
         )
-    sync_all_widget.short_description = 'Синхронізувати все'
+    sync_all_widget.short_description = _('Синхронізувати все')
 
     def export_import_widget(self, obj):
         if not obj or not obj.pk:
@@ -123,7 +124,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
             '</div>',
             export_url,
         )
-    export_import_widget.short_description = 'Листи'
+    export_import_widget.short_description = _('Листи')
 
     def get_urls(self):
         urls = super().get_urls()
@@ -377,7 +378,7 @@ class EmailAccountAdmin(admin.ModelAdmin):
             return format_html('<span style="color:var(--text-dim)">—</span>')
         from django.utils.formats import date_format
         return date_format(obj.last_sync_at, 'd.m.Y H:i')
-    last_sync_col.short_description = 'Остання синхронізація'
+    last_sync_col.short_description = _('Остання синхронізація')
 
 
 @admin.register(EmailSettings)
@@ -454,13 +455,13 @@ class EmailMessageAdmin(admin.ModelAdmin):
 
     def subject_col(self, obj):
         return obj.subject[:70] or '(без теми)'
-    subject_col.short_description = 'Тема'
+    subject_col.short_description = _('Тема')
 
     def attach_col(self, obj):
         if obj.has_attachments:
             return format_html('<span title="{} вкладень">📎</span>', len(obj.attachments))
         return ''
-    attach_col.short_description = '📎'
+    attach_col.short_description = _('📎')
 
     def has_add_permission(self, request):
         return False
@@ -483,7 +484,7 @@ class EmailThreadAdmin(admin.ModelAdmin):
 
     def subject_col(self, obj):
         return obj.subject[:70]
-    subject_col.short_description = 'Тема'
+    subject_col.short_description = _('Тема')
 
     def has_add_permission(self, request):
         return False
@@ -507,11 +508,11 @@ class ScheduledEmailAdmin(admin.ModelAdmin):
 
     def subject_col(self, obj):
         return obj.subject[:60]
-    subject_col.short_description = 'Тема'
+    subject_col.short_description = _('Тема')
 
     def to_col(self, obj):
         return ', '.join(obj.to_emails[:2])
-    to_col.short_description = 'Кому'
+    to_col.short_description = _('Кому')
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

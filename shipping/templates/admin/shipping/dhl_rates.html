@@ -1,13 +1,14 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 {% block title %}{{ title }} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
-  <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a> &rsaquo;
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a> &rsaquo;
+  <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a> &rsaquo;
   <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}">{{ shipment }}</a> &rsaquo;
-  DHL Тарифи
+  {% trans "DHL Тарифи" %}
 </div>
 {% endblock %}
 
@@ -67,11 +68,11 @@
   <div class="dhl-hdr">
     <span class="badge-dhl">DHL</span>
     <div>
-      <h2>Тарифи DHL Express</h2>
+      <h2>{% trans "Тарифи DHL Express" %}</h2>
       <div class="dhl-meta">
-        Відправлення #{{ shipment.pk }} → {{ shipment.recipient_name }}
+        {% trans "Відправлення" %} #{{ shipment.pk }} → {{ shipment.recipient_name }}
         &nbsp;|&nbsp; {{ order.addr_country }} {{ order.addr_postal_code }} {{ order.addr_city }}
-        &nbsp;|&nbsp; {{ weight }} кг, {{ dims }}
+        &nbsp;|&nbsp; {{ weight }} {% trans "кг" %}, {{ dims }}
       </div>
     </div>
   </div>
@@ -79,48 +80,47 @@
   <!-- Customs block -->
   {% with dest=order.addr_country %}
   <div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:8px;padding:14px 18px;margin-bottom:12px">
-    <div style="font-size:13px;font-weight:600;color:#c9d8e4;margin-bottom:10px">🛃 Митна декларація</div>
+    <div style="font-size:13px;font-weight:600;color:#c9d8e4;margin-bottom:10px">🛃 {% trans "Митна декларація" %}</div>
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#9aafbe">
         <input type="checkbox" id="customs_requested"
           {% if shipment.recipient_country and shipment.recipient_country not in "AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE" %}checked{% endif %}
           style="width:16px;height:16px;accent-color:#ff9800">
-        Включити митну декларацію (exportDeclaration)
+        {% trans "Включити митну декларацію (exportDeclaration)" %}
       </label>
       <span id="customs-auto-label" style="font-size:11px;color:#607d8b"></span>
     </div>
     <div style="font-size:11px;color:#607d8b;margin-top:8px">
-      Обов'язково для відправлень за межі ЄС (Тайвань, США, Японія тощо).
-      Дані беруться з розділу 🛃 Митна декларація відправлення.
+      {% trans "Обов'язково для відправлень за межі ЄС (Тайвань, США, Японія тощо). Дані беруться з розділу 🛃 Митна декларація відправлення." %}
     </div>
   </div>
   {% endwith %}
 
   <!-- Pickup block -->
   <div style="background:#1e2a35;border:1px solid #2a3f52;border-radius:8px;padding:14px 18px;margin-bottom:18px">
-    <div style="font-size:13px;font-weight:600;color:#c9d8e4;margin-bottom:10px">🚚 Забір посилки кур'єром</div>
+    <div style="font-size:13px;font-weight:600;color:#c9d8e4;margin-bottom:10px">🚚 {% trans "Забір посилки кур'єром" %}</div>
     <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
       <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;color:#9aafbe">
         <input type="checkbox" id="pickup_requested" style="width:16px;height:16px;accent-color:#2196f3">
-        Запросити кур'єра DHL для забору
+        {% trans "Запросити кур'єра DHL для забору" %}
       </label>
       <div id="pickup-details" style="display:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <label style="font-size:12px;color:#607d8b">До котрої години готово:
+        <label style="font-size:12px;color:#607d8b">{% trans "До котрої години готово" %}:
           <input type="time" id="pickup_close" value="18:00"
             style="background:#111c26;border:1px solid #2a3f52;color:#c9d8e4;border-radius:4px;padding:3px 7px;font-size:12px;margin-left:4px">
         </label>
-        <label style="font-size:12px;color:#607d8b">Місце:
+        <label style="font-size:12px;color:#607d8b">{% trans "Місце" %}:
           <select id="pickup_location"
             style="background:#111c26;border:1px solid #2a3f52;color:#c9d8e4;border-radius:4px;padding:3px 7px;font-size:12px;margin-left:4px">
-            <option value="reception">Reception / Ресепшн</option>
-            <option value="front door">Front door / Двері</option>
-            <option value="warehouse">Warehouse / Склад</option>
+            <option value="reception">Reception / {% trans "Ресепшн" %}</option>
+            <option value="front door">Front door / {% trans "Двері" %}</option>
+            <option value="warehouse">Warehouse / {% trans "Склад" %}</option>
           </select>
         </label>
       </div>
     </div>
     <div style="font-size:11px;color:#607d8b;margin-top:8px">
-      ⚠️ Без кур'єра — посилку потрібно <b>самостійно відвезти</b> у найближчий DHL Service Point.
+      ⚠️ {% trans "Без кур'єра — посилку потрібно" %} <b>{% trans "самостійно відвезти" %}</b> {% trans "у найближчий DHL Service Point." %}
     </div>
   </div>
   <script>
@@ -144,18 +144,18 @@
 
   {% if dhl_error %}
   <div class="dhl-error">
-    <strong>❌ Помилка DHL API:</strong><br>{{ dhl_error }}
+    <strong>❌ {% trans "Помилка DHL API" %}:</strong><br>{{ dhl_error }}
     {% if "401" in dhl_error or "403" in dhl_error %}
     <br><small style="color:#607d8b;margin-top:6px;display:block">
-      Перевірте API Key та Secret у налаштуваннях DHL Carrier.
+      {% trans "Перевірте API Key та Secret у налаштуваннях DHL Carrier." %}
     </small>
     {% endif %}
   </div>
 
   {% elif not products %}
   <p class="dhl-empty">
-    ⚠️ DHL не повернув жодного тарифу для цього напрямку.<br>
-    <small>Перевірте адресу отримувача (країна, місто, поштовий індекс).</small>
+    ⚠️ {% trans "DHL не повернув жодного тарифу для цього напрямку." %}<br>
+    <small>{% trans "Перевірте адресу отримувача (країна, місто, поштовий індекс)." %}</small>
   </p>
 
   {% else %}
@@ -163,11 +163,11 @@
     <thead>
       <tr>
         <th>#</th>
-        <th>Послуга</th>
-        <th>Код</th>
-        <th>Ціна</th>
-        <th>Транзит</th>
-        <th>Орієнтовна дата</th>
+        <th>{% trans "Послуга" %}</th>
+        <th>{% trans "Код" %}</th>
+        <th>{% trans "Ціна" %}</th>
+        <th>{% trans "Транзит" %}</th>
+        <th>{% trans "Орієнтовна дата" %}</th>
         <th></th>
       </tr>
     </thead>
@@ -186,7 +186,7 @@
           {% endif %}
         </td>
         <td class="dhl-transit">
-          {% if p.transit_days is not None %}{{ p.transit_days }} дн.{% else %}—{% endif %}
+          {% if p.transit_days is not None %}{{ p.transit_days }} {% trans "дн." %}{% else %}—{% endif %}
         </td>
         <td class="dhl-date">{{ p.delivery_date|default:"—" }}</td>
         <td>
@@ -194,8 +194,8 @@
           <a class="btn-book"
              href="#"
              data-base-url="{% url 'admin:shipping_shipment_dhl_book' shipment.pk %}?product_code={{ p.code }}&product_name={{ p.name|urlencode }}&price={{ p.price }}"
-             onclick="var u=_bookUrl(this.dataset.baseUrl);var msg='Оформити DHL {{ p.name }} за {{ p.price|floatformat:2 }} {{ p.currency }}?\n\n'+(document.getElementById('pickup_requested').checked?'✅ Кур\'єр буде замовлений.':'📦 Без кур\'єра — відвезти самостійно.')+'\n'+(document.getElementById('customs_requested').checked?'🛃 Митна декларація включена.':'⬜ Без митної декларації.');return confirm(msg)?(location.href=u,false):false">
-            🚀 Оформити
+             onclick="var u=_bookUrl(this.dataset.baseUrl);var msg='{% trans "Оформити DHL" %} {{ p.name }} {% trans "за" %} {{ p.price|floatformat:2 }} {{ p.currency }}?\n\n'+(document.getElementById('pickup_requested').checked?'✅ {% trans "Кур\'єр буде замовлений." %}':'📦 {% trans "Без кур\'єра — відвезти самостійно." %}')+'\n'+(document.getElementById('customs_requested').checked?'🛃 {% trans "Митна декларація включена." %}':'⬜ {% trans "Без митної декларації." %}');return confirm(msg)?(location.href=u,false):false">
+            🚀 {% trans "Оформити" %}
           </a>
           {% endif %}
         </td>
@@ -206,7 +206,7 @@
   {% endif %}
 
   <a href="{% url 'admin:shipping_shipment_change' shipment.pk %}" class="dhl-back">
-    ← Назад до відправлення
+    ← {% trans "Назад до відправлення" %}
   </a>
 </div>
 {% endblock %}

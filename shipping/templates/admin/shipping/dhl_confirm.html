@@ -1,13 +1,14 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 
 {% block title %}{{ title }} | Minerva{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
-  &rsaquo; <a href="{{ back_url }}">Чернетка #{{ shipment.pk }}</a>
-  &rsaquo; Підтвердити DHL
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a>
+  &rsaquo; <a href="{{ back_url }}">{% trans "Чернетка" %} #{{ shipment.pk }}</a>
+  &rsaquo; {% trans "Підтвердити DHL" %}
 </div>
 {% endblock %}
 
@@ -78,7 +79,7 @@
 
 <div class="dc-wrap">
   <h1 style="color:var(--text);font-size:20px;margin-bottom:20px">
-    🟡 Перевірте дані перед відправкою через DHL API
+    🟡 {% trans "Перевірте дані перед відправкою через DHL API" %}
   </h1>
 
   {% if messages %}
@@ -89,19 +90,19 @@
 
   <!-- Продукт -->
   <div class="dc-card">
-    <div class="dc-head">🚚 Обраний продукт DHL</div>
+    <div class="dc-head">🚚 {% trans "Обраний продукт DHL" %}</div>
     <div class="dc-body">
       <div class="dc-row">
-        <span class="dc-lbl">Продукт</span>
+        <span class="dc-lbl">{% trans "Продукт" %}</span>
         <span class="dc-val accent">{{ product_name }}</span>
       </div>
       <div class="dc-row">
-        <span class="dc-lbl">Код</span>
+        <span class="dc-lbl">{% trans "Код" %}</span>
         <span class="dc-val" style="font-family:monospace">{{ product_code }}</span>
       </div>
       {% if price %}
       <div class="dc-row">
-        <span class="dc-lbl">Орієнтовна вартість</span>
+        <span class="dc-lbl">{% trans "Орієнтовна вартість" %}</span>
         <span class="dc-val ok">{{ price }} EUR</span>
       </div>
       {% endif %}
@@ -116,26 +117,26 @@
   <div class="dc-2col">
 
     <div class="dc-card">
-      <div class="dc-head">📤 Відправник</div>
+      <div class="dc-head">📤 {% trans "Відправник" %}</div>
       <div class="dc-body">
         {% if shipper.company %}
-        <div class="dc-row"><span class="dc-lbl">Компанія</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Компанія" %}</span>
           <span class="dc-val">{{ shipper.company }}</span></div>
         {% endif %}
-        <div class="dc-row"><span class="dc-lbl">Ім'я</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Ім'я" %}</span>
           <span class="dc-val">{{ shipper.name|default:"—" }}</span></div>
-        <div class="dc-row"><span class="dc-lbl">Вулиця</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Вулиця" %}</span>
           <span class="dc-val">{{ shipper.address_line|default:"—" }}</span></div>
-        <div class="dc-row"><span class="dc-lbl">Місто / ZIP</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Місто / ZIP" %}</span>
           <span class="dc-val">{{ shipper.city|default:"—" }}, {{ shipper.postal|default:"" }}</span></div>
         {% if shipper.state %}
-        <div class="dc-row"><span class="dc-lbl">Штат</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Штат" %}</span>
           <span class="dc-val">{{ shipper.state }}</span></div>
         {% endif %}
-        <div class="dc-row"><span class="dc-lbl">Країна</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Країна" %}</span>
           <span class="dc-val">{{ shipper.country|default:"DE" }}</span></div>
         {% if shipper.phone %}
-        <div class="dc-row"><span class="dc-lbl">Телефон</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Телефон" %}</span>
           <span class="dc-val">{{ shipper.phone }}</span></div>
         {% endif %}
         {% if shipper.email %}
@@ -146,28 +147,28 @@
     </div>
 
     <div class="dc-card">
-      <div class="dc-head">📥 Отримувач</div>
+      <div class="dc-head">📥 {% trans "Отримувач" %}</div>
       <div class="dc-body">
         {% if to_addr.company %}
-        <div class="dc-row"><span class="dc-lbl">Компанія</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Компанія" %}</span>
           <span class="dc-val">{{ to_addr.company }}</span></div>
         {% endif %}
-        <div class="dc-row"><span class="dc-lbl">Ім'я</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Ім'я" %}</span>
           <span class="dc-val">{{ to_addr.name|default:"—" }}</span></div>
-        <div class="dc-row"><span class="dc-lbl">Вулиця</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Вулиця" %}</span>
           <span class="dc-val">{{ to_addr.address_line|default:"—" }}</span></div>
-        <div class="dc-row"><span class="dc-lbl">Місто / ZIP</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Місто / ZIP" %}</span>
           <span class="dc-val">{{ to_addr.city|default:"—" }}, {{ to_addr.postal|default:"" }}</span></div>
         {% if to_addr.state %}
-        <div class="dc-row"><span class="dc-lbl">Штат / Регіон</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Штат / Регіон" %}</span>
           <span class="dc-val">{{ to_addr.state }}</span></div>
         {% endif %}
-        <div class="dc-row"><span class="dc-lbl">Країна</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Країна" %}</span>
           <span class="dc-val{% if is_intl %} accent{% endif %}">{{ to_addr.country|default:"—" }}
-            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> (міжнародне)</span>{% endif %}
+            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> ({% trans "міжнародне" %})</span>{% endif %}
           </span></div>
         {% if to_addr.phone %}
-        <div class="dc-row"><span class="dc-lbl">Телефон</span>
+        <div class="dc-row"><span class="dc-lbl">{% trans "Телефон" %}</span>
           <span class="dc-val">{{ to_addr.phone }}</span></div>
         {% endif %}
       </div>
@@ -177,16 +178,16 @@
 
   <!-- Коробки -->
   <div class="dc-card">
-    <div class="dc-head">📦 Коробки ({{ packages|length }} шт.)</div>
+    <div class="dc-head">📦 {% trans "Коробки" %} ({{ packages|length }} {% trans "шт." %})</div>
     <div class="dc-body" style="padding:0">
       <table class="dc-table">
         <thead>
           <tr>
             <th>#</th>
-            <th>Вага (кг)</th>
-            <th>Довжина (см)</th>
-            <th>Ширина (см)</th>
-            <th>Висота (см)</th>
+            <th>{% trans "Вага (кг)" %}</th>
+            <th>{% trans "Довжина (см)" %}</th>
+            <th>{% trans "Ширина (см)" %}</th>
+            <th>{% trans "Висота (см)" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -207,15 +208,15 @@
   <!-- Митна декларація -->
   {% if customs and is_intl %}
   <div class="dc-card">
-    <div class="dc-head">🛃 Митна декларація</div>
+    <div class="dc-head">🛃 {% trans "Митна декларація" %}</div>
     <div class="dc-body">
       <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
-        <span><span class="dc-lbl" style="display:inline">Валюта: </span>
+        <span><span class="dc-lbl" style="display:inline">{% trans "Валюта" %}: </span>
           <b>{{ customs.currency|default:"EUR" }}</b></span>
-        <span><span class="dc-lbl" style="display:inline">Тип: </span>
+        <span><span class="dc-lbl" style="display:inline">{% trans "Тип" %}: </span>
           <b>{{ customs.contents_type|default:"SALE" }}</b></span>
         {% if customs.description %}
-        <span><span class="dc-lbl" style="display:inline">Опис: </span>
+        <span><span class="dc-lbl" style="display:inline">{% trans "Опис" %}: </span>
           <b>{{ customs.description }}</b></span>
         {% endif %}
       </div>
@@ -223,12 +224,12 @@
       <table class="dc-table">
         <thead>
           <tr>
-            <th>Опис</th>
-            <th style="text-align:center">К-сть</th>
-            <th style="text-align:right">Вартість</th>
-            <th>Вага нетто</th>
-            <th>Походження</th>
-            <th>HS код</th>
+            <th>{% trans "Опис" %}</th>
+            <th style="text-align:center">{% trans "К-сть" %}</th>
+            <th style="text-align:right">{% trans "Вартість" %}</th>
+            <th>{% trans "Вага нетто" %}</th>
+            <th>{% trans "Походження" %}</th>
+            <th>{% trans "HS код" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -238,7 +239,7 @@
             <td style="text-align:center">{{ item.quantity }}</td>
             <td style="text-align:right;color:var(--ok);font-weight:700">
               {{ item.value }} {{ customs.currency|default:"EUR" }}</td>
-            <td style="color:var(--text-muted)">{{ item.weight_kg }} кг</td>
+            <td style="color:var(--text-muted)">{{ item.weight_kg }} {% trans "кг" %}</td>
             <td style="color:var(--text-muted)">{{ item.country|default:"—" }}</td>
             <td style="color:var(--text-dim);font-family:monospace">{{ item.hs_code|default:"—" }}</td>
           </tr>
@@ -252,25 +253,25 @@
 
   <!-- Abholung / Спосіб відправки -->
   <div class="dc-card">
-    <div class="dc-head">🚐 Спосіб відправки</div>
+    <div class="dc-head">🚐 {% trans "Спосіб відправки" %}</div>
     <div class="dc-body">
       <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:16px">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text)">
           <input type="radio" name="_pickup_type" value="pickup" id="pt_pickup" checked
                  onchange="document.getElementById('pickup-details').style.display=''">
-          🚐 Кур'єр забере (Abholung)
+          🚐 {% trans "Кур'єр забере (Abholung)" %}
         </label>
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;font-weight:600;color:var(--text)">
           <input type="radio" name="_pickup_type" value="dropoff" id="pt_dropoff"
                  onchange="document.getElementById('pickup-details').style.display='none'">
-          🏪 Здам на відділення DHL сам
+          🏪 {% trans "Здам на відділення DHL сам" %}
         </label>
       </div>
       <div id="pickup-details" style="background:var(--bg-input);border-radius:6px;padding:14px 16px">
         <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
           <div>
             <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
-                           letter-spacing:.04em;display:block;margin-bottom:5px">Дата забирання</label>
+                           letter-spacing:.04em;display:block;margin-bottom:5px">{% trans "Дата забирання" %}</label>
             <input type="date" id="inp_pickup_date" name="_pickup_date"
                    min="{{ pickup_min_date }}" value="{{ pickup_default_date }}"
                    style="background:var(--bg-card);border:1px solid var(--border-strong);
@@ -278,7 +279,7 @@
           </div>
           <div style="flex:1;min-width:280px">
             <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
-                           letter-spacing:.04em;display:block;margin-bottom:8px">Часове вікно (з — до)</label>
+                           letter-spacing:.04em;display:block;margin-bottom:8px">{% trans "Часове вікно (з — до)" %}</label>
             <div style="display:flex;justify-content:center;gap:10px;font-size:18px;font-weight:700;
                         color:var(--text);margin-bottom:14px">
               <span id="dr-from-lbl">09:00</span>
@@ -300,7 +301,7 @@
           </div>
           <div style="min-width:180px">
             <label style="font-size:11px;color:var(--text-dim);font-weight:700;text-transform:uppercase;
-                           letter-spacing:.04em;display:block;margin-bottom:5px">Місце забирання</label>
+                           letter-spacing:.04em;display:block;margin-bottom:5px">{% trans "Місце забирання" %}</label>
             <input type="text" id="inp_pickup_location" value="reception" maxlength="80"
                    placeholder="reception / front door / warehouse"
                    style="width:100%;background:var(--bg-card);border:1px solid var(--border-strong);
@@ -308,7 +309,7 @@
           </div>
         </div>
         <div style="margin-top:10px;font-size:12px;color:var(--text-dim)">
-          ℹ️ DHL підтвердить час Abholung окремо. Вкажіть приблизне вікно коли кур'єр може приїхати.
+          ℹ️ {% trans "DHL підтвердить час Abholung окремо. Вкажіть приблизне вікно коли кур'єр може приїхати." %}
         </div>
       </div>
     </div>
@@ -316,13 +317,13 @@
 
   <!-- Підтвердження -->
   <div class="dc-card">
-    <div class="dc-head">⚠️ Підтвердження</div>
+    <div class="dc-head">⚠️ {% trans "Підтвердження" %}</div>
     <div class="dc-body">
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
-        Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
+        {% blocktrans %}Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
         Minerva викличе <b style="color:var(--text)">DHL REST API</b> і
         <b style="color:var(--text)">створить реальне відправлення</b> у системі DHL.
-        Буде згенеровано трекінг-номер та PDF-етикетку.
+        Буде згенеровано трекінг-номер та PDF-етикетку.{% endblocktrans %}
       </p>
       <form method="post" action="{{ confirm_url }}" id="dhl-confirm-form">
         {% csrf_token %}
@@ -348,26 +349,26 @@
   <!-- Кнопки -->
   <div class="dc-actions">
     <button type="submit" form="dhl-confirm-form" class="btn-confirm"
-      onclick="return confirm('Відправити через DHL API?\n\nПродукт: {{ product_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі DHL.')">
-      🟡 Підтвердити і відправити через DHL
+      onclick="return confirm('{% trans "Відправити через DHL API?" %}\n\n{% trans "Продукт" %}: {{ product_name }}\n{% trans "Одержувач" %}: {{ to_addr.name }} ({{ to_addr.country }})\n\n{% trans "Після підтвердження відправлення буде створено в системі DHL." %}')">
+      🟡 {% trans "Підтвердити і відправити через DHL" %}
     </button>
     <button type="button" class="btn-back" id="btn-dhl-dry-run" onclick="dhlDryRun()">
-      🔍 Переглянути тіло запиту
+      🔍 {% trans "Переглянути тіло запиту" %}
     </button>
-    <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
+    <a href="{{ back_url }}" class="btn-back">← {% trans "Назад до чернетки" %}</a>
   </div>
 
   <!-- DHL Debug JSON panel -->
   <div id="dhl-dry-panel" style="display:none;margin-top:16px">
     <div class="dc-card">
       <div class="dc-head" style="justify-content:space-between">
-        <span>📋 DHL API Request Body (dry run — не відправляється)</span>
+        <span>📋 DHL API Request Body (dry run — {% trans "не відправляється" %})</span>
         <div style="display:flex;gap:8px">
-          <button type="button" class="btn-back" onclick="dhlCopyPayload()" style="padding:4px 10px;font-size:12px">📋 Копіювати</button>
+          <button type="button" class="btn-back" onclick="dhlCopyPayload()" style="padding:4px 10px;font-size:12px">📋 {% trans "Копіювати" %}</button>
           <button type="button" class="btn-back" onclick="document.getElementById('dhl-dry-panel').style.display='none'" style="padding:4px 10px;font-size:12px">✕</button>
         </div>
       </div>
-      <pre id="dhl-dry-json" style="margin:0;padding:12px;overflow:auto;max-height:500px;font-size:12px;line-height:1.4;white-space:pre-wrap">Завантаження…</pre>
+      <pre id="dhl-dry-json" style="margin:0;padding:12px;overflow:auto;max-height:500px;font-size:12px;line-height:1.4;white-space:pre-wrap">{% trans "Завантаження…" %}</pre>
     </div>
   </div>
 
@@ -414,11 +415,14 @@
 </script>
 <script>
 var _dhlDryPayload = '';
+var _msgLoading = '{% trans "Завантаження…" %}';
+var _msgError   = '{% trans "Помилка" %}';
+var _msgCopied  = '{% trans "Скопійовано" %}';
 function dhlDryRun() {
   var panel = document.getElementById('dhl-dry-panel');
   var pre   = document.getElementById('dhl-dry-json');
   panel.style.display = 'block';
-  pre.textContent = 'Завантаження…';
+  pre.textContent = _msgLoading;
   var url = '{% url "admin:shipping_shipment_dhl_dry_run" shipment.pk %}?product_code={{ product_code|urlencode }}&pickup=0';
   fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
     .then(function(r){ return r.json(); })
@@ -427,7 +431,7 @@ function dhlDryRun() {
         _dhlDryPayload = JSON.stringify(d.payload, null, 2);
         pre.textContent = _dhlDryPayload;
       } else {
-        pre.textContent = '❌ ' + (d.error || 'Помилка');
+        pre.textContent = '❌ ' + (d.error || _msgError);
       }
     })
     .catch(function(e){ pre.textContent = '❌ ' + e; });
@@ -436,7 +440,7 @@ function dhlCopyPayload() {
   if (!_dhlDryPayload) return;
   navigator.clipboard.writeText(_dhlDryPayload).then(function(){
     var btn = document.querySelector('#dhl-dry-panel button');
-    if (btn) { var t = btn.textContent; btn.textContent = '✅ Скопійовано'; setTimeout(function(){ btn.textContent = t; }, 1500); }
+    if (btn) { var t = btn.textContent; btn.textContent = '✅ ' + _msgCopied; setTimeout(function(){ btn.textContent = t; }, 1500); }
   });
 }
 </script>

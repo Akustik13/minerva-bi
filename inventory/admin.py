@@ -18,6 +18,7 @@ from django.urls import path, reverse
 from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
 
 from .forms import ExcelUploadForm, SetStockForm
@@ -100,7 +101,7 @@ def _reorder(product, stock=None, sales_3m_total=None):
 # ── Фільтр по статусу ─────────────────────────────────────────────────────────
 
 class ReorderStatusFilter(admin.SimpleListFilter):
-    title = "Статус запасів"
+    title = _("Статус запасів")
     parameter_name = "reorder_status"
 
     def lookups(self, request, model_admin):
@@ -467,7 +468,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     def name_col(self, obj):
         n = obj.name
         return (n[:45] + "…") if len(n) > 45 else n
-    name_col.short_description = "Назва"
+    name_col.short_description = _("Назва")
 
     def _get_reorder_cached(self, obj):
         if not hasattr(obj, '_reorder_cache'):
@@ -487,14 +488,14 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         elif s < 5:
             return format_html('<b style="color:#ff9800">⚠️ {}</b>', int(s))
         return format_html('<b style="color:#4caf50">{}</b>', int(s))
-    stock_col.short_description = "На складі"
+    stock_col.short_description = _("На складі")
 
     def monthly_col(self, obj):
         d = self._get_reorder_cached(obj)
         if not d['monthly']:
             return format_html('<span style="opacity:.4">—</span>')
         return format_html('{}/міс', d['monthly'])
-    monthly_col.short_description = "Прод./міс"
+    monthly_col.short_description = _("Прод./міс")
 
     def months_left_col(self, obj):
         d = self._get_reorder_cached(obj)
@@ -509,14 +510,14 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         elif ml <= 3:
             return format_html('<span style="color:#ffb300">{} міс</span>', ml_str)
         return format_html('<span style="color:#4caf50">{} міс</span>', ml_str)
-    months_left_col.short_description = "Вистачить"
+    months_left_col.short_description = _("Вистачить")
 
     def reorder_col(self, obj):
         d = self._get_reorder_cached(obj)
         if not d['reorder_qty']:
             return format_html('<span style="opacity:.4">—</span>')
         return format_html('<b style="color:#2196f3">📦 {} шт.</b>', d['reorder_qty'])
-    reorder_col.short_description = "Замовити"
+    reorder_col.short_description = _("Замовити")
 
     def status_col(self, obj):
         d = self._get_reorder_cached(obj)
@@ -532,7 +533,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             '<span style="background:{};color:#fff;padding:3px 10px;border-radius:12px;'
             'font-size:11px;font-weight:bold;white-space:nowrap">{}</span>',
             color, label)
-    status_col.short_description = "Статус"
+    status_col.short_description = _("Статус")
 
     def po_btn(self, obj):
         d = _reorder(obj)
@@ -543,7 +544,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             '<a href="{}" style="background:#1976d2;color:#fff;padding:4px 12px;'
             'border-radius:6px;text-decoration:none;font-size:11px;white-space:nowrap">'
             '+ PO</a>', url)
-    po_btn.short_description = "Дія"
+    po_btn.short_description = _("Дія")
 
     def bulk_create_po(self, request, queryset):
         """Масово додати всі відібрані товари до одного draft PO."""
@@ -587,7 +588,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             f"Відкрийте: /admin/inventory/purchaseorder/{po.pk}/change/",
             messages.SUCCESS,
         )
-    bulk_create_po.short_description = "📦 Додати до PO (чернетка)"
+    bulk_create_po.short_description = _("📦 Додати до PO (чернетка)")
 
 
 # ── Стандартні admin класи (без змін) ─────────────────────────────────────────
@@ -677,7 +678,7 @@ class ProductCategoryAdmin(admin.ModelAdmin):
             '<span style="background:{};color:#fff;padding:3px 12px;border-radius:10px;'
             'font-size:12px;font-weight:bold">{}</span>',
             obj.color, obj.name)
-    color_badge.short_description = "Вигляд бейджу"
+    color_badge.short_description = _("Вигляд бейджу")
 
 
 @admin.register(ProductAlias)
@@ -756,7 +757,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         'Reserved':   ('🔒', '#FFB300',           'rgba(255,179,0,.13)',   'Резерв'),
     }
 
-    @admin.display(description="Дата", ordering="tx_date")
+    @admin.display(description=_("Дата"), ordering="tx_date")
     def date_col(self, obj):
         from django.utils.formats import date_format
         d = obj.tx_date
@@ -767,7 +768,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             date_format(d, 'd.m.Y'),
         )
 
-    @admin.display(description="Тип", ordering="tx_type")
+    @admin.display(description=_("Тип"), ordering="tx_type")
     def tx_type_badge(self, obj):
         icon, color, bg, label = self._TX_META.get(obj.tx_type, ('•', 'var(--text-dim)', 'transparent', obj.tx_type))
         return format_html(
@@ -777,7 +778,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             bg, color, icon, label,
         )
 
-    @admin.display(description="К-сть", ordering="qty")
+    @admin.display(description=_("К-сть"), ordering="qty")
     def qty_col(self, obj):
         try:
             q = Decimal(str(obj.qty))
@@ -855,7 +856,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         self._ref_link_cache = None
         return super().changelist_view(request, extra_context)
 
-    @admin.display(description="📄 Документ", ordering="ref_doc")
+    @admin.display(description=_("📄 Документ"), ordering="ref_doc")
     def ref_doc_link(self, obj):
         ref = obj.ref_doc
         if not ref:
@@ -908,7 +909,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             ))
         )
 
-    @admin.display(description="Залишок після")
+    @admin.display(description=_("Залишок після"))
     def balance_col(self, obj):
         val = getattr(obj, 'running_balance', None)
         if val is None:

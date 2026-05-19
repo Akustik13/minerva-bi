@@ -1,3 +1,4 @@
+{% load i18n %}
 <style>
 .em-pv{display:flex;flex-direction:column;flex:1;min-height:0}
 .em-pv-hd{padding:14px 18px 10px;border-bottom:1px solid var(--border-strong);flex-shrink:0;background:var(--bg-input)}
@@ -109,7 +110,7 @@
 
   <!-- Header -->
   <div class="em-pv-hd">
-    <div class="em-pv-subj">{{ emails.0.subject|default:"(без теми)" }}</div>
+    {% trans "(без теми)" as no_subject %}<div class="em-pv-subj">{{ emails.0.subject|default:no_subject }}</div>
     <div class="em-pv-meta">
       {% if thread and thread.crm_customer %}
       <a href="/admin/crm/customer/{{ thread.crm_customer.pk }}/change/"
@@ -120,18 +121,18 @@
     </div>
     <div class="em-pv-acts" style="margin-top:8px">
       {% if last %}
-      <a href="/email/compose/?reply_to={{ last.pk }}" class="em-pv-btn">↩ Відповісти</a>
-      <a href="/email/compose/?forward={{ last.pk }}" class="em-pv-btn">→ Переслати</a>
+      <a href="/email/compose/?reply_to={{ last.pk }}" class="em-pv-btn">↩ {% trans "Відповісти" %}</a>
+      <a href="/email/compose/?forward={{ last.pk }}" class="em-pv-btn">→ {% trans "Переслати" %}</a>
       {% if thread %}
         {% if thread.is_archived %}
-        <button class="em-pv-btn" onclick="pvUnarchive({{ thread.pk }})">📤 З архіву</button>
+        <button class="em-pv-btn" onclick="pvUnarchive({{ thread.pk }})">📤 {% trans "З архіву" %}</button>
         {% else %}
-        <button class="em-pv-btn" onclick="pvArchive({{ thread.pk }})">📦 В архів</button>
+        <button class="em-pv-btn" onclick="pvArchive({{ thread.pk }})">📦 {% trans "В архів" %}</button>
         {% endif %}
       {% endif %}
       <button class="em-pv-btn danger" onclick="pvDelete({{ last.pk }})">🗑️</button>
       <a href="{% if thread %}/email/thread/{{ thread.pk }}/{% else %}/email/message/{{ last.pk }}/{% endif %}"
-         class="em-pv-btn" target="_blank" title="Відкрити на повній сторінці">↗ Окремо</a>
+         class="em-pv-btn" target="_blank" title="{% trans "Відкрити на повній сторінці" %}">↗ {% trans "Окремо" %}</a>
       {% endif %}
     </div>
   </div>
@@ -159,12 +160,12 @@
           <span class="em-card-date">{{ msg.sent_at|date:"d.m.Y H:i" }}</span>
           <!-- Action buttons always in header -->
           <div class="em-card-actions" onclick="event.stopPropagation()">
-            <button class="em-hd-btn ai" onclick="pvAiReply({{ msg.pk }})" title="AI відповідь">🏛️</button>
-            <button class="em-hd-btn" onclick="pvAiTranslate({{ msg.pk }})" title="Перекласти UA">🌐</button>
+            <button class="em-hd-btn ai" onclick="pvAiReply({{ msg.pk }})" title="{% trans "AI відповідь" %}">🏛️</button>
+            <button class="em-hd-btn" onclick="pvAiTranslate({{ msg.pk }})" title="{% trans "Перекласти UA" %}">🌐</button>
             <button class="em-hd-btn{% if msg.is_spam %} spam-on{% endif %}"
                     id="pv-spam-btn-{{ msg.pk }}"
-                    onclick="pvToggleSpam({{ msg.pk }}, this)" title="Спам">🚫</button>
-            <button class="em-hd-btn danger" onclick="pvDelete({{ msg.pk }})" title="Видалити">🗑️</button>
+                    onclick="pvToggleSpam({{ msg.pk }}, this)" title="{% trans "Спам" %}">🚫</button>
+            <button class="em-hd-btn danger" onclick="pvDelete({{ msg.pk }})" title="{% trans "Видалити" %}">🗑️</button>
           </div>
         </div>
       </div>
@@ -200,13 +201,13 @@
             <a class="em-att-btn"
                href="/email/message/{{ msg.pk }}/attachment/{{ forloop.counter0 }}/"
                target="_blank"
-               title="Переглянути"
+               title="{% trans "Переглянути" %}"
                onmouseenter="attTipHide()">👁</a>
             <span class="em-att-sep"></span>
             <a class="em-att-btn"
                href="/email/message/{{ msg.pk }}/attachment/{{ forloop.counter0 }}/?download=1"
                download="{{ att.name }}"
-               title="Завантажити"
+               title="{% trans "Завантажити" %}"
                onmouseenter="attTipHide()">⬇</a>
           </div>
           {% endfor %}
@@ -215,17 +216,17 @@
 
         <!-- AI box (prompt + result) -->
         <div class="em-ai-box" id="pv-ai-{{ msg.pk }}">
-          <div class="em-ai-lbl">🏛️ Minerva пропонує</div>
+          <div class="em-ai-lbl">🏛️ {% trans "Minerva пропонує" %}</div>
           <div style="display:flex;gap:6px;margin-bottom:8px">
             <input class="em-ai-prompt-inp" type="text"
                    id="pv-ai-prompt-{{ msg.pk }}"
-                   placeholder="Що відповісти? (залиш порожнім для авто-відповіді)">
-            <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">Генерувати →</button>
+                   placeholder="{% trans "Що відповісти? (залиш порожнім для авто-відповіді)" %}">
+            <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">{% trans "Генерувати" %} →</button>
           </div>
           <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
           <div style="display:flex;gap:6px;margin-top:8px">
-            <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 Копіювати</button>
-            <button class="em-pv-btn ai" onclick="pvUseAsReply({{ msg.pk }})">Вставити у відповідь →</button>
+            <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 {% trans "Копіювати" %}</button>
+            <button class="em-pv-btn ai" onclick="pvUseAsReply({{ msg.pk }})">{% trans "Вставити у відповідь" %} →</button>
           </div>
         </div>
       </div>
@@ -239,29 +240,29 @@
   <div class="em-reply" id="pv-reply-wrap">
     <!-- Toggle header — always visible -->
     <div class="em-reply-toggle-hd" onclick="pvToggleReply()" id="pv-reply-hd"
-         title="Натисни щоб відповісти">
-      <span>↩ Відповісти</span>
+         title="{% trans "Натисни щоб відповісти" %}">
+      <span>↩ {% trans "Відповісти" %}</span>
       <span id="pv-reply-arrow" style="transition:transform .15s">▲</span>
     </div>
     <!-- Collapsible body -->
     <div id="pv-reply-body" style="display:none">
       <div class="em-reply-toolbar">
-        <button class="em-tb-btn" onmousedown="return fmt(event,'bold')" title="Жирний"><b>B</b></button>
-        <button class="em-tb-btn" onmousedown="return fmt(event,'italic')" title="Курсив"><i>I</i></button>
-        <button class="em-tb-btn" onmousedown="return fmt(event,'underline')" title="Підкреслений"><u>U</u></button>
-        <button class="em-tb-btn" onmousedown="return fmt(event,'strikeThrough')" title="Закреслений"><s>S</s></button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'bold')" title="{% trans "Жирний" %}"><b>B</b></button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'italic')" title="{% trans "Курсив" %}"><i>I</i></button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'underline')" title="{% trans "Підкреслений" %}"><u>U</u></button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'strikeThrough')" title="{% trans "Закреслений" %}"><s>S</s></button>
         <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
-        <button class="em-tb-btn" onmousedown="return fmtBlock(event,'insertUnorderedList')" title="Список">≡</button>
-        <button class="em-tb-btn" onmousedown="return fmt(event,'removeFormat')" title="Очистити">✕</button>
+        <button class="em-tb-btn" onmousedown="return fmtBlock(event,'insertUnorderedList')" title="{% trans "Список" %}">≡</button>
+        <button class="em-tb-btn" onmousedown="return fmt(event,'removeFormat')" title="{% trans "Очистити" %}">✕</button>
       </div>
       <div class="em-reply-editor" id="pv-reply-editor" contenteditable="true"
-           placeholder="Текст відповіді..."></div>
+           placeholder="{% trans "Текст відповіді..." %}"></div>
       {% if reply_signature %}
       <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:12px" id="pv-reply-sig">{{ reply_signature|safe }}</div>
       {% endif %}
       <div class="em-reply-footer">
         <button class="em-reply-send" onclick="pvSendReply({{ last.pk }}, '{{ last.from_email|escapejs }}', '{{ last.subject|escapejs }}')">
-          Відправити →
+          {% trans "Відправити" %} →
         </button>
         <span class="em-reply-status" id="pv-reply-status"></span>
       </div>
@@ -359,7 +360,7 @@ window.pvSendReply = async function(pk, fromEmail, subj) {
   var status = document.getElementById('pv-reply-status');
   var btn    = document.querySelector('.em-reply-send');
   var textBody = (editor.innerText || editor.textContent).trim();
-  if (!textBody) { status.textContent = 'Введіть текст'; return; }
+  if (!textBody) { status.textContent = '{% trans "Введіть текст" %}'; return; }
 
   var htmlBody = editor.innerHTML;
   if (sig) htmlBody += '<br><hr style="border:none;border-top:1px solid #ccc;margin:10px 0">' + sig.innerHTML;
@@ -367,7 +368,7 @@ window.pvSendReply = async function(pk, fromEmail, subj) {
   var plainBody = textBody;
 
   if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
-  status.textContent = 'Відправляю...'; status.style.color = 'var(--text-muted)';
+  status.textContent = '{% trans "Відправляю..." %}'; status.style.color = 'var(--text-muted)';
   var fd = new FormData();
   fd.append('reply_to_pk', pk);
   fd.append('body',      plainBody);
@@ -377,12 +378,12 @@ window.pvSendReply = async function(pk, fromEmail, subj) {
   try {
     var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
     var d = await r.json();
-    status.textContent  = d.ok ? '✓ Відправлено' : '✗ ' + d.error;
+    status.textContent  = d.ok ? '✓ {% trans "Відправлено" %}' : '✗ ' + d.error;
     status.style.color  = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
     if (d.ok) editor.innerHTML = '';
     else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   } catch {
-    status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';
+    status.textContent = '✗ {% trans "Помилка мережі" %}'; status.style.color = 'var(--err,#e53935)';
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
 };
@@ -401,24 +402,24 @@ window.pvAiGenerate = async function(pk) {
   var txt   = document.getElementById('pv-ai-txt-' + pk);
   var inp   = document.getElementById('pv-ai-prompt-' + pk);
   var query = inp ? encodeURIComponent(inp.value.trim()) : '';
-  txt.textContent = '⏳ Minerva думає...';
+  txt.textContent = '⏳ {% trans "Minerva думає..." %}';
   var url = '/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : '');
   try {
     var r = await fetch(url);
     var d = await r.json();
     txt.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
-  } catch { txt.textContent = '⚠️ Помилка'; }
+  } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
 
 window.pvAiTranslate = async function(pk) {
   var box = document.getElementById('pv-ai-' + pk);
   var txt = document.getElementById('pv-ai-txt-' + pk);
-  box.style.display = 'block'; txt.textContent = '⏳ Перекладаю...';
+  box.style.display = 'block'; txt.textContent = '⏳ {% trans "Перекладаю..." %}';
   try {
     var r = await fetch('/email/message/' + pk + '/ai-translate/?lang=uk');
     var d = await r.json();
     txt.textContent = d.ok ? d.translation : '⚠️ ' + d.error;
-  } catch { txt.textContent = '⚠️ Помилка'; }
+  } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
 
 window.pvCopyAI = function(pk) {
@@ -442,13 +443,13 @@ window.pvToggleSpam = async function(pk, btn) {
   var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
   if (d.ok) {
-    btn.textContent = d.spam ? '✓ Спам' : '🚫 Спам';
+    btn.textContent = d.spam ? '✓ {% trans "Спам" %}' : '🚫 {% trans "Спам" %}';
     btn.classList.toggle('spam-on', d.spam);
   }
 };
 
 window.pvDelete = async function(pk) {
-  if (!confirm('Видалити лист?')) return;
+  if (!confirm('{% trans "Видалити лист?" %}')) return;
   var r = await fetch('/email/message/' + pk + '/delete/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
   if (d.ok) {
@@ -517,7 +518,7 @@ window.attTipShow = function(ev, el) {
   }
   html += '<div class="att-tip-info">'
         + '<div class="att-tip-name">' + name.replace(/</g,'&lt;') + '</div>'
-        + '<div class="att-tip-meta">' + (ct || 'файл') + (size ? ' · ' + size : '') + '</div>'
+        + '<div class="att-tip-meta">' + (ct || '{% trans "файл" %}') + (size ? ' · ' + size : '') + '</div>'
         + '</div>';
 
   _tip.innerHTML = html;

@@ -1,13 +1,13 @@
 {% extends "admin/base_site.html" %}
 {% load i18n log %}
 
-{% block title %}📦 Склад | Minerva{% endblock %}
+{% block title %}📦 {% trans "Склад" %} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; Склад
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; {% trans "Склад" %}
 </div>
 {% endblock %}
 
@@ -154,10 +154,10 @@
   <div class="inv-header">
     <div class="inv-header-icon">📦</div>
     <div>
-      <h1>Склад</h1>
-      <p>Товари · Залишки · Транзакції · Reorder · Постачальники · Імпорт Excel</p>
+      <h1>{% trans "Склад" %}</h1>
+      <p>{% trans "Товари · Залишки · Транзакції · Reorder · Постачальники · Імпорт Excel" %}</p>
     </div>
-    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ Налаштувати плитки</button>
+    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ {% trans "Налаштувати плитки" %}</button>
   </div>
 
   <!-- Stat strip + overview card -->
@@ -165,142 +165,142 @@
     <div class="inv-stats">
       <a href="/admin/inventory/reorderproxy/" class="inv-stat">
         <div class="inv-stat-val" style="color:#f44336">{{ inventory_stats.critical }}</div>
-        <div class="inv-stat-lbl">⚠️ Нижче reorder point</div>
+        <div class="inv-stat-lbl">⚠️ {% trans "Нижче reorder point" %}</div>
       </a>
       <a href="/admin/inventory/purchaseorder/" class="inv-stat">
         <div class="inv-stat-val" style="color:#ff9800">{{ inventory_stats.active_po }}</div>
-        <div class="inv-stat-lbl">📋 Активних PO</div>
+        <div class="inv-stat-lbl">📋 {% trans "Активних PO" %}</div>
       </a>
       <a href="/admin/inventory/inventorytransaction/" class="inv-stat">
         <div class="inv-stat-val" style="color:#2196f3">{{ inventory_stats.tx_today }}</div>
-        <div class="inv-stat-lbl">🔄 Транзакцій сьогодні</div>
+        <div class="inv-stat-lbl">🔄 {% trans "Транзакцій сьогодні" %}</div>
       </a>
       <a href="/admin/inventory/product/" class="inv-stat">
         <div class="inv-stat-val" style="color:#4caf50">{{ inventory_stats.active_products }}</div>
-        <div class="inv-stat-lbl">📦 Активних товарів</div>
+        <div class="inv-stat-lbl">📦 {% trans "Активних товарів" %}</div>
       </a>
     </div>
     <!-- Overview card -->
     <div class="inv-overview">
-      <div class="inv-overview-title">📊 Огляд складу</div>
+      <div class="inv-overview-title">📊 {% trans "Огляд складу" %}</div>
       <div class="inv-overview-row">
-        <span class="inv-overview-label">🟢 Нормальний</span>
+        <span class="inv-overview-label">🟢 {% trans "Нормальний" %}</span>
         <span class="inv-overview-val" style="color:var(--ok,#4caf50)">{{ inventory_stats.in_stock_ok }}</span>
       </div>
       <div class="inv-overview-row">
-        <span class="inv-overview-label">🟡 Критичний</span>
+        <span class="inv-overview-label">🟡 {% trans "Критичний" %}</span>
         <span class="inv-overview-val" style="color:#ff9800">{{ inventory_stats.critical }}</span>
       </div>
       <div class="inv-overview-row">
-        <span class="inv-overview-label">🔴 Закінчився</span>
+        <span class="inv-overview-label">🔴 {% trans "Закінчився" %}</span>
         <span class="inv-overview-val" style="color:var(--err,#f44336)">{{ inventory_stats.out_of_stock }}</span>
       </div>
     </div>
   </div>
 
   <!-- Товари -->
-  <div class="inv-section-hdr"><span>🗃️</span> Товари</div>
+  <div class="inv-section-hdr"><span>🗃️</span> {% trans "Товари" %}</div>
   <div class="inv-grid" data-grid-id="inv-products">
     <a href="/admin/inventory/product/" class="inv-tile" style="--ta:#2196f3" data-tile-id="all-products">
       <span class="inv-tile-icon">📦</span>
-      <span class="inv-tile-name">Всі товари</span>
-      <span class="inv-tile-sub">Список · пошук · фільтри</span>
+      <span class="inv-tile-name">{% trans "Всі товари" %}</span>
+      <span class="inv-tile-sub">{% trans "Список · пошук · фільтри" %}</span>
     </a>
     <a href="/admin/inventory/product/add/" class="inv-tile" style="--ta:#4caf50" data-tile-id="add-product">
       <span class="inv-tile-icon">➕</span>
-      <span class="inv-tile-name">Новий товар</span>
-      <span class="inv-tile-sub">Додати Product</span>
+      <span class="inv-tile-name">{% trans "Новий товар" %}</span>
+      <span class="inv-tile-sub">{% trans "Додати Product" %}</span>
     </a>
     <a href="/admin/inventory/product/import-excel/" class="inv-tile inv-tile-import" data-tile-id="import-products">
       <span class="inv-tile-icon">📥</span>
-      <span class="inv-tile-name">Імпорт товарів</span>
-      <span class="inv-tile-sub">Excel → Склад (wizard)</span>
+      <span class="inv-tile-name">{% trans "Імпорт товарів" %}</span>
+      <span class="inv-tile-sub">{% trans "Excel → Склад (wizard)" %}</span>
       <span class="inv-tile-badge">Excel</span>
     </a>
     <a href="/admin/inventory/productcategory/" class="inv-tile" style="--ta:#607d8b" data-tile-id="categories">
       <span class="inv-tile-icon">🗂️</span>
-      <span class="inv-tile-name">Категорії товарів</span>
-      <span class="inv-tile-sub">Довідник категорій</span>
+      <span class="inv-tile-name">{% trans "Категорії товарів" %}</span>
+      <span class="inv-tile-sub">{% trans "Довідник категорій" %}</span>
     </a>
     <a href="/admin/inventory/reorderproxy/" class="inv-tile" style="--ta:#ff9800" data-tile-id="reorder">
       <span class="inv-tile-icon">⚠️</span>
-      <span class="inv-tile-name">Reorder-аналіз</span>
-      <span class="inv-tile-sub">Критичні залишки</span>
+      <span class="inv-tile-name">{% trans "Reorder-аналіз" %}</span>
+      <span class="inv-tile-sub">{% trans "Критичні залишки" %}</span>
     </a>
     <a href="/admin/inventory/reorderproxy/supply/" class="inv-tile" style="--ta:#e91e63" data-tile-id="supply">
       <span class="inv-tile-icon">📋</span>
-      <span class="inv-tile-name">Резервації та прихід</span>
-      <span class="inv-tile-sub">Замовники · PO · Очікувані дати</span>
+      <span class="inv-tile-name">{% trans "Резервації та прихід" %}</span>
+      <span class="inv-tile-sub">{% trans "Замовники · PO · Очікувані дати" %}</span>
     </a>
     <a href="/admin/inventory/incomingshipment/" class="inv-tile" style="--ta:#00897b" data-tile-id="incoming-shipment">
       <span class="inv-tile-icon">🚢</span>
-      <span class="inv-tile-name">Трекінг приходу</span>
-      <span class="inv-tile-sub">Статус · DHL · Від постачальника</span>
+      <span class="inv-tile-name">{% trans "Трекінг приходу" %}</span>
+      <span class="inv-tile-sub">{% trans "Статус · DHL · Від постачальника" %}</span>
     </a>
     <a href="/dashboard/import-template/inventory/" class="inv-tile" style="--ta:#00bcd4" data-tile-id="excel-template">
       <span class="inv-tile-icon">📄</span>
-      <span class="inv-tile-name">Шаблон Excel</span>
-      <span class="inv-tile-sub">Завантажити .xlsx для імпорту</span>
+      <span class="inv-tile-name">{% trans "Шаблон Excel" %}</span>
+      <span class="inv-tile-sub">{% trans "Завантажити .xlsx для імпорту" %}</span>
     </a>
     <a href="/dashboard/help/#inventory" class="inv-tile" style="--ta:#607d8b" data-tile-id="help">
       <span class="inv-tile-icon">📖</span>
-      <span class="inv-tile-name">Довідник</span>
-      <span class="inv-tile-sub">Документація модуля Склад</span>
+      <span class="inv-tile-name">{% trans "Довідник" %}</span>
+      <span class="inv-tile-sub">{% trans "Документація модуля Склад" %}</span>
     </a>
   </div>
 
   <!-- Рух товару -->
-  <div class="inv-section-hdr"><span>🔄</span> Рух товару</div>
+  <div class="inv-section-hdr"><span>🔄</span> {% trans "Рух товару" %}</div>
   <div class="inv-grid" data-grid-id="inv-tx">
     <a href="/admin/inventory/inventorytransaction/" class="inv-tile" style="--ta:#00bcd4" data-tile-id="all-transactions">
       <span class="inv-tile-icon">🔄</span>
-      <span class="inv-tile-name">Всі транзакції</span>
-      <span class="inv-tile-sub">Прихід · витрата · коригування</span>
+      <span class="inv-tile-name">{% trans "Всі транзакції" %}</span>
+      <span class="inv-tile-sub">{% trans "Прихід · витрата · коригування" %}</span>
     </a>
     <a href="/admin/inventory/inventorytransaction/?tx_type=RECEIPT" class="inv-tile" style="--ta:#4caf50" data-tile-id="receipt">
       <span class="inv-tile-icon">📥</span>
-      <span class="inv-tile-name">Прихід</span>
-      <span class="inv-tile-sub">Отримані товари</span>
+      <span class="inv-tile-name">{% trans "Прихід" %}</span>
+      <span class="inv-tile-sub">{% trans "Отримані товари" %}</span>
     </a>
     <a href="/admin/inventory/inventorytransaction/?tx_type=SHIPMENT" class="inv-tile" style="--ta:#f44336" data-tile-id="shipment">
       <span class="inv-tile-icon">📤</span>
-      <span class="inv-tile-name">Витрата</span>
-      <span class="inv-tile-sub">Відвантажені товари</span>
+      <span class="inv-tile-name">{% trans "Витрата" %}</span>
+      <span class="inv-tile-sub">{% trans "Відвантажені товари" %}</span>
     </a>
     <a href="/admin/inventory/inventorytransaction/?tx_type=ADJUSTMENT" class="inv-tile" style="--ta:#9c27b0" data-tile-id="adjustment">
       <span class="inv-tile-icon">⚖️</span>
-      <span class="inv-tile-name">Коригування</span>
-      <span class="inv-tile-sub">Ревізія · інвентаризація</span>
+      <span class="inv-tile-name">{% trans "Коригування" %}</span>
+      <span class="inv-tile-sub">{% trans "Ревізія · інвентаризація" %}</span>
     </a>
   </div>
 
   <!-- Закупівлі -->
-  <div class="inv-section-hdr"><span>🏭</span> Постачальники та закупівлі</div>
+  <div class="inv-section-hdr"><span>🏭</span> {% trans "Постачальники та закупівлі" %}</div>
   <div class="inv-grid" data-grid-id="inv-po">
     <a href="/admin/inventory/supplier/" class="inv-tile" style="--ta:#ff9800" data-tile-id="suppliers">
       <span class="inv-tile-icon">🏭</span>
-      <span class="inv-tile-name">Постачальники</span>
-      <span class="inv-tile-sub">Довідник постачальників</span>
+      <span class="inv-tile-name">{% trans "Постачальники" %}</span>
+      <span class="inv-tile-sub">{% trans "Довідник постачальників" %}</span>
     </a>
     <a href="/admin/inventory/supplier/add/" class="inv-tile" style="--ta:#ff9800" data-tile-id="add-supplier">
       <span class="inv-tile-icon">➕</span>
-      <span class="inv-tile-name">Новий постачальник</span>
-      <span class="inv-tile-sub">Додати Supplier</span>
+      <span class="inv-tile-name">{% trans "Новий постачальник" %}</span>
+      <span class="inv-tile-sub">{% trans "Додати Supplier" %}</span>
     </a>
     <a href="/admin/inventory/purchaseorder/" class="inv-tile" style="--ta:#795548" data-tile-id="purchase-orders">
       <span class="inv-tile-icon">📋</span>
-      <span class="inv-tile-name">Замовлення закупівлі</span>
+      <span class="inv-tile-name">{% trans "Замовлення закупівлі" %}</span>
       <span class="inv-tile-sub">Purchase Orders</span>
     </a>
     <a href="/admin/inventory/purchaseorder/add/" class="inv-tile" style="--ta:#795548" data-tile-id="add-po">
       <span class="inv-tile-icon">➕</span>
-      <span class="inv-tile-name">Нове PO</span>
-      <span class="inv-tile-sub">Нове замовлення постачальнику</span>
+      <span class="inv-tile-name">{% trans "Нове PO" %}</span>
+      <span class="inv-tile-sub">{% trans "Нове замовлення постачальнику" %}</span>
     </a>
   </div>
 
   <!-- Недавні дії -->
-  <div class="inv-section-hdr" style="margin-top:8px"><span>🕐</span> Недавні дії</div>
+  <div class="inv-section-hdr" style="margin-top:8px"><span>🕐</span> {% trans "Недавні дії" %}</div>
   {% get_admin_log 10 as admin_log for_user user %}
   {% if admin_log %}
   <div class="inv-recent-grid">
@@ -323,7 +323,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="inv-empty">Дій ще не виконано.</p>
+  <p class="inv-empty">{% trans "Дій ще не виконано." %}</p>
   {% endif %}
 
 </div>

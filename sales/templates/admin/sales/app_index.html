@@ -1,13 +1,13 @@
 {% extends "admin/base_site.html" %}
 {% load i18n log %}
 
-{% block title %}🛒 Продажі | Minerva{% endblock %}
+{% block title %}🛒 {% trans "Продажі" %} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; Продажі
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; {% trans "Продажі" %}
 </div>
 {% endblock %}
 
@@ -129,100 +129,100 @@
   <div class="sal-header">
     <div class="sal-header-icon">🛒</div>
     <div>
-      <h1>Продажі</h1>
-      <p>Замовлення · Статуси · Трекінг · DYMO-етикетки · Імпорт Excel</p>
+      <h1>{% trans "Продажі" %}</h1>
+      <p>{% trans "Замовлення · Статуси · Трекінг · DYMO-етикетки · Імпорт Excel" %}</p>
     </div>
-    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ Налаштувати плитки</button>
+    <button id="tile-edit-trigger" onclick="_tileEdit()">✏️ {% trans "Налаштувати плитки" %}</button>
   </div>
 
   <!-- Stat strip -->
   <div class="sal-stats">
     <a href="/admin/sales/salesorder/?status=received" class="sal-stat">
       <div class="sal-stat-val" style="color:#2196f3">{{ sales_stats.received }}</div>
-      <div class="sal-stat-lbl">🆕 Нових замовлень</div>
+      <div class="sal-stat-lbl">🆕 {% trans "Нових замовлень" %}</div>
     </a>
     <a href="/admin/sales/salesorder/?status=processing" class="sal-stat">
       <div class="sal-stat-val" style="color:#ff9800">{{ sales_stats.processing }}</div>
-      <div class="sal-stat-lbl">⚙️ В обробці</div>
+      <div class="sal-stat-lbl">⚙️ {% trans "В обробці" %}</div>
     </a>
     <a href="/admin/sales/salesorder/?overdue=1" class="sal-stat">
       <div class="sal-stat-val" style="color:#f44336">{{ sales_stats.overdue }}</div>
-      <div class="sal-stat-lbl">⚠️ Прострочені дедлайни</div>
+      <div class="sal-stat-lbl">⚠️ {% trans "Прострочені дедлайни" %}</div>
     </a>
     <a href="/admin/sales/salesorder/?shipped_period=month" class="sal-stat">
       <div class="sal-stat-val" style="color:#4caf50">{{ sales_stats.shipped_month }}</div>
-      <div class="sal-stat-lbl">🚚 Відправлено цього місяця</div>
+      <div class="sal-stat-lbl">🚚 {% trans "Відправлено цього місяця" %}</div>
     </a>
   </div>
 
   <!-- Замовлення -->
-  <div class="sal-section-hdr"><span>📋</span> Замовлення</div>
+  <div class="sal-section-hdr"><span>📋</span> {% trans "Замовлення" %}</div>
   <div class="sal-grid" data-grid-id="sal-orders">
     <a href="/admin/sales/salesorder/" class="sal-tile" style="--ta:#ff9800" data-tile-id="all-orders">
       <span class="sal-tile-icon">📋</span>
-      <span class="sal-tile-name">Всі замовлення</span>
-      <span class="sal-tile-sub">Список · фільтри · пошук</span>
+      <span class="sal-tile-name">{% trans "Всі замовлення" %}</span>
+      <span class="sal-tile-sub">{% trans "Список · фільтри · пошук" %}</span>
     </a>
     <a href="/admin/sales/salesorder/add/" class="sal-tile" style="--ta:#4caf50" data-tile-id="add-order">
       <span class="sal-tile-icon">➕</span>
-      <span class="sal-tile-name">Нове замовлення</span>
-      <span class="sal-tile-sub">Створити SalesOrder</span>
+      <span class="sal-tile-name">{% trans "Нове замовлення" %}</span>
+      <span class="sal-tile-sub">{% trans "Створити SalesOrder" %}</span>
     </a>
     <a href="/admin/sales/salesorder/import-excel/" class="sal-tile sal-tile-import" data-tile-id="import-orders">
       <span class="sal-tile-icon">📥</span>
-      <span class="sal-tile-name">Імпорт замовлень</span>
-      <span class="sal-tile-sub">Excel → Продажі (wizard)</span>
+      <span class="sal-tile-name">{% trans "Імпорт замовлень" %}</span>
+      <span class="sal-tile-sub">{% trans "Excel → Продажі (wizard)" %}</span>
       <span class="sal-tile-badge">Excel</span>
     </a>
     <a href="/admin/sales/salesorder/?status=received" class="sal-tile" style="--ta:#2196f3" data-tile-id="new-orders">
       <span class="sal-tile-icon">🆕</span>
-      <span class="sal-tile-name">Нові</span>
-      <span class="sal-tile-sub">Очікують обробки</span>
+      <span class="sal-tile-name">{% trans "Нові" %}</span>
+      <span class="sal-tile-sub">{% trans "Очікують обробки" %}</span>
     </a>
     <a href="/admin/sales/salesorder/?status=processing" class="sal-tile" style="--ta:#ff9800" data-tile-id="processing-orders">
       <span class="sal-tile-icon">⚙️</span>
-      <span class="sal-tile-name">В обробці</span>
-      <span class="sal-tile-sub">Готуються до відправки</span>
+      <span class="sal-tile-name">{% trans "В обробці" %}</span>
+      <span class="sal-tile-sub">{% trans "Готуються до відправки" %}</span>
     </a>
     <a href="/admin/sales/salesorder/?shipped_period=month" class="sal-tile" style="--ta:#4caf50" data-tile-id="shipped-orders">
       <span class="sal-tile-icon">🚚</span>
-      <span class="sal-tile-name">Відправлені</span>
-      <span class="sal-tile-sub">Цього місяця</span>
+      <span class="sal-tile-name">{% trans "Відправлені" %}</span>
+      <span class="sal-tile-sub">{% trans "Цього місяця" %}</span>
     </a>
     <a href="/admin/sales/salesorder/?status=cancelled" class="sal-tile" style="--ta:#607d8b" data-tile-id="cancelled-orders">
       <span class="sal-tile-icon">❌</span>
-      <span class="sal-tile-name">Скасовані</span>
+      <span class="sal-tile-name">{% trans "Скасовані" %}</span>
       <span class="sal-tile-sub">Cancelled orders</span>
     </a>
   </div>
 
   <!-- Довідники -->
-  <div class="sal-section-hdr"><span>⚙️</span> Довідники</div>
+  <div class="sal-section-hdr"><span>⚙️</span> {% trans "Довідники" %}</div>
   <div class="sal-grid" data-grid-id="sal-ref">
     <a href="/admin/sales/salessource/" class="sal-tile" style="--ta:#9c27b0" data-tile-id="sources">
       <span class="sal-tile-icon">🔌</span>
-      <span class="sal-tile-name">Джерела продажів</span>
+      <span class="sal-tile-name">{% trans "Джерела продажів" %}</span>
       <span class="sal-tile-sub">DigiKey · Nova Poshta · Manual</span>
     </a>
     <a href="/admin/sales/salescategory/" class="sal-tile" style="--ta:#607d8b" data-tile-id="categories">
       <span class="sal-tile-icon">🏷️</span>
-      <span class="sal-tile-name">Категорії</span>
-      <span class="sal-tile-sub">Типи замовлень</span>
+      <span class="sal-tile-name">{% trans "Категорії" %}</span>
+      <span class="sal-tile-sub">{% trans "Типи замовлень" %}</span>
     </a>
     <a href="/dashboard/import-template/sales/" class="sal-tile" style="--ta:#00bcd4" data-tile-id="excel-template">
       <span class="sal-tile-icon">📄</span>
-      <span class="sal-tile-name">Шаблон Excel</span>
-      <span class="sal-tile-sub">Завантажити .xlsx для імпорту</span>
+      <span class="sal-tile-name">{% trans "Шаблон Excel" %}</span>
+      <span class="sal-tile-sub">{% trans "Завантажити .xlsx для імпорту" %}</span>
     </a>
     <a href="/dashboard/help/#sales" class="sal-tile" style="--ta:#607d8b" data-tile-id="help">
       <span class="sal-tile-icon">📖</span>
-      <span class="sal-tile-name">Довідник</span>
-      <span class="sal-tile-sub">Документація модуля Продажі</span>
+      <span class="sal-tile-name">{% trans "Довідник" %}</span>
+      <span class="sal-tile-sub">{% trans "Документація модуля Продажі" %}</span>
     </a>
   </div>
 
   <!-- Недавні дії -->
-  <div class="sal-section-hdr" style="margin-top:8px"><span>🕐</span> Недавні дії</div>
+  <div class="sal-section-hdr" style="margin-top:8px"><span>🕐</span> {% trans "Недавні дії" %}</div>
   {% get_admin_log 10 as admin_log for_user user %}
   {% if admin_log %}
   <div class="sal-recent-grid">
@@ -245,7 +245,7 @@
     {% endfor %}
   </div>
   {% else %}
-  <p class="sal-empty">Дій ще не виконано.</p>
+  <p class="sal-empty">{% trans "Дій ще не виконано." %}</p>
   {% endif %}
 
 </div>

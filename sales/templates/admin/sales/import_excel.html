@@ -126,23 +126,23 @@ optgroup { font-weight: bold; color: var(--accent); }
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Головна</a>
-  &rsaquo; <a href="{% url 'admin:app_list' app_label='sales' %}">Продажі</a>
-  &rsaquo; <a href="{% url 'admin:sales_salesorder_changelist' %}">Замовлення</a>
-  &rsaquo; Імпорт з Excel
+  <a href="{% url 'admin:index' %}">{% trans "Головна" %}</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='sales' %}">{% trans "Продажі" %}</a>
+  &rsaquo; <a href="{% url 'admin:sales_salesorder_changelist' %}">{% trans "Замовлення" %}</a>
+  &rsaquo; {% trans "Імпорт з Excel" %}
 </div>
 {% endblock %}
 
 {% block content %}
-<h1>📥 Імпорт замовлень з Excel</h1>
+<h1>📥 {% trans "Імпорт замовлень з Excel" %}</h1>
 
 <!-- Step indicator -->
 <div class="ie-steps">
-  <span class="ie-step {% if step == 1 %}active{% elif step > 1 %}done{% endif %}">1. Файл</span>
+  <span class="ie-step {% if step == 1 %}active{% elif step > 1 %}done{% endif %}">1. {% trans "Файл" %}</span>
   <span class="ie-sep">›</span>
-  <span class="ie-step {% if step == 2 %}active{% elif step > 2 %}done{% endif %}">2. Маппінг</span>
+  <span class="ie-step {% if step == 2 %}active{% elif step > 2 %}done{% endif %}">2. {% trans "Маппінг" %}</span>
   <span class="ie-sep">›</span>
-  <span class="ie-step {% if step == 3 %}active{% endif %}">3. Результат</span>
+  <span class="ie-step {% if step == 3 %}active{% endif %}">3. {% trans "Результат" %}</span>
 </div>
 
 {% if messages %}
@@ -152,7 +152,7 @@ optgroup { font-weight: bold; color: var(--accent); }
 {# ═══════════════════════════ STEP 1 ══ #}
 {% if step == 1 %}
 <div class="ie-card">
-  <h2>📂 Оберіть файл Excel</h2>
+  <h2>📂 {% trans "Оберіть файл Excel" %}</h2>
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <input type="hidden" name="step" value="1">
@@ -165,21 +165,20 @@ optgroup { font-weight: bold; color: var(--accent); }
       <div class="ie-hint">{{ form.excel_file.help_text }}</div>
     </div>
     <div style="display:flex;gap:12px;align-items:center">
-      <button type="submit" class="btn-primary">🔍 Аналізувати файл →</button>
-      <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-secondary">✕ Скасувати</a>
+      <button type="submit" class="btn-primary">🔍 {% trans "Аналізувати файл" %} →</button>
+      <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-secondary">✕ {% trans "Скасувати" %}</a>
     </div>
   </form>
 </div>
 
 <div class="ie-card">
-  <h2>ℹ️ Структура файлу</h2>
+  <h2>ℹ️ {% trans "Структура файлу" %}</h2>
   <p style="font-size:13px;margin:0 0 12px;color:var(--text-muted)">
-    Файл Excel повинен містити рядок заголовків (перший непустий рядок).
-    Після завантаження ви зможете вказати яка колонка відповідає якому полю бази даних.
+    {% trans "Файл Excel повинен містити рядок заголовків (перший непустий рядок). Після завантаження ви зможете вказати яка колонка відповідає якому полю бази даних." %}
   </p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div>
-      <div style="color:var(--text-muted);font-size:12px;font-weight:bold;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">📋 Поля ЗАМОВЛЕННЯ</div>
+      <div style="color:var(--text-muted);font-size:12px;font-weight:bold;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">📋 {% trans "Поля ЗАМОВЛЕННЯ" %}</div>
       {% for field, label in order_fields %}
       <div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="font-family:monospace;color:var(--text-muted)">{{ field }}</span>
@@ -188,7 +187,7 @@ optgroup { font-weight: bold; color: var(--accent); }
       {% endfor %}
     </div>
     <div>
-      <div style="color:var(--text-muted);font-size:12px;font-weight:bold;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">📦 Поля РЯДКУ ТОВАРУ</div>
+      <div style="color:var(--text-muted);font-size:12px;font-weight:bold;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em">📦 {% trans "Поля РЯДКУ ТОВАРУ" %}</div>
       {% for field, label in line_fields %}
       <div style="font-size:11px;padding:3px 0;border-bottom:1px solid var(--border)">
         <span style="font-family:monospace;color:var(--text-muted)">{{ field }}</span>
@@ -210,7 +209,7 @@ optgroup { font-weight: bold; color: var(--accent); }
     <!-- Sheet selector -->
     <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;align-items:flex-end">
       <div>
-        <label style="font-weight:bold;display:block;margin-bottom:6px">Аркуш (sheet):</label>
+        <label style="font-weight:bold;display:block;margin-bottom:6px">{% trans "Аркуш (sheet)" %}:</label>
         <select name="sheet_name" id="sheetSelect" style="min-width:200px"
                 onchange="onSheetChange(this.value)">
           {% for sname in sheet_names %}
@@ -220,39 +219,38 @@ optgroup { font-weight: bold; color: var(--accent); }
       </div>
       <div>
         <label style="font-weight:bold;display:block;margin-bottom:6px">
-          Джерело за замовчуванням:
+          {% trans "Джерело за замовчуванням" %}:
         </label>
         <select name="default_source" style="min-width:160px">
           <option value="manual">manual</option>
           <option value="digikey">digikey</option>
           <option value="nova_post">nova_post</option>
         </select>
-        <div class="ie-hint">Використовується якщо колонка "Джерело" не замаплена</div>
+        <div class="ie-hint">{% trans "Використовується якщо колонка \"Джерело\" не замаплена" %}</div>
       </div>
     </div>
 
     <!-- Column mapping table -->
     <div style="margin-bottom:20px">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-        <label style="font-weight:bold">Маппінг колонок Excel → поля БД:</label>
+        <label style="font-weight:bold">{% trans "Маппінг колонок Excel → поля БД" %}:</label>
         <div style="display:flex;gap:6px">
           <button type="button" class="btn-secondary" style="font-size:12px;padding:5px 12px"
-                  onclick="applyAutoMap()">🤖 Авто-маппінг</button>
+                  onclick="applyAutoMap()">🤖 {% trans "Авто-маппінг" %}</button>
           <button type="button" class="btn-secondary" style="font-size:12px;padding:5px 12px"
-                  onclick="clearAllMap()">🚫 Всі — не імпортувати</button>
+                  onclick="clearAllMap()">🚫 {% trans "Всі — не імпортувати" %}</button>
         </div>
       </div>
       <div class="ie-hint" style="margin-bottom:10px">
-        Рядки з однаковим <b>Номером замовлення</b> групуються в одне замовлення.
-        Кожен рядок може мати товар (SKU + Кількість).
+        {% trans "Рядки з однаковим <b>Номером замовлення</b> групуються в одне замовлення. Кожен рядок може мати товар (SKU + Кількість)." %}
       </div>
       <div style="overflow-x:auto">
         <table class="map-table">
           <thead>
             <tr>
               <th style="width:36px">#</th>
-              <th>Колонка Excel</th>
-              <th>Поле бази даних</th>
+              <th>{% trans "Колонка Excel" %}</th>
+              <th>{% trans "Поле бази даних" %}</th>
             </tr>
           </thead>
           <tbody id="mappingBody"></tbody>
@@ -265,26 +263,34 @@ optgroup { font-weight: bold; color: var(--accent); }
     <!-- Options -->
     <div class="ie-options">
       <div>
-        <label style="font-weight:bold;display:block;margin-bottom:6px">Якщо замовлення вже є:</label>
+        <label style="font-weight:bold;display:block;margin-bottom:6px">{% trans "Якщо замовлення вже є" %}:</label>
         <select name="conflict_mode" style="min-width:220px">
-          <option value="skip">⏭ Пропустити існуючі</option>
-          <option value="update">✏️ Оновити + перезаписати рядки</option>
+          <option value="skip">⏭ {% trans "Пропустити існуючі" %}</option>
+          <option value="update">✏️ {% trans "Оновити + перезаписати рядки" %}</option>
         </select>
       </div>
       <label style="margin-top:22px">
         <input type="checkbox" name="dry_run" value="1">
-        <span>🧪 Тестовий запуск (без збереження)</span>
+        <span>🧪 {% trans "Тестовий запуск (без збереження)" %}</span>
       </label>
     </div>
 
     <div style="margin-top:20px;display:flex;gap:12px;align-items:center">
-      <button type="submit" class="btn-primary">✅ Імпортувати →</button>
-      <a href="{% url 'admin:sales_salesorder_import' %}" class="btn-secondary">← Назад</a>
+      <button type="submit" class="btn-primary">✅ {% trans "Імпортувати" %} →</button>
+      <a href="{% url 'admin:sales_salesorder_import' %}" class="btn-secondary">← {% trans "Назад" %}</a>
     </div>
   </form>
 </div>
 
 <script>
+var _IE_MSG_NOT_IMPORTED = '{% trans "— не імпортувати —" %}';
+var _IE_MSG_EMPTY_COL = '{% trans "пуста" %}';
+var _IE_MSG_REQUIRED_LABEL = "{% trans "Обов\'язкові" %}:";
+var _IE_MSG_RECOMMENDED_LABEL = "{% trans "Рекомендовані" %}:";
+var _IE_MSG_MISSING_REQUIRED = '{% trans "Обов\'язкові поля не замаплені" %}:\n';
+var _IE_ORDER_LABEL = '📋 {% trans "Замовлення" %}';
+var _IE_LINE_LABEL  = '📦 {% trans "Рядок товару" %}';
+
 const SHEET_DATA = {{ sheet_data_json|safe }};
 
 const ORDER_FIELDS = [
@@ -344,14 +350,14 @@ const REQUIRED_FIELDS     = { "order_number": "Номер замовлення" 
 const RECOMMENDED_FIELDS  = { "sku_raw": "SKU товару", "qty": "Кількість" };
 
 function buildOptions(guessed) {
-  let opts = `<option value="--">— не імпортувати —</option>`;
-  opts += `<optgroup label="📋 Замовлення">`;
+  let opts = `<option value="--">— ${_IE_MSG_NOT_IMPORTED}</option>`;
+  opts += `<optgroup label="${_IE_ORDER_LABEL}">`;
   ORDER_FIELDS.forEach(([val, lbl]) => {
     const mark = REQUIRED_FIELDS[val] ? " ★" : (RECOMMENDED_FIELDS[val] ? " ·" : "");
     opts += `<option value="${val}" ${val === guessed ? "selected" : ""}>${lbl}${mark}</option>`;
   });
   opts += `</optgroup>`;
-  opts += `<optgroup label="📦 Рядок товару">`;
+  opts += `<optgroup label="${_IE_LINE_LABEL}">`;
   LINE_FIELDS.forEach(([val, lbl]) => {
     const mark = REQUIRED_FIELDS[val] ? " ★" : (RECOMMENDED_FIELDS[val] ? " ·" : "");
     opts += `<option value="${val}" ${val === guessed ? "selected" : ""}>${lbl}${mark}</option>`;
@@ -372,13 +378,13 @@ function updateReqStatus() {
 
   const el = document.getElementById('req-status');
   if (!el) return;
-  let html = '<span style="font-size:11px;font-weight:700;color:var(--text-muted);margin-right:8px">Обов\'язкові:</span>';
+  let html = `<span style="font-size:11px;font-weight:700;color:var(--text-muted);margin-right:8px">${_IE_MSG_REQUIRED_LABEL}</span>`;
   for (const [field, label] of Object.entries(REQUIRED_FIELDS)) {
     const ok = mapped.has(field);
     html += `<span class="req-badge" style="background:${ok ? 'rgba(63,185,80,.15)' : 'rgba(248,81,73,.15)'};color:${ok ? 'var(--ok)' : 'var(--err)'};border-color:${ok ? 'var(--ok)' : 'var(--err)'}">
       ${ok ? '✓' : '✗'} ${label}</span>`;
   }
-  html += '<span style="font-size:11px;font-weight:700;color:var(--text-muted);margin:0 8px">Рекомендовані:</span>';
+  html += `<span style="font-size:11px;font-weight:700;color:var(--text-muted);margin:0 8px">${_IE_MSG_RECOMMENDED_LABEL}</span>`;
   for (const [field, label] of Object.entries(RECOMMENDED_FIELDS)) {
     const ok = mapped.has(field);
     html += `<span class="req-badge" style="background:${ok ? 'rgba(63,185,80,.1)' : 'rgba(227,179,65,.12)'};color:${ok ? 'var(--ok)' : 'var(--warn)'};border-color:${ok ? 'var(--ok)' : 'var(--warn)'}">
@@ -400,7 +406,7 @@ function renderMappingRows(sheetName) {
     tbody.innerHTML += `
       <tr>
         <td style="color:${cDim};font-size:11px">${String.fromCharCode(65 + idx)}</td>
-        <td style="font-weight:bold;color:${col ? cText : cDim}">${col || "<em>пуста</em>"}</td>
+        <td style="font-weight:bold;color:${col ? cText : cDim}">${col || `<em>${_IE_MSG_EMPTY_COL}</em>`}</td>
         <td><select name="col_${idx}" onchange="updateReqStatus()">${buildOptions(guessed)}</select></td>
       </tr>`;
   });
@@ -432,7 +438,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const missing = Object.entries(REQUIRED_FIELDS).filter(([f]) => !mapped.has(f)).map(([,l]) => l);
     if (missing.length) {
       e.preventDefault();
-      alert('⚠️ Обов\'язкові поля не замаплені:\n' + missing.join('\n'));
+      alert('⚠️ ' + _IE_MSG_MISSING_REQUIRED + missing.join('\n'));
     }
   });
 });
@@ -442,37 +448,37 @@ document.addEventListener("DOMContentLoaded", () => {
 {% elif step == 3 %}
 
 {% if dry_run %}
-  <div class="dry-run-badge">🧪 ТЕСТОВИЙ РЕЖИМ — дані НЕ збережено в базу</div>
+  <div class="dry-run-badge">🧪 {% trans "ТЕСТОВИЙ РЕЖИМ — дані НЕ збережено в базу" %}</div>
 {% endif %}
 
 <div class="stat-row">
   <div class="stat-box stat-created">
     <span class="num">{{ stats.created }}</span>
-    <span class="lbl">Створено замовлень</span>
+    <span class="lbl">{% trans "Створено замовлень" %}</span>
   </div>
   <div class="stat-box stat-updated">
     <span class="num">{{ stats.updated }}</span>
-    <span class="lbl">Оновлено</span>
+    <span class="lbl">{% trans "Оновлено" %}</span>
   </div>
   <div class="stat-box stat-skipped">
     <span class="num">{{ stats.skipped }}</span>
-    <span class="lbl">Пропущено</span>
+    <span class="lbl">{% trans "Пропущено" %}</span>
   </div>
   <div class="stat-box stat-lines">
     <span class="num">{{ stats.lines_created }}</span>
-    <span class="lbl">Рядків товарів</span>
+    <span class="lbl">{% trans "Рядків товарів" %}</span>
   </div>
   <div class="stat-box stat-errors">
     <span class="num">{{ stats.errors|length }}</span>
-    <span class="lbl">Помилок</span>
+    <span class="lbl">{% trans "Помилок" %}</span>
   </div>
 </div>
 
 {% if stats.errors %}
 <div class="ie-card">
-  <h2>❌ Помилки імпорту</h2>
+  <h2>❌ {% trans "Помилки імпорту" %}</h2>
   <table class="err-table">
-    <thead><tr><th>#</th><th>Опис помилки</th></tr></thead>
+    <thead><tr><th>#</th><th>{% trans "Опис помилки" %}</th></tr></thead>
     <tbody>
       {% for err in stats.errors %}
       <tr>
@@ -488,15 +494,15 @@ document.addEventListener("DOMContentLoaded", () => {
 <div style="display:flex;gap:12px;margin-top:20px">
   {% if dry_run %}
     <a href="{% url 'admin:sales_salesorder_import' %}" class="btn-primary">
-      ✅ Запустити реальний імпорт
+      ✅ {% trans "Запустити реальний імпорт" %}
     </a>
   {% endif %}
   <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-primary"
      style="background:var(--ok)">
-    📋 До списку замовлень
+    📋 {% trans "До списку замовлень" %}
   </a>
   <a href="{% url 'admin:sales_salesorder_import' %}" class="btn-secondary">
-    ← Імпортувати ще раз
+    ← {% trans "Імпортувати ще раз" %}
   </a>
 </div>
 

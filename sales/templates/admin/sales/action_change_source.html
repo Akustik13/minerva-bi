@@ -1,14 +1,14 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block title %}Змінити джерело | Minerva{% endblock %}
+{% block title %}{% trans "Змінити джерело" %} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
   &rsaquo; <a href="{% url 'admin:sales_salesorder_changelist' %}">Sales orders</a>
-  &rsaquo; Змінити джерело
+  &rsaquo; {% trans "Змінити джерело" %}
 </div>
 {% endblock %}
 
@@ -62,8 +62,8 @@
 </style>
 
 <div class="mv-action-box">
-  <h2>📦 Змінити джерело замовлення</h2>
-  <p>Вибрано <strong style="color:#c9d8e4">{{ queryset.count }}</strong> замовлень</p>
+  <h2>📦 {% trans "Змінити джерело замовлення" %}</h2>
+  <p>{% blocktrans with count=queryset.count %}Вибрано <strong style="color:#c9d8e4">{{ count }}</strong> замовлень{% endblocktrans %}</p>
 
   <form method="post">
     {% csrf_token %}
@@ -80,15 +80,15 @@
       {% endfor %}
     </div>
 
-    <label for="id_source_slug">Нове джерело</label>
+    <label for="id_source_slug">{% trans "Нове джерело" %}</label>
     <select name="source_slug" id="id_source_slug">
       {% for src in sources %}
       <option value="{{ src.slug }}">{{ src.name }} ({{ src.slug }})</option>
       {% endfor %}
     </select>
 
-    <button type="submit" class="btn-apply">✅ Застосувати</button>
-    <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-cancel">Скасувати</a>
+    <button type="submit" class="btn-apply">✅ {% trans "Застосувати" %}</button>
+    <a href="{% url 'admin:sales_salesorder_changelist' %}" class="btn-cancel">{% trans "Скасувати" %}</a>
   </form>
 </div>
 {% endblock %}

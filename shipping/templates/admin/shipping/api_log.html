@@ -101,42 +101,41 @@
   <div class="api-log-toolbar">
     <h2>📋 {{ title }}</h2>
     {% if entries %}
-    <span class="log-meta">{{ entries|length }} / {{ max_entries }} записів</span>
+    <span class="log-meta">{{ entries|length }} / {{ max_entries }} {% trans "записів" %}</span>
     {% endif %}
 
     <!-- Download -->
     <a href="{% url 'admin:carrier_api_log_download' carrier.pk %}"
-       class="log-btn log-btn-sec" style="margin-left:auto">💾 Зберегти лог</a>
+       class="log-btn log-btn-sec" style="margin-left:auto">💾 {% trans "Зберегти лог" %}</a>
 
     <!-- Copy -->
-    <button class="log-btn log-btn-sec" onclick="copyLog()">📋 Копіювати лог</button>
-    <span id="copy-ok">✅ Скопійовано</span>
+    <button class="log-btn log-btn-sec" onclick="copyLog()">📋 {% trans "Копіювати лог" %}</button>
+    <span id="copy-ok">✅ {% trans "Скопійовано" %}</span>
 
     <!-- Clear -->
     <form method="post" action="{% url 'admin:carrier_api_log_clear' carrier.pk %}"
-          style="display:inline" onsubmit="return confirm('Очистити весь лог?')">
+          style="display:inline" onsubmit="return confirm('{% trans "Очистити весь лог?" %}')">
       {% csrf_token %}
-      <button type="submit" class="log-btn log-btn-danger">🗑️ Очистити лог</button>
+      <button type="submit" class="log-btn log-btn-danger">🗑️ {% trans "Очистити лог" %}</button>
     </form>
 
-    <a href="{% url 'admin:shipping_carrier_change' carrier.pk %}" class="log-btn log-btn-sec">← Перевізник</a>
+    <a href="{% url 'admin:shipping_carrier_change' carrier.pk %}" class="log-btn log-btn-sec">← {% trans "Перевізник" %}</a>
   </div>
 
   <!-- ── Settings ── -->
   <form method="post" action="{% url 'admin:carrier_api_log' carrier.pk %}" class="log-settings">
     {% csrf_token %}
-    <label for="max_entries">Зберігати останніх</label>
+    <label for="max_entries">{% trans "Зберігати останніх" %}</label>
     <input type="number" id="max_entries" name="max_entries"
            value="{{ max_entries }}" min="1" max="500">
-    <span class="log-settings-hint">записів (1–500) — спільне для DHL / FedEx / Jumingo / DigiKey</span>
-    <button type="submit" class="log-btn log-btn-ok">Зберегти</button>
+    <span class="log-settings-hint">{% trans "записів (1–500) — спільне для DHL / FedEx / Jumingo / DigiKey" %}</span>
+    <button type="submit" class="log-btn log-btn-ok">{% trans "Зберегти" %}</button>
   </form>
 
   <!-- ── Entries ── -->
   {% if not entries %}
   <div class="log-empty">
-    Лог порожній. Зробіть будь-який {{ service|upper }} API запит —
-    він з'явиться тут автоматично.
+    {% trans "Лог порожній. Зробіть будь-який" %} {{ service|upper }} {% trans "API запит — він з'явиться тут автоматично." %}
   </div>
   {% else %}
   {% for e in entries %}
@@ -170,22 +169,22 @@
     <div class="log-body" id="body-{{ forloop.counter0 }}">
       <div class="log-cols">
         <div class="log-col">
-          <div class="log-col-title">↑ Запит — заголовки</div>
+          <div class="log-col-title">↑ {% trans "Запит — заголовки" %}</div>
           <pre class="log-json">{{ e.req_headers }}</pre>
         </div>
         <div class="log-col">
-          <div class="log-col-title">↑ Запит — тіло</div>
+          <div class="log-col-title">↑ {% trans "Запит — тіло" %}</div>
           <pre class="log-json">{{ e.req_body }}</pre>
         </div>
         <div class="log-col">
-          <div class="log-col-title">↓ Відповідь — статус {{ e.resp_status|default:"—" }}</div>
+          <div class="log-col-title">↓ {% trans "Відповідь — статус" %} {{ e.resp_status|default:"—" }}</div>
           <pre class="log-json">{{ e.resp_body }}</pre>
         </div>
         <div class="log-col">
-          <div class="log-col-title">ℹ️ Метадані</div>
+          <div class="log-col-title">ℹ️ {% trans "Метадані" %}</div>
           <pre class="log-json">URL: {{ e.url }}
-Тривалість: {{ e.duration_ms|default:"—" }}ms
-Час: {{ e.ts }}</pre>
+{% trans "Тривалість" %}: {{ e.duration_ms|default:"—" }}ms
+{% trans "Час" %}: {{ e.ts }}</pre>
         </div>
       </div>
     </div>

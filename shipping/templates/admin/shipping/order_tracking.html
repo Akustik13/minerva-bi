@@ -1,12 +1,13 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 {% block title %}{{ title }} | Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
-  <a href="{% url 'admin:shipping_shipment_changelist' %}">Доставка</a> &rsaquo;
-  Відслідковування
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a> &rsaquo;
+  <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Доставка" %}</a> &rsaquo;
+  {% trans "Відслідковування" %}
 </div>
 {% endblock %}
 
@@ -63,13 +64,13 @@
 <div class="ot-wrap">
   <div class="ot-hdr">
     <div>
-      <h2>📡 Відслідковування замовлень</h2>
+      <h2>📡 {% trans "Відслідковування замовлень" %}</h2>
       <div style="font-size:12px;color:var(--text-dim);margin-top:4px">
-        Замовлення з трекінг-номерами — авто (DHL) та ручне відслідковування
+        {% trans "Замовлення з трекінг-номерами — авто (DHL) та ручне відслідковування" %}
       </div>
     </div>
     <div style="display:flex;gap:10px;align-items:center">
-      <span style="font-size:11px;color:var(--text-dim)">{{ rows|length }} замовлень</span>
+      <span style="font-size:11px;color:var(--text-dim)">{{ rows|length }} {% trans "замовлень" %}</span>
     </div>
   </div>
 
@@ -77,13 +78,13 @@
   <table class="ot-table">
     <thead>
       <tr>
-        <th>Замовлення</th>
-        <th>Клієнт</th>
-        <th>Трекінг</th>
-        <th>Перевізник</th>
-        <th>Джерело</th>
-        <th>Статус замовлення</th>
-        <th>Дія</th>
+        <th>{% trans "Замовлення" %}</th>
+        <th>{% trans "Клієнт" %}</th>
+        <th>{% trans "Трекінг" %}</th>
+        <th>{% trans "Перевізник" %}</th>
+        <th>{% trans "Джерело" %}</th>
+        <th>{% trans "Статус замовлення" %}</th>
+        <th>{% trans "Дія" %}</th>
       </tr>
     </thead>
     <tbody>
@@ -128,10 +129,10 @@
         </span>
         {% if not row.carrier.auto %}
           <div class="note-manual" style="margin-top:4px">
-            👁️ Ручне відслідковування
+            👁️ {% trans "Ручне відслідковування" %}
           </div>
         {% elif row.via_minerva %}
-          <div style="font-size:10px;color:var(--ok);margin-top:3px">✅ Minerva тречить</div>
+          <div style="font-size:10px;color:var(--ok);margin-top:3px">✅ {% trans "Minerva тречить" %}</div>
         {% endif %}
       </td>
 
@@ -144,7 +145,7 @@
           </a>
         {% else %}
           <span class="via-badge" style="background:var(--bg-card-2);color:var(--text-dim);border:1px solid var(--border-strong)">
-            📦 Зовнішнє
+            📦 {% trans "Зовнішнє" %}
           </span>
         {% endif %}
       </td>
@@ -160,7 +161,7 @@
           </div>
         {% elif row.order.shipped_at %}
           <div style="font-size:11px;color:var(--text-dim)">
-            відправлено {{ row.order.shipped_at|date:"d.m.Y" }}
+            {% trans "відправлено" %} {{ row.order.shipped_at|date:"d.m.Y" }}
           </div>
         {% endif %}
       </td>
@@ -172,7 +173,7 @@
                 action="{% url 'admin:shipping_order_tracking_refresh' row.order.pk %}"
                 style="display:inline">
             {% csrf_token %}
-            <button class="btn-refresh" type="submit">🔄 Оновити</button>
+            <button class="btn-refresh" type="submit">🔄 {% trans "Оновити" %}</button>
           </form>
           {% if row.carrier.url %}
             <a href="{{ row.carrier.url }}" target="_blank" class="btn-ext" style="margin-left:4px">🔗</a>
@@ -180,9 +181,9 @@
         {% else %}
           <!-- Ручне відслідковування → зовнішнє посилання -->
           {% if row.carrier.url %}
-            <a href="{{ row.carrier.url }}" target="_blank" class="btn-ext">🔗 Перейти</a>
+            <a href="{{ row.carrier.url }}" target="_blank" class="btn-ext">🔗 {% trans "Перейти" %}</a>
           {% else %}
-            <span class="note-manual">⚠️ Невідомий — перевір вручну</span>
+            <span class="note-manual">⚠️ {% trans "Невідомий — перевір вручну" %}</span>
           {% endif %}
         {% endif %}
       </td>
@@ -192,17 +193,17 @@
   </table>
 
   <div style="margin-top:16px;font-size:11px;color:var(--text-dim);line-height:1.7">
-    <b style="color:var(--text-muted)">Легенда:</b>
-    ✅ Minerva тречить = автооновлення через Jumingo або DHL API ·
-    👁️ Ручне = треба перевіряти самостійно ·
-    🔗 Minerva API = відправлення створено через Minerva ·
-    📦 Зовнішнє = трекінг вказаний вручну в замовленні
+    <b style="color:var(--text-muted)">{% trans "Легенда" %}:</b>
+    ✅ {% trans "Minerva тречить" %} = {% trans "автооновлення через Jumingo або DHL API" %} ·
+    👁️ {% trans "Ручне" %} = {% trans "треба перевіряти самостійно" %} ·
+    🔗 Minerva API = {% trans "відправлення створено через Minerva" %} ·
+    📦 {% trans "Зовнішнє" %} = {% trans "трекінг вказаний вручну в замовленні" %}
   </div>
 
   {% else %}
   <div class="ot-empty">
-    📭 Немає замовлень з трекінг-номерами.<br>
-    <small>Трекінг-номер вказується у замовленні → поле «Трекінг-номер».</small>
+    📭 {% trans "Немає замовлень з трекінг-номерами." %}<br>
+    <small>{% trans "Трекінг-номер вказується у замовленні → поле «Трекінг-номер»." %}</small>
   </div>
   {% endif %}
 

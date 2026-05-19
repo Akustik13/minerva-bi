@@ -1,5 +1,5 @@
 {% extends "admin/change_form.html" %}
-{% load static %}
+{% load static i18n %}
 
 {% block extrahead %}{{ block.super }}
 <style>
@@ -68,9 +68,11 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!window.MinervaLocalSave || !window.MinervaLocalSave.supported) {
     var noSupport = document.createElement('div');
     noSupport.id = 'ls-no-support';
+    var _msgNoSupport = '{% trans "Ваш браузер не підтримує File System Access API." %}';
+    var _msgNoSupportHint = '{% trans "Для локального збереження використовуйте Chrome або Edge (версія 86+)." %}';
     noSupport.innerHTML =
-      '⚠️ Ваш браузер не підтримує File System Access API.<br>'
-      + 'Для локального збереження використовуйте <b>Chrome</b> або <b>Edge</b> (версія 86+).';
+      '⚠️ ' + _msgNoSupport + '<br>'
+      + _msgNoSupportHint;
     if (pathRow) pathRow.row.insertAdjacentElement('afterend', noSupport);
     return;
   }
@@ -78,19 +80,25 @@ document.addEventListener('DOMContentLoaded', function () {
   var LS = window.MinervaLocalSave;
 
   /* ── Будуємо UI ───────────────────────────────────────────────────────── */
+  var _msgFolderTitle   = '{% trans "Локальна папка для збереження" %}';
+  var _msgChecking      = '{% trans "Перевірка..." %}';
+  var _msgPickFolder    = '{% trans "Обрати папку" %}';
+  var _msgForgetFolder  = '{% trans "Забути папку" %}';
+  var _msgFolderHint1   = '{% trans "Папка обирається один раз і запам\'ятовується в браузері (IndexedDB)." %}';
+  var _msgFolderHint2   = '{% trans "Файли зберігаються браузером напряму на ваш ПК — сервер не потрібен." %}';
   var ui = document.createElement('div');
   ui.id = 'ls-folder-ui';
   ui.innerHTML =
-    '<div style="color:#7ab3cc;font-weight:700;margin-bottom:10px">📂 Локальна папка для збереження</div>'
+    '<div style="color:#7ab3cc;font-weight:700;margin-bottom:10px">📂 ' + _msgFolderTitle + '</div>'
     + '<div id="ls-folder-name">—</div>'
-    + '<div id="ls-status" style="color:#607d8b">Перевірка...</div>'
+    + '<div id="ls-status" style="color:#607d8b">' + _msgChecking + '</div>'
     + '<div style="margin-top:10px">'
-    +   '<button type="button" class="ls-btn primary" id="ls-pick-btn">📂 Обрати папку</button>'
-    +   '<button type="button" class="ls-btn danger"  id="ls-forget-btn" style="display:none">🗑️ Забути папку</button>'
+    +   '<button type="button" class="ls-btn primary" id="ls-pick-btn">📂 ' + _msgPickFolder + '</button>'
+    +   '<button type="button" class="ls-btn danger"  id="ls-forget-btn" style="display:none">🗑️ ' + _msgForgetFolder + '</button>'
     + '</div>'
     + '<div style="margin-top:10px;font-size:11px;color:#455a64;line-height:1.6">'
-    +   'ℹ️ Папка обирається один раз і запам\'ятовується в браузері (IndexedDB).<br>'
-    +   'Файли зберігаються браузером напряму на ваш ПК — сервер не потрібен.'
+    +   'ℹ️ ' + _msgFolderHint1 + '<br>'
+    +   _msgFolderHint2
     + '</div>';
 
   if (pathRow) {
@@ -105,8 +113,10 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ── Оновити відображення ─────────────────────────────────────────────── */
   function setReady(folderName) {
     nameEl.textContent   = '📁 ' + folderName;
-    statusEl.innerHTML   = '<span style="color:#4caf50">✅ Доступ є — файли зберігатимуться сюди</span>';
-    pickBtn.textContent  = '🔄 Змінити папку';
+    var _msgAccessOk = '{% trans "Доступ є — файли зберігатимуться сюди" %}';
+    var _msgChangeFolder = '{% trans "Змінити папку" %}';
+    statusEl.innerHTML   = '<span style="color:#4caf50">✅ ' + _msgAccessOk + '</span>';
+    pickBtn.textContent  = '🔄 ' + _msgChangeFolder;
     forgetBtn.style.display = 'inline-block';
     /* Зберігаємо назву папки у прихованому полі (для відображення в upload_widget) */
     if (pathRow) pathRow.inp.value = folderName;
@@ -114,8 +124,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function setEmpty() {
     nameEl.textContent   = '—';
-    statusEl.innerHTML   = '<span style="color:#607d8b">Папку не обрано</span>';
-    pickBtn.textContent  = '📂 Обрати папку';
+    var _msgNoFolder = '{% trans "Папку не обрано" %}';
+    statusEl.innerHTML   = '<span style="color:#607d8b">' + _msgNoFolder + '</span>';
+    pickBtn.textContent  = '📂 {% trans "Обрати папку" %}';
     forgetBtn.style.display = 'none';
     if (pathRow) pathRow.inp.value = '';
   }
@@ -138,7 +149,7 @@ document.addEventListener('DOMContentLoaded', function () {
   /* ── Обрати папку ─────────────────────────────────────────────────────── */
   pickBtn.addEventListener('click', function () {
     pickBtn.disabled = true;
-    pickBtn.textContent = '⏳ Відкриття...';
+    pickBtn.textContent = '⏳ {% trans "Відкриття..." %}';
     LS.pickFolder().then(function (handle) {
       pickBtn.disabled = false;
       if (handle) {
@@ -146,18 +157,18 @@ document.addEventListener('DOMContentLoaded', function () {
       } else {
         /* Користувач скасував picker */
         setEmpty();
-        pickBtn.textContent = '📂 Обрати папку';
+        pickBtn.textContent = '📂 {% trans "Обрати папку" %}';
       }
     }).catch(function (e) {
       pickBtn.disabled = false;
-      setError('Помилка: ' + (e.message || String(e)));
-      pickBtn.textContent = '📂 Обрати папку';
+      setError('{% trans "Помилка:" %} ' + (e.message || String(e)));
+      pickBtn.textContent = '📂 {% trans "Обрати папку" %}';
     });
   });
 
   /* ── Забути папку ─────────────────────────────────────────────────────── */
   forgetBtn.addEventListener('click', function () {
-    if (!confirm('Забути збережену папку?')) return;
+    if (!confirm('{% trans "Забути збережену папку?" %}')) return;
     LS.forgetFolder().then(function () {
       setEmpty();
     });

@@ -1,5 +1,6 @@
 {% extends "admin/base_site.html" %}
-{% block title %}Email Асистент — Minerva{% endblock %}
+{% load i18n %}
+{% block title %}{% trans "Email Асистент" %} — Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 {% block messages %}{% endblock %}
 
@@ -141,15 +142,15 @@
   <!-- ═══ Panel 1: Folders ═══ -->
   <div class="em-p1" id="em-p1">
     <div class="em-p1-top">
-      <a href="{% url 'email_assistant:compose' %}" class="em-compose-btn" title="Написати лист">
-        <span>✏️</span><span class="em-compose-label">Написати</span>
+      <a href="{% url 'email_assistant:compose' %}" class="em-compose-btn" title="{% trans "Написати лист" %}">
+        <span>✏️</span><span class="em-compose-label">{% trans "Написати" %}</span>
       </a>
-      <button class="em-p1-toggle" id="p1-toggle" onclick="toggleP1()" title="Згорнути/розгорнути">◀</button>
+      <button class="em-p1-toggle" id="p1-toggle" onclick="toggleP1()" title="{% trans "Згорнути/розгорнути" %}">◀</button>
     </div>
 
     <form class="em-search" method="get" action="">
       <input type="hidden" name="folder" value="{{ folder }}">
-      <input class="em-search-inp" type="search" name="q" value="{{ q }}" placeholder="🔍 Пошук..." id="em-q">
+      <input class="em-search-inp" type="search" name="q" value="{{ q }}" placeholder="🔍 {% trans "Пошук..." %}" id="em-q">
     </form>
 
     <div class="em-folders">
@@ -170,12 +171,12 @@
     <div id="em-server-folders"></div>
 
     <div class="em-sync-area">
-      <button class="em-sync-btn" onclick="syncNow(this,false)" title="Завантажити нові листи">
-        🔄 Синхронізувати
+      <button class="em-sync-btn" onclick="syncNow(this,false)" title="{% trans "Завантажити нові листи" %}">
+        🔄 {% trans "Синхронізувати" %}
       </button>
       <a href="/admin/email_assistant/emailaccount/{{ account.pk }}/change/"
          class="em-sync-btn" style="text-decoration:none;justify-content:center">
-        ⚙️ Налаштування
+        ⚙️ {% trans "Налаштування" %}
       </a>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
       <div id="sync-countdown"></div>
@@ -194,25 +195,25 @@
         <span>{{ total }}</span>
         <select id="sort-sel" onchange="sortRows(this.value)"
                 style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text-muted);cursor:pointer;max-width:90px">
-          <option value="date-desc">Дата ↓</option>
-          <option value="date-asc">Дата ↑</option>
-          <option value="sender">Від A-Z</option>
-          <option value="subject">Тема A-Z</option>
+          <option value="date-desc">{% trans "Дата ↓" %}</option>
+          <option value="date-asc">{% trans "Дата ↑" %}</option>
+          <option value="sender">{% trans "Від A-Z" %}</option>
+          <option value="subject">{% trans "Тема A-Z" %}</option>
         </select>
       </span>
     </div>
     <!-- Quick local filter + thread grouping -->
     <div class="em-p2-search-row">
       <input class="em-p2-search-inp" type="search" id="em-p2-q"
-             placeholder="🔍 Фільтр по відправнику, темі…"
+             placeholder="🔍 {% trans "Фільтр по відправнику, темі…" %}"
              oninput="filterP2(this.value)" autocomplete="off">
       <button class="em-p2-group-btn" id="em-group-btn"
-              onclick="toggleGrouping()" title="Групувати по гілці листування">⎘</button>
+              onclick="toggleGrouping()" title="{% trans "Групувати по гілці листування" %}">⎘</button>
     </div>
 
     <div class="em-p2-list" id="em-p2-list">
       {% if not emails %}
-      <div class="em-empty-list">📭 Листів немає</div>
+      <div class="em-empty-list">📭 {% trans "Листів немає" %}</div>
       {% endif %}
 
       {% for msg in emails %}
@@ -228,7 +229,7 @@
 
         <button class="em-star-btn{% if msg.is_starred %} starred{% endif %}"
                 onclick="toggleStar(event,{{ msg.pk }},this)"
-                title="Позначити важливим">
+                title="{% trans "Позначити важливим" %}">
           {% if msg.is_starred %}⭐{% else %}☆{% endif %}
         </button>
 
@@ -239,7 +240,7 @@
             <span class="em-row-sender">{{ msg.sender_display|truncatechars:22 }}</span>
             <span class="em-row-date">{{ msg.sent_at|date:"d.m H:i" }}</span>
           </div>
-          <div class="em-row-subj">{{ msg.subject|default:"(без теми)"|truncatechars:40 }}</div>
+          <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
           <div class="em-row-prev">{{ msg.body_text|truncatechars:55 }}</div>
         </div>
 
@@ -248,17 +249,17 @@
         <!-- Hover actions -->
         <div class="em-row-act">
           {% if folder == 'trash' %}
-            <button onclick="restoreMsg(event,{{ msg.pk }})" title="Відновити">↩️</button>
+            <button onclick="restoreMsg(event,{{ msg.pk }})" title="{% trans "Відновити" %}">↩️</button>
           {% elif folder == 'archived' %}
-            <button onclick="unarchiveThread(event,{{ tpk }})" title="З архіву">📤</button>
+            <button onclick="unarchiveThread(event,{{ tpk }})" title="{% trans "З архіву" %}">📤</button>
           {% else %}
-            {% if tpk %}<button onclick="archiveThread(event,{{ tpk }})" title="В архів">📦</button>{% endif %}
-            <button onclick="deleteMsg(event,{{ msg.pk }})" title="Видалити">🗑️</button>
+            {% if tpk %}<button onclick="archiveThread(event,{{ tpk }})" title="{% trans "В архів" %}">📦</button>{% endif %}
+            <button onclick="deleteMsg(event,{{ msg.pk }})" title="{% trans "Видалити" %}">🗑️</button>
           {% endif %}
           <a href="{% if tpk %}{% url 'email_assistant:thread' tpk %}{% else %}{% url 'email_assistant:message' msg.pk %}{% endif %}"
              onclick="event.stopPropagation()"
              style="font-size:12px;padding:3px 6px;border-radius:4px;color:var(--text-muted);text-decoration:none"
-             title="Відкрити окремо" target="_blank">↗</a>
+             title="{% trans "Відкрити окремо" %}" target="_blank">↗</a>
         </div>
       </div>
       {% endwith %}
@@ -268,7 +269,7 @@
     {% if total_pages > 1 %}
     <div class="em-pagination">
       {% if has_prev %}
-      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'-1' }}{% if q %}&q={{ q }}{% endif %}">← Назад</a>
+      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'-1' }}{% if q %}&q={{ q }}{% endif %}">← {% trans "Назад" %}</a>
       {% else %}<span></span>{% endif %}
 
       <!-- Smart page numbers from server-computed page_range -->
@@ -286,7 +287,7 @@
       </span>
 
       {% if has_next %}
-      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'1' }}{% if q %}&q={{ q }}{% endif %}">Далі →</a>
+      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'1' }}{% if q %}&q={{ q }}{% endif %}">{% trans "Далі" %} →</a>
       {% else %}<span></span>{% endif %}
     </div>
     {% endif %}
@@ -294,10 +295,10 @@
 
   <!-- ═══ Panel 3: Preview ═══ -->
   <div class="em-p3" id="em-p3">
-    <button class="em-p2-toggle" id="p2-toggle" onclick="toggleP2()" title="Згорнути/розгорнути список">◀</button>
+    <button class="em-p2-toggle" id="p2-toggle" onclick="toggleP2()" title="{% trans "Згорнути/розгорнути список" %}">◀</button>
     <div class="em-p3-empty" id="em-p3-empty">
       <span>📩</span>
-      Виберіть лист для перегляду
+      {% trans "Виберіть лист для перегляду" %}
     </div>
     <div class="em-p3-content" id="em-p3-content" style="display:none"></div>
   </div>
@@ -307,8 +308,8 @@
 <!-- Folder management modal -->
 <div id="em-folder-modal">
   <div id="em-folder-box">
-    <h4 id="em-folder-modal-title">Нова папка</h4>
-    <input type="text" id="em-folder-modal-inp" class="em-folder-modal-inp" placeholder="Назва папки">
+    <h4 id="em-folder-modal-title">{% trans "Нова папка" %}</h4>
+    <input type="text" id="em-folder-modal-inp" class="em-folder-modal-inp" placeholder="{% trans "Назва папки" %}">
     <div id="em-folder-modal-err"></div>
     <div class="em-folder-modal-btns" id="em-folder-modal-btns"></div>
   </div>
@@ -316,6 +317,34 @@
 
 <script>
 const CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+
+/* ── i18n strings ── */
+var _i18n = {
+  скасувати:         '{% trans "Скасувати" %}',
+  новаПапка:         '{% trans "Нова папка" %}',
+  назваНовоїПапки:   '{% trans "Назва нової папки" %}',
+  введітьНазву:      '{% trans "Введіть назву" %}',
+  помилка:           '{% trans "Помилка" %}',
+  помилкаМережі:     '{% trans "Помилка мережі" %}',
+  перейменуватиП:    '{% trans "Перейменувати папку" %}',
+  новаНазва:         '{% trans "Нова назва" %}',
+  введітьНовуНазву:  '{% trans "Введіть нову назву" %}',
+  видалитиПапку:     '{% trans "Видалити папку «" %}',
+  створити:          '{% trans "✓ Створити" %}',
+  перейменувати:     '{% trans "✓ Перейменувати" %}',
+  папкиСервера:      '{% trans "Папки сервера" %}',
+  новийЛист:         '{% trans "📧 Minerva — новий лист" %}',
+  непрочитаних:      '{% trans "непрочитаних листів" %}',
+  завантажую:        '{% trans "завантажую з сервера…" %}',
+  знайдено:          '{% trans "знайдено" %}',
+  листів:            '{% trans "листів" %}',
+  нових:             '{% trans "нових" %}',
+  перевірено:        '{% trans "перевірено" %}',
+  лімітЧасу:         '{% trans "Ліміт часу вичерпано — пропущено" %}',
+  завантажуюПошту:   '{% trans "Завантажую..." %}',
+  помилкаЗавант:     '{% trans "Помилка завантаження" %}',
+  готово:            '{% trans "Готово" %}',
+};
 
 /* ── Panel 1 collapse ── */
 (function(){
@@ -361,7 +390,7 @@ async function previewMsg(pk, tpk, rowEl) {
   var cont = document.getElementById('em-p3-content');
   cont.style.display = 'flex';
   cont.style.flexDirection = 'column';
-  cont.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:13px">⏳ Завантажую...</div>';
+  cont.innerHTML = '<div style="padding:24px;color:var(--text-muted);font-size:13px">⏳ ' + _i18n.завантажуюПошту + '</div>';
 
   var url = tpk ? '/email/thread/' + tpk + '/preview/' : '/email/message/' + pk + '/preview/';
   try {
@@ -377,7 +406,7 @@ async function previewMsg(pk, tpk, rowEl) {
       document.head.removeChild(newSc);
     });
   } catch(e) {
-    cont.innerHTML = '<div style="padding:24px;color:var(--err)">⚠️ Помилка завантаження</div>';
+    cont.innerHTML = '<div style="padding:24px;color:var(--err)">⚠️ ' + _i18n.помилкаЗавант + '</div>';
   }
 
   // Auto-collapse P2 on small screens only when no explicit preference saved
@@ -453,9 +482,9 @@ async function syncNow(btn, full) {
       method:'POST', headers:{'X-CSRFToken':CSRF}, body
     });
     var d = await r.json();
-    st.textContent = d.ok ? '✓ Готово' : '✗ ' + d.error;
+    st.textContent = d.ok ? '✓ ' + _i18n.готово : '✗ ' + d.error;
     if (d.ok) setTimeout(function(){ location.reload(); }, 700);
-  } catch(e) { st.textContent = '✗ Помилка'; }
+  } catch(e) { st.textContent = '✗ ' + _i18n.помилка; }
   finally { btn.disabled = false; btn.textContent = orig; }
 }
 
@@ -547,7 +576,7 @@ function _applyP2Visibility() {
     });
     var cancel = document.createElement('button');
     cancel.className = 'em-folder-modal-btn em-folder-modal-cancel';
-    cancel.textContent = 'Скасувати';
+    cancel.textContent = _i18n.скасувати;
     cancel.onclick = _closeModal;
     _modalBtns.appendChild(cancel);
     _modal.classList.add('open');
@@ -562,49 +591,49 @@ function _applyP2Visibility() {
   }
 
   window.showCreateFolder = function() {
-    _showModal('Нова папка', 'Назва нової папки', [{
-      label: '✓ Створити', cls: 'em-folder-modal-ok',
+    _showModal(_i18n.новаПапка, _i18n.назваНовоїПапки, [{
+      label: _i18n.створити, cls: 'em-folder-modal-ok',
       action: async function() {
         var name = _modalInp.value.trim();
-        if (!name) { _modalErr.textContent = 'Введіть назву'; return; }
-        _modalErr.textContent = '⏳ Створюю…';
+        if (!name) { _modalErr.textContent = _i18n.введітьНазву; return; }
+        _modalErr.textContent = '⏳…';
         try {
           var d = await _apiPost('/email/imap-folder/create/', {name: name});
           if (d.ok) { _closeModal(); loadServerFolders(); }
-          else _modalErr.textContent = d.error || 'Помилка';
-        } catch(e) { _modalErr.textContent = 'Помилка мережі'; }
+          else _modalErr.textContent = d.error || _i18n.помилка;
+        } catch(e) { _modalErr.textContent = _i18n.помилкаМережі; }
       }
     }]);
   };
 
   window.showRenameFolder = function(oldName) {
     _modalInp.value = oldName;
-    _showModal('Перейменувати папку', 'Нова назва', [{
-      label: '✓ Перейменувати', cls: 'em-folder-modal-ok',
+    _showModal(_i18n.перейменуватиП, _i18n.новаНазва, [{
+      label: _i18n.перейменувати, cls: 'em-folder-modal-ok',
       action: async function() {
         var newName = _modalInp.value.trim();
-        if (!newName) { _modalErr.textContent = 'Введіть нову назву'; return; }
-        _modalErr.textContent = '⏳ Перейменовую…';
+        if (!newName) { _modalErr.textContent = _i18n.введітьНовуНазву; return; }
+        _modalErr.textContent = '⏳…';
         try {
           var d = await _apiPost('/email/imap-folder/rename/', {old_name: oldName, new_name: newName});
           if (d.ok) { _closeModal(); loadServerFolders(); if (currentFolder === oldName) location.href = '?folder=' + encodeURIComponent(newName); }
-          else _modalErr.textContent = d.error || 'Помилка';
-        } catch(e) { _modalErr.textContent = 'Помилка мережі'; }
+          else _modalErr.textContent = d.error || _i18n.помилка;
+        } catch(e) { _modalErr.textContent = _i18n.помилкаМережі; }
       }
     }]);
   };
 
   window.showDeleteFolder = function(name) {
     _modalInp.style.display = 'none';
-    _showModal('Видалити папку «' + name + '»?', '', [{
-      label: '🗑️ Видалити', cls: 'em-folder-modal-del',
+    _showModal(_i18n.видалитиПапку + name + '»?', '', [{
+      label: '🗑️ {% trans "Видалити" %}', cls: 'em-folder-modal-del',
       action: async function() {
-        _modalErr.textContent = '⏳ Видаляю…';
+        _modalErr.textContent = '⏳…';
         try {
           var d = await _apiPost('/email/imap-folder/delete/', {name: name});
           if (d.ok) { _closeModal(); loadServerFolders(); if (currentFolder === name) location.href = '?folder=inbox'; }
-          else _modalErr.textContent = d.error || 'Помилка';
-        } catch(e) { _modalErr.textContent = 'Помилка мережі'; }
+          else _modalErr.textContent = d.error || _i18n.помилка;
+        } catch(e) { _modalErr.textContent = _i18n.помилкаМережі; }
       }
     }]);
   };
@@ -616,8 +645,8 @@ function _applyP2Visibility() {
       var r = await fetch('/email/imap-folders/', {credentials:'same-origin'});
       var d = await r.json();
       var extra = (d.folders || []).filter(function(f){ return f.selectable && !SKIP.has(f.name); });
-      var html = '<div class="em-folders-divider"><span>Папки сервера</span>'
-               + '<button class="em-folders-divider-add" onclick="showCreateFolder()" title="Нова папка">+</button>'
+      var html = '<div class="em-folders-divider"><span>' + _i18n.папкиСервера + '</span>'
+               + '<button class="em-folders-divider-add" onclick="showCreateFolder()" title="' + _i18n.новаПапка + '">+</button>'
                + '</div>';
       if (extra.length) {
         extra.forEach(function(f){
@@ -632,8 +661,8 @@ function _applyP2Visibility() {
                 + '<span style="font-size:13px;flex-shrink:0">📁</span>'
                 + '<span class="em-sf-label">' + label + '</span>'
                 + '</div>'
-                + '<button class="em-sf-action" onclick="event.stopPropagation();showRenameFolder(' + nameJ + ')" title="Перейменувати">✏️</button>'
-                + '<button class="em-sf-action em-sf-del" onclick="event.stopPropagation();showDeleteFolder(' + nameJ + ')" title="Видалити">🗑️</button>'
+                + '<button class="em-sf-action" onclick="event.stopPropagation();showRenameFolder(' + nameJ + ')" title="{% trans "Перейменувати" %}">✏️</button>'
+                + '<button class="em-sf-action em-sf-del" onclick="event.stopPropagation();showDeleteFolder(' + nameJ + ')" title="{% trans "Видалити" %}">🗑️</button>'
                 + '</div>';
         });
       }
@@ -677,8 +706,8 @@ function _applyP2Visibility() {
       var d = await r.json();
       var n = d.count || 0;
       if (n > lastCount && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('📧 Minerva — новий лист', {
-          body: 'У вас ' + n + ' непрочитаних листів',
+        new Notification(_i18n.новийЛист, {
+          body: n + ' ' + _i18n.непрочитаних,
           icon: '/static/icons/icon-192.png',
           tag:  'email-unread',
         });
@@ -693,9 +722,10 @@ function _applyP2Visibility() {
   var countdownSec = Math.round(INTERVAL_MS / 1000);
   var cdEl = document.getElementById('sync-countdown');
   function resetCountdown() { countdownSec = Math.round(INTERVAL_MS / 1000); }
+  var _countdownLabel = '{% trans "оновлення через" %}';
   function fmtCountdown(s) {
     var m = Math.floor(s / 60), ss = s % 60;
-    return '⏱ оновлення через ' + m + ':' + (ss < 10 ? '0' : '') + ss;
+    return '⏱ ' + _countdownLabel + ' ' + m + ':' + (ss < 10 ? '0' : '') + ss;
   }
   if (cdEl) {
     setInterval(function() {

@@ -1,5 +1,5 @@
 {% extends "admin/base_site.html" %}
-{% load static %}
+{% load i18n static %}
 {% block title %}{{ title }} — Minerva{% endblock %}
 {% block content_title %}{% endblock %}
 {% block messages %}{% endblock %}
@@ -101,7 +101,7 @@
 {% block content %}
 <div class="em-compose">
   <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
-    <a href="{% url 'email_assistant:inbox' %}" style="color:var(--text-muted);text-decoration:none;font-size:13px">← Вхідні</a>
+    <a href="{% url 'email_assistant:inbox' %}" style="color:var(--text-muted);text-decoration:none;font-size:13px">← {% trans "Вхідні" %}</a>
     <h2 style="font-size:18px;color:var(--text)">{{ title }}</h2>
   </div>
 
@@ -110,30 +110,30 @@
       {% csrf_token %}
 
       <div class="em-field">
-        <span class="em-field-label">Кому</span>
+        <span class="em-field-label">{% trans "Кому" %}</span>
         <input type="text" name="to" id="to-field"
                value="{{ initial.to|default:'' }}"
                placeholder="email@example.com, ..." autocomplete="off">
       </div>
       <div class="em-field">
         <span class="em-field-label">CC</span>
-        <input type="text" name="cc" id="cc-field" placeholder="Копія..." autocomplete="off">
+        <input type="text" name="cc" id="cc-field" placeholder="{% trans "Копія..." %}" autocomplete="off">
       </div>
       <div class="em-field">
-        <span class="em-field-label">Тема</span>
+        <span class="em-field-label">{% trans "Тема" %}</span>
         <input type="text" name="subject" id="subject-field"
                value="{{ initial.subject|default:'' }}"
-               placeholder="Тема листа" style="font-weight:500">
+               placeholder="{% trans "Тема листа" %}" style="font-weight:500">
       </div>
 
       <!-- ══ AI generation panel ══ -->
       <div id="ai-panel" style="display:none">
-        <div class="ai-panel-head">✨ AI генерація листа</div>
+        <div class="ai-panel-head">✨ {% trans "AI генерація листа" %}</div>
         <div class="ai-panel-row">
           <textarea id="ai-prompt-input"
-            placeholder="Опишіть лист: кому, з якого приводу, яким тоном, що треба вказати..."></textarea>
+            placeholder="{% trans "Опишіть лист: кому, з якого приводу, яким тоном, що треба вказати..." %}"></textarea>
           <button type="button" class="ai-gen-btn" id="ai-gen-btn" onclick="aiGenerate()">
-            ✨ Генерувати
+            ✨ {% trans "Генерувати" %}
           </button>
         </div>
         <div id="ai-gen-status" style="font-size:12px;margin-top:5px;min-height:16px"></div>
@@ -142,36 +142,36 @@
       <!-- Body with formatting toolbar -->
       <div class="em-body-area">
         <div class="em-toolbar">
-          <button type="button" class="em-tb-btn" onmousedown="return fmt('bold')" title="Жирний"><b>B</b></button>
-          <button type="button" class="em-tb-btn" onmousedown="return fmt('italic')" title="Курсив"><i>I</i></button>
-          <button type="button" class="em-tb-btn" onmousedown="return fmt('underline')" title="Підкреслений"><u>U</u></button>
-          <button type="button" class="em-tb-btn" onmousedown="return fmt('strikeThrough')" title="Закреслений"><s>S</s></button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('bold')" title="{% trans "Жирний" %}"><b>B</b></button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('italic')" title="{% trans "Курсив" %}"><i>I</i></button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('underline')" title="{% trans "Підкреслений" %}"><u>U</u></button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('strikeThrough')" title="{% trans "Закреслений" %}"><s>S</s></button>
           <span class="em-tb-sep"></span>
           <select onchange="fmtVal('fontSize', this.value); this.value=''" style="padding:3px 6px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;cursor:pointer">
-            <option value="">Розмір</option>
+            <option value="">{% trans "Розмір" %}</option>
             <option value="1">8px</option><option value="2">10px</option>
             <option value="3">12px</option><option value="4">14px</option>
             <option value="5">18px</option><option value="6">24px</option>
           </select>
           <select onchange="fmtVal('fontName', this.value); this.value=''" style="padding:3px 6px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;cursor:pointer">
-            <option value="">Шрифт</option>
+            <option value="">{% trans "Шрифт" %}</option>
             <option value="Arial">Arial</option>
             <option value="Times New Roman">Times New Roman</option>
             <option value="Courier New">Courier New</option>
             <option value="Georgia">Georgia</option>
           </select>
-          <input type="color" onchange="fmtVal('foreColor', this.value)" title="Колір тексту"
+          <input type="color" onchange="fmtVal('foreColor', this.value)" title="{% trans "Колір тексту" %}"
                  style="width:28px;height:26px;border-radius:4px;border:1px solid var(--border-strong);padding:1px;cursor:pointer;background:var(--bg-input)">
           <span class="em-tb-sep"></span>
           <button type="button" class="em-tb-btn" onmousedown="return fmt('insertUnorderedList')">≡</button>
           <button type="button" class="em-tb-btn" onmousedown="return fmt('insertOrderedList')">1.</button>
           <span class="em-tb-sep"></span>
-          <button type="button" class="em-tb-btn" onmousedown="return fmt('removeFormat')">✕ Очистити</button>
+          <button type="button" class="em-tb-btn" onmousedown="return fmt('removeFormat')">✕ {% trans "Очистити" %}</button>
           <span class="em-tb-sep"></span>
           <button type="button" class="em-tb-btn" id="ai-toggle-btn"
-                  onclick="toggleAiPanel()" title="AI генерація">✨ AI</button>
+                  onclick="toggleAiPanel()" title="{% trans "AI генерація" %}">✨ AI</button>
           <button type="button" class="em-tb-btn" id="grammar-btn"
-                  onclick="checkGrammar()" title="Перевірити граматику">✓ Граматика</button>
+                  onclick="checkGrammar()" title="{% trans "Перевірити граматику" %}">✓ {% trans "Граматика" %}</button>
         </div>
 
         <div id="body-editor" class="em-body-editor" contenteditable="true"
@@ -184,7 +184,7 @@
       <!-- Attachments -->
       <div style="padding:8px 18px 10px;border-top:1px solid var(--border)">
         <button type="button" class="em-att-btn" onclick="document.getElementById('att-input').click()">
-          📎 Додати вкладення
+          📎 {% trans "Додати вкладення" %}
         </button>
         <input type="file" id="att-input" name="attachments" multiple
                style="display:none" onchange="showFiles(this)">
@@ -194,19 +194,19 @@
       <!-- Footer -->
       <div class="em-footer">
         <button type="button" class="em-send-btn" id="send-btn" onclick="sendOrSchedule()">
-          Відправити →
+          {% trans "Відправити" %} →
         </button>
         <button type="button" class="em-sec-btn" id="schedule-toggle-btn"
-                onclick="toggleSchedule()" title="Відправити пізніше">
-          ⏰ Пізніше
+                onclick="toggleSchedule()" title="{% trans "Відправити пізніше" %}">
+          ⏰ {% trans "Пізніше" %}
         </button>
-        <button type="button" class="em-sec-btn" onclick="saveDraft()">💾 Зберегти</button>
+        <button type="button" class="em-sec-btn" onclick="saveDraft()">💾 {% trans "Зберегти" %}</button>
         <div id="send-status" style="font-size:12px;color:var(--text-muted);flex:1"></div>
 
         <!-- Schedule row -->
         <div id="schedule-row" style="display:none">
           <input type="datetime-local" id="schedule-dt">
-          <span style="font-size:12px;color:var(--text-muted)">Відправити о цей час</span>
+          <span style="font-size:12px;color:var(--text-muted)">{% trans "Відправити о цей час" %}</span>
         </div>
       </div>
     </form>
@@ -215,16 +215,16 @@
 
 <div id="grammar-panel" style="display:none">
   <div id="grammar-panel-head">
-    <span>✓ Перевірка граматики — виправлена версія</span>
+    <span>✓ {% trans "Перевірка граматики — виправлена версія" %}</span>
     <button type="button" onclick="dismissGrammar()"
             style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:16px">✕</button>
   </div>
   <div id="grammar-result"></div>
   <div id="grammar-actions">
     <button type="button" class="em-send-btn" onclick="applyGrammar()"
-            style="padding:7px 18px;font-size:12px">✓ Замінити текст</button>
+            style="padding:7px 18px;font-size:12px">✓ {% trans "Замінити текст" %}</button>
     <button type="button" class="em-sec-btn" onclick="dismissGrammar()"
-            style="padding:7px 14px;font-size:12px">Відхилити</button>
+            style="padding:7px 14px;font-size:12px">{% trans "Відхилити" %}</button>
     <span id="grammar-msg" style="font-size:12px;color:var(--text-muted);align-self:center"></span>
   </div>
 </div>

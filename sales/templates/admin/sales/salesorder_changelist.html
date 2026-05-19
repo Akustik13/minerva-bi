@@ -1,4 +1,5 @@
 {% extends "admin/change_list.html" %}
+{% load i18n %}
 
 {% block extrahead %}{{ block.super }}
 <script>
@@ -7,13 +8,13 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!sel) return;
 
   var GROUPS = [
-    { label: '🔄 Статус',          match: 'Статус →' },
-    { label: '💱 Валюта продажу',   match: 'Валюта продажу →' },
-    { label: '🚚 Валюта доставки',  match: 'Валюта доставки →' },
-    { label: '📄 Тип документа',    match: 'Тип документа →' },
-    { label: '📦 Склад',            match: 'Склад →' },
-    { label: '🏭 Джерело',          match: 'Змінити джерело' },
-    { label: '📊 Звіти',            match: 'Експортувати' },
+    { label: '🔄 {% trans "Статус" %}',          match: 'Статус →' },
+    { label: '💱 {% trans "Валюта продажу" %}',   match: 'Валюта продажу →' },
+    { label: '🚚 {% trans "Валюта доставки" %}',  match: 'Валюта доставки →' },
+    { label: '📄 {% trans "Тип документа" %}',    match: 'Тип документа →' },
+    { label: '📦 {% trans "Склад" %}',            match: 'Склад →' },
+    { label: '🏭 {% trans "Джерело" %}',          match: 'Змінити джерело' },
+    { label: '📊 {% trans "Звіти" %}',            match: 'Експортувати' },
   ];
 
   var allOpts = Array.from(sel.options);
@@ -35,7 +36,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (remaining.length) {
     var og = document.createElement('optgroup');
-    og.label = '⚙️ Адмін';
+    og.label = '⚙️ {% trans "Адмін" %}';
     remaining.forEach(function (o) { og.appendChild(o); });
     sel.appendChild(og);
   }
@@ -171,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function () {
         <a href="{% url 'admin:sales_salesorder_import' %}"
            style="background:#2e7d32;color:white;padding:8px 16px;border-radius:6px;
                   text-decoration:none;font-weight:600;display:inline-block">
-            📥 Імпорт з Excel
+            📥 {% trans "Імпорт з Excel" %}
         </a>
     </li>
 {% endblock %}
@@ -181,23 +182,23 @@ document.addEventListener('DOMContentLoaded', function () {
 {# ── Quick filter bar ──────────────────────────────────────────────────────── #}
 <div class="sv-qf-bar" id="sv-qf-bar">
   {# Status filters — built by JS from window.location #}
-  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Статус:</span>
-  <a class="sv-qf-btn" id="svf-s-all"       onclick="svQFStatus('');return false" href="#">Всі</a>
-  <a class="sv-qf-btn" id="svf-s-received"  onclick="svQFStatus('received');return false" href="#">📥 Отримано{% if sv_status_counts.received %} <span class="sv-qf-cnt">{{ sv_status_counts.received }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-s-processing" onclick="svQFStatus('processing');return false" href="#">⚙️ Обробка{% if sv_status_counts.processing %} <span class="sv-qf-cnt">{{ sv_status_counts.processing }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-s-shipped"   onclick="svQFStatus('shipped');return false" href="#">🚚 Відправлено{% if sv_status_counts.shipped %} <span class="sv-qf-cnt">{{ sv_status_counts.shipped }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQFStatus('delivered');return false" href="#">✅ Доставлено{% if sv_status_counts.delivered %} <span class="sv-qf-cnt">{{ sv_status_counts.delivered }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQFStatus('cancelled');return false" href="#">🚫 Скасовано{% if sv_status_counts.cancelled %} <span class="sv-qf-cnt">{{ sv_status_counts.cancelled }}</span>{% endif %}</a>
+  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">{% trans "Статус:" %}</span>
+  <a class="sv-qf-btn" id="svf-s-all"       onclick="svQFStatus('');return false" href="#">{% trans "Всі" %}</a>
+  <a class="sv-qf-btn" id="svf-s-received"  onclick="svQFStatus('received');return false" href="#">📥 {% trans "Отримано" %}{% if sv_status_counts.received %} <span class="sv-qf-cnt">{{ sv_status_counts.received }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-s-processing" onclick="svQFStatus('processing');return false" href="#">⚙️ {% trans "Обробка" %}{% if sv_status_counts.processing %} <span class="sv-qf-cnt">{{ sv_status_counts.processing }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-s-shipped"   onclick="svQFStatus('shipped');return false" href="#">🚚 {% trans "Відправлено" %}{% if sv_status_counts.shipped %} <span class="sv-qf-cnt">{{ sv_status_counts.shipped }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-s-delivered" onclick="svQFStatus('delivered');return false" href="#">✅ {% trans "Доставлено" %}{% if sv_status_counts.delivered %} <span class="sv-qf-cnt">{{ sv_status_counts.delivered }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-s-cancelled" onclick="svQFStatus('cancelled');return false" href="#">🚫 {% trans "Скасовано" %}{% if sv_status_counts.cancelled %} <span class="sv-qf-cnt">{{ sv_status_counts.cancelled }}</span>{% endif %}</a>
   <div class="sv-qf-sep"></div>
-  <a class="sv-qf-btn" id="svf-in-transit" onclick="svQFToggle('in_transit');return false" href="#">🚚 В дорозі{% if sv_count_in_transit %} <span class="sv-qf-cnt">{{ sv_count_in_transit }}</span>{% endif %}</a>
-  <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#">🚨 Затримки{% if sv_count_delayed %} <span class="sv-qf-cnt">{{ sv_count_delayed }}</span>{% endif %}</a>
-  <a class="sv-qf-btn" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#">🔴 Прострочені{% if sv_count_overdue %} <span class="sv-qf-cnt">{{ sv_count_overdue }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-in-transit" onclick="svQFToggle('in_transit');return false" href="#">🚚 {% trans "В дорозі" %}{% if sv_count_in_transit %} <span class="sv-qf-cnt">{{ sv_count_in_transit }}</span>{% endif %}</a>
+  <a class="sv-qf-btn sv-qf-warn" id="svf-delayed" onclick="svQFToggle('delayed');return false" href="#">🚨 {% trans "Затримки" %}{% if sv_count_delayed %} <span class="sv-qf-cnt">{{ sv_count_delayed }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-overdue" onclick="svQFToggle('overdue');return false" href="#">🔴 {% trans "Прострочені" %}{% if sv_count_overdue %} <span class="sv-qf-cnt">{{ sv_count_overdue }}</span>{% endif %}</a>
   <div class="sv-qf-sep"></div>
-  <a class="sv-qf-btn" id="svf-flagged" onclick="svQFToggle('flagged');return false" href="#">⭐ Важливі{% if sv_count_flagged %} <span class="sv-qf-cnt">{{ sv_count_flagged }}</span>{% endif %}</a>
+  <a class="sv-qf-btn" id="svf-flagged" onclick="svQFToggle('flagged');return false" href="#">⭐ {% trans "Важливі" %}{% if sv_count_flagged %} <span class="sv-qf-cnt">{{ sv_count_flagged }}</span>{% endif %}</a>
   {% if sv_sources %}
   <div class="sv-qf-sep"></div>
-  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">Джерело:</span>
-  <a class="sv-qf-btn" id="svf-src-all" onclick="svQFSource('');return false" href="#">Всі</a>
+  <span style="font-size:11px;color:var(--text-muted);font-weight:600;white-space:nowrap">{% trans "Джерело:" %}</span>
+  <a class="sv-qf-btn" id="svf-src-all" onclick="svQFSource('');return false" href="#">{% trans "Всі" %}</a>
   {% for src in sv_sources %}
   <a class="sv-qf-btn" id="svf-src-{{ src.slug }}" onclick="svQFSource('{{ src.slug }}');return false" href="#">{{ src.name }}{% if src.count %} <span class="sv-qf-cnt">{{ src.count }}</span>{% endif %}</a>
   {% endfor %}
@@ -213,15 +214,15 @@ document.addEventListener('DOMContentLoaded', function () {
     <div id="sv-select-bar" style="display:none;align-items:center;gap:8px">
       <input type="checkbox" id="sv-check-all" onchange="svCheckAll(this)"
              style="width:16px;height:16px;accent-color:#1565c0">
-      <label for="sv-check-all" style="color:var(--text);font-weight:600;cursor:pointer;font-size:13px">Вибрати всі</label>
+      <label for="sv-check-all" style="color:var(--text);font-weight:600;cursor:pointer;font-size:13px">{% trans "Вибрати всі" %}</label>
       <span id="sv-selected-count" style="color:var(--text-muted);font-size:12px"></span>
     </div>
   </div>
   {# Right: view toggle #}
   <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-    <span style="font-size:12px;color:var(--text-muted)">Вигляд:</span>
-    <button type="button" class="sv-toggle-btn" id="sv-btn-table" onclick="svSetView('table')">📋 Таблиця</button>
-    <button type="button" class="sv-toggle-btn" id="sv-btn-cards" onclick="svSetView('cards')">🃏 Картки</button>
+    <span style="font-size:12px;color:var(--text-muted)">{% trans "Вигляд:" %}</span>
+    <button type="button" class="sv-toggle-btn" id="sv-btn-table" onclick="svSetView('table')">📋 {% trans "Таблиця" %}</button>
+    <button type="button" class="sv-toggle-btn" id="sv-btn-cards" onclick="svSetView('cards')">🃏 {% trans "Картки" %}</button>
   </div>
 </div>
 
@@ -260,7 +261,7 @@ document.addEventListener('DOMContentLoaded', function () {
         </span>
         {# Status source badge — which API last changed the status #}
         {% if order.status_source %}
-        <span title="Останній статус встановлено: {{ order.status_source }}"
+        <span title="{% trans "Останній статус встановлено:" %} {{ order.status_source }}"
               style="font-size:10px;color:var(--text-dim);padding:2px 7px;border-radius:6px;
                      border:1px solid var(--border-strong);background:var(--bg-input);
                      white-space:nowrap;cursor:default">🔌 {{ order.status_source }}</span>
@@ -270,23 +271,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 data-pk="{{ order.pk }}"
                 onclick="svFlagOrder({{ order.pk }})"
                 style="color:{% if order.is_flagged %}#FFB300{% else %}var(--text-dim){% endif %}"
-                title="{% if order.is_flagged %}Зняти позначку{% else %}Позначити як важливе{% endif %}">
+                title="{% if order.is_flagged %}{% trans "Зняти позначку" %}{% else %}{% trans "Позначити як важливе" %}{% endif %}">
           {% if order.is_flagged %}⭐{% else %}☆{% endif %}
         </button>
       </div>
       {# Dates column #}
       <div style="text-align:right;font-size:12px;display:flex;flex-direction:column;gap:3px;align-items:flex-end">
         {% if order.order_date %}
-          <span style="color:var(--text-muted)">📅 Замовлено: <strong style="color:var(--text)">{{ order.order_date|date:"d.m.Y" }}</strong></span>
+          <span style="color:var(--text-muted)">📅 {% trans "Замовлено:" %} <strong style="color:var(--text)">{{ order.order_date|date:"d.m.Y" }}</strong></span>
         {% endif %}
         {% if order.status == 'received' or order.status == 'processing' %}{% with ds=order.deadline_status %}{% if ds %}
-          <span style="color:{{ ds.color }};font-size:11px">{{ ds.icon }} Дедлайн {{ order.shipping_deadline|date:"d.m.Y" }} — {{ ds.label }}</span>
+          <span style="color:{{ ds.color }};font-size:11px">{{ ds.icon }} {% trans "Дедлайн" %} {{ order.shipping_deadline|date:"d.m.Y" }} — {{ ds.label }}</span>
         {% endif %}{% endwith %}{% endif %}
         {% if order.shipped_at %}
-          <span style="color:var(--text-muted)">📬 Відправлено: <strong style="color:#2e7d32">{{ order.shipped_at|date:"d.m.Y" }}</strong></span>
+          <span style="color:var(--text-muted)">📬 {% trans "Відправлено:" %} <strong style="color:#2e7d32">{{ order.shipped_at|date:"d.m.Y" }}</strong></span>
         {% endif %}
         {% if order.delivered_at %}
-          <span style="color:var(--text-muted)">✅ Доставлено: <strong style="color:#00695c">{{ order.delivered_at|date:"d.m.Y" }}</strong></span>
+          <span style="color:var(--text-muted)">✅ {% trans "Доставлено:" %} <strong style="color:#00695c">{{ order.delivered_at|date:"d.m.Y" }}</strong></span>
         {% endif %}
       </div>
     </div>
@@ -295,27 +296,27 @@ document.addEventListener('DOMContentLoaded', function () {
     <div class="sv-prog">
       <div class="sv-ps {% if s != 'cancelled' %}sv-ps-done{% endif %}">
         <div class="sv-pd">✓</div>
-        <div class="sv-pl">Чернетка{% if order.order_date %}<small>{{ order.order_date|date:"d.m" }}</small>{% endif %}</div>
+        <div class="sv-pl">{% trans "Чернетка" %}{% if order.order_date %}<small>{{ order.order_date|date:"d.m" }}</small>{% endif %}</div>
       </div>
       <div class="sv-pc {% if sh %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-ps-done{% else %}sv-ps-cur{% endif %}{% endif %}">
         <div class="sv-pd">{% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}✓{% else %}●{% endif %}{% else %}·{% endif %}</div>
-        <div class="sv-pl">Оформлення</div>
+        <div class="sv-pl">{% trans "Оформлення" %}</div>
       </div>
       <div class="sv-pc {% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'shipped' or s == 'delivered' %}sv-ps-done{% elif sh.label_url %}sv-ps-cur{% endif %}">
         <div class="sv-pd">{% if s == 'shipped' or s == 'delivered' %}✓{% elif sh.label_url %}●{% else %}·{% endif %}</div>
-        <div class="sv-pl">Етикетка{% if sh.label_url and s != 'shipped' and s != 'delivered' %}<small>{% if sv_label_open_mode == 'download' %}<a href="#" onclick="svLabelAction('download','{{ sh.label_url }}');return false" style="color:inherit">PDF ⬇️</a>{% elif sv_label_open_mode == 'ask' %}<a href="#" onclick="svLabelAction('ask','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% else %}<a href="#" onclick="svLabelAction('view','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% endif %}</small>{% endif %}</div>
+        <div class="sv-pl">{% trans "Етикетка" %}{% if sh.label_url and s != 'shipped' and s != 'delivered' %}<small>{% if sv_label_open_mode == 'download' %}<a href="#" onclick="svLabelAction('download','{{ sh.label_url }}');return false" style="color:inherit">PDF ⬇️</a>{% elif sv_label_open_mode == 'ask' %}<a href="#" onclick="svLabelAction('ask','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% else %}<a href="#" onclick="svLabelAction('view','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% endif %}</small>{% endif %}</div>
       </div>
       <div class="sv-pc {% if s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'shipped' %}{% if sh.carrier_delayed %}sv-ps-warn{% else %}sv-ps-cur{% endif %}{% elif s == 'delivered' %}sv-ps-done{% endif %}">
         <div class="sv-pd">{% if s == 'delivered' %}✓{% elif s == 'shipped' and sh.carrier_delayed %}!{% elif s == 'shipped' %}●{% else %}·{% endif %}</div>
-        <div class="sv-pl">{% if s == 'shipped' and sh.carrier_delayed %}<span style="color:#e65100;font-weight:700">Затримка!</span>{% else %}В дорозі{% if order.shipped_at %}<small>{{ order.shipped_at|date:"d.m" }}</small>{% endif %}{% endif %}</div>
+        <div class="sv-pl">{% if s == 'shipped' and sh.carrier_delayed %}<span style="color:#e65100;font-weight:700">{% trans "Затримка!" %}</span>{% else %}{% trans "В дорозі" %}{% if order.shipped_at %}<small>{{ order.shipped_at|date:"d.m" }}</small>{% endif %}{% endif %}</div>
       </div>
       <div class="sv-pc {% if s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'delivered' %}sv-ps-done{% endif %}">
         <div class="sv-pd">{% if s == 'delivered' %}✓{% else %}·{% endif %}</div>
-        <div class="sv-pl">Доставлено{% if s == 'delivered' and order.delivered_at %}<small>{{ order.delivered_at|date:"d.m" }}</small>{% elif s == 'shipped' and sh %}{% if sh.carrier_eta %}<small>~{{ sh.carrier_eta|date:"d.m" }}</small>{% elif sh.eta_to %}<small>до {{ sh.eta_to|date:"d.m" }}</small>{% endif %}{% endif %}</div>
+        <div class="sv-pl">{% trans "Доставлено" %}{% if s == 'delivered' and order.delivered_at %}<small>{{ order.delivered_at|date:"d.m" }}</small>{% elif s == 'shipped' and sh %}{% if sh.carrier_eta %}<small>~{{ sh.carrier_eta|date:"d.m" }}</small>{% elif sh.eta_to %}<small>{% trans "до" %} {{ sh.eta_to|date:"d.m" }}</small>{% endif %}{% endif %}</div>
       </div>
     </div>
     {% if sh and sh.carrier_status_label %}
@@ -332,7 +333,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {% if c %}
           <a href="{% url 'admin:crm_customer_change' c.pk %}"
              style="color:var(--text);font-weight:600;text-decoration:none"
-             title="Відкрити клієнта в CRM">👤 {{ order.client|default:order.email }}</a>
+             title="{% trans "Відкрити клієнта в CRM" %}">👤 {{ order.client|default:order.email }}</a>
         {% else %}
           <span style="color:var(--text);font-weight:600">👤 {{ order.client|default:order.email }}</span>
         {% endif %}
@@ -351,7 +352,7 @@ document.addEventListener('DOMContentLoaded', function () {
                   border:1px solid var(--border-strong);color:var(--text-muted);display:inline-flex;gap:6px;align-items:center;text-decoration:none">
           <span style="color:var(--text)">{{ c.get_status_display }}</span>
           {% if rfm %}<span style="color:var(--text)">{{ rfm.segment }}</span>{% endif %}
-          · <b style="color:var(--text)">{{ c.total_orders }}</b> замов.
+          · <b style="color:var(--text)">{{ c.total_orders }}</b> {% trans "замов." %}
         </a>
         {% endwith %}
       {% endif %}{% endwith %}
@@ -363,12 +364,12 @@ document.addEventListener('DOMContentLoaded', function () {
       <thead>
         <tr style="color:var(--text-muted);border-bottom:1px solid var(--border-strong);
                    font-size:11px;text-transform:uppercase;letter-spacing:.04em">
-          <th style="padding:5px 8px;text-align:left;font-weight:600">Артикул</th>
+          <th style="padding:5px 8px;text-align:left;font-weight:600">{% trans "Артикул" %}</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600">📄</th>
-          <th style="padding:5px 8px;text-align:center;font-weight:600;white-space:nowrap">🏷️ Етикетка</th>
-          <th style="padding:5px 8px;text-align:center;font-weight:600">К-сть</th>
-          <th style="padding:5px 8px;text-align:right;font-weight:600">Ціна</th>
-          <th style="padding:5px 8px;text-align:right;font-weight:600">Сума</th>
+          <th style="padding:5px 8px;text-align:center;font-weight:600;white-space:nowrap">🏷️ {% trans "Етикетка" %}</th>
+          <th style="padding:5px 8px;text-align:center;font-weight:600">{% trans "К-сть" %}</th>
+          <th style="padding:5px 8px;text-align:right;font-weight:600">{% trans "Ціна" %}</th>
+          <th style="padding:5px 8px;text-align:right;font-weight:600">{% trans "Сума" %}</th>
         </tr>
       </thead>
       <tbody>
@@ -380,7 +381,7 @@ document.addEventListener('DOMContentLoaded', function () {
             {% if line.product %}
               <a href="{% url 'admin:inventory_product_change' line.product.pk %}"
                  style="color:inherit;text-decoration:none;border-bottom:1px dashed var(--text-dim)"
-                 title="Перейти на склад: {{ lsku }}">{{ lsku|default:"—" }}</a>
+                 title="{% trans "Перейти на склад:" %} {{ lsku }}">{{ lsku|default:"—" }}</a>
             {% else %}{{ lsku|default:"—" }}{% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center">
@@ -401,7 +402,7 @@ document.addEventListener('DOMContentLoaded', function () {
                  {% if sv_show_pdf_preview %}class="sv-pdf-icon" data-pdf="{{ line.product.datasheet_url }}" data-pdfname="{{ lsku }}"{% endif %}
                  style="font-size:14px;text-decoration:none;opacity:.85">📄</a>
             {% else %}
-              <span style="font-size:13px;opacity:.25;cursor:default" title="Немає документу">📄</span>
+              <span style="font-size:13px;opacity:.25;cursor:default" title="{% trans "Немає документу" %}">📄</span>
             {% endif %}
           </td>
           <td style="padding:6px 8px;text-align:center">
@@ -422,7 +423,7 @@ document.addEventListener('DOMContentLoaded', function () {
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--border-strong)">
-          <td colspan="5" style="padding:7px 8px;text-align:right;color:var(--text-muted);font-size:12px">Разом:</td>
+          <td colspan="5" style="padding:7px 8px;text-align:right;color:var(--text-muted);font-size:12px">{% trans "Разом:" %}</td>
           <td style="padding:7px 8px;text-align:right;font-size:15px;font-weight:800;color:#2e7d32;white-space:nowrap">
             {% with t=order.order_total %}{% if t %}{{ t|floatformat:"2" }} {{ lines.0.currency|default:order.currency }}{% else %}—{% endif %}{% endwith %}
           </td>
@@ -430,7 +431,7 @@ document.addEventListener('DOMContentLoaded', function () {
       </tfoot>
     </table>
     {% else %}
-      <p style="color:var(--text-muted);font-size:12px;margin:0 0 10px">Немає позицій</p>
+      <p style="color:var(--text-muted);font-size:12px;margin:0 0 10px">{% trans "Немає позицій" %}</p>
     {% endif %}
 
     {# Footer: chips row + action #}
@@ -440,25 +441,25 @@ document.addEventListener('DOMContentLoaded', function () {
       <a href="{% url 'admin:sales_salesorder_change' order.pk %}"
          style="padding:5px 14px;background:#1565c0;color:#fff;
                 border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
-        ⚙️ Обробити
+        ⚙️ {% trans "Обробити" %}
       </a>
 
       {% if order.status != 'delivered' and order.status != 'shipped' %}
       <a href="{% url 'admin:shipping_shipment_create' order.pk %}"
          style="padding:5px 14px;background:#2e7d32;color:#fff;
                 border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
-        🚚 Відправлення
+        🚚 {% trans "Відправлення" %}
       </a>
       {# Склад chip — green if affects_stock, red if not #}
       {% if order.affects_stock %}
         <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
                      background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32">
-          ✅ Склад
+          ✅ {% trans "Склад" %}
         </span>
       {% else %}
         <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
                      background:rgba(198,40,40,.12);color:#ef5350;border:1px solid #c62828">
-          ❌ Немає
+          ❌ {% trans "Немає" %}
         </span>
       {% endif %}
       {% endif %}
@@ -499,7 +500,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {# Shipments list #}
         {% with shipments=order.shipments.all %}{% if shipments %}
         <span style="font-family:sans-serif;border-left:1px solid var(--border-strong);padding-left:6px;display:inline-flex;align-items:center;gap:4px">
-          Відправлень: <b style="color:var(--text)">{{ shipments|length }}</b>
+          {% trans "Відправлень:" %} <b style="color:var(--text)">{{ shipments|length }}</b>
           {% for sh in shipments %}
           · <a href="/admin/shipping/shipment/{{ sh.pk }}/detail/"
                style="text-decoration:none;font-weight:600;
@@ -522,13 +523,13 @@ document.addEventListener('DOMContentLoaded', function () {
       <button type="button" class="sv-note-btn {% if order.internal_note %}sv-note-has{% endif %}"
               id="sv-note-btn-{{ order.pk }}"
               onclick="svNoteToggle({{ order.pk }})"
-              title="{{ order.internal_note|default:'Додати нотатку' }}">
+              title="{{ order.internal_note|default:'' }}">
         📝{% if order.internal_note %} {{ order.internal_note|truncatechars:22 }}{% endif %}
       </button>
 
       {# Expand button — rightmost in footer #}
       <button type="button" class="sv-cex-btn" id="sv-cex-btn-{{ order.pk }}"
-              onclick="svCardExpand(this, {{ order.pk }})" title="Документи та деталі">⛶</button>
+              onclick="svCardExpand(this, {{ order.pk }})" title="{% trans "Документи та деталі" %}">⛶</button>
     </div>
 
     {# Note edit panel #}
@@ -536,15 +537,15 @@ document.addEventListener('DOMContentLoaded', function () {
       <span style="font-size:13px;flex-shrink:0">📝</span>
       <input class="sv-note-input" id="sv-note-input-{{ order.pk }}" type="text" maxlength="500"
              value="{{ order.internal_note }}"
-             placeholder="Короткий коментар (Enter — зберегти, Esc — закрити)…"
+             placeholder="{% trans "Короткий коментар (Enter — зберегти, Esc — закрити)…" %}"
              onkeydown="if(event.key==='Enter')svNoteSave({{ order.pk }});if(event.key==='Escape')svNoteToggle({{ order.pk }})">
-      <button type="button" onclick="svNoteSave({{ order.pk }})" style="background:#1565c0;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">💾 Зберегти</button>
+      <button type="button" onclick="svNoteSave({{ order.pk }})" style="background:#1565c0;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">💾 {% trans "Зберегти" %}</button>
       <button type="button" onclick="svNoteToggle({{ order.pk }})" style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong);border-radius:4px;padding:4px 8px;cursor:pointer;color:var(--text-muted);font-size:11px;flex-shrink:0">✕</button>
     </div>
 
     {# Expandable panel — docs, upload, auto-doc, packaging #}
     <div class="sv-cex-panel" id="sv-cex-{{ order.pk }}">
-      <span style="color:var(--text-muted);font-size:12px">⏳ Завантаження…</span>
+      <span style="color:var(--text-muted);font-size:12px">⏳ {% trans "Завантаження…" %}</span>
     </div>
 
   </div>
@@ -553,7 +554,7 @@ document.addEventListener('DOMContentLoaded', function () {
   {% endfor %}
 
   {% if not cl.result_list %}
-    <p style="color:var(--text-muted);padding:20px 0">Замовлень не знайдено.</p>
+    <p style="color:var(--text-muted);padding:20px 0">{% trans "Замовлень не знайдено." %}</p>
   {% endif %}
 </div>
 
@@ -592,11 +593,11 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
   };
   window.svDymoError=function(url,sku,msg){
     _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:24px 28px;max-width:440px;width:90%">'
-      +'<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text,#c9d8e4)">⚠️ DYMO недоступний</div>'
+      +'<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text,#c9d8e4)">⚠️ {% trans "DYMO недоступний" %}</div>'
       +'<div style="font-size:13px;color:var(--text-muted,#9aafbe);margin-bottom:18px;line-height:1.6">'+msg+'</div>'
       +'<div style="display:flex;gap:10px">'
       +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
-        +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">⬇️ Завантажити файл</button>'
+        +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">⬇️ {% trans "Завантажити файл" %}</button>'
       +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
         +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 12px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
       +'</div></div>');
@@ -606,13 +607,13 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
   function _dymoCertError(url,sku){
     var btnStyle='background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;margin-top:10px;margin-right:8px';
     window.svDymoError(url,sku,
-      '⚠️ DYMO Connect не відповідає.<br><br>'
-      +'<b>Крок 1:</b> Прийміть сертифікат (один раз у браузері):<br>'
-      +'<button onclick="window.open(\'https://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected\',\'_blank\')" style="'+btnStyle+'">🔒 Відкрити DYMO (прийняти сертифікат)</button><br><br>'
-      +'<b>Крок 2:</b> У вкладці що відкрилась:<br>'
-      +'&nbsp;&nbsp;Chrome: <b>Додатково → Перейти до 127.0.0.1</b><br>'
-      +'&nbsp;&nbsp;Firefox: <b>Прийняти ризик і продовжити</b><br><br>'
-      +'<b>Крок 3:</b> Поверніться і натисніть «Повторити»'
+      '⚠️ {% trans "DYMO Connect не відповідає." %}<br><br>'
+      +'<b>{% trans "Крок 1:" %}</b> {% trans "Прийміть сертифікат (один раз у браузері):" %}<br>'
+      +'<button onclick="window.open(\'https://127.0.0.1:41951/DYMO/DLS/Printing/StatusConnected\',\'_blank\')" style="'+btnStyle+'">🔒 {% trans "Відкрити DYMO (прийняти сертифікат)" %}</button><br><br>'
+      +'<b>{% trans "Крок 2:" %}</b> {% trans "У вкладці що відкрилась:" %}<br>'
+      +'&nbsp;&nbsp;Chrome: <b>{% trans "Додатково → Перейти до 127.0.0.1" %}</b><br>'
+      +'&nbsp;&nbsp;Firefox: <b>{% trans "Прийняти ризик і продовжити" %}</b><br><br>'
+      +'<b>{% trans "Крок 3:" %}</b> {% trans "Поверніться і натисніть «Повторити»" %}'
     );
     // Append retry button to error modal
     setTimeout(function(){
@@ -622,7 +623,7 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
       if(!box) return;
       var rb=document.createElement('button');
       rb.type='button';
-      rb.textContent='🔄 Повторити';
+      rb.textContent='🔄 {% trans "Повторити" %}';
       rb.style.cssText=btnStyle+';background:#2e7d32;margin-top:6px';
       rb.onclick=function(){m.remove();window.svDymoPrint(url,sku,qty);};
       box.appendChild(rb);
@@ -637,7 +638,7 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
     })
     .then(function(xml){
       var m=xml.match(/<Name>([^<]+)<\/Name>/);
-      if(!m){window.svDymoError(url,sku,'Принтер DYMO не знайдено.<br>Перевірте підключення USB та що DYMO Connect запущено.');return;}
+      if(!m){window.svDymoError(url,sku,'{% trans "Принтер DYMO не знайдено. Перевірте підключення USB та що DYMO Connect запущено." %}');return;}
       var printer=m[1];
       // Step 2: fetch label XML
       fetch(url)
@@ -651,9 +652,9 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
         fd.append('labelSetXml','');
         fetch(_DYMO_BASE+'/DYMO/DLS/Printing/PrintLabel',{method:'POST',body:fd})
         .then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t);});})
-        .catch(function(e){window.svDymoError(url,sku,'Помилка друку: '+(e.message||String(e)));});
+        .catch(function(e){window.svDymoError(url,sku,'{% trans "Помилка друку:" %} '+(e.message||String(e)));});
       })
-      .catch(function(e){window.svDymoError(url,sku,'Помилка завантаження мітки: '+e);});
+      .catch(function(e){window.svDymoError(url,sku,'{% trans "Помилка завантаження мітки:" %} '+e);});
     })
     .catch(function(e){
       // Try HTTP fallback (old DYMO Label Software)
@@ -661,14 +662,14 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
       .then(function(r){return r.text();})
       .then(function(xml){
         var m=xml.match(/<Name>([^<]+)<\/Name>/);
-        if(!m){window.svDymoError(url,sku,'Принтер DYMO не знайдено.');return;}
+        if(!m){window.svDymoError(url,sku,'{% trans "Принтер DYMO не знайдено." %}');return;}
         _loadFW(function(err){
-          if(err){window.svDymoError(url,sku,'Помилка SDK: '+err);return;}
+          if(err){window.svDymoError(url,sku,'{% trans "Помилка SDK:" %} '+err);return;}
           fetch(url).then(function(r){return r.text();}).then(function(lxml){
             try{
               var label=window.dymo.label.framework.openLabelXml(lxml);
               label.print(m[1]);
-            }catch(ex){window.svDymoError(url,sku,'Помилка SDK: '+(ex.message||ex));}
+            }catch(ex){window.svDymoError(url,sku,'{% trans "Помилка SDK:" %} '+(ex.message||ex));}
           });
         });
       })
@@ -677,12 +678,12 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
   };
   window.svDymoAsk=function(url,sku,qty){
     _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:22px 26px;max-width:360px;width:90%">'
-      +'<div style="font-weight:700;font-size:15px;margin-bottom:14px;color:var(--text,#c9d8e4)">🖨️ Мітка: '+sku+'</div>'
+      +'<div style="font-weight:700;font-size:15px;margin-bottom:14px;color:var(--text,#c9d8e4)">🖨️ {% trans "Мітка:" %} '+sku+'</div>'
       +'<div style="display:flex;gap:10px;flex-wrap:wrap">'
       +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoPrint(\''+url+'\',\''+sku+'\','+qty+')" '
-        +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">🖨️ Через DYMO</button>'
+        +'style="background:#1565c0;color:#fff;border:none;border-radius:6px;padding:8px 18px;font-size:13px;font-weight:600;cursor:pointer">🖨️ {% trans "Через DYMO" %}</button>'
       +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove();svDymoDownload(\''+url+'\',\''+sku+'\')" '
-        +'style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted,#9aafbe)">⬇️ Завантажити</button>'
+        +'style="background:var(--bg-card-2,#1e2d40);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted,#9aafbe)">⬇️ {% trans "Завантажити" %}</button>'
       +'<button type="button" onclick="document.getElementById(\'sv-dymo-modal\').remove()" '
         +'style="background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);border-radius:6px;padding:8px 10px;font-size:13px;cursor:pointer;color:var(--text-muted,#9aafbe)">✕</button>'
       +'</div></div>');
@@ -762,7 +763,7 @@ function _svCexOpen(pk) {
     })
     .then(function(r) { return r.text(); })
     .then(function(html) { panel.innerHTML = html; })
-    .catch(function() { panel.innerHTML = '<span style="color:#ef5350">❌ Помилка завантаження</span>'; });
+    .catch(function() { panel.innerHTML = '<span style="color:#ef5350">❌ {% trans "Помилка завантаження" %}</span>'; });
   }
 }
 function _svCexClose(pk) {
@@ -790,17 +791,17 @@ function _cexUpload(input, pk, listUrl, resultEl) {
   Array.from(files).forEach(function(f) { fd.append('files', f); });
   var csrf = document.cookie.match(/csrftoken=([^;]+)/);
   if (csrf) fd.append('csrfmiddlewaretoken', csrf[1]);
-  resultEl.textContent = '⏳ Завантаження…';
+  resultEl.textContent = '⏳ {% trans "Завантаження…" %}';
   fetch('/admin/sales/salesorder/' + pk + '/upload-docs/',
     {method: 'POST', body: fd, headers: {'X-Requested-With': 'XMLHttpRequest'}})
   .then(function(r) { return r.json(); })
   .then(function(d) {
-    resultEl.textContent = d.saved ? ('✅ ' + d.saved.join(', ')) : (d.error || 'Помилка');
+    resultEl.textContent = d.saved ? ('✅ ' + d.saved.join(', ')) : (d.error || '{% trans "Помилка" %}');
     var panel = document.getElementById('cex-docs-' + pk);
     if (panel) fetch(listUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
       .then(function(r) { return r.text(); }).then(function(h) { panel.innerHTML = h; });
   })
-  .catch(function() { resultEl.textContent = '❌ Помилка мережі'; });
+  .catch(function() { resultEl.textContent = '❌ {% trans "Помилка мережі" %}'; });
   input.value = '';
 }
 function _cexDocSave(btn) {
@@ -859,8 +860,8 @@ function _cexToggleOvr(id) {
   var today = new Date();
   var lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
   var lmY = lm.getFullYear(), lmM = lm.getMonth() + 1;
-  var MONTHS_UK = ['Січень','Лютий','Березень','Квітень','Травень','Червень',
-                   'Липень','Серпень','Вересень','Жовтень','Листопад','Грудень'];
+  var MONTHS_UK = ['{% trans "Січень" %}','{% trans "Лютий" %}','{% trans "Березень" %}','{% trans "Квітень" %}','{% trans "Травень" %}','{% trans "Червень" %}',
+                   '{% trans "Липень" %}','{% trans "Серпень" %}','{% trans "Вересень" %}','{% trans "Жовтень" %}','{% trans "Листопад" %}','{% trans "Грудень" %}'];
   var isActive = activeYear === String(lmY) && activeMonth === String(lmM);
 
   var lmP = new URLSearchParams(p);
@@ -882,7 +883,7 @@ function svCardCheckChange() {
   var bar = document.getElementById('sv-select-bar');
   var cnt = document.getElementById('sv-selected-count');
   if (bar) bar.style.display = selected ? 'flex' : 'none';
-  if (cnt) cnt.textContent = selected ? ('Вибрано: ' + selected) : '';
+  if (cnt) cnt.textContent = selected ? ('{% trans "Вибрано:" %} ' + selected) : '';
   var allChecked = selected === checks.length && checks.length > 0;
   var allCheck = document.getElementById('sv-check-all');
   if (allCheck) allCheck.checked = allChecked;
@@ -985,7 +986,7 @@ function svSetView(mode) {
           a.type = 'button';
           a.title = '🖨️ ' + sku + ' × ' + qty;
           a.className = 'sv-lbl-btn sv-lbl-on';
-          a.textContent = '🖨️ Друкувати';
+          a.textContent = '🖨️ {% trans "Друкувати" %}';
           (function(u,s,q){a.onclick=function(){svDymoOpen(u,s,q);};}(_lurl,sku,qty));
           btn.parentNode.replaceChild(a, btn);
         } else {
@@ -998,9 +999,9 @@ function svSetView(mode) {
 
             var addBtn = document.createElement('button');
             addBtn.type = 'button';
-            addBtn.title = 'Додати етикетку для ' + sku;
+            addBtn.title = '{% trans "Додати етикетку для" %} ' + sku;
             addBtn.className = 'sv-lbl-btn sv-lbl-add';
-            addBtn.textContent = '➕ Додати';
+            addBtn.textContent = '➕ {% trans "Додати" %}';
             origBtn.parentNode.replaceChild(addBtn, origBtn);
 
             addBtn.addEventListener('click', function() { fileInput.click(); });
@@ -1026,17 +1027,17 @@ function svSetView(mode) {
                   a.type = 'button';
                   a.title = '🖨️ ' + sku + ' × ' + qty;
                   a.className = 'sv-lbl-btn sv-lbl-on';
-                  a.textContent = '🖨️ Друкувати';
+                  a.textContent = '🖨️ {% trans "Друкувати" %}';
                   (function(u,s,q){a.onclick=function(){svDymoOpen(u,s,q);};}(_lurl2,sku,qty));
                   addBtn.parentNode.replaceChild(a, addBtn);
                   document.body.removeChild(fileInput);
                 } else {
-                  addBtn.textContent = '❌ Помилка';
+                  addBtn.textContent = '❌ {% trans "Помилка" %}';
                   addBtn.disabled = false;
                 }
               })
               .catch(function() {
-                addBtn.textContent = '❌ Помилка';
+                addBtn.textContent = '❌ {% trans "Помилка" %}';
                 addBtn.disabled = false;
               });
             });
@@ -1057,7 +1058,7 @@ function svFlagOrder(pk) {
     document.querySelectorAll('.sv-flag-btn[data-pk="' + pk + '"]').forEach(function(btn) {
       btn.classList.toggle('sv-flagged', d.flagged);
       btn.style.color = d.flagged ? '#FFB300' : 'var(--text-dim)';
-      btn.title = d.flagged ? 'Зняти позначку' : 'Позначити як важливе';
+      btn.title = d.flagged ? '{% trans "Зняти позначку" %}' : '{% trans "Позначити як важливе" %}';
       btn.textContent = d.flagged ? '⭐' : '☆';
     });
     var card = document.querySelector('.sv-card[data-pk="' + pk + '"]');
@@ -1084,7 +1085,7 @@ function svNoteSave(pk) {
     var btn = document.getElementById('sv-note-btn-' + pk);
     if (btn) {
       btn.classList.toggle('sv-note-has', !!note);
-      btn.title = note || 'Додати нотатку';
+      btn.title = note || '{% trans "Додати нотатку" %}';
       btn.innerHTML = note
         ? '📝 <span style="max-width:120px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle">' + note.substring(0, 22) + (note.length > 22 ? '…' : '') + '</span>'
         : '📝';
@@ -1106,7 +1107,7 @@ function svLabelAction(mode, url) {
       var a = document.createElement('a'); a.href = url; a.download = 'label.pdf'; a.click();
     });
   } else if (mode === 'ask') {
-    if (confirm('Як відкрити мітку?\n\nОК → відкрити у браузері\nСкасувати → завантажити')) {
+    if (confirm('{% trans "Як відкрити мітку?" %}\n\n{% trans "ОК → відкрити у браузері" %}\n{% trans "Скасувати → завантажити" %}')) {
       var w = window.open(url, '_blank');
       if (!w) { svLabelAction('download', url); }
     } else {
@@ -1129,7 +1130,7 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
     var src = el.dataset.img;
     tip.innerHTML = src
       ? '<img src="' + src + '" alt="">'
-      : '<div class="sv-img-nophoto">Немає фото</div>';
+      : '<div class="sv-img-nophoto">{% trans "Немає фото" %}</div>';
     tip.style.display = 'block';
     move(e);
   }
@@ -1239,7 +1240,7 @@ if (!window._cexDelDocDef) {
   };
   window.deleteOrderDoc = function(btn) {
     var fn = btn.dataset.filename;
-    if (!confirm('Видалити файл "' + fn + '" з сервера?')) return;
+    if (!confirm('{% trans "Видалити файл" %} "' + fn + '" {% trans "з сервера?" %}')) return;
     btn.disabled = true; btn.textContent = '…';
     var csrf = document.cookie.match(/csrftoken=([^;]+)/);
     if (!csrf) return;
@@ -1252,10 +1253,10 @@ if (!window._cexDelDocDef) {
       .then(function(r) { return r.json(); })
       .then(function(d) {
         if (d.ok) { window._refreshCexDocs(pk); }
-        else { alert('Помилка: ' + (d.error || '?'));
+        else { alert('{% trans "Помилка:" %} ' + (d.error || '?'));
                btn.disabled = false; btn.textContent = '🗑️'; }
       })
-      .catch(function() { alert('Помилка мережі');
+      .catch(function() { alert('{% trans "Помилка мережі" %}');
                           btn.disabled = false; btn.textContent = '🗑️'; });
   };
 }

@@ -294,3 +294,2355 @@ msgstr "Some sites block embedding"
 
 msgid "Відкрити в новій вкладці"
 msgstr "Open in new tab"
+
+msgid "(без теми)"
+msgstr "(no subject)"
+
+
+msgid "AI аналізує виконані кроки стратегії та дає рекомендацію щодо корегування"
+msgstr "AI analyzes completed strategy steps and provides adjustment recommendations"
+
+
+msgid "AI генерація"
+msgstr "AI generation"
+
+
+msgid "AI генерація листа"
+msgstr "AI email generation"
+
+
+msgid "API запит — він з'явиться тут автоматично."
+msgstr "API request — it will appear here automatically."
+
+
+msgid "Email Асистент"
+msgstr "Email Assistant"
+
+
+msgid "Email акаунт не налаштований"
+msgstr "Email account not configured"
+
+
+msgid "Excel → Продажі (wizard)"
+msgstr "Excel → Sales (wizard)"
+
+
+msgid "Excel → Склад (wizard)"
+msgstr "Excel → Inventory (wizard)"
+
+
+msgid "Reorder-аналіз"
+msgstr "Reorder analysis"
+
+
+msgid "URL етикетки (PDF)"
+msgstr "Label URL (PDF)"
+
+
+msgid "VIP клієнти"
+msgstr "VIP customers"
+
+
+msgid "VIP клієнтів"
+msgstr "VIP customers"
+
+
+msgid "Ім'я отримувача"
+msgstr "Recipient name"
+
+
+msgid "Імпорт з Excel"
+msgstr "Import from Excel"
+
+
+msgid "Імпорт замовлень"
+msgstr "Order import"
+
+
+msgid "Імпорт замовлень з Excel"
+msgstr "Import orders from Excel"
+
+
+msgid "Імпорт товарів"
+msgstr "Product import"
+
+
+msgid "Імпорт товарів з Excel"
+msgstr "Import products from Excel"
+
+
+msgid "Імпортувати"
+msgstr "Import"
+
+
+msgid "Імпортувати ще раз"
+msgstr "Import again"
+
+
+msgid "Імпортувати →"
+msgstr "Import →"
+
+
+msgid "Інвентаризація:"
+msgstr "Inventory count:"
+
+
+msgid "Авто-маппінг"
+msgstr "Auto-mapping"
+
+
+msgid "Адаптивна стратегія"
+msgstr "Adaptive strategy"
+
+
+msgid "Адмін"
+msgstr "Admin"
+
+
+msgid "Активна"
+msgstr "Active"
+
+
+msgid "Активний"
+msgstr "Active"
+
+
+msgid "Активних PO"
+msgstr "Active POs"
+
+
+msgid "Активних товарів"
+msgstr "Active products"
+
+
+msgid "Активні"
+msgstr "Active"
+
+
+msgid "Аналіз клієнта"
+msgstr "Customer analysis"
+
+
+msgid "Аналізувати"
+msgstr "Analyse"
+
+
+msgid "Аналізувати файл"
+msgstr "Analyse file"
+
+
+msgid "Аналізувати файл →"
+msgstr "Analyse file →"
+
+
+msgid "Аркуш (sheet)"
+msgstr "Sheet"
+
+
+msgid "Без замовлення"
+msgstr "Without order"
+
+
+msgid "В архів"
+msgstr "Archive"
+
+
+msgid "В дорозі"
+msgstr "In transit"
+
+
+msgid "Валюта замовлення і вартість доставки — не змінюються."
+msgstr "Order currency and shipping cost — not changed."
+
+
+msgid "Вартість доставки"
+msgstr "Shipping cost"
+
+
+msgid "Вартість та етикетка"
+msgstr "Cost & label"
+
+
+msgid "Введи або вибери код валюти. Зміна торкнеться замовлення і всіх рядків."
+msgstr "Enter or select currency code. Change will affect order and all lines."
+
+
+msgid "Введіть назву"
+msgstr "Enter name"
+
+
+msgid "Введіть нову назву"
+msgstr "Enter new name"
+
+
+msgid "Виберіть дію"
+msgstr "Select action"
+
+
+msgid "Виберіть лист для перегляду"
+msgstr "Select sheet to view"
+
+
+msgid "Виберіть яке поле БД відповідає кожній колонці Excel. Колонки без призначення ігноруються."
+msgstr "Select which DB field corresponds to each Excel column. Unassigned columns are ignored."
+
+
+msgid "Вибрати"
+msgstr "Select"
+
+
+msgid "Вибрати всі"
+msgstr "Select all"
+
+
+msgid "Вигляд"
+msgstr "View"
+
+
+msgid "Видалити папку «"
+msgstr "Delete folder «"
+
+
+msgid "Виконавець"
+msgstr "Assignee"
+
+
+msgid "Виручка"
+msgstr "Revenue"
+
+
+msgid "Вперед"
+msgstr "Next"
+
+
+msgid "Всього клієнтів"
+msgstr "Total customers"
+
+
+msgid "Всього операцій:"
+msgstr "Total transactions:"
+
+
+msgid "Всі відправлення"
+msgstr "All shipments"
+
+
+msgid "Всі замовлення"
+msgstr "All orders"
+
+
+msgid "Всі клієнти"
+msgstr "All customers"
+
+
+msgid "Всі товари"
+msgstr "All products"
+
+
+msgid "Всі транзакції"
+msgstr "All transactions"
+
+
+msgid "Всі — не імпортувати"
+msgstr "All — do not import"
+
+
+msgid "Втрачений"
+msgstr "Lost"
+
+
+msgid "Вхідні"
+msgstr "Inbox"
+
+
+msgid "Від A-Z"
+msgstr "A–Z"
+
+
+msgid "Відвантажені товари"
+msgstr "Shipped goods"
+
+
+msgid "Відкрити"
+msgstr "Open"
+
+
+msgid "Відкрити окремо"
+msgstr "Open separately"
+
+
+msgid "Відновити"
+msgstr "Restore"
+
+
+msgid "Відповідь — статус"
+msgstr "Response — status"
+
+
+msgid "Відправити о цей час"
+msgstr "Send at this time"
+
+
+msgid "Відправити пізніше"
+msgstr "Send later"
+
+
+msgid "Відправлення"
+msgstr "Shipments"
+
+
+msgid "Відправлення · Перевізники · Трекінг · Jumingo · DHL Express"
+msgstr "Shipments · Carriers · Tracking · Jumingo · DHL Express"
+
+
+msgid "Відправлено цього місяця"
+msgstr "Shipped this month"
+
+
+msgid "Відправлені"
+msgstr "Shipped"
+
+
+msgid "Відслідковування замовлень"
+msgstr "Order tracking"
+
+
+msgid "Відхилити"
+msgstr "Reject"
+
+
+msgid "Готово"
+msgstr "Done"
+
+
+msgid "Готуються до відправки"
+msgstr "Preparing for shipment"
+
+
+msgid "Граматика"
+msgstr "Grammar"
+
+
+msgid "Групувати по гілці листування"
+msgstr "Group by conversation thread"
+
+
+msgid "Далі"
+msgstr "Next"
+
+
+msgid "Дата"
+msgstr "Date"
+
+
+msgid "Дата ↑"
+msgstr "Date ↑"
+
+
+msgid "Дата ↓"
+msgstr "Date ↓"
+
+
+msgid "Джерела продажів"
+msgstr "Sales sources"
+
+
+msgid "Джерело за замовчуванням"
+msgstr "Default source"
+
+
+msgid "Дзвінок"
+msgstr "Call"
+
+
+msgid "Дистриб'ютор"
+msgstr "Distributor"
+
+
+msgid "До списку замовлень"
+msgstr "Back to orders"
+
+
+msgid "До списку товарів"
+msgstr "Back to products"
+
+
+msgid "Довідник категорій"
+msgstr "Category directory"
+
+
+msgid "Довідник постачальників"
+msgstr "Supplier directory"
+
+
+msgid "Довідники"
+msgstr "Directories"
+
+
+msgid "Додайте IMAP/SMTP акаунт щоб почати користуватись Email Асистентом."
+msgstr "Add an IMAP/SMTP account to start using the Email Assistant."
+
+
+msgid "Додати Customer"
+msgstr "Add Customer"
+
+
+msgid "Додати Product"
+msgstr "Add Product"
+
+
+msgid "Додати Supplier"
+msgstr "Add Supplier"
+
+
+msgid "Додати акаунт"
+msgstr "Add account"
+
+
+msgid "Додати вкладення"
+msgstr "Add attachment"
+
+
+msgid "Додати трекінг"
+msgstr "Add tracking"
+
+
+msgid "Додати трекінг вручну"
+msgstr "Add tracking manually"
+
+
+msgid "Документ"
+msgstr "Document"
+
+
+msgid "Документація модуля CRM"
+msgstr "CRM module documentation"
+
+
+msgid "Документація модуля Доставка"
+msgstr "Shipping module documentation"
+
+
+msgid "Документація модуля Продажі"
+msgstr "Sales module documentation"
+
+
+msgid "Документація модуля Склад"
+msgstr "Inventory module documentation"
+
+
+msgid "Домівка"
+msgstr "Home"
+
+
+msgid "Доставка"
+msgstr "Shipping"
+
+
+msgid "Доставлено цього місяця"
+msgstr "Delivered this month"
+
+
+msgid "Дій ще не виконано."
+msgstr "No actions performed yet."
+
+
+msgid "Жирний"
+msgstr "Bold"
+
+
+msgid "З архіву"
+msgstr "From archive"
+
+
+msgid "Заблоковані"
+msgstr "Blocked"
+
+
+msgid "Завантажити .xlsx для імпорту"
+msgstr "Download .xlsx for import"
+
+
+msgid "Завантажити нові листи"
+msgstr "Download new emails"
+
+
+msgid "Завантажую..."
+msgstr "Loading..."
+
+
+msgid "Закреслений"
+msgstr "Strikethrough"
+
+
+msgid "Закінчився"
+msgstr "Expired"
+
+
+msgid "Замовлення (необов'язково)"
+msgstr "Order (optional)"
+
+
+msgid "Замовлення · Статуси · Трекінг · DYMO-етикетки · Імпорт Excel"
+msgstr "Orders · Statuses · Tracking · DYMO labels · Excel import"
+
+
+msgid "Замовлення закупівлі"
+msgstr "Purchase orders"
+
+
+msgid "Замовники · PO · Очікувані дати"
+msgstr "Customers · PO · Expected dates"
+
+
+msgid "Замінити текст"
+msgstr "Replace text"
+
+
+msgid "Запит — заголовки"
+msgstr "Request — headers"
+
+
+msgid "Запит — тіло"
+msgstr "Request — body"
+
+
+msgid "Запустити реальний імпорт"
+msgstr "Run real import"
+
+
+msgid "Застосувати"
+msgstr "Apply"
+
+
+msgid "Зберегти залишок"
+msgstr "Save stock"
+
+
+msgid "Зберегти лог"
+msgstr "Save log"
+
+
+msgid "Зберігати останніх"
+msgstr "Keep last"
+
+
+msgid "Згорнути"
+msgstr "Collapse"
+
+
+msgid "Згорнути/розгорнути"
+msgstr "Collapse/expand"
+
+
+msgid "Згорнути/розгорнути список"
+msgstr "Collapse/expand list"
+
+
+msgid "Змінити валюту"
+msgstr "Change currency"
+
+
+msgid "Змінити валюту замовлення"
+msgstr "Change order currency"
+
+
+msgid "Змінити джерело"
+msgstr "Change source"
+
+
+msgid "Змінити джерело замовлення"
+msgstr "Change order source"
+
+
+msgid "Знайти дублікати"
+msgstr "Find duplicates"
+
+
+msgid "Зняти обраність"
+msgstr "Deselect"
+
+
+msgid "Зустріч"
+msgstr "Meeting"
+
+
+msgid "К-сть"
+msgstr "Qty"
+
+
+msgid "Картки"
+msgstr "Cards"
+
+
+msgid "Категорії"
+msgstr "Categories"
+
+
+msgid "Категорії товарів"
+msgstr "Product categories"
+
+
+msgid "Клієнт / Постачальник"
+msgstr "Customer / Supplier"
+
+
+msgid "Клієнти"
+msgstr "Customers"
+
+
+msgid "Клієнти · RFM-аналіз · Сегменти · Нотатки"
+msgstr "Customers · RFM analysis · Segments · Notes"
+
+
+msgid "Клієнтів не знайдено."
+msgstr "No customers found."
+
+
+msgid "Колонка Excel"
+msgstr "Excel column"
+
+
+msgid "Колонка в Excel"
+msgstr "Column in Excel"
+
+
+msgid "Колір тексту"
+msgstr "Text color"
+
+
+msgid "Коментарі до клієнтів"
+msgstr "Customer comments"
+
+
+msgid "Кому"
+msgstr "To"
+
+
+msgid "Конфлікт (SKU вже є):"
+msgstr "Conflict (SKU already exists):"
+
+
+msgid "Копіювати лог"
+msgstr "Copy log"
+
+
+msgid "Копія..."
+msgstr "Copy..."
+
+
+msgid "Країн"
+msgstr "Countries"
+
+
+msgid "Курсив"
+msgstr "Italic"
+
+
+msgid "Лист (аркуш) Excel:"
+msgstr "Excel sheet:"
+
+
+msgid "Листи зі скриньки"
+msgstr "Emails from inbox"
+
+
+msgid "Листування"
+msgstr "Correspondence"
+
+
+msgid "Листів немає"
+msgstr "No emails"
+
+
+msgid "Лог"
+msgstr "Log"
+
+
+msgid "Лог порожній. Зробіть будь-який"
+msgstr "Log is empty. Make any"
+
+
+msgid "Локація"
+msgstr "Location"
+
+
+msgid "Ліміт часу вичерпано — пропущено"
+msgstr "Time limit exceeded — skipped"
+
+
+msgid "Маппінг"
+msgstr "Mapping"
+
+
+msgid "Маппінг колонок Excel → поля БД"
+msgstr "Excel column → DB field mapping"
+
+
+msgid "Маппінг колонок → поля бази даних:"
+msgstr "Column → DB field mapping:"
+
+
+msgid "Матеріали · розміри · вага"
+msgstr "Materials · dimensions · weight"
+
+
+msgid "Метадані"
+msgstr "Metadata"
+
+
+msgid "Мітка готова"
+msgstr "Label ready"
+
+
+msgid "Нагадування"
+msgstr "Reminder"
+
+
+msgid "Назад"
+msgstr "Back"
+
+
+msgid "Назва нової папки"
+msgstr "New folder name"
+
+
+msgid "Назва папки"
+msgstr "Folder name"
+
+
+msgid "Налаштувати плитки"
+msgstr "Configure tiles"
+
+
+msgid "Написати"
+msgstr "Write"
+
+
+msgid "Написати лист"
+msgstr "Write email"
+
+
+msgid "Нарощування"
+msgstr "Nurturing"
+
+
+msgid "Не вибрано"
+msgstr "Not selected"
+
+
+msgid "Неактивний"
+msgstr "Inactive"
+
+
+msgid "Неактивні"
+msgstr "Inactive"
+
+
+msgid "Недавні дії"
+msgstr "Recent actions"
+
+
+msgid "Непідтверджені"
+msgstr "Unconfirmed"
+
+
+msgid "Нижче reorder point"
+msgstr "Below reorder point"
+
+
+msgid "Нова валюта (ISO 4217)"
+msgstr "New currency (ISO 4217)"
+
+
+msgid "Нова назва"
+msgstr "New name"
+
+
+msgid "Нова папка"
+msgstr "New folder"
+
+
+msgid "Нове"
+msgstr "New"
+
+
+msgid "Нове PO"
+msgstr "New PO"
+
+
+msgid "Нове джерело"
+msgstr "New source"
+
+
+msgid "Нове замовлення постачальнику"
+msgstr "New supplier order"
+
+
+msgid "Новий клієнт"
+msgstr "New customer"
+
+
+msgid "Новий постачальник"
+msgstr "New supplier"
+
+
+msgid "Новий товар"
+msgstr "New product"
+
+
+msgid "Нових за місяць"
+msgstr "New this month"
+
+
+msgid "Нових замовлень"
+msgstr "New orders"
+
+
+msgid "Нові"
+msgstr "New"
+
+
+msgid "Номер трекінгу"
+msgstr "Tracking number"
+
+
+msgid "Нормальний"
+msgstr "Normal"
+
+
+msgid "Нормально"
+msgstr "Normal"
+
+
+msgid "Нотатка"
+msgstr "Note"
+
+
+msgid "Оберіть файл Excel"
+msgstr "Select Excel file"
+
+
+msgid "Обрані"
+msgstr "Selected"
+
+
+msgid "Огляд складу"
+msgstr "Inventory overview"
+
+
+msgid "Онбординг"
+msgstr "Onboarding"
+
+
+msgid "Оновити + перезаписати рядки"
+msgstr "Update + overwrite rows"
+
+
+msgid "Оновити існуючі"
+msgstr "Update existing"
+
+
+msgid "Оновлено"
+msgstr "Updated"
+
+
+msgid "Опис"
+msgstr "Description"
+
+
+msgid "Опис помилки"
+msgstr "Error description"
+
+
+msgid "Остання покупка"
+msgstr "Last purchase"
+
+
+msgid "Отримані товари"
+msgstr "Received goods"
+
+
+msgid "Отримувач"
+msgstr "Recipient"
+
+
+msgid "Очистити"
+msgstr "Clear"
+
+
+msgid "Очистити весь лог?"
+msgstr "Clear entire log?"
+
+
+msgid "Очистити лог"
+msgstr "Clear log"
+
+
+msgid "Очікують відправки"
+msgstr "Awaiting shipment"
+
+
+msgid "Очікують обробки"
+msgstr "Awaiting processing"
+
+
+msgid "Папки сервера"
+msgstr "Server folders"
+
+
+msgid "Перевізники"
+msgstr "Carriers"
+
+
+msgid "Перевірити граматику"
+msgstr "Check grammar"
+
+
+msgid "Перевірка граматики — виправлена версія"
+msgstr "Grammar check — corrected version"
+
+
+msgid "Перейменувати"
+msgstr "Rename"
+
+
+msgid "Перейменувати папку"
+msgstr "Rename folder"
+
+
+msgid "Повернутись до товару"
+msgstr "Back to product"
+
+
+msgid "Позначити важливим"
+msgstr "Mark as important"
+
+
+msgid "Позначити як обраний"
+msgstr "Mark as favourite"
+
+
+msgid "Поле БД"
+msgstr "DB field"
+
+
+msgid "Поле бази даних"
+msgstr "Database field"
+
+
+msgid "Поля ЗАМОВЛЕННЯ"
+msgstr "ORDER fields"
+
+
+msgid "Поля РЯДКУ ТОВАРУ"
+msgstr "ORDER LINE fields"
+
+
+msgid "Помилки"
+msgstr "Errors"
+
+
+msgid "Помилки імпорту"
+msgstr "Import errors"
+
+
+msgid "Помилок"
+msgstr "Errors"
+
+
+msgid "Посилання на PDF-файл етикетки, якщо є."
+msgstr "Link to label PDF file, if available."
+
+
+msgid "Постачальники"
+msgstr "Suppliers"
+
+
+msgid "Постачальники та закупівлі"
+msgstr "Suppliers & procurement"
+
+
+msgid "Поточний залишок (за даними системи)"
+msgstr "Current stock (system data)"
+
+
+msgid "Поточний залишок:"
+msgstr "Current stock:"
+
+
+msgid "Потребують уваги"
+msgstr "Need attention"
+
+
+msgid "Пошук за номером або клієнтом…"
+msgstr "Search by number or customer…"
+
+
+msgid "Пошук за номером відправлення"
+msgstr "Search by shipment number"
+
+
+msgid "Пошук..."
+msgstr "Search..."
+
+
+msgid "Призупинена"
+msgstr "Paused"
+
+
+msgid "Приклад значення"
+msgstr "Example value"
+
+
+msgid "Прихід · витрата · коригування"
+msgstr "Receipt · outgoing · adjustment"
+
+
+msgid "Продажі"
+msgstr "Sales"
+
+
+msgid "Пропустити існуючі"
+msgstr "Skip existing"
+
+
+msgid "Пропущено"
+msgstr "Skipped"
+
+
+msgid "Прострочені дедлайни"
+msgstr "Overdue deadlines"
+
+
+msgid "Пріоритетні клієнти"
+msgstr "Priority customers"
+
+
+msgid "Підкреслений"
+msgstr "Underline"
+
+
+msgid "Підтверджені"
+msgstr "Confirmed"
+
+
+msgid "Пізніше"
+msgstr "Later"
+
+
+msgid "Рахунок"
+msgstr "Invoice"
+
+
+msgid "Реактивація"
+msgstr "Reactivation"
+
+
+msgid "Ревізія · інвентаризація"
+msgstr "Audit · inventory count"
+
+
+msgid "Резервації та прихід"
+msgstr "Reservations & arrivals"
+
+
+msgid "Результат"
+msgstr "Result"
+
+
+msgid "Рекомендовані"
+msgstr "Recommended"
+
+
+msgid "Реселер"
+msgstr "Reseller"
+
+
+msgid "Референс"
+msgstr "Reference"
+
+
+msgid "Ризик"
+msgstr "Risk"
+
+
+msgid "Розмір"
+msgstr "Size"
+
+
+msgid "Рух товару"
+msgstr "Stock movement"
+
+
+msgid "Рядків товарів"
+msgstr "Order lines"
+
+
+msgid "Рядок товару"
+msgstr "Order line"
+
+
+msgid "Свіжий"
+msgstr "Fresh"
+
+
+msgid "Сегмент"
+msgstr "Segment"
+
+
+msgid "Сер. чек"
+msgstr "Avg. order"
+
+
+msgid "Синхронізація CRM"
+msgstr "CRM sync"
+
+
+msgid "Синхронізувати"
+msgstr "Synchronise"
+
+
+msgid "Скасовані"
+msgstr "Cancelled"
+
+
+msgid "Склад"
+msgstr "Inventory"
+
+
+msgid "Скопійовано"
+msgstr "Copied"
+
+
+msgid "Список · пошук · фільтри"
+msgstr "List · search · filters"
+
+
+msgid "Список · статуси · пошук"
+msgstr "List · statuses · search"
+
+
+msgid "Список · фільтри · пошук"
+msgstr "List · filters · search"
+
+
+msgid "Статус · DHL · Від постачальника"
+msgstr "Status · DHL · From supplier"
+
+
+msgid "Статус всіх відправлень"
+msgstr "All shipment statuses"
+
+
+msgid "Статус: активний"
+msgstr "Status: active"
+
+
+msgid "Створено"
+msgstr "Created"
+
+
+msgid "Створено замовлень"
+msgstr "Orders created"
+
+
+msgid "Створити SalesOrder"
+msgstr "Create SalesOrder"
+
+
+msgid "Стратегія AI"
+msgstr "AI Strategy"
+
+
+msgid "Структура файлу"
+msgstr "File structure"
+
+
+msgid "ТЕСТОВИЙ РЕЖИМ — дані НЕ збережено в базу"
+msgstr "TEST MODE — data NOT saved to database"
+
+
+msgid "Таблиця"
+msgstr "Table"
+
+
+msgid "Тема A-Z"
+msgstr "Subject A-Z"
+
+
+msgid "Тема листа"
+msgstr "Email subject"
+
+
+msgid "Тестовий запуск (без збереження)"
+msgstr "Test run (no save)"
+
+
+msgid "Тип"
+msgstr "Type"
+
+
+msgid "Типи замовлень"
+msgstr "Order types"
+
+
+msgid "Товари"
+msgstr "Products"
+
+
+msgid "Товари · Залишки · Транзакції · Reorder · Постачальники · Імпорт Excel"
+msgstr "Products · Stock · Transactions · Reorder · Suppliers · Excel import"
+
+
+msgid "Топ товари"
+msgstr "Top products"
+
+
+msgid "Транзакцій для цього товару ще немає"
+msgstr "No transactions for this product yet"
+
+
+msgid "Транзакцій сьогодні"
+msgstr "Transactions today"
+
+
+msgid "Трекінг"
+msgstr "Tracking"
+
+
+msgid "Трекінг приходу"
+msgstr "Arrival tracking"
+
+
+msgid "Тривалість"
+msgstr "Duration"
+
+
+msgid "Упаковка"
+msgstr "Packaging"
+
+
+msgid "Усі замовлення"
+msgstr "All orders"
+
+
+msgid "Утримання"
+msgstr "Retention"
+
+
+msgid "Фактично на складі після підрахунку:"
+msgstr "Physically in stock after count:"
+
+
+msgid "Фільтр по відправнику, темі…"
+msgstr "Filter by sender, subject…"
+
+
+msgid "Хронологія клієнта"
+msgstr "Customer timeline"
+
+
+msgid "Цього місяця"
+msgstr "This month"
+
+
+msgid "Час"
+msgstr "Time"
+
+
+msgid "Чернетки"
+msgstr "Drafts"
+
+
+msgid "Шаблон Excel"
+msgstr "Excel template"
+
+
+msgid "Шрифт"
+msgstr "Font"
+
+
+msgid "Що можна імпортувати"
+msgstr "What can be imported"
+
+
+msgid "Якщо замовлення вже є"
+msgstr "If order already exists"
+
+
+msgid "або"
+msgstr "or"
+
+
+msgid "активних:"
+msgstr "active:"
+
+
+msgid "більше"
+msgstr "more"
+
+
+msgid "всього:"
+msgstr "total:"
+
+
+msgid "дн. тому"
+msgstr "days ago"
+
+
+msgid "з"
+msgstr "of"
+
+
+msgid "завантажую з сервера…"
+msgstr "loading from server…"
+
+
+msgid "записів"
+msgstr "records"
+
+
+msgid "зараз"
+msgstr "now"
+
+
+msgid "знайдено"
+msgstr "found"
+
+
+msgid "кроків…"
+msgstr "steps…"
+
+
+msgid "листів"
+msgstr "emails"
+
+
+msgid "непрочитаних листів"
+msgstr "unread emails"
+
+
+msgid "нових"
+msgstr "new"
+
+
+msgid "оновлення через"
+msgstr "update in"
+
+
+msgid "перевірено"
+msgstr "checked"
+
+
+msgid "посилок"
+msgstr "parcels"
+
+
+msgid "поточна"
+msgstr "current"
+
+
+msgid "пуста"
+msgstr "empty"
+
+
+msgid "тільки"
+msgstr "only"
+
+
+msgid "шт"
+msgstr "pcs"
+
+
+msgid "ще"
+msgstr "more"
+
+
+msgid "✓ Перейменувати"
+msgstr "✓ Rename"
+
+
+msgid "✓ Створити"
+msgstr "✓ Create"
+
+
+msgid "📧 Minerva — новий лист"
+msgstr "📧 Minerva — new email"
+
+
+msgid "Синхронізувати всіх клієнтів з замовлень? Це може зайняти кілька секунд."
+msgstr "Synchronise all customers from orders? This may take a few seconds."
+
+
+msgid "Скинути пам'ять AI для цього клієнта — нова розмова почнеться з чистого аркуша"
+msgstr "Reset AI memory for this customer — a new conversation will start from scratch"
+
+
+msgid "Введи реальну кількість яку нарахували. Система сама розрахує різницю і запише коригування. Наприклад: якщо в системі 26, а фізично 24 — вводь"
+msgstr "Enter the actual counted quantity. The system will calculate the difference and record an adjustment. For example: if the system shows 26 but physically 24 — enter"
+
+
+msgid "Підтвердити замовлення на DigiKey?\n\nЦя дія надішле підтвердження через DigiKey Marketplace API."
+msgstr "Confirm order on DigiKey?\n\nThis action will send confirmation via DigiKey Marketplace API."
+
+
+msgid "Рядки з однаковим <b>Номером замовлення</b> групуються в одне замовлення. Кожен рядок може мати товар (SKU + Кількість)."
+msgstr "Rows with the same <b>Order number</b> are grouped into one order. Each row can have a product (SKU + Qty)."
+
+
+msgid "Файл Excel повинен містити рядок заголовків (перший непустий рядок). Після завантаження ви зможете вказати яка колонка відповідає якому полю бази даних."
+msgstr "The Excel file must contain a header row (first non-empty row). After uploading you can specify which column corresponds to which database field."
+
+
+msgid "На що акцентувати аналіз: конкретне питання, сфера інтересів, проблема... (необов'язково)"
+msgstr "What to focus the analysis on: specific question, area of interest, problem... (optional)"
+
+
+msgid "На що акцентувати стратегію: галузь, проблема клієнта, особливий підхід... (необов'язково)"
+msgstr "What to focus the strategy on: industry, customer problem, special approach... (optional)"
+
+
+msgid "Опишіть лист: кому, з якого приводу, яким тоном, що треба вказати..."
+msgstr "Describe the email: to whom, about what, in what tone, what to mention..."
+
+
+msgid "Тільки замовлення що вже є в системі (останні 300). Можна залишити порожнім."
+msgstr "Only orders already in the system (last 300). Can be left empty."
+
+
+msgid "записів (1–500) — спільне для DHL / FedEx / Jumingo / DigiKey"
+msgstr "records (1–500) — shared for DHL / FedEx / Jumingo / DigiKey"
+
+
+msgid "Довідник"
+msgstr "Directory"
+
+
+msgid "Налаштування"
+msgstr "Settings"
+
+
+msgid "Нотатки"
+msgstr "Notes"
+
+
+msgid "Обрано"
+msgstr "Selected"
+
+
+msgid "Пов'язати з замовленням"
+msgstr "Link to order"
+
+msgid "Відповісти"
+msgstr "Reply"
+
+
+msgid "Переслати"
+msgstr "Forward"
+
+
+msgid "Відкрити на повній сторінці"
+msgstr "Open full page"
+
+
+msgid "Окремо"
+msgstr "Separately"
+
+
+msgid "AI відповідь"
+msgstr "AI reply"
+
+
+msgid "Перекласти UA"
+msgstr "Translate UA"
+
+
+msgid "Спам"
+msgstr "Spam"
+
+
+msgid "Переглянути"
+msgstr "View"
+
+
+msgid "Minerva пропонує"
+msgstr "Minerva suggests"
+
+
+msgid "Що відповісти? (залиш порожнім для авто-відповіді)"
+msgstr "What to reply? (leave empty for auto-reply)"
+
+
+msgid "Копіювати"
+msgstr "Copy"
+
+
+msgid "Вставити у відповідь"
+msgstr "Insert into reply"
+
+
+msgid "Натисни щоб відповісти"
+msgstr "Click to reply"
+
+
+msgid "Список"
+msgstr "List"
+
+
+msgid "Текст відповіді..."
+msgstr "Reply text..."
+
+
+msgid "Введіть текст"
+msgstr "Enter text"
+
+
+msgid "Відправляю..."
+msgstr "Sending..."
+
+
+msgid "Minerva думає..."
+msgstr "Minerva is thinking..."
+
+
+msgid "Перекладаю..."
+msgstr "Translating..."
+
+
+msgid "Видалити лист?"
+msgstr "Delete email?"
+
+
+msgid "файл"
+msgstr "file"
+
+
+msgid "вкладень"
+msgstr "attachments"
+
+
+msgid "Мінерва пропонує"
+msgstr "Minerva suggests"
+
+
+msgid "Мінерва думає..."
+msgstr "Minerva is thinking..."
+
+msgid "Ваш браузер не підтримує File System Access API."
+msgstr "Your browser does not support the File System Access API."
+
+
+msgid "Для локального збереження використовуйте Chrome або Edge (версія 86+)."
+msgstr "For local saving use Chrome or Edge (version 86+)."
+
+
+msgid "Локальна папка для збереження"
+msgstr "Local save folder"
+
+
+msgid "Перевірка..."
+msgstr "Checking..."
+
+
+msgid "Обрати папку"
+msgstr "Select folder"
+
+
+msgid "Забути папку"
+msgstr "Forget folder"
+
+
+msgid "Папка обирається один раз і запам'ятовується в браузері (IndexedDB)."
+msgstr "The folder is selected once and remembered in the browser (IndexedDB)."
+
+
+msgid "Файли зберігаються браузером напряму на ваш ПК — сервер не потрібен."
+msgstr "Files are saved directly to your PC by the browser — no server needed."
+
+
+msgid "Доступ є — файли зберігатимуться сюди"
+msgstr "Access granted — files will be saved here"
+
+
+msgid "Змінити папку"
+msgstr "Change folder"
+
+
+msgid "Папку не обрано"
+msgstr "No folder selected"
+
+
+msgid "Відкриття..."
+msgstr "Opening..."
+
+
+msgid "Помилка:"
+msgstr "Error:"
+
+
+msgid "Забути збережену папку?"
+msgstr "Forget saved folder?"
+
+
+msgid "Валюта продажу"
+msgstr "Sales currency"
+
+
+msgid "Валюта доставки"
+msgstr "Shipping currency"
+
+
+msgid "Тип документа"
+msgstr "Document type"
+
+
+msgid "Джерело"
+msgstr "Source"
+
+
+msgid "Звіти"
+msgstr "Reports"
+
+
+msgid "Статус:"
+msgstr "Status:"
+
+
+msgid "Обробка"
+msgstr "Processing"
+
+
+msgid "Затримки"
+msgstr "Delayed"
+
+
+msgid "Прострочені"
+msgstr "Overdue"
+
+
+msgid "Важливі"
+msgstr "Important"
+
+
+msgid "Джерело:"
+msgstr "Source:"
+
+
+msgid "Останній статус встановлено:"
+msgstr "Last status set:"
+
+
+msgid "Зняти позначку"
+msgstr "Remove mark"
+
+
+msgid "Позначити як важливе"
+msgstr "Mark as important"
+
+
+msgid "Замовлено:"
+msgstr "Ordered:"
+
+
+msgid "Дедлайн"
+msgstr "Deadline"
+
+
+msgid "Відправлено:"
+msgstr "Shipped:"
+
+
+msgid "Доставлено:"
+msgstr "Delivered:"
+
+
+msgid "Чернетка"
+msgstr "Draft"
+
+
+msgid "Оформлення"
+msgstr "Processing"
+
+
+msgid "Етикетка"
+msgstr "Label"
+
+
+msgid "Затримка!"
+msgstr "Delay!"
+
+
+msgid "до"
+msgstr "to"
+
+
+msgid "Відкрити клієнта в CRM"
+msgstr "Open customer in CRM"
+
+
+msgid "замов."
+msgstr "ord."
+
+
+msgid "Ціна"
+msgstr "Price"
+
+
+msgid "Перейти на склад:"
+msgstr "Go to inventory:"
+
+
+msgid "Немає документу"
+msgstr "No document"
+
+
+msgid "Разом:"
+msgstr "Total:"
+
+
+msgid "Немає позицій"
+msgstr "No items"
+
+
+msgid "Обробити"
+msgstr "Process"
+
+
+msgid "Немає"
+msgstr "None"
+
+
+msgid "Відправлень:"
+msgstr "Shipments:"
+
+
+msgid "Документи та деталі"
+msgstr "Documents & details"
+
+
+msgid "Короткий коментар (Enter — зберегти, Esc — закрити)…"
+msgstr "Short comment (Enter — save, Esc — close)…"
+
+
+msgid "Завантаження…"
+msgstr "Loading…"
+
+
+msgid "Замовлень не знайдено."
+msgstr "No orders found."
+
+
+msgid "DYMO недоступний"
+msgstr "DYMO unavailable"
+
+
+msgid "DYMO Connect не відповідає."
+msgstr "DYMO Connect is not responding."
+
+
+msgid "Крок 1:"
+msgstr "Step 1:"
+
+
+msgid "Прийміть сертифікат (один раз у браузері):"
+msgstr "Accept the certificate (once in your browser):"
+
+
+msgid "Відкрити DYMO (прийняти сертифікат)"
+msgstr "Open DYMO (accept certificate)"
+
+
+msgid "Крок 2:"
+msgstr "Step 2:"
+
+
+msgid "У вкладці що відкрилась:"
+msgstr "In the tab that opened:"
+
+
+msgid "Додатково → Перейти до 127.0.0.1"
+msgstr "Advanced → Go to 127.0.0.1"
+
+
+msgid "Прийняти ризик і продовжити"
+msgstr "Accept risk and continue"
+
+
+msgid "Крок 3:"
+msgstr "Step 3:"
+
+
+msgid "Поверніться і натисніть «Повторити»"
+msgstr "Go back and click «Retry»"
+
+
+msgid "Повторити"
+msgstr "Retry"
+
+
+msgid "Принтер DYMO не знайдено. Перевірте підключення USB та що DYMO Connect запущено."
+msgstr "DYMO printer not found. Check USB connection and that DYMO Connect is running."
+
+
+msgid "Помилка друку:"
+msgstr "Print error:"
+
+
+msgid "Помилка завантаження мітки:"
+msgstr "Label load error:"
+
+
+msgid "Принтер DYMO не знайдено."
+msgstr "DYMO printer not found."
+
+
+msgid "Помилка SDK:"
+msgstr "SDK error:"
+
+
+msgid "Мітка:"
+msgstr "Label:"
+
+
+msgid "Через DYMO"
+msgstr "Via DYMO"
+
+
+msgid "Вибрано:"
+msgstr "Selected:"
+
+
+msgid "Додати нотатку"
+msgstr "Add note"
+
+
+msgid "Як відкрити мітку?"
+msgstr "How to open label?"
+
+
+msgid "ОК → відкрити у браузері"
+msgstr "OK → open in browser"
+
+
+msgid "Скасувати → завантажити"
+msgstr "Cancel → download"
+
+
+msgid "Немає фото"
+msgstr "No photo"
+
+
+msgid "Додати етикетку для"
+msgstr "Add label for"
+
+
+msgid "Друкувати"
+msgstr "Print"
+
+
+msgid "Видалити файл"
+msgstr "Delete file"
+
+
+msgid "з сервера?"
+msgstr "from server?"
+
+
+msgid "Січень"
+msgstr "January"
+
+
+msgid "Лютий"
+msgstr "February"
+
+
+msgid "Березень"
+msgstr "March"
+
+
+msgid "Квітень"
+msgstr "April"
+
+
+msgid "Травень"
+msgstr "May"
+
+
+msgid "Червень"
+msgstr "June"
+
+
+msgid "Липень"
+msgstr "July"
+
+
+msgid "Серпень"
+msgstr "August"
+
+
+msgid "Вересень"
+msgstr "September"
+
+
+msgid "Жовтень"
+msgstr "October"
+
+
+msgid "Листопад"
+msgstr "November"
+
+
+msgid "Грудень"
+msgstr "December"
+
+msgid "Назад до відправлення"
+msgstr "Back to shipment"
+
+
+msgid "Знайти"
+msgstr "Find"
+
+
+msgid "Нове відправлення"
+msgstr "New shipment"
+
+
+msgid "Відслідковування"
+msgstr "Tracking"
+
+
+msgid "DHL Трекінг"
+msgstr "DHL Tracking"
+
+
+msgid "UPS Трекінг"
+msgstr "UPS Tracking"
+
+
+msgid "FedEx Трекінг"
+msgstr "FedEx Tracking"
+
+
+msgid "Замовлення з трекінг-номерами — авто (DHL) та ручне відслідковування"
+msgstr "Orders with tracking numbers — auto (DHL) and manual tracking"
+
+
+msgid "замовлень"
+msgstr "orders"
+
+
+msgid "Статус замовлення"
+msgstr "Order status"
+
+
+msgid "Ручне відслідковування"
+msgstr "Manual tracking"
+
+
+msgid "Minerva тречить"
+msgstr "Minerva tracks"
+
+
+msgid "Зовнішнє"
+msgstr "External"
+
+
+msgid "Перейти"
+msgstr "Go"
+
+
+msgid "Невідомий — перевір вручну"
+msgstr "Unknown — check manually"
+
+
+msgid "Легенда"
+msgstr "Legend"
+
+
+msgid "автооновлення через Jumingo або DHL API"
+msgstr "auto-update via Jumingo or DHL API"
+
+
+msgid "треба перевіряти самостійно"
+msgstr "needs manual checking"
+
+
+msgid "відправлення створено через Minerva"
+msgstr "shipment created via Minerva"
+
+
+msgid "трекінг вказаний вручну в замовленні"
+msgstr "tracking entered manually in order"
+
+
+msgid "Немає замовлень з трекінг-номерами."
+msgstr "No orders with tracking numbers."
+
+
+msgid "Трекінг-номер вказується у замовленні → поле «Трекінг-номер»."
+msgstr "Tracking number is specified in the order → «Tracking number» field."
+
+
+msgid "відправлено"
+msgstr "shipped"
+
+
+msgid "DHL carrier не налаштовано."
+msgstr "DHL carrier not configured."
+
+
+msgid "UPS carrier не налаштовано."
+msgstr "UPS carrier not configured."
+
+
+msgid "FedEx carrier не налаштовано."
+msgstr "FedEx carrier not configured."
+
+
+msgid "Перейди до"
+msgstr "Go to"
+
+
+msgid "заповни"
+msgstr "fill in"
+
+
+msgid "та"
+msgstr "and"
+
+
+msgid "Трекінг-номер"
+msgstr "Tracking number"
+
+
+msgid "Очікувана доставка"
+msgstr "Expected delivery"
+
+
+msgid "Історія"
+msgstr "History"
+
+
+msgid "Повернення"
+msgstr "Return"
+
+
+msgid "Виняток"
+msgstr "Exception"
+
+
+msgid "Прийнято"
+msgstr "Accepted"
+
+
+msgid "В доставці"
+msgstr "Out for delivery"
+
+
+msgid "Очікувана доставка:"
+msgstr "Expected delivery:"
+
+
+msgid "Місцезнаходження:"
+msgstr "Location:"
+
+
+msgid "Підпис:"
+msgstr "Signature:"
+
+
+msgid "Статуси"
+msgstr "Statuses"
+
+
+msgid "Немає даних про переміщення."
+msgstr "No movement data."
+
+
+msgid "UPS Тарифи"
+msgstr "UPS Rates"
+
+
+msgid "DHL Тарифи"
+msgstr "DHL Rates"
+
+
+msgid "Вага:"
+msgstr "Weight:"
+
+
+msgid "Sandbox"
+msgstr "Sandbox"
+
+
+msgid "Код:"
+msgstr "Code:"
+
+
+msgid "договірний"
+msgstr "negotiated"
+
+
+msgid "роздрібний"
+msgstr "retail"
+
+
+msgid "Роздрібний:"
+msgstr "Retail:"
+
+
+msgid "гарантовано"
+msgstr "guaranteed"
+
+
+msgid "дн."
+msgstr "d."
+
+
+msgid "ETA недоступний"
+msgstr "ETA unavailable"
+
+
+msgid "Оформити →"
+msgstr "Proceed →"
+
+
+msgid "Тарифи не знайдено. Перевір адресу та налаштування UPS."
+msgstr "No rates found. Check address and UPS settings."
+
+
+msgid "Тарифи не знайдено. Перевір адресу та налаштування DHL."
+msgstr "No rates found. Check address and DHL settings."
+
+
+msgid "Підтвердження відправлення"
+msgstr "Shipment confirmation"
+
+
+msgid "Відправник"
+msgstr "Sender"
+
+
+msgid "Параметри посилки"
+msgstr "Package parameters"
+
+
+msgid "Оформити відправлення"
+msgstr "Create shipment"
+
+
+msgid "Вага"
+msgstr "Weight"
+
+
+msgid "Довжина"
+msgstr "Length"
+
+
+msgid "Ширина"
+msgstr "Width"
+
+
+msgid "Висота"
+msgstr "Height"
+
+
+msgid "Вміст"
+msgstr "Contents"
+
+
+msgid "Послуга"
+msgstr "Service"
+
+
+msgid "Адреса"
+msgstr "Address"
+
+
+msgid "Місто"
+msgstr "City"
+
+
+msgid "Індекс"
+msgstr "Postal code"
+
+
+msgid "Країна"
+msgstr "Country"
+
+
+msgid "Ім'я / Компанія"
+msgstr "Name / Company"
+
+
+msgid "Телефон"
+msgstr "Phone"
+
+
+msgid "Email"
+msgstr "Email"
+
+
+msgid "Митна декларація"
+msgstr "Customs declaration"
+
+
+msgid "Опис товару"
+msgstr "Product description"
+
+
+msgid "Кількість"
+msgstr "Quantity"
+
+
+msgid "Ціна за од."
+msgstr "Unit price"
+
+
+msgid "Загальна вартість"
+msgstr "Total value"
+
+
+msgid "Скопійовано!"
+msgstr "Copied!"
+
+
+msgid "Увага: вага перевищує"
+msgstr "Warning: weight exceeds"
+
+
+msgid "Місце отримання"
+msgstr "Pickup location"
+
+
+msgid "Рецепшен"
+msgstr "Reception"
+
+
+msgid "Офіс"
+msgstr "Office"
+
+
+msgid "Поштовий відділ"
+msgstr "Post office"
+
+
+msgid "Лобі"
+msgstr "Lobby"
+
+
+msgid "Інше"
+msgstr "Other"
+
+
+msgid "Умови поставки"
+msgstr "Delivery terms"
+
+
+msgid "Вага посилки (брутто)"
+msgstr "Package weight (gross)"
+
+
+msgid "Митне оформлення"
+msgstr "Customs clearance"
+
+
+msgid "Включити митні параметри"
+msgstr "Include customs parameters"
+
+
+msgid "Розрахувати тарифи"
+msgstr "Calculate rates"
+
+
+msgid "Тест підключення"
+msgstr "Connection test"
+
+
+msgid "Перевірити OAuth підключення"
+msgstr "Test OAuth connection"
+
+
+msgid "Тест тарифів (NY→DE, 1кг)"
+msgstr "Rate test (NY→DE, 1kg)"
+
+
+msgid "Спочатку збережи налаштування (Client ID, Secret, Account Number) — потім тестуй підключення"
+msgstr "First save settings (Client ID, Secret, Account Number) — then test connection"
+
+
+msgid "Перевіряю…"
+msgstr "Checking…"
+
+
+msgid "Запит тарифів…"
+msgstr "Requesting rates…"
+
+
+msgid "Тарифи:"
+msgstr "Rates:"
+
+
+msgid "Помилка запиту"
+msgstr "Request error"
+
+
+msgid "Тарифи не знайдено"
+msgstr "No rates found"
+
+
+msgid "Деталі відправлення"
+msgstr "Shipment details"
+
+
+msgid "Надіслано"
+msgstr "Sent"
+
+
+msgid "Клонувати відправлення"
+msgstr "Clone shipment"
+
+
+msgid "Дані відправника"
+msgstr "Sender data"
+
+
+msgid "Дані отримувача"
+msgstr "Recipient data"
+
+
+msgid "Інформація про забір"
+msgstr "Pickup information"
+
+
+msgid "Результат перевізника"
+msgstr "Carrier result"
+
+
+msgid "Стан доставки"
+msgstr "Delivery status"
+
+
+msgid "Дії"
+msgstr "Actions"
+
+
+msgid "Збереження…"
+msgstr "Saving…"
+
+
+msgid "Оберіть папку…"
+msgstr "Select folder…"
+
+
+msgid "Збережено"
+msgstr "Saved"
+
+
+msgid "Зберегти упаковку"
+msgstr "Save packaging"
+
+
+msgid "Помилка збереження"
+msgstr "Save error"

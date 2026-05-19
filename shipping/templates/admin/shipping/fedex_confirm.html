@@ -1,13 +1,14 @@
 {% extends "admin/base_site.html" %}
+{% load i18n %}
 
 {% block title %}{{ title }} | Minerva{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-  <a href="{% url 'admin:index' %}">Домівка</a>
-  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">Відправлення</a>
-  &rsaquo; <a href="{{ back_url }}">Чернетка #{{ shipment.pk }}</a>
-  &rsaquo; Підтвердити FedEx
+  <a href="{% url 'admin:index' %}">{% trans "Домівка" %}</a>
+  &rsaquo; <a href="{% url 'admin:shipping_shipment_changelist' %}">{% trans "Відправлення" %}</a>
+  &rsaquo; <a href="{{ back_url }}">{% trans "Чернетка" %} #{{ shipment.pk }}</a>
+  &rsaquo; {% trans "Підтвердити FedEx" %}
 </div>
 {% endblock %}
 
@@ -51,7 +52,7 @@
 
 <div class="fc-wrap">
   <h1 style="color:var(--text);font-size:20px;margin-bottom:20px">
-    🟣 Перевірте дані перед відправкою через FedEx API
+    🟣 {% trans "Перевірте дані перед відправкою через FedEx API" %}
   </h1>
 
   {% if messages %}
@@ -62,25 +63,25 @@
 
   <!-- Сервіс -->
   <div class="fc-card">
-    <div class="fc-head">🚚 Обраний сервіс FedEx</div>
+    <div class="fc-head">🚚 {% trans "Обраний сервіс FedEx" %}</div>
     <div class="fc-body">
       <div class="fc-row">
-        <span class="fc-lbl">Сервіс</span>
+        <span class="fc-lbl">{% trans "Сервіс" %}</span>
         <span class="fc-val accent">{{ service_name }}</span>
       </div>
       <div class="fc-row">
-        <span class="fc-lbl">Код</span>
+        <span class="fc-lbl">{% trans "Код" %}</span>
         <span class="fc-val" style="font-family:monospace">{{ service_code }}</span>
       </div>
       {% if shipment.carrier %}
       <div class="fc-row">
-        <span class="fc-lbl">Акаунт FedEx</span>
+        <span class="fc-lbl">{% trans "Акаунт FedEx" %}</span>
         <span class="fc-val">{{ shipment.carrier.name }}</span>
       </div>
       {% endif %}
       {% if price %}
       <div class="fc-row">
-        <span class="fc-lbl">Орієнтовна вартість</span>
+        <span class="fc-lbl">{% trans "Орієнтовна вартість" %}</span>
         <span class="fc-val ok">{{ price }} EUR</span>
       </div>
       {% endif %}
@@ -95,26 +96,26 @@
   <div class="fc-2col">
 
     <div class="fc-card">
-      <div class="fc-head">📤 Відправник</div>
+      <div class="fc-head">📤 {% trans "Відправник" %}</div>
       <div class="fc-body">
         {% if shipper.company %}
-        <div class="fc-row"><span class="fc-lbl">Компанія</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Компанія" %}</span>
           <span class="fc-val">{{ shipper.company }}</span></div>
         {% endif %}
-        <div class="fc-row"><span class="fc-lbl">Ім'я</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Ім'я" %}</span>
           <span class="fc-val">{{ shipper.name|default:"—" }}</span></div>
-        <div class="fc-row"><span class="fc-lbl">Вулиця</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Вулиця" %}</span>
           <span class="fc-val">{{ shipper.address_line|default:"—" }}</span></div>
-        <div class="fc-row"><span class="fc-lbl">Місто / ZIP</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Місто / ZIP" %}</span>
           <span class="fc-val">{{ shipper.city|default:"—" }}, {{ shipper.postal|default:"" }}</span></div>
         {% if shipper.state %}
-        <div class="fc-row"><span class="fc-lbl">Штат</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Штат" %}</span>
           <span class="fc-val">{{ shipper.state }}</span></div>
         {% endif %}
-        <div class="fc-row"><span class="fc-lbl">Країна</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Країна" %}</span>
           <span class="fc-val">{{ shipper.country|default:"DE" }}</span></div>
         {% if shipper.phone %}
-        <div class="fc-row"><span class="fc-lbl">Телефон</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Телефон" %}</span>
           <span class="fc-val">{{ shipper.phone }}</span></div>
         {% endif %}
         {% if shipper.email %}
@@ -125,28 +126,28 @@
     </div>
 
     <div class="fc-card">
-      <div class="fc-head">📥 Отримувач</div>
+      <div class="fc-head">📥 {% trans "Отримувач" %}</div>
       <div class="fc-body">
         {% if to_addr.company %}
-        <div class="fc-row"><span class="fc-lbl">Компанія</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Компанія" %}</span>
           <span class="fc-val">{{ to_addr.company }}</span></div>
         {% endif %}
-        <div class="fc-row"><span class="fc-lbl">Ім'я</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Ім'я" %}</span>
           <span class="fc-val">{{ to_addr.name|default:"—" }}</span></div>
-        <div class="fc-row"><span class="fc-lbl">Вулиця</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Вулиця" %}</span>
           <span class="fc-val">{{ to_addr.address_line|default:"—" }}</span></div>
-        <div class="fc-row"><span class="fc-lbl">Місто / ZIP</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Місто / ZIP" %}</span>
           <span class="fc-val">{{ to_addr.city|default:"—" }}, {{ to_addr.postal|default:"" }}</span></div>
         {% if to_addr.state %}
-        <div class="fc-row"><span class="fc-lbl">Штат / Регіон</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Штат / Регіон" %}</span>
           <span class="fc-val">{{ to_addr.state }}</span></div>
         {% endif %}
-        <div class="fc-row"><span class="fc-lbl">Країна</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Країна" %}</span>
           <span class="fc-val{% if is_intl %} accent{% endif %}">{{ to_addr.country|default:"—" }}
-            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> (міжнародне)</span>{% endif %}
+            {% if is_intl %}<span style="font-size:11px;font-weight:400;color:var(--text-muted)"> ({% trans "міжнародне" %})</span>{% endif %}
           </span></div>
         {% if to_addr.phone %}
-        <div class="fc-row"><span class="fc-lbl">Телефон</span>
+        <div class="fc-row"><span class="fc-lbl">{% trans "Телефон" %}</span>
           <span class="fc-val">{{ to_addr.phone }}</span></div>
         {% endif %}
       </div>
@@ -156,16 +157,16 @@
 
   <!-- Коробки -->
   <div class="fc-card">
-    <div class="fc-head">📦 Коробки ({{ packages|length }} шт.)</div>
+    <div class="fc-head">📦 {% trans "Коробки" %} ({{ packages|length }} {% trans "шт." %})</div>
     <div class="fc-body" style="padding:0">
       <table class="fc-table">
         <thead>
           <tr>
             <th>#</th>
-            <th>Вага (кг)</th>
-            <th>Довжина (см)</th>
-            <th>Ширина (см)</th>
-            <th>Висота (см)</th>
+            <th>{% trans "Вага (кг)" %}</th>
+            <th>{% trans "Довжина (см)" %}</th>
+            <th>{% trans "Ширина (см)" %}</th>
+            <th>{% trans "Висота (см)" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -186,15 +187,15 @@
   <!-- Митна декларація -->
   {% if customs and is_intl %}
   <div class="fc-card">
-    <div class="fc-head">🛃 Митна декларація</div>
+    <div class="fc-head">🛃 {% trans "Митна декларація" %}</div>
     <div class="fc-body">
       <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;font-size:13px">
-        <span><span class="fc-lbl" style="display:inline">Валюта: </span>
+        <span><span class="fc-lbl" style="display:inline">{% trans "Валюта" %}: </span>
           <b>{{ customs.currency|default:"EUR" }}</b></span>
-        <span><span class="fc-lbl" style="display:inline">Тип: </span>
+        <span><span class="fc-lbl" style="display:inline">{% trans "Тип" %}: </span>
           <b>{{ customs.contents_type|default:"SALE" }}</b></span>
         {% if customs.description %}
-        <span><span class="fc-lbl" style="display:inline">Опис: </span>
+        <span><span class="fc-lbl" style="display:inline">{% trans "Опис" %}: </span>
           <b>{{ customs.description }}</b></span>
         {% endif %}
       </div>
@@ -202,12 +203,12 @@
       <table class="fc-table">
         <thead>
           <tr>
-            <th>Опис</th>
-            <th style="text-align:center">К-сть</th>
-            <th style="text-align:right">Вартість</th>
-            <th>Вага нетто</th>
-            <th>Походження</th>
-            <th>HS код</th>
+            <th>{% trans "Опис" %}</th>
+            <th style="text-align:center">{% trans "К-сть" %}</th>
+            <th style="text-align:right">{% trans "Вартість" %}</th>
+            <th>{% trans "Вага нетто" %}</th>
+            <th>{% trans "Походження" %}</th>
+            <th>{% trans "HS код" %}</th>
           </tr>
         </thead>
         <tbody>
@@ -217,7 +218,7 @@
             <td style="text-align:center">{{ item.quantity }}</td>
             <td style="text-align:right;color:var(--ok);font-weight:700">
               {{ item.value }} {{ customs.currency|default:"EUR" }}</td>
-            <td style="color:var(--text-muted)">{{ item.weight_kg }} кг</td>
+            <td style="color:var(--text-muted)">{{ item.weight_kg }} {% trans "кг" %}</td>
             <td style="color:var(--text-muted)">{{ item.country|default:"—" }}</td>
             <td style="color:var(--text-dim);font-family:monospace">{{ item.hs_code|default:"—" }}</td>
           </tr>
@@ -231,13 +232,13 @@
 
   <!-- Підтвердження -->
   <div class="fc-card">
-    <div class="fc-head">⚠️ Підтвердження</div>
+    <div class="fc-head">⚠️ {% trans "Підтвердження" %}</div>
     <div class="fc-body">
       <p style="font-size:13px;color:var(--text-muted);margin:0 0 12px">
-        Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
+        {% blocktrans %}Після натискання <b style="color:var(--text)">«Підтвердити і відправити»</b>
         Minerva викличе <b style="color:var(--text)">FedEx REST API</b> і
         <b style="color:var(--text)">створить реальне відправлення</b> у системі FedEx.
-        Буде списано кошти з акаунту <b>{{ shipment.carrier.connection_uuid|default:"FedEx" }}</b>.
+        Буде списано кошти з акаунту{% endblocktrans %} <b>{{ shipment.carrier.connection_uuid|default:"FedEx" }}</b>.
       </p>
       <form method="post" action="{{ confirm_url }}" id="fedex-confirm-form">
         {% csrf_token %}
@@ -249,37 +250,40 @@
   <!-- Кнопки -->
   <div class="fc-actions">
     <button type="submit" form="fedex-confirm-form" class="btn-confirm"
-      onclick="return confirm('Відправити через FedEx API?\n\nСервіс: {{ service_name }}\nОдержувач: {{ to_addr.name }} ({{ to_addr.country }})\n\nПісля підтвердження відправлення буде створено в системі FedEx і списано кошти з акаунту.')">
-      🟣 Підтвердити і відправити через FedEx
+      onclick="return confirm('{% trans "Відправити через FedEx API?" %}\n\n{% trans "Сервіс" %}: {{ service_name }}\n{% trans "Одержувач" %}: {{ to_addr.name }} ({{ to_addr.country }})\n\n{% trans "Після підтвердження відправлення буде створено в системі FedEx і списано кошти з акаунту." %}')">
+      🟣 {% trans "Підтвердити і відправити через FedEx" %}
     </button>
     <button type="button" class="btn-back" id="btn-fedex-dry-run" onclick="fedexDryRun()">
-      🔍 Переглянути тіло запиту
+      🔍 {% trans "Переглянути тіло запиту" %}
     </button>
-    <a href="{{ back_url }}" class="btn-back">← Назад до чернетки</a>
+    <a href="{{ back_url }}" class="btn-back">← {% trans "Назад до чернетки" %}</a>
   </div>
 
   <!-- FedEx Debug JSON panel -->
   <div id="fedex-dry-panel" style="display:none;margin-top:16px">
     <div class="fc-card">
       <div class="fc-head" style="justify-content:space-between">
-        <span>📋 FedEx API Request Body (dry run — не відправляється)</span>
+        <span>📋 FedEx API Request Body (dry run — {% trans "не відправляється" %})</span>
         <div style="display:flex;gap:8px">
-          <button type="button" class="btn-back" onclick="fedexCopyPayload()" style="padding:4px 10px;font-size:12px">📋 Копіювати</button>
+          <button type="button" class="btn-back" onclick="fedexCopyPayload()" style="padding:4px 10px;font-size:12px">📋 {% trans "Копіювати" %}</button>
           <button type="button" class="btn-back" onclick="document.getElementById('fedex-dry-panel').style.display='none'" style="padding:4px 10px;font-size:12px">✕</button>
         </div>
       </div>
-      <pre id="fedex-dry-json" style="margin:0;padding:12px;overflow:auto;max-height:500px;font-size:12px;line-height:1.4;white-space:pre-wrap">Завантаження…</pre>
+      <pre id="fedex-dry-json" style="margin:0;padding:12px;overflow:auto;max-height:500px;font-size:12px;line-height:1.4;white-space:pre-wrap">{% trans "Завантаження…" %}</pre>
     </div>
   </div>
 
 </div>
 <script>
 var _fedexDryPayload = '';
+var _msgLoading = '{% trans "Завантаження…" %}';
+var _msgError   = '{% trans "Помилка" %}';
+var _msgCopied  = '{% trans "Скопійовано" %}';
 function fedexDryRun() {
   var panel = document.getElementById('fedex-dry-panel');
   var pre   = document.getElementById('fedex-dry-json');
   panel.style.display = 'block';
-  pre.textContent = 'Завантаження…';
+  pre.textContent = _msgLoading;
   var url = '{% url "admin:shipping_shipment_fedex_dry_run" shipment.pk %}?service_code={{ service_code }}';
   fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
     .then(function(r){ return r.json(); })
@@ -288,7 +292,7 @@ function fedexDryRun() {
         _fedexDryPayload = JSON.stringify(d.payload, null, 2);
         pre.textContent = _fedexDryPayload;
       } else {
-        pre.textContent = '❌ ' + (d.error || 'Помилка');
+        pre.textContent = '❌ ' + (d.error || _msgError);
       }
     })
     .catch(function(e){ pre.textContent = '❌ ' + e; });
@@ -297,7 +301,7 @@ function fedexCopyPayload() {
   if (!_fedexDryPayload) return;
   navigator.clipboard.writeText(_fedexDryPayload).then(function(){
     var btn = document.querySelector('#fedex-dry-panel button');
-    if (btn) { var t = btn.textContent; btn.textContent = '✅ Скопійовано'; setTimeout(function(){ btn.textContent = t; }, 1500); }
+    if (btn) { var t = btn.textContent; btn.textContent = '✅ ' + _msgCopied; setTimeout(function(){ btn.textContent = t; }, 1500); }
   });
 }
 </script>
