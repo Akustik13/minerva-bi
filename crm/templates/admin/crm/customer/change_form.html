@@ -150,28 +150,28 @@
                        border:1px solid var(--border-strong);
                        background:var(--bg-input);color:var(--text)">
           <option value="follow_up">Follow-up</option>
-          <option value="reactivation">Реактивація</option>
-          <option value="overdue_payment">Прострочений платіж</option>
-          <option value="new_offer">Нова пропозиція</option>
-          <option value="thank_you">Подяка</option>
-          <option value="shipping_update">Статус доставки</option>
+          <option value="reactivation">{% trans "Реактивація" %}</option>
+          <option value="overdue_payment">{% trans "Прострочений платіж" %}</option>
+          <option value="new_offer">{% trans "Нова пропозиція" %}</option>
+          <option value="thank_you">{% trans "Подяка" %}</option>
+          <option value="shipping_update">{% trans "Статус доставки" %}</option>
         </select>
         <select id="email-lang"
                 style="padding:6px 10px;border-radius:6px;font-size:13px;
                        border:1px solid var(--border-strong);
                        background:var(--bg-input);color:var(--text)">
-          <option value="uk">Українська</option>
+          <option value="uk">{% trans "Українська" %}</option>
           <option value="de">Deutsch</option>
           <option value="en">English</option>
         </select>
         <button type="button" onclick="generateEmail()"
                 style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
                        background:var(--accent);color:#fff;border:none;cursor:pointer">
-          Згенерувати →
+          {% trans "Генерувати" %} →
         </button>
       </div>
       <textarea id="email-prompt"
-                placeholder="Додатковий промпт: що саме хочеш донести клієнту, на що акцентувати увагу, особливі умови тощо..."
+                placeholder="{% trans "Опишіть лист: кому, з якого приводу, яким тоном, що треба вказати..." %}"
                 rows="2"
                 style="width:100%;box-sizing:border-box;padding:7px 10px;border-radius:6px;
                        font-size:13px;border:1px solid var(--border-strong);
@@ -182,16 +182,16 @@
       <div id="ai-response-section" style="display:none;margin-bottom:14px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
           <div style="font-size:10px;font-weight:700;color:var(--text-dim);
-                      text-transform:uppercase;letter-spacing:.7px">💬 Відповідь AI</div>
+                      text-transform:uppercase;letter-spacing:.7px">💬 {% trans "AI відповідь" %}</div>
           <div style="display:flex;gap:5px">
             <button type="button" onclick="generateEmail()"
                     style="padding:2px 9px;border-radius:4px;font-size:11px;cursor:pointer;
                            border:1px solid var(--border-strong);background:transparent;
-                           color:var(--text-dim)">🔄 Ще варіант</button>
+                           color:var(--text-dim)">🔄 {% trans "Ще варіант" %}</button>
             <button type="button" id="btn-toggle-ai" onclick="toggleAiResponse()"
                     style="padding:2px 9px;border-radius:4px;font-size:11px;cursor:pointer;
                            border:1px solid var(--border-strong);background:transparent;
-                           color:var(--text-dim)">▾ Згорнути</button>
+                           color:var(--text-dim)">▾ {% trans "Згорнути" %}</button>
           </div>
         </div>
         <div id="ai-response-body"
@@ -205,30 +205,30 @@
       <div id="email-compose-section" style="display:none">
         <div style="font-size:10px;font-weight:700;color:var(--text);
                     text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">
-          📧 Сформований лист
+          📧 {% trans "Сформований лист" %}
         </div>
 
         <!-- Заголовки -->
         <div style="display:grid;grid-template-columns:46px 1fr;gap:5px 6px;
                     margin-bottom:10px;align-items:center">
-          <label style="font-size:12px;color:var(--text-muted);text-align:right">Від:</label>
+          <label style="font-size:12px;color:var(--text-muted);text-align:right">{% trans "Від:" %}</label>
           <div id="email-from-display"
                style="padding:5px 9px;border-radius:6px;font-size:13px;
                       color:var(--text-dim);background:var(--bg-input);
                       border:1px solid var(--border-strong)">—</div>
-          <label style="font-size:12px;color:var(--text-muted);text-align:right">Кому:</label>
+          <label style="font-size:12px;color:var(--text-muted);text-align:right">{% trans "Кому:" %}</label>
           <input id="email-to" type="text"
                  style="padding:5px 9px;border-radius:6px;font-size:13px;width:100%;
                         box-sizing:border-box;border:1px solid var(--border-strong);
                         background:var(--bg-card);color:var(--text)"
                  placeholder="email@example.com">
-          <label style="font-size:12px;color:var(--text-muted);text-align:right">Копія:</label>
+          <label style="font-size:12px;color:var(--text-muted);text-align:right">{% trans "Копія:" %}</label>
           <input id="email-cc" type="text"
                  style="padding:5px 9px;border-radius:6px;font-size:13px;width:100%;
                         box-sizing:border-box;border:1px solid var(--border-strong);
                         background:var(--bg-card);color:var(--text)"
                  placeholder="email1, email2 (через кому)">
-          <label style="font-size:12px;color:var(--text-muted);text-align:right">Тема:</label>
+          <label style="font-size:12px;color:var(--text-muted);text-align:right">{% trans "Тема:" %}</label>
           <input id="email-subject" type="text"
                  style="padding:5px 9px;border-radius:6px;font-size:13px;width:100%;font-weight:600;
                         box-sizing:border-box;border:1px solid var(--border-strong);
@@ -242,32 +242,32 @@
           <!-- Toolbar -->
           <div style="display:flex;gap:3px;padding:5px 8px;flex-wrap:wrap;align-items:center;
                       background:var(--bg-hover);border-bottom:1px solid var(--border-strong)">
-            <button type="button" title="Жирний" onclick="mvBodyCmd('bold')"
+            <button type="button" title="{% trans "Жирний" %}" onclick="mvBodyCmd('bold')"
                     style="padding:2px 8px;border-radius:3px;font-weight:700;font-size:13px;cursor:pointer;
                            border:1px solid var(--border-strong);background:transparent;color:var(--text)">B</button>
-            <button type="button" title="Курсив" onclick="mvBodyCmd('italic')"
+            <button type="button" title="{% trans "Курсив" %}" onclick="mvBodyCmd('italic')"
                     style="padding:2px 8px;border-radius:3px;font-style:italic;font-size:13px;cursor:pointer;
                            border:1px solid var(--border-strong);background:transparent;color:var(--text)">I</button>
-            <button type="button" title="Підкреслення" onclick="mvBodyCmd('underline')"
+            <button type="button" title="{% trans "Підкреслений" %}" onclick="mvBodyCmd('underline')"
                     style="padding:2px 8px;border-radius:3px;text-decoration:underline;font-size:13px;cursor:pointer;
                            border:1px solid var(--border-strong);background:transparent;color:var(--text)">U</button>
             <div style="width:1px;height:18px;background:var(--border-strong);margin:0 2px"></div>
-            <select title="Розмір" onchange="mvBodyCmd('fontSize',this.value);this.selectedIndex=0"
+            <select title="{% trans "Розмір" %}" onchange="mvBodyCmd('fontSize',this.value);this.selectedIndex=0"
                     style="padding:2px 5px;border-radius:3px;font-size:11px;cursor:pointer;
                            border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text)">
-              <option value="">Розмір</option>
-              <option value="1">Дрібний (8px)</option>
-              <option value="2">Малий (10px)</option>
-              <option value="3">Звичайний (12px)</option>
-              <option value="4">Середній (14px)</option>
-              <option value="5">Великий (18px)</option>
+              <option value="">{% trans "Розмір" %}</option>
+              <option value="1">{% trans "Дрібний (8px)" %}</option>
+              <option value="2">{% trans "Малий (10px)" %}</option>
+              <option value="3">{% trans "Звичайний (12px)" %}</option>
+              <option value="4">{% trans "Середній (14px)" %}</option>
+              <option value="5">{% trans "Великий (18px)" %}</option>
               <option value="6">XL (24px)</option>
               <option value="7">XXL (36px)</option>
             </select>
-            <select title="Шрифт" onchange="mvBodyCmd('fontName',this.value);this.selectedIndex=0"
+            <select title="{% trans "Шрифт" %}" onchange="mvBodyCmd('fontName',this.value);this.selectedIndex=0"
                     style="padding:2px 5px;border-radius:3px;font-size:11px;cursor:pointer;
                            border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text)">
-              <option value="">Шрифт</option>
+              <option value="">{% trans "Шрифт" %}</option>
               <option value="Arial">Arial</option>
               <option value="Georgia">Georgia</option>
               <option value="Verdana">Verdana</option>
@@ -275,7 +275,7 @@
               <option value="Times New Roman">Times New Roman</option>
             </select>
             <div style="width:1px;height:18px;background:var(--border-strong);margin:0 2px"></div>
-            <label title="Колір тексту"
+            <label title="{% trans "Колір тексту" %}"
                    style="display:flex;align-items:center;gap:3px;cursor:pointer;
                           font-size:12px;color:var(--text-muted);font-weight:700">
               A <input type="color" value="#c9d8e4" oninput="mvBodyCmd('foreColor',this.value)"
@@ -283,11 +283,11 @@
                               border:1px solid var(--border-strong);border-radius:3px;
                               background:transparent">
             </label>
-            <button type="button" title="Зняти форматування"
+            <button type="button" title="{% trans "Зняти форматування" %}"
                     onclick="document.execCommand('removeFormat')"
                     style="margin-left:auto;padding:2px 7px;border-radius:3px;font-size:10px;cursor:pointer;
                            border:1px solid var(--border-strong);background:transparent;
-                           color:var(--text-dim)">✕ Форм.</button>
+                           color:var(--text-dim)">✕</button>
           </div>
           <!-- Editable body -->
           <div id="email-body-editor" contenteditable="true"
@@ -298,7 +298,7 @@
           <!-- Підпис у листі -->
           <div id="sig-in-compose" style="display:none;padding:10px 14px 12px;
                border-top:1px dashed var(--border-strong);background:var(--bg-card)">
-            <div style="font-size:10px;color:var(--text-dim);margin-bottom:5px">— підпис —</div>
+            <div style="font-size:10px;color:var(--text-dim);margin-bottom:5px">— {% trans "підпис" %} —</div>
             <div id="sig-in-compose-content" style="font-size:13px;line-height:1.6"></div>
           </div>
         </div>
@@ -308,12 +308,12 @@
           <button type="button" id="btn-send-email" onclick="sendEmailToCustomer()"
                   style="padding:7px 20px;border-radius:6px;font-size:13px;font-weight:600;
                          border:none;background:var(--accent);color:#fff;cursor:pointer">
-            📤 Надіслати
+            📤 {% trans "Надіслати" %}
           </button>
           <button type="button" onclick="copyEmail()"
                   style="padding:7px 14px;border-radius:6px;font-size:12px;cursor:pointer;
                          border:1px solid var(--border-strong);background:transparent;
-                         color:var(--text)">📋 Копіювати</button>
+                         color:var(--text)">📋 {% trans "Копіювати" %}</button>
           <span id="email-send-status" style="font-size:12px;color:var(--text-muted)"></span>
         </div>
       </div>
@@ -438,6 +438,44 @@
 
 {{ request.user.profile.smtp_signature|default:""|json_script:"mv-user-sig" }}
 <script>
+const _crm = {
+  loading:        '{% trans "Завантаження..." %}',
+  no_emails:      '{% trans "Листів немає" %}',
+  selected:       '{% trans "Вибрано:" %}',
+  added_to_analysis: '{% trans "листів — додано до аналізу" %}',
+  analysing_strategy: '⏳ {% trans "Аналізую стратегію..." %}',
+  strategy_ai:    '🧭 {% trans "Стратегія AI" %}',
+  analysing:      '⏳ {% trans "Аналізую..." %}',
+  minerva_analysing: '{% trans "Minerva думає..." %}',
+  analysis_btn:   '🔍 {% trans "Аналіз клієнта" %}',
+  generating:     '{% trans "Генерую лист..." %}',
+  error:          '{% trans "Помилка" %}',
+  copied:         '✓ {% trans "Скопійовано" %}',
+  copy:           '📋 {% trans "Копіювати" %}',
+  no_recipient:   '⚠️ {% trans "Вкажіть отримувача" %}',
+  empty_body:     '⚠️ {% trans "Текст листа порожній" %}',
+  sending:        '⏳ {% trans "Відправляю..." %}',
+  more:           '▾ {% trans "більше" %}',
+  less:           '▴ {% trans "менше" %}',
+  no_events:      '{% trans "Поки немає подій" %}',
+  load_error:     '{% trans "Помилка завантаження" %}',
+  gen_strategy:   '⏳ {% trans "Генерую..." %}',
+  minerva_strategy: '{% trans "Minerva думає..." %}',
+  gen_btn:        '{% trans "Генерувати" %}',
+  write_for_step: '✉️ {% trans "Написати лист по кроку" %}',
+  apply:          '✅ {% trans "Застосувати" %}',
+  regenerate:     '🔄 {% trans "Перегенерувати" %}',
+  steps_suffix:   '{% trans "кроків…" %}',
+  open_canvas:    '→ {% trans "Відкрити" %}',
+  behaviour: {
+    reactivation: '{% trans "Реактивація" %}',
+    nurturing:    '{% trans "Нарощування" %}',
+    retention:    '{% trans "Утримання" %}',
+    onboarding:   '{% trans "Онбординг" %}',
+  },
+};
+</script>
+<script>
 const CUSTOMER_PK = '{{ original.pk }}';
 const CUSTOMER_EMAIL = '{{ original.email|default:"" }}';
 const USER_DISPLAY_NAME = '{{ request.user.get_full_name|default:request.user.username|escapejs }}';
@@ -485,7 +523,7 @@ async function loadMailboxEmails() {
     const d = await r.json();
     if (d.error) { status.textContent = '⚠️ ' + d.error; return; }
     const emails = d.emails || [];
-    if (!emails.length) { status.textContent = d.message || 'Листів не знайдено.'; return; }
+    if (!emails.length) { status.textContent = d.message || _crm.no_emails; return; }
     emails.forEach(e => { _mailboxEmails[e.id] = e; });
     list.innerHTML = emails.map(e => `
       <label style="display:flex;gap:6px;align-items:flex-start;padding:4px 2px;
@@ -504,9 +542,9 @@ async function loadMailboxEmails() {
     list.style.display = 'block';
     updateMailboxStatus();
   } catch(e) {
-    status.textContent = '⚠️ Помилка завантаження';
+    status.textContent = '⚠️ ' + _crm.load_error;
   }
-  btn.disabled = false; btn.textContent = 'Оновити';
+  btn.disabled = false; btn.textContent = '{% trans "Оновити" %}';
 }
 
 function toggleMailboxEmail(id) {
@@ -518,7 +556,7 @@ function toggleMailboxEmail(id) {
 function updateMailboxStatus() {
   const s = document.getElementById('mailbox-status');
   if (s) s.textContent = _selectedMailboxIds.size
-    ? `✅ Вибрано: ${_selectedMailboxIds.size} листів — додано до аналізу`
+    ? `✅ ${_crm.selected} ${_selectedMailboxIds.size} ${_crm.added_to_analysis}`
     : '';
 }
 
@@ -527,9 +565,9 @@ function updateMailboxStatus() {
 async function runStrategyAdvisor() {
   const btn = document.getElementById('btn-strategy-advisor');
   const res = document.getElementById('strategy-advisor-result');
-  btn.disabled = true; btn.textContent = '⏳ Аналізую стратегію...';
+  btn.disabled = true; btn.textContent = _crm.analysing_strategy;
   res.style.display = 'block';
-  res.innerHTML = '<span style="color:rgba(147,112,219,.7)">🧭 Minerva аналізує прогрес стратегії...</span>';
+  res.innerHTML = `<span style="color:rgba(147,112,219,.7)">🧭 ${_crm.minerva_strategy}</span>`;
   document.getElementById('analysis-result').style.display = 'none';
   try {
     const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-strategy-advisor/`);
@@ -548,16 +586,16 @@ async function runStrategyAdvisor() {
   } catch(e) {
     res.innerHTML = '<span style="color:var(--err)">⚠️ Помилка з\'єднання</span>';
   }
-  btn.disabled = false; btn.textContent = '🧭 Стратегія AI';
+  btn.disabled = false; btn.textContent = _crm.strategy_ai;
 }
 
 async function runAnalysis() {
   const btn = document.getElementById('btn-analysis');
   const res = document.getElementById('analysis-result');
-  btn.disabled = true; btn.textContent = '⏳ Аналізую...';
+  btn.disabled = true; btn.textContent = _crm.analysing;
   res.style.display = 'block';
   document.getElementById('strategy-advisor-result').style.display = 'none';
-  res.innerHTML = '<span style="color:var(--text-dim)">Мінерва аналізує клієнта...</span>';
+  res.innerHTML = `<span style="color:var(--text-dim)">${_crm.minerva_analysing}</span>`;
 
   const include = Object.keys(_analysisScope).filter(k => _analysisScope[k]).join(',') || 'customer';
   const extraAnalysis = (document.getElementById('analysis-extra')?.value || '').trim();
@@ -579,7 +617,7 @@ async function runAnalysis() {
   } catch(e) {
     res.innerHTML = '<span style="color:var(--err)">⚠️ Помилка з\'єднання</span>';
   }
-  btn.disabled = false; btn.textContent = '🔍 Аналіз клієнта';
+  btn.disabled = false; btn.textContent = _crm.analysis_btn;
 }
 
 function toggleEmailComposer() {
@@ -660,8 +698,8 @@ async function generateEmail() {
   aiSection.style.display      = 'block';
   composeSection.style.display = 'none';
   aiBody.style.display         = 'block';
-  aiBody.textContent           = 'Генерую лист...';
-  document.getElementById('btn-toggle-ai').textContent = '▾ Згорнути';
+  aiBody.textContent           = _crm.generating;
+  document.getElementById('btn-toggle-ai').textContent = '▾ {% trans "Згорнути" %}';
   try {
     const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-email/`, {
       method: 'POST',
@@ -709,8 +747,8 @@ async function sendEmailToCustomer() {
   const to       = document.getElementById('email-to').value.trim();
   const cc       = document.getElementById('email-cc').value.trim();
   const subj     = document.getElementById('email-subject').value.trim();
-  if (!to)       { status.style.color='var(--err)'; status.textContent='⚠️ Вкажіть отримувача'; return; }
-  if (!bodyText) { status.style.color='var(--err)'; status.textContent='⚠️ Текст листа порожній'; return; }
+  if (!to)       { status.style.color='var(--err)'; status.textContent=_crm.no_recipient; return; }
+  if (!bodyText) { status.style.color='var(--err)'; status.textContent=_crm.empty_body; return; }
 
   const origBg   = btn.style.background;
   const origText = btn.textContent;
@@ -724,7 +762,7 @@ async function sendEmailToCustomer() {
   btn.disabled = true;
   btn.style.background = '#607d8b';
   btn.style.opacity = '0.75';
-  btn.textContent = '⏳ Надсилаю…';
+  btn.textContent = _crm.sending;
   status.textContent = '';
 
   try {
@@ -774,11 +812,11 @@ function tlExpand(idx) {
   if (open) {
     full.style.display = 'none';
     preview.style.display = 'inline';
-    btn.textContent = '▾ більше';
+    btn.textContent = _crm.more;
   } else {
     preview.style.display = 'none';
     full.style.display = 'inline';
-    btn.textContent = '▴ менше';
+    btn.textContent = _crm.less;
   }
 }
 
@@ -804,7 +842,7 @@ async function loadTimeline() {
     const r = await fetch(`/crm/customer/${CUSTOMER_PK}/timeline/`);
     const d = await r.json();
     if (!d.events || d.events.length === 0) {
-      list.innerHTML = '<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:20px">Поки немає подій</div>';
+      list.innerHTML = `<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:20px">${_crm.no_events}</div>`;
       return;
     }
     list.innerHTML = d.events.map((e, idx) => {
@@ -826,7 +864,7 @@ async function loadTimeline() {
       </div>`;
     }).join('');
   } catch(e) {
-    list.innerHTML = '<div style="color:var(--err);font-size:13px;padding:10px">Помилка завантаження</div>';
+    list.innerHTML = `<div style="color:var(--err);font-size:13px;padding:10px">${_crm.load_error}</div>`;
   }
 }
 
@@ -884,17 +922,14 @@ async function addNote() {
 // ── AI Адаптивна стратегія ──────────────────────────────────────────
 window._aiStrategy = null;
 const STEP_TYPE_ICONS = {email:'📧', call:'📞', pause:'⏸', decision:'🔀'};
-const BEHAVIOR_LABELS = {
-  reactivation:'Реактивація', nurturing:'Нарощування',
-  retention:'Утримання', onboarding:'Онбординг',
-};
+const BEHAVIOR_LABELS = _crm.behaviour;
 
 async function generateStrategy() {
   const btn = document.getElementById('btn-gen-strategy');
   const box = document.getElementById('strategy-result');
-  btn.disabled = true; btn.textContent = '⏳ Генерую...';
+  btn.disabled = true; btn.textContent = _crm.gen_strategy;
   box.style.display = 'block';
-  box.innerHTML = '<span style="color:var(--text-dim)">Мінерва аналізує клієнта і будує стратегію...</span>';
+  box.innerHTML = `<span style="color:var(--text-dim)">${_crm.minerva_strategy}</span>`;
   const extraStrategy = (document.getElementById('strategy-extra')?.value || '').trim();
   const strategyUrl = `/crm/customer/${CUSTOMER_PK}/ai-strategy/`
     + (extraStrategy ? `?extra_prompt=${encodeURIComponent(extraStrategy)}` : '');
@@ -911,7 +946,7 @@ async function generateStrategy() {
   } catch(e) {
     box.innerHTML = '<span style="color:var(--err)">⚠️ Помилка з\'єднання</span>';
   }
-  btn.disabled = false; btn.textContent = 'Генерувати';
+  btn.disabled = false; btn.textContent = _crm.gen_btn;
 }
 
 function _renderStrategy(s) {
@@ -926,7 +961,7 @@ function _renderStrategy(s) {
            onclick="composeForStrategy('${title_esc}','${desc_esc}')"
            style="margin-top:4px;padding:2px 8px;border-radius:4px;font-size:11px;cursor:pointer;
                   border:1px solid rgba(79,143,255,.4);background:rgba(79,143,255,.1);
-                  color:#4f8fff">✉️ Написати лист по кроку</button>`
+                  color:#4f8fff">${_crm.write_for_step}</button>`
       : '';
     return `<div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--border-strong)">
       <div style="flex-shrink:0;font-size:13px;color:var(--text-dim);width:20px;text-align:right">${i+1}</div>
@@ -954,15 +989,15 @@ function _renderStrategy(s) {
       <button type="button" onclick="applyStrategy()"
               style="padding:6px 16px;border-radius:6px;font-size:12px;font-weight:600;
                      background:#9370db;color:#fff;border:none;cursor:pointer">
-        ✅ Застосувати
+        ${_crm.apply}
       </button>
       <button type="button" onclick="generateStrategy()"
               style="padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;
                      background:transparent;color:var(--text-dim);
                      border:1px solid var(--border-strong);cursor:pointer">
-        🔄 Перегенерувати
+        ${_crm.regenerate}
       </button>
-      <span style="font-size:11px;color:var(--text-dim)">${(s.steps||[]).length} кроків</span>
+      <span style="font-size:11px;color:var(--text-dim)">${(s.steps||[]).length} ${_crm.steps_suffix}</span>
       <span id="strategy-applied" style="display:none;font-size:13px;color:#9370db"></span>
     </div>
   `;
@@ -1025,8 +1060,8 @@ window.generateEmail = async function() {
   aiSection.style.display      = 'block';
   composeSection.style.display = 'none';
   aiBody.style.display         = 'block';
-  aiBody.textContent           = 'Генерую лист...';
-  document.getElementById('btn-toggle-ai').textContent = '▾ Згорнути';
+  aiBody.textContent           = _crm.generating;
+  document.getElementById('btn-toggle-ai').textContent = '▾ {% trans "Згорнути" %}';
   try {
     const r = await fetch(`/crm/customer/${CUSTOMER_PK}/ai-email/`, {
       method: 'POST',
@@ -1071,7 +1106,7 @@ document.addEventListener('DOMContentLoaded', () => {
 <div style="margin:16px 0;padding:14px 16px;border:1px solid var(--border-strong);
             border-radius:10px;background:var(--bg-card)">
   <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px">
-    📄 Документи клієнта
+    📄 {% trans "Документи клієнта" %}
   </div>
   <div id="doc-templates-list"
        style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px"></div>

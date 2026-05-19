@@ -2646,3 +2646,114 @@ msgstr "Save packaging"
 
 msgid "Помилка збереження"
 msgstr "Save error"
+
+msgid "Прострочений платіж"
+msgstr "Overdue payment"
+
+
+msgid "Нова пропозиція"
+msgstr "New offer"
+
+
+msgid "Подяка"
+msgstr "Thank you"
+
+
+msgid "Статус доставки"
+msgstr "Shipping status"
+
+
+msgid "Українська"
+msgstr "Ukrainian"
+
+
+msgid "Ще варіант"
+msgstr "Another option"
+
+
+msgid "Сформований лист"
+msgstr "Composed email"
+
+
+msgid "Від:"
+msgstr "From:"
+
+
+msgid "Кому:"
+msgstr "To:"
+
+
+msgid "Копія:"
+msgstr "CC:"
+
+
+msgid "Тема:"
+msgstr "Subject:"
+
+
+msgid "Дрібний (8px)"
+msgstr "Tiny (8px)"
+
+
+msgid "Малий (10px)"
+msgstr "Small (10px)"
+
+
+msgid "Звичайний (12px)"
+msgstr "Normal (12px)"
+
+
+msgid "Середній (14px)"
+msgstr "Medium (14px)"
+
+
+msgid "Великий (18px)"
+msgstr "Large (18px)"
+
+
+msgid "Зняти форматування"
+msgstr "Remove formatting"
+
+
+msgid "підпис"
+msgstr "signature"
+
+
+msgid "Надіслати"
+msgstr "Send"
+
+
+msgid "Документи клієнта"
+msgstr "Customer documents"
+
+
+msgid "листів — додано до аналізу"
+msgstr "emails added to analysis"
+
+
+msgid "Аналізую стратегію..."
+msgstr "Analysing strategy..."
+
+
+msgid "Аналізую..."
+msgstr "Analysing..."
+
+
+msgid "Генерую лист..."
+msgstr "Generating email..."
+
+
+msgid "Текст листа порожній"
+msgstr "Email body is empty"
+
+
+msgid "Вкажіть отримувача"
+msgstr "Enter recipient"
+
+
+msgid "Поки немає подій"
+msgstr "No events yet"
+
+
+msgid "Генерую..."
+msgstr "Generating..."

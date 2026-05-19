@@ -2645,3 +2645,114 @@ msgstr "Verpackung speichern"
 
 msgid "Помилка збереження"
 msgstr "Speicherfehler"
+
+msgid "Прострочений платіж"
+msgstr "Überfällige Zahlung"
+
+
+msgid "Нова пропозиція"
+msgstr "Neues Angebot"
+
+
+msgid "Подяка"
+msgstr "Dankeschön"
+
+
+msgid "Статус доставки"
+msgstr "Lieferstatus"
+
+
+msgid "Українська"
+msgstr "Ukrainisch"
+
+
+msgid "Ще варіант"
+msgstr "Weitere Option"
+
+
+msgid "Сформований лист"
+msgstr "Verfasste E-Mail"
+
+
+msgid "Від:"
+msgstr "Von:"
+
+
+msgid "Кому:"
+msgstr "An:"
+
+
+msgid "Копія:"
+msgstr "CC:"
+
+
+msgid "Тема:"
+msgstr "Betreff:"
+
+
+msgid "Дрібний (8px)"
+msgstr "Winzig (8px)"
+
+
+msgid "Малий (10px)"
+msgstr "Klein (10px)"
+
+
+msgid "Звичайний (12px)"
+msgstr "Normal (12px)"
+
+
+msgid "Середній (14px)"
+msgstr "Mittel (14px)"
+
+
+msgid "Великий (18px)"
+msgstr "Groß (18px)"
+
+
+msgid "Зняти форматування"
+msgstr "Formatierung entfernen"
+
+
+msgid "підпис"
+msgstr "Signatur"
+
+
+msgid "Надіслати"
+msgstr "Senden"
+
+
+msgid "Документи клієнта"
+msgstr "Kundendokumente"
+
+
+msgid "листів — додано до аналізу"
+msgstr "E-Mails zur Analyse hinzugefügt"
+
+
+msgid "Аналізую стратегію..."
+msgstr "Strategie analysieren..."
+
+
+msgid "Аналізую..."
+msgstr "Analysiere..."
+
+
+msgid "Генерую лист..."
+msgstr "E-Mail generieren..."
+
+
+msgid "Текст листа порожній"
+msgstr "E-Mail-Text ist leer"
+
+
+msgid "Вкажіть отримувача"
+msgstr "Empfänger eingeben"
+
+
+msgid "Поки немає подій"
+msgstr "Noch keine Ereignisse"
+
+
+msgid "Генерую..."
+msgstr "Generiere..."
