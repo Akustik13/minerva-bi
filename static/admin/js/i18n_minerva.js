@@ -62,6 +62,14 @@ window.MINERVA_I18N = {
     lang_en: 'English',
     lang_de: 'Deutsch',
     lang_ru: 'Русский',
+    // Launchpad strings
+    open:           'Відкрити',
+    goto:           'Перейти →',
+    tiles_label:    'Плитки',
+    menu_section:   'Розділ меню',
+    all_sections:   '← Всі розділи',
+    system_tagline: 'Система управління бізнесом',
+    my_dashboard:   '📌 Мій дашборд',
     // Link labels (uk = identity, no change needed)
     lnk: {},
   },
@@ -116,6 +124,14 @@ window.MINERVA_I18N = {
     lang_en: 'English',
     lang_de: 'Deutsch',
     lang_ru: 'Русский',
+    // Launchpad strings
+    open:           'Open',
+    goto:           'Go to →',
+    tiles_label:    'Tiles',
+    menu_section:   'Menu section',
+    all_sections:   '← All sections',
+    system_tagline: 'Business Management System',
+    my_dashboard:   '📌 My Dashboard',
     // Sidebar link labels (Ukrainian → English)
     lnk: {
       'Дашборд':            'Dashboard',
@@ -217,6 +233,14 @@ window.MINERVA_I18N = {
     lang_en: 'English',
     lang_de: 'Deutsch',
     lang_ru: 'Русский',
+    // Launchpad strings
+    open:           'Öffnen',
+    goto:           'Gehe zu →',
+    tiles_label:    'Kacheln',
+    menu_section:   'Menübereich',
+    all_sections:   '← Alle Bereiche',
+    system_tagline: 'Unternehmensverwaltung',
+    my_dashboard:   '📌 Mein Dashboard',
     // Sidebar link labels (Ukrainian → Deutsch)
     lnk: {
       'Дашборд':            'Dashboard',
@@ -318,6 +342,14 @@ window.MINERVA_I18N = {
     lang_en: 'English',
     lang_de: 'Deutsch',
     lang_ru: 'Русский',
+    // Launchpad strings
+    open:           'Открыть',
+    goto:           'Перейти →',
+    tiles_label:    'Плитки',
+    menu_section:   'Раздел меню',
+    all_sections:   '← Все разделы',
+    system_tagline: 'Система управления бизнесом',
+    my_dashboard:   '📌 Мой дашборд',
     // Sidebar link labels (Ukrainian → Russian)
     lnk: {
       'Дашборд':            'Дашборд',

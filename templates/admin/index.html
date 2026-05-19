@@ -221,7 +221,7 @@
   <div id="lp-topbar" class="lp-topbar">
     <div>
       <h1 class="lp-title" id="lp-title">🏛️ Minerva Business Intelligence</h1>
-      <div class="lp-sub" id="lp-sub">Система управління бізнесом</div>
+      <div class="lp-sub" id="lp-sub"></div>
     </div>
     <div class="lp-date" id="lp-date"></div>
   </div>
@@ -235,13 +235,13 @@
     <!-- ── Widget panel ── -->
     <aside class="lp-widget-panel" id="lp-widget-panel">
       <div class="lwp-header">
-        <span class="lwp-title">📌 Мій дашборд</span>
+        <span class="lwp-title" id="lwp-title-el">📌 Мій дашборд</span>
         <button id="lwp-refresh-btn" class="lwp-btn" title="Оновити дані">🔄</button>
         <button id="lwp-edit-btn"    class="lwp-btn" title="Налаштувати">✏️</button>
       </div>
       <div class="lwp-body" id="lwp-body">
         <div style="color:var(--text-dim);font-size:12px;text-align:center;padding:20px 0">
-          Завантаження…
+          <span id="lwp-loading-text">Завантаження…</span>
         </div>
       </div>
     </aside>
@@ -251,14 +251,28 @@
 <!-- ── Launchpad JS ── -->
 <script>
 (function(){
+  // Apply static i18n strings
+  var _lang = window.MINERVA_LANG || 'uk';
+  var _localeMap = {uk:'uk-UA', en:'en-US', de:'de-DE', ru:'ru-RU'};
+  var _locale = _localeMap[_lang] || 'uk-UA';
+  var _t = window.t || function(k, fb){ return fb || k; };
+
+  var subEl = document.getElementById('lp-sub');
+  if (subEl) subEl.textContent = _t('system_tagline', 'Система управління бізнесом');
+
+  var lwpTitle = document.getElementById('lwp-title-el');
+  if (lwpTitle) lwpTitle.textContent = _t('my_dashboard', '📌 Мій дашборд');
+
+  var lwpLoading = document.getElementById('lwp-loading-text');
+  if (lwpLoading) lwpLoading.textContent = _t('loading', 'Завантаження...');
+
   var dateEl = document.getElementById('lp-date');
   if (dateEl) {
     var d = new Date();
-    var days   = ['Неділя','Понеділок','Вівторок','Середа','Четвер','Пʼятниця','Субота'];
-    var months = ['січня','лютого','березня','квітня','травня','червня',
-                  'липня','серпня','вересня','жовтня','листопада','грудня'];
-    dateEl.innerHTML = days[d.getDay()] + '<br><strong style="color:var(--text-muted);font-size:13px">' +
-      d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear() + '</strong>';
+    var dayName  = new Intl.DateTimeFormat(_locale, {weekday:'long'}).format(d);
+    var dateStr  = new Intl.DateTimeFormat(_locale, {day:'numeric', month:'long', year:'numeric'}).format(d);
+    var capDay   = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+    dateEl.innerHTML = capDay + '<br><strong style="color:var(--text-muted);font-size:13px">' + dateStr + '</strong>';
   }
 
   function buildLaunchpad() {
@@ -282,9 +296,9 @@
         var fb = grp.href || ('/admin/?g=' + grp.id);
         tilesHtml = '<a href="' + fb + '" class="lp-tile ' + accentCls + '">' +
           '<span class="lp-tile-icon">' + (grp.icon || '📄') + '</span>' +
-          '<span class="lp-tile-name">Відкрити</span></a>';
+          '<span class="lp-tile-name">' + _t('open','Відкрити') + '</span></a>';
       }
-      var gl  = grp.href ? '<a href="' + grp.href + '" class="lp-section-link">Перейти →</a>' : '';
+      var gl  = grp.href ? '<a href="' + grp.href + '" class="lp-section-link">' + _t('goto','Перейти →') + '</a>' : '';
       var lbl = grp.label.replace(/^[\u{1F000}-\u{1FFFF}\u{2600}-\u{27FF}\u{2B00}-\u{2BFF}️\s]+/u, '') || grp.label;
       return '<section class="lp-section" id="lp-g-' + grp.id + '">' +
         '<div class="lp-section-hdr">' +
@@ -298,9 +312,9 @@
     var html = '';
     if (filterG) {
       var grp = groups.filter(function(g){ return g.id === filterG; })[0];
-      document.getElementById('lp-title').textContent = (grp ? grp.label : '?') + ' — Плитки';
-      document.getElementById('lp-sub').textContent   = 'Розділ меню';
-      html += '<a href="/admin/" class="lp-back">← Всі розділи</a>';
+      document.getElementById('lp-title').textContent = (grp ? grp.label : '?') + ' — ' + _t('tiles_label','Плитки');
+      document.getElementById('lp-sub').textContent   = _t('menu_section','Розділ меню');
+      html += '<a href="/admin/" class="lp-back">' + _t('all_sections','← Всі розділи') + '</a>';
       if (grp) html += renderGroup(grp);
     } else {
       groups.forEach(function(grp){
