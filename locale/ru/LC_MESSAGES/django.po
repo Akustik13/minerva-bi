@@ -1,0 +1,114 @@
+# Russian translations for Minerva BI
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ru\n"
+
+msgid "Зберегти"
+msgstr "Сохранить"
+
+msgid "Видалити"
+msgstr "Удалить"
+
+msgid "Скасувати"
+msgstr "Отмена"
+
+msgid "Додати"
+msgstr "Добавить"
+
+msgid "Редагувати"
+msgstr "Редактировать"
+
+msgid "Пошук"
+msgstr "Поиск"
+
+msgid "Фільтр"
+msgstr "Фильтр"
+
+msgid "Експорт"
+msgstr "Экспорт"
+
+msgid "Імпорт"
+msgstr "Импорт"
+
+msgid "Оновити"
+msgstr "Обновить"
+
+msgid "Закрити"
+msgstr "Закрыть"
+
+msgid "Підтвердити"
+msgstr "Подтвердить"
+
+msgid "Так"
+msgstr "Да"
+
+msgid "Ні"
+msgstr "Нет"
+
+msgid "Завантажити"
+msgstr "Скачать"
+
+msgid "Генерувати"
+msgstr "Создать"
+
+msgid "Відправити"
+msgstr "Отправить"
+
+msgid "Мова інтерфейсу"
+msgstr "Язык интерфейса"
+
+msgid "Тема"
+msgstr "Тема"
+
+msgid "Записів на сторінку"
+msgstr "Записей на страницу"
+
+msgid "Мої налаштування"
+msgstr "Мои настройки"
+
+msgid "Налаштування збережено"
+msgstr "Настройки сохранены"
+
+msgid "Клієнт"
+msgstr "Клиент"
+
+msgid "Компанія"
+msgstr "Компания"
+
+msgid "Замовлення"
+msgstr "Заказ"
+
+msgid "Товар"
+msgstr "Товар"
+
+msgid "Артикул"
+msgstr "Артикул"
+
+msgid "Залишок"
+msgstr "Остаток"
+
+msgid "Статус"
+msgstr "Статус"
+
+msgid "Сума"
+msgstr "Сумма"
+
+msgid "Валюта"
+msgstr "Валюта"
+
+msgid "Відправлено"
+msgstr "Отправлено"
+
+msgid "Доставлено"
+msgstr "Доставлено"
+
+msgid "Скасовано"
+msgstr "Отменено"
+
+msgid "В обробці"
+msgstr "В обработке"
+
+msgid "Отримано"
+msgstr "Получено"

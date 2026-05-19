@@ -1,0 +1,114 @@
+# Deutsch translations for Minerva BI
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: de\n"
+
+msgid "Зберегти"
+msgstr "Speichern"
+
+msgid "Видалити"
+msgstr "Löschen"
+
+msgid "Скасувати"
+msgstr "Abbrechen"
+
+msgid "Додати"
+msgstr "Hinzufügen"
+
+msgid "Редагувати"
+msgstr "Bearbeiten"
+
+msgid "Пошук"
+msgstr "Suchen"
+
+msgid "Фільтр"
+msgstr "Filter"
+
+msgid "Експорт"
+msgstr "Exportieren"
+
+msgid "Імпорт"
+msgstr "Importieren"
+
+msgid "Оновити"
+msgstr "Aktualisieren"
+
+msgid "Закрити"
+msgstr "Schließen"
+
+msgid "Підтвердити"
+msgstr "Bestätigen"
+
+msgid "Так"
+msgstr "Ja"
+
+msgid "Ні"
+msgstr "Nein"
+
+msgid "Завантажити"
+msgstr "Herunterladen"
+
+msgid "Генерувати"
+msgstr "Generieren"
+
+msgid "Відправити"
+msgstr "Senden"
+
+msgid "Мова інтерфейсу"
+msgstr "Sprache der Benutzeroberfläche"
+
+msgid "Тема"
+msgstr "Design"
+
+msgid "Записів на сторінку"
+msgstr "Einträge pro Seite"
+
+msgid "Мої налаштування"
+msgstr "Meine Einstellungen"
+
+msgid "Налаштування збережено"
+msgstr "Einstellungen gespeichert"
+
+msgid "Клієнт"
+msgstr "Kunde"
+
+msgid "Компанія"
+msgstr "Unternehmen"
+
+msgid "Замовлення"
+msgstr "Bestellung"
+
+msgid "Товар"
+msgstr "Produkt"
+
+msgid "Артикул"
+msgstr "Artikelnummer"
+
+msgid "Залишок"
+msgstr "Bestand"
+
+msgid "Статус"
+msgstr "Status"
+
+msgid "Сума"
+msgstr "Betrag"
+
+msgid "Валюта"
+msgstr "Währung"
+
+msgid "Відправлено"
+msgstr "Versendet"
+
+msgid "Доставлено"
+msgstr "Geliefert"
+
+msgid "Скасовано"
+msgstr "Storniert"
+
+msgid "В обробці"
+msgstr "In Bearbeitung"
+
+msgid "Отримано"
+msgstr "Empfangen"

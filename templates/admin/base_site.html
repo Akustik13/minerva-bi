@@ -10,6 +10,8 @@
   localStorage.setItem('theme', t === 'light' ? 'light' : 'dark');
 })();
 </script>
+<script>window.MINERVA_LANG = '{{ CURRENT_LANGUAGE|default:"uk" }}';</script>
+<script src="/static/admin/js/i18n_minerva.js"></script>
 <!-- PWA -->
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -953,6 +955,7 @@ window.MV_GROUPS = [
       { href:'/admin/core/tenantaccount/', icon:'👥', label:'Клієнти системи' },
     ], apps:[] },
 ];
+if (window.applyMVGroupI18n) applyMVGroupI18n();
 </script>
 
 <button id="mob-menu-btn" aria-label="Меню">☰</button>
@@ -1498,7 +1501,32 @@ document.addEventListener('DOMContentLoaded', function(){
 </a>
 {% endblock %}
 
-{% block usertools %}{{ block.super }}{% endblock %}
+{% block usertools %}
+<div id="mv-lang-sw" style="position:relative;display:inline-flex;align-items:center;margin-right:8px">
+  <button type="button" onclick="mvToggleLang(event)"
+    style="padding:4px 9px;border-radius:6px;font-size:12px;border:1px solid var(--border-strong);
+           background:var(--bg-card);cursor:pointer;color:var(--text-muted)">
+    🌐 {{ CURRENT_LANGUAGE|upper }}
+  </button>
+  <div id="mv-lang-menu" style="display:none;position:absolute;top:34px;right:0;
+       background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;
+       overflow:hidden;min-width:150px;z-index:10000;box-shadow:0 4px 16px rgba(0,0,0,.4)">
+    {% for code, name in LANGUAGES %}
+    <a href="/core/set-language/{{ code }}/"
+       style="display:block;padding:8px 14px;font-size:13px;text-decoration:none;
+              color:{% if CURRENT_LANGUAGE == code %}var(--accent){% else %}var(--text){% endif %};
+              background:{% if CURRENT_LANGUAGE == code %}var(--accent-subtle){% else %}transparent{% endif %}">
+      {{ name }}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+<script>
+function mvToggleLang(e){e.stopPropagation();var m=document.getElementById('mv-lang-menu');m.style.display=m.style.display==='none'?'block':'none';}
+document.addEventListener('click',function(){var m=document.getElementById('mv-lang-menu');if(m)m.style.display='none';});
+</script>
+{{ block.super }}
+{% endblock %}
 
 {% block footer %}
 <style>

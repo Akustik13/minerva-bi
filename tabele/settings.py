@@ -69,9 +69,11 @@ SITE_ID = 1
 _MIDDLEWARE_BASE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.UserLanguageMiddleware",
     "core.middleware.AuditMiddleware",
     "core.middleware.ModuleAccessMiddleware",
     "config.middleware.OnboardingMiddleware",
@@ -95,7 +97,9 @@ TEMPLATES = [
             "django.template.context_processors.request",
             "django.contrib.auth.context_processors.auth",
             "django.contrib.messages.context_processors.messages",
+            "django.template.context_processors.i18n",
             "core.context_processors.user_modules",
+            "core.context_processors.language_context",
         ]},
     }
 ]
@@ -134,6 +138,17 @@ LANGUAGE_CODE = "uk"
 TIME_ZONE = "Europe/Berlin"
 USE_I18N = True
 USE_TZ = True
+
+LANGUAGES = [
+    ('uk', 'Українська'),
+    ('en', 'English'),
+    ('de', 'Deutsch'),
+    ('ru', 'Русский'),
+]
+
+LOCALE_PATHS = [
+    BASE_DIR / 'locale',
+]
 
 STATIC_URL  = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"

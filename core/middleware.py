@@ -141,6 +141,27 @@ class ModuleAccessMiddleware:
             return False, _empty  # fail open
 
 
+class UserLanguageMiddleware:
+    """Activates interface language from UserProfile.interface_language per request."""
+
+    _SUPPORTED = frozenset({'uk', 'de', 'en', 'ru'})
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated:
+            try:
+                lang = request.user.profile.interface_language
+                if lang in self._SUPPORTED:
+                    from django.utils import translation
+                    translation.activate(lang)
+                    request.LANGUAGE_CODE = lang
+            except Exception:
+                pass
+        return self.get_response(request)
+
+
 class TenantMiddleware:
     """
     Stub: future multi-tenant middleware.

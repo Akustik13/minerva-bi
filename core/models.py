@@ -197,7 +197,7 @@ class UserProfile(models.Model):
     notify_telegram    = models.BooleanField(default=False, verbose_name='Telegram сповіщення')
     interface_language = models.CharField(
         max_length=5,
-        choices=[('uk', 'Українська'), ('de', 'Deutsch'), ('en', 'English')],
+        choices=[('uk', 'Українська'), ('en', 'English'), ('de', 'Deutsch'), ('ru', 'Русский')],
         default='uk', verbose_name='Мова інтерфейсу',
     )
     items_per_page     = models.PositiveIntegerField(default=25, verbose_name='Записів на сторінку')

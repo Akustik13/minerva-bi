@@ -1,5 +1,6 @@
 """core/context_processors.py — Inject user role + allowed modules into templates."""
 import json
+from django.conf import settings as _settings
 
 
 def user_modules(request):
@@ -21,3 +22,12 @@ def user_modules(request):
         }
     except Exception:
         return {'allowed_modules_json': '"__all__"', 'denied_models_json': '[]', 'user_role': ''}
+
+
+def language_context(request):
+    """Inject LANGUAGES list and CURRENT_LANGUAGE into all templates."""
+    lang = getattr(request, 'LANGUAGE_CODE', 'uk')[:2]
+    return {
+        'LANGUAGES':        getattr(_settings, 'LANGUAGES', []),
+        'CURRENT_LANGUAGE': lang,
+    }

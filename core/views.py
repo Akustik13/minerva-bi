@@ -81,6 +81,30 @@ def my_settings_view(request):
     return render(request, 'core/my_settings.html', context)
 
 
+@staff_member_required
+def set_language_view(request, lang_code):
+    """Change interface language for the current user and redirect back."""
+    from django.http import HttpResponseRedirect
+    from django.utils import translation
+
+    supported = {'uk', 'en', 'de', 'ru'}
+    if lang_code not in supported:
+        lang_code = 'uk'
+
+    try:
+        profile = request.user.profile
+        profile.interface_language = lang_code
+        profile.save(update_fields=['interface_language'])
+    except Exception:
+        pass
+
+    translation.activate(lang_code)
+    redirect_to = request.META.get('HTTP_REFERER', '/admin/')
+    response = HttpResponseRedirect(redirect_to)
+    response.set_cookie('django_language', lang_code, max_age=365 * 24 * 3600)
+    return response
+
+
 def custom_403_view(request, exception=None):
     return render(request, 'core/access_denied.html', {
         'title': 'Доступ обмежено',
