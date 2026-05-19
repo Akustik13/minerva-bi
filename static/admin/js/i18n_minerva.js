@@ -62,6 +62,8 @@ window.MINERVA_I18N = {
     lang_en: 'English',
     lang_de: 'Deutsch',
     lang_ru: 'Русский',
+    // Link labels (uk = identity, no change needed)
+    lnk: {},
   },
 
   en: {
@@ -114,6 +116,55 @@ window.MINERVA_I18N = {
     lang_en: 'English',
     lang_de: 'Deutsch',
     lang_ru: 'Русский',
+    // Sidebar link labels (Ukrainian → English)
+    lnk: {
+      'Дашборд':            'Dashboard',
+      'Сигнали':            'Signals',
+      'Тенденції':          'Trends',
+      'Аналітика':          'Analytics',
+      'Клієнти':            'Clients',
+      'Стратегії':          'Strategies',
+      'Шаблони':            'Templates',
+      'Відправлення':       'Shipments',
+      'Нове відправлення':  'New Shipment',
+      'Адресна книга':      'Address Book',
+      'Додати трекінг':     'Add Tracking',
+      'Перевізники':        'Carriers',
+      'Товари':             'Products',
+      'Огляд складу':       'Inventory Overview',
+      'Транзакції':         'Transactions',
+      'Закупівлі (PO)':     'Purchases (PO)',
+      'Трекінг приходу':    'Incoming Tracking',
+      'Постачальники':      'Suppliers',
+      'Налаштування':       'Settings',
+      'Розмови':            'Conversations',
+      'Бюджет AI':          'AI Budget',
+      'Налаштування AI':    'AI Settings',
+      'Діагностика':        'Diagnostics',
+      'Вхідні':             'Inbox',
+      'Написати':           'Compose',
+      'Акаунти':            'Accounts',
+      'Заплановані':        'Scheduled',
+      'Мій календар':       'My Calendar',
+      'Нова подія':         'New Event',
+      'Сповіщення':         'Notifications',
+      'Архів документів':   'Document Archive',
+      'Боти та скрипти':    'Bots & Scripts',
+      'Лог ботів':          'Bot Log',
+      'API Токени':         'API Tokens',
+      'API Документація':   'API Documentation',
+      'Інтеграції':         'Integrations',
+      'Авто-імпорт':        'Auto-Import',
+      'Імпорт даних':       'Data Import',
+      'Довідник':           'Help',
+      'Мої налаштування':   'My Settings',
+      'Резервні копії':     'Backups',
+      'Користувачі':        'Users',
+      'Журнал аудиту':      'Audit Log',
+      'Ролі користувачів':  'User Roles',
+      'Реєстр модулів':     'Module Registry',
+      'Клієнти системи':    'System Clients',
+    },
   },
 
   de: {
@@ -166,6 +217,55 @@ window.MINERVA_I18N = {
     lang_en: 'English',
     lang_de: 'Deutsch',
     lang_ru: 'Русский',
+    // Sidebar link labels (Ukrainian → Deutsch)
+    lnk: {
+      'Дашборд':            'Dashboard',
+      'Сигнали':            'Signale',
+      'Тенденції':          'Trends',
+      'Аналітика':          'Analytik',
+      'Клієнти':            'Kunden',
+      'Стратегії':          'Strategien',
+      'Шаблони':            'Vorlagen',
+      'Відправлення':       'Sendungen',
+      'Нове відправлення':  'Neue Sendung',
+      'Адресна книга':      'Adressbuch',
+      'Додати трекінг':     'Tracking hinzufügen',
+      'Перевізники':        'Spediteure',
+      'Товари':             'Produkte',
+      'Огляд складу':       'Lagerübersicht',
+      'Транзакції':         'Transaktionen',
+      'Закупівлі (PO)':     'Einkäufe (PO)',
+      'Трекінг приходу':    'Eingangs-Tracking',
+      'Постачальники':      'Lieferanten',
+      'Налаштування':       'Einstellungen',
+      'Розмови':            'Gespräche',
+      'Бюджет AI':          'KI-Budget',
+      'Налаштування AI':    'KI-Einstellungen',
+      'Діагностика':        'Diagnose',
+      'Вхідні':             'Posteingang',
+      'Написати':           'Verfassen',
+      'Акаунти':            'Konten',
+      'Заплановані':        'Geplant',
+      'Мій календар':       'Mein Kalender',
+      'Нова подія':         'Neues Ereignis',
+      'Сповіщення':         'Benachrichtigungen',
+      'Архів документів':   'Dokumentenarchiv',
+      'Боти та скрипти':    'Bots & Skripte',
+      'Лог ботів':          'Bot-Protokoll',
+      'API Токени':         'API-Token',
+      'API Документація':   'API-Dokumentation',
+      'Інтеграції':         'Integrationen',
+      'Авто-імпорт':        'Auto-Import',
+      'Імпорт даних':       'Datenimport',
+      'Довідник':           'Handbuch',
+      'Мої налаштування':   'Meine Einstellungen',
+      'Резервні копії':     'Datensicherungen',
+      'Користувачі':        'Benutzer',
+      'Журнал аудиту':      'Prüfprotokoll',
+      'Ролі користувачів':  'Benutzerrollen',
+      'Реєстр модулів':     'Modulregister',
+      'Клієнти системи':    'Systemkunden',
+    },
   },
 
   ru: {
@@ -218,6 +318,55 @@ window.MINERVA_I18N = {
     lang_en: 'English',
     lang_de: 'Deutsch',
     lang_ru: 'Русский',
+    // Sidebar link labels (Ukrainian → Russian)
+    lnk: {
+      'Дашборд':            'Дашборд',
+      'Сигнали':            'Сигналы',
+      'Тенденції':          'Тенденции',
+      'Аналітика':          'Аналитика',
+      'Клієнти':            'Клиенты',
+      'Стратегії':          'Стратегии',
+      'Шаблони':            'Шаблоны',
+      'Відправлення':       'Отправления',
+      'Нове відправлення':  'Новая отправка',
+      'Адресна книга':      'Адресная книга',
+      'Додати трекінг':     'Добавить трекинг',
+      'Перевізники':        'Перевозчики',
+      'Товари':             'Товары',
+      'Огляд складу':       'Обзор склада',
+      'Транзакції':         'Транзакции',
+      'Закупівлі (PO)':     'Закупки (PO)',
+      'Трекінг приходу':    'Трекинг прихода',
+      'Постачальники':      'Поставщики',
+      'Налаштування':       'Настройки',
+      'Розмови':            'Разговоры',
+      'Бюджет AI':          'Бюджет AI',
+      'Налаштування AI':    'Настройки AI',
+      'Діагностика':        'Диагностика',
+      'Вхідні':             'Входящие',
+      'Написати':           'Написать',
+      'Акаунти':            'Аккаунты',
+      'Заплановані':        'Запланированные',
+      'Мій календар':       'Мой календарь',
+      'Нова подія':         'Новое событие',
+      'Сповіщення':         'Уведомления',
+      'Архів документів':   'Архив документов',
+      'Боти та скрипти':    'Боты и скрипты',
+      'Лог ботів':          'Лог ботов',
+      'API Токени':         'API Токены',
+      'API Документація':   'API Документация',
+      'Інтеграції':         'Интеграции',
+      'Авто-імпорт':        'Авто-импорт',
+      'Імпорт даних':       'Импорт данных',
+      'Довідник':           'Справочник',
+      'Мої налаштування':   'Мои настройки',
+      'Резервні копії':     'Резервные копии',
+      'Користувачі':        'Пользователи',
+      'Журнал аудиту':      'Журнал аудита',
+      'Ролі користувачів':  'Роли пользователей',
+      'Реєстр модулів':     'Реестр модулей',
+      'Клієнти системи':    'Клиенты системы',
+    },
   },
 };
 
@@ -228,15 +377,24 @@ window.t = function(key, fallback) {
   return dict[key] !== undefined ? dict[key] : (fallback !== undefined ? fallback : key);
 };
 
-/* ── Apply translations to MV_GROUPS sidebar labels ── */
+/* ── Apply translations to MV_GROUPS sidebar labels + link labels ── */
 window.applyMVGroupI18n = function() {
   var lang = window.MINERVA_LANG || 'uk';
   if (lang === 'uk') return;  // Ukrainian is the default — no change needed
+  var dict = window.MINERVA_I18N[lang] || window.MINERVA_I18N['uk'];
+  var lnk = dict.lnk || {};
   var groups = window.MV_GROUPS;
   if (!groups) return;
   groups.forEach(function(g) {
+    // Translate group header label
     var key = 'grp_' + g.id;
     var translated = t(key);
     if (translated !== key) g.label = translated;
+    // Translate individual link labels
+    if (g.links) {
+      g.links.forEach(function(ln) {
+        if (lnk[ln.label]) ln.label = lnk[ln.label];
+      });
+    }
   });
 };
