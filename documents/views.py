@@ -602,6 +602,69 @@ def _add_item_loop_markers(docx_bytes):
     return out.read()
 
 
+def _remove_unmatched_endtags(docx_bytes):
+    """Remove stray {% endfor %} / {% endif %} from paragraph XML runs.
+    When the count of end-tags exceeds the matching open-tags (e.g. the loop
+    lives in {%tr for %}/{%tr endfor %} table markers, not in paragraphs),
+    standalone end-tags in paragraphs are unmatched and cause TemplateSyntaxError."""
+    import zipfile, re
+    from io import BytesIO
+
+    # These regexes intentionally do NOT match {%tr ... %} variants
+    PARA_FOR_RE    = re.compile(r'\{%-?\s*for\b')
+    PARA_ENDFOR_RE = re.compile(r'\{%-?\s*endfor\b')
+    PARA_IF_RE     = re.compile(r'\{%-?\s*if\b')
+    PARA_ENDIF_RE  = re.compile(r'\{%-?\s*endif\b')
+
+    def _patch_xml(xml):
+        n_for    = len(PARA_FOR_RE.findall(xml))
+        n_endfor = len(PARA_ENDFOR_RE.findall(xml))
+        n_if     = len(PARA_IF_RE.findall(xml))
+        n_endif  = len(PARA_ENDIF_RE.findall(xml))
+        remove_endfor = n_endfor > n_for
+        remove_endif  = n_endif > n_if
+        if not remove_endfor and not remove_endif:
+            return xml
+
+        def _fix_para(para_xml):
+            text = ''.join(re.findall(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', para_xml))
+            if 'endfor' not in text and 'endif' not in text:
+                return para_xml
+            run_matches = list(re.finditer(r'<w:r\b[^>]*>.*?</w:r>', para_xml, re.DOTALL))
+            remove_idx = set()
+            for idx, rm in enumerate(run_matches):
+                t = ''.join(re.findall(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', rm.group(0)))
+                if remove_endfor and PARA_ENDFOR_RE.search(t):
+                    remove_idx.add(idx)
+                if remove_endif and PARA_ENDIF_RE.search(t):
+                    remove_idx.add(idx)
+            if not remove_idx:
+                return para_xml
+            result = para_xml
+            for rev_i, rm in enumerate(reversed(run_matches)):
+                actual = len(run_matches) - 1 - rev_i
+                if actual not in remove_idx:
+                    continue
+                result = result[:rm.start()] + result[rm.end():]
+            return result
+
+        return re.sub(r'<w:p\b[^>]*>.*?</w:p>',
+                      lambda m: _fix_para(m.group(0)),
+                      xml, flags=re.DOTALL)
+
+    inp = BytesIO(docx_bytes)
+    out = BytesIO()
+    with zipfile.ZipFile(inp, 'r') as zin, \
+         zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for info in zin.infolist():
+            data = zin.read(info.filename)
+            if info.filename.endswith('.xml') and info.filename.startswith('word/'):
+                data = _patch_xml(data.decode('utf-8')).encode('utf-8')
+            zout.writestr(info, data)
+    out.seek(0)
+    return out.read()
+
+
 def _auto_fix_syntax_tags(docx_bytes):
     """Replace {% varname %} → {{ varname }} green+bold at paragraph level.
     Skips real Jinja2 block tags (for/endfor/if/etc.) and docxtpl row markers (tr/p/tc)."""
@@ -726,6 +789,15 @@ def _syntax_error_hint(err_str):
             tag = err_str.split("'")[1]
         except IndexError:
             tag = '?'
+        _END_TAGS = {'endfor', 'endif', 'endblock', 'endwith', 'endmacro'}
+        if tag in _END_TAGS:
+            open_tag = tag[3:]  # endfor → for, endif → if
+            return (
+                f'Синтаксична помилка: зайвий «{{% {tag} %}}» без відповідного «{{% {open_tag} ... %}}». '
+                f'Якщо цикл у таблиці — використовуй {{%tr for item in items %}} ... {{%tr endfor %}} '
+                f'у рядках таблиці, а не «{{% {tag} %}}» у тексті параграфу. '
+                f'Видали «{{% {tag} %}}» з шаблону або натисни «🔧 Виправити і завантажити» для автовиправлення.'
+            )
         return (
             f'Синтаксична помилка: невідомий тег «{{% {tag} %}}». '
             f'Можливо, замість «{{{{ {tag} }}}}» (подвійні дужки) вжито «{{% {tag} %}}» (відсоток). '
@@ -855,6 +927,12 @@ def auto_fix_download(request, template_pk):
         patched = _auto_fix_field_errors(original_bytes, issues)
     except jinja2.exceptions.TemplateSyntaxError:
         patched = _auto_fix_syntax_tags(original_bytes)
+        # Remove stray {% endfor %} / {% endif %} that have no matching opener —
+        # they caused the TemplateSyntaxError and _auto_fix_syntax_tags keeps them.
+        try:
+            patched = _remove_unmatched_endtags(patched)
+        except Exception:
+            pass
     except Exception as e:
         logger.error('auto_fix_download %s: %s', template_pk, e)
         return HttpResponse(str(e), status=500)
