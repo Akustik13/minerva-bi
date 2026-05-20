@@ -81,6 +81,32 @@
 .bk-note code { background: rgba(255,255,255,.07); border-radius: 4px;
                 padding: 1px 5px; font-family: monospace; color: var(--text); }
 
+/* ── Update progress panel ──────────────────────────── */
+.upd-bar-outer {
+  background: var(--bg-card-2); border-radius: 20px; height: 8px; overflow: hidden;
+}
+.upd-bar-inner {
+  height: 100%; width: 0%; border-radius: 20px; background: var(--accent);
+}
+.upd-bar-inner.ok  { background: var(--ok); }
+.upd-bar-inner.err { background: var(--err); }
+
+.upd-step {
+  display: flex; align-items: center; gap: 10px;
+  padding: 5px 0; border-bottom: 1px solid var(--border);
+  font-size: .85rem;
+}
+.upd-step:last-child { border-bottom: none; }
+.upd-step-icon { width: 20px; text-align: center; flex-shrink: 0; font-style: normal; }
+.upd-step-name { flex: 1; color: var(--text-dim); font-family: monospace; }
+.upd-step-name.active { color: var(--text); font-weight: 700; }
+.upd-step-name.done { color: var(--text-muted); }
+.upd-step-est { font-size: .78rem; color: var(--border-strong); min-width: 32px; text-align: right; }
+.upd-step-time { font-size: .82rem; color: var(--text-dim); min-width: 36px; text-align: right; font-family: monospace; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.upd-spin { display: inline-block; animation: spin .7s linear infinite; }
+
 /* ── History table ──────────────────────────────────── */
 .bk-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
 .bk-table th {
@@ -297,8 +323,35 @@
 
     </div>
 
-    <!-- Result / commit list -->
-    <div id="git-result" class="bk-result idle" style="margin-top:14px; display:none;"></div>
+    <!-- Progress panel -->
+    <div id="upd-panel" style="margin-top:16px; display:none;">
+
+      <!-- Header row: icon + label + timer -->
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+        <span id="upd-icon" style="font-size:1.1rem; flex-shrink:0; line-height:1;">⏳</span>
+        <span id="upd-label" style="flex:1; font-size:.88rem; font-weight:600; color:var(--text);"></span>
+        <span id="upd-timer" style="font-family:monospace; font-size:.85rem; color:var(--text-dim); min-width:36px; text-align:right;"></span>
+      </div>
+
+      <!-- Progress bar -->
+      <div class="upd-bar-outer" style="margin-bottom:12px;">
+        <div id="upd-bar" class="upd-bar-inner"></div>
+      </div>
+
+      <!-- Step list (full deploy only) -->
+      <div id="upd-steps" style="display:none; border:1px solid var(--border-strong);
+           border-radius:8px; padding:8px 14px; margin-bottom:12px;"></div>
+
+      <!-- Log output (collapsible) -->
+      <div id="upd-log" style="display:none; background:var(--bg-app);
+           border:1px solid var(--border-strong); border-radius:8px;
+           padding:12px 14px; font-family:monospace; font-size:.78rem;
+           white-space:pre-wrap; max-height:240px; overflow-y:auto;
+           color:var(--text); line-height:1.6;"></div>
+
+    </div>
+
+    <!-- Commit list (check update only) -->
     <div id="git-commits" style="margin-top:10px; display:none;">
       <div style="font-size:.8rem; color:var(--text-muted); margin-bottom:6px;">Нові коміти:</div>
       <ul id="git-commits-list" style="margin:0; padding-left:20px; font-size:.82rem;
@@ -947,276 +1000,357 @@ async function runBackup(type, btn) {
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   Git Update
+   Progress panel helpers
 ════════════════════════════════════════════════════════════════════ */
-const GIT_STATUS_URL = '{% url "admin:backup_git_status" %}';
-const GIT_UPDATE_URL = '{% url "admin:backup_git_update" %}';
+const GIT_STATUS_URL    = '{% url "admin:backup_git_status" %}';
+const GIT_UPDATE_URL    = '{% url "admin:backup_git_update" %}';
+const MIGRATE_URL       = '{% url "admin:backup_migrate" %}';
+const SETUP_MODULES_URL = '{% url "admin:backup_setup_modules" %}';
+const RESTART_WEB_URL   = '{% url "admin:backup_restart_web" %}';
+const COLLECTSTATIC_URL = '{% url "admin:backup_collectstatic" %}';
 
+/* Estimated seconds per step */
+const STEP_EST = {
+  'git pull':      8,
+  collectstatic:  40,
+  migrate:        15,
+  setup_modules:   6,
+  restart:         5,
+};
+
+let _uptStart = 0, _uptTimer = null, _uptBarTimer = null;
+
+function _updPanel() { return document.getElementById('upd-panel'); }
+
+function _updOpen(icon, label) {
+  const p = _updPanel();
+  p.style.display = 'block';
+  document.getElementById('upd-icon').textContent  = icon;
+  document.getElementById('upd-label').textContent = label;
+  document.getElementById('upd-timer').textContent = '0с';
+  document.getElementById('upd-steps').style.display = 'none';
+  document.getElementById('upd-log').style.display   = 'none';
+  // reset bar
+  const bar = document.getElementById('upd-bar');
+  bar.className = 'upd-bar-inner';
+  bar.style.transition = 'none';
+  bar.style.width = '0%';
+  // start global elapsed timer
+  _uptStart = Date.now();
+  clearInterval(_uptTimer);
+  _uptTimer = setInterval(() => {
+    const sec = Math.round((Date.now() - _uptStart) / 1000);
+    document.getElementById('upd-timer').textContent = sec + 'с';
+  }, 500);
+}
+
+/* Animate bar asymptotically toward 90% over estSec, from fromPct */
+function _animBar(fromPct, toPct, estSec) {
+  clearInterval(_uptBarTimer);
+  const bar = document.getElementById('upd-bar');
+  bar.style.transition = 'none';
+  bar.style.width = fromPct + '%';
+  const start = Date.now();
+  _uptBarTimer = setInterval(() => {
+    const elapsed = (Date.now() - start) / 1000;
+    const frac = 1 - Math.exp(-1.6 * elapsed / Math.max(estSec, 1));
+    const pct = fromPct + (toPct - fromPct) * frac * 0.92; // reach 92% of range
+    bar.style.width = Math.min(pct, toPct * 0.97) + '%';
+  }, 250);
+}
+
+function _finishBar(ok) {
+  clearInterval(_uptBarTimer);
+  clearInterval(_uptTimer);
+  const bar = document.getElementById('upd-bar');
+  bar.style.transition = 'width .4s ease';
+  bar.style.width = '100%';
+  bar.className = 'upd-bar-inner ' + (ok ? 'ok' : 'err');
+  const elapsed = Math.round((Date.now() - _uptStart) / 1000);
+  document.getElementById('upd-timer').textContent = elapsed + 'с';
+}
+
+function _updDone(ok, label, logText) {
+  _finishBar(ok);
+  document.getElementById('upd-icon').textContent  = ok ? '✅' : '❌';
+  document.getElementById('upd-label').textContent = label;
+  if (logText) {
+    const logEl = document.getElementById('upd-log');
+    logEl.style.display = 'block';
+    logEl.textContent = logText;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+}
+
+function _disableUpdateBtns(disabled) {
+  ['btn-check-update','btn-apply-update','btn-collectstatic','btn-migrate',
+   'btn-setup-modules','btn-restart-web','btn-full-deploy'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = disabled;
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Check Update
+════════════════════════════════════════════════════════════════════ */
 async function checkUpdate(btn) {
-  const resultEl  = document.getElementById('git-result');
-  const commitBox = document.getElementById('git-commits');
-  const applyBtn  = document.getElementById('btn-apply-update');
   btn.disabled = true;
-  resultEl.style.display = 'block';
-  resultEl.className = 'bk-result running';
-  resultEl.textContent = '⏳ Перевірка оновлень… (git fetch origin)';
-  commitBox.style.display = 'none';
-  applyBtn.style.display = 'none';
+  _updOpen('🔍', 'git fetch origin…');
+  _animBar(0, 80, 6);
+  document.getElementById('git-commits').style.display = 'none';
+  document.getElementById('btn-apply-update').style.display = 'none';
 
   try {
-    const resp = await fetch(GIT_STATUS_URL, {
-      method: 'POST', headers: { 'X-CSRFToken': CSRF },
-    });
+    const resp = await fetch(GIT_STATUS_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
     const data = await resp.json();
 
     if (!data.ok) {
-      resultEl.className = 'bk-result error';
-      resultEl.textContent = '❌ ' + data.error;
-      btn.disabled = false; return;
+      _updDone(false, data.error || 'git fetch помилка'); btn.disabled = false; return;
     }
 
-    // Fill status block
     document.getElementById('git-current').textContent =
       data.current_hash ? (data.current_hash + ' — ' + data.current_subject) : '—';
-    document.getElementById('git-branch').textContent =
-      'Гілка: ' + (data.branch || '?');
-    document.getElementById('git-remote').textContent =
-      data.remote_url ? ('Remote: ' + data.remote_url) : '';
+    document.getElementById('git-branch').textContent  = 'Гілка: ' + (data.branch || '?');
+    document.getElementById('git-remote').textContent  = data.remote_url ? 'Remote: ' + data.remote_url : '';
 
     if (!data.fetch_ok && data.fetch_err) {
-      resultEl.className = 'bk-result error';
-      resultEl.textContent = '⚠️ git fetch помилка: ' + data.fetch_err;
-      btn.disabled = false; return;
+      _updDone(false, 'git fetch: ' + data.fetch_err); btn.disabled = false; return;
     }
 
     if (data.behind === 0) {
-      resultEl.className = 'bk-result ok';
-      resultEl.textContent = '✅ Система актуальна — нових оновлень немає.';
+      _updDone(true, 'Система актуальна — нових оновлень немає.');
     } else {
-      resultEl.className = 'bk-result running';
-      resultEl.textContent = `⬆️ Доступно ${data.behind} нових комітів!`;
-      // Show commit list
+      _finishBar(true);
+      document.getElementById('upd-icon').textContent  = '⬆️';
+      document.getElementById('upd-label').textContent = `Доступно ${data.behind} нових комітів!`;
       const ul = document.getElementById('git-commits-list');
       ul.innerHTML = data.commits.map(c =>
         `<li><span style="color:var(--accent)">${c.hash}</span> ${c.subject}</li>`
       ).join('');
-      commitBox.style.display = 'block';
-      applyBtn.style.display = 'block';
+      document.getElementById('git-commits').style.display = 'block';
+      document.getElementById('btn-apply-update').style.display = 'block';
     }
   } catch(e) {
-    resultEl.className = 'bk-result error';
-    resultEl.textContent = '❌ ' + e.message;
+    _updDone(false, '❌ ' + e.message);
   }
   btn.disabled = false;
 }
 
+/* ══════════════════════════════════════════════════════════════════
+   Apply Update (git pull only)
+════════════════════════════════════════════════════════════════════ */
 async function applyUpdate(btn) {
-  if (!confirm('Застосувати оновлення?\n\ngit pull + перезавантаження workers.\nСторінка може не відповідати ~5 секунд.')) return;
-  const resultEl = document.getElementById('git-result');
-  btn.disabled = true;
-  document.getElementById('btn-check-update').disabled = true;
-  resultEl.className = 'bk-result running';
-  resultEl.textContent = '⏳ git pull origin… не закривайте сторінку.';
+  if (!confirm('Застосувати git pull?\n\nWorkers перезавантажуються автоматично.')) return;
+  _disableUpdateBtns(true);
+  _updOpen('⬇️', 'git pull origin…');
+  _animBar(0, 90, STEP_EST['git pull']);
+
   try {
-    const resp = await fetch(GIT_UPDATE_URL, {
-      method: 'POST', headers: { 'X-CSRFToken': CSRF },
-    });
+    const resp = await fetch(GIT_UPDATE_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
     const data = await resp.json();
     if (data.ok) {
-      const reload = data.reloaded ? ' Workers перезавантажені.' : ' ⚠️ Перезавантаження вручну.';
-      resultEl.className = 'bk-result ok';
-      resultEl.textContent = `✅ Оновлено за ${data.duration}с.${reload}\n${data.output || ''}`;
+      _updDone(true, 'git pull готово! Сторінка оновиться…', data.output || '');
       document.getElementById('git-commits').style.display = 'none';
       btn.style.display = 'none';
-      setTimeout(() => location.reload(), 4000);
+      _startReloadCountdown(5);
     } else {
-      resultEl.className = 'bk-result error';
-      resultEl.textContent = '❌ ' + data.error;
-      btn.disabled = false;
-      document.getElementById('btn-check-update').disabled = false;
+      _updDone(false, 'git pull помилка', data.error || '');
     }
   } catch(e) {
-    resultEl.className = 'bk-result error';
-    resultEl.textContent = '❌ ' + e.message;
-    btn.disabled = false;
-    document.getElementById('btn-check-update').disabled = false;
+    _updDone(false, '❌ ' + e.message);
   }
+  _disableUpdateBtns(false);
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   Migrate
+   Individual operations
 ════════════════════════════════════════════════════════════════════ */
-const MIGRATE_URL = '{% url "admin:backup_migrate" %}';
-
-async function runMigrate(btn) {
-  const resultEl = document.getElementById('git-result');
+async function runCollectstatic(btn) {
   btn.disabled = true;
-  resultEl.style.display = 'block';
-  resultEl.className = 'bk-result running';
-  resultEl.textContent = '⏳ manage.py migrate… не закривайте сторінку.';
+  _updOpen('📦', 'collectstatic… (~30–60с)');
+  _animBar(0, 90, STEP_EST.collectstatic);
   try {
-    const resp = await fetch(MIGRATE_URL, {
-      method: 'POST', headers: { 'X-CSRFToken': CSRF },
-    });
+    const resp = await fetch(COLLECTSTATIC_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
     const data = await resp.json();
-    resultEl.className = data.ok ? 'bk-result ok' : 'bk-result error';
-    const icon = data.ok ? '✅' : '❌';
-    const dur  = data.duration ? ` (${data.duration}с)` : '';
-    resultEl.textContent = `${icon} migrate${dur}\n${data.output || data.error || ''}`;
-  } catch(e) {
-    resultEl.className = 'bk-result error';
-    resultEl.textContent = '❌ ' + e.message;
-  }
+    const out = (data.output || data.error || '').split('\n').slice(-8).join('\n');
+    _updDone(data.ok, data.ok ? 'collectstatic готово!' : 'collectstatic помилка', out);
+  } catch(e) { _updDone(false, '❌ ' + e.message); }
   btn.disabled = false;
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   Setup Modules
-════════════════════════════════════════════════════════════════════ */
-const SETUP_MODULES_URL  = '{% url "admin:backup_setup_modules" %}';
-const RESTART_WEB_URL    = '{% url "admin:backup_restart_web" %}';
-const COLLECTSTATIC_URL  = '{% url "admin:backup_collectstatic" %}';
+async function runMigrate(btn) {
+  btn.disabled = true;
+  _updOpen('🗄️', 'manage.py migrate…');
+  _animBar(0, 90, STEP_EST.migrate);
+  try {
+    const resp = await fetch(MIGRATE_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
+    const data = await resp.json();
+    _updDone(data.ok, data.ok ? 'Міграції застосовано!' : 'Migrate помилка',
+             data.output || data.error || '');
+  } catch(e) { _updDone(false, '❌ ' + e.message); }
+  btn.disabled = false;
+}
 
 async function runSetupModules(btn) {
-  const resultEl = document.getElementById('git-result');
   btn.disabled = true;
-  resultEl.style.display = 'block';
-  resultEl.className = 'bk-result running';
-  resultEl.textContent = '⏳ setup_modules… зачекайте.';
+  _updOpen('🧩', 'setup_modules…');
+  _animBar(0, 90, STEP_EST.setup_modules);
   try {
-    const resp = await fetch(SETUP_MODULES_URL, {
-      method: 'POST', headers: { 'X-CSRFToken': CSRF },
-    });
+    const resp = await fetch(SETUP_MODULES_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
     const data = await resp.json();
-    resultEl.className = data.ok ? 'bk-result ok' : 'bk-result error';
-    const icon = data.ok ? '✅' : '❌';
-    const dur  = data.duration ? ` (${data.duration}с)` : '';
-    resultEl.textContent = `${icon} setup_modules${dur}\n${data.output || data.error || ''}`;
-  } catch(e) {
-    resultEl.className = 'bk-result error';
-    resultEl.textContent = '❌ ' + e.message;
-  }
+    _updDone(data.ok, data.ok ? 'Модулі оновлено!' : 'setup_modules помилка',
+             data.output || data.error || '');
+  } catch(e) { _updDone(false, '❌ ' + e.message); }
   btn.disabled = false;
 }
 
 async function restartWeb(btn) {
-  const resultEl = document.getElementById('git-result');
   btn.disabled = true;
-  resultEl.style.display = 'block';
-  resultEl.className = 'bk-result running';
-  resultEl.textContent = '⏳ Надсилаю SIGHUP до gunicorn…';
+  _updOpen('🔁', 'Перезапуск gunicorn workers…');
+  _animBar(0, 90, STEP_EST.restart);
   try {
-    const resp = await fetch(RESTART_WEB_URL, {
-      method: 'POST', headers: { 'X-CSRFToken': CSRF },
-    });
+    const resp = await fetch(RESTART_WEB_URL, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
     const data = await resp.json();
-    resultEl.className = data.ok ? 'bk-result ok' : 'bk-result error';
-    resultEl.textContent = data.ok
-      ? '✅ ' + (data.message || 'Перезапуск ініційовано. Сторінка оновиться через ~10 с.')
-      : '❌ ' + (data.error || 'Помилка');
     if (data.ok) {
-      setTimeout(() => location.reload(), 10000);
+      _updDone(true, 'Workers перезапущено!');
+      _startReloadCountdown(10);
+    } else {
+      _updDone(false, data.error || 'Помилка перезапуску');
     }
-  } catch(e) {
-    resultEl.className = 'bk-result error';
-    resultEl.textContent = '❌ ' + e.message;
-  }
+  } catch(e) { _updDone(false, '❌ ' + e.message); }
   btn.disabled = false;
 }
 
 /* ══════════════════════════════════════════════════════════════════
-   Collectstatic
+   Full Deploy — step list + progress
 ════════════════════════════════════════════════════════════════════ */
-async function runCollectstatic(btn) {
-  const resultEl = document.getElementById('git-result');
-  btn.disabled = true;
-  resultEl.style.display = 'block';
-  resultEl.className = 'bk-result running';
-  resultEl.textContent = '⏳ collectstatic… зачекайте (~30–60 с).';
-  try {
-    const resp = await fetch(COLLECTSTATIC_URL, {
-      method: 'POST', headers: { 'X-CSRFToken': CSRF },
-    });
-    const data = await resp.json();
-    resultEl.className = data.ok ? 'bk-result ok' : 'bk-result error';
-    const icon = data.ok ? '✅' : '❌';
-    const dur  = data.duration ? ` (${data.duration}с)` : '';
-    const out  = (data.output || data.error || '').split('\n').slice(-5).join('\n');
-    resultEl.textContent = `${icon} collectstatic${dur}\n${out}`;
-  } catch(e) {
-    resultEl.className = 'bk-result error';
-    resultEl.textContent = '❌ ' + e.message;
-  }
-  btn.disabled = false;
+const DEPLOY_STEPS = [
+  { id: 'pull',    url: GIT_UPDATE_URL,    label: 'git pull',       logKey: 'output',  est: 8  },
+  { id: 'static',  url: COLLECTSTATIC_URL, label: 'collectstatic',  logKey: 'output',  est: 40, tail: 6 },
+  { id: 'migrate', url: MIGRATE_URL,       label: 'migrate',        logKey: 'output',  est: 15 },
+  { id: 'modules', url: SETUP_MODULES_URL, label: 'setup_modules',  logKey: 'output',  est: 6  },
+  { id: 'restart', url: RESTART_WEB_URL,   label: 'restart',        logKey: 'message', est: 5  },
+];
+const TOTAL_EST = DEPLOY_STEPS.reduce((s, st) => s + st.est, 0);
+
+function _stepIcon(state) {
+  if (state === 'wait')    return '<span style="color:var(--border-strong)">⏺</span>';
+  if (state === 'running') return '<span class="upd-spin">⚙️</span>';
+  if (state === 'ok')      return '✅';
+  if (state === 'err')     return '❌';
+  return '⏺';
 }
 
-/* ══════════════════════════════════════════════════════════════════
-   Full Deploy: git pull → collectstatic → migrate → reload
-════════════════════════════════════════════════════════════════════ */
 async function runFullDeploy(btn) {
-  const resultEl = document.getElementById('git-result');
-  const steps = [
-    { url: GIT_UPDATE_URL,     label: 'git pull',       key: 'output' },
-    { url: COLLECTSTATIC_URL,  label: 'collectstatic',  key: 'output', tail: 5 },
-    { url: MIGRATE_URL,        label: 'migrate',        key: 'output', tail: 10 },
-    { url: SETUP_MODULES_URL,  label: 'setup_modules',  key: 'output' },
-    { url: RESTART_WEB_URL,    label: 'restart',        key: 'message' },
-  ];
+  _disableUpdateBtns(true);
 
-  // Disable all update buttons
-  ['btn-check-update','btn-apply-update','btn-collectstatic','btn-migrate',
-   'btn-setup-modules','btn-restart-web','btn-full-deploy'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = true;
-  });
-  resultEl.style.display = 'block';
+  const totalEst = TOTAL_EST;
+  _updOpen('🚀', 'Повне оновлення…');
 
-  let log = '';
+  // Build step list
+  const stepsEl = document.getElementById('upd-steps');
+  stepsEl.style.display = 'block';
+  stepsEl.innerHTML = DEPLOY_STEPS.map(s =>
+    `<div class="upd-step" id="step-row-${s.id}">
+       <span class="upd-step-icon" id="step-icon-${s.id}">${_stepIcon('wait')}</span>
+       <span class="upd-step-name" id="step-name-${s.id}">${s.label}</span>
+       <span class="upd-step-est"  id="step-est-${s.id}">~${s.est}с</span>
+       <span class="upd-step-time" id="step-time-${s.id}"></span>
+     </div>`
+  ).join('');
+
+  const logEl = document.getElementById('upd-log');
+  logEl.style.display = 'block';
+  logEl.textContent = '';
+
+  let completedEst = 0;
+  let fullLog = '';
   let allOk = true;
 
-  for (const step of steps) {
-    resultEl.className = 'bk-result running';
-    log += `\n⏳ ${step.label}…`;
-    resultEl.textContent = log.trim();
+  for (const step of DEPLOY_STEPS) {
+    // Mark running
+    document.getElementById(`step-icon-${step.id}`).innerHTML = _stepIcon('running');
+    document.getElementById(`step-name-${step.id}`).className = 'upd-step-name active';
+    document.getElementById(`step-est-${step.id}`).textContent = '';
+
+    const barFrom = completedEst / totalEst * 100;
+    const barTo   = (completedEst + step.est) / totalEst * 100;
+    _animBar(barFrom, barTo, step.est);
+
+    // Per-step elapsed timer
+    const stepStart = Date.now();
+    const stepTimer = setInterval(() => {
+      document.getElementById(`step-time-${step.id}`).textContent =
+        Math.round((Date.now() - stepStart) / 1000) + 'с';
+    }, 500);
+
+    let ok = false, stepDur = 0, stepOut = '';
     try {
-      const resp = await fetch(step.url, {
-        method: 'POST', headers: { 'X-CSRFToken': CSRF },
-      });
+      const resp = await fetch(step.url, { method: 'POST', headers: { 'X-CSRFToken': CSRF } });
       const data = await resp.json();
-      const dur = data.duration ? ` (${data.duration}с)` : '';
-      let out = (data[step.key] || data.output || data.error || '').trim();
+      ok = data.ok !== false;
+      stepDur = data.duration ? Math.round(parseFloat(data.duration)) : Math.round((Date.now() - stepStart) / 1000);
+      let out = (data[step.logKey] || data.output || data.error || '').trim();
       if (step.tail && out) out = out.split('\n').slice(-step.tail).join('\n');
-      if (data.ok || data.ok === undefined) {
-        log += ` ✅${dur}\n${out ? out + '\n' : ''}`;
-      } else {
-        allOk = false;
-        log += ` ❌${dur}\n${out}\n`;
-        resultEl.className = 'bk-result error';
-        resultEl.textContent = log.trim();
-        break;
-      }
-      resultEl.textContent = log.trim();
+      stepOut = out;
     } catch(e) {
-      allOk = false;
-      log += ` ❌ ${e.message}\n`;
-      resultEl.className = 'bk-result error';
-      resultEl.textContent = log.trim();
-      break;
+      stepDur = Math.round((Date.now() - stepStart) / 1000);
+      stepOut = e.message;
+      ok = false;
     }
+
+    clearInterval(stepTimer);
+    completedEst += step.est;
+
+    // Snap bar to actual step completion
+    clearInterval(_uptBarTimer);
+    const bar = document.getElementById('upd-bar');
+    bar.style.transition = 'width .3s ease';
+    bar.style.width = (completedEst / totalEst * 100) + '%';
+
+    // Update step row
+    document.getElementById(`step-icon-${step.id}`).innerHTML = _stepIcon(ok ? 'ok' : 'err');
+    document.getElementById(`step-name-${step.id}`).className = 'upd-step-name done';
+    document.getElementById(`step-time-${step.id}`).textContent = stepDur + 'с';
+
+    fullLog += `── ${step.label} (${stepDur}с) ──\n${stepOut || '(ok)'}\n\n`;
+    logEl.textContent = fullLog;
+    logEl.scrollTop = logEl.scrollHeight;
+
+    if (!ok) { allOk = false; break; }
   }
+
+  // Final
+  _finishBar(allOk);
+  document.getElementById('upd-icon').textContent  = allOk ? '🚀' : '❌';
 
   if (allOk) {
-    resultEl.className = 'bk-result ok';
-    log += '\n🚀 Повне оновлення завершено! Сторінка оновиться через 10 с.';
-    resultEl.textContent = log.trim();
-    setTimeout(() => location.reload(), 10000);
+    _startReloadCountdown(10, txt => {
+      document.getElementById('upd-label').textContent = txt;
+    });
+  } else {
+    document.getElementById('upd-label').textContent = 'Помилка — перевірте лог нижче';
   }
 
-  ['btn-check-update','btn-collectstatic','btn-migrate',
-   'btn-setup-modules','btn-restart-web','btn-full-deploy'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.disabled = false;
-  });
+  _disableUpdateBtns(false);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Reload countdown helper
+════════════════════════════════════════════════════════════════════ */
+function _startReloadCountdown(sec, labelFn) {
+  let cnt = sec;
+  const update = () => {
+    const msg = `Готово! Сторінка оновиться через ${cnt}с…`;
+    if (labelFn) { labelFn(msg); }
+    else { document.getElementById('upd-label').textContent = msg; }
+  };
+  update();
+  const t = setInterval(() => {
+    cnt--;
+    if (cnt <= 0) { clearInterval(t); location.reload(); return; }
+    update();
+  }, 1000);
 }
 
 /* ══════════════════════════════════════════════════════════════════
