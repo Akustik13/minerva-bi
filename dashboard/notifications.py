@@ -927,8 +927,19 @@ def notify_new_order(order, is_test: bool = False):
         else:
             days_left_str = f'Прострочено ({-days_left} дн.) 🔴'
 
-    # Destination — country only
-    destination = (order.addr_country or '').strip()
+    # Destination — full country name
+    _COUNTRY_NAMES = {
+        'AT':'Австрія','BE':'Бельгія','BG':'Болгарія','CH':'Швейцарія','CY':'Кіпр',
+        'CZ':'Чехія','DE':'Німеччина','DK':'Данія','EE':'Естонія','ES':'Іспанія',
+        'FI':'Фінляндія','FR':'Франція','GB':'Велика Британія','GR':'Греція',
+        'HR':'Хорватія','HU':'Угорщина','IE':'Ірландія','IT':'Італія','LT':'Литва',
+        'LU':'Люксембург','LV':'Латвія','MT':'Мальта','NL':'Нідерланди','NO':'Норвегія',
+        'PL':'Польща','PT':'Португалія','RO':'Румунія','SE':'Швеція','SI':'Словенія',
+        'SK':'Словаччина','UA':'Україна','US':'США','CA':'Канада','AU':'Австралія',
+        'JP':'Японія','CN':'Китай','TR':'Туреччина',
+    }
+    _cc = (order.addr_country or '').strip().upper()
+    destination = _COUNTRY_NAMES.get(_cc, _cc)
 
     # Total
     total_str = ''
@@ -1042,8 +1053,6 @@ def notify_new_order(order, is_test: bool = False):
                 meta += f'<br><b>📊 Замовлень від клієнта:</b> <b style="color:#1565c0">{crm_orders}</b>'
             if destination:
                 meta += f'<br><b>📍 Куди:</b> {destination}'
-            if order.contact_name and order.contact_name != client:
-                meta += f'<br><b>Контакт:</b> {order.contact_name}'
             if deadline_str:
                 dl_color = '#c62828' if days_left is not None and days_left <= 2 else '#2e7d32'
                 meta += (
@@ -1081,10 +1090,7 @@ def notify_new_order(order, is_test: bool = False):
 
             # ── Order info ─────────────────────────────────────────────────
             tg.append(f'📋 <code>{order.order_number}</code> · {order.source}')
-            contact_part = (
-                f' · {order.contact_name}' if order.contact_name and order.contact_name != client else ''
-            )
-            tg.append(f'👤 <b>{client}</b>{contact_part}')
+            tg.append(f'👤 <b>{client}</b>')
             if crm_orders is not None:
                 tg.append(f'   📊 Замовлень всього: <b>{crm_orders}</b>')
             if destination:
