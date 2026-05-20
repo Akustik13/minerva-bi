@@ -968,6 +968,8 @@ def notify_new_order(order, is_test: bool = False):
                     curr = ld.get('currency', '')
                     unit_str     = f'{ld["unit_price"]:.2f} {curr}'.strip() if ld.get('unit_price') else '—'
                     total_str_ld = f'{ld["line_total"]:.2f} {curr}'.strip() if ld.get('line_total') else '—'
+                    qty_val_e = ld["qty"] or 0
+                    qty_disp  = str(int(qty_val_e)) if float(qty_val_e) == int(float(qty_val_e)) else str(qty_val_e)
                     img_url = _abs_url(ld.get('image', ''))
                     if img_url:
                         img_cell = (
@@ -988,7 +990,7 @@ def notify_new_order(order, is_test: bool = False):
                         f'<tr style="border-bottom:1px solid #eee">'
                         f'{img_cell}'
                         f'<td style="padding:6px 8px">{sku_cell}</td>'
-                        f'<td style="padding:6px 8px;text-align:center;font-weight:600;color:#1565c0">{ld["qty"]} шт</td>'
+                        f'<td style="padding:6px 8px;text-align:center;font-weight:600;color:#1565c0">{qty_disp} шт</td>'
                         f'<td style="padding:6px 8px;text-align:right;color:#555;white-space:nowrap">{unit_str}</td>'
                         f'<td style="padding:6px 8px;text-align:right;font-weight:600;white-space:nowrap">{total_str_ld}</td>'
                         f'<td style="padding:6px 8px;text-align:right;font-size:12px">{stock_cell}</td>'
