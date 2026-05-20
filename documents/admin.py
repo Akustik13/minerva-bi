@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.html import format_html, mark_safe
 from .models import DocumentTemplate, GeneratedDocument, TEMPLATE_VARIABLES_GUIDE
 
 
@@ -102,31 +102,77 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
                 '<span style="color:var(--text-dim);font-size:12px">'
                 '📁 Завантажте файл шаблону — після цього з\'являться кнопки перевірки</span>'
             )
-        pk = obj.pk
-        dl_url  = f'/documents/template/{pk}/check-download/'
-        fix_url = f'/documents/template/{pk}/auto-fix/'
-        return format_html(
-            '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
-
-            '<button type="button" onclick="checkDocTemplateDetail({pk})"'
-            ' style="padding:6px 16px;border-radius:6px;font-size:13px;cursor:pointer;'
-            'border:1px solid var(--border-strong);background:none;color:var(--text)">'
-            '🔍 Перевірити шаблон</button>'
-
-            '<a href="{dl_url}" download'
-            ' style="padding:6px 16px;border-radius:6px;font-size:13px;'
-            'border:1px solid #ff9800;color:#ff9800;text-decoration:none;white-space:nowrap">'
-            '⬇ Перевірити і завантажити</a>'
-
-            '<a href="{fix_url}" download'
-            ' style="padding:6px 16px;border-radius:6px;font-size:13px;'
-            'border:1px solid var(--ok);color:var(--ok);text-decoration:none;white-space:nowrap">'
-            '🔧 Виправити і завантажити</a>'
-
-            '</div>'
-            '<div id="dtcf-result-{pk}" style="margin-top:10px;font-size:12px"></div>',
-            pk=pk, dl_url=dl_url, fix_url=fix_url,
+        pk        = obj.pk
+        check_url = f'/documents/template/{pk}/check/'
+        dl_url    = f'/documents/template/{pk}/check-download/'
+        fix_url   = f'/documents/template/{pk}/auto-fix/'
+        # Inline JS — works without collectstatic
+        js = f"""
+if(!window._mvDTCDetail){{
+  window._mvDTCDetail = async function(pk, cu, du, fu) {{
+    var el = document.getElementById('mvdtc-' + pk);
+    if (el) el.innerHTML = '<span style="color:var(--text-dim)">⏳ Перевіряємо…</span>';
+    var dBtn = '<a href="' + du + '" style="padding:5px 12px;border-radius:5px;font-size:12px;' +
+      'border:1px solid #ff9800;color:#ff9800;text-decoration:none;white-space:nowrap;margin-right:6px">' +
+      '⬇ Перевірити і завантажити</a>';
+    var fBtn = '<a href="' + fu + '" style="padding:5px 12px;border-radius:5px;font-size:12px;' +
+      'border:1px solid var(--ok);color:var(--ok);text-decoration:none;white-space:nowrap">' +
+      '🔧 Виправити і завантажити</a>';
+    try {{
+      var r = await fetch(cu), d = await r.json();
+      if (!el) return;
+      if (!d.ok) {{
+        el.innerHTML = '<div style="color:var(--err);font-weight:600;margin-bottom:6px">' +
+          (d.syntax_error ? '⚠️ Синтаксична помилка' : '✗ Помилка') + '</div>' +
+          '<div style="margin-bottom:8px">' + d.error + '</div>' +
+          '<div>' + dBtn + fBtn + '</div>';
+        return;
+      }}
+      if (!d.issues || !d.issues.length) {{
+        el.innerHTML = '<span style="color:var(--ok);font-weight:600">✓ Шаблон коректний</span>';
+        return;
+      }}
+      el.innerHTML = '';
+      if (d.loop_note) {{
+        el.innerHTML += '<div style="margin-bottom:8px;padding:8px 12px;background:rgba(21,101,192,.1);' +
+          'border-left:3px solid #1565c0;border-radius:4px;font-size:12px;color:#1565c0">' +
+          '💡 ' + d.loop_note + '</div>';
+      }}
+      var errIssues = d.issues.filter(function(i){{return !i.is_item;}});
+      var rows = d.issues.map(function(i) {{
+        var clr = i.is_item ? '#1565c0' : 'var(--err)';
+        var bg  = i.is_item ? 'rgba(21,101,192,.1)' : 'rgba(244,67,54,.12)';
+        var fix = (i.suggestion && i.suggestion !== i.var)
+          ? '<span style="color:var(--ok)"> → {{{{' + i.suggestion + '}}}}</span>'
+          : '<span style="color:var(--text-dim)"> ' + i.label + '</span>';
+        return '<div style="padding:2px 0"><code style="background:' + bg + ';' +
+          'padding:1px 5px;border-radius:3px;color:' + clr + '">{{{{' + i.var + '}}}}</code>' + fix + '</div>';
+      }}).join('');
+      var cnt = errIssues.length;
+      el.innerHTML += (cnt ? '<div style="color:#ff9800;font-weight:600;margin-bottom:6px">⚠️ ' +
+        cnt + ' невідом' + (cnt === 1 ? 'е поле' : 'их полів') + '</div>' : '') +
+        (rows ? '<div style="margin-bottom:8px">' + rows + '</div>' : '') +
+        '<div>' + dBtn + fBtn + '</div>';
+    }} catch(e) {{
+      if (el) el.innerHTML = '<span style="color:var(--err)">✗ Помилка зв\\'язку</span>';
+    }}
+  }};
+}}"""
+        btn_style  = 'padding:6px 16px;border-radius:6px;font-size:13px;cursor:pointer;border:1px solid var(--border-strong);background:none;color:var(--text)'
+        dl_style   = 'padding:6px 16px;border-radius:6px;font-size:13px;border:1px solid #ff9800;color:#ff9800;text-decoration:none;white-space:nowrap'
+        fix_style  = 'padding:6px 16px;border-radius:6px;font-size:13px;border:1px solid var(--ok);color:var(--ok);text-decoration:none;white-space:nowrap'
+        html = (
+            f'<script>{js}</script>'
+            f'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
+            f'<button type="button" style="{btn_style}"'
+            f' onclick="_mvDTCDetail({pk},{check_url!r},{dl_url!r},{fix_url!r})">'
+            f'🔍 Перевірити шаблон</button>'
+            f'<a href="{dl_url}" style="{dl_style}">⬇ Перевірити і завантажити</a>'
+            f'<a href="{fix_url}" style="{fix_style}">🔧 Виправити і завантажити</a>'
+            f'</div>'
+            f'<div id="mvdtc-{pk}" style="margin-top:10px;font-size:12px"></div>'
         )
+        return mark_safe(html)
     check_fix_actions.short_description = 'Перевірка та виправлення'
 
     def save_model(self, request, obj, form, change):

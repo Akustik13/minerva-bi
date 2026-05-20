@@ -463,9 +463,11 @@ def _auto_fix_field_errors(docx_bytes, issues):
         var = issue['var']
         sug = issue.get('suggestion') or ''
         if sug and sug != var:
-            fix_map[var] = (f'{{{{ {sug} }}}}', '2E7D32')   # green
+            fix_map[var] = (f'{{{{ {sug} }}}}', '2E7D32')          # green — renamed
+        elif var.startswith('item.') and var.split('.', 1)[1] in _KNOWN_ITEM_VARS:
+            fix_map[var] = (f'{{{{ {var} }}}}', '1565C0')          # blue — valid in loop
         else:
-            fix_map[var] = (f'⚠️ [{var}]', 'FF0000')         # red
+            fix_map[var] = (f'⚠️ [{var}]', 'FF0000')               # red — truly unknown
 
     if not fix_map:
         return docx_bytes
@@ -675,15 +677,28 @@ def check_template(request, template_pk):
         ctx = get_order_context(int(order_pk)) if order_pk else _sample_context()
         issues_raw = _collect_undefined(template.template_file.path, ctx)
         issues = []
+        has_item_vars = False
         for var in issues_raw:
             suggestion = _suggest(var)
+            is_item = (var.startswith('item.') and
+                       var.split('.', 1)[1] in _KNOWN_ITEM_VARS)
+            if is_item:
+                has_item_vars = True
+                label = '✓ коректна змінна — тільки всередині циклу по рядку таблиці'
+            elif suggestion and suggestion != var:
+                label = f'→ правильно: {{{{{suggestion}}}}}'
+            else:
+                label = '— невідоме поле'
             issues.append({
-                'var':        var,
-                'suggestion': suggestion,
-                'label':      (f'→ правильно: {{{{{suggestion}}}}}' if suggestion and suggestion != var
-                               else '— невідоме поле'),
+                'var': var, 'suggestion': suggestion,
+                'label': label, 'is_item': is_item,
             })
-        return JsonResponse({'ok': True, 'issues': issues})
+        loop_note = (
+            'Змінні item.* доступні лише всередині рядка таблиці з циклом. '
+            'Додай у перший рядок даних: {%tr for item in items %} '
+            'та в останній: {%tr endfor %}'
+        ) if has_item_vars else None
+        return JsonResponse({'ok': True, 'issues': issues, 'loop_note': loop_note})
     except jinja2.exceptions.TemplateSyntaxError as e:
         return JsonResponse({'ok': False, 'syntax_error': True, 'error': _syntax_error_hint(str(e))})
     except Exception as e:
