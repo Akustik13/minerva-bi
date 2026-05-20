@@ -734,7 +734,7 @@ def run_custom_command(cmd_str: str) -> dict:
         return {
             "ok": ok,
             "output": output or ("✅ Виконано (без виводу)" if ok else "❌ Помилка (без деталей)"),
-            "cmd": " ".join(parts[1:]),   # show normalised form
+            "cmd": " ".join(parts[2:]),   # subcommand only (skip python + manage.py)
             "duration": round(time.time() - start, 1),
         }
     except subprocess.TimeoutExpired:
