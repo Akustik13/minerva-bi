@@ -4569,14 +4569,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     # ── Проксі-завантаження документів Jumingo (мітка, рахунок, підтвердження) ─
 
     def jumingo_document_view(self, request, shipment_id, doc_type, filename):
-        """Проксує PDF-документ Jumingo (label/invoice/orderconfirmation) через API.
+        """Проксує PDF-документ Jumingo через API з кількома fallback варіантами.
 
-        GET /v1/orders/{orderNumber}/documents/{doc_type} → binary PDF stream.
-        Якщо відповідь не є PDF — fallback: GET /v1/orders/{orderNumber}/documents
-        і шукаємо URL у списку.
+        Порядок спроб:
+        1. GET /v1/orders/{id}/documents → шукаємо URL або перенаправляємо
+        2. Для мітки: shipment.label_url з auth-заголовками
+        3. GET /v1/orders/{id}/documents/{doc_type}
+        4. GET /v1/orders/{id}/documents/{reference} (з raw_response)
         """
         import requests as _req
-        from django.http import StreamingHttpResponse, HttpResponseBadRequest
+        from django.http import StreamingHttpResponse, HttpResponseBadRequest, HttpResponse
 
         shipment = get_object_or_404(Shipment, pk=shipment_id)
         order_num = shipment.jumingo_order_number
@@ -4586,50 +4588,99 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if not service:
             return HttpResponseBadRequest("Jumingo service not configured.")
 
-        # Спроба 1: GET /v1/orders/{orderNumber}/documents/{doc_type}
-        resp = service.download_document(order_num, doc_type)
-        if resp.status_code == 200:
-            ct = resp.headers.get("Content-Type", "application/pdf")
-            response = StreamingHttpResponse(
-                resp.iter_content(chunk_size=8192),
-                content_type=ct,
-            )
-            response["Content-Disposition"] = f'inline; filename="{filename}"'
-            return response
+        def _try_stream(url):
+            """GET url з auth, повертає StreamingHttpResponse або None."""
+            try:
+                r = _req.get(url, headers=service._headers(), timeout=30, stream=True)
+                if r.status_code == 200:
+                    ct = r.headers.get("Content-Type", "application/pdf")
+                    sr = StreamingHttpResponse(r.iter_content(chunk_size=8192), content_type=ct)
+                    sr["Content-Disposition"] = f'inline; filename="{filename}"'
+                    return sr
+                r.close()
+            except Exception:
+                pass
+            return None
 
-        # Спроба 2: для мітки — проксі через збережений label_url (з auth-заголовками)
+        def _doc_url_from_list(docs_data):
+            """Шукає URL завантаження в структурі відповіді /documents."""
+            _url_keys = ("url", "link", "downloadUrl", "download_url", "href")
+            # labels може бути dict {id: {...}} або list [{...}]
+            labels = docs_data.get("labels") or {}
+            items = labels.values() if isinstance(labels, dict) else labels
+            for v in items:
+                if isinstance(v, dict) and (v.get("type") == doc_type or doc_type == "label"):
+                    for k in _url_keys:
+                        if v.get(k):
+                            return v[k]
+            for section, dtype in (("invoices", "invoice"), ("confirmations", "orderconfirmation")):
+                if doc_type not in (dtype, doc_type):
+                    continue
+                for item in (docs_data.get(section) or []):
+                    if isinstance(item, dict) and item.get("type", dtype) == doc_type:
+                        for k in _url_keys:
+                            if item.get(k):
+                                return item[k]
+            return None
+
+        def _reference_from_raw():
+            """Витягує reference документа з raw_response."""
+            rv = shipment.raw_response
+            if not isinstance(rv, dict):
+                return None
+            docs = rv.get("documents") or {}
+            labels = docs.get("labels") or {}
+            items = labels.values() if isinstance(labels, dict) else labels
+            for v in items:
+                if isinstance(v, dict) and (v.get("type") == doc_type or doc_type == "label"):
+                    return v.get("reference")
+            for section, dtype in (("invoices", "invoice"), ("confirmations", "orderconfirmation")):
+                for item in (docs.get(section) or []):
+                    if isinstance(item, dict) and item.get("type", dtype) == doc_type:
+                        return item.get("reference")
+            return None
+
+        base = service._base()
+
+        # ── Спроба 1: GET /v1/orders/{id}/documents → шукаємо URL ───────────
+        try:
+            docs_data = service.get_order_documents(order_num)
+            doc_url = _doc_url_from_list(docs_data)
+            if doc_url:
+                streamed = _try_stream(doc_url)
+                if streamed:
+                    return streamed
+                from django.http import HttpResponseRedirect
+                return HttpResponseRedirect(doc_url)
+        except Exception:
+            pass
+
+        # ── Спроба 2: label_url з auth ────────────────────────────────────────
         if doc_type == "label" and shipment.label_url and shipment.label_url.startswith("http"):
-            resp2 = _req.get(shipment.label_url, headers=service._headers(), timeout=30, stream=True)
-            if resp2.status_code == 200:
-                ct2 = resp2.headers.get("Content-Type", "application/pdf")
-                r2 = StreamingHttpResponse(resp2.iter_content(chunk_size=8192), content_type=ct2)
-                r2["Content-Disposition"] = f'inline; filename="{filename}"'
-                return r2
+            streamed = _try_stream(shipment.label_url)
+            if streamed:
+                return streamed
 
-        # Спроба 3: GET /v1/orders/{orderNumber}/documents — пошук URL у списку
-        docs_data = service.get_order_documents(order_num)
-        doc_url = None
-        for _key, val in (docs_data.get("labels") or {}).items():
-            if val.get("type") == doc_type or doc_type == "label":
-                doc_url = val.get("url") or val.get("link") or val.get("downloadUrl")
-                break
-        if not doc_url:
-            for item in (docs_data.get("invoices") or []):
-                if doc_type in ("invoice", item.get("type", "")):
-                    doc_url = item.get("url") or item.get("link") or item.get("downloadUrl")
-                    break
-        if not doc_url:
-            for item in (docs_data.get("confirmations") or []):
-                if doc_type in ("orderconfirmation", item.get("type", "")):
-                    doc_url = item.get("url") or item.get("link") or item.get("downloadUrl")
-                    break
-        if doc_url:
-            from django.http import HttpResponseRedirect
-            return HttpResponseRedirect(doc_url)
+        # ── Спроба 3: /documents/{doc_type} ──────────────────────────────────
+        streamed = _try_stream(f"{base}/orders/{order_num}/documents/{doc_type}")
+        if streamed:
+            return streamed
 
-        from django.http import HttpResponse
+        # ── Спроба 4: /documents/{reference} ─────────────────────────────────
+        ref = _reference_from_raw()
+        if ref:
+            streamed = _try_stream(f"{base}/orders/{order_num}/documents/{ref}")
+            if streamed:
+                return streamed
+
+        # Нічого не спрацювало — повертаємо 404 з підказкою
         return HttpResponse(
-            f"Document not available (API {resp.status_code}).", status=resp.status_code
+            f"Документ недоступний через API Jumingo.\n"
+            f"Замовлення: {order_num}, тип: {doc_type}\n\n"
+            f"Спробуйте завантажити вручну:\n"
+            f"https://app.jumingo.com/orders/{order_num}",
+            status=404,
+            content_type="text/plain; charset=utf-8",
         )
 
     # ── Бронювання через API (Variant 3) ─────────────────────────────────────
