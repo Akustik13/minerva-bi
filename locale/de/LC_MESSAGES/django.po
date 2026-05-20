@@ -3068,3 +3068,15 @@ msgstr "🔥 Kritisch (< 2 Wochen)"
 
 msgid "🔧 Виправити знак qty для Outgoing з позитивним qty (пошкоджені дані)"
 msgstr "🔧 qty-Vorzeichen für Ausgang mit positivem qty korrigieren (beschädigte Daten)"
+
+msgid "Без замовлення — натисни щоб створити"
+msgstr "Ohne Bestellung — klicken um zu erstellen"
+
+msgid "Створити нове замовлення на основі цього відправлення?"
+msgstr "Neue Bestellung aus dieser Sendung erstellen?"
+
+msgid "Відправлення не прив’язане до жодного замовлення. Дані отримувача та вартість доставки будуть перенесені автоматично."
+msgstr "Diese Sendung ist keiner Bestellung zugeordnet. Empfängerdaten und Versandkosten werden automatisch übernommen."
+
+msgid "Створити замовлення"
+msgstr "Bestellung erstellen"
