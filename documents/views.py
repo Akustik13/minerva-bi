@@ -525,6 +525,83 @@ def _auto_fix_field_errors(docx_bytes, issues):
     return out.read()
 
 
+def _add_item_loop_markers(docx_bytes):
+    """Inject {%tr for item in items %} / {%tr endfor %} into table rows
+    that contain {{ item.xxx }} variables but lack loop markers.
+    Works on already-patched bytes (after _auto_fix_syntax_tags)."""
+    import zipfile, re
+    from io import BytesIO
+
+    ROW_RE  = re.compile(r'<w:tr\b[^>]*>.*?</w:tr>', re.DOTALL)
+    TEXT_RE = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>')
+    ITEM_RE = re.compile(r'\{\{\s*item\.')
+    LOOP_RE = re.compile(r'\{%-?\s*tr\b')
+
+    def _row_text(row):
+        return ''.join(TEXT_RE.findall(row))
+
+    def _prepend_run(row_xml, tag_text):
+        """Insert run with tag_text after first <w:p...> opening in first <w:tc>."""
+        tc_m = re.search(r'<w:tc\b[^>]*>', row_xml)
+        if not tc_m:
+            return row_xml
+        after_tc = row_xml[tc_m.end():]
+        p_m = re.search(r'<w:p\b[^>]*>', after_tc)
+        if not p_m:
+            return row_xml
+        insert = tc_m.end() + p_m.end()
+        run = f'<w:r><w:t xml:space="preserve">{tag_text} </w:t></w:r>'
+        return row_xml[:insert] + run + row_xml[insert:]
+
+    def _append_run(row_xml, tag_text):
+        """Insert run with tag_text before last </w:p> in last <w:tc>."""
+        tc_ends = [m.start() for m in re.finditer(r'</w:tc>', row_xml)]
+        if not tc_ends:
+            return row_xml
+        section = row_xml[:tc_ends[-1]]
+        p_ends = [m.start() for m in re.finditer(r'</w:p>', section)]
+        if not p_ends:
+            return row_xml
+        insert = p_ends[-1]
+        run = f'<w:r><w:t xml:space="preserve"> {tag_text}</w:t></w:r>'
+        return row_xml[:insert] + run + row_xml[insert:]
+
+    def _patch_xml(xml):
+        rows = list(ROW_RE.finditer(xml))
+        item_rows = [
+            rm for rm in rows
+            if ITEM_RE.search(_row_text(rm.group(0)))
+            and not LOOP_RE.search(_row_text(rm.group(0)))
+            and not LOOP_RE.search(rm.group(0))
+        ]
+        if not item_rows:
+            return xml
+
+        first, last = item_rows[0], item_rows[-1]
+        if first.start() == last.start():
+            new = _prepend_run(first.group(0), '{%tr for item in items %}')
+            new = _append_run(new, '{%tr endfor %}')
+            xml = xml[:first.start()] + new + xml[first.end():]
+        else:
+            new_last = _append_run(last.group(0), '{%tr endfor %}')
+            xml = xml[:last.start()] + new_last + xml[last.end():]
+            new_first = _prepend_run(first.group(0), '{%tr for item in items %}')
+            xml = xml[:first.start()] + new_first + xml[first.end():]
+        return xml
+
+    inp = BytesIO(docx_bytes)
+    out = BytesIO()
+    with zipfile.ZipFile(inp, 'r') as zin, \
+         zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as zout:
+        for info in zin.infolist():
+            data = zin.read(info.filename)
+            if info.filename == 'word/document.xml':
+                data = _patch_xml(data.decode('utf-8')).encode('utf-8')
+            zout.writestr(info, data)
+    out.seek(0)
+    return out.read()
+
+
 def _auto_fix_syntax_tags(docx_bytes):
     """Replace {% varname %} → {{ varname }} green+bold at paragraph level.
     Skips real Jinja2 block tags (for/endfor/if/etc.) and docxtpl row markers (tr/p/tc)."""
@@ -781,6 +858,13 @@ def auto_fix_download(request, template_pk):
     except Exception as e:
         logger.error('auto_fix_download %s: %s', template_pk, e)
         return HttpResponse(str(e), status=500)
+
+    # Always try to inject {%tr for item in items %} / {%tr endfor %}
+    # into rows that have {{ item.xxx }} but no loop markers yet.
+    try:
+        patched = _add_item_loop_markers(patched)
+    except Exception as e:
+        logger.warning('auto_fix_download loop markers %s: %s', template_pk, e)
 
     resp = HttpResponse(
         patched,
