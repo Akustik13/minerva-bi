@@ -3111,9 +3111,6 @@ msgstr "Dokumente"
 msgid "Мітка"
 msgstr "Etikett"
 
-msgid "Рахунок"
-msgstr "Rechnung"
-
 msgid "Підтвердження"
 msgstr "Bestätigung"
 

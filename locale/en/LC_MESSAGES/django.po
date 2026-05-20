@@ -3112,9 +3112,6 @@ msgstr "Documents"
 msgid "Мітка"
 msgstr "Label"
 
-msgid "Рахунок"
-msgstr "Invoice"
-
 msgid "Підтвердження"
 msgstr "Confirmation"
 
