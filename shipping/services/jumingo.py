@@ -380,10 +380,10 @@ class JumingoService(BaseCarrierService):
         today    = date.today()
         tomorrow = today + timedelta(days=1)
         payload  = {
-            "shipmentId":    carrier_shipment_id,
-            "pickup_date":   today.strftime("%Y-%m-%dT12:00:00"),
-            "delivery_date": tomorrow.strftime("%Y-%m-%dT12:00:00"),
-            "settings":      {"mode": "m"},
+            "shipmentId":  carrier_shipment_id,
+            "pickupDate":  today.strftime("%Y-%m-%dT12:00:00"),
+            "deliveryDate": tomorrow.strftime("%Y-%m-%dT12:00:00"),
+            "settings":    {"mode": "m"},
         }
         try:
             from tabele.api_logger import logged_request
@@ -458,7 +458,6 @@ class JumingoService(BaseCarrierService):
             }],
             "details": {
                 "value_amount":        max(1, int(declared_value or 1)),
-                "value_currency":      "EUR",
                 "content_description": "Goods",
                 "reference_number":    "PREVIEW",
                 "email":               c.sender_email or "",
@@ -499,10 +498,10 @@ class JumingoService(BaseCarrierService):
         today    = date.today()
         tomorrow = today + timedelta(days=1)
         rates_payload = {
-            "shipmentId":    preview_id,
-            "pickup_date":   today.strftime("%Y-%m-%dT12:00:00"),
-            "delivery_date": tomorrow.strftime("%Y-%m-%dT12:00:00"),
-            "settings":      {"mode": "m"},
+            "shipmentId":  preview_id,
+            "pickupDate":  today.strftime("%Y-%m-%dT12:00:00"),
+            "deliveryDate": tomorrow.strftime("%Y-%m-%dT12:00:00"),
+            "settings":    {"mode": "m"},
         }
         try:
             r2 = logged_request('jumingo', 'get_rates_preview', 'POST',

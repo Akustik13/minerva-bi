@@ -4624,11 +4624,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return None
 
         def _reference_from_raw():
-            """Витягує reference документа з raw_response."""
+            """Витягує reference документа з raw_response.
+            Підтримує дві структури:
+            - GET /v1/orders/{id}: docs = {labels: {id: {type, reference, url}}, invoices: [...]}
+            - GET /v1/shipments/{id}: docs = {"label": "L-xxx.pdf", "proforma": "P-xxx.pdf"}
+            """
             rv = shipment.raw_response
             if not isinstance(rv, dict):
                 return None
             docs = rv.get("documents") or {}
+            # Flat structure from shipments endpoint: {"label": "L-xxx.pdf", ...}
+            if doc_type in docs and isinstance(docs.get(doc_type), str):
+                return docs[doc_type]
+            # Nested structure from orders endpoint
             labels = docs.get("labels") or {}
             items = labels.values() if isinstance(labels, dict) else labels
             for v in items:
@@ -5770,6 +5778,7 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
         ""
     )
     prog_delayed = bool(
+        data.get("delayed") or          # top-level field in GET /v1/shipments/{id}
         progress.get("delayed") or
         progress.get("isDelayed") or
         progress.get("is_delayed") or
