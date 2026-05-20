@@ -2827,8 +2827,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                              "msg": f"Створено {len(created)} запис(ів) упаковки"})
 
     def save_labels_to_docs_view(self, request, shipment_id):
-        """POST — copies label/customs PDFs from media/shipping/ into
-        media/orders/{source}/{order_number}/ so they appear in the order document list."""
+        """POST — saves shipping PDFs into media/orders/{source}/{order_number}/.
+
+        For Jumingo: downloads base64 PDF from API (label/invoice/confirmation).
+        For others:  copies from local media paths (label_url / customs_url).
+
+        POST params:
+          doc_type — optional: label | invoice | orderconfirmation | confirmation
+                     (if omitted for Jumingo, saves all available documents)
+        """
         from django.http import JsonResponse
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
@@ -2843,20 +2850,62 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if not order:
             return JsonResponse({"error": "Немає замовлення"}, status=400)
 
-        import shutil
         from pathlib import Path as _P
         from django.conf import settings as _s
 
         dest_dir = _P(str(_s.MEDIA_ROOT)) / 'orders' / (order.source or 'manual') / order.order_number
         dest_dir.mkdir(parents=True, exist_ok=True)
-
         saved, errors = [], []
+
+        # ── Jumingo: decode base64 from API ──────────────────────────────────
+        if shipment.jumingo_order_number:
+            import base64 as _b64
+            doc_type = request.POST.get("doc_type", "").strip()
+            service = get_service(shipment.carrier)
+            if not service:
+                return JsonResponse({"ok": False, "errors": ["Jumingo service not configured"]})
+            try:
+                docs_data = service.get_order_documents(shipment.jumingo_order_number)
+            except Exception as e:
+                return JsonResponse({"ok": False, "errors": [f"Jumingo API: {e}"]})
+
+            def _write(b64, name):
+                try:
+                    (_P(str(dest_dir)) / name).write_bytes(_b64.b64decode(b64))
+                    saved.append(name)
+                except Exception as exc:
+                    errors.append(f"{name}: {exc}")
+
+            want_label = not doc_type or doc_type == "label"
+            want_inv   = not doc_type or doc_type == "invoice"
+            want_conf  = not doc_type or doc_type in ("orderconfirmation", "confirmation")
+
+            if want_label:
+                labels = docs_data.get("labels") or {}
+                for v in (labels.values() if isinstance(labels, dict) else labels):
+                    if isinstance(v, dict) and v.get("file"):
+                        _write(v["file"], v.get("name") or f"label-{shipment.jumingo_order_number}.pdf")
+
+            if want_inv:
+                for item in (docs_data.get("invoices") or []):
+                    if isinstance(item, dict) and item.get("file"):
+                        _write(item["file"], item.get("name") or f"invoice-{shipment.jumingo_order_number}.pdf")
+
+            if want_conf:
+                for item in (docs_data.get("confirmations") or []):
+                    if isinstance(item, dict) and item.get("file"):
+                        _write(item["file"], item.get("name") or f"confirmation-{shipment.jumingo_order_number}.pdf")
+
+            return JsonResponse({"ok": True, "saved": saved, "errors": errors,
+                                 "order_number": order.order_number})
+
+        # ── Non-Jumingo: copy from local media paths ──────────────────────────
+        import shutil
+        media_url = _s.MEDIA_URL.rstrip('/')
         for url_attr in ('label_url', 'customs_url'):
             url = getattr(shipment, url_attr, '') or ''
             if not url:
                 continue
-            # Resolve URL to filesystem path
-            media_url = _s.MEDIA_URL.rstrip('/')
             if url.startswith('/media/'):
                 rel = url[7:]
             elif url.startswith(media_url + '/'):
@@ -2868,7 +2917,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if not src.exists():
                 errors.append(f"{url_attr}: file not found ({src.name})")
                 continue
-            dest = dest_dir / src.name
+            dest = _P(str(dest_dir)) / src.name
             try:
                 shutil.copy2(str(src), str(dest))
                 saved.append(src.name)
