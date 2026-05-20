@@ -969,19 +969,24 @@ def notify_new_order(order, is_test: bool = False):
                     unit_str     = f'{ld["unit_price"]:.2f} {curr}'.strip() if ld.get('unit_price') else '—'
                     total_str_ld = f'{ld["line_total"]:.2f} {curr}'.strip() if ld.get('line_total') else '—'
                     img_url = _abs_url(ld.get('image', ''))
-                    img_cell = (
-                        f'<td style="padding:4px 6px;text-align:center;width:46px">'
-                        f'<img src="{img_url}" width="40" height="40" style="object-fit:cover;'
-                        f'border-radius:4px;display:block;margin:auto" onerror="this.style.display=\'none\'">'
-                        f'</td>'
-                        if img_url else
-                        '<td style="width:46px"></td>'
-                    )
+                    if img_url:
+                        img_cell = (
+                            f'<td style="padding:4px 8px;text-align:center;width:72px">'
+                            f'<a href="{img_url}" target="_blank" title="Відкрити фото">'
+                            f'<img src="{img_url}" width="60" height="60"'
+                            f' class="mv-prod-img"'
+                            f' style="object-fit:cover;border-radius:6px;display:block;'
+                            f'margin:auto;border:1px solid #e0e0e0;cursor:zoom-in;'
+                            f'transition:transform .25s ease,box-shadow .25s ease"'
+                            f' onerror="this.parentNode.parentNode.style.display=\'none\'">'
+                            f'</a></td>'
+                        )
+                    else:
+                        img_cell = '<td style="width:72px"></td>'
                     rows += (
                         f'<tr style="border-bottom:1px solid #eee">'
                         f'{img_cell}'
                         f'<td style="padding:6px 8px">{sku_cell}</td>'
-                        f'<td style="padding:6px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
                         f'<td style="padding:6px 8px;text-align:center;font-weight:600;color:#1565c0">{ld["qty"]} шт</td>'
                         f'<td style="padding:6px 8px;text-align:right;color:#555;white-space:nowrap">{unit_str}</td>'
                         f'<td style="padding:6px 8px;text-align:right;font-weight:600;white-space:nowrap">{total_str_ld}</td>'
@@ -989,14 +994,17 @@ def notify_new_order(order, is_test: bool = False):
                         f'</tr>'
                     )
                 lines_html = (
+                    '<style>'
+                    '.mv-prod-img:hover{transform:scale(3.5);box-shadow:0 4px 24px rgba(0,0,0,.35);'
+                    'border-radius:4px;z-index:99;position:relative}'
+                    '</style>'
                     '<div style="margin-top:16px">'
                     '<b style="font-size:13px;color:#333">📋 Товари:</b>'
                     '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;'
                     'border:1px solid #e8ecf0;border-radius:6px;overflow:hidden">'
                     '<tr style="background:#e8f0fe;color:#1565c0;font-size:11px;font-weight:600">'
-                    '<th style="padding:6px 6px;width:46px"></th>'
+                    '<th style="padding:6px 8px;width:72px"></th>'
                     '<th style="padding:6px 8px;text-align:left">SKU</th>'
-                    '<th style="padding:6px 8px;text-align:left">Назва товару</th>'
                     '<th style="padding:6px 8px;text-align:center">К-сть</th>'
                     '<th style="padding:6px 8px;text-align:right">Ціна/шт</th>'
                     '<th style="padding:6px 8px;text-align:right">Сума</th>'
