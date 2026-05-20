@@ -1245,6 +1245,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_jumingo_sync",
             ),
             path(
+                "<int:shipment_id>/jumingo-doc/<str:doc_type>/<str:filename>",
+                self.admin_site.admin_view(self.jumingo_document_view),
+                name="shipping_shipment_jumingo_doc",
+            ),
+            path(
                 "<int:shipment_id>/clone/",
                 self.admin_site.admin_view(self.clone_view),
                 name="shipping_shipment_clone",
@@ -2541,6 +2546,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "account_owner":    rv.get("accountOwner", ""),
             }
 
+        # For Jumingo with an external label_url: route through authenticated proxy
+        _label_display_url = shipment.label_url or ""
+        if is_jumingo and shipment.jumingo_order_number and _label_display_url.startswith("http"):
+            _lbl_filename = _label_display_url.split("/")[-1] or f"label-{shipment.jumingo_order_number}.pdf"
+            _label_display_url = reverse(
+                "admin:shipping_shipment_jumingo_doc",
+                args=[shipment.pk, "label", _lbl_filename],
+            )
+
         return render(request, "admin/shipping/shipment_detail.html", {
             **self.admin_site.each_context(request),
             "shipment":                  shipment,
@@ -2561,6 +2575,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "save_labels_url":           _save_labels_url,
             "tracking_url":              _tracking_url,
             "jumingo_order":             jumingo_order,
+            "label_display_url":         _label_display_url,
         })
 
     # ── Створення SalesOrder з відправлення ──────────────────────────────────
@@ -4550,6 +4565,72 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         # Тариф збережено → показуємо preview перед відправкою на Jumingo API
         return redirect(reverse("admin:shipping_shipment_jumingo_confirm", args=[shipment.pk]))
+
+    # ── Проксі-завантаження документів Jumingo (мітка, рахунок, підтвердження) ─
+
+    def jumingo_document_view(self, request, shipment_id, doc_type, filename):
+        """Проксує PDF-документ Jumingo (label/invoice/orderconfirmation) через API.
+
+        GET /v1/orders/{orderNumber}/documents/{doc_type} → binary PDF stream.
+        Якщо відповідь не є PDF — fallback: GET /v1/orders/{orderNumber}/documents
+        і шукаємо URL у списку.
+        """
+        import requests as _req
+        from django.http import StreamingHttpResponse, HttpResponseBadRequest
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order_num = shipment.jumingo_order_number
+        if not order_num:
+            return HttpResponseBadRequest("No Jumingo order number on this shipment.")
+        service = get_service(shipment.carrier)
+        if not service:
+            return HttpResponseBadRequest("Jumingo service not configured.")
+
+        # Спроба 1: GET /v1/orders/{orderNumber}/documents/{doc_type}
+        resp = service.download_document(order_num, doc_type)
+        if resp.status_code == 200:
+            ct = resp.headers.get("Content-Type", "application/pdf")
+            response = StreamingHttpResponse(
+                resp.iter_content(chunk_size=8192),
+                content_type=ct,
+            )
+            response["Content-Disposition"] = f'inline; filename="{filename}"'
+            return response
+
+        # Спроба 2: для мітки — проксі через збережений label_url (з auth-заголовками)
+        if doc_type == "label" and shipment.label_url and shipment.label_url.startswith("http"):
+            resp2 = _req.get(shipment.label_url, headers=service._headers(), timeout=30, stream=True)
+            if resp2.status_code == 200:
+                ct2 = resp2.headers.get("Content-Type", "application/pdf")
+                r2 = StreamingHttpResponse(resp2.iter_content(chunk_size=8192), content_type=ct2)
+                r2["Content-Disposition"] = f'inline; filename="{filename}"'
+                return r2
+
+        # Спроба 3: GET /v1/orders/{orderNumber}/documents — пошук URL у списку
+        docs_data = service.get_order_documents(order_num)
+        doc_url = None
+        for _key, val in (docs_data.get("labels") or {}).items():
+            if val.get("type") == doc_type or doc_type == "label":
+                doc_url = val.get("url") or val.get("link") or val.get("downloadUrl")
+                break
+        if not doc_url:
+            for item in (docs_data.get("invoices") or []):
+                if doc_type in ("invoice", item.get("type", "")):
+                    doc_url = item.get("url") or item.get("link") or item.get("downloadUrl")
+                    break
+        if not doc_url:
+            for item in (docs_data.get("confirmations") or []):
+                if doc_type in ("orderconfirmation", item.get("type", "")):
+                    doc_url = item.get("url") or item.get("link") or item.get("downloadUrl")
+                    break
+        if doc_url:
+            from django.http import HttpResponseRedirect
+            return HttpResponseRedirect(doc_url)
+
+        from django.http import HttpResponse
+        return HttpResponse(
+            f"Document not available (API {resp.status_code}).", status=resp.status_code
+        )
 
     # ── Бронювання через API (Variant 3) ─────────────────────────────────────
 

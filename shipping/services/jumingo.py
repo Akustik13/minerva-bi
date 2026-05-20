@@ -714,3 +714,11 @@ class JumingoService(BaseCarrierService):
         except Exception as e:
             logger.error("Jumingo get_order_documents error: %s", e)
             return {}
+
+    def download_document(self, order_number: str, doc_type: str):
+        """GET /v1/orders/{id}/documents/{type} → повертає requests.Response (PDF binary).
+        Caller відповідає за streaming та закриття з'єднання."""
+        import requests as req
+        url = f"{self._base()}/orders/{order_number}/documents/{doc_type}"
+        resp = req.get(url, headers=self._headers(), timeout=30, stream=True)
+        return resp

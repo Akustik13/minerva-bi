@@ -560,13 +560,13 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             <span class="sd-info-val sd-price">{{ shipment.carrier_price }} {{ shipment.carrier_currency }}</span>
           </div>
           {% endif %}
-          {% if shipment.label_url %}
+          {% if label_display_url %}
           <div class="sd-info-row">
             <span class="sd-info-key">{% trans "Етикетка" %}</span>
             <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-              <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 {% trans "Відкрити PDF" %}</a>
+              <a href="{{ label_display_url }}" target="_blank" class="sd-label-link">📄 {% trans "Відкрити PDF" %}</a>
               <button type="button" class="sd-save-local-btn"
-                data-url="{{ shipment.label_url }}"
+                data-url="{{ label_display_url }}"
                 data-filename=""
                 title="{% trans 'Зберегти на ПК' %}">💾</button>
               <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
@@ -668,19 +668,40 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           {% for lbl in jumingo_order.labels %}
           <div class="sd-info-row">
             <span class="sd-info-key">{% trans "Мітка" %}</span>
-            <span class="sd-info-val sd-mono sd-small">{{ lbl.name }}</span>
+            <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <a href="{% url 'admin:shipping_shipment_jumingo_doc' shipment.pk lbl.type lbl.name %}" target="_blank" class="sd-label-link">📄 {% trans "Відкрити PDF" %}</a>
+              <button type="button" class="sd-save-local-btn"
+                data-url="{% url 'admin:shipping_shipment_jumingo_doc' shipment.pk lbl.type lbl.name %}"
+                data-filename="{{ lbl.name }}"
+                title="{% trans 'Зберегти на ПК' %}">💾</button>
+              <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
+            </span>
           </div>
           {% endfor %}
           {% for inv in jumingo_order.invoices %}
           <div class="sd-info-row">
             <span class="sd-info-key">{% trans "Рахунок" %}</span>
-            <span class="sd-info-val sd-mono sd-small">{{ inv.name }}</span>
+            <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <a href="{% url 'admin:shipping_shipment_jumingo_doc' shipment.pk inv.type inv.name %}" target="_blank" class="sd-label-link">📄 {% trans "Відкрити PDF" %}</a>
+              <button type="button" class="sd-save-local-btn"
+                data-url="{% url 'admin:shipping_shipment_jumingo_doc' shipment.pk inv.type inv.name %}"
+                data-filename="{{ inv.name }}"
+                title="{% trans 'Зберегти на ПК' %}">💾</button>
+              <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
+            </span>
           </div>
           {% endfor %}
           {% for conf in jumingo_order.confirmations %}
           <div class="sd-info-row">
             <span class="sd-info-key">{% trans "Підтвердження" %}</span>
-            <span class="sd-info-val sd-mono sd-small">{{ conf.name }}</span>
+            <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <a href="{% url 'admin:shipping_shipment_jumingo_doc' shipment.pk conf.type conf.name %}" target="_blank" class="sd-label-link">📄 {% trans "Відкрити PDF" %}</a>
+              <button type="button" class="sd-save-local-btn"
+                data-url="{% url 'admin:shipping_shipment_jumingo_doc' shipment.pk conf.type conf.name %}"
+                data-filename="{{ conf.name }}"
+                title="{% trans 'Зберегти на ПК' %}">💾</button>
+              <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
+            </span>
           </div>
           {% endfor %}
         </div>
@@ -860,13 +881,13 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               <span class="sd-info-val" style="color:var(--ok);font-weight:700">📅 {{ shipment.carrier_eta }}</span>
             </div>
             {% endif %}
-            {% if shipment.label_url %}
+            {% if label_display_url %}
             <div class="sd-info-row">
               <span class="sd-info-key">{% trans "Етикетка" %}</span>
               <span class="sd-info-val" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-                <a href="{{ shipment.label_url }}" target="_blank" class="sd-label-link">📄 PDF</a>
+                <a href="{{ label_display_url }}" target="_blank" class="sd-label-link">📄 PDF</a>
                 <button type="button" class="sd-save-local-btn"
-                  data-url="{{ shipment.label_url }}"
+                  data-url="{{ label_display_url }}"
                   data-filename=""
                   title="{% trans 'Зберегти на ПК' %}">💾</button>
                 <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
