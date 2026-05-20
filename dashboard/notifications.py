@@ -881,14 +881,22 @@ def notify_new_order(order, is_test: bool = False):
                 stock    = int(_IT.objects.filter(product=product).aggregate(t=_LSum('qty'))['t'] or 0)
                 in_stock = stock >= (line.qty or 0)
             img = ''
-            if product and hasattr(product, 'image_display_url'):
-                try:
-                    img = product.image_display_url() or ''
-                except Exception:
-                    pass
+            if product:
+                # Prefer external image_url (reachable by email clients + Telegram)
+                ext_img = getattr(product, 'image_url', '') or ''
+                if ext_img and ext_img.startswith('http'):
+                    img = ext_img
+                elif hasattr(product, 'image_display_url'):
+                    try:
+                        img = _abs_url(product.image_display_url() or '')
+                    except Exception:
+                        pass
+            name_val = getattr(product, 'name', None) or ''
+            if not name_val and product:
+                name_val = getattr(product, 'description', None) or ''
             lines_data.append({
                 'sku':        getattr(product, 'sku', None) or getattr(line, 'sku_raw', None) or '—',
-                'name':       getattr(product, 'name', None) or '—',
+                'name':       name_val or '—',
                 'qty':        line.qty or 0,
                 'stock':      stock,
                 'in_stock':   in_stock,
