@@ -1084,21 +1084,20 @@ def notify_new_order(order, is_test: bool = False):
                 for ld in lines_data:
                     icon = '✅' if ld['in_stock'] is True else ('❌' if ld['in_stock'] is False else '•')
                     curr = ld.get('currency', '')
-                    name_part  = f' — {ld["name"]}' if ld['name'] not in ('—', '', None) else ''
-                    # Qty: integer when whole number (no trailing zeros)
+                    name_part = f' — {ld["name"]}' if ld['name'] not in ('—', '', None) else ''
                     qty_val = ld["qty"] or 0
                     qty_str = str(int(qty_val)) if float(qty_val) == int(float(qty_val)) else str(qty_val)
-                    price_part = f' | {ld["unit_price"]:.2f} {curr}/шт'.strip() if ld.get('unit_price') else ''
-                    stock_part = ''
+                    lines = [f'{icon} <code>{ld["sku"]}</code>{name_part}']
+                    lines.append(f'   📦 × <b>{qty_str} шт</b>')
+                    if ld.get('unit_price'):
+                        lines.append(f'   💵 {ld["unit_price"]:.2f} {curr}/шт'.strip())
                     if ld['in_stock'] is True:
-                        stock_part = f' | склад: <b>{ld["stock"]} шт</b> ✅'
+                        lines.append(f'   🏪 склад: <b>{ld["stock"]} шт</b> ✅')
                     elif ld['in_stock'] is False:
-                        stock_part = f' | склад: <b>{ld["stock"]} шт</b> ❌'
-                    # Everything on one line: icon SKU name × qty | price | stock
-                    line_txt = f'{icon} <code>{ld["sku"]}</code>{name_part} × <b>{qty_str} шт</b>{price_part}{stock_part}'
+                        lines.append(f'   🏪 склад: <b>{ld["stock"]} шт</b> ❌')
                     if ld.get('datasheet'):
-                        line_txt += f'\n   <a href="{ld["datasheet"]}">📄 Datasheet</a>'
-                    tg.append(line_txt)
+                        lines.append(f'   📄 <a href="{ld["datasheet"]}">Datasheet</a>')
+                    tg.append('\n'.join(lines))
 
             tg_text = '\n'.join(tg)
             first_image = next(
