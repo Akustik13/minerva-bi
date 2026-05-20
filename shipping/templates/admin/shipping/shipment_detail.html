@@ -616,6 +616,95 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
         </div>
       </div>
 
+      <!-- Деталі замовлення Jumingo -->
+      {% if jumingo_order %}
+      <details class="sd-card">
+        <summary class="sd-card-title">📑 {% trans "Деталі замовлення Jumingo" %} {% if jumingo_order.internal_number %}<span style="font-weight:400;color:var(--text-dim)">{{ jumingo_order.internal_number }}</span>{% endif %}</summary>
+
+        <!-- Вартість -->
+        <div class="sd-section-label" style="margin-top:4px">💰 {% trans "Вартість" %}</div>
+        <div class="sd-info-grid">
+          {% if jumingo_order.tax_net %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "Нетто" %}</span>
+            <span class="sd-info-val">{{ jumingo_order.tax_net }} {{ jumingo_order.currency }}</span>
+          </div>
+          {% endif %}
+          {% if jumingo_order.tax %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "ПДВ" %}</span>
+            <span class="sd-info-val">{{ jumingo_order.tax }} {{ jumingo_order.currency }}</span>
+          </div>
+          {% endif %}
+          {% if jumingo_order.gross %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "Разом (брутто)" %}</span>
+            <span class="sd-info-val sd-price">{{ jumingo_order.gross }} {{ jumingo_order.currency }}</span>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Оплата -->
+        {% if jumingo_order.payment_method %}
+        <div class="sd-section-label" style="margin-top:12px">💳 {% trans "Оплата" %}</div>
+        <div class="sd-info-grid">
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "Метод" %}</span>
+            <span class="sd-info-val">{{ jumingo_order.payment_method }}{% if jumingo_order.payment_card %} {{ jumingo_order.payment_card }}{% endif %}</span>
+          </div>
+          {% if jumingo_order.payment_date %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "Дата оплати" %}</span>
+            <span class="sd-info-val">{{ jumingo_order.payment_date }}</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Документи -->
+        {% if jumingo_order.labels or jumingo_order.invoices or jumingo_order.confirmations %}
+        <div class="sd-section-label" style="margin-top:12px">📄 {% trans "Документи" %}</div>
+        <div class="sd-info-grid">
+          {% for lbl in jumingo_order.labels %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "Мітка" %}</span>
+            <span class="sd-info-val sd-mono sd-small">{{ lbl.name }}</span>
+          </div>
+          {% endfor %}
+          {% for inv in jumingo_order.invoices %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "Рахунок" %}</span>
+            <span class="sd-info-val sd-mono sd-small">{{ inv.name }}</span>
+          </div>
+          {% endfor %}
+          {% for conf in jumingo_order.confirmations %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "Підтвердження" %}</span>
+            <span class="sd-info-val sd-mono sd-small">{{ conf.name }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Відправлення Jumingo -->
+        {% if jumingo_order.shipments %}
+        <div class="sd-section-label" style="margin-top:12px">📦 {% trans "Відправлення в замовленні" %}</div>
+        <div class="sd-info-grid">
+          {% for s in jumingo_order.shipments %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{{ s.number }}</span>
+            <span class="sd-info-val sd-mono sd-small">{{ s.tracking }}{% if s.content %} — {{ s.content }}{% endif %}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if jumingo_order.created %}
+        <div class="sd-section-note">{% trans "Jumingo замовлення створено" %}: {{ jumingo_order.created }} · {% trans "змінено" %}: {{ jumingo_order.modified }}</div>
+        {% endif %}
+      </details>
+      {% endif %}
+
       <!-- Митна декларація / Комерційний інвойс -->
       {% if customs_display %}
       <div class="sd-card">

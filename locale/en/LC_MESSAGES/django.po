@@ -3081,3 +3081,48 @@ msgstr "This shipment is not linked to any order. Recipient data and shipping co
 
 msgid "Створити замовлення"
 msgstr "Create order"
+
+msgid "Деталі замовлення Jumingo"
+msgstr "Jumingo order details"
+
+msgid "Вартість"
+msgstr "Cost"
+
+msgid "Нетто"
+msgstr "Net"
+
+msgid "ПДВ"
+msgstr "VAT"
+
+msgid "Разом (брутто)"
+msgstr "Total (gross)"
+
+msgid "Оплата"
+msgstr "Payment"
+
+msgid "Метод"
+msgstr "Method"
+
+msgid "Дата оплати"
+msgstr "Payment date"
+
+msgid "Документи"
+msgstr "Documents"
+
+msgid "Мітка"
+msgstr "Label"
+
+msgid "Рахунок"
+msgstr "Invoice"
+
+msgid "Підтвердження"
+msgstr "Confirmation"
+
+msgid "Відправлення в замовленні"
+msgstr "Shipments in order"
+
+msgid "Jumingo замовлення створено"
+msgstr "Jumingo order created"
+
+msgid "змінено"
+msgstr "modified"

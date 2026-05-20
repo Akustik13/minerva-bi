@@ -3080,3 +3080,48 @@ msgstr "Отправка не привязана ни к одному заказ
 
 msgid "Створити замовлення"
 msgstr "Создать заказ"
+
+msgid "Деталі замовлення Jumingo"
+msgstr "Детали заказа Jumingo"
+
+msgid "Вартість"
+msgstr "Стоимость"
+
+msgid "Нетто"
+msgstr "Нетто"
+
+msgid "ПДВ"
+msgstr "НДС"
+
+msgid "Разом (брутто)"
+msgstr "Итого (брутто)"
+
+msgid "Оплата"
+msgstr "Оплата"
+
+msgid "Метод"
+msgstr "Метод"
+
+msgid "Дата оплати"
+msgstr "Дата оплаты"
+
+msgid "Документи"
+msgstr "Документы"
+
+msgid "Мітка"
+msgstr "Метка"
+
+msgid "Рахунок"
+msgstr "Счёт"
+
+msgid "Підтвердження"
+msgstr "Подтверждение"
+
+msgid "Відправлення в замовленні"
+msgstr "Отправления в заказе"
+
+msgid "Jumingo замовлення створено"
+msgstr "Заказ Jumingo создан"
+
+msgid "змінено"
+msgstr "изменён"

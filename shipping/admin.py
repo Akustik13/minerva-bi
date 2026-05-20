@@ -2504,6 +2504,43 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         ct = shipment.carrier.carrier_type if shipment.carrier else ""
         _tracking_url = self._carrier_tracking_url(ct, shipment.tracking_number or "")
 
+        # ── Jumingo order details (parsed from raw_response if it's an orders response) ──
+        jumingo_order = None
+        rv = shipment.raw_response or {}
+        if isinstance(rv, dict) and "documents" in rv:
+            docs      = rv.get("documents") or {}
+            shipm_lst = rv.get("shipments") or []
+            labels    = docs.get("labels") or {}
+            invoices  = docs.get("invoices") or []
+            confirms  = docs.get("confirmations") or []
+            pcard     = rv.get("paymentCreditcardNumber") or ""
+            tax_net   = rv.get("taxNet") or rv.get("subtotal")
+            tax_amt   = rv.get("tax")
+            gross     = rv.get("gross")
+            jumingo_order = {
+                "internal_number":  rv.get("orderNumber", ""),       # B-260519V9KM
+                "order_number":     docs.get("orderNumber", ""),      # 260519V9KM
+                "created":          rv.get("created", ""),
+                "modified":         rv.get("modified", ""),
+                "payment_method":   rv.get("paymentMethod", ""),
+                "payment_date":     rv.get("paymentDate", "")[:10] if rv.get("paymentDate") else "",
+                "payment_card":     pcard,
+                "currency":         rv.get("currency", "EUR"),
+                "gross":            gross,
+                "tax_net":          tax_net,
+                "tax":              tax_amt,
+                "labels":           list(labels.values()),
+                "invoices":         invoices,
+                "confirmations":    confirms,
+                "shipments":        [
+                    {"number": s.get("orderShipmentNumber", ""),
+                     "tracking": s.get("trackingNumber", ""),
+                     "content":  s.get("shipmentContent", "")}
+                    for s in shipm_lst
+                ],
+                "account_owner":    rv.get("accountOwner", ""),
+            }
+
         return render(request, "admin/shipping/shipment_detail.html", {
             **self.admin_site.each_context(request),
             "shipment":                  shipment,
@@ -2523,6 +2560,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "auto_save_labels_to_server": _sales_cfg.auto_save_labels_to_server,
             "save_labels_url":           _save_labels_url,
             "tracking_url":              _tracking_url,
+            "jumingo_order":             jumingo_order,
         })
 
     # ── Створення SalesOrder з відправлення ──────────────────────────────────
@@ -4383,9 +4421,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         """Отримує актуальні дані від Jumingo API (ціна, сервіс, label, ETA)
         і зберігає в Shipment — незалежно від UPS-трекінгу.
 
-        Використовує GET /v1/orders/{order_number} якщо є jumingo_order_number,
-        інакше GET /v1/shipments/{carrier_shipment_id}.
+        GET /v1/orders/{order_number} — структура відрізняється від /v1/shipments/.
+        Парсимо відповідь напряму, не через _apply_tracking_update.
         """
+        import requests as _req
+        from decimal import Decimal, InvalidOperation
+
         shipment = get_object_or_404(Shipment, pk=shipment_id)
 
         if not (shipment.carrier_shipment_id or shipment.jumingo_order_number):
@@ -4397,12 +4438,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             messages.error(request, "❌ Jumingo сервіс не налаштований.")
             return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
-        # Try orders endpoint first (booked shipments live here), fall back to shipments
+        from tabele.api_logger import logged_request
+
+        # ── Крок 1: GET /v1/orders/{order_number} ────────────────────────────
         data = {}
         if shipment.jumingo_order_number:
-            import requests as _req
             try:
-                from tabele.api_logger import logged_request
                 resp = logged_request(
                     'jumingo', 'sync_order', 'GET',
                     f"{service._base()}/orders/{shipment.jumingo_order_number}",
@@ -4423,10 +4464,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 messages.error(request, f"❌ Jumingo orders помилка: {e}")
                 return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
         elif shipment.carrier_shipment_id:
-            data = service.track(
-                shipment.carrier_shipment_id,
-                jumingo_order_number="",
-            )
+            data = service.track(shipment.carrier_shipment_id, jumingo_order_number="")
             if data.get("error"):
                 messages.error(request, f"❌ Jumingo: {data['error']}")
                 return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
@@ -4435,18 +4473,47 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             messages.warning(request, "⚠️ Jumingo повернув порожню відповідь.")
             return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
-        changed = _apply_tracking_update(shipment, data, upgrade_only=False)
-        shipment.refresh_from_db()
+        # ── Крок 2: Парсинг orders-структури (/v1/orders/{id} response) ──────
+        update_fields = []
+        docs     = data.get("documents") or {}
+        shipments_list = data.get("shipments") or []
 
-        # Also update jumingo_order_number if returned in response and not yet set
-        order_num_api = (data.get("order") or {}).get("number", "") or data.get("order_number", "")
-        if order_num_api and not shipment.jumingo_order_number:
-            shipment.jumingo_order_number = order_num_api
-            shipment.save(update_fields=["jumingo_order_number"])
-            changed = True
+        # Jumingo order number (без "B-" префіксу)
+        order_num = docs.get("orderNumber") or docs.get("id") or ""
+        if order_num and order_num != shipment.jumingo_order_number:
+            shipment.jumingo_order_number = order_num
+            update_fields.append("jumingo_order_number")
 
+        # Carrier price — gross = повна сума (з ПДВ)
+        gross = data.get("gross")
+        if gross is not None:
+            try:
+                new_price = Decimal(str(gross))
+                if new_price != shipment.carrier_price:
+                    shipment.carrier_price    = new_price
+                    shipment.carrier_currency = data.get("currency", "EUR")
+                    update_fields += ["carrier_price", "carrier_currency"]
+            except InvalidOperation:
+                pass
+
+        # Tracking number from shipments list
+        for s in shipments_list:
+            tn = s.get("trackingNumber") or ""
+            if tn and tn != shipment.tracking_number:
+                shipment.tracking_number = tn
+                update_fields.append("tracking_number")
+                break
+
+        # Store full orders response for rich display on detail page
+        shipment.raw_response = data
+        update_fields.append("raw_response")
+
+        if update_fields:
+            shipment.save(update_fields=list(dict.fromkeys(update_fields)))
+
+        changed = bool([f for f in update_fields if f != "raw_response"])
         if changed:
-            messages.success(request, "✅ Дані від Jumingo оновлено (ціна, сервіс, статус).")
+            messages.success(request, "✅ Дані від Jumingo оновлено (ціна, трекінг, документи).")
         else:
             messages.info(request, "ℹ️ Jumingo — без змін, дані актуальні.")
 

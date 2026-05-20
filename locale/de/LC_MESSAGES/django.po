@@ -3080,3 +3080,48 @@ msgstr "Diese Sendung ist keiner Bestellung zugeordnet. Empfängerdaten und Vers
 
 msgid "Створити замовлення"
 msgstr "Bestellung erstellen"
+
+msgid "Деталі замовлення Jumingo"
+msgstr "Jumingo-Bestelldetails"
+
+msgid "Вартість"
+msgstr "Kosten"
+
+msgid "Нетто"
+msgstr "Netto"
+
+msgid "ПДВ"
+msgstr "MwSt."
+
+msgid "Разом (брутто)"
+msgstr "Gesamt (brutto)"
+
+msgid "Оплата"
+msgstr "Zahlung"
+
+msgid "Метод"
+msgstr "Methode"
+
+msgid "Дата оплати"
+msgstr "Zahlungsdatum"
+
+msgid "Документи"
+msgstr "Dokumente"
+
+msgid "Мітка"
+msgstr "Etikett"
+
+msgid "Рахунок"
+msgstr "Rechnung"
+
+msgid "Підтвердження"
+msgstr "Bestätigung"
+
+msgid "Відправлення в замовленні"
+msgstr "Sendungen in der Bestellung"
+
+msgid "Jumingo замовлення створено"
+msgstr "Jumingo-Bestellung erstellt"
+
+msgid "змінено"
+msgstr "geändert"
