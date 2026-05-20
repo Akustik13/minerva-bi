@@ -927,10 +927,8 @@ def notify_new_order(order, is_test: bool = False):
         else:
             days_left_str = f'Прострочено ({-days_left} дн.) 🔴'
 
-    # Destination (full address)
-    zip_city = f"{order.addr_zip} {order.addr_city}".strip() if (order.addr_zip or order.addr_city) else ""
-    dest_parts  = [p for p in [order.addr_street, zip_city, order.addr_country] if p]
-    destination = ', '.join(dest_parts) if dest_parts else ''
+    # Destination — country only
+    destination = (order.addr_country or '').strip()
 
     # Total
     total_str = ''
@@ -940,6 +938,15 @@ def notify_new_order(order, is_test: bool = False):
         if t:
             currency  = getattr(order, 'currency', '') or ''
             total_str = f'{t} {currency}'.strip()
+    except Exception:
+        pass
+
+    # CRM: total orders from this customer
+    crm_orders = None
+    try:
+        cust = order.crm_customer()
+        if cust:
+            crm_orders = cust.total_orders()
     except Exception:
         pass
 
@@ -1031,6 +1038,8 @@ def notify_new_order(order, is_test: bool = False):
             meta = ''
             if total_str:
                 meta += f'<br><b>💰 Сума:</b> <b style="color:#1565c0">{total_str}</b>'
+            if crm_orders is not None:
+                meta += f'<br><b>📊 Замовлень від клієнта:</b> <b style="color:#1565c0">{crm_orders}</b>'
             if destination:
                 meta += f'<br><b>📍 Куди:</b> {destination}'
             if order.contact_name and order.contact_name != client:
@@ -1076,6 +1085,8 @@ def notify_new_order(order, is_test: bool = False):
                 f' · {order.contact_name}' if order.contact_name and order.contact_name != client else ''
             )
             tg.append(f'👤 <b>{client}</b>{contact_part}')
+            if crm_orders is not None:
+                tg.append(f'   📊 Замовлень всього: <b>{crm_orders}</b>')
             if destination:
                 tg.append(f'📍 {destination}')
             if deadline_str:
