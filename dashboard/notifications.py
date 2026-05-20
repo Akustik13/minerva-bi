@@ -954,21 +954,26 @@ def notify_new_order(order, is_test: bool = False):
 
     # CRM: total orders from this customer
     crm_orders = None
+    crm_debug = ''
     try:
         cust = order.crm_customer()
+        crm_debug += f'key={bool(order.customer_key)} email={bool(order.email)} '
         if not cust:
             from crm.models import Customer as _Cust
             _cn = (order.client or '').strip()
+            crm_debug += f'client={_cn!r} '
             if _cn:
                 cust = (
                     _Cust.objects.filter(company__iexact=_cn).first()
                     or _Cust.objects.filter(name__iexact=_cn).first()
                     or _Cust.objects.filter(company__icontains=_cn).first()
                 )
+            crm_debug += f'found={cust.pk if cust else None} '
         if cust:
             crm_orders = cust.total_orders()
-    except Exception:
-        pass
+            crm_debug += f'orders={crm_orders}'
+    except Exception as _e:
+        crm_debug += f'ERR={_e}'
 
     if send_email:
         try:
@@ -1060,6 +1065,8 @@ def notify_new_order(order, is_test: bool = False):
                 meta += f'<br><b>💰 Сума:</b> <b style="color:#1565c0">{total_str}</b>'
             if crm_orders is not None:
                 meta += f'<br><b>📊 Замовлень від клієнта:</b> <b style="color:#1565c0">{crm_orders}</b>'
+            if is_test and crm_debug:
+                meta += f'<br><small style="color:#999;font-family:monospace">CRM debug: {crm_debug}</small>'
             if destination:
                 meta += f'<br><b>📍 Куди:</b> {destination}'
             if deadline_str:
