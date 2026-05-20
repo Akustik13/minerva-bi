@@ -307,6 +307,77 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
+       CONSOLE — Custom manage.py command
+  ════════════════════════════════════════════════════════ -->
+  <div class="bk-card" id="console-card">
+    <h2>💻 Консоль команд</h2>
+    <p style="font-size:.82rem;color:var(--text-muted);margin:0 0 14px">
+      Введіть команду <code style="background:rgba(255,255,255,.07);border-radius:4px;padding:1px 6px;font-family:monospace">manage.py</code> —
+      можна з повним префіксом <code style="background:rgba(255,255,255,.07);border-radius:4px;padding:1px 6px;font-family:monospace">docker-compose exec web python manage.py ...</code>
+    </p>
+
+    <div style="display:flex;gap:8px;align-items:stretch;flex-wrap:wrap">
+      <div style="flex:1;min-width:260px;position:relative">
+        <input id="cmd-input" type="text" class="bk-input"
+               placeholder="compilemessages"
+               style="font-family:monospace;padding-right:32px"
+               autocomplete="off" spellcheck="false">
+        <!-- history arrow -->
+        <button type="button" id="cmd-history-btn"
+                title="Останні команди"
+                style="position:absolute;right:6px;top:50%;transform:translateY(-50%);
+                       background:none;border:none;cursor:pointer;color:var(--text-dim);
+                       font-size:16px;padding:0 4px;line-height:1">▾</button>
+        <div id="cmd-history-list"
+             style="display:none;position:absolute;z-index:200;top:100%;left:0;right:0;
+                    background:var(--bg-card);border:1px solid var(--border-strong);
+                    border-radius:7px;margin-top:3px;box-shadow:0 6px 20px rgba(0,0,0,.5);
+                    max-height:220px;overflow-y:auto"></div>
+      </div>
+      <button id="cmd-run-btn" class="bk-btn" style="background:#0f766e;min-width:130px"
+              onclick="runCustomCmd()">
+        ▶ Виконати
+      </button>
+      <button type="button" class="bk-btn" style="background:transparent;border:1px solid var(--border-strong);
+              color:var(--text-dim);min-width:40px" title="Очистити вивід"
+              onclick="document.getElementById('cmd-result').textContent='';document.getElementById('cmd-result').className='bk-result idle';document.getElementById('cmd-result').style.display='none'">
+        🗑
+      </button>
+    </div>
+
+    <!-- Quick presets -->
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px">
+      <span style="font-size:.78rem;color:var(--text-dim);align-self:center">Швидкий вибір:</span>
+      {% for preset in console_presets %}
+      <button type="button" class="bk-btn"
+              style="background:var(--bg-card-2);border:1px solid var(--border-strong);
+                     color:var(--text-muted);font-size:.78rem;padding:4px 10px;font-weight:400"
+              onclick="runPreset(this)">{{ preset }}</button>
+      {% empty %}
+      <button type="button" class="bk-btn"
+              style="background:var(--bg-card-2);border:1px solid var(--border-strong);
+                     color:var(--text-muted);font-size:.78rem;padding:4px 10px;font-weight:400"
+              onclick="document.getElementById('cmd-input').value=this.textContent.trim()">compilemessages</button>
+      <button type="button" class="bk-btn"
+              style="background:var(--bg-card-2);border:1px solid var(--border-strong);
+                     color:var(--text-muted);font-size:.78rem;padding:4px 10px;font-weight:400"
+              onclick="document.getElementById('cmd-input').value=this.textContent.trim()">setup_modules</button>
+      <button type="button" class="bk-btn"
+              style="background:var(--bg-card-2);border:1px solid var(--border-strong);
+                     color:var(--text-muted);font-size:.78rem;padding:4px 10px;font-weight:400"
+              onclick="document.getElementById('cmd-input').value=this.textContent.trim()">create_strategy_templates</button>
+      <button type="button" class="bk-btn"
+              style="background:var(--bg-card-2);border:1px solid var(--border-strong);
+                     color:var(--text-muted);font-size:.78rem;padding:4px 10px;font-weight:400"
+              onclick="document.getElementById('cmd-input').value=this.textContent.trim()">setup_roles</button>
+      {% endfor %}
+    </div>
+
+    <div id="cmd-result" class="bk-result idle" style="display:none;margin-top:12px;
+         font-family:monospace;font-size:.8rem;white-space:pre-wrap;max-height:320px;overflow-y:auto"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
        SECTION 1 — Manual Backup
   ════════════════════════════════════════════════════════ -->
   <div class="bk-card">
@@ -1470,6 +1541,123 @@ async function doRestore() {
     result.className  = 'modal-result error';
     result.textContent = '❌ Помилка з\'єднання: ' + e.message;
     btn.disabled = false;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Console — custom manage.py command
+════════════════════════════════════════════════════════════════════ */
+const CMD_URL = '{% url "admin:backup_run_command" %}';
+const CMD_HISTORY_KEY = 'mv-cmd-history';
+const CMD_MAX_HISTORY = 20;
+
+function getCmdHistory() {
+  try { return JSON.parse(localStorage.getItem(CMD_HISTORY_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveCmdToHistory(cmd) {
+  var h = getCmdHistory().filter(c => c !== cmd);
+  h.unshift(cmd);
+  h = h.slice(0, CMD_MAX_HISTORY);
+  localStorage.setItem(CMD_HISTORY_KEY, JSON.stringify(h));
+}
+
+function renderHistoryList() {
+  var list = document.getElementById('cmd-history-list');
+  var h = getCmdHistory();
+  if (!h.length) { list.style.display = 'none'; return; }
+  list.innerHTML = h.map(cmd =>
+    `<div class="cmd-hist-item" onclick="pickHistory(this)" data-cmd="${cmd.replace(/"/g,'&quot;')}"
+      style="padding:8px 14px;cursor:pointer;font-family:monospace;font-size:.82rem;
+             color:var(--text);border-bottom:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${cmd}</div>`
+  ).join('');
+  list.style.display = 'block';
+}
+function pickHistory(el) {
+  document.getElementById('cmd-input').value = el.dataset.cmd;
+  document.getElementById('cmd-history-list').style.display = 'none';
+  document.getElementById('cmd-input').focus();
+}
+document.addEventListener('click', function(e) {
+  var list = document.getElementById('cmd-history-list');
+  if (list && !list.contains(e.target) && e.target.id !== 'cmd-history-btn' && e.target.id !== 'cmd-input') {
+    list.style.display = 'none';
+  }
+});
+document.addEventListener('DOMContentLoaded', function() {
+  var histBtn = document.getElementById('cmd-history-btn');
+  var list    = document.getElementById('cmd-history-list');
+  if (histBtn) {
+    histBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (list.style.display === 'none') { renderHistoryList(); }
+      else { list.style.display = 'none'; }
+    });
+  }
+  var input = document.getElementById('cmd-input');
+  if (input) {
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); runCustomCmd(); }
+    });
+    // hover history items
+    input.addEventListener('focus', function() {
+      if (getCmdHistory().length) renderHistoryList();
+    });
+  }
+  // style hover on history items (dynamic)
+  document.getElementById('cmd-history-list').addEventListener('mouseover', function(e) {
+    var item = e.target.closest('.cmd-hist-item');
+    if (item) item.style.background = 'var(--bg-hover)';
+  });
+  document.getElementById('cmd-history-list').addEventListener('mouseout', function(e) {
+    var item = e.target.closest('.cmd-hist-item');
+    if (item) item.style.background = '';
+  });
+});
+
+function runPreset(btn) {
+  document.getElementById('cmd-input').value = btn.textContent.trim();
+  document.getElementById('cmd-history-list').style.display = 'none';
+  runCustomCmd();
+}
+
+async function runCustomCmd() {
+  var input   = document.getElementById('cmd-input');
+  var runBtn  = document.getElementById('cmd-run-btn');
+  var resultEl = document.getElementById('cmd-result');
+  var cmd = input.value.trim();
+  if (!cmd) { input.focus(); return; }
+
+  runBtn.disabled = true;
+  resultEl.style.display = 'block';
+  resultEl.className = 'bk-result running';
+  resultEl.textContent = '⏳ Виконується: ' + cmd + '\n…';
+
+  try {
+    var fd = new FormData();
+    fd.append('cmd', cmd);
+    var resp = await fetch(CMD_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: fd,
+    });
+    var d = await resp.json();
+    saveCmdToHistory(cmd);
+
+    if (d.error && !d.output) {
+      resultEl.className = 'bk-result error';
+      resultEl.textContent = '❌ ' + d.error;
+    } else {
+      var normalised = d.cmd ? '$ manage.py ' + d.cmd : '$ ' + cmd;
+      var header = (d.ok ? '✅' : '❌') + ' ' + normalised + ' (' + (d.duration || 0) + 'с)\n\n';
+      resultEl.className = d.ok ? 'bk-result ok' : 'bk-result error';
+      resultEl.textContent = header + (d.output || '');
+    }
+  } catch(e) {
+    resultEl.className = 'bk-result error';
+    resultEl.textContent = '❌ Помилка з\'єднання: ' + e.message;
+  } finally {
+    runBtn.disabled = false;
   }
 }
 </script>

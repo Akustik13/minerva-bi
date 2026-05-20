@@ -684,6 +684,65 @@ def run_collectstatic() -> dict:
         return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
 
 
+def run_custom_command(cmd_str: str) -> dict:
+    """Run an arbitrary manage.py command typed by the user.
+
+    Accepts full forms:
+      compilemessages
+      python manage.py compilemessages --locale uk
+      docker-compose exec web python manage.py compilemessages
+    Normalises them all to [sys.executable, "manage.py", ...].
+    Only manage.py commands are allowed (not arbitrary shell).
+    """
+    import shlex, sys as _sys
+    start = time.time()
+
+    cmd = cmd_str.strip()
+    # Strip docker-compose prefix (user may copy from SSH instructions)
+    for prefix in ("docker-compose exec web ", "docker compose exec web "):
+        if cmd.startswith(prefix):
+            cmd = cmd[len(prefix):].strip()
+            break
+
+    try:
+        parts = shlex.split(cmd)
+    except ValueError as exc:
+        return {"ok": False, "error": f"Помилка парсингу: {exc}", "duration": 0}
+
+    if not parts:
+        return {"ok": False, "error": "Порожня команда", "duration": 0}
+
+    # Normalise to [python, manage.py, subcommand, ...]
+    if parts[0] in ("python", "python3"):
+        if len(parts) < 2 or not parts[1].endswith("manage.py"):
+            return {"ok": False, "error": "Дозволені лише команди manage.py"}
+        parts = [_sys.executable] + parts[1:]
+    elif parts[0].endswith("manage.py"):
+        parts = [_sys.executable] + parts
+    else:
+        # bare subcommand: "compilemessages" → python manage.py compilemessages
+        parts = [_sys.executable, "manage.py"] + parts
+
+    try:
+        result = subprocess.run(
+            parts,
+            capture_output=True, text=True, timeout=180,
+            cwd=str(settings.BASE_DIR),
+        )
+        output = (result.stdout + result.stderr).strip()
+        ok = result.returncode == 0
+        return {
+            "ok": ok,
+            "output": output or ("✅ Виконано (без виводу)" if ok else "❌ Помилка (без деталей)"),
+            "cmd": " ".join(parts[1:]),   # show normalised form
+            "duration": round(time.time() - start, 1),
+        }
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": "Timeout (>180 с)", "duration": round(time.time() - start, 1)}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
+
+
 def restart_web() -> dict:
     """Graceful gunicorn worker reload — надсилає SIGHUP до PID 1.
 

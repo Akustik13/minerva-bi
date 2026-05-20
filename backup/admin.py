@@ -101,6 +101,11 @@ class BackupAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.collectstatic_view),
                 name="backup_collectstatic",
             ),
+            path(
+                "run-command/",
+                self.admin_site.admin_view(self.run_command_view),
+                name="backup_run_command",
+            ),
         ]
 
     def _ctx(self, request, **extra):
@@ -343,6 +348,17 @@ class BackupAdmin(admin.ModelAdmin):
         if request.method != "POST":
             return JsonResponse({"error": "POST only"}, status=405)
         return JsonResponse(utils.restart_web())
+
+    def run_command_view(self, request):
+        """AJAX — run an arbitrary manage.py command (superadmin only)."""
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        if not request.user.is_superuser:
+            return JsonResponse({"error": "Тільки для суперадміна"}, status=403)
+        cmd = request.POST.get("cmd", "").strip()
+        if not cmd:
+            return JsonResponse({"error": "Команда не вказана"}, status=400)
+        return JsonResponse(utils.run_custom_command(cmd))
 
     def has_add_permission(self, request):              return False
     def has_change_permission(self, request, obj=None): return False
