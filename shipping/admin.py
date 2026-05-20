@@ -5395,7 +5395,7 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
 
     # ── Jumingo order number: order.number ────────────────────────────────────
     order_num = (data.get("order") or {}).get("number", "")
-    if order_num and not shipment.jumingo_order_number:
+    if order_num and order_num != shipment.jumingo_order_number:
         shipment.jumingo_order_number = order_num
         changed = True
 
@@ -5413,14 +5413,18 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
         except InvalidOperation:
             pass
 
-    # ── Назва сервісу: UPS EXPEDITED ® ────────────────────────────────────────
-    if not shipment.carrier_service:
-        carrier_name  = (rate.get("carrier") or {}).get("shipper_group_name", "")
-        service_name  = (rate.get("service") or {}).get("name", "")
-        service_str   = f"{carrier_name} {service_name}".strip()
-        if service_str:
-            shipment.carrier_service = service_str
-            changed = True
+    # ── Назва сервісу та тариф ────────────────────────────────────────────────
+    carrier_name = (rate.get("carrier") or {}).get("shipper_group_name", "")
+    service_name = (rate.get("service") or {}).get("name", "")
+    service_str  = f"{carrier_name} {service_name}".strip()
+    if service_str and service_str != shipment.carrier_service:
+        shipment.carrier_service = service_str
+        changed = True
+
+    tariff_id = str(rate.get("id") or rate.get("tariff_id") or "").strip()
+    if tariff_id and tariff_id != shipment.selected_tariff_id:
+        shipment.selected_tariff_id = tariff_id
+        changed = True
 
     # ── Митна декларація: customs_invoice.lineItems → customs_articles ────────
     customs_inv    = data.get("customs_invoice") or {}
