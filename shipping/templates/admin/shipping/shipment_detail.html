@@ -231,7 +231,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       <div class="sd-meta">
         {{ shipment.carrier.name|default:"{% trans 'Без перевізника' %}" }}
         <span class="sd-dot">·</span>
-        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% else %}<span style="color:var(--text-muted)">{% trans "Без замовлення" %}</span>{% endif %}
+        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% else %}<form method="post" action="{% url 'admin:shipping_shipment_create_order' shipment.pk %}" style="display:inline">{% csrf_token %}<button type="submit" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0;text-decoration:underline" onclick="return confirm('{% trans "Створити нове замовлення на основі цього відправлення?" %}')">➕ {% trans "Без замовлення — натисни щоб створити" %}</button></form>{% endif %}
         <span class="sd-dot">·</span>
         {% trans "Створено" %} {{ shipment.created_at|date:"d.m.Y H:i" }}
         {% if shipment.submitted_at %}
@@ -909,6 +909,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
         </div>
 
         <!-- Дані замовлення -->
+        {% if order %}
         <div class="sd-card">
           <div class="sd-card-title">📋 {% trans "Замовлення" %} {{ order.order_number }}</div>
           <div class="sd-info-grid">
@@ -944,6 +945,22 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             {% endif %}
           </div>
         </div>
+        {% else %}
+        <div class="sd-card" style="border-left:3px solid var(--accent)">
+          <div class="sd-card-title">📋 {% trans "Замовлення" %}</div>
+          <p style="font-size:12px;color:var(--text-dim);margin:0 0 12px">
+            {% trans "Відправлення не прив'язане до жодного замовлення. Дані отримувача та вартість доставки будуть перенесені автоматично." %}
+          </p>
+          <form method="post" action="{% url 'admin:shipping_shipment_create_order' shipment.pk %}">
+            {% csrf_token %}
+            <button type="submit"
+              onclick="return confirm('{% trans "Створити нове замовлення на основі цього відправлення?" %}')"
+              class="sd-btn sd-btn-blue" style="border:none;cursor:pointer;width:100%;font-size:12px">
+              ➕ {% trans "Створити замовлення" %}
+            </button>
+          </form>
+        </div>
+        {% endif %}
 
       </div>
     </div><!-- /right -->

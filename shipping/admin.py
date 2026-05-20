@@ -1325,6 +1325,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 self.admin_site.admin_view(self.save_to_addr_book_view),
                 name="shipping_shipment_save_to_addr_book",
             ),
+            path(
+                "<int:shipment_id>/create-order/",
+                self.admin_site.admin_view(self.create_order_from_shipment_view),
+                name="shipping_shipment_create_order",
+            ),
         ]
         return custom + urls
 
@@ -2499,6 +2504,73 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "auto_save_labels_to_server": _sales_cfg.auto_save_labels_to_server,
             "save_labels_url":           _save_labels_url,
         })
+
+    # ── Створення SalesOrder з відправлення ──────────────────────────────────
+
+    def create_order_from_shipment_view(self, request, shipment_id):
+        """Create a SalesOrder from a shipment that has no linked order."""
+        from django.utils import timezone as _tz
+        from sales.models import SalesOrder
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        if shipment.order_id:
+            messages.warning(request, "Відправлення вже прив'язане до замовлення.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+
+        carrier_name = ""
+        if shipment.carrier:
+            ct = shipment.carrier.carrier_type.upper()
+            carrier_name = ct if ct in ("DHL", "UPS", "FEDEX") else shipment.carrier.name
+
+        order_number = f"SHIP-{shipment.pk}"
+        source = "manual"
+
+        # Ensure unique order_number within source
+        suffix = 0
+        while SalesOrder.objects.filter(source=source, order_number=order_number).exists():
+            suffix += 1
+            order_number = f"SHIP-{shipment.pk}-{suffix}"
+
+        status = "shipped" if shipment.tracking_number else "processing"
+        shipped_at = None
+        if shipment.submitted_at:
+            shipped_at = shipment.submitted_at.date()
+
+        order = SalesOrder(
+            source=source,
+            order_number=order_number,
+            order_date=_tz.now().date(),
+            status=status,
+            client=shipment.recipient_company or shipment.recipient_name,
+            contact_name=shipment.recipient_name,
+            email=shipment.recipient_email or "",
+            phone=shipment.recipient_phone or "",
+            addr_street=shipment.recipient_street or "",
+            addr_city=shipment.recipient_city or "",
+            addr_zip=shipment.recipient_zip or "",
+            addr_country=shipment.recipient_country or "",
+            ship_name=shipment.recipient_name,
+            ship_company=shipment.recipient_company or "",
+            shipping_courier=carrier_name,
+            tracking_number=shipment.tracking_number or "",
+            shipped_at=shipped_at,
+            shipping_cost=shipment.carrier_price or 0,
+            shipping_currency=shipment.carrier_currency or "EUR",
+        )
+        order.save()
+
+        shipment.order = order
+        shipment.save(update_fields=["order"])
+
+        messages.success(
+            request,
+            f"✅ Замовлення {order.order_number} створено і прив'язано до відправлення."
+        )
+        return redirect(reverse("admin:sales_salesorder_change", args=[order.pk]))
 
     # ── Синхронізація статусу замовлення ─────────────────────────────────────
 
@@ -5330,12 +5402,14 @@ def _apply_tracking_update(shipment, data: dict, upgrade_only: bool = False) -> 
     # ── Вартість доставки: rate.price_total ───────────────────────────────────
     rate = data.get("rate") or {}
     price_total = rate.get("price_total") or rate.get("price_net")
-    if price_total and not shipment.carrier_price:
+    if price_total:
         from decimal import Decimal, InvalidOperation
         try:
-            shipment.carrier_price    = Decimal(str(price_total))
-            shipment.carrier_currency = rate.get("price_total_currency", "EUR")
-            changed = True
+            new_price = Decimal(str(price_total))
+            if new_price != shipment.carrier_price:
+                shipment.carrier_price    = new_price
+                shipment.carrier_currency = rate.get("price_total_currency", "EUR")
+                changed = True
         except InvalidOperation:
             pass
 
