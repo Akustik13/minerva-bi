@@ -159,6 +159,22 @@ def _send_telegram(ns, text):
         return json.loads(resp.read())
 
 
+def _send_telegram_photo(ns, photo_url, caption):
+    """Send a photo via Telegram Bot API (caption max 1024 chars)."""
+    url  = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendPhoto'
+    if len(caption) > 1024:
+        caption = caption[:1020] + '\n...'
+    data = json.dumps({
+        'chat_id':    ns.telegram_chat_id,
+        'photo':      photo_url,
+        'caption':    caption,
+        'parse_mode': 'HTML',
+    }).encode('utf-8')
+    req = urllib.request.Request(url, data, {'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read())
+
+
 # ── Email HTML builder ─────────────────────────────────────────────────────────
 
 def _build_html(critical_items, overdue_orders, company_name='Minerva'):
@@ -628,6 +644,7 @@ def notify_digikey_auto_confirmed(sale, mode: str):
                 'name':      (p.name if p else '') or '—',
                 'qty':       line.qty,
                 'datasheet': (p.datasheet_url if p else '') or '',
+                'image':     (p.image_display_url() if p else '') or '',
             })
     except Exception:
         pass
@@ -653,7 +670,18 @@ def notify_digikey_auto_confirmed(sale, mode: str):
                     if ld.get('datasheet'):
                         line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
                     tg.append(line_txt)
-            _send_telegram(ns, '\n'.join(tg))
+            tg_text = '\n'.join(tg)
+            first_image = next(
+                (ld['image'] for ld in lines_data if ld.get('image', '').startswith('http')),
+                ''
+            )
+            if first_image:
+                try:
+                    _send_telegram_photo(ns, first_image, tg_text)
+                except Exception:
+                    _send_telegram(ns, tg_text)
+            else:
+                _send_telegram(ns, tg_text)
         except Exception:
             pass
 
@@ -670,8 +698,18 @@ def notify_digikey_auto_confirmed(sale, mode: str):
                         if ds else
                         f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
                     )
+                    img_url = ld.get('image', '')
+                    img_cell = (
+                        f'<td style="padding:5px 8px;text-align:center;width:44px">'
+                        f'<img src="{img_url}" width="38" height="38" style="object-fit:cover;'
+                        f'border-radius:4px;display:block;margin:auto" onerror="this.style.display=\'none\'">'
+                        f'</td>'
+                        if img_url and img_url.startswith('http') else
+                        '<td style="width:44px"></td>'
+                    )
                     rows += (
                         f'<tr style="border-bottom:1px solid #eee">'
+                        f'{img_cell}'
                         f'<td style="padding:5px 8px">{sku_cell}</td>'
                         f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
                         f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
@@ -681,6 +719,7 @@ def notify_digikey_auto_confirmed(sale, mode: str):
                     '<div style="margin-top:12px"><b style="font-size:13px">📋 Товари:</b>'
                     '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">'
                     '<tr style="background:#f0f4f8;color:#555;font-size:11px">'
+                    '<th style="padding:5px 8px;width:44px"></th>'
                     '<th style="padding:5px 8px;text-align:left">SKU</th>'
                     '<th style="padding:5px 8px;text-align:left">Назва</th>'
                     '<th style="padding:5px 8px;text-align:center">К-сть</th>'
@@ -813,7 +852,7 @@ def notify_new_order(order):
                 lines_data.append({
                     'sku': line.sku_raw or '—', 'name': '—',
                     'qty': line.qty, 'in_stock': None, 'stock': 0,
-                    'datasheet': '',
+                    'datasheet': '', 'image': '',
                     'unit_price': float(line.unit_price or 0),
                     'line_total': float(line.total_price or 0),
                     'currency':   line.currency or '',
@@ -830,6 +869,7 @@ def notify_new_order(order):
                 'stock':      int(stock),
                 'in_stock':   stock >= line.qty,
                 'datasheet':  getattr(product, 'datasheet_url', '') or '',
+                'image':      getattr(product, 'image_display_url', lambda: '')() or '',
                 'unit_price': float(line.unit_price or 0),
                 'line_total': float(line.total_price or (
                     (line.unit_price or 0) * (line.qty or 0)
@@ -896,8 +936,18 @@ def notify_new_order(order):
                     )
                     unit_str  = f'{ld["unit_price"]:.2f} {ld["currency"]}'.strip() if ld.get('unit_price') else '—'
                     total_str_ld = f'{ld["line_total"]:.2f} {ld["currency"]}'.strip() if ld.get('line_total') else '—'
+                    img_url = ld.get('image', '')
+                    img_cell = (
+                        f'<td style="padding:5px 8px;text-align:center;width:44px">'
+                        f'<img src="{img_url}" width="38" height="38" style="object-fit:cover;'
+                        f'border-radius:4px;display:block;margin:auto" onerror="this.style.display=\'none\'">'
+                        f'</td>'
+                        if img_url and img_url.startswith('http') else
+                        '<td style="width:44px"></td>'
+                    )
                     rows += (
                         f'<tr style="border-bottom:1px solid #eee">'
+                        f'{img_cell}'
                         f'<td style="padding:5px 8px">{sku_cell}</td>'
                         f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
                         f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
@@ -911,6 +961,7 @@ def notify_new_order(order):
                     '<b style="font-size:13px">📋 Товари:</b>'
                     '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">'
                     '<tr style="background:#f0f4f8;color:#555;font-size:11px">'
+                    '<th style="padding:5px 8px;width:44px"></th>'
                     '<th style="padding:5px 8px;text-align:left">SKU</th>'
                     '<th style="padding:5px 8px;text-align:left">Назва</th>'
                     '<th style="padding:5px 8px;text-align:center">Кіл-ть</th>'
@@ -982,7 +1033,18 @@ def notify_new_order(order):
                     if ld.get('datasheet'):
                         line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
                     tg.append(line_txt)
-            _send_telegram(ns, '\n'.join(tg))
+            tg_text = '\n'.join(tg)
+            first_image = next(
+                (ld['image'] for ld in lines_data if ld.get('image', '').startswith('http')),
+                ''
+            )
+            if first_image:
+                try:
+                    _send_telegram_photo(ns, first_image, tg_text)
+                except Exception:
+                    _send_telegram(ns, tg_text)
+            else:
+                _send_telegram(ns, tg_text)
         except Exception:
             pass
 
