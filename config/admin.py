@@ -502,7 +502,14 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         from django.contrib import messages
         from sales.models import SalesOrder
         from dashboard.notifications import notify_new_order
-        order = SalesOrder.objects.order_by('-order_date', '-pk').first()
+        order_ref = request.GET.get('order_ref', '').strip()
+        if order_ref:
+            order = SalesOrder.objects.filter(order_number=order_ref).first()
+            if not order:
+                messages.error(request, f"❌ Замовлення «{order_ref}» не знайдено.")
+                return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        else:
+            order = SalesOrder.objects.order_by('-order_date', '-pk').first()
         if not order:
             messages.warning(request, "⚠️ Немає замовлень для тесту.")
             return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
@@ -520,13 +527,14 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return "—"
         return format_html(
-            '<a href="../test-new-order/" style="'
-            'display:inline-block;padding:8px 18px;'
-            'background:#2e7d32;color:#fff;border-radius:6px;'
-            'text-decoration:none;font-weight:600;font-size:13px">'
-            '🧪 Надіслати тестове сповіщення</a>'
-            '<span style="margin-left:12px;font-size:12px;color:var(--text-dim,#607d8b)">'
-            'Бере останнє замовлення та надсилає тестовий email / Telegram</span>'
+            '<form method="get" action="../test-new-order/" style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">'
+            '<input type="text" name="order_ref" placeholder="№ замовлення (або порожньо = останнє)" '
+            'style="padding:7px 10px;border:1px solid var(--border-strong,#2a3f52);border-radius:6px;'
+            'background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;width:260px">'
+            '<button type="submit" style="padding:8px 18px;background:#2e7d32;color:#fff;'
+            'border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer">'
+            '🧪 Надіслати тест</button>'
+            '</form>'
         )
     new_order_test_actions.short_description = "Тест нового замовлення"
 
