@@ -790,18 +790,34 @@ def _send_event_email(ns, subject, html_body):
     msg.send()
 
 
-def _order_email_html(order, title, color, body_extra=''):
+def _abs_url(url: str) -> str:
+    """Make a relative /media/... URL absolute using the first HTTPS trusted origin."""
+    if not url or url.startswith('http'):
+        return url
+    try:
+        from django.conf import settings as _ds
+        origins = getattr(_ds, 'CSRF_TRUSTED_ORIGINS', [])
+        base = next((o for o in origins if o.startswith('https://')), '')
+        if not base:
+            base = next((o for o in origins if o.startswith('http://')), '')
+        return base.rstrip('/') + url if base else url
+    except Exception:
+        return url
+
+
+def _order_email_html(order, title, color, body_extra='', show_total: bool = True):
     """Compact HTML email block for a single order event."""
     now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
     client  = order.client or order.email or '—'
     total   = ''
-    try:
-        from django.db.models import Sum
-        t = order.lines.aggregate(s=Sum('total_price'))['s']
-        if t:
-            total = f'<br><span style="color:#aaa">Сума: <b>{t}</b></span>'
-    except Exception:
-        pass
+    if show_total:
+        try:
+            from django.db.models import Sum
+            t = order.lines.aggregate(s=Sum('total_price'))['s']
+            if t:
+                total = f'<br><span style="color:#aaa">Сума: <b>{t}</b></span>'
+        except Exception:
+            pass
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
         '<body style="font-family:Arial,sans-serif;background:#f0f2f5;margin:0;padding:20px">'
@@ -844,44 +860,48 @@ def notify_new_order(order, is_test: bool = False):
 
     # ── Enriched data ───────────────────────────────────────────────────────
     lines_data = []
+    _IT = _LP = None
     try:
-        from django.db.models import Sum
-        from inventory.models import InventoryTransaction, Product as _Product
-        for line in order.lines.select_related('product').all():
-            product = line.product
-            # Fallback: match by SKU when FK is not set
-            if not product and line.sku_raw:
-                product = _Product.objects.filter(sku=line.sku_raw).first()
-            if not product:
-                lines_data.append({
-                    'sku': line.sku_raw or '—', 'name': '—',
-                    'qty': line.qty, 'in_stock': None, 'stock': 0,
-                    'datasheet': '', 'image': '',
-                    'unit_price': float(line.unit_price or 0),
-                    'line_total': float(line.total_price or 0),
-                    'currency':   line.currency or '',
-                })
-                continue
-            stock = (
-                InventoryTransaction.objects.filter(product=product)
-                .aggregate(t=Sum('qty'))['t'] or 0
-            )
+        from inventory.models import InventoryTransaction as _IT, Product as _LP
+    except Exception:
+        pass
+    try:
+        order_lines = list(order.lines.select_related('product').all())
+    except Exception:
+        order_lines = []
+    from django.db.models import Sum as _LSum
+    for line in order_lines:
+        try:
+            product = getattr(line, 'product', None)
+            if not product and _LP and getattr(line, 'sku_raw', None):
+                product = _LP.objects.filter(sku=line.sku_raw).first()
+            stock    = 0
+            in_stock = None
+            if product and _IT:
+                stock    = int(_IT.objects.filter(product=product).aggregate(t=_LSum('qty'))['t'] or 0)
+                in_stock = stock >= (line.qty or 0)
+            img = ''
+            if product and hasattr(product, 'image_display_url'):
+                try:
+                    img = product.image_display_url() or ''
+                except Exception:
+                    pass
             lines_data.append({
-                'sku':        product.sku,
-                'name':       product.name,
-                'qty':        line.qty,
-                'stock':      int(stock),
-                'in_stock':   stock >= line.qty,
+                'sku':        getattr(product, 'sku', None) or getattr(line, 'sku_raw', None) or '—',
+                'name':       getattr(product, 'name', None) or '—',
+                'qty':        line.qty or 0,
+                'stock':      stock,
+                'in_stock':   in_stock,
                 'datasheet':  getattr(product, 'datasheet_url', '') or '',
-                'image':      getattr(product, 'image_display_url', lambda: '')() or '',
+                'image':      img,
                 'unit_price': float(line.unit_price or 0),
                 'line_total': float(line.total_price or (
                     (line.unit_price or 0) * (line.qty or 0)
                 )),
                 'currency':   line.currency or getattr(order, 'currency', '') or '',
             })
-    except Exception:
-        pass
+        except Exception:
+            pass
 
     # Deadline countdown
     deadline_str  = ''
@@ -917,17 +937,16 @@ def notify_new_order(order, is_test: bool = False):
 
     if send_email:
         try:
-            # Products table
+            # ── Products table ───────────────────────────────────────────────
             lines_html = ''
             if lines_data:
                 rows = ''
                 for ld in lines_data:
                     if ld['in_stock'] is True:
-                        stock_cell = f'<span style="color:#2e7d32">✅ {ld["stock"]} шт</span>'
+                        stock_cell = f'<span style="color:#2e7d32;white-space:nowrap">✅ {ld["stock"]} шт</span>'
                     elif ld['in_stock'] is False:
                         stock_cell = (
-                            f'<span style="color:#c62828">❌ є: {ld["stock"]} шт, '
-                            f'потрібно: {ld["qty"]}</span>'
+                            f'<span style="color:#c62828;white-space:nowrap">❌ {ld["stock"]} / {ld["qty"]} шт</span>'
                         )
                     else:
                         stock_cell = '—'
@@ -938,72 +957,75 @@ def notify_new_order(order, is_test: bool = False):
                         if ds else
                         f'<span style="font-family:monospace;font-size:12px;color:#1565c0">{ld["sku"]}</span>'
                     )
-                    unit_str  = f'{ld["unit_price"]:.2f} {ld["currency"]}'.strip() if ld.get('unit_price') else '—'
-                    total_str_ld = f'{ld["line_total"]:.2f} {ld["currency"]}'.strip() if ld.get('line_total') else '—'
-                    img_url = ld.get('image', '')
+                    curr = ld.get('currency', '')
+                    unit_str     = f'{ld["unit_price"]:.2f} {curr}'.strip() if ld.get('unit_price') else '—'
+                    total_str_ld = f'{ld["line_total"]:.2f} {curr}'.strip() if ld.get('line_total') else '—'
+                    img_url = _abs_url(ld.get('image', ''))
                     img_cell = (
-                        f'<td style="padding:5px 8px;text-align:center;width:44px">'
-                        f'<img src="{img_url}" width="38" height="38" style="object-fit:cover;'
+                        f'<td style="padding:4px 6px;text-align:center;width:46px">'
+                        f'<img src="{img_url}" width="40" height="40" style="object-fit:cover;'
                         f'border-radius:4px;display:block;margin:auto" onerror="this.style.display=\'none\'">'
                         f'</td>'
-                        if img_url and img_url.startswith('http') else
-                        '<td style="width:44px"></td>'
+                        if img_url else
+                        '<td style="width:46px"></td>'
                     )
                     rows += (
                         f'<tr style="border-bottom:1px solid #eee">'
                         f'{img_cell}'
-                        f'<td style="padding:5px 8px">{sku_cell}</td>'
-                        f'<td style="padding:5px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
-                        f'<td style="padding:5px 8px;text-align:center;color:#555">{ld["qty"]}</td>'
-                        f'<td style="padding:5px 8px;text-align:right;color:#555;white-space:nowrap">{unit_str}</td>'
-                        f'<td style="padding:5px 8px;text-align:right;font-weight:600;white-space:nowrap">{total_str_ld}</td>'
-                        f'<td style="padding:5px 8px;text-align:right;font-size:12px">{stock_cell}</td>'
+                        f'<td style="padding:6px 8px">{sku_cell}</td>'
+                        f'<td style="padding:6px 8px;font-size:13px;color:#333">{ld["name"]}</td>'
+                        f'<td style="padding:6px 8px;text-align:center;font-weight:600;color:#1565c0">{ld["qty"]} шт</td>'
+                        f'<td style="padding:6px 8px;text-align:right;color:#555;white-space:nowrap">{unit_str}</td>'
+                        f'<td style="padding:6px 8px;text-align:right;font-weight:600;white-space:nowrap">{total_str_ld}</td>'
+                        f'<td style="padding:6px 8px;text-align:right;font-size:12px">{stock_cell}</td>'
                         f'</tr>'
                     )
                 lines_html = (
-                    '<div style="margin-top:12px">'
-                    '<b style="font-size:13px">📋 Товари:</b>'
-                    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">'
-                    '<tr style="background:#f0f4f8;color:#555;font-size:11px">'
-                    '<th style="padding:5px 8px;width:44px"></th>'
-                    '<th style="padding:5px 8px;text-align:left">SKU</th>'
-                    '<th style="padding:5px 8px;text-align:left">Назва</th>'
-                    '<th style="padding:5px 8px;text-align:center">Кіл-ть</th>'
-                    '<th style="padding:5px 8px;text-align:right">Ціна/шт</th>'
-                    '<th style="padding:5px 8px;text-align:right">Сума</th>'
-                    '<th style="padding:5px 8px;text-align:right">Склад</th>'
+                    '<div style="margin-top:16px">'
+                    '<b style="font-size:13px;color:#333">📋 Товари:</b>'
+                    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;'
+                    'border:1px solid #e8ecf0;border-radius:6px;overflow:hidden">'
+                    '<tr style="background:#e8f0fe;color:#1565c0;font-size:11px;font-weight:600">'
+                    '<th style="padding:6px 6px;width:46px"></th>'
+                    '<th style="padding:6px 8px;text-align:left">SKU</th>'
+                    '<th style="padding:6px 8px;text-align:left">Назва товару</th>'
+                    '<th style="padding:6px 8px;text-align:center">К-сть</th>'
+                    '<th style="padding:6px 8px;text-align:right">Ціна/шт</th>'
+                    '<th style="padding:6px 8px;text-align:right">Сума</th>'
+                    '<th style="padding:6px 8px;text-align:right">Склад</th>'
                     '</tr>'
                     + rows +
                     '</table></div>'
                 )
 
-            extra = ''
+            # ── Extra block ───────────────────────────────────────────────────
+            meta = ''
             if total_str:
-                extra += f'<br><b>Сума:</b> {total_str}'
+                meta += f'<br><b>💰 Сума:</b> <b style="color:#1565c0">{total_str}</b>'
             if destination:
-                extra += f'<br><b>📍 Куди:</b> {destination}'
+                meta += f'<br><b>📍 Куди:</b> {destination}'
             if order.contact_name and order.contact_name != client:
-                extra += f'<br><b>Контакт:</b> {order.contact_name}'
+                meta += f'<br><b>Контакт:</b> {order.contact_name}'
             if deadline_str:
-                dl_color = '#c62828' if days_left is not None and days_left <= 2 else '#333'
-                extra += (
-                    f'<br><b>📦 Дедлайн відправки:</b> {deadline_str}'
-                    + (f' <span style="color:{dl_color}">({days_left_str})</span>'
+                dl_color = '#c62828' if days_left is not None and days_left <= 2 else '#2e7d32'
+                meta += (
+                    f'<br><b>📦 Дедлайн:</b> {deadline_str}'
+                    + (f' <span style="color:{dl_color};font-weight:600">({days_left_str})</span>'
                        if days_left_str else '')
                 )
-            if lines_html:
-                extra += f'<br>{lines_html}'
+
+            extra = meta + (f'<br>{lines_html}' if lines_html else '')
 
             title = '🧪 ТЕСТ: Нове замовлення' if is_test else '🆕 Нове замовлення'
             if is_test:
                 extra = (
-                    '<div style="margin-bottom:12px;padding:10px 14px;'
+                    '<div style="margin-bottom:14px;padding:10px 14px;'
                     'background:#fff8e1;border-left:4px solid #f9a825;border-radius:4px;'
                     'font-size:13px;color:#5d4037">'
                     '⚠️ <b>Тестове повідомлення</b> — це не реальне нове замовлення, '
                     'лише перевірка налаштувань сповіщень.</div>'
                 ) + extra
-            html = _order_email_html(order, title, '#1565c0', extra)
+            html = _order_email_html(order, title, '#1565c0', extra, show_total=False)
             _send_event_email(ns, subject, html)
         except Exception:
             pass
@@ -1011,51 +1033,54 @@ def notify_new_order(order, is_test: bool = False):
     if send_tg:
         try:
             _cname = _get_company_name()
-            tg = [
-                f'🏛️ <b>{_cname}</b>',
-                f'{"🧪 ТЕСТ — " if is_test else ""}🆕 <b>Нове замовлення</b>',
-                f'<i>{_cname} · {timezone.now().strftime("%d.%m.%Y %H:%M")}</i>',
-            ]
+            now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
+            prefix  = '🧪 ТЕСТ · ' if is_test else ''
+            tg = [f'🏛️ <b>{_cname}</b>']
+            tg.append(f'{prefix}🆕 <b>Нове замовлення</b> · <i>{now_str}</i>')
             if is_test:
-                tg.append('<i>⚠️ Це тестове повідомлення, не реальне нове замовлення.</i>')
-            tg += [
-                '',
-                f'Замовлення: <code>{order.order_number}</code>',
-                f'Клієнт: <b>{client}</b>',
-                f'Джерело: {order.source}',
-            ]
+                tg.append('<i>⚠️ Тестове — не реальне нове замовлення</i>')
+            tg.append('')
+
+            # ── Order info ─────────────────────────────────────────────────
+            tg.append(f'📋 <code>{order.order_number}</code> · {order.source}')
+            contact_part = (
+                f' · {order.contact_name}' if order.contact_name and order.contact_name != client else ''
+            )
+            tg.append(f'👤 <b>{client}</b>{contact_part}')
             if destination:
-                tg.append(f'📍 Куди: {destination}')
-            if order.contact_name and order.contact_name != client:
-                tg.append(f'Контакт: {order.contact_name}')
+                tg.append(f'📍 {destination}')
             if deadline_str:
-                tg.append(f'📦 Відправити до: <b>{deadline_str}</b> ({days_left_str})')
+                dl_warn = ' ⚠️' if days_left is not None and days_left <= 2 else ''
+                tg.append(f'📦 Дедлайн: <b>{deadline_str}</b> ({days_left_str}){dl_warn}')
             if total_str:
-                tg.append(f'💰 Сума: <b>{total_str}</b>')
+                tg.append(f'💰 <b>{total_str}</b>')
+
+            # ── Products ───────────────────────────────────────────────────
             if lines_data:
                 tg.append('')
-                tg.append('📋 <b>Товари:</b>')
+                tg.append('📦 <b>Товари:</b>')
                 for ld in lines_data:
                     icon = '✅' if ld['in_stock'] is True else ('❌' if ld['in_stock'] is False else '•')
-                    name_part  = f' {ld["name"]}' if ld['name'] != '—' else ''
-                    stock_part = f' | склад: {ld["stock"]} шт' if ld['in_stock'] is not None else ''
                     curr = ld.get('currency', '')
-                    price_part = ''
-                    if ld.get('unit_price'):
-                        price_part = f' | {ld["unit_price"]:.2f} {curr}/шт'.strip()
-                    total_part = ''
-                    if ld.get('line_total'):
-                        total_part = f' | сума: {ld["line_total"]:.2f} {curr}'.strip()
-                    line_txt = f'{icon} <code>{ld["sku"]}</code>{name_part} × {ld["qty"]}{price_part}{total_part}{stock_part}'
+                    name_part  = f' — {ld["name"]}' if ld['name'] not in ('—', '', None) else ''
+                    qty_part   = f'× <b>{ld["qty"]} шт</b>'
+                    price_part = f' | {ld["unit_price"]:.2f} {curr}/шт'.strip() if ld.get('unit_price') else ''
+                    stock_part = ''
+                    if ld['in_stock'] is True:
+                        stock_part = f' | склад: <b>{ld["stock"]} шт</b> ✅'
+                    elif ld['in_stock'] is False:
+                        stock_part = f' | склад: <b>{ld["stock"]} шт</b> ❌'
+                    line_txt = f'{icon} <code>{ld["sku"]}</code>{name_part}\n   {qty_part}{price_part}{stock_part}'
                     if ld.get('datasheet'):
-                        line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
+                        line_txt += f'\n   <a href="{ld["datasheet"]}">📄 Datasheet</a>'
                     tg.append(line_txt)
+
             tg_text = '\n'.join(tg)
             first_image = next(
-                (ld['image'] for ld in lines_data if ld.get('image', '').startswith('http')),
+                (_abs_url(ld['image']) for ld in lines_data if ld.get('image')),
                 ''
             )
-            if first_image:
+            if first_image and first_image.startswith('http'):
                 try:
                     _send_telegram_photo(ns, first_image, tg_text)
                 except Exception:
