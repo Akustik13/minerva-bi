@@ -960,9 +960,11 @@ def notify_new_order(order, is_test: bool = False):
             from crm.models import Customer as _Cust
             _cn = (order.client or '').strip()
             if _cn:
-                cust = _Cust.objects.filter(company__iexact=_cn).first()
-            if not cust and _cn:
-                cust = _Cust.objects.filter(name__iexact=_cn).first()
+                cust = (
+                    _Cust.objects.filter(company__iexact=_cn).first()
+                    or _Cust.objects.filter(name__iexact=_cn).first()
+                    or _Cust.objects.filter(company__icontains=_cn).first()
+                )
         if cust:
             crm_orders = cust.total_orders()
     except Exception:
