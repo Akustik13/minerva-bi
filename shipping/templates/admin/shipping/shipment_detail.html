@@ -29,7 +29,7 @@
 .sd-company { font-size: 13px; color: var(--text-dim); background: var(--bg-card-2);
               padding: 2px 10px; border-radius: 10px; }
 .sd-meta    { font-size: 12px; color: var(--text-dim); }
-.sd-meta a  { color: var(--accent); text-decoration: none; }
+.sd-meta a  { color: var(--link-fg); text-decoration: none; }
 .sd-meta a:hover { text-decoration: underline; }
 .sd-dot     { margin: 0 6px; }
 
@@ -75,12 +75,12 @@
 }
 .sd-tl-done   .sd-tl-dot { background: var(--ok); border-color: var(--ok); }
 .sd-tl-active .sd-tl-dot {
-  background: var(--accent); border-color: var(--accent);
-  width: 18px; height: 18px; box-shadow: 0 0 0 4px rgba(88,166,255,.2);
+  background: var(--link-fg); border-color: var(--link-fg);
+  width: 18px; height: 18px; box-shadow: 0 0 0 4px rgba(33,150,243,.2);
 }
 .sd-tl-label        { font-size: 11px; font-weight: 600; white-space: nowrap; color: var(--text-dim); }
 .sd-tl-done   .sd-tl-label { color: var(--ok); }
-.sd-tl-active .sd-tl-label { color: var(--accent); }
+.sd-tl-active .sd-tl-label { color: var(--link-fg); }
 .sd-tl-delay  .sd-tl-dot   { background: var(--err); border-color: var(--err); }
 .sd-tl-delay  .sd-tl-label { color: var(--err); }
 .sd-tl-delay-reason {
@@ -127,10 +127,10 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 .sd-mono      { font-family: monospace; }
 .sd-small     { font-size: 11px; }
 .sd-country   { font-weight: 700; font-family: monospace; font-size: 14px; }
-.sd-tracking  { font-family: monospace; color: var(--accent); font-weight: 700; font-size: 14px; }
+.sd-tracking  { font-family: monospace; color: var(--link-fg); font-weight: 700; font-size: 14px; }
 .sd-price     { color: var(--ok); font-weight: 700; font-size: 15px; }
 .sd-label-link {
-  background: var(--bg-card-2); color: var(--accent);
+  background: var(--bg-card-2); color: var(--link-fg);
   padding: 3px 10px; border-radius: 5px; text-decoration: none; font-size: 12px;
 }
 .sd-label-link:hover { background: var(--bg-hover); }
@@ -231,7 +231,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
       <div class="sd-meta">
         {{ shipment.carrier.name|default:"{% trans 'Без перевізника' %}" }}
         <span class="sd-dot">·</span>
-        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% else %}<form method="post" action="{% url 'admin:shipping_shipment_create_order' shipment.pk %}" style="display:inline">{% csrf_token %}<button type="submit" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:12px;padding:0;text-decoration:underline" onclick="return confirm('{% trans "Створити нове замовлення на основі цього відправлення?" %}')">➕ {% trans "Без замовлення — натисни щоб створити" %}</button></form>{% endif %}
+        {% if order %}<a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% else %}<form method="post" action="{% url 'admin:shipping_shipment_create_order' shipment.pk %}" style="display:inline">{% csrf_token %}<button type="submit" style="background:none;border:none;cursor:pointer;color:var(--link-fg);font-size:12px;padding:0;text-decoration:underline" onclick="return confirm('{% trans "Створити нове замовлення на основі цього відправлення?" %}')">➕ {% trans "Без замовлення — натисни щоб створити" %}</button></form>{% endif %}
         <span class="sd-dot">·</span>
         {% trans "Створено" %} {{ shipment.created_at|date:"d.m.Y H:i" }}
         {% if shipment.submitted_at %}
