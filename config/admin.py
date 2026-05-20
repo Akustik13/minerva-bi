@@ -221,6 +221,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         "alert_actions", "last_alert_sent",
+        "new_order_test_actions",
         "digest_actions", "digest_last_sent",
         "imap_actions", "imap_last_fetched",
         "weekly_digest_actions", "weekly_digest_last_sent",
@@ -272,6 +273,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         ("📬 Нові замовлення", {
             "fields": (
                 ("new_order_email", "new_order_telegram"),
+                "new_order_test_actions",
             ),
             "description": (
                 "Миттєве сповіщення при надходженні нового замовлення. "
@@ -421,6 +423,11 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 name="config_notificationsettings_test_telegram",
             ),
             path(
+                "<int:pk>/test-new-order/",
+                self.admin_site.admin_view(self._test_new_order),
+                name="config_notificationsettings_test_new_order",
+            ),
+            path(
                 "<int:pk>/send-digest/",
                 self.admin_site.admin_view(self._send_digest),
                 name="config_notificationsettings_send_digest",
@@ -490,6 +497,38 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         else:
             messages.warning(request, "⚠️ Telegram вимкнено або не налаштований (Bot Token / Chat ID).")
         return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def _test_new_order(self, request, pk):
+        from django.contrib import messages
+        from sales.models import SalesOrder
+        from dashboard.notifications import notify_new_order
+        order = SalesOrder.objects.order_by('-order_date', '-pk').first()
+        if not order:
+            messages.warning(request, "⚠️ Немає замовлень для тесту.")
+            return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        try:
+            notify_new_order(order, is_test=True)
+            messages.success(
+                request,
+                f"✅ Тестове сповіщення надіслано на основі замовлення {order.order_number}."
+            )
+        except Exception as e:
+            messages.error(request, f"❌ Помилка: {e}")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def new_order_test_actions(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return format_html(
+            '<a href="../test-new-order/" style="'
+            'display:inline-block;padding:8px 18px;'
+            'background:#2e7d32;color:#fff;border-radius:6px;'
+            'text-decoration:none;font-weight:600;font-size:13px">'
+            '🧪 Надіслати тестове сповіщення</a>'
+            '<span style="margin-left:12px;font-size:12px;color:var(--text-dim,#607d8b)">'
+            'Бере останнє замовлення та надсилає тестовий email / Telegram</span>'
+        )
+    new_order_test_actions.short_description = "Тест нового замовлення"
 
     def _send_digest(self, request, pk):
         from django.contrib import messages

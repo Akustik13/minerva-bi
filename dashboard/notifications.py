@@ -824,7 +824,7 @@ def _order_email_html(order, title, color, body_extra=''):
     )
 
 
-def notify_new_order(order):
+def notify_new_order(order, is_test: bool = False):
     """Send new-order notification via email and/or Telegram."""
     ns = _get_ns()
     if not ns:
@@ -836,7 +836,11 @@ def notify_new_order(order):
         return
 
     client  = order.client or order.email or '—'
-    subject = f'🆕 Minerva: Нове замовлення {order.order_number}'
+    subject = (
+        f'🧪 ТЕСТ — Нове замовлення {order.order_number}'
+        if is_test else
+        f'🆕 Minerva: Нове замовлення {order.order_number}'
+    )
 
     # ── Enriched data ───────────────────────────────────────────────────────
     lines_data = []
@@ -990,7 +994,16 @@ def notify_new_order(order):
             if lines_html:
                 extra += f'<br>{lines_html}'
 
-            html = _order_email_html(order, '🆕 Нове замовлення', '#1565c0', extra)
+            title = '🧪 ТЕСТ: Нове замовлення' if is_test else '🆕 Нове замовлення'
+            if is_test:
+                extra = (
+                    '<div style="margin-bottom:12px;padding:10px 14px;'
+                    'background:#fff8e1;border-left:4px solid #f9a825;border-radius:4px;'
+                    'font-size:13px;color:#5d4037">'
+                    '⚠️ <b>Тестове повідомлення</b> — це не реальне нове замовлення, '
+                    'лише перевірка налаштувань сповіщень.</div>'
+                ) + extra
+            html = _order_email_html(order, title, '#1565c0', extra)
             _send_event_email(ns, subject, html)
         except Exception:
             pass
@@ -1000,8 +1013,12 @@ def notify_new_order(order):
             _cname = _get_company_name()
             tg = [
                 f'🏛️ <b>{_cname}</b>',
-                f'🆕 <b>Нове замовлення</b>',
+                f'{"🧪 ТЕСТ — " if is_test else ""}🆕 <b>Нове замовлення</b>',
                 f'<i>{_cname} · {timezone.now().strftime("%d.%m.%Y %H:%M")}</i>',
+            ]
+            if is_test:
+                tg.append('<i>⚠️ Це тестове повідомлення, не реальне нове замовлення.</i>')
+            tg += [
                 '',
                 f'Замовлення: <code>{order.order_number}</code>',
                 f'Клієнт: <b>{client}</b>',
