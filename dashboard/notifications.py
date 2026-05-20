@@ -979,11 +979,7 @@ def notify_new_order(order, is_test: bool = False):
                             f'border:1px solid #e0e0e0;cursor:zoom-in"'
                             f' onerror="this.closest(\'td\').style.display=\'none\'">'
                             f'</a>'
-                            f'<img src="{img_url}" class="mv-big"'
-                            f' style="display:none;position:absolute;top:-60px;left:68px;'
-                            f'width:220px;height:220px;object-fit:contain;background:#fff;'
-                            f'border-radius:8px;box-shadow:0 6px 30px rgba(0,0,0,.4);'
-                            f'z-index:999;pointer-events:none;border:1px solid #e0e0e0">'
+                            f'<img src="{img_url}" class="mv-big" style="display:none">'
                             f'</span></td>'
                         )
                     else:
@@ -1000,9 +996,18 @@ def notify_new_order(order, is_test: bool = False):
                     )
                 lines_html = (
                     '<style>'
-                    '.mv-img-wrap:hover .mv-big{display:block !important}'
+                    '.mv-img-wrap:hover .mv-big{'
+                    'display:block !important;'
+                    'position:fixed !important;'
+                    'top:50% !important;left:50% !important;'
+                    'transform:translate(-50%,-50%) !important;'
+                    'width:300px !important;height:300px !important;'
+                    'object-fit:contain !important;background:#fff !important;'
+                    'border-radius:12px !important;border:2px solid #ddd !important;'
+                    'box-shadow:0 8px 40px rgba(0,0,0,.55) !important;'
+                    'z-index:99999 !important;pointer-events:none !important}'
                     '.mv-thumb{transition:opacity .15s}'
-                    '.mv-thumb:hover{opacity:.75}'
+                    '.mv-thumb:hover{opacity:.7}'
                     '</style>'
                     '<div style="margin-top:16px">'
                     '<b style="font-size:13px;color:#333">📋 Товари:</b>'
