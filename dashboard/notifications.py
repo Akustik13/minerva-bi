@@ -971,15 +971,20 @@ def notify_new_order(order, is_test: bool = False):
                     img_url = _abs_url(ld.get('image', ''))
                     if img_url:
                         img_cell = (
-                            f'<td style="padding:4px 8px;text-align:center;width:72px">'
-                            f'<a href="{img_url}" target="_blank" title="Відкрити фото">'
-                            f'<img src="{img_url}" width="60" height="60"'
-                            f' class="mv-prod-img"'
+                            f'<td style="padding:4px 8px;width:72px;vertical-align:middle">'
+                            f'<span class="mv-img-wrap" style="position:relative;display:inline-block">'
+                            f'<a href="{img_url}" target="_blank">'
+                            f'<img src="{img_url}" width="60" height="60" class="mv-thumb"'
                             f' style="object-fit:cover;border-radius:6px;display:block;'
-                            f'margin:auto;border:1px solid #e0e0e0;cursor:zoom-in;'
-                            f'transition:transform .25s ease,box-shadow .25s ease"'
-                            f' onerror="this.parentNode.parentNode.style.display=\'none\'">'
-                            f'</a></td>'
+                            f'border:1px solid #e0e0e0;cursor:zoom-in"'
+                            f' onerror="this.closest(\'td\').style.display=\'none\'">'
+                            f'</a>'
+                            f'<img src="{img_url}" class="mv-big"'
+                            f' style="display:none;position:absolute;top:-60px;left:68px;'
+                            f'width:220px;height:220px;object-fit:contain;background:#fff;'
+                            f'border-radius:8px;box-shadow:0 6px 30px rgba(0,0,0,.4);'
+                            f'z-index:999;pointer-events:none;border:1px solid #e0e0e0">'
+                            f'</span></td>'
                         )
                     else:
                         img_cell = '<td style="width:72px"></td>'
@@ -995,8 +1000,9 @@ def notify_new_order(order, is_test: bool = False):
                     )
                 lines_html = (
                     '<style>'
-                    '.mv-prod-img:hover{transform:scale(3.5);box-shadow:0 4px 24px rgba(0,0,0,.35);'
-                    'border-radius:4px;z-index:99;position:relative}'
+                    '.mv-img-wrap:hover .mv-big{display:block !important}'
+                    '.mv-thumb{transition:opacity .15s}'
+                    '.mv-thumb:hover{opacity:.75}'
                     '</style>'
                     '<div style="margin-top:16px">'
                     '<b style="font-size:13px;color:#333">📋 Товари:</b>'
@@ -1079,14 +1085,17 @@ def notify_new_order(order, is_test: bool = False):
                     icon = '✅' if ld['in_stock'] is True else ('❌' if ld['in_stock'] is False else '•')
                     curr = ld.get('currency', '')
                     name_part  = f' — {ld["name"]}' if ld['name'] not in ('—', '', None) else ''
-                    qty_part   = f'× <b>{ld["qty"]} шт</b>'
+                    # Qty: integer when whole number (no trailing zeros)
+                    qty_val = ld["qty"] or 0
+                    qty_str = str(int(qty_val)) if float(qty_val) == int(float(qty_val)) else str(qty_val)
                     price_part = f' | {ld["unit_price"]:.2f} {curr}/шт'.strip() if ld.get('unit_price') else ''
                     stock_part = ''
                     if ld['in_stock'] is True:
                         stock_part = f' | склад: <b>{ld["stock"]} шт</b> ✅'
                     elif ld['in_stock'] is False:
                         stock_part = f' | склад: <b>{ld["stock"]} шт</b> ❌'
-                    line_txt = f'{icon} <code>{ld["sku"]}</code>{name_part}\n   {qty_part}{price_part}{stock_part}'
+                    # Everything on one line: icon SKU name × qty | price | stock
+                    line_txt = f'{icon} <code>{ld["sku"]}</code>{name_part} × <b>{qty_str} шт</b>{price_part}{stock_part}'
                     if ld.get('datasheet'):
                         line_txt += f'\n   <a href="{ld["datasheet"]}">📄 Datasheet</a>'
                     tg.append(line_txt)
