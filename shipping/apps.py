@@ -5,3 +5,6 @@ class ShippingConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "shipping"
     verbose_name = "📦 Доставка"
+
+    def ready(self):
+        import shipping.signals  # noqa: F401

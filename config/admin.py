@@ -302,6 +302,19 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "Оберіть канал (Email / Telegram) та які саме зміни статусу надсилати."
             ),
         }),
+        ("📦 Статус відправлення (посилки)", {
+            "fields": (
+                ("shipment_email", "shipment_telegram"),
+                ("shipment_on_submitted", "shipment_on_label_ready",
+                 "shipment_on_in_transit", "shipment_on_delivered",
+                 "shipment_on_error", "shipment_on_cancelled"),
+            ),
+            "description": (
+                "Сповіщення при зміні статусу посилки (відправлення). "
+                "Спрацьовує автоматично при збереженні відправлення з новим статусом — "
+                "вручну або через автотрекінг DHL/UPS."
+            ),
+        }),
         ("🔔 Планові сповіщення (cron)", {
             "fields": (
                 "stock_alerts_enabled",

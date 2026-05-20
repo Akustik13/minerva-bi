@@ -1267,3 +1267,129 @@ def notify_status_change(order, old_status, new_status):
             _send_telegram(ns, '\n'.join(lines))
         except Exception:
             pass
+
+
+# ── Shipment status notifications ─────────────────────────────────────────────
+
+_SHIPMENT_STATUS_LABELS = {
+    'submitted':   'Передано перевізнику',
+    'label_ready': 'Етикетка готова',
+    'in_transit':  'В дорозі 🚚',
+    'delivered':   'Доставлено ✅',
+    'error':       'Помилка ❌',
+    'cancelled':   'Скасовано',
+}
+_SHIPMENT_STATUS_COLORS = {
+    'submitted':   '#1976d2',
+    'label_ready': '#0288d1',
+    'in_transit':  '#f57c00',
+    'delivered':   '#2e7d32',
+    'error':       '#c62828',
+    'cancelled':   '#757575',
+}
+
+
+def notify_shipment_status(shipment, old_status, new_status):
+    """Send notification when Shipment status changes."""
+    ns = _get_ns()
+    if not ns:
+        return
+
+    flag_map = {
+        'submitted':   getattr(ns, 'shipment_on_submitted',   False),
+        'label_ready': getattr(ns, 'shipment_on_label_ready', False),
+        'in_transit':  getattr(ns, 'shipment_on_in_transit',  True),
+        'delivered':   getattr(ns, 'shipment_on_delivered',   True),
+        'error':       getattr(ns, 'shipment_on_error',       True),
+        'cancelled':   getattr(ns, 'shipment_on_cancelled',   False),
+    }
+    if not flag_map.get(new_status, False):
+        return
+
+    send_email = ns.email_enabled and getattr(ns, 'shipment_email', False)
+    send_tg    = ns.telegram_enabled and getattr(ns, 'shipment_telegram', True)
+    if not send_email and not send_tg:
+        return
+
+    new_label = _SHIPMENT_STATUS_LABELS.get(new_status, new_status)
+    old_label = _SHIPMENT_STATUS_LABELS.get(old_status, old_status)
+    color     = _SHIPMENT_STATUS_COLORS.get(new_status, '#333')
+
+    recipient = (getattr(shipment, 'recipient_name', '') or
+                 getattr(shipment, 'recipient_company', '') or '—')
+    carrier   = str(getattr(shipment, 'carrier', '') or '—')
+    tracking  = getattr(shipment, 'tracking_number', '') or ''
+    country   = getattr(shipment, 'recipient_country', '') or ''
+    order_num = ''
+    try:
+        if shipment.order:
+            order_num = shipment.order.order_number or ''
+    except Exception:
+        pass
+
+    if send_email:
+        try:
+            _cname  = _get_company_name()
+            from django.utils import timezone as _tz
+            now_str = _tz.now().strftime('%d.%m.%Y %H:%M')
+            subject = f'📦 Відправлення #{shipment.pk}: {new_label}'
+            rows = f'<br><b>Статус:</b> {old_label} → <b style="color:{color}">{new_label}</b>'
+            if order_num:
+                rows += f'<br><b>Замовлення:</b> {order_num}'
+            rows += f'<br><b>Отримувач:</b> {recipient}'
+            if country:
+                rows += f'<br><b>Країна:</b> {country}'
+            rows += f'<br><b>Перевізник:</b> {carrier}'
+            if tracking:
+                rows += (f'<br><b>Трекінг:</b> '
+                         f'<code style="font-family:monospace">{tracking}</code>')
+            clabel = getattr(shipment, 'carrier_status_label', '') or ''
+            if clabel:
+                rows += f'<br><b>Статус перевізника:</b> {clabel}'
+            eta = getattr(shipment, 'carrier_eta', None)
+            if eta:
+                rows += f'<br><b>Очікувана доставка:</b> {eta.strftime("%d.%m.%Y")}'
+            html = (
+                f'<div style="font-family:sans-serif;max-width:560px;margin:0 auto;'
+                f'border:1px solid #e0e0e0;border-radius:8px;overflow:hidden">'
+                f'<div style="background:{color};padding:16px 20px">'
+                f'<span style="color:#fff;font-size:18px;font-weight:700">📦 {new_label}</span>'
+                f'</div>'
+                f'<div style="padding:20px;background:#fafafa">'
+                f'<p style="margin:0 0 4px;font-size:13px;color:#555">{_cname} · {now_str}</p>'
+                f'<hr style="border:none;border-top:1px solid #e0e0e0;margin:10px 0">'
+                f'<p style="font-size:14px;line-height:1.8;margin:0">{rows}</p>'
+                f'</div></div>'
+            )
+            _send_event_email(ns, subject, html)
+        except Exception:
+            pass
+
+    if send_tg:
+        try:
+            _cname  = _get_company_name()
+            from django.utils import timezone as _tz
+            now_str = _tz.now().strftime('%d.%m.%Y %H:%M')
+            lines = [
+                f'🏛️ <b>{_cname}</b>',
+                f'📦 <b>Відправлення #{shipment.pk}</b> · <i>{now_str}</i>',
+                '',
+                f'Статус: {old_label} → <b>{new_label}</b>',
+            ]
+            if order_num:
+                lines.append(f'🛒 Замовлення: <code>{order_num}</code>')
+            lines.append(f'👤 {recipient}')
+            if country:
+                lines.append(f'📍 {country}')
+            lines.append(f'🚚 {carrier}')
+            if tracking:
+                lines.append(f'🔎 Трекінг: <code>{tracking}</code>')
+            clabel = getattr(shipment, 'carrier_status_label', '') or ''
+            if clabel:
+                lines.append(f'ℹ️ {clabel}')
+            eta = getattr(shipment, 'carrier_eta', None)
+            if eta:
+                lines.append(f'📅 ETA: <b>{eta.strftime("%d.%m.%Y")}</b>')
+            _send_telegram(ns, '\n'.join(lines))
+        except Exception:
+            pass

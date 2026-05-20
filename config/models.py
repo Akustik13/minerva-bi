@@ -471,6 +471,40 @@ class NotificationSettings(models.Model):
         help_text="Сповістити при скасуванні замовлення.",
     )
 
+    # ── Shipment status notifications ─────────────────────────────────────────
+    shipment_email = models.BooleanField(
+        "Email: статус посилки", default=False,
+        help_text="Надсилати email при зміні статусу відправлення (посилки).",
+    )
+    shipment_telegram = models.BooleanField(
+        "Telegram: статус посилки", default=True,
+        help_text="Надсилати Telegram при зміні статусу відправлення (посилки).",
+    )
+    shipment_on_submitted = models.BooleanField(
+        "→ Передано перевізнику", default=False,
+        help_text="Сповістити коли відправлення передано перевізнику.",
+    )
+    shipment_on_label_ready = models.BooleanField(
+        "→ Етикетка готова", default=False,
+        help_text="Сповістити коли етикетка сформована.",
+    )
+    shipment_on_in_transit = models.BooleanField(
+        "→ В дорозі", default=True,
+        help_text="Сповістити коли посилка в дорозі (отримано перевізником).",
+    )
+    shipment_on_delivered = models.BooleanField(
+        "→ Доставлено", default=True,
+        help_text="Сповістити коли посилка доставлена одержувачу.",
+    )
+    shipment_on_error = models.BooleanField(
+        "→ Помилка", default=True,
+        help_text="Сповістити при помилці відправлення.",
+    )
+    shipment_on_cancelled = models.BooleanField(
+        "→ Скасовано (посилка)", default=False,
+        help_text="Сповістити при скасуванні відправлення.",
+    )
+
     # ── Telegram ──────────────────────────────────────────────────────────────
     telegram_enabled = models.BooleanField(
         "Надсилати Telegram-сповіщення", default=False,
