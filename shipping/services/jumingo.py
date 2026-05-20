@@ -542,8 +542,12 @@ class JumingoService(BaseCarrierService):
 
     # ── Трекінг ───────────────────────────────────────────────────────────────
 
-    def track(self, carrier_shipment_id: str) -> dict:
-        """GET /v1/shipments/{id} — повертає статус та трекінг відправлення."""
+    def track(self, carrier_shipment_id: str, jumingo_order_number: str = "") -> dict:
+        """GET /v1/shipments/{id} — повертає статус та трекінг відправлення.
+
+        Якщо shipment 404 (видалено після оплати) — автоматично пробує
+        GET /v1/orders/{jumingo_order_number} як fallback.
+        """
         import requests as req
 
         try:
@@ -551,11 +555,37 @@ class JumingoService(BaseCarrierService):
             resp = logged_request('jumingo', 'track', 'GET',
                                   f"{self._base()}/shipments/{carrier_shipment_id}", req.get,
                                   headers=self._headers(), timeout=15)
+
+            if resp.status_code == 404 and jumingo_order_number:
+                # Draft shipment cleaned up after booking — try orders endpoint
+                resp2 = logged_request('jumingo', 'track_order', 'GET',
+                                       f"{self._base()}/orders/{jumingo_order_number}", req.get,
+                                       headers=self._headers(), timeout=15)
+                if resp2.status_code == 200:
+                    return resp2.json()
+                raw2 = {}
+                try:
+                    raw2 = resp2.json()
+                except Exception:
+                    pass
+                return {"error": f"404 shipment + {resp2.status_code} order: "
+                                 f"{raw2.get('detail') or raw2.get('message') or jumingo_order_number}"}
+
             resp.raise_for_status()
             return resp.json()
+
+        except req.HTTPError as e:
+            raw = {}
+            try:
+                raw = e.response.json()
+            except Exception:
+                pass
+            err = raw.get("detail") or raw.get("message") or str(e)
+            logger.error("Jumingo track HTTP error for %s: %s", carrier_shipment_id, err)
+            return {"error": err}
         except Exception as e:
             logger.error("Jumingo track error for %s: %s", carrier_shipment_id, e)
-            return {}
+            return {"error": str(e)}
 
     # ── Вибір тарифу ─────────────────────────────────────────────────────────
 

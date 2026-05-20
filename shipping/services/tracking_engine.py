@@ -122,7 +122,10 @@ def _track_jumingo(shipment) -> dict:
     try:
         from shipping.services.registry import get_service
         svc = get_service(shipment.carrier)
-        return svc.track(shipment.carrier_shipment_id) or {"error": "порожня відповідь"}
+        return svc.track(
+            shipment.carrier_shipment_id,
+            jumingo_order_number=shipment.jumingo_order_number or "",
+        ) or {"error": "порожня відповідь"}
     except Exception as e:
         return {"error": str(e)}
 
