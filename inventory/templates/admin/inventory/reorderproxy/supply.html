@@ -308,7 +308,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                data-ds-trigger data-pk="{{ p.pk }}">{{ p.sku }}</a>
             {% if p.datasheet_file or p.datasheet_url %}
             <span style="color:var(--text-dim);margin-left:4px;font-size:10px;cursor:default"
-                  title="Datasheet доступний — наведи для перегляду">📄</span>
+                  title="{% trans "Datasheet доступний — наведи для перегляду" %}">📄</span>
             {% endif %}
           </div>
           <div class="sv-name">{{ p.name }}</div>

@@ -5,6 +5,7 @@ from typing import Optional
 
 from django.db import models
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 from django.core.validators import MinValueValidator
 
 
@@ -34,8 +35,8 @@ class ProductCategory(models.Model):
 
     class Meta:
         ordering = ["order", "name"]
-        verbose_name = "Категорія товару"
-        verbose_name_plural = "Категорії товарів"
+        verbose_name = _("Категорія товару")
+        verbose_name_plural = _("Категорії товарів")
 
     def __str__(self):
         return self.name
@@ -363,8 +364,8 @@ class InventorySettings(models.Model):
     )
 
     class Meta:
-        verbose_name = "Налаштування складу"
-        verbose_name_plural = "⚙️ Налаштування складу"
+        verbose_name = _("Налаштування складу")
+        verbose_name_plural = _("⚙️ Налаштування складу")
 
     @classmethod
     def get(cls):
@@ -414,8 +415,8 @@ class IncomingShipment(models.Model):
     updated_at           = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name        = 'Вхідне відправлення'
-        verbose_name_plural = 'Вхідні відправлення'
+        verbose_name        = _('Вхідне відправлення')
+        verbose_name_plural = _('Вхідні відправлення')
         ordering            = ['-created_at']
 
     def __str__(self):

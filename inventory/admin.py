@@ -106,11 +106,11 @@ class ReorderStatusFilter(admin.SimpleListFilter):
 
     def lookups(self, request, model_admin):
         return [
-            ("critical", "🔥 Критично (< 2 тижні)"),
-            ("warning",  "⚠️ Мало (< 1.5 міс)"),
-            ("low",      "📉 Низько (< 3 міс)"),
-            ("ok",       "✅ OK"),
-            ("no_sales", "💤 Нема продажів"),
+            ("critical", _("🔥 Критично (< 2 тижні)")),
+            ("warning",  _("⚠️ Мало (< 1.5 міс)")),
+            ("low",      _("📉 Низько (< 3 міс)")),
+            ("ok",       _("✅ OK")),
+            ("no_sales", _("💤 Нема продажів")),
         ]
 
     def queryset(self, request, queryset):
@@ -125,8 +125,8 @@ class ReorderStatusFilter(admin.SimpleListFilter):
 class ReorderProxy(Product):
     class Meta:
         proxy = True
-        verbose_name        = "Аналіз запасів"
-        verbose_name_plural = "📊 Аналіз запасів"
+        verbose_name        = _("Аналіз запасів")
+        verbose_name_plural = _("📊 Аналіз запасів")
 
 
 @admin.register(ReorderProxy)
@@ -176,7 +176,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         if not products:
             return render(request, 'admin/inventory/reorderproxy/supply.html', {
                 **self.admin_site.each_context(request),
-                'title': 'Склад — огляд залишків та руху',
+                'title': _('Склад — огляд залишків та руху'),
                 'subtitle': None,
                 'rows': [],
                 'opts': ReorderProxy._meta,
@@ -282,7 +282,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         context = {
             **self.admin_site.each_context(request),
-            'title':    'Склад — огляд залишків та руху',
+            'title':    _('Склад — огляд залишків та руху'),
             'subtitle': None,
             'rows':     rows,
             'opts':     ReorderProxy._meta,
@@ -370,7 +370,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                     f'</tr>'
                 )
             if not rows_html:
-                body = '<tr><td colspan="7" style="color:var(--text-dim);padding:8px">Рухів немає</td></tr>'
+                body = '<tr><td colspan="7" style="color:var(--text-dim);padding:8px">' + str(_('Рухів немає')) + '</td></tr>'
             else:
                 body = ''.join(rows_html)
             TH = ('text-align:{};color:var(--text-dim);font-size:10px;'
@@ -378,19 +378,19 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             html = (
                 '<table style="width:100%;border-collapse:collapse;font-size:12px">'
                 '<thead><tr>'
-                f'<th style="{TH.format("left")}">ДАТА</th>'
-                f'<th style="{TH.format("left")}">ТИП</th>'
-                f'<th style="{TH.format("right")}">К-СТЬ</th>'
-                f'<th style="{TH.format("right")}">ЗАЛИШОК</th>'
-                f'<th style="{TH.format("left")}">ВИКОНАВЕЦЬ</th>'
-                f'<th style="{TH.format("left")}">ДОКУМЕНТ</th>'
-                f'<th style="{TH.format("left")}">МІСЦЕ</th>'
+                f'<th style="{TH.format("left")}">' + str(_('ДАТА')) + '</th>'
+                f'<th style="{TH.format("left")}">' + str(_('ТИП')) + '</th>'
+                f'<th style="{TH.format("right")}">' + str(_('К-СТЬ')) + '</th>'
+                f'<th style="{TH.format("right")}">' + str(_('ЗАЛИШОК')) + '</th>'
+                f'<th style="{TH.format("left")}">' + str(_('ВИКОНАВЕЦЬ')) + '</th>'
+                f'<th style="{TH.format("left")}">' + str(_('ДОКУМЕНТ')) + '</th>'
+                f'<th style="{TH.format("left")}">' + str(_('МІСЦЕ')) + '</th>'
                 '</tr></thead>'
                 f'<tbody>{body}</tbody>'
                 '</table>'
             )
         except Exception as exc:
-            html = f'<p style="color:#ef5350">Помилка: {escape(str(exc))}</p>'
+            html = f'<p style="color:#ef5350">' + str(_('Помилка:')) + f' {escape(str(exc))}</p>'
         return HttpResponse(html)
 
     def supply_receive_view(self, request):
@@ -522,11 +522,11 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     def status_col(self, obj):
         d = self._get_reorder_cached(obj)
         cfg = {
-            'critical': ('#f44336', '🔥 КРИТИЧНО'),
-            'warning':  ('#ff9800', '⚠️ Мало'),
-            'low':      ('#ffb300', '📉 Низько'),
-            'ok':       ('#4caf50', '✅ OK'),
-            'no_sales': ('#607d8b', '💤 Нема продажів'),
+            'critical': ('#f44336', _('🔥 КРИТИЧНО')),
+            'warning':  ('#ff9800', _('⚠️ Мало')),
+            'low':      ('#ffb300', _('📉 Низько')),
+            'ok':       ('#4caf50', _('✅ OK')),
+            'no_sales': ('#607d8b', _('💤 Нема продажів')),
         }
         color, label = cfg.get(d['status'], ('#607d8b', d['status']))
         return format_html(
@@ -553,7 +553,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             supplier = Supplier.objects.first()
             if not supplier:
                 self.message_user(request,
-                    "❌ Спочатку створіть хоча б одного постачальника.", messages.ERROR)
+                    _("❌ Спочатку створіть хоча б одного постачальника."), messages.ERROR)
                 return
             po = PurchaseOrder.objects.create(
                 supplier=supplier,
@@ -584,8 +584,9 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         po_url = reverse('admin:inventory_purchaseorder_change', args=[po.pk])
         self.message_user(
             request,
-            f"✅ Додано {added} позицій до PO {po} (пропущено: {skipped}). "
-            f"Відкрийте: /admin/inventory/purchaseorder/{po.pk}/change/",
+            _("✅ Додано %(n)d позицій до PO %(po)s (пропущено: %(skipped)d). "
+              "Відкрийте: /admin/inventory/purchaseorder/%(pk)d/change/") % {
+                "n": added, "po": po, "skipped": skipped, "pk": po.pk},
             messages.SUCCESS,
         )
     bulk_create_po.short_description = _("📦 Додати до PO (чернетка)")
@@ -709,31 +710,35 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         "fix_outgoing_sign",
     ]
 
-    @admin.action(description="🔒 Змінити тип → Резерв")
+    @admin.action(description=_("🔒 Змінити тип → Резерв"))
     def mark_as_reserved(self, request, queryset):
         updated = queryset.update(tx_type=InventoryTransaction.TxType.RESERVED)
-        self.message_user(request, f"Змінено {updated} транзакцій → Резерв.",
+        self.message_user(request,
+                          _("Змінено %(n)d транзакцій → Резерв.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
-    @admin.action(description="🔓 Змінити тип → Списання (Outgoing)")
+    @admin.action(description=_("🔓 Змінити тип → Списання (Outgoing)"))
     def release_reservations(self, request, queryset):
         updated = queryset.update(tx_type=InventoryTransaction.TxType.OUTGOING)
-        self.message_user(request, f"Змінено {updated} транзакцій → Списання.",
+        self.message_user(request,
+                          _("Змінено %(n)d транзакцій → Списання.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
-    @admin.action(description="▲ Змінити тип → Прихід (Incoming)")
+    @admin.action(description=_("▲ Змінити тип → Прихід (Incoming)"))
     def mark_as_incoming(self, request, queryset):
         updated = queryset.update(tx_type=InventoryTransaction.TxType.INCOMING)
-        self.message_user(request, f"Змінено {updated} транзакцій → Прихід.",
+        self.message_user(request,
+                          _("Змінено %(n)d транзакцій → Прихід.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
-    @admin.action(description="⇄ Змінити тип → Коригування (Adjustment)")
+    @admin.action(description=_("⇄ Змінити тип → Коригування (Adjustment)"))
     def mark_as_adjustment(self, request, queryset):
         updated = queryset.update(tx_type=InventoryTransaction.TxType.ADJUSTMENT)
-        self.message_user(request, f"Змінено {updated} транзакцій → Коригування.",
+        self.message_user(request,
+                          _("Змінено %(n)d транзакцій → Коригування.") % {"n": updated},
                           messages.SUCCESS if updated else messages.WARNING)
 
-    @admin.action(description="🔧 Виправити знак qty для Outgoing з позитивним qty (пошкоджені дані)")
+    @admin.action(description=_("🔧 Виправити знак qty для Outgoing з позитивним qty (пошкоджені дані)"))
     def fix_outgoing_sign(self, request, queryset):
         from django.db.models import F
         corrupted = queryset.filter(
@@ -742,19 +747,20 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         )
         count = corrupted.count()
         if count == 0:
-            self.message_user(request, "Не знайдено пошкоджених рядків (Outgoing з qty > 0).",
+            self.message_user(request,
+                              _("Не знайдено пошкоджених рядків (Outgoing з qty > 0)."),
                               messages.WARNING)
             return
         corrupted.update(qty=F('qty') * -1)
         self.message_user(request,
-                          f"Виправлено {count} транзакцій: qty змінено на від'ємне значення.",
+                          _("Виправлено %(n)d транзакцій: qty змінено на від'ємне значення.") % {"n": count},
                           messages.SUCCESS)
 
     _TX_META = {
-        'Incoming':   ('▲', 'var(--ok,#3fb950)',  'rgba(63,185,80,.13)',   'Прихід'),
-        'Outgoing':   ('▼', 'var(--err,#f85149)', 'rgba(248,81,73,.13)',   'Відвантаження'),
-        'Adjustment': ('⇄', '#78909c',            'rgba(120,144,156,.13)', 'Коригування'),
-        'Reserved':   ('🔒', '#FFB300',           'rgba(255,179,0,.13)',   'Резерв'),
+        'Incoming':   ('▲', 'var(--ok,#3fb950)',  'rgba(63,185,80,.13)',   _('Прихід')),
+        'Outgoing':   ('▼', 'var(--err,#f85149)', 'rgba(248,81,73,.13)',   _('Відвантаження')),
+        'Adjustment': ('⇄', '#78909c',            'rgba(120,144,156,.13)', _('Коригування')),
+        'Reserved':   ('🔒', '#FFB300',           'rgba(255,179,0,.13)',   _('Резерв')),
     }
 
     @admin.display(description=_("Дата"), ordering="tx_date")
@@ -932,7 +938,7 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             )
         return balance_html
 
-    @admin.display(description="Товар")
+    @admin.display(description=_("Товар"))
     def product_link(self, obj):
         url = reverse("admin:inventory_product_change", args=[obj.product_id])
         return format_html(
@@ -940,13 +946,14 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
             url, obj.product.sku,
         )
 
-    @admin.display(description="Виконавець")
+    @admin.display(description=_("Виконавець"))
     def performer_col(self, obj):
         u = obj.performed_by
         if u:
             name = (f"{u.first_name} {u.last_name}".strip()) or u.username
             return format_html('<span style="color:#42a5f5;font-weight:600">👤 {}</span>', name)
-        return format_html('<span style="color:var(--text-dim,#607d8b);font-size:11px">⚙️ Система</span>')
+        return format_html('<span style="color:var(--text-dim,#607d8b);font-size:11px">⚙️ {}</span>',
+                           _("Система"))
 
 
 class ProductComponentInline(admin.TabularInline):
@@ -1089,7 +1096,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         if hasattr(obj, '_stock_total'):
             return obj._stock_total
         return Decimal(str(_get_stock(obj)))
-    stock_qty.short_description = "On stock"
+    stock_qty.short_description = _("На складі (точно)")
 
     def reserved_qty(self, obj):
         if hasattr(obj, '_reserved_total'):
@@ -1100,11 +1107,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                  .aggregate(t=Sum("qty")).get("t")) or Decimal("0")
         if r and r < 0:
             return format_html(
-                '<span style="color:#FFB300;font-weight:700" title="Зарезервовано під замовлення">🔒 {}</span>',
-                abs(r),
+                '<span style="color:#FFB300;font-weight:700" title="{}">🔒 {}</span>',
+                _("Зарезервовано під замовлення"), abs(r),
             )
         return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
-    reserved_qty.short_description = "🔒 Резерв"
+    reserved_qty.short_description = _("🔒 Резерв")
 
     def _get_reorder_cached(self, obj):
         """Return _reorder() result, cached on obj to avoid duplicate calls per row."""
@@ -1149,11 +1156,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         """Детальна аналітика в картці товару."""
         d = _reorder(obj)
         status_cfg = {
-            'critical': ('#f44336', '🔥 КРИТИЧНО — замовляйте ЗАРАЗ!'),
-            'warning':  ('#ff9800', '⚠️ Мало — треба замовити'),
-            'low':      ('#ffb300', '📉 Низько — скоро потрібно замовити'),
-            'ok':       ('#4caf50', '✅ Запасів достатньо'),
-            'no_sales': ('#607d8b', '💤 Продажів не було (немає даних)'),
+            'critical': ('#f44336', _('🔥 КРИТИЧНО — замовляйте ЗАРАЗ!')),
+            'warning':  ('#ff9800', _('⚠️ Мало — треба замовити')),
+            'low':      ('#ffb300', _('📉 Низько — скоро потрібно замовити')),
+            'ok':       ('#4caf50', _('✅ Запасів достатньо')),
+            'no_sales': ('#607d8b', _('💤 Продажів не було (немає даних)')),
         }
         color, msg = status_cfg.get(d['status'], ('#607d8b', '—'))
 
@@ -1161,17 +1168,21 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         reserved = int(abs(getattr(obj, '_reserved_total', None) or 0))
         available = on_hand - reserved
         avail_color = '#f44336' if available <= 0 else ('#ff9800' if available < 5 else '#4caf50')
-        avail_html = f"<b style='color:{avail_color}'>{available} шт.</b>"
+        pcs = str(_("шт."))
+        avail_html = f"<b style='color:{avail_color}'>{available} {pcs}</b>"
         rows = [
-            ("На руках (фізично)", f"<b>{on_hand} шт.</b>"),
+            (str(_("На руках (фізично)")), f"<b>{on_hand} {pcs}</b>"),
         ]
         if reserved:
-            rows.append(("🔒 Зарезервовано", f"<span style='color:#FFB300;font-weight:700'>−{reserved} шт.</span>"))
+            rows.append((str(_("🔒 Зарезервовано")), f"<span style='color:#FFB300;font-weight:700'>−{reserved} {pcs}</span>"))
         rows += [
-            ("✅ Доступно до продажу", avail_html),
-            ("Середні продажі", f"{d['monthly']}/міс (останні 3 міс)" if d['monthly'] else "—"),
-            ("Вистачить на", f"{d['months_left']} міс" if d['months_left'] is not None else "—"),
-            ("Рекомендовано замовити", f"<b style='color:#2196f3'>{d['reorder_qty']} шт.</b>" if d['reorder_qty'] else "Не потрібно"),
+            (str(_("✅ Доступно до продажу")), avail_html),
+            (str(_("Середні продажі")),
+             f"{d['monthly']}/{str(_('міс'))} ({str(_('останні 3 міс'))})" if d['monthly'] else "—"),
+            (str(_("Вистачить на")),
+             f"{d['months_left']} {str(_('міс'))}" if d['months_left'] is not None else "—"),
+            (str(_("Рекомендовано замовити")),
+             f"<b style='color:#2196f3'>{d['reorder_qty']} {pcs}</b>" if d['reorder_qty'] else str(_("Не потрібно"))),
         ]
         table_rows = "".join(
             f"<tr><td style='padding:6px 12px;opacity:.7;white-space:nowrap'>{k}</td>"
@@ -1184,7 +1195,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             f'<table style="border-collapse:collapse;border:1px solid rgba(128,128,128,.2);'
             f'border-radius:6px">{table_rows}</table>'
         )
-    reorder_info.short_description = "📊 Аналіз запасів"
+    reorder_info.short_description = _("📊 Аналіз запасів")
 
     def incoming_qty(self, obj):
         if hasattr(obj, '_incoming_total'):
@@ -1218,7 +1229,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         from django.conf import settings
         sku = (obj.sku or "").strip()
         if not sku:
-            return mark_safe('<p style="color:#607d8b">SKU не вказано</p>')
+            return format_html('<p style="color:#607d8b">{}</p>', _("SKU не вказано"))
         labels_dir = Path(getattr(settings, 'LABELS_DIR', Path(settings.BASE_DIR) / 'labels'))
         sku_up = sku.upper()
         label_path = None
@@ -1238,28 +1249,32 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     else alert('Помилка: '+(d.results?d.results[0].msg:d.error));
   }});
 }})(this.files[0])"""
+        _replace_lbl = str(_("Замінити файл"))
+        _upload_lbl = str(_("Завантажити %(sku)s.dymo") % {"sku": sku})
         upload_btn = f'''<label style="display:inline-block;padding:6px 14px;background:#1a2e4a;
     border:1px solid #2a4a6a;border-radius:7px;font-size:12px;color:#58a6ff;
     cursor:pointer;white-space:nowrap">
   <input type="file" accept=".dymo" style="display:none" onchange="{upload_js}">
-  📤 {'Замінити файл' if label_path else f'Завантажити {sku}.dymo'}
+  📤 {_replace_lbl if label_path else _upload_lbl}
 </label>'''
 
         if label_path:
             url_base = f"/labels/serve/{sku}/"
+            _qty_lbl = str(_("К-сть:"))
+            _print_lbl = str(_("Друкувати"))
             return mark_safe(f'''
 <div style="display:flex;flex-direction:column;gap:12px;padding:4px 0">
   <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
     <span style="color:#4caf50;font-size:13px">✅ {label_path.name}</span>
     <div style="display:flex;align-items:center;gap:8px">
-      <label style="font-size:12px;color:#9aafbe">К-сть:</label>
+      <label style="font-size:12px;color:#9aafbe">{_qty_lbl}</label>
       <input id="lbl-qty-{sku}" type="number" value="1" min="1" max="999"
              style="width:60px;padding:4px 6px;background:#111c26;border:1px solid #2a3f52;
                     border-radius:5px;color:#c9d8e4;font-size:13px;text-align:center">
       <a id="lbl-btn-{sku}" href="{url_base}?qty=1" target="_blank"
          style="background:#1976d2;color:#fff;padding:7px 18px;border-radius:7px;
                 font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">
-        🖨️ Друкувати
+        🖨️ {_print_lbl}
       </a>
     </div>
   </div>
@@ -1275,12 +1290,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 }})();
 </script>''')
 
+        _not_found = str(_("Файл %(sku)s.dymo не знайдено") % {"sku": sku})
         return mark_safe(f'''
 <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:4px 0">
-  <span style="color:#f44336;font-size:13px">❌ Файл {sku}.dymo не знайдено</span>
+  <span style="color:#f44336;font-size:13px">❌ {_not_found}</span>
   {upload_btn}
 </div>''')
-    label_detail.short_description = "Друк етикетки"
+    label_detail.short_description = _("Друк етикетки")
 
     def label_btn(self, obj):
         sku = (obj.sku or "").strip()
@@ -1309,12 +1325,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 f'🖨️ Друк</a>')
         return mark_safe(
             f'<span style="color:#607d8b;font-size:11px" title="Немає {sku}.dymo">—</span>')
-    label_btn.short_description = "🏷️ Друк"
+    label_btn.short_description = _("🏷️ Друк")
 
     def movement_history(self, obj):
         """Рух товару: всі InventoryTransaction з посиланнями на замовлення/PO."""
         if not obj.pk:
-            return mark_safe('<span style="color:var(--text-dim,#607d8b)">Збережіть товар спочатку</span>')
+            return format_html('<span style="color:var(--text-dim,#607d8b)">{}</span>',
+                               _("Збережіть товар спочатку"))
 
         from django.utils.timezone import localtime as _localtime
         txs = list(
@@ -1323,7 +1340,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             .order_by('-tx_date', '-pk')[:150]
         )
         if not txs:
-            return mark_safe('<span style="color:var(--text-dim,#607d8b)">Транзакцій немає</span>')
+            return format_html('<span style="color:var(--text-dim,#607d8b)">{}</span>',
+                               _("Транзакцій немає"))
 
         # ── Batch-fetch AuditLog performer ─────────────────────────────────────
         audit_user_map: dict = {}
@@ -1379,10 +1397,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
         # ── Render ─────────────────────────────────────────────────────────────
         TYPE_CFG = {
-            'Incoming':   ('▲', '#4caf50', 'Прихід'),
-            'Outgoing':   ('▼', '#ef5350', 'Відвантаження'),
-            'Adjustment': ('⇄', '#2196f3', 'Коригування'),
-            'Reserved':   ('🔒', '#FFB300', 'Резерв'),
+            'Incoming':   ('▲', '#4caf50', _('Прихід')),
+            'Outgoing':   ('▼', '#ef5350', _('Відвантаження')),
+            'Adjustment': ('⇄', '#2196f3', _('Коригування')),
+            'Reserved':   ('🔒', '#FFB300', _('Резерв')),
         }
 
         rows = []
@@ -1456,41 +1474,36 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
         total = InventoryTransaction.objects.filter(product=obj).count()
         note = (
-            f' <span style="opacity:.5">(показано {len(txs)} з {total})</span>'
+            f' <span style="opacity:.5">({str(_("показано %(n)d з %(total)d") % {"n": len(txs), "total": total})})</span>'
             if total > len(txs) else ''
         )
 
+        th_style = 'padding:5px 10px;text-align:{align};font-size:11px;font-weight:600;white-space:nowrap;color:var(--text-muted,#9aafbe)'
         return mark_safe(
             f'<div style="overflow-x:auto">'
             f'<div style="font-size:12px;color:var(--text-muted,#9aafbe);margin-bottom:8px">'
-            f'Всього записів: <b>{total}</b>{note}</div>'
+            + str(_('Всього записів:')) + f' <b>{total}</b>{note}</div>'
             f'<table style="width:100%;border-collapse:collapse">'
             f'<thead><tr style="border-bottom:2px solid rgba(128,128,128,.2)">'
-            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
-            f'white-space:nowrap;color:var(--text-muted,#9aafbe)">Дата</th>'
-            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
-            f'color:var(--text-muted,#9aafbe)">Тип</th>'
-            f'<th style="padding:5px 10px;text-align:right;font-size:11px;font-weight:600;'
-            f'color:var(--text-muted,#9aafbe)">К-сть</th>'
-            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
-            f'color:var(--text-muted,#9aafbe)">Документ</th>'
-            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
-            f'color:var(--text-muted,#9aafbe)">Клієнт / Постачальник</th>'
-            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
-            f'color:var(--text-muted,#9aafbe)">Виконавець</th>'
-            f'<th style="padding:5px 10px;text-align:left;font-size:11px;font-weight:600;'
-            f'color:var(--text-muted,#9aafbe)">Локація</th>'
+            f'<th style="{th_style.format(align="left")}">' + str(_('Дата')) + '</th>'
+            f'<th style="{th_style.format(align="left")}">' + str(_('Тип')) + '</th>'
+            f'<th style="{th_style.format(align="right")}">' + str(_('К-сть')) + '</th>'
+            f'<th style="{th_style.format(align="left")}">' + str(_('Документ')) + '</th>'
+            f'<th style="{th_style.format(align="left")}">' + str(_('Клієнт / Постачальник')) + '</th>'
+            f'<th style="{th_style.format(align="left")}">' + str(_('Виконавець')) + '</th>'
+            f'<th style="{th_style.format(align="left")}">' + str(_('Локація')) + '</th>'
             f'</tr></thead>'
             f'<tbody>{"".join(rows)}</tbody>'
             f'</table></div>'
         )
-    movement_history.short_description = "📋 Рух товару"
+    movement_history.short_description = _("📋 Рух товару")
 
     def datasheet_link(self, obj):
         url = obj.datasheet_display_url
         if not url:
-            return mark_safe('<span style="color:var(--text-dim,#607d8b);font-size:12px">— не вказано —</span>')
-        label = '📎 Відкрити (файл)' if (obj.datasheet_file and obj.datasheet_file.name) else '📄 Відкрити Datasheet'
+            return format_html('<span style="color:var(--text-dim,#607d8b);font-size:12px">{}</span>',
+                               _("— не вказано —"))
+        label = ('📎 ' + str(_("Відкрити (файл)"))) if (obj.datasheet_file and obj.datasheet_file.name) else ('📄 ' + str(_("Відкрити Datasheet")))
         return format_html(
             '<a href="{}" target="_blank" rel="noopener noreferrer" '
             'style="display:inline-flex;align-items:center;gap:6px;'
@@ -1504,7 +1517,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     def image_preview(self, obj):
         url = obj.image.url if obj.image else obj.image_url
         if not url:
-            return mark_safe('<span style="color:var(--text-dim,#607d8b);font-size:12px">— немає зображення —</span>')
+            return format_html('<span style="color:var(--text-dim,#607d8b);font-size:12px">{}</span>',
+                               _("— немає зображення —"))
         return format_html(
             '<a href="{}" target="_blank" rel="noopener noreferrer">'
             '<img src="{}" style="max-height:160px;max-width:320px;border-radius:8px;'
@@ -1512,12 +1526,12 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             '</a>',
             url, url,
         )
-    image_preview.short_description = "Попередній перегляд"
+    image_preview.short_description = _("Попередній перегляд")
 
     def set_stock_link(self, obj):
         url = reverse("admin:inventory_product_set_stock", args=[obj.pk])
         return format_html('<a class="button" href="{}">Set stock…</a>', url)
-    set_stock_link.short_description = "⚙️ Дії"
+    set_stock_link.short_description = _("⚙️ Дії")
 
     def history_view(self, request, object_id, extra_context=None):
         """Рух товару замість стандартного Django LogEntry history."""
@@ -1729,11 +1743,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 target = Decimal(str(form.cleaned_data["target_stock"]))
                 delta = target - current
                 if delta == 0:
-                    messages.info(request, "Залишок вже такий — нічого не змінюю.")
+                    messages.info(request, _("Залишок вже такий — нічого не змінюю."))
                     return redirect(reverse("admin:inventory_product_change", args=[product.pk]))
                 location = Location.objects.filter(code="MAIN").first()
                 if not location:
-                    messages.error(request, "Нема локації MAIN.")
+                    messages.error(request, _("Нема локації MAIN."))
                     return redirect(reverse("admin:inventory_product_change", args=[product.pk]))
                 InventoryTransaction.objects.create(
                     external_key=f"manual:setstock:{uuid.uuid4()}",
@@ -1742,7 +1756,9 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     ref_doc="manual:set_stock", tx_date=timezone.now(),
                 )
                 sign = '+' if delta > 0 else ''
-                messages.success(request, f"✅ Залишок оновлено: {current} → {target} (коригування {sign}{delta}).")
+                messages.success(request,
+                    _("✅ Залишок оновлено: %(cur)s → %(tgt)s (коригування %(sign)s%(delta)s).") % {
+                        "cur": current, "tgt": target, "sign": sign, "delta": delta})
                 return redirect(reverse("admin:inventory_product_change", args=[product.pk]))
         else:
             form = SetStockForm(initial={"target_stock": current})
@@ -1852,7 +1868,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         if request.POST.get("step") == "2":
             tmp_path = request.session.get("excel_import_tmp")
             if not tmp_path or not os.path.exists(tmp_path):
-                messages.error(request, "Сесія застаріла — завантажте файл знову.")
+                messages.error(request, _("Сесія застаріла — завантажте файл знову."))
                 return redirect(reverse("admin:inventory_product_import_excel"))
 
             sheet_name   = request.POST.get("sheet_name", "")
@@ -1870,7 +1886,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                         pass
 
             if not any(v == "sku" for v in mappings.values()):
-                messages.error(request, "Необхідно вибрати колонку для поля SKU.")
+                messages.error(request, _("Необхідно вибрати колонку для поля SKU."))
                 return redirect(reverse("admin:inventory_product_import_excel"))
 
             # Завантажуємо Excel і запускаємо імпорт
@@ -2113,7 +2129,7 @@ function invMediaCache() {{
             '#ff9800' if img_need else '#4caf50', img_need,
             cache_url,
         )
-    media_cache_panel.short_description = "Статус медіафайлів"
+    media_cache_panel.short_description = _("Статус медіафайлів")
 
     def get_urls(self):
         urls = super().get_urls()
@@ -2300,13 +2316,13 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
             '<span style="background:{};color:#fff;padding:3px 10px;border-radius:12px;'
             'font-size:11px;font-weight:bold;white-space:nowrap">{}</span>',
             color, obj.get_status_display())
-    status_badge.short_description = "Статус"
+    status_badge.short_description = _("Статус")
     status_badge.admin_order_field = "status"
 
     def lines_count(self, obj):
         c = obj.lines.count()
-        return format_html('<b>{}</b> поз.', c)
-    lines_count.short_description = "Позицій"
+        return format_html('<b>{}</b> {}', c, _("поз."))
+    lines_count.short_description = _("Позицій")
 
 
 @admin.register(PurchaseOrderLine)
@@ -2349,12 +2365,12 @@ class IncomingShipmentAdmin(admin.ModelAdmin):
     )
 
     _STATUS_META = {
-        'pending':    ('🕐', '#607d8b', 'Очікує відправлення'),
-        'in_transit': ('🚚', '#ff9800', 'В дорозі'),
-        'customs':    ('🏛️', '#9c27b0', 'На митниці'),
-        'arrived':    ('📦', '#2196f3', 'Прибув на склад'),
-        'delivered':  ('✅', '#4caf50', 'Отримано'),
-        'exception':  ('❌', '#f44336', 'Проблема'),
+        'pending':    ('🕐', '#607d8b', _('Очікує відправлення')),
+        'in_transit': ('🚚', '#ff9800', _('В дорозі')),
+        'customs':    ('🏛️', '#9c27b0', _('На митниці')),
+        'arrived':    ('📦', '#2196f3', _('Прибув на склад')),
+        'delivered':  ('✅', '#4caf50', _('Отримано')),
+        'exception':  ('❌', '#f44336', _('Проблема')),
     }
 
     def get_urls(self):
@@ -2373,16 +2389,16 @@ class IncomingShipmentAdmin(admin.ModelAdmin):
             from inventory.services.incoming_tracking import refresh_tracking
             changed, log = refresh_tracking(ship)
             level = msg.SUCCESS if not log.startswith('Помилка') else msg.WARNING
-            msg.add_message(request, level,
-                            f'{"✅ Оновлено" if changed else "ℹ️ Без змін"}: {log}')
+            status_str = _("✅ Оновлено") if changed else _("ℹ️ Без змін")
+            msg.add_message(request, level, f'{status_str}: {log}')
         except IncomingShipment.DoesNotExist:
-            msg.add_message(request, msg.ERROR, 'Відправлення не знайдено')
+            msg.add_message(request, msg.ERROR, _('Відправлення не знайдено'))
         except Exception as e:
-            msg.add_message(request, msg.ERROR, f'Помилка: {e}')
+            msg.add_message(request, msg.ERROR, _('Помилка: %(err)s') % {'err': e})
         return redirect(request.META.get('HTTP_REFERER',
                         f'/admin/inventory/incomingshipment/{pk}/change/'))
 
-    @admin.action(description='🔄 Оновити трекінг')
+    @admin.action(description=_('🔄 Оновити трекінг'))
     def refresh_selected(self, request, queryset):
         from inventory.services.incoming_tracking import refresh_tracking
         updated = 0
@@ -2393,11 +2409,12 @@ class IncomingShipmentAdmin(admin.ModelAdmin):
                     updated += 1
             except Exception:
                 pass
-        self.message_user(request, f'Оновлено: {updated} з {queryset.count()}.')
+        self.message_user(request,
+                          _("Оновлено: %(n)d з %(total)d.") % {"n": updated, "total": queryset.count()})
 
     actions = ['refresh_selected']
 
-    @admin.display(description='Відстеження')
+    @admin.display(description=_('Відстеження'))
     def tracking_col(self, obj):
         num = obj.tracking_number or '—'
         if obj.tracking_url:
@@ -2406,12 +2423,12 @@ class IncomingShipmentAdmin(admin.ModelAdmin):
                 'color:var(--link-fg)">{}</a>', obj.tracking_url, num)
         return format_html('<span style="font-family:monospace;font-weight:700">{}</span>', num)
 
-    @admin.display(description='Перевізник')
+    @admin.display(description=_('Перевізник'))
     def carrier_col(self, obj):
         name = obj.carrier_name or (obj.carrier.name if obj.carrier_id else '—')
         return format_html('<span style="font-weight:600">{}</span>', name)
 
-    @admin.display(description='Статус')
+    @admin.display(description=_('Статус'))
     def status_badge(self, obj):
         icon, color, label = self._STATUS_META.get(
             obj.status, ('•', '#607d8b', obj.get_status_display()))
@@ -2435,7 +2452,7 @@ class IncomingShipmentAdmin(admin.ModelAdmin):
             '<a href="{}" style="color:var(--link-fg);font-weight:600">{}</a>',
             url, obj.purchase_order)
 
-    @admin.display(description='Звідки')
+    @admin.display(description=_('Звідки'))
     def origin_col(self, obj):
         parts = [obj.origin_city, obj.origin_country]
         return ', '.join(p for p in parts if p) or '—'
@@ -2463,7 +2480,7 @@ class IncomingShipmentAdmin(admin.ModelAdmin):
             url, lbl)
     refresh_inline_btn.short_description = ''
 
-    @admin.display(description='Трекінг події')
+    @admin.display(description=_('Трекінг події'))
     def events_panel(self, obj):
         events = obj.tracking_events
         if not events:
@@ -2492,12 +2509,13 @@ class IncomingShipmentAdmin(admin.ModelAdmin):
             '<table style="width:100%;border-collapse:collapse;font-size:12px">'
             '<thead><tr>'
             '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
-            'padding:4px 8px;border-bottom:1px solid var(--border)">Час</th>'
+            'padding:4px 8px;border-bottom:1px solid var(--border)">{}</th>'
             '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
-            'padding:4px 8px;border-bottom:1px solid var(--border)">Подія</th>'
+            'padding:4px 8px;border-bottom:1px solid var(--border)">{}</th>'
             '<th style="text-align:left;color:var(--text-dim);font-size:10px;'
-            'padding:4px 8px;border-bottom:1px solid var(--border)">Локація</th>'
+            'padding:4px 8px;border-bottom:1px solid var(--border)">{}</th>'
             '</tr></thead><tbody>{}</tbody></table>',
+            _("Час"), _("Подія"), _("Локація"),
             mark_safe(''.join(str(r) for r in rows)))
 
 

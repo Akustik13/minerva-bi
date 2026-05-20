@@ -2757,3 +2757,315 @@ msgstr "No events yet"
 
 msgid "Генерую..."
 msgstr "Generating..."
+
+msgid "Категорія товару"
+msgstr "Product category"
+
+msgid "Налаштування складу"
+msgstr "Warehouse settings"
+
+msgid "⚙️ Налаштування складу"
+msgstr "⚙️ Warehouse settings"
+
+msgid "Вхідне відправлення"
+msgstr "Incoming shipment"
+
+msgid "Вхідні відправлення"
+msgstr "Incoming shipments"
+
+msgid "Datasheet доступний — наведи для перегляду"
+msgstr "Datasheet available — hover to preview"
+
+msgid "Аналіз запасів"
+msgstr "Stock analysis"
+
+msgid "📊 Аналіз запасів"
+msgstr "📊 Stock analysis"
+
+msgid "SKU не вказано"
+msgstr "SKU not specified"
+
+msgid "ВИКОНАВЕЦЬ"
+msgstr "OPERATOR"
+
+msgid "Вигляд бейджу"
+msgstr "Badge appearance"
+
+msgid "Виправлено %(n)d транзакцій: qty змінено на від'ємне значення."
+msgstr "Fixed %(n)d transactions: qty changed to negative."
+
+msgid "Вистачить"
+msgstr "Lasts"
+
+msgid "Вистачить на"
+msgstr "Lasts for"
+
+msgid "Всього записів:"
+msgstr "Total records:"
+
+msgid "Відвантаження"
+msgstr "Shipment"
+
+msgid "Відкрити (файл)"
+msgstr "Open (file)"
+
+msgid "Відкрити Datasheet"
+msgstr "Open Datasheet"
+
+msgid "Відправлення не знайдено"
+msgstr "Shipment not found"
+
+msgid "Відстеження"
+msgstr "Tracking"
+
+msgid "ДАТА"
+msgstr "DATE"
+
+msgid "ДОКУМЕНТ"
+msgstr "DOCUMENT"
+
+msgid "Друк етикетки"
+msgstr "Print label"
+
+msgid "Завантажити %(sku)s.dymo"
+msgstr "Download %(sku)s.dymo"
+
+msgid "Залишок вже такий — нічого не змінюю."
+msgstr "Stock is already at that level — no changes."
+
+msgid "Залишок після"
+msgstr "Balance after"
+
+msgid "Замовити"
+msgstr "Order"
+
+msgid "Замінити файл"
+msgstr "Replace file"
+
+msgid "Зарезервовано під замовлення"
+msgstr "Reserved for order"
+
+msgid "Збережіть товар спочатку"
+msgstr "Save the product first"
+
+msgid "Звідки"
+msgstr "From"
+
+msgid "Змінено %(n)d транзакцій → Коригування."
+msgstr "Changed %(n)d transactions → Adjustment."
+
+msgid "Змінено %(n)d транзакцій → Прихід."
+msgstr "Changed %(n)d transactions → Incoming."
+
+msgid "Змінено %(n)d транзакцій → Резерв."
+msgstr "Changed %(n)d transactions → Reserved."
+
+msgid "Змінено %(n)d транзакцій → Списання."
+msgstr "Changed %(n)d transactions → Write-off."
+
+msgid "К-сть:"
+msgstr "Qty:"
+
+msgid "МІСЦЕ"
+msgstr "LOCATION"
+
+msgid "На митниці"
+msgstr "At customs"
+
+msgid "На руках (фізично)"
+msgstr "On hand (physical)"
+
+msgid "На складі (точно)"
+msgstr "In stock (exact)"
+
+msgid "Назва"
+msgstr "Name"
+
+msgid "Не знайдено пошкоджених рядків (Outgoing з qty > 0)."
+msgstr "No corrupted rows found (Outgoing with qty > 0)."
+
+msgid "Не потрібно"
+msgstr "Not needed"
+
+msgid "Нема локації MAIN."
+msgstr "Location MAIN not found."
+
+msgid "Необхідно вибрати колонку для поля SKU."
+msgstr "You must select a column for the SKU field."
+
+msgid "Оновлено: %(n)d з %(total)d."
+msgstr "Updated: %(n)d of %(total)d."
+
+msgid "Очікує відправлення"
+msgstr "Awaiting shipment"
+
+msgid "Перевізник"
+msgstr "Carrier"
+
+msgid "Подія"
+msgstr "Event"
+
+msgid "Позицій"
+msgstr "Items"
+
+msgid "Помилка: %(err)s"
+msgstr "Error: %(err)s"
+
+msgid "Попередній перегляд"
+msgstr "Preview"
+
+msgid "Прибув на склад"
+msgstr "Arrived at warehouse"
+
+msgid "Проблема"
+msgstr "Issue"
+
+msgid "Прод./міс"
+msgstr "Sales/mo"
+
+msgid "Рекомендовано замовити"
+msgstr "Recommended order qty"
+
+msgid "Рухів немає"
+msgstr "No movements"
+
+msgid "Середні продажі"
+msgstr "Average sales"
+
+msgid "Сесія застаріла — завантажте файл знову."
+msgstr "Session expired — please upload the file again."
+
+msgid "Система"
+msgstr "System"
+
+msgid "Склад — огляд залишків та руху"
+msgstr "Warehouse — stock & movements overview"
+
+msgid "Статус запасів"
+msgstr "Stock status"
+
+msgid "Статус медіафайлів"
+msgstr "Media files status"
+
+msgid "ТИП"
+msgstr "TYPE"
+
+msgid "Транзакцій немає"
+msgstr "No transactions"
+
+msgid "Трекінг події"
+msgstr "Tracking events"
+
+msgid "Файл %(sku)s.dymo не знайдено"
+msgstr "File %(sku)s.dymo not found"
+
+msgid "міс"
+msgstr "mo"
+
+msgid "останні 3 міс"
+msgstr "last 3 mo"
+
+msgid "поз."
+msgstr "pos."
+
+msgid "показано %(n)d з %(total)d"
+msgstr "showing %(n)d of %(total)d"
+
+msgid "шт."
+msgstr "pcs."
+
+msgid "— не вказано —"
+msgstr "— not specified —"
+
+msgid "— немає зображення —"
+msgstr "— no image —"
+
+msgid "ℹ️ Без змін"
+msgstr "ℹ️ No changes"
+
+msgid "⇄ Змінити тип → Коригування (Adjustment)"
+msgstr "⇄ Change type → Adjustment"
+
+msgid "▲ Змінити тип → Прихід (Incoming)"
+msgstr "▲ Change type → Incoming"
+
+msgid "⚙️ Дії"
+msgstr "⚙️ Actions"
+
+msgid "⚠️ Мало"
+msgstr "⚠️ Low"
+
+msgid "⚠️ Мало (< 1.5 міс)"
+msgstr "⚠️ Low (< 1.5 mo)"
+
+msgid "⚠️ Мало — треба замовити"
+msgstr "⚠️ Low — order needed"
+
+msgid "✅ Доступно до продажу"
+msgstr "✅ Available for sale"
+
+msgid "✅ Залишок оновлено: %(cur)s → %(tgt)s (коригування %(sign)s%(delta)s)."
+msgstr "✅ Stock updated: %(cur)s → %(tgt)s (adjustment %(sign)s%(delta)s)."
+
+msgid "✅ Запасів достатньо"
+msgstr "✅ Sufficient stock"
+
+msgid "✅ Оновлено"
+msgstr "✅ Updated"
+
+msgid "❌ Спочатку створіть хоча б одного постачальника."
+msgstr "❌ Please create at least one supplier first."
+
+msgid "🏷️ Друк"
+msgstr "🏷️ Print"
+
+msgid "💤 Нема продажів"
+msgstr "💤 No sales"
+
+msgid "💤 Продажів не було (немає даних)"
+msgstr "💤 No sales (no data)"
+
+msgid "📄 Документ"
+msgstr "📄 Document"
+
+msgid "📉 Низько"
+msgstr "📉 Low"
+
+msgid "📉 Низько (< 3 міс)"
+msgstr "📉 Low (< 3 mo)"
+
+msgid "📉 Низько — скоро потрібно замовити"
+msgstr "📉 Low — order soon"
+
+msgid "📋 Рух товару"
+msgstr "📋 Stock movement"
+
+msgid "📦 Додати до PO (чернетка)"
+msgstr "📦 Add to PO (draft)"
+
+msgid "🔄 Оновити трекінг"
+msgstr "🔄 Refresh tracking"
+
+msgid "🔒 Зарезервовано"
+msgstr "🔒 Reserved"
+
+msgid "🔒 Змінити тип → Резерв"
+msgstr "🔒 Change type → Reserved"
+
+msgid "🔒 Резерв"
+msgstr "🔒 Reserved"
+
+msgid "🔓 Змінити тип → Списання (Outgoing)"
+msgstr "🔓 Change type → Write-off (Outgoing)"
+
+msgid "🔥 КРИТИЧНО"
+msgstr "🔥 CRITICAL"
+
+msgid "🔥 КРИТИЧНО — замовляйте ЗАРАЗ!"
+msgstr "🔥 CRITICAL — order NOW!"
+
+msgid "🔥 Критично (< 2 тижні)"
+msgstr "🔥 Critical (< 2 weeks)"
+
+msgid "🔧 Виправити знак qty для Outgoing з позитивним qty (пошкоджені дані)"
+msgstr "🔧 Fix qty sign for Outgoing with positive qty (corrupted data)"
