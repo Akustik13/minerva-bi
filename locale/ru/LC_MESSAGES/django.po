@@ -3122,3 +3122,18 @@ msgstr "Заказ Jumingo создан"
 
 msgid "змінено"
 msgstr "изменён"
+
+msgid "Замовлення Jumingo №"
+msgstr "Заказ Jumingo №"
+
+msgid "Замовлення Jumingo"
+msgstr "Заказ Jumingo"
+
+msgid "Підтвердження отримання"
+msgstr "Подтверждение получения"
+
+msgid "Сайт UPS"
+msgstr "Сайт UPS"
+
+msgid "Jumingo Shipment ID"
+msgstr "Jumingo Shipment ID"

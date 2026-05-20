@@ -600,7 +600,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           {% endif %}
           {% if shipment.jumingo_order_number %}
           <div class="sd-info-row">
-            <span class="sd-info-key">Jumingo Order #</span>
+            <span class="sd-info-key">{% trans "Замовлення Jumingo №" %}</span>
             <span class="sd-info-val sd-mono">{{ shipment.jumingo_order_number }}</span>
           </div>
           {% endif %}
@@ -871,7 +871,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             {% endif %}
             {% if shipment.jumingo_order_number %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Jumingo Order</span>
+              <span class="sd-info-key">{% trans "Замовлення Jumingo" %}</span>
               <span class="sd-info-val sd-mono">{{ shipment.jumingo_order_number }}</span>
             </div>
             {% endif %}
@@ -909,9 +909,9 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             {% endif %}
             {% if shipment.tracking_number %}{% with tn=shipment.tracking_number %}{% if tn|slice:":2" == "1Z" %}
             <div class="sd-info-row">
-              <span class="sd-info-key">Empfangsbestätigung</span>
+              <span class="sd-info-key">{% trans "Підтвердження отримання" %}</span>
               <span class="sd-info-val">
-                <a href="https://www.ups.com/track?tracknum={{ tn }}&loc=de_DE" target="_blank" class="sd-label-link">🧾 UPS сайт</a>
+                <a href="https://www.ups.com/track?tracknum={{ tn }}&loc=de_DE" target="_blank" class="sd-label-link">🧾 {% trans "Сайт UPS" %}</a>
               </span>
             </div>
             {% endif %}{% endwith %}{% endif %}
@@ -963,7 +963,7 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           <!-- Manual Jumingo ID -->
           {% if shipment.carrier.carrier_type == "jumingo" and shipment.status not in "cancelled,delivered" %}
           <div class="sd-divider">
-            <div class="sd-section-label">🔗 Jumingo Shipment ID</div>
+            <div class="sd-section-label">🔗 {% trans "Jumingo Shipment ID" %}</div>
             {% if shipment.carrier_shipment_id %}
             <div style="font-size:11px;color:var(--text-dim);margin-bottom:6px;font-family:monospace;word-break:break-all">
               {% trans "Поточний" %}: <span style="color:var(--accent)">{{ shipment.carrier_shipment_id }}</span>
