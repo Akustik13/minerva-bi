@@ -1240,6 +1240,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_set_jumingo_id",
             ),
             path(
+                "<int:shipment_id>/jumingo-sync/",
+                self.admin_site.admin_view(self.jumingo_sync_view),
+                name="shipping_shipment_jumingo_sync",
+            ),
+            path(
                 "<int:shipment_id>/clone/",
                 self.admin_site.admin_view(self.clone_view),
                 name="shipping_shipment_clone",
@@ -2229,7 +2234,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         show_timeline = shipment.status not in ("error", "cancelled")
 
         # ── Кнопки дій залежно від статусу ────────────────────────────────────
-        has_dhl = Carrier.objects.filter(carrier_type="dhl", is_active=True).exists()
+        has_dhl   = Carrier.objects.filter(carrier_type="dhl", is_active=True).exists()
+        is_jumingo = bool(shipment.carrier and shipment.carrier.carrier_type == "jumingo")
         actions = []
         st = shipment.status
 
@@ -2264,6 +2270,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 actions.append({"label": "🔄 Оновити трекінг",
                                  "url": reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
                                  "cls": "orange"})
+            # Окрема кнопка для Jumingo: синхронізація ціни/сервісу незалежно від UPS
+            if is_jumingo and (shipment.carrier_shipment_id or shipment.jumingo_order_number):
+                actions.append({"label": "📦 Jumingo: ціна та сервіс",
+                                 "url": reverse("admin:shipping_shipment_jumingo_sync", args=[shipment.pk]),
+                                 "cls": "pink"})
             # Якщо перевізник вже каже "Delivered" — показати кнопку синхронізації
             carrier_lbl = (shipment.carrier_status_label or "").lower()
             if "delivered" in carrier_lbl or "доставлено" in carrier_lbl:
@@ -2287,6 +2298,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     "url":   reverse("admin:shipping_shipment_sync_order", args=[shipment.pk]),
                     "cls":   "green",
                 })
+            # Jumingo sync for delivered — label/price may still be fetchable
+            if is_jumingo and (shipment.carrier_shipment_id or shipment.jumingo_order_number):
+                actions.append({"label": "📦 Jumingo: ціна та сервіс",
+                                 "url": reverse("admin:shipping_shipment_jumingo_sync", args=[shipment.pk]),
+                                 "cls": "pink"})
             if shipment.label_url:
                 actions.append({"label": "📄 Етикетка PDF",
                                  "url": shipment.label_url,
@@ -4358,6 +4374,81 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 )
             else:
                 messages.info(request, f"ℹ️ [{tracker_used}] Без змін — статус актуальний.")
+
+        return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+    # ── Пряма синхронізація даних Jumingo (ціна, сервіс, мітка) ─────────────
+
+    def jumingo_sync_view(self, request, shipment_id):
+        """Отримує актуальні дані від Jumingo API (ціна, сервіс, label, ETA)
+        і зберігає в Shipment — незалежно від UPS-трекінгу.
+
+        Використовує GET /v1/orders/{order_number} якщо є jumingo_order_number,
+        інакше GET /v1/shipments/{carrier_shipment_id}.
+        """
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+
+        if not (shipment.carrier_shipment_id or shipment.jumingo_order_number):
+            messages.warning(request, "⚠️ Відправлення не має Jumingo ID або номера замовлення.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        service = get_service(shipment.carrier)
+        if not service:
+            messages.error(request, "❌ Jumingo сервіс не налаштований.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        # Try orders endpoint first (booked shipments live here), fall back to shipments
+        data = {}
+        if shipment.jumingo_order_number:
+            import requests as _req
+            try:
+                from tabele.api_logger import logged_request
+                resp = logged_request(
+                    'jumingo', 'sync_order', 'GET',
+                    f"{service._base()}/orders/{shipment.jumingo_order_number}",
+                    _req.get, headers=service._headers(), timeout=15,
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                else:
+                    raw = {}
+                    try:
+                        raw = resp.json()
+                    except Exception:
+                        pass
+                    err = raw.get("detail") or raw.get("message") or f"HTTP {resp.status_code}"
+                    messages.error(request, f"❌ Jumingo orders: {err}")
+                    return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+            except Exception as e:
+                messages.error(request, f"❌ Jumingo orders помилка: {e}")
+                return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+        elif shipment.carrier_shipment_id:
+            data = service.track(
+                shipment.carrier_shipment_id,
+                jumingo_order_number="",
+            )
+            if data.get("error"):
+                messages.error(request, f"❌ Jumingo: {data['error']}")
+                return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        if not data:
+            messages.warning(request, "⚠️ Jumingo повернув порожню відповідь.")
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+        changed = _apply_tracking_update(shipment, data, upgrade_only=False)
+        shipment.refresh_from_db()
+
+        # Also update jumingo_order_number if returned in response and not yet set
+        order_num_api = (data.get("order") or {}).get("number", "") or data.get("order_number", "")
+        if order_num_api and not shipment.jumingo_order_number:
+            shipment.jumingo_order_number = order_num_api
+            shipment.save(update_fields=["jumingo_order_number"])
+            changed = True
+
+        if changed:
+            messages.success(request, "✅ Дані від Jumingo оновлено (ціна, сервіс, статус).")
+        else:
+            messages.info(request, "ℹ️ Jumingo — без змін, дані актуальні.")
 
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
 
