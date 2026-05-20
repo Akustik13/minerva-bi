@@ -11,7 +11,8 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     list_filter   = ('doc_type', 'module', 'source', 'language', 'is_active')
     list_editable = ('is_active', 'is_default', 'sort_order')
     search_fields = ('name', 'description')
-    readonly_fields = ('variables_guide_display', 'created_at', 'updated_at')
+    readonly_fields = ('variables_guide_display', 'created_at', 'updated_at',
+                       'check_fix_actions')
 
     class Media:
         js = ('admin/js/document_template_check.js',)
@@ -24,7 +25,7 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
             ),
         }),
         ('📁 Файл шаблону', {
-            'fields': ('template_file',),
+            'fields': ('template_file', 'check_fix_actions'),
             'description': (
                 '<strong>Як створити шаблон:</strong><br>'
                 '1. Відкрий Word і зроби документ<br>'
@@ -89,6 +90,44 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
             obj.pk, obj.pk,
         )
     check_col.short_description = 'Перевірка'
+
+    def check_fix_actions(self, obj):
+        if not obj.pk:
+            return format_html(
+                '<span style="color:var(--text-dim);font-size:12px">'
+                '💾 Збережіть шаблон — після цього з\'являться кнопки перевірки</span>'
+            )
+        if not obj.template_file:
+            return format_html(
+                '<span style="color:var(--text-dim);font-size:12px">'
+                '📁 Завантажте файл шаблону — після цього з\'являться кнопки перевірки</span>'
+            )
+        pk = obj.pk
+        dl_url  = f'/documents/template/{pk}/check-download/'
+        fix_url = f'/documents/template/{pk}/auto-fix/'
+        return format_html(
+            '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
+
+            '<button type="button" onclick="checkDocTemplateDetail({pk})"'
+            ' style="padding:6px 16px;border-radius:6px;font-size:13px;cursor:pointer;'
+            'border:1px solid var(--border-strong);background:none;color:var(--text)">'
+            '🔍 Перевірити шаблон</button>'
+
+            '<a href="{dl_url}" download'
+            ' style="padding:6px 16px;border-radius:6px;font-size:13px;'
+            'border:1px solid #ff9800;color:#ff9800;text-decoration:none;white-space:nowrap">'
+            '⬇ Перевірити і завантажити</a>'
+
+            '<a href="{fix_url}" download'
+            ' style="padding:6px 16px;border-radius:6px;font-size:13px;'
+            'border:1px solid var(--ok);color:var(--ok);text-decoration:none;white-space:nowrap">'
+            '🔧 Виправити і завантажити</a>'
+
+            '</div>'
+            '<div id="dtcf-result-{pk}" style="margin-top:10px;font-size:12px"></div>',
+            pk=pk, dl_url=dl_url, fix_url=fix_url,
+        )
+    check_fix_actions.short_description = 'Перевірка та виправлення'
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:

@@ -3,6 +3,63 @@
  * Validation buttons for DocumentTemplate admin changelist.
  */
 
+async function checkDocTemplateDetail(pk) {
+  const resultEl = document.getElementById('dtcf-result-' + pk);
+  if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-dim)">⏳ Перевіряємо…</span>';
+
+  const dlUrl  = `/documents/template/${pk}/check-download/`;
+  const fixUrl = `/documents/template/${pk}/auto-fix/`;
+
+  try {
+    const r = await fetch(`/documents/template/${pk}/check/`);
+    const d = await r.json();
+    if (!resultEl) return;
+
+    const dlBtn = `<a href="${dlUrl}" download
+      style="display:inline-block;padding:5px 12px;border-radius:5px;
+             font-size:12px;border:1px solid #ff9800;color:#ff9800;
+             text-decoration:none;white-space:nowrap">⬇ Перевірити і завантажити</a>`;
+    const fixBtn = `<a href="${fixUrl}" download
+      style="display:inline-block;padding:5px 12px;border-radius:5px;font-size:12px;
+             border:1px solid var(--ok);color:var(--ok);
+             text-decoration:none;white-space:nowrap">🔧 Виправити і завантажити</a>`;
+
+    if (!d.ok) {
+      resultEl.innerHTML =
+        `<div style="color:var(--err);font-weight:600;margin-bottom:6px">`+
+          `${d.syntax_error ? '⚠️ Синтаксична помилка' : '✗ Помилка'}</div>`+
+        `<div style="margin-bottom:8px">${d.error}</div>`+
+        `<div style="display:flex;gap:8px;flex-wrap:wrap">${dlBtn}${fixBtn}</div>`;
+      return;
+    }
+
+    if (!d.issues || !d.issues.length) {
+      resultEl.innerHTML =
+        '<span style="color:var(--ok);font-weight:600">✓ Шаблон коректний — помилок не знайдено</span>';
+      return;
+    }
+
+    const rows = d.issues.map(i => {
+      const fix = (i.suggestion && i.suggestion !== i.var)
+        ? `<span style="color:var(--ok)"> → {{${i.suggestion}}}</span>`
+        : `<span style="color:var(--text-dim)"> — невідоме поле</span>`;
+      return `<div style="padding:2px 0">
+        <code style="background:rgba(244,67,54,.12);padding:1px 5px;
+          border-radius:3px;color:var(--err)">{{${i.var}}}</code>${fix}</div>`;
+    }).join('');
+
+    resultEl.innerHTML =
+      `<div style="color:#ff9800;font-weight:600;margin-bottom:6px">`+
+        `⚠️ Знайдено ${d.issues.length} невідом${d.issues.length===1?'е поле':'их полів'}</div>`+
+      `<div style="margin-bottom:8px">${rows}</div>`+
+      `<div style="display:flex;gap:8px;flex-wrap:wrap">${dlBtn}${fixBtn}</div>`;
+
+  } catch (e) {
+    if (resultEl) resultEl.innerHTML =
+      '<span style="color:var(--err)">✗ Помилка з\'єднання</span>';
+  }
+}
+
 async function checkDocTemplate(pk) {
   const resultEl = document.getElementById('dtc-result-' + pk);
   if (resultEl) resultEl.innerHTML = '<span style="color:var(--text-dim)">⏳</span>';
