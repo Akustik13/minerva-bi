@@ -543,7 +543,9 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           {% if shipment.tracking_number %}
           <div class="sd-info-row">
             <span class="sd-info-key">{% trans "Трекінг-номер" %}</span>
-            <span class="sd-info-val sd-tracking">{{ shipment.tracking_number }}</span>
+            <span class="sd-info-val sd-tracking">
+              {% if tracking_url %}<a href="{{ tracking_url }}" target="_blank" rel="noopener" class="sd-tracking" style="text-decoration:underline dotted">{{ shipment.tracking_number }}</a>{% else %}{{ shipment.tracking_number }}{% endif %}
+            </span>
           </div>
           {% endif %}
           {% if shipment.carrier_service %}
@@ -734,7 +736,9 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             {% if shipment.tracking_number %}
             <div class="sd-info-row">
               <span class="sd-info-key">{% trans "Трекінг" %}</span>
-              <span class="sd-info-val sd-tracking">{{ shipment.tracking_number }}</span>
+              <span class="sd-info-val sd-tracking">
+                {% if tracking_url %}<a href="{{ tracking_url }}" target="_blank" rel="noopener" class="sd-tracking" style="text-decoration:underline dotted">{{ shipment.tracking_number }}</a>{% else %}{{ shipment.tracking_number }}{% endif %}
+              </span>
             </div>
             {% endif %}
             {% if shipment.carrier_service %}

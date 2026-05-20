@@ -2485,6 +2485,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "email":   shipment.sender_email,
             }
 
+        ct = shipment.carrier.carrier_type if shipment.carrier else ""
+        _tracking_url = self._carrier_tracking_url(ct, shipment.tracking_number or "")
+
         return render(request, "admin/shipping/shipment_detail.html", {
             **self.admin_site.each_context(request),
             "shipment":                  shipment,
@@ -2503,6 +2506,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "title":                     f"Відправлення #{shipment.pk} — {shipment.recipient_name}",
             "auto_save_labels_to_server": _sales_cfg.auto_save_labels_to_server,
             "save_labels_url":           _save_labels_url,
+            "tracking_url":              _tracking_url,
         })
 
     # ── Створення SalesOrder з відправлення ──────────────────────────────────
@@ -2535,16 +2539,17 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             suffix += 1
             order_number = f"SHIP-{shipment.pk}-{suffix}"
 
-        status = "shipped" if shipment.tracking_number else "processing"
         shipped_at = None
         if shipment.submitted_at:
             shipped_at = shipment.submitted_at.date()
 
+        # Always create with 'processing' so status transition to 'shipped' fires
+        # the inventory signal correctly (signal only fires on transitions, not creation).
         order = SalesOrder(
             source=source,
             order_number=order_number,
             order_date=_tz.now().date(),
-            status=status,
+            status="processing",
             client=shipment.recipient_company or shipment.recipient_name,
             contact_name=shipment.recipient_name,
             email=shipment.recipient_email or "",
@@ -2568,7 +2573,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         messages.success(
             request,
-            f"✅ Замовлення {order.order_number} створено і прив'язано до відправлення."
+            f"✅ Замовлення {order.order_number} створено і прив'язано до відправлення.",
+        )
+        messages.warning(
+            request,
+            "⚠️ Додайте рядки товарів (SKU + кількість), а потім змініть статус на "
+            "«Відправлено» — тільки тоді відбудеться списання зі складу.",
         )
         return redirect(reverse("admin:sales_salesorder_change", args=[order.pk]))
 
