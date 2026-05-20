@@ -527,14 +527,19 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return "—"
         return format_html(
-            '<form method="get" action="../test-new-order/" style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">'
-            '<input type="text" name="order_ref" placeholder="№ замовлення (або порожньо = останнє)" '
-            'style="padding:7px 10px;border:1px solid var(--border-strong,#2a3f52);border-radius:6px;'
-            'background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;width:260px">'
-            '<button type="submit" style="padding:8px 18px;background:#2e7d32;color:#fff;'
-            'border:none;border-radius:6px;font-weight:600;font-size:13px;cursor:pointer">'
+            '<span style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">'
+            '<input type="text" id="mv_test_order_ref"'
+            ' placeholder="№ замовлення (або порожньо = останнє)"'
+            ' style="padding:7px 10px;border:1px solid var(--border-strong,#2a3f52);'
+            'border-radius:6px;background:var(--bg-input,#141f2b);'
+            'color:var(--text,#c9d8e4);font-size:13px;width:260px">'
+            '<button type="button"'
+            ' onclick="var v=document.getElementById(\'mv_test_order_ref\').value.trim();'
+            'window.location.href=\'../test-new-order/\'+(v?\'?order_ref=\'+encodeURIComponent(v):\'\');"'
+            ' style="padding:8px 18px;background:#2e7d32;color:#fff;border:none;'
+            'border-radius:6px;font-weight:600;font-size:13px;cursor:pointer">'
             '🧪 Надіслати тест</button>'
-            '</form>'
+            '</span>'
         )
     new_order_test_actions.short_description = "Тест нового замовлення"
 
