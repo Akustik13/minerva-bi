@@ -290,6 +290,109 @@ class ScheduledEmail(models.Model):
         return f'{self.subject[:50]} → {recipients} ({self.scheduled_at:%d.%m.Y %H:%M})'
 
 
+class EmailRule(models.Model):
+    """Автоматичне правило обробки вхідних листів."""
+
+    FIELD_FROM_EMAIL = 'from_email'
+    FIELD_FROM_NAME  = 'from_name'
+    FIELD_SUBJECT    = 'subject'
+    FIELD_BODY       = 'body'
+    FIELD_TO_EMAIL   = 'to_email'
+
+    FIELD_CHOICES = [
+        (FIELD_FROM_EMAIL, 'Відправник (email)'),
+        (FIELD_FROM_NAME,  "Відправник (ім'я)"),
+        (FIELD_SUBJECT,    'Тема'),
+        (FIELD_BODY,       'Текст листа'),
+        (FIELD_TO_EMAIL,   'Кому (email)'),
+    ]
+
+    OP_CONTAINS     = 'contains'
+    OP_EQUALS       = 'equals'
+    OP_STARTS_WITH  = 'starts_with'
+    OP_ENDS_WITH    = 'ends_with'
+    OP_NOT_CONTAINS = 'not_contains'
+
+    OP_CHOICES = [
+        (OP_CONTAINS,     'Містить'),
+        (OP_EQUALS,       'Рівно'),
+        (OP_STARTS_WITH,  'Починається з'),
+        (OP_ENDS_WITH,    'Закінчується на'),
+        (OP_NOT_CONTAINS, 'Не містить'),
+    ]
+
+    ACTION_MARK_READ  = 'mark_read'
+    ACTION_MARK_SPAM  = 'mark_spam'
+    ACTION_MOVE       = 'move_folder'
+    ACTION_STAR       = 'star'
+    ACTION_TRASH      = 'trash'
+
+    ACTION_CHOICES = [
+        (ACTION_MARK_READ, 'Позначити прочитаним'),
+        (ACTION_MARK_SPAM, 'Позначити спамом'),
+        (ACTION_MOVE,      'Перемістити до папки'),
+        (ACTION_STAR,      'Позначити зірочкою'),
+        (ACTION_TRASH,     'Видалити'),
+    ]
+
+    account         = models.ForeignKey(EmailAccount, on_delete=models.CASCADE, related_name='rules')
+    name            = models.CharField(max_length=200, verbose_name='Назва правила')
+    condition_field = models.CharField(max_length=20, choices=FIELD_CHOICES, default=FIELD_FROM_EMAIL, verbose_name='Поле')
+    condition_op    = models.CharField(max_length=20, choices=OP_CHOICES,    default=OP_CONTAINS,     verbose_name='Умова')
+    condition_value = models.CharField(max_length=500, verbose_name='Значення')
+    action          = models.CharField(max_length=20, choices=ACTION_CHOICES, default=ACTION_MARK_READ, verbose_name='Дія')
+    action_value    = models.CharField(max_length=200, blank=True, verbose_name='Параметр дії',
+                                       help_text='Для "move_folder" — назва папки IMAP')
+    is_active       = models.BooleanField(default=True, verbose_name='Активне')
+    created_at      = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Правило пошти'
+        verbose_name_plural = 'Правила пошти'
+        ordering            = ['name']
+
+    def __str__(self):
+        return f'{self.name} ({self.get_action_display()})'
+
+    def matches(self, msg: 'EmailMessage') -> bool:
+        field_map = {
+            self.FIELD_FROM_EMAIL: msg.from_email or '',
+            self.FIELD_FROM_NAME:  msg.from_name  or '',
+            self.FIELD_SUBJECT:    msg.subject     or '',
+            self.FIELD_BODY:       msg.body_text   or '',
+            self.FIELD_TO_EMAIL:   ', '.join(msg.to_emails or []),
+        }
+        val  = field_map.get(self.condition_field, '').lower()
+        cond = self.condition_value.lower()
+        if   self.condition_op == self.OP_CONTAINS:     return cond in val
+        elif self.condition_op == self.OP_EQUALS:       return val == cond
+        elif self.condition_op == self.OP_STARTS_WITH:  return val.startswith(cond)
+        elif self.condition_op == self.OP_ENDS_WITH:    return val.endswith(cond)
+        elif self.condition_op == self.OP_NOT_CONTAINS: return cond not in val
+        return False
+
+    def apply_to(self, msg: 'EmailMessage') -> bool:
+        """Apply action to msg. Returns True if changed."""
+        changed = []
+        if self.action == self.ACTION_MARK_READ:
+            if not msg.is_read:
+                msg.is_read = True; changed.append('is_read')
+        elif self.action == self.ACTION_MARK_SPAM:
+            msg.is_spam = True; msg.folder = EmailMessage.FOLDER_SPAM
+            changed += ['is_spam', 'folder']
+        elif self.action == self.ACTION_MOVE:
+            if self.action_value:
+                msg.imap_folder_name = self.action_value; changed.append('imap_folder_name')
+        elif self.action == self.ACTION_STAR:
+            if not msg.is_starred:
+                msg.is_starred = True; changed.append('is_starred')
+        elif self.action == self.ACTION_TRASH:
+            msg.folder = EmailMessage.FOLDER_TRASH; changed.append('folder')
+        if changed:
+            msg.save(update_fields=changed)
+        return bool(changed)
+
+
 class EmailContact(models.Model):
     """Address book: auto-populated from sent/scheduled messages."""
     user       = models.ForeignKey(User, on_delete=models.CASCADE,

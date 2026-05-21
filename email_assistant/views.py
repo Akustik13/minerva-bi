@@ -1162,6 +1162,154 @@ def export_emails_view(request):
 
 @staff_member_required
 @require_POST
+def mark_read_api(request, message_pk):
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    if not msg.is_read:
+        msg.is_read = True
+        msg.save(update_fields=['is_read'])
+    return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_POST
+def mark_unread_api(request, message_pk):
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    if msg.is_read:
+        msg.is_read = False
+        msg.save(update_fields=['is_read'])
+    return JsonResponse({'ok': True})
+
+
+@staff_member_required
+def rules_list(request):
+    """Return JSON list of email rules for this account."""
+    from email_assistant.models import EmailRule
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'rules': []})
+    rules = list(account.rules.filter(is_active=True).values(
+        'id', 'name', 'condition_field', 'condition_op',
+        'condition_value', 'action', 'action_value', 'is_active',
+    ))
+    return JsonResponse({'rules': rules})
+
+
+@staff_member_required
+@require_POST
+def create_rule_api(request):
+    """Create an EmailRule from POST data."""
+    import json as _json
+    from email_assistant.models import EmailRule
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+    name = data.get('name', '').strip()
+    cond_field = data.get('condition_field', 'from_email')
+    cond_op    = data.get('condition_op',    'contains')
+    cond_val   = data.get('condition_value', '').strip()
+    action     = data.get('action',          'mark_read')
+    action_val = data.get('action_value',    '').strip()
+    if not name or not cond_val:
+        return JsonResponse({'ok': False, 'error': 'Вкажіть назву і значення умови'})
+    rule = EmailRule.objects.create(
+        account=account, name=name,
+        condition_field=cond_field, condition_op=cond_op, condition_value=cond_val,
+        action=action, action_value=action_val,
+    )
+    return JsonResponse({'ok': True, 'id': rule.pk})
+
+
+@staff_member_required
+@require_POST
+def delete_rule(request, rule_pk):
+    from email_assistant.models import EmailRule
+    account = _get_account(request)
+    rule = get_object_or_404(EmailRule, pk=rule_pk, account=account)
+    rule.delete()
+    return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_POST
+def create_rule_from_message(request, message_pk):
+    """Quick-create a rule from a message's sender."""
+    import json as _json
+    from email_assistant.models import EmailMessage, EmailRule
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        data = {}
+    action     = data.get('action',     'mark_read')
+    action_val = data.get('action_value','')
+    cond_field = data.get('condition_field', 'from_email')
+    cond_op    = data.get('condition_op',    'contains')
+    cond_val   = data.get('condition_value', msg.from_email)
+    name = data.get('name') or f'Від {msg.from_name or msg.from_email}'
+    rule = EmailRule.objects.create(
+        account=account, name=name[:200],
+        condition_field=cond_field, condition_op=cond_op,
+        condition_value=cond_val[:500],
+        action=action, action_value=action_val[:200],
+    )
+    return JsonResponse({'ok': True, 'id': rule.pk, 'name': rule.name})
+
+
+@staff_member_required
+@require_POST
+def create_task_from_email(request, message_pk):
+    """Create a CalendarEvent task from an email."""
+    import json as _json
+    from email_assistant.models import EmailMessage
+    from calendar_app.models import CalendarEvent
+    from django.utils.dateparse import parse_datetime
+    from django.utils import timezone as tz
+
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        data = {}
+
+    title = (data.get('title') or msg.subject or 'Завдання з листа')[:300]
+    desc  = (data.get('description') or '')[:500]
+    dt_str = data.get('start_at', '')
+    try:
+        dt = parse_datetime(dt_str)
+        if dt is None:
+            raise ValueError
+        if tz.is_naive(dt):
+            dt = tz.make_aware(dt)
+    except Exception:
+        dt = tz.now().replace(hour=9, minute=0, second=0, microsecond=0)
+        from datetime import timedelta
+        dt += timedelta(days=1)
+
+    ev = CalendarEvent.objects.create(
+        user=request.user,
+        title=title,
+        description=desc,
+        event_type=CalendarEvent.TYPE_EMAIL,
+        start_at=dt,
+        email_message=msg,
+        remind_minutes_before=60,
+    )
+    return JsonResponse({'ok': True, 'event_id': ev.pk, 'title': ev.title,
+                         'start': ev.start_at.strftime('%d.%m.%Y %H:%M')})
+
+
+@staff_member_required
+@require_POST
 def import_emails_view(request):
     """Import .eml files (or .zip of .emls) into the account."""
     import zipfile, io, email as email_lib

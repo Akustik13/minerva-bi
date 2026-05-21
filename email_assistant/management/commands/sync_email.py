@@ -240,15 +240,29 @@ class Command(BaseCommand):
         )
 
     def _post_process_inbox(self, em, account, thread):
-        """Run deadline detection + auto-reply for a freshly saved inbox message."""
+        """Run rules + deadline detection + auto-reply for a freshly saved inbox message."""
         from email_assistant.models import EmailSettings
         es = EmailSettings.get_for_user(account.user)
+
+        self._apply_rules(em, account)
 
         if es.deadline_detection:
             self._detect_deadlines(em, account)
 
         if es.auto_reply_enabled:
             self._auto_reply(em, account, es, thread)
+
+    def _apply_rules(self, em, account):
+        """Check active rules and apply the first matching one."""
+        from email_assistant.models import EmailRule
+        try:
+            for rule in account.rules.filter(is_active=True):
+                if rule.matches(em):
+                    rule.apply_to(em)
+                    logger.info('Rule "%s" applied to uid=%s', rule.name, em.imap_uid)
+                    break
+        except Exception as e:
+            logger.warning('apply_rules uid=%s: %s', em.imap_uid, e)
 
     def _detect_deadlines(self, em, account):
         """Extract deadlines from email body and create CalendarEvent records."""

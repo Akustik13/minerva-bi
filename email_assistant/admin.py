@@ -6,7 +6,7 @@ from django.http import JsonResponse
 from django.urls import path
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings, ScheduledEmail
+from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings, ScheduledEmail, EmailRule
 
 
 class ScheduledEmailComposeForm(forms.ModelForm):
@@ -555,3 +555,30 @@ class ScheduledEmailAdmin(admin.ModelAdmin):
             except ScheduledEmail.DoesNotExist:
                 pass
         return super().changeform_view(request, object_id, form_url, extra_context)
+
+
+@admin.register(EmailRule)
+class EmailRuleAdmin(admin.ModelAdmin):
+    list_display  = ('name', 'account', 'condition_field', 'condition_op',
+                     'condition_value', 'action', 'is_active', 'created_at')
+    list_filter   = ('is_active', 'condition_field', 'action', 'account')
+    search_fields = ('name', 'condition_value')
+    list_editable = ('is_active',)
+
+    fieldsets = (
+        (None, {
+            'fields': ('account', 'name', 'is_active'),
+        }),
+        ('Умова', {
+            'fields': ('condition_field', 'condition_op', 'condition_value'),
+        }),
+        ('Дія', {
+            'fields': ('action', 'action_value'),
+        }),
+    )
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        if request.user.is_superuser:
+            return qs
+        return qs.filter(account__user=request.user)

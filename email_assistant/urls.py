@@ -49,4 +49,14 @@ urlpatterns = [
     path('ai-grammar/',                                  views.ai_grammar_check,        name='ai_grammar'),
     # CRM contacts for autocomplete
     path('crm-contacts/',                                views.crm_contacts_view,       name='crm_contacts'),
+    # Mark read / unread
+    path('message/<int:message_pk>/read/',               views.mark_read_api,           name='mark_read'),
+    path('message/<int:message_pk>/unread/',             views.mark_unread_api,         name='mark_unread'),
+    # Email rules
+    path('rules/',                                       views.rules_list,              name='rules_list'),
+    path('rules/create/',                                views.create_rule_api,         name='create_rule'),
+    path('rules/<int:rule_pk>/delete/',                  views.delete_rule,             name='delete_rule'),
+    path('message/<int:message_pk>/create-rule/',        views.create_rule_from_message, name='create_rule_from_message'),
+    # Create calendar task from email
+    path('message/<int:message_pk>/create-task/',        views.create_task_from_email,  name='create_task_from_email'),
 ]

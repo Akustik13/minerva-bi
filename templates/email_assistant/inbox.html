@@ -133,6 +133,46 @@
 
 /* Quick search highlight */
 .em-empty-list{display:flex;align-items:center;justify-content:center;height:120px;color:var(--text-muted);font-size:13px}
+
+/* ── Context menu ── */
+#em-ctx{display:none;position:fixed;z-index:99999;background:var(--bg-card);
+  border:1px solid var(--border-strong);border-radius:8px;
+  box-shadow:0 4px 16px rgba(0,0,0,.35);min-width:180px;padding:4px 0;font-size:13px}
+#em-ctx.open{display:block}
+.em-ctx-item{display:flex;align-items:center;gap:8px;padding:7px 14px;
+  cursor:pointer;color:var(--text-muted);white-space:nowrap;transition:background .1s,color .1s}
+.em-ctx-item:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.em-ctx-item.danger:hover{background:rgba(229,57,53,.1);color:#ef5350}
+.em-ctx-sep{height:1px;background:var(--border);margin:3px 0}
+
+/* ── Rule modal ── */
+#em-rule-modal{display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.5);
+  align-items:center;justify-content:center}
+#em-rule-modal.open{display:flex}
+#em-rule-box{background:var(--bg-card);border:1px solid var(--border-strong);border-radius:12px;
+  padding:20px 24px;min-width:340px;max-width:90vw;max-height:90vh;overflow-y:auto}
+#em-rule-box h4{margin:0 0 14px;color:var(--text);font-size:14px}
+.em-rule-row{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.em-rule-row label{font-size:11px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.em-rule-inp,.em-rule-sel{width:100%;padding:7px 10px;border-radius:6px;
+  border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);
+  font-size:13px;box-sizing:border-box;outline:none}
+.em-rule-inp:focus,.em-rule-sel:focus{border-color:#1a73e8}
+.em-rule-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.em-rule-btn{padding:7px 16px;border-radius:6px;font-size:12px;font-weight:600;
+  cursor:pointer;border:none;transition:opacity .1s}
+.em-rule-btn:hover{opacity:.85}
+.em-rule-ok{background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff}
+.em-rule-cancel{background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border-strong)}
+#em-rule-err{color:var(--err,#e53935);font-size:11px;min-height:14px;margin-bottom:6px}
+
+/* ── Task modal ── */
+#em-task-modal{display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.5);
+  align-items:center;justify-content:center}
+#em-task-modal.open{display:flex}
+#em-task-box{background:var(--bg-card);border:1px solid var(--border-strong);border-radius:12px;
+  padding:20px 24px;min-width:320px;max-width:90vw}
+#em-task-box h4{margin:0 0 14px;color:var(--text);font-size:14px}
 </style>
 {% endblock %}
 
@@ -225,7 +265,10 @@
            data-ts="{{ msg.sent_at|date:'U' }}"
            data-sender="{{ msg.sender_display|lower|escapejs }}"
            data-subject="{{ msg.subject|lower|escapejs }}"
-           onclick="previewMsg({{ msg.pk }}, {{ tpk }}, this)">
+           data-from="{{ msg.from_email|escapejs }}"
+           data-read="{{ msg.is_read|yesno:'1,0' }}"
+           onclick="previewMsg({{ msg.pk }}, {{ tpk }}, this)"
+           oncontextmenu="showCtxMenu(event, {{ msg.pk }}, {{ tpk }}, this)">
 
         <button class="em-star-btn{% if msg.is_starred %} starred{% endif %}"
                 onclick="toggleStar(event,{{ msg.pk }},this)"
@@ -303,6 +346,97 @@
     <div class="em-p3-content" id="em-p3-content" style="display:none"></div>
   </div>
 
+</div>
+
+<!-- Context menu -->
+<div id="em-ctx">
+  <div class="em-ctx-item" onclick="ctxAction('open')">↗ Відкрити окремо</div>
+  <div class="em-ctx-item" onclick="ctxAction('read')">✉️ Позначити прочитаним</div>
+  <div class="em-ctx-item" onclick="ctxAction('unread')">📩 Позначити непрочитаним</div>
+  <div class="em-ctx-item" onclick="ctxAction('star')">⭐ Важливе</div>
+  <div class="em-ctx-sep"></div>
+  <div class="em-ctx-item" onclick="ctxAction('rule')">📋 Правило з відправника</div>
+  <div class="em-ctx-item" onclick="ctxAction('task')">📅 Завдання в календар</div>
+  <div class="em-ctx-sep"></div>
+  <div class="em-ctx-item" onclick="ctxAction('archive')">📦 Архів</div>
+  <div class="em-ctx-item danger" onclick="ctxAction('delete')">🗑️ Видалити</div>
+</div>
+
+<!-- Rule creation modal -->
+<div id="em-rule-modal">
+  <div id="em-rule-box">
+    <h4>📋 Нове правило пошти</h4>
+    <div class="em-rule-row">
+      <label>Назва правила</label>
+      <input type="text" id="rule-name" class="em-rule-inp" placeholder="Наприклад: Заблокувати спам">
+    </div>
+    <div class="em-rule-row">
+      <label>Поле</label>
+      <select id="rule-field" class="em-rule-sel">
+        <option value="from_email">Відправник (email)</option>
+        <option value="from_name">Відправник (ім'я)</option>
+        <option value="subject">Тема</option>
+        <option value="body">Текст листа</option>
+      </select>
+    </div>
+    <div class="em-rule-row">
+      <label>Умова</label>
+      <select id="rule-op" class="em-rule-sel">
+        <option value="contains">Містить</option>
+        <option value="equals">Рівно</option>
+        <option value="starts_with">Починається з</option>
+        <option value="ends_with">Закінчується на</option>
+        <option value="not_contains">Не містить</option>
+      </select>
+    </div>
+    <div class="em-rule-row">
+      <label>Значення</label>
+      <input type="text" id="rule-value" class="em-rule-inp" placeholder="відправник@example.com">
+    </div>
+    <div class="em-rule-row">
+      <label>Дія</label>
+      <select id="rule-action" class="em-rule-sel" onchange="toggleActionValue()">
+        <option value="mark_read">Позначити прочитаним</option>
+        <option value="mark_spam">Позначити спамом</option>
+        <option value="move_folder">Перемістити до папки</option>
+        <option value="star">Позначити зірочкою</option>
+        <option value="trash">Видалити</option>
+      </select>
+    </div>
+    <div class="em-rule-row" id="rule-action-val-row" style="display:none">
+      <label>Назва папки IMAP</label>
+      <input type="text" id="rule-action-val" class="em-rule-inp" placeholder="Назва папки">
+    </div>
+    <div id="em-rule-err"></div>
+    <div class="em-rule-btns">
+      <button class="em-rule-btn em-rule-cancel" onclick="closeRuleModal()">Скасувати</button>
+      <button class="em-rule-btn em-rule-ok" onclick="saveRule()">✓ Зберегти правило</button>
+    </div>
+  </div>
+</div>
+
+<!-- Task creation modal -->
+<div id="em-task-modal">
+  <div id="em-task-box">
+    <h4>📅 Завдання в календар</h4>
+    <div class="em-rule-row">
+      <label>Назва завдання</label>
+      <input type="text" id="task-title" class="em-rule-inp">
+    </div>
+    <div class="em-rule-row">
+      <label>Дата та час</label>
+      <input type="datetime-local" id="task-date" class="em-rule-inp">
+    </div>
+    <div class="em-rule-row">
+      <label>Опис (необов'язково)</label>
+      <input type="text" id="task-desc" class="em-rule-inp" placeholder="Додатковий коментар">
+    </div>
+    <div id="em-task-err" style="color:var(--err,#e53935);font-size:11px;min-height:14px;margin-bottom:6px"></div>
+    <div class="em-rule-btns">
+      <button class="em-rule-btn em-rule-cancel" onclick="closeTaskModal()">Скасувати</button>
+      <button class="em-rule-btn em-rule-ok" onclick="saveTask()">✓ Створити завдання</button>
+    </div>
+  </div>
 </div>
 
 <!-- Folder management modal -->
@@ -680,6 +814,147 @@ function _applyP2Visibility() {
 
   loadServerFolders();
 })();
+
+/* ── Context menu ── */
+var _ctxMsg = null; // {pk, tpk, rowEl, from}
+var _ctx = document.getElementById('em-ctx');
+
+function showCtxMenu(ev, pk, tpk, rowEl) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  _ctxMsg = {pk: pk, tpk: tpk, rowEl: rowEl, from: rowEl.dataset.from || ''};
+  var x = ev.clientX, y = ev.clientY;
+  if (x + 200 > window.innerWidth) x = window.innerWidth - 205;
+  if (y + 280 > window.innerHeight) y = window.innerHeight - 285;
+  _ctx.style.left = x + 'px';
+  _ctx.style.top  = y + 'px';
+  _ctx.classList.add('open');
+}
+
+document.addEventListener('click', function() { _ctx.classList.remove('open'); });
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') _ctx.classList.remove('open'); });
+
+async function ctxAction(action) {
+  _ctx.classList.remove('open');
+  if (!_ctxMsg) return;
+  var {pk, tpk, rowEl} = _ctxMsg;
+
+  if (action === 'open') {
+    var url = tpk ? '/email/thread/' + tpk + '/' : '/email/message/' + pk + '/';
+    window.open(url, '_blank');
+  } else if (action === 'read') {
+    var r = await fetch('/email/message/' + pk + '/read/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    if ((await r.json()).ok) { rowEl.classList.remove('unread'); rowEl.dataset.read = '1'; }
+  } else if (action === 'unread') {
+    var r = await fetch('/email/message/' + pk + '/unread/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    if ((await r.json()).ok) { rowEl.classList.add('unread'); rowEl.dataset.read = '0'; }
+  } else if (action === 'star') {
+    var starBtn = rowEl.querySelector('.em-star-btn');
+    if (starBtn) toggleStar({stopPropagation:function(){}}, pk, starBtn);
+  } else if (action === 'archive') {
+    if (tpk) archiveThread({stopPropagation:function(){}}, tpk);
+  } else if (action === 'delete') {
+    deleteMsg({stopPropagation:function(){}}, pk);
+  } else if (action === 'rule') {
+    openRuleModal();
+  } else if (action === 'task') {
+    openTaskModal();
+  }
+}
+
+/* ── Rule modal ── */
+var _ruleModal = document.getElementById('em-rule-modal');
+
+function openRuleModal() {
+  if (!_ctxMsg) return;
+  var from = _ctxMsg.from || '';
+  document.getElementById('rule-name').value  = 'Від ' + from;
+  document.getElementById('rule-field').value = 'from_email';
+  document.getElementById('rule-op').value    = 'contains';
+  document.getElementById('rule-value').value = from;
+  document.getElementById('rule-action').value = 'mark_read';
+  document.getElementById('em-rule-err').textContent = '';
+  toggleActionValue();
+  _ruleModal.classList.add('open');
+}
+
+function closeRuleModal() { _ruleModal.classList.remove('open'); }
+
+function toggleActionValue() {
+  var act = document.getElementById('rule-action').value;
+  var row = document.getElementById('rule-action-val-row');
+  if (row) row.style.display = (act === 'move_folder') ? '' : 'none';
+}
+
+_ruleModal.addEventListener('click', function(e) { if (e.target === _ruleModal) closeRuleModal(); });
+
+async function saveRule() {
+  var name  = document.getElementById('rule-name').value.trim();
+  var field = document.getElementById('rule-field').value;
+  var op    = document.getElementById('rule-op').value;
+  var val   = document.getElementById('rule-value').value.trim();
+  var act   = document.getElementById('rule-action').value;
+  var actV  = (document.getElementById('rule-action-val').value || '').trim();
+  var err   = document.getElementById('em-rule-err');
+  if (!name || !val) { err.textContent = 'Вкажіть назву і значення'; return; }
+  err.textContent = '⏳…';
+  try {
+    var r = await fetch('/email/rules/create/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({name, condition_field: field, condition_op: op,
+                            condition_value: val, action: act, action_value: actV}),
+    });
+    var d = await r.json();
+    if (d.ok) { closeRuleModal(); err.textContent = ''; }
+    else err.textContent = d.error || 'Помилка';
+  } catch(e) { err.textContent = 'Помилка мережі'; }
+}
+
+/* ── Task modal ── */
+var _taskModal = document.getElementById('em-task-modal');
+
+function openTaskModal() {
+  if (!_ctxMsg) return;
+  // Pre-fill from active row data-subject
+  var rowEl = _ctxMsg.rowEl;
+  var subj  = rowEl.dataset.subject || '';
+  document.getElementById('task-title').value = subj.charAt(0).toUpperCase() + subj.slice(1);
+  // Default: tomorrow 09:00
+  var d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0);
+  var iso = d.getFullYear() + '-'
+          + String(d.getMonth()+1).padStart(2,'0') + '-'
+          + String(d.getDate()).padStart(2,'0') + 'T09:00';
+  document.getElementById('task-date').value = iso;
+  document.getElementById('task-desc').value = '';
+  document.getElementById('em-task-err').textContent = '';
+  _taskModal.classList.add('open');
+}
+
+function closeTaskModal() { _taskModal.classList.remove('open'); }
+_taskModal.addEventListener('click', function(e) { if (e.target === _taskModal) closeTaskModal(); });
+
+async function saveTask() {
+  if (!_ctxMsg) return;
+  var title = document.getElementById('task-title').value.trim();
+  var dt    = document.getElementById('task-date').value;
+  var desc  = document.getElementById('task-desc').value.trim();
+  var err   = document.getElementById('em-task-err');
+  if (!title) { err.textContent = 'Вкажіть назву завдання'; return; }
+  err.textContent = '⏳…';
+  try {
+    var r = await fetch('/email/message/' + _ctxMsg.pk + '/create-task/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({title, start_at: dt ? dt + ':00' : '', description: desc}),
+    });
+    var d = await r.json();
+    if (d.ok) {
+      closeTaskModal();
+      err.textContent = '';
+    } else err.textContent = d.error || 'Помилка';
+  } catch(e) { err.textContent = 'Помилка мережі'; }
+}
 
 /* ── Auto-sync + browser push notifications ── */
 (function(){

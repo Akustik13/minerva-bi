@@ -4,21 +4,36 @@ from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_GET
 
+EVENT_COLORS = {
+    'deadline':      '#e53935',   # red
+    'meeting':       '#1a73e8',   # blue
+    'reminder':      '#f5a623',   # amber
+    'email_follow_up': '#43a047', # green
+    'other':         '#607d8b',   # grey
+}
+
+EVENT_TYPE_LABELS = {
+    'deadline':        '⏰ Дедлайн',
+    'meeting':         '🤝 Зустріч',
+    'reminder':        '🔔 Нагадування',
+    'email_follow_up': '📧 Email follow-up',
+    'other':           '📌 Інше',
+}
+
 
 @staff_member_required
 def calendar_view(request):
     from calendar_app.models import CalendarEvent
     import calendar as _cal
+    import json
 
     now   = timezone.now()
     year  = int(request.GET.get('year',  now.year))
     month = int(request.GET.get('month', now.month))
 
-    # Clamp
     year  = max(2020, min(2035, year))
     month = max(1, min(12, month))
 
-    # Navigation
     if month == 1:
         prev_year, prev_month = year - 1, 12
     else:
@@ -28,17 +43,18 @@ def calendar_view(request):
     else:
         next_year, next_month = year, month + 1
 
-    events = (CalendarEvent.objects
-              .filter(user=request.user, start_at__year=year,
-                      start_at__month=month, is_done=False)
-              .select_related('crm_customer')
-              .order_by('start_at'))
+    show_done = request.GET.get('show_done') == '1'
+    qs = CalendarEvent.objects.filter(user=request.user, start_at__year=year, start_at__month=month)
+    if not show_done:
+        qs = qs.filter(is_done=False)
+    events = list(qs.select_related('crm_customer').order_by('start_at'))
+    for ev in events:
+        ev._color = EVENT_COLORS.get(ev.event_type, '#607d8b')
 
-    # Build calendar grid (pre-processed so template needs no custom filters)
-    cal  = _cal.Calendar(firstweekday=0)  # Monday first
-    raw_weeks = cal.monthdayscalendar(year, month)
+    cal        = _cal.Calendar(firstweekday=0)
+    raw_weeks  = cal.monthdayscalendar(year, month)
     month_name = _cal.month_name[month]
-    today_day = now.day if now.year == year and now.month == month else None
+    today_day  = now.day if now.year == year and now.month == month else None
 
     events_by_day: dict = {}
     for ev in events:
@@ -59,17 +75,20 @@ def calendar_view(request):
     weekdays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Нд']
 
     return render(request, 'calendar_app/calendar.html', {
-        'title':      f'Календар — {month_name} {year}',
-        'year':       year,
-        'month':      month,
-        'month_name': month_name,
-        'weeks_data': weeks_data,
-        'weekdays':   weekdays,
-        'events':     events,
-        'prev_year':  prev_year,
-        'prev_month': prev_month,
-        'next_year':  next_year,
-        'next_month': next_month,
+        'title':             f'Календар — {month_name} {year}',
+        'year':              year,
+        'month':             month,
+        'month_name':        month_name,
+        'weeks_data':        weeks_data,
+        'weekdays':          weekdays,
+        'events':            events,
+        'prev_year':         prev_year,
+        'prev_month':        prev_month,
+        'next_year':         next_year,
+        'next_month':        next_month,
+        'show_done':         show_done,
+        'event_colors_json': json.dumps(EVENT_COLORS),
+        'event_labels_json': json.dumps(EVENT_TYPE_LABELS),
         'is_nav_sidebar_enabled': True,
     })
 
@@ -95,6 +114,36 @@ def events_json(request):
         }
         for e in events
     ]})
+
+
+@staff_member_required
+@require_GET
+def event_detail_api(request, pk):
+    from calendar_app.models import CalendarEvent
+    ev = get_object_or_404(CalendarEvent, pk=pk, user=request.user)
+    return JsonResponse({
+        'id':          ev.pk,
+        'title':       ev.title,
+        'description': ev.description,
+        'event_type':  ev.event_type,
+        'type_label':  EVENT_TYPE_LABELS.get(ev.event_type, ev.event_type),
+        'color':       EVENT_COLORS.get(ev.event_type, '#607d8b'),
+        'start':       ev.start_at.strftime('%d.%m.%Y %H:%M'),
+        'end':         ev.end_at.strftime('%d.%m.%Y %H:%M') if ev.end_at else '',
+        'all_day':     ev.all_day,
+        'is_done':     ev.is_done,
+        'customer':    str(ev.crm_customer) if ev.crm_customer_id else '',
+    })
+
+
+@staff_member_required
+@require_POST
+def event_toggle_done(request, pk):
+    from calendar_app.models import CalendarEvent
+    ev = get_object_or_404(CalendarEvent, pk=pk, user=request.user)
+    ev.is_done = not ev.is_done
+    ev.save(update_fields=['is_done'])
+    return JsonResponse({'ok': True, 'is_done': ev.is_done})
 
 
 @staff_member_required
