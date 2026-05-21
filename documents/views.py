@@ -526,67 +526,83 @@ def _auto_fix_field_errors(docx_bytes, issues):
 
 
 def _add_item_loop_markers(docx_bytes):
-    """Inject {%tr for item in items %} / {%tr endfor %} into table rows
-    that contain {{ item.xxx }} variables but lack loop markers.
-    Works on already-patched bytes (after _auto_fix_syntax_tags)."""
+    """Insert dedicated {%tr for item in items %} / {%tr endfor %} rows
+    around table rows that contain {{ item.xxx }} variables but lack loop markers.
+
+    IMPORTANT: docxtpl replaces the ENTIRE <w:tr> containing a {%tr %} marker
+    with the corresponding Jinja2 tag.  The markers MUST live in their own
+    dedicated rows — never inside the data rows.  Data rows are left untouched
+    so Jinja2 can repeat them for each item.
+
+    Also handles the broken case where {%tr for/endfor %} were previously
+    injected INTO the data row — strips those runs from the data row first.
+    """
     import zipfile, re
     from io import BytesIO
 
     ROW_RE  = re.compile(r'<w:tr\b[^>]*>.*?</w:tr>', re.DOTALL)
+    RUN_RE  = re.compile(r'<w:r\b[^>]*>.*?</w:r>', re.DOTALL)
     TEXT_RE = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>')
     ITEM_RE = re.compile(r'\{\{\s*item\.')
-    LOOP_RE = re.compile(r'\{%-?\s*tr\b')
+    TR_RE   = re.compile(r'\{%tr\b')
+
+    FOR_ROW = (
+        '<w:tr><w:tc><w:p><w:r>'
+        '<w:t xml:space="preserve">{%tr for item in items %}</w:t>'
+        '</w:r></w:p></w:tc></w:tr>'
+    )
+    END_ROW = (
+        '<w:tr><w:tc><w:p><w:r>'
+        '<w:t xml:space="preserve">{%tr endfor %}</w:t>'
+        '</w:r></w:p></w:tc></w:tr>'
+    )
+
+    RUN_RE  = re.compile(r'<w:r\b[^>]*>.*?</w:r>', re.DOTALL)
 
     def _row_text(row):
         return ''.join(TEXT_RE.findall(row))
 
-    def _prepend_run(row_xml, tag_text):
-        """Insert run with tag_text after first <w:p...> opening in first <w:tc>."""
-        tc_m = re.search(r'<w:tc\b[^>]*>', row_xml)
-        if not tc_m:
-            return row_xml
-        after_tc = row_xml[tc_m.end():]
-        p_m = re.search(r'<w:p\b[^>]*>', after_tc)
-        if not p_m:
-            return row_xml
-        insert = tc_m.end() + p_m.end()
-        run = f'<w:r><w:t xml:space="preserve">{tag_text} </w:t></w:r>'
-        return row_xml[:insert] + run + row_xml[insert:]
-
-    def _append_run(row_xml, tag_text):
-        """Insert run with tag_text before last </w:p> in last <w:tc>."""
-        tc_ends = [m.start() for m in re.finditer(r'</w:tc>', row_xml)]
-        if not tc_ends:
-            return row_xml
-        section = row_xml[:tc_ends[-1]]
-        p_ends = [m.start() for m in re.finditer(r'</w:p>', section)]
-        if not p_ends:
-            return row_xml
-        insert = p_ends[-1]
-        run = f'<w:r><w:t xml:space="preserve"> {tag_text}</w:t></w:r>'
-        return row_xml[:insert] + run + row_xml[insert:]
+    def _strip_tr_runs(row_xml):
+        """Remove <w:r> elements whose sole text content is a {%tr %} marker."""
+        # Build replacement by iterating runs and dropping marker-only ones
+        result = row_xml
+        # Process in reverse so positions stay valid
+        for rm in reversed(list(RUN_RE.finditer(row_xml))):
+            run_text = ''.join(TEXT_RE.findall(rm.group(0))).strip()
+            if TR_RE.match(run_text):  # starts with {%tr
+                result = result[:rm.start()] + result[rm.end():]
+        return result
 
     def _patch_xml(xml):
+        rows = list(ROW_RE.finditer(xml))
+
+        # Phase 1: Remove {%tr %} runs that were incorrectly injected INTO data rows.
+        # A "broken" row has {{ item.xxx }} AND {%tr %} markers in the same <w:tr>.
+        # Process in reverse order to keep earlier offsets valid.
+        for rm in reversed(rows):
+            row = rm.group(0)
+            text = _row_text(row)
+            if ITEM_RE.search(text) and TR_RE.search(text):
+                clean_row = _strip_tr_runs(row)
+                if clean_row != row:
+                    xml = xml[:rm.start()] + clean_row + xml[rm.end():]
+
+        # Phase 2: Find rows with {{ item.xxx }} that still lack loop markers.
         rows = list(ROW_RE.finditer(xml))
         item_rows = [
             rm for rm in rows
             if ITEM_RE.search(_row_text(rm.group(0)))
-            and not LOOP_RE.search(_row_text(rm.group(0)))
-            and not LOOP_RE.search(rm.group(0))
+            and not TR_RE.search(_row_text(rm.group(0)))
+            and not TR_RE.search(rm.group(0))
         ]
         if not item_rows:
             return xml
 
         first, last = item_rows[0], item_rows[-1]
-        if first.start() == last.start():
-            new = _prepend_run(first.group(0), '{%tr for item in items %}')
-            new = _append_run(new, '{%tr endfor %}')
-            xml = xml[:first.start()] + new + xml[first.end():]
-        else:
-            new_last = _append_run(last.group(0), '{%tr endfor %}')
-            xml = xml[:last.start()] + new_last + xml[last.end():]
-            new_first = _prepend_run(first.group(0), '{%tr for item in items %}')
-            xml = xml[:first.start()] + new_first + xml[first.end():]
+        # Insert END_ROW after last data row first (preserves earlier offsets)
+        xml = xml[:last.end()] + END_ROW + xml[last.end():]
+        # Insert FOR_ROW before first data row
+        xml = xml[:first.start()] + FOR_ROW + xml[first.start():]
         return xml
 
     inp = BytesIO(docx_bytes)
