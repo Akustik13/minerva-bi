@@ -73,9 +73,8 @@ def generate_docx(template, context: dict,
 def _convert_to_pdf(docx_path: str) -> bytes | None:
     """Конвертувати .docx в PDF через LibreOffice.
 
-    Використовує ізольований профіль LibreOffice (--env:UserInstallation) і
-    writer_pdf_Export з вбудованими шрифтами щоб мінімізувати розбіжності
-    форматування між Word і PDF.
+    Використовує ізольований профіль (--env:UserInstallation) щоб уникнути
+    конфліктів при паралельних конвертаціях. Логує stderr при помилці.
     """
     candidates = (
         'libreoffice', 'soffice',
@@ -84,8 +83,6 @@ def _convert_to_pdf(docx_path: str) -> bytes | None:
     for cmd in candidates:
         if os.path.exists(cmd) or _command_exists(cmd):
             with tempfile.TemporaryDirectory() as tmpdir:
-                # Isolated user profile — prevents stale state / lock-file issues
-                # and ensures reproducible output across concurrent calls
                 profile_url = 'file://' + tmpdir.replace('\\', '/') + '/lo_profile'
                 result = subprocess.run(
                     [
@@ -94,14 +91,11 @@ def _convert_to_pdf(docx_path: str) -> bytes | None:
                         '--norestore',
                         '--nofirststartwizard',
                         f'--env:UserInstallation={profile_url}',
-                        '--convert-to',
-                        # Embed fonts → prevents glyph substitution that causes reflow
-                        'pdf:writer_pdf_Export:EmbedStandardFonts=true,SelectPdfVersion=0',
+                        '--convert-to', 'pdf:writer_pdf_Export',
                         '--outdir', tmpdir,
                         docx_path,
                     ],
                     capture_output=True, timeout=60,
-                    env={**os.environ, 'HOME': tmpdir},
                 )
                 if result.returncode == 0:
                     pdf_name = os.path.splitext(os.path.basename(docx_path))[0] + '.pdf'
