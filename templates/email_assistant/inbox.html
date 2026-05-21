@@ -99,8 +99,19 @@
 #em-folder-modal-err{color:var(--err,#e53935);font-size:11px;min-height:14px;margin-bottom:6px}
 
 /* ── Panel 2 — message list ── */
-.em-p2{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);overflow:hidden;transition:width .2s}
+.em-p2{width:260px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);overflow:hidden;transition:width .15s,border .15s}
 .em-p2.collapsed{width:0;border-right:none}
+/* Vertical drag handle (inside p3 when layout=vertical) */
+.em-drag-v{height:5px;cursor:row-resize;flex-shrink:0;background:transparent;transition:background .1s;z-index:5}
+.em-drag-v:hover,.em-drag-v.dragging{background:rgba(26,115,232,.25)}
+/* Vertical layout: p2+p3 stacked */
+.em-app.v-layout .em-p2{width:100%;height:var(--p2-h,280px);border-right:none;border-bottom:1px solid var(--border-strong);flex-shrink:0}
+.em-app.v-layout .em-p3{flex:1;min-height:0}
+/* Layout toggle button */
+.em-layout-btn{border:1px solid var(--border-strong);background:none;cursor:pointer;
+  color:var(--text-muted);padding:4px 7px;border-radius:6px;font-size:12px;
+  flex-shrink:0;transition:background .1s,color .1s;line-height:1}
+.em-layout-btn:hover,.em-layout-btn.on{background:rgba(26,115,232,.15);color:#1a73e8;border-color:#1a73e8}
 .em-p2-header{padding:10px 14px 8px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}
 .em-p2-title{font-size:13px;font-weight:600;color:var(--text)}
 .em-p2-count{font-size:11px;color:var(--text-muted)}
@@ -252,6 +263,7 @@
         {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
       </span>
       <span class="em-p2-count" style="display:flex;align-items:center;gap:6px">
+        <button class="em-layout-btn" id="em-layout-btn" onclick="toggleLayout()" title="{% trans "Вертикальне / горизонтальне розміщення" %}">⬒</button>
         <span>{{ total }}</span>
         <select id="sort-sel" onchange="sortRows(this.value)"
                 style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text-muted);cursor:pointer;max-width:90px">
@@ -358,6 +370,9 @@
   </div>
 
   <!-- Drag handle 2: resize P2 -->
+  <div class="em-drag" id="em-drag2" title="Потягни для зміни розміру"></div>
+
+  <!-- Drag handle 2: resize P2 horizontal -->
   <div class="em-drag" id="em-drag2" title="Потягни для зміни розміру"></div>
 
   <!-- ═══ Panel 3: Preview ═══ -->
@@ -568,9 +583,84 @@ var _i18n = {
   window.resetPanelSizes = function() {
     p1.style.width = DEFAULTS.p1 + 'px';
     p2.style.width = DEFAULTS.p2 + 'px';
+    p2.style.height = '';
     localStorage.removeItem('em-p1-w');
     localStorage.removeItem('em-p2-w');
+    localStorage.removeItem('em-p2-h');
     if (p1.classList.contains('collapsed')) { window.toggleP1(); }
+    // Exit vertical layout
+    var app = document.getElementById('em-app');
+    if (app.classList.contains('v-layout')) { toggleLayout(); }
+  };
+})();
+
+/* ── Vertical layout toggle + vertical drag ── */
+(function(){
+  var app     = document.getElementById('em-app');
+  var p2      = document.getElementById('em-p2');
+  var drag2   = document.getElementById('em-drag2');
+  var layoutBtn = document.getElementById('em-layout-btn');
+  var vDrag   = null;  // created dynamically in v-layout
+  var _vLayout = localStorage.getItem('em-v-layout') === '1';
+
+  function _applyLayout(v) {
+    app.classList.toggle('v-layout', v);
+    if (layoutBtn) layoutBtn.classList.toggle('on', v);
+
+    if (v) {
+      // Vertical: p2 stacked above p3, drag handle between them
+      var savedH = parseInt(localStorage.getItem('em-p2-h') || '280');
+      p2.style.width = '100%';
+      app.style.flexDirection = 'column';
+      // move drag2 (horizontal) out of flow; insert vertical drag
+      if (drag2) drag2.style.display = 'none';
+      if (!vDrag) {
+        vDrag = document.createElement('div');
+        vDrag.className = 'em-drag-v';
+        vDrag.title = 'Потягни для зміни висоти';
+        p2.after(vDrag);
+        // drag logic
+        vDrag.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          vDrag.classList.add('dragging');
+          var startY = e.clientY;
+          var startH = p2.offsetHeight;
+          function onMove(e) {
+            var newH = Math.max(120, Math.min(window.innerHeight * 0.7, startH + (e.clientY - startY)));
+            p2.style.height = newH + 'px';
+            app.style.setProperty('--p2-h', newH + 'px');
+          }
+          function onUp() {
+            vDrag.classList.remove('dragging');
+            localStorage.setItem('em-p2-h', p2.offsetHeight);
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+          }
+          document.addEventListener('mousemove', onMove);
+          document.addEventListener('mouseup', onUp);
+        });
+      }
+      p2.style.height = savedH + 'px';
+      app.style.setProperty('--p2-h', savedH + 'px');
+    } else {
+      // Horizontal
+      app.style.flexDirection = '';
+      p2.style.height = '';
+      app.style.removeProperty('--p2-h');
+      if (drag2) drag2.style.display = '';
+      if (vDrag) { vDrag.style.display = 'none'; }
+      // restore p2 width
+      var savedW = parseInt(localStorage.getItem('em-p2-w') || '260');
+      p2.style.width = savedW + 'px';
+    }
+  }
+
+  _applyLayout(_vLayout);
+
+  window.toggleLayout = function() {
+    _vLayout = !_vLayout;
+    localStorage.setItem('em-v-layout', _vLayout ? '1' : '0');
+    _applyLayout(_vLayout);
   };
 })();
 

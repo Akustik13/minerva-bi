@@ -136,6 +136,48 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
 .cal-email-badge:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .cal-list-empty{text-align:center;padding:32px;color:var(--text-muted);font-size:13px;display:none}
 
+/* ── AI assistant panel ── */
+#cal-ai-panel{position:fixed;right:0;top:0;bottom:0;width:340px;z-index:10000;
+  background:var(--bg-card);border-left:1px solid var(--border-strong);
+  display:flex;flex-direction:column;box-shadow:-4px 0 20px rgba(0,0,0,.25);
+  transform:translateX(100%);transition:transform .25s ease}
+#cal-ai-panel.open{transform:translateX(0)}
+#cal-ai-header{display:flex;align-items:center;gap:8px;padding:12px 14px;
+  border-bottom:1px solid var(--border-strong);flex-shrink:0}
+#cal-ai-header h3{flex:1;margin:0;font-size:14px;color:var(--text);font-weight:600}
+#cal-ai-close{border:none;background:none;cursor:pointer;color:var(--text-dim);
+  font-size:18px;line-height:1;padding:2px 4px}
+#cal-ai-messages{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.cal-ai-msg{max-width:92%;padding:8px 12px;border-radius:10px;font-size:12px;line-height:1.5;word-wrap:break-word}
+.cal-ai-msg.user{align-self:flex-end;background:#1a73e8;color:#fff;border-radius:10px 10px 3px 10px}
+.cal-ai-msg.ai{align-self:flex-start;background:var(--bg-input);color:var(--text);border-radius:10px 10px 10px 3px;border:1px solid var(--border-strong)}
+.cal-ai-msg.ai pre{white-space:pre-wrap;font-size:11px;margin:4px 0}
+.cal-ai-thinking{color:var(--text-dim);font-size:11px;font-style:italic;align-self:flex-start;padding:4px 0}
+#cal-ai-reload-banner{display:none;padding:8px 14px;background:rgba(26,115,232,.1);
+  border-bottom:1px solid rgba(26,115,232,.2);font-size:12px;color:#1a73e8;
+  align-items:center;gap:8px;flex-shrink:0}
+#cal-ai-reload-banner.show{display:flex}
+#cal-ai-reload-banner button{padding:4px 10px;border-radius:5px;border:none;
+  background:#1a73e8;color:#fff;cursor:pointer;font-size:11px;font-weight:600}
+#cal-ai-input-row{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--border-strong);flex-shrink:0}
+#cal-ai-inp{flex:1;padding:8px 10px;border-radius:8px;border:1px solid var(--border-strong);
+  background:var(--bg-input);color:var(--text);font-size:12px;resize:none;
+  outline:none;font-family:inherit;line-height:1.4;max-height:80px;overflow-y:auto}
+#cal-ai-inp:focus{border-color:#1a73e8}
+#cal-ai-send{padding:8px 12px;border-radius:8px;border:none;background:#1a73e8;
+  color:#fff;cursor:pointer;font-size:14px;flex-shrink:0;transition:opacity .1s}
+#cal-ai-send:hover{opacity:.85}
+#cal-ai-send:disabled{opacity:.45;cursor:not-allowed}
+/* floating open button */
+#cal-ai-btn{position:fixed;bottom:24px;right:24px;z-index:9998;
+  width:52px;height:52px;border-radius:50%;border:none;
+  background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff;
+  font-size:22px;cursor:pointer;box-shadow:0 4px 16px rgba(26,115,232,.5);
+  transition:transform .15s,box-shadow .15s;display:flex;align-items:center;justify-content:center}
+#cal-ai-btn:hover{transform:scale(1.08);box-shadow:0 6px 20px rgba(26,115,232,.6)}
+#cal-ai-btn.panel-open{background:rgba(26,115,232,.15);color:#1a73e8;
+  box-shadow:none;border:1px solid #1a73e8}
+
 /* ── Event detail popup ── */
 #cal-popup{display:none;position:fixed;z-index:9999;background:var(--bg-card);
   border:1px solid var(--border-strong);border-radius:10px;padding:16px;
@@ -286,6 +328,30 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
   {% endif %}
 
 </div><!-- /.cal-wrap -->
+
+<!-- ── AI assistant panel ── -->
+<div id="cal-ai-panel">
+  <div id="cal-ai-header">
+    <span style="font-size:20px">🤖</span>
+    <h3>AI Асистент календаря</h3>
+    <button id="cal-ai-close" onclick="toggleAiPanel()">×</button>
+  </div>
+  <div id="cal-ai-reload-banner">
+    📅 Дані змінено — оновити сторінку?
+    <button onclick="location.reload()">Оновити</button>
+  </div>
+  <div id="cal-ai-messages">
+    <div class="cal-ai-msg ai">Привіт! Я допоможу керувати календарем. Запитай, наприклад:<br>
+      • <em>Покажи прострочені дедлайни DigiKey</em><br>
+      • <em>Позначити всі відправлені замовлення виконаними</em><br>
+      • <em>Що в мене на цьому тижні?</em></div>
+  </div>
+  <div id="cal-ai-input-row">
+    <textarea id="cal-ai-inp" rows="1" placeholder="Запитай про свій календар…"></textarea>
+    <button id="cal-ai-send" onclick="aiSend()">➤</button>
+  </div>
+</div>
+<button id="cal-ai-btn" onclick="toggleAiPanel()" title="AI Асистент">🤖</button>
 
 <!-- ── Event detail popup ── -->
 <div id="cal-popup">
@@ -854,6 +920,88 @@ document.addEventListener('click', function(e){
   if (_popup.classList.contains('open') && !_popup.contains(e.target)) closePopup();
 });
 document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closePopup(); if(_bulkMode) exitBulkMode(); } });
+
+/* ─── AI Assistant panel ────────────────────────────────── */
+var _aiHistory = [];  // [{role,content}]
+var _aiNeedsReload = false;
+
+function toggleAiPanel() {
+  var panel = document.getElementById('cal-ai-panel');
+  var btn   = document.getElementById('cal-ai-btn');
+  var open  = panel.classList.toggle('open');
+  btn.classList.toggle('panel-open', open);
+  if (open) setTimeout(function(){ document.getElementById('cal-ai-inp').focus(); }, 300);
+}
+
+function _aiAppend(role, text) {
+  var msgs = document.getElementById('cal-ai-messages');
+  var div = document.createElement('div');
+  div.className = 'cal-ai-msg ' + (role === 'user' ? 'user' : 'ai');
+  // Simple markdown: **bold**, *italic*, line breaks, bullet lists
+  var html = text
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/\n/g,'<br>');
+  div.innerHTML = html;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  return div;
+}
+
+async function aiSend() {
+  var inp = document.getElementById('cal-ai-inp');
+  var msg = (inp.value || '').trim();
+  if (!msg) return;
+  var sendBtn = document.getElementById('cal-ai-send');
+  inp.value = '';
+  inp.style.height = '';
+
+  _aiAppend('user', msg);
+  var thinking = document.createElement('div');
+  thinking.className = 'cal-ai-thinking';
+  thinking.textContent = '⏳ думаю…';
+  document.getElementById('cal-ai-messages').appendChild(thinking);
+  document.getElementById('cal-ai-messages').scrollTop = 9999;
+  sendBtn.disabled = true;
+
+  try {
+    var r = await fetch('/calendar/ai-chat/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg, history: _aiHistory}),
+    });
+    var d = await r.json();
+    thinking.remove();
+    if (d.ok) {
+      _aiHistory.push({role:'user', content: msg});
+      _aiHistory.push({role:'assistant', content: d.reply});
+      if (_aiHistory.length > 40) _aiHistory = _aiHistory.slice(-40);
+      _aiAppend('ai', d.reply);
+      if (d.action === 'reload') {
+        _aiNeedsReload = true;
+        document.getElementById('cal-ai-reload-banner').classList.add('show');
+      }
+    } else {
+      _aiAppend('ai', '⚠️ ' + (d.error || 'Помилка'));
+    }
+  } catch(e) {
+    thinking.remove();
+    _aiAppend('ai', '⚠️ Помилка мережі');
+  } finally {
+    sendBtn.disabled = false;
+    inp.focus();
+  }
+}
+
+document.getElementById('cal-ai-inp')?.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); aiSend(); }
+});
+// Auto-grow textarea
+document.getElementById('cal-ai-inp')?.addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 80) + 'px';
+});
 
 /* ─── Init ──────────────────────────────────────────────── */
 buildFilterBar();

@@ -361,6 +361,22 @@ def pending_push_view(request):
 
 
 @staff_member_required
+@require_POST
+def calendar_ai_chat(request):
+    from calendar_app.ai_service import calendar_chat
+    try:
+        data = json.loads(request.body)
+    except (ValueError, TypeError):
+        return JsonResponse({'ok': False, 'error': 'invalid json'}, status=400)
+    user_message = data.get('message', '').strip()[:2000]
+    history      = data.get('history', [])
+    if not user_message:
+        return JsonResponse({'ok': False, 'error': 'empty message'}, status=400)
+    result = calendar_chat(user_message, history, request.user)
+    return JsonResponse(result)
+
+
+@staff_member_required
 def settings_view(request):
     from calendar_app.models import CalendarSettings
 

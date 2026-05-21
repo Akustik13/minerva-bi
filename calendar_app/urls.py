@@ -14,6 +14,7 @@ urlpatterns = [
     path('categories/',                     views.category_list_api,   name='category_list'),
     path('categories/create/',              views.category_create_api, name='category_create'),
     path('categories/<int:cat_pk>/delete/', views.category_delete_api, name='category_delete'),
+    path('ai-chat/',                         views.calendar_ai_chat,    name='ai_chat'),
     path('pending-push/',                   views.pending_push_view,   name='pending_push'),
     path('settings/',                       views.settings_view,       name='settings'),
 ]
