@@ -9,6 +9,7 @@ urlpatterns = [
     path('event/<int:pk>/',            views.event_detail_api,  name='event_detail'),
     path('event/<int:pk>/done/',       views.event_done,        name='event_done'),
     path('event/<int:pk>/toggle/',     views.event_toggle_done, name='event_toggle'),
+    path('event/<int:pk>/set-type/',   views.event_set_type,    name='event_set_type'),
     path('pending-push/',              views.pending_push_view, name='pending_push'),
     path('settings/',                  views.settings_view,     name='settings'),
 ]

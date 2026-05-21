@@ -6,7 +6,7 @@
 {% block extrahead %}{{ block.super }}
 <style>
 .cal-wrap{max-width:1100px;margin:0 auto;padding:16px}
-.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
 .cal-nav{display:flex;align-items:center;gap:10px}
 .cal-nav a{padding:5px 14px;border-radius:6px;border:1px solid var(--border-strong);
   color:var(--text-muted);text-decoration:none;font-size:13px;transition:background .1s}
@@ -20,40 +20,55 @@
   background:none;cursor:pointer;color:var(--text-muted);font-size:12px;transition:background .1s,color .1s}
 .cal-done-toggle:hover,.cal-done-toggle.on{background:rgba(26,115,232,.12);color:#1a73e8;border-color:#1a73e8}
 
-/* Calendar grid */
-.cal-grid{width:100%;border-collapse:collapse;margin-bottom:24px}
+/* ── Category / legend filter bar ── */
+.cal-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.cal-cat-btn{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;
+  border:1px solid var(--border-strong);background:none;cursor:pointer;font-size:12px;
+  color:var(--text-muted);transition:background .12s,color .12s,border-color .12s;white-space:nowrap}
+.cal-cat-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.cal-cat-btn.active{color:#fff;border-color:transparent}
+.cal-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ── Calendar grid ── */
+.cal-grid{width:100%;border-collapse:collapse;margin-bottom:20px}
 .cal-grid th{padding:8px 4px;text-align:center;font-size:12px;font-weight:500;
   color:var(--text-muted);border-bottom:1px solid var(--border-strong)}
 .cal-grid td{width:14.28%;vertical-align:top;border:1px solid var(--border-strong);
-  min-height:72px;padding:6px;font-size:12px;cursor:default}
-.cal-grid td.other-month{background:var(--bg-input);opacity:.45}
-.cal-grid td.today{background:rgba(26,115,232,.08)}
+  min-height:72px;padding:5px 6px;font-size:12px;cursor:pointer;transition:background .1s}
+.cal-grid td.other-month{background:var(--bg-input);opacity:.45;cursor:default}
+.cal-grid td.today{background:rgba(26,115,232,.07)}
 .cal-grid td:not(.other-month):hover{background:var(--bg-hover,#1e2d40)}
-.cal-day-num{font-size:12px;color:var(--text-muted);margin-bottom:3px;font-weight:500}
-td.today .cal-day-num{color:#1a73e8;font-weight:700;background:#1a73e8;
-  width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;color:#fff;font-size:11px;margin-bottom:4px}
+.cal-grid td.day-selected{background:rgba(26,115,232,.18) !important;
+  outline:2px solid #1a73e8;outline-offset:-2px}
+.cal-day-num{font-size:12px;color:var(--text-muted);margin-bottom:3px;font-weight:500;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:22px;height:22px;border-radius:50%}
+td.today .cal-day-num{background:#1a73e8;color:#fff;font-size:11px}
+td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1a73e8}
 .cal-chip{display:flex;align-items:center;gap:3px;padding:2px 5px;border-radius:4px;
   margin-bottom:2px;font-size:10px;cursor:pointer;transition:opacity .1s;
   white-space:nowrap;overflow:hidden}
 .cal-chip:hover{opacity:.75}
 .cal-chip-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .cal-chip-txt{overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
-.cal-chip.done-ev{opacity:.4;text-decoration:line-through}
+.cal-chip.done-ev{opacity:.35;text-decoration:line-through}
 
-/* Legend */
-.cal-legend{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:16px;font-size:12px;color:var(--text-muted)}
-.cal-legend-item{display:flex;align-items:center;gap:4px}
-.cal-legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+/* ── Event list toolbar ── */
+.cal-list-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:10px 0 8px;border-top:1px solid var(--border-strong);margin-bottom:10px}
+.cal-list-heading{font-size:14px;font-weight:600;color:var(--text);flex:1;min-width:0}
+.cal-list-heading span{font-weight:400;font-size:12px;color:var(--text-muted)}
+.cal-day-reset{padding:4px 10px;border-radius:6px;border:1px solid var(--border-strong);
+  background:none;cursor:pointer;color:var(--text-muted);font-size:12px;
+  transition:background .1s;display:none}
+.cal-day-reset:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.cal-day-reset.visible{display:inline-block}
 
-/* Event list */
-.cal-list-title{font-size:14px;font-weight:600;color:var(--text);
-  padding-top:16px;border-top:1px solid var(--border-strong);margin-bottom:10px;
-  display:flex;align-items:center;justify-content:space-between}
+/* ── Event rows ── */
 .cal-event-row{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;
   border-radius:8px;background:var(--bg-card);border:1px solid var(--border-strong);
-  margin-bottom:8px;transition:opacity .3s;position:relative}
-.cal-event-row.done-row{opacity:.45}
+  margin-bottom:8px;transition:opacity .3s}
+.cal-event-row.done-row{opacity:.42}
 .cal-event-bar{width:4px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:32px}
 .cal-event-title{font-size:13px;color:var(--text);font-weight:500}
 .cal-event-meta{font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.5}
@@ -62,11 +77,12 @@ td.today .cal-day-num{color:#1a73e8;font-weight:700;background:#1a73e8;
   font-size:14px;padding:4px 6px;border-radius:4px;transition:color .1s,background .1s;line-height:1}
 .cal-done-btn:hover{color:var(--ok,#2e7d32);background:rgba(46,125,50,.1)}
 .cal-done-btn.done{color:var(--ok,#2e7d32)}
-.cal-admin-link{font-size:11px;color:var(--link-fg);text-decoration:none;padding:4px 6px;
-  border-radius:4px;transition:background .1s}
+.cal-admin-link{font-size:11px;color:var(--link-fg);text-decoration:none;
+  padding:4px 6px;border-radius:4px;transition:background .1s}
 .cal-admin-link:hover{background:var(--bg-hover,#1e2d40)}
+.cal-list-empty{text-align:center;padding:32px;color:var(--text-muted);font-size:13px;display:none}
 
-/* Event detail popup */
+/* ── Event detail popup ── */
 #cal-popup{display:none;position:fixed;z-index:9999;background:var(--bg-card);
   border:1px solid var(--border-strong);border-radius:10px;padding:16px;
   max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,.3);font-size:13px}
@@ -81,7 +97,7 @@ td.today .cal-day-num{color:#1a73e8;font-weight:700;background:#1a73e8;
 {% block content %}
 <div class="cal-wrap">
 
-  <!-- Header -->
+  <!-- ── Header ── -->
   <div class="cal-header">
     <div class="cal-nav">
       <a href="?year={{ prev_year }}&month={{ prev_month }}{% if show_done %}&show_done=1{% endif %}">← Попередній</a>
@@ -97,11 +113,14 @@ td.today .cal-day-num{color:#1a73e8;font-weight:700;background:#1a73e8;
     </div>
   </div>
 
-  <!-- Legend -->
-  <div class="cal-legend" id="cal-legend"></div>
+  <!-- ── Category filter bar (doubles as legend) ── -->
+  <div class="cal-filter-bar" id="cal-filter-bar">
+    <span style="font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0">Категорії:</span>
+    <!-- filled by JS -->
+  </div>
 
-  <!-- Calendar grid -->
-  <table class="cal-grid">
+  <!-- ── Calendar grid ── -->
+  <table class="cal-grid" id="cal-grid-table">
     <thead>
       <tr>{% for wd in weekdays %}<th>{{ wd }}</th>{% endfor %}</tr>
     </thead>
@@ -109,33 +128,50 @@ td.today .cal-day-num{color:#1a73e8;font-weight:700;background:#1a73e8;
       {% for week in weeks_data %}
       <tr>
         {% for cell in week %}
-        <td class="{% if cell.other %}other-month{% endif %}{% if cell.is_today %} today{% endif %}">
-          {% if not cell.other %}
+        {% if cell.other %}
+        <td class="other-month"></td>
+        {% else %}
+        <td id="cal-td-{{ cell.day }}"
+            class="{% if cell.is_today %}today{% endif %}"
+            onclick="selectDay({{ cell.day }})">
           <div class="cal-day-num">{{ cell.day }}</div>
           {% for ev in cell.events %}
           <div class="cal-chip{% if ev.is_done %} done-ev{% endif %}"
-               style="background:{{ ev.display_color }}22;color:{{ ev.display_color }}"
-               onclick="showEventPopup(event, {{ ev.pk }})"
+               style="background:{{ ev.display_color }}33;color:{{ ev.display_color }}"
+               data-type="{{ ev.event_type }}"
+               data-pk="{{ ev.pk }}"
+               onclick="openChip(event, {{ cell.day }}, {{ ev.pk }})"
                title="{{ ev.title }}">
             <span class="cal-chip-dot" style="background:{{ ev.display_color }}"></span>
             <span class="cal-chip-txt">{{ ev.title|truncatechars:20 }}</span>
           </div>
           {% endfor %}
-          {% endif %}
         </td>
+        {% endif %}
         {% endfor %}
       </tr>
       {% endfor %}
     </tbody>
   </table>
 
-  <!-- Event list -->
+  <!-- ── Event list ── -->
+  <div class="cal-list-toolbar">
+    <div class="cal-list-heading" id="cal-list-heading">
+      📋 Всі події місяця
+      <span id="cal-list-count-wrap">(<span id="cal-list-count">{{ events|length }}</span>)</span>
+    </div>
+    <button class="cal-day-reset" id="cal-day-reset" onclick="selectDay(0)">✕ Скинути фільтр дня</button>
+  </div>
+
   {% if events %}
-  <div class="cal-list-title">
-    <span>📋 Всі події місяця ({{ events|length }})</span>
+  <div id="cal-list-empty" class="cal-list-empty" style="display:none">
+    📭 Немає подій за вибраними фільтрами
   </div>
   {% for ev in events %}
-  <div class="cal-event-row{% if ev.is_done %} done-row{% endif %}" id="ev-{{ ev.pk }}">
+  <div class="cal-event-row{% if ev.is_done %} done-row{% endif %}"
+       id="ev-{{ ev.pk }}"
+       data-day="{{ ev.start_at|date:'j' }}"
+       data-type="{{ ev.event_type }}">
     <div class="cal-event-bar" style="background:{{ ev.display_color }}"></div>
     <div style="flex:1;min-width:0">
       <div class="cal-event-title">{{ ev.title }}</div>
@@ -156,89 +192,319 @@ td.today .cal-day-num{color:#1a73e8;font-weight:700;background:#1a73e8;
   </div>
   {% endfor %}
   {% else %}
-  <div style="text-align:center;padding:40px;color:var(--text-muted);font-size:14px">
+  <div style="text-align:center;padding:40px;color:var(--text-muted);font-size:13px">
     📭 Подій у цьому місяці немає
   </div>
   {% endif %}
 
-</div>
+</div><!-- /.cal-wrap -->
 
 <!-- Event detail popup -->
 <div id="cal-popup">
   <button id="cal-popup-close" onclick="closePopup()">×</button>
   <div id="cal-popup-title"></div>
   <div id="cal-popup-meta"></div>
+  <div style="margin-top:10px;border-top:1px solid var(--border-strong);padding-top:8px">
+    <div style="font-size:10px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Категорія</div>
+    <div id="cal-popup-types" style="display:flex;flex-wrap:wrap;gap:4px"></div>
+  </div>
+  <div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-strong)">
+    <button id="cal-popup-done-btn" onclick="popupToggleDone()"
+            style="flex:1;padding:6px 4px;border-radius:6px;border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text);font-size:12px;transition:color .1s,border-color .1s">
+      ✓ Виконано
+    </button>
+    <a id="cal-popup-edit-link" href="#"
+       style="flex:1;padding:6px 4px;border-radius:6px;border:1px solid var(--border-strong);text-align:center;color:var(--link-fg);text-decoration:none;font-size:12px;display:block">
+      ✏️ Редагувати
+    </a>
+  </div>
 </div>
 
 <script>
-const CSRF = document.cookie.split(';').find(c=>c.trim().startsWith('csrftoken='))?.split('=')[1]||'';
+const CSRF        = document.cookie.split(';').find(c=>c.trim().startsWith('csrftoken='))?.split('=')[1]||'';
 const EVENT_COLORS = {{ event_colors_json|safe }};
 const EVENT_LABELS = {{ event_labels_json|safe }};
 const SHOW_DONE    = {{ show_done|yesno:"true,false" }};
 
-/* Legend */
+/* ─── State ─────────────────────────────────────────────── */
+var _selDay   = 0;                            // 0 = all days
+var _activeCats = new Set(Object.keys(EVENT_LABELS)); // all on
+
+/* ─── Build category filter bar ─────────────────────────── */
 (function(){
-  var leg = document.getElementById('cal-legend');
-  if (!leg) return;
-  Object.entries(EVENT_LABELS).forEach(function([k, label]){
-    var color = EVENT_COLORS[k] || '#607d8b';
-    leg.innerHTML += '<span class="cal-legend-item">'
-      + '<span class="cal-legend-dot" style="background:' + color + '"></span>'
-      + label + '</span>';
+  var bar = document.getElementById('cal-filter-bar');
+  if (!bar) return;
+  Object.entries(EVENT_LABELS).forEach(function([type, label]){
+    var color = EVENT_COLORS[type] || '#607d8b';
+    var btn = document.createElement('button');
+    btn.className = 'cal-cat-btn active';
+    btn.dataset.type = type;
+    btn.style.setProperty('--cat-color', color);
+    btn.innerHTML = '<span class="cal-chip-dot" style="background:' + color + '"></span>' + label;
+    btn.style.background = color;
+    btn.style.borderColor = color;
+    btn.onclick = function(){ toggleCat(type); };
+    bar.appendChild(btn);
   });
 })();
 
-/* Toggle done filter */
-function toggleDone() {
-  var url = new URL(location.href);
-  if (SHOW_DONE) { url.searchParams.delete('show_done'); }
-  else { url.searchParams.set('show_done', '1'); }
-  location.href = url.toString();
+/* ─── Day selection ─────────────────────────────────────── */
+function selectDay(day) {
+  // deselect previous
+  if (_selDay) {
+    var prev = document.getElementById('cal-td-' + _selDay);
+    if (prev) prev.classList.remove('day-selected');
+  }
+  _selDay = (day === _selDay) ? 0 : day;  // second click deselects
+  if (_selDay) {
+    var td = document.getElementById('cal-td-' + _selDay);
+    if (td) td.classList.add('day-selected');
+  }
+  applyFilters();
+  updateListHeading();
+  // scroll to list
+  if (_selDay) {
+    var toolbar = document.getElementById('cal-list-heading');
+    if (toolbar) toolbar.scrollIntoView({behavior:'smooth', block:'start'});
+  }
 }
 
-/* Toggle event done in list */
+/* Chip click: select day + open popup */
+function openChip(ev, day, pk) {
+  ev.stopPropagation();   // don't bubble to td
+  selectDay(day);
+  showEventPopup(ev, pk);
+}
+
+/* ─── Category toggle ───────────────────────────────────── */
+function toggleCat(type) {
+  var allBtns = document.querySelectorAll('.cal-cat-btn');
+  // If clicking the only active → reset to all
+  if (_activeCats.size === 1 && _activeCats.has(type)) {
+    _activeCats = new Set(Object.keys(EVENT_LABELS));
+  } else {
+    if (_activeCats.has(type)) _activeCats.delete(type);
+    else _activeCats.add(type);
+  }
+  // update button styles
+  allBtns.forEach(function(btn){
+    var t = btn.dataset.type;
+    var color = EVENT_COLORS[t] || '#607d8b';
+    if (_activeCats.has(t)) {
+      btn.classList.add('active');
+      btn.style.background = color;
+      btn.style.borderColor = color;
+      btn.style.color = '#fff';
+    } else {
+      btn.classList.remove('active');
+      btn.style.background = '';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }
+  });
+  // also dim chips in grid
+  document.querySelectorAll('.cal-chip[data-type]').forEach(function(chip){
+    chip.style.opacity = _activeCats.has(chip.dataset.type) ? '' : '.2';
+  });
+  applyFilters();
+}
+
+/* ─── Apply day + category filters to list ──────────────── */
+function applyFilters() {
+  var rows = document.querySelectorAll('.cal-event-row[data-day]');
+  var visible = 0;
+  rows.forEach(function(row){
+    var dayMatch = (_selDay === 0) || (parseInt(row.dataset.day) === _selDay);
+    var catMatch = _activeCats.has(row.dataset.type);
+    var show = dayMatch && catMatch;
+    row.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+  var countEl = document.getElementById('cal-list-count');
+  if (countEl) countEl.textContent = visible;
+  var emptyEl = document.getElementById('cal-list-empty');
+  if (emptyEl) emptyEl.style.display = (visible === 0 && rows.length > 0) ? '' : 'none';
+}
+
+function updateListHeading() {
+  var h = document.getElementById('cal-list-heading');
+  var resetBtn = document.getElementById('cal-day-reset');
+  if (!h) return;
+  if (_selDay) {
+    h.innerHTML = '📋 Події за ' + _selDay + ' числа '
+      + '<span>(<span id="cal-list-count">0</span>)</span>';
+    applyFilters();  // recount
+    if (resetBtn) resetBtn.classList.add('visible');
+  } else {
+    h.innerHTML = '📋 Всі події місяця '
+      + '<span>(<span id="cal-list-count">0</span>)</span>';
+    applyFilters();
+    if (resetBtn) resetBtn.classList.remove('visible');
+  }
+}
+
+/* ─── Toggle done/undone on server ─────────────────────── */
 async function toggleEventDone(pk, btn) {
   try {
     var r = await fetch('/calendar/event/' + pk + '/toggle/', {
-      method: 'POST', headers: {'X-CSRFToken': CSRF}
+      method:'POST', headers:{'X-CSRFToken':CSRF}
     });
     var d = await r.json();
     if (!d.ok) return;
     var row = document.getElementById('ev-' + pk);
     if (row) {
       row.classList.toggle('done-row', d.is_done);
-      btn.classList.toggle('done', d.is_done);
+      btn.classList.toggle('done',     d.is_done);
       btn.textContent = d.is_done ? '↩' : '✓';
       btn.title = d.is_done ? 'Відновити' : 'Виконано';
     }
-  } catch(e) { console.error(e); }
+  } catch(e){ console.error(e); }
 }
 
-/* Event detail popup */
-var _popup = document.getElementById('cal-popup');
+/* ─── Toggle "show done" (server filter) ───────────────── */
+function toggleDone() {
+  var url = new URL(location.href);
+  if (SHOW_DONE) url.searchParams.delete('show_done');
+  else           url.searchParams.set('show_done', '1');
+  location.href = url.toString();
+}
+
+/* ─── Event detail popup ────────────────────────────────── */
+var _popup    = document.getElementById('cal-popup');
+var _popupPk  = null;
+var _popupDone = false;
+
+function buildPopupTypes(currentType) {
+  var c = document.getElementById('cal-popup-types');
+  if (!c) return;
+  c.innerHTML = '';
+  Object.entries(EVENT_LABELS).forEach(function([type, label]){
+    var color = EVENT_COLORS[type] || '#607d8b';
+    var btn = document.createElement('button');
+    btn.textContent = label;
+    btn.dataset.type = type;
+    btn.style.cssText = 'padding:3px 8px;border-radius:12px;font-size:11px;cursor:pointer;'
+      + 'transition:background .12s,color .12s;border:1px solid ' + color + ';'
+      + (type === currentType
+          ? 'background:' + color + ';color:#fff'
+          : 'background:none;color:' + color);
+    btn.onclick = function(e){ e.stopPropagation(); popupSetType(type); };
+    c.appendChild(btn);
+  });
+}
+
 async function showEventPopup(ev, pk) {
-  ev.stopPropagation();
+  _popupPk = pk;
   try {
     var r = await fetch('/calendar/event/' + pk + '/', {credentials:'same-origin'});
     var d = await r.json();
+    _popupDone = d.is_done;
     document.getElementById('cal-popup-title').textContent = d.title;
-    var meta = '<b>' + (d.type_label || d.event_type) + '</b><br>'
-             + '📅 ' + d.start + (d.end ? ' → ' + d.end : '') + '<br>';
-    if (d.customer) meta += '👤 ' + d.customer + '<br>';
+    var meta = '📅 ' + d.start + (d.end?' → '+d.end:'') + '<br>';
+    if (d.customer)    meta += '👤 ' + d.customer + '<br>';
     if (d.description) meta += '<br>' + d.description;
-    if (d.is_done) meta += '<br><span style="color:var(--ok)">✓ Виконано</span>';
     document.getElementById('cal-popup-meta').innerHTML = meta;
-    // Position near click
-    var x = ev.clientX + 12, y = ev.clientY + 12;
-    if (x + 340 > window.innerWidth) x = ev.clientX - 340;
-    if (y + 200 > window.innerHeight) y = ev.clientY - 200;
-    _popup.style.left = x + 'px';
-    _popup.style.top  = y + 'px';
+    buildPopupTypes(d.event_type);
+    var doneBtn = document.getElementById('cal-popup-done-btn');
+    if (doneBtn) {
+      doneBtn.textContent = d.is_done ? '↩ Відновити' : '✓ Виконано';
+      doneBtn.style.color = d.is_done ? 'var(--ok,#2e7d32)' : '';
+      doneBtn.style.borderColor = d.is_done ? 'var(--ok,#2e7d32)' : '';
+    }
+    var editLink = document.getElementById('cal-popup-edit-link');
+    if (editLink) editLink.href = '/admin/calendar_app/calendarevent/' + pk + '/change/';
+    var x = ev.clientX+14, y = ev.clientY+14;
+    if (x+340 > window.innerWidth)  x = ev.clientX-340;
+    if (y+320 > window.innerHeight) y = ev.clientY-320;
+    _popup.style.left = x+'px';
+    _popup.style.top  = y+'px';
     _popup.classList.add('open');
-  } catch(e) { console.error(e); }
+  } catch(e){ console.error(e); }
+}
+
+async function popupSetType(newType) {
+  if (!_popupPk) return;
+  try {
+    var r = await fetch('/calendar/event/' + _popupPk + '/set-type/', {
+      method:'POST',
+      headers:{'X-CSRFToken':CSRF,'Content-Type':'application/json'},
+      body:JSON.stringify({event_type:newType})
+    });
+    var d = await r.json();
+    if (!d.ok) return;
+    buildPopupTypes(newType);
+    // update grid chip
+    var chip = document.querySelector('.cal-chip[data-pk="' + _popupPk + '"]');
+    if (chip) {
+      chip.dataset.type = newType;
+      chip.style.background = d.color + '33';
+      chip.style.color = d.color;
+      var dot = chip.querySelector('.cal-chip-dot');
+      if (dot) dot.style.background = d.color;
+      chip.style.opacity = _activeCats.has(newType) ? '' : '.2';
+    }
+    // update list row
+    var row = document.getElementById('ev-' + _popupPk);
+    if (row) {
+      row.dataset.type = newType;
+      var bar = row.querySelector('.cal-event-bar');
+      if (bar) bar.style.background = d.color;
+      applyFilters();
+    }
+  } catch(e){ console.error(e); }
+}
+
+async function popupToggleDone() {
+  if (!_popupPk) return;
+  try {
+    var r = await fetch('/calendar/event/' + _popupPk + '/toggle/', {
+      method:'POST', headers:{'X-CSRFToken':CSRF}
+    });
+    var d = await r.json();
+    if (!d.ok) return;
+    _popupDone = d.is_done;
+    var doneBtn = document.getElementById('cal-popup-done-btn');
+    if (doneBtn) {
+      doneBtn.textContent = d.is_done ? '↩ Відновити' : '✓ Виконано';
+      doneBtn.style.color = d.is_done ? 'var(--ok,#2e7d32)' : '';
+      doneBtn.style.borderColor = d.is_done ? 'var(--ok,#2e7d32)' : '';
+    }
+    // update grid chip
+    var chip = document.querySelector('.cal-chip[data-pk="' + _popupPk + '"]');
+    if (chip) chip.classList.toggle('done-ev', d.is_done);
+    // update list row
+    var row = document.getElementById('ev-' + _popupPk);
+    if (row) {
+      row.classList.toggle('done-row', d.is_done);
+      var btn = row.querySelector('.cal-done-btn');
+      if (btn) {
+        btn.classList.toggle('done', d.is_done);
+        btn.textContent = d.is_done ? '↩' : '✓';
+        btn.title = d.is_done ? 'Відновити' : 'Виконано';
+      }
+    }
+  } catch(e){ console.error(e); }
 }
 
 function closePopup() { _popup.classList.remove('open'); }
-document.addEventListener('click', function(e){ if (!_popup.contains(e.target)) closePopup(); });
+document.addEventListener('click', function(e){
+  if (_popup.classList.contains('open') && !_popup.contains(e.target)) closePopup();
+});
+document.addEventListener('keydown', function(e){ if(e.key==='Escape') closePopup(); });
+
+/* ─── Init: highlight today's day ──────────────────────── */
+(function(){
+  var todayTd = document.querySelector('.cal-grid td.today');
+  if (todayTd) {
+    // auto-select today on page load
+    var id = todayTd.id; // cal-td-N
+    if (id) {
+      var day = parseInt(id.replace('cal-td-',''));
+      if (!isNaN(day)) selectDay(day);
+    }
+  } else {
+    applyFilters(); // just count
+  }
+})();
 </script>
 {% endblock %}

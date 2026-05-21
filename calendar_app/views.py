@@ -157,6 +157,29 @@ def event_done(request, pk):
 
 
 @staff_member_required
+@require_POST
+def event_set_type(request, pk):
+    import json
+    from calendar_app.models import CalendarEvent
+    ev = get_object_or_404(CalendarEvent, pk=pk, user=request.user)
+    try:
+        data = json.loads(request.body)
+    except (ValueError, TypeError):
+        return JsonResponse({'ok': False}, status=400)
+    new_type = data.get('event_type', '')
+    if new_type not in EVENT_COLORS:
+        return JsonResponse({'ok': False, 'error': 'invalid type'}, status=400)
+    ev.event_type = new_type
+    ev.save(update_fields=['event_type'])
+    return JsonResponse({
+        'ok':         True,
+        'event_type': ev.event_type,
+        'color':      EVENT_COLORS[ev.event_type],
+        'type_label': EVENT_TYPE_LABELS.get(ev.event_type, ev.event_type),
+    })
+
+
+@staff_member_required
 @require_GET
 def pending_push_view(request):
     """Return events whose push reminder is due; mark them push_sent=True."""
