@@ -28,4 +28,6 @@ urlpatterns = [
          views.check_template_download, name='check_template_download'),
     path('template/<int:template_pk>/auto-fix/',
          views.auto_fix_download, name='auto_fix_download'),
+    path('template/<int:template_pk>/variable-test/',
+         views.variable_test_view, name='variable_test'),
 ]

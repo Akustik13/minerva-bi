@@ -966,3 +966,47 @@ def auto_fix_download(request, template_pk):
     )
     resp['Content-Disposition'] = f'attachment; filename="fixed_{safe_name}.docx"'
     return resp
+
+
+@staff_member_required
+def variable_test_view(request, template_pk):
+    """AJAX: return real context values for a given order number or customer name."""
+    from sales.models import SalesOrder
+    from documents.generators import get_order_context
+
+    q = request.GET.get('q', '').strip()
+    if not q:
+        return JsonResponse({'ok': False, 'error': 'Введіть номер замовлення або назву клієнта'})
+
+    qs = SalesOrder.objects.filter(
+        Q(order_number__icontains=q) |
+        Q(client__icontains=q) |
+        Q(ship_name__icontains=q)
+    ).order_by('-order_date')[:10]
+
+    if not qs.exists():
+        return JsonResponse({'ok': False, 'error': f'Замовлення не знайдено: «{q}»'})
+
+    order = qs.first()
+    try:
+        ctx = get_order_context(order.pk)
+    except Exception as e:
+        return JsonResponse({'ok': False, 'error': f'Помилка побудови контексту: {e}'})
+
+    # Serialize: items → list of dicts with str values; everything else → str
+    items = ctx.pop('items', [])
+    flat = {k: (str(v) if v is not None else '') for k, v in ctx.items()}
+    serial_items = []
+    for item in items:
+        serial_items.append({k: str(v) if v is not None else '' for k, v in item.items()})
+
+    found_count = qs.count()
+    return JsonResponse({
+        'ok': True,
+        'order_number': order.order_number,
+        'customer_name': order.client or order.ship_name or '—',
+        'found': found_count,
+        'context': flat,
+        'items': serial_items,
+        'items_count': len(serial_items),
+    })

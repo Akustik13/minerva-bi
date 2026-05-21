@@ -11,8 +11,8 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
     list_filter   = ('doc_type', 'module', 'source', 'language', 'is_active')
     list_editable = ('is_active', 'is_default', 'sort_order')
     search_fields = ('name', 'description')
-    readonly_fields = ('variables_guide_display', 'created_at', 'updated_at',
-                       'check_fix_actions')
+    readonly_fields = ('variables_guide_display', 'variable_test_display',
+                       'created_at', 'updated_at', 'check_fix_actions')
 
     class Media:
         js = ('admin/js/document_template_check.js',)
@@ -40,6 +40,11 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
             'description': 'Розгорни щоб побачити всі доступні змінні',
         }),
+        ('🧪 Тест змінних', {
+            'fields': ('variable_test_display',),
+            'classes': ('collapse',),
+            'description': 'Введи номер замовлення або назву клієнта — побачиш реальні значення всіх змінних',
+        }),
     )
 
     def variables_guide_display(self, obj):
@@ -51,6 +56,110 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
             TEMPLATE_VARIABLES_GUIDE,
         )
     variables_guide_display.short_description = 'Всі змінні'
+
+    def variable_test_display(self, obj):
+        if not obj.pk:
+            return format_html(
+                '<span style="color:var(--text-dim);font-size:12px">'
+                '💾 Збережіть шаблон щоб активувати тест змінних</span>'
+            )
+        test_url = f'/documents/template/{obj.pk}/variable-test/'
+        html = f"""
+<div id="mvvt-{obj.pk}">
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <input id="mvvt-q-{obj.pk}" type="text"
+      placeholder="Номер замовлення або назва клієнта"
+      style="padding:6px 10px;border-radius:6px;font-size:13px;
+             border:1px solid var(--border-strong);background:var(--bg-input);
+             color:var(--text);min-width:260px;flex:1 1 260px"
+      onkeydown="if(event.key==='Enter')mvVarTest({obj.pk},{test_url!r})">
+    <button type="button"
+      style="padding:6px 16px;border-radius:6px;font-size:13px;cursor:pointer;
+             border:1px solid var(--border-strong);background:none;color:var(--text);
+             white-space:nowrap"
+      onclick="mvVarTest({obj.pk},{test_url!r})">🔍 Перевірити</button>
+  </div>
+  <div id="mvvt-out-{obj.pk}" style="margin-top:12px"></div>
+</div>
+<script>
+(function(){{
+  if(window._mvVarTestInit) return;
+  window._mvVarTestInit = true;
+  window.mvVarTest = async function(pk, url) {{
+    var q = document.getElementById('mvvt-q-'+pk).value.trim();
+    if(!q) return;
+    var out = document.getElementById('mvvt-out-'+pk);
+    out.innerHTML = '<span style="color:var(--text-dim)">⏳ Шукаємо…</span>';
+    try {{
+      var r = await fetch(url+'?q='+encodeURIComponent(q));
+      var d = await r.json();
+      if(!d.ok) {{
+        out.innerHTML = '<span style="color:var(--err)">✗ '+d.error+'</span>';
+        return;
+      }}
+
+      // Header
+      var more = d.found > 1 ? ' <span style="color:var(--text-dim);font-size:11px">(ще '+(d.found-1)+')</span>' : '';
+      var hdr = '<div style="margin-bottom:10px;font-size:12px">'
+        + '<strong>📋 '+d.order_number+'</strong> — '+d.customer_name+more+'</div>';
+
+      // Flat variables table
+      var rows = '';
+      var ctx = d.context;
+      for(var k in ctx) {{
+        var v = ctx[k];
+        var empty = (v==='' || v===null || v===undefined);
+        rows += '<tr>'
+          + '<td style="padding:3px 8px 3px 0;color:var(--text-dim);white-space:nowrap;'
+          +   'font-size:11px;vertical-align:top"><code style="background:var(--bg-hover);'
+          +   'padding:1px 4px;border-radius:3px">{{{{'+k+'}}}}</code></td>'
+          + '<td style="padding:3px 0 3px 8px;font-size:12px;word-break:break-all;'
+          +   'color:'+(empty?'var(--text-dim)':'var(--text)')+'">'
+          +   (empty ? '<em>—</em>' : _mvEsc(v))+'</td>'
+          + '</tr>';
+      }}
+      var tbl = '<table style="border-collapse:collapse;width:100%;margin-bottom:12px">'+rows+'</table>';
+
+      // Items sub-table
+      var itemsHtml = '';
+      if(d.items && d.items.length) {{
+        var cols = Object.keys(d.items[0]);
+        var thead = '<tr>'+cols.map(function(c){{
+          return '<th style="padding:3px 6px;font-size:11px;text-align:left;'
+            +'color:var(--text-dim);border-bottom:1px solid var(--border-strong)">'
+            +'item.'+c+'</th>';
+        }}).join('')+'</tr>';
+        var tbody = d.items.map(function(item,i){{
+          return '<tr style="background:'+(i%2?'var(--bg-hover)':'none')+'">'+
+            cols.map(function(c){{
+              var v=item[c]||'';
+              return '<td style="padding:3px 6px;font-size:11px;white-space:nowrap">'
+                +_mvEsc(v)+'</td>';
+            }}).join('')+'</tr>';
+        }}).join('');
+        itemsHtml = '<div style="margin-bottom:6px;font-size:12px;color:var(--text-dim)">'
+          +'<strong style="color:var(--text)">items</strong> — '+d.items_count+' рядк'
+          +(d.items_count===1?'ий':(d.items_count<5?'и':'ів'))+'</div>'
+          +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px">'
+          +'<thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+      }}
+
+      out.innerHTML = hdr
+        + '<div style="max-height:420px;overflow-y:auto;padding:10px 12px;'
+        +   'background:var(--darkened-bg);border-radius:6px">'
+        + tbl + itemsHtml + '</div>';
+    }} catch(e) {{
+      out.innerHTML = '<span style="color:var(--err)">✗ Помилка зв\\'язку</span>';
+    }}
+  }};
+  window._mvEsc = function(s) {{
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }};
+}})();
+</script>
+"""
+        return mark_safe(html)
+    variable_test_display.short_description = 'Тест'
 
     def doc_type_badge(self, obj):
         colors = {
