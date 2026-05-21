@@ -111,7 +111,7 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
         + '<strong>📋 '+_mvEsc(d.order_number)+'</strong>'
         + ' — '+_mvEsc(d.customer_name)+more+'</div>';
 
-      // Flat variables table — context is ordered array [{k,v}, ...]
+      // Flat variables table — context is ordered array of {{k,v}} objects
       var rows = '';
       (d.context||[]).forEach(function(item) {{
         var k = item.k, v = item.v;
