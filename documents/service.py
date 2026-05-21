@@ -71,11 +71,7 @@ def generate_docx(template, context: dict,
 
 
 def _convert_to_pdf(docx_path: str) -> bytes | None:
-    """Конвертувати .docx в PDF через LibreOffice.
-
-    Використовує ізольований профіль (--env:UserInstallation) щоб уникнути
-    конфліктів при паралельних конвертаціях. Логує stderr при помилці.
-    """
+    """Конвертувати .docx в PDF через LibreOffice. None якщо недоступний."""
     candidates = (
         'libreoffice', 'soffice',
         '/usr/bin/libreoffice', '/usr/lib/libreoffice/program/soffice',
@@ -83,18 +79,9 @@ def _convert_to_pdf(docx_path: str) -> bytes | None:
     for cmd in candidates:
         if os.path.exists(cmd) or _command_exists(cmd):
             with tempfile.TemporaryDirectory() as tmpdir:
-                profile_url = 'file://' + tmpdir.replace('\\', '/') + '/lo_profile'
                 result = subprocess.run(
-                    [
-                        cmd,
-                        '--headless',
-                        '--norestore',
-                        '--nofirststartwizard',
-                        f'--env:UserInstallation={profile_url}',
-                        '--convert-to', 'pdf:writer_pdf_Export',
-                        '--outdir', tmpdir,
-                        docx_path,
-                    ],
+                    [cmd, '--headless', '--convert-to', 'pdf',
+                     '--outdir', tmpdir, docx_path],
                     capture_output=True, timeout=60,
                 )
                 if result.returncode == 0:
