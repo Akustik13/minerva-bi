@@ -49,7 +49,7 @@ def calendar_view(request):
         qs = qs.filter(is_done=False)
     events = list(qs.select_related('crm_customer').order_by('start_at'))
     for ev in events:
-        ev._color = EVENT_COLORS.get(ev.event_type, '#607d8b')
+        ev.display_color = EVENT_COLORS.get(ev.event_type, '#607d8b')
 
     cal        = _cal.Calendar(firstweekday=0)
     raw_weeks  = cal.monthdayscalendar(year, month)

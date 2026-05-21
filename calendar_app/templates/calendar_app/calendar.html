@@ -114,10 +114,10 @@ td.today .cal-day-num{color:#1a73e8;font-weight:700;background:#1a73e8;
           <div class="cal-day-num">{{ cell.day }}</div>
           {% for ev in cell.events %}
           <div class="cal-chip{% if ev.is_done %} done-ev{% endif %}"
-               style="background:{{ ev._color }}22;color:{{ ev._color }}"
+               style="background:{{ ev.display_color }}22;color:{{ ev.display_color }}"
                onclick="showEventPopup(event, {{ ev.pk }})"
                title="{{ ev.title }}">
-            <span class="cal-chip-dot" style="background:{{ ev._color }}"></span>
+            <span class="cal-chip-dot" style="background:{{ ev.display_color }}"></span>
             <span class="cal-chip-txt">{{ ev.title|truncatechars:20 }}</span>
           </div>
           {% endfor %}
@@ -136,7 +136,7 @@ td.today .cal-day-num{color:#1a73e8;font-weight:700;background:#1a73e8;
   </div>
   {% for ev in events %}
   <div class="cal-event-row{% if ev.is_done %} done-row{% endif %}" id="ev-{{ ev.pk }}">
-    <div class="cal-event-bar" style="background:{{ ev._color }}"></div>
+    <div class="cal-event-bar" style="background:{{ ev.display_color }}"></div>
     <div style="flex:1;min-width:0">
       <div class="cal-event-title">{{ ev.title }}</div>
       <div class="cal-event-meta">
