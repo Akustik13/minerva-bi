@@ -76,6 +76,36 @@ LANG_CHOICES = [
     ('uk', 'Українська'),
 ]
 
+# Канонічний порядок змінних — використовується в Довіднику та 🧪 Тест змінних
+CONTEXT_VARIABLES_ORDER = [
+    # Замовлення
+    'order_number', 'order_date', 'order_status',
+    'invoice_number', 'invoice_date', 'due_date',
+    # Клієнт
+    'customer_name', 'customer_address', 'customer_city',
+    'customer_country', 'customer_email', 'customer_phone', 'customer_vat',
+    # Відправник
+    'shipper_name', 'shipper_address', 'shipper_city', 'shipper_country',
+    'shipper_email', 'shipper_phone',
+    'vat_number', 'eori_number',
+    'bank_name', 'bank_iban', 'bank_swift',
+    # Доставка
+    'tracking_number', 'carrier_name', 'shipping_date',
+    # Фінанси
+    'currency', 'subtotal', 'vat_rate', 'vat_amount', 'total_amount', 'payment_terms',
+    # Параметри
+    'total_weight', 'total_items', 'items_count',
+    # Митна
+    'customs_type', 'customs_reason', 'country_of_origin', 'declared_value', 'gross_weight',
+    # Мета
+    'generated_date', 'generated_by', 'notes', 'proforma_notes',
+]
+
+ITEM_VARIABLES_ORDER = [
+    'sku', 'name', 'quantity', 'unit_price', 'total_price',
+    'weight', 'hs_code', 'country',
+]
+
 TEMPLATE_VARIABLES_GUIDE = """
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║           ПОВНИЙ ДОВІДНИК ЗМІННИХ ДЛЯ WORD ШАБЛОНІВ Minerva             ║
@@ -138,15 +168,16 @@ TEMPLATE_VARIABLES_GUIDE = """
 {{gross_weight}}        → Вага брутто
 
 ── ТАБЛИЦЯ ТОВАРІВ (for loop) ─────────────────────────────────────────────
-Варіант А — таблиця Word (рядки, що повторюються):
-  У першій клітинці рядка-шаблону: {%tr for item in items %}
-  У останній клітинці того самого рядка: {%tr endfor %}
-  Між ними в клітинках: {{item.sku}}, {{item.name}}, тощо.
+Варіант А — таблиця Word (3 окремих рядки):
+  Рядок 1 (маркер-початок) — одна клітинка: {%tr for item in items %}
+  Рядок 2 (дані)           — клітинки з: {{item.sku}}, {{item.name}}, тощо
+  Рядок 3 (маркер-кінець)  — одна клітинка: {%tr endfor %}
+  ⚠ Маркери МУСЯТЬ бути в окремих рядках — НЕ в одному рядку з даними!
 
 Варіант Б — список поза таблицею:
-  {% for item in items %}
+  {%% for item in items %%}
   {{item.sku}} — {{item.name}} — {{item.quantity}} шт.
-  {% endfor %}
+  {%% endfor %%}
 
 ПОМИЛКА «item is undefined» означає що {{item.xxx}} вжито поза for-циклом.
 
@@ -167,12 +198,11 @@ TEMPLATE_VARIABLES_GUIDE = """
 {{proforma_notes}}      → Примітки для Proforma
 
 ══════════════════════════════════════════════════════════════════════════
-ПРИКЛАД ТАБЛИЦІ В WORD ШАБЛОНІ:
+ПРИКЛАД ТАБЛИЦІ В WORD ШАБЛОНІ (3 рядки):
 ──────────────────────────────
-| SKU          | Назва         | К-сть         | Ціна          | Сума  |
-| {{item.sku}} | {{item.name}} | {{item.quantity}} | {{item.unit_price}} | {{item.total_price}} |
-
-(рядок таблиці обгорни в {% for item in items %}...{% endfor %})
+Рядок 1: | {%tr for item in items %}                                     |
+Рядок 2: | {{item.sku}} | {{item.name}} | {{item.quantity}} | {{item.unit_price}} | {{item.total_price}} |
+Рядок 3: | {%tr endfor %}                                                |
 ══════════════════════════════════════════════════════════════════════════
 """
 

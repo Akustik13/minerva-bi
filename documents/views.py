@@ -973,6 +973,7 @@ def variable_test_view(request, template_pk):
     """AJAX: return real context values for a given order number or customer name."""
     from sales.models import SalesOrder
     from documents.generators import get_order_context
+    from documents.models import CONTEXT_VARIABLES_ORDER, ITEM_VARIABLES_ORDER
 
     q = request.GET.get('q', '').strip()
     if not q:
@@ -993,12 +994,35 @@ def variable_test_view(request, template_pk):
     except Exception as e:
         return JsonResponse({'ok': False, 'error': f'Помилка побудови контексту: {e}'})
 
-    # Serialize: items → list of dicts with str values; everything else → str
-    items = ctx.pop('items', [])
-    flat = {k: (str(v) if v is not None else '') for k, v in ctx.items()}
+    def _val(v):
+        """Empty/None → 'nan', otherwise string."""
+        if v is None:
+            return 'nan'
+        s = str(v).strip()
+        return s if s else 'nan'
+
+    items_raw = ctx.pop('items', [])
+
+    # Return flat context in canonical guide order; unknowns appended at the end
+    ordered_ctx = []
+    seen = set()
+    for key in CONTEXT_VARIABLES_ORDER:
+        ordered_ctx.append({'k': key, 'v': _val(ctx.get(key))})
+        seen.add(key)
+    for key, val in ctx.items():
+        if key not in seen:
+            ordered_ctx.append({'k': key, 'v': _val(val)})
+
+    # Items: canonical field order; fill missing fields with 'nan'
     serial_items = []
-    for item in items:
-        serial_items.append({k: str(v) if v is not None else '' for k, v in item.items()})
+    for item in items_raw:
+        row = {}
+        for f in ITEM_VARIABLES_ORDER:
+            row[f] = _val(item.get(f))
+        for f, v in item.items():
+            if f not in row:
+                row[f] = _val(v)
+        serial_items.append(row)
 
     found_count = qs.count()
     return JsonResponse({
@@ -1006,7 +1030,8 @@ def variable_test_view(request, template_pk):
         'order_number': order.order_number,
         'customer_name': order.client or order.ship_name or '—',
         'found': found_count,
-        'context': flat,
+        'context': ordered_ctx,       # list of {k, v} in guide order
+        'item_cols': ITEM_VARIABLES_ORDER,
         'items': serial_items,
         'items_count': len(serial_items),
     })

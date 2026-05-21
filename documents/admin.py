@@ -85,6 +85,11 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
 (function(){{
   if(window._mvVarTestInit) return;
   window._mvVarTestInit = true;
+
+  window._mvEsc = function(s) {{
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }};
+
   window.mvVarTest = async function(pk, url) {{
     var q = document.getElementById('mvvt-q-'+pk).value.trim();
     if(!q) return;
@@ -94,66 +99,72 @@ class DocumentTemplateAdmin(admin.ModelAdmin):
       var r = await fetch(url+'?q='+encodeURIComponent(q));
       var d = await r.json();
       if(!d.ok) {{
-        out.innerHTML = '<span style="color:var(--err)">✗ '+d.error+'</span>';
+        out.innerHTML = '<span style="color:var(--err)">✗ '+_mvEsc(d.error)+'</span>';
         return;
       }}
 
       // Header
-      var more = d.found > 1 ? ' <span style="color:var(--text-dim);font-size:11px">(ще '+(d.found-1)+')</span>' : '';
+      var more = d.found > 1
+        ? ' <span style="color:var(--text-dim);font-size:11px">(знайдено '+(d.found)+', показую перший)</span>'
+        : '';
       var hdr = '<div style="margin-bottom:10px;font-size:12px">'
-        + '<strong>📋 '+d.order_number+'</strong> — '+d.customer_name+more+'</div>';
+        + '<strong>📋 '+_mvEsc(d.order_number)+'</strong>'
+        + ' — '+_mvEsc(d.customer_name)+more+'</div>';
 
-      // Flat variables table
+      // Flat variables table — context is ordered array [{k,v}, ...]
       var rows = '';
-      var ctx = d.context;
-      for(var k in ctx) {{
-        var v = ctx[k];
-        var empty = (v==='' || v===null || v===undefined);
+      (d.context||[]).forEach(function(item) {{
+        var k = item.k, v = item.v;
+        var isNan = (v==='nan');
         rows += '<tr>'
-          + '<td style="padding:3px 8px 3px 0;color:var(--text-dim);white-space:nowrap;'
-          +   'font-size:11px;vertical-align:top"><code style="background:var(--bg-hover);'
-          +   'padding:1px 4px;border-radius:3px">{{{{'+k+'}}}}</code></td>'
-          + '<td style="padding:3px 0 3px 8px;font-size:12px;word-break:break-all;'
-          +   'color:'+(empty?'var(--text-dim)':'var(--text)')+'">'
-          +   (empty ? '<em>—</em>' : _mvEsc(v))+'</td>'
+          + '<td style="padding:2px 8px 2px 0;color:var(--text-dim);white-space:nowrap;'
+          +   'font-size:11px;vertical-align:top">'
+          +   '<code style="background:var(--bg-hover);padding:1px 5px;border-radius:3px">'
+          +   '{{{{'+_mvEsc(k)+'}}}}</code></td>'
+          + '<td style="padding:2px 0 2px 8px;font-size:12px;word-break:break-all;'
+          +   'color:'+(isNan?'var(--text-dim)':'var(--text)')+'">'
+          +   (isNan ? '<span style="opacity:.5">nan</span>' : _mvEsc(v))+'</td>'
           + '</tr>';
-      }}
-      var tbl = '<table style="border-collapse:collapse;width:100%;margin-bottom:12px">'+rows+'</table>';
+      }});
+      var tbl = '<table style="border-collapse:collapse;width:100%;margin-bottom:14px">'+rows+'</table>';
 
-      // Items sub-table
+      // Items sub-table — item_cols gives canonical column order
       var itemsHtml = '';
       if(d.items && d.items.length) {{
-        var cols = Object.keys(d.items[0]);
+        var cols = d.item_cols || Object.keys(d.items[0]);
         var thead = '<tr>'+cols.map(function(c){{
-          return '<th style="padding:3px 6px;font-size:11px;text-align:left;'
-            +'color:var(--text-dim);border-bottom:1px solid var(--border-strong)">'
-            +'item.'+c+'</th>';
+          return '<th style="padding:3px 8px;font-size:11px;text-align:left;white-space:nowrap;'
+            +'color:var(--text-dim);border-bottom:1px solid var(--border-strong);'
+            +'background:var(--bg-hover)">item.'+_mvEsc(c)+'</th>';
         }}).join('')+'</tr>';
         var tbody = d.items.map(function(item,i){{
-          return '<tr style="background:'+(i%2?'var(--bg-hover)':'none')+'">'+
-            cols.map(function(c){{
-              var v=item[c]||'';
-              return '<td style="padding:3px 6px;font-size:11px;white-space:nowrap">'
-                +_mvEsc(v)+'</td>';
-            }}).join('')+'</tr>';
+          return '<tr>'+cols.map(function(c){{
+            var v = item[c]!==undefined ? item[c] : 'nan';
+            var isNan = (v==='nan');
+            return '<td style="padding:3px 8px;font-size:11px;white-space:nowrap;'
+              +'color:'+(isNan?'var(--text-dim)':'var(--text)')+';">'
+              +(isNan?'<span style="opacity:.5">nan</span>':_mvEsc(v))+'</td>';
+          }}).join('')+'</tr>';
         }}).join('');
-        itemsHtml = '<div style="margin-bottom:6px;font-size:12px;color:var(--text-dim)">'
-          +'<strong style="color:var(--text)">items</strong> — '+d.items_count+' рядк'
-          +(d.items_count===1?'ий':(d.items_count<5?'и':'ів'))+'</div>'
-          +'<div style="overflow-x:auto"><table style="border-collapse:collapse;font-size:11px">'
+        var cnt = d.items_count;
+        var word = cnt===1?'рядок':(cnt<5?'рядки':'рядків');
+        itemsHtml = '<div style="margin-bottom:6px;font-size:12px">'
+          +'<strong>items</strong>'
+          +' <span style="color:var(--text-dim)">— '+cnt+' '+word+'</span></div>'
+          +'<div style="overflow-x:auto;border-radius:4px;border:1px solid var(--border-strong)">'
+          +'<table style="border-collapse:collapse;width:100%">'
           +'<thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+      }} else {{
+        itemsHtml = '<div style="color:var(--text-dim);font-size:12px">items — порожньо</div>';
       }}
 
       out.innerHTML = hdr
-        + '<div style="max-height:420px;overflow-y:auto;padding:10px 12px;'
+        + '<div style="max-height:480px;overflow-y:auto;padding:12px 14px;'
         +   'background:var(--darkened-bg);border-radius:6px">'
         + tbl + itemsHtml + '</div>';
     }} catch(e) {{
       out.innerHTML = '<span style="color:var(--err)">✗ Помилка зв\\'язку</span>';
     }}
-  }};
-  window._mvEsc = function(s) {{
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }};
 }})();
 </script>
