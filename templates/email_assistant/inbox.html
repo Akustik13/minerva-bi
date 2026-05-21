@@ -7,11 +7,23 @@
 {% block extrahead %}{{ block.super }}
 <style>
 /* ── Layout ── */
-.em-app{display:flex;height:calc(100vh - 112px);overflow:hidden;border:1px solid var(--border-strong);border-radius:12px;background:var(--bg-card)}
+.em-app{display:flex;height:calc(100vh - 112px);overflow:hidden;border:1px solid var(--border-strong);border-radius:12px;background:var(--bg-card);position:relative}
+/* Drag handles between panels */
+.em-drag{width:5px;cursor:col-resize;flex-shrink:0;background:transparent;transition:background .1s;z-index:5;position:relative}
+.em-drag:hover,.em-drag.dragging{background:rgba(26,115,232,.25)}
+.em-drag::after{content:'';position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:1px;height:32px;background:var(--border-strong);border-radius:1px}
+/* Expand tab when p1 is collapsed */
+#em-p1-expand{position:absolute;left:0;top:50%;transform:translateY(-50%);z-index:20;
+  width:14px;height:48px;background:var(--bg-input);border:1px solid var(--border-strong);
+  border-left:none;border-radius:0 6px 6px 0;cursor:pointer;display:none;
+  align-items:center;justify-content:center;color:var(--text-dim);font-size:10px;
+  transition:background .1s,color .1s;padding:0}
+#em-p1-expand:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 
 /* ── Panel 1 — folders ── */
-.em-p1{width:220px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);background:var(--bg-input);transition:width .2s}
-.em-p1.collapsed{width:52px}
+.em-p1{width:220px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border-strong);background:var(--bg-input);transition:width .15s,border .15s;overflow:hidden}
+.em-p1.collapsed{width:0;border-right:none}
 .em-p1-top{display:flex;align-items:center;gap:6px;padding:10px 10px 6px;border-bottom:1px solid var(--border)}
 .em-compose-btn{flex:1;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:linear-gradient(135deg,#1565c0,#1a73e8);color:#fff !important;text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;transition:opacity .15s}
 .em-compose-btn:hover,.em-compose-btn:visited,.em-compose-btn:active{opacity:.85;color:#fff !important}
@@ -178,6 +190,8 @@
 
 {% block content %}
 <div class="em-app" id="em-app">
+  <!-- P1 expand tab (visible when folders panel is hidden) -->
+  <button id="em-p1-expand" onclick="toggleP1()" title="Показати папки">▶</button>
 
   <!-- ═══ Panel 1: Folders ═══ -->
   <div class="em-p1" id="em-p1">
@@ -218,10 +232,16 @@
          class="em-sync-btn" style="text-decoration:none;justify-content:center">
         ⚙️ {% trans "Налаштування" %}
       </a>
+      <button class="em-sync-btn" onclick="resetPanelSizes()" title="{% trans "Відновити пропорції панелей" %}">
+        ↺ {% trans "Скинути розміри" %}
+      </button>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
       <div id="sync-countdown"></div>
     </div>
   </div>
+
+  <!-- Drag handle 1: resize P1 -->
+  <div class="em-drag" id="em-drag1" title="Потягни для зміни розміру"></div>
 
   <!-- ═══ Panel 2: Message list ═══ -->
   <div class="em-p2" id="em-p2">
@@ -299,6 +319,7 @@
             {% if tpk %}<button onclick="archiveThread(event,{{ tpk }})" title="{% trans "В архів" %}">📦</button>{% endif %}
             <button onclick="deleteMsg(event,{{ msg.pk }})" title="{% trans "Видалити" %}">🗑️</button>
           {% endif %}
+          <button onclick="quickAddToCalendar(event,{{ msg.pk }},'{{ msg.subject|escapejs }}')" title="{% trans "Додати в календар" %}" style="font-size:12px">📅</button>
           <a href="{% if tpk %}{% url 'email_assistant:thread' tpk %}{% else %}{% url 'email_assistant:message' msg.pk %}{% endif %}"
              onclick="event.stopPropagation()"
              style="font-size:12px;padding:3px 6px;border-radius:4px;color:var(--text-muted);text-decoration:none"
@@ -335,6 +356,9 @@
     </div>
     {% endif %}
   </div>
+
+  <!-- Drag handle 2: resize P2 -->
+  <div class="em-drag" id="em-drag2" title="Потягни для зміни розміру"></div>
 
   <!-- ═══ Panel 3: Preview ═══ -->
   <div class="em-p3" id="em-p3">
@@ -401,6 +425,7 @@
         <option value="move_folder">Перемістити до папки</option>
         <option value="star">Позначити зірочкою</option>
         <option value="trash">Видалити</option>
+        <option value="add_to_calendar">📅 Додати в календар</option>
       </select>
     </div>
     <div class="em-rule-row" id="rule-action-val-row" style="display:none">
@@ -480,17 +505,72 @@ var _i18n = {
   готово:            '{% trans "Готово" %}',
 };
 
-/* ── Panel 1 collapse ── */
+/* ── Panel 1 collapse (full hide / show) ── */
 (function(){
-  var p1  = document.getElementById('em-p1');
-  var btn = document.getElementById('p1-toggle');
+  var p1        = document.getElementById('em-p1');
+  var drag1     = document.getElementById('em-drag1');
+  var btn       = document.getElementById('p1-toggle');
+  var expandTab = document.getElementById('em-p1-expand');
   var collapsed = localStorage.getItem('em-p1-col') === '1';
-  if (collapsed) { p1.classList.add('collapsed'); btn.textContent = '▶'; }
+
+  function _applyP1(c) {
+    p1.classList.toggle('collapsed', c);
+    if (btn) btn.textContent = c ? '▶' : '◀';
+    if (expandTab) expandTab.style.display = c ? 'flex' : 'none';
+    if (drag1) drag1.style.display = c ? 'none' : '';
+  }
+  _applyP1(collapsed);
+
   window.toggleP1 = function() {
     collapsed = !collapsed;
-    p1.classList.toggle('collapsed', collapsed);
-    btn.textContent = collapsed ? '▶' : '◀';
+    _applyP1(collapsed);
     localStorage.setItem('em-p1-col', collapsed ? '1' : '0');
+  };
+})();
+
+/* ── Resizable panels ── */
+(function(){
+  var DEFAULTS = {p1: 220, p2: 260};
+  var p1 = document.getElementById('em-p1');
+  var p2 = document.getElementById('em-p2');
+
+  var savedP1 = parseInt(localStorage.getItem('em-p1-w') || '0');
+  var savedP2 = parseInt(localStorage.getItem('em-p2-w') || '0');
+  if (savedP1 >= 100 && savedP1 <= 450 && !p1.classList.contains('collapsed')) p1.style.width = savedP1 + 'px';
+  if (savedP2 >= 140 && savedP2 <= 600) p2.style.width = savedP2 + 'px';
+
+  function makeDrag(handleId, panel, storageKey, minW, maxW) {
+    var handle = document.getElementById(handleId);
+    if (!handle || !panel) return;
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      handle.classList.add('dragging');
+      var startX = e.clientX;
+      var startW = panel.offsetWidth;
+      function onMove(e) {
+        var dx = e.clientX - startX;
+        panel.style.width = Math.max(minW, Math.min(maxW, startW + dx)) + 'px';
+      }
+      function onUp() {
+        handle.classList.remove('dragging');
+        localStorage.setItem(storageKey, panel.offsetWidth);
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      }
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+  }
+
+  makeDrag('em-drag1', p1, 'em-p1-w', 100, 450);
+  makeDrag('em-drag2', p2, 'em-p2-w', 140, 600);
+
+  window.resetPanelSizes = function() {
+    p1.style.width = DEFAULTS.p1 + 'px';
+    p2.style.width = DEFAULTS.p2 + 'px';
+    localStorage.removeItem('em-p1-w');
+    localStorage.removeItem('em-p2-w');
+    if (p1.classList.contains('collapsed')) { window.toggleP1(); }
   };
 })();
 
@@ -912,6 +992,19 @@ async function saveRule() {
 }
 
 /* ── Task modal ── */
+/* ── Quick "Add to calendar" from hover button ── */
+function quickAddToCalendar(ev, pk, subject) {
+  ev.stopPropagation();
+  // Reuse task modal: set _ctxMsg so saveTask works
+  var rowEl = document.getElementById('row-' + pk);
+  _ctxMsg = {pk: pk, tpk: rowEl?.dataset.tpk || 0, rowEl: rowEl || document.createElement('div'), from: rowEl?.dataset.from || ''};
+  if (!rowEl) {
+    rowEl = document.createElement('div');
+    rowEl.dataset.subject = subject;
+  }
+  openTaskModal();
+}
+
 var _taskModal = document.getElementById('em-task-modal');
 
 function openTaskModal() {

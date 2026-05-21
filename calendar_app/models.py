@@ -2,6 +2,22 @@ from django.contrib.auth.models import User
 from django.db import models
 
 
+class CalendarCategory(models.Model):
+    user  = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cal_categories')
+    name  = models.CharField(max_length=100, verbose_name='Назва')
+    color = models.CharField(max_length=7, default='#607d8b', verbose_name='Колір (hex)')
+    emoji = models.CharField(max_length=10, blank=True, default='📌', verbose_name='Іконка')
+
+    class Meta:
+        unique_together     = [('user', 'name')]
+        verbose_name        = 'Категорія календаря'
+        verbose_name_plural = 'Категорії календаря'
+        ordering            = ['name']
+
+    def __str__(self):
+        return f'{self.emoji} {self.name}'
+
+
 class CalendarEvent(models.Model):
     TYPE_DEADLINE = 'deadline'
     TYPE_MEETING  = 'meeting'
@@ -23,6 +39,10 @@ class CalendarEvent(models.Model):
     description = models.TextField(blank=True, verbose_name='Опис')
     event_type  = models.CharField(max_length=30, choices=TYPE_CHOICES,
                                    default=TYPE_OTHER, verbose_name='Тип')
+    custom_category = models.ForeignKey(
+        'CalendarCategory', null=True, blank=True,
+        on_delete=models.SET_NULL, related_name='events',
+        verbose_name='Власна категорія')
 
     start_at = models.DateTimeField(verbose_name='Початок', db_index=True)
     end_at   = models.DateTimeField(null=True, blank=True, verbose_name='Кінець')

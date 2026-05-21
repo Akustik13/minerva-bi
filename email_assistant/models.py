@@ -321,18 +321,20 @@ class EmailRule(models.Model):
         (OP_NOT_CONTAINS, 'Не містить'),
     ]
 
-    ACTION_MARK_READ  = 'mark_read'
-    ACTION_MARK_SPAM  = 'mark_spam'
-    ACTION_MOVE       = 'move_folder'
-    ACTION_STAR       = 'star'
-    ACTION_TRASH      = 'trash'
+    ACTION_MARK_READ     = 'mark_read'
+    ACTION_MARK_SPAM     = 'mark_spam'
+    ACTION_MOVE          = 'move_folder'
+    ACTION_STAR          = 'star'
+    ACTION_TRASH         = 'trash'
+    ACTION_ADD_CALENDAR  = 'add_to_calendar'
 
     ACTION_CHOICES = [
-        (ACTION_MARK_READ, 'Позначити прочитаним'),
-        (ACTION_MARK_SPAM, 'Позначити спамом'),
-        (ACTION_MOVE,      'Перемістити до папки'),
-        (ACTION_STAR,      'Позначити зірочкою'),
-        (ACTION_TRASH,     'Видалити'),
+        (ACTION_MARK_READ,    'Позначити прочитаним'),
+        (ACTION_MARK_SPAM,    'Позначити спамом'),
+        (ACTION_MOVE,         'Перемістити до папки'),
+        (ACTION_STAR,         'Позначити зірочкою'),
+        (ACTION_TRASH,        'Видалити'),
+        (ACTION_ADD_CALENDAR, 'Додати в календар (email follow-up)'),
     ]
 
     account         = models.ForeignKey(EmailAccount, on_delete=models.CASCADE, related_name='rules')
@@ -388,6 +390,23 @@ class EmailRule(models.Model):
                 msg.is_starred = True; changed.append('is_starred')
         elif self.action == self.ACTION_TRASH:
             msg.folder = EmailMessage.FOLDER_TRASH; changed.append('folder')
+        elif self.action == self.ACTION_ADD_CALENDAR:
+            try:
+                from calendar_app.models import CalendarEvent
+                from django.utils import timezone as _tz
+                from datetime import timedelta
+                CalendarEvent.objects.get_or_create(
+                    email_message=msg,
+                    defaults={
+                        'user':                  msg.account.user,
+                        'title':                 (msg.subject or 'Лист-нагадування')[:300],
+                        'event_type':            CalendarEvent.TYPE_EMAIL,
+                        'start_at':              _tz.now() + timedelta(days=1),
+                        'remind_minutes_before': 60,
+                    },
+                )
+            except Exception:
+                pass
         if changed:
             msg.save(update_fields=changed)
         return bool(changed)

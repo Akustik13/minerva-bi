@@ -20,14 +20,55 @@
   background:none;cursor:pointer;color:var(--text-muted);font-size:12px;transition:background .1s,color .1s}
 .cal-done-toggle:hover,.cal-done-toggle.on{background:rgba(26,115,232,.12);color:#1a73e8;border-color:#1a73e8}
 
-/* ── Category / legend filter bar ── */
-.cal-filter-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.cal-cat-btn{display:flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;
-  border:1px solid var(--border-strong);background:none;cursor:pointer;font-size:12px;
+/* ── Filter bar ── */
+.cal-filter-bar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.cal-filter-label{font-size:10px;color:var(--text-dim);font-weight:700;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0;white-space:nowrap}
+.cal-filter-sep{width:1px;height:18px;background:var(--border-strong);flex-shrink:0;margin:0 2px}
+.cal-cat-btn{display:flex;align-items:center;gap:5px;padding:3px 9px;border-radius:20px;
+  border:1px solid var(--border-strong);background:none;cursor:pointer;font-size:11px;
   color:var(--text-muted);transition:background .12s,color .12s,border-color .12s;white-space:nowrap}
 .cal-cat-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .cal-cat-btn.active{color:#fff;border-color:transparent}
-.cal-cat-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cal-cat-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.cal-cat-del{border:none;background:none;cursor:pointer;color:inherit;font-size:10px;
+  opacity:0;padding:0 0 0 2px;line-height:1;transition:opacity .1s;flex-shrink:0}
+.cal-cat-btn:hover .cal-cat-del{opacity:.7}
+.cal-cat-del:hover{opacity:1 !important}
+
+/* Add-category form */
+.cal-add-cat-btn{padding:3px 9px;border-radius:20px;border:1px dashed var(--border-strong);
+  background:none;cursor:pointer;font-size:11px;color:var(--text-dim);
+  transition:border-color .1s,color .1s;white-space:nowrap}
+.cal-add-cat-btn:hover{border-color:#1a73e8;color:#1a73e8}
+#cal-add-cat-form{display:none;align-items:center;gap:4px;flex-wrap:nowrap}
+.cal-cat-inp{padding:3px 7px;border-radius:5px;border:1px solid var(--border-strong);
+  background:var(--bg-input);color:var(--text);font-size:11px;outline:none;min-width:0}
+.cal-cat-inp:focus{border-color:#1a73e8}
+.cal-cat-emoji-inp{width:36px;text-align:center}
+.cal-cat-color-inp{width:30px;height:22px;padding:1px 2px;border-radius:4px;
+  border:1px solid var(--border-strong);background:var(--bg-input);cursor:pointer}
+.cal-cat-form-ok{padding:3px 8px;border-radius:5px;background:#1a73e8;color:#fff;
+  border:none;cursor:pointer;font-size:11px;font-weight:600;transition:opacity .1s}
+.cal-cat-form-ok:hover{opacity:.85}
+.cal-cat-form-cancel{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:13px;padding:0 3px}
+
+/* ── Bulk mode bar ── */
+#cal-bulk-bar{display:none;align-items:center;gap:8px;flex-wrap:wrap;
+  padding:8px 12px;border-radius:8px;background:rgba(26,115,232,.08);
+  border:1px solid rgba(26,115,232,.25);margin-bottom:10px}
+#cal-bulk-bar.visible{display:flex}
+#cal-bulk-count{font-size:12px;color:#1a73e8;font-weight:600;flex-shrink:0}
+#cal-bulk-type-sel{padding:4px 6px;border-radius:5px;border:1px solid var(--border-strong);
+  background:var(--bg-input);color:var(--text);font-size:11px;cursor:pointer;max-width:160px}
+.cal-bulk-btn{padding:5px 10px;border-radius:6px;border:1px solid var(--border-strong);
+  background:none;cursor:pointer;color:var(--text-muted);font-size:11px;
+  transition:background .1s,color .1s;white-space:nowrap;flex-shrink:0}
+.cal-bulk-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.cal-bulk-btn.danger:hover{background:rgba(229,57,53,.12);color:#e53935;border-color:#e53935}
+.cal-bulk-btn.primary{background:rgba(26,115,232,.15);color:#1a73e8;border-color:#1a73e8}
+.cal-bulk-cancel{margin-left:auto;font-size:12px;color:var(--text-dim);cursor:pointer;
+  border:none;background:none;padding:4px 6px;border-radius:4px}
+.cal-bulk-cancel:hover{color:var(--text)}
 
 /* ── Calendar grid ── */
 .cal-grid{width:100%;border-collapse:collapse;margin-bottom:20px}
@@ -53,7 +94,7 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
 .cal-chip-txt{overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
 .cal-chip.done-ev{opacity:.35;text-decoration:line-through}
 
-/* ── Event list toolbar ── */
+/* ── List toolbar ── */
 .cal-list-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
   padding:10px 0 8px;border-top:1px solid var(--border-strong);margin-bottom:10px}
 .cal-list-heading{font-size:14px;font-weight:600;color:var(--text);flex:1;min-width:0}
@@ -63,12 +104,22 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
   transition:background .1s;display:none}
 .cal-day-reset:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .cal-day-reset.visible{display:inline-block}
+.cal-bulk-toggle{padding:4px 10px;border-radius:6px;border:1px solid var(--border-strong);
+  background:none;cursor:pointer;color:var(--text-muted);font-size:12px;
+  transition:background .1s,color .1s,border-color .1s}
+.cal-bulk-toggle:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.cal-bulk-toggle.on{background:rgba(26,115,232,.12);color:#1a73e8;border-color:#1a73e8}
 
 /* ── Event rows ── */
-.cal-event-row{display:flex;align-items:flex-start;gap:12px;padding:10px 12px;
+.cal-event-row{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;
   border-radius:8px;background:var(--bg-card);border:1px solid var(--border-strong);
-  margin-bottom:8px;transition:opacity .3s}
+  margin-bottom:8px;transition:opacity .3s,background .1s;cursor:pointer}
+.cal-event-row:hover{background:var(--bg-hover,#1e2d40)}
 .cal-event-row.done-row{opacity:.42}
+.cal-event-row.bulk-selected{background:rgba(26,115,232,.1);border-color:#1a73e8}
+.cal-row-check{flex-shrink:0;display:none;align-items:center;padding-top:2px}
+.bulk-mode .cal-row-check{display:flex}
+input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
 .cal-event-bar{width:4px;border-radius:2px;flex-shrink:0;align-self:stretch;min-height:32px}
 .cal-event-title{font-size:13px;color:var(--text);font-weight:500}
 .cal-event-meta{font-size:11px;color:var(--text-muted);margin-top:2px;line-height:1.5}
@@ -80,14 +131,17 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
 .cal-admin-link{font-size:11px;color:var(--link-fg);text-decoration:none;
   padding:4px 6px;border-radius:4px;transition:background .1s}
 .cal-admin-link:hover{background:var(--bg-hover,#1e2d40)}
+.cal-email-badge{font-size:10px;color:var(--text-dim);padding:2px 5px;border-radius:4px;
+  border:1px solid var(--border-strong);text-decoration:none;transition:background .1s}
+.cal-email-badge:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .cal-list-empty{text-align:center;padding:32px;color:var(--text-muted);font-size:13px;display:none}
 
 /* ── Event detail popup ── */
 #cal-popup{display:none;position:fixed;z-index:9999;background:var(--bg-card);
   border:1px solid var(--border-strong);border-radius:10px;padding:16px;
-  max-width:320px;box-shadow:0 4px 20px rgba(0,0,0,.3);font-size:13px}
+  max-width:340px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,.3);font-size:13px}
 #cal-popup.open{display:block}
-#cal-popup-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px}
+#cal-popup-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:6px;padding-right:20px}
 #cal-popup-meta{font-size:12px;color:var(--text-muted);line-height:1.6}
 #cal-popup-close{position:absolute;top:8px;right:10px;border:none;background:none;
   cursor:pointer;color:var(--text-dim);font-size:16px;line-height:1}
@@ -113,10 +167,31 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
     </div>
   </div>
 
-  <!-- ── Category filter bar (doubles as legend) ── -->
+  <!-- ── Category filter bar (legend + custom cats) ── -->
   <div class="cal-filter-bar" id="cal-filter-bar">
-    <span style="font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.05em;flex-shrink:0">Категорії:</span>
-    <!-- filled by JS -->
+    <span class="cal-filter-label">Типи:</span>
+    <div id="cal-builtin-cats" style="display:contents"></div>
+    <span class="cal-filter-sep" id="cal-custom-sep" style="display:none"></span>
+    <div id="cal-custom-cats" style="display:contents"></div>
+    <button class="cal-add-cat-btn" id="cal-add-cat-btn" onclick="openAddCatForm()">+ Категорія</button>
+    <div id="cal-add-cat-form">
+      <input type="text"  id="cal-cat-emoji" class="cal-cat-inp cal-cat-emoji-inp" placeholder="📌" maxlength="4" value="📌">
+      <input type="text"  id="cal-cat-name"  class="cal-cat-inp" placeholder="Назва категорії" style="width:120px">
+      <input type="color" id="cal-cat-color" class="cal-cat-color-inp" value="#607d8b">
+      <button class="cal-cat-form-ok" onclick="saveNewCat()">✓</button>
+      <button class="cal-cat-form-cancel" onclick="closeAddCatForm()">✕</button>
+    </div>
+  </div>
+
+  <!-- ── Bulk mode action bar ── -->
+  <div id="cal-bulk-bar">
+    <span id="cal-bulk-count">Вибрано: 0</span>
+    <select id="cal-bulk-type-sel" onchange="bulkSetType()">
+      <option value="">— Перемістити до категорії —</option>
+    </select>
+    <button class="cal-bulk-btn primary" onclick="bulkMarkDone()">✓ Виконати</button>
+    <button class="cal-bulk-btn danger" onclick="bulkDelete()">🗑 Видалити</button>
+    <button class="cal-bulk-cancel" onclick="exitBulkMode()">✕ Скасувати</button>
   </div>
 
   <!-- ── Calendar grid ── -->
@@ -138,7 +213,7 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
           {% for ev in cell.events %}
           <div class="cal-chip{% if ev.is_done %} done-ev{% endif %}"
                style="background:{{ ev.display_color }}33;color:{{ ev.display_color }}"
-               data-type="{{ ev.event_type }}"
+               data-type="{{ ev.display_type_key }}"
                data-pk="{{ ev.pk }}"
                onclick="openChip(event, {{ cell.day }}, {{ ev.pk }})"
                title="{{ ev.title }}">
@@ -154,13 +229,14 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
     </tbody>
   </table>
 
-  <!-- ── Event list ── -->
+  <!-- ── List toolbar ── -->
   <div class="cal-list-toolbar">
     <div class="cal-list-heading" id="cal-list-heading">
       📋 Всі події місяця
       <span id="cal-list-count-wrap">(<span id="cal-list-count">{{ events|length }}</span>)</span>
     </div>
     <button class="cal-day-reset" id="cal-day-reset" onclick="selectDay(0)">✕ Скинути фільтр дня</button>
+    <button class="cal-bulk-toggle" id="cal-bulk-toggle" onclick="toggleBulkMode()">☑ Вибрати</button>
   </div>
 
   {% if events %}
@@ -171,17 +247,29 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
   <div class="cal-event-row{% if ev.is_done %} done-row{% endif %}"
        id="ev-{{ ev.pk }}"
        data-day="{{ ev.start_at|date:'j' }}"
-       data-type="{{ ev.event_type }}">
+       data-type="{{ ev.display_type_key }}"
+       onclick="rowClick(event, {{ ev.pk }})">
+    <!-- Bulk checkbox -->
+    <div class="cal-row-check">
+      <input type="checkbox" class="cal-ev-check" data-pk="{{ ev.pk }}"
+             onclick="event.stopPropagation()" onchange="onCheckChange()">
+    </div>
     <div class="cal-event-bar" style="background:{{ ev.display_color }}"></div>
     <div style="flex:1;min-width:0">
-      <div class="cal-event-title">{{ ev.title }}</div>
+      <div class="cal-event-title">
+        {{ ev.title }}
+        {% if ev.email_message_id %}<span style="font-size:10px;color:#43a047">📧</span>{% endif %}
+      </div>
       <div class="cal-event-meta">
         📅 {{ ev.start_at|date:"d.m.Y H:i" }}
         {% if ev.crm_customer %} · 👤 {{ ev.crm_customer }}{% endif %}
         {% if ev.description %}<br>{{ ev.description|truncatechars:80 }}{% endif %}
       </div>
     </div>
-    <div class="cal-event-actions">
+    <div class="cal-event-actions" onclick="event.stopPropagation()">
+      {% if ev.email_message_id %}
+      <a class="cal-email-badge" href="/email/message/{{ ev.email_message_id }}/" target="_blank" title="Відкрити лист">📧</a>
+      {% endif %}
       <a class="cal-admin-link" href="/admin/calendar_app/calendarevent/{{ ev.pk }}/change/" title="Редагувати">✏️</a>
       <button class="cal-done-btn{% if ev.is_done %} done{% endif %}"
               title="{% if ev.is_done %}Відновити{% else %}Виконано{% endif %}"
@@ -199,7 +287,7 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
 
 </div><!-- /.cal-wrap -->
 
-<!-- Event detail popup -->
+<!-- ── Event detail popup ── -->
 <div id="cal-popup">
   <button id="cal-popup-close" onclick="closePopup()">×</button>
   <div id="cal-popup-title"></div>
@@ -221,75 +309,216 @@ td.day-selected:not(.today) .cal-day-num{background:rgba(26,115,232,.3);color:#1
 </div>
 
 <script>
-const CSRF        = document.cookie.split(';').find(c=>c.trim().startsWith('csrftoken='))?.split('=')[1]||'';
+const CSRF         = document.cookie.split(';').find(c=>c.trim().startsWith('csrftoken='))?.split('=')[1]||'';
 const EVENT_COLORS = {{ event_colors_json|safe }};
 const EVENT_LABELS = {{ event_labels_json|safe }};
 const SHOW_DONE    = {{ show_done|yesno:"true,false" }};
+var CUSTOM_CATS    = {{ custom_cats_json|safe }};  // [{id,name,color,emoji}]
 
 /* ─── State ─────────────────────────────────────────────── */
-var _selDay   = 0;                            // 0 = all days
-var _activeCats = new Set(Object.keys(EVENT_LABELS)); // all on
+var _selDay    = 0;
+var _activeCats = new Set();   // filled by buildFilterBar
+var _bulkMode  = false;
 
-/* ─── Build category filter bar ─────────────────────────── */
-(function(){
-  var bar = document.getElementById('cal-filter-bar');
-  if (!bar) return;
+/* ─── Helpers ───────────────────────────────────────────── */
+function _typeKey(cat) { return 'cat_' + cat.id; }
+function _allTypeKeys() {
+  var keys = new Set(Object.keys(EVENT_LABELS));
+  CUSTOM_CATS.forEach(function(c){ keys.add(_typeKey(c)); });
+  return keys;
+}
+function _colorFor(typeKey) {
+  if (typeKey.startsWith('cat_')) {
+    var id = parseInt(typeKey.slice(4));
+    var c = CUSTOM_CATS.find(function(x){ return x.id === id; });
+    return c ? c.color : '#607d8b';
+  }
+  return EVENT_COLORS[typeKey] || '#607d8b';
+}
+function _labelFor(typeKey) {
+  if (typeKey.startsWith('cat_')) {
+    var id = parseInt(typeKey.slice(4));
+    var c = CUSTOM_CATS.find(function(x){ return x.id === id; });
+    return c ? (c.emoji + ' ' + c.name) : typeKey;
+  }
+  return EVENT_LABELS[typeKey] || typeKey;
+}
+
+/* ─── Build filter bar ──────────────────────────────────── */
+function buildFilterBar() {
+  // activate all types
+  _activeCats = _allTypeKeys();
+
+  // built-in types
+  var builtinDiv = document.getElementById('cal-builtin-cats');
+  builtinDiv.innerHTML = '';
   Object.entries(EVENT_LABELS).forEach(function([type, label]){
-    var color = EVENT_COLORS[type] || '#607d8b';
-    var btn = document.createElement('button');
-    btn.className = 'cal-cat-btn active';
-    btn.dataset.type = type;
-    btn.style.setProperty('--cat-color', color);
-    btn.innerHTML = '<span class="cal-chip-dot" style="background:' + color + '"></span>' + label;
-    btn.style.background = color;
-    btn.style.borderColor = color;
-    btn.onclick = function(){ toggleCat(type); };
-    bar.appendChild(btn);
+    builtinDiv.appendChild(_makeCatBtn(type, EVENT_COLORS[type]||'#607d8b', label, false));
   });
-})();
+
+  // custom categories
+  _rebuildCustomCats();
+}
+
+function _rebuildCustomCats() {
+  var div = document.getElementById('cal-custom-cats');
+  var sep = document.getElementById('cal-custom-sep');
+  div.innerHTML = '';
+  if (CUSTOM_CATS.length === 0) { sep.style.display = 'none'; return; }
+  sep.style.display = '';
+  CUSTOM_CATS.forEach(function(cat){
+    var key = _typeKey(cat);
+    var btn = _makeCatBtn(key, cat.color, cat.emoji + ' ' + cat.name, true, cat.id);
+    div.appendChild(btn);
+  });
+  // rebuild bulk type selector
+  _rebuildBulkSel();
+}
+
+function _makeCatBtn(typeKey, color, label, isDeletable, catId) {
+  var btn = document.createElement('button');
+  btn.className = 'cal-cat-btn active';
+  btn.dataset.type = typeKey;
+  btn.innerHTML = '<span class="cal-chip-dot" style="background:' + color + '"></span>' + label
+    + (isDeletable ? '<span class="cal-cat-del" title="Видалити категорію">✕</span>' : '');
+  btn.style.background = color;
+  btn.style.borderColor = color;
+  btn.style.color = '#fff';
+  btn.onclick = function(e){
+    if (isDeletable && e.target.classList.contains('cal-cat-del')) {
+      e.stopPropagation();
+      deleteCustomCat(catId, btn);
+      return;
+    }
+    if (_bulkMode) { bulkSelectByType(typeKey); }
+    else           { toggleCat(typeKey); }
+  };
+  return btn;
+}
+
+function _rebuildBulkSel() {
+  var sel = document.getElementById('cal-bulk-type-sel');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— Перемістити до категорії —</option>';
+  Object.entries(EVENT_LABELS).forEach(function([type, label]){
+    var o = document.createElement('option');
+    o.value = type; o.textContent = label;
+    sel.appendChild(o);
+  });
+  CUSTOM_CATS.forEach(function(cat){
+    var o = document.createElement('option');
+    o.value = _typeKey(cat); o.textContent = cat.emoji + ' ' + cat.name;
+    sel.appendChild(o);
+  });
+}
+
+/* ─── Add custom category ───────────────────────────────── */
+function openAddCatForm() {
+  document.getElementById('cal-add-cat-btn').style.display = 'none';
+  var f = document.getElementById('cal-add-cat-form');
+  f.style.display = 'flex';
+  setTimeout(function(){ document.getElementById('cal-cat-name').focus(); }, 50);
+}
+function closeAddCatForm() {
+  document.getElementById('cal-add-cat-btn').style.display = '';
+  document.getElementById('cal-add-cat-form').style.display = 'none';
+  document.getElementById('cal-cat-name').value = '';
+  document.getElementById('cal-cat-emoji').value = '📌';
+}
+async function saveNewCat() {
+  var name  = document.getElementById('cal-cat-name').value.trim();
+  var color = document.getElementById('cal-cat-color').value;
+  var emoji = document.getElementById('cal-cat-emoji').value.trim() || '📌';
+  if (!name) { document.getElementById('cal-cat-name').focus(); return; }
+  try {
+    var r = await fetch('/calendar/categories/create/', {
+      method:'POST', headers:{'X-CSRFToken':CSRF,'Content-Type':'application/json'},
+      body:JSON.stringify({name,color,emoji})
+    });
+    var d = await r.json();
+    if (!d.ok) { alert('Помилка: ' + (d.error||'невідома')); return; }
+    if (d.created) {
+      CUSTOM_CATS.push({id:d.id, name:d.name, color:d.color, emoji:d.emoji});
+      _activeCats.add(_typeKey({id:d.id}));
+      _rebuildCustomCats();
+    }
+    closeAddCatForm();
+  } catch(e){ console.error(e); }
+}
+document.getElementById('cal-cat-name')?.addEventListener('keydown', function(e){
+  if (e.key === 'Enter') saveNewCat();
+  if (e.key === 'Escape') closeAddCatForm();
+});
+
+/* ─── Delete custom category ────────────────────────────── */
+async function deleteCustomCat(catId, btn) {
+  if (!confirm('Видалити категорію? Всі події повернуться до типу за замовчуванням.')) return;
+  try {
+    var r = await fetch('/calendar/categories/' + catId + '/delete/', {
+      method:'POST', headers:{'X-CSRFToken':CSRF}
+    });
+    var d = await r.json();
+    if (!d.ok) { alert('Помилка видалення'); return; }
+    var key = 'cat_' + catId;
+    CUSTOM_CATS = CUSTOM_CATS.filter(function(c){ return c.id !== catId; });
+    _activeCats.delete(key);
+    // reset events that had this type to 'other' display
+    document.querySelectorAll('.cal-event-row[data-type="' + key + '"]').forEach(function(row){
+      row.dataset.type = 'other';
+      var bar = row.querySelector('.cal-event-bar');
+      if (bar) bar.style.background = EVENT_COLORS.other;
+    });
+    document.querySelectorAll('.cal-chip[data-type="' + key + '"]').forEach(function(chip){
+      chip.dataset.type = 'other';
+      chip.style.background = EVENT_COLORS.other + '33';
+      chip.style.color = EVENT_COLORS.other;
+      var dot = chip.querySelector('.cal-chip-dot');
+      if (dot) dot.style.background = EVENT_COLORS.other;
+    });
+    _rebuildCustomCats();
+    applyFilters();
+  } catch(e){ console.error(e); }
+}
 
 /* ─── Day selection ─────────────────────────────────────── */
 function selectDay(day) {
-  // deselect previous
   if (_selDay) {
     var prev = document.getElementById('cal-td-' + _selDay);
     if (prev) prev.classList.remove('day-selected');
   }
-  _selDay = (day === _selDay) ? 0 : day;  // second click deselects
+  _selDay = (day === _selDay) ? 0 : day;
   if (_selDay) {
     var td = document.getElementById('cal-td-' + _selDay);
     if (td) td.classList.add('day-selected');
   }
   applyFilters();
   updateListHeading();
-  // scroll to list
   if (_selDay) {
-    var toolbar = document.getElementById('cal-list-heading');
-    if (toolbar) toolbar.scrollIntoView({behavior:'smooth', block:'start'});
+    var h = document.getElementById('cal-list-heading');
+    if (h) h.scrollIntoView({behavior:'smooth', block:'start'});
   }
 }
 
-/* Chip click: select day + open popup */
 function openChip(ev, day, pk) {
-  ev.stopPropagation();   // don't bubble to td
-  selectDay(day);
-  showEventPopup(ev, pk);
+  ev.stopPropagation();
+  if (!_bulkMode) {
+    selectDay(day);
+    showEventPopup(ev, pk);
+  }
 }
 
 /* ─── Category toggle ───────────────────────────────────── */
 function toggleCat(type) {
-  var allBtns = document.querySelectorAll('.cal-cat-btn');
-  // If clicking the only active → reset to all
+  var allKeys = _allTypeKeys();
   if (_activeCats.size === 1 && _activeCats.has(type)) {
-    _activeCats = new Set(Object.keys(EVENT_LABELS));
+    _activeCats = allKeys;
   } else {
     if (_activeCats.has(type)) _activeCats.delete(type);
     else _activeCats.add(type);
   }
-  // update button styles
-  allBtns.forEach(function(btn){
+  document.querySelectorAll('.cal-cat-btn').forEach(function(btn){
     var t = btn.dataset.type;
-    var color = EVENT_COLORS[t] || '#607d8b';
+    var color = _colorFor(t);
     if (_activeCats.has(t)) {
       btn.classList.add('active');
       btn.style.background = color;
@@ -302,14 +531,13 @@ function toggleCat(type) {
       btn.style.color = '';
     }
   });
-  // also dim chips in grid
   document.querySelectorAll('.cal-chip[data-type]').forEach(function(chip){
     chip.style.opacity = _activeCats.has(chip.dataset.type) ? '' : '.2';
   });
   applyFilters();
 }
 
-/* ─── Apply day + category filters to list ──────────────── */
+/* ─── Apply filters ─────────────────────────────────────── */
 function applyFilters() {
   var rows = document.querySelectorAll('.cal-event-row[data-day]');
   var visible = 0;
@@ -330,20 +558,145 @@ function updateListHeading() {
   var h = document.getElementById('cal-list-heading');
   var resetBtn = document.getElementById('cal-day-reset');
   if (!h) return;
+  var cw = '<span>(<span id="cal-list-count">0</span>)</span>';
   if (_selDay) {
-    h.innerHTML = '📋 Події за ' + _selDay + ' числа '
-      + '<span>(<span id="cal-list-count">0</span>)</span>';
-    applyFilters();  // recount
+    h.innerHTML = '📋 Події за ' + _selDay + ' числа ' + cw;
     if (resetBtn) resetBtn.classList.add('visible');
   } else {
-    h.innerHTML = '📋 Всі події місяця '
-      + '<span>(<span id="cal-list-count">0</span>)</span>';
-    applyFilters();
+    h.innerHTML = '📋 Всі події місяця ' + cw;
     if (resetBtn) resetBtn.classList.remove('visible');
   }
+  applyFilters();
 }
 
-/* ─── Toggle done/undone on server ─────────────────────── */
+/* ─── Bulk mode ─────────────────────────────────────────── */
+function toggleBulkMode() {
+  _bulkMode = !_bulkMode;
+  var wrapper = document.querySelector('.cal-wrap');
+  var bar     = document.getElementById('cal-bulk-bar');
+  var toggle  = document.getElementById('cal-bulk-toggle');
+  if (_bulkMode) {
+    wrapper.classList.add('bulk-mode');
+    bar.classList.add('visible');
+    toggle.classList.add('on');
+    toggle.textContent = '☑ Режим вибору';
+    // make rows click toggle checkbox
+  } else {
+    exitBulkMode();
+  }
+}
+function exitBulkMode() {
+  _bulkMode = false;
+  document.querySelector('.cal-wrap').classList.remove('bulk-mode');
+  document.getElementById('cal-bulk-bar').classList.remove('visible');
+  var toggle = document.getElementById('cal-bulk-toggle');
+  toggle.classList.remove('on');
+  toggle.textContent = '☑ Вибрати';
+  // uncheck all
+  document.querySelectorAll('.cal-ev-check').forEach(function(cb){ cb.checked = false; });
+  document.querySelectorAll('.cal-event-row.bulk-selected').forEach(function(r){ r.classList.remove('bulk-selected'); });
+  updateBulkCount();
+}
+function onCheckChange() {
+  document.querySelectorAll('.cal-event-row').forEach(function(row){
+    var cb = row.querySelector('.cal-ev-check');
+    if (cb) row.classList.toggle('bulk-selected', cb.checked);
+  });
+  updateBulkCount();
+}
+function updateBulkCount() {
+  var n = document.querySelectorAll('.cal-ev-check:checked').length;
+  document.getElementById('cal-bulk-count').textContent = 'Вибрано: ' + n;
+}
+function rowClick(ev, pk) {
+  if (_bulkMode) {
+    var cb = document.querySelector('#ev-' + pk + ' .cal-ev-check');
+    if (cb) { cb.checked = !cb.checked; onCheckChange(); }
+    return;
+  }
+  showEventPopup(ev, pk);
+}
+
+// In bulk mode: clicking category button selects all events of that type
+function bulkSelectByType(typeKey) {
+  document.querySelectorAll('.cal-ev-check').forEach(function(cb){ cb.checked = false; });
+  document.querySelectorAll('.cal-event-row[data-type="' + typeKey + '"]:not([style*="display: none"])').forEach(function(row){
+    var cb = row.querySelector('.cal-ev-check');
+    if (cb) cb.checked = true;
+  });
+  onCheckChange();
+}
+
+function _getCheckedPks() {
+  return Array.from(document.querySelectorAll('.cal-ev-check:checked')).map(function(cb){ return parseInt(cb.dataset.pk); });
+}
+async function _bulkApi(body) {
+  var r = await fetch('/calendar/events/bulk/', {
+    method:'POST', headers:{'X-CSRFToken':CSRF,'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+  return r.json();
+}
+
+async function bulkSetType() {
+  var sel = document.getElementById('cal-bulk-type-sel');
+  var typeKey = sel.value;
+  if (!typeKey) return;
+  var pks = _getCheckedPks();
+  if (!pks.length) return;
+  var d = await _bulkApi({pks, action:'set_type', value:typeKey});
+  if (!d.ok) return;
+  pks.forEach(function(pk){
+    var row  = document.getElementById('ev-' + pk);
+    var chip = document.querySelector('.cal-chip[data-pk="' + pk + '"]');
+    if (row) {
+      row.dataset.type = typeKey;
+      var bar = row.querySelector('.cal-event-bar');
+      if (bar) bar.style.background = d.color;
+    }
+    if (chip) {
+      chip.dataset.type = typeKey;
+      chip.style.background = d.color + '33';
+      chip.style.color = d.color;
+      var dot = chip.querySelector('.cal-chip-dot');
+      if (dot) dot.style.background = d.color;
+    }
+  });
+  sel.value = '';
+  applyFilters();
+  exitBulkMode();
+}
+async function bulkMarkDone() {
+  var pks = _getCheckedPks();
+  if (!pks.length) return;
+  if (!confirm('Позначити ' + pks.length + ' подій як виконані?')) return;
+  var d = await _bulkApi({pks, action:'done'});
+  if (!d.ok) return;
+  pks.forEach(function(pk){
+    var row  = document.getElementById('ev-' + pk);
+    var chip = document.querySelector('.cal-chip[data-pk="' + pk + '"]');
+    if (row) { row.classList.add('done-row'); }
+    if (chip) { chip.classList.add('done-ev'); }
+  });
+  exitBulkMode();
+}
+async function bulkDelete() {
+  var pks = _getCheckedPks();
+  if (!pks.length) return;
+  if (!confirm('Видалити ' + pks.length + ' подій? Цю дію неможливо скасувати.')) return;
+  var d = await _bulkApi({pks, action:'delete'});
+  if (!d.ok) return;
+  pks.forEach(function(pk){
+    var row  = document.getElementById('ev-' + pk);
+    var chip = document.querySelector('.cal-chip[data-pk="' + pk + '"]');
+    if (row)  row.remove();
+    if (chip) chip.remove();
+  });
+  exitBulkMode();
+  applyFilters();
+}
+
+/* ─── Toggle done (single event) ───────────────────────── */
 async function toggleEventDone(pk, btn) {
   try {
     var r = await fetch('/calendar/event/' + pk + '/toggle/', {
@@ -354,14 +707,15 @@ async function toggleEventDone(pk, btn) {
     var row = document.getElementById('ev-' + pk);
     if (row) {
       row.classList.toggle('done-row', d.is_done);
-      btn.classList.toggle('done',     d.is_done);
+      btn.classList.toggle('done', d.is_done);
       btn.textContent = d.is_done ? '↩' : '✓';
       btn.title = d.is_done ? 'Відновити' : 'Виконано';
     }
+    var chip = document.querySelector('.cal-chip[data-pk="' + pk + '"]');
+    if (chip) chip.classList.toggle('done-ev', d.is_done);
   } catch(e){ console.error(e); }
 }
 
-/* ─── Toggle "show done" (server filter) ───────────────── */
 function toggleDone() {
   var url = new URL(location.href);
   if (SHOW_DONE) url.searchParams.delete('show_done');
@@ -370,27 +724,37 @@ function toggleDone() {
 }
 
 /* ─── Event detail popup ────────────────────────────────── */
-var _popup    = document.getElementById('cal-popup');
-var _popupPk  = null;
+var _popup     = document.getElementById('cal-popup');
+var _popupPk   = null;
 var _popupDone = false;
 
-function buildPopupTypes(currentType) {
+function buildPopupTypes(currentKey) {
   var c = document.getElementById('cal-popup-types');
   if (!c) return;
   c.innerHTML = '';
-  Object.entries(EVENT_LABELS).forEach(function([type, label]){
-    var color = EVENT_COLORS[type] || '#607d8b';
+  function _makeBtn(typeKey, color, label) {
     var btn = document.createElement('button');
     btn.textContent = label;
-    btn.dataset.type = type;
+    btn.dataset.type = typeKey;
     btn.style.cssText = 'padding:3px 8px;border-radius:12px;font-size:11px;cursor:pointer;'
       + 'transition:background .12s,color .12s;border:1px solid ' + color + ';'
-      + (type === currentType
+      + (typeKey === currentKey
           ? 'background:' + color + ';color:#fff'
           : 'background:none;color:' + color);
-    btn.onclick = function(e){ e.stopPropagation(); popupSetType(type); };
+    btn.onclick = function(e){ e.stopPropagation(); popupSetType(typeKey); };
     c.appendChild(btn);
+  }
+  Object.entries(EVENT_LABELS).forEach(function([type, label]){
+    _makeBtn(type, EVENT_COLORS[type]||'#607d8b', label);
   });
+  if (CUSTOM_CATS.length) {
+    var sep = document.createElement('span');
+    sep.style.cssText = 'display:block;width:100%;height:1px;background:var(--border-strong);margin:4px 0';
+    c.appendChild(sep);
+    CUSTOM_CATS.forEach(function(cat){
+      _makeBtn(_typeKey(cat), cat.color, cat.emoji + ' ' + cat.name);
+    });
+  }
 }
 
 async function showEventPopup(ev, pk) {
@@ -401,10 +765,11 @@ async function showEventPopup(ev, pk) {
     _popupDone = d.is_done;
     document.getElementById('cal-popup-title').textContent = d.title;
     var meta = '📅 ' + d.start + (d.end?' → '+d.end:'') + '<br>';
-    if (d.customer)    meta += '👤 ' + d.customer + '<br>';
-    if (d.description) meta += '<br>' + d.description;
+    if (d.customer)     meta += '👤 ' + d.customer + '<br>';
+    if (d.source_email) meta += '📧 <a href="' + d.source_email.url + '" target="_blank" style="color:var(--link-fg)">' + (d.source_email.subject||'Відкрити лист') + '</a><br>';
+    if (d.description)  meta += '<br>' + d.description;
     document.getElementById('cal-popup-meta').innerHTML = meta;
-    buildPopupTypes(d.event_type);
+    buildPopupTypes(d.type_key);
     var doneBtn = document.getElementById('cal-popup-done-btn');
     if (doneBtn) {
       doneBtn.textContent = d.is_done ? '↩ Відновити' : '✓ Виконано';
@@ -414,8 +779,10 @@ async function showEventPopup(ev, pk) {
     var editLink = document.getElementById('cal-popup-edit-link');
     if (editLink) editLink.href = '/admin/calendar_app/calendarevent/' + pk + '/change/';
     var x = ev.clientX+14, y = ev.clientY+14;
-    if (x+340 > window.innerWidth)  x = ev.clientX-340;
-    if (y+320 > window.innerHeight) y = ev.clientY-320;
+    if (x+360 > window.innerWidth)  x = ev.clientX-360;
+    if (y+340 > window.innerHeight) y = ev.clientY-340;
+    if (x < 0) x = 8;
+    if (y < 0) y = 8;
     _popup.style.left = x+'px';
     _popup.style.top  = y+'px';
     _popup.classList.add('open');
@@ -433,7 +800,6 @@ async function popupSetType(newType) {
     var d = await r.json();
     if (!d.ok) return;
     buildPopupTypes(newType);
-    // update grid chip
     var chip = document.querySelector('.cal-chip[data-pk="' + _popupPk + '"]');
     if (chip) {
       chip.dataset.type = newType;
@@ -443,7 +809,6 @@ async function popupSetType(newType) {
       if (dot) dot.style.background = d.color;
       chip.style.opacity = _activeCats.has(newType) ? '' : '.2';
     }
-    // update list row
     var row = document.getElementById('ev-' + _popupPk);
     if (row) {
       row.dataset.type = newType;
@@ -469,10 +834,8 @@ async function popupToggleDone() {
       doneBtn.style.color = d.is_done ? 'var(--ok,#2e7d32)' : '';
       doneBtn.style.borderColor = d.is_done ? 'var(--ok,#2e7d32)' : '';
     }
-    // update grid chip
     var chip = document.querySelector('.cal-chip[data-pk="' + _popupPk + '"]');
     if (chip) chip.classList.toggle('done-ev', d.is_done);
-    // update list row
     var row = document.getElementById('ev-' + _popupPk);
     if (row) {
       row.classList.toggle('done-row', d.is_done);
@@ -490,20 +853,20 @@ function closePopup() { _popup.classList.remove('open'); }
 document.addEventListener('click', function(e){
   if (_popup.classList.contains('open') && !_popup.contains(e.target)) closePopup();
 });
-document.addEventListener('keydown', function(e){ if(e.key==='Escape') closePopup(); });
+document.addEventListener('keydown', function(e){ if(e.key==='Escape'){ closePopup(); if(_bulkMode) exitBulkMode(); } });
 
-/* ─── Init: highlight today's day ──────────────────────── */
+/* ─── Init ──────────────────────────────────────────────── */
+buildFilterBar();
 (function(){
   var todayTd = document.querySelector('.cal-grid td.today');
   if (todayTd) {
-    // auto-select today on page load
-    var id = todayTd.id; // cal-td-N
+    var id = todayTd.id;
     if (id) {
       var day = parseInt(id.replace('cal-td-',''));
       if (!isNaN(day)) selectDay(day);
     }
   } else {
-    applyFilters(); // just count
+    applyFilters();
   }
 })();
 </script>
