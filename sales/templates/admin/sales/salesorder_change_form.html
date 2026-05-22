@@ -78,6 +78,113 @@
 
 {% block extrahead %}
 {{ block.super }}
+<style>
+.sol-calc-hint {
+  display: block;
+  font-size: 11px;
+  margin-top: 3px;
+  color: var(--err, #c62828);
+  white-space: nowrap;
+}
+.sol-field-err {
+  outline: 2px solid var(--err, #c62828) !important;
+  border-radius: 3px;
+}
+</style>
+<script>
+/* ── SalesOrderLine inline: live price/qty validation ── */
+(function () {
+  /* Mirror of Python parse_price: handles EU (1.234,56) and US (1,234.56) formats */
+  function parseNum(s) {
+    if (s === null || s === undefined || s === '') return NaN;
+    s = String(s).trim().replace(/\s/g, '').replace(/[^\d.,\-]/g, '');
+    if (!s || s === '-') return NaN;
+    var ci = s.lastIndexOf(','), di = s.lastIndexOf('.');
+    if (ci > -1 && di > -1) {
+      if (ci > di) { s = s.replace(/\./g, '').replace(',', '.'); }  /* EU */
+      else         { s = s.replace(/,/g, '');                     }  /* US */
+    } else {
+      s = s.replace(',', '.');  /* only comma → treat as decimal */
+    }
+    return parseFloat(s);
+  }
+
+  function round2(n) { return Math.round(n * 100) / 100; }
+
+  function getField(idx, name) {
+    return document.getElementById('id_lines-' + idx + '-' + name);
+  }
+
+  /* per-row: which field was last touched */
+  var _lastChanged = {};
+
+  function clearRow(idx) {
+    ['unit_price', 'qty', 'total_price'].forEach(function (name) {
+      var el = getField(idx, name);
+      if (!el) return;
+      el.classList.remove('sol-field-err');
+      var h = el.closest('td').querySelector('.sol-calc-hint');
+      if (h) h.remove();
+    });
+  }
+
+  function markField(idx, name, msg) {
+    var el = getField(idx, name);
+    if (!el) return;
+    el.classList.add('sol-field-err');
+    var hint = document.createElement('span');
+    hint.className = 'sol-calc-hint';
+    hint.textContent = msg;
+    el.closest('td').appendChild(hint);
+  }
+
+  function validateRow(idx) {
+    clearRow(idx);
+    var qty   = parseNum((getField(idx, 'qty')         || {}).value);
+    var unit  = parseNum((getField(idx, 'unit_price')  || {}).value);
+    var total = parseNum((getField(idx, 'total_price') || {}).value);
+
+    if (isNaN(qty) || isNaN(unit) || isNaN(total) || qty === 0) return;
+    /* skip empty / placeholder row */
+    if (!unit && !total) return;
+
+    var calcTotal = round2(unit * qty);
+    var calcUnit  = round2(total / qty);
+    var eps = 0.02; /* allow 2¢ rounding tolerance */
+
+    if (Math.abs(calcTotal - total) <= eps) return; /* all good */
+
+    /* Discrepancy: highlight the field that "should" match */
+    if (_lastChanged[idx] === 'total_price') {
+      /* user changed total → suggest updated unit price */
+      markField(idx, 'unit_price',
+        '⚠ Розрах.: ' + calcUnit.toFixed(2) + ' (Total÷Qty)');
+    } else {
+      /* user changed unit or qty → suggest updated total */
+      markField(idx, 'total_price',
+        '⚠ Розрах.: ' + calcTotal.toFixed(2) + ' (Unit×Qty)');
+    }
+  }
+
+  /* ── event delegation ── */
+  document.addEventListener('input', function (e) {
+    var id = (e.target && e.target.id) || '';
+    var m  = id.match(/^id_lines-(\d+)-(unit_price|qty|total_price)$/);
+    if (!m) return;
+    var idx = m[1], field = m[2];
+    _lastChanged[idx] = field;
+    validateRow(idx);
+  });
+
+  /* ── initial check on page load ── */
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[id^="id_lines-"][id$="-qty"]').forEach(function (el) {
+      var m = el.id.match(/id_lines-(\d+)-qty/);
+      if (m) validateRow(m[1]);
+    });
+  });
+})();
+</script>
 <script>
 function pushToShipping(url) {
   const btn = document.getElementById('push-to-shipping-btn');
