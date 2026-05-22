@@ -222,12 +222,19 @@
       {% for fkey, flabel, ficon in folders %}
       <a href="?folder={{ fkey }}{% if q %}&q={{ q }}{% endif %}"
          class="em-folder-link{% if folder == fkey %} active{% endif %}"
+         id="folder-link-{{ fkey }}"
          title="{{ flabel }}">
         <span class="em-folder-icon">{{ ficon }}</span>
         <span class="em-folder-label">{{ flabel }}</span>
-        {% if fkey == 'inbox' and unread_count %}
-          <span class="em-badge">{{ unread_count }}</span>
-        {% endif %}
+        {% with n=unread_counts|default_if_none:0 %}
+          {% if fkey == 'inbox' %}
+            <span class="em-badge" id="badge-inbox"{% if not unread_counts.inbox %} style="display:none"{% endif %}>{{ unread_counts.inbox|default:0 }}</span>
+          {% elif fkey == 'starred' %}
+            <span class="em-badge" id="badge-starred"{% if not unread_counts.starred %} style="display:none"{% endif %}>{{ unread_counts.starred|default:0 }}</span>
+          {% elif fkey == 'spam' %}
+            <span class="em-badge" id="badge-spam"{% if not unread_counts.spam %} style="display:none"{% endif %}>{{ unread_counts.spam|default:0 }}</span>
+          {% endif %}
+        {% endwith %}
       </a>
       {% endfor %}
     </div>
@@ -245,6 +252,9 @@
       </a>
       <button class="em-sync-btn" onclick="resetPanelSizes()" title="{% trans "Відновити пропорції панелей" %}">
         ↺ {% trans "Скинути розміри" %}
+      </button>
+      <button class="em-sync-btn" onclick="openSpamFilter()" title="{% trans "Фільтри спаму" %}">
+        🚫 {% trans "Фільтри спаму" %}
       </button>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
       <div id="sync-countdown"></div>
@@ -372,9 +382,6 @@
   <!-- Drag handle 2: resize P2 -->
   <div class="em-drag" id="em-drag2" title="Потягни для зміни розміру"></div>
 
-  <!-- Drag handle 2: resize P2 horizontal -->
-  <div class="em-drag" id="em-drag2" title="Потягни для зміни розміру"></div>
-
   <!-- ═══ Panel 3: Preview ═══ -->
   <div class="em-p3" id="em-p3">
     <button class="em-p2-toggle" id="p2-toggle" onclick="toggleP2()" title="{% trans "Згорнути/розгорнути список" %}">◀</button>
@@ -475,6 +482,36 @@
     <div class="em-rule-btns">
       <button class="em-rule-btn em-rule-cancel" onclick="closeTaskModal()">Скасувати</button>
       <button class="em-rule-btn em-rule-ok" onclick="saveTask()">✓ Створити завдання</button>
+    </div>
+  </div>
+</div>
+
+<!-- Spam filter modal -->
+<div id="em-spam-modal" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.5);align-items:center;justify-content:center">
+  <div id="em-spam-box" style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:12px;padding:20px 24px;min-width:380px;max-width:95vw;max-height:80vh;overflow-y:auto">
+    <h4 style="margin:0 0 14px;color:var(--text);font-size:14px">🚫 {% trans "Фільтри спаму" %}</h4>
+    <p style="font-size:12px;color:var(--text-muted);margin:0 0 12px">
+      {% trans "Вхідні від вказаних email або доменів автоматично потрапляють у спам." %}
+    </p>
+    <!-- Add new filter -->
+    <div style="display:flex;gap:6px;margin-bottom:14px">
+      <input type="text" id="spam-filter-inp" placeholder="email@example.com або @domain.com"
+             style="flex:1;padding:7px 10px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:13px;outline:none;min-width:0">
+      <button onclick="addSpamFilter()"
+              style="padding:7px 14px;border-radius:6px;background:linear-gradient(135deg,#b71c1c,#d32f2f);color:#fff;border:none;cursor:pointer;font-size:13px;font-weight:600;flex-shrink:0">
+        + {% trans "Додати" %}
+      </button>
+    </div>
+    <div id="spam-filter-err" style="color:var(--err,#e53935);font-size:11px;min-height:14px;margin-bottom:8px"></div>
+    <!-- List of existing spam rules -->
+    <div id="spam-filter-list" style="display:flex;flex-direction:column;gap:4px">
+      <div style="font-size:12px;color:var(--text-dim)">⏳ {% trans "Завантаження..." %}</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:14px">
+      <button onclick="closeSpamFilter()"
+              style="padding:6px 14px;border-radius:6px;background:var(--bg-input);color:var(--text-muted);border:1px solid var(--border-strong);cursor:pointer;font-size:12px;font-weight:600">
+        {% trans "Закрити" %}
+      </button>
     </div>
   </div>
 </div>
@@ -1153,7 +1190,8 @@ async function saveTask() {
   }
 
   function updateBadge(count) {
-    document.querySelectorAll('.em-badge').forEach(function(b){ b.textContent = count > 0 ? count : ''; });
+    var b = document.getElementById('badge-inbox');
+    if (b) { b.textContent = count > 0 ? count : ''; b.style.display = count > 0 ? '' : 'none'; }
   }
 
   async function tick() {
@@ -1194,5 +1232,67 @@ async function saveTask() {
 
   setInterval(tick, INTERVAL_MS);
 })();
+
+/* ── Spam filter modal ── */
+var _spamModal = document.getElementById('em-spam-modal');
+document.getElementById('spam-filter-inp').addEventListener('keydown', function(e){ if (e.key === 'Enter') addSpamFilter(); });
+_spamModal.addEventListener('click', function(e){ if (e.target === _spamModal) closeSpamFilter(); });
+
+function openSpamFilter() {
+  _spamModal.style.display = 'flex';
+  loadSpamFilters();
+}
+function closeSpamFilter() { _spamModal.style.display = 'none'; }
+
+function loadSpamFilters() {
+  var list = document.getElementById('spam-filter-list');
+  list.innerHTML = '<div style="font-size:12px;color:var(--text-dim)">⏳ {% trans "Завантаження..." %}</div>';
+  fetch('/email/rules/', {credentials:'same-origin'})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var spam = (d.rules || []).filter(function(r){ return r.action === 'mark_spam'; });
+      if (!spam.length) {
+        list.innerHTML = '<div style="font-size:12px;color:var(--text-dim)">{% trans "Фільтрів ще немає." %}</div>';
+        return;
+      }
+      list.innerHTML = spam.map(function(r){
+        return '<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:6px;background:var(--bg-input);font-size:12px">'
+             + '<span style="flex:1;color:var(--text);font-family:monospace">' + r.condition_value + '</span>'
+             + '<span style="color:var(--text-dim);font-size:11px">' + r.name + '</span>'
+             + '<button onclick="deleteSpamFilter(' + r.id + ',this)" title="{% trans "Видалити фільтр" %}"'
+             + ' style="border:none;background:none;cursor:pointer;color:var(--text-dim);padding:2px 5px;border-radius:4px;font-size:13px">🗑️</button>'
+             + '</div>';
+      }).join('');
+    })
+    .catch(function(){ list.innerHTML = '<div style="font-size:12px;color:var(--err)">{% trans "Помилка завантаження" %}</div>'; });
+}
+
+function addSpamFilter() {
+  var inp = document.getElementById('spam-filter-inp');
+  var err = document.getElementById('spam-filter-err');
+  var val = (inp.value || '').trim().toLowerCase();
+  if (!val) { err.textContent = '{% trans "Введіть email або домен (наприклад @amazon.de)" %}'; return; }
+  err.textContent = '⏳…';
+  var name = 'Спам: ' + val;
+  fetch('/email/rules/create/', {
+    method:'POST', credentials:'same-origin',
+    headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+    body: JSON.stringify({name: name, condition_field:'from_email', condition_op:'contains', condition_value:val, action:'mark_spam', action_value:''}),
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) { inp.value = ''; err.textContent = ''; loadSpamFilters(); }
+    else err.textContent = d.error || '{% trans "Помилка" %}';
+  }).catch(function(){ err.textContent = '{% trans "Помилка мережі" %}'; });
+}
+
+function deleteSpamFilter(ruleId, btn) {
+  btn.disabled = true;
+  fetch('/email/rules/' + ruleId + '/delete/', {
+    method:'POST', credentials:'same-origin',
+    headers:{'X-CSRFToken':CSRF},
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.ok) loadSpamFilters();
+    else { btn.disabled = false; }
+  }).catch(function(){ btn.disabled = false; });
+}
 </script>
 {% endblock %}

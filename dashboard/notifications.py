@@ -616,7 +616,7 @@ def notify_sync_result(source: str, stats: dict, force_notify: bool = False):
             pass
 
 
-def notify_digikey_auto_confirmed(sale, mode: str):
+def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
     """Надсилає сповіщення після успішного авто-підтвердження DigiKey замовлення."""
     ns = _get_ns()
     if not ns:
@@ -633,43 +633,144 @@ def notify_digikey_auto_confirmed(sale, mode: str):
     }
     mode_label = MODE_LABELS.get(mode, mode)
     client = sale.client or sale.email or '—'
+    now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
 
-    # Collect product lines
+    # Country label
+    _COUNTRY_NAMES = {
+        'AT':'Австрія','BE':'Бельгія','BG':'Болгарія','CH':'Швейцарія','CY':'Кіпр',
+        'CZ':'Чехія','DE':'Німеччина','DK':'Данія','EE':'Естонія','ES':'Іспанія',
+        'FI':'Фінляндія','FR':'Франція','GB':'Велика Британія','GR':'Греція',
+        'HR':'Хорватія','HU':'Угорщина','IE':'Ірландія','IT':'Італія','LT':'Литва',
+        'LU':'Люксембург','LV':'Латвія','MT':'Мальта','NL':'Нідерланди','NO':'Норвегія',
+        'PL':'Польща','PT':'Португалія','RO':'Румунія','SE':'Швеція','SI':'Словенія',
+        'SK':'Словаччина','UA':'Україна','US':'США','CA':'Канада','AU':'Австралія',
+        'JP':'Японія','CN':'Китай','TR':'Туреччина',
+    }
+    _cc = (sale.addr_country or '').strip().upper()
+    destination = _COUNTRY_NAMES.get(_cc, _cc)
+
+    # Deadline
+    deadline_str, days_left_str, days_left = '', '', None
+    if sale.shipping_deadline:
+        deadline_str = sale.shipping_deadline.strftime('%d.%m.%Y')
+        days_left = (sale.shipping_deadline - timezone.now().date()).days
+        days_left_str = (
+            f'{days_left} дн.' if days_left > 1 else
+            'Завтра ⚠️' if days_left == 1 else
+            'Сьогодні! ⚠️' if days_left == 0 else
+            f'Прострочено ({-days_left} дн.) 🔴'
+        )
+
+    # CRM order count
+    crm_orders = None
+    try:
+        cust = sale.crm_customer
+        if not cust:
+            from crm.models import Customer as _Cust
+            _cn = (sale.client or '').strip()
+            if _cn:
+                cust = (
+                    _Cust.objects.filter(company__iexact=_cn).first()
+                    or _Cust.objects.filter(name__iexact=_cn).first()
+                )
+        if cust:
+            crm_orders = cust.total_orders()
+    except Exception:
+        pass
+
+    # Collect product lines — prefer DB lines, fall back to raw DigiKey data
     lines_data = []
     try:
         for line in sale.lines.select_related('product').all():
             p = line.product
+            img = ''
+            try:
+                img = _abs_url(p.image_display_url() or '') if p else ''
+            except Exception:
+                pass
             lines_data.append({
                 'sku':       (p.sku if p else line.sku_raw) or '—',
                 'name':      (p.name if p else '') or '—',
                 'qty':       line.qty,
                 'datasheet': (p.datasheet_url if p else '') or '',
-                'image':     (p.image_display_url() if p else '') or '',
+                'image':     img,
+                'in_stock':  None,
+                'unit_price': float(line.unit_price or 0),
+                'currency':  line.currency or '',
             })
+    except Exception:
+        pass
+
+    # Fallback: build lines_data from raw DigiKey API response
+    if not lines_data and raw_order:
+        try:
+            for detail in (raw_order.get('orderDetails') or []):
+                sku  = (detail.get('supplierSku') or detail.get('manufacturerPartNumber') or '').strip()
+                name = (detail.get('productDescription') or '').strip()
+                qty  = detail.get('quantity') or detail.get('adjustedQuantity') or 0
+                up   = detail.get('unitPrice')
+                lines_data.append({
+                    'sku':       sku or '—',
+                    'name':      name or '—',
+                    'qty':       qty,
+                    'datasheet': '',
+                    'image':     '',
+                    'in_stock':  None,
+                    'unit_price': float(up) if up else 0,
+                    'currency':  sale.currency or '',
+                })
+        except Exception:
+            pass
+
+    # Total
+    total_str = ''
+    try:
+        from django.db.models import Sum as _Sum
+        t = sale.lines.aggregate(s=_Sum('total_price'))['s']
+        if t:
+            total_str = f'{t} {sale.currency or ""}'.strip()
+        elif raw_order:
+            t = raw_order.get('totalPrice')
+            if t:
+                total_str = f'{t} {sale.currency or ""}'.strip()
     except Exception:
         pass
 
     if send_tg:
         try:
             _cname = _get_company_name()
-            tg = [
-                f'🏛️ <b>{_cname}</b>',
-                f'✅ <b>DigiKey: авто-підтверджено</b>',
-                '',
-                f'Замовлення: <code>{sale.order_number}</code>',
-                f'Клієнт: <b>{client}</b>',
-                f'🤖 Система підтвердила автоматично <i>({mode_label})</i>',
-                f'Статус → <b>В обробці</b>',
-            ]
+            tg = [f'🏛️ <b>{_cname}</b>']
+            tg.append(f'✅ <b>DigiKey: авто-підтверджено</b> · <i>{now_str}</i>')
+            tg.append('')
+            tg.append(f'📋 <code>{sale.order_number}</code> · digikey')
+            tg.append(f'👤 <b>{client}</b>')
+            if crm_orders is not None:
+                tg.append(f'   📊 Замовлень всього: <b>{crm_orders}</b>')
+            if destination:
+                tg.append(f'📍 {destination}')
+            if deadline_str:
+                dl_warn = ' ⚠️' if days_left is not None and days_left <= 2 else ''
+                tg.append(f'📦 Дедлайн: <b>{deadline_str}</b> ({days_left_str}){dl_warn}')
+            if total_str:
+                tg.append(f'💰 <b>{total_str}</b>')
+            tg.append(f'🤖 <i>Підтверджено автоматично ({mode_label})</i>')
+
             if lines_data:
                 tg.append('')
-                tg.append('📋 <b>Товари:</b>')
+                tg.append('📦 <b>Товари:</b>')
                 for ld in lines_data:
-                    name_part = f' {ld["name"]}' if ld['name'] not in ('—', '') else ''
-                    line_txt  = f'• <code>{ld["sku"]}</code>{name_part} × {ld["qty"]}'
+                    name_part = f' — {ld["name"]}' if ld['name'] not in ('—', '', None) else ''
+                    qty_val = ld["qty"] or 0
+                    qty_str = str(int(qty_val)) if qty_val and float(qty_val) == int(float(qty_val)) else str(qty_val)
+                    curr = ld.get('currency', '')
+                    line_lines = [f'• <code>{ld["sku"]}</code>{name_part}']
+                    line_lines.append(f'   📦 × <b>{qty_str} шт</b>')
+                    if ld.get('unit_price'):
+                        line_lines.append(f'   💵 {ld["unit_price"]:.2f} {curr}/шт'.strip())
                     if ld.get('datasheet'):
-                        line_txt += f'\n  <a href="{ld["datasheet"]}">📄 Datasheet</a>'
-                    tg.append(line_txt)
+                        line_lines.append(f'   📄 <a href="{ld["datasheet"]}">Datasheet</a>')
+                    tg.append('\n'.join(line_lines))
+
             tg_text = '\n'.join(tg)
             first_image = next(
                 (ld['image'] for ld in lines_data if ld.get('image', '').startswith('http')),

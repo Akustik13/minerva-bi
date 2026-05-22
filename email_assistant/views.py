@@ -189,11 +189,22 @@ def inbox_view(request):
     # rename key to `emails` to avoid shadowing Django messages framework
     emails = list(qs.select_related('thread')[start:start + per_page])
 
-    unread_count = EmailMessage.objects.filter(
+    from email_assistant.models import EmailThread as _ET
+    _archived_ids = _ET.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
+    unread_inbox = EmailMessage.objects.filter(
         account=account, folder='inbox',
         imap_folder_name__in=['', account.imap_folder_inbox],
-        is_read=False, is_deleted=False
-    ).count()
+        is_read=False, is_deleted=False,
+    ).exclude(thread_id__in=_archived_ids).count()
+    unread_counts = {
+        'inbox':    unread_inbox,
+        'starred':  EmailMessage.objects.filter(account=account, is_starred=True, is_read=False, is_deleted=False).count(),
+        'spam':     EmailMessage.objects.filter(account=account, is_spam=True, is_read=False, is_deleted=False).count(),
+        'sent':     0,
+        'archived': 0,
+        'trash':    0,
+    }
+    unread_count = unread_inbox  # backwards-compat for template
 
     return render(request, 'email_assistant/inbox.html', _ctx(request, {
         'title':                 'Email Асистент',
@@ -210,6 +221,7 @@ def inbox_view(request):
         'total_pages':           max(1, (total + per_page - 1) // per_page),
         'page_range':            _page_range(page, max(1, (total + per_page - 1) // per_page)),
         'unread_count':          unread_count,
+        'unread_counts':         unread_counts,
         'crm_contacts':          json.dumps(_crm_contacts(request.user)),
         'sync_interval_minutes': max(1, account.sync_interval_minutes),
     }))
@@ -842,13 +854,28 @@ def restore_message_view(request, message_pk):
 @staff_member_required
 @require_POST
 def toggle_spam_view(request, message_pk):
-    from email_assistant.models import EmailMessage
+    from email_assistant.models import EmailMessage, EmailRule
     account = _get_account(request)
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
     msg.is_spam = not msg.is_spam
     msg.folder  = EmailMessage.FOLDER_SPAM if msg.is_spam else EmailMessage.FOLDER_INBOX
     msg.save(update_fields=['is_spam', 'folder'])
-    return JsonResponse({'ok': True, 'spam': msg.is_spam})
+
+    auto_rule = None
+    if msg.is_spam and msg.from_email and '@' in msg.from_email:
+        domain = '@' + msg.from_email.split('@')[-1].lower().rstrip('>')
+        _, created = EmailRule.objects.get_or_create(
+            account=account,
+            condition_field=EmailRule.FIELD_FROM_EMAIL,
+            condition_op=EmailRule.OP_CONTAINS,
+            condition_value=domain,
+            action=EmailRule.ACTION_MARK_SPAM,
+            defaults={'name': f'Спам: {domain}'},
+        )
+        if created:
+            auto_rule = domain
+
+    return JsonResponse({'ok': True, 'spam': msg.is_spam, 'auto_rule': auto_rule})
 
 
 @staff_member_required

@@ -59,7 +59,7 @@
   flex:1;display:flex;flex-direction:column;min-height:0;
 }
 .em-msgs.has-expanded .em-card.expanded .em-body-iframe{
-  flex:1;min-height:100px;height:auto!important;
+  flex:1;min-height:200px;height:100%!important;
 }
 .em-msgs.has-expanded .em-card.expanded .em-card-body-text{
   max-height:none;flex:1;overflow-y:auto;
@@ -177,7 +177,7 @@
           <iframe src="/email/message/{{ msg.pk }}/html/"
                   class="em-body-iframe"
                   id="pv-iframe-{{ msg.pk }}"
-                  sandbox="allow-same-origin allow-popups"
+                  sandbox="allow-same-origin allow-popups allow-scripts"
                   onload="emResizeIframe(this)"></iframe>
           {% else %}
           <div class="em-card-body-text">{{ msg.body_text }}</div>
@@ -280,16 +280,25 @@ var CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 function emResizeIframe(f) {
   var msgs = f.closest ? f.closest('.em-msgs') : null;
   if (msgs && msgs.classList.contains('has-expanded')) {
-    f.style.height = ''; // CSS flex handles height in fullscreen
+    f.style.height = '100%';
     return;
   }
-  try {
-    var h = f.contentDocument.documentElement.scrollHeight || f.contentDocument.body.scrollHeight;
-    var maxH = Math.max(400, window.innerHeight - 180);
-    f.style.height = Math.min(h + 20, maxH) + 'px';
-  } catch(e) {
-    f.style.height = Math.max(400, window.innerHeight - 180) + 'px';
+  function _measure() {
+    try {
+      var doc = f.contentDocument || f.contentWindow.document;
+      var h = doc.documentElement.scrollHeight || doc.body.scrollHeight;
+      if (h > 50) {
+        f.style.height = Math.max(300, h + 20) + 'px';
+      } else {
+        f.style.height = '600px';
+      }
+    } catch(e) {
+      f.style.height = '600px';
+    }
   }
+  _measure();
+  // Re-measure once scripts have rendered (100ms after load)
+  setTimeout(_measure, 150);
 }
 window.emResizeIframe = emResizeIframe;
 
@@ -443,8 +452,19 @@ window.pvToggleSpam = async function(pk, btn) {
   var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
   if (d.ok) {
-    btn.textContent = d.spam ? '✓ {% trans "Спам" %}' : '🚫 {% trans "Спам" %}';
     btn.classList.toggle('spam-on', d.spam);
+    if (d.spam) {
+      btn.textContent = '✓ {% trans "Спам" %}';
+      if (d.auto_rule) {
+        var tip = document.createElement('div');
+        tip.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;padding:10px 18px;font-size:12px;color:var(--text-muted);z-index:99999;box-shadow:0 4px 14px rgba(0,0,0,.3)';
+        tip.textContent = '🚫 {% trans "Правило спаму додано для" %} ' + d.auto_rule;
+        document.body.appendChild(tip);
+        setTimeout(function(){ tip.remove(); }, 3500);
+      }
+    } else {
+      btn.textContent = '🚫 {% trans "Спам" %}';
+    }
   }
 };
 

@@ -127,14 +127,25 @@ def _capture_old_status(sender, instance, **kwargs):
 def _notify_order_events(sender, instance, created, **kwargs):
     """Надсилає сповіщення про нове замовлення або зміну статусу."""
     try:
-        from dashboard.notifications import notify_new_order, notify_status_change
         if created:
-            notify_new_order(instance)
+            # Delay until after transaction commits so order lines are already in DB.
+            from django.db import transaction as _tx
+            _pk = instance.pk
+            def _do_notify():
+                try:
+                    from sales.models import SalesOrder as _SO
+                    from dashboard.notifications import notify_new_order
+                    _order = _SO.objects.get(pk=_pk)
+                    notify_new_order(_order)
+                except Exception:
+                    pass
+            _tx.on_commit(_do_notify)
         else:
             # Batch syncs (DigiKey Marketplace, auto-tracking) set this flag and
             # handle their own notification via notify_sync_result — skip here.
             if getattr(instance, '_skip_status_notification', False):
                 return
+            from dashboard.notifications import notify_status_change
             old_status = getattr(instance, '_old_status', None)
             if old_status and old_status != instance.status:
                 notify_status_change(instance, old_status, instance.status)

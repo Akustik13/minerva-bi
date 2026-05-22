@@ -876,7 +876,7 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
         stats["changes"].append(_change_entry)
         _create_marketplace_lines(sale, order, currency, stats)
         if config:
-            _maybe_auto_confirm(config, order_number, sale, _change_entry)
+            _maybe_auto_confirm(config, order_number, sale, _change_entry, raw_order=order)
     else:
         # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
         update_fields = []
@@ -1248,7 +1248,7 @@ def _check_stock_for_order(sale) -> bool:
     return True
 
 
-def _maybe_auto_confirm(config, order_id: str, sale, change_entry: dict = None) -> None:
+def _maybe_auto_confirm(config, order_id: str, sale, change_entry: dict = None, raw_order: dict = None) -> None:
     """
     Перевіряє auto_confirm_mode і при потребі підтверджує замовлення на DigiKey.
     Викликається одразу після створення нового Marketplace замовлення.
@@ -1282,7 +1282,7 @@ def _maybe_auto_confirm(config, order_id: str, sale, change_entry: dict = None) 
             change_entry["extra"] = "🤖 авто-підтверджено"
         try:
             from dashboard.notifications import notify_digikey_auto_confirmed
-            notify_digikey_auto_confirmed(sale, mode)
+            notify_digikey_auto_confirmed(sale, mode, raw_order=raw_order)
         except Exception:
             pass
     else:
