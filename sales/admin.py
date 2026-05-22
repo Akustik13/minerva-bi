@@ -1445,7 +1445,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context = extra_context or {}
         try:
             obj = self.get_object(request, object_id)
-            if obj and obj.source == "digikey" and obj.status in ("received", "processing"):
+            if obj and obj.source == "digikey" and obj.status == "received":
+                # "processing" = already Accepted in DigiKey — no point calling /accept
                 from django.urls import reverse as _rev
                 extra_context["digikey_confirm_url"] = _rev(
                     "admin:bots_digikeyconfig_confirm_order",

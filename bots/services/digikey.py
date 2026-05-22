@@ -624,6 +624,7 @@ MARKETPLACE_STATUS_MAP = {
     "New":                "received",
     "PendingAcceptance":  "received",
     "AwaitingAcceptance": "received",
+    "WaitingAcceptance":  "received",   # DigiKey error message uses this spelling
     "Accepted":           "processing",
     "ShippingInProgress": "processing",
     "Shipped":            "shipped",
@@ -632,6 +633,11 @@ MARKETPLACE_STATUS_MAP = {
     "Completed":          "delivered",
     "Cancelled":          "cancelled",
     "Rejected":           "cancelled",
+}
+
+# States where DigiKey's /accept endpoint is allowed
+_MARKETPLACE_ACCEPTABLE_STATES = {
+    "New", "PendingAcceptance", "AwaitingAcceptance", "WaitingAcceptance",
 }
 
 # ISO 3166-1 alpha-3 → alpha-2 (найпоширеніші в e-commerce)
@@ -1331,21 +1337,46 @@ def confirm_marketplace_order(config, order_id: str) -> dict:
     PUT /Sales/Marketplace2/Orders/v1/orders/{orderId}/accept
     Body: {"acceptOrderDetails": [{"orderDetailId": "...", "accepted": true}]}
 
-    Спочатку отримує деталі замовлення (GET) щоб дістати orderDetailId кожного рядка,
-    потім відправляє PUT з підтвердженням усіх рядків.
+    Спочатку отримує деталі замовлення (GET) щоб дістати orderDetailId кожного рядка
+    та перевіряє поточний orderState — DigiKey приймає /accept тільки у стані
+    WaitingAcceptance/PendingAcceptance/AwaitingAcceptance/New.
     Повертає {'ok': bool, 'message': str, 'raw': dict}.
     """
     import requests as req
 
     token = get_marketplace_token(config)
 
-    # Отримуємо деталі замовлення — потрібні orderDetailId для кожного рядка
+    # GET — деталі замовлення: потрібні orderDetailId + перевірка orderState
     order_data = _fetch_marketplace_order(config, order_id, token)
+
+    current_state = order_data.get("orderState") or order_data.get("state") or ""
+
+    # Якщо замовлення вже не в стані "Waiting Acceptance" — не викликати PUT
+    if current_state and current_state not in _MARKETPLACE_ACCEPTABLE_STATES:
+        minerva_status = MARKETPLACE_STATUS_MAP.get(current_state, current_state)
+        logger.info(
+            "DigiKey confirm order %s skipped: orderState=%s (already past acceptance)",
+            order_id, current_state,
+        )
+        return {
+            "ok":      False,
+            "message": (
+                f"ℹ️ Замовлення вже підтверджено (DigiKey статус: {current_state}"
+                f"{' → ' + minerva_status if minerva_status != current_state else ''})."
+                f" Підтвердження можливе лише у стані Waiting Acceptance."
+            ),
+            "raw": {"orderState": current_state},
+        }
+
     accept_details = []
     for line in order_data.get("orderDetails") or []:
         detail_id = line.get("orderDetailId")
         if detail_id:
             accept_details.append({"orderDetailId": detail_id, "accepted": True})
+
+    if not accept_details:
+        logger.warning("DigiKey confirm order %s: no orderDetailId found in order data", order_id)
+        return {"ok": False, "message": "❌ Не знайдено рядків замовлення (orderDetailId відсутні)", "raw": order_data}
 
     payload = {"acceptOrderDetails": accept_details}
     url = f"{_base_url(config)}{MARKETPLACE_CONFIRM_PATH.format(order_id=order_id)}"
