@@ -1456,9 +1456,11 @@ def upload_vat_invoice(config, file_bytes: bytes, filename: str,
     params = {}
     if supplier_id:
         params["supplierId"] = supplier_id
+    import mimetypes
+    ct = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     resp = logged_request('digikey', 'upload_vat_invoice', 'POST', url, req.post,
                           headers=headers,
-                          files={"File": (filename, file_bytes)},
+                          files={"file": (filename, file_bytes, ct)},
                           params=params,
                           timeout=30)
     raw = {}

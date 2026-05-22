@@ -247,7 +247,7 @@ def digikey_ship_order(request, order_pk):
     from bots.models import DigiKeyConfig
     from bots.services.digikey import (
         ship_marketplace_order, upload_vat_invoice,
-        fetch_marketplace_order_data, link_vat_to_order, DigiKeyAPIError,
+        fetch_marketplace_order_data, DigiKeyAPIError,
     )
 
     order  = get_object_or_404(SalesOrder, pk=order_pk, source="digikey")
@@ -305,18 +305,14 @@ def digikey_ship_order(request, order_pk):
                     order.save(update_fields=update_fields)
                     msg.success(request, result["message"])
 
-                    # РЎРїСЂРѕР±Р° 3: РїСЂРёРІ'СЏР·Р°С‚Рё VAT С„Р°Р№Р» С‡РµСЂРµР· additionalFields (undocumented)
+                    # VAT file sent as supplierVATObjectId in ship request.
+                    # additionalFields/vatFileId does not exist in DigiKey API.
                     if vat_file_id:
-                        lnk = link_vat_to_order(config, order.order_number, vat_file_id)
-                        if lnk["ok"]:
-                            msg.success(request, f"рџ“Ћ {lnk['message']}")
-                        else:
-                            msg.warning(
-                                request,
-                                f"вљ пёЏ Р¤Р°Р№Р» VAT Р·Р°РІР°РЅС‚Р°Р¶РµРЅРѕ РЅР° DigiKey (ID: {vat_file_id}), "
-                                f"Р°Р»Рµ Р°РІС‚РѕРјР°С‚РёС‡РЅРѕ РїСЂРёРІ'СЏР·Р°С‚Рё РЅРµ РІРґР°Р»РѕСЃСЏ вЂ” РґРѕРґР°Р№ РІСЂСѓС‡РЅСѓ РЅР° СЃР°Р№С‚С– DigiKey. "
-                                f"({lnk['message']})"
-                            )
+                        msg.info(
+                            request,
+                            f"\U0001f4ce VAT \u0444\u0430\u0439\u043b \u0437\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043e \u043d\u0430 DigiKey (ID: {vat_file_id}). "
+                            f"\u042f\u043a\u0449\u043e \u043d\u0435 \u043f\u0440\u0438\u0432\u2019\u044f\u0437\u0430\u043b\u043e\u0441\u044c \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u043d\u043e \u2014 \u0434\u043e\u0434\u0430\u0439 \u0432\u0440\u0443\u0447\u043d\u0443 \u0443 DigiKey Marketplace."
+                        )
                 else:
                     msg.error(request, result["message"])
             except DigiKeyAPIError as e:
