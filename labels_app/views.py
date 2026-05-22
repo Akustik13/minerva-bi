@@ -136,22 +136,46 @@ def upload_label(request):
         if not name.endswith('.dymo'):
             results.append({'name': name, 'status': 'error', 'msg': 'Тільки .dymo файли'})
             continue
-        
+
         dest = LABELS_DIR / name
+        sku  = Path(name).stem
+
+        # Delete any existing label for this SKU that has a different filename
+        # (covers fuzzy matches like "AN100-01A Alt.dymo" being replaced by "AN100-01A.dymo")
+        old_path = get_label_path(sku)
+        replaced_old = None
+        if old_path and old_path.resolve() != dest.resolve():
+            replaced_old = old_path.name
+            old_path.unlink()
+
         existed = dest.exists()
-        
         with open(dest, 'wb') as out:
             for chunk in f.chunks():
                 out.write(chunk)
-        
+
         results.append({
-            'name': name,
-            'sku': Path(name).stem,
-            'status': 'updated' if existed else 'created',
-            'size': f.size,
+            'name':         name,
+            'sku':          sku,
+            'status':       'updated' if (existed or replaced_old) else 'created',
+            'size':         f.size,
+            'replaced_old': replaced_old,
         })
     
     return JsonResponse({'results': results})
+
+
+@staff_member_required
+@csrf_exempt
+def delete_label(request, sku):
+    """DELETE (або POST) — видаляє .dymo файл для SKU."""
+    if request.method not in ('POST', 'DELETE'):
+        return JsonResponse({'error': 'POST/DELETE only'}, status=405)
+    path = get_label_path(sku)
+    if not path:
+        return JsonResponse({'ok': False, 'error': f'Етикетку для {sku} не знайдено'}, status=404)
+    filename = path.name
+    path.unlink()
+    return JsonResponse({'ok': True, 'deleted': filename})
 
 
 @staff_member_required

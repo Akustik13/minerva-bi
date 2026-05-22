@@ -40,7 +40,7 @@
     </thead>
     <tbody>
       {% for lbl in labels %}
-      <tr style="border-bottom:1px solid var(--border)">
+      <tr id="lbl-row-{{ lbl.sku }}" style="border-bottom:1px solid var(--border)">
         <td style="padding:8px 10px;font-family:monospace;font-weight:700;color:var(--text)">
           {{ lbl.sku }}</td>
         <td style="padding:8px 10px;color:var(--text-muted)">{{ lbl.filename }}</td>
@@ -48,12 +48,19 @@
           {{ lbl.size_kb }} KB</td>
         <td style="padding:8px 10px;color:var(--text-muted);white-space:nowrap">
           {{ lbl.modified_fmt }}</td>
-        <td style="padding:8px 10px;text-align:center">
+        <td style="padding:8px 10px;text-align:center;white-space:nowrap">
           <a href="/labels/serve/{{ lbl.sku }}/?qty=1" target="_blank"
              style="background:#1565c0;color:#fff;padding:3px 10px;border-radius:4px;
                     text-decoration:none;font-size:12px;font-weight:600">
             🖨️ Друкувати
           </a>
+          <button type="button"
+                  onclick="deleteLabel('{{ lbl.sku }}')"
+                  style="background:var(--err,#c62828);color:#fff;padding:3px 10px;
+                         border-radius:4px;border:none;cursor:pointer;font-size:12px;
+                         font-weight:600;margin-left:6px">
+            🗑️
+          </button>
         </td>
       </tr>
       {% endfor %}
@@ -65,32 +72,29 @@
 </div>
 
 <script>
-{% csrf_token %}
-(function () {
-  var csrfToken = '{{ csrf_token }}';
-  document.getElementById('dymoUploadBtn').addEventListener('click', function () {
-    var input = document.getElementById('dymoFiles');
-    var result = document.getElementById('dymoResult');
-    if (!input.files.length) {
-      result.innerHTML = '<span style="color:#f44336">Оберіть файли!</span>';
-      return;
-    }
-    var fd = new FormData();
-    for (var i = 0; i < input.files.length; i++) fd.append('labels', input.files[i]);
-    result.innerHTML = '⏳ Завантаження...';
-    fetch('/labels/upload/', {
-      method: 'POST',
-      headers: {'X-CSRFToken': csrfToken},
-      body: fd,
-    })
+var csrfToken = '{{ csrf_token }}';
+
+/* ── Upload ─────────────────────────────────────────────────────── */
+document.getElementById('dymoUploadBtn').addEventListener('click', function () {
+  var input  = document.getElementById('dymoFiles');
+  var result = document.getElementById('dymoResult');
+  if (!input.files.length) {
+    result.innerHTML = '<span style="color:var(--err)">Оберіть файли!</span>';
+    return;
+  }
+  var fd = new FormData();
+  for (var i = 0; i < input.files.length; i++) fd.append('labels', input.files[i]);
+  result.innerHTML = '⏳ Завантаження...';
+  fetch('/labels/upload/', { method: 'POST', headers: {'X-CSRFToken': csrfToken}, body: fd })
     .then(function (r) { return r.json(); })
     .then(function (data) {
       var html = '<ul style="margin:5px 0;padding-left:20px">';
       data.results.forEach(function (r) {
-        var icon = r.status === 'created' ? '✅' : r.status === 'updated' ? '🔄' : '❌';
-        var color = r.status === 'error' ? '#f44336' : '#4caf50';
+        var icon  = r.status === 'created' ? '✅' : r.status === 'updated' ? '🔄' : '❌';
+        var color = r.status === 'error'   ? 'var(--err)' : 'var(--ok)';
         html += '<li style="color:' + color + '">' + icon + ' ' + r.name + ': ' + r.status;
-        if (r.size) html += ' (' + (r.size / 1024).toFixed(1) + ' KB)';
+        if (r.size)         html += ' (' + (r.size / 1024).toFixed(1) + ' KB)';
+        if (r.replaced_old) html += ' <span style="color:var(--text-dim);font-size:11px">(видалено: ' + r.replaced_old + ')</span>';
         html += '</li>';
       });
       html += '</ul><button onclick="location.reload()" '
@@ -99,9 +103,30 @@
       result.innerHTML = html;
     })
     .catch(function (e) {
-      result.innerHTML = '<span style="color:#f44336">Помилка: ' + e + '</span>';
+      result.innerHTML = '<span style="color:var(--err)">Помилка: ' + e + '</span>';
     });
-  });
-})();
+});
+
+/* ── Delete ─────────────────────────────────────────────────────── */
+function deleteLabel(sku) {
+  if (!confirm('Видалити етикетку ' + sku + '?')) return;
+  fetch('/labels/delete/' + encodeURIComponent(sku) + '/', {
+    method: 'POST',
+    headers: {'X-CSRFToken': csrfToken},
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
+    if (data.ok) {
+      var row = document.getElementById('lbl-row-' + sku);
+      if (row) row.remove();
+      /* update count */
+      var cnt = document.querySelector('b[style*="color:var(--text)"]');
+      if (cnt) cnt.textContent = parseInt(cnt.textContent || '0') - 1;
+    } else {
+      alert('Помилка: ' + (data.error || 'невідома'));
+    }
+  })
+  .catch(function (e) { alert('Помилка мережі: ' + e); });
+}
 </script>
 {% endblock %}

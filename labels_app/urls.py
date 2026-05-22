@@ -4,8 +4,9 @@ from . import views
 app_name = 'labels'
 
 urlpatterns = [
-    path('serve/<str:sku>/',  views.serve_label,  name='serve'),
-    path('status/',           views.label_status,  name='status'),
-    path('upload/',           views.upload_label,  name='upload'),
-    path('list/',             views.list_labels,   name='list'),
+    path('serve/<str:sku>/',   views.serve_label,   name='serve'),
+    path('status/',            views.label_status,  name='status'),
+    path('upload/',            views.upload_label,  name='upload'),
+    path('delete/<str:sku>/',  views.delete_label,  name='delete'),
+    path('list/',              views.list_labels,   name='list'),
 ]
