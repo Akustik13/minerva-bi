@@ -16,6 +16,19 @@ from django.views.decorators.http import require_http_methods
 logger = logging.getLogger(__name__)
 
 
+def _match_carrier_id(shipping_courier, carriers):
+    """Return the DigiKey carrier UUID that best matches order.shipping_courier."""
+    if not shipping_courier or not carriers:
+        return None
+    sc = shipping_courier.lower().strip()
+    for c in carriers:
+        label = (c.get("label") or "").lower()
+        code  = (c.get("code") or "").lower()
+        if sc and (sc in label or label.startswith(sc) or (code and sc in code)):
+            return c.get("id") or c.get("carrierId")
+    return None
+
+
 def digikey_oauth_callback(request):
     """
     РћР±СЂРѕР±Р»СЏС” redirect РІС–Рґ DigiKey РїС–СЃР»СЏ Р°РІС‚РѕСЂРёР·Р°С†С–С— РєРѕСЂРёСЃС‚СѓРІР°С‡Р°.
@@ -331,6 +344,9 @@ def digikey_ship_order(request, order_pk):
             order_details = []
             supplier_id   = ""
 
+    # Auto-match order.shipping_courier against DigiKey carrier list
+    preset_carrier_id = _match_carrier_id(order.shipping_courier, carriers)
+
     EU_COUNTRIES = {
         "AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI",
         "FR","GR","HR","HU","IE","IT","LT","LU","LV","MT",
@@ -347,7 +363,8 @@ def digikey_ship_order(request, order_pk):
         "carriers":      carriers,
         "order_details": order_details,
         "supplier_id":   supplier_id,
-        "is_eu":         is_eu,
+        "is_eu":            is_eu,
+        "preset_carrier_id": preset_carrier_id,
     })
 
 

@@ -115,9 +115,14 @@
                      color:var(--text);font-size:13px;box-sizing:border-box">
         <option value="">— не вказувати —</option>
         {% for c in carriers %}
-        <option value="{{ c.id }}">{{ c.label }}{% if c.code %} ({{ c.code }}){% endif %}</option>
+        <option value="{{ c.id }}"{% if c.id == preset_carrier_id %} selected{% endif %}>{{ c.label }}{% if c.code %} ({{ c.code }}){% endif %}</option>
         {% endfor %}
       </select>
+      {% if preset_carrier_id %}
+      <div style="font-size:11px;color:var(--ok);margin-top:4px">
+        ✓ Автоматично підібрано з замовлення ({{ order.shipping_courier }})
+      </div>
+      {% endif %}
       {% else %}
       <input type="text" name="carrier_id"
              placeholder="UUID перевізника (залиш порожнім якщо невідомо)"
