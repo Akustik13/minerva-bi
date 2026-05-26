@@ -26,10 +26,14 @@ class CompanySettingsAdmin(admin.ModelAdmin):
             "fields": ("addr_street", ("addr_city", "addr_zip", "addr_country"))
         }),
         ("💳 Реквізити", {
-            "fields": ("vat_id", "iban", "swift", "bank_name")
+            "fields": ("vat_id", "eori", "tax_id", "registration_court", "iban", "swift", "bank_name")
         }),
         ("📞 Контакти", {
-            "fields": ("email", "phone")
+            "fields": ("email", "phone", "fax", "mobile", "website")
+        }),
+        ("🖊 Підписант", {
+            "fields": ("ceo_name",),
+            "description": "Ім'я та посада під підписом, напр.: Dr. Max Mustermann, CEO",
         }),
         ("🔢 Нумерація рахунків", {
             "fields": ("invoice_prefix", "next_number"),

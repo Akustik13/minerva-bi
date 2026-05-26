@@ -23,7 +23,20 @@ class CompanySettings(models.Model):
     bank_name      = models.CharField("Банк", max_length=255, blank=True, default="")
     swift          = models.CharField("SWIFT/BIC", max_length=11, blank=True, default="")
     email          = models.EmailField("Email", blank=True, default="")
-    phone          = models.CharField("Телефон", max_length=50, blank=True, default="")
+    phone          = models.CharField("Телефон (Tel)", max_length=50, blank=True, default="")
+    fax            = models.CharField("Факс (Fax)", max_length=50, blank=True, default="")
+    mobile         = models.CharField("Мобільний (Mob)", max_length=50, blank=True, default="")
+    website        = models.CharField("Сайт", max_length=200, blank=True, default="")
+    eori           = models.CharField("EORI номер", max_length=50, blank=True, default="")
+    tax_id         = models.CharField("TAX ID (Steuernummer)", max_length=50, blank=True, default="")
+    registration_court = models.CharField(
+        "Реєстраційний суд (напр. Munich, HRB 208657)",
+        max_length=100, blank=True, default="",
+    )
+    ceo_name       = models.CharField(
+        "Підписант (для рахунків)", max_length=200, blank=True, default="",
+        help_text="Ім'я та посада, напр.: Dr. Max Mustermann, CEO",
+    )
     logo           = models.FileField("Логотип (PNG/JPG)", upload_to="accounting/logos/",
                                       null=True, blank=True)
     invoice_prefix    = models.CharField("Префікс рахунку", max_length=10, default="INV")

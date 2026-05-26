@@ -1,4 +1,4 @@
-"""EU Invoice PDF generator for DigiKey Marketplace and other EU buyers."""
+"""EU Invoice PDF generator — layout matches Invoice_10229 template."""
 from __future__ import annotations
 
 import os
@@ -11,12 +11,10 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-    HRFlowable, Image,
+    HRFlowable, Image, KeepTogether,
 )
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 
-
-# ── Reuse font registration from doc_generators ───────────────────────────────
 try:
     from sales.doc_generators import _FONT, _FONT_BOLD, _UNIT_LABEL
 except Exception:
@@ -24,22 +22,36 @@ except Exception:
     _UNIT_LABEL = {}
 
 
-# ── Colours ───────────────────────────────────────────────────────────────────
-_DARK   = colors.HexColor("#1a237e")
-_GREY   = colors.HexColor("#546e7a")
-_LIGHT  = colors.HexColor("#e8eaf6")
-_SUBTLE = colors.HexColor("#f5f5f5")
-_WHITE  = colors.white
-_BLACK  = colors.black
-
-
 def _r2(v) -> Decimal:
     return Decimal(str(v)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
-def _fmt(amount: Decimal, currency: str = "") -> str:
-    prefix = f"{currency} " if currency else ""
-    return f"{prefix}{amount:,.2f}"
+def _eu_num(amount: Decimal) -> str:
+    """Format with comma decimal separator: 79,99"""
+    s = f"{amount:,.2f}"          # "79.99" or "1,234.56"
+    # swap . and , (US→EU format)
+    return s.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _p(text, size=9, bold=False, align=TA_LEFT, color=colors.black, leading=None):
+    font = _FONT_BOLD if bold else _FONT
+    ps = ParagraphStyle(
+        "_p",
+        fontName=font, fontSize=size,
+        leading=leading or (size * 1.35),
+        textColor=color, alignment=align,
+        spaceAfter=0, spaceBefore=0,
+    )
+    return Paragraph(str(text) if text is not None else "", ps)
+
+
+def _safe_img(path, width, height):
+    if path and os.path.isfile(path):
+        try:
+            return Image(path, width=width, height=height, kind="proportional")
+        except Exception:
+            pass
+    return None
 
 
 def generate_eu_invoice(
@@ -54,29 +66,13 @@ def generate_eu_invoice(
     discount_pct: Decimal = Decimal("0"),
     vat_rate: Decimal = Decimal("19"),
 ) -> bytes:
-    """Generate a professional EU Invoice PDF and return as bytes."""
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
-        leftMargin=1.8 * cm, rightMargin=1.8 * cm,
-        topMargin=1.5 * cm, bottomMargin=2 * cm,
+        leftMargin=2.0 * cm, rightMargin=2.0 * cm,
+        topMargin=1.5 * cm, bottomMargin=2.2 * cm,
     )
-    page_w = A4[0] - 3.6 * cm
-
-    def _p(text, size=9, bold=False, align=TA_LEFT, color=_BLACK, leading=None):
-        font = _FONT_BOLD if bold else _FONT
-        ps = ParagraphStyle(
-            "_p",
-            fontName=font, fontSize=size,
-            leading=leading or (size * 1.35),
-            textColor=color, alignment=align,
-            spaceAfter=0, spaceBefore=0,
-        )
-        return Paragraph(str(text) if text is not None else "", ps)
-
-    def _cell(paragraphs):
-        """Wrap a list of mixed Paragraph/Spacer/Image in a simple 1-col table cell."""
-        return paragraphs  # ReportLab accepts a list in a table cell
+    page_w = A4[0] - 4.0 * cm   # usable width ≈ 17.1 cm
 
     story = []
 
@@ -87,334 +83,383 @@ def generate_eu_invoice(
     except Exception:
         cs = None
 
-    co_name    = (cs.legal_name or cs.name) if cs else "Seller"
-    co_addr_parts = []
-    if cs:
-        if cs.addr_street:
-            co_addr_parts.append(cs.addr_street)
-        city_line = " ".join(filter(None, [cs.addr_zip, cs.addr_city]))
-        if city_line:
-            co_addr_parts.append(city_line)
-        if cs.addr_country:
-            co_addr_parts.append(cs.addr_country)
-    co_vat     = cs.vat_id if cs else ""
-    co_iban    = cs.iban if cs else ""
-    co_swift   = cs.swift if cs else ""
-    co_bank    = cs.bank_name if cs else ""
-    co_email   = cs.email if cs else ""
-    co_phone   = cs.phone if cs else ""
+    co_name   = (cs.legal_name or cs.name) if cs else "Seller"
+    co_street = cs.addr_street if cs else ""
+    co_city   = " ".join(filter(None, [cs.addr_zip if cs else "", cs.addr_city if cs else ""]))
+    co_country = cs.addr_country if cs else ""
+    co_vat    = cs.vat_id if cs else ""
+    co_iban   = cs.iban if cs else ""
+    co_swift  = cs.swift if cs else ""
+    co_bank   = cs.bank_name if cs else ""
+    co_email  = cs.email if cs else ""
+    co_phone  = cs.phone if cs else ""
+    co_fax    = getattr(cs, "fax", "") or ""
+    co_mobile = getattr(cs, "mobile", "") or ""
+    co_website = getattr(cs, "website", "") or ""
+    co_eori   = getattr(cs, "eori", "") or ""
+    co_tax_id = getattr(cs, "tax_id", "") or ""
+    co_reg    = getattr(cs, "registration_court", "") or ""
+    co_ceo    = getattr(cs, "ceo_name", "") or ""
 
-    logo_path  = None
-    sig_path   = None
-    stamp_path = None
-    if cs:
-        if cs.logo:
-            try:
-                logo_path = cs.logo.path
-                if not os.path.isfile(logo_path):
-                    logo_path = None
-            except Exception:
-                logo_path = None
-        if cs.invoice_signature:
-            try:
-                sig_path = cs.invoice_signature.path
-                if not os.path.isfile(sig_path):
-                    sig_path = None
-            except Exception:
-                sig_path = None
-        if cs.invoice_stamp:
-            try:
-                stamp_path = cs.invoice_stamp.path
-                if not os.path.isfile(stamp_path):
-                    stamp_path = None
-            except Exception:
-                stamp_path = None
+    logo_img  = _safe_img(cs.logo.path if cs and cs.logo else None,    4.5*cm, 2.0*cm)
+    sig_img   = _safe_img(cs.invoice_signature.path if cs and cs.invoice_signature else None, 3.5*cm, 1.8*cm)
 
-    # ── Date formatting ───────────────────────────────────────────────────────
-    def _fmt_date(d):
+    # ── Date helpers ──────────────────────────────────────────────────────────
+    def _fd(d):
         if not d:
             return ""
         try:
-            return d.strftime("%d.%m.%Y")
+            return d.strftime("%m/%d/%Y")
         except Exception:
             return str(d)
 
-    inv_date_str   = _fmt_date(invoice_date)
-    order_date_str = _fmt_date(order.order_date)
-    shipped_str    = _fmt_date(order.shipped_at)
-    currency       = order.currency or "EUR"
+    currency       = order.currency or "USD"
+    inv_date_str   = _fd(invoice_date)
+    order_date_str = _fd(order.order_date)
+    shipped_str    = _fd(order.shipped_at)
 
-    # ── 1. HEADER ─────────────────────────────────────────────────────────────
-    if logo_path:
-        logo_cell = Image(logo_path, width=4.5 * cm, height=2 * cm, kind="proportional")
+    # ═════════════════════════════════════════════════════════════════════════
+    # 1. TOP HEADER: Invoice No. (left) | Logo + company block (right)
+    # ═════════════════════════════════════════════════════════════════════════
+    inv_no_cell = [_p(f"Invoice No.: {invoice_number}", size=10, bold=True)]
+
+    # Company info block (right side)
+    right_block = []
+    if logo_img:
+        right_block.append(logo_img)
     else:
-        logo_cell = _cell([
-            _p(co_name, size=12, bold=True, color=_DARK),
-        ])
+        right_block.append(_p(co_name, size=13, bold=True))
+    right_block.append(Spacer(1, 0.15*cm))
+    right_block.append(_p(f"<b>{co_name}</b>", size=9, align=TA_RIGHT))
+    if co_street:
+        right_block.append(_p(co_street, size=9, align=TA_RIGHT))
+    if co_city:
+        right_block.append(_p(co_city, size=9, align=TA_RIGHT))
+    if co_country:
+        right_block.append(_p(co_country, size=9, align=TA_RIGHT))
+    right_block.append(Spacer(1, 0.1*cm))
+    if co_phone:
+        right_block.append(_p(f"Tel.:  {co_phone}", size=8, align=TA_RIGHT))
+    if co_fax:
+        right_block.append(_p(f"Fax:  {co_fax}", size=8, align=TA_RIGHT))
+    if co_mobile:
+        right_block.append(_p(f"Mob:  {co_mobile}", size=8, align=TA_RIGHT))
+    right_block.append(Spacer(1, 0.1*cm))
+    if co_email:
+        right_block.append(_p(f"E-Mail:   {co_email}", size=8, align=TA_RIGHT))
+    if co_website:
+        right_block.append(_p(f"Internet:  {co_website}", size=8, align=TA_RIGHT))
 
-    right_meta = [
-        _p(f"Invoice No.: {invoice_number}", size=9, bold=True, align=TA_RIGHT, color=_DARK),
-        _p(f"Invoice Date: {inv_date_str}", size=8, align=TA_RIGHT),
-        _p(f"Order No.: {order.order_number}", size=8, align=TA_RIGHT),
-    ]
-    if order_date_str:
-        right_meta.append(_p(f"Order Date: {order_date_str}", size=8, align=TA_RIGHT))
-    if shipped_str:
-        right_meta.append(_p(f"Date of Shipment: {shipped_str}", size=8, align=TA_RIGHT))
-
-    header_data = [[logo_cell, _p("INVOICE", size=18, bold=True, align=TA_CENTER, color=_DARK), right_meta]]
-    header_tbl = Table(header_data, colWidths=[5.5 * cm, 6 * cm, 6.5 * cm])
+    header_tbl = Table(
+        [[inv_no_cell, right_block]],
+        colWidths=[page_w * 0.45, page_w * 0.55],
+    )
     header_tbl.setStyle(TableStyle([
-        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING",    (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (-1, 0), (-1, -1), 0),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
     ]))
     story.append(header_tbl)
-    story.append(HRFlowable(width="100%", thickness=2, color=_DARK, spaceAfter=10))
+    story.append(Spacer(1, 0.6*cm))
 
-    # ── 2. BILL TO / SELLER INFO ──────────────────────────────────────────────
-    bill_name = buyer_name or order.client or ""
-    bill_addr = buyer_address or ""
+    # ═════════════════════════════════════════════════════════════════════════
+    # 2. BILL-TO ADDRESS (left) — return-address line above
+    # ═════════════════════════════════════════════════════════════════════════
+    # Small return-address underlined text
+    return_addr = ", ".join(filter(None, [co_name, co_street, co_city, co_country]))
+    bill_name   = buyer_name or order.client or ""
+    bill_lines  = [bill_name] + [l.strip() for l in buyer_address.splitlines() if l.strip()]
 
-    bill_to_content = [_p("Bill To:", size=8, bold=True, color=_DARK)]
-    if bill_name:
-        bill_to_content.append(_p(bill_name, size=9, bold=True))
-    for line in bill_addr.splitlines():
-        if line.strip():
-            bill_to_content.append(_p(line.strip(), size=8))
-    if buyer_vat_id:
-        bill_to_content.append(_p(f"VAT ID: {buyer_vat_id}", size=8))
+    addr_cell = []
+    if return_addr:
+        addr_cell.append(_p(f"<u>{return_addr}</u>", size=7,
+                            color=colors.HexColor("#555555")))
+        addr_cell.append(Spacer(1, 0.1*cm))
+    for i, line in enumerate(bill_lines):
+        addr_cell.append(_p(line, size=10 if i == 0 else 9,
+                            bold=(i == 0)))
 
-    seller_content = [_p("From:", size=8, bold=True, color=_DARK)]
-    seller_content.append(_p(co_name, size=9, bold=True))
-    for line in co_addr_parts:
-        seller_content.append(_p(line, size=8))
-    if co_vat:
-        seller_content.append(_p(f"VAT: {co_vat}", size=8))
-    if co_email:
-        seller_content.append(_p(co_email, size=8))
-    if co_phone:
-        seller_content.append(_p(co_phone, size=8))
-
-    addr_tbl = Table(
-        [[bill_to_content, seller_content]],
-        colWidths=[page_w * 0.55, page_w * 0.45],
-    )
+    addr_tbl = Table([[addr_cell, []]], colWidths=[page_w * 0.50, page_w * 0.50])
     addr_tbl.setStyle(TableStyle([
-        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING",    (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (-1, 0), (-1, -1), 0),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
     ]))
     story.append(addr_tbl)
+    story.append(Spacer(1, 0.8*cm))
 
-    # ── 3. SHIP TO ────────────────────────────────────────────────────────────
+    # ═════════════════════════════════════════════════════════════════════════
+    # 3. INVOICE TITLE
+    # ═════════════════════════════════════════════════════════════════════════
+    story.append(_p("INVOICE", size=18, bold=True, align=TA_CENTER))
+    story.append(Spacer(1, 0.6*cm))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 4. REFERENCE BLOCK: Your… | Our…
+    # ═════════════════════════════════════════════════════════════════════════
+    left_refs = [
+        _p(f"Your Order No.: <b>{order.order_number}</b>", size=9),
+        _p(f"Your Order Date: {order_date_str}", size=9),
+    ]
+    if buyer_vat_id:
+        left_refs.append(_p(f"<b>Your VAT ID: {buyer_vat_id}</b>", size=9))
+    if shipped_str:
+        left_refs.append(_p(f"Date of shipment: {shipped_str}", size=9))
+
+    right_refs = [
+        _p(f"Our Invoice No.: <b>{invoice_number}</b>", size=9),
+        _p(f"Our Invoice Date: {inv_date_str}", size=9),
+    ]
+    if co_vat:
+        right_refs.append(_p(f"<b>Our VAT ID: {co_vat}</b>", size=9))
+    if co_eori:
+        right_refs.append(_p(f"Our EORI: {co_eori}", size=9))
+
+    ref_tbl = Table([[left_refs, right_refs]], colWidths=[page_w * 0.50, page_w * 0.50])
+    ref_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (-1, 0), (-1, -1), 0),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 3),
+    ]))
+    story.append(ref_tbl)
+    story.append(Spacer(1, 0.5*cm))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 5. GREETING
+    # ═════════════════════════════════════════════════════════════════════════
+    story.append(_p("Dear Ladies and Gentlemen,", size=9))
+    story.append(Spacer(1, 0.2*cm))
+    story.append(_p("Herewith we would like to charge:", size=9))
+    story.append(Spacer(1, 0.3*cm))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 6. ITEMS TABLE
+    # ═════════════════════════════════════════════════════════════════════════
+    lines = list(order.lines.select_related("product").all())
+
+    col_w = [1.2*cm, 8.5*cm, 2.5*cm, 2.5*cm, 2.4*cm]
+    hdr_ps = ParagraphStyle("th", fontName=_FONT_BOLD, fontSize=9,
+                             leading=12, alignment=TA_CENTER)
+    headers = [
+        Paragraph("Pos.", hdr_ps),
+        Paragraph("Description", hdr_ps),
+        Paragraph(f"Quantity,\nUnits", hdr_ps),
+        Paragraph(f"Price/Unit,\n{currency}", hdr_ps),
+        Paragraph(f"Amount,\n{currency}", hdr_ps),
+    ]
+
+    subtotal = Decimal("0")
+    item_rows = []
+
+    for i, line in enumerate(lines, 1):
+        sku  = line.sku_raw or (line.product.sku if line.product else "")
+        name = line.product.name if line.product else ""
+        # Two-line description: SKU bold + product name
+        if sku and name and sku != name:
+            desc_text = f"<b>{sku}</b><br/>{name}"
+        else:
+            desc_text = f"<b>{sku or name}</b>"
+
+        qty_val    = line.qty
+        unit_price = line.unit_price or Decimal("0")
+        if line.total_price:
+            line_total = _r2(line.total_price)
+        else:
+            line_total = _r2(unit_price * qty_val)
+        subtotal += line_total
+
+        unit_label = "pcs"
+        if line.product:
+            unit_label = _UNIT_LABEL.get(getattr(line.product, "unit_type", ""), "pcs")
+
+        item_rows.append([
+            _p(str(i), size=9, align=TA_CENTER),
+            Paragraph(desc_text, ParagraphStyle("d", fontName=_FONT, fontSize=9, leading=12)),
+            _p(f"{qty_val:g}", size=9, align=TA_CENTER),
+            _p(_eu_num(unit_price),   size=9, align=TA_RIGHT),
+            _p(_eu_num(line_total),   size=9, align=TA_RIGHT),
+        ])
+
+    # Discount row
+    discount_amount = _r2(subtotal * discount_pct / 100) if discount_pct else Decimal("0")
+    if discount_amount:
+        disc_label = f"Discount {discount_pct:.0f}%"
+        item_rows.append([
+            _p(str(len(lines) + 1), size=9, align=TA_CENTER),
+            _p(disc_label, size=9),
+            _p("", size=9), _p("", size=9),
+            _p(f"- {_eu_num(discount_amount)}", size=9, align=TA_RIGHT),
+        ])
+
+    # Shipping row
+    ship_cost    = _r2(order.shipping_cost or Decimal("0"))
+    ship_pos     = len(lines) + (2 if discount_amount else 1)
+    if ship_cost:
+        item_rows.append([
+            _p(str(ship_pos), size=9, align=TA_CENTER),
+            _p("Shipping Charges", size=9),
+            _p("1,0", size=9, align=TA_CENTER),
+            _p(_eu_num(ship_cost), size=9, align=TA_RIGHT),
+            _p(_eu_num(ship_cost), size=9, align=TA_RIGHT),
+        ])
+
+    # Totals rows
+    net_goods   = _r2(subtotal - discount_amount)
+    vat_base    = net_goods
+    vat_amount  = _r2(vat_base * vat_rate / 100) if vat_rate else Decimal("0")
+    grand_total = _r2(net_goods + vat_amount + ship_cost)
+
+    _s = ParagraphStyle("ts", fontName=_FONT, fontSize=9, leading=12)
+    _sb = ParagraphStyle("tsb", fontName=_FONT_BOLD, fontSize=9, leading=12)
+
+    def _trow(label, amount, bold=False):
+        ps = _sb if bold else _s
+        return [
+            Paragraph("", ps),
+            Paragraph(label, ps),
+            Paragraph("", ps),
+            Paragraph("", ps),
+            Paragraph(_eu_num(amount), ps if not bold else _sb),
+        ]
+
+    item_rows.append(_trow("Total Amount without VAT", net_goods + ship_cost))
+    item_rows.append(_trow(f"VAT {vat_rate:.0f}%", vat_amount))
+    item_rows.append(_trow("Total Amount with VAT", grand_total, bold=True))
+
+    n_items = len(lines) + (1 if discount_amount else 0) + (1 if ship_cost else 0)
+    n_total_rows = 3  # subtotal, vat, grand total
+
+    all_rows  = [headers] + item_rows
+    items_tbl = Table(all_rows, colWidths=col_w, repeatRows=1)
+
+    n_data = len(all_rows)
+    first_total_row = 1 + n_items + 1  # header + items + 1 (0-indexed)
+
+    style_cmds = [
+        # outer border
+        ("BOX",       (0, 0), (-1, -1), 0.8, colors.black),
+        # header row
+        ("BOX",       (0, 0), (-1, 0), 1.0, colors.black),
+        ("FONTNAME",  (0, 0), (-1, 0), _FONT_BOLD),
+        ("FONTSIZE",  (0, 0), (-1, 0), 9),
+        ("ALIGN",     (0, 0), (-1, 0), "CENTER"),
+        ("VALIGN",    (0, 0), (-1, 0), "MIDDLE"),
+        ("TOPPADDING",    (0, 0), (-1, 0), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
+        # data rows
+        ("FONTSIZE",  (0, 1), (-1, -1), 9),
+        ("TOPPADDING",    (0, 1), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING",  (-1, 0), (-1, -1), 5),
+        # inner grid for item rows
+        ("INNERGRID", (0, 0), (-1, first_total_row - 1), 0.4, colors.black),
+        # align amounts right
+        ("ALIGN",     (2, 1), (2, -1), "CENTER"),
+        ("ALIGN",     (3, 1), (4, -1), "RIGHT"),
+        # total rows separator
+        ("LINEABOVE", (0, first_total_row), (-1, first_total_row), 0.8, colors.black),
+        ("LINEBELOW", (0, -1), (-1, -1), 0.8, colors.black),
+        # grand total bold
+        ("FONTNAME",  (0, -1), (-1, -1), _FONT_BOLD),
+    ]
+    items_tbl.setStyle(TableStyle(style_cmds))
+    story.append(items_tbl)
+    story.append(Spacer(1, 0.6*cm))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 7. SHIPPED TO / FROM
+    # ═════════════════════════════════════════════════════════════════════════
     ship_company = order.ship_company or ""
     ship_person  = order.ship_name or order.contact_name or ""
     ship_street  = order.addr_street or ""
     city_zip     = " ".join(filter(None, [order.addr_zip, order.addr_city]))
     ship_country = order.addr_country or ""
 
-    if ship_company or ship_street:
-        ship_content = [_p("Shipped To:", size=8, bold=True, color=_DARK)]
-        if ship_company:
-            ship_content.append(_p(ship_company, size=8, bold=True))
-        if ship_person and ship_person != ship_company:
-            ship_content.append(_p(ship_person, size=8))
-        if ship_street:
-            ship_content.append(_p(ship_street, size=8))
-        addr_line2 = ", ".join(filter(None, [city_zip, ship_country]))
-        if addr_line2:
-            ship_content.append(_p(addr_line2, size=8))
-        if ship_vat_id:
-            ship_content.append(_p(f"VAT ID: {ship_vat_id}", size=8))
+    to_cell = [_p("<b>Shipped to:</b>", size=9)]
+    for line in filter(None, [ship_company, ship_person, ship_street,
+                               f"{city_zip}, {ship_country}".strip(", ")]):
+        to_cell.append(_p(line, size=9))
+    if ship_vat_id:
+        to_cell.append(_p(f"VAT ID: {ship_vat_id}", size=9))
 
-        ship_tbl = Table(
-            [[ship_content, []]],
-            colWidths=[page_w * 0.55, page_w * 0.45],
-        )
-        ship_tbl.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING",    (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
-            ("LEFTPADDING",   (0, 0), (-1, -1), 0),
-        ]))
-        story.append(ship_tbl)
-
-    story.append(HRFlowable(width="100%", thickness=0.5, color=_GREY, spaceBefore=4, spaceAfter=8))
-
-    # ── 4. LINE ITEMS ─────────────────────────────────────────────────────────
-    lines = list(order.lines.select_related("product").all())
-    col_widths = [0.8 * cm, 7.8 * cm, 1.8 * cm, 1.5 * cm, 2.8 * cm, 3.3 * cm]
-
-    headers = [
-        _p("#",              size=8, bold=True, color=_DARK, align=TA_CENTER),
-        _p("Description",    size=8, bold=True, color=_DARK),
-        _p("Qty",            size=8, bold=True, color=_DARK, align=TA_RIGHT),
-        _p("Unit",           size=8, bold=True, color=_DARK, align=TA_CENTER),
-        _p("Unit Price",     size=8, bold=True, color=_DARK, align=TA_RIGHT),
-        _p(f"Amount ({currency})", size=8, bold=True, color=_DARK, align=TA_RIGHT),
-    ]
-
-    rows = []
-    subtotal = Decimal("0")
-
-    for i, line in enumerate(lines, 1):
-        sku  = line.sku_raw or (line.product.sku if line.product else "")
-        name = line.product.name if line.product else ""
-        if sku and name and sku != name:
-            desc = f"{sku} — {name}"
-        else:
-            desc = name or sku or ""
-
-        qty        = line.qty
-        unit_price = line.unit_price or Decimal("0")
-        if line.total_price:
-            line_total = _r2(line.total_price)
-        else:
-            line_total = _r2(unit_price * qty)
-        subtotal += line_total
-
-        unit_label = "pcs"
-        if line.product:
-            unit_label = _UNIT_LABEL.get(
-                getattr(line.product, "unit_type", ""), "pcs"
-            )
-
-        rows.append([
-            _p(str(i),                  size=8, align=TA_CENTER),
-            _p(desc,                    size=8),
-            _p(f"{qty:g}",              size=8, align=TA_RIGHT),
-            _p(unit_label,              size=8, align=TA_CENTER),
-            _p(f"{unit_price:,.4f}",    size=8, align=TA_RIGHT),
-            _p(f"{line_total:,.2f}",    size=8, align=TA_RIGHT),
-        ])
-
-    items_tbl = Table([headers] + rows, colWidths=col_widths, repeatRows=1)
-    row_bgs = [(_SUBTLE if idx % 2 == 0 else _WHITE) for idx in range(len(rows))]
-
-    style_cmds = [
-        ("BACKGROUND",    (0, 0), (-1, 0), _LIGHT),
-        ("TEXTCOLOR",     (0, 0), (-1, 0), _DARK),
-        ("FONTNAME",      (0, 0), (-1, 0), _FONT_BOLD),
-        ("FONTSIZE",      (0, 0), (-1, 0), 8),
-        ("TOPPADDING",    (0, 0), (-1, 0), 5),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
-        ("FONTSIZE",      (0, 1), (-1, -1), 8),
-        ("TOPPADDING",    (0, 1), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 5),
-        ("RIGHTPADDING",  (-1, 0), (-1, -1), 5),
-        ("GRID",          (0, 0), (-1, -1), 0.3, colors.HexColor("#bdbdbd")),
-        ("ALIGN",         (2, 1), (2, -1), "RIGHT"),
-        ("ALIGN",         (3, 1), (3, -1), "CENTER"),
-        ("ALIGN",         (4, 1), (5, -1), "RIGHT"),
-    ]
-    for idx, bg in enumerate(row_bgs):
-        style_cmds.append(("BACKGROUND", (0, idx + 1), (-1, idx + 1), bg))
-    items_tbl.setStyle(TableStyle(style_cmds))
-    story.append(items_tbl)
-    story.append(Spacer(1, 0.3 * cm))
-
-    # ── 5. TOTALS ─────────────────────────────────────────────────────────────
-    discount_amount = _r2(subtotal * discount_pct / 100) if discount_pct else Decimal("0")
-    net_goods       = _r2(subtotal - discount_amount)
-    ship_cost       = _r2(order.shipping_cost or Decimal("0"))
-    ship_currency   = order.shipping_currency or currency
-    vat_base        = net_goods
-    vat_amount      = _r2(vat_base * vat_rate / 100) if vat_rate else Decimal("0")
-    grand_total     = _r2(net_goods + vat_amount + ship_cost)
-
-    totals_data = []
-
-    def _trow(label, amount, curr=None, bold=False, color=_BLACK):
-        c = curr or currency
-        return [
-            _p(label, size=9, bold=bold, align=TA_RIGHT, color=color),
-            _p(f"{c} {amount:,.2f}", size=9, bold=bold, align=TA_RIGHT, color=color),
-        ]
-
-    totals_data.append(_trow("Subtotal:", subtotal))
-    if discount_amount:
-        totals_data.append(_trow(
-            f"Discount ({discount_pct:.0f}%):",
-            -discount_amount,
-            color=colors.HexColor("#c62828"),
-        ))
-    if ship_cost:
-        totals_data.append(_trow("Shipping:", ship_cost, curr=ship_currency))
-    totals_data.append(_trow("VAT Base:", vat_base))
-    totals_data.append(_trow(f"VAT ({vat_rate:.0f}%):", vat_amount))
-    totals_data.append(_trow("TOTAL:", grand_total, bold=True, color=_DARK))
-
-    totals_col = page_w - 4.6 * cm
-    totals_tbl = Table(totals_data, colWidths=[totals_col, 4.6 * cm])
-    totals_style = [
-        ("ALIGN",         (0, 0), (-1, -1), "RIGHT"),
-        ("VALIGN",        (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING",    (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-        ("LINEABOVE",     (0, -1), (-1, -1), 1, _DARK),
-        ("TOPPADDING",    (0, -1), (-1, -1), 6),
-    ]
-    totals_tbl.setStyle(TableStyle(totals_style))
-    story.append(totals_tbl)
-    story.append(HRFlowable(width="100%", thickness=0.5, color=_GREY, spaceBefore=8, spaceAfter=8))
-
-    # ── 6. PAYMENT & SIGNATURE ────────────────────────────────────────────────
-    pay_content = [_p("Payment Details:", size=8, bold=True, color=_DARK)]
-    if co_iban:
-        pay_content.append(_p(f"IBAN:      {co_iban}", size=8))
-    if co_swift:
-        pay_content.append(_p(f"SWIFT/BIC: {co_swift}", size=8))
-    if co_bank:
-        pay_content.append(_p(f"Bank:      {co_bank}", size=8))
-    pay_content.append(Spacer(1, 0.15 * cm))
-    pay_content.append(_p(
-        f"Payment reference: Invoice {invoice_number} / Order {order.order_number}",
-        size=8,
-    ))
-
-    sig_content = []
-    if sig_path:
-        sig_content.append(Image(sig_path, width=3.2 * cm, height=1.6 * cm, kind="proportional"))
-    sig_content.append(_p("Authorized Signature", size=7, color=_GREY, align=TA_CENTER))
-
-    stamp_content = []
-    if stamp_path:
-        stamp_content.append(Image(stamp_path, width=2.8 * cm, height=2.8 * cm, kind="proportional"))
-
-    bottom_data = [[pay_content, sig_content, stamp_content]]
-    bottom_col_w = page_w - 7.2 * cm
-    bottom_tbl = Table(bottom_data, colWidths=[bottom_col_w, 4.2 * cm, 3 * cm])
-    bottom_tbl.setStyle(TableStyle([
-        ("VALIGN",        (0, 0), (-1, -1), "BOTTOM"),
-        ("TOPPADDING",    (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
-    ]))
-    story.append(bottom_tbl)
-
-    # ── 7. FOOTER ─────────────────────────────────────────────────────────────
-    footer_parts = [co_name]
-    co_addr_str = ", ".join(co_addr_parts)
-    if co_addr_str:
-        footer_parts.append(co_addr_str)
+    from_cell = [_p("<b>Shipped from:</b>", size=9)]
+    for line in filter(None, [co_name, co_street, co_city, co_country]):
+        from_cell.append(_p(line, size=9))
+    if co_phone:
+        from_cell.append(_p(f"Phone: {co_phone}", size=9))
     if co_vat:
-        footer_parts.append(f"VAT: {co_vat}")
-    contacts = " | ".join(filter(None, [co_email, co_phone]))
-    if contacts:
-        footer_parts.append(contacts)
+        from_cell.append(_p(f"VAT ID: {co_vat}", size=9))
 
-    story.append(HRFlowable(width="100%", thickness=0.5, color=_GREY, spaceBefore=6, spaceAfter=3))
-    story.append(_p(" · ".join(footer_parts), size=7, color=_GREY, align=TA_CENTER))
+    ship_tbl = Table([[to_cell, from_cell]], colWidths=[page_w * 0.50, page_w * 0.50])
+    ship_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (-1, 0), (-1, -1), 0),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
+    ]))
+    story.append(ship_tbl)
+    story.append(Spacer(1, 0.7*cm))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 8. SIGNATURE
+    # ═════════════════════════════════════════════════════════════════════════
+    sig_block = [_p("Sincerely yours,", size=9)]
+    sig_block.append(Spacer(1, 0.2*cm))
+    if sig_img:
+        sig_block.append(sig_img)
+    else:
+        sig_block.append(Spacer(1, 1.2*cm))
+    if co_ceo:
+        sig_block.append(_p(co_ceo, size=9))
+    story.append(KeepTogether(sig_block))
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 9. FOOTER
+    # ═════════════════════════════════════════════════════════════════════════
+    story.append(Spacer(1, 0.4*cm))
+    story.append(HRFlowable(width="100%", thickness=0.8, color=colors.black,
+                             spaceBefore=0, spaceAfter=3))
+
+    footer_grey = colors.HexColor("#444444")
+    # Line 1: Company name + VAT + IBAN
+    f1_left  = f"{co_name}, Principal Office: {co_city}" if co_city else co_name
+    f1_mid   = f"VAT ID:  {co_vat}" if co_vat else ""
+    f1_right = f"IBAN:  {co_iban}" if co_iban else ""
+    # Line 2: Registration + TAX + BIC
+    f2_left  = f"Registration Court: {co_reg}" if co_reg else ""
+    f2_mid   = f"TAX ID:  {co_tax_id}" if co_tax_id else ""
+    f2_right = f"BIC / SWIFT:  {co_swift}" if co_swift else ""
+
+    def _fp(txt):
+        return _p(txt, size=7, color=footer_grey, align=TA_CENTER)
+
+    footer_data = [
+        [_fp(f1_left), _fp(f1_mid), _fp(f1_right)],
+        [_fp(f2_left), _fp(f2_mid), _fp(f2_right)],
+    ]
+    footer_tbl = Table(footer_data, colWidths=[page_w * 0.38, page_w * 0.31, page_w * 0.31])
+    footer_tbl.setStyle(TableStyle([
+        ("VALIGN",       (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING",  (0, 0), (-1, -1), 2),
+        ("RIGHTPADDING", (-1, 0), (-1, -1), 2),
+        ("TOPPADDING",   (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
+    ]))
+    story.append(footer_tbl)
 
     doc.build(story)
     return buf.getvalue()
 
 
 def get_next_invoice_number() -> int:
-    """Return max(eu_invoice_number) + 1 across all SalesOrders."""
     from django.db.models import Max
     from sales.models import SalesOrder
     result = SalesOrder.objects.aggregate(m=Max("eu_invoice_number"))["m"]
