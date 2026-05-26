@@ -298,9 +298,9 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="sv-pd">✓</div>
         <div class="sv-pl">{% trans "Чернетка" %}{% if order.order_date %}<small>{{ order.order_date|date:"d.m" }}</small>{% endif %}</div>
       </div>
-      <div class="sv-pc {% if sh %}sv-pc-done{% endif %}"></div>
-      <div class="sv-ps {% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-ps-done{% else %}sv-ps-cur{% endif %}{% endif %}">
-        <div class="sv-pd">{% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}✓{% else %}●{% endif %}{% else %}·{% endif %}</div>
+      <div class="sv-pc {% if sh or s == 'processing' or s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
+      <div class="sv-ps {% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-ps-done{% else %}sv-ps-cur{% endif %}{% elif s == 'processing' %}sv-ps-cur{% endif %}">
+        <div class="sv-pd">{% if sh %}{% if sh.label_url or s == 'shipped' or s == 'delivered' %}✓{% else %}●{% endif %}{% elif s == 'processing' %}●{% else %}·{% endif %}</div>
         <div class="sv-pl">{% trans "Оформлення" %}</div>
       </div>
       <div class="sv-pc {% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
