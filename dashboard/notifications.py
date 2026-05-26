@@ -1173,15 +1173,7 @@ def notify_new_order(order, is_test: bool = False):
 
             extra = meta + (f'<br>{lines_html}' if lines_html else '')
 
-            title = '🧪 ТЕСТ: Нове замовлення' if is_test else '🆕 Нове замовлення'
-            if is_test:
-                extra = (
-                    '<div style="margin-bottom:14px;padding:10px 14px;'
-                    'background:#fff8e1;border-left:4px solid #f9a825;border-radius:4px;'
-                    'font-size:13px;color:#5d4037">'
-                    '⚠️ <b>Тестове повідомлення</b> — це не реальне нове замовлення, '
-                    'лише перевірка налаштувань сповіщень.</div>'
-                ) + extra
+            title = '🆕 Нове замовлення'
             html = _order_email_html(order, title, '#1565c0', extra, show_total=False)
             _send_event_email(ns, subject, html)
         except Exception:
@@ -1191,11 +1183,8 @@ def notify_new_order(order, is_test: bool = False):
         try:
             _cname = _get_company_name()
             now_str = timezone.now().strftime('%d.%m.%Y %H:%M')
-            prefix  = '🧪 ТЕСТ · ' if is_test else ''
             tg = [f'🏛️ <b>{_cname}</b>']
-            tg.append(f'{prefix}🆕 <b>Нове замовлення</b> · <i>{now_str}</i>')
-            if is_test:
-                tg.append('<i>⚠️ Тестове — не реальне нове замовлення</i>')
+            tg.append(f'🆕 <b>Нове замовлення</b> · <i>{now_str}</i>')
             tg.append('')
 
             # ── Order info ─────────────────────────────────────────────────

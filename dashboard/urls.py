@@ -169,7 +169,7 @@ def widget_data_api(request):
     # ── Sales ──────────────────────────────────────────────────────────────
     try:
         from sales.models import SalesOrder
-        data['new_orders']        = SalesOrder.objects.filter(status__in=['received', 'processing']).count()
+        data['new_orders']        = SalesOrder.objects.filter(status='received').count()
         data['processing_orders'] = SalesOrder.objects.filter(status='processing').count()
         data['sales_today']       = SalesOrder.objects.filter(order_date=today).count()
         data['unshipped']         = SalesOrder.objects.filter(
