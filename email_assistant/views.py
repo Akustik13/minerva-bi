@@ -788,14 +788,19 @@ def sync_all_folders_view(request):
 
 @staff_member_required
 def unread_count_view(request):
-    from email_assistant.models import EmailMessage
+    from email_assistant.models import EmailMessage, EmailThread
     account = _get_account(request)
     if not account:
-        return JsonResponse({'count': 0})
-    count = EmailMessage.objects.filter(
-        account=account, folder='inbox', is_read=False, is_deleted=False
-    ).count()
-    return JsonResponse({'count': count})
+        return JsonResponse({'count': 0, 'inbox': 0, 'starred': 0, 'spam': 0})
+    base = EmailMessage.objects.filter(account=account, is_deleted=False, is_read=False)
+    archived_ids = EmailThread.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
+    inbox = base.filter(
+        folder='inbox',
+        imap_folder_name__in=['', account.imap_folder_inbox],
+    ).exclude(thread_id__in=archived_ids).count()
+    starred = base.filter(is_starred=True).count()
+    spam    = base.filter(is_spam=True).count()
+    return JsonResponse({'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam})
 
 
 @staff_member_required

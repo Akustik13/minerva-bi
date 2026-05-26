@@ -757,6 +757,8 @@ async function previewMsg(pk, tpk, rowEl) {
     cont.innerHTML = '<div style="padding:24px;color:var(--err)">⚠️ ' + _i18n.помилкаЗавант + '</div>';
   }
 
+  window.refreshBadges && window.refreshBadges();
+
   // Auto-collapse P2 on small screens only when no explicit preference saved
   if (window.innerWidth < 1200 && !localStorage.getItem('em-p2-col')) {
     window.toggleP2 && window.toggleP2();
@@ -781,6 +783,7 @@ window.spamRow = function(pk) {
   if (row) row.remove();
   if (_activeRow && _activeRow === row) { _activeRow = null; resetPreview(); }
   _showToast('🚫 {% trans "Переміщено до Спаму" %}');
+  window.refreshBadges && window.refreshBadges();
 };
 
 async function spamMsg(pk, rowEl) {
@@ -790,6 +793,7 @@ async function spamMsg(pk, rowEl) {
     if (rowEl) rowEl.remove();
     if (_activeRow === rowEl) { _activeRow = null; resetPreview(); }
     _showToast('🚫 {% trans "Переміщено до Спаму" %}' + (d.auto_rule ? ' · {% trans "Правило додано для" %} ' + d.auto_rule : ''));
+    window.refreshBadges && window.refreshBadges();
   }
 }
 
@@ -812,6 +816,7 @@ async function deleteMsg(ev, pk) {
     var row = document.getElementById('row-' + pk);
     if (row) row.remove();
     if (_activeRow === row) { _activeRow = null; resetPreview(); }
+    window.refreshBadges && window.refreshBadges();
   }
 }
 
@@ -819,7 +824,7 @@ async function restoreMsg(ev, pk) {
   ev.stopPropagation();
   var r = await fetch('/email/message/' + pk + '/restore/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
   var d = await r.json();
-  if (d.ok) { var row = document.getElementById('row-' + pk); if (row) row.remove(); }
+  if (d.ok) { var row = document.getElementById('row-' + pk); if (row) row.remove(); window.refreshBadges && window.refreshBadges(); }
 }
 
 async function archiveThread(ev, tpk) {
@@ -829,6 +834,7 @@ async function archiveThread(ev, tpk) {
   if (d.ok) {
     document.querySelectorAll('[data-tpk="' + tpk + '"]').forEach(function(el){ el.remove(); });
     resetPreview();
+    window.refreshBadges && window.refreshBadges();
   }
 }
 
@@ -860,7 +866,7 @@ async function syncNow(btn, full) {
     });
     var d = await r.json();
     st.textContent = d.ok ? '✓ ' + _i18n.готово : '✗ ' + d.error;
-    if (d.ok) setTimeout(function(){ location.reload(); }, 700);
+    if (d.ok) { window.refreshBadges && window.refreshBadges(); setTimeout(function(){ location.reload(); }, 700); }
   } catch(e) { st.textContent = '✗ ' + _i18n.помилка; }
   finally { btn.disabled = false; btn.textContent = orig; }
 }
@@ -1087,10 +1093,10 @@ async function ctxAction(action) {
     window.open(url, '_blank');
   } else if (action === 'read') {
     var r = await fetch('/email/message/' + pk + '/read/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    if ((await r.json()).ok) { rowEl.classList.remove('unread'); rowEl.dataset.read = '1'; }
+    if ((await r.json()).ok) { rowEl.classList.remove('unread'); rowEl.dataset.read = '1'; window.refreshBadges && window.refreshBadges(); }
   } else if (action === 'unread') {
     var r = await fetch('/email/message/' + pk + '/unread/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    if ((await r.json()).ok) { rowEl.classList.add('unread'); rowEl.dataset.read = '0'; }
+    if ((await r.json()).ok) { rowEl.classList.add('unread'); rowEl.dataset.read = '0'; window.refreshBadges && window.refreshBadges(); }
   } else if (action === 'star') {
     var starBtn = rowEl.querySelector('.em-star-btn');
     if (starBtn) toggleStar({stopPropagation:function(){}}, pk, starBtn);
@@ -1214,6 +1220,25 @@ async function saveTask() {
   } catch(e) { err.textContent = 'Помилка мережі'; }
 }
 
+/* ── Badge helpers ── */
+function _setBadge(id, count) {
+  var b = document.getElementById(id);
+  if (!b) return;
+  b.textContent = count > 0 ? count : '';
+  b.style.display = count > 0 ? '' : 'none';
+}
+
+window.refreshBadges = async function() {
+  try {
+    var r = await fetch('/email/unread-count/', {credentials:'same-origin'});
+    var d = await r.json();
+    _setBadge('badge-inbox',   d.inbox   || 0);
+    _setBadge('badge-starred', d.starred || 0);
+    _setBadge('badge-spam',    d.spam    || 0);
+    return d.inbox || 0;
+  } catch(e) { return null; }
+};
+
 /* ── Auto-sync + browser push notifications ── */
 (function(){
   var lastCount = {{ unread_count }};
@@ -1227,27 +1252,19 @@ async function saveTask() {
     }, {once: true});
   }
 
-  function updateBadge(count) {
-    var b = document.getElementById('badge-inbox');
-    if (b) { b.textContent = count > 0 ? count : ''; b.style.display = count > 0 ? '' : 'none'; }
-  }
-
   async function tick() {
     try {
       fetch('/email/sync/', {method:'POST', headers:{'X-CSRFToken':CSRF}, credentials:'same-origin'})
         .catch(function(){});
-      var r = await fetch('/email/unread-count/', {credentials:'same-origin'});
-      var d = await r.json();
-      var n = d.count || 0;
-      if (n > lastCount && 'Notification' in window && Notification.permission === 'granted') {
+      var n = await window.refreshBadges();
+      if (n !== null && n > lastCount && 'Notification' in window && Notification.permission === 'granted') {
         new Notification(_i18n.новийЛист, {
           body: n + ' ' + _i18n.непрочитаних,
           icon: '/static/icons/icon-192.png',
           tag:  'email-unread',
         });
       }
-      updateBadge(n);
-      lastCount = n;
+      if (n !== null) lastCount = n;
     } catch(e) {}
     resetCountdown();
   }
@@ -1401,6 +1418,7 @@ window.bulkAction = async function(action) {
       cb.closest('.em-row').classList.remove('selected');
     });
     _updateBulkBar();
+    window.refreshBadges && window.refreshBadges();
   } catch(e) {}
 };
 </script>
