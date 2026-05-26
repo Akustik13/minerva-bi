@@ -297,6 +297,8 @@
       <input class="em-p2-search-inp" type="search" id="em-p2-q"
              placeholder="🔍 {% trans "Фільтр по відправнику, темі…" %}"
              oninput="filterP2(this.value)" autocomplete="off">
+      <button class="em-p2-group-btn" id="em-unread-btn"
+              onclick="toggleUnreadOnly()" title="{% trans "Тільки непрочитані" %}">●</button>
       <button class="em-p2-group-btn" id="em-group-btn"
               onclick="toggleGrouping()" title="{% trans "Групувати по гілці листування" %}">⎘</button>
     </div>
@@ -888,6 +890,7 @@ window.sortRows = function(key) {
 /* ── Panel 2 local filter ── */
 var _p2Filter = '';
 var _p2Grouping = false;
+var _p2UnreadOnly = false;
 
 window.filterP2 = function(q) {
   _p2Filter = (q || '').toLowerCase().trim();
@@ -901,6 +904,13 @@ window.toggleGrouping = function() {
   _applyP2Visibility();
 };
 
+window.toggleUnreadOnly = function() {
+  _p2UnreadOnly = !_p2UnreadOnly;
+  var btn = document.getElementById('em-unread-btn');
+  if (btn) btn.classList.toggle('on', _p2UnreadOnly);
+  _applyP2Visibility();
+};
+
 function _applyP2Visibility() {
   var rows  = document.querySelectorAll('#em-p2-list .em-row');
   var seen  = {};
@@ -910,7 +920,12 @@ function _applyP2Visibility() {
     var subject = (row.dataset.subject || '').toLowerCase();
     var pass = !_p2Filter || sender.indexOf(_p2Filter) >= 0 || subject.indexOf(_p2Filter) >= 0;
 
-    // 2. thread grouping — hide duplicates, keep first (=newest) per thread
+    // 2. unread only
+    if (pass && _p2UnreadOnly) {
+      pass = row.dataset.read === '0' || row.classList.contains('unread');
+    }
+
+    // 3. thread grouping — hide duplicates, keep first (=newest) per thread
     if (pass && _p2Grouping) {
       var tpk = row.dataset.tpk;
       if (tpk && tpk !== '0') {
@@ -1235,6 +1250,7 @@ window.refreshBadges = async function() {
     _setBadge('badge-inbox',   d.inbox   || 0);
     _setBadge('badge-starred', d.starred || 0);
     _setBadge('badge-spam',    d.spam    || 0);
+    if (_p2UnreadOnly) _applyP2Visibility();
     return d.inbox || 0;
   } catch(e) { return null; }
 };
