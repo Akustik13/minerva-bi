@@ -26,8 +26,16 @@ class CompanySettings(models.Model):
     phone          = models.CharField("Телефон", max_length=50, blank=True, default="")
     logo           = models.FileField("Логотип (PNG/JPG)", upload_to="accounting/logos/",
                                       null=True, blank=True)
-    invoice_prefix = models.CharField("Префікс рахунку", max_length=10, default="INV")
-    next_number    = models.PositiveIntegerField("Наступний номер рахунку", default=1)
+    invoice_prefix    = models.CharField("Префікс рахунку", max_length=10, default="INV")
+    next_number       = models.PositiveIntegerField("Наступний номер рахунку", default=1)
+    invoice_signature = models.ImageField(
+        "Підпис (для рахунків-фактур)", upload_to="accounting/",
+        null=True, blank=True,
+    )
+    invoice_stamp = models.ImageField(
+        "Печатка (для рахунків-фактур)", upload_to="accounting/",
+        null=True, blank=True,
+    )
 
     class Meta:
         verbose_name        = "Налаштування компанії"

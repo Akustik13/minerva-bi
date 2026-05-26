@@ -36,6 +36,11 @@ class CompanySettingsAdmin(admin.ModelAdmin):
             "description": "Рахунки нумеруються: <prefix>-<рік>-<номер>. "
                            "Наступний номер збільшується автоматично."
         }),
+        ("🖊 Підпис і печатка (EU Invoice)", {
+            "fields": ("invoice_signature", "invoice_stamp"),
+            "classes": ("collapse",),
+            "description": "Зображення підставляються в нижній частині рахунку-фактури.",
+        }),
     )
 
     def get_urls(self):

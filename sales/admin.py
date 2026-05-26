@@ -1458,6 +1458,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["digikey_ship_url"] = f"/bots/digikey/ship/{obj.pk}/"
             if obj and obj.source == "digikey":
                 extra_context["digikey_fetch_tracking_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-fetch-tracking/"
+            # EU Invoice button (shown for all orders, especially DigiKey EU)
+            if obj and obj.pk:
+                extra_context["eu_invoice_suggest_url"]  = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/suggest/"
+                extra_context["eu_invoice_generate_url"] = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/generate/"
+                extra_context["eu_invoice_number"]       = obj.eu_invoice_number
+                extra_context["order_source"]            = obj.source
             # Auto-sync shipping fields from active shipment (GET only)
             if obj and request.method == "GET":
                 _sync_order_from_active_shipment(obj)
@@ -2092,6 +2098,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/push-to-shipping/',
                  self.admin_site.admin_view(self.push_to_shipping_view),
                  name='sales_salesorder_push_to_shipping'),
+            # EU Invoice: suggest next number + generate PDF
+            path('<int:pk>/eu-invoice/suggest/',
+                 self.admin_site.admin_view(self.eu_invoice_suggest_view),
+                 name='sales_salesorder_eu_invoice_suggest'),
+            path('<int:pk>/eu-invoice/generate/',
+                 self.admin_site.admin_view(self.eu_invoice_generate_view),
+                 name='sales_salesorder_eu_invoice_generate'),
         ]
         return custom_urls + urls
 
@@ -2185,6 +2198,105 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             "shipment_pk": shipment.pk,
             "shipment_url": f"/admin/shipping/shipment/{shipment.pk}/change/",
         })
+
+    def eu_invoice_suggest_view(self, request, pk):
+        """GET — повертає запропонований номер рахунку та поточні VAT IDs."""
+        from django.http import JsonResponse
+        from .eu_invoice_pdf import get_next_invoice_number
+        order = get_object_or_404(SalesOrder, pk=pk)
+        try:
+            from config.models import SystemSettings
+            default_vat = float(SystemSettings.get().default_vat_rate)
+        except Exception:
+            default_vat = 19.0
+        return JsonResponse({
+            "suggested_number": get_next_invoice_number(),
+            "buyer_vat_id":     order.buyer_vat_id,
+            "ship_vat_id":      order.ship_vat_id,
+            "eu_invoice_number": order.eu_invoice_number,
+            "default_vat_rate": default_vat,
+        })
+
+    def eu_invoice_generate_view(self, request, pk):
+        """POST — генерує EU Invoice PDF; зберігає поля та повертає PDF."""
+        from django.http import JsonResponse
+        import json as _json
+        from datetime import date as _date
+        from decimal import Decimal as _Dec, InvalidOperation
+        from .eu_invoice_pdf import generate_eu_invoice
+
+        if request.method != "POST":
+            return JsonResponse({"error": "POST required"}, status=405)
+
+        order = get_object_or_404(SalesOrder, pk=pk)
+
+        try:
+            body = _json.loads(request.body)
+        except Exception:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+
+        def _dec(key, default="0"):
+            try:
+                return _Dec(str(body.get(key, default)))
+            except InvalidOperation:
+                return _Dec(default)
+
+        invoice_number  = int(body.get("invoice_number", 1))
+        invoice_date_s  = body.get("invoice_date", "") or str(_date.today())
+        buyer_name      = (body.get("buyer_name") or "").strip()
+        buyer_address   = (body.get("buyer_address") or "").strip()
+        buyer_vat_id    = (body.get("buyer_vat_id") or "").strip()
+        ship_vat_id     = (body.get("ship_vat_id") or "").strip()
+        discount_pct    = _dec("discount_pct", "0")
+        vat_rate        = _dec("vat_rate", "19")
+
+        try:
+            from datetime import datetime
+            invoice_date = datetime.strptime(invoice_date_s, "%Y-%m-%d").date()
+        except Exception:
+            invoice_date = _date.today()
+
+        # Save back to order
+        order.eu_invoice_number = invoice_number
+        order.eu_invoice_date   = invoice_date
+        order.buyer_vat_id      = buyer_vat_id
+        order.ship_vat_id       = ship_vat_id
+        order.save(update_fields=["eu_invoice_number", "eu_invoice_date",
+                                  "buyer_vat_id", "ship_vat_id"])
+
+        try:
+            pdf_bytes = generate_eu_invoice(
+                order,
+                invoice_number=invoice_number,
+                invoice_date=invoice_date,
+                buyer_name=buyer_name,
+                buyer_address=buyer_address,
+                buyer_vat_id=buyer_vat_id,
+                ship_vat_id=ship_vat_id,
+                discount_pct=discount_pct,
+                vat_rate=vat_rate,
+            )
+        except Exception as e:
+            return JsonResponse({"error": f"PDF generation failed: {e}"}, status=500)
+
+        # Optionally save to order media folder
+        filename = f"EU_Invoice_{invoice_number}_{order.order_number}.pdf"
+        try:
+            import os
+            from django.conf import settings as _s
+            media_dir = os.path.join(
+                _s.MEDIA_ROOT, "orders",
+                order.source, order.order_number,
+            )
+            os.makedirs(media_dir, exist_ok=True)
+            with open(os.path.join(media_dir, filename), "wb") as f:
+                f.write(pdf_bytes)
+        except Exception:
+            pass  # Save failure is non-fatal — still return the PDF
+
+        response = HttpResponse(pdf_bytes, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
 
     def sync_inventory_view(self, request, pk):
         """

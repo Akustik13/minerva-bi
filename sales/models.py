@@ -91,6 +91,23 @@ class SalesOrder(models.Model):
     is_flagged    = models.BooleanField("⭐ Важливе", default=False, db_index=True)
     internal_note = models.CharField("Нотатка", max_length=500, blank=True, default="")
 
+    # ── EU Invoice ────────────────────────────────────────────────────────────
+    eu_invoice_number = models.IntegerField(
+        "EU Invoice №", null=True, blank=True,
+        help_text="Номер рахунку-фактури для ЄС (автозаповнюється при генерації)",
+    )
+    eu_invoice_date = models.DateField(
+        "Дата рахунку-фактури", null=True, blank=True,
+    )
+    buyer_vat_id = models.CharField(
+        "VAT ID покупця", max_length=50, blank=True, default="",
+        help_text="ПДВ маркетплейсу (напр. DigiKey DE815236628)",
+    )
+    ship_vat_id = models.CharField(
+        "VAT ID отримувача", max_length=50, blank=True, default="",
+        help_text="ПДВ отримувача (якщо є)",
+    )
+
     class Meta:
         unique_together = [("source", "order_number")]
         indexes = [
