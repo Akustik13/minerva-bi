@@ -59,4 +59,6 @@ urlpatterns = [
     path('message/<int:message_pk>/create-rule/',        views.create_rule_from_message, name='create_rule_from_message'),
     # Create calendar task from email
     path('message/<int:message_pk>/create-task/',        views.create_task_from_email,  name='create_task_from_email'),
+    # Bulk actions
+    path('messages/bulk/',                               views.bulk_action_view,        name='bulk_action'),
 ]

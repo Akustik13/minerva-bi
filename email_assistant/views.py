@@ -1251,7 +1251,46 @@ def create_rule_api(request):
         condition_field=cond_field, condition_op=cond_op, condition_value=cond_val,
         action=action, action_value=action_val,
     )
+    # Retroactively apply spam rule to existing inbox messages
+    if action == EmailRule.ACTION_MARK_SPAM:
+        from email_assistant.models import EmailMessage
+        for msg in EmailMessage.objects.filter(account=account, folder='inbox', is_spam=False, is_deleted=False).iterator():
+            if rule.matches(msg):
+                rule.apply_to(msg)
     return JsonResponse({'ok': True, 'id': rule.pk})
+
+
+@staff_member_required
+@require_POST
+def bulk_action_view(request):
+    """Bulk actions on multiple messages: read/unread/delete/archive/spam."""
+    import json as _json
+    from email_assistant.models import EmailMessage, EmailThread
+    account = _get_account(request)
+    if not account:
+        return JsonResponse({'ok': False, 'error': 'Акаунт не знайдено'})
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+    action = data.get('action', '')
+    pks = [int(p) for p in (data.get('pks') or []) if str(p).isdigit()]
+    if not pks or action not in ('read', 'unread', 'delete', 'archive', 'spam'):
+        return JsonResponse({'ok': False, 'error': 'Невірні параметри'})
+    msgs = EmailMessage.objects.filter(pk__in=pks, account=account)
+    if action == 'read':
+        msgs.update(is_read=True)
+    elif action == 'unread':
+        msgs.update(is_read=False)
+    elif action == 'delete':
+        msgs.update(folder=EmailMessage.FOLDER_TRASH, is_deleted=True)
+    elif action == 'spam':
+        msgs.update(is_spam=True, folder=EmailMessage.FOLDER_SPAM)
+    elif action == 'archive':
+        tpk_set = set(msgs.exclude(thread=None).values_list('thread_id', flat=True))
+        if tpk_set:
+            EmailThread.objects.filter(pk__in=tpk_set, account=account).update(is_archived=True)
+    return JsonResponse({'ok': True})
 
 
 @staff_member_required

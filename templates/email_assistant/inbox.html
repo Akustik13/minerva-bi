@@ -135,11 +135,19 @@
 .em-row-subj{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .em-row-prev{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* Row hover actions */
-.em-row-act{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:none;gap:2px;background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:2px;box-shadow:0 2px 8px rgba(0,0,0,.3);z-index:5}
-.em-row:hover .em-row-act{display:flex}
-.em-row-act button{border:none;background:none;cursor:pointer;color:var(--text-muted);padding:3px 6px;border-radius:4px;font-size:12px;line-height:1;transition:background .1s}
-.em-row-act button:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+/* Checkbox */
+.em-row-check{width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#1a73e8;margin-top:3px}
+.em-row.selected{background:rgba(26,115,232,.08) !important}
+/* Bulk bar */
+.em-bulk-bar{display:none;align-items:center;gap:5px;padding:5px 10px;
+  border-bottom:1px solid var(--border-strong);background:rgba(26,115,232,.06);flex-shrink:0}
+.em-bulk-bar.visible{display:flex}
+.em-bulk-count{font-size:11px;color:var(--text-muted);flex:1;white-space:nowrap}
+.em-bulk-btn{border:1px solid var(--border-strong);background:none;cursor:pointer;
+  color:var(--text-muted);padding:3px 7px;border-radius:5px;font-size:12px;white-space:nowrap;
+  transition:background .1s,color .1s;line-height:1}
+.em-bulk-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.em-bulk-btn.danger:hover{background:rgba(229,57,53,.1);color:#ef5350}
 
 /* ── Panel 3 — preview ── */
 .em-p3{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0;position:relative}
@@ -293,6 +301,18 @@
               onclick="toggleGrouping()" title="{% trans "Групувати по гілці листування" %}">⎘</button>
     </div>
 
+    <!-- Bulk actions bar (visible when rows are selected) -->
+    <div class="em-bulk-bar" id="em-bulk-bar">
+      <input type="checkbox" id="em-check-all" class="em-row-check"
+             onchange="selectAllRows(this.checked)" title="{% trans "Вибрати всі" %}">
+      <span class="em-bulk-count" id="em-bulk-count">0 {% trans "вибрано" %}</span>
+      <button class="em-bulk-btn" onclick="bulkAction('read')" title="{% trans "Позначити прочитаним" %}">✉️</button>
+      <button class="em-bulk-btn" onclick="bulkAction('unread')" title="{% trans "Позначити непрочитаним" %}">📩</button>
+      <button class="em-bulk-btn" onclick="bulkAction('archive')" title="{% trans "В архів" %}">📦</button>
+      <button class="em-bulk-btn" onclick="bulkAction('spam')" title="{% trans "Спам" %}">🚫</button>
+      <button class="em-bulk-btn danger" onclick="bulkAction('delete')" title="{% trans "Видалити" %}">🗑️</button>
+    </div>
+
     <div class="em-p2-list" id="em-p2-list">
       {% if not emails %}
       <div class="em-empty-list">📭 {% trans "Листів немає" %}</div>
@@ -312,6 +332,9 @@
            onclick="previewMsg({{ msg.pk }}, {{ tpk }}, this)"
            oncontextmenu="showCtxMenu(event, {{ msg.pk }}, {{ tpk }}, this)">
 
+        <input type="checkbox" class="em-row-check em-row-cb" data-pk="{{ msg.pk }}"
+               onclick="event.stopPropagation();toggleRowCheck(this)">
+
         <button class="em-star-btn{% if msg.is_starred %} starred{% endif %}"
                 onclick="toggleStar(event,{{ msg.pk }},this)"
                 title="{% trans "Позначити важливим" %}">
@@ -330,23 +353,6 @@
         </div>
 
         {% if msg.has_attachments %}<span style="font-size:12px;color:var(--text-dim);flex-shrink:0">📎</span>{% endif %}
-
-        <!-- Hover actions -->
-        <div class="em-row-act">
-          {% if folder == 'trash' %}
-            <button onclick="restoreMsg(event,{{ msg.pk }})" title="{% trans "Відновити" %}">↩️</button>
-          {% elif folder == 'archived' %}
-            <button onclick="unarchiveThread(event,{{ tpk }})" title="{% trans "З архіву" %}">📤</button>
-          {% else %}
-            {% if tpk %}<button onclick="archiveThread(event,{{ tpk }})" title="{% trans "В архів" %}">📦</button>{% endif %}
-            <button onclick="deleteMsg(event,{{ msg.pk }})" title="{% trans "Видалити" %}">🗑️</button>
-          {% endif %}
-          <button onclick="quickAddToCalendar(event,{{ msg.pk }},'{{ msg.subject|escapejs }}')" title="{% trans "Додати в календар" %}" style="font-size:12px">📅</button>
-          <a href="{% if tpk %}{% url 'email_assistant:thread' tpk %}{% else %}{% url 'email_assistant:message' msg.pk %}{% endif %}"
-             onclick="event.stopPropagation()"
-             style="font-size:12px;padding:3px 6px;border-radius:4px;color:var(--text-muted);text-decoration:none"
-             title="{% trans "Відкрити окремо" %}" target="_blank">↗</a>
-        </div>
       </div>
       {% endwith %}
       {% endfor %}
@@ -1294,5 +1300,76 @@ function deleteSpamFilter(ruleId, btn) {
     else { btn.disabled = false; }
   }).catch(function(){ btn.disabled = false; });
 }
+
+/* ── Bulk selection ── */
+function _getSelectedPks() {
+  return Array.from(document.querySelectorAll('.em-row-cb:checked'))
+    .map(function(cb){ return parseInt(cb.dataset.pk); });
+}
+
+function _updateBulkBar() {
+  var pks = _getSelectedPks();
+  var bar = document.getElementById('em-bulk-bar');
+  var countEl = document.getElementById('em-bulk-count');
+  if (pks.length > 0) {
+    bar.classList.add('visible');
+    countEl.textContent = pks.length + ' {% trans "вибрано" %}';
+  } else {
+    bar.classList.remove('visible');
+    var allCb = document.getElementById('em-check-all');
+    if (allCb) allCb.checked = false;
+  }
+}
+
+window.toggleRowCheck = function(cb) {
+  cb.closest('.em-row').classList.toggle('selected', cb.checked);
+  _updateBulkBar();
+};
+
+window.selectAllRows = function(checked) {
+  document.querySelectorAll('#em-p2-list .em-row-cb').forEach(function(cb) {
+    var row = cb.closest('.em-row');
+    if (!row || row.style.display === 'none') return;
+    cb.checked = checked;
+    row.classList.toggle('selected', checked);
+  });
+  _updateBulkBar();
+};
+
+window.bulkAction = async function(action) {
+  var pks = _getSelectedPks();
+  if (!pks.length) return;
+  try {
+    var r = await fetch('/email/messages/bulk/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({action: action, pks: pks}),
+    });
+    var d = await r.json();
+    if (!d.ok) return;
+    if (action === 'delete' || action === 'archive' || action === 'spam') {
+      pks.forEach(function(pk) {
+        var row = document.getElementById('row-' + pk);
+        if (row) row.remove();
+      });
+      if (_activeRow && pks.indexOf(parseInt(_activeRow.dataset.pk)) >= 0) resetPreview();
+    } else if (action === 'read') {
+      pks.forEach(function(pk) {
+        var row = document.getElementById('row-' + pk);
+        if (row) { row.classList.remove('unread'); row.dataset.read = '1'; }
+      });
+    } else if (action === 'unread') {
+      pks.forEach(function(pk) {
+        var row = document.getElementById('row-' + pk);
+        if (row) { row.classList.add('unread'); row.dataset.read = '0'; }
+      });
+    }
+    document.querySelectorAll('.em-row-cb').forEach(function(cb) {
+      cb.checked = false;
+      cb.closest('.em-row').classList.remove('selected');
+    });
+    _updateBulkBar();
+  } catch(e) {}
+};
 </script>
 {% endblock %}

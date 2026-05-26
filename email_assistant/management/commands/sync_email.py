@@ -120,11 +120,11 @@ class Command(BaseCommand):
                         if crm_customer:
                             self._sync_to_crm(em, crm_customer, account)
 
-                        if folder_type == EmailMessage.FOLDER_INBOX and not msg_data['is_read']:
-                            self._notify_new_email(em, account)
-
                         if folder_type == EmailMessage.FOLDER_INBOX:
                             self._post_process_inbox(em, account, thread)
+                            em.refresh_from_db(fields=['is_spam', 'folder'])
+                            if not em.is_spam and not msg_data['is_read']:
+                                self._notify_new_email(em, account)
 
                         created += 1
 
