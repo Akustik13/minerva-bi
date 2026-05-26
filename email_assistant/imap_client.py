@@ -384,6 +384,39 @@ class IMAPClient:
             logger.warning('IMAP mark_seen failed uid=%s: %s', uid, e)
             return False
 
+    def mark_unseen(self, folder: str, uid: int) -> bool:
+        """Remove \\Seen flag on the IMAP server (mark as unread)."""
+        try:
+            self._select_writable(folder)
+            self.conn.uid('STORE', str(uid).encode(), '-FLAGS', '(\\Seen)')
+            return True
+        except Exception as e:
+            logger.warning('IMAP mark_unseen failed uid=%s: %s', uid, e)
+            return False
+
+    def move_to_spam(self, folder: str, uid: int) -> bool:
+        """Copy message to Spam/Junk folder and delete from source."""
+        try:
+            self._select_writable(folder)
+            uid_str = str(uid).encode()
+            spam_candidates = [
+                'Spam', 'Junk', '[Gmail]/Spam', 'INBOX.Spam', 'INBOX.Junk',
+                'Junk Email', 'Junk Mail',
+            ]
+            for spam in spam_candidates:
+                try:
+                    ok, _ = self.conn.uid('COPY', uid_str, spam)
+                    if ok == 'OK':
+                        self.conn.uid('STORE', uid_str, '+FLAGS', '(\\Deleted)')
+                        self.conn.expunge()
+                        return True
+                except Exception:
+                    continue
+            return False
+        except Exception as e:
+            logger.warning('IMAP move_to_spam failed uid=%s: %s', uid, e)
+            return False
+
     def move_to_trash(self, folder: str, uid: int) -> bool:
         """Move a message to Trash folder. Falls back to marking \\Deleted."""
         try:

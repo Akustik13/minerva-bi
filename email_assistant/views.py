@@ -11,6 +11,30 @@ from django.utils import timezone
 logger = logging.getLogger('email_assistant')
 
 
+def _imap_bg(account_pk: int, imap_folder: str, uid: int, action: str):
+    """Run an IMAP flag/move operation in a background daemon thread."""
+    import threading
+
+    def _run():
+        try:
+            from django.db import close_old_connections
+            close_old_connections()
+            from email_assistant.models import EmailAccount
+            from email_assistant.imap_client import IMAPClient
+            acc = EmailAccount.objects.get(pk=account_pk)
+            with IMAPClient(acc) as imap:
+                if action == 'seen':
+                    imap.mark_seen(imap_folder, uid)
+                elif action == 'unseen':
+                    imap.mark_unseen(imap_folder, uid)
+                elif action == 'spam':
+                    imap.move_to_spam(imap_folder, uid)
+        except Exception as ex:
+            logger.warning('_imap_bg %s uid=%s: %s', action, uid, ex)
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def _get_account(request):
     from email_assistant.models import EmailAccount
     return (EmailAccount.objects
@@ -862,9 +886,13 @@ def toggle_spam_view(request, message_pk):
     from email_assistant.models import EmailMessage, EmailRule
     account = _get_account(request)
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    was_spam = msg.is_spam
     msg.is_spam = not msg.is_spam
     msg.folder  = EmailMessage.FOLDER_SPAM if msg.is_spam else EmailMessage.FOLDER_INBOX
     msg.save(update_fields=['is_spam', 'folder'])
+    if msg.is_spam and not was_spam and msg.imap_uid:
+        _imap_bg(account.pk, msg.imap_folder_name or account.imap_folder_inbox,
+                 msg.imap_uid, 'spam')
 
     auto_rule = None
     if msg.is_spam and msg.from_email and '@' in msg.from_email:
@@ -1201,6 +1229,9 @@ def mark_read_api(request, message_pk):
     if not msg.is_read:
         msg.is_read = True
         msg.save(update_fields=['is_read'])
+        if msg.imap_uid:
+            _imap_bg(account.pk, msg.imap_folder_name or account.imap_folder_inbox,
+                     msg.imap_uid, 'seen')
     return JsonResponse({'ok': True})
 
 
@@ -1213,6 +1244,9 @@ def mark_unread_api(request, message_pk):
     if msg.is_read:
         msg.is_read = False
         msg.save(update_fields=['is_read'])
+        if msg.imap_uid:
+            _imap_bg(account.pk, msg.imap_folder_name or account.imap_folder_inbox,
+                     msg.imap_uid, 'unseen')
     return JsonResponse({'ok': True})
 
 

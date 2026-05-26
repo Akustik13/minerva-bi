@@ -170,10 +170,10 @@
 .em-empty-list{display:flex;align-items:center;justify-content:center;height:120px;color:var(--text-muted);font-size:13px}
 
 /* ── Context menu ── */
-#em-ctx{display:none;position:fixed;z-index:99999;background:var(--bg-card);
+#em-ctx,#em-sf-ctx{display:none;position:fixed;z-index:99999;background:var(--bg-card);
   border:1px solid var(--border-strong);border-radius:8px;
   box-shadow:0 4px 16px rgba(0,0,0,.35);min-width:180px;padding:4px 0;font-size:13px}
-#em-ctx.open{display:block}
+#em-ctx.open,#em-sf-ctx.open{display:block}
 .em-ctx-item{display:flex;align-items:center;gap:8px;padding:7px 14px;
   cursor:pointer;color:var(--text-muted);white-space:nowrap;transition:background .1s,color .1s}
 .em-ctx-item:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
@@ -249,10 +249,9 @@
         {% endwith %}
       </a>
       {% endfor %}
+      <!-- Server folders (loaded via AJAX) -->
+      <div id="em-server-folders"></div>
     </div>
-
-    <!-- Server folders (loaded via AJAX) -->
-    <div id="em-server-folders"></div>
 
     <div class="em-sync-area">
       <button class="em-sync-btn" onclick="syncNow(this,false)" title="{% trans "Завантажити нові листи" %}">
@@ -419,6 +418,15 @@
   <div class="em-ctx-item" onclick="ctxAction('spam')">🚫 Спам</div>
   <div class="em-ctx-item" onclick="ctxAction('archive')">📦 Архів</div>
   <div class="em-ctx-item danger" onclick="ctxAction('delete')">🗑️ Видалити</div>
+</div>
+
+<!-- Folder context menu -->
+<div id="em-sf-ctx">
+  <div class="em-ctx-item" onclick="sfCtxAction('open')">📂 Відкрити</div>
+  <div class="em-ctx-item" id="em-sf-fav-item" onclick="sfCtxAction('fav')">⭐ Додати в улюблені</div>
+  <div class="em-ctx-sep"></div>
+  <div class="em-ctx-item" onclick="sfCtxAction('rename')">✏️ Перейменувати</div>
+  <div class="em-ctx-item danger" onclick="sfCtxAction('delete')">🗑️ Видалити</div>
 </div>
 
 <!-- Rule creation modal -->
@@ -950,6 +958,9 @@ function _applyP2Visibility() {
                       'Drafts', 'INBOX.Drafts', '[Gmail]/Drafts']);
   var currentFolder = '{{ folder|escapejs }}';
   var _sfCollapsed = localStorage.getItem('em-sf-col') === '1';
+  var _sfFavs      = new Set(JSON.parse(localStorage.getItem('em-sf-favs') || '[]'));
+  var _sfCtxFolder = null;
+  var _sfCtx       = document.getElementById('em-sf-ctx');
   var _modal = document.getElementById('em-folder-modal');
   var _modalTitle = document.getElementById('em-folder-modal-title');
   var _modalInp   = document.getElementById('em-folder-modal-inp');
@@ -1048,6 +1059,10 @@ function _applyP2Visibility() {
       var r = await fetch('/email/imap-folders/', {credentials:'same-origin'});
       var d = await r.json();
       var extra = (d.folders || []).filter(function(f){ return f.selectable && !SKIP.has(f.name); });
+      extra.sort(function(a, b) {
+        var af = _sfFavs.has(a.name), bf = _sfFavs.has(b.name);
+        return (af && !bf) ? -1 : (!af && bf) ? 1 : 0;
+      });
       var wrap2 = document.getElementById('em-server-folders');
       if (wrap2) { if (_sfCollapsed) wrap2.classList.add('sf-collapsed'); else wrap2.classList.remove('sf-collapsed'); }
       var toggleCls = _sfCollapsed ? ' collapsed' : '';
@@ -1059,18 +1074,17 @@ function _applyP2Visibility() {
       if (extra.length) {
         extra.forEach(function(f){
           var paddingLeft = 12 + (f.level > 0 ? f.level * 14 : 0);
-          var active  = (currentFolder === f.name) ? ' active' : '';
-          var label   = f.name.replace(/.*[\/\.]/, '');
-          var nameJ   = JSON.stringify(f.name);
-          // Use <div> + inner <div> for click — avoids nested-button issues
-          html += '<div class="em-server-folder' + active + '">'
-                + '<div class="em-sf-main" style="padding-left:' + paddingLeft + 'px" '
-                + 'onclick="openServerFolder(' + nameJ + ',this.querySelector(\'.em-sf-label\'))">'
-                + '<span style="font-size:13px;flex-shrink:0">📁</span>'
+          var active   = (currentFolder === f.name) ? ' active' : '';
+          var label    = f.name.replace(/.*[\/\.]/, '');
+          var nameAttr = f.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
+          var icon     = _sfFavs.has(f.name) ? '⭐' : '📁';
+          html += '<div class="em-server-folder' + active + '" data-folder="' + nameAttr + '"'
+                + ' oncontextmenu="showSfCtx(event,this.dataset.folder)">'
+                + '<div class="em-sf-main" style="padding-left:' + paddingLeft + 'px"'
+                + ' onclick="openServerFolder(this.parentElement.dataset.folder,this.querySelector(\'.em-sf-label\'))">'
+                + '<span style="font-size:13px;flex-shrink:0">' + icon + '</span>'
                 + '<span class="em-sf-label">' + label + '</span>'
                 + '</div>'
-                + '<button class="em-sf-action" onclick="event.stopPropagation();showRenameFolder(' + nameJ + ')" title="{% trans "Перейменувати" %}">✏️</button>'
-                + '<button class="em-sf-action em-sf-del" onclick="event.stopPropagation();showDeleteFolder(' + nameJ + ')" title="{% trans "Видалити" %}">🗑️</button>'
                 + '</div>';
         });
       }
@@ -1088,6 +1102,39 @@ function _applyP2Visibility() {
       if (btn) { if (_sfCollapsed) btn.classList.add('collapsed'); else btn.classList.remove('collapsed'); }
     }
   };
+
+  window.showSfCtx = function(ev, folderName) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    _sfCtxFolder = folderName;
+    var favItem = document.getElementById('em-sf-fav-item');
+    if (favItem) favItem.textContent = _sfFavs.has(folderName) ? '★ Видалити з улюблених' : '⭐ Додати в улюблені';
+    var x = ev.clientX, y = ev.clientY;
+    if (x + 200 > window.innerWidth) x = window.innerWidth - 205;
+    if (y + 140 > window.innerHeight) y = window.innerHeight - 145;
+    _sfCtx.style.left = x + 'px';
+    _sfCtx.style.top  = y + 'px';
+    _sfCtx.classList.add('open');
+  };
+
+  window.sfCtxAction = function(action) {
+    _sfCtx.classList.remove('open');
+    if (!_sfCtxFolder) return;
+    var fn = _sfCtxFolder;
+    if (action === 'open') {
+      openServerFolder(fn);
+    } else if (action === 'fav') {
+      if (_sfFavs.has(fn)) _sfFavs.delete(fn); else _sfFavs.add(fn);
+      localStorage.setItem('em-sf-favs', JSON.stringify(Array.from(_sfFavs)));
+      loadServerFolders();
+    } else if (action === 'rename') {
+      showRenameFolder(fn);
+    } else if (action === 'delete') {
+      showDeleteFolder(fn);
+    }
+  };
+
+  document.addEventListener('click', function() { if (_sfCtx) _sfCtx.classList.remove('open'); });
 
   window.openServerFolder = async function(folderName, labelEl) {
     if (labelEl) labelEl.textContent = '⏳ ' + labelEl.textContent;
