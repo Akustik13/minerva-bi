@@ -373,12 +373,133 @@ def message_html_view(request, message_pk):
             html = _resolve_cid_images(msg, html)
         return HttpResponse(html, content_type='text/html; charset=utf-8')
     import html as html_mod
-    txt = html_mod.escape(msg.body_text or '(Лист порожній)')
+    body = msg.body_text or ''
+    if 'BEGIN:VCALENDAR' in body:
+        return HttpResponse(
+            _render_icalendar_card(body),
+            content_type='text/html; charset=utf-8',
+        )
+    txt = html_mod.escape(body or '(Лист порожній)')
     return HttpResponse(
         f'<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:14px;line-height:1.7;'
         f'white-space:pre-wrap;padding:12px;margin:0">{txt}</body></html>',
         content_type='text/html; charset=utf-8',
     )
+
+
+def _render_icalendar_card(ical_text: str) -> str:
+    """Parse iCalendar VEVENT and return a styled HTML card."""
+    import re, html as _h
+    from datetime import datetime
+
+    def _field(name, text):
+        pattern = re.compile(
+            r'^' + re.escape(name) + r'(?:;[^:]*)?:(.+)$',
+            re.MULTILINE | re.IGNORECASE,
+        )
+        m = pattern.search(text)
+        return m.group(1).strip() if m else ''
+
+    def _fields(name, text):
+        pattern = re.compile(
+            r'^' + re.escape(name) + r'(?:;[^:]*)?:(.+)$',
+            re.MULTILINE | re.IGNORECASE,
+        )
+        return [m.group(1).strip() for m in pattern.finditer(text)]
+
+    def _fmt_dt(raw):
+        raw = re.sub(r'Z$', '', raw.strip())
+        for fmt in ('%Y%m%dT%H%M%S', '%Y%m%dT%H%M', '%Y%m%d'):
+            try:
+                dt = datetime.strptime(raw, fmt)
+                if 'T' in raw:
+                    return dt.strftime('%d.%m.%Y, %H:%M')
+                return dt.strftime('%d.%m.%Y')
+            except ValueError:
+                continue
+        return raw
+
+    def _clean_desc(raw):
+        raw = raw.replace('\\n', '\n').replace('\\,', ',').replace('\\;', ';')
+        raw = re.sub(r'<[^>]+>', '', raw)
+        return raw.strip()
+
+    def _organizer_name(raw):
+        m = re.search(r'CN="?([^":]+)"?', raw, re.IGNORECASE)
+        return m.group(1).strip() if m else raw.split(':')[-1]
+
+    def _attendee_name(raw):
+        m = re.search(r'CN="?([^":]+)"?', raw, re.IGNORECASE)
+        return m.group(1).strip() if m else raw.split(':')[-1]
+
+    # unfold continuation lines (space/tab at start = continuation)
+    unfolded = re.sub(r'\r?\n[ \t]', '', ical_text)
+
+    vevent_m = re.search(r'BEGIN:VEVENT(.+?)END:VEVENT', unfolded, re.DOTALL | re.IGNORECASE)
+    block = vevent_m.group(1) if vevent_m else unfolded
+
+    summary   = _h.escape(_field('SUMMARY', block))
+    location  = _h.escape(_field('LOCATION', block))
+    organizer = _h.escape(_organizer_name(_field('ORGANIZER', block)))
+    dt_start  = _fmt_dt(_field('DTSTART', block))
+    dt_end    = _fmt_dt(_field('DTEND', block))
+    desc_raw  = _clean_desc(_field('DESCRIPTION', block))
+    attendees = [_h.escape(_attendee_name(a)) for a in _fields('ATTENDEE', block)]
+
+    zoom_url = ''
+    for line in desc_raw.splitlines():
+        if 'zoom.us' in line and line.strip().startswith('http'):
+            zoom_url = line.strip()
+            break
+    if not zoom_url and 'zoom.us' in location:
+        zoom_url = location
+
+    desc_lines = []
+    for line in desc_raw.splitlines():
+        if line.strip().startswith('http') and 'zoom.us' in line:
+            continue
+        if line.strip():
+            desc_lines.append(_h.escape(line))
+    desc_html = '<br>'.join(desc_lines[:8])
+
+    attendees_html = ''.join(
+        f'<span style="display:inline-block;background:#1e3a5f;border-radius:4px;'
+        f'padding:2px 8px;margin:2px;font-size:12px">{a}</span>'
+        for a in attendees
+    ) if attendees else ''
+
+    zoom_btn = (
+        f'<a href="{_h.escape(zoom_url)}" target="_blank" '
+        f'style="display:inline-block;margin-top:12px;padding:10px 20px;'
+        f'background:#2d8cf0;color:#fff;border-radius:6px;text-decoration:none;'
+        f'font-weight:600;font-size:14px">📹 Приєднатися до Zoom</a>'
+    ) if zoom_url else ''
+
+    return f'''<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body{{margin:0;padding:12px;background:#10192a;color:#c9d8e4;font-family:sans-serif;font-size:14px;line-height:1.6}}
+  .card{{background:#1a2535;border:1px solid #243347;border-radius:8px;padding:16px 20px;max-width:600px}}
+  .badge{{display:inline-block;background:#7c3aed;color:#fff;border-radius:4px;padding:2px 8px;font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:10px}}
+  .title{{font-size:18px;font-weight:700;color:#fff;margin-bottom:12px}}
+  .row{{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;font-size:13px}}
+  .icon{{width:18px;flex-shrink:0;opacity:.7;margin-top:1px}}
+  .label{{color:#9aafbe;min-width:90px;flex-shrink:0}}
+  .val{{color:#c9d8e4}}
+  .sep{{border:none;border-top:1px solid #243347;margin:12px 0}}
+  .desc{{font-size:13px;color:#9aafbe;white-space:pre-wrap}}
+</style></head><body>
+<div class="card">
+  <div class="badge">📅 Запрошення на зустріч</div>
+  <div class="title">{summary or 'Зустріч'}</div>
+  <div class="row"><span class="icon">🕐</span><span class="label">Початок:</span><span class="val">{dt_start}</span></div>
+  <div class="row"><span class="icon">🕔</span><span class="label">Кінець:</span><span class="val">{dt_end}</span></div>
+  {'<div class="row"><span class="icon">👤</span><span class="label">Організатор:</span><span class="val">' + organizer + '</span></div>' if organizer else ''}
+  {'<div class="row"><span class="icon">📍</span><span class="label">Місце:</span><span class="val">' + location + '</span></div>' if location and 'zoom' not in location.lower() else ''}
+  {'<hr class="sep"><div style="font-size:12px;color:#9aafbe;margin-bottom:6px">Учасники:</div><div>' + attendees_html + '</div>' if attendees_html else ''}
+  {'<hr class="sep"><div class="desc">' + desc_html + '</div>' if desc_html else ''}
+  {zoom_btn}
+</div>
+</body></html>'''
 
 
 def _resolve_cid_images(msg_obj, html: str) -> str:

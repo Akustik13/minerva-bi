@@ -40,14 +40,14 @@ def _get_body(msg) -> tuple:
             charset = part.get_content_charset() or 'utf-8'
             decoded = payload.decode(charset, errors='replace')
             if ct == 'text/plain' and not text_body:
-                text_body = decoded[:10000]
+                text_body = decoded[:200000]
             elif ct == 'text/html' and not html_body:
-                html_body = decoded[:20000]
+                html_body = decoded[:1000000]
     else:
         payload = msg.get_payload(decode=True)
         if payload:
             charset   = msg.get_content_charset() or 'utf-8'
-            text_body = payload.decode(charset, errors='replace')[:10000]
+            text_body = payload.decode(charset, errors='replace')[:200000]
     return text_body, html_body
 
 
