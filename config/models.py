@@ -144,6 +144,14 @@ class SystemSettings(models.Model):
     def save(self, *args, **kwargs):
         self.pk = 1  # Singleton — завжди pk=1
         super().save(*args, **kwargs)
+        try:
+            from django.contrib.sites.models import Site
+            Site.objects.filter(pk=1).update(
+                domain=self.site_domain,
+                name=self.company_name or "Minerva BI",
+            )
+        except Exception:
+            pass
 
     @classmethod
     def get(cls):
