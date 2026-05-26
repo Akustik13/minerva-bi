@@ -76,6 +76,10 @@
 .em-p1.collapsed .em-sf-main .em-sf-label{display:none}
 .em-p1.collapsed .em-sf-main{padding:8px;justify-content:center}
 .em-p1.collapsed .em-sf-action{display:none}
+#em-server-folders.sf-collapsed .em-server-folder{display:none}
+.em-folders-divider-toggle{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:11px;padding:0 4px;line-height:1;flex-shrink:0;transition:color .1s,transform .15s;transform-origin:center}
+.em-folders-divider-toggle:hover{color:var(--text)}
+.em-folders-divider-toggle.collapsed{transform:rotate(-90deg)}
 
 /* ── Panel 2 search ── */
 .em-p2-search-row{padding:5px 10px 4px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
@@ -945,6 +949,7 @@ function _applyP2Visibility() {
                       'Spam', 'Junk', '[Gmail]/Spam', 'INBOX.Spam',
                       'Drafts', 'INBOX.Drafts', '[Gmail]/Drafts']);
   var currentFolder = '{{ folder|escapejs }}';
+  var _sfCollapsed = localStorage.getItem('em-sf-col') === '1';
   var _modal = document.getElementById('em-folder-modal');
   var _modalTitle = document.getElementById('em-folder-modal-title');
   var _modalInp   = document.getElementById('em-folder-modal-inp');
@@ -1043,7 +1048,12 @@ function _applyP2Visibility() {
       var r = await fetch('/email/imap-folders/', {credentials:'same-origin'});
       var d = await r.json();
       var extra = (d.folders || []).filter(function(f){ return f.selectable && !SKIP.has(f.name); });
-      var html = '<div class="em-folders-divider"><span>' + _i18n.папкиСервера + '</span>'
+      var wrap2 = document.getElementById('em-server-folders');
+      if (wrap2) { if (_sfCollapsed) wrap2.classList.add('sf-collapsed'); else wrap2.classList.remove('sf-collapsed'); }
+      var toggleCls = _sfCollapsed ? ' collapsed' : '';
+      var html = '<div class="em-folders-divider">'
+               + '<button class="em-folders-divider-toggle' + toggleCls + '" onclick="toggleServerFolders()" title="Згорнути/Розгорнути">▾</button>'
+               + '<span>' + _i18n.папкиСервера + '</span>'
                + '<button class="em-folders-divider-add" onclick="showCreateFolder()" title="' + _i18n.новаПапка + '">+</button>'
                + '</div>';
       if (extra.length) {
@@ -1055,7 +1065,7 @@ function _applyP2Visibility() {
           // Use <div> + inner <div> for click — avoids nested-button issues
           html += '<div class="em-server-folder' + active + '">'
                 + '<div class="em-sf-main" style="padding-left:' + paddingLeft + 'px" '
-                + 'onclick="openServerFolder(' + nameJ + ')">'
+                + 'onclick="openServerFolder(' + nameJ + ',this.querySelector(\'.em-sf-label\'))">'
                 + '<span style="font-size:13px;flex-shrink:0">📁</span>'
                 + '<span class="em-sf-label">' + label + '</span>'
                 + '</div>'
@@ -1068,11 +1078,24 @@ function _applyP2Visibility() {
     } catch(e) {}
   }
 
-  window.openServerFolder = function(folderName) {
-    // fire background sync (don't wait — navigate immediately)
+  window.toggleServerFolders = function() {
+    _sfCollapsed = !_sfCollapsed;
+    localStorage.setItem('em-sf-col', _sfCollapsed ? '1' : '0');
+    var wrap2 = document.getElementById('em-server-folders');
+    if (wrap2) {
+      if (_sfCollapsed) wrap2.classList.add('sf-collapsed'); else wrap2.classList.remove('sf-collapsed');
+      var btn = wrap2.querySelector('.em-folders-divider-toggle');
+      if (btn) { if (_sfCollapsed) btn.classList.add('collapsed'); else btn.classList.remove('collapsed'); }
+    }
+  };
+
+  window.openServerFolder = async function(folderName, labelEl) {
+    if (labelEl) labelEl.textContent = '⏳ ' + labelEl.textContent;
     var fd = new FormData();
     fd.append('imap_folder', folderName);
-    fetch('/email/sync-imap-folder/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd}).catch(function(){});
+    try {
+      await fetch('/email/sync-imap-folder/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
+    } catch(e) {}
     window.location.href = '?folder=' + encodeURIComponent(folderName);
   };
 
