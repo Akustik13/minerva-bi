@@ -35,7 +35,10 @@ class TaskAdmin(admin.ModelAdmin):
         }),
     )
     readonly_fields = ('notified_at', 'created_at', 'updated_at')
-    actions = ['mark_done', 'mark_cancelled', 'mark_in_progress', 'enable_email_notify']
+    actions = ['mark_done', 'mark_cancelled', 'mark_in_progress', 'enable_email_notify', 'delete_selected']
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_staff
 
     # ── Колонки ─────────────────────────────────────────────────────────────
 

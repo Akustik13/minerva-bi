@@ -140,49 +140,82 @@ def widget_data_api(request):
     data = {}
     today = date.today()
 
+    # ── Email ──────────────────────────────────────────────────────────────
     try:
-        from email_assistant.models import EmailMessage, EmailThread
-        data['unread_emails'] = EmailMessage.objects.filter(
-            folder='inbox', is_read=False, is_deleted=False, is_spam=False
-        ).count()
-        data['unread_threads'] = EmailThread.objects.filter(
-            has_unread=True, is_archived=False
-        ).count()
+        from email_assistant.models import EmailMessage, EmailThread, EmailAccount
+        em_account = EmailAccount.objects.filter(
+            user=request.user, is_active=True
+        ).order_by('-is_primary').first()
+        if em_account:
+            archived_ids = EmailThread.objects.filter(
+                account=em_account, is_archived=True
+            ).values_list('id', flat=True)
+            data['unread_emails'] = EmailMessage.objects.filter(
+                account=em_account,
+                folder='inbox',
+                imap_folder_name__in=['', em_account.imap_folder_inbox],
+                is_read=False, is_deleted=False,
+            ).exclude(thread_id__in=archived_ids).count()
+            data['unread_threads'] = EmailThread.objects.filter(
+                account=em_account, has_unread=True, is_archived=False
+            ).count()
+        else:
+            data['unread_emails'] = 0
+            data['unread_threads'] = 0
     except Exception:
         data['unread_emails'] = 0
         data['unread_threads'] = 0
 
+    # ── Sales ──────────────────────────────────────────────────────────────
     try:
         from sales.models import SalesOrder
-        data['new_orders'] = SalesOrder.objects.filter(status='received').count()
+        data['new_orders']        = SalesOrder.objects.filter(status__in=['received', 'processing']).count()
         data['processing_orders'] = SalesOrder.objects.filter(status='processing').count()
-        data['sales_today'] = SalesOrder.objects.filter(
-            order_date__date=today
-        ).count()
-        data['unshipped'] = SalesOrder.objects.filter(
+        data['sales_today']       = SalesOrder.objects.filter(order_date__date=today).count()
+        data['unshipped']         = SalesOrder.objects.filter(
             affects_stock=True, shipped_at__isnull=True,
             status__in=['received', 'processing']
         ).count()
     except Exception:
         data['new_orders'] = 0
+        data['processing_orders'] = 0
         data['sales_today'] = 0
         data['unshipped'] = 0
 
+    # ── Shipping ───────────────────────────────────────────────────────────
     try:
         from shipping.models import Shipment
         data['in_transit'] = Shipment.objects.filter(status='in_transit').count()
     except Exception:
         data['in_transit'] = 0
 
+    # ── Inventory (inline — no admin import) ───────────────────────────────
     try:
-        from inventory.admin import _get_inventory_stats
-        inv = _get_inventory_stats()
-        data['critical_stock'] = inv.get('critical', 0) if isinstance(inv.get('critical'), int) else 0
-        data['active_po'] = inv.get('active_po', 0) if isinstance(inv.get('active_po'), int) else 0
+        from django.db.models import Sum, OuterRef, Subquery, F, Value
+        from django.db.models.functions import Coalesce
+        from decimal import Decimal
+        from inventory.models import Product, InventoryTransaction, PurchaseOrder
+        stock_subq = (
+            InventoryTransaction.objects
+            .filter(product=OuterRef('pk'))
+            .values('product')
+            .annotate(total=Sum('qty'))
+            .values('total')
+        )
+        data['critical_stock'] = (
+            Product.objects.filter(is_active=True, reorder_point__gt=0)
+            .annotate(stock=Coalesce(Subquery(stock_subq), Value(Decimal('0'))))
+            .filter(stock__lt=F('reorder_point'))
+            .count()
+        )
+        data['active_po'] = PurchaseOrder.objects.filter(
+            status__in=['draft', 'ordered', 'partial']
+        ).count()
     except Exception:
         data['critical_stock'] = 0
         data['active_po'] = 0
 
+    # ── Tasks ──────────────────────────────────────────────────────────────
     try:
         from tasks.models import Task
         data['tasks_pending'] = Task.objects.filter(
@@ -191,6 +224,7 @@ def widget_data_api(request):
     except Exception:
         data['tasks_pending'] = 0
 
+    # ── Calendar ───────────────────────────────────────────────────────────
     try:
         from calendar_app.models import CalendarEvent
         now = _tz.now()
