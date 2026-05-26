@@ -444,6 +444,57 @@ class EmailSettingsAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
+def refetch_body_from_imap(modeladmin, request, queryset):
+    """Re-download full body from IMAP for selected messages."""
+    import email as email_lib
+    from .imap_client import IMAPClient, _get_body
+
+    updated = skipped = errors = 0
+    by_account: dict = {}
+    for m in queryset.select_related('account'):
+        by_account.setdefault(m.account_id, (m.account, []))[1].append(m)
+
+    for account, msgs in by_account.values():
+        try:
+            client = IMAPClient(account)
+            client.connect()
+        except Exception as e:
+            errors += len(msgs)
+            modeladmin.message_user(request, f"IMAP connect error ({account}): {e}", level='error')
+            continue
+        try:
+            for m in msgs:
+                if not m.imap_uid:
+                    skipped += 1
+                    continue
+                folder = m.imap_folder_name or account.imap_folder_inbox or 'INBOX'
+                try:
+                    client.conn.select(f'"{folder}"', readonly=True)
+                    _, data = client.conn.uid('fetch', str(m.imap_uid), '(RFC822)')
+                    raw = data[0][1] if data and data[0] and isinstance(data[0], tuple) else None
+                    if not raw:
+                        skipped += 1
+                        continue
+                    parsed = email_lib.message_from_bytes(raw)
+                    text_body, html_body = _get_body(parsed)
+                    m.body_text = text_body
+                    m.body_html = html_body
+                    m.save(update_fields=['body_text', 'body_html'])
+                    updated += 1
+                except Exception:
+                    skipped += 1
+        finally:
+            client.disconnect()
+
+    modeladmin.message_user(
+        request,
+        f"Оновлено: {updated}, пропущено: {skipped}, помилок: {errors}",
+        level='success' if not errors else 'warning',
+    )
+
+refetch_body_from_imap.short_description = "🔄 Перезавантажити вміст з IMAP"
+
+
 @admin.register(EmailMessage)
 class EmailMessageAdmin(admin.ModelAdmin):
     list_display  = ('subject_col', 'from_email', 'folder', 'is_read', 'attach_col', 'sent_at')
@@ -452,6 +503,7 @@ class EmailMessageAdmin(admin.ModelAdmin):
     readonly_fields = ('account', 'thread', 'imap_uid', 'message_id', 'from_email',
                        'to_emails', 'cc_emails', 'body_text', 'body_html',
                        'sent_at', 'created_at', 'ai_summary', 'ai_reply_draft', 'ai_translated')
+    actions = [refetch_body_from_imap]
 
     def subject_col(self, obj):
         return obj.subject[:70] or '(без теми)'
