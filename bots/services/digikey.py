@@ -356,16 +356,19 @@ def _process_sales_order(so: dict, so_id: str, order_number: str,
         "lieferschein_nr": order_number,
     }
 
-    sale, created = SalesOrder.objects.get_or_create(
-        source="digikey",
-        order_number=so_id,
-        defaults=defaults,
-    )
+    from django.db import transaction as _tx_dk
+    with _tx_dk.atomic():
+        sale, created = SalesOrder.objects.get_or_create(
+            source="digikey",
+            order_number=so_id,
+            defaults=defaults,
+        )
 
-    if created:
-        stats["created"] += 1
-        _create_lines(sale, so, so_currency, stats)
-    else:
+        if created:
+            stats["created"] += 1
+            _create_lines(sale, so, so_currency, stats)
+
+    if not created:
         # Respect sync_order_status flag: if disabled, never touch status
         config_allows_status = _config_sync_status()
         if config_allows_status and _status_can_advance(sale.status, minerva_status):
@@ -859,24 +862,26 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
         "shipping_deadline": deadline,
     }
 
-    sale, created = SalesOrder.objects.get_or_create(
-        source="digikey",
-        order_number=order_number,
-        defaults=defaults,
-    )
+    from django.db import transaction as _tx_dk
+    with _tx_dk.atomic():
+        sale, created = SalesOrder.objects.get_or_create(
+            source="digikey",
+            order_number=order_number,
+            defaults=defaults,
+        )
 
-    if created:
-        stats["created"] += 1
-        _change_entry = {
-            "order":      order_number,
-            "client":     client,
-            "old_status": "—",
-            "new_status": minerva_status,
-        }
-        stats["changes"].append(_change_entry)
-        _create_marketplace_lines(sale, order, currency, stats)
-        if config:
-            _maybe_auto_confirm(config, order_number, sale, _change_entry, raw_order=order)
+        if created:
+            stats["created"] += 1
+            _change_entry = {
+                "order":      order_number,
+                "client":     client,
+                "old_status": "—",
+                "new_status": minerva_status,
+            }
+            stats["changes"].append(_change_entry)
+            _create_marketplace_lines(sale, order, currency, stats)
+            if config:
+                _maybe_auto_confirm(config, order_number, sale, _change_entry, raw_order=order)
     else:
         # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
         update_fields = []
