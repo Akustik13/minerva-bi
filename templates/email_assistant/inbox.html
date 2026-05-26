@@ -410,6 +410,7 @@
   <div class="em-ctx-item" onclick="ctxAction('rule')">📋 Правило з відправника</div>
   <div class="em-ctx-item" onclick="ctxAction('task')">📅 Завдання в календар</div>
   <div class="em-ctx-sep"></div>
+  <div class="em-ctx-item" onclick="ctxAction('spam')">🚫 Спам</div>
   <div class="em-ctx-item" onclick="ctxAction('archive')">📦 Архів</div>
   <div class="em-ctx-item danger" onclick="ctxAction('delete')">🗑️ Видалити</div>
 </div>
@@ -774,6 +775,35 @@ async function toggleStar(ev, pk, btn) {
 }
 
 /* ── Row actions ── */
+/* Called from preview panel after spam toggle — removes row from P2 */
+window.spamRow = function(pk) {
+  var row = document.getElementById('row-' + pk);
+  if (row) row.remove();
+  if (_activeRow && _activeRow === row) { _activeRow = null; resetPreview(); }
+  _showToast('🚫 {% trans "Переміщено до Спаму" %}');
+};
+
+async function spamMsg(pk, rowEl) {
+  var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+  var d = await r.json();
+  if (d.ok && d.spam) {
+    if (rowEl) rowEl.remove();
+    if (_activeRow === rowEl) { _activeRow = null; resetPreview(); }
+    _showToast('🚫 {% trans "Переміщено до Спаму" %}' + (d.auto_rule ? ' · {% trans "Правило додано для" %} ' + d.auto_rule : ''));
+  }
+}
+
+function _showToast(msg) {
+  var t = document.createElement('div');
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);'
+    + 'background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;'
+    + 'padding:10px 18px;font-size:12px;color:var(--text-muted);z-index:99999;'
+    + 'box-shadow:0 4px 14px rgba(0,0,0,.3);white-space:nowrap';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 3000);
+}
+
 async function deleteMsg(ev, pk) {
   ev.stopPropagation();
   var r = await fetch('/email/message/' + pk + '/delete/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
@@ -1064,6 +1094,8 @@ async function ctxAction(action) {
   } else if (action === 'star') {
     var starBtn = rowEl.querySelector('.em-star-btn');
     if (starBtn) toggleStar({stopPropagation:function(){}}, pk, starBtn);
+  } else if (action === 'spam') {
+    spamMsg(pk, rowEl);
   } else if (action === 'archive') {
     if (tpk) archiveThread({stopPropagation:function(){}}, tpk);
   } else if (action === 'delete') {
