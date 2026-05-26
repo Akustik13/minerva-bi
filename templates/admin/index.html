@@ -384,9 +384,10 @@ document.addEventListener('DOMContentLoaded', function(){
     /* Data widgets — show live counts */
     { id:'unread_emails',  t:'d', ic:'📧', lb:'Непрочитані листи',  hr:'/email/',                                           dk:'unread_emails',  ac:'#e91e63', cat:'Email' },
     { id:'unread_threads', t:'d', ic:'📨', lb:'Непрочитані гілки',   hr:'/email/',                                           dk:'unread_threads', ac:'#e91e63', cat:'Email' },
-    { id:'new_orders',     t:'d', ic:'🛒', lb:'Нові замовлення',      hr:'/admin/sales/salesorder/?status=received',          dk:'new_orders',     ac:'#4caf50', cat:'Продажі' },
-    { id:'sales_today',    t:'d', ic:'💰', lb:'Замовлень сьогодні',   hr:'/admin/sales/salesorder/',                          dk:'sales_today',    ac:'#4caf50', cat:'Продажі' },
-    { id:'unshipped',      t:'d', ic:'📦', lb:'Не відправлено',       hr:'/admin/sales/salesorder/?status=received',          dk:'unshipped',      ac:'#ff9800', cat:'Продажі' },
+    { id:'new_orders',       t:'d', ic:'🛒', lb:'Нові замовлення',      hr:'/admin/sales/salesorder/?status=received',          dk:'new_orders',         ac:'#4caf50', cat:'Продажі' },
+    { id:'processing_orders',t:'d', ic:'⚙️', lb:'В обробці',           hr:'/admin/sales/salesorder/?status=processing',        dk:'processing_orders',  ac:'#ff9800', cat:'Продажі' },
+    { id:'sales_today',      t:'d', ic:'💰', lb:'Замовлень сьогодні',  hr:'/admin/sales/salesorder/',                          dk:'sales_today',        ac:'#4caf50', cat:'Продажі' },
+    { id:'unshipped',        t:'d', ic:'📦', lb:'Не відправлено',      hr:'/admin/sales/salesorder/?status=received',          dk:'unshipped',          ac:'#ff9800', cat:'Продажі' },
     { id:'in_transit',     t:'d', ic:'🚚', lb:'В дорозі',             hr:'/admin/shipping/shipment/?status=in_transit',       dk:'in_transit',     ac:'#00bcd4', cat:'Доставка' },
     { id:'critical_stock', t:'d', ic:'⚠️', lb:'Критичний залишок',   hr:'/admin/inventory/reorderproxy/',                    dk:'critical_stock', ac:'#f44336', cat:'Склад' },
     { id:'active_po',      t:'d', ic:'📋', lb:'Активних PO',          hr:'/admin/inventory/purchaseorder/',                   dk:'active_po',      ac:'#795548', cat:'Склад' },
@@ -406,7 +407,7 @@ document.addEventListener('DOMContentLoaded', function(){
     { id:'nav_documents',  t:'n', ic:'📄', lb:'Документи',            hr:'/admin/documents/generateddocument/',               ac:'#78909c', cat:'Документи' },
   ];
 
-  var DEFAULT_ACTIVE = ['unread_emails','new_orders','unshipped','in_transit','critical_stock','tasks_pending'];
+  var DEFAULT_ACTIVE = ['unread_emails','new_orders','processing_orders','unshipped','in_transit','critical_stock','tasks_pending'];
   var SK = 'mv-wp-v1-{{ user.username }}';   /* per-user storage key */
 
   var _liveData = {};
