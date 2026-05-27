@@ -33,6 +33,10 @@ class SalesOrder(models.Model):
     order_date      = models.DateField(null=True, blank=True)
     shipped_at      = models.DateField(null=True, blank=True)
     delivered_at        = models.DateTimeField("Фактична доставка", null=True, blank=True)
+    order_confirm_sent_at = models.DateTimeField(
+        "📥 Підтвердження замовлення надіслано", null=True, blank=True,
+        help_text="Дата/час надсилання email-підтвердження отримання замовлення"
+    )
     ship_notify_sent_at = models.DateTimeField(
         "📧 Повідомлення клієнту надіслано", null=True, blank=True,
         help_text="Дата/час надсилання email-сповіщення про відправку"

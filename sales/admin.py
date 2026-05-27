@@ -1489,6 +1489,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                         allowed_srcs = [s.strip() for s in (_ns.order_confirm_notify_sources or '').split(',') if s.strip()]
                         if not allowed_srcs or (obj.source in allowed_srcs):
                             extra_context["notify_order_confirm_url"] = f"/admin/sales/salesorder/{obj.pk}/notify-order-confirm/"
+                            extra_context["order_confirm_sent_at"] = obj.order_confirm_sent_at
                 except Exception:
                     pass
             # Auto-sync shipping fields from active shipment (GET only)
@@ -2534,6 +2535,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 )
                 msg.attach_alternative(html_body, 'text/html')
                 msg.send()
+                from django.utils import timezone as _tz
+                SalesOrder.objects.filter(pk=pk).update(order_confirm_sent_at=_tz.now())
                 return JsonResponse({'ok': True})
             except Exception as e:
                 return JsonResponse({'ok': False, 'error': str(e)})

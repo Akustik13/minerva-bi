@@ -1125,7 +1125,8 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
                 from config.models import NotificationSettings as _NS
                 _ns = _NS.get()
                 if getattr(_ns, 'order_confirm_notify_auto', False):
-                    send_order_confirm_notification(sale)
+                    if not getattr(sale, 'order_confirm_sent_at', None):
+                        send_order_confirm_notification(sale)
             except Exception:
                 pass
         return

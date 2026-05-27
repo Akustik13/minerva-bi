@@ -1557,6 +1557,9 @@ def send_order_confirm_notification(order):
         )
         msg.attach_alternative(html_body, 'text/html')
         msg.send()
+        from django.utils import timezone as _tz
+        from sales.models import SalesOrder
+        SalesOrder.objects.filter(pk=order.pk).update(order_confirm_sent_at=_tz.now())
         return True
     except Exception:
         return False

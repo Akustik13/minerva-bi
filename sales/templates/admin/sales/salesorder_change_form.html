@@ -85,12 +85,22 @@
   {% endif %}
   {% if notify_order_confirm_url %}
     <li>
-      <button type="button"
-              onclick="ncoOpen('{{ notify_order_confirm_url }}')"
-              style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
-                     font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
-        📥 {% trans "Підтвердження замовлення" %}
-      </button>
+      {% if order_confirm_sent_at %}
+        <button type="button"
+                onclick="ncoOpen('{{ notify_order_confirm_url }}')"
+                style="background:#0d3b6e;color:#90caf9;padding:6px 14px;border-radius:6px;
+                       font-weight:bold;border:1px solid #1565c0;cursor:pointer;white-space:nowrap;font-size:13px"
+                title="{% trans 'Підтвердження вже надіслано. Натисни щоб надіслати повторно.' %}">
+          ✅ 📥 {% trans "Надіслано" %} {{ order_confirm_sent_at|date:"d.m.Y H:i" }}
+        </button>
+      {% else %}
+        <button type="button"
+                onclick="ncoOpen('{{ notify_order_confirm_url }}')"
+                style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
+                       font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
+          📥 {% trans "Підтвердження замовлення" %}
+        </button>
+      {% endif %}
     </li>
   {% endif %}
   {% if notify_customer_url %}
@@ -1485,6 +1495,13 @@ document.getElementById('nc-modal').addEventListener('click',function(e){ if(e.t
       <button onclick="ncoClose()" style="background:none;border:none;font-size:20px;cursor:pointer;
               color:var(--text-muted,#607d8b);line-height:1">×</button>
     </div>
+    {% if order_confirm_sent_at %}
+    <div style="background:rgba(21,101,192,.15);border:1px solid #1565c0;border-radius:6px;
+                padding:8px 14px;margin-bottom:12px;font-size:12px;color:#90caf9">
+      ✅ {% trans "Підтвердження вже надіслано автоматично" %} — {{ order_confirm_sent_at|date:"d.m.Y H:i" }}.
+      {% trans "Форма нижче — для повторного надсилання." %}
+    </div>
+    {% endif %}
     <div id="nco-loading" style="text-align:center;padding:20px;color:var(--text-muted,#607d8b)">⏳ {% trans "Генерація..." %}</div>
     <div id="nco-form" style="display:none">
       <div style="margin-bottom:12px">
