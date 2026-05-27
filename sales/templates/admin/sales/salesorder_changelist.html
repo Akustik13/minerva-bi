@@ -304,14 +304,14 @@ document.addEventListener('DOMContentLoaded', function () {
         <div class="sv-pl">{% trans "Оформлення" %}</div>
       </div>
       <div class="sv-pc {% if sh.label_url or s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
-      <div class="sv-ps {% if s == 'shipped' or s == 'delivered' %}sv-ps-done{% elif sh.label_url %}sv-ps-cur{% endif %}">
-        <div class="sv-pd">{% if s == 'shipped' or s == 'delivered' %}✓{% elif sh.label_url %}●{% else %}·{% endif %}</div>
-        <div class="sv-pl">{% trans "Етикетка" %}{% if sh.label_url and s != 'shipped' and s != 'delivered' %}<small>{% if sv_label_open_mode == 'download' %}<a href="#" onclick="svLabelAction('download','{{ sh.label_url }}');return false" style="color:inherit">PDF ⬇️</a>{% elif sv_label_open_mode == 'ask' %}<a href="#" onclick="svLabelAction('ask','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% else %}<a href="#" onclick="svLabelAction('view','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% endif %}</small>{% endif %}</div>
+      <div class="sv-ps {% if sh.status == 'in_transit' or sh.status == 'delivered' or s == 'delivered' %}sv-ps-done{% elif sh.label_url %}sv-ps-cur{% endif %}">
+        <div class="sv-pd">{% if sh.status == 'in_transit' or sh.status == 'delivered' or s == 'delivered' %}✓{% elif sh.label_url %}●{% else %}·{% endif %}</div>
+        <div class="sv-pl">{% trans "Етикетка" %}{% if sh.label_url and sh.status != 'in_transit' and sh.status != 'delivered' and s != 'delivered' %}<small>{% if sv_label_open_mode == 'download' %}<a href="#" onclick="svLabelAction('download','{{ sh.label_url }}');return false" style="color:inherit">PDF ⬇️</a>{% elif sv_label_open_mode == 'ask' %}<a href="#" onclick="svLabelAction('ask','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% else %}<a href="#" onclick="svLabelAction('view','{{ sh.label_url }}');return false" style="color:inherit">PDF</a>{% endif %}</small>{% endif %}</div>
       </div>
-      <div class="sv-pc {% if s == 'shipped' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
-      <div class="sv-ps {% if s == 'shipped' %}{% if sh.carrier_delayed %}sv-ps-warn{% else %}sv-ps-cur{% endif %}{% elif s == 'delivered' %}sv-ps-done{% endif %}">
-        <div class="sv-pd">{% if s == 'delivered' %}✓{% elif s == 'shipped' and sh.carrier_delayed %}!{% elif s == 'shipped' %}●{% else %}·{% endif %}</div>
-        <div class="sv-pl">{% if s == 'shipped' and sh.carrier_delayed %}<span style="color:#e65100;font-weight:700">{% trans "Затримка!" %}</span>{% else %}{% trans "В дорозі" %}{% if order.shipped_at %}<small>{{ order.shipped_at|date:"d.m" }}</small>{% endif %}{% endif %}</div>
+      <div class="sv-pc {% if sh.status == 'in_transit' or sh.status == 'delivered' or s == 'delivered' %}sv-pc-done{% endif %}"></div>
+      <div class="sv-ps {% if sh.status == 'in_transit' %}{% if sh.carrier_delayed %}sv-ps-warn{% else %}sv-ps-cur{% endif %}{% elif not sh and s == 'shipped' %}sv-ps-cur{% elif s == 'delivered' %}sv-ps-done{% endif %}">
+        <div class="sv-pd">{% if s == 'delivered' %}✓{% elif sh.status == 'in_transit' and sh.carrier_delayed %}!{% elif sh.status == 'in_transit' or not sh and s == 'shipped' %}●{% else %}·{% endif %}</div>
+        <div class="sv-pl">{% if sh.status == 'in_transit' and sh.carrier_delayed %}<span style="color:#e65100;font-weight:700">{% trans "Затримка!" %}</span>{% else %}{% trans "В дорозі" %}{% if order.shipped_at %}<small>{{ order.shipped_at|date:"d.m" }}</small>{% endif %}{% endif %}</div>
       </div>
       <div class="sv-pc {% if s == 'delivered' %}sv-pc-done{% endif %}"></div>
       <div class="sv-ps {% if s == 'delivered' %}sv-ps-done{% endif %}">
