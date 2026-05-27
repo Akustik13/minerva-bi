@@ -389,8 +389,10 @@ document.addEventListener('DOMContentLoaded', function(){
     { id:'sales_today',      t:'d', ic:'💰', lb:'Замовлень сьогодні',  hr:'/admin/sales/salesorder/',                          dk:'sales_today',        ac:'#4caf50', cat:'Продажі' },
     { id:'unshipped',        t:'d', ic:'📦', lb:'Не відправлено',      hr:'/admin/sales/salesorder/?shipped=no',               dk:'unshipped',          ac:'#ff9800', cat:'Продажі' },
     { id:'in_transit',     t:'d', ic:'🚚', lb:'В дорозі',             hr:'/admin/shipping/shipment/?status=in_transit',       dk:'in_transit',     ac:'#00bcd4', cat:'Доставка' },
+    { id:'label_ready',   t:'d', ic:'🏷️', lb:'Етикетка готова',      hr:'/admin/shipping/shipment/?status=label_ready',      dk:'label_ready',    ac:'#a78bfa', cat:'Доставка' },
     { id:'critical_stock', t:'d', ic:'⚠️', lb:'Критичний залишок',   hr:'/admin/inventory/reorderproxy/',                    dk:'critical_stock', ac:'#f44336', cat:'Склад' },
     { id:'active_po',      t:'d', ic:'📋', lb:'Активних PO',          hr:'/admin/inventory/purchaseorder/',                   dk:'active_po',      ac:'#795548', cat:'Склад' },
+    { id:'supply_count',  t:'d', ic:'📋', lb:'До замовлення',         hr:'/admin/inventory/reorderproxy/supply/',             dk:'critical_stock', ac:'#8d6e63', cat:'Склад' },
     { id:'tasks_pending',  t:'d', ic:'✅', lb:'Активні задачі',       hr:'/admin/tasks/task/',                                dk:'tasks_pending',  ac:'#9c27b0', cat:'Задачі' },
     { id:'calendar_today', t:'d', ic:'📅', lb:'Подій сьогодні',       hr:'/calendar/',                                        dk:'calendar_today', ac:'#3f51b5', cat:'Календар' },
     /* Nav widgets — quick-access links */

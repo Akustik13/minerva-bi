@@ -187,9 +187,11 @@ def widget_data_api(request):
     # ── Shipping ───────────────────────────────────────────────────────────
     try:
         from shipping.models import Shipment
-        data['in_transit'] = Shipment.objects.filter(status='in_transit').count()
+        data['in_transit']   = Shipment.objects.filter(status='in_transit').count()
+        data['label_ready']  = Shipment.objects.filter(status='label_ready').count()
     except Exception:
-        data['in_transit'] = 0
+        data['in_transit']  = 0
+        data['label_ready'] = 0
 
     # ── Inventory (inline — no admin import) ───────────────────────────────
     try:
