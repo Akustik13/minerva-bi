@@ -590,6 +590,34 @@ class NotificationSettings(models.Model):
         help_text="Товари з запасом менше 1.5 місяців.",
     )
 
+    # ── Customer shipment notification ────────────────────────────────────────
+    customer_notify_enabled = models.BooleanField(
+        "Кнопка «Надіслати клієнту»", default=False,
+        help_text="На сторінці замовлення з'являється кнопка для надсилання клієнту повідомлення про відправку.",
+    )
+    customer_notify_auto = models.BooleanField(
+        "Авто-відправка (без підтвердження)", default=False,
+        help_text="Якщо увімкнено — лист надсилається одразу при натисканні кнопки без попереднього перегляду.",
+    )
+    customer_notify_subject = models.CharField(
+        "Тема листа клієнту (шаблон)", max_length=500, blank=True,
+        default="Ihre Bestellung #{order_number} wurde versendet",
+        help_text="Змінні: {order_number} {customer_name} {tracking_number} {carrier} {shipped_date}",
+    )
+    customer_notify_body = models.TextField(
+        "Текст листа клієнту (шаблон)", blank=True,
+        default=(
+            "Sehr geehrte/r {customer_name},\n\n"
+            "Ihre Bestellung #{order_number} wurde am {shipped_date} versendet.\n\n"
+            "Versanddienstleister: {carrier}\n"
+            "Tracking-Nummer: {tracking_number}\n\n"
+            "Bestellte Artikel:\n{items}\n\n"
+            "Lieferadresse:\n{ship_address}\n\n"
+            "Mit freundlichen Grüßen"
+        ),
+        help_text="Змінні: {order_number} {customer_name} {tracking_number} {carrier} {shipped_date} {items} {ship_address}",
+    )
+
     # ── IMAP last fetch tracking ───────────────────────────────────────────────
     imap_last_fetched = models.DateTimeField(
         "Останнє оновлення пошти", null=True, blank=True,

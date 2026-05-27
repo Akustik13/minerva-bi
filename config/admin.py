@@ -315,6 +315,18 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "вручну або через автотрекінг DHL/UPS."
             ),
         }),
+        ("📧 Повідомлення клієнту про відправку", {
+            "fields": (
+                ("customer_notify_enabled", "customer_notify_auto"),
+                "customer_notify_subject",
+                "customer_notify_body",
+            ),
+            "description": (
+                "Кнопка «📧 Надіслати клієнту» на сторінці замовлення. "
+                "Змінні шаблону: {order_number} {customer_name} {tracking_number} "
+                "{carrier} {shipped_date} {items} {ship_address}"
+            ),
+        }),
         ("🔔 Планові сповіщення (cron)", {
             "fields": (
                 "stock_alerts_enabled",

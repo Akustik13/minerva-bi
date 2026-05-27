@@ -83,6 +83,16 @@
       </button>
     </li>
   {% endif %}
+  {% if notify_customer_url %}
+    <li>
+      <button type="button"
+              onclick="ncOpen('{{ notify_customer_url }}')"
+              style="background:#00695c;color:#fff;padding:6px 14px;border-radius:6px;
+                     font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
+        📧 {% trans "Надіслати клієнту" %}
+      </button>
+    </li>
+  {% endif %}
   {{ block.super }}
 {% endblock %}
 
@@ -1280,5 +1290,120 @@ document.addEventListener('DOMContentLoaded',function(){
   {% endif %}
   {% endwith %}
 </div>
+{% endif %}
+
+{% if notify_customer_url %}
+<!-- ── Customer notification modal ── -->
+<div id="nc-modal" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(0,0,0,.55);align-items:center;justify-content:center">
+  <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+              border-radius:12px;padding:28px;width:min(640px,95vw);max-height:90vh;
+              overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h3 style="margin:0;font-size:16px;color:var(--text,#c9d8e4)">📧 {% trans "Надіслати клієнту" %}</h3>
+      <button onclick="ncClose()" style="background:none;border:none;font-size:20px;cursor:pointer;
+              color:var(--text-muted,#607d8b);line-height:1">×</button>
+    </div>
+    <div id="nc-loading" style="text-align:center;padding:20px;color:var(--text-muted,#607d8b)">⏳ {% trans "Генерація..." %}</div>
+    <div id="nc-form" style="display:none">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Кому" %} *</label>
+        <input id="nc-to" type="email"
+               style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
+                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Копія (CC)" %}</label>
+        <input id="nc-cc" type="email"
+               style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
+                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Тема" %} *</label>
+        <input id="nc-subject" type="text"
+               style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
+                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Текст листа" %}</label>
+        <textarea id="nc-body" rows="12"
+               style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
+                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;
+                      font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button id="nc-send-btn" onclick="ncSend()"
+                style="padding:9px 24px;border-radius:7px;background:linear-gradient(135deg,#00695c,#00897b);
+                       color:#fff;border:none;cursor:pointer;font-weight:700;font-size:13px">
+          📤 {% trans "Надіслати" %}
+        </button>
+        <button onclick="ncClose()"
+                style="padding:9px 16px;border-radius:7px;background:none;color:var(--text-muted,#607d8b);
+                       border:1px solid var(--border-strong,#243347);cursor:pointer;font-size:13px">
+          {% trans "Скасувати" %}
+        </button>
+        <span id="nc-status" style="font-size:13px;margin-left:auto"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+var NC_URL = '{{ notify_customer_url }}';
+var CSRF   = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+function ncOpen(url) {
+  var m = document.getElementById('nc-modal');
+  m.style.display = 'flex';
+  document.getElementById('nc-loading').style.display = 'block';
+  document.getElementById('nc-form').style.display   = 'none';
+  document.getElementById('nc-status').textContent   = '';
+  fetch(url, {headers:{'X-CSRFToken':CSRF}})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.getElementById('nc-loading').style.display = 'none';
+      if (!d.ok){ document.getElementById('nc-status').textContent='✗ '+d.error; return; }
+      document.getElementById('nc-to').value      = d.to      || '';
+      document.getElementById('nc-cc').value      = '';
+      document.getElementById('nc-subject').value = d.subject || '';
+      document.getElementById('nc-body').value    = d.body    || '';
+      document.getElementById('nc-form').style.display = 'block';
+      if (d.auto){ ncSend(); }
+    })
+    .catch(function(e){ document.getElementById('nc-status').textContent='✗ '+e; });
+}
+window.ncOpen = ncOpen;
+function ncClose(){ document.getElementById('nc-modal').style.display='none'; }
+window.ncClose = ncClose;
+async function ncSend(){
+  var btn=document.getElementById('nc-send-btn');
+  var st=document.getElementById('nc-status');
+  btn.disabled=true; btn.textContent='⏳...'; st.textContent='';
+  try{
+    var r=await fetch(NC_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF},
+      body:JSON.stringify({
+        to:document.getElementById('nc-to').value.trim(),
+        cc:document.getElementById('nc-cc').value.trim(),
+        subject:document.getElementById('nc-subject').value.trim(),
+        body:document.getElementById('nc-body').value,
+      }),
+    });
+    var d=await r.json();
+    if(d.ok){
+      st.style.color='var(--ok,#2e7d32)';
+      st.textContent='✓ {% trans "Надіслано!" %}';
+      setTimeout(ncClose,1500);
+    } else {
+      st.style.color='var(--err,#c62828)';
+      st.textContent='✗ '+d.error;
+    }
+  } catch(e){ st.textContent='✗ '+e; st.style.color='var(--err,#c62828)'; }
+  finally{ btn.disabled=false; btn.textContent='📤 {% trans "Надіслати" %}'; }
+}
+window.ncSend = ncSend;
+document.getElementById('nc-modal').addEventListener('click',function(e){ if(e.target===this) ncClose(); });
+})();
+</script>
 {% endif %}
 {% endblock %}

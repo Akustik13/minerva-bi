@@ -1464,6 +1464,16 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["eu_invoice_generate_url"] = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/generate/"
                 extra_context["eu_invoice_number"]       = obj.eu_invoice_number
                 extra_context["order_source"]            = obj.source
+            # Customer shipment notification button
+            if obj and obj.pk:
+                try:
+                    from config.models import NotificationSettings as _NS
+                    _ns = _NS.get()
+                    if _ns.customer_notify_enabled and _ns.email_enabled:
+                        extra_context["notify_customer_url"] = f"/admin/sales/salesorder/{obj.pk}/notify-customer/"
+                        extra_context["notify_customer_auto"] = _ns.customer_notify_auto
+                except Exception:
+                    pass
             # Auto-sync shipping fields from active shipment (GET only)
             if obj and request.method == "GET":
                 _sync_order_from_active_shipment(obj)
@@ -2105,6 +2115,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/eu-invoice/generate/',
                  self.admin_site.admin_view(self.eu_invoice_generate_view),
                  name='sales_salesorder_eu_invoice_generate'),
+            # Customer shipment notification
+            path('<int:pk>/notify-customer/',
+                 self.admin_site.admin_view(self.notify_customer_view),
+                 name='sales_salesorder_notify_customer'),
         ]
         return custom_urls + urls
 
@@ -2297,6 +2311,108 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         response = HttpResponse(pdf_bytes, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+    def notify_customer_view(self, request, pk):
+        """GET — повертає JSON з попередньо заповненим листом з шаблону.
+           POST — надсилає лист клієнту через SMTP."""
+        from django.http import JsonResponse
+        import json as _json
+
+        order = get_object_or_404(SalesOrder, pk=pk)
+
+        try:
+            from config.models import NotificationSettings as _NS
+            ns = _NS.get()
+        except Exception:
+            return JsonResponse({'ok': False, 'error': 'NotificationSettings недоступні'})
+
+        if request.method == 'GET':
+            to_email    = (order.ship_email or order.email or '').strip()
+            cust_name   = (order.ship_name or order.client or order.contact_name or '').strip()
+            tracking    = (order.tracking_number or '').strip()
+            carrier     = (order.shipping_courier or '').strip()
+            shipped     = order.shipped_at.strftime('%d.%m.%Y') if order.shipped_at else ''
+
+            lines = order.lines.select_related('product').all()
+            items_text = '\n'.join(
+                '• {} — {} Stk.'.format(
+                    l.sku_raw or (l.product.sku if l.product else ''), int(l.qty)
+                )
+                for l in lines
+            ) or '—'
+
+            addr_parts = filter(None, [
+                order.ship_name or order.client,
+                order.addr_street or order.shipping_address,
+                ('{} {}'.format(order.addr_zip or '', order.addr_city or '')).strip(),
+                order.addr_country,
+            ])
+            ship_address = '\n'.join(addr_parts)
+
+            ctx = {
+                'order_number':    order.order_number or str(order.pk),
+                'customer_name':   cust_name,
+                'tracking_number': tracking,
+                'carrier':         carrier,
+                'shipped_date':    shipped,
+                'items':           items_text,
+                'ship_address':    ship_address,
+            }
+            try:
+                subject = (ns.customer_notify_subject or '').format(**ctx)
+                body    = (ns.customer_notify_body or '').format(**ctx)
+            except KeyError as e:
+                subject = ns.customer_notify_subject or ''
+                body    = ns.customer_notify_body or ''
+
+            return JsonResponse({
+                'ok':      True,
+                'to':      to_email,
+                'subject': subject,
+                'body':    body,
+                'auto':    ns.customer_notify_auto,
+            })
+
+        if request.method == 'POST':
+            try:
+                data = _json.loads(request.body or b'{}')
+            except Exception:
+                data = {}
+
+            to_email  = (data.get('to') or '').strip()
+            cc_email  = (data.get('cc') or '').strip()
+            subject   = (data.get('subject') or '').strip()
+            body_text = (data.get('body') or '').strip()
+
+            if not to_email:
+                return JsonResponse({'ok': False, 'error': 'Не вказано отримувача (Кому)'})
+            if not subject:
+                return JsonResponse({'ok': False, 'error': 'Не вказано тему листа'})
+            if not ns.email_enabled:
+                return JsonResponse({'ok': False, 'error': 'SMTP не налаштовано. Увімкніть Email у Налаштуваннях сповіщень.'})
+
+            try:
+                from django.core.mail import EmailMultiAlternatives
+                from dashboard.notifications import _smtp_connection
+
+                from_email = (ns.email_from or ns.email_host_user or '').strip()
+                html_body  = '<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">' \
+                             + body_text.replace('\n', '<br>') + '</body></html>'
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=body_text,
+                    from_email=from_email,
+                    to=[to_email],
+                    cc=[cc_email] if cc_email else [],
+                    connection=_smtp_connection(ns),
+                )
+                msg.attach_alternative(html_body, 'text/html')
+                msg.send()
+                return JsonResponse({'ok': True})
+            except Exception as e:
+                return JsonResponse({'ok': False, 'error': str(e)})
+
+        return JsonResponse({'ok': False, 'error': 'Method not allowed'}, status=405)
 
     def sync_inventory_view(self, request, pk):
         """
