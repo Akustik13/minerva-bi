@@ -212,6 +212,25 @@ class DocumentSettingsAdmin(admin.ModelAdmin):
         return False
 
 
+class SourcesComboWidget(widgets.TextInput):
+    """Text input + datalist with SalesSource slugs from DB."""
+    def render(self, name, value, attrs=None, renderer=None):
+        if attrs is None:
+            attrs = {}
+        list_id = f'cfg-sources-dl-{name}'
+        attrs['list'] = list_id
+        html = super().render(name, value, attrs, renderer)
+        try:
+            from sales.models import SalesSource
+            slugs = list(SalesSource.objects.values_list('slug', flat=True).order_by('order', 'name'))
+        except Exception:
+            slugs = []
+        options = ''.join(f'<option value="{s}">' for s in slugs)
+        html += f'<datalist id="{list_id}">{options}</datalist>'
+        from django.utils.safestring import mark_safe
+        return mark_safe(html)
+
+
 @admin.register(NotificationSettings)
 class NotificationSettingsAdmin(admin.ModelAdmin):
     # Singleton: redirect changelist → change view for pk=1
@@ -234,6 +253,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         for field_name in ('email_host_password', 'telegram_bot_token'):
             if field_name in form.base_fields:
                 form.base_fields[field_name].widget = PasswordInput(render_value=True)
+        if 'order_confirm_notify_sources' in form.base_fields:
+            form.base_fields['order_confirm_notify_sources'].widget = SourcesComboWidget()
         return form
 
     fieldsets = [
