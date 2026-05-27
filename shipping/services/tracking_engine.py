@@ -294,9 +294,9 @@ def _ups_status_to_class(status_type: str, delivered: bool) -> str:
     """UPS status type → Jumingo progress.class"""
     if delivered or status_type == "D":
         return "completed"
-    if status_type in ("I", "O", "X"):   # X = Exception (rescheduled/delay) — still in transit
+    if status_type in ("I", "O", "X", "P"):  # P = Pickup Scan — carrier has package
         return "in_transit"
-    if status_type in ("M", "P"):        # M = Manifest/label created, P = Pickup at shipper
+    if status_type == "M":                   # M = Manifest/label created, carrier not yet
         return "in_system"
     return "in_transit"
 
