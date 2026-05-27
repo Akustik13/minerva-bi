@@ -181,6 +181,14 @@ function autoResizeIframe(f) {
   _m();
   setTimeout(_m, 300);
   setTimeout(_m, 1500);
+  setTimeout(_m, 4000);
+  // Recheck height after each image inside iframe finishes loading
+  try {
+    var imgs = (f.contentDocument || f.contentWindow.document).querySelectorAll('img');
+    imgs.forEach(function(img) {
+      if (!img.complete) img.addEventListener('load', _m);
+    });
+  } catch(e) {}
 }
 
 function aiReply(pk) {

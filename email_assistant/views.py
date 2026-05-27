@@ -215,10 +215,13 @@ def inbox_view(request):
     emails = list(qs.select_related('thread')[start:start + per_page])
 
     from email_assistant.models import EmailThread as _ET
+    from django.db.models import Q as _Q
     _archived_ids = _ET.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
     unread_inbox = EmailMessage.objects.filter(
         account=account, folder='inbox',
         is_read=False, is_deleted=False,
+    ).filter(
+        _Q(imap_folder_name='') | _Q(imap_folder_name__iexact=account.imap_folder_inbox)
     ).exclude(thread_id__in=_archived_ids).count()
     unread_counts = {
         'inbox':    unread_inbox,
