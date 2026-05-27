@@ -43,27 +43,9 @@
 .em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
 .em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:500px;overflow-y:auto}
 .em-body-iframe{width:100%;border:none;display:block;min-height:200px;overflow:hidden}
-/* ── Fullscreen card (multi-message thread) ── */
+/* ── Thread scroll: all messages stack normally, last expanded ── */
 .em-msgs{position:relative}
-.em-msgs.has-expanded{overflow:hidden}
-.em-msgs.has-expanded .em-card.expanded{
-  position:absolute;top:0;left:0;right:0;bottom:0;z-index:5;
-  display:flex;flex-direction:column;overflow:hidden;border-radius:0;
-}
-.em-msgs.has-expanded .em-card.expanded .em-card-hd{cursor:pointer}
-.em-msgs.has-expanded .em-card.expanded .em-card-hd:hover{background:var(--bg-hover,#1e2d40)}
-.em-msgs.has-expanded .em-card.expanded .em-card-collapse{
-  flex:1;display:flex;flex-direction:column;overflow-y:auto;min-height:0;
-}
-.em-msgs.has-expanded .em-card.expanded .em-card-body{
-  flex:1;display:flex;flex-direction:column;min-height:0;
-}
-.em-msgs.has-expanded .em-card.expanded .em-body-iframe{
-  flex:1;min-height:200px;height:100%!important;
-}
-.em-msgs.has-expanded .em-card.expanded .em-card-body-text{
-  max-height:none;flex:1;overflow-y:auto;
-}
+.em-card-body-text{max-height:none!important}
 .em-card-atts{padding:8px 14px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap}
 .em-att-item{display:inline-flex;align-items:center;gap:0;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);overflow:hidden;font-size:11px;position:relative}
 .em-att-name{padding:4px 9px;color:var(--text-muted);white-space:nowrap;max-width:160px;overflow:hidden;text-overflow:ellipsis}
@@ -235,36 +217,63 @@
     {% endfor %}
   </div>
 
-  <!-- Quick reply (collapsed by default) -->
+  <!-- Quick reply / forward (collapsed by default) -->
   {% if last %}
   <div class="em-reply" id="pv-reply-wrap">
     <!-- Toggle header — always visible -->
-    <div class="em-reply-toggle-hd" onclick="pvToggleReply()" id="pv-reply-hd"
-         title="{% trans "Натисни щоб відповісти" %}">
-      <span>↩ {% trans "Відповісти" %}</span>
-      <span id="pv-reply-arrow" style="transition:transform .15s">▲</span>
+    <div class="em-reply-toggle-hd" id="pv-reply-hd" title="{% trans "Натисни щоб відповісти" %}">
+      <div style="display:flex;gap:6px">
+        <button class="em-tb-btn" onclick="pvOpenReply('reply','{{ last.from_email|escapejs }}','{{ last.subject|escapejs }}')" title="{% trans "Відповісти" %}" style="padding:4px 10px;border:1px solid var(--border-strong);border-radius:5px">↩ {% trans "Відповісти" %}</button>
+        <button class="em-tb-btn" onclick="pvOpenReply('forward','','{{ last.subject|escapejs }}')" title="{% trans "Переслати" %}" style="padding:4px 10px;border:1px solid var(--border-strong);border-radius:5px">→ {% trans "Переслати" %}</button>
+      </div>
+      <span id="pv-reply-arrow" style="transition:transform .15s;cursor:pointer" onclick="pvToggleReply()">▲</span>
     </div>
     <!-- Collapsible body -->
     <div id="pv-reply-body" style="display:none">
-      <div class="em-reply-toolbar">
-        <button class="em-tb-btn" onmousedown="return fmt(event,'bold')" title="{% trans "Жирний" %}"><b>B</b></button>
-        <button class="em-tb-btn" onmousedown="return fmt(event,'italic')" title="{% trans "Курсив" %}"><i>I</i></button>
-        <button class="em-tb-btn" onmousedown="return fmt(event,'underline')" title="{% trans "Підкреслений" %}"><u>U</u></button>
-        <button class="em-tb-btn" onmousedown="return fmt(event,'strikeThrough')" title="{% trans "Закреслений" %}"><s>S</s></button>
-        <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
-        <button class="em-tb-btn" onmousedown="return fmtBlock(event,'insertUnorderedList')" title="{% trans "Список" %}">≡</button>
-        <button class="em-tb-btn" onmousedown="return fmt(event,'removeFormat')" title="{% trans "Очистити" %}">✕</button>
+      <!-- To field -->
+      <div style="padding:6px 18px 0;display:flex;align-items:center;gap:8px">
+        <label style="font-size:12px;color:var(--text-muted);min-width:40px">{% trans "Кому" %}:</label>
+        <input id="pv-reply-to" type="email" autocomplete="off"
+               style="flex:1;padding:5px 9px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:13px;outline:none"
+               placeholder="email@example.com">
       </div>
-      <div class="em-reply-editor" id="pv-reply-editor" contenteditable="true"
-           placeholder="{% trans "Текст відповіді..." %}"></div>
-      {% if reply_signature %}
-      <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:12px" id="pv-reply-sig">{{ reply_signature|safe }}</div>
-      {% endif %}
-      <div class="em-reply-footer">
-        <button class="em-reply-send" onclick="pvSendReply({{ last.pk }}, '{{ last.from_email|escapejs }}', '{{ last.subject|escapejs }}')">
-          {% trans "Відправити" %} →
-        </button>
-        <span class="em-reply-status" id="pv-reply-status"></span>
+      <div id="pv-reply-body-inner" style="padding:10px 18px 12px">
+        <div class="em-reply-toolbar">
+          <button class="em-tb-btn" onmousedown="return fmt(event,'bold')" title="{% trans "Жирний" %}"><b>B</b></button>
+          <button class="em-tb-btn" onmousedown="return fmt(event,'italic')" title="{% trans "Курсив" %}"><i>I</i></button>
+          <button class="em-tb-btn" onmousedown="return fmt(event,'underline')" title="{% trans "Підкреслений" %}"><u>U</u></button>
+          <button class="em-tb-btn" onmousedown="return fmt(event,'strikeThrough')" title="{% trans "Закреслений" %}"><s>S</s></button>
+          <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
+          <button class="em-tb-btn" onmousedown="return fmtBlock(event,'insertUnorderedList')" title="{% trans "Список" %}">≡</button>
+          <button class="em-tb-btn" onmousedown="return fmt(event,'removeFormat')" title="{% trans "Очистити" %}">✕</button>
+          <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
+          <button class="em-tb-btn ai" onclick="pvReplyAI({{ last.pk }})" title="{% trans "Написати листа з AI" %}" style="color:rgba(0,212,170,.8)">🏛️ AI</button>
+          <button class="em-tb-btn" onclick="pvReplyTranslate()" title="{% trans "Перекласти текст на UA" %}">🌐</button>
+        </div>
+        <!-- AI write panel inside reply -->
+        <div id="pv-reply-ai-box" style="display:none;padding:8px 0 10px">
+          <div style="display:flex;gap:6px">
+            <input id="pv-reply-ai-prompt" type="text"
+                   style="flex:1;padding:5px 9px;border-radius:6px;border:1px solid rgba(0,212,170,.3);background:rgba(0,212,170,.04);color:var(--text);font-size:12px;outline:none"
+                   placeholder="{% trans "Що написати? (наприклад: підтвердь отримання)" %}">
+            <button class="em-pv-btn ai" onclick="pvReplyAIGenerate({{ last.pk }})">{% trans "Генерувати" %} →</button>
+          </div>
+          <div id="pv-reply-ai-result" style="margin-top:8px;font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.6"></div>
+          <div id="pv-reply-ai-actions" style="display:none;margin-top:6px;display:flex;gap:6px">
+            <button class="em-pv-btn" onclick="pvReplyAIUse()">{% trans "Вставити" %} →</button>
+          </div>
+        </div>
+        <div class="em-reply-editor" id="pv-reply-editor" contenteditable="true"
+             placeholder="{% trans "Текст відповіді..." %}"></div>
+        {% if reply_signature %}
+        <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:12px" id="pv-reply-sig">{{ reply_signature|safe }}</div>
+        {% endif %}
+        <div class="em-reply-footer">
+          <button class="em-reply-send" onclick="pvSendReply2()">
+            {% trans "Відправити" %} →
+          </button>
+          <span class="em-reply-status" id="pv-reply-status"></span>
+        </div>
       </div>
     </div>
   </div>
@@ -331,15 +340,10 @@ window.pvToggleCard = function(pk, e) {
 
   card.classList.toggle('expanded', !wasExpanded);
 
-  // Toggle fullscreen mode on the msgs container
-  if (msgs && multiCard) {
-    var anyExpanded = !!msgs.querySelector('.em-card.expanded');
-    msgs.classList.toggle('has-expanded', anyExpanded);
-    // Clear JS-set iframe height so CSS flex takes over in fullscreen
-    if (anyExpanded && !wasExpanded) {
-      var fr = document.getElementById('pv-iframe-' + pk);
-      if (fr) fr.style.height = '';
-    }
+  // Scroll expanded card into view
+  if (!wasExpanded) {
+    var expandedCard = document.getElementById('pv-card-' + pk);
+    if (expandedCard) setTimeout(function(){ expandedCard.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 80);
   }
 
   // Load iframe lazily when first expanded
@@ -350,6 +354,10 @@ window.pvToggleCard = function(pk, e) {
     }
   }
 };
+
+// Track current reply context
+var _pvReplyPk   = {{ last.pk|default:'0' }};
+var _pvReplySubj = '{{ last.subject|default:''|escapejs }}';
 
 window.pvToggleReply = function() {
   var body  = document.getElementById('pv-reply-body');
@@ -363,38 +371,102 @@ window.pvToggleReply = function() {
   }
 };
 
-window.pvSendReply = async function(pk, fromEmail, subj) {
+window.pvOpenReply = function(mode, toEmail, subj) {
+  var body  = document.getElementById('pv-reply-body');
+  var toInp = document.getElementById('pv-reply-to');
+  var arrow = document.getElementById('pv-reply-arrow');
+  if (toInp) toInp.value = toEmail || '';
+  _pvReplySubj = (mode === 'forward' ? 'Fwd: ' : 'Re: ') + subj.replace(/^(Re:|Fwd:)\s*/i, '');
+  body.style.display = 'block';
+  if (arrow) arrow.style.transform = '';
+  var ed = document.getElementById('pv-reply-editor');
+  if (ed) setTimeout(function(){ ed.focus(); }, 50);
+};
+
+window.pvSendReply2 = async function() {
   var editor = document.getElementById('pv-reply-editor');
+  var toInp  = document.getElementById('pv-reply-to');
   var sig    = document.getElementById('pv-reply-sig');
   var status = document.getElementById('pv-reply-status');
   var btn    = document.querySelector('.em-reply-send');
+  var toEmail = toInp ? toInp.value.trim() : '';
   var textBody = (editor.innerText || editor.textContent).trim();
+  if (!toEmail) { status.textContent = '{% trans "Вкажіть кому" %}'; return; }
   if (!textBody) { status.textContent = '{% trans "Введіть текст" %}'; return; }
-
   var htmlBody = editor.innerHTML;
   if (sig) htmlBody += '<br><hr style="border:none;border-top:1px solid #ccc;margin:10px 0">' + sig.innerHTML;
-  // Plain text body: no sig here — SMTPClient appends stripped-HTML sig on backend
-  var plainBody = textBody;
-
   if (btn) { btn.disabled = true; btn.style.opacity = '.5'; }
   status.textContent = '{% trans "Відправляю..." %}'; status.style.color = 'var(--text-muted)';
   var fd = new FormData();
-  fd.append('reply_to_pk', pk);
-  fd.append('body',      plainBody);
+  fd.append('reply_to_pk', _pvReplyPk);
+  fd.append('body',      textBody);
   fd.append('body_html', htmlBody);
-  fd.append('subject', subj.startsWith('Re:') ? subj : 'Re: ' + subj);
-  fd.append('to', fromEmail);
+  fd.append('subject',   _pvReplySubj);
+  fd.append('to', toEmail);
   try {
     var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
     var d = await r.json();
-    status.textContent  = d.ok ? '✓ {% trans "Відправлено" %}' : '✗ ' + d.error;
-    status.style.color  = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
-    if (d.ok) editor.innerHTML = '';
+    status.textContent = d.ok ? '✓ {% trans "Відправлено" %}' : '✗ ' + d.error;
+    status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
+    if (d.ok) { editor.innerHTML = ''; if (btn) { btn.disabled = false; btn.style.opacity = '1'; } }
     else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   } catch {
     status.textContent = '✗ {% trans "Помилка мережі" %}'; status.style.color = 'var(--err,#e53935)';
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
+};
+
+window.pvReplyAI = function(pk) {
+  var box = document.getElementById('pv-reply-ai-box');
+  if (!box) return;
+  var open = box.style.display !== 'none';
+  box.style.display = open ? 'none' : 'block';
+  if (!open) {
+    var inp = document.getElementById('pv-reply-ai-prompt');
+    if (inp) setTimeout(function(){ inp.focus(); }, 50);
+  }
+};
+
+window.pvReplyAIGenerate = async function(pk) {
+  var inp    = document.getElementById('pv-reply-ai-prompt');
+  var result = document.getElementById('pv-reply-ai-result');
+  var acts   = document.getElementById('pv-reply-ai-actions');
+  var query  = inp ? encodeURIComponent(inp.value.trim()) : '';
+  result.textContent = '⏳ {% trans "Minerva думає..." %}';
+  if (acts) acts.style.display = 'none';
+  try {
+    var r = await fetch('/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : ''));
+    var d = await r.json();
+    result.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
+    if (d.ok && acts) acts.style.display = 'flex';
+  } catch { result.textContent = '⚠️ {% trans "Помилка" %}'; }
+};
+
+window.pvReplyAIUse = function() {
+  var result = document.getElementById('pv-reply-ai-result');
+  var ed     = document.getElementById('pv-reply-editor');
+  if (!result || !ed) return;
+  ed.innerText = result.textContent;
+  ed.focus();
+  document.getElementById('pv-reply-ai-box').style.display = 'none';
+};
+
+window.pvReplyTranslate = async function() {
+  var ed = document.getElementById('pv-reply-editor');
+  var status = document.getElementById('pv-reply-status');
+  var text = (ed.innerText || ed.textContent).trim();
+  if (!text) { status.textContent = '{% trans "Введіть текст для перекладу" %}'; return; }
+  status.textContent = '⏳ {% trans "Перекладаю..." %}'; status.style.color = 'var(--text-muted)';
+  try {
+    var r = await fetch('/email/translate-text/', {
+      method: 'POST',
+      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
+      body: JSON.stringify({text: text, lang: 'uk'})
+    });
+    var d = await r.json();
+    if (d.ok) { ed.innerText = d.translation; status.textContent = '✓ {% trans "Перекладено" %}'; status.style.color = 'var(--ok)'; }
+    else { status.textContent = '⚠️ ' + d.error; status.style.color = 'var(--err)'; }
+  } catch { status.textContent = '⚠️ {% trans "Помилка" %}'; status.style.color = 'var(--err)'; }
 };
 
 window.pvAiReply = function(pk) {

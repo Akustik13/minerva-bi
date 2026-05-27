@@ -61,4 +61,6 @@ urlpatterns = [
     path('message/<int:message_pk>/create-task/',        views.create_task_from_email,  name='create_task_from_email'),
     # Bulk actions
     path('messages/bulk/',                               views.bulk_action_view,        name='bulk_action'),
+    # Translate arbitrary text (reply draft)
+    path('translate-text/',                              views.translate_text_view,     name='translate_text'),
 ]

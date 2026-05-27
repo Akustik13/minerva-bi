@@ -746,6 +746,25 @@ def ai_translate(request, message_pk):
 
 @staff_member_required
 @require_POST
+def translate_text_view(request):
+    """Translate arbitrary text (e.g. reply draft) to target language."""
+    import json
+    from email_assistant.ai_helper import translate_email
+    try:
+        data = json.loads(request.body)
+    except Exception:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+    text   = (data.get('text') or '').strip()
+    target = data.get('lang') or 'uk'
+    if not text:
+        return JsonResponse({'ok': False, 'error': 'Текст порожній'})
+    profile = getattr(request.user, 'profile', None)
+    translation = translate_email(text, target, profile)
+    return JsonResponse({'ok': bool(translation), 'translation': translation or '', 'lang': target})
+
+
+@staff_member_required
+@require_POST
 def sync_now(request):
     account = _get_account(request)
     if not account:
