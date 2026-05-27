@@ -154,11 +154,14 @@ def _build_qs(account, folder, q=''):
             account=account, thread_id__in=archived_ids, is_deleted=False
         )
     elif folder == 'inbox':
+        from django.db.models import Q
         archived_ids = EmailThread.objects.filter(
             account=account, is_archived=True
         ).values_list('id', flat=True)
         qs = EmailMessage.objects.filter(
             account=account, folder='inbox', is_deleted=False
+        ).filter(
+            Q(imap_folder_name='') | Q(imap_folder_name__iexact=account.imap_folder_inbox)
         ).exclude(thread_id__in=archived_ids)
     elif folder not in _STANDARD_FOLDERS:
         # Custom IMAP folder (e.g. "Meine Order")
@@ -960,10 +963,13 @@ def unread_count_view(request):
     account = _get_account(request)
     if not account:
         return JsonResponse({'count': 0, 'inbox': 0, 'starred': 0, 'spam': 0})
+    from django.db.models import Q
     base = EmailMessage.objects.filter(account=account, is_deleted=False, is_read=False)
     archived_ids = EmailThread.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
     inbox = base.filter(
         folder='inbox',
+    ).filter(
+        Q(imap_folder_name='') | Q(imap_folder_name__iexact=account.imap_folder_inbox)
     ).exclude(thread_id__in=archived_ids).count()
     starred = base.filter(is_starred=True).count()
     spam    = base.filter(is_spam=True).count()

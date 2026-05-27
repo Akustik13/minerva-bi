@@ -147,6 +147,7 @@ def widget_data_api(request):
             user=request.user, is_active=True
         ).order_by('-is_primary').first()
         if em_account:
+            from django.db.models import Q
             archived_ids = EmailThread.objects.filter(
                 account=em_account, is_archived=True
             ).values_list('id', flat=True)
@@ -154,6 +155,8 @@ def widget_data_api(request):
                 account=em_account,
                 folder='inbox',
                 is_read=False, is_deleted=False,
+            ).filter(
+                Q(imap_folder_name='') | Q(imap_folder_name__iexact=em_account.imap_folder_inbox)
             ).exclude(thread_id__in=archived_ids).count()
             data['unread_threads'] = EmailThread.objects.filter(
                 account=em_account, has_unread=True, is_archived=False
