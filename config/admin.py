@@ -319,6 +319,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
             "fields": (
                 ("customer_notify_enabled", "customer_notify_auto"),
                 "customer_notify_subject",
+                "customer_notify_cc",
                 "customer_notify_body",
                 "customer_notify_body_noneu",
             ),

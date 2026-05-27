@@ -1403,7 +1403,7 @@ function ncOpen(url) {
       var startWith = d.is_eu ? 'eu' : 'noneu';
       ncSetTemplate(startWith);
       document.getElementById('nc-to').value      = d.to      || '';
-      document.getElementById('nc-cc').value      = '';
+      document.getElementById('nc-cc').value      = d.cc      || '';
       document.getElementById('nc-subject').value = d.subject || '';
       document.getElementById('nc-form').style.display = 'block';
       if (d.auto){ ncSend(); }

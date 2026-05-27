@@ -2379,6 +2379,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({
                 'ok':        True,
                 'to':        to_email,
+                'cc':        (getattr(ns, 'customer_notify_cc', '') or '').strip(),
                 'subject':   subject,
                 'body':      body_eu if is_eu else body_noneu,
                 'body_eu':   body_eu,

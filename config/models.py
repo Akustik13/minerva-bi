@@ -636,6 +636,10 @@ class NotificationSettings(models.Model):
         help_text="Використовується для країн за межами ЄС (автовизначення за addr_country). "
                   "Змінні: {order_number} {customer_name} {tracking_number} {carrier} {shipped_date} {items} {ship_address}",
     )
+    customer_notify_cc = models.CharField(
+        "CC (копія) за замовчуванням", max_length=500, blank=True,
+        help_text="Email-адреси через кому — автоматично підставляються в поле CC при надсиланні клієнту.",
+    )
 
     # ── IMAP last fetch tracking ───────────────────────────────────────────────
     imap_last_fetched = models.DateTimeField(
