@@ -128,6 +128,9 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
   font-size:14px;padding:4px 6px;border-radius:4px;transition:color .1s,background .1s;line-height:1}
 .cal-done-btn:hover{color:var(--ok,#2e7d32);background:rgba(46,125,50,.1)}
 .cal-done-btn.done{color:var(--ok,#2e7d32)}
+.cal-del-btn{border:none;background:none;cursor:pointer;color:var(--text-dim);
+  font-size:13px;padding:4px 6px;border-radius:4px;transition:color .1s,background .1s;line-height:1;opacity:.6}
+.cal-del-btn:hover{color:var(--err,#c62828);background:rgba(198,40,40,.1);opacity:1}
 .cal-admin-link{font-size:11px;color:var(--link-fg);text-decoration:none;
   padding:4px 6px;border-radius:4px;transition:background .1s}
 .cal-admin-link:hover{background:var(--bg-hover,#1e2d40)}
@@ -227,6 +230,10 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
 
   <!-- ── Bulk mode action bar ── -->
   <div id="cal-bulk-bar">
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text-muted)">
+      <input type="checkbox" id="cal-select-all" onclick="toggleSelectAll()" style="cursor:pointer">
+      Всі
+    </label>
     <span id="cal-bulk-count">Вибрано: 0</span>
     <select id="cal-bulk-type-sel" onchange="bulkSetType()">
       <option value="">— Перемістити до категорії —</option>
@@ -318,6 +325,7 @@ input.cal-ev-check{width:15px;height:15px;cursor:pointer;accent-color:#1a73e8}
               onclick="toggleEventDone({{ ev.pk }}, this)">
         {% if ev.is_done %}↩{% else %}✓{% endif %}
       </button>
+      <button class="cal-del-btn" title="Видалити" onclick="deleteEventSingle({{ ev.pk }}, this)">🗑️</button>
     </div>
   </div>
   {% endfor %}
@@ -661,7 +669,28 @@ function exitBulkMode() {
   // uncheck all
   document.querySelectorAll('.cal-ev-check').forEach(function(cb){ cb.checked = false; });
   document.querySelectorAll('.cal-event-row.bulk-selected').forEach(function(r){ r.classList.remove('bulk-selected'); });
+  var sa = document.getElementById('cal-select-all');
+  if (sa) sa.checked = false;
   updateBulkCount();
+}
+function toggleSelectAll() {
+  var sa = document.getElementById('cal-select-all');
+  var visible = Array.from(document.querySelectorAll('.cal-ev-check')).filter(function(cb){
+    return cb.closest('.cal-event-row').style.display !== 'none';
+  });
+  visible.forEach(function(cb){ cb.checked = sa.checked; });
+  onCheckChange();
+}
+async function deleteEventSingle(pk, btn) {
+  if (!confirm('Видалити цю подію?')) return;
+  btn.disabled = true;
+  var d = await _bulkApi({pks: [pk], action: 'delete'});
+  if (!d.ok) { btn.disabled = false; return; }
+  var row  = document.getElementById('ev-' + pk);
+  var chip = document.querySelector('.cal-chip[data-pk="' + pk + '"]');
+  if (row)  row.remove();
+  if (chip) chip.remove();
+  applyFilters();
 }
 function onCheckChange() {
   document.querySelectorAll('.cal-event-row').forEach(function(row){
@@ -671,8 +700,11 @@ function onCheckChange() {
   updateBulkCount();
 }
 function updateBulkCount() {
-  var n = document.querySelectorAll('.cal-ev-check:checked').length;
+  var all    = document.querySelectorAll('.cal-ev-check').length;
+  var n      = document.querySelectorAll('.cal-ev-check:checked').length;
   document.getElementById('cal-bulk-count').textContent = 'Вибрано: ' + n;
+  var sa = document.getElementById('cal-select-all');
+  if (sa) { sa.checked = n > 0 && n === all; sa.indeterminate = n > 0 && n < all; }
 }
 function rowClick(ev, pk) {
   if (_bulkMode) {
