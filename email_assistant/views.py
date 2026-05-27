@@ -369,7 +369,7 @@ def _inject_email_css(html: str) -> str:
         '<style>'
         'html,body{'
         'height:auto!important;min-height:0!important;max-height:none!important;'
-        'overflow-x:auto!important;overflow-y:visible!important;'
+        'overflow-x:auto!important;'
         '}'
         '</style>'
     )

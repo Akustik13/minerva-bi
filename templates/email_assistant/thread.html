@@ -167,29 +167,31 @@ function fmt(cmd) {
   return false;
 }
 
-function autoResizeIframe(f) {
-  function _m() {
-    try {
-      var doc = f.contentDocument || f.contentWindow.document;
-      var h = Math.max(
-        doc.documentElement.scrollHeight || 0,
-        doc.body ? doc.body.scrollHeight : 0
-      );
-      if (h > 100) f.style.height = h + 'px';
-    } catch(e) {}
-  }
-  _m();
-  setTimeout(_m, 300);
-  setTimeout(_m, 1500);
-  setTimeout(_m, 4000);
-  // Recheck height after each image inside iframe finishes loading
+function _iframeH(f) {
   try {
-    var imgs = (f.contentDocument || f.contentWindow.document).querySelectorAll('img');
-    imgs.forEach(function(img) {
-      if (!img.complete) img.addEventListener('load', _m);
-    });
+    var doc = f.contentDocument || f.contentWindow.document;
+    var h = Math.max(
+      doc.documentElement.scrollHeight || 0,
+      doc.body ? doc.body.scrollHeight : 0
+    );
+    if (h > 100) f.style.height = h + 'px';
   } catch(e) {}
 }
+
+function autoResizeIframe(f) {
+  _iframeH(f);
+  setTimeout(function(){ _iframeH(f); }, 400);
+}
+
+// After ALL iframes on the page finish loading, recheck every one.
+// window.load fires after the last iframe's onload — guarantees all images are done.
+window.addEventListener('load', function() {
+  function _recheckAll() {
+    document.querySelectorAll('.em-body-iframe').forEach(_iframeH);
+  }
+  setTimeout(_recheckAll, 300);
+  setTimeout(_recheckAll, 1500);
+});
 
 function aiReply(pk) {
   var box = document.getElementById('ai-box-' + pk);
