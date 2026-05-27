@@ -2962,11 +2962,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 if not order.shipped_at:
                     order.shipped_at = timezone.now().date()
                     order_fields.append("shipped_at")
-            elif new_status == "label_ready" and order.status in ("received", "processing"):
-                # label_ready = наклейка надрукована, кур'єр ще не забрав → статус НЕ міняємо
-                if not order.shipped_at:
-                    order.shipped_at = timezone.now().date()
-                    order_fields.append("shipped_at")
+            elif new_status == "label_ready" and order.status == "received":
+                # label_ready = наклейка надрукована, кур'єр ще не забрав → просуваємо до processing
+                order.status = "processing"
+                order_fields.append("status")
             if order_fields:
                 order.save(update_fields=order_fields)
 
@@ -3631,10 +3630,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if not order.shipping_courier:
                 order.shipping_courier = 'UPS'
                 order_fields.append('shipping_courier')
-            # UPS label created ≠ package picked up → статус залишаємо processing
-            if not order.shipped_at:
-                order.shipped_at = _date.today()
-                order_fields.append('shipped_at')
+            # UPS label created ≠ package picked up → processing, shipped_at only when carrier picks up
+            if order.status == 'received':
+                order.status = 'processing'
+                order_fields.append('status')
             # Sync shipping cost from UPS API
             if result['total_charge'] and not order.shipping_cost:
                 order.shipping_cost     = result['total_charge']
