@@ -83,6 +83,16 @@
       </button>
     </li>
   {% endif %}
+  {% if notify_order_confirm_url %}
+    <li>
+      <button type="button"
+              onclick="ncoOpen('{{ notify_order_confirm_url }}')"
+              style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
+                     font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
+        📥 {% trans "Підтвердження замовлення" %}
+      </button>
+    </li>
+  {% endif %}
   {% if notify_customer_url %}
     <li>
       <button type="button"
@@ -1442,6 +1452,121 @@ async function ncSend(){
 }
 window.ncSend = ncSend;
 document.getElementById('nc-modal').addEventListener('click',function(e){ if(e.target===this) ncClose(); });
+})();
+</script>
+{% endif %}
+
+{% if notify_order_confirm_url %}
+<!-- ── Order confirmation notification modal ── -->
+<div id="nco-modal" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(0,0,0,.55);align-items:center;justify-content:center">
+  <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+              border-radius:12px;padding:28px;width:min(640px,95vw);max-height:90vh;
+              overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.5)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <h3 style="margin:0;font-size:16px;color:var(--text,#c9d8e4)">📥 {% trans "Підтвердження замовлення" %}</h3>
+      <button onclick="ncoClose()" style="background:none;border:none;font-size:20px;cursor:pointer;
+              color:var(--text-muted,#607d8b);line-height:1">×</button>
+    </div>
+    <div id="nco-loading" style="text-align:center;padding:20px;color:var(--text-muted,#607d8b)">⏳ {% trans "Генерація..." %}</div>
+    <div id="nco-form" style="display:none">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Кому" %} *</label>
+        <input id="nco-to" type="email"
+               style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
+                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Копія (CC)" %}</label>
+        <input id="nco-cc"
+               style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
+                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Тема" %} *</label>
+        <input id="nco-subject" type="text"
+               style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
+                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Текст листа" %}</label>
+        <textarea id="nco-body" rows="12"
+               style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
+                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;
+                      font-family:monospace;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <button id="nco-send-btn" onclick="ncoSend()"
+                style="padding:9px 24px;border-radius:7px;background:linear-gradient(135deg,#1565c0,#1976d2);
+                       color:#fff;border:none;cursor:pointer;font-weight:700;font-size:13px">
+          📤 {% trans "Надіслати" %}
+        </button>
+        <button onclick="ncoClose()"
+                style="padding:9px 16px;border-radius:7px;background:none;color:var(--text-muted,#607d8b);
+                       border:1px solid var(--border-strong,#243347);cursor:pointer;font-size:13px">
+          {% trans "Скасувати" %}
+        </button>
+        <span id="nco-status" style="font-size:13px;margin-left:auto"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+(function(){
+var NCO_URL = '{{ notify_order_confirm_url }}';
+var CSRF2   = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+function ncoOpen(url) {
+  var m = document.getElementById('nco-modal');
+  m.style.display = 'flex';
+  document.getElementById('nco-loading').style.display = 'block';
+  document.getElementById('nco-form').style.display   = 'none';
+  document.getElementById('nco-status').textContent   = '';
+  fetch(url, {headers:{'X-CSRFToken':CSRF2}})
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      document.getElementById('nco-loading').style.display = 'none';
+      if (!d.ok){ document.getElementById('nco-status').textContent='✗ '+d.error; return; }
+      document.getElementById('nco-to').value      = d.to      || '';
+      document.getElementById('nco-cc').value      = d.cc      || '';
+      document.getElementById('nco-subject').value = d.subject || '';
+      document.getElementById('nco-body').value    = d.body    || '';
+      document.getElementById('nco-form').style.display = 'block';
+      if (d.auto){ ncoSend(); }
+    })
+    .catch(function(e){ document.getElementById('nco-status').textContent='✗ '+e; });
+}
+window.ncoOpen = ncoOpen;
+function ncoClose(){ document.getElementById('nco-modal').style.display='none'; }
+window.ncoClose = ncoClose;
+async function ncoSend(){
+  var btn=document.getElementById('nco-send-btn');
+  var st=document.getElementById('nco-status');
+  btn.disabled=true; btn.textContent='⏳...'; st.textContent='';
+  try{
+    var r=await fetch(NCO_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','X-CSRFToken':CSRF2},
+      body:JSON.stringify({
+        to:document.getElementById('nco-to').value.trim(),
+        cc:document.getElementById('nco-cc').value.trim(),
+        subject:document.getElementById('nco-subject').value.trim(),
+        body:document.getElementById('nco-body').value,
+      }),
+    });
+    var d=await r.json();
+    if(d.ok){
+      st.style.color='var(--ok,#2e7d32)';
+      st.textContent='✓ {% trans "Надіслано!" %}';
+      setTimeout(ncoClose,1500);
+    } else {
+      st.style.color='var(--err,#c62828)';
+      st.textContent='✗ '+d.error;
+    }
+  } catch(e){ st.textContent='✗ '+e; st.style.color='var(--err,#c62828)'; }
+  finally{ btn.disabled=false; btn.textContent='📤 {% trans "Надіслати" %}'; }
+}
+window.ncoSend = ncoSend;
+document.getElementById('nco-modal').addEventListener('click',function(e){ if(e.target===this) ncoClose(); });
 })();
 </script>
 {% endif %}

@@ -1484,6 +1484,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     if _ns.customer_notify_enabled and _ns.email_enabled:
                         extra_context["notify_customer_url"] = f"/admin/sales/salesorder/{obj.pk}/notify-customer/"
                         extra_context["notify_customer_auto"] = _ns.customer_notify_auto
+                    if _ns.order_confirm_notify_enabled and _ns.email_enabled:
+                        allowed_srcs = [s.strip() for s in (_ns.order_confirm_notify_sources or '').split(',') if s.strip()]
+                        if not allowed_srcs or (obj.source in allowed_srcs):
+                            extra_context["notify_order_confirm_url"] = f"/admin/sales/salesorder/{obj.pk}/notify-order-confirm/"
                 except Exception:
                     pass
             # Auto-sync shipping fields from active shipment (GET only)
@@ -2131,6 +2135,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/notify-customer/',
                  self.admin_site.admin_view(self.notify_customer_view),
                  name='sales_salesorder_notify_customer'),
+            # Customer order confirmation notification
+            path('<int:pk>/notify-order-confirm/',
+                 self.admin_site.admin_view(self.notify_order_confirm_view),
+                 name='sales_salesorder_notify_order_confirm'),
         ]
         return custom_urls + urls
 
@@ -2426,6 +2434,93 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 from_email = (ns.email_from or ns.email_host_user or '').strip()
                 html_body  = '<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">' \
                              + body_text.replace('\n', '<br>') + '</body></html>'
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=body_text,
+                    from_email=from_email,
+                    to=[to_email],
+                    cc=[a.strip() for a in cc_email.split(',') if a.strip()] if cc_email else [],
+                    connection=_smtp_connection(ns),
+                )
+                msg.attach_alternative(html_body, 'text/html')
+                msg.send()
+                return JsonResponse({'ok': True})
+            except Exception as e:
+                return JsonResponse({'ok': False, 'error': str(e)})
+
+        return JsonResponse({'ok': False, 'error': 'Method not allowed'}, status=405)
+
+    def notify_order_confirm_view(self, request, pk):
+        """GET — JSON з попередньо заповненим листом підтвердження замовлення.
+           POST — надсилає лист клієнту через SMTP."""
+        from django.http import JsonResponse
+        import json as _json
+        order = get_object_or_404(SalesOrder, pk=pk)
+        try:
+            from config.models import NotificationSettings
+            ns = NotificationSettings.get()
+        except Exception:
+            return JsonResponse({'ok': False, 'error': 'NotificationSettings недоступні'})
+
+        if request.method == 'GET':
+            to_email = (order.ship_email or '').strip()
+            if not to_email:
+                try:
+                    to_email = (order.customer.email or '').strip()
+                except Exception:
+                    to_email = ''
+
+            customer_name = (order.ship_name or order.client or '').strip()
+            order_date = order.order_date.strftime('%d.%m.%Y') if order.order_date else ''
+
+            lines = order.lines.select_related('product').all()
+            items_lines = []
+            for line in lines:
+                sku = line.sku_raw or (line.product.sku if line.product else '')
+                qty = int(line.qty) if line.qty == int(line.qty) else line.qty
+                items_lines.append(f'• {sku} — {qty} Stk.')
+            items_str = '\n'.join(items_lines) if items_lines else '—'
+
+            def _render(tmpl):
+                return (tmpl
+                        .replace('{order_number}', order.order_number or '')
+                        .replace('{customer_name}', customer_name)
+                        .replace('{order_date}', order_date)
+                        .replace('{items}', items_str))
+
+            subject = _render(ns.order_confirm_notify_subject or '')
+            body    = _render(ns.order_confirm_notify_body or '')
+            cc      = (ns.order_confirm_notify_cc or '').strip()
+            auto    = ns.order_confirm_notify_auto
+
+            return JsonResponse({
+                'ok': True, 'to': to_email, 'cc': cc,
+                'subject': subject, 'body': body, 'auto': auto,
+            })
+
+        if request.method == 'POST':
+            try:
+                data = _json.loads(request.body or b'{}')
+            except Exception:
+                data = {}
+            to_email   = (data.get('to') or '').strip()
+            cc_email   = (data.get('cc') or '').strip()
+            subject    = (data.get('subject') or '').strip()
+            body_text  = (data.get('body') or '').strip()
+
+            if not to_email:
+                return JsonResponse({'ok': False, 'error': 'Не вказано адресу отримувача'})
+            if not subject:
+                return JsonResponse({'ok': False, 'error': 'Не вказано тему листа'})
+            if not ns.email_enabled:
+                return JsonResponse({'ok': False, 'error': 'SMTP не налаштовано. Увімкніть Email у Налаштуваннях сповіщень.'})
+
+            try:
+                from django.core.mail import EmailMultiAlternatives
+                from dashboard.notifications import _smtp_connection
+                from_email = (ns.email_from or ns.email_host_user or '').strip()
+                html_body  = ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
+                              + body_text.replace('\n', '<br>') + '</body></html>')
                 msg = EmailMultiAlternatives(
                     subject=subject,
                     body=body_text,

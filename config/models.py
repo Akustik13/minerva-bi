@@ -641,6 +641,43 @@ class NotificationSettings(models.Model):
         help_text="Email-адреси через кому — автоматично підставляються в поле CC при надсиланні клієнту.",
     )
 
+    # ── Підтвердження отримання замовлення ────────────────────────────────────
+    order_confirm_notify_enabled = models.BooleanField(
+        "Кнопка «📥 Підтвердження замовлення»", default=False,
+        help_text="На сторінці замовлення з'являється кнопка для надсилання клієнту підтвердження отримання замовлення.",
+    )
+    order_confirm_notify_auto = models.BooleanField(
+        "Авто-відправка при створенні замовлення", default=False,
+        help_text="Якщо увімкнено — лист надсилається автоматично при імпорті або створенні нового замовлення (залежно від фільтра джерел).",
+    )
+    order_confirm_notify_sources = models.CharField(
+        "Джерела (фільтр)", max_length=500, blank=True,
+        help_text="Slug-коди джерел через кому, для яких діє авто- та ручна відправка. "
+                  "Порожньо = всі джерела. Приклад: digikey, webshop",
+    )
+    order_confirm_notify_subject = models.CharField(
+        "Тема листа (шаблон)", max_length=500, blank=True,
+        default="Your order #{order_number} has been received",
+        help_text="Змінні: {order_number} {customer_name} {order_date} {items}",
+    )
+    order_confirm_notify_body = models.TextField(
+        "Текст листа (шаблон)", blank=True,
+        default=(
+            "Dear {customer_name},\n\n"
+            "Thank you for your order #{order_number} placed on {order_date}.\n\n"
+            "We have received your order and it is currently being processed.\n\n"
+            "Items ordered:\n{items}\n\n"
+            "If you have any questions, please feel free to contact us.\n\n"
+            "Best regards,\n"
+            "Sevskiy GmbH Team"
+        ),
+        help_text="Змінні: {order_number} {customer_name} {order_date} {items}",
+    )
+    order_confirm_notify_cc = models.CharField(
+        "CC (копія) за замовчуванням", max_length=500, blank=True,
+        help_text="Email-адреси через кому.",
+    )
+
     # ── IMAP last fetch tracking ───────────────────────────────────────────────
     imap_last_fetched = models.DateTimeField(
         "Останнє оновлення пошти", null=True, blank=True,

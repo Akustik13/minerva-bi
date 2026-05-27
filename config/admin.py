@@ -331,6 +331,20 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "{carrier} {shipped_date} {items} {ship_address}"
             ),
         }),
+        ("📥 Підтвердження отримання замовлення", {
+            "fields": (
+                ("order_confirm_notify_enabled", "order_confirm_notify_auto"),
+                "order_confirm_notify_sources",
+                "order_confirm_notify_subject",
+                "order_confirm_notify_cc",
+                "order_confirm_notify_body",
+            ),
+            "description": (
+                "Кнопка «📥 Підтвердження замовлення» на сторінці замовлення та/або авто-відправка при імпорті. "
+                "Фільтр джерел дозволяє надсилати лише для певних джерел (напр. digikey). "
+                "Змінні: {order_number} {customer_name} {order_date} {items}"
+            ),
+        }),
         ("🔔 Планові сповіщення (cron)", {
             "fields": (
                 "stock_alerts_enabled",

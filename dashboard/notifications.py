@@ -1483,3 +1483,80 @@ def notify_shipment_status(shipment, old_status, new_status):
             _send_telegram(ns, '\n'.join(lines))
         except Exception:
             pass
+
+
+def send_order_confirm_notification(order):
+    """Send order-received confirmation email to customer.
+    Called on auto-send (import/create) or manually via notify_order_confirm_view.
+    Respects order_confirm_notify_sources filter."""
+    ns = _get_ns()
+    if not ns:
+        return False
+    if not getattr(ns, 'order_confirm_notify_enabled', False):
+        return False
+    if not ns.email_enabled:
+        return False
+
+    allowed_srcs = [s.strip() for s in (getattr(ns, 'order_confirm_notify_sources', '') or '').split(',') if s.strip()]
+    if allowed_srcs and (order.source not in allowed_srcs):
+        return False
+
+    to_email = (getattr(order, 'ship_email', '') or '').strip()
+    if not to_email:
+        try:
+            to_email = (order.customer.email or '').strip()
+        except Exception:
+            to_email = ''
+    if not to_email:
+        return False
+
+    customer_name = (getattr(order, 'ship_name', '') or order.client or '').strip()
+    order_date    = order.order_date.strftime('%d.%m.%Y') if order.order_date else ''
+
+    try:
+        lines_qs = order.lines.select_related('product').all()
+    except Exception:
+        lines_qs = []
+    items_lines = []
+    for line in lines_qs:
+        sku = getattr(line, 'sku_raw', '') or (line.product.sku if line.product else '')
+        qty = line.qty
+        try:
+            qty = int(qty) if qty == int(qty) else qty
+        except Exception:
+            pass
+        items_lines.append(f'• {sku} — {qty} Stk.')
+    items_str = '\n'.join(items_lines) if items_lines else '—'
+
+    def _render(tmpl):
+        return (tmpl
+                .replace('{order_number}', order.order_number or '')
+                .replace('{customer_name}', customer_name)
+                .replace('{order_date}', order_date)
+                .replace('{items}', items_str))
+
+    subject   = _render(getattr(ns, 'order_confirm_notify_subject', '') or '')
+    body_text = _render(getattr(ns, 'order_confirm_notify_body', '') or '')
+    cc_str    = (getattr(ns, 'order_confirm_notify_cc', '') or '').strip()
+    from_email = (ns.email_from or ns.email_host_user or '').strip()
+
+    if not subject or not body_text:
+        return False
+
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        html_body = ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
+                     + body_text.replace('\n', '<br>') + '</body></html>')
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=body_text,
+            from_email=from_email,
+            to=[to_email],
+            cc=[a.strip() for a in cc_str.split(',') if a.strip()] if cc_str else [],
+            connection=_smtp_connection(ns),
+        )
+        msg.attach_alternative(html_body, 'text/html')
+        msg.send()
+        return True
+    except Exception:
+        return False

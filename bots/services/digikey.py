@@ -1119,6 +1119,15 @@ def _reconcile_one(order: dict, stats: dict, dry_run: bool = False):
                 tracking_number=tracking,
             )
             _create_marketplace_lines(sale, order, currency, stats)
+            # Auto-confirmation email to customer on new order
+            try:
+                from dashboard.notifications import send_order_confirm_notification
+                from config.models import NotificationSettings as _NS
+                _ns = _NS.get()
+                if getattr(_ns, 'order_confirm_notify_auto', False):
+                    send_order_confirm_notification(sale)
+            except Exception:
+                pass
         return
 
     # ── Порівнюємо і оновлюємо ────────────────────────────────────────────────
