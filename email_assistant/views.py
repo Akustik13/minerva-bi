@@ -360,6 +360,28 @@ def message_preview_view(request, message_pk):
     }))
 
 
+def _inject_email_css(html: str) -> str:
+    """Inject normalization CSS so email body expands fully and scrolls horizontally."""
+    css = (
+        '<style>'
+        'html,body{'
+        'height:auto!important;min-height:0!important;max-height:none!important;'
+        'overflow-x:auto!important;overflow-y:visible!important;'
+        '}'
+        '</style>'
+    )
+    lower = html.lower()
+    pos = lower.rfind('</head>')
+    if pos != -1:
+        return html[:pos] + css + html[pos:]
+    pos = lower.find('<body')
+    if pos != -1:
+        end = html.find('>', pos)
+        if end != -1:
+            return html[:end + 1] + css + html[end + 1:]
+    return css + html
+
+
 @staff_member_required
 @xframe_options_exempt
 def message_html_view(request, message_pk):
@@ -371,6 +393,7 @@ def message_html_view(request, message_pk):
         html = msg.body_html
         if 'cid:' in html.lower():
             html = _resolve_cid_images(msg, html)
+        html = _inject_email_css(html)
         return HttpResponse(html, content_type='text/html; charset=utf-8')
     import html as html_mod
     body = msg.body_text or ''
