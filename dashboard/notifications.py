@@ -1501,7 +1501,7 @@ def send_order_confirm_notification(order):
     if allowed_srcs and (order.source not in allowed_srcs):
         return False
 
-    to_email = (getattr(order, 'ship_email', '') or '').strip()
+    to_email = (getattr(order, 'ship_email', '') or getattr(order, 'email', '') or '').strip()
     if not to_email:
         try:
             to_email = (order.customer.email or '').strip()
@@ -1510,7 +1510,7 @@ def send_order_confirm_notification(order):
     if not to_email:
         return False
 
-    customer_name = (getattr(order, 'ship_name', '') or order.client or '').strip()
+    customer_name = (getattr(order, 'ship_name', '') or getattr(order, 'client', '') or getattr(order, 'contact_name', '') or '').strip()
     order_date    = order.order_date.strftime('%d.%m.%Y') if order.order_date else ''
 
     try:

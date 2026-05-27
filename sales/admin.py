@@ -2463,14 +2463,14 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({'ok': False, 'error': 'NotificationSettings недоступні'})
 
         if request.method == 'GET':
-            to_email = (order.ship_email or '').strip()
+            to_email = (order.ship_email or order.email or '').strip()
             if not to_email:
                 try:
                     to_email = (order.customer.email or '').strip()
                 except Exception:
                     to_email = ''
 
-            customer_name = (order.ship_name or order.client or '').strip()
+            customer_name = (order.ship_name or order.client or order.contact_name or '').strip()
             order_date = order.order_date.strftime('%d.%m.%Y') if order.order_date else ''
 
             lines = order.lines.select_related('product').all()
