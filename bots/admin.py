@@ -6,7 +6,7 @@ from django.urls import reverse, path
 from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Bot, BotLog, DigiKeyConfig
+from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing
 
 
 @admin.register(Bot)
@@ -122,7 +122,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             ),
         }),
         ("🔑 DigiKey API Credentials", {
-            "fields": ("client_id", "client_secret", "account_id"),
+            "fields": ("client_id", "client_secret", "account_id", "marketplace_supplier_id"),
             "description": (
                 "Отримати на <a href='https://developer.digikey.com/' target='_blank'>"
                 "developer.digikey.com</a> → My Apps → Create App (тип: Marketplace Seller)."
@@ -907,3 +907,230 @@ class BotLogAdmin(admin.ModelAdmin):
     def message_short(self, obj):
         return obj.message[:80] + "..." if len(obj.message) > 80 else obj.message
     message_short.short_description = "Повідомлення"
+
+
+# ── DigiKey Marketplace Listings ──────────────────────────────────────────────
+
+@admin.register(DigiKeyListing)
+class DigiKeyListingAdmin(admin.ModelAdmin):
+    list_display   = ('product_sku_link', 'dk_title', 'category_type',
+                      'stock_qty_display', 'sync_status_badge',
+                      'last_synced_at', 'publish_btn')
+    list_filter    = ('sync_status', 'category_type', 'dk_is_active')
+    search_fields  = ('product__sku', 'dk_title', 'dk_supplier_sku')
+    autocomplete_fields = ('product',)
+    actions        = ['action_sync_qty']
+
+    readonly_fields = (
+        'dk_product_id', 'dk_offer_id',
+        'sync_status', 'last_synced_at', 'last_error',
+        'created_at', 'updated_at',
+        'stock_qty_readonly', 'prices_widget',
+    )
+
+    fieldsets = (
+        ('📦 Товар', {
+            'fields': ('product', 'category_type', 'dk_is_active'),
+        }),
+        ('🏷️ Product (DigiKey Catalog)', {
+            'fields': (
+                'dk_category_id', 'dk_title', 'dk_description',
+                'dk_manufacturer', 'dk_image_url', 'dk_datasheet_url',
+            ),
+        }),
+        ('🛒 Offer (Пропозиція)', {
+            'fields': (
+                'dk_supplier_sku', 'dk_min_order_qty',
+                'dk_lead_time_days', 'dk_qty_alert',
+                'stock_qty_readonly',
+            ),
+        }),
+        ('💰 Цінові тири', {
+            'fields': ('prices_widget', 'dk_prices'),
+            'description': (
+                'Формат JSON: <code>[{"qty": 1, "price": 11.99}, {"qty": 10, "price": 11.50}, ...]</code>. '
+                'Перший тир = MOQ. Максимум 9 тирів.'
+            ),
+        }),
+        ('🔧 Filter Attributes', {
+            'fields': (
+                'fa_frequency', 'fa_bandwidth', 'fa_filter_type',
+                'fa_ripple', 'fa_insertion_loss', 'fa_mounting_type',
+                'fa_package_case', 'fa_size_dimension', 'fa_height_max',
+            ),
+            'classes': ('collapse',),
+        }),
+        ('📊 Sync Status', {
+            'fields': (
+                'dk_product_id', 'dk_offer_id',
+                'sync_status', 'last_synced_at', 'last_error',
+                'created_at', 'updated_at',
+            ),
+            'classes': ('collapse',),
+        }),
+    )
+
+    # ── change_view: inject buttons ───────────────────────────────────────────
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        if object_id:
+            extra_context['publish_url'] = reverse(
+                'admin:bots_digikeylisting_publish', args=[object_id]
+            )
+            extra_context['sync_qty_url'] = reverse(
+                'admin:bots_digikeylisting_sync_qty', args=[object_id]
+            )
+        return super().changeform_view(request, object_id, form_url, extra_context)
+
+    def get_urls(self):
+        urls = super().get_urls()
+        custom = [
+            path('<int:pk>/publish/',
+                 self.admin_site.admin_view(self.publish_view),
+                 name='bots_digikeylisting_publish'),
+            path('<int:pk>/sync-qty/',
+                 self.admin_site.admin_view(self.sync_qty_view),
+                 name='bots_digikeylisting_sync_qty'),
+        ]
+        return custom + urls
+
+    def publish_view(self, request, pk):
+        from bots.services.dk_marketplace import publish_listing, DKMarketplaceError
+        listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+        try:
+            publish_listing(listing)
+            messages.success(
+                request,
+                f"✅ «{listing.product.sku}» успішно опубліковано на DigiKey. "
+                f"Product ID: {listing.dk_product_id} | Offer ID: {listing.dk_offer_id}"
+            )
+        except DKMarketplaceError as exc:
+            messages.error(request, f"❌ Помилка публікації: {exc}")
+        except Exception as exc:
+            messages.error(request, f"❌ Помилка: {exc}")
+        return redirect(
+            reverse('admin:bots_digikeylisting_change', args=[pk])
+        )
+
+    def sync_qty_view(self, request, pk):
+        from bots.services.dk_marketplace import sync_quantity, DKMarketplaceError
+        listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+        try:
+            stock = listing.get_stock_qty()
+            sync_quantity(listing)
+            messages.success(
+                request,
+                f"✅ Залишок оновлено: {listing.product.sku} → {stock} шт."
+            )
+        except DKMarketplaceError as exc:
+            messages.error(request, f"❌ Помилка оновлення залишку: {exc}")
+        except Exception as exc:
+            messages.error(request, f"❌ Помилка: {exc}")
+        return redirect(
+            reverse('admin:bots_digikeylisting_change', args=[pk])
+        )
+
+    # ── Bulk action: sync quantities ──────────────────────────────────────────
+
+    @admin.action(description='🔄 Оновити залишки на DigiKey')
+    def action_sync_qty(self, request, queryset):
+        from bots.services.dk_marketplace import sync_quantity, DKMarketplaceError
+        ok = err = 0
+        for listing in queryset.filter(dk_offer_id__gt='').select_related('product'):
+            try:
+                sync_quantity(listing)
+                ok += 1
+            except Exception as exc:
+                logger.warning("sync_qty failed %s: %s", listing.product.sku, exc)
+                err += 1
+        if ok:
+            self.message_user(request, f"✅ Оновлено залишки для {ok} лістингів.", messages.SUCCESS)
+        if err:
+            self.message_user(request, f"⚠️ Помилки для {err} лістингів (перевір Last Error).", messages.WARNING)
+
+    # ── Display helpers ───────────────────────────────────────────────────────
+
+    def product_sku_link(self, obj):
+        url = reverse('admin:inventory_product_change', args=[obj.product_id])
+        return format_html('<a href="{}">{}</a>', url, obj.product.sku)
+    product_sku_link.short_description = 'Товар (SKU)'
+    product_sku_link.admin_order_field = 'product__sku'
+
+    def stock_qty_display(self, obj):
+        qty = obj.get_stock_qty()
+        color = 'var(--ok)' if qty > 0 else 'var(--err)'
+        return format_html('<span style="color:{};font-weight:600">{} шт.</span>', color, qty)
+    stock_qty_display.short_description = 'Залишок'
+
+    def stock_qty_readonly(self, obj):
+        if obj and obj.pk:
+            qty = obj.get_stock_qty()
+            color = 'var(--ok)' if qty > 0 else 'var(--err)'
+            return format_html(
+                '<strong style="color:{};font-size:15px">{} шт.</strong>'
+                '<span style="color:var(--text-muted);margin-left:8px;font-size:12px">'
+                '(поточний залишок зі складу)</span>',
+                color, qty
+            )
+        return '—'
+    stock_qty_readonly.short_description = 'Поточний залишок'
+
+    _STATUS_COLORS = {
+        'draft':     ('#607d8b', '⬜'),
+        'published': ('#4caf50', '✅'),
+        'error':     ('#e53935', '❌'),
+    }
+
+    def sync_status_badge(self, obj):
+        color, icon = self._STATUS_COLORS.get(obj.sync_status, ('#607d8b', '?'))
+        label = obj.get_sync_status_display()
+        return format_html(
+            '<span style="color:{};font-weight:600">{} {}</span>', color, icon, label
+        )
+    sync_status_badge.short_description = 'Статус'
+    sync_status_badge.admin_order_field = 'sync_status'
+
+    def publish_btn(self, obj):
+        if not obj.pk:
+            return '—'
+        url = reverse('admin:bots_digikeylisting_publish', args=[obj.pk])
+        label = '🔄 Оновити' if obj.dk_offer_id else '🚀 Опублікувати'
+        return format_html(
+            '<a class="button" href="{}" style="padding:3px 8px;font-size:12px">{}</a>',
+            url, label
+        )
+    publish_btn.short_description = 'Дія'
+
+    def prices_widget(self, obj):
+        """Read-only preview of pricing tiers in a table."""
+        if not obj or not obj.dk_prices:
+            return format_html(
+                '<span style="color:var(--text-muted)">Заповни поле «Цінові тири» нижче у форматі JSON</span>'
+            )
+        rows = ''
+        for i, tier in enumerate(obj.dk_prices, 1):
+            qty   = tier.get('qty', '?')
+            price = tier.get('price', '?')
+            bg    = 'var(--bg-hover)' if i % 2 == 0 else 'transparent'
+            rows += (
+                f'<tr style="background:{bg}">'
+                f'<td style="padding:3px 10px">{i}</td>'
+                f'<td style="padding:3px 10px;font-weight:600">{qty}</td>'
+                f'<td style="padding:3px 10px;color:var(--ok)">€&nbsp;{price}</td>'
+                f'</tr>'
+            )
+        return format_html(
+            '<table style="border-collapse:collapse;font-size:13px;min-width:200px">'
+            '<thead><tr style="color:var(--text-muted);font-size:11px">'
+            '<th style="padding:3px 10px">#</th>'
+            '<th style="padding:3px 10px">Qty Break</th>'
+            '<th style="padding:3px 10px">Ціна (EUR)</th>'
+            '</tr></thead><tbody>{}</tbody></table>',
+            format_html(''.join(rows)),  # mark_safe-equivalent via format_html
+        )
+    prices_widget.short_description = 'Перегляд тирів'
+
+
+import logging as _logging
+logger = _logging.getLogger(__name__)

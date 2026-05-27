@@ -1,0 +1,96 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block submit_buttons_bottom %}
+  {{ block.super }}
+  {% if publish_url %}
+  <div class="submit-row dk-action-row">
+    <a href="{{ publish_url }}" class="button dk-publish-btn"
+       onclick="return confirm('{% if original.dk_offer_id %}Оновити лістинг на DigiKey?{% else %}Опублікувати товар на DigiKey Marketplace?{% endif %}')">
+      {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати на DigiKey{% endif %}
+    </a>
+    {% if original.dk_offer_id %}
+    <a href="{{ sync_qty_url }}" class="button dk-sync-btn"
+       onclick="return confirm('Оновити залишок складу на DigiKey?')">
+      📦 Оновити залишок
+    </a>
+    {% endif %}
+    {% if original.sync_status == 'error' and original.last_error %}
+    <span class="dk-error-note">❌ {{ original.last_error|truncatechars:120 }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.dk-action-row {
+  background: var(--bg-card, #1a2535);
+  border-top: 2px solid var(--border-strong, #243347);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.dk-publish-btn {
+  background: #2e7d32 !important;
+  color: #fff !important;
+  font-weight: 600 !important;
+  padding: 8px 18px !important;
+  border-radius: 5px !important;
+  text-decoration: none !important;
+  font-size: 13px !important;
+  transition: background .15s;
+}
+.dk-publish-btn:hover { background: #388e3c !important; }
+.dk-sync-btn {
+  background: #1565c0 !important;
+  color: #fff !important;
+  font-weight: 500 !important;
+  padding: 8px 16px !important;
+  border-radius: 5px !important;
+  text-decoration: none !important;
+  font-size: 13px !important;
+  transition: background .15s;
+}
+.dk-sync-btn:hover { background: #1976d2 !important; }
+.dk-error-note {
+  color: var(--err, #e53935);
+  font-size: 12px;
+  font-style: italic;
+  flex: 1;
+}
+
+/* Pricing JSON field help */
+.field-dk_prices textarea {
+  font-family: monospace;
+  font-size: 12px;
+  min-height: 120px;
+}
+</style>
+
+<script>
+// Pretty-print JSON in dk_prices textarea on load
+document.addEventListener('DOMContentLoaded', function() {
+  var ta = document.querySelector('[name="dk_prices"]');
+  if (!ta) return;
+  try {
+    var val = ta.value.trim();
+    if (val) ta.value = JSON.stringify(JSON.parse(val), null, 2);
+  } catch(e) {}
+
+  // Validate JSON on change
+  ta.addEventListener('blur', function() {
+    try {
+      var parsed = JSON.parse(ta.value.trim() || '[]');
+      ta.style.borderColor = '';
+      // Normalize: ensure keys are qty/price
+      ta.value = JSON.stringify(parsed, null, 2);
+    } catch(e) {
+      ta.style.borderColor = 'var(--err, #e53935)';
+    }
+  });
+});
+</script>
+{% endblock %}

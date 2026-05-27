@@ -125,10 +125,165 @@ class DigiKeyConfig(models.Model):
                 pass
         super().save(*args, **kwargs)
 
+    # ── Marketplace Supplier UUID ─────────────────────────────────────────────
+    marketplace_supplier_id = models.CharField(
+        "Marketplace Supplier UUID", max_length=36, blank=True, default="",
+        help_text="UUID що DigiKey призначає постачальнику в Marketplace Portal "
+                  "(My Account → Supplier Info → Supplier ID)"
+    )
+
     @classmethod
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# ── DigiKey Marketplace Listing ───────────────────────────────────────────────
+
+class DigiKeyListing(models.Model):
+    """Лістинг товару на DigiKey Marketplace.
+
+    Зберігає всі поля для публікації: назва, опис, категорія,
+    технічні атрибути (фільтри), цінові тири, статус синхронізації.
+    """
+
+    SYNC_DRAFT     = 'draft'
+    SYNC_PUBLISHED = 'published'
+    SYNC_ERROR     = 'error'
+    SYNC_CHOICES = [
+        ('draft',     'Чернетка'),
+        ('published', 'Опубліковано'),
+        ('error',     'Помилка'),
+    ]
+
+    CAT_FILTER = 'filter'
+    CAT_CABLE  = 'cable'
+    CAT_OTHER  = 'other'
+    CAT_CHOICES = [
+        ('filter', 'RF Filter'),
+        ('cable',  'Cable Assembly'),
+        ('other',  'Інше'),
+    ]
+
+    product = models.OneToOneField(
+        'inventory.Product', on_delete=models.CASCADE,
+        related_name='dk_listing', verbose_name='Товар'
+    )
+    category_type = models.CharField(
+        'Категорія', max_length=20, choices=CAT_CHOICES, default='filter'
+    )
+
+    # ── Product stage fields ───────────────────────────────────────────────────
+    dk_product_id   = models.CharField('DK Product ID',  max_length=36, blank=True, default='',
+                                        help_text='UUID — заповнюється автоматично після публікації')
+    dk_category_id  = models.CharField('DK Category ID', max_length=256, blank=True, default='',
+                                        help_text='Код категорії DigiKey (напр. "29" для RF Filters). '
+                                                  'Знайти в DigiKey Marketplace Portal → Product Catalog')
+    dk_title        = models.CharField('Назва (DK)', max_length=50,
+                                        help_text='Назва товару на DigiKey, макс. 50 символів')
+    dk_description  = models.TextField('Опис товару (DK)', max_length=2048,
+                                        help_text='Повний опис товару, макс. 2048 символів')
+    dk_manufacturer = models.CharField('Виробник (DK)', max_length=50, blank=True, default='',
+                                        help_text='Назва виробника, макс. 50 символів')
+    dk_image_url    = models.URLField('Фото (URL)', blank=True, default='',
+                                       help_text='Пряме посилання на зображення товару')
+    dk_datasheet_url = models.URLField('Datasheet (URL)', blank=True, default='',
+                                        help_text='Пряме посилання на datasheet')
+
+    # ── Offer fields ───────────────────────────────────────────────────────────
+    dk_offer_id      = models.CharField('DK Offer ID', max_length=36, blank=True, default='',
+                                         help_text='UUID — заповнюється автоматично після публікації')
+    dk_supplier_sku  = models.CharField('Supplier SKU (DK)', max_length=50, blank=True, default='',
+                                         help_text='Порожньо = використовує SKU товару')
+    dk_min_order_qty = models.PositiveIntegerField('MOQ (мін. кількість)', default=1,
+                                                    help_text='Мінімальна кількість для замовлення (≥ 1)')
+    dk_lead_time_days = models.PositiveIntegerField('Термін відвантаження (дні)', default=11,
+                                                     help_text='Кількість днів від замовлення до відправки')
+    dk_qty_alert     = models.PositiveIntegerField('Мін. залишок (алерт)', default=3,
+                                                    help_text='При залишку нижче цього — DigiKey виводить попередження')
+    dk_is_active     = models.BooleanField('Активне на DigiKey', default=True)
+
+    # ── Volume pricing (up to 9 tiers) ────────────────────────────────────────
+    # Stored as JSON: [{"qty": 1, "price": 11.99}, {"qty": 10, "price": 11.53}, ...]
+    dk_prices = models.JSONField('Цінові тири', default=list,
+                                  help_text='Список цінових тирів: [{"qty": 1, "price": 11.99}, ...]')
+
+    # ── Filter attributes (category_type = "filter") ───────────────────────────
+    # DK attribute codes in parentheses — passed as additionalFields in API
+    fa_frequency      = models.CharField('Frequency (139)',       max_length=100, blank=True, default='',
+                                          help_text='напр. "1.12GHz Center"')
+    fa_bandwidth      = models.CharField('Bandwidth (398)',       max_length=100, blank=True, default='',
+                                          help_text='напр. "210MHz"')
+    fa_filter_type    = models.CharField('Filter Type (21)',      max_length=100, blank=True, default='',
+                                          help_text='Band Pass / Band Stop / Low Pass / High Pass / Notch')
+    fa_ripple         = models.CharField('Ripple (428)',          max_length=100, blank=True, default='',
+                                          help_text='напр. "1.6dB"')
+    fa_insertion_loss = models.CharField('Insertion Loss (327)',  max_length=100, blank=True, default='',
+                                          help_text='напр. "4dB"')
+    fa_mounting_type  = models.CharField('Mounting Type (69)',    max_length=100, blank=True, default='',
+                                          help_text='напр. "Free Hanging (In-Line)"')
+    fa_package_case   = models.CharField('Package / Case (16)',   max_length=100, blank=True, default='',
+                                          help_text='напр. "Inline, SMA Connection, F and M"')
+    fa_size_dimension = models.CharField('Size / Dimension (46)', max_length=200, blank=True, default='',
+                                          help_text='напр. "1.496\\" L x 1.338\\" W (38mm x 34mm)"')
+    fa_height_max     = models.CharField('Height Max (966)',      max_length=100, blank=True, default='',
+                                          help_text='напр. "0.063\\" (1.60mm)"')
+
+    # ── Sync status ────────────────────────────────────────────────────────────
+    sync_status    = models.CharField('Статус', max_length=20,
+                                       choices=SYNC_CHOICES, default='draft')
+    last_synced_at = models.DateTimeField('Остання синхронізація', null=True, blank=True)
+    last_error     = models.TextField('Остання помилка', blank=True, default='')
+    created_at     = models.DateTimeField(auto_now_add=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = 'DigiKey — Лістинг'
+        verbose_name_plural = 'DigiKey — Лістинги'
+        ordering            = ['product__sku']
+
+    def __str__(self):
+        return f"{self.product.sku} [{self.get_sync_status_display()}]"
+
+    def get_supplier_sku(self):
+        return self.dk_supplier_sku or self.product.sku
+
+    def get_stock_qty(self):
+        """Поточний залишок на складі (з InventoryTransaction)."""
+        from django.db.models import Sum
+        from inventory.models import InventoryTransaction
+        result = InventoryTransaction.objects.filter(
+            product=self.product
+        ).aggregate(total=Sum('qty'))
+        return max(0, int(result['total'] or 0))
+
+    def get_prices_api(self):
+        """Prices list for API: [{"quantityBreak": N, "price": X.XX}, ...]"""
+        return [
+            {"quantityBreak": int(t["qty"]), "price": float(t["price"])}
+            for t in (self.dk_prices or [])
+            if t.get("qty") and t.get("price")
+        ]
+
+    def get_filter_attributes_api(self):
+        """additionalFields list for API (filter category only)."""
+        mapping = [
+            ('fa_frequency',      '139'),
+            ('fa_bandwidth',      '398'),
+            ('fa_filter_type',    '21'),
+            ('fa_ripple',         '428'),
+            ('fa_insertion_loss', '327'),
+            ('fa_mounting_type',  '69'),
+            ('fa_package_case',   '16'),
+            ('fa_size_dimension', '46'),
+            ('fa_height_max',     '966'),
+        ]
+        attrs = []
+        for field, code in mapping:
+            val = getattr(self, field, '').strip()
+            if val:
+                attrs.append({"code": code, "type": "String", "value": val})
+        return attrs
 
 
 class Bot(models.Model):
