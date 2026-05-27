@@ -2431,7 +2431,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     body=body_text,
                     from_email=from_email,
                     to=[to_email],
-                    cc=[cc_email] if cc_email else [],
+                    cc=[a.strip() for a in cc_email.split(',') if a.strip()] if cc_email else [],
                     connection=_smtp_connection(ns),
                 )
                 msg.attach_alternative(html_body, 'text/html')
