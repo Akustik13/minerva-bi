@@ -882,34 +882,34 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
             _create_marketplace_lines(sale, order, currency, stats)
             if config:
                 _maybe_auto_confirm(config, order_number, sale, _change_entry, raw_order=order)
-    else:
-        # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
-        update_fields = []
-        if _status_can_advance(sale.status, minerva_status):
-            old_status = sale.status
-            sale.status = minerva_status
-            sale.status_source = "DigiKey Marketplace"
-            sale._skip_status_notification = True
-            update_fields += ["status", "status_source"]
-            stats["changes"].append({
-                "order":      order_number,
-                "client":     client,
-                "old_status": old_status,
-                "new_status": minerva_status,
-                "extra":      "DigiKey Marketplace",
-            })
-
-        # Трекінг: підтягуємо з DigiKey якщо є і відрізняється від поточного
-        tracking = _extract_tracking(order)
-        if tracking and tracking != sale.tracking_number:
-            sale.tracking_number = tracking
-            update_fields.append("tracking_number")
-
-        if update_fields:
-            sale.save(update_fields=update_fields)
-            stats["updated"] += 1
         else:
-            stats["skipped"] += 1
+            # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
+            update_fields = []
+            if _status_can_advance(sale.status, minerva_status):
+                old_status = sale.status
+                sale.status = minerva_status
+                sale.status_source = "DigiKey Marketplace"
+                sale._skip_status_notification = True
+                update_fields += ["status", "status_source"]
+                stats["changes"].append({
+                    "order":      order_number,
+                    "client":     client,
+                    "old_status": old_status,
+                    "new_status": minerva_status,
+                    "extra":      "DigiKey Marketplace",
+                })
+
+            # Трекінг: підтягуємо з DigiKey якщо є і відрізняється від поточного
+            tracking = _extract_tracking(order)
+            if tracking and tracking != sale.tracking_number:
+                sale.tracking_number = tracking
+                update_fields.append("tracking_number")
+
+            if update_fields:
+                sale.save(update_fields=update_fields)
+                stats["updated"] += 1
+            else:
+                stats["skipped"] += 1
 
 
 def _create_marketplace_lines(sale, order: dict, currency: str, stats: dict):
