@@ -158,9 +158,7 @@ def _build_qs(account, folder, q=''):
             account=account, is_archived=True
         ).values_list('id', flat=True)
         qs = EmailMessage.objects.filter(
-            account=account, folder='inbox',
-            imap_folder_name__in=['', account.imap_folder_inbox],
-            is_deleted=False
+            account=account, folder='inbox', is_deleted=False
         ).exclude(thread_id__in=archived_ids)
     elif folder not in _STANDARD_FOLDERS:
         # Custom IMAP folder (e.g. "Meine Order")
@@ -217,7 +215,6 @@ def inbox_view(request):
     _archived_ids = _ET.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
     unread_inbox = EmailMessage.objects.filter(
         account=account, folder='inbox',
-        imap_folder_name__in=['', account.imap_folder_inbox],
         is_read=False, is_deleted=False,
     ).exclude(thread_id__in=_archived_ids).count()
     unread_counts = {

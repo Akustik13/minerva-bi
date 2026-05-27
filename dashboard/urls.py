@@ -153,7 +153,6 @@ def widget_data_api(request):
             data['unread_emails'] = EmailMessage.objects.filter(
                 account=em_account,
                 folder='inbox',
-                imap_folder_name__in=['', em_account.imap_folder_inbox],
                 is_read=False, is_deleted=False,
             ).exclude(thread_id__in=archived_ids).count()
             data['unread_threads'] = EmailThread.objects.filter(
