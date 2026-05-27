@@ -32,7 +32,11 @@ class SalesOrder(models.Model):
     order_number    = models.CharField(max_length=64)
     order_date      = models.DateField(null=True, blank=True)
     shipped_at      = models.DateField(null=True, blank=True)
-    delivered_at    = models.DateTimeField("Фактична доставка", null=True, blank=True)
+    delivered_at        = models.DateTimeField("Фактична доставка", null=True, blank=True)
+    ship_notify_sent_at = models.DateTimeField(
+        "📧 Повідомлення клієнту надіслано", null=True, blank=True,
+        help_text="Дата/час надсилання email-сповіщення про відправку"
+    )
     shipping_courier   = models.CharField(max_length=64,  blank=True, default="")
     tracking_number    = models.CharField(max_length=128, blank=True, default="")
     lieferschein_nr    = models.CharField(max_length=64,  blank=True, default="")

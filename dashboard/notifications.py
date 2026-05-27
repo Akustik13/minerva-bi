@@ -1560,3 +1560,109 @@ def send_order_confirm_notification(order):
         return True
     except Exception:
         return False
+
+
+# ── Shipment notification to customer ─────────────────────────────────────────
+
+_EU_COUNTRIES = {
+    'AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI',
+    'FR','GR','HR','HU','IE','IT','LT','LU','LV','MT',
+    'NL','PL','PT','RO','SE','SI','SK',
+}
+
+
+def send_ship_notification(order) -> bool:
+    """Send shipment notification email to customer.
+
+    Uses EU or non-EU template based on order.addr_country.
+    Sets order.ship_notify_sent_at on success.
+    Returns True on success, False on failure.
+    """
+    try:
+        from config.models import NotificationSettings as _NS
+        ns = _NS.get()
+    except Exception:
+        return False
+
+    if not ns.email_enabled:
+        return False
+
+    to_email = (getattr(order, 'ship_email', '') or order.email or '').strip()
+    if not to_email:
+        return False
+
+    cust_name   = (getattr(order, 'ship_name', '') or order.client or
+                   getattr(order, 'contact_name', '') or '').strip()
+    tracking    = (order.tracking_number or '').strip()
+    carrier     = (order.shipping_courier or '').strip()
+    shipped     = order.shipped_at.strftime('%d.%m.%Y') if order.shipped_at else ''
+    country     = (order.addr_country or '').strip().upper()
+    is_eu       = country in _EU_COUNTRIES
+
+    lines = order.lines.select_related('product').all() if hasattr(order, 'lines') else []
+    items_text = '\n'.join(
+        '• {} — {} Stk.'.format(
+            l.sku_raw or (l.product.sku if l.product else ''), int(l.qty)
+        )
+        for l in lines
+    ) or '—'
+
+    addr_parts = filter(None, [
+        getattr(order, 'ship_name', '') or order.client,
+        getattr(order, 'addr_street', '') or getattr(order, 'shipping_address', ''),
+        ('{} {}'.format(
+            getattr(order, 'addr_zip', '') or '',
+            getattr(order, 'addr_city', '') or ''
+        )).strip(),
+        country,
+    ])
+    ship_address = '\n'.join(addr_parts)
+
+    ctx = {
+        'order_number':    order.order_number or str(order.pk),
+        'customer_name':   cust_name,
+        'tracking_number': tracking,
+        'carrier':         carrier,
+        'shipped_date':    shipped,
+        'items':           items_text,
+        'ship_address':    ship_address,
+    }
+
+    def _render(tpl):
+        try:
+            return (tpl or '').format(**ctx)
+        except KeyError:
+            return tpl or ''
+
+    body_tpl = ns.customer_notify_body if is_eu else (
+        getattr(ns, 'customer_notify_body_noneu', '') or ns.customer_notify_body
+    )
+    subject   = _render(ns.customer_notify_subject)
+    body_text = _render(body_tpl)
+    cc_str    = (getattr(ns, 'customer_notify_cc', '') or '').strip()
+    from_email = (ns.email_from or ns.email_host_user or '').strip()
+
+    if not subject or not body_text:
+        return False
+
+    try:
+        from django.core.mail import EmailMultiAlternatives
+        from django.utils import timezone as _tz
+        html_body = ('<html><body style="font-family:sans-serif;font-size:14px;line-height:1.7">'
+                     + body_text.replace('\n', '<br>') + '</body></html>')
+        msg = EmailMultiAlternatives(
+            subject=subject,
+            body=body_text,
+            from_email=from_email,
+            to=[to_email],
+            cc=[a.strip() for a in cc_str.split(',') if a.strip()] if cc_str else [],
+            connection=_smtp_connection(ns),
+        )
+        msg.attach_alternative(html_body, 'text/html')
+        msg.send()
+
+        from sales.models import SalesOrder
+        SalesOrder.objects.filter(pk=order.pk).update(ship_notify_sent_at=_tz.now())
+        return True
+    except Exception:
+        return False

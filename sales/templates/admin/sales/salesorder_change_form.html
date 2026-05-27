@@ -95,12 +95,22 @@
   {% endif %}
   {% if notify_customer_url %}
     <li>
-      <button type="button"
-              onclick="ncOpen('{{ notify_customer_url }}')"
-              style="background:#00695c;color:#fff;padding:6px 14px;border-radius:6px;
-                     font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
-        📧 {% trans "Надіслати клієнту" %}
-      </button>
+      {% if ship_notify_sent_at %}
+        <button type="button"
+                onclick="ncOpen('{{ notify_customer_url }}')"
+                style="background:#1b5e20;color:#a5d6a7;padding:6px 14px;border-radius:6px;
+                       font-weight:bold;border:1px solid #2e7d32;cursor:pointer;white-space:nowrap;font-size:13px"
+                title="{% trans 'Лист вже надіслано. Натисни щоб надіслати повторно.' %}">
+          ✅ 📧 {% trans "Надіслано" %} {{ ship_notify_sent_at|date:"d.m.Y H:i" }}
+        </button>
+      {% else %}
+        <button type="button"
+                onclick="ncOpen('{{ notify_customer_url }}')"
+                style="background:#00695c;color:#fff;padding:6px 14px;border-radius:6px;
+                       font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
+          📧 {% trans "Надіслати клієнту" %}
+        </button>
+      {% endif %}
     </li>
   {% endif %}
   {{ block.super }}
@@ -1314,6 +1324,13 @@ document.addEventListener('DOMContentLoaded',function(){
       <button onclick="ncClose()" style="background:none;border:none;font-size:20px;cursor:pointer;
               color:var(--text-muted,#607d8b);line-height:1">×</button>
     </div>
+    {% if ship_notify_sent_at %}
+    <div style="background:rgba(46,125,50,.15);border:1px solid #2e7d32;border-radius:6px;
+                padding:8px 14px;margin-bottom:12px;font-size:12px;color:#a5d6a7">
+      ✅ {% trans "Повідомлення вже надіслано автоматично" %} — {{ ship_notify_sent_at|date:"d.m.Y H:i" }}.
+      {% trans "Форма нижче — для повторного надсилання." %}
+    </div>
+    {% endif %}
     <div id="nc-loading" style="text-align:center;padding:20px;color:var(--text-muted,#607d8b)">⏳ {% trans "Генерація..." %}</div>
     <div id="nc-form" style="display:none">
       <div style="margin-bottom:12px">

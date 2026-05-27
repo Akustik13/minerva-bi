@@ -3684,6 +3684,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             f'✅ UPS відправлення створено! Трекінг: {result["tracking_number"]} | '
             f'{result["service_name"]} | {result["total_charge"]} {result["currency"]}{pickup_msg}',
         )
+
+        # ── Авто-відправка email клієнту ──────────────────────────────────────
+        if shipment.order:
+            try:
+                from config.models import NotificationSettings as _NS
+                _ns = _NS.get()
+                if _ns.customer_notify_enabled and _ns.customer_notify_auto and _ns.email_enabled:
+                    _order = shipment.order
+                    if not _order.ship_notify_sent_at and _order.tracking_number:
+                        from dashboard.notifications import send_ship_notification
+                        send_ship_notification(_order)
+            except Exception as _e:
+                logger.warning('Auto ship_notify failed: %s', _e)
+
         return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
 
     def ups_track_view(self, request, shipment_id):
