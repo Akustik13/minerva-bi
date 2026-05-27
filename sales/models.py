@@ -175,7 +175,7 @@ class SalesOrderLine(models.Model):
     qty         = models.DecimalField(max_digits=12, decimal_places=3)
     # ── Ціни ──
     unit_price  = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
-    total_price = models.DecimalField(max_digits=18, decimal_places=2,  null=True, blank=True)
+    total_price = models.DecimalField(max_digits=18, decimal_places=4,  null=True, blank=True)
     currency    = models.CharField(max_length=8, blank=True, default="USD", verbose_name="Валюта")
 
     def __str__(self):

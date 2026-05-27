@@ -45,6 +45,18 @@ class SalesOrderLineInlineForm(forms.ModelForm):
         initial="USD",
         widget=CurrencyComboWidget(),
     )
+    unit_price = forms.DecimalField(
+        required=False,
+        max_digits=18,
+        decimal_places=4,
+        widget=forms.NumberInput(attrs={"step": "0.0001", "style": "width:90px"}),
+    )
+    total_price = forms.DecimalField(
+        required=False,
+        max_digits=18,
+        decimal_places=4,
+        widget=forms.NumberInput(attrs={"step": "0.0001", "style": "width:90px"}),
+    )
 
     class Meta:
         model = SalesOrderLine
