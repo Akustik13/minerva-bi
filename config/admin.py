@@ -320,10 +320,13 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 ("customer_notify_enabled", "customer_notify_auto"),
                 "customer_notify_subject",
                 "customer_notify_body",
+                "customer_notify_body_noneu",
             ),
             "description": (
                 "Кнопка «📧 Надіслати клієнту» на сторінці замовлення. "
-                "Змінні шаблону: {order_number} {customer_name} {tracking_number} "
+                "ЄС-шаблон — для країн EU; не-ЄС-шаблон — для решти (містить попередження про мито). "
+                "Автовизначення за полем 'Країна' замовлення. "
+                "Змінні: {order_number} {customer_name} {tracking_number} "
                 "{carrier} {shipped_date} {items} {ship_address}"
             ),
         }),

@@ -2327,11 +2327,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({'ok': False, 'error': 'NotificationSettings недоступні'})
 
         if request.method == 'GET':
+            _EU = {
+                'AT','BE','BG','CY','CZ','DE','DK','EE','ES','FI',
+                'FR','GR','HR','HU','IE','IT','LT','LU','LV','MT',
+                'NL','PL','PT','RO','SE','SI','SK',
+            }
             to_email    = (order.ship_email or order.email or '').strip()
             cust_name   = (order.ship_name or order.client or order.contact_name or '').strip()
             tracking    = (order.tracking_number or '').strip()
             carrier     = (order.shipping_courier or '').strip()
             shipped     = order.shipped_at.strftime('%d.%m.%Y') if order.shipped_at else ''
+            country     = (order.addr_country or '').strip().upper()
+            is_eu       = country in _EU
 
             lines = order.lines.select_related('product').all()
             items_text = '\n'.join(
@@ -2358,19 +2365,27 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 'items':           items_text,
                 'ship_address':    ship_address,
             }
-            try:
-                subject = (ns.customer_notify_subject or '').format(**ctx)
-                body    = (ns.customer_notify_body or '').format(**ctx)
-            except KeyError as e:
-                subject = ns.customer_notify_subject or ''
-                body    = ns.customer_notify_body or ''
+
+            def _render(tpl):
+                try:
+                    return (tpl or '').format(**ctx)
+                except KeyError:
+                    return tpl or ''
+
+            body_eu    = _render(ns.customer_notify_body)
+            body_noneu = _render(getattr(ns, 'customer_notify_body_noneu', '') or ns.customer_notify_body)
+            subject    = _render(ns.customer_notify_subject)
 
             return JsonResponse({
-                'ok':      True,
-                'to':      to_email,
-                'subject': subject,
-                'body':    body,
-                'auto':    ns.customer_notify_auto,
+                'ok':        True,
+                'to':        to_email,
+                'subject':   subject,
+                'body':      body_eu if is_eu else body_noneu,
+                'body_eu':   body_eu,
+                'body_noneu': body_noneu,
+                'is_eu':     is_eu,
+                'country':   country,
+                'auto':      ns.customer_notify_auto,
             })
 
         if request.method == 'POST':

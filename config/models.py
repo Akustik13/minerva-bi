@@ -605,17 +605,36 @@ class NotificationSettings(models.Model):
         help_text="Змінні: {order_number} {customer_name} {tracking_number} {carrier} {shipped_date}",
     )
     customer_notify_body = models.TextField(
-        "Текст листа клієнту (шаблон)", blank=True,
+        "Текст листа клієнту — ЄС (шаблон)", blank=True,
         default=(
-            "Sehr geehrte/r {customer_name},\n\n"
-            "Ihre Bestellung #{order_number} wurde am {shipped_date} versendet.\n\n"
-            "Versanddienstleister: {carrier}\n"
-            "Tracking-Nummer: {tracking_number}\n\n"
-            "Bestellte Artikel:\n{items}\n\n"
-            "Lieferadresse:\n{ship_address}\n\n"
-            "Mit freundlichen Grüßen"
+            "Dear {customer_name},\n\n"
+            "Your order #{order_number} has been shipped on {shipped_date}.\n\n"
+            "Carrier: {carrier}\n"
+            "Tracking number: {tracking_number}\n\n"
+            "Items shipped:\n{items}\n\n"
+            "Delivery address:\n{ship_address}\n\n"
+            "Best regards"
         ),
         help_text="Змінні: {order_number} {customer_name} {tracking_number} {carrier} {shipped_date} {items} {ship_address}",
+    )
+    customer_notify_body_noneu = models.TextField(
+        "Текст листа клієнту — не-ЄС (шаблон)", blank=True,
+        default=(
+            "Dear {customer_name},\n\n"
+            "Your order #{order_number} has been shipped on {shipped_date}.\n\n"
+            "Carrier: {carrier}\n"
+            "Tracking number: {tracking_number}\n\n"
+            "Items shipped:\n{items}\n\n"
+            "Delivery address:\n{ship_address}\n\n"
+            "Please note: Your shipment originates from the EU. "
+            "Depending on your country's import regulations, customs duties and/or import taxes "
+            "may be charged upon delivery. These fees are the responsibility of the recipient "
+            "and are not included in the order price. "
+            "We recommend checking with your local customs authority for more information.\n\n"
+            "Best regards"
+        ),
+        help_text="Використовується для країн за межами ЄС (автовизначення за addr_country). "
+                  "Змінні: {order_number} {customer_name} {tracking_number} {carrier} {shipped_date} {items} {ship_address}",
     )
 
     # ── IMAP last fetch tracking ───────────────────────────────────────────────

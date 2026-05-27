@@ -1324,6 +1324,18 @@ document.addEventListener('DOMContentLoaded',function(){
                style="width:100%;padding:8px 10px;border-radius:6px;border:1px solid var(--border-strong,#243347);
                       background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px;box-sizing:border-box">
       </div>
+      <div id="nc-template-row" style="display:none;margin-bottom:12px;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text-muted,#607d8b)">{% trans "Шаблон:" %}</span>
+        <button type="button" id="nc-btn-eu" onclick="ncSetTemplate('eu')"
+                style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;
+                       border:1px solid var(--border-strong,#243347);background:var(--bg-card-2,#1e2d40);
+                       color:var(--text-muted,#9aafbe)">🇪🇺 ЄС</button>
+        <button type="button" id="nc-btn-noneu" onclick="ncSetTemplate('noneu')"
+                style="padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;
+                       border:1px solid var(--border-strong,#243347);background:var(--bg-card-2,#1e2d40);
+                       color:var(--text-muted,#9aafbe)">🌍 {% trans "Не-ЄС" %}</button>
+        <span id="nc-country-hint" style="font-size:11px;color:var(--text-dim,#607d8b)"></span>
+      </div>
       <div style="margin-bottom:16px">
         <label style="font-size:12px;color:var(--text-muted,#607d8b);display:block;margin-bottom:4px">{% trans "Текст листа" %}</label>
         <textarea id="nc-body" rows="12"
@@ -1351,6 +1363,22 @@ document.addEventListener('DOMContentLoaded',function(){
 (function(){
 var NC_URL = '{{ notify_customer_url }}';
 var CSRF   = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+var _ncBodyEu    = '';
+var _ncBodyNonEu = '';
+var _ncActive    = 'eu';  /* 'eu' | 'noneu' */
+
+function ncSetTemplate(which) {
+  _ncActive = which;
+  document.getElementById('nc-body').value = which === 'eu' ? _ncBodyEu : _ncBodyNonEu;
+  var btnEu    = document.getElementById('nc-btn-eu');
+  var btnNonEu = document.getElementById('nc-btn-noneu');
+  var active   = 'background:#00695c;color:#fff;border-color:#00695c';
+  var inactive = 'padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;border:1px solid var(--border-strong,#243347);background:var(--bg-card-2,#1e2d40);color:var(--text-muted,#9aafbe)';
+  if (btnEu)    btnEu.style.cssText    = (which === 'eu'    ? 'padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;'+active : inactive);
+  if (btnNonEu) btnNonEu.style.cssText = (which === 'noneu' ? 'padding:5px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;'+active : inactive);
+}
+window.ncSetTemplate = ncSetTemplate;
+
 function ncOpen(url) {
   var m = document.getElementById('nc-modal');
   m.style.display = 'flex';
@@ -1362,10 +1390,21 @@ function ncOpen(url) {
     .then(function(d){
       document.getElementById('nc-loading').style.display = 'none';
       if (!d.ok){ document.getElementById('nc-status').textContent='✗ '+d.error; return; }
+      _ncBodyEu    = d.body_eu    || d.body || '';
+      _ncBodyNonEu = d.body_noneu || d.body || '';
+      var tplRow = document.getElementById('nc-template-row');
+      if (_ncBodyEu && _ncBodyNonEu && _ncBodyEu !== _ncBodyNonEu) {
+        tplRow.style.display = 'flex';
+        var hint = document.getElementById('nc-country-hint');
+        if (hint) hint.textContent = d.country ? ('(країна: ' + d.country + ')') : '';
+      } else {
+        tplRow.style.display = 'none';
+      }
+      var startWith = d.is_eu ? 'eu' : 'noneu';
+      ncSetTemplate(startWith);
       document.getElementById('nc-to').value      = d.to      || '';
       document.getElementById('nc-cc').value      = '';
       document.getElementById('nc-subject').value = d.subject || '';
-      document.getElementById('nc-body').value    = d.body    || '';
       document.getElementById('nc-form').style.display = 'block';
       if (d.auto){ ncSend(); }
     })
