@@ -42,7 +42,7 @@
 .em-card.expanded .em-card-collapse{display:block}
 .em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
 .em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:500px;overflow-y:auto}
-.em-body-iframe{width:100%;border:none;display:block;min-height:200px;overflow-y:auto;overflow-x:auto;max-height:1200px}
+.em-body-iframe{width:100%;border:none;display:block;min-height:200px;overflow-x:auto;}
 /* ── Thread scroll: all messages stack normally, last expanded ── */
 .em-msgs{position:relative}
 .em-card-body-text{max-height:none!important}
@@ -287,31 +287,23 @@
 var CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 
 function _pvIframeH(f) {
-  var MAX_H = 1200;
   try {
     var doc = f.contentDocument || f.contentWindow.document;
     var h = Math.max(
       doc.documentElement.scrollHeight || 0,
       doc.body ? doc.body.scrollHeight : 0
     );
-    h = Math.min(Math.max(h, 200), MAX_H);
-    f.style.height = h + 'px';
-  } catch(e) { f.style.height = '500px'; }
+    if (h > 100) f.style.height = h + 'px';
+  } catch(e) {}
 }
 
 function emResizeIframe(f) {
   _pvIframeH(f);
-  setTimeout(function(){ _pvIframeH(f); }, 300);
+  setTimeout(function(){ _pvIframeH(f); }, 400);
+  setTimeout(function(){ _pvIframeH(f); }, 1200);
+  setTimeout(function(){ _pvIframeH(f); }, 3500);
 }
 window.emResizeIframe = emResizeIframe;
-
-window.addEventListener('load', function() {
-  function _recheckAll() {
-    document.querySelectorAll('.em-body-iframe').forEach(_pvIframeH);
-  }
-  setTimeout(_recheckAll, 300);
-  setTimeout(_recheckAll, 1500);
-});
 
 function fmt(e, cmd) {
   e.preventDefault();
