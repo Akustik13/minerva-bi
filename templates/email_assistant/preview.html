@@ -42,7 +42,7 @@
 .em-card.expanded .em-card-collapse{display:block}
 .em-card-body{padding:0;font-size:13px;line-height:1.75;color:var(--text);word-break:break-word}
 .em-card-body-text{padding:14px 16px;white-space:pre-wrap;max-height:500px;overflow-y:auto}
-.em-body-iframe{width:100%;border:none;display:block;min-height:200px;overflow:hidden}
+.em-body-iframe{width:100%;border:none;display:block;min-height:200px;overflow-y:auto;max-height:1200px}
 /* ── Thread scroll: all messages stack normally, last expanded ── */
 .em-msgs{position:relative}
 .em-card-body-text{max-height:none!important}
@@ -287,26 +287,22 @@
 var CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
 
 function emResizeIframe(f) {
-  var msgs = f.closest ? f.closest('.em-msgs') : null;
-  if (msgs && msgs.classList.contains('has-expanded')) {
-    f.style.height = '100%';
-    return;
-  }
+  var MAX_H = 1200;
   function _measure() {
     try {
       var doc = f.contentDocument || f.contentWindow.document;
-      var h = doc.documentElement.scrollHeight || doc.body.scrollHeight;
-      if (h > 50) {
-        f.style.height = Math.max(300, h + 20) + 'px';
-      } else {
-        f.style.height = '600px';
-      }
+      // getBoundingClientRect gives actual rendered height (no trailing whitespace)
+      var rendered = Math.ceil(doc.body.getBoundingClientRect().height);
+      var scroll   = doc.documentElement.scrollHeight || doc.body.scrollHeight;
+      // Use rendered height, fall back to scrollHeight; cap at MAX_H
+      var h = rendered > 50 ? rendered : scroll;
+      h = Math.min(Math.max(h, 200), MAX_H);
+      f.style.height = h + 'px';
     } catch(e) {
-      f.style.height = '600px';
+      f.style.height = '500px';
     }
   }
   _measure();
-  // Re-measure once scripts have rendered (100ms after load)
   setTimeout(_measure, 150);
 }
 window.emResizeIframe = emResizeIframe;

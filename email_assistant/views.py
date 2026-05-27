@@ -844,7 +844,10 @@ def sync_imap_folder_view(request):
                     imap_folder_name=imap_folder,
                     message_id=msg_data['message_id'],
                     in_reply_to=msg_data['in_reply_to'],
-                    folder=EmailMessage.FOLDER_INBOX,
+                    folder=(EmailMessage.FOLDER_SENT
+                            if account.imap_folder_sent and
+                               imap_folder.lower() == account.imap_folder_sent.lower()
+                            else EmailMessage.FOLDER_INBOX),
                     subject=msg_data['subject'],
                     from_email=msg_data['from_email'],
                     from_name=msg_data['from_name'],
@@ -924,12 +927,16 @@ def sync_all_folders_view(request):
                             subject=msg_data['subject'][:500],
                             participants=[msg_data['from_email']] + msg_data['to_emails'],
                         )
+                    _sent = account.imap_folder_sent or ''
+                    _ftype = (EmailMessage.FOLDER_SENT
+                              if _sent and name.lower() == _sent.lower()
+                              else EmailMessage.FOLDER_INBOX)
                     EmailMessage.objects.create(
                         account=account, thread=thread,
                         imap_uid=msg_data['uid'], imap_folder_name=name,
                         message_id=msg_data['message_id'],
                         in_reply_to=msg_data['in_reply_to'],
-                        folder=EmailMessage.FOLDER_INBOX,
+                        folder=_ftype,
                         subject=msg_data['subject'], from_email=msg_data['from_email'],
                         from_name=msg_data['from_name'], to_emails=msg_data['to_emails'],
                         cc_emails=msg_data['cc_emails'], body_text=msg_data['body_text'],
@@ -957,7 +964,6 @@ def unread_count_view(request):
     archived_ids = EmailThread.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
     inbox = base.filter(
         folder='inbox',
-        imap_folder_name__in=['', account.imap_folder_inbox],
     ).exclude(thread_id__in=archived_ids).count()
     starred = base.filter(is_starred=True).count()
     spam    = base.filter(is_spam=True).count()
