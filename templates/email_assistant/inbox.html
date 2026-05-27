@@ -256,8 +256,11 @@
     </div>
 
     <div class="em-sync-area">
-      <button class="em-sync-btn" onclick="syncNow(this,false)" title="{% trans "Завантажити нові листи" %}">
+      <button class="em-sync-btn" onclick="syncNow(this,false)" title="{% trans "Завантажити нові листи з вхідних" %}">
         🔄 {% trans "Синхронізувати" %}
+      </button>
+      <button class="em-sync-btn" onclick="syncAllFolders(this)" title="{% trans "Синхронізувати всі IMAP-папки (повільно)" %}">
+        📂 {% trans "Всі папки" %}
       </button>
       <a href="/admin/email_assistant/emailaccount/{{ account.pk }}/change/"
          class="em-sync-btn" style="text-decoration:none;justify-content:center">
@@ -883,6 +886,29 @@ async function syncNow(btn, full) {
     var d = await r.json();
     st.textContent = d.ok ? '✓ ' + _i18n.готово : '✗ ' + d.error;
     if (d.ok) { window.refreshBadges && window.refreshBadges(); setTimeout(function(){ location.reload(); }, 700); }
+  } catch(e) { st.textContent = '✗ ' + _i18n.помилка; }
+  finally { btn.disabled = false; btn.textContent = orig; }
+}
+
+async function syncAllFolders(btn) {
+  var st = document.getElementById('sync-status');
+  btn.disabled = true;
+  var orig = btn.textContent;
+  btn.textContent = '⏳...';
+  st.textContent = '{% trans "Синхронізація всіх папок, зачекайте..." %}';
+  try {
+    var r = await fetch('{% url "email_assistant:sync_all_folders" %}', {
+      method:'POST', headers:{'X-CSRFToken':CSRF}
+    });
+    var d = await r.json();
+    if (d.ok) {
+      var created = (d.folders || []).reduce(function(s,f){ return s + (f.created||0); }, 0);
+      st.textContent = '✓ ' + _i18n.готово + ' (+' + created + ')';
+      window.refreshBadges && window.refreshBadges();
+      setTimeout(function(){ location.reload(); }, 800);
+    } else {
+      st.textContent = '✗ ' + (d.error || _i18n.помилка);
+    }
   } catch(e) { st.textContent = '✗ ' + _i18n.помилка; }
   finally { btn.disabled = false; btn.textContent = orig; }
 }
