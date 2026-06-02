@@ -277,48 +277,54 @@ def sync_quantity(listing) -> None:
     listing.save(update_fields=['last_synced_at', 'last_error'])
 
 
-def fetch_supplier_uuid(config) -> str:
-    """Try to find supplier UUID by calling GET /products with supplier name filter.
-    Returns UUID string if found, raises DKMarketplaceError otherwise."""
+def fetch_supplier_uuid(config) -> dict:
+    """Find supplier UUID via GET /offers (supplierId in each offer belongs to the token owner).
+    Falls back to GET /products if no offers found.
+    Returns dict {uuid: name}."""
     import requests as req
 
-    token = get_marketplace_token(config)
+    token  = get_marketplace_token(config)
+    uuids  = {}
 
-    # Use account_id (company name / partial match) as SupplierName filter
-    supplier_name = config.account_id or ''
-    url = f"{_base_url(config)}{_PRODUCTS_BASE}/products"
-    params = {'Max': 5}
-    if supplier_name:
-        params['SupplierName'] = supplier_name
-
-    resp = req.get(url, params=params, headers=_headers(config, token), timeout=15)
-    try:
-        resp.raise_for_status()
-    except req.HTTPError as e:
-        body = {}
-        try: body = e.response.json()
-        except Exception: pass
-        raise DKMarketplaceError(f"GET /products {e.response.status_code}: {body}") from e
-
-    data = resp.json()
-    products = data.get('products', [])
-
-    # Extract all unique supplier UUIDs from authorizedSuppliersList
-    uuids = {}
-    for p in products:
-        for sup in p.get('authorizedSuppliersList', []):
-            uid = sup.get('id', '')
-            name = sup.get('name', '')
+    # ── Try GET /offers first (supplierId is always the authenticated supplier) ──
+    resp = req.get(
+        f"{_base_url(config)}{_OFFERS_BASE}/offers",
+        params={'Max': 5},
+        headers=_headers(config, token),
+        timeout=15,
+    )
+    if resp.status_code == 200:
+        for offer in resp.json().get('offers', []):
+            uid  = offer.get('supplierId', '')
+            name = offer.get('supplierName', '')
             if uid:
                 uuids[uid] = name
 
     if uuids:
-        return uuids  # dict {uuid: name}
+        return uuids
+
+    # ── Fallback: GET /products (no filter = all products visible to token) ────
+    resp2 = req.get(
+        f"{_base_url(config)}{_PRODUCTS_BASE}/products",
+        params={'Max': 10},
+        headers=_headers(config, token),
+        timeout=15,
+    )
+    if resp2.status_code == 200:
+        for p in resp2.json().get('products', []):
+            for sup in p.get('authorizedSuppliersList', []):
+                uid  = sup.get('id', '')
+                name = sup.get('name', '')
+                if uid:
+                    uuids[uid] = name
+
+    if uuids:
+        return uuids
 
     raise DKMarketplaceError(
-        f"Не знайдено товарів на DigiKey для постачальника '{supplier_name}'. "
-        "UUID знаходиться в DigiKey Supplier Portal → supplier.digikey.com → "
-        "Account Settings → Company Information (поле Supplier GUID або ID)."
+        "Не знайдено жодного offer/product для поточного Marketplace токена. "
+        "UUID знаходиться в supplier.digikey.com → Account → Company Information "
+        "(поле Supplier GUID / API Supplier ID)."
     )
 
 
