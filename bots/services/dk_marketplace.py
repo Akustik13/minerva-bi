@@ -230,10 +230,6 @@ def publish_listing(listing) -> None:
     from bots.models import DigiKeyConfig
 
     config = DigiKeyConfig.get()
-    if not config.marketplace_supplier_id:
-        raise DKMarketplaceError(
-            "Marketplace Supplier UUID не вказано в DigiKey → Конфігурація"
-        )
     if not listing.dk_category_id:
         raise DKMarketplaceError("DK Category ID не заповнено")
     if not listing.dk_title:
