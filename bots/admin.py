@@ -1072,7 +1072,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'dk_product_id', 'dk_offer_id',
         'sync_status', 'last_synced_at', 'last_error',
         'created_at', 'updated_at',
-        'stock_qty_readonly', 'prices_widget',
+        'stock_qty_readonly',
     )
 
     fieldsets = (
@@ -1093,11 +1093,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             ),
         }),
         ('💰 Цінові тири', {
-            'fields': ('prices_widget', 'dk_prices'),
-            'description': (
-                'Формат JSON: <code>[{"qty": 1, "price": 11.99}, {"qty": 10, "price": 11.50}, ...]</code>. '
-                'Перший тир = MOQ. Максимум 9 тирів.'
-            ),
+            'fields': ('dk_prices',),
         }),
         ('📋 Обов\'язкові атрибути DigiKey', {
             'fields': (
@@ -1227,18 +1223,40 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
 
     def pull_product_view(self, request, pk):
-        from bots.services.dk_marketplace import pull_product_fields, DKMarketplaceError
+        from bots.services.dk_marketplace import (
+            pull_product_fields, fetch_product_by_sku, DKMarketplaceError
+        )
+        from bots.models import DigiKeyConfig
         listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
         try:
             changed = pull_product_fields(listing)
             if changed:
-                field_names = ', '.join(changed.keys())
-                messages.success(
-                    request,
-                    f"✅ Оновлено поля з DigiKey: {field_names}"
-                )
+                label_map = {
+                    'dk_title': 'Назва', 'dk_description': 'Опис',
+                    'dk_manufacturer': 'Виробник', 'dk_image_url': 'Фото',
+                    'dk_datasheet_url': 'Datasheet', 'dk_category_id': 'Category ID',
+                    'dk_packaging': 'Packaging', 'dk_lifecycle_status': 'Lifecycle',
+                }
+                updated = ', '.join(label_map.get(f, f) for f in changed)
+                messages.success(request, f"✅ Оновлено з DigiKey: {updated}")
             else:
-                messages.info(request, "ℹ️ Всі поля вже актуальні — DigiKey нічого нового не повернув.")
+                # Show what DigiKey actually returned for debugging
+                config = DigiKeyConfig.get()
+                prod = fetch_product_by_sku(config, listing.get_supplier_sku(),
+                                            listing.dk_product_id or '')
+                if prod:
+                    add_codes = [f.get('code') for f in prod.get('additionalFields', [])]
+                    messages.info(
+                        request,
+                        f"ℹ️ DigiKey повернув продукт, але всі поля вже актуальні. "
+                        f"Доступні additionalFields: {', '.join(add_codes) or '(порожньо)'}"
+                    )
+                else:
+                    messages.warning(
+                        request,
+                        f"⚠️ DigiKey не повернув продукт для SKU='{listing.get_supplier_sku()}'. "
+                        "Перевір чи співпадає Supplier SKU з PartNumber в DigiKey."
+                    )
         except DKMarketplaceError as exc:
             messages.error(request, f"❌ {exc}")
         except Exception as exc:

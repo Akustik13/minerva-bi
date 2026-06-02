@@ -46,125 +46,85 @@
   flex-wrap: wrap;
 }
 .dk-publish-btn {
-  background: #2e7d32 !important;
-  color: #fff !important;
-  font-weight: 600 !important;
-  padding: 8px 18px !important;
-  border-radius: 5px !important;
-  text-decoration: none !important;
-  font-size: 13px !important;
-  transition: background .15s;
+  background: #2e7d32 !important; color: #fff !important;
+  font-weight: 600 !important; padding: 8px 18px !important;
+  border-radius: 5px !important; text-decoration: none !important;
+  font-size: 13px !important; transition: background .15s;
 }
 .dk-publish-btn:hover { background: #388e3c !important; }
 .dk-sync-btn {
-  background: #1565c0 !important;
-  color: #fff !important;
-  font-weight: 500 !important;
-  padding: 8px 16px !important;
-  border-radius: 5px !important;
-  text-decoration: none !important;
-  font-size: 13px !important;
-  transition: background .15s;
+  background: #1565c0 !important; color: #fff !important;
+  font-weight: 500 !important; padding: 8px 16px !important;
+  border-radius: 5px !important; text-decoration: none !important;
+  font-size: 13px !important; transition: background .15s;
 }
 .dk-sync-btn:hover { background: #1976d2 !important; }
 .dk-pull-btn {
-  background: #00695c !important;
-  color: #fff !important;
-  font-weight: 500 !important;
-  padding: 8px 16px !important;
-  border-radius: 5px !important;
-  text-decoration: none !important;
-  font-size: 13px !important;
-  transition: background .15s;
+  background: #00695c !important; color: #fff !important;
+  font-weight: 500 !important; padding: 8px 16px !important;
+  border-radius: 5px !important; text-decoration: none !important;
+  font-size: 13px !important; transition: background .15s;
 }
 .dk-pull-btn:hover { background: #00897b !important; }
-.dk-error-note {
-  color: var(--err, #e53935);
-  font-size: 12px;
-  font-style: italic;
-  flex: 1;
-}
+.dk-error-note { color: var(--err, #e53935); font-size: 12px; font-style: italic; flex: 1; }
 
-/* Pricing JSON field — hidden, replaced by table */
-.field-dk_prices textarea {
-  display: none !important;
-}
+/* ── Price table ─────────────────────────────────────── */
+.dk-prices-wrap { margin: 4px 0 8px; }
 
-/* Required fields highlight */
-.dk-required-field .field-box,
-.dk-required-field > div {
-  position: relative;
-}
-.dk-required-mark {
-  display: inline-block;
-  background: #c62828;
-  color: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 3px;
-  margin-left: 6px;
-  vertical-align: middle;
-  letter-spacing: .3px;
-}
-.dk-required-empty input,
-.dk-required-empty textarea,
-.dk-required-empty select {
-  border-color: #c62828 !important;
-  box-shadow: 0 0 0 1px #c62828 !important;
-}
-
-/* ── Price table ─────────────────────────────────── */
-.dk-price-table-wrap {
-  margin-top: 6px;
-}
-.dk-price-table {
+.dk-prices-table {
   border-collapse: collapse;
   width: 100%;
-  max-width: 420px;
+  max-width: 380px;
   font-size: 13px;
 }
-.dk-price-table th {
+.dk-prices-table th {
   text-align: left;
-  padding: 5px 10px;
+  padding: 5px 12px;
   background: var(--bg-hover, #1e2d40);
   color: var(--text-muted, #9aafbe);
   font-weight: 600;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: .5px;
+  border-bottom: 2px solid var(--border-strong, #243347);
+}
+.dk-prices-table td {
+  padding: 3px 6px;
   border-bottom: 1px solid var(--border-strong, #243347);
 }
-.dk-price-table td {
-  padding: 4px 6px;
-  border-bottom: 1px solid var(--border-strong, #243347);
-}
-.dk-price-table input[type="number"] {
+.dk-prices-table input[type="number"] {
   width: 100%;
   background: var(--bg-input, #141f2b);
   color: var(--text, #c9d8e4);
   border: 1px solid var(--border-strong, #243347);
   border-radius: 3px;
-  padding: 4px 7px;
+  padding: 5px 8px;
   font-size: 13px;
   box-sizing: border-box;
 }
-.dk-price-table input[type="number"]:focus {
+.dk-prices-table input[type="number"]:focus {
   outline: none;
   border-color: var(--accent, #58a6ff);
+  box-shadow: 0 0 0 2px rgba(88,166,255,.2);
 }
-.dk-price-table .dk-del-row {
-  background: none;
-  border: none;
-  color: var(--err, #e53935);
-  cursor: pointer;
-  font-size: 16px;
-  padding: 0 4px;
-  line-height: 1;
+.dk-prices-table .dk-tier-num {
+  color: var(--text-dim, #607d8b);
+  font-size: 11px;
+  text-align: center;
+  width: 28px;
 }
-.dk-price-table .dk-del-row:hover { color: #ff5252; }
-.dk-add-row-btn {
-  margin-top: 8px;
+.dk-del-row {
+  background: none; border: none;
+  color: var(--text-dim, #607d8b);
+  cursor: pointer; font-size: 18px; padding: 0 6px;
+  line-height: 1; transition: color .1s;
+}
+.dk-del-row:hover { color: var(--err, #e53935); }
+.dk-prices-footer {
+  display: flex; align-items: center;
+  gap: 12px; margin-top: 8px;
+}
+.dk-add-btn {
   background: var(--bg-hover, #1e2d40);
   color: var(--text, #c9d8e4);
   border: 1px solid var(--border-strong, #243347);
@@ -174,100 +134,135 @@
   cursor: pointer;
   transition: background .15s;
 }
-.dk-add-row-btn:hover { background: var(--bg-card, #1a2535); }
-.dk-price-hint {
+.dk-add-btn:hover { background: var(--bg-card, #1a2535); }
+.dk-prices-hint {
   color: var(--text-muted, #9aafbe);
   font-size: 11px;
-  margin-top: 5px;
 }
-.dk-price-err {
+.dk-prices-err {
   color: var(--err, #e53935);
   font-size: 11px;
-  margin-top: 3px;
+  margin-top: 4px;
   display: none;
+}
+
+/* Hide raw JSONField textarea — replaced by table above */
+.field-dk_prices > .flex-container,
+.field-dk_prices textarea {
+  display: none !important;
+}
+/* But keep the form-row visible so our widget renders inside it */
+.field-dk_prices {
+  display: block !important;
+}
+
+/* Required fields */
+.dk-required-mark {
+  display: inline-block;
+  background: #c62828; color: #fff;
+  font-size: 10px; font-weight: 700;
+  padding: 1px 5px; border-radius: 3px;
+  margin-left: 6px; vertical-align: middle;
+  letter-spacing: .3px;
+}
+.dk-required-empty input,
+.dk-required-empty textarea,
+.dk-required-empty select {
+  border-color: #c62828 !important;
+  box-shadow: 0 0 0 1px #c62828 !important;
 }
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
 
-  // ── Price table ──────────────────────────────────────────────────────────
-  var ta = document.querySelector('[name="dk_prices"]');
-  if (ta) {
+  // ── Price table ────────────────────────────────────────────────────────
+  (function() {
+    // Find the dk_prices field container
+    var fieldRow = (
+      document.querySelector('.field-dk_prices') ||
+      document.querySelector('[data-field-name="dk_prices"]')
+    );
+    // Also try finding textarea directly
+    var ta = document.querySelector('[name="dk_prices"]');
+    if (!ta) return;
+
+    // Build widget
     var wrap = document.createElement('div');
-    wrap.className = 'dk-price-table-wrap';
+    wrap.className = 'dk-prices-wrap';
 
-    var table = document.createElement('table');
-    table.className = 'dk-price-table';
-    table.innerHTML =
-      '<thead><tr>' +
-      '<th style="width:130px">Кількість (шт.)</th>' +
-      '<th style="width:150px">Ціна (EUR)</th>' +
-      '<th style="width:36px"></th>' +
-      '</tr></thead>' +
-      '<tbody id="dk-price-tbody"></tbody>';
+    wrap.innerHTML =
+      '<table class="dk-prices-table">' +
+        '<thead><tr>' +
+          '<th style="width:28px">#</th>' +
+          '<th style="width:140px">Кількість (шт.)</th>' +
+          '<th style="width:150px">Ціна (EUR)</th>' +
+          '<th style="width:36px"></th>' +
+        '</tr></thead>' +
+        '<tbody class="dk-tbody"></tbody>' +
+      '</table>' +
+      '<div class="dk-prices-footer">' +
+        '<button type="button" class="dk-add-btn">+ Додати тир</button>' +
+        '<span class="dk-prices-hint">Перший тир = MOQ. Макс. 9 тирів.</span>' +
+      '</div>' +
+      '<div class="dk-prices-err" id="dk-prices-err"></div>';
 
-    var addBtn = document.createElement('button');
-    addBtn.type = 'button';
-    addBtn.className = 'dk-add-row-btn';
-    addBtn.textContent = '+ Додати тир';
+    // Insert widget right before the hidden textarea
+    ta.parentNode.insertBefore(wrap, ta);
 
-    var hint = document.createElement('p');
-    hint.className = 'dk-price-hint';
-    hint.textContent = 'Перший тир = мінімальне замовлення (MOQ). Максимум 9 тирів.';
+    var tbody  = wrap.querySelector('.dk-tbody');
+    var addBtn = wrap.querySelector('.dk-add-btn');
 
-    var errMsg = document.createElement('p');
-    errMsg.className = 'dk-price-err';
-    errMsg.id = 'dk-price-err';
-
-    wrap.appendChild(table);
-    wrap.appendChild(addBtn);
-    wrap.appendChild(hint);
-    wrap.appendChild(errMsg);
-
-    var fieldRow = ta.closest('.form-row') || ta.closest('div');
-    fieldRow.insertBefore(wrap, ta);
-
-    var tbody = document.getElementById('dk-price-tbody');
-
-    function addRow(qty, price) {
-      var tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td><input type="number" class="dk-qty" min="1" step="1" value="' + (qty||'') + '" placeholder="1"></td>' +
-        '<td><input type="number" class="dk-price" min="0" step="0.01" value="' + (price||'') + '" placeholder="0.00"></td>' +
-        '<td><button type="button" class="dk-del-row" title="Видалити">×</button></td>';
-      tr.querySelector('.dk-del-row').addEventListener('click', function() {
-        tr.remove();
-        syncJson();
+    function renumber() {
+      tbody.querySelectorAll('tr').forEach(function(tr, i) {
+        tr.querySelector('.dk-tier-num').textContent = i + 1;
       });
-      tr.querySelector('.dk-qty').addEventListener('input', syncJson);
-      tr.querySelector('.dk-price').addEventListener('input', syncJson);
-      tbody.appendChild(tr);
-      syncJson();
     }
 
     function syncJson() {
-      var rows = tbody.querySelectorAll('tr');
+      var rows  = tbody.querySelectorAll('tr');
       var tiers = [];
-      var ok = true;
+      var hasErr = false;
       rows.forEach(function(tr) {
-        var qty   = parseInt(tr.querySelector('.dk-qty').value, 10);
-        var price = parseFloat(tr.querySelector('.dk-price').value);
+        var qtyVal   = tr.querySelector('.dk-qty').value;
+        var priceVal = tr.querySelector('.dk-price').value;
+        var qty      = parseInt(qtyVal, 10);
+        var price    = parseFloat(priceVal);
         if (!isNaN(qty) && qty > 0 && !isNaN(price) && price >= 0) {
           tiers.push({qty: qty, price: price});
-        } else if (tr.querySelector('.dk-qty').value || tr.querySelector('.dk-price').value) {
-          ok = false;
+        } else if (qtyVal !== '' || priceVal !== '') {
+          hasErr = true;
         }
       });
       tiers.sort(function(a, b) { return a.qty - b.qty; });
       ta.value = JSON.stringify(tiers);
-      var err = document.getElementById('dk-price-err');
-      if (!ok) {
-        err.textContent = '⚠️ Заповни обидва поля (кількість і ціна) у кожному рядку.';
+      var err = document.getElementById('dk-prices-err');
+      if (hasErr) {
+        err.textContent = '⚠️ Заповни обидва поля в кожному рядку.';
         err.style.display = 'block';
       } else {
         err.style.display = 'none';
       }
+    }
+
+    function addRow(qty, price) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td class="dk-tier-num">?</td>' +
+        '<td><input type="number" class="dk-qty" min="1" step="1" value="' +
+          (qty !== undefined && qty !== '' ? qty : '') +
+          '" placeholder="1" autocomplete="off"></td>' +
+        '<td><input type="number" class="dk-price" min="0" step="0.0001" value="' +
+          (price !== undefined && price !== '' ? price : '') +
+          '" placeholder="0.0000" autocomplete="off"></td>' +
+        '<td><button type="button" class="dk-del-row" title="Видалити рядок">×</button></td>';
+      tr.querySelector('.dk-del-row').addEventListener('click', function() {
+        tr.remove(); renumber(); syncJson();
+      });
+      tr.querySelector('.dk-qty').addEventListener('input', syncJson);
+      tr.querySelector('.dk-price').addEventListener('input', syncJson);
+      tbody.appendChild(tr);
+      renumber();
     }
 
     addBtn.addEventListener('click', function() {
@@ -276,20 +271,26 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
       }
       addRow('', '');
+      tbody.lastElementChild.querySelector('.dk-qty').focus();
+      syncJson();
     });
 
-    // Load existing tiers from textarea
+    // Load existing tiers from hidden field
+    var existing = [];
     try {
-      var existing = JSON.parse(ta.value.trim() || '[]');
-      existing.forEach(function(t) { addRow(t.qty, t.price); });
+      var raw = ta.value.trim();
+      if (raw) existing = JSON.parse(raw);
     } catch(e) {}
 
-    if (tbody.querySelectorAll('tr').length === 0) {
-      addRow('1', '');
+    if (Array.isArray(existing) && existing.length) {
+      existing.forEach(function(t) { addRow(t.qty, t.price); });
+    } else {
+      addRow(1, '');
     }
-  }
+    syncJson();
+  })();
 
-  // ── Required field badges ─────────────────────────────────────────────────
+  // ── Required field badges ──────────────────────────────────────────────
   var REQUIRED = [
     'dk_category_id', 'dk_title', 'dk_description',
     'dk_packaging', 'dk_lifecycle_status', 'dk_prices'
@@ -300,7 +301,7 @@ document.addEventListener('DOMContentLoaded', function() {
     var row = el.closest('.form-row') || el.closest('div');
     if (!row) return;
     var label = row.querySelector('label');
-    if (label) {
+    if (label && !label.querySelector('.dk-required-mark')) {
       var badge = document.createElement('span');
       badge.className = 'dk-required-mark';
       badge.textContent = '★ обов\'язково';

@@ -556,27 +556,50 @@ def create_listings_from_offers() -> dict:
     return {'created': created, 'already_exists': already_exists_cnt, 'no_product': no_product}
 
 
-def fetch_product_by_sku(config, supplier_sku: str) -> dict | None:
-    """GET /products?PartNumber=SKU — returns first matching ProductExpanded dict or None."""
+def fetch_product_by_sku(config, supplier_sku: str,
+                         product_id: str = '') -> dict | None:
+    """Fetch ProductExpanded from DigiKey.
+
+    Primary:  GET /products?BusinessIds={product_id}  (if product_id provided)
+    Fallback: GET /products?PartNumber={supplier_sku}
+    Returns first matching dict or None.
+    """
     import requests as req
 
     token = get_marketplace_token(config)
-    resp  = req.get(
-        f"{_base_url(config)}{_PRODUCTS_BASE}/products",
-        params={'PartNumber': supplier_sku, 'Max': 1},
-        headers=_headers(config, token),
-        timeout=15,
-    )
-    try:
-        resp.raise_for_status()
-    except req.HTTPError as e:
-        body = {}
-        try: body = e.response.json()
-        except Exception: pass
-        raise DKMarketplaceError(f"fetch_product {e.response.status_code}: {body}") from e
 
-    products = resp.json().get('products', [])
-    return products[0] if products else None
+    for params in (
+        ({'BusinessIds': product_id, 'Max': 1} if product_id else None),
+        {'PartNumber': supplier_sku, 'Max': 5},
+    ):
+        if params is None:
+            continue
+        resp = req.get(
+            f"{_base_url(config)}{_PRODUCTS_BASE}/products",
+            params=params,
+            headers=_headers(config, token),
+            timeout=15,
+        )
+        try:
+            resp.raise_for_status()
+        except req.HTTPError as e:
+            body = {}
+            try: body = e.response.json()
+            except Exception: pass
+            raise DKMarketplaceError(f"fetch_product {e.response.status_code}: {body}") from e
+
+        products = resp.json().get('products', [])
+        if products:
+            # When searching by PartNumber, confirm exact match
+            if 'PartNumber' in params:
+                exact = [p for p in products if p.get('partNumber') == supplier_sku]
+                if exact:
+                    return exact[0]
+                # accept first result if no exact match (partial SKU)
+                return products[0]
+            return products[0]
+
+    return None
 
 
 def _additional_field_value(additional_fields: list, code: str) -> str:
@@ -592,35 +615,47 @@ def _additional_field_value(additional_fields: list, code: str) -> str:
 
 
 def pull_product_fields(listing) -> dict:
-    """Fetch product from DigiKey and update listing fields.
+    """Fetch product from DigiKey and overwrite listing fields with DigiKey values.
 
-    Pulls: dk_title, dk_description, dk_manufacturer, dk_image_url,
-           dk_datasheet_url, dk_category_id, dk_packaging, dk_lifecycle_status.
-    Only overwrites a field when DigiKey returned a non-empty value.
-    Returns dict of {field: new_value} for every field that changed.
+    Always overwrites fields that DigiKey returned as non-empty (explicit pull).
+    Correct max_length per model: title=50, description=2048, manufacturer=50.
+
+    Pulls:
+      dk_title, dk_description, dk_manufacturer, dk_image_url,
+      dk_datasheet_url, dk_category_id, dk_packaging, dk_lifecycle_status
+
+    Returns dict of {field: new_value} for every field that was updated.
     """
     from bots.models import DigiKeyConfig
 
-    config = DigiKeyConfig.get()
-    sku    = listing.get_supplier_sku()
-    prod   = fetch_product_by_sku(config, sku)
+    config     = DigiKeyConfig.get()
+    sku        = listing.get_supplier_sku()
+    product_id = listing.dk_product_id or ''
+    prod       = fetch_product_by_sku(config, sku, product_id)
 
     if not prod:
         raise DKMarketplaceError(
             f"Продукт з PartNumber='{sku}' не знайдено в DigiKey Products API."
         )
 
+    logger.info("DK pull_product_fields SKU=%s prod_id=%s raw_keys=%s",
+                sku, prod.get('_id'), list(prod.keys()))
+
     add_fields = prod.get('additionalFields', [])
     changed    = {}
 
-    def _set(field, value):
-        if value and getattr(listing, field) != value:
+    def _set(field, value, max_len=None):
+        if not value:
+            return
+        if max_len:
+            value = value[:max_len]
+        if getattr(listing, field) != value:
             setattr(listing, field, value)
             changed[field] = value
 
-    _set('dk_title',            (prod.get('title') or '')[:200])
-    _set('dk_description',      (prod.get('description') or '')[:500])
-    _set('dk_manufacturer',     (prod.get('manufacturer') or '')[:200])
+    _set('dk_title',            prod.get('title') or '',            max_len=50)
+    _set('dk_description',      prod.get('description') or '',      max_len=2048)
+    _set('dk_manufacturer',     prod.get('manufacturer') or '',     max_len=50)
     _set('dk_image_url',        prod.get('imageUrl') or '')
     _set('dk_category_id',      prod.get('categoryId') or '')
     _set('dk_datasheet_url',    _additional_field_value(add_fields, 'datasheetUrl'))
@@ -629,7 +664,9 @@ def pull_product_fields(listing) -> dict:
 
     if changed:
         listing.save(update_fields=list(changed.keys()))
-        logger.info("DK pull_product_fields SKU=%s updated=%s", sku, list(changed.keys()))
+        logger.info("DK pull_product_fields updated=%s", list(changed.keys()))
+    else:
+        logger.info("DK pull_product_fields SKU=%s nothing changed (all fields already match)", sku)
 
     return changed
 
