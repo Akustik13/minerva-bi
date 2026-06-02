@@ -556,6 +556,84 @@ def create_listings_from_offers() -> dict:
     return {'created': created, 'already_exists': already_exists_cnt, 'no_product': no_product}
 
 
+def fetch_product_by_sku(config, supplier_sku: str) -> dict | None:
+    """GET /products?PartNumber=SKU — returns first matching ProductExpanded dict or None."""
+    import requests as req
+
+    token = get_marketplace_token(config)
+    resp  = req.get(
+        f"{_base_url(config)}{_PRODUCTS_BASE}/products",
+        params={'PartNumber': supplier_sku, 'Max': 1},
+        headers=_headers(config, token),
+        timeout=15,
+    )
+    try:
+        resp.raise_for_status()
+    except req.HTTPError as e:
+        body = {}
+        try: body = e.response.json()
+        except Exception: pass
+        raise DKMarketplaceError(f"fetch_product {e.response.status_code}: {body}") from e
+
+    products = resp.json().get('products', [])
+    return products[0] if products else None
+
+
+def _additional_field_value(additional_fields: list, code: str) -> str:
+    """Extract value for a given code from additionalFields list."""
+    for f in additional_fields:
+        if f.get('code') == code:
+            val = f.get('value')
+            if isinstance(val, str):
+                return val
+            if isinstance(val, list):
+                return val[0] if val else ''
+    return ''
+
+
+def pull_product_fields(listing) -> dict:
+    """Fetch product from DigiKey and update listing fields.
+
+    Pulls: dk_title, dk_description, dk_manufacturer, dk_image_url,
+           dk_datasheet_url, dk_category_id, dk_packaging, dk_lifecycle_status.
+    Only overwrites a field when DigiKey returned a non-empty value.
+    Returns dict of {field: new_value} for every field that changed.
+    """
+    from bots.models import DigiKeyConfig
+
+    config = DigiKeyConfig.get()
+    sku    = listing.get_supplier_sku()
+    prod   = fetch_product_by_sku(config, sku)
+
+    if not prod:
+        raise DKMarketplaceError(
+            f"Продукт з PartNumber='{sku}' не знайдено в DigiKey Products API."
+        )
+
+    add_fields = prod.get('additionalFields', [])
+    changed    = {}
+
+    def _set(field, value):
+        if value and getattr(listing, field) != value:
+            setattr(listing, field, value)
+            changed[field] = value
+
+    _set('dk_title',            (prod.get('title') or '')[:200])
+    _set('dk_description',      (prod.get('description') or '')[:500])
+    _set('dk_manufacturer',     (prod.get('manufacturer') or '')[:200])
+    _set('dk_image_url',        prod.get('imageUrl') or '')
+    _set('dk_category_id',      prod.get('categoryId') or '')
+    _set('dk_datasheet_url',    _additional_field_value(add_fields, 'datasheetUrl'))
+    _set('dk_packaging',        _additional_field_value(add_fields, 'packaging'))
+    _set('dk_lifecycle_status', _additional_field_value(add_fields, 'productLifecycleStatus'))
+
+    if changed:
+        listing.save(update_fields=list(changed.keys()))
+        logger.info("DK pull_product_fields SKU=%s updated=%s", sku, list(changed.keys()))
+
+    return changed
+
+
 def fetch_custom_fields(config) -> list:
     """GET /custom/fields?Owner=Product — returns list of custom field defs with codes."""
     import requests as req

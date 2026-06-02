@@ -21,6 +21,10 @@
       📦 Оновити залишок
     </a>
     {% endif %}
+    <a href="{{ pull_product_url }}" class="button dk-pull-btn"
+       onclick="return confirm('Стягнути поля (назва, опис, зображення, упаковка, datasheet) з DigiKey Products API?')">
+      📥 Стягнути поля з DigiKey
+    </a>
     {% if original.sync_status == 'staged' %}
     <span class="dk-staged-note">⏳ Продукт надіслано на перевірку DigiKey. Після затвердження натисніть 📦 Створити Offer.</span>
     {% elif original.sync_status == 'error' and original.last_error %}
@@ -63,6 +67,17 @@
   transition: background .15s;
 }
 .dk-sync-btn:hover { background: #1976d2 !important; }
+.dk-pull-btn {
+  background: #00695c !important;
+  color: #fff !important;
+  font-weight: 500 !important;
+  padding: 8px 16px !important;
+  border-radius: 5px !important;
+  text-decoration: none !important;
+  font-size: 13px !important;
+  transition: background .15s;
+}
+.dk-pull-btn:hover { background: #00897b !important; }
 .dk-error-note {
   color: var(--err, #e53935);
   font-size: 12px;
@@ -70,11 +85,9 @@
   flex: 1;
 }
 
-/* Pricing JSON field help */
+/* Pricing JSON field — hidden, replaced by table */
 .field-dk_prices textarea {
-  font-family: monospace;
-  font-size: 12px;
-  min-height: 120px;
+  display: none !important;
 }
 
 /* Required fields highlight */
@@ -100,29 +113,183 @@
   border-color: #c62828 !important;
   box-shadow: 0 0 0 1px #c62828 !important;
 }
+
+/* ── Price table ─────────────────────────────────── */
+.dk-price-table-wrap {
+  margin-top: 6px;
+}
+.dk-price-table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 420px;
+  font-size: 13px;
+}
+.dk-price-table th {
+  text-align: left;
+  padding: 5px 10px;
+  background: var(--bg-hover, #1e2d40);
+  color: var(--text-muted, #9aafbe);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 1px solid var(--border-strong, #243347);
+}
+.dk-price-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-strong, #243347);
+}
+.dk-price-table input[type="number"] {
+  width: 100%;
+  background: var(--bg-input, #141f2b);
+  color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 3px;
+  padding: 4px 7px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.dk-price-table input[type="number"]:focus {
+  outline: none;
+  border-color: var(--accent, #58a6ff);
+}
+.dk-price-table .dk-del-row {
+  background: none;
+  border: none;
+  color: var(--err, #e53935);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 4px;
+  line-height: 1;
+}
+.dk-price-table .dk-del-row:hover { color: #ff5252; }
+.dk-add-row-btn {
+  margin-top: 8px;
+  background: var(--bg-hover, #1e2d40);
+  color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 4px;
+  padding: 5px 14px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.dk-add-row-btn:hover { background: var(--bg-card, #1a2535); }
+.dk-price-hint {
+  color: var(--text-muted, #9aafbe);
+  font-size: 11px;
+  margin-top: 5px;
+}
+.dk-price-err {
+  color: var(--err, #e53935);
+  font-size: 11px;
+  margin-top: 3px;
+  display: none;
+}
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // Pretty-print JSON in dk_prices textarea on load
+
+  // ── Price table ──────────────────────────────────────────────────────────
   var ta = document.querySelector('[name="dk_prices"]');
   if (ta) {
-    try {
-      var val = ta.value.trim();
-      if (val) ta.value = JSON.stringify(JSON.parse(val), null, 2);
-    } catch(e) {}
-    ta.addEventListener('blur', function() {
-      try {
-        var parsed = JSON.parse(ta.value.trim() || '[]');
-        ta.style.borderColor = '';
-        ta.value = JSON.stringify(parsed, null, 2);
-      } catch(e) {
-        ta.style.borderColor = 'var(--err, #e53935)';
+    var wrap = document.createElement('div');
+    wrap.className = 'dk-price-table-wrap';
+
+    var table = document.createElement('table');
+    table.className = 'dk-price-table';
+    table.innerHTML =
+      '<thead><tr>' +
+      '<th style="width:130px">Кількість (шт.)</th>' +
+      '<th style="width:150px">Ціна (EUR)</th>' +
+      '<th style="width:36px"></th>' +
+      '</tr></thead>' +
+      '<tbody id="dk-price-tbody"></tbody>';
+
+    var addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'dk-add-row-btn';
+    addBtn.textContent = '+ Додати тир';
+
+    var hint = document.createElement('p');
+    hint.className = 'dk-price-hint';
+    hint.textContent = 'Перший тир = мінімальне замовлення (MOQ). Максимум 9 тирів.';
+
+    var errMsg = document.createElement('p');
+    errMsg.className = 'dk-price-err';
+    errMsg.id = 'dk-price-err';
+
+    wrap.appendChild(table);
+    wrap.appendChild(addBtn);
+    wrap.appendChild(hint);
+    wrap.appendChild(errMsg);
+
+    var fieldRow = ta.closest('.form-row') || ta.closest('div');
+    fieldRow.insertBefore(wrap, ta);
+
+    var tbody = document.getElementById('dk-price-tbody');
+
+    function addRow(qty, price) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><input type="number" class="dk-qty" min="1" step="1" value="' + (qty||'') + '" placeholder="1"></td>' +
+        '<td><input type="number" class="dk-price" min="0" step="0.01" value="' + (price||'') + '" placeholder="0.00"></td>' +
+        '<td><button type="button" class="dk-del-row" title="Видалити">×</button></td>';
+      tr.querySelector('.dk-del-row').addEventListener('click', function() {
+        tr.remove();
+        syncJson();
+      });
+      tr.querySelector('.dk-qty').addEventListener('input', syncJson);
+      tr.querySelector('.dk-price').addEventListener('input', syncJson);
+      tbody.appendChild(tr);
+      syncJson();
+    }
+
+    function syncJson() {
+      var rows = tbody.querySelectorAll('tr');
+      var tiers = [];
+      var ok = true;
+      rows.forEach(function(tr) {
+        var qty   = parseInt(tr.querySelector('.dk-qty').value, 10);
+        var price = parseFloat(tr.querySelector('.dk-price').value);
+        if (!isNaN(qty) && qty > 0 && !isNaN(price) && price >= 0) {
+          tiers.push({qty: qty, price: price});
+        } else if (tr.querySelector('.dk-qty').value || tr.querySelector('.dk-price').value) {
+          ok = false;
+        }
+      });
+      tiers.sort(function(a, b) { return a.qty - b.qty; });
+      ta.value = JSON.stringify(tiers);
+      var err = document.getElementById('dk-price-err');
+      if (!ok) {
+        err.textContent = '⚠️ Заповни обидва поля (кількість і ціна) у кожному рядку.';
+        err.style.display = 'block';
+      } else {
+        err.style.display = 'none';
       }
+    }
+
+    addBtn.addEventListener('click', function() {
+      if (tbody.querySelectorAll('tr').length >= 9) {
+        alert('Максимум 9 цінових тирів.');
+        return;
+      }
+      addRow('', '');
     });
+
+    // Load existing tiers from textarea
+    try {
+      var existing = JSON.parse(ta.value.trim() || '[]');
+      existing.forEach(function(t) { addRow(t.qty, t.price); });
+    } catch(e) {}
+
+    if (tbody.querySelectorAll('tr').length === 0) {
+      addRow('1', '');
+    }
   }
 
-  // Mark required fields for publishing
+  // ── Required field badges ─────────────────────────────────────────────────
   var REQUIRED = [
     'dk_category_id', 'dk_title', 'dk_description',
     'dk_packaging', 'dk_lifecycle_status', 'dk_prices'
@@ -132,7 +299,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (!el) return;
     var row = el.closest('.form-row') || el.closest('div');
     if (!row) return;
-    // Add red badge next to label
     var label = row.querySelector('label');
     if (label) {
       var badge = document.createElement('span');
@@ -140,7 +306,6 @@ document.addEventListener('DOMContentLoaded', function() {
       badge.textContent = '★ обов\'язково';
       label.appendChild(badge);
     }
-    // Highlight if empty
     function checkEmpty() {
       var empty = !el.value || el.value.trim() === '' || el.value.trim() === '[]';
       row.classList.toggle('dk-required-empty', empty);

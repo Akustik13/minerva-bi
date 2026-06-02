@@ -1146,6 +1146,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['create_offer_url'] = reverse(
                 'admin:bots_digikeylisting_create_offer', args=[object_id]
             )
+            extra_context['pull_product_url'] = reverse(
+                'admin:bots_digikeylisting_pull_product', args=[object_id]
+            )
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     def get_urls(self):
@@ -1160,6 +1163,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/create-offer/',
                  self.admin_site.admin_view(self.create_offer_view),
                  name='bots_digikeylisting_create_offer'),
+            path('<int:pk>/pull-product/',
+                 self.admin_site.admin_view(self.pull_product_view),
+                 name='bots_digikeylisting_pull_product'),
         ]
         return custom + urls
 
@@ -1210,6 +1216,25 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             )
         except DKMarketplaceError as exc:
             messages.error(request, f"❌ Помилка створення Offer: {exc}")
+        except Exception as exc:
+            messages.error(request, f"❌ Помилка: {exc}")
+        return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
+
+    def pull_product_view(self, request, pk):
+        from bots.services.dk_marketplace import pull_product_fields, DKMarketplaceError
+        listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+        try:
+            changed = pull_product_fields(listing)
+            if changed:
+                field_names = ', '.join(changed.keys())
+                messages.success(
+                    request,
+                    f"✅ Оновлено поля з DigiKey: {field_names}"
+                )
+            else:
+                messages.info(request, "ℹ️ Всі поля вже актуальні — DigiKey нічого нового не повернув.")
+        except DKMarketplaceError as exc:
+            messages.error(request, f"❌ {exc}")
         except Exception as exc:
             messages.error(request, f"❌ Помилка: {exc}")
         return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
