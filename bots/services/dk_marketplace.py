@@ -115,7 +115,7 @@ def upsert_product(config, listing) -> str:
     else:
         additional_fields = []
 
-    payload = {
+    product = {
         "supplierId":       config.marketplace_supplier_id,
         "partNumber":       listing.get_supplier_sku(),
         "categoryId":       listing.dk_category_id,
@@ -125,7 +125,9 @@ def upsert_product(config, listing) -> str:
         "additionalFields": additional_fields,
     }
     if listing.dk_product_id:
-        payload["existingProductId"] = listing.dk_product_id
+        product["existingProductId"] = listing.dk_product_id
+
+    payload = {"product": product}
 
     logger.info("DK upsert_product SKU=%s payload=%s", listing.get_supplier_sku(), payload)
     resp = req.post(url, json=payload, headers=_headers(config, token), timeout=30)
