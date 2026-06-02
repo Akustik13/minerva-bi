@@ -1,0 +1,139 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Масова зміна цін — DigiKey лістинги{% endblock %}
+
+{% block content %}
+<h1>💰 Масова зміна цін</h1>
+<p style="color:var(--text-muted);margin-bottom:16px">
+  Нові цінові тири будуть застосовані до <strong>{{ count }} лістингів</strong>:
+  <span style="font-size:12px;color:var(--text-dim)">{{ skus }}</span>
+</p>
+
+<form method="post">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="action_bulk_prices">
+  <input type="hidden" name="apply" value="1">
+  {% for pk in pks %}
+  <input type="hidden" name="_selected_action" value="{{ pk }}">
+  {% endfor %}
+
+  <!-- Price table -->
+  <div class="dk-price-table-wrap" style="margin-bottom:20px">
+    <table class="dk-price-table">
+      <thead><tr>
+        <th style="width:160px">Кількість (шт.)</th>
+        <th style="width:180px">Ціна (EUR)</th>
+        <th style="width:40px"></th>
+      </tr></thead>
+      <tbody id="dk-price-tbody"></tbody>
+    </table>
+    <button type="button" class="dk-add-row-btn" id="dk-add-row">+ Додати тир</button>
+    <p class="dk-price-hint">Перший тир = мінімальне замовлення (MOQ). Максимум 9 тирів.</p>
+    <p class="dk-price-err" id="dk-price-err" style="display:none"></p>
+    <!-- hidden JSON field -->
+    <input type="hidden" name="bulk_prices_json" id="bulk_prices_json" value="[]">
+  </div>
+
+  <div style="margin-bottom:20px">
+    <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px">
+      <input type="checkbox" name="push_to_dk" value="1" checked style="width:16px;height:16px">
+      Оновити на DigiKey одразу (тільки лістинги з Offer ID)
+    </label>
+  </div>
+
+  <div class="submit-row" style="background:var(--bg-card,#1a2535);padding:12px 16px;border-radius:5px;display:flex;gap:12px;align-items:center">
+    <button type="submit" class="button default" id="dk-apply-btn">
+      ✅ Застосувати до {{ count }} лістингів
+    </button>
+    <a href="../" style="color:var(--text-muted);font-size:13px">Скасувати</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.dk-price-table { border-collapse:collapse; width:100%; max-width:440px; font-size:13px; }
+.dk-price-table th {
+  text-align:left; padding:5px 10px;
+  background:var(--bg-hover,#1e2d40); color:var(--text-muted,#9aafbe);
+  font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.5px;
+  border-bottom:1px solid var(--border-strong,#243347);
+}
+.dk-price-table td { padding:4px 6px; border-bottom:1px solid var(--border-strong,#243347); }
+.dk-price-table input[type="number"] {
+  width:100%; background:var(--bg-input,#141f2b); color:var(--text,#c9d8e4);
+  border:1px solid var(--border-strong,#243347); border-radius:3px;
+  padding:4px 7px; font-size:13px; box-sizing:border-box;
+}
+.dk-price-table input[type="number"]:focus { outline:none; border-color:var(--accent,#58a6ff); }
+.dk-del-row { background:none; border:none; color:var(--err,#e53935); cursor:pointer; font-size:16px; padding:0 4px; }
+.dk-del-row:hover { color:#ff5252; }
+.dk-add-row-btn {
+  margin-top:8px; background:var(--bg-hover,#1e2d40); color:var(--text,#c9d8e4);
+  border:1px solid var(--border-strong,#243347); border-radius:4px;
+  padding:5px 14px; font-size:12px; cursor:pointer;
+}
+.dk-add-row-btn:hover { background:var(--bg-card,#1a2535); }
+.dk-price-hint { color:var(--text-muted,#9aafbe); font-size:11px; margin-top:5px; }
+.dk-price-err { color:var(--err,#e53935); font-size:11px; margin-top:3px; }
+</style>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var tbody  = document.getElementById('dk-price-tbody');
+  var addBtn = document.getElementById('dk-add-row');
+  var jsonIn = document.getElementById('bulk_prices_json');
+
+  function syncJson() {
+    var rows = tbody.querySelectorAll('tr');
+    var tiers = [], ok = true;
+    rows.forEach(function(tr) {
+      var qty   = parseInt(tr.querySelector('.dk-qty').value, 10);
+      var price = parseFloat(tr.querySelector('.dk-price').value);
+      if (!isNaN(qty) && qty > 0 && !isNaN(price) && price >= 0) {
+        tiers.push({qty: qty, price: price});
+      } else if (tr.querySelector('.dk-qty').value || tr.querySelector('.dk-price').value) {
+        ok = false;
+      }
+    });
+    tiers.sort(function(a, b) { return a.qty - b.qty; });
+    jsonIn.value = JSON.stringify(tiers);
+    var err = document.getElementById('dk-price-err');
+    if (!ok) {
+      err.textContent = '⚠️ Заповни обидва поля в кожному рядку.';
+      err.style.display = 'block';
+    } else { err.style.display = 'none'; }
+  }
+
+  function addRow(qty, price) {
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="number" class="dk-qty" min="1" step="1" value="' + (qty||'') + '" placeholder="1"></td>' +
+      '<td><input type="number" class="dk-price" min="0" step="0.01" value="' + (price||'') + '" placeholder="0.00"></td>' +
+      '<td><button type="button" class="dk-del-row" title="Видалити">×</button></td>';
+    tr.querySelector('.dk-del-row').addEventListener('click', function() { tr.remove(); syncJson(); });
+    tr.querySelector('.dk-qty').addEventListener('input', syncJson);
+    tr.querySelector('.dk-price').addEventListener('input', syncJson);
+    tbody.appendChild(tr);
+    syncJson();
+  }
+
+  addBtn.addEventListener('click', function() {
+    if (tbody.querySelectorAll('tr').length >= 9) { alert('Максимум 9 тирів.'); return; }
+    addRow('', '');
+  });
+
+  // Validate before submit
+  document.querySelector('form').addEventListener('submit', function(e) {
+    var tiers = JSON.parse(jsonIn.value || '[]');
+    if (!tiers.length) {
+      e.preventDefault();
+      alert('Додай хоча б один ціновий тир перед застосуванням.');
+    }
+  });
+
+  addRow('1', '');
+});
+</script>
+{% endblock %}

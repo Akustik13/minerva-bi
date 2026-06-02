@@ -1059,7 +1059,13 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     list_filter    = ('sync_status', 'category_type', 'dk_is_active')
     search_fields  = ('product__sku', 'dk_title', 'dk_supplier_sku')
     autocomplete_fields = ('product',)
-    actions        = ['action_sync_qty']
+    actions        = [
+        'action_sync_qty',
+        'action_bulk_publish',
+        'action_bulk_activate',
+        'action_bulk_deactivate',
+        'action_bulk_prices',
+    ]
     save_as        = True
 
     readonly_fields = (
@@ -1256,6 +1262,111 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             self.message_user(request, f"✅ Оновлено залишки для {ok} лістингів.", messages.SUCCESS)
         if err:
             self.message_user(request, f"⚠️ Помилки для {err} лістингів (перевір Last Error).", messages.WARNING)
+
+    @admin.action(description='🚀 Опублікувати / Оновити на DigiKey')
+    def action_bulk_publish(self, request, queryset):
+        from bots.services.dk_marketplace import publish_listing, DKMarketplaceError
+        ok = err = 0
+        for listing in queryset.select_related('product'):
+            try:
+                publish_listing(listing)
+                ok += 1
+            except Exception as exc:
+                listing.sync_status = DigiKeyListing.SYNC_ERROR
+                listing.last_error  = str(exc)
+                listing.save(update_fields=['sync_status', 'last_error'])
+                logger.warning("bulk_publish failed %s: %s", listing.product.sku, exc)
+                err += 1
+        if ok:
+            self.message_user(request, f"✅ Опубліковано / оновлено {ok} лістингів на DigiKey.", messages.SUCCESS)
+        if err:
+            self.message_user(request, f"⚠️ Помилки для {err} лістингів — перевір Last Error.", messages.WARNING)
+
+    @admin.action(description='✅ Активувати на DigiKey (dk_is_active=True)')
+    def action_bulk_activate(self, request, queryset):
+        self._bulk_set_active(request, queryset, active=True)
+
+    @admin.action(description='❌ Деактивувати на DigiKey (dk_is_active=False)')
+    def action_bulk_deactivate(self, request, queryset):
+        self._bulk_set_active(request, queryset, active=False)
+
+    def _bulk_set_active(self, request, queryset, active: bool):
+        from bots.services.dk_marketplace import update_offer, DKMarketplaceError
+        from bots.models import DigiKeyConfig
+        label = "активовано" if active else "деактивовано"
+        queryset.update(dk_is_active=active)
+        pushed = err = 0
+        config = DigiKeyConfig.get()
+        for listing in queryset.filter(dk_offer_id__gt='').select_related('product'):
+            try:
+                update_offer(config, listing)
+                pushed += 1
+            except Exception as exc:
+                logger.warning("bulk_active failed %s: %s", listing.product.sku, exc)
+                err += 1
+        msg = f"✅ {queryset.count()} лістингів {label} локально"
+        if pushed:
+            msg += f", {pushed} оновлено на DigiKey"
+        self.message_user(request, msg + ".", messages.SUCCESS)
+        if err:
+            self.message_user(request, f"⚠️ Не вдалося оновити на DigiKey: {err} лістингів.", messages.WARNING)
+
+    @admin.action(description='💰 Змінити ціни (масово)')
+    def action_bulk_prices(self, request, queryset):
+        import json
+        from django.template.response import TemplateResponse
+        from bots.services.dk_marketplace import update_offer, DKMarketplaceError
+        from bots.models import DigiKeyConfig
+
+        if 'apply' in request.POST:
+            raw = request.POST.get('bulk_prices_json', '[]')
+            try:
+                tiers = json.loads(raw)
+                if not tiers:
+                    raise ValueError("empty")
+            except (ValueError, TypeError):
+                self.message_user(request, "❌ Невалідний JSON цін.", messages.ERROR)
+                return
+
+            prices_json = json.dumps(tiers)
+            push_to_dk  = request.POST.get('push_to_dk') == '1'
+            updated = pushed = err = 0
+
+            for listing in queryset.select_related('product'):
+                listing.dk_prices = prices_json
+                listing.save(update_fields=['dk_prices'])
+                updated += 1
+                if push_to_dk and listing.dk_offer_id:
+                    try:
+                        config = DigiKeyConfig.get()
+                        update_offer(config, listing)
+                        pushed += 1
+                    except Exception as exc:
+                        logger.warning("bulk_prices push failed %s: %s", listing.product.sku, exc)
+                        err += 1
+
+            msg = f"✅ Ціни оновлено для {updated} лістингів"
+            if pushed:
+                msg += f", {pushed} оновлено на DigiKey"
+            self.message_user(request, msg + ".", messages.SUCCESS)
+            if err:
+                self.message_user(request, f"⚠️ Не вдалося оновити на DigiKey: {err} лістингів.", messages.WARNING)
+            return
+
+        # Render intermediate form
+        skus = ", ".join(
+            queryset.select_related('product').values_list('product__sku', flat=True)[:20]
+        )
+        if queryset.count() > 20:
+            skus += f" … і ще {queryset.count() - 20}"
+
+        return TemplateResponse(request, 'admin/bots/digikeylisting/bulk_prices.html', {
+            'title':   'Масова зміна цін',
+            'count':   queryset.count(),
+            'skus':    skus,
+            'pks':     list(queryset.values_list('pk', flat=True)),
+            'opts':    self.model._meta,
+        })
 
     # ── Display helpers ───────────────────────────────────────────────────────
 
