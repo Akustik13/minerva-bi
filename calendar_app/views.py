@@ -28,7 +28,7 @@ def _event_display(ev, custom_cats_map):
     if ev.custom_category_id and ev.custom_category_id in custom_cats_map:
         cat = custom_cats_map[ev.custom_category_id]
         ev.display_color    = cat.color
-        ev.display_type_key = f'cat_{cat.pk}'
+        ev.display_type_key = f'cat_{cat.id}'
         ev.display_label    = f'{cat.emoji} {cat.name}'
     else:
         ev.display_color    = EVENT_COLORS.get(ev.event_type, '#607d8b')
