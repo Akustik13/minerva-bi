@@ -276,5 +276,27 @@ def sync_quantity(listing) -> None:
     listing.save(update_fields=['last_synced_at', 'last_error'])
 
 
+def fetch_supplier_uuid(config) -> str:
+    """Call DigiKey Marketplace API to retrieve the supplier's UUID."""
+    import requests as req
+    token = get_marketplace_token(config)
+    url   = f"{_base_url(config)}{_PRODUCTS_BASE}/suppliers/me"
+    resp  = req.get(url, headers=_headers(config, token), timeout=15)
+    try:
+        resp.raise_for_status()
+    except req.HTTPError as e:
+        body = {}
+        try: body = e.response.json()
+        except Exception: pass
+        raise DKMarketplaceError(
+            f"fetch_supplier_uuid {e.response.status_code}: {body}"
+        ) from e
+    data = resp.json()
+    # API may return supplierId / id / _id / supplierGuid
+    uid = (data.get('supplierId') or data.get('supplierGuid')
+           or data.get('id') or data.get('_id') or '')
+    return str(uid)
+
+
 # Import model reference after definition to avoid circular import
 from bots.models import DigiKeyListing  # noqa: E402

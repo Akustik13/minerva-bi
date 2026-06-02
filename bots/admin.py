@@ -243,6 +243,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.api_log_download_view),
                 name="bots_digikeyconfig_api_log_download",
             ),
+            path(
+                "fetch-supplier-uuid/",
+                self.admin_site.admin_view(self.fetch_supplier_uuid_view),
+                name="bots_digikeyconfig_fetch_supplier_uuid",
+            ),
         ]
         return custom + urls
 
@@ -777,6 +782,31 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
+    def fetch_supplier_uuid_view(self, request):
+        """Fetch Supplier UUID/GUID from DigiKey Marketplace API and display it."""
+        from bots.models import DigiKeyConfig
+        from bots.services.dk_marketplace import fetch_supplier_uuid, DKMarketplaceError
+        config = DigiKeyConfig.get()
+        try:
+            uid = fetch_supplier_uuid(config)
+            if uid:
+                self.message_user(
+                    request,
+                    f'✅ Supplier UUID: {uid}  — скопіюй в поле "Marketplace Vendor ID" вище.',
+                    level='success',
+                )
+            else:
+                self.message_user(
+                    request,
+                    '⚠️ UUID не знайдено у відповіді API. Перевір відповідь у API Лог.',
+                    level='warning',
+                )
+        except DKMarketplaceError as e:
+            self.message_user(request, f'❌ {e}', level='error')
+        except Exception as e:
+            self.message_user(request, f'❌ Помилка: {e}', level='error')
+        return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
+
     # ── Readonly display fields ───────────────────────────────────────────────
 
     def action_buttons(self, obj):
@@ -790,6 +820,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         mkorders_url   = reverse("admin:bots_digikeyconfig_marketplace_orders")
         reconcile_url  = reverse("admin:bots_digikeyconfig_reconcile")
         log_url        = reverse("admin:bots_digikeyconfig_api_log")
+        supplier_uuid_url = reverse("admin:bots_digikeyconfig_fetch_supplier_uuid")
 
         authorized     = bool(obj and obj.marketplace_refresh_token)
         auth_label     = "✅ Marketplace авторизовано" if authorized else "🔑 Авторизувати Marketplace"
@@ -809,6 +840,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             '<a href="{}" style="background:#1565c0;{}">📋 Marketplace замовлення</a>'
             '<a href="{}" style="background:#2e7d32;{}">🔄 Синхронізувати</a>'
             '<a href="{}" style="background:#f57c00;{}">🔍 Звірити з DigiKey</a>'
+            '<a href="{}" style="background:#00838f;{}">🪪 Отримати Supplier UUID</a>'
             '</div>',
             test_url, s,
             clear_url, s,
@@ -820,6 +852,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             mkorders_url, s,
             sync_url, s,
             reconcile_url, s,
+            supplier_uuid_url, s,
         )
     action_buttons.short_description = "Дії"
 
