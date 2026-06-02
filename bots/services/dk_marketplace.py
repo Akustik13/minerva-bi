@@ -115,7 +115,15 @@ def upsert_product(config, listing) -> str:
     else:
         additional_fields = []
 
-    product = {
+    if not config.marketplace_supplier_id:
+        raise DKMarketplaceError(
+            "Marketplace Vendor UUID не вказано. "
+            "Натисни 🪪 Отримати Supplier UUID щоб знайти його автоматично, "
+            "або зайди supplier.digikey.com → Account → Company Profile."
+        )
+
+    payload = {
+        "supplierId":       config.marketplace_supplier_id,
         "partNumber":       listing.get_supplier_sku(),
         "categoryId":       listing.dk_category_id,
         "description":      listing.dk_description,
@@ -123,12 +131,8 @@ def upsert_product(config, listing) -> str:
         "imageUrl":         listing.dk_image_url or "",
         "additionalFields": additional_fields,
     }
-    if config.marketplace_supplier_id:
-        product["supplierId"] = config.marketplace_supplier_id
     if listing.dk_product_id:
-        product["existingProductId"] = listing.dk_product_id
-
-    payload = {"product": product}
+        payload["existingProductId"] = listing.dk_product_id
 
     logger.info("DK upsert_product SKU=%s payload=%s", listing.get_supplier_sku(), payload)
     resp = req.post(url, json=payload, headers=_headers(config, token), timeout=30)
@@ -273,24 +277,49 @@ def sync_quantity(listing) -> None:
     listing.save(update_fields=['last_synced_at', 'last_error'])
 
 
-def fetch_supplier_uuid(config) -> dict:
-    """Decode marketplace JWT token to extract supplier UUID from claims.
-    Returns dict with all token claims for inspection."""
-    import base64
-    import json as _json
+def fetch_supplier_uuid(config) -> str:
+    """Try to find supplier UUID by calling GET /products with supplier name filter.
+    Returns UUID string if found, raises DKMarketplaceError otherwise."""
+    import requests as req
 
     token = get_marketplace_token(config)
 
-    # JWT = header.payload.signature — decode middle part (base64url, no verify)
+    # Use account_id (company name / partial match) as SupplierName filter
+    supplier_name = config.account_id or ''
+    url = f"{_base_url(config)}{_PRODUCTS_BASE}/products"
+    params = {'Max': 5}
+    if supplier_name:
+        params['SupplierName'] = supplier_name
+
+    resp = req.get(url, params=params, headers=_headers(config, token), timeout=15)
     try:
-        parts = token.split('.')
-        if len(parts) < 2:
-            return {'raw_token_preview': token[:40] + '...', 'error': 'Not a JWT'}
-        padding = parts[1] + '=' * (4 - len(parts[1]) % 4)
-        claims = _json.loads(base64.urlsafe_b64decode(padding).decode('utf-8', errors='replace'))
-        return claims
-    except Exception as e:
-        return {'error': str(e), 'raw_token_preview': token[:60] + '...'}
+        resp.raise_for_status()
+    except req.HTTPError as e:
+        body = {}
+        try: body = e.response.json()
+        except Exception: pass
+        raise DKMarketplaceError(f"GET /products {e.response.status_code}: {body}") from e
+
+    data = resp.json()
+    products = data.get('products', [])
+
+    # Extract all unique supplier UUIDs from authorizedSuppliersList
+    uuids = {}
+    for p in products:
+        for sup in p.get('authorizedSuppliersList', []):
+            uid = sup.get('id', '')
+            name = sup.get('name', '')
+            if uid:
+                uuids[uid] = name
+
+    if uuids:
+        return uuids  # dict {uuid: name}
+
+    raise DKMarketplaceError(
+        f"Не знайдено товарів на DigiKey для постачальника '{supplier_name}'. "
+        "UUID знаходиться в DigiKey Supplier Portal → supplier.digikey.com → "
+        "Account Settings → Company Information (поле Supplier GUID або ID)."
+    )
 
 
 # Import model reference after definition to avoid circular import

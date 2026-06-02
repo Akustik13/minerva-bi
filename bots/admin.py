@@ -789,17 +789,13 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         from django.utils.html import format_html
         config = DigiKeyConfig.get()
         try:
-            claims = fetch_supplier_uuid(config)
-            # Look for likely UUID fields
-            uuid_candidates = {k: v for k, v in claims.items()
-                               if any(x in k.lower() for x in ('supplier', 'guid', 'uuid', 'sub', 'id'))}
-            if uuid_candidates:
-                parts = ' | '.join(f'{k}: {v}' for k, v in uuid_candidates.items())
-                self.message_user(request,
-                    f'🪪 JWT claims (можливі UUID поля): {parts}', level='success')
-            all_claims = ' | '.join(f'{k}: {v}' for k, v in claims.items())
-            self.message_user(request,
-                f'📋 Всі JWT claims: {all_claims}', level='info')
+            uuids = fetch_supplier_uuid(config)
+            if isinstance(uuids, dict):
+                for uid, name in uuids.items():
+                    self.message_user(request,
+                        f'✅ Supplier UUID: {uid}  (назва: {name or "—"}) — '
+                        f'скопіюй в поле "Marketplace Vendor ID" вище.',
+                        level='success')
         except DKMarketplaceError as e:
             self.message_user(request, f'❌ {e}', level='error')
         except Exception as e:
