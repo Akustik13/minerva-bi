@@ -229,21 +229,15 @@ class DigiKeyListing(models.Model):
     fa_height_max     = models.CharField('Height Max (966)',      max_length=100, blank=True, default='',
                                           help_text='напр. "0.063\\" (1.60mm)"')
 
-    # ── Required product attributes ───────────────────────────────────────────
+    # ── Required product attributes (codes hardcoded from Custom Fields API) ───
     dk_packaging        = models.CharField(
         'Packaging', max_length=100, blank=True, default='',
-        help_text='напр. "Tape & Reel (TR)", "Cut Tape (CT)", "Bulk". '
-                  'Обов\'язково для DigiKey PIM. Код атрибута — знайди через кнопку 📋 Custom Fields.')
+        help_text='Обов\'язково. Значення: Tape & Reel (TR) / Cut Tape (CT) / Bulk / Digi-Reel®. '
+                  'Код атрибута DigiKey: "packaging"')
     dk_lifecycle_status = models.CharField(
         'Product Life Cycle Status', max_length=100, blank=True, default='Active',
-        help_text='напр. "Active", "Obsolete", "Last Time Buy". '
-                  'Обов\'язково для DigiKey PIM. Код атрибута — знайди через кнопку 📋 Custom Fields.')
-    dk_packaging_code   = models.CharField(
-        'Packaging attr code', max_length=20, blank=True, default='',
-        help_text='Код атрибута "Packaging" з DigiKey Custom Fields API (напр. "7")')
-    dk_lifecycle_code   = models.CharField(
-        'Lifecycle attr code', max_length=20, blank=True, default='',
-        help_text='Код атрибута "Product Life Cycle Status" з DigiKey Custom Fields API')
+        help_text='Обов\'язково. Значення: Active / Obsolete / Last Time Buy / Not For New Design. '
+                  'Код атрибута DigiKey: "productLifecycleStatus"')
 
     # ── Sync status ────────────────────────────────────────────────────────────
     sync_status    = models.CharField('Статус', max_length=20,
@@ -284,10 +278,10 @@ class DigiKeyListing(models.Model):
     def get_common_attributes_api(self):
         """Common required attributes: Packaging + Product Life Cycle Status."""
         attrs = []
-        if self.dk_packaging and self.dk_packaging_code:
-            attrs.append({"code": self.dk_packaging_code, "type": "String", "value": self.dk_packaging})
-        if self.dk_lifecycle_status and self.dk_lifecycle_code:
-            attrs.append({"code": self.dk_lifecycle_code, "type": "String", "value": self.dk_lifecycle_status})
+        if self.dk_packaging:
+            attrs.append({"code": "packaging", "type": "String", "value": self.dk_packaging})
+        if self.dk_lifecycle_status:
+            attrs.append({"code": "productLifecycleStatus", "type": "String", "value": self.dk_lifecycle_status})
         return attrs
 
     def get_filter_attributes_api(self):

@@ -1016,8 +1016,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         }),
         ('📋 Обов\'язкові атрибути DigiKey', {
             'fields': (
-                'dk_packaging', 'dk_packaging_code',
-                'dk_lifecycle_status', 'dk_lifecycle_code',
+                'dk_packaging',
+                'dk_lifecycle_status',
             ),
             'description': (
                 'Коди атрибутів знайди через кнопку <b>📋 Custom Fields</b> в '
