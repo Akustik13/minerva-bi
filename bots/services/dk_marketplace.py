@@ -479,6 +479,83 @@ def import_offers_from_dk() -> dict:
     return {'updated': updated, 'not_found': not_found}
 
 
+def create_listings_from_offers() -> dict:
+    """Create DigiKeyListing records for DigiKey offers that have no listing in Minerva.
+
+    For each unmatched offer:
+      - Looks up Product by sku == offer.supplierSku
+      - If found and no listing exists: creates DigiKeyListing with offer data pre-filled
+      - sync_status = published (offer already live on DigiKey)
+
+    Returns: {created: N, already_exists: M, no_product: [sku, ...]}
+    """
+    import json
+    from django.db import models as _m
+    from django.utils import timezone
+    from bots.models import DigiKeyConfig, DigiKeyListing
+
+    try:
+        from inventory.models import Product
+    except ImportError:
+        raise DKMarketplaceError("inventory.Product модель не знайдена")
+
+    config = DigiKeyConfig.get()
+    offers = fetch_offers(config)
+
+    created: int       = 0
+    already_exists_cnt = 0
+    no_product: list   = []
+
+    for offer in offers:
+        sku = offer.get('supplierSku', '')
+        if not sku:
+            continue
+
+        # Skip if a listing already covers this offer (by dk_supplier_sku or product.sku)
+        if DigiKeyListing.objects.filter(
+            _m.Q(dk_supplier_sku=sku) | _m.Q(product__sku=sku)
+        ).exists():
+            already_exists_cnt += 1
+            continue
+
+        # Find product in inventory
+        try:
+            product = Product.objects.get(sku=sku)
+        except Product.DoesNotExist:
+            no_product.append(sku)
+            continue
+        except Product.MultipleObjectsReturned:
+            no_product.append(f"{sku} (дублі SKU)")
+            continue
+
+        raw_prices = offer.get('prices', [])
+        prices_json = json.dumps([
+            {'qty': p['quantityBreak'], 'price': float(p['price'])}
+            for p in raw_prices
+        ]) if raw_prices else '[]'
+
+        DigiKeyListing.objects.create(
+            product          = product,
+            dk_supplier_sku  = sku,
+            dk_offer_id      = offer.get('id', ''),
+            dk_product_id    = offer.get('productId', ''),
+            dk_title         = (offer.get('title') or '')[:200],
+            dk_description   = (offer.get('description') or '')[:500],
+            dk_is_active     = bool(offer.get('isActive', True)),
+            dk_min_order_qty = max(1, int(offer.get('minOrderQuantity') or 1)),
+            dk_lead_time_days= int(offer.get('leadTimeToShip') or 0),
+            dk_qty_alert     = int(offer.get('minQuantityAlert') or 0),
+            dk_prices        = prices_json,
+            sync_status      = DigiKeyListing.SYNC_PUBLISHED,
+            last_synced_at   = timezone.now(),
+        )
+        created += 1
+
+    logger.info("DK create_listings created=%d already=%d no_product=%d",
+                created, already_exists_cnt, len(no_product))
+    return {'created': created, 'already_exists': already_exists_cnt, 'no_product': no_product}
+
+
 def fetch_custom_fields(config) -> list:
     """GET /custom/fields?Owner=Product — returns list of custom field defs with codes."""
     import requests as req

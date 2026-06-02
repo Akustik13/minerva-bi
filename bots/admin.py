@@ -258,6 +258,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.import_offers_view),
                 name="bots_digikeyconfig_import_offers",
             ),
+            path(
+                "create-listings/",
+                self.admin_site.admin_view(self.create_listings_view),
+                name="bots_digikeyconfig_create_listings",
+            ),
         ]
         return custom + urls
 
@@ -866,6 +871,40 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             self.message_user(request, f"❌ Помилка: {exc}", messages.ERROR)
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
+    def create_listings_view(self, request):
+        """Create DigiKeyListing records for DK offers that have no listing in Minerva."""
+        from bots.services.dk_marketplace import create_listings_from_offers, DKMarketplaceError
+        try:
+            result        = create_listings_from_offers()
+            created       = result['created']
+            already       = result['already_exists']
+            no_product    = result['no_product']
+            if created:
+                self.message_user(
+                    request,
+                    f"✅ Створено {created} нових лістингів з DigiKey офферів.",
+                    messages.SUCCESS,
+                )
+            else:
+                self.message_user(request, "ℹ️ Нових лістингів не створено.", messages.INFO)
+            if already:
+                self.message_user(
+                    request, f"ℹ️ Пропущено {already} офферів — лістинги вже існують.",
+                    messages.INFO,
+                )
+            if no_product:
+                self.message_user(
+                    request,
+                    f"⚠️ SKU не знайдено в inventory ({len(no_product)}): "
+                    + ", ".join(no_product[:30]),
+                    messages.WARNING,
+                )
+        except DKMarketplaceError as exc:
+            self.message_user(request, f"❌ {exc}", messages.ERROR)
+        except Exception as exc:
+            self.message_user(request, f"❌ Помилка: {exc}", messages.ERROR)
+        return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
+
     # ── Readonly display fields ───────────────────────────────────────────────
 
     def action_buttons(self, obj):
@@ -881,7 +920,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         log_url        = reverse("admin:bots_digikeyconfig_api_log")
         supplier_uuid_url  = reverse("admin:bots_digikeyconfig_fetch_supplier_uuid")
         custom_fields_url  = reverse("admin:bots_digikeyconfig_custom_fields")
-        import_offers_url  = reverse("admin:bots_digikeyconfig_import_offers")
+        import_offers_url    = reverse("admin:bots_digikeyconfig_import_offers")
+        create_listings_url  = reverse("admin:bots_digikeyconfig_create_listings")
 
         authorized     = bool(obj and obj.marketplace_refresh_token)
         auth_label     = "✅ Marketplace авторизовано" if authorized else "🔑 Авторизувати Marketplace"
@@ -904,6 +944,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             '<a href="{}" style="background:#00838f;{}">🪪 Отримати Supplier UUID</a>'
             '<a href="{}" style="background:#4527a0;{}">📋 Custom Fields</a>'
             '<a href="{}" style="background:#00695c;{}">📥 Імпорт офферів</a>'
+            '<a href="{}" style="background:#00838f;{}">🆕 Створити лістинги з DigiKey</a>'
             '</div>',
             test_url, s,
             clear_url, s,
@@ -918,6 +959,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             supplier_uuid_url, s,
             custom_fields_url, s,
             import_offers_url, s,
+            create_listings_url, s,
         )
     action_buttons.short_description = "Дії"
 
@@ -1193,8 +1235,13 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     # ── Display helpers ───────────────────────────────────────────────────────
 
     def product_sku_link(self, obj):
-        url = reverse('admin:inventory_product_change', args=[obj.product_id])
-        return format_html('<a href="{}">{}</a>', url, obj.product.sku)
+        listing_url  = reverse('admin:bots_digikeylisting_change', args=[obj.pk])
+        inventory_url = reverse('admin:inventory_product_change', args=[obj.product_id])
+        return format_html(
+            '<a href="{}">{}</a>'
+            '&nbsp;<a href="{}" title="Картка складу" style="color:var(--text-muted);font-size:11px">🏭</a>',
+            listing_url, obj.product.sku, inventory_url,
+        )
     product_sku_link.short_description = 'Товар (SKU)'
     product_sku_link.admin_order_field = 'product__sku'
 
