@@ -125,11 +125,11 @@ class DigiKeyConfig(models.Model):
                 pass
         super().save(*args, **kwargs)
 
-    # ── Marketplace Supplier UUID ─────────────────────────────────────────────
+    # ── Marketplace Supplier ID ───────────────────────────────────────────────
     marketplace_supplier_id = models.CharField(
-        "Marketplace Supplier UUID", max_length=36, blank=True, default="",
-        help_text="UUID що DigiKey призначає постачальнику в Marketplace Portal "
-                  "(My Account → Supplier Info → Supplier ID)"
+        "Marketplace Vendor ID", max_length=64, blank=True, default="",
+        help_text="Числовий Vendor ID з supplier.digikey.com → Account → Company Profile "
+                  "(напр. 3228)"
     )
 
     @classmethod
