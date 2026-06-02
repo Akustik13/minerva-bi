@@ -148,10 +148,12 @@ class DigiKeyListing(models.Model):
     """
 
     SYNC_DRAFT     = 'draft'
+    SYNC_STAGED    = 'staged'
     SYNC_PUBLISHED = 'published'
     SYNC_ERROR     = 'error'
     SYNC_CHOICES = [
         ('draft',     'Чернетка'),
+        ('staged',    '⏳ Очікує затвердження'),
         ('published', 'Опубліковано'),
         ('error',     'Помилка'),
     ]

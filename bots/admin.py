@@ -1053,6 +1053,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['sync_qty_url'] = reverse(
                 'admin:bots_digikeylisting_sync_qty', args=[object_id]
             )
+            extra_context['create_offer_url'] = reverse(
+                'admin:bots_digikeylisting_create_offer', args=[object_id]
+            )
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     def get_urls(self):
@@ -1064,6 +1067,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/sync-qty/',
                  self.admin_site.admin_view(self.sync_qty_view),
                  name='bots_digikeylisting_sync_qty'),
+            path('<int:pk>/create-offer/',
+                 self.admin_site.admin_view(self.create_offer_view),
+                 name='bots_digikeylisting_create_offer'),
         ]
         return custom + urls
 
@@ -1102,6 +1108,21 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         return redirect(
             reverse('admin:bots_digikeylisting_change', args=[pk])
         )
+
+    def create_offer_view(self, request, pk):
+        from bots.services.dk_marketplace import create_offer_for_listing, DKMarketplaceError
+        listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+        try:
+            create_offer_for_listing(listing)
+            messages.success(
+                request,
+                f"✅ Offer створено: {listing.product.sku} | Offer ID: {listing.dk_offer_id}"
+            )
+        except DKMarketplaceError as exc:
+            messages.error(request, f"❌ Помилка створення Offer: {exc}")
+        except Exception as exc:
+            messages.error(request, f"❌ Помилка: {exc}")
+        return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
 
     # ── Bulk action: sync quantities ──────────────────────────────────────────
 

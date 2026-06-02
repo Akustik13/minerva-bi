@@ -228,8 +228,16 @@ def update_offer(config, listing) -> None:
 
 # ── High-level actions ────────────────────────────────────────────────────────
 
-def publish_listing(listing) -> None:
-    """Full publish: stage product → create/update offer → save IDs & status."""
+_SYNC_STAGED = 'staged'
+
+
+def publish_listing(listing) -> str:
+    """Stage product in DigiKey PIM. Returns 'staged' or 'published'.
+
+    DigiKey workflow:
+      1. upsert_product → product enters PIM review queue (staged)
+      2. After DigiKey approves the product, call create_offer_for_listing()
+    """
     from django.utils import timezone
     from bots.models import DigiKeyConfig
 
@@ -245,24 +253,59 @@ def publish_listing(listing) -> None:
         product_id = upsert_product(config, listing)
         listing.dk_product_id = product_id
 
+        # Try offer immediately — works if product already approved
         if listing.dk_offer_id:
-            update_offer(config, listing)
+            try:
+                update_offer(config, listing)
+                status = DigiKeyListing.SYNC_PUBLISHED
+            except DKMarketplaceError:
+                status = _SYNC_STAGED
         else:
-            offer_id = create_offer(config, listing)
-            listing.dk_offer_id = offer_id
+            try:
+                offer_id = create_offer(config, listing)
+                listing.dk_offer_id = offer_id
+                status = DigiKeyListing.SYNC_PUBLISHED
+            except DKMarketplaceError:
+                # Product staged but not yet approved — offer will be created later
+                status = _SYNC_STAGED
 
-        listing.sync_status    = DigiKeyListing.SYNC_PUBLISHED
+        listing.sync_status    = status
         listing.last_synced_at = timezone.now()
-        listing.last_error     = ''
+        listing.last_error     = '' if status == DigiKeyListing.SYNC_PUBLISHED else (
+            'Продукт в черзі на перевірку DigiKey. '
+            'Після затвердження натисніть 📦 Створити Offer.'
+        )
         listing.save(update_fields=[
             'dk_product_id', 'dk_offer_id',
             'sync_status', 'last_synced_at', 'last_error',
         ])
+        return status
     except Exception as exc:
         listing.sync_status = DigiKeyListing.SYNC_ERROR
         listing.last_error  = str(exc)
         listing.save(update_fields=['sync_status', 'last_error'])
         raise
+
+
+def create_offer_for_listing(listing) -> None:
+    """Create or update offer for an already-staged/approved product."""
+    from django.utils import timezone
+    from bots.models import DigiKeyConfig
+
+    config = DigiKeyConfig.get()
+    if not listing.dk_product_id:
+        raise DKMarketplaceError("Product ID відсутній. Спочатку опублікуй продукт.")
+
+    if listing.dk_offer_id:
+        update_offer(config, listing)
+    else:
+        offer_id = create_offer(config, listing)
+        listing.dk_offer_id = offer_id
+
+    listing.sync_status    = DigiKeyListing.SYNC_PUBLISHED
+    listing.last_synced_at = timezone.now()
+    listing.last_error     = ''
+    listing.save(update_fields=['dk_offer_id', 'sync_status', 'last_synced_at', 'last_error'])
 
 
 def sync_quantity(listing) -> None:

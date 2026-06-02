@@ -9,13 +9,21 @@
        onclick="return confirm('{% if original.dk_offer_id %}Оновити лістинг на DigiKey?{% else %}Опублікувати товар на DigiKey Marketplace?{% endif %}')">
       {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати на DigiKey{% endif %}
     </a>
+    {% if original.sync_status == 'staged' and not original.dk_offer_id %}
+    <a href="{{ create_offer_url }}" class="button dk-offer-btn"
+       onclick="return confirm('Спробувати створити Offer? Продукт має бути затверджений DigiKey.')">
+      📦 Створити Offer
+    </a>
+    {% endif %}
     {% if original.dk_offer_id %}
     <a href="{{ sync_qty_url }}" class="button dk-sync-btn"
        onclick="return confirm('Оновити залишок складу на DigiKey?')">
       📦 Оновити залишок
     </a>
     {% endif %}
-    {% if original.sync_status == 'error' and original.last_error %}
+    {% if original.sync_status == 'staged' %}
+    <span class="dk-staged-note">⏳ Продукт надіслано на перевірку DigiKey. Після затвердження натисніть 📦 Створити Offer.</span>
+    {% elif original.sync_status == 'error' and original.last_error %}
     <span class="dk-error-note">❌ {{ original.last_error|truncatechars:120 }}</span>
     {% endif %}
   </div>
