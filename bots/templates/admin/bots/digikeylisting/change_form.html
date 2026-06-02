@@ -68,28 +68,78 @@
   font-size: 12px;
   min-height: 120px;
 }
+
+/* Required fields highlight */
+.dk-required-field .field-box,
+.dk-required-field > div {
+  position: relative;
+}
+.dk-required-mark {
+  display: inline-block;
+  background: #c62828;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  letter-spacing: .3px;
+}
+.dk-required-empty input,
+.dk-required-empty textarea,
+.dk-required-empty select {
+  border-color: #c62828 !important;
+  box-shadow: 0 0 0 1px #c62828 !important;
+}
 </style>
 
 <script>
-// Pretty-print JSON in dk_prices textarea on load
 document.addEventListener('DOMContentLoaded', function() {
+  // Pretty-print JSON in dk_prices textarea on load
   var ta = document.querySelector('[name="dk_prices"]');
-  if (!ta) return;
-  try {
-    var val = ta.value.trim();
-    if (val) ta.value = JSON.stringify(JSON.parse(val), null, 2);
-  } catch(e) {}
-
-  // Validate JSON on change
-  ta.addEventListener('blur', function() {
+  if (ta) {
     try {
-      var parsed = JSON.parse(ta.value.trim() || '[]');
-      ta.style.borderColor = '';
-      // Normalize: ensure keys are qty/price
-      ta.value = JSON.stringify(parsed, null, 2);
-    } catch(e) {
-      ta.style.borderColor = 'var(--err, #e53935)';
+      var val = ta.value.trim();
+      if (val) ta.value = JSON.stringify(JSON.parse(val), null, 2);
+    } catch(e) {}
+    ta.addEventListener('blur', function() {
+      try {
+        var parsed = JSON.parse(ta.value.trim() || '[]');
+        ta.style.borderColor = '';
+        ta.value = JSON.stringify(parsed, null, 2);
+      } catch(e) {
+        ta.style.borderColor = 'var(--err, #e53935)';
+      }
+    });
+  }
+
+  // Mark required fields for publishing
+  var REQUIRED = [
+    'dk_category_id', 'dk_title', 'dk_description',
+    'dk_packaging', 'dk_lifecycle_status', 'dk_prices'
+  ];
+  REQUIRED.forEach(function(name) {
+    var el = document.querySelector('[name="' + name + '"]');
+    if (!el) return;
+    var row = el.closest('.form-row') || el.closest('div');
+    if (!row) return;
+    // Add red badge next to label
+    var label = row.querySelector('label');
+    if (label) {
+      var badge = document.createElement('span');
+      badge.className = 'dk-required-mark';
+      badge.textContent = '★ обов\'язково';
+      label.appendChild(badge);
     }
+    // Highlight if empty
+    function checkEmpty() {
+      var empty = !el.value || el.value.trim() === '' || el.value.trim() === '[]';
+      row.classList.toggle('dk-required-empty', empty);
+    }
+    checkEmpty();
+    el.addEventListener('input', checkEmpty);
+    el.addEventListener('change', checkEmpty);
   });
 });
 </script>
