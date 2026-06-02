@@ -322,5 +322,31 @@ def fetch_supplier_uuid(config) -> str:
     )
 
 
+def fetch_custom_fields(config) -> list:
+    """GET /custom/fields?Owner=Product — returns list of custom field defs with codes."""
+    import requests as req
+    token = get_marketplace_token(config)
+    url   = f"{_base_url(config)}/Sales/Marketplace2/Custom/v1/custom/fields"
+    all_fields = []
+    offset = 0
+    while True:
+        resp = req.get(url, params={'Owner': 'Product', 'Max': 50, 'Offset': offset},
+                       headers=_headers(config, token), timeout=15)
+        try:
+            resp.raise_for_status()
+        except req.HTTPError as e:
+            body = {}
+            try: body = e.response.json()
+            except Exception: pass
+            raise DKMarketplaceError(f"fetch_custom_fields {e.response.status_code}: {body}") from e
+        data = resp.json()
+        fields = data.get('customFields', [])
+        all_fields.extend(fields)
+        if len(fields) < 50:
+            break
+        offset += 50
+    return all_fields
+
+
 # Import model reference after definition to avoid circular import
 from bots.models import DigiKeyListing  # noqa: E402

@@ -248,6 +248,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.fetch_supplier_uuid_view),
                 name="bots_digikeyconfig_fetch_supplier_uuid",
             ),
+            path(
+                "custom-fields/",
+                self.admin_site.admin_view(self.custom_fields_view),
+                name="bots_digikeyconfig_custom_fields",
+            ),
         ]
         return custom + urls
 
@@ -802,6 +807,32 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             self.message_user(request, f'❌ Помилка: {e}', level='error')
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
+    def custom_fields_view(self, request):
+        """Fetch Product custom field definitions from DigiKey Custom API."""
+        from bots.models import DigiKeyConfig
+        from bots.services.dk_marketplace import fetch_custom_fields, DKMarketplaceError
+        config = DigiKeyConfig.get()
+        try:
+            fields = fetch_custom_fields(config)
+            if not fields:
+                self.message_user(request, '⚠️ Поля не знайдено (порожня відповідь)', level='warning')
+            else:
+                for f in fields:
+                    req_mark = '✅ required' if f.get('required') else '—'
+                    vals = ', '.join(f.get('fieldValues', []) or []) or ''
+                    self.message_user(
+                        request,
+                        f'📋 code={f.get("code","?")} | {f.get("name","?")} | '
+                        f'{f.get("fieldType","?")} | {req_mark}'
+                        + (f' | values: {vals}' if vals else ''),
+                        level='info',
+                    )
+        except DKMarketplaceError as e:
+            self.message_user(request, f'❌ {e}', level='error')
+        except Exception as e:
+            self.message_user(request, f'❌ Помилка: {e}', level='error')
+        return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
+
     # ── Readonly display fields ───────────────────────────────────────────────
 
     def action_buttons(self, obj):
@@ -815,7 +846,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         mkorders_url   = reverse("admin:bots_digikeyconfig_marketplace_orders")
         reconcile_url  = reverse("admin:bots_digikeyconfig_reconcile")
         log_url        = reverse("admin:bots_digikeyconfig_api_log")
-        supplier_uuid_url = reverse("admin:bots_digikeyconfig_fetch_supplier_uuid")
+        supplier_uuid_url  = reverse("admin:bots_digikeyconfig_fetch_supplier_uuid")
+        custom_fields_url  = reverse("admin:bots_digikeyconfig_custom_fields")
 
         authorized     = bool(obj and obj.marketplace_refresh_token)
         auth_label     = "✅ Marketplace авторизовано" if authorized else "🔑 Авторизувати Marketplace"
@@ -836,6 +868,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             '<a href="{}" style="background:#2e7d32;{}">🔄 Синхронізувати</a>'
             '<a href="{}" style="background:#f57c00;{}">🔍 Звірити з DigiKey</a>'
             '<a href="{}" style="background:#00838f;{}">🪪 Отримати Supplier UUID</a>'
+            '<a href="{}" style="background:#4527a0;{}">📋 Custom Fields</a>'
             '</div>',
             test_url, s,
             clear_url, s,
@@ -848,6 +881,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             sync_url, s,
             reconcile_url, s,
             supplier_uuid_url, s,
+            custom_fields_url, s,
         )
     action_buttons.short_description = "Дії"
 
@@ -978,6 +1012,16 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'description': (
                 'Формат JSON: <code>[{"qty": 1, "price": 11.99}, {"qty": 10, "price": 11.50}, ...]</code>. '
                 'Перший тир = MOQ. Максимум 9 тирів.'
+            ),
+        }),
+        ('📋 Обов\'язкові атрибути DigiKey', {
+            'fields': (
+                'dk_packaging', 'dk_packaging_code',
+                'dk_lifecycle_status', 'dk_lifecycle_code',
+            ),
+            'description': (
+                'Коди атрибутів знайди через кнопку <b>📋 Custom Fields</b> в '
+                '<a href="/admin/bots/digikeyconfig/1/change/">DigiKey → Конфігурація</a> → Дії.'
             ),
         }),
         ('🔧 Filter Attributes', {

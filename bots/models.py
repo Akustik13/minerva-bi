@@ -229,6 +229,22 @@ class DigiKeyListing(models.Model):
     fa_height_max     = models.CharField('Height Max (966)',      max_length=100, blank=True, default='',
                                           help_text='напр. "0.063\\" (1.60mm)"')
 
+    # ── Required product attributes ───────────────────────────────────────────
+    dk_packaging        = models.CharField(
+        'Packaging', max_length=100, blank=True, default='',
+        help_text='напр. "Tape & Reel (TR)", "Cut Tape (CT)", "Bulk". '
+                  'Обов\'язково для DigiKey PIM. Код атрибута — знайди через кнопку 📋 Custom Fields.')
+    dk_lifecycle_status = models.CharField(
+        'Product Life Cycle Status', max_length=100, blank=True, default='Active',
+        help_text='напр. "Active", "Obsolete", "Last Time Buy". '
+                  'Обов\'язково для DigiKey PIM. Код атрибута — знайди через кнопку 📋 Custom Fields.')
+    dk_packaging_code   = models.CharField(
+        'Packaging attr code', max_length=20, blank=True, default='',
+        help_text='Код атрибута "Packaging" з DigiKey Custom Fields API (напр. "7")')
+    dk_lifecycle_code   = models.CharField(
+        'Lifecycle attr code', max_length=20, blank=True, default='',
+        help_text='Код атрибута "Product Life Cycle Status" з DigiKey Custom Fields API')
+
     # ── Sync status ────────────────────────────────────────────────────────────
     sync_status    = models.CharField('Статус', max_length=20,
                                        choices=SYNC_CHOICES, default='draft')
@@ -265,8 +281,17 @@ class DigiKeyListing(models.Model):
             if t.get("qty") and t.get("price")
         ]
 
+    def get_common_attributes_api(self):
+        """Common required attributes: Packaging + Product Life Cycle Status."""
+        attrs = []
+        if self.dk_packaging and self.dk_packaging_code:
+            attrs.append({"code": self.dk_packaging_code, "type": "String", "value": self.dk_packaging})
+        if self.dk_lifecycle_status and self.dk_lifecycle_code:
+            attrs.append({"code": self.dk_lifecycle_code, "type": "String", "value": self.dk_lifecycle_status})
+        return attrs
+
     def get_filter_attributes_api(self):
-        """additionalFields list for API (filter category only)."""
+        """additionalFields list for API (filter category only) + common attributes."""
         mapping = [
             ('fa_frequency',      '139'),
             ('fa_bandwidth',      '398'),
@@ -278,7 +303,7 @@ class DigiKeyListing(models.Model):
             ('fa_size_dimension', '46'),
             ('fa_height_max',     '966'),
         ]
-        attrs = []
+        attrs = self.get_common_attributes_api()
         for field, code in mapping:
             val = getattr(self, field, '').strip()
             if val:
