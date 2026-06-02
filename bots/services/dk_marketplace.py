@@ -116,7 +116,6 @@ def upsert_product(config, listing) -> str:
         additional_fields = []
 
     product = {
-        "supplierId":       config.marketplace_supplier_id,
         "partNumber":       listing.get_supplier_sku(),
         "categoryId":       listing.dk_category_id,
         "description":      listing.dk_description,
@@ -124,6 +123,8 @@ def upsert_product(config, listing) -> str:
         "imageUrl":         listing.dk_image_url or "",
         "additionalFields": additional_fields,
     }
+    if config.marketplace_supplier_id:
+        product["supplierId"] = config.marketplace_supplier_id
     if listing.dk_product_id:
         product["existingProductId"] = listing.dk_product_id
 
@@ -276,26 +277,24 @@ def sync_quantity(listing) -> None:
     listing.save(update_fields=['last_synced_at', 'last_error'])
 
 
-def fetch_supplier_uuid(config) -> str:
-    """Call DigiKey Marketplace API to retrieve the supplier's UUID."""
-    import requests as req
+def fetch_supplier_uuid(config) -> dict:
+    """Decode marketplace JWT token to extract supplier UUID from claims.
+    Returns dict with all token claims for inspection."""
+    import base64
+    import json as _json
+
     token = get_marketplace_token(config)
-    url   = f"{_base_url(config)}{_PRODUCTS_BASE}/suppliers/me"
-    resp  = req.get(url, headers=_headers(config, token), timeout=15)
+
+    # JWT = header.payload.signature — decode middle part (base64url, no verify)
     try:
-        resp.raise_for_status()
-    except req.HTTPError as e:
-        body = {}
-        try: body = e.response.json()
-        except Exception: pass
-        raise DKMarketplaceError(
-            f"fetch_supplier_uuid {e.response.status_code}: {body}"
-        ) from e
-    data = resp.json()
-    # API may return supplierId / id / _id / supplierGuid
-    uid = (data.get('supplierId') or data.get('supplierGuid')
-           or data.get('id') or data.get('_id') or '')
-    return str(uid)
+        parts = token.split('.')
+        if len(parts) < 2:
+            return {'raw_token_preview': token[:40] + '...', 'error': 'Not a JWT'}
+        padding = parts[1] + '=' * (4 - len(parts[1]) % 4)
+        claims = _json.loads(base64.urlsafe_b64decode(padding).decode('utf-8', errors='replace'))
+        return claims
+    except Exception as e:
+        return {'error': str(e), 'raw_token_preview': token[:60] + '...'}
 
 
 # Import model reference after definition to avoid circular import
