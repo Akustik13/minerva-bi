@@ -253,6 +253,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.custom_fields_view),
                 name="bots_digikeyconfig_custom_fields",
             ),
+            path(
+                "import-offers/",
+                self.admin_site.admin_view(self.import_offers_view),
+                name="bots_digikeyconfig_import_offers",
+            ),
         ]
         return custom + urls
 
@@ -833,6 +838,34 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             self.message_user(request, f'❌ Помилка: {e}', level='error')
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
+    def import_offers_view(self, request):
+        """Fetch all DigiKey offers and sync to local DigiKeyListing records."""
+        from bots.services.dk_marketplace import import_offers_from_dk, DKMarketplaceError
+        try:
+            result    = import_offers_from_dk()
+            updated   = result['updated']
+            not_found = result['not_found']
+            if updated:
+                self.message_user(
+                    request,
+                    f"✅ Синхронізовано {updated} лістингів з DigiKey (offer_id, product_id, ціни).",
+                    messages.SUCCESS,
+                )
+            else:
+                self.message_user(request, "ℹ️ Жодного співпадіння за SKU не знайдено.", messages.WARNING)
+            if not_found:
+                self.message_user(
+                    request,
+                    f"⚠️ Офери на DigiKey без лістингу в Minerva ({len(not_found)}): "
+                    + ", ".join(not_found[:30]),
+                    messages.WARNING,
+                )
+        except DKMarketplaceError as exc:
+            self.message_user(request, f"❌ {exc}", messages.ERROR)
+        except Exception as exc:
+            self.message_user(request, f"❌ Помилка: {exc}", messages.ERROR)
+        return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
+
     # ── Readonly display fields ───────────────────────────────────────────────
 
     def action_buttons(self, obj):
@@ -848,6 +881,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         log_url        = reverse("admin:bots_digikeyconfig_api_log")
         supplier_uuid_url  = reverse("admin:bots_digikeyconfig_fetch_supplier_uuid")
         custom_fields_url  = reverse("admin:bots_digikeyconfig_custom_fields")
+        import_offers_url  = reverse("admin:bots_digikeyconfig_import_offers")
 
         authorized     = bool(obj and obj.marketplace_refresh_token)
         auth_label     = "✅ Marketplace авторизовано" if authorized else "🔑 Авторизувати Marketplace"
@@ -869,6 +903,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             '<a href="{}" style="background:#f57c00;{}">🔍 Звірити з DigiKey</a>'
             '<a href="{}" style="background:#00838f;{}">🪪 Отримати Supplier UUID</a>'
             '<a href="{}" style="background:#4527a0;{}">📋 Custom Fields</a>'
+            '<a href="{}" style="background:#00695c;{}">📥 Імпорт офферів</a>'
             '</div>',
             test_url, s,
             clear_url, s,
@@ -882,6 +917,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             reconcile_url, s,
             supplier_uuid_url, s,
             custom_fields_url, s,
+            import_offers_url, s,
         )
     action_buttons.short_description = "Дії"
 
@@ -982,6 +1018,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     search_fields  = ('product__sku', 'dk_title', 'dk_supplier_sku')
     autocomplete_fields = ('product',)
     actions        = ['action_sync_qty']
+    save_as        = True
 
     readonly_fields = (
         'dk_product_id', 'dk_offer_id',
@@ -1041,6 +1078,17 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'classes': ('collapse',),
         }),
     )
+
+    # ── Save / copy ───────────────────────────────────────────────────────────
+
+    def save_model(self, request, obj, form, change):
+        if '_saveasnew' in request.POST:
+            obj.dk_offer_id    = ''
+            obj.dk_product_id  = ''
+            obj.sync_status    = DigiKeyListing.SYNC_DRAFT
+            obj.last_error     = ''
+            obj.last_synced_at = None
+        super().save_model(request, obj, form, change)
 
     # ── change_view: inject buttons ───────────────────────────────────────────
 

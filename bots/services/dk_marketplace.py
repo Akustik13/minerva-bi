@@ -371,6 +371,114 @@ def fetch_supplier_uuid(config) -> dict:
     )
 
 
+def fetch_offers(config, max_count: int = 500) -> list:
+    """GET /offers — paginated, returns list of Offer dicts for authenticated supplier."""
+    import requests as req
+
+    token = get_marketplace_token(config)
+    url   = f"{_base_url(config)}{_OFFERS_BASE}/offers"
+    all_offers: list = []
+    offset = 0
+
+    while True:
+        resp = req.get(url, params={'Max': 50, 'Offset': offset},
+                       headers=_headers(config, token), timeout=15)
+        try:
+            resp.raise_for_status()
+        except req.HTTPError as e:
+            body = {}
+            try: body = e.response.json()
+            except Exception: pass
+            raise DKMarketplaceError(f"fetch_offers {e.response.status_code}: {body}") from e
+
+        data   = resp.json()
+        offers = data.get('offers', [])
+        all_offers.extend(offers)
+
+        if len(offers) < 50 or len(all_offers) >= max_count:
+            break
+        offset += 50
+
+    logger.info("DK fetch_offers total=%d", len(all_offers))
+    return all_offers
+
+
+def import_offers_from_dk() -> dict:
+    """Pull all offers from DigiKey and sync to local DigiKeyListing records.
+
+    Matching logic (by priority):
+      1. listing.dk_supplier_sku == offer.supplierSku
+      2. listing.product.sku     == offer.supplierSku
+
+    Updates per matched listing:
+      dk_offer_id, dk_product_id, sync_status=published, last_synced_at, last_error
+      dk_prices  — overwritten from DigiKey if offer has prices
+      dk_title   — filled from DigiKey only when blank in Minerva
+
+    Returns dict: {updated: N, not_found: [sku, ...]}
+    """
+    import json
+    from django.utils import timezone
+    from bots.models import DigiKeyConfig, DigiKeyListing
+
+    config = DigiKeyConfig.get()
+    offers = fetch_offers(config)
+
+    updated: int    = 0
+    not_found: list = []
+
+    for offer in offers:
+        offer_id   = offer.get('id', '')
+        product_id = offer.get('productId', '')
+        sku        = offer.get('supplierSku', '')
+        if not sku:
+            continue
+
+        listing = None
+        # 1. match by dk_supplier_sku
+        try:
+            listing = DigiKeyListing.objects.select_related('product').get(dk_supplier_sku=sku)
+        except DigiKeyListing.DoesNotExist:
+            pass
+
+        # 2. match by product.sku
+        if listing is None:
+            try:
+                listing = DigiKeyListing.objects.select_related('product').get(product__sku=sku)
+            except DigiKeyListing.DoesNotExist:
+                not_found.append(sku)
+                continue
+
+        listing.dk_offer_id    = offer_id
+        listing.dk_product_id  = product_id
+        listing.sync_status    = DigiKeyListing.SYNC_PUBLISHED
+        listing.last_synced_at = timezone.now()
+        listing.last_error     = ''
+
+        update_flds = ['dk_offer_id', 'dk_product_id', 'sync_status',
+                       'last_synced_at', 'last_error']
+
+        # Pull title only if blank
+        if offer.get('title') and not listing.dk_title:
+            listing.dk_title = offer['title'][:200]
+            update_flds.append('dk_title')
+
+        # Pull prices from DigiKey (overwrite)
+        raw_prices = offer.get('prices', [])
+        if raw_prices:
+            listing.dk_prices = json.dumps([
+                {'qty': p['quantityBreak'], 'price': float(p['price'])}
+                for p in raw_prices
+            ])
+            update_flds.append('dk_prices')
+
+        listing.save(update_fields=update_flds)
+        updated += 1
+
+    logger.info("DK import_offers updated=%d not_found=%d", updated, len(not_found))
+    return {'updated': updated, 'not_found': not_found}
+
+
 def fetch_custom_fields(config) -> list:
     """GET /custom/fields?Owner=Product — returns list of custom field defs with codes."""
     import requests as req
