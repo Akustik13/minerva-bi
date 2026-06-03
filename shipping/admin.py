@@ -2552,11 +2552,13 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             }
 
         # A4 label URL (only if GIF source exists)
+        import os as _os
+        from django.conf import settings as django_settings
         _label_a4_url = ''
         if shipment.label_url:
             _gif_rel  = shipment.label_url.lstrip('/media/').rsplit('.', 1)[0] + '.gif'
-            _gif_path = os.path.join(django_settings.MEDIA_ROOT, _gif_rel)
-            if os.path.exists(_gif_path):
+            _gif_path = _os.path.join(django_settings.MEDIA_ROOT, _gif_rel)
+            if _os.path.exists(_gif_path):
                 _label_a4_url = reverse('admin:shipping_shipment_label_a4', args=[shipment.pk])
 
         # For Jumingo: always route label download through base64 proxy view
@@ -2842,7 +2844,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     def label_a4_view(self, request, shipment_id):
         """GET — generate A4 PDF from stored UPS GIF label and return inline."""
+        import os as _os
         import base64 as _b64_mod
+        from django.conf import settings as django_settings
         from django.http import HttpResponse
         from shipping.ups_client import _gif_label_to_a4_pdf
 
@@ -2857,9 +2861,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         # Derive GIF path: same base name as PDF label but .gif extension
         label_media_rel = shipment.label_url.lstrip('/media/')
         gif_rel  = label_media_rel.rsplit('.', 1)[0] + '.gif'
-        gif_path = os.path.join(django_settings.MEDIA_ROOT, gif_rel)
+        gif_path = _os.path.join(django_settings.MEDIA_ROOT, gif_rel)
 
-        if not os.path.exists(gif_path):
+        if not _os.path.exists(gif_path):
             return HttpResponse(
                 'GIF-джерело недоступне для цієї відправки.\n'
                 'Ця функція працює для відправок, створених після оновлення системи.',
