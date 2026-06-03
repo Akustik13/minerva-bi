@@ -1525,7 +1525,7 @@ def send_order_confirm_notification(order):
             qty = int(qty) if qty == int(qty) else qty
         except Exception:
             pass
-        items_lines.append(f'• {sku} — {qty} Stk.')
+        items_lines.append(f'• {sku} — {qty} pcs.')
     items_str = '\n'.join(items_lines) if items_lines else '—'
 
     def _render(tmpl):
@@ -1604,7 +1604,7 @@ def send_ship_notification(order) -> bool:
 
     lines = order.lines.select_related('product').all() if hasattr(order, 'lines') else []
     items_text = '\n'.join(
-        '• {} — {} Stk.'.format(
+        '• {} — {} pcs.'.format(
             l.sku_raw or (l.product.sku if l.product else ''), int(l.qty)
         )
         for l in lines
