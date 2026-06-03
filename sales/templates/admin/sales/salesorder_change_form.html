@@ -85,7 +85,15 @@
   {% endif %}
   {% if notify_order_confirm_url %}
     <li>
-      {% if order_confirm_sent_at %}
+      {% if ship_notify_sent_at %}
+        {# Shipping confirmation already sent — order-received email no longer relevant #}
+        <button type="button" disabled
+                style="background:#263238;color:#546e7a;padding:6px 14px;border-radius:6px;
+                       font-weight:bold;border:1px solid #37474f;cursor:not-allowed;white-space:nowrap;font-size:13px"
+                title="{% trans 'Підтвердження відправки вже надіслано — лист підтвердження замовлення не надсилається.' %}">
+          🚫 📥 {% trans "Підтвердження замовлення" %}
+        </button>
+      {% elif order_confirm_sent_at %}
         <button type="button"
                 onclick="ncoOpen('{{ notify_order_confirm_url }}')"
                 style="background:#0d3b6e;color:#90caf9;padding:6px 14px;border-radius:6px;
