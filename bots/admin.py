@@ -1339,22 +1339,22 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     # ── Queryset: annotate stock qty for sorting ──────────────────────────────
 
     def get_queryset(self, request):
-        from django.db.models import OuterRef, Subquery, DecimalField
+        from django.db.models import OuterRef, Subquery, Sum, DecimalField, Value
         from django.db.models.functions import Coalesce
         try:
             from inventory.models import InventoryTransaction
-            from django.db.models import Sum
+            _out = DecimalField(max_digits=18, decimal_places=3)
             stock_subq = (
                 InventoryTransaction.objects
                 .filter(product_id=OuterRef('product_id'))
                 .values('product_id')
                 .annotate(total=Sum('qty'))
-                .values('total')
+                .values('total')[:1]
             )
             return super().get_queryset(request).annotate(
                 _stock_qty=Coalesce(
-                    Subquery(stock_subq, output_field=DecimalField()),
-                    0,
+                    Subquery(stock_subq, output_field=_out),
+                    Value(0, output_field=_out),
                 )
             )
         except Exception:
