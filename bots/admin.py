@@ -1574,70 +1574,123 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         from bots.models import DigiKeyConfig, DigiKeyPriceLog
 
         if 'apply' in request.POST:
-            try:
-                delta_pct = float(request.POST.get('delta_pct', '0'))
-            except (ValueError, TypeError):
-                self.message_user(request, "❌ Невалідний відсоток.", messages.ERROR)
-                return
-
-            if not delta_pct:
-                self.message_user(request, "❌ Відсоток не може бути 0.", messages.ERROR)
-                return
-
             push_to_dk = request.POST.get('push_to_dk') == '1'
             config     = DigiKeyConfig.get() if push_to_dk else None
+            mode       = request.POST.get('mode', 'pct')
             updated = pushed = err = skipped = 0
-            multiplier = 1.0 + delta_pct / 100.0
 
-            for listing in queryset.select_related('product'):
-                old_prices = list(listing.dk_prices or [])
-                if not old_prices:
-                    skipped += 1
-                    continue
-                new_prices = [
-                    {"qty": t["qty"], "price": round(float(t["price"]) * multiplier, 4)}
-                    for t in old_prices
-                    if t.get("qty") and t.get("price") is not None
-                ]
-                try:
-                    DigiKeyPriceLog.objects.create(
-                        listing=listing,
-                        delta_pct=delta_pct,
-                        old_prices=old_prices,
-                        new_prices=new_prices,
-                        user=request.user.username if request.user else '',
-                    )
-                except Exception:
-                    pass
-                listing.dk_prices = new_prices
-                try:
-                    listing.price_delta_pct = delta_pct
-                    listing.save(update_fields=['dk_prices', 'price_delta_pct'])
-                except Exception:
-                    listing.save(update_fields=['dk_prices'])
-                updated += 1
-                if push_to_dk and listing.dk_offer_id and config:
+            if mode == 'abs':
+                # ── absolute price edit ──────────────────────────────────────
+                for listing in queryset.select_related('product'):
+                    old_prices = list(listing.dk_prices or [])
+                    if not old_prices:
+                        skipped += 1
+                        continue
+                    new_prices = []
+                    changed = False
+                    for ti, tier in enumerate(old_prices):
+                        raw = request.POST.get(f'price_{listing.pk}_{ti}', '')
+                        try:
+                            new_val = round(float(str(raw).replace(',', '.')), 4)
+                        except (ValueError, TypeError):
+                            new_val = float(tier.get('price', 0))
+                        old_val = float(tier.get('price', 0))
+                        if abs(new_val - old_val) > 1e-6:
+                            changed = True
+                        new_prices.append({'qty': tier['qty'], 'price': new_val})
+                    if not changed:
+                        skipped += 1
+                        continue
                     try:
-                        update_offer(config, listing)
-                        pushed += 1
-                    except Exception as exc:
-                        logger.warning("bulk_prices push failed %s: %s", listing.product.sku, exc)
-                        err += 1
+                        DigiKeyPriceLog.objects.create(
+                            listing=listing,
+                            delta_pct=0,
+                            old_prices=old_prices,
+                            new_prices=new_prices,
+                            user=request.user.username if request.user else '',
+                        )
+                    except Exception:
+                        pass
+                    listing.dk_prices = new_prices
+                    try:
+                        listing.price_delta_pct = None
+                        listing.save(update_fields=['dk_prices', 'price_delta_pct'])
+                    except Exception:
+                        listing.save(update_fields=['dk_prices'])
+                    updated += 1
+                    if push_to_dk and listing.dk_offer_id and config:
+                        try:
+                            update_offer(config, listing)
+                            pushed += 1
+                        except Exception as exc:
+                            logger.warning("bulk_prices push failed %s: %s", listing.product.sku, exc)
+                            err += 1
+                if updated:
+                    msg = f"✅ Ціни оновлено (вручну) для {updated} лістингів"
+                    if pushed:
+                        msg += f", {pushed} опубліковано на DigiKey"
+                    self.message_user(request, msg + ".", messages.SUCCESS)
 
-            sign = '+' if delta_pct >= 0 else ''
-            if updated:
-                msg = f"✅ Ціни {sign}{delta_pct:.1f}% застосовано до {updated} лістингів"
-                if pushed:
-                    msg += f", {pushed} опубліковано на DigiKey"
-                self.message_user(request, msg + ".", messages.SUCCESS)
-            if skipped:
+            else:
+                # ── percentage change ────────────────────────────────────────
+                try:
+                    delta_pct = float(request.POST.get('delta_pct', '0'))
+                except (ValueError, TypeError):
+                    self.message_user(request, "❌ Невалідний відсоток.", messages.ERROR)
+                    return
+                if not delta_pct:
+                    self.message_user(request, "❌ Відсоток не може бути 0.", messages.ERROR)
+                    return
+                multiplier = 1.0 + delta_pct / 100.0
+                for listing in queryset.select_related('product'):
+                    old_prices = list(listing.dk_prices or [])
+                    if not old_prices:
+                        skipped += 1
+                        continue
+                    new_prices = [
+                        {"qty": t["qty"], "price": round(float(t["price"]) * multiplier, 4)}
+                        for t in old_prices
+                        if t.get("qty") and t.get("price") is not None
+                    ]
+                    try:
+                        DigiKeyPriceLog.objects.create(
+                            listing=listing,
+                            delta_pct=delta_pct,
+                            old_prices=old_prices,
+                            new_prices=new_prices,
+                            user=request.user.username if request.user else '',
+                        )
+                    except Exception:
+                        pass
+                    listing.dk_prices = new_prices
+                    try:
+                        listing.price_delta_pct = delta_pct
+                        listing.save(update_fields=['dk_prices', 'price_delta_pct'])
+                    except Exception:
+                        listing.save(update_fields=['dk_prices'])
+                    updated += 1
+                    if push_to_dk and listing.dk_offer_id and config:
+                        try:
+                            update_offer(config, listing)
+                            pushed += 1
+                        except Exception as exc:
+                            logger.warning("bulk_prices push failed %s: %s", listing.product.sku, exc)
+                            err += 1
+                sign = '+' if delta_pct >= 0 else ''
+                if updated:
+                    msg = f"✅ Ціни {sign}{delta_pct:.1f}% застосовано до {updated} лістингів"
+                    if pushed:
+                        msg += f", {pushed} опубліковано на DigiKey"
+                    self.message_user(request, msg + ".", messages.SUCCESS)
+
+            if skipped and mode == 'pct':
                 self.message_user(
                     request,
                     f"⚠️ {skipped} лістингів пропущено — немає збережених цін. "
                     "Спочатку натисніть «📥 Стягнути поля з DigiKey» для кожного лістингу.",
                     messages.WARNING,
                 )
-            if not updated and not skipped:
+            if not updated:
                 self.message_user(request, "⚠️ Жоден лістинг не оновлено.", messages.WARNING)
             if err:
                 self.message_user(request, f"⚠️ Не вдалося опублікувати: {err} лістингів.", messages.WARNING)
