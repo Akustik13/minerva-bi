@@ -687,6 +687,63 @@ def _detect_category_type(category_name: str) -> str:
     return 'other'
 
 
+def fetch_product_tech_attrs(config, supplier_sku: str) -> dict:
+    """Fetch full technical attributes from DigiKey ProductSearch API (2-legged OAuth).
+
+    GET /products/v4/search/{sku}/productdetails
+    Returns selling + technical parameters, category name, datasheet, photo.
+
+    Result dict:
+      {
+        'params':         {'Antenna Type': 'PCB Trace', ...},   # Parameters[]
+        'category_name':  'RF Antennas',
+        'datasheet_url':  'https://...',
+        'photo_url':      'https://...',
+        'description':    '...',
+      }
+    Returns empty dict on any failure (caller logs warning).
+    """
+    import requests as req
+    from bots.services.digikey import get_token, _headers
+
+    token = get_token(config)
+    url   = f"{_base_url(config)}/products/v4/search/{supplier_sku}/productdetails"
+    try:
+        resp = req.get(url, headers=_headers(config, token), timeout=20)
+        if not resp.ok:
+            logger.warning("ProductSearch %s HTTP %s: %s", supplier_sku, resp.status_code, resp.text[:300])
+            return {}
+        data    = resp.json()
+        product = data.get('Product') or {}
+    except Exception as e:
+        logger.warning("ProductSearch %s error: %s", supplier_sku, e)
+        return {}
+
+    params: dict[str, str] = {}
+    for p in product.get('Parameters', []):
+        text = (p.get('ParameterText') or '').strip()
+        val  = (p.get('ValueText')     or '').strip()
+        if text and val and val.lower() != '-':
+            params[text] = val
+
+    cat       = product.get('Category') or {}
+    cat_name  = (cat.get('Name') or '').strip()
+    # Prefer child category name if available
+    if cat_name == '' and cat.get('Children'):
+        first_child = cat['Children'][0] if isinstance(cat['Children'], list) else {}
+        cat_name = (first_child.get('Name') or '').strip()
+
+    return {
+        'params':        params,
+        'category_name': cat_name,
+        'datasheet_url': (product.get('DatasheetUrl') or '').strip(),
+        'photo_url':     (product.get('PhotoUrl')     or '').strip(),
+        'description':   (product.get('Description', {}).get('DetailedDescription') or '').strip()
+                         if isinstance(product.get('Description'), dict)
+                         else (product.get('Description') or '').strip(),
+    }
+
+
 def pull_product_fields(listing) -> dict:
     """Pull ALL data from DigiKey and update listing.
 
@@ -744,14 +801,25 @@ def pull_product_fields(listing) -> dict:
     _set('dk_image_url',     prod.get('imageUrl') or '')
     _set('dk_category_id',   str(prod.get('categoryId') or ''))
 
-    # ── Category name ──────────────────────────────────────────────────────
-    # ── Category name ──────────────────────────────────────────────────────────────────────
-    # Try top-level categoryName first; fall back to nested category.name
+    # ── Category name from Marketplace API ────────────────────────────────────
     cat_name = prod.get('categoryName') or ''
     if not cat_name and isinstance(prod.get('category'), dict):
         cat_name = prod['category'].get('name', '') or ''
+    # categoryId fallback (will be overwritten by ProductSearch below if possible)
     if not cat_name and prod.get('categoryId'):
         cat_name = f"DK Category {prod['categoryId']}"
+
+    # ── Fetch full technical attributes from ProductSearch API (2-legged) ─────
+    tech = {}
+    try:
+        tech = fetch_product_tech_attrs(config, sku)
+    except Exception as e:
+        logger.warning("DK pull: ProductSearch failed for %s: %s", sku, e)
+
+    # Override category name with real name from ProductSearch (it has full catalog)
+    if tech.get('category_name'):
+        cat_name = tech['category_name']
+
     if cat_name and hasattr(listing, 'dk_category_name'):
         _set('dk_category_name', cat_name, max_len=200)
 
@@ -760,18 +828,27 @@ def pull_product_fields(listing) -> dict:
         detected = _detect_category_type(cat_name)
         if detected != 'other' and listing.category_type != detected:
             _set('category_type', detected)
+
     # ── All attributes dict ────────────────────────────────────────────────
-    # Merge: keep existing manual overrides, add/update from DigiKey
+    # Layer 1: existing manual overrides
+    # Layer 2: Marketplace API additionalFields (code-based: packaging, hts…)
+    # Layer 3: ProductSearch Parameters (human-readable: Antenna Type, Gain…)
     merged_attrs = dict(listing.dk_attributes or {})
     merged_attrs.update(attrs_dict)
+    if tech.get('params'):
+        merged_attrs.update(tech['params'])
     if merged_attrs != (listing.dk_attributes or {}):
         listing.dk_attributes = merged_attrs
         changed.append('dk_attributes')
 
-    # ── Map known codes to model fields ────────────────────────────────────
-    _set('dk_datasheet_url',    merged_attrs.get('datasheetUrl', ''))
+    # ── Map known code-based fields to model fields ────────────────────────
+    _set('dk_datasheet_url',    merged_attrs.get('datasheetUrl', '') or tech.get('datasheet_url', ''))
     _set('dk_packaging',        merged_attrs.get('packaging', ''))
     _set('dk_lifecycle_status', merged_attrs.get('productLifecycleStatus', ''))
+
+    # Better photo from ProductSearch if Marketplace has none
+    if not (prod.get('imageUrl') or '').strip() and tech.get('photo_url'):
+        _set('dk_image_url', tech['photo_url'])
 
     # Filter-category attributes (apply for ALL categories, not just 'filter')
     for code, field in _FILTER_ATTR_MAP.items():

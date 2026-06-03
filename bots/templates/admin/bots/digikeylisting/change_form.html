@@ -367,6 +367,39 @@ function dkEnterEdit() {
   document.body.classList.add('dk-edit');
 }
 
+/* ── Hide RF Filter section for non-filter categories ───────────────────── */
+function dkAdaptToCategory() {
+  var catSel = document.getElementById('id_category_type');
+  var cat = catSel ? catSel.value : 'other';
+
+  document.querySelectorAll('fieldset').forEach(function(fs) {
+    var h2 = fs.querySelector('h2');
+    if (!h2) return;
+    var txt = h2.textContent || '';
+
+    /* RF Filter section — hide unless category = filter */
+    if (txt.indexOf('RF Filter') >= 0) {
+      fs.style.display = cat === 'filter' ? '' : 'none';
+    }
+
+    /* Technical attributes section — adapt title to category */
+    if (txt.indexOf('Технічні атрибути DigiKey') >= 0) {
+      var labels = {
+        filter:    '📡 Технічні атрибути — RF Filter',
+        antenna:   '📡 Технічні атрибути — Antenna',
+        cable:     '📡 Технічні атрибути — Cable Assembly',
+        connector: '📡 Технічні атрибути — Connector/Adapter',
+        other:     '📡 Технічні атрибути DigiKey',
+      };
+      h2.textContent = labels[cat] || labels.other;
+    }
+  });
+
+  if (catSel) {
+    catSel.addEventListener('change', dkAdaptToCategory);
+  }
+}
+
 function dkCancel() {
   window.location.reload();
 }
@@ -721,6 +754,9 @@ document.addEventListener('DOMContentLoaded', function() {
     card.id = 'dkPreviewCard';
     anchor.parentNode.insertBefore(card, anchor);
   }
+
+  /* Adapt UI to category */
+  dkAdaptToCategory();
 
   /* Start in VIEW mode */
   dkEnterView();
