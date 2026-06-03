@@ -1,0 +1,276 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}AI-аналіз ціноутворення — {{ count }} лістингів{% endblock %}
+
+{% block content %}
+<style>
+.ai-card{background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:16px 20px;margin-bottom:12px}
+.ai-row-header{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+.ai-row-body{display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--border-strong,#243347)}
+.ai-row-body.open{display:block}
+.sev-error{background:rgba(198,40,40,.15);border-left:3px solid #ef5350;padding:8px 12px;border-radius:4px;margin-bottom:6px}
+.sev-warning{background:rgba(245,127,23,.12);border-left:3px solid #ffa726;padding:8px 12px;border-radius:4px;margin-bottom:6px}
+.sev-info{background:rgba(21,101,192,.12);border-left:3px solid #42a5f5;padding:8px 12px;border-radius:4px;margin-bottom:6px}
+.badge-strategy{display:inline-block;padding:2px 9px;border-radius:10px;font-size:11px;font-weight:700}
+.price-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(46,125,50,.15);
+            border:1px solid rgba(46,125,50,.35);border-radius:5px;padding:3px 8px;
+            font-size:12px;font-weight:700;color:#66bb6a;margin:2px}
+.spin{width:20px;height:20px;border:2px solid var(--border-strong,#243347);border-top-color:#42a5f5;
+      border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.run-btn{padding:5px 14px;font-size:12px;font-weight:700;border-radius:5px;cursor:pointer;border:none;
+         background:rgba(21,101,192,.2);color:#42a5f5;border:1px solid rgba(21,101,192,.4)}
+.run-btn:disabled{opacity:.4;cursor:not-allowed}
+.apply-btn{padding:4px 12px;font-size:12px;font-weight:700;border-radius:5px;cursor:pointer;
+           background:rgba(46,125,50,.2);color:#66bb6a;border:1px solid rgba(46,125,50,.4)}
+.apply-btn:disabled{opacity:.4;cursor:not-allowed}
+</style>
+
+<h1>🤖 AI-аналіз ціноутворення
+  <span style="font-size:14px;color:var(--text-muted);font-weight:400;margin-left:8px">{{ count }} лістингів</span>
+</h1>
+<p style="color:var(--text-muted);font-size:13px;margin-bottom:20px">
+  Аналіз запускається по одному (щоб не перевантажувати API). Максимум 20 лістингів за раз.
+  Після завершення можна застосувати ціни прямо тут.
+</p>
+
+<!-- Run all button -->
+<div style="display:flex;align-items:center;gap:14px;margin-bottom:22px">
+  <button id="btn-run-all" class="button default"
+          style="padding:9px 24px;font-size:13px;font-weight:700">
+    ▶ Запустити всі ({{ count }})
+  </button>
+  <span id="global-progress" style="font-size:13px;color:var(--text-muted)"></span>
+  <a href="../" style="color:var(--text-muted);font-size:12px;margin-left:auto">← Назад</a>
+</div>
+
+<div id="listings-wrap"></div>
+
+<script>
+(function(){
+  var LISTINGS = {{ listings_json|safe }};
+  var CSRF = "{{ csrf_token }}";
+  var wrap = document.getElementById('listings-wrap');
+  var btnRunAll = document.getElementById('btn-run-all');
+  var globalProg = document.getElementById('global-progress');
+
+  // ── Build initial cards ──────────────────────────────────────────────────
+  LISTINGS.forEach(function(l, idx){
+    var card = document.createElement('div');
+    card.className = 'ai-card';
+    card.id = 'card-' + l.pk;
+    card.innerHTML =
+      '<div class="ai-row-header" onclick="toggleBody(' + l.pk + ')">' +
+        '<span style="font-family:monospace;font-weight:700;color:var(--text,#c9d8e4);min-width:90px">' + esc(l.sku) + '</span>' +
+        '<span style="flex:1;font-size:12px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(l.title) + '">' + esc(l.title) + '</span>' +
+        '<span id="status-' + l.pk + '" style="font-size:11px;color:var(--text-muted);min-width:100px;text-align:right">Очікує</span>' +
+        '<button class="run-btn" id="run-btn-' + l.pk + '" onclick="event.stopPropagation();runOne(' + l.pk + ', ' + idx + ')">▶ Аналіз</button>' +
+        '<span style="font-size:18px;color:var(--text-muted);margin-left:4px;transition:transform .2s" id="chevron-' + l.pk + '">›</span>' +
+      '</div>' +
+      '<div class="ai-row-body" id="body-' + l.pk + '"></div>';
+    wrap.appendChild(card);
+  });
+
+  function toggleBody(pk){
+    var body = document.getElementById('body-' + pk);
+    var chev = document.getElementById('chevron-' + pk);
+    var open = body.classList.toggle('open');
+    chev.style.transform = open ? 'rotate(90deg)' : '';
+  }
+
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  var stratColors = {
+    bulk_volume:  {bg:'rgba(46,125,50,.2)',  color:'#66bb6a'},
+    small_batch:  {bg:'rgba(21,101,192,.2)', color:'#42a5f5'},
+    balanced:     {bg:'rgba(123,31,162,.2)', color:'#ce93d8'}
+  };
+
+  function setStatus(pk, html){ document.getElementById('status-' + pk).innerHTML = html; }
+
+  // ── Run one ──────────────────────────────────────────────────────────────
+  function runOne(pk, idx){
+    var listing = LISTINGS[idx];
+    var btn     = document.getElementById('run-btn-' + pk);
+    var body    = document.getElementById('body-' + pk);
+    btn.disabled = true;
+    body.classList.add('open');
+    document.getElementById('chevron-' + pk).style.transform = 'rotate(90deg)';
+    body.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:8px 0"><div class="spin"></div><span style="color:var(--text-muted);font-size:13px">Claude аналізує…</span></div>';
+    setStatus(pk, '<span style="color:#42a5f5">⏳ Аналіз…</span>');
+
+    fetch(listing.run_url, {
+      method:'POST',
+      headers:{'X-CSRFToken': CSRF, 'Content-Type':'application/x-www-form-urlencoded'},
+      body:''
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      btn.disabled = false;
+      if (!data.ok){ renderError(pk, data.error || 'Помилка'); return; }
+      renderResult(pk, idx, data.result, data.sales);
+    })
+    .catch(function(e){
+      btn.disabled = false;
+      renderError(pk, 'Мережева помилка: ' + e.message);
+    });
+  }
+  window.runOne = runOne;
+
+  function renderError(pk, msg){
+    setStatus(pk, '<span style="color:#ef5350">❌ Помилка</span>');
+    document.getElementById('body-' + pk).innerHTML =
+      '<div style="color:#ef9a9a;font-size:13px;padding:8px 0">❌ ' + esc(msg) + '</div>';
+  }
+
+  function renderResult(pk, idx, r, sales){
+    var listing = LISTINGS[idx];
+    var sc = stratColors[r.strategy] || stratColors['balanced'];
+    setStatus(pk,
+      '<span class="badge-strategy" style="background:' + sc.bg + ';color:' + sc.color + ';border:1px solid ' + sc.color + '40">' +
+      esc(r.strategy_name || r.strategy) + '</span>' +
+      '<span style="margin-left:6px;color:#' + (r.quality_score >= 7 ? '66bb6a' : r.quality_score >= 4 ? 'ffa726' : 'ef5350') + ';font-size:11px;font-weight:700">' +
+      (r.quality_score || '?') + '/10</span>'
+    );
+
+    // Price chips
+    var priceHtml = (r.recommended_prices || []).map(function(p){
+      return '<span class="price-chip">від ' + p.qty + ' шт. $' + Number(p.price).toFixed(4) + '</span>';
+    }).join('');
+
+    // Quality issues
+    var issuesHtml = '';
+    if (r.quality_issues && r.quality_issues.length){
+      issuesHtml = r.quality_issues.slice(0, 4).map(function(qi){
+        return '<div class="sev-' + (qi.severity||'info') + '" style="font-size:12px">' +
+          '<strong>' + esc(qi.field||'') + '</strong>: ' + esc(qi.issue||'') +
+          (qi.fix ? '<br><span style="color:var(--text-muted);font-size:11px">💡 ' + esc(qi.fix) + '</span>' : '') +
+          '</div>';
+      }).join('');
+    } else {
+      issuesHtml = '<span style="color:#66bb6a;font-size:12px">✅ Серйозних проблем не знайдено</span>';
+    }
+
+    var applyId = 'apply-' + pk;
+    var applyStatusId = 'applyst-' + pk;
+    document.getElementById('body-' + pk).innerHTML =
+      // Strategy
+      '<div style="margin-bottom:10px">' +
+        '<span class="badge-strategy" style="background:' + sc.bg + ';color:' + sc.color + ';border:1px solid ' + sc.color + '40">' + esc(r.strategy_name||r.strategy) + '</span>' +
+        '<span style="font-size:12px;color:var(--text-muted);margin-left:10px">' + esc(r.strategy_explanation||'') + '</span>' +
+      '</div>' +
+      // Prices
+      '<div style="margin-bottom:10px">' +
+        '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Рекомендовані ціни</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">' + priceHtml + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-top:4px">' + esc(r.price_change_summary||'') + '</div>' +
+      '</div>' +
+      // Apply button
+      '<div style="margin-bottom:12px">' +
+        '<button class="apply-btn" id="' + applyId + '" onclick="applyPrices(' + pk + ',' + idx + ')">' +
+          '✅ Застосувати ціни' +
+        '</button>' +
+        '<span id="' + applyStatusId + '" style="margin-left:8px;font-size:12px;color:var(--text-muted)"></span>' +
+        '<a href="' + listing.advisor_url + '" style="margin-left:14px;font-size:12px;color:var(--text-muted)">Повний аналіз ›</a>' +
+      '</div>' +
+      // Quality
+      '<div>' +
+        '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">' +
+          'Якість лістингу: ' + (r.quality_score||'?') + '/10 — ' + esc(r.quality_summary||'') +
+        '</div>' +
+        issuesHtml +
+      '</div>';
+
+    // Store recommended prices for apply
+    LISTINGS[idx]._recommended = r.recommended_prices || [];
+  }
+
+  // ── Apply prices ──────────────────────────────────────────────────────────
+  function applyPrices(pk, idx){
+    var listing = LISTINGS[idx];
+    var prices = listing._recommended || [];
+    if (!prices.length){ return; }
+    if (!confirm('Застосувати рекомендовані ціни для ' + listing.sku + '?')){ return; }
+    var btn = document.getElementById('apply-' + pk);
+    var st  = document.getElementById('applyst-' + pk);
+    btn.disabled = true;
+    st.textContent = 'Зберігаємо…';
+
+    var body = 'apply_prices=1';
+    prices.forEach(function(p){ body += '&price_' + p.qty + '=' + encodeURIComponent(Number(p.price).toFixed(4)); });
+
+    fetch(listing.run_url, {
+      method:'POST',
+      headers:{'X-CSRFToken': CSRF, 'Content-Type':'application/x-www-form-urlencoded'},
+      body: body
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      btn.disabled = false;
+      if (data.ok && data.prices_applied){
+        st.textContent = '✅ Збережено!';
+        st.style.color = '#66bb6a';
+      } else {
+        st.textContent = '❌ ' + (data.error || 'Помилка');
+        st.style.color = '#ef5350';
+        btn.disabled = false;
+      }
+    })
+    .catch(function(e){
+      btn.disabled = false;
+      st.textContent = '❌ ' + e.message;
+      st.style.color = '#ef5350';
+    });
+  }
+  window.applyPrices = applyPrices;
+
+  // ── Run all sequentially ──────────────────────────────────────────────────
+  btnRunAll.addEventListener('click', function(){
+    btnRunAll.disabled = true;
+    var queue = LISTINGS.map(function(l, i){ return {pk: l.pk, idx: i}; });
+    var done = 0;
+
+    function next(){
+      if (!queue.length){
+        globalProg.textContent = '✅ Всі ' + LISTINGS.length + ' проаналізовано';
+        btnRunAll.disabled = false;
+        return;
+      }
+      var item = queue.shift();
+      globalProg.textContent = (done + 1) + ' / ' + LISTINGS.length + ' …';
+      var listing = LISTINGS[item.idx];
+      var btn = document.getElementById('run-btn-' + item.pk);
+      var body = document.getElementById('body-' + item.pk);
+      btn.disabled = true;
+      body.classList.add('open');
+      document.getElementById('chevron-' + item.pk).style.transform = 'rotate(90deg)';
+      body.innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:8px 0"><div class="spin"></div><span style="color:var(--text-muted);font-size:13px">Claude аналізує…</span></div>';
+      setStatus(item.pk, '<span style="color:#42a5f5">⏳ Аналіз…</span>');
+
+      fetch(listing.run_url, {
+        method:'POST',
+        headers:{'X-CSRFToken': CSRF, 'Content-Type':'application/x-www-form-urlencoded'},
+        body:''
+      })
+      .then(function(r){ return r.json(); })
+      .then(function(data){
+        btn.disabled = false;
+        done++;
+        if (!data.ok){ renderError(item.pk, data.error || 'Помилка'); }
+        else          { renderResult(item.pk, item.idx, data.result, data.sales); }
+        next();
+      })
+      .catch(function(e){
+        btn.disabled = false;
+        done++;
+        renderError(item.pk, 'Мережева помилка: ' + e.message);
+        next();
+      });
+    }
+    next();
+  });
+
+})();
+</script>
+{% endblock %}

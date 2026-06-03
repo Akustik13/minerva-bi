@@ -1222,7 +1222,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     change_form_template = 'admin/bots/digikeylisting/change_form.html'
 
     list_display   = ('product_sku_link', 'dk_title', 'category_type',
-                      'stock_qty_display', 'sync_status_badge', 'price_delta_badge',
+                      'stock_qty_display', 'dk_qty_display',
+                      'sync_status_badge', 'price_delta_badge',
                       'last_synced_at', 'publish_btn')
     list_filter    = ('sync_status', 'category_type', 'dk_is_active')
     search_fields  = ('product__sku', 'dk_title', 'dk_supplier_sku')
@@ -1230,6 +1231,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     actions        = [
         'action_sync_qty',
         'action_bulk_pull',
+        'action_bulk_ai_analysis',
         'action_bulk_publish',
         'action_bulk_activate',
         'action_bulk_deactivate',
@@ -1683,12 +1685,12 @@ Rules:
                 messages=[{'role': 'user', 'content': prompt}],
             )
             raw = response.content[0].text.strip()
-            # strip markdown fences if Claude wraps in ```json
-            if raw.startswith('```'):
-                raw = raw.split('```')[1]
-                if raw.startswith('json'):
-                    raw = raw[4:]
-            result = json.loads(raw)
+            # Extract the JSON object robustly: find first { ... last }
+            import re as _re
+            m = _re.search(r'\{[\s\S]*\}', raw)
+            if not m:
+                raise ValueError(f"Claude did not return JSON. Response: {raw[:300]}")
+            result = json.loads(m.group(0))
         except Exception as exc:
             return JsonResponse({'error': str(exc)}, status=500)
 
@@ -2018,6 +2020,33 @@ Rules:
         if err:
             self.message_user(request, f"⚠️ Помилки для {err} лістингів — перевір Last Error.", messages.WARNING)
 
+    @admin.action(description='🤖 AI-аналіз ціноутворення (масово)')
+    def action_bulk_ai_analysis(self, request, queryset):
+        import json as _json
+        from django.template.response import TemplateResponse
+
+        listings = list(queryset.select_related('product')[:20])  # cap at 20 to avoid timeout
+        if not listings:
+            self.message_user(request, "Немає лістингів для аналізу.", messages.WARNING)
+            return
+
+        return TemplateResponse(request, 'admin/bots/digikeylisting/bulk_ai_analysis.html', {
+            'title':       'AI-аналіз ціноутворення',
+            'count':       len(listings),
+            'listings_json': _json.dumps([
+                {
+                    'pk':       l.pk,
+                    'sku':      l.product.sku,
+                    'title':    l.dk_title or l.product.sku,
+                    'run_url':  reverse('admin:bots_digikeylisting_ai_run', args=[l.pk]),
+                    'change_url': reverse('admin:bots_digikeylisting_change', args=[l.pk]),
+                    'advisor_url': reverse('admin:bots_digikeylisting_ai_advisor', args=[l.pk]),
+                }
+                for l in listings
+            ], ensure_ascii=False),
+            'opts':        self.model._meta,
+        })
+
     # ── Display helpers ───────────────────────────────────────────────────────
 
     def product_sku_link(self, obj):
@@ -2035,7 +2064,24 @@ Rules:
         qty = obj.get_stock_qty()
         color = 'var(--ok)' if qty > 0 else 'var(--err)'
         return format_html('<span style="color:{};font-weight:600">{} шт.</span>', color, qty)
-    stock_qty_display.short_description = 'Залишок'
+    stock_qty_display.short_description = 'Склад'
+
+    def dk_qty_display(self, obj):
+        if obj.dk_quantity_override is not None:
+            qty = obj.dk_quantity_override
+            color = '#66bb6a' if qty > 0 else '#ef5350'
+            return format_html(
+                '<span style="color:{};font-weight:700">{}</span>'
+                '<span style="color:var(--text-muted);font-size:10px;margin-left:3px">ов.</span>',
+                color, qty,
+            )
+        qty = obj.dk_quantity_available
+        if qty is not None:
+            color = '#66bb6a' if qty > 0 else '#ef5350'
+            return format_html('<span style="color:{};font-weight:600">{}</span>', color, qty)
+        return format_html('<span style="color:var(--text-muted);font-size:11px">—</span>')
+    dk_qty_display.short_description = 'DigiKey'
+    dk_qty_display.admin_order_field = 'dk_quantity_override'
 
     def price_delta_badge(self, obj):
         d = obj.price_delta_pct
