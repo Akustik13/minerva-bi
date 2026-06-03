@@ -1,0 +1,213 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Масова зміна залишків — DigiKey лістинги{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+#preview-tbody tr:hover td { background:rgba(255,255,255,.03); }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>📦 Масова зміна залишків <span style="font-size:14px;color:var(--text-muted);font-weight:400">({{ count }} лістингів)</span></h1>
+
+<form method="post" id="bulk-stock-form">
+  {% csrf_token %}
+  <input type="hidden" name="action"        value="action_bulk_stock">
+  <input type="hidden" name="apply"         value="1">
+  <input type="hidden" name="select_across" value="0">
+  {% for pk in pks %}
+  <input type="hidden" name="_selected_action" value="{{ pk }}">
+  {% endfor %}
+
+  <!-- ── Qty input ── -->
+  <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+              border-radius:8px;padding:20px 24px;margin-bottom:20px;max-width:520px">
+
+    <label style="font-size:12px;font-weight:600;color:var(--text-muted,#9aafbe);
+                  text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:12px">
+      Новий залишок (шт.) — для всіх {{ count }} лістингів
+    </label>
+
+    <!-- Spinner -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="display:flex;align-items:stretch;border:1px solid var(--border-strong,#243347);
+                  border-radius:6px;overflow:hidden;height:46px">
+        <button type="button" id="btn-minus"
+                style="width:46px;background:rgba(198,40,40,.18);color:#ef5350;border:none;cursor:pointer;
+                       font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center">−</button>
+        <input id="inp-qty" type="number" step="1" min="0" value=""
+               placeholder="0"
+               style="width:100px;text-align:center;padding:0 8px;background:var(--bg-input,#141f2b);
+                      color:var(--text,#c9d8e4);border:none;
+                      border-left:1px solid var(--border-strong,#243347);
+                      border-right:1px solid var(--border-strong,#243347);
+                      font-size:20px;font-weight:700;outline:none;-moz-appearance:textfield"
+               name="new_qty">
+        <button type="button" id="btn-plus"
+                style="width:46px;background:rgba(46,125,50,.18);color:#66bb6a;border:none;cursor:pointer;
+                       font-size:22px;font-weight:700;display:flex;align-items:center;justify-content:center">+</button>
+      </div>
+      <span style="font-size:14px;color:var(--text-muted,#9aafbe);font-weight:600">шт.</span>
+    </div>
+
+    <!-- Quick qty buttons -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
+      <button type="button" class="qqty" data-v="0"
+              style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
+                     border:1px solid var(--border-strong,#243347);background:rgba(198,40,40,.12);color:#ef9a9a">0</button>
+      <button type="button" class="qqty" data-v="1"
+              style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
+                     border:1px solid var(--border-strong,#243347);background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4)">1</button>
+      <button type="button" class="qqty" data-v="5"
+              style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
+                     border:1px solid var(--border-strong,#243347);background:var(--bg-hover,#1e2d40);color:var(--text,#c9d8e4)">5</button>
+      <button type="button" class="qqty" data-v="10"
+              style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
+                     border:1px solid var(--border-strong,#243347);background:rgba(46,125,50,.12);color:#a5d6a7">10</button>
+      <button type="button" class="qqty" data-v="25"
+              style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
+                     border:1px solid var(--border-strong,#243347);background:rgba(46,125,50,.12);color:#a5d6a7">25</button>
+      <button type="button" class="qqty" data-v="50"
+              style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
+                     border:1px solid var(--border-strong,#243347);background:rgba(46,125,50,.12);color:#a5d6a7">50</button>
+      <button type="button" class="qqty" data-v="100"
+              style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
+                     border:1px solid var(--border-strong,#243347);background:rgba(46,125,50,.12);color:#a5d6a7">100</button>
+    </div>
+
+    <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text,#c9d8e4)">
+      <input type="checkbox" name="push_to_dk" value="1" checked style="width:15px;height:15px">
+      Опублікувати на DigiKey одразу (тільки з Offer ID)
+    </label>
+  </div>
+
+  <!-- ── Preview table ── -->
+  <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+              border-radius:8px;margin-bottom:20px;overflow-x:auto">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--border-strong,#243347)">
+      <span style="font-size:13px;font-weight:600;color:var(--text,#c9d8e4)">📋 Залишки: поточні → нові</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:520px">
+      <thead>
+        <tr style="background:var(--bg-hover,#1e2d40)">
+          <th style="padding:7px 14px;text-align:left;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347)">SKU</th>
+          <th style="padding:7px 14px;text-align:left;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);max-width:220px">Назва</th>
+          <th style="padding:7px 12px;text-align:center;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:90px">Склад</th>
+          <th style="padding:7px 12px;text-align:center;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:90px">DigiKey зараз</th>
+          <th style="padding:7px 4px;text-align:center;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:20px">→</th>
+          <th style="padding:7px 12px;text-align:center;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:100px">Стане</th>
+          <th style="padding:7px 10px;text-align:center;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:60px">Offer</th>
+        </tr>
+      </thead>
+      <tbody id="preview-tbody"></tbody>
+    </table>
+  </div>
+
+  <!-- ── Submit ── -->
+  <div style="display:flex;align-items:center;gap:14px">
+    <button type="submit" id="apply-btn" class="button default" disabled
+            style="padding:10px 26px;font-size:13px;font-weight:700;opacity:.4;cursor:not-allowed">
+      ✅ Застосувати до {{ count }} лістингів
+    </button>
+    <a href="../" style="color:var(--text-muted);font-size:13px">Скасувати</a>
+  </div>
+</form>
+
+<script>
+(function(){
+  var LISTINGS = {{ listings_json|safe }};
+  var COUNT    = {{ count }};
+  var inp      = document.getElementById('inp-qty');
+  var tbody    = document.getElementById('preview-tbody');
+  var applyBtn = document.getElementById('apply-btn');
+
+  function setApply(on){
+    applyBtn.disabled = !on;
+    applyBtn.style.opacity = on ? '1' : '.4';
+    applyBtn.style.cursor  = on ? 'pointer' : 'not-allowed';
+  }
+
+  function buildRows(newQty){
+    tbody.innerHTML = '';
+    if (!LISTINGS.length){
+      tbody.innerHTML = '<tr><td colspan="7" style="padding:14px;text-align:center;color:var(--text-muted)">Немає лістингів</td></tr>';
+      return;
+    }
+    LISTINGS.forEach(function(l){
+      var hasOffer = l.has_offer;
+      var cur      = l.dk_override !== null ? l.dk_override : (l.dk_current !== null ? l.dk_current : '—');
+      var curStr   = cur === '—' ? '<span style="color:var(--text-muted)">—</span>' : cur;
+
+      var newStr, newClr;
+      if (newQty === null){
+        newStr = '<span style="color:var(--text-muted)">?</span>';
+        newClr = 'var(--text-muted)';
+      } else {
+        var diff = typeof cur === 'number' ? newQty - cur : null;
+        newClr = newQty === 0 ? '#ef5350' : '#66bb6a';
+        if (diff !== null && diff === 0) newClr = 'var(--text,#c9d8e4)';
+        newStr = '<span style="font-weight:700;color:'+newClr+'">'+newQty+'</span>';
+      }
+
+      var offerBadge = hasOffer
+        ? '<span style="color:#66bb6a;font-size:11px;font-weight:700">✓</span>'
+        : '<span style="color:var(--text-muted);font-size:11px">—</span>';
+
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td style="padding:7px 14px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4);white-space:nowrap">'+l.sku+'</td>'+
+        '<td style="padding:7px 14px;color:var(--text-muted,#9aafbe);font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+l.title+'">'+l.title+'</td>'+
+        '<td style="padding:7px 12px;text-align:center;color:var(--text,#c9d8e4)">'+l.wh_qty+'</td>'+
+        '<td style="padding:7px 12px;text-align:center;color:var(--text,#c9d8e4)">'+curStr+'</td>'+
+        '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">→</td>'+
+        '<td style="padding:7px 12px;text-align:center">'+newStr+'</td>'+
+        '<td style="padding:7px 10px;text-align:center">'+offerBadge+'</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function refresh(){
+    var raw = inp.value.trim();
+    var val = raw === '' ? null : parseInt(raw);
+    var ok  = val !== null && !isNaN(val) && val >= 0;
+    setApply(ok);
+    buildRows(ok ? val : null);
+  }
+
+  inp.addEventListener('input',  refresh);
+  inp.addEventListener('change', refresh);
+
+  document.getElementById('btn-plus').addEventListener('click', function(){
+    var v = parseInt(inp.value) || 0;
+    inp.value = v + 1; refresh();
+  });
+  document.getElementById('btn-minus').addEventListener('click', function(){
+    var v = parseInt(inp.value) || 0;
+    inp.value = Math.max(0, v - 1); refresh();
+  });
+  document.querySelectorAll('.qqty').forEach(function(btn){
+    btn.addEventListener('click', function(){ inp.value = btn.dataset.v; refresh(); });
+  });
+
+  document.getElementById('bulk-stock-form').addEventListener('submit', function(e){
+    var val = parseInt(inp.value);
+    if (isNaN(val) || val < 0){ e.preventDefault(); return; }
+    if (!confirm('Встановити залишок ' + val + ' шт. для ' + COUNT + ' лістингів?'))
+      { e.preventDefault(); }
+  });
+
+  buildRows(null);
+})();
+</script>
+{% endblock %}

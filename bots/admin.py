@@ -1225,6 +1225,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'action_bulk_activate',
         'action_bulk_deactivate',
         'action_bulk_prices',
+        'action_bulk_stock',
     ]
     save_as        = True
 
@@ -1742,6 +1743,67 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'pks':             list(queryset.values_list('pk', flat=True)),
             'opts':            self.model._meta,
             'no_prices_count': no_prices_count,
+        })
+
+    # ── Bulk action: set stock quantity ──────────────────────────────────────
+
+    @admin.action(description='📦 Встановити залишок (масово)')
+    def action_bulk_stock(self, request, queryset):
+        import json
+        from django.template.response import TemplateResponse
+        from bots.services.dk_marketplace import update_offer, DKMarketplaceError
+
+        if 'apply' in request.POST:
+            try:
+                new_qty = int(request.POST.get('new_qty', '').strip())
+                if new_qty < 0:
+                    raise ValueError
+            except (ValueError, TypeError):
+                self.message_user(request, "❌ Невалідна кількість.", messages.ERROR)
+                return
+
+            push_to_dk = request.POST.get('push_to_dk') == '1'
+            config     = DigiKeyConfig.get() if push_to_dk else None
+            updated = pushed = err = 0
+
+            for listing in queryset.select_related('product'):
+                listing.dk_quantity_override = new_qty
+                listing.save(update_fields=['dk_quantity_override'])
+                updated += 1
+                if push_to_dk and listing.dk_offer_id and config:
+                    try:
+                        update_offer(config, listing)
+                        pushed += 1
+                    except Exception as exc:
+                        logger.warning("bulk_stock push failed %s: %s", listing.pk, exc)
+                        err += 1
+
+            msg = f"✅ Залишок {new_qty} шт встановлено для {updated} лістингів"
+            if pushed:
+                msg += f", {pushed} опубліковано на DigiKey"
+            self.message_user(request, msg + ".", messages.SUCCESS)
+            if err:
+                self.message_user(request, f"⚠️ Не вдалося опублікувати: {err} лістингів.", messages.WARNING)
+            return
+
+        listings_data = []
+        for listing in queryset.select_related('product'):
+            listings_data.append({
+                'pk':          listing.pk,
+                'sku':         listing.product.sku if listing.product else str(listing.pk),
+                'title':       listing.dk_title or '',
+                'wh_qty':      listing.get_stock_qty(),
+                'dk_override': listing.dk_quantity_override,
+                'dk_current':  listing.dk_quantity_available,
+                'has_offer':   bool(listing.dk_offer_id),
+            })
+
+        return TemplateResponse(request, 'admin/bots/digikeylisting/bulk_stock.html', {
+            'title':         'Масова зміна залишків',
+            'count':         queryset.count(),
+            'listings_json': json.dumps(listings_data, ensure_ascii=False),
+            'pks':           list(queryset.values_list('pk', flat=True)),
+            'opts':          self.model._meta,
         })
 
     # ── Display helpers ───────────────────────────────────────────────────────
