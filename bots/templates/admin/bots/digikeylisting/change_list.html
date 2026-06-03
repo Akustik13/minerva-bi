@@ -1,0 +1,148 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+
+{# ── Bulk-pull progress toolbar ────────────────────────────────────────────── #}
+<div id="pull-toolbar" style="
+  display:none;position:sticky;top:0;z-index:900;
+  background:linear-gradient(90deg,#0d1e2e 0%,#0e2035 100%);
+  border-bottom:2px solid #1565c0;
+  padding:11px 20px;align-items:center;gap:14px;
+  box-shadow:0 3px 14px rgba(0,0,0,.5);
+">
+  <div style="font-size:19px;flex-shrink:0">⬇️</div>
+  <div style="flex:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:5px;flex-wrap:wrap">
+      <span id="pull-label" style="font-size:13px;font-weight:700;color:#c9d8e4">
+        Стягування даних з DigiKey…
+      </span>
+      <span id="pull-counter" style="font-size:12px;color:#42a5f5;font-weight:600;white-space:nowrap"></span>
+      <span id="pull-sku"
+            style="font-size:11px;color:#9aafbe;font-family:monospace;
+                   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px"></span>
+      <span id="pull-err-badge" style="display:none;font-size:11px;font-weight:700;
+            color:#ffa726;background:rgba(245,127,23,.15);
+            border:1px solid rgba(245,127,23,.35);border-radius:4px;padding:1px 8px"></span>
+    </div>
+    <div style="height:5px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
+      <div id="pull-bar" style="height:100%;width:0%;
+           background:linear-gradient(90deg,#1565c0,#42a5f5);
+           border-radius:3px;transition:width .4s ease"></div>
+    </div>
+  </div>
+  <button id="pull-stop-btn" onclick="pullStop()"
+          style="padding:6px 16px;background:rgba(198,40,40,.2);color:#ef5350;
+                 border:1px solid rgba(198,40,40,.4);border-radius:6px;
+                 font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">
+    ⛔ Зупинити
+  </button>
+  <div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.12);
+              border-top-color:#42a5f5;border-radius:50%;flex-shrink:0;
+              animation:dkpullspin .7s linear infinite"></div>
+</div>
+
+{# ── Finished / cancelled banner ─────────────────────────────────────────── #}
+<div id="pull-done" style="display:none;background:#0a2218;
+     border-bottom:2px solid #2e7d32;padding:10px 20px;
+     align-items:center;gap:12px;">
+  <span id="pull-done-msg" style="font-size:13px;font-weight:700;color:#a5d6a7;flex:1"></span>
+  <button onclick="document.getElementById('pull-done').style.display='none'"
+          style="font-size:18px;background:none;border:none;color:#9aafbe;cursor:pointer">✕</button>
+</div>
+
+<style>
+@keyframes dkpullspin { to { transform:rotate(360deg); } }
+</style>
+
+<script>
+(function(){
+  var STATUS_URL = "{{ pull_task_status_url }}";
+  var CANCEL_URL = "{{ pull_task_cancel_url }}";
+  var toolbar    = document.getElementById('pull-toolbar');
+  var doneBanner = document.getElementById('pull-done');
+  var pollTimer  = null;
+  var wasRunning = false;
+
+  function show(el){ el.style.display = 'flex'; }
+  function hide(el){ el.style.display = 'none'; }
+
+  function applyProgress(p){
+    var done  = p.done  || 0;
+    var total = p.total || 0;
+    var sku   = p.sku   || '';
+    var err   = p.err   || 0;
+    var pct   = total > 0 ? Math.round(done / total * 100) : 0;
+
+    document.getElementById('pull-bar').style.width = (total > 0 ? pct : 0) + '%';
+    document.getElementById('pull-counter').textContent =
+      total > 0 ? (done + ' / ' + total + ' (' + pct + '%)') : '';
+    document.getElementById('pull-sku').textContent = sku ? ('→ ' + sku) : '';
+
+    var eb = document.getElementById('pull-err-badge');
+    if (err > 0){
+      eb.style.display = 'inline';
+      eb.textContent   = '⚠️ ' + err + ' помилок';
+    } else {
+      eb.style.display = 'none';
+    }
+  }
+
+  function onData(data){
+    if (data.status === 'running'){
+      wasRunning = true;
+      show(toolbar);
+      hide(doneBanner);
+      try { applyProgress(data.progress); } catch(e){}
+      if (!pollTimer) startPolling();
+    } else {
+      hide(toolbar);
+      if (wasRunning){
+        wasRunning = false;
+        stopPolling();
+        var msg = data.message || '✅ Завершено';
+        document.getElementById('pull-done-msg').textContent = msg;
+        show(doneBanner);
+        setTimeout(function(){ hide(doneBanner); }, 10000);
+      }
+    }
+  }
+
+  function poll(){
+    fetch(STATUS_URL, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .then(function(r){ return r.json(); })
+      .then(onData)
+      .catch(function(){});
+  }
+
+  function startPolling(){
+    if (!pollTimer) pollTimer = setInterval(poll, 1500);
+  }
+  function stopPolling(){
+    if (pollTimer){ clearInterval(pollTimer); pollTimer = null; }
+  }
+
+  window.pullStop = function(){
+    var btn = document.getElementById('pull-stop-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Скасовуємо…';
+    document.getElementById('pull-label').textContent = 'Скасування після поточного елемента…';
+    fetch(CANCEL_URL, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .catch(function(){});
+  };
+
+  // On page load: if task was running server-side, start polling immediately
+  {% if pull_task_active %}
+  wasRunning = true;
+  show(toolbar);
+  startPolling();
+  poll();
+  {% else %}
+  // Single check in case task just started or just finished
+  poll();
+  {% endif %}
+})();
+</script>
+
+{{ block.super }}
+{% endblock %}

@@ -1336,6 +1336,23 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             return redirect(reverse('admin:bots_digikeylisting_change', args=[obj.pk]))
         return super().response_change(request, obj)
 
+    # ── changelist_view: inject pull-task toolbar context ─────────────────────
+
+    def changelist_view(self, request, extra_context=None):
+        extra_context = extra_context or {}
+        extra_context['pull_task_status_url'] = reverse('admin:bots_digikeylisting_pull_task_status')
+        extra_context['pull_task_cancel_url']  = reverse('admin:bots_digikeylisting_pull_task_cancel')
+        try:
+            t = BotTask.objects.get(name=self.PULL_TASK_NAME)
+            extra_context['pull_task_active']  = t.status == BotTask.RUNNING
+            extra_context['pull_task_message'] = t.message
+            extra_context['pull_task_status']  = t.status
+        except BotTask.DoesNotExist:
+            extra_context['pull_task_active']  = False
+            extra_context['pull_task_message'] = ''
+            extra_context['pull_task_status']  = 'idle'
+        return super().changelist_view(request, extra_context)
+
     # ── change_view: inject buttons ───────────────────────────────────────────
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
@@ -1385,6 +1402,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/ai-run/',
                  self.admin_site.admin_view(self.ai_run_view),
                  name='bots_digikeylisting_ai_run'),
+            path('pull-task/status/',
+                 self.admin_site.admin_view(self.pull_task_status_view),
+                 name='bots_digikeylisting_pull_task_status'),
+            path('pull-task/cancel/',
+                 self.admin_site.admin_view(self.pull_task_cancel_view),
+                 name='bots_digikeylisting_pull_task_cancel'),
         ]
         return custom + urls
 
@@ -2016,24 +2039,86 @@ Rules:
             'opts':          self.model._meta,
         })
 
+    PULL_TASK_NAME = 'bulk_pull_dk'
+
     @admin.action(description='⬇️ Стягнути дані з DigiKey (масово)')
     def action_bulk_pull(self, request, queryset):
-        from bots.services.dk_marketplace import pull_product_fields, DKMarketplaceError
-        ok = err = 0
-        for listing in queryset.select_related('product'):
+        import threading, json as _json
+
+        if BotTask.objects.filter(name=self.PULL_TASK_NAME, status=BotTask.RUNNING).exists():
+            self.message_user(request, "⚠️ Стягування вже виконується у фоні.", messages.WARNING)
+            return
+
+        pks   = list(queryset.values_list('pk', flat=True))
+        total = len(pks)
+        task  = BotTask.start(self.PULL_TASK_NAME)
+        task.set_progress(_json.dumps({'done': 0, 'total': total, 'sku': '', 'err': 0}))
+
+        def _run():
+            from bots.services.dk_marketplace import pull_product_fields
+            done = err = 0
             try:
-                pull_product_fields(listing)
-                ok += 1
+                for pk in pks:
+                    if task.is_cancelled():
+                        raise InterruptedError(f"⛔ Скасовано після {done}/{total}")
+                    try:
+                        listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+                        sku     = listing.product.sku
+                        task.set_progress(_json.dumps({'done': done, 'total': total, 'sku': sku, 'err': err}))
+                        pull_product_fields(listing)
+                        done += 1
+                    except InterruptedError:
+                        raise
+                    except Exception as exc:
+                        err += 1
+                        try:
+                            listing.sync_status = DigiKeyListing.SYNC_ERROR
+                            listing.last_error  = str(exc)[:500]
+                            listing.save(update_fields=['sync_status', 'last_error'])
+                        except Exception:
+                            pass
+                        logger.warning("bulk_pull pk=%s: %s", pk, exc)
+                    task.set_progress(_json.dumps({'done': done, 'total': total, 'sku': '', 'err': err}))
+                msg = f"✅ Готово: {done}/{total} оновлено"
+                if err:
+                    msg += f", ⚠️ {err} помилок"
+                task.finish(msg)
+            except InterruptedError as e:
+                task.finish(str(e))
             except Exception as exc:
-                listing.sync_status = DigiKeyListing.SYNC_ERROR
-                listing.last_error  = str(exc)[:500]
-                listing.save(update_fields=['sync_status', 'last_error'])
-                logger.warning("bulk_pull failed %s: %s", listing.product.sku, exc)
-                err += 1
-        if ok:
-            self.message_user(request, f"✅ Дані стягнуто з DigiKey для {ok} лістингів.", messages.SUCCESS)
-        if err:
-            self.message_user(request, f"⚠️ Помилки для {err} лістингів — перевір Last Error.", messages.WARNING)
+                task.finish(f"❌ {exc}", error=True)
+                logger.error("bulk_pull FAILED: %s", exc, exc_info=True)
+            finally:
+                from django.db import connection
+                connection.close()
+
+        threading.Thread(target=_run, daemon=True).start()
+        self.message_user(request, f"⏳ Стягування {total} лістингів запущено у фоні. Прогрес видно вгорі списку.", messages.INFO)
+
+    def pull_task_status_view(self, request):
+        import json as _json
+        from django.http import JsonResponse
+        try:
+            t = BotTask.objects.get(name=self.PULL_TASK_NAME)
+            try:
+                prog = _json.loads(t.progress) if t.progress else {}
+            except Exception:
+                prog = {'text': t.progress}
+            return JsonResponse({
+                'status':   t.status,
+                'progress': prog,
+                'message':  t.message,
+                'started':  t.started_at.strftime('%H:%M:%S') if t.started_at else '',
+            })
+        except BotTask.DoesNotExist:
+            return JsonResponse({'status': 'idle', 'progress': {}, 'message': '', 'started': ''})
+
+    def pull_task_cancel_view(self, request):
+        from django.http import JsonResponse
+        updated = BotTask.objects.filter(
+            name=self.PULL_TASK_NAME, status=BotTask.RUNNING
+        ).update(cancel_requested=True)
+        return JsonResponse({'ok': bool(updated)})
 
     @admin.action(description='🤖 AI-аналіз ціноутворення (масово)')
     def action_bulk_ai_analysis(self, request, queryset):
