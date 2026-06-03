@@ -430,6 +430,24 @@ def fetch_offers(config, max_count: int = 500) -> list:
     return all_offers
 
 
+def _parse_dk_price_tiers(raw_prices: list) -> list:
+    """Convert DK API prices list to internal format [{qty, price}, ...].
+
+    DK GET /offers returns either {quantityBreak, price} or {breakQuantity, unitPrice}
+    depending on API version. Handles both.
+    """
+    tiers = []
+    for p in raw_prices:
+        qty   = p.get('quantityBreak') or p.get('breakQuantity') or p.get('qty')
+        price = p.get('price') if p.get('price') is not None else p.get('unitPrice')
+        if qty is not None and price is not None:
+            try:
+                tiers.append({'qty': int(qty), 'price': float(price)})
+            except (TypeError, ValueError):
+                pass
+    return sorted(tiers, key=lambda x: x['qty'])
+
+
 def import_offers_from_dk(task=None) -> dict:
     """Pull all offers from DigiKey and sync to local DigiKeyListing records.
 
@@ -496,11 +514,10 @@ def import_offers_from_dk(task=None) -> dict:
 
         raw_prices = offer.get('prices', [])
         if raw_prices:
-            listing.dk_prices = json.dumps([
-                {'qty': p['quantityBreak'], 'price': float(p['price'])}
-                for p in raw_prices
-            ])
-            update_flds.append('dk_prices')
+            tiers = _parse_dk_price_tiers(raw_prices)
+            if tiers:
+                listing.dk_prices = tiers
+                update_flds.append('dk_prices')
 
         listing.save(update_fields=update_flds)
 
@@ -566,10 +583,7 @@ def create_listings_from_offers(task=None) -> dict:
             continue
 
         raw_prices = offer.get('prices', [])
-        prices_json = json.dumps([
-            {'qty': p['quantityBreak'], 'price': float(p['price'])}
-            for p in raw_prices
-        ]) if raw_prices else '[]'
+        prices_list = _parse_dk_price_tiers(raw_prices) if raw_prices else []
 
         listing = DigiKeyListing.objects.create(
             product          = product,
@@ -582,7 +596,7 @@ def create_listings_from_offers(task=None) -> dict:
             dk_min_order_qty = max(1, int(offer.get('minOrderQuantity') or 1)),
             dk_lead_time_days= int(offer.get('leadTimeToShip') or 0),
             dk_qty_alert     = int(offer.get('minQuantityAlert') or 0),
-            dk_prices        = prices_json,
+            dk_prices        = prices_list,
             sync_status      = DigiKeyListing.SYNC_PUBLISHED,
             last_synced_at   = timezone.now(),
         )
@@ -902,13 +916,8 @@ def pull_product_fields(listing) -> dict:
     if offer:
         raw_prices = offer.get('prices', [])
         if raw_prices:
-            new_prices = sorted(
-                [{'qty': p['quantityBreak'], 'price': float(p['price'])}
-                 for p in raw_prices
-                 if p.get('quantityBreak') and p.get('price') is not None],
-                key=lambda x: x['qty']
-            )
-            if new_prices != (listing.dk_prices or []):
+            new_prices = _parse_dk_price_tiers(raw_prices)
+            if new_prices and new_prices != (listing.dk_prices or []):
                 listing.dk_prices = new_prices
                 changed.append('dk_prices')
 
