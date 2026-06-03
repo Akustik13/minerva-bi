@@ -1485,7 +1485,7 @@ def upload_vat_invoice(config, file_bytes: bytes, filename: str,
     ct = mimetypes.guess_type(filename)[0] or "application/octet-stream"
     resp = logged_request('digikey', 'upload_vat_invoice', 'POST', url, req.post,
                           headers=headers,
-                          files={"file": (filename, file_bytes, ct)},
+                          files={"File": (filename, file_bytes, ct)},
                           params=params,
                           timeout=30)
     raw = {}
@@ -1562,8 +1562,7 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
 
     shipped_quantities: {orderDetailId: quantity} — перевизначає кількості по рядках.
     net_vat_invoice_amount: float — сума рахунку без ПДВ.
-    vat_file_id: str — ID файлу VAT (з upload_vat_invoice); спроба передати як
-                       supplierVATObjectId у tracking entry (undocumented path).
+    vat_file_id: str — зарезервовано (не підтримується у ShipOrderModel, ігнорується).
     Повертає {'ok': bool, 'message': str, 'raw': dict}.
     """
     import requests as req
@@ -1590,10 +1589,6 @@ def ship_marketplace_order(config, order_id: str, tracking_number: str,
     tracking_entry = {"shippingTrackingNumber": tracking_number, "shippedParts": shipped_parts}
     if carrier_id:
         tracking_entry["shippingCarrierId"] = carrier_id
-    if vat_file_id:
-        # Undocumented: supplierVATObjectId присутній у response моделі — спробуємо в request
-        tracking_entry["supplierVATObjectId"] = vat_file_id
-
     payload = {"shippingTracking": [tracking_entry]}
     if invoice_number:
         payload["supplierInvoiceNumber"] = invoice_number
