@@ -403,18 +403,10 @@ def fetch_offers(config, max_count: int = 500) -> list:
     return all_offers
 
 
-def import_offers_from_dk() -> dict:
+def import_offers_from_dk(task=None) -> dict:
     """Pull all offers from DigiKey and sync to local DigiKeyListing records.
 
-    Matching logic (by priority):
-      1. listing.dk_supplier_sku == offer.supplierSku
-      2. listing.product.sku     == offer.supplierSku
-
-    Updates per matched listing:
-      dk_offer_id, dk_product_id, sync_status=published, last_synced_at, last_error
-      dk_prices  — overwritten from DigiKey if offer has prices
-      dk_title   — filled from DigiKey only when blank in Minerva
-
+    task — optional BotTask instance for progress updates and cancellation.
     Returns dict: {updated: N, not_found: [sku, ...]}
     """
     import json
@@ -423,25 +415,30 @@ def import_offers_from_dk() -> dict:
 
     config = DigiKeyConfig.get()
     offers = fetch_offers(config)
+    total  = len(offers)
 
     updated: int    = 0
     not_found: list = []
 
-    for offer in offers:
+    for idx, offer in enumerate(offers, 1):
+        if task and task.is_cancelled():
+            raise InterruptedError("Скасовано користувачем")
+
         offer_id   = offer.get('id', '')
         product_id = offer.get('productId', '')
         sku        = offer.get('supplierSku', '')
         if not sku:
             continue
 
+        if task:
+            task.set_progress(f"[{idx}/{total}] {sku}")
+
         listing = None
-        # 1. match by dk_supplier_sku
         try:
             listing = DigiKeyListing.objects.select_related('product').get(dk_supplier_sku=sku)
         except DigiKeyListing.DoesNotExist:
             pass
 
-        # 2. match by product.sku
         if listing is None:
             try:
                 listing = DigiKeyListing.objects.select_related('product').get(product__sku=sku)
@@ -458,12 +455,10 @@ def import_offers_from_dk() -> dict:
         update_flds = ['dk_offer_id', 'dk_product_id', 'sync_status',
                        'last_synced_at', 'last_error']
 
-        # Pull title only if blank
         if offer.get('title') and not listing.dk_title:
             listing.dk_title = offer['title'][:200]
             update_flds.append('dk_title')
 
-        # Pull prices from DigiKey (overwrite)
         raw_prices = offer.get('prices', [])
         if raw_prices:
             listing.dk_prices = json.dumps([
@@ -474,7 +469,6 @@ def import_offers_from_dk() -> dict:
 
         listing.save(update_fields=update_flds)
 
-        # Auto-fill all product fields (title, description, image, attrs, etc.)
         try:
             pull_product_fields(listing)
         except Exception as pull_exc:
@@ -486,14 +480,10 @@ def import_offers_from_dk() -> dict:
     return {'updated': updated, 'not_found': not_found}
 
 
-def create_listings_from_offers() -> dict:
+def create_listings_from_offers(task=None) -> dict:
     """Create DigiKeyListing records for DigiKey offers that have no listing in Minerva.
 
-    For each unmatched offer:
-      - Looks up Product by sku == offer.supplierSku
-      - If found and no listing exists: creates DigiKeyListing with offer data pre-filled
-      - sync_status = published (offer already live on DigiKey)
-
+    task — optional BotTask instance for progress updates and cancellation.
     Returns: {created: N, already_exists: M, no_product: [sku, ...]}
     """
     import json
@@ -508,24 +498,29 @@ def create_listings_from_offers() -> dict:
 
     config = DigiKeyConfig.get()
     offers = fetch_offers(config)
+    total  = len(offers)
 
     created: int       = 0
     already_exists_cnt = 0
     no_product: list   = []
 
-    for offer in offers:
+    for idx, offer in enumerate(offers, 1):
+        if task and task.is_cancelled():
+            raise InterruptedError("Скасовано користувачем")
+
         sku = offer.get('supplierSku', '')
         if not sku:
             continue
 
-        # Skip if a listing already covers this offer (by dk_supplier_sku or product.sku)
+        if task:
+            task.set_progress(f"[{idx}/{total}] {sku}")
+
         if DigiKeyListing.objects.filter(
             _m.Q(dk_supplier_sku=sku) | _m.Q(product__sku=sku)
         ).exists():
             already_exists_cnt += 1
             continue
 
-        # Find product in inventory
         try:
             product = Product.objects.get(sku=sku)
         except Product.DoesNotExist:
@@ -556,7 +551,6 @@ def create_listings_from_offers() -> dict:
             sync_status      = DigiKeyListing.SYNC_PUBLISHED,
             last_synced_at   = timezone.now(),
         )
-        # Auto-fill all product fields from DigiKey Products API
         try:
             pull_product_fields(listing)
         except Exception as pull_exc:

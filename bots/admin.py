@@ -6,7 +6,7 @@ from django.urls import reverse, path
 from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.utils.html import format_html
-from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing
+from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing, BotTask
 
 
 @admin.register(Bot)
@@ -108,6 +108,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         "token_expires_at",
         "marketplace_auth_status",
         "action_buttons",
+        "task_status_panel",
         "oauth_url_display",
         "webhook_url_display",
     )
@@ -146,7 +147,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             ),
         }),
         ("🔌 Дії", {
-            "fields": ("action_buttons",),
+            "fields": ("action_buttons", "task_status_panel"),
         }),
         ("🔮 Webhook", {
             "fields": ("webhook_enabled", "webhook_secret"),
@@ -262,6 +263,16 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "create-listings/",
                 self.admin_site.admin_view(self.create_listings_view),
                 name="bots_digikeyconfig_create_listings",
+            ),
+            path(
+                "task-status/",
+                self.admin_site.admin_view(self.task_status_view),
+                name="bots_digikeyconfig_task_status",
+            ),
+            path(
+                "task-cancel/",
+                self.admin_site.admin_view(self.task_cancel_view),
+                name="bots_digikeyconfig_task_cancel",
             ),
         ]
         return custom + urls
@@ -844,63 +855,80 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
     def import_offers_view(self, request):
-        """Fetch all DigiKey offers and sync to local DigiKeyListing records (background thread)."""
+        """Start import_offers in a background thread, track via BotTask."""
         import threading
         from bots.services.dk_marketplace import import_offers_from_dk
 
+        task = BotTask.start('import_offers')
+
         def _run():
             try:
-                result    = import_offers_from_dk()
-                updated   = result['updated']
-                not_found = result['not_found']
-                logger.info(
-                    "DK import_offers DONE: updated=%d not_found=%s",
-                    updated, not_found[:30],
+                result = import_offers_from_dk(task=task)
+                task.finish(
+                    f"✅ Оновлено {result['updated']} лістингів. "
+                    + (f"Не знайдено SKU: {', '.join(result['not_found'][:20])}" if result['not_found'] else "")
                 )
+            except InterruptedError as e:
+                task.finish(f"⛔ {e}")
             except Exception as exc:
+                task.finish(f"❌ {exc}", error=True)
                 logger.error("DK import_offers FAILED: %s", exc, exc_info=True)
             finally:
                 from django.db import connection
                 connection.close()
 
         threading.Thread(target=_run, daemon=True).start()
-        self.message_user(
-            request,
-            "⏳ Імпорт офферів запущено у фоні. Результати з'являться в логах через 1–3 хв. "
-            "Можна закрити сторінку — операція продовжується.",
-            messages.INFO,
-        )
+        self.message_user(request, "⏳ Імпорт офферів запущено у фоні.", messages.INFO)
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
     def create_listings_view(self, request):
-        """Create DigiKeyListing records for DK offers that have no listing in Minerva (background thread)."""
+        """Start create_listings in a background thread, track via BotTask."""
         import threading
         from bots.services.dk_marketplace import create_listings_from_offers
 
+        task = BotTask.start('create_listings')
+
         def _run():
             try:
-                result      = create_listings_from_offers()
-                created     = result['created']
-                already     = result['already_exists']
-                no_product  = result['no_product']
-                logger.info(
-                    "DK create_listings DONE: created=%d already=%d no_product=%s",
-                    created, already, no_product[:30],
+                result = create_listings_from_offers(task=task)
+                task.finish(
+                    f"✅ Створено {result['created']} лістингів. "
+                    f"Вже існувало: {result['already_exists']}. "
+                    + (f"SKU без товару: {', '.join(result['no_product'][:20])}" if result['no_product'] else "")
                 )
+            except InterruptedError as e:
+                task.finish(f"⛔ {e}")
             except Exception as exc:
+                task.finish(f"❌ {exc}", error=True)
                 logger.error("DK create_listings FAILED: %s", exc, exc_info=True)
             finally:
                 from django.db import connection
                 connection.close()
 
         threading.Thread(target=_run, daemon=True).start()
-        self.message_user(
-            request,
-            "⏳ Створення лістингів запущено у фоні. Нові лістинги з'являться в списку через 1–3 хв. "
-            "Можна закрити сторінку — операція продовжується.",
-            messages.INFO,
-        )
+        self.message_user(request, "⏳ Створення лістингів запущено у фоні.", messages.INFO)
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
+
+    def task_status_view(self, request):
+        from django.http import JsonResponse
+        name = request.GET.get('name', '')
+        try:
+            t = BotTask.objects.get(name=name)
+            return JsonResponse({
+                'status':   t.status,
+                'progress': t.progress,
+                'message':  t.message,
+                'started':  t.started_at.strftime('%H:%M:%S') if t.started_at else '',
+                'finished': t.finished_at.strftime('%H:%M:%S') if t.finished_at else '',
+            })
+        except BotTask.DoesNotExist:
+            return JsonResponse({'status': 'idle', 'progress': '', 'message': '', 'started': '', 'finished': ''})
+
+    def task_cancel_view(self, request):
+        from django.http import JsonResponse
+        name = request.GET.get('name', '')
+        updated = BotTask.objects.filter(name=name, status='running').update(cancel_requested=True)
+        return JsonResponse({'ok': bool(updated)})
 
     # ── Readonly display fields ───────────────────────────────────────────────
 
@@ -959,6 +987,138 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             create_listings_url, s,
         )
     action_buttons.short_description = "Дії"
+
+    def task_status_panel(self, obj):
+        status_url = reverse('admin:bots_digikeyconfig_task_status')
+        cancel_url = reverse('admin:bots_digikeyconfig_task_cancel')
+        tasks_html = ''
+        for name, label in [('import_offers', '📥 Імпорт офферів'), ('create_listings', '🆕 Створити лістинги')]:
+            try:
+                t = BotTask.objects.get(name=name)
+            except BotTask.DoesNotExist:
+                t = None
+            status  = t.status if t else 'idle'
+            progress = t.progress if t else ''
+            message  = t.message if t else ''
+            started  = t.started_at.strftime('%H:%M:%S') if (t and t.started_at) else ''
+            finished = t.finished_at.strftime('%H:%M:%S') if (t and t.finished_at) else ''
+
+            if status == 'running':
+                icon = '⏳'; color = '#ff9800'
+                info = f'Запущено о {started} · {progress}'
+                cancel_btn = (
+                    f'<button onclick="dkCancelTask(\'{name}\')" '
+                    f'style="margin-left:10px;background:#c62828;color:#fff;border:none;'
+                    f'padding:3px 10px;border-radius:4px;cursor:pointer;font-size:12px">'
+                    f'⛔ Зупинити</button>'
+                )
+            elif status == 'done':
+                icon = '✅'; color = '#4caf50'
+                info = f'Завершено о {finished} · {message}'
+                cancel_btn = ''
+            elif status == 'error':
+                icon = '❌'; color = '#e53935'
+                info = f'Помилка о {finished} · {message}'
+                cancel_btn = ''
+            else:
+                icon = '💤'; color = '#9aafbe'
+                info = 'Не запускалось'
+                cancel_btn = ''
+
+            tasks_html += (
+                f'<div id="dkTask_{name}" style="display:flex;align-items:center;gap:8px;'
+                f'padding:6px 10px;margin:4px 0;border-radius:6px;background:rgba(0,0,0,.15);'
+                f'font-size:13px;color:#cfd8dc">'
+                f'<span style="min-width:160px;font-weight:bold">{label}</span>'
+                f'<span style="color:{color}">{icon}</span>'
+                f'<span id="dkTaskInfo_{name}" style="color:#b0bec5;flex:1">{info}</span>'
+                f'{cancel_btn}'
+                f'</div>'
+            )
+
+        script = f"""
+<script>
+(function(){{
+  var STATUS_URL = '{status_url}';
+  var CANCEL_URL = '{cancel_url}';
+  var TASKS = ['import_offers','create_listings'];
+  var _timer = null;
+
+  function pollAll() {{
+    TASKS.forEach(function(name) {{
+      fetch(STATUS_URL + '?name=' + name, {{credentials:'same-origin'}})
+        .then(function(r){{return r.json();}})
+        .then(function(d){{updateTask(name, d);}})
+        .catch(function(){{}});
+    }});
+  }}
+
+  function updateTask(name, d) {{
+    var infoEl = document.getElementById('dkTaskInfo_' + name);
+    var taskEl = document.getElementById('dkTask_' + name);
+    if (!infoEl) return;
+    var icons   = {{idle:'💤', running:'⏳', done:'✅', error:'❌'}};
+    var colors  = {{idle:'#9aafbe', running:'#ff9800', done:'#4caf50', error:'#e53935'}};
+    var icon    = icons[d.status] || '❓';
+    var color   = colors[d.status] || '#ccc';
+    var iconEl  = taskEl.querySelector('span[style*="color"]');
+    if (iconEl) {{ iconEl.textContent = icon; iconEl.style.color = color; }}
+
+    if (d.status === 'running') {{
+      infoEl.textContent = 'Запущено о ' + d.started + ' · ' + (d.progress || '...');
+      ensureCancelBtn(name, taskEl);
+      if (!_timer) _timer = setInterval(pollAll, 2000);
+    }} else {{
+      removeCancelBtn(taskEl);
+      if (d.status === 'done' || d.status === 'error') {{
+        infoEl.textContent = (d.status==='done'?'Завершено':'Помилка') + ' о ' + d.finished + ' · ' + d.message;
+      }} else {{
+        infoEl.textContent = 'Не запускалось';
+      }}
+      var stillRunning = TASKS.some(function(n){{
+        var el = document.getElementById('dkTaskInfo_' + n);
+        return el && el.closest('[id^=dkTask_]') && el.textContent.indexOf('Запущено') === 0;
+      }});
+      if (!stillRunning && _timer) {{ clearInterval(_timer); _timer = null; }}
+    }}
+  }}
+
+  function ensureCancelBtn(name, taskEl) {{
+    if (taskEl.querySelector('.dk-cancel-btn')) return;
+    var btn = document.createElement('button');
+    btn.className = 'dk-cancel-btn';
+    btn.textContent = '⛔ Зупинити';
+    btn.style.cssText = 'margin-left:10px;background:#c62828;color:#fff;border:none;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:12px';
+    btn.onclick = function(){{ dkCancelTask(name); }};
+    taskEl.appendChild(btn);
+  }}
+
+  function removeCancelBtn(taskEl) {{
+    var btn = taskEl.querySelector('.dk-cancel-btn');
+    if (btn) btn.remove();
+  }}
+
+  window.dkCancelTask = function(name) {{
+    if (!confirm('Зупинити операцію? Поточний SKU завершить обробку.')) return;
+    fetch(CANCEL_URL + '?name=' + name, {{credentials:'same-origin'}})
+      .then(function(r){{return r.json();}})
+      .then(function(d){{
+        var infoEl = document.getElementById('dkTaskInfo_' + name);
+        if (infoEl) infoEl.textContent = '⛔ Запит на скасування відправлено…';
+      }});
+  }};
+
+  /* Auto-start polling if any task is running */
+  var anyRunning = {str(BotTask.objects.filter(status='running').exists()).lower()};
+  if (anyRunning) {{ _timer = setInterval(pollAll, 2000); }}
+
+  /* Poll once immediately to refresh stale initial state */
+  pollAll();
+}})();
+</script>"""
+
+        return format_html('{}{}', format_html(tasks_html), format_html(script))
+    task_status_panel.short_description = "📊 Фонові завдання"
 
     def marketplace_auth_status(self, obj):
         from django.utils import timezone

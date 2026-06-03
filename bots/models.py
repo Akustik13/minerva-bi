@@ -138,6 +138,56 @@ class DigiKeyConfig(models.Model):
         return obj
 
 
+# ── Background task tracker ───────────────────────────────────────────────────
+
+class BotTask(models.Model):
+    """Tracks state of long-running admin background operations."""
+    IDLE    = 'idle'
+    RUNNING = 'running'
+    DONE    = 'done'
+    ERROR   = 'error'
+
+    name             = models.CharField(max_length=64, unique=True)
+    status           = models.CharField(max_length=16, default=IDLE)
+    started_at       = models.DateTimeField(null=True, blank=True)
+    finished_at      = models.DateTimeField(null=True, blank=True)
+    progress         = models.CharField(max_length=300, blank=True, default='')
+    message          = models.TextField(blank=True, default='')
+    cancel_requested = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Background Task'
+
+    def __str__(self):
+        return f"{self.name} [{self.status}]"
+
+    @classmethod
+    def start(cls, name: str) -> 'BotTask':
+        from django.utils import timezone
+        task, _ = cls.objects.get_or_create(name=name)
+        task.status           = cls.RUNNING
+        task.started_at       = timezone.now()
+        task.finished_at      = None
+        task.progress         = ''
+        task.message          = ''
+        task.cancel_requested = False
+        task.save()
+        return task
+
+    def set_progress(self, text: str):
+        BotTask.objects.filter(pk=self.pk).update(progress=text[:300])
+
+    def is_cancelled(self) -> bool:
+        return BotTask.objects.values_list('cancel_requested', flat=True).get(pk=self.pk)
+
+    def finish(self, message: str = '', error: bool = False):
+        from django.utils import timezone
+        self.status      = self.ERROR if error else self.DONE
+        self.finished_at = timezone.now()
+        self.message     = message
+        self.save(update_fields=['status', 'finished_at', 'message'])
+
+
 # ── DigiKey Marketplace Listing ───────────────────────────────────────────────
 
 class DigiKeyListing(models.Model):
