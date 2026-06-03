@@ -454,10 +454,16 @@ function dkBuildViewValues() {
     disp.className = 'dk-view-val' + (html.indexOf('dk-empty') >= 0 && inputs.length + selects.length <= 1 ? ' dk-empty' : '');
     disp.innerHTML = html;
 
-    /* Insert after the last input/select in the row */
+    /* FK/autocomplete fields: insert BEFORE .related-widget-wrapper so the
+       view value lands outside the hidden wrapper and stays visible. */
     var lastInp = row.querySelector('input:not([type=hidden]), textarea, select');
-    if (lastInp && lastInp.parentNode) {
-      lastInp.parentNode.appendChild(disp);
+    if (lastInp) {
+      var relWrapper = lastInp.closest('.related-widget-wrapper');
+      if (relWrapper && relWrapper.parentNode) {
+        relWrapper.parentNode.insertBefore(disp, relWrapper);
+      } else {
+        lastInp.parentNode.appendChild(disp);
+      }
     } else {
       row.appendChild(disp);
     }

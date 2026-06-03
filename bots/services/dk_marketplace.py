@@ -841,6 +841,19 @@ def pull_product_fields(listing) -> dict:
         listing.dk_attributes = merged_attrs
         changed.append('dk_attributes')
 
+    # ── Attribute-based category detection (fallback when name matching fails) ─
+    if listing.category_type == 'other':
+        _ATTR_CAT_SIGNALS = {
+            'antenna':   ('Antenna Type', 'Gain', 'VSWR', 'Frequency Range'),
+            'filter':    ('Insertion Loss', 'Filter Type', 'Center Frequency', 'Bandwidth'),
+            'cable':     ('Cable Length', 'Cable Type', 'Cable Assembly'),
+            'connector': ('Contact Finish', 'Number of Positions', 'Connector Type'),
+        }
+        for cat, signals in _ATTR_CAT_SIGNALS.items():
+            if any(sig in merged_attrs for sig in signals):
+                _set('category_type', cat)
+                break
+
     # ── Map known code-based fields to model fields ────────────────────────
     _set('dk_datasheet_url',    merged_attrs.get('datasheetUrl', '') or tech.get('datasheet_url', ''))
     _set('dk_packaging',        merged_attrs.get('packaging', ''))
