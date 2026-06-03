@@ -369,16 +369,22 @@ class DigiKeyListing(models.Model):
         return self.get_stock_qty()
 
     def save(self, *args, **kwargs):
-        # Keep dk_price_min synced for fast DB-level sorting
-        try:
-            tiers = [t for t in (self.dk_prices or []) if t.get('price') not in (None, '')]
-            if tiers:
-                min_qty_tier = min(tiers, key=lambda t: int(t.get('qty') or 0))
-                self.dk_price_min = float(min_qty_tier['price'])
-            else:
+        # Keep dk_price_min synced for fast DB-level sorting.
+        # Only recalculate when dk_prices is actually being written.
+        update_fields = kwargs.get('update_fields')
+        if update_fields is None or 'dk_prices' in update_fields:
+            try:
+                tiers = [t for t in (self.dk_prices or []) if t.get('price') not in (None, '')]
+                if tiers:
+                    min_qty_tier = min(tiers, key=lambda t: int(t.get('qty') or 0))
+                    self.dk_price_min = float(min_qty_tier['price'])
+                else:
+                    self.dk_price_min = None
+            except Exception:
                 self.dk_price_min = None
-        except Exception:
-            self.dk_price_min = None
+            # Make sure dk_price_min is included when update_fields is used
+            if update_fields is not None and 'dk_price_min' not in update_fields:
+                kwargs['update_fields'] = list(update_fields) + ['dk_price_min']
         super().save(*args, **kwargs)
 
     def get_prices_api(self):
