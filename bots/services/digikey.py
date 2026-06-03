@@ -882,6 +882,16 @@ def _process_marketplace_order(order: dict, stats: dict, config=None):
             _create_marketplace_lines(sale, order, currency, stats)
             if config:
                 _maybe_auto_confirm(config, order_number, sale, _change_entry, raw_order=order)
+            # Auto-send customer order confirmation email
+            try:
+                from dashboard.notifications import send_order_confirm_notification
+                from config.models import NotificationSettings as _NS
+                _ns = _NS.get()
+                if getattr(_ns, 'order_confirm_notify_auto', False):
+                    if not getattr(sale, 'order_confirm_sent_at', None):
+                        send_order_confirm_notification(sale)
+            except Exception:
+                pass
         else:
             # Оновлюємо статус тільки вперед (не відкочуємо: DigiKey може відставати)
             update_fields = []
