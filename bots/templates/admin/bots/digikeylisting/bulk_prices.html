@@ -10,6 +10,7 @@
   {% csrf_token %}
   <input type="hidden" name="action" value="action_bulk_prices">
   <input type="hidden" name="apply" value="1">
+  <input type="hidden" name="select_across" value="0">
   <input type="hidden" name="delta_pct" id="f-delta-pct" value="0">
   {% for pk in pks %}
   <input type="hidden" name="_selected_action" value="{{ pk }}">
@@ -83,6 +84,29 @@
       Опублікувати на DigiKey одразу (тільки з Offer ID)
     </label>
   </div>
+
+  {% if no_prices_count %}
+  <!-- ── No-prices warning ── -->
+  <div style="background:rgba(198,40,40,.12);border:1px solid rgba(198,40,40,.4);
+              border-radius:8px;padding:12px 18px;margin-bottom:16px;max-width:580px;
+              display:flex;align-items:flex-start;gap:10px">
+    <span style="font-size:18px;line-height:1">⚠️</span>
+    <div>
+      <div style="font-size:13px;font-weight:700;color:#ef9a9a;margin-bottom:4px">
+        {% if no_prices_count == count %}
+          Жоден лістинг не має збережених цін
+        {% else %}
+          {{ no_prices_count }} з {{ count }} лістингів не мають збережених цін
+        {% endif %}
+      </div>
+      <div style="font-size:12px;color:var(--text-muted,#9aafbe);line-height:1.5">
+        Спочатку відкрийте кожен лістинг і натисніть
+        <strong style="color:var(--text,#c9d8e4)">📥 Стягнути поля з DigiKey</strong>,
+        щоб завантажити актуальні ціни з DigiKey Marketplace.
+      </div>
+    </div>
+  </div>
+  {% endif %}
 
   <!-- ── Preview table ── -->
   <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
@@ -176,8 +200,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
         var tr = document.createElement('tr');
         tr.className = 'tier-row';
         tr.innerHTML =
-          '<td style="padding:6px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4)">' + listing.sku + '</td>' +
-          '<td colspan="5" style="padding:6px 12px;color:var(--text-muted,#9aafbe);font-size:11px">— немає цін —</td>';
+          '<td style="padding:7px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4)">' + listing.sku + '</td>' +
+          '<td colspan="5" style="padding:7px 12px;color:#ef9a9a;font-size:12px;font-style:italic">' +
+          '⚠️ немає цін — стягніть дані з DigiKey</td>';
         tbody.appendChild(tr);
       } else {
         prices.forEach(function(tier, ti) {
@@ -214,10 +239,13 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
     });
   }
 
+  var HAS_ANY_PRICES = LISTINGS.some(function(l) { return l.prices && l.prices.length > 0; });
+
   function refresh() {
     var raw = parseFloat(inp.value);
     fDelta.value = isNaN(raw) ? '0' : raw;
 
+    var canApply = !isNaN(raw) && raw !== 0 && HAS_ANY_PRICES;
     if (!isNaN(raw) && raw !== 0) {
       var sign = raw > 0 ? '+' : '';
       var clr  = raw > 0 ? '#66bb6a' : '#ef5350';
@@ -228,15 +256,12 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
       badge.style.background = bg;
       badge.style.border  = '1px solid ' + bdr;
       badge.textContent   = sign + raw.toFixed(1) + '%';
-      applyBtn.disabled = false;
-      applyBtn.style.opacity = '1';
-      applyBtn.style.cursor  = 'pointer';
     } else {
       badge.style.display = 'none';
-      applyBtn.disabled = true;
-      applyBtn.style.opacity = '.4';
-      applyBtn.style.cursor  = 'not-allowed';
     }
+    applyBtn.disabled = !canApply;
+    applyBtn.style.opacity = canApply ? '1' : '.4';
+    applyBtn.style.cursor  = canApply ? 'pointer' : 'not-allowed';
     buildRows(isNaN(raw) ? null : raw);
   }
 

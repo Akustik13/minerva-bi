@@ -1580,30 +1580,41 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 self.message_user(request, "❌ Невалідний відсоток.", messages.ERROR)
                 return
 
+            if not delta_pct:
+                self.message_user(request, "❌ Відсоток не може бути 0.", messages.ERROR)
+                return
+
             push_to_dk = request.POST.get('push_to_dk') == '1'
             config     = DigiKeyConfig.get() if push_to_dk else None
-            updated = pushed = err = 0
+            updated = pushed = err = skipped = 0
             multiplier = 1.0 + delta_pct / 100.0
 
             for listing in queryset.select_related('product'):
                 old_prices = list(listing.dk_prices or [])
                 if not old_prices:
+                    skipped += 1
                     continue
                 new_prices = [
                     {"qty": t["qty"], "price": round(float(t["price"]) * multiplier, 4)}
                     for t in old_prices
                     if t.get("qty") and t.get("price") is not None
                 ]
-                DigiKeyPriceLog.objects.create(
-                    listing=listing,
-                    delta_pct=delta_pct,
-                    old_prices=old_prices,
-                    new_prices=new_prices,
-                    user=request.user.username if request.user else '',
-                )
-                listing.dk_prices       = new_prices
-                listing.price_delta_pct = delta_pct
-                listing.save(update_fields=['dk_prices', 'price_delta_pct'])
+                try:
+                    DigiKeyPriceLog.objects.create(
+                        listing=listing,
+                        delta_pct=delta_pct,
+                        old_prices=old_prices,
+                        new_prices=new_prices,
+                        user=request.user.username if request.user else '',
+                    )
+                except Exception:
+                    pass
+                listing.dk_prices = new_prices
+                try:
+                    listing.price_delta_pct = delta_pct
+                    listing.save(update_fields=['dk_prices', 'price_delta_pct'])
+                except Exception:
+                    listing.save(update_fields=['dk_prices'])
                 updated += 1
                 if push_to_dk and listing.dk_offer_id and config:
                     try:
@@ -1614,31 +1625,46 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                         err += 1
 
             sign = '+' if delta_pct >= 0 else ''
-            msg = f"✅ Ціни {sign}{delta_pct:.1f}% застосовано до {updated} лістингів"
-            if pushed:
-                msg += f", {pushed} опубліковано на DigiKey"
-            self.message_user(request, msg + ".", messages.SUCCESS)
+            if updated:
+                msg = f"✅ Ціни {sign}{delta_pct:.1f}% застосовано до {updated} лістингів"
+                if pushed:
+                    msg += f", {pushed} опубліковано на DigiKey"
+                self.message_user(request, msg + ".", messages.SUCCESS)
+            if skipped:
+                self.message_user(
+                    request,
+                    f"⚠️ {skipped} лістингів пропущено — немає збережених цін. "
+                    "Спочатку натисніть «📥 Стягнути поля з DigiKey» для кожного лістингу.",
+                    messages.WARNING,
+                )
+            if not updated and not skipped:
+                self.message_user(request, "⚠️ Жоден лістинг не оновлено.", messages.WARNING)
             if err:
                 self.message_user(request, f"⚠️ Не вдалося опублікувати: {err} лістингів.", messages.WARNING)
             return
 
         # Collect current prices for preview
         listings_data = []
+        no_prices_count = 0
         for listing in queryset.select_related('product'):
+            prices = listing.dk_prices or []
+            if not prices:
+                no_prices_count += 1
             listings_data.append({
                 'pk':     listing.pk,
-                'sku':    listing.product.sku,
+                'sku':    listing.product.sku if listing.product else str(listing.pk),
                 'title':  listing.dk_title or '',
-                'prices': listing.dk_prices or [],
+                'prices': prices,
                 'delta':  listing.price_delta_pct,
             })
 
         return TemplateResponse(request, 'admin/bots/digikeylisting/bulk_prices.html', {
-            'title':         'Масова зміна цін',
-            'count':         queryset.count(),
-            'listings_json': json.dumps(listings_data, ensure_ascii=False),
-            'pks':           list(queryset.values_list('pk', flat=True)),
-            'opts':          self.model._meta,
+            'title':           'Масова зміна цін',
+            'count':           queryset.count(),
+            'listings_json':   json.dumps(listings_data, ensure_ascii=False),
+            'pks':             list(queryset.values_list('pk', flat=True)),
+            'opts':            self.model._meta,
+            'no_prices_count': no_prices_count,
         })
 
     # ── Display helpers ───────────────────────────────────────────────────────
