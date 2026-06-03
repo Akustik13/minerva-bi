@@ -87,10 +87,18 @@ body.dk-view p.help { display: none !important; }
 /* Show display values */
 body.dk-view .dk-view-val { display: block !important; }
 
-/* Price / attrs widgets: read-only in view mode */
-body.dk-view .dk-prices-footer { display: none !important; }
-body.dk-view .dk-prices-table input { pointer-events: none; opacity: .7; }
-body.dk-view .dk-attr-val input  { pointer-events: none; opacity: .7; }
+/* Price / attrs widgets: keep inputs visible but read-only in view mode */
+body.dk-view .dk-prices-footer  { display: none !important; }
+body.dk-view .dk-edit-col       { display: none !important; }
+
+body.dk-view .dk-prices-wrap input,
+body.dk-view .dk-attrs-wrap  input {
+  display: inline-block !important;
+  pointer-events: none;
+  opacity: .85;
+  background: transparent;
+  border-color: transparent;
+}
 
 /* ── Edit mode ─────────────────────────────────────────────────────────── */
 body.dk-edit .dk-django-submit { display: block !important; }
