@@ -745,19 +745,21 @@ def pull_product_fields(listing) -> dict:
     _set('dk_category_id',   str(prod.get('categoryId') or ''))
 
     # ── Category name ──────────────────────────────────────────────────────
-    cat_name = (prod.get('categoryName') or prod.get('category', {}).get('name', '')
-                if isinstance(prod.get('category'), dict) else '')
+    # ── Category name ──────────────────────────────────────────────────────────────────────
+    # Try top-level categoryName first; fall back to nested category.name
+    cat_name = prod.get('categoryName') or ''
+    if not cat_name and isinstance(prod.get('category'), dict):
+        cat_name = prod['category'].get('name', '') or ''
     if not cat_name and prod.get('categoryId'):
         cat_name = f"DK Category {prod['categoryId']}"
     if cat_name and hasattr(listing, 'dk_category_name'):
         _set('dk_category_name', cat_name, max_len=200)
 
-    # ── Auto-detect category_type if still default ─────────────────────────
-    if cat_name and listing.category_type in ('other', ''):
+    # ── Auto-detect category_type — always update if better match found ─────
+    if cat_name:
         detected = _detect_category_type(cat_name)
-        if detected != 'other':
+        if detected != 'other' and listing.category_type != detected:
             _set('category_type', detected)
-
     # ── All attributes dict ────────────────────────────────────────────────
     # Merge: keep existing manual overrides, add/update from DigiKey
     merged_attrs = dict(listing.dk_attributes or {})

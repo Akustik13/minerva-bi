@@ -176,7 +176,7 @@ class DigiKeyListing(models.Model):
         related_name='dk_listing', verbose_name='Товар'
     )
     category_type = models.CharField(
-        'Категорія', max_length=20, choices=CAT_CHOICES, default='filter'
+        'Категорія', max_length=20, choices=CAT_CHOICES, default='other'
     )
 
     # ── Product stage fields ───────────────────────────────────────────────────

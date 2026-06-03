@@ -1109,21 +1109,23 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 'Заповнюються автоматично при натисканні «📥 Стягнути поля з DigiKey».'
             ),
         }),
-        ('🔧 Технічні атрибути (категорія Filter)', {
+        ('📡 Технічні атрибути DigiKey', {
+            'fields': ('dk_attributes',),
+            'description': (
+                'Всі технічні атрибути товару з DigiKey (Antenna Type, Gain, Frequency Range, VSWR тощо). '
+                'Редагуються через таблицю нижче. Заповнюються кнопкою «📥 Стягнути поля з DigiKey».'
+            ),
+        }),
+        ('🔧 RF Filter — спеціальні поля', {
             'fields': (
                 'fa_frequency', 'fa_bandwidth', 'fa_filter_type',
                 'fa_ripple', 'fa_insertion_loss', 'fa_mounting_type',
                 'fa_package_case', 'fa_size_dimension', 'fa_height_max',
             ),
             'classes': ('collapse',),
-            'description': 'Заповнюються автоматично з DigiKey для категорії RF Filter.',
-        }),
-        ('📡 Всі атрибути DigiKey (raw JSON)', {
-            'fields': ('dk_attributes',),
-            'classes': ('collapse',),
             'description': (
-                'Редагується через таблицю нижче. '
-                'Тут зберігаються всі additionalFields з DigiKey Products API.'
+                'Тільки для категорії RF Filter — передаються в DigiKey API як additionalFields. '
+                'Для антен, кабелів, конекторів — використовуй таблицю вище (Технічні атрибути DigiKey).'
             ),
         }),
         ('📊 Статус синхронізації', {
