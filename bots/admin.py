@@ -1253,6 +1253,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'fields': (
                 'dk_supplier_sku', 'dk_min_order_qty',
                 'dk_lead_time_days', 'dk_qty_alert',
+                'dk_quantity_override',
                 'stock_qty_readonly',
             ),
         }),
@@ -1627,35 +1628,35 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
     def stock_qty_readonly(self, obj):
         if obj and obj.pk:
-            qty = obj.get_stock_qty()
-            wh_color = 'var(--ok)' if qty > 0 else 'var(--err)'
+            wh_qty   = obj.get_stock_qty()
+            wh_color = '#388e3c' if wh_qty > 0 else '#c62828'
 
-            dk_qty = obj.dk_quantity_available
-            if dk_qty is not None:
-                dk_color  = '#4caf50' if dk_qty > 0 else '#e53935'
-                dk_part   = format_html(
+            dk_override = obj.dk_quantity_override
+            if dk_override is not None:
+                dk_color = '#388e3c' if dk_override > 0 else '#c62828'
+                dk_part  = format_html(
                     ' &nbsp;·&nbsp; '
-                    '<span style="color:{};font-weight:600">{} шт.</span>'
+                    '<strong style="color:{};font-size:15px">{} шт.</strong>'
                     '<span style="color:var(--text-muted);margin-left:6px;font-size:12px">'
-                    '(показано на DigiKey)</span>',
-                    dk_color, dk_qty,
+                    '→ DigiKey</span>',
+                    dk_color, dk_override,
                 )
             else:
                 dk_part = format_html(
                     ' &nbsp;·&nbsp; '
                     '<span style="color:var(--text-muted);font-size:12px">'
-                    'DigiKey: не синхронізовано</span>'
+                    'Кількість для DigiKey — не задано (заповни поле нижче)</span>'
                 )
 
             return format_html(
-                '<strong style="color:{};font-size:15px">{} шт.</strong>'
-                '<span style="color:var(--text-muted);margin-left:8px;font-size:12px">'
-                '(наш склад)</span>'
+                '<span style="color:{};font-size:13px">{} шт.</span>'
+                '<span style="color:var(--text-muted);margin-left:6px;font-size:11px">'
+                '(склад, нотатка)</span>'
                 '{}',
-                wh_color, qty, dk_part,
+                wh_color, wh_qty, dk_part,
             )
         return '—'
-    stock_qty_readonly.short_description = 'Поточний залишок'
+    stock_qty_readonly.short_description = 'Залишок'
 
     def dk_attributes_table(self, obj):
         if not obj or not obj.dk_attributes:

@@ -182,7 +182,7 @@ def upsert_product(config, listing) -> str:
 # ── Offers API ───────────────────────────────────────────────────────────────
 
 def _offer_payload(listing) -> dict:
-    stock  = listing.get_stock_qty()
+    stock  = listing.get_dk_quantity()
     prices = listing.get_prices_api()
     if not prices:
         raise DKMarketplaceError("Цінові тири не заповнені (dk_prices порожній)")
@@ -912,7 +912,7 @@ def pull_product_fields(listing) -> dict:
         if val:
             _set(field, val, max_len=200)
 
-    # ── Prices from offer ──────────────────────────────────────────────────
+    # ── Prices + quantity from offer ───────────────────────────────────────
     if offer:
         raw_prices = offer.get('prices', [])
         if raw_prices:
@@ -920,6 +920,16 @@ def pull_product_fields(listing) -> dict:
             if new_prices and new_prices != (listing.dk_prices or []):
                 listing.dk_prices = new_prices
                 changed.append('dk_prices')
+
+        qty_on_dk = offer.get('quantityAvailable')
+        if qty_on_dk is not None:
+            try:
+                new_qty = int(qty_on_dk)
+                if listing.dk_quantity_override != new_qty:
+                    listing.dk_quantity_override = new_qty
+                    changed.append('dk_quantity_override')
+            except (TypeError, ValueError):
+                pass
 
     if changed:
         listing.save(update_fields=changed)

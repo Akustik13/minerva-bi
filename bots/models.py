@@ -259,6 +259,11 @@ class DigiKeyListing(models.Model):
                                                      help_text='Кількість днів від замовлення до відправки')
     dk_qty_alert     = models.PositiveIntegerField('Мін. залишок (алерт)', default=3,
                                                     help_text='При залишку нижче цього — DigiKey виводить попередження')
+    dk_quantity_override = models.IntegerField(
+        'Кількість для DigiKey', null=True, blank=True,
+        help_text='Кількість що передається на DigiKey. Якщо порожньо — використовується залишок складу. '
+                  'Оновлюється автоматично при «📥 Стягнути з DigiKey».'
+    )
     dk_quantity_available = models.IntegerField('Залишок на DigiKey', null=True, blank=True,
                                                 help_text='Кількість, яку бачить покупець на DigiKey (оновлюється при імпорті)')
     dk_is_active     = models.BooleanField('Активне на DigiKey', default=True)
@@ -333,6 +338,12 @@ class DigiKeyListing(models.Model):
             product=self.product
         ).aggregate(total=Sum('qty'))
         return max(0, int(result['total'] or 0))
+
+    def get_dk_quantity(self):
+        """Кількість для передачі на DigiKey: override якщо задано, інакше склад."""
+        if self.dk_quantity_override is not None:
+            return self.dk_quantity_override
+        return self.get_stock_qty()
 
     def get_prices_api(self):
         """Prices list for API: [{"quantityBreak": N, "price": X.XX}, ...]"""
