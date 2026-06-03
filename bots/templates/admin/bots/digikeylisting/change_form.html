@@ -869,53 +869,62 @@ document.addEventListener('DOMContentLoaded', function() {
   /* Start in VIEW mode */
   dkEnterView();
 
-  /* Field highlight from ai_advisor link (#id_fieldname or #id_attr_key) */
+  /* Field highlight from ai_advisor link (#id_fieldname) */
   if (location.hash && location.hash.length > 1) {
-    var _hashId   = location.hash.slice(1);
-    var _attrKey  = _hashId.replace(/^id_/, '');
+    var _hashId  = location.hash.slice(1);
+    var _attrKey = _hashId.replace(/^id_/, '');
     history.replaceState(null, '', location.pathname + location.search);
 
     setTimeout(function() {
       dkEnterEdit();
+      void document.body.offsetHeight; // force layout after class change
 
-      /* 1. Try standard Django form input */
-      var _hashEl = document.getElementById(_hashId) ||
-                    document.querySelector('[name="' + _attrKey + '"]');
+      /* 1. Standard Django form input */
+      var _el = document.getElementById(_hashId) ||
+                document.querySelector('[name="' + _attrKey + '"]');
 
-      /* 2. Try dk_attributes custom table row by data-code */
-      var _attrRow = null;
-      if (!_hashEl || _hashEl.offsetParent === null) {
-        var _attrInp = document.querySelector('.dk-atbody [data-code="' + _attrKey + '"]');
-        if (_attrInp) {
-          _attrRow = _attrInp.closest('tr');
-          _hashEl  = _attrInp;
-        }
+      /* 2. dk_attributes table row (data-code lookup) */
+      var _row = null;
+      if (!_el) {
+        var _ai = document.querySelector('.dk-atbody [data-code="' + _attrKey + '"]');
+        if (_ai) { _el = _ai; _row = _ai.closest('tr'); }
       }
 
-      if (!_hashEl && !_attrRow) return;
+      if (!_el && !_row) return;
 
-      /* Scroll target: table row or form-row */
-      var _scrollTarget = _attrRow ||
-                          (_hashEl && (_hashEl.closest('.form-row') || _hashEl.parentNode));
-      if (_scrollTarget) {
-        _scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        /* Highlight the row/container */
-        if (_attrRow) {
-          _attrRow.style.transition = 'background 2.5s ease-out';
-          _attrRow.style.background = 'rgba(0,191,165,.18)';
-          setTimeout(function() { _attrRow.style.background = ''; }, 2500);
-          /* Also outline the input */
-          if (_hashEl) { _hashEl.style.boxShadow = '0 0 0 2px #00bfa5'; }
-          setTimeout(function() { if (_hashEl) _hashEl.style.boxShadow = ''; }, 2500);
-        } else {
-          _scrollTarget.classList.add('dk-row-focus');
-          setTimeout(function() { _scrollTarget.classList.remove('dk-row-focus'); }, 3000);
-          dkHighlight(_hashEl);
-        }
+      /* Scroll */
+      var _anchor = _row || _el.closest('.form-row') || _el.parentNode;
+      if (_anchor) _anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      /* Highlight via inline style (works regardless of overflow/outline clipping) */
+      function dkFlash(target) {
+        if (!target) return;
+        target.style.transition = 'none';
+        target.style.background = 'rgba(0,191,165,.22)';
+        target.style.boxShadow  = '0 0 0 3px rgba(0,191,165,.7), inset 0 0 0 1px rgba(0,191,165,.4)';
+        target.style.borderRadius = '5px';
+        setTimeout(function() {
+          target.style.transition = 'background 2s ease-out, box-shadow 2s ease-out';
+          target.style.background = '';
+          target.style.boxShadow  = '';
+        }, 900);
       }
 
-      if (_hashEl && _hashEl.offsetParent !== null) _hashEl.focus();
-    }, 400);
+      dkFlash(_row || _el.closest('.form-row') || _el.parentNode);
+
+      /* Also highlight the actual input/select */
+      if (_el && _el.tagName !== 'TR') {
+        _el.style.transition = 'none';
+        _el.style.borderColor = '#00bfa5';
+        _el.style.boxShadow   = '0 0 0 2px rgba(0,191,165,.5)';
+        setTimeout(function() {
+          _el.style.transition  = 'border-color 2s, box-shadow 2s';
+          _el.style.borderColor = '';
+          _el.style.boxShadow   = '';
+        }, 900);
+        if (_el.offsetParent !== null) _el.focus();
+      }
+    }, 500);
   }
 });
 </script>
