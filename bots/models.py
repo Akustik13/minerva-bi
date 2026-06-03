@@ -311,6 +311,12 @@ class DigiKeyListing(models.Model):
                   'Заповнюється кнопкою «📥 Стягнути поля з DigiKey».'
     )
 
+    # ── Price history ──────────────────────────────────────────────────────────
+    price_delta_pct = models.FloatField(
+        'Остання зміна цін (%)', null=True, blank=True,
+        help_text='Останній застосований масовий відсоток зміни цін (наприклад +10 або -5).'
+    )
+
     # ── Sync status ────────────────────────────────────────────────────────────
     sync_status    = models.CharField('Статус', max_length=20,
                                        choices=SYNC_CHOICES, default='draft')
@@ -381,6 +387,28 @@ class DigiKeyListing(models.Model):
             if val:
                 attrs.append({"code": code, "type": "String", "value": val})
         return attrs
+
+
+class DigiKeyPriceLog(models.Model):
+    """Лог масових змін цін DigiKey лістингу."""
+    listing     = models.ForeignKey(
+        DigiKeyListing, on_delete=models.CASCADE,
+        related_name='price_logs', verbose_name='Лістинг',
+    )
+    applied_at  = models.DateTimeField('Застосовано', auto_now_add=True, db_index=True)
+    delta_pct   = models.FloatField('Зміна (%)')
+    old_prices  = models.JSONField('Старі ціни')
+    new_prices  = models.JSONField('Нові ціни')
+    user        = models.CharField('Користувач', max_length=150, blank=True, default='')
+
+    class Meta:
+        verbose_name        = 'Лог зміни цін'
+        verbose_name_plural = 'Лог змін цін'
+        ordering            = ['-applied_at']
+
+    def __str__(self):
+        sign = '+' if self.delta_pct >= 0 else ''
+        return f"{self.listing.product.sku} {sign}{self.delta_pct:.1f}% @ {self.applied_at:%Y-%m-%d %H:%M}"
 
 
 class Bot(models.Model):

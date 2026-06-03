@@ -7,7 +7,7 @@ from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing, BotTask
+from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing, BotTask, DigiKeyPriceLog
 
 
 @admin.register(Bot)
@@ -1214,7 +1214,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     change_form_template = 'admin/bots/digikeylisting/change_form.html'
 
     list_display   = ('product_sku_link', 'dk_title', 'category_type',
-                      'stock_qty_display', 'sync_status_badge',
+                      'stock_qty_display', 'sync_status_badge', 'price_delta_badge',
                       'last_synced_at', 'publish_btn')
     list_filter    = ('sync_status', 'category_type', 'dk_is_active')
     search_fields  = ('product__sku', 'dk_title', 'dk_supplier_sku')
@@ -1571,56 +1571,74 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         import json
         from django.template.response import TemplateResponse
         from bots.services.dk_marketplace import update_offer, DKMarketplaceError
-        from bots.models import DigiKeyConfig
+        from bots.models import DigiKeyConfig, DigiKeyPriceLog
 
         if 'apply' in request.POST:
-            raw = request.POST.get('bulk_prices_json', '[]')
             try:
-                tiers = json.loads(raw)
-                if not tiers:
-                    raise ValueError("empty")
+                delta_pct = float(request.POST.get('delta_pct', '0'))
             except (ValueError, TypeError):
-                self.message_user(request, "❌ Невалідний JSON цін.", messages.ERROR)
+                self.message_user(request, "❌ Невалідний відсоток.", messages.ERROR)
                 return
 
-            prices_json = json.dumps(tiers)
-            push_to_dk  = request.POST.get('push_to_dk') == '1'
+            push_to_dk = request.POST.get('push_to_dk') == '1'
+            config     = DigiKeyConfig.get() if push_to_dk else None
             updated = pushed = err = 0
+            multiplier = 1.0 + delta_pct / 100.0
 
             for listing in queryset.select_related('product'):
-                listing.dk_prices = prices_json
-                listing.save(update_fields=['dk_prices'])
+                old_prices = list(listing.dk_prices or [])
+                if not old_prices:
+                    continue
+                new_prices = [
+                    {"qty": t["qty"], "price": round(float(t["price"]) * multiplier, 4)}
+                    for t in old_prices
+                    if t.get("qty") and t.get("price") is not None
+                ]
+                DigiKeyPriceLog.objects.create(
+                    listing=listing,
+                    delta_pct=delta_pct,
+                    old_prices=old_prices,
+                    new_prices=new_prices,
+                    user=request.user.username if request.user else '',
+                )
+                listing.dk_prices       = new_prices
+                listing.price_delta_pct = delta_pct
+                listing.save(update_fields=['dk_prices', 'price_delta_pct'])
                 updated += 1
-                if push_to_dk and listing.dk_offer_id:
+                if push_to_dk and listing.dk_offer_id and config:
                     try:
-                        config = DigiKeyConfig.get()
                         update_offer(config, listing)
                         pushed += 1
                     except Exception as exc:
                         logger.warning("bulk_prices push failed %s: %s", listing.product.sku, exc)
                         err += 1
 
-            msg = f"✅ Ціни оновлено для {updated} лістингів"
+            sign = '+' if delta_pct >= 0 else ''
+            msg = f"✅ Ціни {sign}{delta_pct:.1f}% застосовано до {updated} лістингів"
             if pushed:
-                msg += f", {pushed} оновлено на DigiKey"
+                msg += f", {pushed} опубліковано на DigiKey"
             self.message_user(request, msg + ".", messages.SUCCESS)
             if err:
-                self.message_user(request, f"⚠️ Не вдалося оновити на DigiKey: {err} лістингів.", messages.WARNING)
+                self.message_user(request, f"⚠️ Не вдалося опублікувати: {err} лістингів.", messages.WARNING)
             return
 
-        # Render intermediate form
-        skus = ", ".join(
-            queryset.select_related('product').values_list('product__sku', flat=True)[:20]
-        )
-        if queryset.count() > 20:
-            skus += f" … і ще {queryset.count() - 20}"
+        # Collect current prices for preview
+        listings_data = []
+        for listing in queryset.select_related('product'):
+            listings_data.append({
+                'pk':     listing.pk,
+                'sku':    listing.product.sku,
+                'title':  listing.dk_title or '',
+                'prices': listing.dk_prices or [],
+                'delta':  listing.price_delta_pct,
+            })
 
         return TemplateResponse(request, 'admin/bots/digikeylisting/bulk_prices.html', {
-            'title':   'Масова зміна цін',
-            'count':   queryset.count(),
-            'skus':    skus,
-            'pks':     list(queryset.values_list('pk', flat=True)),
-            'opts':    self.model._meta,
+            'title':         'Масова зміна цін',
+            'count':         queryset.count(),
+            'listings_json': json.dumps(listings_data, ensure_ascii=False),
+            'pks':           list(queryset.values_list('pk', flat=True)),
+            'opts':          self.model._meta,
         })
 
     # ── Display helpers ───────────────────────────────────────────────────────
@@ -1641,6 +1659,23 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         color = 'var(--ok)' if qty > 0 else 'var(--err)'
         return format_html('<span style="color:{};font-weight:600">{} шт.</span>', color, qty)
     stock_qty_display.short_description = 'Залишок'
+
+    def price_delta_badge(self, obj):
+        d = obj.price_delta_pct
+        if d is None:
+            return format_html('<span style="color:var(--text-muted);font-size:11px">—</span>')
+        sign   = '+' if d >= 0 else ''
+        color  = '#2e7d32' if d >= 0 else '#c62828'
+        bg     = 'rgba(46,125,50,.15)' if d >= 0 else 'rgba(198,40,40,.15)'
+        border = '#2e7d32' if d >= 0 else '#c62828'
+        return format_html(
+            '<span style="color:{};background:{};border:1px solid {};'
+            'border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">'
+            '{}{:.1f}%</span>',
+            color, bg, border, sign, d,
+        )
+    price_delta_badge.short_description = 'Δ Ціна'
+    price_delta_badge.admin_order_field = 'price_delta_pct'
 
     def stock_qty_readonly(self, obj):
         if obj and obj.pk:
@@ -1767,3 +1802,51 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
 import logging as _logging
 logger = _logging.getLogger(__name__)
+
+
+@admin.register(DigiKeyPriceLog)
+class DigiKeyPriceLogAdmin(admin.ModelAdmin):
+    list_display  = ('listing_sku', 'delta_pct_badge', 'applied_at', 'user', 'prices_summary')
+    list_filter   = ('applied_at',)
+    search_fields = ('listing__product__sku', 'user')
+    readonly_fields = ('listing', 'applied_at', 'delta_pct', 'old_prices', 'new_prices', 'user')
+    ordering      = ('-applied_at',)
+
+    def listing_sku(self, obj):
+        url = reverse('admin:bots_digikeylisting_change', args=[obj.listing_id])
+        return format_html('<a href="{}">{}</a>', url, obj.listing.product.sku)
+    listing_sku.short_description = 'Лістинг (SKU)'
+    listing_sku.admin_order_field = 'listing__product__sku'
+
+    def delta_pct_badge(self, obj):
+        d      = obj.delta_pct
+        sign   = '+' if d >= 0 else ''
+        color  = '#2e7d32' if d >= 0 else '#c62828'
+        bg     = 'rgba(46,125,50,.15)' if d >= 0 else 'rgba(198,40,40,.15)'
+        border = '#2e7d32' if d >= 0 else '#c62828'
+        return format_html(
+            '<span style="color:{};background:{};border:1px solid {};'
+            'border-radius:4px;padding:1px 7px;font-size:12px;font-weight:700">'
+            '{}{:.1f}%</span>',
+            color, bg, border, sign, d,
+        )
+    delta_pct_badge.short_description = 'Зміна'
+    delta_pct_badge.admin_order_field = 'delta_pct'
+
+    def prices_summary(self, obj):
+        old = obj.old_prices or []
+        new = obj.new_prices or []
+        if not old:
+            return '—'
+        parts = []
+        for o, n in zip(old[:3], new[:3]):
+            op = float(o.get('price', 0))
+            np_ = float(n.get('price', 0))
+            parts.append(f'{op:.2f}→{np_:.2f}')
+        if len(old) > 3:
+            parts.append('…')
+        return format_html(
+            '<span style="font-family:monospace;font-size:11px">{}</span>',
+            '  |  '.join(parts),
+        )
+    prices_summary.short_description = 'Ціни (було→стало)'
