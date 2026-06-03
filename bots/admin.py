@@ -1646,33 +1646,33 @@ Analyze this DigiKey listing and provide pricing recommendations and quality aud
 {json.dumps(price_logs, ensure_ascii=False, indent=2)}
 
 === YOUR TASK ===
-Respond ONLY with a valid JSON object (no markdown, no explanation outside JSON):
+Respond ONLY with a valid JSON object. No markdown. No text outside the JSON.
+Keep every string value under 120 characters. Do not use newlines inside strings.
 
 {{
   "strategy": "bulk_volume" | "small_batch" | "balanced",
-  "strategy_name": "Назва стратегії (Ukraine)",
-  "strategy_explanation": "2-3 sentences why this strategy fits (Ukrainian)",
+  "strategy_name": "Назва (до 40 символів, укр)",
+  "strategy_explanation": "Чому ця стратегія (до 120 символів, укр)",
   "recommended_prices": [
-    {{"qty": 1, "price": 0.00, "note": "explanation (Ukrainian)"}},
-    ...
+    {{"qty": 1, "price": 0.00, "note": "до 80 символів, укр"}}
   ],
-  "price_change_summary": "e.g. '-5% для 1шт, -12% для 100шт' (Ukrainian)",
-  "expected_impact": "What to expect from this change (Ukrainian, 2-3 sentences)",
+  "price_change_summary": "напр. '-5% для 1шт, -12% для 100шт' (укр, до 80 символів)",
+  "expected_impact": "Що очікувати (до 120 символів, укр)",
   "quality_issues": [
-    {{"field": "field_name", "severity": "error|warning|info", "issue": "description (Ukrainian)", "fix": "suggested fix (Ukrainian)"}}
+    {{"field": "назва поля", "severity": "error|warning|info", "issue": "до 100 символів, укр", "fix": "до 100 символів, укр"}}
   ],
-  "quality_score": 0-10,
-  "quality_summary": "Overall listing quality summary (Ukrainian)",
-  "post_change_advice": "What metrics to watch after price change and when to re-evaluate (Ukrainian)"
+  "quality_score": 7,
+  "quality_summary": "до 120 символів, укр",
+  "post_change_advice": "до 120 символів, укр"
 }}
 
 Rules:
-- recommended_prices must use same qty breaks as current_prices (or suggest new ones if none exist)
-- If sales data shows zero sales: suggest competitive entry pricing
-- Quality issues: check title length (>50 chars good), description completeness, missing key specs for the category, MOQ reasonableness, lead time
-- For RF filters: check fa_* fields completeness (frequency, bandwidth, insertion loss, filter type)
-- Be specific with prices (actual numbers, not ranges)
-- Respond in Ukrainian language for all text fields"""
+- recommended_prices: use same qty breaks as current_prices (or propose if empty)
+- quality_issues: max 5 items, most important first
+- Zero sales → suggest competitive entry pricing
+- RF filters → check fa_* attribute completeness
+- Concrete prices (numbers, not ranges)
+- All text in Ukrainian"""
 
         # ── 5. Call Claude API ─────────────────────────────────────────────────
         try:
@@ -1681,12 +1681,13 @@ Rules:
             client = anthropic.Anthropic(api_key=AISettings.get().anthropic_api_key)
             response = client.messages.create(
                 model='claude-sonnet-4-6',
-                max_tokens=2048,
+                max_tokens=4096,
                 system=(
                     "You are a JSON API. "
                     "Output ONLY a single valid JSON object — no markdown, no code fences, "
                     "no text before or after the JSON. "
-                    "All string values must be on one line (no literal newlines inside strings)."
+                    "Every string value must fit on one line — no literal newlines inside strings. "
+                    "Keep all string values concise (under 120 characters each)."
                 ),
                 messages=[{'role': 'user', 'content': prompt}],
             )
