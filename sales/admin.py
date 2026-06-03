@@ -2251,6 +2251,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             "ship_vat_id":      order.ship_vat_id,
             "eu_invoice_number": order.eu_invoice_number,
             "default_vat_rate": default_vat,
+            "shipping_cost":    float(order.shipping_cost or 0),
         })
 
     def eu_invoice_generate_view(self, request, pk):
@@ -2285,6 +2286,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         ship_vat_id     = (body.get("ship_vat_id") or "").strip()
         discount_pct    = _dec("discount_pct", "0")
         vat_rate        = _dec("vat_rate", "19")
+        shipping_cost   = _dec("shipping_cost", str(order.shipping_cost or "0"))
 
         try:
             from datetime import datetime
@@ -2300,6 +2302,17 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         order.save(update_fields=["eu_invoice_number", "eu_invoice_date",
                                   "buyer_vat_id", "ship_vat_id"])
 
+        # Fetch fresh DigiKey Marketplace API data if this is a DigiKey order
+        dk_order_data = None
+        if order.source == "digikey" and order.order_number:
+            try:
+                from bots.models import DigiKeyConfig
+                from bots.services.digikey import fetch_marketplace_order_data
+                config = DigiKeyConfig.get()
+                dk_order_data = fetch_marketplace_order_data(config, order.order_number)
+            except Exception:
+                pass  # Fall back to DB data
+
         try:
             pdf_bytes = generate_eu_invoice(
                 order,
@@ -2311,6 +2324,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 ship_vat_id=ship_vat_id,
                 discount_pct=discount_pct,
                 vat_rate=vat_rate,
+                shipping_cost=shipping_cost,
+                dk_order_data=dk_order_data,
             )
         except Exception as e:
             return JsonResponse({"error": f"PDF generation failed: {e}"}, status=500)

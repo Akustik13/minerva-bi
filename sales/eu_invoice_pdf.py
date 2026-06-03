@@ -1,4 +1,4 @@
-"""EU Invoice PDF generator — layout matches Invoice_10229 template."""
+"""EU Invoice PDF generator — matches Invoice_10231/10232 sample format."""
 from __future__ import annotations
 
 import os
@@ -27,9 +27,8 @@ def _r2(v) -> Decimal:
 
 
 def _eu_num(amount: Decimal) -> str:
-    """Format with comma decimal separator: 79,99"""
-    s = f"{amount:,.2f}"          # "79.99" or "1,234.56"
-    # swap . and , (US→EU format)
+    """Format with comma decimal separator: 1.234,56"""
+    s = f"{amount:,.2f}"
     return s.replace(",", "X").replace(".", ",").replace("X", ".")
 
 
@@ -54,6 +53,38 @@ def _safe_img(path, width, height):
     return None
 
 
+def _fmt_dk_address(addr: dict) -> list[str]:
+    """Format DigiKey API address dict → list of display lines."""
+    if not addr:
+        return []
+    lines = []
+    company = (addr.get("companyName") or "").strip()
+    first   = (addr.get("firstName") or "").strip()
+    last    = (addr.get("lastName") or "").strip()
+    name    = f"{first} {last}".strip()
+    if company:
+        lines.append(company)
+    if name and name != company:
+        lines.append(name)
+    for key in ("street1", "street2"):
+        val = (addr.get(key) or "").strip()
+        if val:
+            lines.append(val)
+    city    = (addr.get("city") or "").strip()
+    state   = (addr.get("state") or "").strip()
+    postal  = (addr.get("postalCode") or "").strip()
+    country = (addr.get("countryCode") or "").strip()
+    city_parts = [p for p in [city, state] if p]
+    city_line  = ", ".join(city_parts)
+    if postal:
+        city_line = f"{city_line}, {postal}".strip(", ")
+    if city_line:
+        lines.append(city_line)
+    if country:
+        lines.append(country)
+    return lines
+
+
 def generate_eu_invoice(
     order,
     *,
@@ -65,7 +96,15 @@ def generate_eu_invoice(
     ship_vat_id: str = "",
     discount_pct: Decimal = Decimal("0"),
     vat_rate: Decimal = Decimal("19"),
+    shipping_cost: Decimal = None,
+    dk_order_data: dict = None,
 ) -> bytes:
+    """Generate EU invoice PDF.
+
+    dk_order_data: raw dict from DigiKey Marketplace Orders API — used for
+    line items, buyer address, and ship-to when available.
+    shipping_cost: explicit value; falls back to order.shipping_cost from DB.
+    """
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -76,7 +115,7 @@ def generate_eu_invoice(
 
     story = []
 
-    # ── Load company settings ─────────────────────────────────────────────────
+    # ── Company settings ──────────────────────────────────────────────────────
     try:
         from accounting.models import CompanySettings
         cs = CompanySettings.get()
@@ -103,6 +142,7 @@ def generate_eu_invoice(
 
     logo_img  = _safe_img(cs.logo.path if cs and cs.logo else None,    4.5*cm, 2.0*cm)
     sig_img   = _safe_img(cs.invoice_signature.path if cs and cs.invoice_signature else None, 3.5*cm, 1.8*cm)
+    stamp_img = _safe_img(cs.invoice_stamp.path if cs and getattr(cs, "invoice_stamp", None) else None, 2.5*cm, 2.5*cm)
 
     # ── Date helpers ──────────────────────────────────────────────────────────
     def _fd(d):
@@ -113,17 +153,64 @@ def generate_eu_invoice(
         except Exception:
             return str(d)
 
+    # ── Currency and order info ───────────────────────────────────────────────
     currency       = order.currency or "USD"
     inv_date_str   = _fd(invoice_date)
     order_date_str = _fd(order.order_date)
     shipped_str    = _fd(order.shipped_at)
+
+    # ── Shipping cost ─────────────────────────────────────────────────────────
+    if shipping_cost is None:
+        shipping_cost = _r2(order.shipping_cost or Decimal("0"))
+    else:
+        shipping_cost = _r2(shipping_cost)
+
+    # ── Line items: DigiKey API first, DB fallback ────────────────────────────
+    dk_lines = []
+    if dk_order_data:
+        for item in (dk_order_data.get("orderDetails") or []):
+            part   = (item.get("productPartNumber") or item.get("supplierSku") or "").strip()
+            desc   = (item.get("productDescription") or item.get("offerDescription") or "").strip()
+            qty    = Decimal(str(item.get("quantity") or 1))
+            uprice = _r2(item.get("unitPrice") or 0)
+            total  = _r2(item.get("totalPrice") or (uprice * qty))
+            dk_lines.append({
+                "sku": part, "name": desc,
+                "qty": qty, "unit_price": uprice, "total": total,
+            })
+        # Infer currency from additionalFields if available
+        for f in (dk_order_data.get("additionalFields") or []):
+            if f.get("code") == "currency" and f.get("value"):
+                currency = f["value"].upper()
+                break
+
+    db_lines = list(order.lines.select_related("product").all()) if not dk_lines else []
+
+    # ── Buyer info from DigiKey API billingAddress ────────────────────────────
+    dk_buyer_lines: list[str] = []
+    dk_buyer_vat: str = ""
+    if dk_order_data:
+        customer  = dk_order_data.get("customer") or {}
+        bill_addr = customer.get("billingAddress") or {}
+        dk_buyer_lines = _fmt_dk_address(bill_addr)
+        # VAT ID may be in additionalFields
+        for f in (dk_order_data.get("additionalFields") or []):
+            if f.get("code") in ("buyer-vat-id", "customer-vat-number", "vat-number"):
+                dk_buyer_vat = f.get("value") or ""
+                break
+
+    # ── Ship-to from DigiKey API shippingAddress ──────────────────────────────
+    dk_ship_lines: list[str] = []
+    if dk_order_data:
+        customer  = dk_order_data.get("customer") or {}
+        ship_addr = customer.get("shippingAddress") or customer.get("billingAddress") or {}
+        dk_ship_lines = _fmt_dk_address(ship_addr)
 
     # ═════════════════════════════════════════════════════════════════════════
     # 1. TOP HEADER: Invoice No. (left) | Logo + company block (right)
     # ═════════════════════════════════════════════════════════════════════════
     inv_no_cell = [_p(f"Invoice No.: {invoice_number}", size=10, bold=True)]
 
-    # Company info block (right side)
     right_block = []
     if logo_img:
         right_block.append(logo_img)
@@ -165,12 +252,23 @@ def generate_eu_invoice(
     story.append(Spacer(1, 0.6*cm))
 
     # ═════════════════════════════════════════════════════════════════════════
-    # 2. BILL-TO ADDRESS (left) — return-address line above
+    # 2. BILL-TO ADDRESS
     # ═════════════════════════════════════════════════════════════════════════
-    # Small return-address underlined text
     return_addr = ", ".join(filter(None, [co_name, co_street, co_city, co_country]))
-    bill_name   = buyer_name or order.client or ""
-    bill_lines  = [bill_name] + [l.strip() for l in buyer_address.splitlines() if l.strip()]
+
+    # Use provided buyer_name/buyer_address if given; otherwise use DigiKey API billingAddress
+    if buyer_name or buyer_address:
+        bill_lines = []
+        if buyer_name:
+            bill_lines.append(buyer_name)
+        for l in buyer_address.splitlines():
+            l = l.strip()
+            if l:
+                bill_lines.append(l)
+    elif dk_buyer_lines:
+        bill_lines = dk_buyer_lines
+    else:
+        bill_lines = [order.client or ""]
 
     addr_cell = []
     if return_addr:
@@ -178,8 +276,7 @@ def generate_eu_invoice(
                             color=colors.HexColor("#555555")))
         addr_cell.append(Spacer(1, 0.1*cm))
     for i, line in enumerate(bill_lines):
-        addr_cell.append(_p(line, size=10 if i == 0 else 9,
-                            bold=(i == 0)))
+        addr_cell.append(_p(line, size=10 if i == 0 else 9, bold=(i == 0)))
 
     addr_tbl = Table([[addr_cell, []]], colWidths=[page_w * 0.50, page_w * 0.50])
     addr_tbl.setStyle(TableStyle([
@@ -199,14 +296,16 @@ def generate_eu_invoice(
     story.append(Spacer(1, 0.6*cm))
 
     # ═════════════════════════════════════════════════════════════════════════
-    # 4. REFERENCE BLOCK: Your… | Our…
+    # 4. REFERENCE BLOCK
     # ═════════════════════════════════════════════════════════════════════════
+    eff_buyer_vat = buyer_vat_id or dk_buyer_vat
+
     left_refs = [
         _p(f"Your Order No.: <b>{order.order_number}</b>", size=9),
         _p(f"Your Order Date: {order_date_str}", size=9),
     ]
-    if buyer_vat_id:
-        left_refs.append(_p(f"<b>Your VAT ID: {buyer_vat_id}</b>", size=9))
+    if eff_buyer_vat:
+        left_refs.append(_p(f"<b>Your VAT ID: {eff_buyer_vat}</b>", size=9))
     if shipped_str:
         left_refs.append(_p(f"Date of shipment: {shipped_str}", size=9))
 
@@ -241,8 +340,6 @@ def generate_eu_invoice(
     # ═════════════════════════════════════════════════════════════════════════
     # 6. ITEMS TABLE
     # ═════════════════════════════════════════════════════════════════════════
-    lines = list(order.lines.select_related("product").all())
-
     col_w = [1.2*cm, 8.5*cm, 2.5*cm, 2.5*cm, 2.4*cm]
     hdr_ps = ParagraphStyle("th", fontName=_FONT_BOLD, fontSize=9,
                              leading=12, alignment=TA_CENTER)
@@ -256,66 +353,87 @@ def generate_eu_invoice(
 
     subtotal = Decimal("0")
     item_rows = []
+    n_product_rows = 0
 
-    for i, line in enumerate(lines, 1):
-        sku  = line.sku_raw or (line.product.sku if line.product else "")
-        name = line.product.name if line.product else ""
-        # Two-line description: SKU bold + product name
-        if sku and name and sku != name:
-            desc_text = f"<b>{sku}</b><br/>{name}"
-        else:
-            desc_text = f"<b>{sku or name}</b>"
+    if dk_lines:
+        for i, item in enumerate(dk_lines, 1):
+            sku  = item["sku"]
+            name = item["name"]
+            qty_val    = item["qty"]
+            unit_price = item["unit_price"]
+            line_total = item["total"]
+            subtotal += line_total
 
-        qty_val    = line.qty
-        unit_price = line.unit_price or Decimal("0")
-        if line.total_price:
-            line_total = _r2(line.total_price)
-        else:
-            line_total = _r2(unit_price * qty_val)
-        subtotal += line_total
+            desc_text = f"<b>{sku}</b>"
+            if name and name != sku:
+                desc_text += f"<br/>{name}"
 
-        unit_label = "pcs"
-        if line.product:
-            unit_label = _UNIT_LABEL.get(getattr(line.product, "unit_type", ""), "pcs")
+            item_rows.append([
+                _p(str(i), size=9, align=TA_CENTER),
+                Paragraph(desc_text, ParagraphStyle("d", fontName=_FONT, fontSize=9, leading=12)),
+                _p(f"{qty_val:g}", size=9, align=TA_CENTER),
+                _p(_eu_num(unit_price), size=9, align=TA_RIGHT),
+                _p(_eu_num(line_total), size=9, align=TA_RIGHT),
+            ])
+            n_product_rows += 1
+    else:
+        for i, line in enumerate(db_lines, 1):
+            sku  = line.sku_raw or (line.product.sku if line.product else "")
+            name = line.product.name if line.product else ""
+            if sku and name and sku != name:
+                desc_text = f"<b>{sku}</b><br/>{name}"
+            else:
+                desc_text = f"<b>{sku or name}</b>"
 
-        item_rows.append([
-            _p(str(i), size=9, align=TA_CENTER),
-            Paragraph(desc_text, ParagraphStyle("d", fontName=_FONT, fontSize=9, leading=12)),
-            _p(f"{qty_val:g}", size=9, align=TA_CENTER),
-            _p(_eu_num(unit_price),   size=9, align=TA_RIGHT),
-            _p(_eu_num(line_total),   size=9, align=TA_RIGHT),
-        ])
+            qty_val    = line.qty
+            unit_price = line.unit_price or Decimal("0")
+            if line.total_price:
+                line_total = _r2(line.total_price)
+            else:
+                line_total = _r2(unit_price * qty_val)
+            subtotal += line_total
+
+            item_rows.append([
+                _p(str(i), size=9, align=TA_CENTER),
+                Paragraph(desc_text, ParagraphStyle("d", fontName=_FONT, fontSize=9, leading=12)),
+                _p(f"{qty_val:g}", size=9, align=TA_CENTER),
+                _p(_eu_num(unit_price),   size=9, align=TA_RIGHT),
+                _p(_eu_num(line_total),   size=9, align=TA_RIGHT),
+            ])
+            n_product_rows += 1
 
     # Discount row
     discount_amount = _r2(subtotal * discount_pct / 100) if discount_pct else Decimal("0")
+    pos = n_product_rows + 1
     if discount_amount:
         disc_label = f"Discount {discount_pct:.0f}%"
         item_rows.append([
-            _p(str(len(lines) + 1), size=9, align=TA_CENTER),
+            _p(str(pos), size=9, align=TA_CENTER),
             _p(disc_label, size=9),
             _p("", size=9), _p("", size=9),
             _p(f"- {_eu_num(discount_amount)}", size=9, align=TA_RIGHT),
         ])
+        pos += 1
+
+    # Net goods after discount
+    net_goods = _r2(subtotal - discount_amount)
 
     # Shipping row
-    ship_cost    = _r2(order.shipping_cost or Decimal("0"))
-    ship_pos     = len(lines) + (2 if discount_amount else 1)
-    if ship_cost:
+    if shipping_cost:
         item_rows.append([
-            _p(str(ship_pos), size=9, align=TA_CENTER),
+            _p(str(pos), size=9, align=TA_CENTER),
             _p("Shipping Charges", size=9),
             _p("1,0", size=9, align=TA_CENTER),
-            _p(_eu_num(ship_cost), size=9, align=TA_RIGHT),
-            _p(_eu_num(ship_cost), size=9, align=TA_RIGHT),
+            _p(_eu_num(shipping_cost), size=9, align=TA_RIGHT),
+            _p(_eu_num(shipping_cost), size=9, align=TA_RIGHT),
         ])
 
-    # Totals rows
-    net_goods   = _r2(subtotal - discount_amount)
-    vat_base    = net_goods
-    vat_amount  = _r2(vat_base * vat_rate / 100) if vat_rate else Decimal("0")
-    grand_total = _r2(net_goods + vat_amount + ship_cost)
+    # ── Totals: VAT applies to net goods + shipping ───────────────────────────
+    net_total   = _r2(net_goods + shipping_cost)      # "Total Amount without VAT"
+    vat_amount  = _r2(net_total * vat_rate / 100) if vat_rate else Decimal("0")
+    grand_total = _r2(net_total + vat_amount)
 
-    _s = ParagraphStyle("ts", fontName=_FONT, fontSize=9, leading=12)
+    _s  = ParagraphStyle("ts",  fontName=_FONT,      fontSize=9, leading=12)
     _sb = ParagraphStyle("tsb", fontName=_FONT_BOLD, fontSize=9, leading=12)
 
     def _trow(label, amount, bold=False):
@@ -328,23 +446,18 @@ def generate_eu_invoice(
             Paragraph(_eu_num(amount), ps if not bold else _sb),
         ]
 
-    item_rows.append(_trow("Total Amount without VAT", net_goods + ship_cost))
-    item_rows.append(_trow(f"VAT {vat_rate:.0f}%", vat_amount))
+    item_rows.append(_trow("Total Amount without VAT", net_total))
+    item_rows.append(_trow(f"VAT {vat_rate:.0f}% ", vat_amount))
     item_rows.append(_trow("Total Amount with VAT", grand_total, bold=True))
 
-    n_items = len(lines) + (1 if discount_amount else 0) + (1 if ship_cost else 0)
-    n_total_rows = 3  # subtotal, vat, grand total
+    n_items = n_product_rows + (1 if discount_amount else 0) + (1 if shipping_cost else 0)
+    first_total_row = 1 + n_items + 1  # header(1) + item rows + first total
 
     all_rows  = [headers] + item_rows
     items_tbl = Table(all_rows, colWidths=col_w, repeatRows=1)
 
-    n_data = len(all_rows)
-    first_total_row = 1 + n_items + 1  # header + items + 1 (0-indexed)
-
     style_cmds = [
-        # outer border
         ("BOX",       (0, 0), (-1, -1), 0.8, colors.black),
-        # header row
         ("BOX",       (0, 0), (-1, 0), 1.0, colors.black),
         ("FONTNAME",  (0, 0), (-1, 0), _FONT_BOLD),
         ("FONTSIZE",  (0, 0), (-1, 0), 9),
@@ -352,21 +465,16 @@ def generate_eu_invoice(
         ("VALIGN",    (0, 0), (-1, 0), "MIDDLE"),
         ("TOPPADDING",    (0, 0), (-1, 0), 5),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 5),
-        # data rows
         ("FONTSIZE",  (0, 1), (-1, -1), 9),
         ("TOPPADDING",    (0, 1), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 1), (-1, -1), 4),
         ("LEFTPADDING",   (0, 0), (-1, -1), 5),
         ("RIGHTPADDING",  (-1, 0), (-1, -1), 5),
-        # inner grid for item rows
         ("INNERGRID", (0, 0), (-1, first_total_row - 1), 0.4, colors.black),
-        # align amounts right
         ("ALIGN",     (2, 1), (2, -1), "CENTER"),
         ("ALIGN",     (3, 1), (4, -1), "RIGHT"),
-        # total rows separator
         ("LINEABOVE", (0, first_total_row), (-1, first_total_row), 0.8, colors.black),
         ("LINEBELOW", (0, -1), (-1, -1), 0.8, colors.black),
-        # grand total bold
         ("FONTNAME",  (0, -1), (-1, -1), _FONT_BOLD),
     ]
     items_tbl.setStyle(TableStyle(style_cmds))
@@ -376,18 +484,25 @@ def generate_eu_invoice(
     # ═════════════════════════════════════════════════════════════════════════
     # 7. SHIPPED TO / FROM
     # ═════════════════════════════════════════════════════════════════════════
-    ship_company = order.ship_company or ""
-    ship_person  = order.ship_name or order.contact_name or ""
-    ship_street  = order.addr_street or ""
-    city_zip     = " ".join(filter(None, [order.addr_zip, order.addr_city]))
-    ship_country = order.addr_country or ""
-
-    to_cell = [_p("<b>Shipped to:</b>", size=9)]
-    for line in filter(None, [ship_company, ship_person, ship_street,
-                               f"{city_zip}, {ship_country}".strip(", ")]):
-        to_cell.append(_p(line, size=9))
-    if ship_vat_id:
-        to_cell.append(_p(f"VAT ID: {ship_vat_id}", size=9))
+    # Ship-to: DigiKey API shippingAddress first, DB fields as fallback
+    if dk_ship_lines:
+        to_cell = [_p("<b>Shipped to:</b>", size=9)]
+        for line in dk_ship_lines:
+            to_cell.append(_p(line, size=9))
+        if ship_vat_id:
+            to_cell.append(_p(f"VAT ID: {ship_vat_id}", size=9))
+    else:
+        ship_company = order.ship_company or ""
+        ship_person  = order.ship_name or order.contact_name or ""
+        ship_street  = order.addr_street or ""
+        city_zip     = " ".join(filter(None, [order.addr_zip, order.addr_city]))
+        ship_country = order.addr_country or ""
+        to_cell = [_p("<b>Shipped to:</b>", size=9)]
+        for line in filter(None, [ship_company, ship_person, ship_street,
+                                   f"{city_zip}, {ship_country}".strip(", ")]):
+            to_cell.append(_p(line, size=9))
+        if ship_vat_id:
+            to_cell.append(_p(f"VAT ID: {ship_vat_id}", size=9))
 
     from_cell = [_p("<b>Shipped from:</b>", size=9)]
     for line in filter(None, [co_name, co_street, co_city, co_country]):
@@ -409,17 +524,31 @@ def generate_eu_invoice(
     story.append(Spacer(1, 0.7*cm))
 
     # ═════════════════════════════════════════════════════════════════════════
-    # 8. SIGNATURE
+    # 8. SIGNATURE + STAMP
     # ═════════════════════════════════════════════════════════════════════════
-    sig_block = [_p("Sincerely yours,", size=9)]
-    sig_block.append(Spacer(1, 0.2*cm))
-    if sig_img:
-        sig_block.append(sig_img)
+    sig_items = [_p("Sincerely yours,", size=9), Spacer(1, 0.2*cm)]
+
+    if sig_img and stamp_img:
+        sig_row = Table(
+            [[sig_img, "", stamp_img]],
+            colWidths=[3.5*cm, page_w - 7.0*cm, 3.5*cm],
+        )
+        sig_row.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "BOTTOM"),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (-1, 0), (-1, -1), 0),
+            ("TOPPADDING",   (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
+        ]))
+        sig_items.append(sig_row)
+    elif sig_img:
+        sig_items.append(sig_img)
     else:
-        sig_block.append(Spacer(1, 1.2*cm))
+        sig_items.append(Spacer(1, 1.2*cm))
+
     if co_ceo:
-        sig_block.append(_p(co_ceo, size=9))
-    story.append(KeepTogether(sig_block))
+        sig_items.append(_p(co_ceo, size=9))
+    story.append(KeepTogether(sig_items))
 
     # ═════════════════════════════════════════════════════════════════════════
     # 9. FOOTER
@@ -429,11 +558,9 @@ def generate_eu_invoice(
                              spaceBefore=0, spaceAfter=3))
 
     footer_grey = colors.HexColor("#444444")
-    # Line 1: Company name + VAT + IBAN
     f1_left  = f"{co_name}, Principal Office: {co_city}" if co_city else co_name
     f1_mid   = f"VAT ID:  {co_vat}" if co_vat else ""
     f1_right = f"IBAN:  {co_iban}" if co_iban else ""
-    # Line 2: Registration + TAX + BIC
     f2_left  = f"Registration Court: {co_reg}" if co_reg else ""
     f2_mid   = f"TAX ID:  {co_tax_id}" if co_tax_id else ""
     f2_right = f"BIC / SWIFT:  {co_swift}" if co_swift else ""

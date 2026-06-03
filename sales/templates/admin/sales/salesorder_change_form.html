@@ -1184,8 +1184,17 @@ document.addEventListener('DOMContentLoaded',function(){
         <input id="eu-inv-discount" type="number" min="0" max="100" step="0.1" value="0">
       </div>
       <div class="eu-inv-field">
+        <label>Доставка ({{ order_source|default:"USD" }})</label>
+        <input id="eu-inv-shipping" type="number" min="0" step="0.01" value="0" placeholder="0.00">
+      </div>
+    </div>
+    <div class="eu-inv-row">
+      <div class="eu-inv-field">
         <label>ПДВ ставка (%)</label>
         <input id="eu-inv-vat" type="number" min="0" max="100" step="0.1" value="19">
+      </div>
+      <div class="eu-inv-field" style="display:flex;align-items:flex-end">
+        <span style="font-size:11px;color:var(--text-muted,#9aafbe)">ПДВ нараховується на товари + доставку</span>
       </div>
     </div>
 
@@ -1225,14 +1234,16 @@ document.addEventListener('DOMContentLoaded',function(){
     fetch(_suggestUrl)
       .then(function(r){ return r.json(); })
       .then(function(d){
-        var numInp = document.getElementById('eu-inv-number');
-        var bvat   = document.getElementById('eu-inv-buyer-vat');
-        var svat   = document.getElementById('eu-inv-ship-vat');
-        var vatInp = document.getElementById('eu-inv-vat');
+        var numInp  = document.getElementById('eu-inv-number');
+        var bvat    = document.getElementById('eu-inv-buyer-vat');
+        var svat    = document.getElementById('eu-inv-ship-vat');
+        var vatInp  = document.getElementById('eu-inv-vat');
+        var shipInp = document.getElementById('eu-inv-shipping');
         if (numInp) numInp.value = d.suggested_number;
         if (bvat && d.buyer_vat_id) bvat.value = d.buyer_vat_id;
         if (svat && d.ship_vat_id)  svat.value = d.ship_vat_id;
         if (vatInp && d.default_vat_rate != null) vatInp.value = d.default_vat_rate;
+        if (shipInp && d.shipping_cost) shipInp.value = d.shipping_cost.toFixed(2);
       })
       .catch(function(){});
   };
@@ -1253,6 +1264,7 @@ document.addEventListener('DOMContentLoaded',function(){
       buyer_vat_id:    document.getElementById('eu-inv-buyer-vat').value,
       ship_vat_id:     document.getElementById('eu-inv-ship-vat').value,
       discount_pct:    parseFloat(document.getElementById('eu-inv-discount').value) || 0,
+      shipping_cost:   parseFloat(document.getElementById('eu-inv-shipping').value) || 0,
       vat_rate:        parseFloat(document.getElementById('eu-inv-vat').value) || 19,
     };
     btn.disabled = true;
