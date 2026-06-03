@@ -320,22 +320,23 @@ body.dk-edit .dk-view-val      { display: none !important; }
 /* ═══════════════════════════════════════════════════════════════════════════
    Attributes editor
 ═══════════════════════════════════════════════════════════════════════════ */
-.dk-attrs-wrap { margin: 4px 0 8px; }
+.dk-attrs-wrap { margin: 4px 0 8px; width: 100%; }
 .dk-attrs-table {
-  border-collapse: collapse; width: 100%; max-width: 900px; font-size: 13px;
+  border-collapse: collapse; width: 100%; font-size: 13px; table-layout: fixed;
 }
 .dk-attrs-table th {
-  text-align: left; padding: 5px 12px;
+  text-align: left; padding: 6px 14px;
   background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
   font-weight: 600; font-size: 11px; text-transform: uppercase;
   letter-spacing: .5px; border-bottom: 2px solid var(--border-strong, #243347);
 }
-.dk-attrs-table td { padding: 3px 6px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; }
-.dk-attr-code { font-family: monospace; font-size: 11px; color: var(--text-muted, #9aafbe); padding: 4px 10px; }
+.dk-attrs-table th:first-child { width: 240px; }
+.dk-attrs-table td { padding: 4px 8px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; word-break: break-word; }
+.dk-attr-code { font-family: monospace; font-size: 12px; color: var(--text-muted, #9aafbe); padding: 5px 14px; white-space: nowrap; }
 .dk-attr-val input {
   width: 100%; background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
   border: 1px solid var(--border-strong, #243347); border-radius: 3px;
-  padding: 4px 8px; font-size: 13px; box-sizing: border-box;
+  padding: 5px 10px; font-size: 13px; box-sizing: border-box;
 }
 .dk-attr-val input:focus {
   outline: none; border-color: var(--accent, #58a6ff);
@@ -776,7 +777,7 @@ function dkAttrsInit() {
   wrap.className = 'dk-attrs-wrap';
   wrap.innerHTML =
     '<table class="dk-attrs-table"><thead><tr>'+
-      '<th style="width:260px">Атрибут</th><th>Значення</th>'+
+      '<th>Атрибут</th><th>Значення</th>'+
     '</tr></thead><tbody class="dk-atbody"></tbody></table>'+
     '<div class="dk-attrs-empty" id="dkAttrsEmpty" style="display:none">'+
       'Порожньо — натисніть 📥 Стягнути поля з DigiKey.'+

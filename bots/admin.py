@@ -1719,18 +1719,21 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         for code, val in sorted(obj.dk_attributes.items()):
             rows += (
                 f'<tr>'
-                f'<td style="padding:3px 10px;color:var(--text-muted);font-family:monospace;font-size:12px">'
+                f'<td style="padding:5px 14px;color:var(--text-muted);font-family:monospace;font-size:12px;'
+                f'white-space:nowrap;border-bottom:1px solid var(--border-strong)">'
                 f'{code}</td>'
-                f'<td style="padding:3px 10px;font-size:13px">{val}</td>'
+                f'<td style="padding:5px 14px;font-size:13px;word-break:break-word;'
+                f'border-bottom:1px solid var(--border-strong)">{val}</td>'
                 f'</tr>'
             )
         return format_html(
-            '<table style="border-collapse:collapse;font-size:13px;max-width:700px">'
+            '<table style="border-collapse:collapse;font-size:13px;width:100%;table-layout:fixed">'
+            '<colgroup><col style="width:220px"><col></colgroup>'
             '<thead><tr>'
-            '<th style="padding:4px 10px;text-align:left;font-size:11px;color:var(--text-muted);'
-            'border-bottom:1px solid var(--border-strong);text-transform:uppercase">Code</th>'
-            '<th style="padding:4px 10px;text-align:left;font-size:11px;color:var(--text-muted);'
-            'border-bottom:1px solid var(--border-strong);text-transform:uppercase">Value</th>'
+            '<th style="padding:5px 14px;text-align:left;font-size:11px;color:var(--text-muted);'
+            'border-bottom:2px solid var(--border-strong);text-transform:uppercase;letter-spacing:.4px">Атрибут</th>'
+            '<th style="padding:5px 14px;text-align:left;font-size:11px;color:var(--text-muted);'
+            'border-bottom:2px solid var(--border-strong);text-transform:uppercase;letter-spacing:.4px">Значення</th>'
             '</tr></thead>'
             '<tbody>{}</tbody></table>',
             format_html(rows)
