@@ -1053,6 +1053,8 @@ class BotLogAdmin(admin.ModelAdmin):
 
 @admin.register(DigiKeyListing)
 class DigiKeyListingAdmin(admin.ModelAdmin):
+    change_form_template = 'admin/bots/digikeylisting/change_form.html'
+
     list_display   = ('product_sku_link', 'dk_title', 'category_type',
                       'stock_qty_display', 'sync_status_badge',
                       'last_synced_at', 'publish_btn')
@@ -1079,10 +1081,14 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         ('📦 Товар', {
             'fields': ('product', 'category_type', 'dk_is_active'),
         }),
-        ('🏷️ Product (DigiKey Catalog)', {
+        ('🏷️ DigiKey Каталог', {
             'fields': (
-                'dk_category_id', 'dk_title', 'dk_description',
+                'dk_category_id', 'dk_category_name',
+                'dk_title', 'dk_description',
                 'dk_manufacturer', 'dk_image_url', 'dk_datasheet_url',
+            ),
+            'description': (
+                'Натисни <b>📥 Стягнути поля з DigiKey</b> вище — всі поля заповнюються автоматично.'
             ),
         }),
         ('🛒 Offer (Пропозиція)', {
@@ -1092,36 +1098,35 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 'stock_qty_readonly',
             ),
         }),
-        ('💰 Цінові тири', {
+        ('💰 Цінові тири (JSON)', {
             'fields': ('dk_prices',),
+            'description': 'Керуй цінами через візуальний редактор нижче. JSON оновлюється автоматично.',
+            'classes': ('collapse',),
         }),
         ('📋 Обов\'язкові атрибути DigiKey', {
-            'fields': (
-                'dk_packaging',
-                'dk_lifecycle_status',
-            ),
+            'fields': ('dk_packaging', 'dk_lifecycle_status'),
             'description': (
-                'Коди атрибутів знайди через кнопку <b>📋 Custom Fields</b> в '
-                '<a href="/admin/bots/digikeyconfig/1/change/">DigiKey → Конфігурація</a> → Дії.'
+                'Заповнюються автоматично при натисканні «📥 Стягнути поля з DigiKey».'
             ),
         }),
-        ('🔧 Filter Attributes', {
+        ('🔧 Технічні атрибути (категорія Filter)', {
             'fields': (
                 'fa_frequency', 'fa_bandwidth', 'fa_filter_type',
                 'fa_ripple', 'fa_insertion_loss', 'fa_mounting_type',
                 'fa_package_case', 'fa_size_dimension', 'fa_height_max',
             ),
             'classes': ('collapse',),
+            'description': 'Заповнюються автоматично з DigiKey для категорії RF Filter.',
         }),
-        ('📡 Всі атрибути DigiKey (raw)', {
-            'fields': ('dk_attributes_table',),
+        ('📡 Всі атрибути DigiKey (raw JSON)', {
+            'fields': ('dk_attributes',),
             'classes': ('collapse',),
             'description': (
-                'Всі атрибути стягнуті з DigiKey Products API (additionalFields). '
-                'Оновлюється кнопкою <b>📥 Стягнути поля з DigiKey</b>.'
+                'Редагується через таблицю нижче. '
+                'Тут зберігаються всі additionalFields з DigiKey Products API.'
             ),
         }),
-        ('📊 Sync Status', {
+        ('📊 Статус синхронізації', {
             'fields': (
                 'dk_product_id', 'dk_offer_id',
                 'sync_status', 'last_synced_at', 'last_error',
@@ -1159,6 +1164,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['pull_product_url'] = reverse(
                 'admin:bots_digikeylisting_pull_product', args=[object_id]
             )
+            # For list of existing sync status choices — used in template
+            extra_context['sync_choices'] = DigiKeyListing.SYNC_CHOICES
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     def get_urls(self):
@@ -1231,60 +1238,84 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
 
     def pull_product_view(self, request, pk):
+        """Pull all fields from DigiKey. Supports both regular redirect and AJAX JSON."""
         from bots.services.dk_marketplace import pull_product_fields, DKMarketplaceError
-        import json as _json
+        from django.http import JsonResponse
+
+        is_ajax = (
+            request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            or request.GET.get('ajax') == '1'
+        )
         listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+
         try:
             result  = pull_product_fields(listing)
             changed = result['changed']
-            prod    = result['raw_product']
-            offer   = result['raw_offer']
+            prod    = result.get('raw_product') or {}
+            offer   = result.get('raw_offer')
 
+            if is_ajax:
+                return JsonResponse({
+                    'ok': True,
+                    'changed': changed,
+                    'data': {
+                        'dk_title':            listing.dk_title,
+                        'dk_description':      listing.dk_description,
+                        'dk_manufacturer':     listing.dk_manufacturer,
+                        'dk_image_url':        listing.dk_image_url,
+                        'dk_datasheet_url':    listing.dk_datasheet_url,
+                        'dk_category_id':      listing.dk_category_id,
+                        'dk_category_name':    getattr(listing, 'dk_category_name', ''),
+                        'dk_packaging':        listing.dk_packaging,
+                        'dk_lifecycle_status': listing.dk_lifecycle_status,
+                        'dk_attributes':       listing.dk_attributes or {},
+                        'dk_prices':           listing.dk_prices or [],
+                        'fa_frequency':        listing.fa_frequency,
+                        'fa_bandwidth':        listing.fa_bandwidth,
+                        'fa_filter_type':      listing.fa_filter_type,
+                        'fa_ripple':           listing.fa_ripple,
+                        'fa_insertion_loss':   listing.fa_insertion_loss,
+                        'fa_mounting_type':    listing.fa_mounting_type,
+                        'fa_package_case':     listing.fa_package_case,
+                        'fa_size_dimension':   listing.fa_size_dimension,
+                        'fa_height_max':       listing.fa_height_max,
+                    },
+                    'raw_product': prod,
+                    'raw_offer':   offer,
+                })
+
+            # ── Non-AJAX: redirect with messages ──────────────────────────
             if changed:
-                messages.success(request, f"✅ Оновлено поля: {', '.join(changed)}")
+                messages.success(request, f"✅ Оновлено {len(changed)} полів: {', '.join(changed)}")
             else:
                 messages.info(request, "ℹ️ Всі поля вже актуальні.")
 
-            # ── Debug: raw product ────────────────────────────────────────
             add_fields = prod.get('additionalFields', [])
             messages.info(
                 request,
-                f"🔍 RAW PRODUCT | id={prod.get('_id')} | title={prod.get('title')!r} | "
-                f"description={str(prod.get('description',''))[:80]!r} | "
-                f"manufacturer={prod.get('manufacturer')!r} | "
-                f"imageUrl={prod.get('imageUrl')!r} | "
-                f"categoryId={prod.get('categoryId')!r}"
+                f"🔍 PRODUCT | id={prod.get('_id')} | title={prod.get('title')!r} | "
+                f"categoryId={prod.get('categoryId')!r} | attrs={len(add_fields)}"
             )
-            if add_fields:
-                for f in add_fields:
-                    messages.info(
-                        request,
-                        f"   additionalField: code={f.get('code')!r}  "
-                        f"type={f.get('type')!r}  "
-                        f"value={str(f.get('value',''))!r}"
-                    )
-            else:
-                messages.warning(request, "⚠️ additionalFields порожній — атрибути не знайдено в Products API.")
-
-            # ── Debug: raw offer ──────────────────────────────────────────
             if offer:
-                prices = offer.get('prices', [])
                 messages.info(
                     request,
-                    f"🔍 RAW OFFER | id={offer.get('id')} | "
-                    f"sku={offer.get('supplierSku')!r} | "
-                    f"isActive={offer.get('isActive')} | "
-                    f"qty={offer.get('quantityAvailable')} | "
-                    f"prices={prices}"
+                    f"🔍 OFFER | id={offer.get('id')} | qty={offer.get('quantityAvailable')} | "
+                    f"prices={len(offer.get('prices', []))}"
                 )
             else:
-                messages.warning(request, "⚠️ Offer не знайдено за цим SKU (GET /offers?SupplierSku=).")
+                messages.warning(request, "⚠️ Offer не знайдено — SKU не збігається або offer ще не створено.")
 
         except DKMarketplaceError as exc:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
             messages.error(request, f"❌ {exc}")
         except Exception as exc:
             import traceback
-            messages.error(request, f"❌ {exc} | {traceback.format_exc()[-300:]}")
+            err_msg = f"❌ {exc}"
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': err_msg}, status=500)
+            messages.error(request, f"{err_msg} | {traceback.format_exc()[-300:]}")
+
         return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
 
     # ── Bulk action: sync quantities ──────────────────────────────────────────

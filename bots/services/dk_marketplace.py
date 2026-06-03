@@ -656,6 +656,23 @@ _FILTER_ATTR_MAP = {
     '966': 'fa_height_max',
 }
 
+# Auto-detect category_type from DK category name keywords
+_CATEGORY_KEYWORDS = {
+    'filter':    ['filter', 'filters', 'фільтр'],
+    'antenna':   ['antenna', 'antennas', 'антена'],
+    'cable':     ['cable', 'cables', 'кабель', 'harness'],
+    'connector': ['connector', 'connectors', 'adapter', 'adapters', 'конектор', 'адаптер'],
+}
+
+
+def _detect_category_type(category_name: str) -> str:
+    """Guess Minerva category_type from DigiKey category name string."""
+    name_lower = (category_name or '').lower()
+    for cat, keywords in _CATEGORY_KEYWORDS.items():
+        if any(kw in name_lower for kw in keywords):
+            return cat
+    return 'other'
+
 
 def pull_product_fields(listing) -> dict:
     """Pull ALL data from DigiKey and update listing.
@@ -712,24 +729,40 @@ def pull_product_fields(listing) -> dict:
     _set('dk_description',   (prod.get('description') or ''),  max_len=2048)
     _set('dk_manufacturer',  (prod.get('manufacturer') or ''), max_len=50)
     _set('dk_image_url',     prod.get('imageUrl') or '')
-    _set('dk_category_id',   prod.get('categoryId') or '')
+    _set('dk_category_id',   str(prod.get('categoryId') or ''))
+
+    # ── Category name ──────────────────────────────────────────────────────
+    cat_name = (prod.get('categoryName') or prod.get('category', {}).get('name', '')
+                if isinstance(prod.get('category'), dict) else '')
+    if not cat_name and prod.get('categoryId'):
+        cat_name = f"DK Category {prod['categoryId']}"
+    if cat_name and hasattr(listing, 'dk_category_name'):
+        _set('dk_category_name', cat_name, max_len=200)
+
+    # ── Auto-detect category_type if still default ─────────────────────────
+    if cat_name and listing.category_type in ('other', ''):
+        detected = _detect_category_type(cat_name)
+        if detected != 'other':
+            _set('category_type', detected)
 
     # ── All attributes dict ────────────────────────────────────────────────
-    if attrs_dict != listing.dk_attributes:
-        listing.dk_attributes = attrs_dict
+    # Merge: keep existing manual overrides, add/update from DigiKey
+    merged_attrs = dict(listing.dk_attributes or {})
+    merged_attrs.update(attrs_dict)
+    if merged_attrs != (listing.dk_attributes or {}):
+        listing.dk_attributes = merged_attrs
         changed.append('dk_attributes')
 
     # ── Map known codes to model fields ────────────────────────────────────
-    _set('dk_datasheet_url',    attrs_dict.get('datasheetUrl', ''))
-    _set('dk_packaging',        attrs_dict.get('packaging', ''))
-    _set('dk_lifecycle_status', attrs_dict.get('productLifecycleStatus', ''))
+    _set('dk_datasheet_url',    merged_attrs.get('datasheetUrl', ''))
+    _set('dk_packaging',        merged_attrs.get('packaging', ''))
+    _set('dk_lifecycle_status', merged_attrs.get('productLifecycleStatus', ''))
 
-    # Filter-category attributes
-    if listing.category_type == 'filter':
-        for code, field in _FILTER_ATTR_MAP.items():
-            val = attrs_dict.get(code, '')
-            if val:
-                _set(field, val, max_len=200)
+    # Filter-category attributes (apply for ALL categories, not just 'filter')
+    for code, field in _FILTER_ATTR_MAP.items():
+        val = merged_attrs.get(code, '')
+        if val:
+            _set(field, val, max_len=200)
 
     # ── Prices from offer ──────────────────────────────────────────────────
     if offer:

@@ -1,80 +1,252 @@
 {% extends "admin/change_form.html" %}
 {% load i18n %}
 
-{% block submit_buttons_bottom %}
-  {{ block.super }}
+{# ── Action bar (top of page, above form fields) ─────────────────────────── #}
+{% block object_tools %}
+{{ block.super }}
+{% if pull_product_url %}
+<div class="dk-action-bar" id="dkActionBar">
+
+  {# Primary: AJAX pull from DigiKey #}
+  <button type="button" class="dk-btn dk-btn-pull" id="dkPullBtn"
+          onclick="dkPullFromDigiKey()">
+    📥 Стягнути поля з DigiKey
+  </button>
+
+  {# Publish / update #}
   {% if publish_url %}
-  <div class="submit-row dk-action-row">
-    <a href="{{ publish_url }}" class="button dk-publish-btn"
-       onclick="return confirm('{% if original.dk_offer_id %}Оновити лістинг на DigiKey?{% else %}Опублікувати товар на DigiKey Marketplace?{% endif %}')">
-      {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати на DigiKey{% endif %}
-    </a>
-    {% if original.sync_status == 'staged' and not original.dk_offer_id %}
-    <a href="{{ create_offer_url }}" class="button dk-offer-btn"
-       onclick="return confirm('Спробувати створити Offer? Продукт має бути затверджений DigiKey.')">
-      📦 Створити Offer
-    </a>
-    {% endif %}
-    {% if original.dk_offer_id %}
-    <a href="{{ sync_qty_url }}" class="button dk-sync-btn"
-       onclick="return confirm('Оновити залишок складу на DigiKey?')">
-      📦 Оновити залишок
-    </a>
-    {% endif %}
-    <a href="{{ pull_product_url }}" class="button dk-pull-btn"
-       onclick="return confirm('Стягнути поля (назва, опис, зображення, упаковка, datasheet) з DigiKey Products API?')">
-      📥 Стягнути поля з DigiKey
-    </a>
-    {% if original.sync_status == 'staged' %}
-    <span class="dk-staged-note">⏳ Продукт надіслано на перевірку DigiKey. Після затвердження натисніть 📦 Створити Offer.</span>
-    {% elif original.sync_status == 'error' and original.last_error %}
-    <span class="dk-error-note">❌ {{ original.last_error|truncatechars:120 }}</span>
-    {% endif %}
-  </div>
+  <a href="{{ publish_url }}" class="dk-btn dk-btn-publish"
+     onclick="return confirm('{% if original.dk_offer_id %}Оновити лістинг на DigiKey?{% else %}Опублікувати товар на DigiKey Marketplace?{% endif %}')">
+    {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати{% endif %}
+  </a>
   {% endif %}
+
+  {# Update stock qty #}
+  {% if original.dk_offer_id %}
+  <a href="{{ sync_qty_url }}" class="dk-btn dk-btn-sync"
+     onclick="return confirm('Оновити залишок складу на DigiKey?')">
+    📦 Оновити залишок
+  </a>
+  {% endif %}
+
+  {# Create offer (staged state only) #}
+  {% if original.sync_status == 'staged' and not original.dk_offer_id %}
+  <a href="{{ create_offer_url }}" class="dk-btn dk-btn-offer"
+     onclick="return confirm('Спробувати створити Offer? Продукт має бути затверджений DigiKey.')">
+    📦 Створити Offer
+  </a>
+  {% endif %}
+
+  {# Pull status indicator #}
+  <span class="dk-status" id="dkStatus" style="display:none">
+    <span id="dkStatusIcon">⏳</span>
+    <span id="dkStatusMsg">Завантаження…</span>
+  </span>
+
+  {# Status notes #}
+  {% if original.sync_status == 'staged' %}
+  <span class="dk-note dk-note-staged">⏳ Продукт на перевірці DigiKey. Після затвердження → 📦 Створити Offer.</span>
+  {% elif original.sync_status == 'error' and original.last_error %}
+  <span class="dk-note dk-note-error">❌ {{ original.last_error|truncatechars:150 }}</span>
+  {% endif %}
+
+</div>
+{% endif %}
 {% endblock %}
 
+
+{# ── Extra CSS + JS ───────────────────────────────────────────────────────── #}
 {% block extrahead %}
 {{ block.super }}
 <style>
-.dk-action-row {
-  background: var(--bg-card, #1a2535);
-  border-top: 2px solid var(--border-strong, #243347);
+/* ═══════════════════════════════════════════════════════════════════════════
+   Action bar
+═══════════════════════════════════════════════════════════════════════════ */
+.dk-action-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
+  padding: 10px 14px;
+  margin: 8px 0 14px;
+  background: var(--bg-card, #1a2535);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 6px;
 }
-.dk-publish-btn {
-  background: #2e7d32 !important; color: #fff !important;
-  font-weight: 600 !important; padding: 8px 18px !important;
-  border-radius: 5px !important; text-decoration: none !important;
-  font-size: 13px !important; transition: background .15s;
-}
-.dk-publish-btn:hover { background: #388e3c !important; }
-.dk-sync-btn {
-  background: #1565c0 !important; color: #fff !important;
-  font-weight: 500 !important; padding: 8px 16px !important;
-  border-radius: 5px !important; text-decoration: none !important;
-  font-size: 13px !important; transition: background .15s;
-}
-.dk-sync-btn:hover { background: #1976d2 !important; }
-.dk-pull-btn {
-  background: #00695c !important; color: #fff !important;
-  font-weight: 500 !important; padding: 8px 16px !important;
-  border-radius: 5px !important; text-decoration: none !important;
-  font-size: 13px !important; transition: background .15s;
-}
-.dk-pull-btn:hover { background: #00897b !important; }
-.dk-error-note { color: var(--err, #e53935); font-size: 12px; font-style: italic; flex: 1; }
 
-/* ── Price table ─────────────────────────────────────── */
+.dk-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none !important;
+  white-space: nowrap;
+  transition: filter .15s, opacity .15s;
+  color: #fff !important;
+}
+.dk-btn:hover { filter: brightness(1.15); }
+.dk-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+.dk-btn-pull    { background: #00695c; }
+.dk-btn-publish { background: #2e7d32; }
+.dk-btn-sync    { background: #1565c0; }
+.dk-btn-offer   { background: #e65100; }
+
+.dk-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted, #9aafbe);
+  margin-left: 4px;
+}
+#dkStatusIcon { font-size: 16px; }
+
+.dk-note {
+  font-size: 12px;
+  font-style: italic;
+  margin-left: auto;
+}
+.dk-note-staged { color: #ffb300; }
+.dk-note-error  { color: var(--err, #e53935); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Field highlight animation
+═══════════════════════════════════════════════════════════════════════════ */
+@keyframes dkHighlight {
+  0%   { box-shadow: 0 0 0 3px rgba(0,230,180,.7); background: rgba(0,230,180,.08); }
+  100% { box-shadow: none; background: transparent; }
+}
+.dk-field-updated input,
+.dk-field-updated textarea,
+.dk-field-updated select {
+  animation: dkHighlight 1.8s ease-out forwards;
+  border-color: #00bfa5 !important;
+}
+.dk-field-updated-label::after {
+  content: ' ✓';
+  color: #00bfa5;
+  font-size: 11px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Product preview card
+═══════════════════════════════════════════════════════════════════════════ */
+#dkPreviewCard {
+  display: none;
+  margin: 16px 0 8px;
+  padding: 14px 16px;
+  background: var(--bg-card, #1a2535);
+  border: 1px solid #00695c55;
+  border-left: 4px solid #00695c;
+  border-radius: 6px;
+  font-size: 13px;
+  max-width: 900px;
+}
+.dk-preview-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.dk-preview-img {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong, #243347);
+  background: #fff;
+  flex-shrink: 0;
+}
+.dk-preview-img-placeholder {
+  width: 72px;
+  height: 72px;
+  border-radius: 4px;
+  border: 1px solid var(--border-strong, #243347);
+  background: var(--bg-hover, #1e2d40);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.dk-preview-meta { flex: 1; min-width: 0; }
+.dk-preview-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text, #c9d8e4);
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dk-preview-mfr {
+  font-size: 12px;
+  color: var(--text-muted, #9aafbe);
+  margin-bottom: 6px;
+}
+.dk-preview-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+.dk-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--bg-hover, #1e2d40);
+  color: var(--text-muted, #9aafbe);
+  border: 1px solid var(--border-strong, #243347);
+}
+.dk-badge-cat  { color: #42a5f5; border-color: #42a5f5aa; }
+.dk-badge-pkg  { color: #66bb6a; border-color: #66bb6aaa; }
+.dk-badge-life { color: #ffa726; border-color: #ffa726aa; }
+
+.dk-preview-desc {
+  font-size: 12px;
+  color: var(--text-muted, #9aafbe);
+  line-height: 1.5;
+  margin-bottom: 10px;
+  max-height: 52px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.dk-preview-links { display: flex; gap: 12px; font-size: 12px; }
+.dk-preview-links a { color: var(--link, #58a6ff); text-decoration: none; }
+.dk-preview-links a:hover { text-decoration: underline; }
+
+.dk-preview-changed {
+  font-size: 12px;
+  color: var(--text-muted, #9aafbe);
+  border-top: 1px solid var(--border-strong, #243347);
+  padding-top: 8px;
+  margin-top: 8px;
+}
+.dk-preview-changed .dk-changed-tag {
+  display: inline-block;
+  padding: 1px 7px;
+  background: rgba(0,191,165,.12);
+  color: #00bfa5;
+  border: 1px solid #00bfa555;
+  border-radius: 8px;
+  margin: 2px 3px;
+  font-size: 11px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Price table
+═══════════════════════════════════════════════════════════════════════════ */
 .dk-prices-wrap { margin: 4px 0 8px; }
 
 .dk-prices-table {
   border-collapse: collapse;
   width: 100%;
-  max-width: 380px;
+  max-width: 400px;
   font-size: 13px;
 }
 .dk-prices-table th {
@@ -102,28 +274,20 @@
   font-size: 13px;
   box-sizing: border-box;
 }
-.dk-prices-table input[type="number"]:focus {
+.dk-prices-table input:focus {
   outline: none;
   border-color: var(--accent, #58a6ff);
   box-shadow: 0 0 0 2px rgba(88,166,255,.2);
 }
-.dk-prices-table .dk-tier-num {
-  color: var(--text-dim, #607d8b);
-  font-size: 11px;
-  text-align: center;
-  width: 28px;
-}
+.dk-tier-num { color: var(--text-dim, #607d8b); font-size: 11px; text-align: center; width: 28px; }
 .dk-del-row {
   background: none; border: none;
   color: var(--text-dim, #607d8b);
   cursor: pointer; font-size: 18px; padding: 0 6px;
-  line-height: 1; transition: color .1s;
+  transition: color .1s;
 }
 .dk-del-row:hover { color: var(--err, #e53935); }
-.dk-prices-footer {
-  display: flex; align-items: center;
-  gap: 12px; margin-top: 8px;
-}
+.dk-prices-footer { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
 .dk-add-btn {
   background: var(--bg-hover, #1e2d40);
   color: var(--text, #c9d8e4);
@@ -135,35 +299,80 @@
   transition: background .15s;
 }
 .dk-add-btn:hover { background: var(--bg-card, #1a2535); }
-.dk-prices-hint {
-  color: var(--text-muted, #9aafbe);
-  font-size: 11px;
-}
-.dk-prices-err {
-  color: var(--err, #e53935);
-  font-size: 11px;
-  margin-top: 4px;
-  display: none;
-}
+.dk-prices-hint { color: var(--text-muted, #9aafbe); font-size: 11px; }
+.dk-prices-err { color: var(--err, #e53935); font-size: 11px; margin-top: 4px; display: none; }
 
-/* Hide raw JSONField textarea — replaced by table above */
+/* Hide raw JSONField textarea — replaced by table */
 .field-dk_prices > .flex-container,
-.field-dk_prices textarea {
-  display: none !important;
+.field-dk_prices textarea { display: none !important; }
+.field-dk_prices { display: block !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Attributes editor
+═══════════════════════════════════════════════════════════════════════════ */
+.dk-attrs-wrap { margin: 4px 0 8px; }
+.dk-attrs-table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 700px;
+  font-size: 13px;
 }
-/* But keep the form-row visible so our widget renders inside it */
-.field-dk_prices {
-  display: block !important;
+.dk-attrs-table th {
+  text-align: left;
+  padding: 5px 12px;
+  background: var(--bg-hover, #1e2d40);
+  color: var(--text-muted, #9aafbe);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border-bottom: 2px solid var(--border-strong, #243347);
+}
+.dk-attrs-table td {
+  padding: 3px 6px;
+  border-bottom: 1px solid var(--border-strong, #243347);
+  vertical-align: middle;
+}
+.dk-attr-code {
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-muted, #9aafbe);
+  padding: 4px 10px;
+}
+.dk-attr-val input {
+  width: 100%;
+  background: var(--bg-input, #141f2b);
+  color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 3px;
+  padding: 4px 8px;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.dk-attr-val input:focus {
+  outline: none;
+  border-color: var(--accent, #58a6ff);
+  box-shadow: 0 0 0 2px rgba(88,166,255,.2);
+}
+.dk-attrs-empty {
+  color: var(--text-muted, #9aafbe);
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px 10px;
 }
 
-/* Required fields */
+/* Hide raw dk_attributes textarea — replaced by table */
+.field-dk_attributes > .flex-container,
+.field-dk_attributes textarea { display: none !important; }
+.field-dk_attributes { display: block !important; }
+
+/* Required field badges */
 .dk-required-mark {
   display: inline-block;
   background: #c62828; color: #fff;
   font-size: 10px; font-weight: 700;
   padding: 1px 5px; border-radius: 3px;
   margin-left: 6px; vertical-align: middle;
-  letter-spacing: .3px;
 }
 .dk-required-empty input,
 .dk-required-empty textarea,
@@ -174,123 +383,382 @@
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+/* ════════════════════════════════════════════════════════════════════════════
+   DigiKey Listing Admin — AJAX pull + editors
+════════════════════════════════════════════════════════════════════════════ */
 
-  // ── Price table ────────────────────────────────────────────────────────
-  (function() {
-    // Find the dk_prices field container
-    var fieldRow = (
-      document.querySelector('.field-dk_prices') ||
-      document.querySelector('[data-field-name="dk_prices"]')
-    );
-    // Also try finding textarea directly
-    var ta = document.querySelector('[name="dk_prices"]');
-    if (!ta) return;
+/* ── Mapping: JSON field name → Django form input id ─────────────────────── */
+var DK_FIELD_MAP = {
+  dk_title:            'id_dk_title',
+  dk_description:      'id_dk_description',
+  dk_manufacturer:     'id_dk_manufacturer',
+  dk_image_url:        'id_dk_image_url',
+  dk_datasheet_url:    'id_dk_datasheet_url',
+  dk_category_id:      'id_dk_category_id',
+  dk_category_name:    'id_dk_category_name',
+  dk_packaging:        'id_dk_packaging',
+  dk_lifecycle_status: 'id_dk_lifecycle_status',
+  fa_frequency:        'id_fa_frequency',
+  fa_bandwidth:        'id_fa_bandwidth',
+  fa_filter_type:      'id_fa_filter_type',
+  fa_ripple:           'id_fa_ripple',
+  fa_insertion_loss:   'id_fa_insertion_loss',
+  fa_mounting_type:    'id_fa_mounting_type',
+  fa_package_case:     'id_fa_package_case',
+  fa_size_dimension:   'id_fa_size_dimension',
+  fa_height_max:       'id_fa_height_max',
+};
 
-    // Build widget
-    var wrap = document.createElement('div');
-    wrap.className = 'dk-prices-wrap';
+/* ── AJAX: Pull all fields from DigiKey ────────────────────────────────────
+   Calls ?ajax=1 endpoint, auto-fills all form fields, highlights changed.    */
+function dkPullFromDigiKey() {
+  var btn    = document.getElementById('dkPullBtn');
+  var status = document.getElementById('dkStatus');
+  var icon   = document.getElementById('dkStatusIcon');
+  var msg    = document.getElementById('dkStatusMsg');
 
-    wrap.innerHTML =
-      '<table class="dk-prices-table">' +
-        '<thead><tr>' +
-          '<th style="width:28px">#</th>' +
-          '<th style="width:140px">Кількість (шт.)</th>' +
-          '<th style="width:150px">Ціна (EUR)</th>' +
-          '<th style="width:36px"></th>' +
-        '</tr></thead>' +
-        '<tbody class="dk-tbody"></tbody>' +
-      '</table>' +
-      '<div class="dk-prices-footer">' +
-        '<button type="button" class="dk-add-btn">+ Додати тир</button>' +
-        '<span class="dk-prices-hint">Перший тир = MOQ. Макс. 9 тирів.</span>' +
-      '</div>' +
-      '<div class="dk-prices-err" id="dk-prices-err"></div>';
+  btn.disabled = true;
+  status.style.display = 'inline-flex';
+  icon.textContent = '⏳';
+  msg.textContent  = 'Завантаження з DigiKey…';
+  msg.style.color  = 'var(--text-muted, #9aafbe)';
 
-    // Insert widget right before the hidden textarea
-    ta.parentNode.insertBefore(wrap, ta);
-
-    var tbody  = wrap.querySelector('.dk-tbody');
-    var addBtn = wrap.querySelector('.dk-add-btn');
-
-    function renumber() {
-      tbody.querySelectorAll('tr').forEach(function(tr, i) {
-        tr.querySelector('.dk-tier-num').textContent = i + 1;
-      });
+  fetch('{{ pull_product_url }}?ajax=1', {
+    method: 'GET',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    credentials: 'same-origin',
+  })
+  .then(function(resp) {
+    return resp.json().then(function(data) {
+      data._status = resp.status;
+      return data;
+    });
+  })
+  .then(function(data) {
+    btn.disabled = false;
+    if (!data.ok) {
+      icon.textContent = '❌';
+      msg.textContent  = data.error || 'Помилка сервера';
+      msg.style.color  = 'var(--err, #e53935)';
+      return;
     }
 
-    function syncJson() {
-      var rows  = tbody.querySelectorAll('tr');
-      var tiers = [];
-      var hasErr = false;
-      rows.forEach(function(tr) {
-        var qtyVal   = tr.querySelector('.dk-qty').value;
-        var priceVal = tr.querySelector('.dk-price').value;
-        var qty      = parseInt(qtyVal, 10);
-        var price    = parseFloat(priceVal);
-        if (!isNaN(qty) && qty > 0 && !isNaN(price) && price >= 0) {
-          tiers.push({qty: qty, price: price});
-        } else if (qtyVal !== '' || priceVal !== '') {
-          hasErr = true;
-        }
-      });
-      tiers.sort(function(a, b) { return a.qty - b.qty; });
-      ta.value = JSON.stringify(tiers);
-      var err = document.getElementById('dk-prices-err');
-      if (hasErr) {
-        err.textContent = '⚠️ Заповни обидва поля в кожному рядку.';
-        err.style.display = 'block';
-      } else {
-        err.style.display = 'none';
+    /* Fill regular form fields */
+    var fields = data.data || {};
+    Object.keys(DK_FIELD_MAP).forEach(function(key) {
+      var inputId = DK_FIELD_MAP[key];
+      var el = document.getElementById(inputId);
+      if (!el || fields[key] === undefined || fields[key] === null) return;
+      var newVal = String(fields[key]);
+      if (el.value !== newVal) {
+        el.value = newVal;
+        dkHighlightField(el);
       }
-    }
-
-    function addRow(qty, price) {
-      var tr = document.createElement('tr');
-      tr.innerHTML =
-        '<td class="dk-tier-num">?</td>' +
-        '<td><input type="number" class="dk-qty" min="1" step="1" value="' +
-          (qty !== undefined && qty !== '' ? qty : '') +
-          '" placeholder="1" autocomplete="off"></td>' +
-        '<td><input type="number" class="dk-price" min="0" step="0.0001" value="' +
-          (price !== undefined && price !== '' ? price : '') +
-          '" placeholder="0.0000" autocomplete="off"></td>' +
-        '<td><button type="button" class="dk-del-row" title="Видалити рядок">×</button></td>';
-      tr.querySelector('.dk-del-row').addEventListener('click', function() {
-        tr.remove(); renumber(); syncJson();
-      });
-      tr.querySelector('.dk-qty').addEventListener('input', syncJson);
-      tr.querySelector('.dk-price').addEventListener('input', syncJson);
-      tbody.appendChild(tr);
-      renumber();
-    }
-
-    addBtn.addEventListener('click', function() {
-      if (tbody.querySelectorAll('tr').length >= 9) {
-        alert('Максимум 9 цінових тирів.');
-        return;
-      }
-      addRow('', '');
-      tbody.lastElementChild.querySelector('.dk-qty').focus();
-      syncJson();
     });
 
-    // Load existing tiers from hidden field
-    var existing = [];
-    try {
-      var raw = ta.value.trim();
-      if (raw) existing = JSON.parse(raw);
-    } catch(e) {}
-
-    if (Array.isArray(existing) && existing.length) {
-      existing.forEach(function(t) { addRow(t.qty, t.price); });
-    } else {
-      addRow(1, '');
+    /* Fill dk_attributes editor */
+    if (fields.dk_attributes && typeof fields.dk_attributes === 'object') {
+      dkAttrsRebuild(fields.dk_attributes);
     }
-    syncJson();
-  })();
 
-  // ── Required field badges ──────────────────────────────────────────────
+    /* Fill price table */
+    if (Array.isArray(fields.dk_prices) && fields.dk_prices.length) {
+      dkPricesRebuild(fields.dk_prices);
+    }
+
+    /* Status */
+    var changed = data.changed || [];
+    icon.textContent = '✅';
+    msg.textContent  = changed.length
+      ? 'Оновлено ' + changed.length + ' полів: ' + changed.join(', ')
+      : 'Всі поля вже актуальні.';
+    msg.style.color = changed.length ? '#00bfa5' : 'var(--text-muted, #9aafbe)';
+
+    /* Preview card */
+    dkShowPreview(data.data, data.raw_product, changed);
+  })
+  .catch(function(err) {
+    btn.disabled = false;
+    icon.textContent = '❌';
+    msg.textContent  = 'Мережева помилка: ' + err.message;
+    msg.style.color  = 'var(--err, #e53935)';
+  });
+}
+
+/* ── Highlight field row on change ──────────────────────────────────────── */
+function dkHighlightField(el) {
+  var row = el.closest('.form-row') || el.closest('.field-box') || el.parentNode;
+  if (!row) return;
+  row.classList.remove('dk-field-updated');
+  void row.offsetWidth; /* reflow to restart animation */
+  row.classList.add('dk-field-updated');
+
+  /* Add ✓ to label */
+  var label = row.querySelector('label');
+  if (label && !label.classList.contains('dk-field-updated-label')) {
+    label.classList.add('dk-field-updated-label');
+    setTimeout(function() { label.classList.remove('dk-field-updated-label'); }, 3000);
+  }
+}
+
+/* ── Preview card ───────────────────────────────────────────────────────── */
+function dkShowPreview(fields, raw, changed) {
+  var card = document.getElementById('dkPreviewCard');
+  if (!card) return;
+
+  var title  = (fields && fields.dk_title)         || (raw && raw.title)        || '—';
+  var mfr    = (fields && fields.dk_manufacturer)  || (raw && raw.manufacturer) || '';
+  var img    = (fields && fields.dk_image_url)     || (raw && raw.primaryPhoto) || '';
+  var ds     = (fields && fields.dk_datasheet_url) || (raw && raw.primaryDatasheet) || '';
+  var desc   = (fields && fields.dk_description)   || (raw && raw.shortDescription) || '';
+  var cat    = (fields && fields.dk_category_name) || (raw && raw.categoryName) || '';
+  var pkg    = (fields && fields.dk_packaging)     || '';
+  var life   = (fields && fields.dk_lifecycle_status) || '';
+
+  var imgHtml = img
+    ? '<img class="dk-preview-img" src="' + dkEsc(img) + '" alt="" onerror="this.style.display=\'none\'">'
+    : '<div class="dk-preview-img-placeholder">📦</div>';
+
+  var badges = '';
+  if (cat)  badges += '<span class="dk-badge dk-badge-cat">' + dkEsc(cat) + '</span>';
+  if (pkg)  badges += '<span class="dk-badge dk-badge-pkg">' + dkEsc(pkg) + '</span>';
+  if (life) badges += '<span class="dk-badge dk-badge-life">' + dkEsc(life) + '</span>';
+
+  var links = '';
+  if (ds) links += '<a href="' + dkEsc(ds) + '" target="_blank" rel="noopener">📄 Datasheet</a>';
+
+  var changedHtml = '';
+  if (changed && changed.length) {
+    changedHtml = '<div class="dk-preview-changed">Оновлено: ' +
+      changed.map(function(f) { return '<span class="dk-changed-tag">' + dkEsc(f) + '</span>'; }).join('') +
+    '</div>';
+  }
+
+  card.innerHTML =
+    '<div class="dk-preview-header">' +
+      imgHtml +
+      '<div class="dk-preview-meta">' +
+        '<div class="dk-preview-title">' + dkEsc(title) + '</div>' +
+        (mfr ? '<div class="dk-preview-mfr">виробник: <b>' + dkEsc(mfr) + '</b></div>' : '') +
+        '<div class="dk-preview-badges">' + badges + '</div>' +
+      '</div>' +
+    '</div>' +
+    (desc ? '<div class="dk-preview-desc">' + dkEsc(desc) + '</div>' : '') +
+    (links ? '<div class="dk-preview-links">' + links + '</div>' : '') +
+    changedHtml;
+
+  card.style.display = 'block';
+}
+
+function dkEsc(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Price table editor
+════════════════════════════════════════════════════════════════════════════ */
+var _pricesTbody = null;
+var _pricesTa    = null;
+
+function dkPricesInit() {
+  _pricesTa = document.querySelector('[name="dk_prices"]');
+  if (!_pricesTa) return;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'dk-prices-wrap';
+  wrap.innerHTML =
+    '<table class="dk-prices-table">' +
+      '<thead><tr>' +
+        '<th style="width:28px">#</th>' +
+        '<th>Кількість (шт.)</th>' +
+        '<th>Ціна (EUR)</th>' +
+        '<th style="width:36px"></th>' +
+      '</tr></thead>' +
+      '<tbody class="dk-tbody"></tbody>' +
+    '</table>' +
+    '<div class="dk-prices-footer">' +
+      '<button type="button" class="dk-add-btn" id="dkAddTierBtn">+ Додати тир</button>' +
+      '<span class="dk-prices-hint">Перший тир = MOQ. Макс. 9 тирів.</span>' +
+    '</div>' +
+    '<div class="dk-prices-err" id="dk-prices-err"></div>';
+
+  _pricesTa.parentNode.insertBefore(wrap, _pricesTa);
+  _pricesTbody = wrap.querySelector('.dk-tbody');
+
+  wrap.querySelector('#dkAddTierBtn').addEventListener('click', function() {
+    if (_pricesTbody.querySelectorAll('tr').length >= 9) {
+      alert('Максимум 9 цінових тирів.'); return;
+    }
+    dkPriceAddRow('', '');
+    _pricesTbody.lastElementChild.querySelector('.dk-qty').focus();
+    dkPricesSyncJson();
+  });
+
+  /* Load existing */
+  var existing = [];
+  try { var raw = _pricesTa.value.trim(); if (raw) existing = JSON.parse(raw); } catch(e) {}
+  if (Array.isArray(existing) && existing.length) {
+    existing.forEach(function(t) { dkPriceAddRow(t.qty, t.price); });
+  } else {
+    dkPriceAddRow(1, '');
+  }
+  dkPricesSyncJson();
+}
+
+function dkPriceAddRow(qty, price) {
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td class="dk-tier-num">?</td>' +
+    '<td><input type="number" class="dk-qty" min="1" step="1" value="' +
+      (qty !== undefined && qty !== '' ? qty : '') + '" placeholder="1" autocomplete="off"></td>' +
+    '<td><input type="number" class="dk-price" min="0" step="0.0001" value="' +
+      (price !== undefined && price !== '' ? price : '') + '" placeholder="0.0000" autocomplete="off"></td>' +
+    '<td><button type="button" class="dk-del-row" title="Видалити">×</button></td>';
+  tr.querySelector('.dk-del-row').addEventListener('click', function() {
+    tr.remove(); dkPricesRenumber(); dkPricesSyncJson();
+  });
+  tr.querySelector('.dk-qty').addEventListener('input', dkPricesSyncJson);
+  tr.querySelector('.dk-price').addEventListener('input', dkPricesSyncJson);
+  _pricesTbody.appendChild(tr);
+  dkPricesRenumber();
+}
+
+function dkPricesRenumber() {
+  _pricesTbody.querySelectorAll('tr').forEach(function(tr, i) {
+    tr.querySelector('.dk-tier-num').textContent = i + 1;
+  });
+}
+
+function dkPricesSyncJson() {
+  var tiers = [], hasErr = false;
+  _pricesTbody.querySelectorAll('tr').forEach(function(tr) {
+    var qv = tr.querySelector('.dk-qty').value;
+    var pv = tr.querySelector('.dk-price').value;
+    var q  = parseInt(qv, 10), p = parseFloat(pv);
+    if (!isNaN(q) && q > 0 && !isNaN(p) && p >= 0) {
+      tiers.push({qty: q, price: p});
+    } else if (qv !== '' || pv !== '') {
+      hasErr = true;
+    }
+  });
+  tiers.sort(function(a, b) { return a.qty - b.qty; });
+  _pricesTa.value = JSON.stringify(tiers);
+  var err = document.getElementById('dk-prices-err');
+  if (err) {
+    err.textContent = hasErr ? '⚠️ Заповни обидва поля в кожному рядку.' : '';
+    err.style.display = hasErr ? 'block' : 'none';
+  }
+}
+
+function dkPricesRebuild(tiers) {
+  if (!_pricesTbody) return;
+  while (_pricesTbody.firstChild) _pricesTbody.removeChild(_pricesTbody.firstChild);
+  tiers.forEach(function(t) { dkPriceAddRow(t.qty, t.price); });
+  dkPricesSyncJson();
+  /* highlight */
+  if (_pricesTa) {
+    var row = _pricesTa.closest('.form-row') || _pricesTa.closest('.field-dk_prices');
+    if (row) {
+      row.classList.remove('dk-field-updated');
+      void row.offsetWidth;
+      row.classList.add('dk-field-updated');
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Attributes editor
+════════════════════════════════════════════════════════════════════════════ */
+var _attrsTa     = null;
+var _attrsTable  = null;
+var _attrsWrap   = null;
+
+function dkAttrsInit() {
+  _attrsTa = document.querySelector('[name="dk_attributes"]');
+  if (!_attrsTa) return;
+
+  _attrsWrap = document.createElement('div');
+  _attrsWrap.className = 'dk-attrs-wrap';
+  _attrsWrap.innerHTML =
+    '<table class="dk-attrs-table">' +
+      '<thead><tr>' +
+        '<th style="width:220px">Атрибут (code)</th>' +
+        '<th>Значення</th>' +
+      '</tr></thead>' +
+      '<tbody class="dk-attrs-tbody"></tbody>' +
+    '</table>' +
+    '<div class="dk-attrs-empty" id="dkAttrsEmpty" style="display:none">' +
+      'Порожньо — натисніть 📥 Стягнути поля з DigiKey щоб заповнити.' +
+    '</div>';
+
+  _attrsTa.parentNode.insertBefore(_attrsWrap, _attrsTa);
+  _attrsTable = _attrsWrap.querySelector('.dk-attrs-tbody');
+
+  /* Load existing */
+  var existing = {};
+  try {
+    var raw = _attrsTa.value.trim();
+    if (raw) existing = JSON.parse(raw);
+  } catch(e) {}
+  dkAttrsRebuild(existing);
+}
+
+function dkAttrsRebuild(attrsObj) {
+  if (!_attrsTable) return;
+  while (_attrsTable.firstChild) _attrsTable.removeChild(_attrsTable.firstChild);
+
+  var keys = Object.keys(attrsObj || {}).sort();
+  var emptyDiv = document.getElementById('dkAttrsEmpty');
+
+  if (!keys.length) {
+    if (emptyDiv) emptyDiv.style.display = 'block';
+    if (_attrsTa) _attrsTa.value = '{}';
+    return;
+  }
+  if (emptyDiv) emptyDiv.style.display = 'none';
+
+  keys.forEach(function(code) {
+    var val = attrsObj[code];
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td class="dk-attr-code">' + dkEsc(code) + '</td>' +
+      '<td class="dk-attr-val"><input type="text" data-code="' + dkEsc(code) +
+        '" value="' + dkEsc(String(val === null || val === undefined ? '' : val)) +
+        '" autocomplete="off"></td>';
+    tr.querySelector('input').addEventListener('input', dkAttrsSyncJson);
+    _attrsTable.appendChild(tr);
+  });
+
+  dkAttrsSyncJson();
+
+  /* highlight */
+  if (_attrsTa) {
+    var row = _attrsTa.closest('.form-row') || _attrsTa.closest('.field-dk_attributes');
+    if (row) {
+      row.classList.remove('dk-field-updated');
+      void row.offsetWidth;
+      row.classList.add('dk-field-updated');
+    }
+  }
+}
+
+function dkAttrsSyncJson() {
+  if (!_attrsTable || !_attrsTa) return;
+  var obj = {};
+  _attrsTable.querySelectorAll('input[data-code]').forEach(function(inp) {
+    obj[inp.dataset.code] = inp.value;
+  });
+  _attrsTa.value = JSON.stringify(obj);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Required field badges
+════════════════════════════════════════════════════════════════════════════ */
+function dkInitRequiredBadges() {
   var REQUIRED = [
     'dk_category_id', 'dk_title', 'dk_description',
     'dk_packaging', 'dk_lifecycle_status', 'dk_prices'
@@ -315,6 +783,48 @@ document.addEventListener('DOMContentLoaded', function() {
     el.addEventListener('input', checkEmpty);
     el.addEventListener('change', checkEmpty);
   });
+}
+
+/* ── Inject preview card placeholder into DOM ───────────────────────────── */
+function dkInjectPreviewCard() {
+  /* Inject just before the first fieldset / form content */
+  var anchor = document.querySelector('.module.aligned') || document.querySelector('fieldset');
+  if (!anchor) return;
+  var card = document.createElement('div');
+  card.id = 'dkPreviewCard';
+  anchor.parentNode.insertBefore(card, anchor);
+}
+
+/* ── Boot ───────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+  dkPricesInit();
+  dkAttrsInit();
+  dkInitRequiredBadges();
+  dkInjectPreviewCard();
 });
 </script>
+{% endblock %}
+
+
+{# ── Remove duplicate pull button from bottom bar; keep save / publish ──── #}
+{% block submit_buttons_bottom %}
+  {{ block.super }}
+  {% if publish_url %}
+  <div class="submit-row dk-bottom-bar">
+    {% if original.dk_offer_id %}
+    <a href="{{ sync_qty_url }}" class="button dk-btn dk-btn-sync"
+       onclick="return confirm('Оновити залишок складу на DigiKey?')"
+       style="margin-right:8px">
+      📦 Оновити залишок
+    </a>
+    {% endif %}
+    {% if original.sync_status == 'staged' and not original.dk_offer_id %}
+    <a href="{{ create_offer_url }}" class="button dk-btn dk-btn-offer"
+       onclick="return confirm('Спробувати створити Offer?')"
+       style="margin-right:8px">
+      📦 Створити Offer
+    </a>
+    {% endif %}
+  </div>
+  {% endif %}
 {% endblock %}

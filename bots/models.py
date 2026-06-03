@@ -185,6 +185,8 @@ class DigiKeyListing(models.Model):
     dk_category_id  = models.CharField('DK Category ID', max_length=256, blank=True, default='',
                                         help_text='Код категорії DigiKey (напр. "29" для RF Filters). '
                                                   'Знайти в DigiKey Marketplace Portal → Product Catalog')
+    dk_category_name = models.CharField('Назва категорії DK', max_length=200, blank=True, default='',
+                                         help_text='Заповнюється автоматично з DigiKey')
     dk_title        = models.CharField('Назва (DK)', max_length=50,
                                         help_text='Назва товару на DigiKey, макс. 50 символів')
     dk_description  = models.TextField('Опис товару (DK)', max_length=2048,
