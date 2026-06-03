@@ -1679,18 +1679,28 @@ Rules:
             import anthropic
             from strategy.models import AISettings
             client = anthropic.Anthropic(api_key=AISettings.get().anthropic_api_key)
+            # Prefill assistant turn with "{" — forces Claude to produce pure JSON
+            # without any surrounding text or markdown fences.
             response = client.messages.create(
                 model='claude-sonnet-4-6',
-                max_tokens=2000,
-                messages=[{'role': 'user', 'content': prompt}],
+                max_tokens=2048,
+                messages=[
+                    {'role': 'user',      'content': prompt},
+                    {'role': 'assistant', 'content': '{'},
+                ],
             )
-            raw = response.content[0].text.strip()
-            # Extract the JSON object robustly: find first { ... last }
-            import re as _re
-            m = _re.search(r'\{[\s\S]*\}', raw)
-            if not m:
-                raise ValueError(f"Claude did not return JSON. Response: {raw[:300]}")
-            result = json.loads(m.group(0))
+            raw = '{' + response.content[0].text
+            try:
+                result = json.loads(raw)
+            except json.JSONDecodeError:
+                # Fallback: find outermost {...} and sanitise embedded newlines
+                import re as _re
+                m = _re.search(r'\{[\s\S]*\}', raw)
+                if not m:
+                    raise ValueError(f"Claude did not return JSON. Raw: {raw[:400]}")
+                # Replace unescaped literal newlines inside JSON string values
+                cleaned = _re.sub(r'(?<!\\)\n', ' ', m.group(0))
+                result = json.loads(cleaned)
         except Exception as exc:
             return JsonResponse({'error': str(exc)}, status=500)
 
