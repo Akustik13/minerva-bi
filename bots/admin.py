@@ -1270,6 +1270,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                         'dk_category_name':    getattr(listing, 'dk_category_name', ''),
                         'dk_packaging':        listing.dk_packaging,
                         'dk_lifecycle_status': listing.dk_lifecycle_status,
+                        'category_type':       listing.category_type,
                         'dk_attributes':       listing.dk_attributes or {},
                         'dk_prices':           listing.dk_prices or [],
                         'fa_frequency':        listing.fa_frequency,

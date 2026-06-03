@@ -341,6 +341,7 @@ var DK_FIELD_MAP = {
   dk_category_name:    'id_dk_category_name',
   dk_packaging:        'id_dk_packaging',
   dk_lifecycle_status: 'id_dk_lifecycle_status',
+  category_type:       'id_category_type',
   fa_frequency:        'id_fa_frequency',
   fa_bandwidth:        'id_fa_bandwidth',
   fa_filter_type:      'id_fa_filter_type',
@@ -512,6 +513,9 @@ function dkPullFromDigiKey() {
     if (Array.isArray(fields.dk_prices) && fields.dk_prices.length) {
       dkPricesRebuild(fields.dk_prices);
     }
+
+    /* Re-adapt UI sections to the (possibly updated) category */
+    dkAdaptToCategory();
 
     /* Rebuild view values for updated inputs */
     document.querySelectorAll('.dk-view-val').forEach(function(el) { el.remove(); });

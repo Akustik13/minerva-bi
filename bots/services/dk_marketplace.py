@@ -541,7 +541,7 @@ def create_listings_from_offers() -> dict:
             for p in raw_prices
         ]) if raw_prices else '[]'
 
-        DigiKeyListing.objects.create(
+        listing = DigiKeyListing.objects.create(
             product          = product,
             dk_supplier_sku  = sku,
             dk_offer_id      = offer.get('id', ''),
