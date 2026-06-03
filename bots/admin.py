@@ -105,6 +105,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         "last_synced_at",
+        "last_pulled_at",
         "access_token_preview",
         "token_expires_at",
         "marketplace_auth_status",
@@ -134,7 +135,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "fields": (("locale_site", "locale_language", "locale_currency"),),
             "description": "Ці значення передаються в кожен API-запит як заголовки.",
         }),
-        ("⏰ Синхронізація", {
+        ("⏰ Синхронізація замовлень", {
             "fields": (
                 "sync_enabled", "sync_interval_minutes", "use_sandbox",
                 "sync_order_status",
@@ -145,6 +146,13 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "<b>Оновлювати статус замовлення:</b> вимкніть якщо статус "
                 "керується трекінгом перевізника (UPS/DHL) або виставляється вручну. "
                 "Зазвичай вмикають поки трекінг-номер ще не отримано."
+            ),
+        }),
+        ("⬇️ Авто-стягування лістингів", {
+            "fields": ("pull_enabled", "pull_interval_hours", "last_pulled_at"),
+            "description": (
+                "Автоматично оновлює дані лістингів (ціни, назви, атрибути) з DigiKey за розкладом. "
+                "Додай до cron: <code>python manage.py pull_dk_listings</code>"
             ),
         }),
         ("🔌 Дії", {
@@ -1221,6 +1229,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     autocomplete_fields = ('product',)
     actions        = [
         'action_sync_qty',
+        'action_bulk_pull',
         'action_bulk_publish',
         'action_bulk_activate',
         'action_bulk_deactivate',
@@ -1346,6 +1355,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['pull_product_url'] = reverse(
                 'admin:bots_digikeylisting_pull_product', args=[object_id]
             )
+            extra_context['ai_advisor_url'] = reverse(
+                'admin:bots_digikeylisting_ai_advisor', args=[object_id]
+            )
             # For list of existing sync status choices — used in template
             extra_context['sync_choices'] = DigiKeyListing.SYNC_CHOICES
         return super().changeform_view(request, object_id, form_url, extra_context)
@@ -1365,6 +1377,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/pull-product/',
                  self.admin_site.admin_view(self.pull_product_view),
                  name='bots_digikeylisting_pull_product'),
+            path('<int:pk>/ai-advisor/',
+                 self.admin_site.admin_view(self.ai_advisor_view),
+                 name='bots_digikeylisting_ai_advisor'),
+            path('<int:pk>/ai-run/',
+                 self.admin_site.admin_view(self.ai_run_view),
+                 name='bots_digikeylisting_ai_run'),
         ]
         return custom + urls
 
@@ -1500,6 +1518,181 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             messages.error(request, f"{err_msg} | {traceback.format_exc()[-300:]}")
 
         return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
+
+    # ── AI Pricing Advisor ────────────────────────────────────────────────────
+
+    def ai_advisor_view(self, request, pk):
+        from django.shortcuts import get_object_or_404
+        listing = get_object_or_404(DigiKeyListing.objects.select_related('product'), pk=pk)
+        ctx = dict(
+            self.admin_site.each_context(request),
+            title=f'🤖 AI Порадник — {listing.product.sku}',
+            listing=listing,
+            opts=self.model._meta,
+            run_url=reverse('admin:bots_digikeylisting_ai_run', args=[pk]),
+            change_url=reverse('admin:bots_digikeylisting_change', args=[pk]),
+        )
+        return render(request, 'admin/bots/digikeylisting/ai_advisor.html', ctx)
+
+    def ai_run_view(self, request, pk):
+        import json
+        from datetime import timedelta
+        from django.http import JsonResponse
+        from django.utils import timezone
+        from django.shortcuts import get_object_or_404
+
+        if request.method != 'POST':
+            return JsonResponse({'error': 'POST required'}, status=405)
+
+        listing = get_object_or_404(DigiKeyListing.objects.select_related('product'), pk=pk)
+
+        # ── Apply recommended prices (from advisor "Apply" button) ─────────────
+        if request.POST.get('apply_prices') == '1':
+            try:
+                new_prices = []
+                for key, val in request.POST.items():
+                    if key.startswith('price_'):
+                        qty = int(key[len('price_'):])
+                        new_prices.append({'qty': qty, 'price': round(float(str(val).replace(',', '.')), 4)})
+                new_prices.sort(key=lambda x: x['qty'])
+                if not new_prices:
+                    return JsonResponse({'error': 'Ціни не передані'}, status=400)
+                listing.dk_prices = new_prices
+                listing.save(update_fields=['dk_prices'])
+                try:
+                    from bots.models import DigiKeyPriceLog
+                    DigiKeyPriceLog.objects.create(
+                        listing=listing,
+                        delta_pct=None,
+                        old_prices=listing.dk_prices,
+                        new_prices=new_prices,
+                        user=request.user.get_username() if request.user else 'ai_advisor',
+                    )
+                except Exception:
+                    pass
+                return JsonResponse({'ok': True, 'prices_applied': True})
+            except Exception as exc:
+                return JsonResponse({'error': str(exc)}, status=500)
+
+        # ── 1. Sales data (last 90 days) ───────────────────────────────────────
+        try:
+            from sales.models import SalesOrderLine
+            cutoff = timezone.now().date() - timedelta(days=90)
+            lines = SalesOrderLine.objects.filter(
+                product=listing.product,
+                order__order_date__gte=cutoff,
+            ).select_related('order')
+            total_qty     = sum(float(l.qty)         for l in lines)
+            total_revenue = sum(float(l.total_price)  for l in lines)
+            order_count   = lines.values('order_id').distinct().count()
+            orders_by_qty = {}
+            for l in lines:
+                q = float(l.qty)
+                orders_by_qty[q] = orders_by_qty.get(q, 0) + 1
+            sales_ctx = {
+                'period_days': 90,
+                'total_qty': round(total_qty, 0),
+                'total_revenue_usd': round(total_revenue, 2),
+                'order_count': order_count,
+                'avg_qty_per_order': round(total_qty / order_count, 1) if order_count else 0,
+                'qty_distribution': dict(sorted(orders_by_qty.items())),
+            }
+        except Exception as e:
+            sales_ctx = {'error': str(e)}
+
+        # ── 2. Price history (last 10 changes) ─────────────────────────────────
+        try:
+            price_logs = list(
+                listing.price_logs.order_by('-applied_at')[:10].values(
+                    'applied_at', 'delta_pct', 'old_prices', 'new_prices', 'user'
+                )
+            )
+            for log in price_logs:
+                log['applied_at'] = log['applied_at'].strftime('%Y-%m-%d')
+        except Exception:
+            price_logs = []
+
+        # ── 3. Current listing info ────────────────────────────────────────────
+        listing_ctx = {
+            'sku':              listing.product.sku,
+            'title':            listing.dk_title or '',
+            'description':      (listing.dk_description or '')[:500],
+            'category':         listing.dk_category_id or '',
+            'category_type':    listing.category_type or '',
+            'manufacturer':     listing.dk_manufacturer or '',
+            'current_prices':   listing.dk_prices or [],
+            'stock_wh':         listing.get_stock_qty(),
+            'stock_dk_override': listing.dk_quantity_override,
+            'min_order_qty':    listing.dk_min_order_qty,
+            'lead_time_days':   listing.dk_lead_time_days,
+            'attributes':       dict(list((listing.dk_attributes or {}).items())[:30]),
+            'sync_status':      listing.sync_status,
+        }
+
+        # ── 4. Build Claude prompt ─────────────────────────────────────────────
+        prompt = f"""You are a DigiKey marketplace pricing and listing quality expert.
+
+Analyze this DigiKey listing and provide pricing recommendations and quality audit.
+
+=== LISTING DATA ===
+{json.dumps(listing_ctx, ensure_ascii=False, indent=2)}
+
+=== SALES DATA (last 90 days) ===
+{json.dumps(sales_ctx, ensure_ascii=False, indent=2)}
+
+=== PRICE CHANGE HISTORY ===
+{json.dumps(price_logs, ensure_ascii=False, indent=2)}
+
+=== YOUR TASK ===
+Respond ONLY with a valid JSON object (no markdown, no explanation outside JSON):
+
+{{
+  "strategy": "bulk_volume" | "small_batch" | "balanced",
+  "strategy_name": "Назва стратегії (Ukraine)",
+  "strategy_explanation": "2-3 sentences why this strategy fits (Ukrainian)",
+  "recommended_prices": [
+    {{"qty": 1, "price": 0.00, "note": "explanation (Ukrainian)"}},
+    ...
+  ],
+  "price_change_summary": "e.g. '-5% для 1шт, -12% для 100шт' (Ukrainian)",
+  "expected_impact": "What to expect from this change (Ukrainian, 2-3 sentences)",
+  "quality_issues": [
+    {{"field": "field_name", "severity": "error|warning|info", "issue": "description (Ukrainian)", "fix": "suggested fix (Ukrainian)"}}
+  ],
+  "quality_score": 0-10,
+  "quality_summary": "Overall listing quality summary (Ukrainian)",
+  "post_change_advice": "What metrics to watch after price change and when to re-evaluate (Ukrainian)"
+}}
+
+Rules:
+- recommended_prices must use same qty breaks as current_prices (or suggest new ones if none exist)
+- If sales data shows zero sales: suggest competitive entry pricing
+- Quality issues: check title length (>50 chars good), description completeness, missing key specs for the category, MOQ reasonableness, lead time
+- For RF filters: check fa_* fields completeness (frequency, bandwidth, insertion loss, filter type)
+- Be specific with prices (actual numbers, not ranges)
+- Respond in Ukrainian language for all text fields"""
+
+        # ── 5. Call Claude API ─────────────────────────────────────────────────
+        try:
+            import anthropic
+            from strategy.models import AISettings
+            client = anthropic.Anthropic(api_key=AISettings.get().anthropic_api_key)
+            response = client.messages.create(
+                model='claude-sonnet-4-6',
+                max_tokens=2000,
+                messages=[{'role': 'user', 'content': prompt}],
+            )
+            raw = response.content[0].text.strip()
+            # strip markdown fences if Claude wraps in ```json
+            if raw.startswith('```'):
+                raw = raw.split('```')[1]
+                if raw.startswith('json'):
+                    raw = raw[4:]
+            result = json.loads(raw)
+        except Exception as exc:
+            return JsonResponse({'error': str(exc)}, status=500)
+
+        return JsonResponse({'ok': True, 'result': result, 'listing': listing_ctx, 'sales': sales_ctx})
 
     # ── Bulk action: sync quantities ──────────────────────────────────────────
 
@@ -1805,6 +1998,25 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'pks':           list(queryset.values_list('pk', flat=True)),
             'opts':          self.model._meta,
         })
+
+    @admin.action(description='⬇️ Стягнути дані з DigiKey (масово)')
+    def action_bulk_pull(self, request, queryset):
+        from bots.services.dk_marketplace import pull_product_fields, DKMarketplaceError
+        ok = err = 0
+        for listing in queryset.select_related('product'):
+            try:
+                pull_product_fields(listing)
+                ok += 1
+            except Exception as exc:
+                listing.sync_status = DigiKeyListing.SYNC_ERROR
+                listing.last_error  = str(exc)[:500]
+                listing.save(update_fields=['sync_status', 'last_error'])
+                logger.warning("bulk_pull failed %s: %s", listing.product.sku, exc)
+                err += 1
+        if ok:
+            self.message_user(request, f"✅ Дані стягнуто з DigiKey для {ok} лістингів.", messages.SUCCESS)
+        if err:
+            self.message_user(request, f"⚠️ Помилки для {err} лістингів — перевір Last Error.", messages.WARNING)
 
     # ── Display helpers ───────────────────────────────────────────────────────
 

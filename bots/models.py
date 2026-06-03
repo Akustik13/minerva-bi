@@ -39,6 +39,19 @@ class DigiKeyConfig(models.Model):
         "Інтервал синхронізації (хвилин)", default=30,
         help_text="Рекомендовано: 15–60 хв"
     )
+
+    # ── Авто-стягування даних лістингів з DigiKey ─────────────────────────────
+    pull_enabled        = models.BooleanField(
+        "Авто-стягування лістингів", default=False,
+        help_text="Автоматично оновлювати дані лістингів (ціни, назви, атрибути) з DigiKey за розкладом"
+    )
+    pull_interval_hours = models.PositiveSmallIntegerField(
+        "Інтервал авто-стягування (годин)", default=24,
+        help_text="Рекомендовано: 12–48 год. Запускати cron: python manage.py pull_dk_listings"
+    )
+    last_pulled_at = models.DateTimeField(
+        "Останнє авто-стягування", null=True, blank=True
+    )
     sync_order_status = models.BooleanField(
         "Оновлювати статус замовлення при синхронізації", default=True,
         help_text=(
