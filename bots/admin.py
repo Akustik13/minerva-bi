@@ -1072,7 +1072,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'dk_product_id', 'dk_offer_id',
         'sync_status', 'last_synced_at', 'last_error',
         'created_at', 'updated_at',
-        'stock_qty_readonly',
+        'stock_qty_readonly', 'dk_attributes_table',
     )
 
     fieldsets = (
@@ -1112,6 +1112,14 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 'fa_package_case', 'fa_size_dimension', 'fa_height_max',
             ),
             'classes': ('collapse',),
+        }),
+        ('📡 Всі атрибути DigiKey (raw)', {
+            'fields': ('dk_attributes_table',),
+            'classes': ('collapse',),
+            'description': (
+                'Всі атрибути стягнуті з DigiKey Products API (additionalFields). '
+                'Оновлюється кнопкою <b>📥 Стягнути поля з DigiKey</b>.'
+            ),
         }),
         ('📊 Sync Status', {
             'fields': (
@@ -1223,44 +1231,60 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
 
     def pull_product_view(self, request, pk):
-        from bots.services.dk_marketplace import (
-            pull_product_fields, fetch_product_by_sku, DKMarketplaceError
-        )
-        from bots.models import DigiKeyConfig
+        from bots.services.dk_marketplace import pull_product_fields, DKMarketplaceError
+        import json as _json
         listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
         try:
-            changed = pull_product_fields(listing)
+            result  = pull_product_fields(listing)
+            changed = result['changed']
+            prod    = result['raw_product']
+            offer   = result['raw_offer']
+
             if changed:
-                label_map = {
-                    'dk_title': 'Назва', 'dk_description': 'Опис',
-                    'dk_manufacturer': 'Виробник', 'dk_image_url': 'Фото',
-                    'dk_datasheet_url': 'Datasheet', 'dk_category_id': 'Category ID',
-                    'dk_packaging': 'Packaging', 'dk_lifecycle_status': 'Lifecycle',
-                }
-                updated = ', '.join(label_map.get(f, f) for f in changed)
-                messages.success(request, f"✅ Оновлено з DigiKey: {updated}")
+                messages.success(request, f"✅ Оновлено поля: {', '.join(changed)}")
             else:
-                # Show what DigiKey actually returned for debugging
-                config = DigiKeyConfig.get()
-                prod = fetch_product_by_sku(config, listing.get_supplier_sku(),
-                                            listing.dk_product_id or '')
-                if prod:
-                    add_codes = [f.get('code') for f in prod.get('additionalFields', [])]
+                messages.info(request, "ℹ️ Всі поля вже актуальні.")
+
+            # ── Debug: raw product ────────────────────────────────────────
+            add_fields = prod.get('additionalFields', [])
+            messages.info(
+                request,
+                f"🔍 RAW PRODUCT | id={prod.get('_id')} | title={prod.get('title')!r} | "
+                f"description={str(prod.get('description',''))[:80]!r} | "
+                f"manufacturer={prod.get('manufacturer')!r} | "
+                f"imageUrl={prod.get('imageUrl')!r} | "
+                f"categoryId={prod.get('categoryId')!r}"
+            )
+            if add_fields:
+                for f in add_fields:
                     messages.info(
                         request,
-                        f"ℹ️ DigiKey повернув продукт, але всі поля вже актуальні. "
-                        f"Доступні additionalFields: {', '.join(add_codes) or '(порожньо)'}"
+                        f"   additionalField: code={f.get('code')!r}  "
+                        f"type={f.get('type')!r}  "
+                        f"value={str(f.get('value',''))!r}"
                     )
-                else:
-                    messages.warning(
-                        request,
-                        f"⚠️ DigiKey не повернув продукт для SKU='{listing.get_supplier_sku()}'. "
-                        "Перевір чи співпадає Supplier SKU з PartNumber в DigiKey."
-                    )
+            else:
+                messages.warning(request, "⚠️ additionalFields порожній — атрибути не знайдено в Products API.")
+
+            # ── Debug: raw offer ──────────────────────────────────────────
+            if offer:
+                prices = offer.get('prices', [])
+                messages.info(
+                    request,
+                    f"🔍 RAW OFFER | id={offer.get('id')} | "
+                    f"sku={offer.get('supplierSku')!r} | "
+                    f"isActive={offer.get('isActive')} | "
+                    f"qty={offer.get('quantityAvailable')} | "
+                    f"prices={prices}"
+                )
+            else:
+                messages.warning(request, "⚠️ Offer не знайдено за цим SKU (GET /offers?SupplierSku=).")
+
         except DKMarketplaceError as exc:
             messages.error(request, f"❌ {exc}")
         except Exception as exc:
-            messages.error(request, f"❌ Помилка: {exc}")
+            import traceback
+            messages.error(request, f"❌ {exc} | {traceback.format_exc()[-300:]}")
         return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
 
     # ── Bulk action: sync quantities ──────────────────────────────────────────
@@ -1417,6 +1441,34 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             )
         return '—'
     stock_qty_readonly.short_description = 'Поточний залишок'
+
+    def dk_attributes_table(self, obj):
+        if not obj or not obj.dk_attributes:
+            return format_html(
+                '<span style="color:var(--text-muted)">Порожньо — натисни '
+                '📥 Стягнути поля з DigiKey щоб заповнити.</span>'
+            )
+        rows = ''
+        for code, val in sorted(obj.dk_attributes.items()):
+            rows += (
+                f'<tr>'
+                f'<td style="padding:3px 10px;color:var(--text-muted);font-family:monospace;font-size:12px">'
+                f'{code}</td>'
+                f'<td style="padding:3px 10px;font-size:13px">{val}</td>'
+                f'</tr>'
+            )
+        return format_html(
+            '<table style="border-collapse:collapse;font-size:13px;max-width:700px">'
+            '<thead><tr>'
+            '<th style="padding:4px 10px;text-align:left;font-size:11px;color:var(--text-muted);'
+            'border-bottom:1px solid var(--border-strong);text-transform:uppercase">Code</th>'
+            '<th style="padding:4px 10px;text-align:left;font-size:11px;color:var(--text-muted);'
+            'border-bottom:1px solid var(--border-strong);text-transform:uppercase">Value</th>'
+            '</tr></thead>'
+            '<tbody>{}</tbody></table>',
+            format_html(rows)
+        )
+    dk_attributes_table.short_description = 'Атрибути DigiKey (raw)'
 
     _STATUS_COLORS = {
         'draft':     ('#607d8b', '⬜'),

@@ -590,85 +590,170 @@ def fetch_product_by_sku(config, supplier_sku: str,
 
         products = resp.json().get('products', [])
         if products:
-            # When searching by PartNumber, confirm exact match
             if 'PartNumber' in params:
                 exact = [p for p in products if p.get('partNumber') == supplier_sku]
-                if exact:
-                    return exact[0]
-                # accept first result if no exact match (partial SKU)
-                return products[0]
+                return exact[0] if exact else products[0]
             return products[0]
 
     return None
 
 
-def _additional_field_value(additional_fields: list, code: str) -> str:
-    """Extract value for a given code from additionalFields list."""
-    for f in additional_fields:
-        if f.get('code') == code:
-            val = f.get('value')
-            if isinstance(val, str):
-                return val
-            if isinstance(val, list):
-                return val[0] if val else ''
+def fetch_offer_by_sku(config, supplier_sku: str, offer_id: str = '') -> dict | None:
+    """Fetch a single Offer from DigiKey.
+
+    Primary:  GET /offers/{offer_id}  (if offer_id provided, but DK uses list endpoint)
+    Fallback: GET /offers?SupplierSku={sku}
+    Returns first matching Offer dict or None.
+    """
+    import requests as req
+
+    token = get_marketplace_token(config)
+    resp  = req.get(
+        f"{_base_url(config)}{_OFFERS_BASE}/offers",
+        params={'SupplierSku': supplier_sku, 'Max': 1},
+        headers=_headers(config, token),
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        logger.warning("fetch_offer_by_sku %s: HTTP %s", supplier_sku, resp.status_code)
+        return None
+    offers = resp.json().get('offers', [])
+    return offers[0] if offers else None
+
+
+def _additional_field_str(field: dict) -> str:
+    """Extract string value from a single additionalField entry."""
+    val = field.get('value')
+    if isinstance(val, str):
+        return val.strip()
+    if isinstance(val, list):
+        return str(val[0]).strip() if val else ''
+    if val is not None:
+        return str(val).strip()
     return ''
 
 
+def _build_attributes_dict(additional_fields: list) -> dict:
+    """Convert additionalFields list → flat dict {code: value_string}."""
+    result = {}
+    for f in additional_fields:
+        code = f.get('code', '')
+        if code:
+            result[code] = _additional_field_str(f)
+    return result
+
+
+# Filter model-field ↔ DK attribute code mapping (codes from DigiKey Custom Fields API)
+_FILTER_ATTR_MAP = {
+    '139': 'fa_frequency',
+    '398': 'fa_bandwidth',
+    '21':  'fa_filter_type',
+    '428': 'fa_ripple',
+    '327': 'fa_insertion_loss',
+    '69':  'fa_mounting_type',
+    '16':  'fa_package_case',
+    '46':  'fa_size_dimension',
+    '966': 'fa_height_max',
+}
+
+
 def pull_product_fields(listing) -> dict:
-    """Fetch product from DigiKey and overwrite listing fields with DigiKey values.
+    """Pull ALL data from DigiKey and update listing.
 
-    Always overwrites fields that DigiKey returned as non-empty (explicit pull).
-    Correct max_length per model: title=50, description=2048, manufacturer=50.
+    - Product fields: title, description, manufacturer, imageUrl, categoryId
+    - additionalFields: ALL codes stored in dk_attributes; known codes mapped
+      to specific model fields (packaging, lifecycle, datasheet, filter attrs)
+    - Offer prices: pulled from GET /offers?SupplierSku=SKU
 
-    Pulls:
-      dk_title, dk_description, dk_manufacturer, dk_image_url,
-      dk_datasheet_url, dk_category_id, dk_packaging, dk_lifecycle_status
-
-    Returns dict of {field: new_value} for every field that was updated.
+    Returns:
+      {
+        'changed':     [list of model field names updated],
+        'raw_product': {...},   # full ProductExpanded from API
+        'raw_offer':   {...},   # full Offer from API (or None)
+      }
     """
     from bots.models import DigiKeyConfig
 
     config     = DigiKeyConfig.get()
     sku        = listing.get_supplier_sku()
     product_id = listing.dk_product_id or ''
-    prod       = fetch_product_by_sku(config, sku, product_id)
 
+    # ── Fetch product ─────────────────────────────────────────────────────
+    prod = fetch_product_by_sku(config, sku, product_id)
     if not prod:
         raise DKMarketplaceError(
-            f"Продукт з PartNumber='{sku}' не знайдено в DigiKey Products API."
+            f"Продукт '{sku}' не знайдено в DigiKey Products API. "
+            "Перевір Supplier SKU — він має точно співпадати з PartNumber в DigiKey."
         )
 
-    logger.info("DK pull_product_fields SKU=%s prod_id=%s raw_keys=%s",
-                sku, prod.get('_id'), list(prod.keys()))
+    # ── Fetch offer (for prices) ──────────────────────────────────────────
+    offer = fetch_offer_by_sku(config, sku, listing.dk_offer_id or '')
+
+    logger.info("DK pull SKU=%s product_id=%s add_fields=%d offer=%s",
+                sku, prod.get('_id'), len(prod.get('additionalFields', [])),
+                offer.get('id') if offer else None)
 
     add_fields = prod.get('additionalFields', [])
-    changed    = {}
+    attrs_dict  = _build_attributes_dict(add_fields)  # {code: value_string}
+
+    changed: list = []
 
     def _set(field, value, max_len=None):
-        if not value:
+        if not value and value != 0:
             return
-        if max_len:
+        if max_len and isinstance(value, str):
             value = value[:max_len]
         if getattr(listing, field) != value:
             setattr(listing, field, value)
-            changed[field] = value
+            changed.append(field)
 
-    _set('dk_title',            prod.get('title') or '',            max_len=50)
-    _set('dk_description',      prod.get('description') or '',      max_len=2048)
-    _set('dk_manufacturer',     prod.get('manufacturer') or '',     max_len=50)
-    _set('dk_image_url',        prod.get('imageUrl') or '')
-    _set('dk_category_id',      prod.get('categoryId') or '')
-    _set('dk_datasheet_url',    _additional_field_value(add_fields, 'datasheetUrl'))
-    _set('dk_packaging',        _additional_field_value(add_fields, 'packaging'))
-    _set('dk_lifecycle_status', _additional_field_value(add_fields, 'productLifecycleStatus'))
+    # ── Core product fields ────────────────────────────────────────────────
+    _set('dk_title',         (prod.get('title') or ''),        max_len=50)
+    _set('dk_description',   (prod.get('description') or ''),  max_len=2048)
+    _set('dk_manufacturer',  (prod.get('manufacturer') or ''), max_len=50)
+    _set('dk_image_url',     prod.get('imageUrl') or '')
+    _set('dk_category_id',   prod.get('categoryId') or '')
+
+    # ── All attributes dict ────────────────────────────────────────────────
+    if attrs_dict != listing.dk_attributes:
+        listing.dk_attributes = attrs_dict
+        changed.append('dk_attributes')
+
+    # ── Map known codes to model fields ────────────────────────────────────
+    _set('dk_datasheet_url',    attrs_dict.get('datasheetUrl', ''))
+    _set('dk_packaging',        attrs_dict.get('packaging', ''))
+    _set('dk_lifecycle_status', attrs_dict.get('productLifecycleStatus', ''))
+
+    # Filter-category attributes
+    if listing.category_type == 'filter':
+        for code, field in _FILTER_ATTR_MAP.items():
+            val = attrs_dict.get(code, '')
+            if val:
+                _set(field, val, max_len=200)
+
+    # ── Prices from offer ──────────────────────────────────────────────────
+    if offer:
+        raw_prices = offer.get('prices', [])
+        if raw_prices:
+            new_prices = sorted(
+                [{'qty': p['quantityBreak'], 'price': float(p['price'])}
+                 for p in raw_prices
+                 if p.get('quantityBreak') and p.get('price') is not None],
+                key=lambda x: x['qty']
+            )
+            if new_prices != (listing.dk_prices or []):
+                listing.dk_prices = new_prices
+                changed.append('dk_prices')
 
     if changed:
-        listing.save(update_fields=list(changed.keys()))
-        logger.info("DK pull_product_fields updated=%s", list(changed.keys()))
-    else:
-        logger.info("DK pull_product_fields SKU=%s nothing changed (all fields already match)", sku)
+        listing.save(update_fields=changed)
+        logger.info("DK pull OK SKU=%s changed=%s", sku, changed)
 
-    return changed
+    return {
+        'changed':     changed,
+        'raw_product': prod,
+        'raw_offer':   offer,
+    }
 
 
 def fetch_custom_fields(config) -> list:

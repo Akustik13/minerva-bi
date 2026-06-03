@@ -158,13 +158,17 @@ class DigiKeyListing(models.Model):
         ('error',     'Помилка'),
     ]
 
-    CAT_FILTER = 'filter'
-    CAT_CABLE  = 'cable'
-    CAT_OTHER  = 'other'
+    CAT_FILTER    = 'filter'
+    CAT_ANTENNA   = 'antenna'
+    CAT_CABLE     = 'cable'
+    CAT_CONNECTOR = 'connector'
+    CAT_OTHER     = 'other'
     CAT_CHOICES = [
-        ('filter', 'RF Filter'),
-        ('cable',  'Cable Assembly'),
-        ('other',  'Інше'),
+        ('filter',    'RF Filter'),
+        ('antenna',   'Antenna'),
+        ('cable',     'Cable Assembly'),
+        ('connector', 'Connector / Adapter'),
+        ('other',     'Інше'),
     ]
 
     product = models.OneToOneField(
@@ -240,6 +244,13 @@ class DigiKeyListing(models.Model):
         'Product Life Cycle Status', max_length=100, blank=True, default='Active',
         help_text='Обов\'язково. Значення: Active / Obsolete / Last Time Buy / Not For New Design. '
                   'Код атрибута DigiKey: "productLifecycleStatus"')
+
+    # ── All DigiKey attributes (raw pull from Products API) ───────────────────
+    dk_attributes = models.JSONField(
+        'Всі атрибути DigiKey', default=dict, blank=True,
+        help_text='additionalFields з DigiKey Products API у форматі {"code": "value", ...}. '
+                  'Заповнюється кнопкою «📥 Стягнути поля з DigiKey».'
+    )
 
     # ── Sync status ────────────────────────────────────────────────────────────
     sync_status    = models.CharField('Статус', max_length=20,
