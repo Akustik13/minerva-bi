@@ -844,65 +844,62 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
     def import_offers_view(self, request):
-        """Fetch all DigiKey offers and sync to local DigiKeyListing records."""
-        from bots.services.dk_marketplace import import_offers_from_dk, DKMarketplaceError
-        try:
-            result    = import_offers_from_dk()
-            updated   = result['updated']
-            not_found = result['not_found']
-            if updated:
-                self.message_user(
-                    request,
-                    f"✅ Синхронізовано {updated} лістингів з DigiKey (offer_id, product_id, ціни).",
-                    messages.SUCCESS,
+        """Fetch all DigiKey offers and sync to local DigiKeyListing records (background thread)."""
+        import threading
+        from bots.services.dk_marketplace import import_offers_from_dk
+
+        def _run():
+            try:
+                result    = import_offers_from_dk()
+                updated   = result['updated']
+                not_found = result['not_found']
+                logger.info(
+                    "DK import_offers DONE: updated=%d not_found=%s",
+                    updated, not_found[:30],
                 )
-            else:
-                self.message_user(request, "ℹ️ Жодного співпадіння за SKU не знайдено.", messages.WARNING)
-            if not_found:
-                self.message_user(
-                    request,
-                    f"⚠️ Офери на DigiKey без лістингу в Minerva ({len(not_found)}): "
-                    + ", ".join(not_found[:30]),
-                    messages.WARNING,
-                )
-        except DKMarketplaceError as exc:
-            self.message_user(request, f"❌ {exc}", messages.ERROR)
-        except Exception as exc:
-            self.message_user(request, f"❌ Помилка: {exc}", messages.ERROR)
+            except Exception as exc:
+                logger.error("DK import_offers FAILED: %s", exc, exc_info=True)
+            finally:
+                from django.db import connection
+                connection.close()
+
+        threading.Thread(target=_run, daemon=True).start()
+        self.message_user(
+            request,
+            "⏳ Імпорт офферів запущено у фоні. Результати з'являться в логах через 1–3 хв. "
+            "Можна закрити сторінку — операція продовжується.",
+            messages.INFO,
+        )
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
     def create_listings_view(self, request):
-        """Create DigiKeyListing records for DK offers that have no listing in Minerva."""
-        from bots.services.dk_marketplace import create_listings_from_offers, DKMarketplaceError
-        try:
-            result        = create_listings_from_offers()
-            created       = result['created']
-            already       = result['already_exists']
-            no_product    = result['no_product']
-            if created:
-                self.message_user(
-                    request,
-                    f"✅ Створено {created} нових лістингів з DigiKey офферів.",
-                    messages.SUCCESS,
+        """Create DigiKeyListing records for DK offers that have no listing in Minerva (background thread)."""
+        import threading
+        from bots.services.dk_marketplace import create_listings_from_offers
+
+        def _run():
+            try:
+                result      = create_listings_from_offers()
+                created     = result['created']
+                already     = result['already_exists']
+                no_product  = result['no_product']
+                logger.info(
+                    "DK create_listings DONE: created=%d already=%d no_product=%s",
+                    created, already, no_product[:30],
                 )
-            else:
-                self.message_user(request, "ℹ️ Нових лістингів не створено.", messages.INFO)
-            if already:
-                self.message_user(
-                    request, f"ℹ️ Пропущено {already} офферів — лістинги вже існують.",
-                    messages.INFO,
-                )
-            if no_product:
-                self.message_user(
-                    request,
-                    f"⚠️ SKU не знайдено в inventory ({len(no_product)}): "
-                    + ", ".join(no_product[:30]),
-                    messages.WARNING,
-                )
-        except DKMarketplaceError as exc:
-            self.message_user(request, f"❌ {exc}", messages.ERROR)
-        except Exception as exc:
-            self.message_user(request, f"❌ Помилка: {exc}", messages.ERROR)
+            except Exception as exc:
+                logger.error("DK create_listings FAILED: %s", exc, exc_info=True)
+            finally:
+                from django.db import connection
+                connection.close()
+
+        threading.Thread(target=_run, daemon=True).start()
+        self.message_user(
+            request,
+            "⏳ Створення лістингів запущено у фоні. Нові лістинги з'являться в списку через 1–3 хв. "
+            "Можна закрити сторінку — операція продовжується.",
+            messages.INFO,
+        )
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
     # ── Readonly display fields ───────────────────────────────────────────────
