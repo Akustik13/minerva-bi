@@ -1311,6 +1311,10 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}
+        try:
+            extra_context['price_currency'] = DigiKeyConfig.get().locale_currency or 'EUR'
+        except Exception:
+            extra_context['price_currency'] = 'EUR'
         if object_id:
             extra_context['publish_url'] = reverse(
                 'admin:bots_digikeylisting_publish', args=[object_id]
@@ -1713,6 +1717,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             return format_html(
                 '<span style="color:var(--text-muted)">Заповни поле «Цінові тири» нижче у форматі JSON</span>'
             )
+        try:
+            currency = DigiKeyConfig.get().locale_currency or 'EUR'
+        except Exception:
+            currency = 'EUR'
+        _symbols = {'EUR': '€', 'USD': '$', 'GBP': '£', 'JPY': '¥', 'CAD': 'CA$', 'AUD': 'A$'}
+        symbol = _symbols.get(currency, currency)
         rows = ''
         for i, tier in enumerate(obj.dk_prices, 1):
             qty   = tier.get('qty', '?')
@@ -1722,7 +1732,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 f'<tr style="background:{bg}">'
                 f'<td style="padding:3px 10px">{i}</td>'
                 f'<td style="padding:3px 10px;font-weight:600">{qty}</td>'
-                f'<td style="padding:3px 10px;color:var(--ok)">€&nbsp;{price}</td>'
+                f'<td style="padding:3px 10px;color:var(--ok)">{symbol}&nbsp;{price}</td>'
                 f'</tr>'
             )
         return format_html(
@@ -1730,9 +1740,10 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             '<thead><tr style="color:var(--text-muted);font-size:11px">'
             '<th style="padding:3px 10px">#</th>'
             '<th style="padding:3px 10px">Qty Break</th>'
-            '<th style="padding:3px 10px">Ціна (EUR)</th>'
+            '<th style="padding:3px 10px">Ціна ({})</th>'
             '</tr></thead><tbody>{}</tbody></table>',
-            format_html(''.join(rows)),  # mark_safe-equivalent via format_html
+            currency,
+            format_html(''.join(rows)),
         )
     prices_widget.short_description = 'Перегляд тирів'
 

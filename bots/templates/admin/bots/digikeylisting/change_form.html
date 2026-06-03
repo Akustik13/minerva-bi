@@ -625,7 +625,7 @@ function dkPricesInit() {
   wrap.className = 'dk-prices-wrap';
   wrap.innerHTML =
     '<table class="dk-prices-table"><thead><tr>'+
-      '<th style="width:28px">#</th><th>Кількість (шт.)</th><th>Ціна (EUR)</th><th class="dk-edit-col" style="width:36px"></th>'+
+      '<th style="width:28px">#</th><th>Кількість (шт.)</th><th>Ціна ({{ price_currency|default:"EUR" }})</th><th class="dk-edit-col" style="width:36px"></th>'+
     '</tr></thead><tbody class="dk-ptbody"></tbody></table>'+
     '<div class="dk-prices-footer">'+
       '<button type="button" class="dk-add-btn" id="dkAddTier">+ Додати тир</button>'+
