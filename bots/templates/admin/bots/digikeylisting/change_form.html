@@ -2,62 +2,61 @@
 {% load i18n %}
 
 {# ═══════════════════════════════════════════════════════════════════════════
-   Action bar + AJAX pull — rendered inside submit_buttons_bottom
-   (same block used by bot/change_form.html — guaranteed to work)
+   Submit area — contains both view-bar and edit action-bar
+   Hidden/shown via CSS based on body.dk-view / body.dk-edit class
 ═══════════════════════════════════════════════════════════════════════════ #}
 {% block submit_buttons_bottom %}
-{{ block.super }}
 
-{% if publish_url %}
-<div class="submit-row dk-action-bar" id="dkActionBar">
+  {# Django's own Save / Delete row — only in edit mode #}
+  <div class="dk-django-submit">{{ block.super }}</div>
 
-  {# ── Primary: AJAX pull ─────────────────────────────────────────────── #}
-  <button type="button" class="dk-btn dk-btn-pull" id="dkPullBtn"
-          onclick="dkPullFromDigiKey()">
-    📥 Стягнути поля з DigiKey
-  </button>
+  {% if publish_url %}
 
-  {# ── Publish / update ────────────────────────────────────────────────── #}
-  <a href="{{ publish_url }}" class="dk-btn dk-btn-publish"
-     onclick="return confirm('{% if original.dk_offer_id %}Оновити лістинг на DigiKey?{% else %}Опублікувати товар на DigiKey Marketplace?{% endif %}')">
-    {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати{% endif %}
-  </a>
+  {# ── VIEW MODE BAR ─────────────────────────────────────────────────────── #}
+  <div class="submit-row dk-bar dk-view-bar" id="dkViewBar">
+    <button type="button" class="dk-btn dk-btn-edit" onclick="dkEnterEdit()">
+      ✏️ Редагувати
+    </button>
+    {% if original.dk_offer_id %}
+    <a href="{{ sync_qty_url }}" class="dk-btn dk-btn-sync"
+       onclick="return confirm('Оновити залишок складу на DigiKey?')">
+      📦 Оновити залишок
+    </a>
+    {% endif %}
+    <span class="dk-bar-hint">Режим перегляду — натисни «Редагувати» щоб змінити поля</span>
+  </div>
 
-  {# ── Stock qty ────────────────────────────────────────────────────────── #}
-  {% if original.dk_offer_id %}
-  <a href="{{ sync_qty_url }}" class="dk-btn dk-btn-sync"
-     onclick="return confirm('Оновити залишок складу на DigiKey?')">
-    📦 Оновити залишок
-  </a>
+  {# ── EDIT MODE BAR ─────────────────────────────────────────────────────── #}
+  <div class="submit-row dk-bar dk-edit-bar" id="dkEditBar">
+    <button type="button" class="dk-btn dk-btn-pull" id="dkPullBtn"
+            onclick="dkPullFromDigiKey()">
+      📥 Стягнути з DigiKey
+    </button>
+    <a href="{{ publish_url }}" class="dk-btn dk-btn-publish"
+       onclick="return confirm('{% if original.dk_offer_id %}Оновити лістинг на DigiKey?{% else %}Опублікувати товар на DigiKey Marketplace?{% endif %}')">
+      {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати{% endif %}
+    </a>
+    {% if original.sync_status == 'staged' and not original.dk_offer_id %}
+    <a href="{{ create_offer_url }}" class="dk-btn dk-btn-offer"
+       onclick="return confirm('Спробувати створити Offer?')">
+      📦 Створити Offer
+    </a>
+    {% endif %}
+    <button type="button" class="dk-btn dk-btn-cancel" onclick="dkCancel()">
+      ✕ Скасувати
+    </button>
+    <span id="dkStatus" style="display:none;align-items:center;gap:6px;font-size:13px">
+      <span id="dkStatusIcon">⏳</span>
+      <span id="dkStatusMsg"></span>
+    </span>
+    {% if original.sync_status == 'staged' %}
+    <span class="dk-bar-note dk-note-staged">⏳ На перевірці DigiKey</span>
+    {% elif original.sync_status == 'error' and original.last_error %}
+    <span class="dk-bar-note dk-note-error">❌ {{ original.last_error|truncatechars:100 }}</span>
+    {% endif %}
+  </div>
+
   {% endif %}
-
-  {# ── Create offer (staged) ───────────────────────────────────────────── #}
-  {% if original.sync_status == 'staged' and not original.dk_offer_id %}
-  <a href="{{ create_offer_url }}" class="dk-btn dk-btn-offer"
-     onclick="return confirm('Спробувати створити Offer?')">
-    📦 Створити Offer
-  </a>
-  {% endif %}
-
-  {# ── Inline pull status ──────────────────────────────────────────────── #}
-  <span id="dkStatus" style="display:none;align-items:center;gap:6px;font-size:13px;color:var(--text-muted,#9aafbe)">
-    <span id="dkStatusIcon">⏳</span>
-    <span id="dkStatusMsg"></span>
-  </span>
-
-  {# ── State notes ─────────────────────────────────────────────────────── #}
-  {% if original.sync_status == 'staged' %}
-  <span style="font-size:12px;color:#ffb300;font-style:italic;margin-left:auto">
-    ⏳ На перевірці DigiKey — після затвердження натисніть «📦 Створити Offer»
-  </span>
-  {% elif original.sync_status == 'error' and original.last_error %}
-  <span style="font-size:12px;color:var(--err,#e53935);font-style:italic;margin-left:auto">
-    ❌ {{ original.last_error|truncatechars:150 }}
-  </span>
-  {% endif %}
-
-</div>
-{% endif %}
 {% endblock %}
 
 
@@ -67,8 +66,66 @@
 {% block extrahead %}
 {{ block.super }}
 <style>
-/* ── Action bar ─────────────────────────────────────────────────────────── */
-.dk-action-bar {
+/* ═══════════════════════════════════════════════════════════════════════════
+   View / Edit mode toggle
+═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── View mode ─────────────────────────────────────────────────────────── */
+body.dk-view .dk-django-submit { display: none !important; }
+body.dk-view .dk-edit-bar      { display: none !important; }
+body.dk-view .dk-view-bar      { display: flex !important; }
+
+/* Hide actual form inputs in view mode */
+body.dk-view .form-row input:not([type=hidden]),
+body.dk-view .form-row textarea,
+body.dk-view .form-row select,
+body.dk-view .form-row .related-widget-wrapper,
+body.dk-view .form-row .selector,
+body.dk-view .form-row .help,
+body.dk-view p.help { display: none !important; }
+
+/* Show display values */
+body.dk-view .dk-view-val { display: block !important; }
+
+/* Price / attrs widgets: read-only in view mode */
+body.dk-view .dk-prices-footer { display: none !important; }
+body.dk-view .dk-prices-table input { pointer-events: none; opacity: .7; }
+body.dk-view .dk-attr-val input  { pointer-events: none; opacity: .7; }
+
+/* ── Edit mode ─────────────────────────────────────────────────────────── */
+body.dk-edit .dk-django-submit { display: block !important; }
+body.dk-edit .dk-view-bar      { display: none !important; }
+body.dk-edit .dk-edit-bar      { display: flex !important; }
+body.dk-edit .dk-view-val      { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Display value (read-only text shown in view mode)
+═══════════════════════════════════════════════════════════════════════════ */
+.dk-view-val {
+  display: none;
+  padding: 5px 0 4px;
+  font-size: 13px;
+  color: var(--text, #c9d8e4);
+  line-height: 1.5;
+  word-break: break-word;
+  min-height: 20px;
+}
+.dk-view-val.dk-empty { color: var(--text-muted, #9aafbe); font-style: italic; }
+.dk-view-val a { color: var(--link, #58a6ff); text-decoration: none; }
+.dk-view-val a:hover { text-decoration: underline; }
+.dk-view-val img.dk-thumb {
+  max-height: 48px; max-width: 120px;
+  object-fit: contain; border-radius: 3px;
+  border: 1px solid var(--border-strong, #243347);
+  background: #fff; vertical-align: middle; margin-right: 8px;
+}
+.dk-view-bool-yes { color: #4caf50; font-weight: 600; }
+.dk-view-bool-no  { color: var(--text-muted, #9aafbe); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Bars
+═══════════════════════════════════════════════════════════════════════════ */
+.dk-bar {
   display: flex !important;
   align-items: center;
   gap: 10px;
@@ -79,32 +136,36 @@
   border: 1px solid var(--border-strong, #243347);
   border-radius: 6px;
 }
+.dk-view-bar { border-color: rgba(88,166,255,.25); }
+.dk-edit-bar { border-color: rgba(0,105,92,.4); }
 
 .dk-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+  display: inline-flex; align-items: center; gap: 5px;
   padding: 7px 16px;
-  border: none;
-  border-radius: 5px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none !important;
-  white-space: nowrap;
+  border: none; border-radius: 5px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  text-decoration: none !important; white-space: nowrap;
   transition: filter .15s, opacity .15s;
-  color: #fff !important;
-  line-height: 1.4;
+  color: #fff !important; line-height: 1.4;
 }
-.dk-btn:hover  { filter: brightness(1.15); }
+.dk-btn:hover   { filter: brightness(1.15); }
 .dk-btn:disabled { opacity: .55; cursor: not-allowed; }
 
+.dk-btn-edit    { background: #1565c0; }
 .dk-btn-pull    { background: #00695c; }
 .dk-btn-publish { background: #2e7d32; }
 .dk-btn-sync    { background: #1565c0; }
 .dk-btn-offer   { background: #e65100; }
+.dk-btn-cancel  { background: var(--bg-hover, #2a3d55); border: 1px solid var(--border-strong, #243347); }
 
-/* ── Field highlight animation ──────────────────────────────────────────── */
+.dk-bar-hint { font-size: 12px; color: var(--text-muted, #9aafbe); margin-left: auto; }
+.dk-bar-note { font-size: 12px; font-style: italic; margin-left: auto; }
+.dk-note-staged { color: #ffb300; }
+.dk-note-error  { color: var(--err, #e53935); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Field highlight animation (on AJAX pull)
+═══════════════════════════════════════════════════════════════════════════ */
 @keyframes dkHighlight {
   0%   { box-shadow: 0 0 0 3px rgba(0,191,165,.6); background: rgba(0,191,165,.07); }
   100% { box-shadow: none; background: transparent; }
@@ -116,47 +177,38 @@
   border-color: #00bfa5 !important;
 }
 
-/* ── Product preview card ───────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Product preview card (after pull)
+═══════════════════════════════════════════════════════════════════════════ */
 #dkPreviewCard {
-  display: none;
-  margin: 10px 0;
+  display: none; margin: 10px 0 0;
   padding: 14px 16px;
   background: var(--bg-card, #1a2535);
-  border: 1px solid rgba(0,105,92,.4);
-  border-left: 4px solid #00695c;
-  border-radius: 6px;
-  font-size: 13px;
-  max-width: 860px;
+  border: 1px solid rgba(0,105,92,.4); border-left: 4px solid #00695c;
+  border-radius: 6px; font-size: 13px; max-width: 860px;
 }
 .dk-preview-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 10px; }
 .dk-preview-img {
-  width: 68px; height: 68px;
-  object-fit: contain;
-  border-radius: 4px;
-  border: 1px solid var(--border-strong, #243347);
-  background: #fff;
-  flex-shrink: 0;
+  width: 68px; height: 68px; object-fit: contain;
+  border-radius: 4px; border: 1px solid var(--border-strong, #243347);
+  background: #fff; flex-shrink: 0;
 }
 .dk-preview-img-ph {
-  width: 68px; height: 68px;
-  border-radius: 4px;
+  width: 68px; height: 68px; border-radius: 4px;
   border: 1px solid var(--border-strong, #243347);
   background: var(--bg-hover, #1e2d40);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 28px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 28px; flex-shrink: 0;
 }
 .dk-preview-meta { flex: 1; min-width: 0; }
 .dk-preview-title {
-  font-size: 15px; font-weight: 700;
-  color: var(--text, #c9d8e4);
-  margin-bottom: 4px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 15px; font-weight: 700; color: var(--text, #c9d8e4);
+  margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .dk-preview-mfr { font-size: 12px; color: var(--text-muted, #9aafbe); margin-bottom: 6px; }
 .dk-preview-badges { display: flex; gap: 6px; flex-wrap: wrap; }
 .dk-badge {
-  display: inline-block; padding: 2px 8px;
-  border-radius: 10px; font-size: 11px; font-weight: 600;
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600;
   background: var(--bg-hover, #1e2d40);
   border: 1px solid var(--border-strong, #243347);
   color: var(--text-muted, #9aafbe);
@@ -165,9 +217,8 @@
 .dk-badge-pkg  { color: #66bb6a; border-color: rgba(102,187,106,.4); }
 .dk-badge-life { color: #ffa726; border-color: rgba(255,167,38,.4); }
 .dk-preview-desc {
-  font-size: 12px; color: var(--text-muted, #9aafbe);
-  line-height: 1.5; margin: 8px 0;
-  max-height: 52px; overflow: hidden;
+  font-size: 12px; color: var(--text-muted, #9aafbe); line-height: 1.5;
+  margin: 8px 0; max-height: 52px; overflow: hidden;
   display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
 }
 .dk-preview-links { display: flex; gap: 12px; font-size: 12px; }
@@ -175,8 +226,7 @@
 .dk-preview-links a:hover { text-decoration: underline; }
 .dk-preview-changed {
   font-size: 12px; color: var(--text-muted, #9aafbe);
-  border-top: 1px solid var(--border-strong, #243347);
-  padding-top: 8px; margin-top: 8px;
+  border-top: 1px solid var(--border-strong, #243347); padding-top: 8px; margin-top: 8px;
 }
 .dk-changed-tag {
   display: inline-block; padding: 1px 7px;
@@ -185,23 +235,24 @@
   border-radius: 8px; margin: 2px 3px; font-size: 11px;
 }
 
-/* ── Price table ────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Price table
+═══════════════════════════════════════════════════════════════════════════ */
 .dk-prices-wrap { margin: 4px 0 8px; }
 .dk-prices-table {
   border-collapse: collapse; width: 100%; max-width: 400px; font-size: 13px;
 }
 .dk-prices-table th {
   text-align: left; padding: 5px 12px;
-  background: var(--bg-hover, #1e2d40);
-  color: var(--text-muted, #9aafbe);
+  background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
   font-weight: 600; font-size: 11px; text-transform: uppercase;
   letter-spacing: .5px; border-bottom: 2px solid var(--border-strong, #243347);
 }
 .dk-prices-table td { padding: 3px 6px; border-bottom: 1px solid var(--border-strong, #243347); }
 .dk-prices-table input[type="number"] {
-  width: 100%; background: var(--bg-input, #141f2b);
-  color: var(--text, #c9d8e4); border: 1px solid var(--border-strong, #243347);
-  border-radius: 3px; padding: 5px 8px; font-size: 13px; box-sizing: border-box;
+  width: 100%; background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347); border-radius: 3px;
+  padding: 5px 8px; font-size: 13px; box-sizing: border-box;
 }
 .dk-prices-table input:focus {
   outline: none; border-color: var(--accent, #58a6ff);
@@ -223,29 +274,30 @@
 .dk-prices-hint { color: var(--text-muted, #9aafbe); font-size: 11px; }
 .dk-prices-err  { color: var(--err, #e53935); font-size: 11px; margin-top: 4px; display: none; }
 
-/* Hide raw dk_prices textarea (replaced by table) */
+/* Hide raw dk_prices textarea */
 .field-dk_prices > .flex-container,
 .field-dk_prices textarea { display: none !important; }
 .field-dk_prices { display: block !important; }
 
-/* ── Attributes editor ──────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Attributes editor
+═══════════════════════════════════════════════════════════════════════════ */
 .dk-attrs-wrap { margin: 4px 0 8px; }
 .dk-attrs-table {
   border-collapse: collapse; width: 100%; max-width: 700px; font-size: 13px;
 }
 .dk-attrs-table th {
   text-align: left; padding: 5px 12px;
-  background: var(--bg-hover, #1e2d40);
-  color: var(--text-muted, #9aafbe);
+  background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
   font-weight: 600; font-size: 11px; text-transform: uppercase;
   letter-spacing: .5px; border-bottom: 2px solid var(--border-strong, #243347);
 }
 .dk-attrs-table td { padding: 3px 6px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; }
 .dk-attr-code { font-family: monospace; font-size: 11px; color: var(--text-muted, #9aafbe); padding: 4px 10px; }
 .dk-attr-val input {
-  width: 100%; background: var(--bg-input, #141f2b);
-  color: var(--text, #c9d8e4); border: 1px solid var(--border-strong, #243347);
-  border-radius: 3px; padding: 4px 8px; font-size: 13px; box-sizing: border-box;
+  width: 100%; background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347); border-radius: 3px;
+  padding: 4px 8px; font-size: 13px; box-sizing: border-box;
 }
 .dk-attr-val input:focus {
   outline: none; border-color: var(--accent, #58a6ff);
@@ -253,12 +305,14 @@
 }
 .dk-attrs-empty { color: var(--text-muted, #9aafbe); font-size: 12px; font-style: italic; padding: 8px 10px; }
 
-/* Hide raw dk_attributes textarea (replaced by table) */
+/* Hide raw dk_attributes textarea */
 .field-dk_attributes > .flex-container,
 .field-dk_attributes textarea { display: none !important; }
 .field-dk_attributes { display: block !important; }
 
-/* ── Required field badges ───────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════════════════════
+   Required field badges
+═══════════════════════════════════════════════════════════════════════════ */
 .dk-required-mark {
   display: inline-block; background: #c62828; color: #fff;
   font-size: 10px; font-weight: 700; padding: 1px 5px;
@@ -273,9 +327,10 @@
 
 <script>
 /* ════════════════════════════════════════════════════════════════════════════
-   DigiKey Listing Admin — AJAX pull + editors
+   DigiKey Listing Admin — View/Edit mode + AJAX pull + editors
 ════════════════════════════════════════════════════════════════════════════ */
 
+/* ── Field map: JSON key → Django form input id ─────────────────────────── */
 var DK_FIELD_MAP = {
   dk_title:            'id_dk_title',
   dk_description:      'id_dk_description',
@@ -297,15 +352,95 @@ var DK_FIELD_MAP = {
   fa_height_max:       'id_fa_height_max',
 };
 
-/* ── AJAX pull ──────────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   View / Edit mode
+════════════════════════════════════════════════════════════════════════════ */
+
+function dkEnterView() {
+  document.body.classList.remove('dk-edit');
+  document.body.classList.add('dk-view');
+  dkBuildViewValues();
+}
+
+function dkEnterEdit() {
+  document.body.classList.remove('dk-view');
+  document.body.classList.add('dk-edit');
+}
+
+function dkCancel() {
+  window.location.reload();
+}
+
+/* Build .dk-view-val elements from current input values */
+function dkBuildViewValues() {
+  document.querySelectorAll('.form-row').forEach(function(row) {
+    /* Skip rows that already have a view-val element */
+    if (row.querySelector('.dk-view-val')) return;
+
+    var inputs    = row.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), textarea');
+    var selects   = row.querySelectorAll('select');
+    var checkboxes = row.querySelectorAll('input[type=checkbox]');
+
+    var html = '';
+
+    inputs.forEach(function(inp) {
+      var val = (inp.value || '').trim();
+      if (!val) { html += '<span class="dk-empty">—</span>'; return; }
+
+      var isUrl = (inp.type === 'url') || (inp.name || '').indexOf('url') >= 0;
+      var isImg = (inp.name || '').indexOf('image') >= 0;
+
+      if (isImg && val) {
+        html += '<img class="dk-thumb" src="' + dkEsc(val) + '" alt="" onerror="this.style.display=\'none\'">';
+        html += ' <a href="' + dkEsc(val) + '" target="_blank" rel="noopener" style="font-size:11px">' + dkEsc(val.split('/').pop()) + '</a>';
+      } else if (isUrl && val) {
+        html += '<a href="' + dkEsc(val) + '" target="_blank" rel="noopener">' + dkEsc(val) + '</a>';
+      } else if (inp.tagName === 'TEXTAREA') {
+        html += '<span style="white-space:pre-wrap">' + dkEsc(val.substring(0, 300)) +
+                (val.length > 300 ? '…' : '') + '</span>';
+      } else {
+        html += dkEsc(val);
+      }
+    });
+
+    selects.forEach(function(sel) {
+      var opt = sel.options[sel.selectedIndex];
+      html += opt ? dkEsc(opt.text) : '<span class="dk-empty">—</span>';
+    });
+
+    checkboxes.forEach(function(cb) {
+      html += cb.checked
+        ? '<span class="dk-view-bool-yes">✓ Так</span>'
+        : '<span class="dk-view-bool-no">✗ Ні</span>';
+    });
+
+    if (!html) return;
+
+    var disp = document.createElement('div');
+    disp.className = 'dk-view-val' + (html.indexOf('dk-empty') >= 0 && inputs.length + selects.length <= 1 ? ' dk-empty' : '');
+    disp.innerHTML = html;
+
+    /* Insert after the last input/select in the row */
+    var lastInp = row.querySelector('input:not([type=hidden]), textarea, select');
+    if (lastInp && lastInp.parentNode) {
+      lastInp.parentNode.appendChild(disp);
+    } else {
+      row.appendChild(disp);
+    }
+  });
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   AJAX Pull from DigiKey
+════════════════════════════════════════════════════════════════════════════ */
 function dkPullFromDigiKey() {
-  var btn    = document.getElementById('dkPullBtn');
-  var status = document.getElementById('dkStatus');
-  var icon   = document.getElementById('dkStatusIcon');
-  var msg    = document.getElementById('dkStatusMsg');
+  var btn  = document.getElementById('dkPullBtn');
+  var stat = document.getElementById('dkStatus');
+  var icon = document.getElementById('dkStatusIcon');
+  var msg  = document.getElementById('dkStatusMsg');
 
   btn.disabled = true;
-  status.style.display = 'inline-flex';
+  stat.style.display = 'inline-flex';
   icon.textContent = '⏳';
   msg.textContent  = 'Завантаження з DigiKey…';
   msg.style.color  = 'var(--text-muted,#9aafbe)';
@@ -345,6 +480,9 @@ function dkPullFromDigiKey() {
       dkPricesRebuild(fields.dk_prices);
     }
 
+    /* Rebuild view values for updated inputs */
+    document.querySelectorAll('.dk-view-val').forEach(function(el) { el.remove(); });
+
     var changed = data.changed || [];
     icon.textContent = '✅';
     msg.textContent  = changed.length
@@ -370,7 +508,9 @@ function dkHighlight(el) {
   row.classList.add('dk-field-updated');
 }
 
-/* ── Preview card ───────────────────────────────────────────────────────── */
+/* ════════════════════════════════════════════════════════════════════════════
+   Preview card
+════════════════════════════════════════════════════════════════════════════ */
 function dkEsc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -378,14 +518,14 @@ function dkEsc(s) {
 function dkShowPreview(fields, raw, changed) {
   var card = document.getElementById('dkPreviewCard');
   if (!card) return;
-  var title = (fields.dk_title)         || (raw && raw.title)             || '—';
-  var mfr   = (fields.dk_manufacturer)  || (raw && raw.manufacturer)      || '';
-  var img   = (fields.dk_image_url)     || (raw && raw.imageUrl)          || '';
-  var ds    = (fields.dk_datasheet_url) || '';
-  var desc  = (fields.dk_description)   || (raw && raw.description)       || '';
-  var cat   = (fields.dk_category_name) || '';
-  var pkg   = (fields.dk_packaging)     || '';
-  var life  = (fields.dk_lifecycle_status) || '';
+  var title = fields.dk_title || (raw && raw.title) || '—';
+  var mfr   = fields.dk_manufacturer || (raw && raw.manufacturer) || '';
+  var img   = fields.dk_image_url || (raw && raw.imageUrl) || '';
+  var ds    = fields.dk_datasheet_url || '';
+  var desc  = fields.dk_description || (raw && raw.description) || '';
+  var cat   = fields.dk_category_name || '';
+  var pkg   = fields.dk_packaging || '';
+  var life  = fields.dk_lifecycle_status || '';
 
   var imgH = img
     ? '<img class="dk-preview-img" src="'+dkEsc(img)+'" alt="" onerror="this.style.display=\'none\'">'
@@ -398,12 +538,11 @@ function dkShowPreview(fields, raw, changed) {
 
   var links = ds ? '<a href="'+dkEsc(ds)+'" target="_blank" rel="noopener">📄 Datasheet</a>' : '';
 
-  var chH = '';
-  if (changed && changed.length) {
-    chH = '<div class="dk-preview-changed">Оновлено: ' +
-      changed.map(function(f){ return '<span class="dk-changed-tag">'+dkEsc(f)+'</span>'; }).join('') +
-    '</div>';
-  }
+  var chH = changed && changed.length
+    ? '<div class="dk-preview-changed">Оновлено: ' +
+        changed.map(function(f){ return '<span class="dk-changed-tag">'+dkEsc(f)+'</span>'; }).join('') +
+      '</div>'
+    : '';
 
   card.innerHTML =
     '<div class="dk-preview-header">'+imgH+
@@ -432,7 +571,7 @@ function dkPricesInit() {
   wrap.className = 'dk-prices-wrap';
   wrap.innerHTML =
     '<table class="dk-prices-table"><thead><tr>'+
-      '<th style="width:28px">#</th><th>Кількість (шт.)</th><th>Ціна (EUR)</th><th style="width:36px"></th>'+
+      '<th style="width:28px">#</th><th>Кількість (шт.)</th><th>Ціна (EUR)</th><th class="dk-edit-col" style="width:36px"></th>'+
     '</tr></thead><tbody class="dk-ptbody"></tbody></table>'+
     '<div class="dk-prices-footer">'+
       '<button type="button" class="dk-add-btn" id="dkAddTier">+ Додати тир</button>'+
@@ -461,9 +600,9 @@ function _pAddRow(qty, price) {
   var tr = document.createElement('tr');
   tr.innerHTML =
     '<td class="dk-tier-num">?</td>'+
-    '<td><input type="number" class="dk-qty" min="1" step="1" value="'+(qty!==''&&qty!==undefined?qty:'')+'" placeholder="1" autocomplete="off"></td>'+
-    '<td><input type="number" class="dk-price" min="0" step="0.0001" value="'+(price!==''&&price!==undefined?price:'')+'" placeholder="0.0000" autocomplete="off"></td>'+
-    '<td><button type="button" class="dk-del-row">×</button></td>';
+    '<td><input type="number" class="dk-qty" min="1" step="1" value="'+(qty!==undefined&&qty!==''?qty:'')+'" placeholder="1" autocomplete="off"></td>'+
+    '<td><input type="number" class="dk-price" min="0" step="0.0001" value="'+(price!==undefined&&price!==''?price:'')+'" placeholder="0.0000" autocomplete="off"></td>'+
+    '<td class="dk-edit-col"><button type="button" class="dk-del-row">×</button></td>';
   tr.querySelector('.dk-del-row').addEventListener('click', function() { tr.remove(); _pRenum(); _pSync(); });
   tr.querySelector('.dk-qty').addEventListener('input', _pSync);
   tr.querySelector('.dk-price').addEventListener('input', _pSync);
@@ -486,7 +625,7 @@ function _pSync() {
   tiers.sort(function(a,b){return a.qty-b.qty;});
   _pTa.value = JSON.stringify(tiers);
   var errEl = document.getElementById('dkPricesErr');
-  if (errEl) { errEl.textContent = err ? '⚠️ Заповни обидва поля в кожному рядку.' : ''; errEl.style.display = err ? 'block' : 'none'; }
+  if (errEl) { errEl.textContent = err ? '⚠️ Заповни обидва поля.' : ''; errEl.style.display = err ? 'block' : 'none'; }
 }
 
 function dkPricesRebuild(tiers) {
@@ -509,7 +648,7 @@ function dkAttrsInit() {
   wrap.className = 'dk-attrs-wrap';
   wrap.innerHTML =
     '<table class="dk-attrs-table"><thead><tr>'+
-      '<th style="width:220px">Атрибут (code)</th><th>Значення</th>'+
+      '<th style="width:220px">Атрибут</th><th>Значення</th>'+
     '</tr></thead><tbody class="dk-atbody"></tbody></table>'+
     '<div class="dk-attrs-empty" id="dkAttrsEmpty" style="display:none">'+
       'Порожньо — натисніть 📥 Стягнути поля з DigiKey.'+
@@ -529,12 +668,14 @@ function dkAttrsRebuild(obj) {
   var keys = Object.keys(obj || {}).sort();
   var emEl = document.getElementById('dkAttrsEmpty');
   if (!keys.length) { if (emEl) emEl.style.display='block'; if (_aTa) _aTa.value='{}'; return; }
-  if (emEl) emEl.style.display = 'none';
+  if (emEl) emEl.style.display='none';
   keys.forEach(function(code) {
+    var val = obj[code];
     var tr = document.createElement('tr');
     tr.innerHTML =
       '<td class="dk-attr-code">'+dkEsc(code)+'</td>'+
-      '<td class="dk-attr-val"><input type="text" data-code="'+dkEsc(code)+'" value="'+dkEsc(String(obj[code]===null||obj[code]===undefined?'':obj[code]))+'" autocomplete="off"></td>';
+      '<td class="dk-attr-val"><input type="text" data-code="'+dkEsc(code)+'" value="'+
+        dkEsc(String(val===null||val===undefined?'':val))+'" autocomplete="off"></td>';
     tr.querySelector('input').addEventListener('input', _aSync);
     _aTbody.appendChild(tr);
   });
@@ -552,6 +693,7 @@ function _aSync() {
    Boot
 ════════════════════════════════════════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', function() {
+  /* Build editors first */
   dkPricesInit();
   dkAttrsInit();
 
@@ -579,6 +721,9 @@ document.addEventListener('DOMContentLoaded', function() {
     card.id = 'dkPreviewCard';
     anchor.parentNode.insertBefore(card, anchor);
   }
+
+  /* Start in VIEW mode */
+  dkEnterView();
 });
 </script>
 {% endblock %}
