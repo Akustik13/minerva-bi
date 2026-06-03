@@ -473,6 +473,13 @@ def import_offers_from_dk() -> dict:
             update_flds.append('dk_prices')
 
         listing.save(update_fields=update_flds)
+
+        # Auto-fill all product fields (title, description, image, attrs, etc.)
+        try:
+            pull_product_fields(listing)
+        except Exception as pull_exc:
+            logger.warning("DK import_offers: pull_product_fields failed for %s: %s", sku, pull_exc)
+
         updated += 1
 
     logger.info("DK import_offers updated=%d not_found=%d", updated, len(not_found))
@@ -549,6 +556,12 @@ def create_listings_from_offers() -> dict:
             sync_status      = DigiKeyListing.SYNC_PUBLISHED,
             last_synced_at   = timezone.now(),
         )
+        # Auto-fill all product fields from DigiKey Products API
+        try:
+            pull_product_fields(listing)
+        except Exception as pull_exc:
+            logger.warning("DK create_listings: pull_product_fields failed for %s: %s", sku, pull_exc)
+
         created += 1
 
     logger.info("DK create_listings created=%d already=%d no_product=%d",
