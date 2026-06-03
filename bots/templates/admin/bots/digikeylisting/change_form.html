@@ -478,11 +478,6 @@ function dkAdaptToCategory() {
     if (!h2) return;
     var txt = h2.textContent || '';
 
-    /* RF Filter section — hide unless category = filter */
-    if (txt.indexOf('RF Filter') >= 0) {
-      fs.style.display = cat === 'filter' ? '' : 'none';
-    }
-
     /* Technical attributes section — adapt title to category */
     if (txt.indexOf('Технічні атрибути DigiKey') >= 0) {
       var labels = {
@@ -874,25 +869,53 @@ document.addEventListener('DOMContentLoaded', function() {
   /* Start in VIEW mode */
   dkEnterView();
 
-  /* Field highlight from ai_advisor link (#id_fieldname) */
+  /* Field highlight from ai_advisor link (#id_fieldname or #id_attr_key) */
   if (location.hash && location.hash.length > 1) {
-    var _hashId = location.hash.slice(1);
-    var _hashEl = document.getElementById(_hashId) ||
-                  document.querySelector('[name="' + _hashId.replace(/^id_/, '') + '"]');
-    if (_hashEl) {
-      history.replaceState(null, '', location.pathname + location.search);
-      setTimeout(function() {
-        dkEnterEdit();
-        var _row = _hashEl.closest('.form-row') || _hashEl.closest('fieldset') || _hashEl.parentNode;
-        if (_row) {
-          _row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          _row.classList.add('dk-row-focus');
-          setTimeout(function() { _row.classList.remove('dk-row-focus'); }, 3000);
+    var _hashId   = location.hash.slice(1);
+    var _attrKey  = _hashId.replace(/^id_/, '');
+    history.replaceState(null, '', location.pathname + location.search);
+
+    setTimeout(function() {
+      dkEnterEdit();
+
+      /* 1. Try standard Django form input */
+      var _hashEl = document.getElementById(_hashId) ||
+                    document.querySelector('[name="' + _attrKey + '"]');
+
+      /* 2. Try dk_attributes custom table row by data-code */
+      var _attrRow = null;
+      if (!_hashEl || _hashEl.offsetParent === null) {
+        var _attrInp = document.querySelector('.dk-atbody [data-code="' + _attrKey + '"]');
+        if (_attrInp) {
+          _attrRow = _attrInp.closest('tr');
+          _hashEl  = _attrInp;
         }
-        dkHighlight(_hashEl);
-        if (_hashEl.offsetParent !== null) _hashEl.focus();
-      }, 400);
-    }
+      }
+
+      if (!_hashEl && !_attrRow) return;
+
+      /* Scroll target: table row or form-row */
+      var _scrollTarget = _attrRow ||
+                          (_hashEl && (_hashEl.closest('.form-row') || _hashEl.parentNode));
+      if (_scrollTarget) {
+        _scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        /* Highlight the row/container */
+        if (_attrRow) {
+          _attrRow.style.transition = 'background 2.5s ease-out';
+          _attrRow.style.background = 'rgba(0,191,165,.18)';
+          setTimeout(function() { _attrRow.style.background = ''; }, 2500);
+          /* Also outline the input */
+          if (_hashEl) { _hashEl.style.boxShadow = '0 0 0 2px #00bfa5'; }
+          setTimeout(function() { if (_hashEl) _hashEl.style.boxShadow = ''; }, 2500);
+        } else {
+          _scrollTarget.classList.add('dk-row-focus');
+          setTimeout(function() { _scrollTarget.classList.remove('dk-row-focus'); }, 3000);
+          dkHighlight(_hashEl);
+        }
+      }
+
+      if (_hashEl && _hashEl.offsetParent !== null) _hashEl.focus();
+    }, 400);
   }
 });
 </script>

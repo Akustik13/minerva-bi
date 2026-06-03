@@ -1251,10 +1251,9 @@ def _local_quality_checks(listing, ignored_fields=None) -> list:
 
     if listing.category_type == 'filter':
         for field, label in [
-            ('fa_center_frequency', 'Центральна частота'),
-            ('fa_bandwidth_3db',    'Смуга пропускання -3 дБ'),
-            ('fa_insertion_loss',   'Вносимі втрати'),
-            ('fa_filter_type',      'Тип фільтра'),
+            ('fa_frequency',      'Частота'),
+            ('fa_insertion_loss', 'Вносимі втрати'),
+            ('fa_filter_type',    'Тип фільтра'),
         ]:
             if not getattr(listing, field, None):
                 issue(field, 'warning', f'{label} не заповнена', f'Вкажіть {label.lower()} — ключовий параметр пошуку')
@@ -1331,18 +1330,6 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'description': (
                 'Всі технічні атрибути товару з DigiKey (Antenna Type, Gain, Frequency Range, VSWR тощо). '
                 'Редагуються через таблицю нижче. Заповнюються кнопкою «📥 Стягнути поля з DigiKey».'
-            ),
-        }),
-        ('🔧 RF Filter — спеціальні поля', {
-            'fields': (
-                'fa_frequency', 'fa_bandwidth', 'fa_filter_type',
-                'fa_ripple', 'fa_insertion_loss', 'fa_mounting_type',
-                'fa_package_case', 'fa_size_dimension', 'fa_height_max',
-            ),
-            'classes': ('collapse',),
-            'description': (
-                'Тільки для категорії RF Filter — передаються в DigiKey API як additionalFields. '
-                'Для антен, кабелів, конекторів — використовуй таблицю вище (Технічні атрибути DigiKey).'
             ),
         }),
         ('📊 Статус синхронізації', {
