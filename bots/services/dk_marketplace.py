@@ -142,6 +142,33 @@ def upsert_product(config, listing) -> str:
         body = {}
         try: body = e.response.json()
         except Exception: pass
+
+        # If DK says existingProductId not found — the stored ID is stale.
+        # Retry as a brand-new product (without existingProductId).
+        detail = str(body.get('detail', '')) + str(body.get('errors', ''))
+        if (e.response.status_code == 400
+                and 'not found' in detail.lower()
+                and 'existingProductId' in payload):
+            logger.warning(
+                "DK upsert_product: existingProductId %s not found, retrying as new product",
+                payload['existingProductId']
+            )
+            payload_new = {k: v for k, v in payload.items() if k != 'existingProductId'}
+            resp2 = req.post(url, json=payload_new, headers=_headers(config, token), timeout=30)
+            try:
+                resp2.raise_for_status()
+            except req.HTTPError as e2:
+                body2 = {}
+                try: body2 = e2.response.json()
+                except Exception: pass
+                raise DKMarketplaceError(
+                    f"upsert_product {e2.response.status_code}: {body2}"
+                ) from e2
+            data = resp2.json()
+            product_id = data.get("_id") or data.get("id") or ""
+            logger.info("DK upsert_product (retry) OK product_id=%s", product_id)
+            return product_id
+
         raise DKMarketplaceError(
             f"upsert_product {e.response.status_code}: {body}"
         ) from e
