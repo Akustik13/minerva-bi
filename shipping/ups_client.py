@@ -79,13 +79,19 @@ def _get_ups_carrier():
 
 
 def _gif_label_to_a4_pdf(gif_b64: str) -> str:
-    """Convert a base64 UPS GIF shipping label to a base64 A4 PDF using Pillow."""
+    """Convert a base64 UPS GIF label to A4 PDF.
+
+    Label is placed on the TOP HALF of A4 (≈ A5 area) so the sheet can be
+    folded in half and inserted into a DIN C5 envelope.
+    A light dashed fold line is drawn at the midpoint.
+    """
     try:
-        from PIL import Image
+        from PIL import Image, ImageDraw
 
         DPI    = 200
-        A4_W   = int(8.27  * DPI)   # 1654 px
-        A4_H   = int(11.69 * DPI)   # 2338 px
+        A4_W   = int(8.27  * DPI)   # 1654 px  (210 mm)
+        A4_H   = int(11.69 * DPI)   # 2338 px  (297 mm)
+        HALF_H = A4_H // 2          # 1169 px  (148.5 mm) — top half = fold area
         MARGIN = int(0.39  * DPI)   # ~10 mm
 
         gif_bytes = base64.b64decode(gif_b64)
@@ -95,15 +101,28 @@ def _gif_label_to_a4_pdf(gif_b64: str) -> str:
         if label.width > label.height:
             label = label.rotate(90, expand=True)
 
-        # Scale to fit within A4 minus margins
-        max_w, max_h = A4_W - 2 * MARGIN, A4_H - 2 * MARGIN
+        # Scale to fit within the TOP HALF of A4 minus margins
+        max_w = A4_W   - 2 * MARGIN
+        max_h = HALF_H - 2 * MARGIN
         label.thumbnail((max_w, max_h), Image.LANCZOS)
 
-        # Paste centered on white A4 canvas
-        canvas = Image.new('RGB', (A4_W, A4_H), 'white')
+        # Centre label in the top half
         x = (A4_W - label.width)  // 2
-        y = (A4_H - label.height) // 2
+        y = MARGIN + (HALF_H - 2 * MARGIN - label.height) // 2
+
+        canvas = Image.new('RGB', (A4_W, A4_H), 'white')
         canvas.paste(label, (x, y))
+
+        # Dashed fold line at the midpoint
+        draw   = ImageDraw.Draw(canvas)
+        dash   = int(0.2 * DPI)   # 10 mm dash
+        gap    = int(0.1 * DPI)   # 5 mm gap
+        fold_y = HALF_H
+        sx = 0
+        while sx < A4_W:
+            draw.line([(sx, fold_y), (min(sx + dash, A4_W), fold_y)],
+                      fill='#bbbbbb', width=2)
+            sx += dash + gap
 
         buf = io.BytesIO()
         canvas.save(buf, format='PDF', resolution=DPI)
