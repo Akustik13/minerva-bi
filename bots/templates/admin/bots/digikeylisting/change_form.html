@@ -862,6 +862,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
   /* Start in VIEW mode */
   dkEnterView();
+
+  /* Field highlight from ai_advisor link (#id_fieldname) */
+  if (location.hash && location.hash.length > 1) {
+    var targetId = location.hash.slice(1);
+    var targetEl = document.getElementById(targetId) ||
+                   document.querySelector('[name="' + targetId.replace(/^id_/, '') + '"]');
+    if (targetEl) {
+      setTimeout(function() {
+        dkEnterEdit();
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        dkHighlight(targetEl);
+        targetEl.focus();
+        history.replaceState(null, '', location.pathname + location.search);
+      }, 200);
+    }
+  }
 });
 </script>
 {% endblock %}

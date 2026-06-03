@@ -6,10 +6,11 @@
 {% block content %}
 <style>
 .ai-card{background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:16px 20px;margin-bottom:16px}
-.ai-card-title{font-size:11px;font-weight:700;color:var(--text-muted,#9aafbe);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px}
-.sev-error{background:rgba(198,40,40,.15);border-left:3px solid #ef5350;padding:9px 13px;border-radius:4px;margin-bottom:7px}
+.ai-card-title{font-size:11px;font-weight:700;color:var(--text-muted,#9aafbe);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.sev-error  {background:rgba(198,40,40,.15);border-left:3px solid #ef5350;padding:9px 13px;border-radius:4px;margin-bottom:7px}
 .sev-warning{background:rgba(245,127,23,.12);border-left:3px solid #ffa726;padding:9px 13px;border-radius:4px;margin-bottom:7px}
-.sev-info{background:rgba(21,101,192,.12);border-left:3px solid #42a5f5;padding:9px 13px;border-radius:4px;margin-bottom:7px}
+.sev-info   {background:rgba(21,101,192,.12);border-left:3px solid #42a5f5;padding:9px 13px;border-radius:4px;margin-bottom:7px}
+.issue-ignored{opacity:.45;filter:grayscale(.5)}
 .price-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-strong,#243347)}
 .price-row:last-child{border-bottom:none}
 .badge-strategy{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
@@ -20,9 +21,34 @@
 @keyframes spin{to{transform:rotate(360deg)}}
 #results-wrap{display:none}
 #error-wrap{display:none;background:rgba(198,40,40,.12);border:1px solid #ef5350;border-radius:8px;padding:14px 18px;margin-bottom:16px;color:#ef9a9a}
-.hist-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-strong,#243347);font-size:12px}
-.hist-row:last-child{border-bottom:none}
-.local-badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-left:5px;vertical-align:middle;background:rgba(21,101,192,.2);color:#42a5f5;border:1px solid rgba(21,101,192,.3)}
+
+/* badges */
+.local-badge   {display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;vertical-align:middle;background:rgba(21,101,192,.2);color:#42a5f5;border:1px solid rgba(21,101,192,.3)}
+.ignored-badge {display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;vertical-align:middle;background:rgba(97,97,97,.2);color:#9e9e9e;border:1px solid rgba(97,97,97,.3)}
+.fixed-badge   {display:inline-block;padding:1px 7px;border-radius:3px;font-size:10px;font-weight:700;vertical-align:middle;background:rgba(46,125,50,.2);color:#66bb6a;border:1px solid rgba(46,125,50,.3)}
+
+/* field link */
+.field-link{font-family:monospace;font-size:11px;font-weight:700;color:#58a6ff;text-decoration:none;border-bottom:1px dashed rgba(88,166,255,.4);padding-bottom:1px}
+.field-link:hover{color:#79b8ff;border-bottom-color:#79b8ff}
+
+/* ignore button */
+.btn-ignore{display:inline-block;margin-top:5px;padding:2px 9px;font-size:11px;border-radius:4px;cursor:pointer;border:1px solid rgba(158,158,158,.3);background:rgba(97,97,97,.12);color:#9e9e9e;transition:background .15s}
+.btn-ignore:hover{background:rgba(97,97,97,.25)}
+.btn-unignore{border-color:rgba(88,166,255,.3);background:rgba(21,101,192,.1);color:#58a6ff}
+.btn-unignore:hover{background:rgba(21,101,192,.2)}
+
+/* history cards */
+.hist-card{background:var(--bg-hover,#1e2d40);border:1px solid var(--border-strong,#243347);border-radius:8px;margin-bottom:12px;overflow:hidden}
+.hist-card-head{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;user-select:none}
+.hist-card-head:hover{background:rgba(255,255,255,.03)}
+.hist-card-body{padding:0 14px 14px;border-top:1px solid var(--border-strong,#243347)}
+.hist-toggle{font-size:12px;color:var(--text-muted);margin-left:auto;transition:transform .2s}
+.hist-card.open .hist-toggle{transform:rotate(180deg)}
+.hist-card.open .hist-card-body{display:block}
+.hist-card:not(.open) .hist-card-body{display:none}
+
+.btn-del-log{padding:3px 10px;font-size:11px;border-radius:4px;cursor:pointer;border:1px solid rgba(198,40,40,.3);background:rgba(198,40,40,.1);color:#ef5350;margin-left:auto;white-space:nowrap}
+.btn-del-log:hover{background:rgba(198,40,40,.2)}
 </style>
 
 <!-- Header -->
@@ -32,23 +58,20 @@
 <p style="margin-bottom:16px;color:var(--text-muted,#9aafbe);font-size:13px">
   {{ listing.dk_title|default:listing.product.sku }}
   &nbsp;·&nbsp;<a href="{{ change_url }}" style="color:var(--text-muted)">← Назад до лістингу</a>
-  &nbsp;·&nbsp;<a href="{% url 'admin:bots_aianalysislog_changelist' %}?listing__id__exact={{ listing.pk }}"
-                 style="color:var(--text-muted);font-size:11px">📋 Всі аналізи</a>
 </p>
 
-<!-- ── Local pre-checks (instant, no AI) ─────────────────────────────────── -->
-{% if local_issue_count %}
-<div class="ai-card" style="{% if local_error_count %}border-color:rgba(198,40,40,.4){% else %}border-color:rgba(245,127,23,.3){% endif %}">
+<!-- ── Local pre-checks ─────────────────────────────────────────────────────── -->
+<div class="ai-card" id="card-local"
+     style="{% if local_error_count %}border-color:rgba(198,40,40,.4){% else %}border-color:rgba(245,127,23,.3){% endif %}">
   <div class="ai-card-title">
-    ⚡ Локальні перевірки
-    <span style="margin-left:6px;font-size:11px;font-weight:400;color:var(--text-muted)">(без AI, миттєво)</span>
-    <span style="float:right;font-weight:700;color:{% if local_error_count %}#ef5350{% else %}#ffa726{% endif %}">
-      {{ local_issue_count }} проблем{% if local_error_count %}, з них {{ local_error_count }} критичних{% endif %}
+    <span>⚡ Локальні перевірки</span>
+    <span style="font-size:11px;font-weight:400;color:var(--text-muted)">(без AI, миттєво)</span>
+    <span style="margin-left:auto;font-weight:700;color:{% if local_error_count %}#ef5350{% else %}#ffa726{% endif %}">
+      <span id="local-count-label">{{ local_issue_count }} проблем{% if local_error_count %}, з них {{ local_error_count }} критичних{% endif %}</span>
     </span>
   </div>
   <div id="local-issues-wrap"></div>
 </div>
-{% endif %}
 
 <!-- Run button -->
 <div style="margin-bottom:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
@@ -56,7 +79,9 @@
           style="padding:10px 28px;font-size:14px;font-weight:700">
     🤖 Запустити AI-аналіз
   </button>
-  <span style="font-size:12px;color:var(--text-muted)">~10–20 сек · економія токенів: {{ local_issue_count }} базових перевірок вже виконано локально</span>
+  <span style="font-size:12px;color:var(--text-muted)">
+    ~10–20 сек · {{ local_issue_count }} базових перевірок вже виконано локально
+  </span>
 </div>
 
 <!-- Spinner -->
@@ -123,7 +148,7 @@
 <div class="ai-card" id="card-history" style="margin-top:8px">
   <div class="ai-card-title">
     🕐 Історія аналізів
-    <span id="hist-count" style="float:right;font-weight:400;color:var(--text-muted)"></span>
+    <span id="hist-count" style="font-weight:400;color:var(--text-muted);margin-left:4px"></span>
   </div>
   <div id="history-wrap">
     <p style="color:var(--text-muted);font-size:12px">Ще немає аналізів для цього лістингу.</p>
@@ -132,17 +157,22 @@
 
 <script>
 (function(){
-  var RUN_URL    = "{{ run_url }}";
-  var CSRF       = "{{ csrf_token }}";
-  var HISTORY    = {{ history_json|safe }};
-  var LOCAL      = {{ local_issues_json|safe }};
+  var RUN_URL          = "{{ run_url }}";
+  var CHANGE_URL       = "{{ change_url }}";
+  var CSRF             = "{{ csrf_token }}";
+  var DELETE_LOG_BASE  = "{{ delete_log_base_url }}";
+  var IGNORE_FIELD_URL = "{{ ignore_field_url }}";
+  var HISTORY          = {{ history_json|safe }};
+  var LOCAL            = {{ local_issues_json|safe }};
+  var IGNORED_FIELDS   = {{ ignored_fields_json|safe }};
+  var CURR_PROBLEM     = {{ current_problem_fields_json|safe }};
 
-  var btnRun     = document.getElementById('btn-run');
-  var spinner    = document.getElementById('ai-spinner');
-  var errWrap    = document.getElementById('error-wrap');
-  var results    = document.getElementById('results-wrap');
-  var applyBtn   = document.getElementById('btn-apply-prices');
-  var applyStatus= document.getElementById('apply-status');
+  var btnRun    = document.getElementById('btn-run');
+  var spinner   = document.getElementById('ai-spinner');
+  var errWrap   = document.getElementById('error-wrap');
+  var results   = document.getElementById('results-wrap');
+  var applyBtn  = document.getElementById('btn-apply-prices');
+  var applyStatus = document.getElementById('apply-status');
 
   var lastRecommended = [];
   var lastLogId = null;
@@ -155,33 +185,92 @@
     balanced:    {bg:'rgba(123,31,162,.2)', color:'#ce93d8', label:'⚖️ Збалансована'},
   };
 
-  // ── Render local pre-checks ─────────────────────────────────────────────────
-  function renderIssues(issues, container, showLocalBadge){
+  /* ── Field link helper ──────────────────────────────────────────────────── */
+  function fieldLink(fieldName) {
+    if (!fieldName) return '';
+    return '<a class="field-link" href="' + esc(CHANGE_URL) + '#id_' + esc(fieldName) + '"' +
+           ' target="_blank" title="Перейти до поля у формі">' + esc(fieldName) + '</a>';
+  }
+
+  /* ── Render one issue ───────────────────────────────────────────────────── */
+  function renderIssue(qi, opts) {
+    // opts: { showIgnore, showFixed, isHistory }
+    opts = opts || {};
+    var isIgnored = IGNORED_FIELDS.indexOf(qi.field) >= 0;
+    var isFixed   = opts.showFixed && qi.field && CURR_PROBLEM.indexOf(qi.field) < 0;
+    var localBadge   = qi.local ? '<span class="local-badge">локально</span>' : '';
+    var ignoredBadge = isIgnored ? '<span class="ignored-badge">ігнорується</span>' : '';
+    var fixedBadge   = isFixed   ? '<span class="fixed-badge">✓ Виправлено</span>' : '';
+
+    var ignoreBtn = '';
+    if (opts.showIgnore && qi.field) {
+      if (isIgnored) {
+        ignoreBtn = '<button class="btn-ignore btn-unignore" data-field="'+esc(qi.field)+'">↩ Відновити</button>';
+      } else {
+        ignoreBtn = '<button class="btn-ignore" data-field="'+esc(qi.field)+'">🙈 Ігнорувати</button>';
+      }
+    }
+
+    var cls = 'sev-' + (qi.severity || 'info') + (isIgnored ? ' issue-ignored' : '');
+    return '<div class="'+cls+'" data-field="'+esc(qi.field||'')+'">' +
+      '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px">' +
+        fieldLink(qi.field) + localBadge + fixedBadge + ignoredBadge +
+        '<span style="font-size:10px;font-weight:600;text-transform:uppercase;opacity:.6;margin-left:auto">' + esc(qi.severity||'') + '</span>' +
+      '</div>' +
+      '<div style="font-size:12px;color:var(--text,#c9d8e4);margin-bottom:3px">' + esc(qi.issue||'') + '</div>' +
+      '<div style="font-size:11px;color:var(--text-muted)">💡 ' + esc(qi.fix||'') + '</div>' +
+      ignoreBtn +
+    '</div>';
+  }
+
+  function renderIssues(issues, container, opts) {
     container.innerHTML = '';
-    if (!issues || !issues.length){
+    if (!issues || !issues.length) {
       container.innerHTML = '<p style="color:#66bb6a;font-size:12px">✅ Проблем не знайдено</p>';
       return;
     }
-    issues.forEach(function(qi){
-      var div = document.createElement('div');
-      div.className = 'sev-' + (qi.severity || 'info');
-      var badge = (showLocalBadge && qi.local) ? '<span class="local-badge">локально</span>' : '';
-      div.innerHTML =
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
-          '<span style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text,#c9d8e4)">' + esc(qi.field||'') + '</span>' + badge +
-          '<span style="font-size:10px;font-weight:600;text-transform:uppercase;opacity:.6;margin-left:auto">' + esc(qi.severity||'') + '</span>' +
-        '</div>' +
-        '<div style="font-size:12px;color:var(--text,#c9d8e4);margin-bottom:3px">' + esc(qi.issue||'') + '</div>' +
-        '<div style="font-size:11px;color:var(--text-muted)">💡 ' + esc(qi.fix||'') + '</div>';
-      container.appendChild(div);
+    issues.forEach(function(qi) {
+      container.insertAdjacentHTML('beforeend', renderIssue(qi, opts));
+    });
+    /* Attach ignore button listeners */
+    if (opts && opts.showIgnore) {
+      container.querySelectorAll('.btn-ignore').forEach(function(btn) {
+        btn.addEventListener('click', function() { doIgnore(btn.dataset.field); });
+      });
+    }
+  }
+
+  /* ── Local pre-checks ───────────────────────────────────────────────────── */
+  var localWrap = document.getElementById('local-issues-wrap');
+  renderIssues(LOCAL, localWrap, { showIgnore: true });
+
+  /* ── Ignore / unignore ──────────────────────────────────────────────────── */
+  function doIgnore(field) {
+    fetch(IGNORE_FIELD_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'field=' + encodeURIComponent(field),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) return;
+      IGNORED_FIELDS = data.ignored_fields;
+      /* Re-render local issues */
+      renderIssues(LOCAL, localWrap, { showIgnore: true });
+      /* Re-render results if visible */
+      if (results.style.display !== 'none') {
+        var qiWrap = document.getElementById('quality-issues');
+        if (qiWrap) {
+          var currentIssues = qiWrap.__allIssues || [];
+          renderIssues(currentIssues, qiWrap, { showIgnore: true });
+          qiWrap.__allIssues = currentIssues;
+        }
+      }
     });
   }
 
-  var localWrap = document.getElementById('local-issues-wrap');
-  if (localWrap) renderIssues(LOCAL, localWrap, false);
-
-  // ── Run AI analysis ─────────────────────────────────────────────────────────
-  btnRun.addEventListener('click', function(){
+  /* ── Run AI analysis ────────────────────────────────────────────────────── */
+  btnRun.addEventListener('click', function() {
     btnRun.disabled = true;
     spinner.style.display = 'flex';
     errWrap.style.display = 'none';
@@ -189,32 +278,32 @@
     lastLogId = null;
 
     fetch(RUN_URL, {
-      method:'POST',
-      headers:{'X-CSRFToken':CSRF,'Content-Type':'application/x-www-form-urlencoded'},
-      body:''
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: '',
     })
-    .then(function(r){ return r.json(); })
-    .then(function(data){
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
       spinner.style.display = 'none';
       btnRun.disabled = false;
-      if (!data.ok){ showError(data.error || 'Невідома помилка'); return; }
+      if (!data.ok) { showError(data.error || 'Невідома помилка'); return; }
       lastLogId = data.log_id || null;
       renderResults(data.result, data.sales, data.local_issues || []);
-      refreshHistory(data.result, data.log_id);
+      addHistoryEntry(data.result, data.log_id);
     })
-    .catch(function(e){
+    .catch(function(e) {
       spinner.style.display = 'none';
       btnRun.disabled = false;
       showError('Мережева помилка: ' + e.message);
     });
   });
 
-  function showError(msg){
+  function showError(msg) {
     errWrap.style.display = 'block';
     errWrap.innerHTML = '<strong>❌ Помилка:</strong> ' + esc(msg);
   }
 
-  function renderResults(r, sales, localIss){
+  function renderResults(r, sales, localIss) {
     var sc = stratColors[r.strategy] || stratColors['balanced'];
     var badge = document.getElementById('badge-strategy');
     badge.textContent = sc.label;
@@ -227,7 +316,7 @@
     document.getElementById('expected-impact').textContent = '💡 ' + (r.expected_impact || '');
 
     var ss = document.getElementById('sales-summary');
-    if (sales && !sales.error){
+    if (sales && !sales.error) {
       ss.innerHTML =
         '<div style="font-weight:700;color:var(--text);margin-bottom:7px">📦 Продажі (90 днів)</div>' +
         sRow('Замовлень', sales.order_count) +
@@ -242,13 +331,13 @@
     lastRecommended = r.recommended_prices || [];
     var priceRows = document.getElementById('price-rows');
     priceRows.innerHTML = '';
-    lastRecommended.forEach(function(p){
+    lastRecommended.forEach(function(p) {
       var d = document.createElement('div');
       d.className = 'price-row';
       d.innerHTML =
-        '<span style="width:70px;font-size:13px;font-weight:700;color:var(--text)">від '+p.qty+' шт.</span>' +
-        '<span style="font-size:17px;font-weight:800;color:#66bb6a;min-width:80px">$'+Number(p.price).toFixed(4)+'</span>' +
-        '<span style="font-size:11px;color:var(--text-muted);flex:1">'+esc(p.note||'')+'</span>';
+        '<span style="width:70px;font-size:13px;font-weight:700;color:var(--text)">від ' + p.qty + ' шт.</span>' +
+        '<span style="font-size:17px;font-weight:800;color:#66bb6a;min-width:80px">$' + Number(p.price).toFixed(4) + '</span>' +
+        '<span style="font-size:11px;color:var(--text-muted);flex:1">' + esc(p.note || '') + '</span>';
       priceRows.appendChild(d);
     });
 
@@ -260,29 +349,30 @@
     document.getElementById('quality-score-fill').style.background = fillColor;
     document.getElementById('quality-summary').textContent = r.quality_summary || '';
 
-    // Merge AI issues + local issues (dedupe by field)
-    var aiIssues  = r.quality_issues || [];
-    var allIssues = aiIssues.concat(localIss.filter(function(li){
-      return !aiIssues.some(function(ai){ return ai.field === li.field; });
+    var aiIssues   = r.quality_issues || [];
+    var allIssues  = aiIssues.concat(localIss.filter(function(li) {
+      return !aiIssues.some(function(ai) { return ai.field === li.field; });
     }));
-    renderIssues(allIssues, document.getElementById('quality-issues'), true);
+    var qiWrap = document.getElementById('quality-issues');
+    qiWrap.__allIssues = allIssues;
+    renderIssues(allIssues, qiWrap, { showIgnore: true });
 
     document.getElementById('post-change-advice').textContent = r.post_change_advice || '';
     results.style.display = 'block';
   }
 
-  function sRow(label, val){
+  function sRow(label, val) {
     return '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
       '<span>' + esc(label) + '</span>' +
       '<span style="font-weight:600;color:var(--text)">' + esc(String(val)) + '</span>' +
       '</div>';
   }
 
-  // ── Apply prices ────────────────────────────────────────────────────────────
-  applyBtn.addEventListener('click', function(){
+  /* ── Apply prices ───────────────────────────────────────────────────────── */
+  applyBtn.addEventListener('click', function() {
     if (!lastRecommended.length) return;
     if (!confirm('Застосувати рекомендовані ціни?\n\n' +
-        lastRecommended.map(function(p){ return 'від '+p.qty+' шт. → $'+Number(p.price).toFixed(4); }).join('\n')
+        lastRecommended.map(function(p) { return 'від ' + p.qty + ' шт. → $' + Number(p.price).toFixed(4); }).join('\n')
     )) return;
 
     applyBtn.disabled = true;
@@ -291,23 +381,23 @@
 
     var body = 'apply_prices=1';
     if (lastLogId) body += '&log_id=' + lastLogId;
-    lastRecommended.forEach(function(p){
+    lastRecommended.forEach(function(p) {
       body += '&price_' + p.qty + '=' + encodeURIComponent(Number(p.price).toFixed(4));
     });
 
     fetch(RUN_URL, {
-      method:'POST',
-      headers:{'X-CSRFToken':CSRF,'Content-Type':'application/x-www-form-urlencoded'},
-      body: body
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body,
     })
-    .then(function(r){ return r.json(); })
-    .then(function(data){
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
       applyBtn.disabled = false;
-      if (data.ok && data.prices_applied){
+      if (data.ok && data.prices_applied) {
         applyStatus.textContent = '✅ Ціни збережено!';
         applyStatus.style.color = '#66bb6a';
-        // Mark latest history row as applied
-        if (HISTORY.length && !HISTORY[0].prices_applied){
+        /* Mark newest history entry as applied */
+        if (HISTORY.length) {
           HISTORY[0].prices_applied = true;
           HISTORY[0].applied_at = 'щойно';
           renderHistory();
@@ -317,56 +407,170 @@
         applyStatus.style.color = '#ef5350';
       }
     })
-    .catch(function(e){
+    .catch(function(e) {
       applyBtn.disabled = false;
       applyStatus.textContent = '❌ ' + e.message;
       applyStatus.style.color = '#ef5350';
     });
   });
 
-  // ── History ─────────────────────────────────────────────────────────────────
-  function refreshHistory(result, logId){
-    var newEntry = {
+  /* ── History ────────────────────────────────────────────────────────────── */
+  function addHistoryEntry(result, logId) {
+    HISTORY.unshift({
       id: logId,
       run_at: 'щойно',
       run_by: '',
+      strategy: result.strategy || '',
       strategy_name: result.strategy_name || '',
       quality_score: result.quality_score || null,
+      quality_summary: result.quality_summary || '',
+      recommended_prices: result.recommended_prices || [],
+      quality_issues: result.quality_issues || [],
+      local_issues: LOCAL,
+      price_change_summary: result.price_change_summary || '',
+      expected_impact: result.expected_impact || '',
+      post_change_advice: result.post_change_advice || '',
       prices_applied: false,
       applied_at: '',
-      price_change_summary: result.price_change_summary || '',
-    };
-    HISTORY.unshift(newEntry);
-    if (HISTORY.length > 10) HISTORY.pop();
+      applied_by: '',
+      outcome_checked: false,
+      outcome_notes: '',
+    });
+    if (HISTORY.length > 20) HISTORY.pop();
     renderHistory();
   }
 
-  function renderHistory(){
+  function deleteLog(logId, cardEl) {
+    if (!confirm('Видалити цей запис аналізу?')) return;
+    var idx = HISTORY.findIndex(function(h) { return h.id === logId; });
+    fetch(DELETE_LOG_BASE + logId + '/delete/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        if (idx >= 0) HISTORY.splice(idx, 1);
+        renderHistory();
+      }
+    });
+  }
+
+  function renderHistory() {
     var wrap = document.getElementById('history-wrap');
     var cnt  = document.getElementById('hist-count');
-    cnt.textContent = HISTORY.length + ' запис(ів)';
-    if (!HISTORY.length){
+    cnt.textContent = HISTORY.length ? '(' + HISTORY.length + ')' : '';
+
+    if (!HISTORY.length) {
       wrap.innerHTML = '<p style="color:var(--text-muted);font-size:12px">Ще немає аналізів.</p>';
       return;
     }
+
     wrap.innerHTML = '';
-    HISTORY.forEach(function(h){
-      var sc    = parseInt(h.quality_score) || 0;
-      var sCol  = sc >= 8 ? '#66bb6a' : sc >= 5 ? '#ffa726' : '#ef5350';
-      var stratCols = stratColors;
-      var div = document.createElement('div');
-      div.className = 'hist-row';
-      div.innerHTML =
-        '<span style="color:var(--text-muted);white-space:nowrap;min-width:120px">' + esc(h.run_at) + '</span>' +
-        '<span style="flex:1;color:var(--text);font-weight:600">' + esc(h.strategy_name || '—') + '</span>' +
-        (sc ? '<span style="font-weight:700;color:'+sCol+';white-space:nowrap">'+sc+'/10</span>' : '') +
-        '<span style="white-space:nowrap;min-width:80px;text-align:right">' +
-          (h.prices_applied
-            ? '<span style="color:#66bb6a;font-weight:700">✓ застосовано</span>' + (h.applied_at ? ' <span style="color:var(--text-muted);font-size:10px">'+esc(h.applied_at)+'</span>' : '')
-            : '<span style="color:var(--text-muted)">не застосовано</span>'
-          ) +
-        '</span>';
-      wrap.appendChild(div);
+    HISTORY.forEach(function(h, idx) {
+      var sc = parseInt(h.quality_score) || 0;
+      var sCol = sc >= 8 ? '#66bb6a' : sc >= 5 ? '#ffa726' : '#ef5350';
+      var sc2 = stratColors[h.strategy] || stratColors['balanced'];
+
+      var appliedBadge = h.prices_applied
+        ? '<span style="color:#66bb6a;font-size:11px;font-weight:700">✓ Ціни застосовано' +
+          (h.applied_at ? ' <span style="color:var(--text-muted);font-weight:400">'+esc(h.applied_at)+'</span>' : '') +
+          '</span>'
+        : '';
+
+      var card = document.createElement('div');
+      card.className = 'hist-card' + (idx === 0 ? ' open' : '');
+
+      /* Head */
+      var headHtml =
+        '<div class="hist-card-head">' +
+          '<span style="color:var(--text-muted);font-size:11px;white-space:nowrap">' + esc(h.run_at) + '</span>' +
+          (h.run_by ? '<span style="font-size:11px;color:var(--text-muted)">·&nbsp;' + esc(h.run_by) + '</span>' : '') +
+          '<span class="badge-strategy" style="background:'+sc2.bg+';color:'+sc2.color+';border:1px solid '+sc2.color+'40;padding:2px 8px;font-size:10px">' +
+            esc(h.strategy_name || '—') + '</span>' +
+          (sc ? '<span style="font-weight:700;color:'+sCol+';font-size:13px">'+sc+'/10</span>' : '') +
+          appliedBadge +
+          (h.id ? '<button class="btn-del-log" data-log-id="'+h.id+'">🗑 Видалити</button>' : '') +
+          '<span class="hist-toggle">▼</span>' +
+        '</div>';
+
+      /* Body */
+      var bodyHtml = '<div class="hist-card-body">';
+
+      /* Prices before / after */
+      if (h.recommended_prices && h.recommended_prices.length) {
+        bodyHtml += '<div style="margin:10px 0 6px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">💰 Рекомендовані ціни</div>';
+        bodyHtml += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
+        h.recommended_prices.forEach(function(p) {
+          bodyHtml += '<span style="background:rgba(46,125,50,.15);color:#66bb6a;border:1px solid rgba(46,125,50,.3);' +
+            'border-radius:5px;padding:3px 10px;font-size:12px;font-weight:700">від ' + p.qty + ' шт. → $' + Number(p.price).toFixed(4) + '</span>';
+        });
+        bodyHtml += '</div>';
+      }
+      if (h.price_change_summary) {
+        bodyHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' + esc(h.price_change_summary) + '</div>';
+      }
+
+      /* Quality summary */
+      if (h.quality_summary) {
+        bodyHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;font-style:italic">' + esc(h.quality_summary) + '</div>';
+      }
+
+      /* Quality issues from AI */
+      var aiIssues = h.quality_issues || [];
+      if (aiIssues.length) {
+        bodyHtml += '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin-bottom:5px">🔍 Проблеми якості (AI)</div>';
+        aiIssues.forEach(function(qi) {
+          bodyHtml += renderIssue(qi, { showFixed: true });
+        });
+      }
+
+      /* Local issues at time of run */
+      var locIssues = h.local_issues || [];
+      if (locIssues.length) {
+        bodyHtml += '<div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;margin:8px 0 5px">⚡ Локальні на момент аналізу</div>';
+        locIssues.forEach(function(qi) {
+          bodyHtml += renderIssue(qi, { showFixed: true });
+        });
+      }
+
+      /* Expected impact */
+      if (h.expected_impact) {
+        bodyHtml += '<div style="font-size:12px;color:var(--text-muted);margin-top:8px">💡 ' + esc(h.expected_impact) + '</div>';
+      }
+
+      /* Post-change advice */
+      if (h.post_change_advice) {
+        bodyHtml += '<div style="font-size:12px;color:var(--text-muted);margin-top:5px">📈 ' + esc(h.post_change_advice) + '</div>';
+      }
+
+      /* Outcome notes */
+      if (h.prices_applied) {
+        bodyHtml += '<div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--border-strong,#243347)">' +
+          '<label style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">📝 Нотатки результату</label>' +
+          '<div style="margin-top:4px;font-size:12px;color:var(--text)">' + esc(h.outcome_notes || 'Ще не заповнено') + '</div>' +
+        '</div>';
+      }
+
+      bodyHtml += '</div>';
+
+      card.innerHTML = headHtml + bodyHtml;
+      wrap.appendChild(card);
+
+      /* Toggle */
+      card.querySelector('.hist-card-head').addEventListener('click', function(e) {
+        if (e.target.classList.contains('btn-del-log')) return;
+        card.classList.toggle('open');
+      });
+
+      /* Delete */
+      var delBtn = card.querySelector('.btn-del-log');
+      if (delBtn) {
+        delBtn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          deleteLog(parseInt(delBtn.dataset.logId), card);
+        });
+      }
     });
   }
 

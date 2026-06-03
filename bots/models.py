@@ -339,6 +339,10 @@ class DigiKeyListing(models.Model):
                                        choices=SYNC_CHOICES, default='draft')
     last_synced_at = models.DateTimeField('Остання синхронізація', null=True, blank=True)
     last_error     = models.TextField('Остання помилка', blank=True, default='')
+    ignored_quality_fields = models.JSONField(
+        'Ігноровані поля перевірок', default=list, blank=True,
+        help_text='Поля, для яких локальні попередження вимкнено вручну'
+    )
     created_at     = models.DateTimeField(auto_now_add=True)
     updated_at     = models.DateTimeField(auto_now=True)
 

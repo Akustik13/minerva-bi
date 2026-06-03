@@ -1217,11 +1217,14 @@ class BotLogAdmin(admin.ModelAdmin):
 
 # ── Local quality pre-checks (no AI, no tokens) ───────────────────────────────
 
-def _local_quality_checks(listing) -> list:
+def _local_quality_checks(listing, ignored_fields=None) -> list:
     """Fast rule-based checks. Run before AI to detect obvious issues instantly."""
+    ignored = set(ignored_fields or [])
     issues = []
 
     def issue(field, severity, text, fix):
+        if field in ignored:
+            return
         issues.append({'field': field, 'severity': severity, 'issue': text, 'fix': fix, 'local': True})
 
     title = listing.dk_title or ''
@@ -1470,6 +1473,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/ai-run/',
                  self.admin_site.admin_view(self.ai_run_view),
                  name='bots_digikeylisting_ai_run'),
+            path('<int:pk>/ai-log/<int:log_id>/delete/',
+                 self.admin_site.admin_view(self.ai_log_delete_view),
+                 name='bots_digikeylisting_ai_log_delete'),
+            path('<int:pk>/ignore-field/',
+                 self.admin_site.admin_view(self.ignore_field_view),
+                 name='bots_digikeylisting_ignore_field'),
             path('pull-task/status/',
                  self.admin_site.admin_view(self.pull_task_status_view),
                  name='bots_digikeylisting_pull_task_status'),
@@ -1614,24 +1623,56 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
     # ── AI Pricing Advisor ────────────────────────────────────────────────────
 
+    def ai_log_delete_view(self, request, pk, log_id):
+        from django.http import JsonResponse
+        if request.method != 'POST':
+            return JsonResponse({'error': 'POST required'}, status=405)
+        deleted, _ = AIAnalysisLog.objects.filter(pk=log_id, listing_id=pk).delete()
+        return JsonResponse({'ok': True, 'deleted': deleted})
+
+    def ignore_field_view(self, request, pk):
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        if request.method != 'POST':
+            return JsonResponse({'error': 'POST required'}, status=405)
+        field = request.POST.get('field', '').strip()
+        if not field:
+            return JsonResponse({'error': 'field required'}, status=400)
+        listing = get_object_or_404(DigiKeyListing, pk=pk)
+        ignored = list(listing.ignored_quality_fields or [])
+        if field in ignored:
+            ignored.remove(field)
+            added = False
+        else:
+            ignored.append(field)
+            added = True
+        listing.ignored_quality_fields = ignored
+        listing.save(update_fields=['ignored_quality_fields'])
+        return JsonResponse({'ok': True, 'added': added, 'ignored_fields': ignored})
+
     def ai_advisor_view(self, request, pk):
         import json as _json
         from django.shortcuts import get_object_or_404
         listing = get_object_or_404(DigiKeyListing.objects.select_related('product'), pk=pk)
         history = list(
             AIAnalysisLog.objects.filter(listing=listing)
-            .order_by('-run_at')[:10]
+            .order_by('-run_at')[:20]
             .values(
-                'id', 'run_at', 'strategy_name', 'quality_score',
-                'prices_applied', 'applied_at', 'skipped_ai',
-                'recommended_prices', 'price_change_summary',
-                'outcome_checked', 'outcome_notes',
+                'id', 'run_at', 'run_by', 'strategy', 'strategy_name', 'quality_score',
+                'quality_summary', 'prices_applied', 'applied_at', 'applied_by',
+                'skipped_ai', 'recommended_prices', 'price_change_summary',
+                'quality_issues', 'local_issues', 'expected_impact', 'post_change_advice',
+                'outcome_checked', 'outcome_notes', 'prices_before',
             )
         )
         for h in history:
             h['run_at'] = h['run_at'].strftime('%Y-%m-%d %H:%M')
             h['applied_at'] = h['applied_at'].strftime('%Y-%m-%d %H:%M') if h['applied_at'] else ''
-        local_issues = _local_quality_checks(listing)
+        ignored_fields = list(listing.ignored_quality_fields or [])
+        local_issues = _local_quality_checks(listing, ignored_fields)
+        # All current issues (no ignore filter) — used to detect "fixed" in history
+        all_current_issues = _local_quality_checks(listing)
+        current_problem_fields = [i['field'] for i in all_current_issues]
         ctx = dict(
             self.admin_site.each_context(request),
             title=f'🤖 AI Порадник — {listing.product.sku}',
@@ -1639,8 +1680,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             opts=self.model._meta,
             run_url=reverse('admin:bots_digikeylisting_ai_run', args=[pk]),
             change_url=reverse('admin:bots_digikeylisting_change', args=[pk]),
+            delete_log_base_url=reverse('admin:bots_digikeylisting_ai_log_delete', args=[pk, 0]).rstrip('0').rstrip('/') + '/',
+            ignore_field_url=reverse('admin:bots_digikeylisting_ignore_field', args=[pk]),
             history_json=_json.dumps(history, ensure_ascii=False),
             local_issues_json=_json.dumps(local_issues, ensure_ascii=False),
+            ignored_fields_json=_json.dumps(ignored_fields, ensure_ascii=False),
+            current_problem_fields_json=_json.dumps(current_problem_fields, ensure_ascii=False),
             local_issue_count=len(local_issues),
             local_error_count=sum(1 for i in local_issues if i['severity'] == 'error'),
         )
