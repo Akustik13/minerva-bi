@@ -1853,6 +1853,16 @@ Rules:
             sales_snapshot=sales_ctx,
         )
 
+        # Keep only 20 most recent logs per listing; delete older ones.
+        old_ids = list(
+            AIAnalysisLog.objects
+            .filter(listing=listing)
+            .order_by('-run_at')
+            .values_list('id', flat=True)[20:]
+        )
+        if old_ids:
+            AIAnalysisLog.objects.filter(id__in=old_ids).delete()
+
         return JsonResponse({
             'ok': True,
             'result': result,
