@@ -1580,21 +1580,32 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             updated = pushed = err = skipped = 0
 
             if mode == 'abs':
-                # ── absolute price edit ──────────────────────────────────────
+                # ── absolute price edit (prices come as JSON map) ────────────
+                import json as _json
+                abs_map = {}
+                try:
+                    abs_map = _json.loads(request.POST.get('abs_prices_json', '{}') or '{}')
+                except Exception:
+                    pass
+
                 for listing in queryset.select_related('product'):
                     old_prices = list(listing.dk_prices or [])
                     if not old_prices:
                         skipped += 1
                         continue
+                    listing_map = abs_map.get(str(listing.pk), {})
+                    if not listing_map:
+                        skipped += 1
+                        continue
                     new_prices = []
                     changed = False
                     for ti, tier in enumerate(old_prices):
-                        raw = request.POST.get(f'price_{listing.pk}_{ti}', '')
+                        raw = listing_map.get(str(ti))
                         try:
-                            new_val = round(float(str(raw).replace(',', '.')), 4)
+                            new_val = round(float(str(raw).replace(',', '.') if raw is not None else ''), 4)
                         except (ValueError, TypeError):
-                            new_val = float(tier.get('price', 0))
-                        old_val = float(tier.get('price', 0))
+                            new_val = round(float(tier.get('price', 0)), 4)
+                        old_val = round(float(tier.get('price', 0)), 4)
                         if abs(new_val - old_val) > 1e-6:
                             changed = True
                         new_prices.append({'qty': tier['qty'], 'price': new_val})
@@ -1603,10 +1614,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                         continue
                     try:
                         DigiKeyPriceLog.objects.create(
-                            listing=listing,
-                            delta_pct=0,
-                            old_prices=old_prices,
-                            new_prices=new_prices,
+                            listing=listing, delta_pct=0,
+                            old_prices=old_prices, new_prices=new_prices,
                             user=request.user.username if request.user else '',
                         )
                     except Exception:
@@ -1623,10 +1632,10 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                             update_offer(config, listing)
                             pushed += 1
                         except Exception as exc:
-                            logger.warning("bulk_prices push failed %s: %s", listing.product.sku, exc)
+                            logger.warning("bulk_prices push abs %s: %s", listing.pk, exc)
                             err += 1
                 if updated:
-                    msg = f"✅ Ціни оновлено (вручну) для {updated} лістингів"
+                    msg = f"✅ Ціни (вручну) оновлено для {updated} лістингів"
                     if pushed:
                         msg += f", {pushed} опубліковано на DigiKey"
                     self.message_user(request, msg + ".", messages.SUCCESS)
@@ -1641,23 +1650,33 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 if not delta_pct:
                     self.message_user(request, "❌ Відсоток не може бути 0.", messages.ERROR)
                     return
+
+                # qty tier filter: None = apply to all
+                sel_qtys_str = request.POST.get('selected_qtys', '').strip()
+                sel_qtys = None
+                if sel_qtys_str:
+                    try:
+                        sel_qtys = {int(q) for q in sel_qtys_str.split(',') if q.strip()}
+                    except ValueError:
+                        sel_qtys = None
+
                 multiplier = 1.0 + delta_pct / 100.0
                 for listing in queryset.select_related('product'):
                     old_prices = list(listing.dk_prices or [])
                     if not old_prices:
                         skipped += 1
                         continue
-                    new_prices = [
-                        {"qty": t["qty"], "price": round(float(t["price"]) * multiplier, 4)}
-                        for t in old_prices
-                        if t.get("qty") and t.get("price") is not None
-                    ]
+                    new_prices = []
+                    for t in old_prices:
+                        if t.get("qty") is None or t.get("price") is None:
+                            continue
+                        apply = sel_qtys is None or int(t["qty"]) in sel_qtys
+                        new_p = round(float(t["price"]) * multiplier, 4) if apply else round(float(t["price"]), 4)
+                        new_prices.append({"qty": t["qty"], "price": new_p})
                     try:
                         DigiKeyPriceLog.objects.create(
-                            listing=listing,
-                            delta_pct=delta_pct,
-                            old_prices=old_prices,
-                            new_prices=new_prices,
+                            listing=listing, delta_pct=delta_pct,
+                            old_prices=old_prices, new_prices=new_prices,
                             user=request.user.username if request.user else '',
                         )
                     except Exception:
@@ -1674,11 +1693,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                             update_offer(config, listing)
                             pushed += 1
                         except Exception as exc:
-                            logger.warning("bulk_prices push failed %s: %s", listing.product.sku, exc)
+                            logger.warning("bulk_prices push pct %s: %s", listing.pk, exc)
                             err += 1
                 sign = '+' if delta_pct >= 0 else ''
+                tier_note = f" (тіри: {sel_qtys_str} шт)" if sel_qtys else ""
                 if updated:
-                    msg = f"✅ Ціни {sign}{delta_pct:.1f}% застосовано до {updated} лістингів"
+                    msg = f"✅ Ціни {sign}{delta_pct:.1f}%{tier_note} застосовано до {updated} лістингів"
                     if pushed:
                         msg += f", {pushed} опубліковано на DigiKey"
                     self.message_user(request, msg + ".", messages.SUCCESS)
@@ -1687,7 +1707,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 self.message_user(
                     request,
                     f"⚠️ {skipped} лістингів пропущено — немає збережених цін. "
-                    "Спочатку натисніть «📥 Стягнути поля з DigiKey» для кожного лістингу.",
+                    "Натисніть «📥 Стягнути поля з DigiKey» для кожного лістингу.",
                     messages.WARNING,
                 )
             if not updated:

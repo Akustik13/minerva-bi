@@ -12,23 +12,24 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
 .bp-mode-btn {
   padding:7px 18px; border-radius:5px; font-size:12px; font-weight:700;
   cursor:pointer; border:1px solid var(--border-strong,#243347);
-  background:transparent; color:var(--text-muted,#9aafbe);
-  transition:all .15s;
+  background:transparent; color:var(--text-muted,#9aafbe); transition:all .15s;
 }
-.bp-mode-btn.active {
-  background:var(--accent,#1a6fc4); color:#fff;
-  border-color:var(--accent,#1a6fc4);
-}
+.bp-mode-btn.active { background:var(--accent,#1a6fc4); color:#fff; border-color:var(--accent,#1a6fc4); }
 .bp-abs-input {
   width:110px; background:var(--bg-input,#141f2b); color:var(--text,#c9d8e4);
   border:1px solid var(--border-strong,#243347); border-radius:3px;
-  padding:3px 8px; font-size:12px; font-family:monospace; text-align:right;
+  padding:4px 8px; font-size:12px; font-family:monospace; text-align:right;
   box-sizing:border-box;
 }
-.bp-abs-input:focus {
-  outline:none; border-color:var(--accent,#58a6ff);
-  box-shadow:0 0 0 2px rgba(88,166,255,.2);
+.bp-abs-input:focus { outline:none; border-color:var(--accent,#58a6ff); box-shadow:0 0 0 2px rgba(88,166,255,.2); }
+.qty-chk-lbl {
+  display:inline-flex; align-items:center; gap:5px; cursor:pointer;
+  padding:4px 10px; border-radius:4px; font-size:12px; font-weight:600;
+  border:1px solid var(--border-strong,#243347);
+  background:var(--bg-hover,#1e2d40); color:var(--text,#c9d8e4);
+  transition:background .12s;
 }
+.qty-chk-lbl:has(input:checked) { background:rgba(88,166,255,.15); border-color:var(--accent,#58a6ff); color:#58a6ff; }
 </style>
 {% endblock %}
 
@@ -37,11 +38,13 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
 
 <form method="post" id="bulk-price-form">
   {% csrf_token %}
-  <input type="hidden" name="action"        value="action_bulk_prices">
-  <input type="hidden" name="apply"         value="1">
-  <input type="hidden" name="select_across" value="0">
-  <input type="hidden" name="mode"          id="f-mode"      value="pct">
-  <input type="hidden" name="delta_pct"     id="f-delta-pct" value="0">
+  <input type="hidden" name="action"          value="action_bulk_prices">
+  <input type="hidden" name="apply"           value="1">
+  <input type="hidden" name="select_across"   value="0">
+  <input type="hidden" name="mode"            id="f-mode"        value="pct">
+  <input type="hidden" name="delta_pct"       id="f-delta-pct"   value="0">
+  <input type="hidden" name="selected_qtys"   id="f-sel-qtys"    value="">
+  <input type="hidden" name="abs_prices_json" id="f-abs-json"    value="{}">
   {% for pk in pks %}
   <input type="hidden" name="_selected_action" value="{{ pk }}">
   {% endfor %}
@@ -52,72 +55,76 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
     <button type="button" id="btn-mode-abs" class="bp-mode-btn">₴ Ціни вручну</button>
   </div>
 
-  <!-- ── % mode panel ── -->
+  <!-- ══════════════ PCT panel ══════════════ -->
   <div id="pct-panel" style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
-              border-radius:8px;padding:20px 24px;margin-bottom:20px;max-width:580px">
+              border-radius:8px;padding:20px 24px;margin-bottom:20px;max-width:600px">
 
     <label style="font-size:12px;font-weight:600;color:var(--text-muted,#9aafbe);
                   text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:10px">
       Зміна цін (%)
     </label>
 
+    <!-- Spinner -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <div style="display:flex;align-items:stretch;border:1px solid var(--border-strong,#243347);
                   border-radius:6px;overflow:hidden;height:42px">
         <button type="button" id="btn-minus"
-                style="width:42px;background:rgba(198,40,40,.18);color:#ef5350;
-                       border:none;cursor:pointer;font-size:20px;font-weight:700;
-                       display:flex;align-items:center;justify-content:center">−</button>
+                style="width:42px;background:rgba(198,40,40,.18);color:#ef5350;border:none;cursor:pointer;
+                       font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center">−</button>
         <input id="inp-delta" type="number" step="1" min="-99" max="999" value="0"
-               style="width:80px;text-align:center;padding:0 8px;
-                      background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);
-                      border:none;border-left:1px solid var(--border-strong,#243347);
+               style="width:80px;text-align:center;padding:0 8px;background:var(--bg-input,#141f2b);
+                      color:var(--text,#c9d8e4);border:none;
+                      border-left:1px solid var(--border-strong,#243347);
                       border-right:1px solid var(--border-strong,#243347);
                       font-size:18px;font-weight:700;outline:none;-moz-appearance:textfield">
         <button type="button" id="btn-plus"
-                style="width:42px;background:rgba(46,125,50,.18);color:#66bb6a;
-                       border:none;cursor:pointer;font-size:20px;font-weight:700;
-                       display:flex;align-items:center;justify-content:center">+</button>
+                style="width:42px;background:rgba(46,125,50,.18);color:#66bb6a;border:none;cursor:pointer;
+                       font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center">+</button>
       </div>
       <span style="font-size:14px;color:var(--text-muted,#9aafbe);font-weight:600">%</span>
       <span id="delta-badge" style="display:none;padding:4px 12px;border-radius:5px;
             font-size:14px;font-weight:700;font-family:monospace"></span>
     </div>
 
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+    <!-- Quick buttons -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
       <button type="button" class="qpct" data-v="-25"
               style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
-                     border:1px solid var(--border-strong,#243347);
-                     background:rgba(198,40,40,.12);color:#ef9a9a">−25%</button>
+                     border:1px solid var(--border-strong,#243347);background:rgba(198,40,40,.12);color:#ef9a9a">−25%</button>
       <button type="button" class="qpct" data-v="-10"
               style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
-                     border:1px solid var(--border-strong,#243347);
-                     background:rgba(198,40,40,.12);color:#ef9a9a">−10%</button>
+                     border:1px solid var(--border-strong,#243347);background:rgba(198,40,40,.12);color:#ef9a9a">−10%</button>
       <button type="button" class="qpct" data-v="-5"
               style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
-                     border:1px solid var(--border-strong,#243347);
-                     background:rgba(198,40,40,.12);color:#ef9a9a">−5%</button>
+                     border:1px solid var(--border-strong,#243347);background:rgba(198,40,40,.12);color:#ef9a9a">−5%</button>
       <span style="width:1px;background:var(--border-strong,#243347);margin:0 2px"></span>
       <button type="button" class="qpct" data-v="5"
               style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
-                     border:1px solid var(--border-strong,#243347);
-                     background:rgba(46,125,50,.12);color:#a5d6a7">+5%</button>
+                     border:1px solid var(--border-strong,#243347);background:rgba(46,125,50,.12);color:#a5d6a7">+5%</button>
       <button type="button" class="qpct" data-v="10"
               style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
-                     border:1px solid var(--border-strong,#243347);
-                     background:rgba(46,125,50,.12);color:#a5d6a7">+10%</button>
+                     border:1px solid var(--border-strong,#243347);background:rgba(46,125,50,.12);color:#a5d6a7">+10%</button>
       <button type="button" class="qpct" data-v="25"
               style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
-                     border:1px solid var(--border-strong,#243347);
-                     background:rgba(46,125,50,.12);color:#a5d6a7">+25%</button>
+                     border:1px solid var(--border-strong,#243347);background:rgba(46,125,50,.12);color:#a5d6a7">+25%</button>
+    </div>
+
+    <!-- Qty tier filter -->
+    <div id="qty-filter-wrap" style="display:none">
+      <div style="font-size:11px;font-weight:600;color:var(--text-muted,#9aafbe);
+                  text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">
+        Застосувати до тирів (кількість):
+      </div>
+      <div id="qty-chk-row" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
   </div>
 
-  <!-- ── Abs mode hint ── -->
-  <div id="abs-panel" style="display:none;background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
-              border-radius:8px;padding:14px 20px;margin-bottom:20px;max-width:580px;
+  <!-- ══════════════ ABS hint ══════════════ -->
+  <div id="abs-panel" style="display:none;background:var(--bg-card,#1a2535);
+              border:1px solid var(--border-strong,#243347);border-radius:8px;
+              padding:14px 20px;margin-bottom:20px;max-width:600px;
               font-size:13px;color:var(--text-muted,#9aafbe)">
-    Введіть нові ціни в поле <strong style="color:var(--text,#c9d8e4)">Нова ціна</strong> для кожного рядка нижче.
+    Введіть нові ціни в колонці <strong style="color:var(--text,#c9d8e4)">Нова ціна</strong>. Незмінені поля залишаться як є.
   </div>
 
   <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;
@@ -137,7 +144,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
         {% else %}{{ no_prices_count }} з {{ count }} лістингів не мають збережених цін{% endif %}
       </div>
       <div style="font-size:12px;color:var(--text-muted,#9aafbe);line-height:1.5">
-        Відкрийте кожен лістинг і натисніть
+        Відкрийте лістинг і натисніть
         <strong style="color:var(--text,#c9d8e4)">📥 Стягнути поля з DigiKey</strong>
         щоб завантажити актуальні ціни.
       </div>
@@ -145,7 +152,7 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
   </div>
   {% endif %}
 
-  <!-- ── Preview table ── -->
+  <!-- ── Preview / Edit table ── -->
   <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
               border-radius:8px;margin-bottom:20px;overflow-x:auto">
     <div style="padding:12px 16px;border-bottom:1px solid var(--border-strong,#243347)">
@@ -158,12 +165,12 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
                      font-weight:600;border-bottom:1px solid var(--border-strong,#243347)">SKU</th>
           <th style="padding:7px 10px;text-align:center;color:var(--text-muted,#9aafbe);
                      font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:56px">Від шт.</th>
-          <th style="padding:7px 12px;text-align:right;color:var(--text-muted,#9aafbe);
-                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:110px" id="th-was">Було</th>
+          <th id="th-was" style="padding:7px 12px;text-align:right;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:110px">Було</th>
           <th id="th-arrow" style="padding:7px 4px;text-align:center;color:var(--text-muted,#9aafbe);
                      font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:20px">→</th>
-          <th style="padding:7px 12px;text-align:right;color:var(--text-muted,#9aafbe);
-                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:120px" id="th-will">Стане</th>
+          <th id="th-will" style="padding:7px 12px;text-align:right;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:120px">Стане</th>
           <th id="th-diff" style="padding:7px 12px;text-align:right;color:var(--text-muted,#9aafbe);
                      font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:80px">Різниця</th>
         </tr>
@@ -183,72 +190,109 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
 </form>
 
 <script>
-/* Script at end of content block — DOM is ready */
 (function(){
-  var LISTINGS  = {{ listings_json|safe }};
-  var COUNT     = {{ count }};
-  var inp       = document.getElementById('inp-delta');
-  var fDelta    = document.getElementById('f-delta-pct');
-  var fMode     = document.getElementById('f-mode');
-  var tbody     = document.getElementById('preview-tbody');
-  var applyBtn  = document.getElementById('apply-btn');
-  var badge     = document.getElementById('delta-badge');
-  var pctPanel  = document.getElementById('pct-panel');
-  var absPanel  = document.getElementById('abs-panel');
-  var tblTitle  = document.getElementById('tbl-title');
-  var thWas     = document.getElementById('th-was');
-  var thArrow   = document.getElementById('th-arrow');
-  var thWill    = document.getElementById('th-will');
-  var thDiff    = document.getElementById('th-diff');
+  var LISTINGS = {{ listings_json|safe }};
+  var COUNT    = {{ count }};
 
-  var mode = 'pct'; /* 'pct' or 'abs' */
+  var inp      = document.getElementById('inp-delta');
+  var fDelta   = document.getElementById('f-delta-pct');
+  var fMode    = document.getElementById('f-mode');
+  var fSelQtys = document.getElementById('f-sel-qtys');
+  var fAbsJson = document.getElementById('f-abs-json');
+  var tbody    = document.getElementById('preview-tbody');
+  var applyBtn = document.getElementById('apply-btn');
+  var badge    = document.getElementById('delta-badge');
+  var pctPanel = document.getElementById('pct-panel');
+  var absPanel = document.getElementById('abs-panel');
+  var tblTitle = document.getElementById('tbl-title');
+  var thWas    = document.getElementById('th-was');
+  var thArrow  = document.getElementById('th-arrow');
+  var thWill   = document.getElementById('th-will');
+  var thDiff   = document.getElementById('th-diff');
+  var qtyWrap  = document.getElementById('qty-filter-wrap');
+  var qtyRow   = document.getElementById('qty-chk-row');
+
+  var mode = 'pct';
   var HAS_PRICES = LISTINGS.some(function(l){ return l.prices && l.prices.length; });
 
-  /* ── number formatter ── */
+  /* ── Collect unique qty values across all listings ── */
+  var allQtys = [];
+  LISTINGS.forEach(function(l){
+    (l.prices || []).forEach(function(t){
+      if (allQtys.indexOf(t.qty) === -1) allQtys.push(t.qty);
+    });
+  });
+  allQtys.sort(function(a,b){ return a-b; });
+
+  /* ── Build qty checkboxes ── */
+  if (allQtys.length > 1) {
+    qtyWrap.style.display = '';
+    allQtys.forEach(function(qty){
+      var lbl = document.createElement('label');
+      lbl.className = 'qty-chk-lbl';
+      var chk = document.createElement('input');
+      chk.type = 'checkbox'; chk.className = 'qty-chk';
+      chk.value = String(qty); chk.checked = true;
+      chk.addEventListener('change', refreshPct);
+      lbl.appendChild(chk);
+      lbl.appendChild(document.createTextNode(' ' + qty + ' шт'));
+      qtyRow.appendChild(lbl);
+    });
+  }
+
+  /* ── Helpers ── */
   function f2(v){ return parseFloat(v).toFixed(2).replace('.', ','); }
 
-  /* ── enable/disable apply ── */
+  function getSelQtys() {
+    var chks = document.querySelectorAll('.qty-chk');
+    if (!chks.length) return null; /* no filter = apply to all */
+    var sel = [];
+    chks.forEach(function(c){ if (c.checked) sel.push(parseInt(c.value)); });
+    return sel.length === chks.length ? null : sel; /* null = all selected */
+  }
+
   function setApply(on) {
     applyBtn.disabled = !on;
     applyBtn.style.opacity = on ? '1' : '.4';
     applyBtn.style.cursor  = on ? 'pointer' : 'not-allowed';
   }
 
-  /* ══ PCT MODE ══════════════════════════════════════════════════════════════ */
+  /* ══ PCT MODE ═══════════════════════════════════════════════════════════ */
   function buildRowsPct(delta) {
     tbody.innerHTML = '';
     if (!LISTINGS.length) {
       tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--text-muted)">Немає лістингів</td></tr>';
       return;
     }
-    var mult = 1 + delta / 100;
-    var clr  = delta > 0 ? '#66bb6a' : delta < 0 ? '#ef5350' : 'var(--text,#c9d8e4)';
+    var mult    = 1 + delta / 100;
+    var clr     = delta > 0 ? '#66bb6a' : delta < 0 ? '#ef5350' : 'var(--text,#c9d8e4)';
+    var selQtys = getSelQtys(); /* null = all tiers */
 
-    LISTINGS.forEach(function(listing, li) {
+    LISTINGS.forEach(function(listing, li){
       var prices = listing.prices || [];
       if (!prices.length) {
-        var tr = document.createElement('tr');
-        tr.className = 'tier-row';
+        var tr = document.createElement('tr'); tr.className = 'tier-row';
         tr.innerHTML = '<td style="padding:7px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4)">' + listing.sku + '</td>' +
           '<td colspan="5" style="padding:7px 12px;color:#ef9a9a;font-size:12px;font-style:italic">⚠️ немає цін — стягніть дані з DigiKey</td>';
         tbody.appendChild(tr);
       } else {
-        prices.forEach(function(tier, ti) {
-          var oldP = parseFloat(tier.price || 0);
-          var newP = oldP * mult;
-          var diff = newP - oldP;
-          var p0   = ti === 0 ? '7' : '3';
-          var tr   = document.createElement('tr');
-          tr.className = 'tier-row';
+        prices.forEach(function(tier, ti){
+          var apply = !selQtys || selQtys.indexOf(tier.qty) !== -1;
+          var oldP  = parseFloat(tier.price || 0);
+          var newP  = apply ? oldP * mult : oldP;
+          var diff  = newP - oldP;
+          var p0    = ti === 0 ? '7' : '3';
+          var rowClr = apply ? clr : 'var(--text-muted,#9aafbe)';
+          var tr = document.createElement('tr'); tr.className = 'tier-row';
           tr.innerHTML =
             '<td style="padding:'+p0+'px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4);white-space:nowrap">' +
               (ti === 0 ? listing.sku : '') + '</td>' +
-            '<td style="padding:'+p0+'px 10px;text-align:center;color:var(--text-muted,#9aafbe)">' + tier.qty + '</td>' +
+            '<td style="padding:'+p0+'px 10px;text-align:center;color:' + (apply ? 'var(--text,#c9d8e4)' : 'var(--text-muted,#9aafbe)') + '">' + tier.qty + '</td>' +
             '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;color:var(--text,#c9d8e4)">' + f2(oldP) + '</td>' +
-            '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">→</td>' +
-            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-weight:700;color:' + clr + '">' + f2(newP) + '</td>' +
-            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-size:11px;color:' + clr + '">' +
-              (delta !== 0 ? (diff >= 0 ? '+' : '') + f2(diff) : '—') + '</td>';
+            '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">' + (apply ? '→' : '·') + '</td>' +
+            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-weight:700;color:' + rowClr + '">' + f2(newP) + '</td>' +
+            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-size:11px;color:' + rowClr + '">' +
+              (apply && delta !== 0 ? (diff >= 0 ? '+' : '') + f2(diff) : '—') + '</td>';
           tbody.appendChild(tr);
         });
       }
@@ -277,15 +321,15 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
     buildRowsPct(isNaN(raw) ? 0 : raw);
   }
 
-  /* ══ ABS MODE ══════════════════════════════════════════════════════════════ */
+  /* ══ ABS MODE ════════════════════════════════════════════════════════════ */
   function buildRowsAbs() {
     tbody.innerHTML = '';
     if (!LISTINGS.length) {
       tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--text-muted)">Немає лістингів</td></tr>';
-      return;
+      setApply(false); return;
     }
-    var anyInput = false;
-    LISTINGS.forEach(function(listing, li) {
+    var anyRow = false;
+    LISTINGS.forEach(function(listing, li){
       var prices = listing.prices || [];
       if (!prices.length) {
         var tr = document.createElement('tr'); tr.className = 'tier-row';
@@ -293,11 +337,11 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
           '<td colspan="4" style="padding:7px 12px;color:#ef9a9a;font-size:12px;font-style:italic">⚠️ немає цін — стягніть дані з DigiKey</td>';
         tbody.appendChild(tr);
       } else {
-        prices.forEach(function(tier, ti) {
+        prices.forEach(function(tier, ti){
           var oldP = parseFloat(tier.price || 0);
           var p0   = ti === 0 ? '7' : '3';
           var tr   = document.createElement('tr'); tr.className = 'tier-row';
-          var inputName = 'price_' + listing.pk + '_' + ti;
+          /* data-pk and data-ti are the safe key — no name collision possible */
           tr.innerHTML =
             '<td style="padding:'+p0+'px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4);white-space:nowrap">' +
               (ti === 0 ? listing.sku : '') + '</td>' +
@@ -306,10 +350,11 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
             '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">→</td>' +
             '<td style="padding:'+p0+'px 8px;text-align:right">' +
               '<input class="bp-abs-input" type="number" step="0.01" min="0" ' +
-                'name="' + inputName + '" value="' + oldP.toFixed(2) + '">' +
+                'data-pk="' + listing.pk + '" data-ti="' + ti + '" ' +
+                'value="' + oldP.toFixed(2) + '">' +
             '</td>';
           tbody.appendChild(tr);
-          anyInput = true;
+          anyRow = true;
         });
       }
       if (li < LISTINGS.length - 1) {
@@ -317,10 +362,22 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
         sep.innerHTML = '<td colspan="5"></td>'; tbody.appendChild(sep);
       }
     });
-    setApply(anyInput);
+    setApply(anyRow);
   }
 
-  /* ══ MODE SWITCH ═══════════════════════════════════════════════════════════ */
+  /* Collect abs prices into hidden JSON field before submit */
+  function collectAbsPrices() {
+    var map = {};
+    tbody.querySelectorAll('input.bp-abs-input[data-pk]').forEach(function(inp){
+      var pk = inp.dataset.pk;
+      var ti = inp.dataset.ti;
+      if (!map[pk]) map[pk] = {};
+      map[pk][ti] = parseFloat(inp.value) || 0;
+    });
+    fAbsJson.value = JSON.stringify(map);
+  }
+
+  /* ══ MODE SWITCH ═════════════════════════════════════════════════════════ */
   function switchMode(m) {
     mode = m;
     fMode.value = m;
@@ -328,54 +385,47 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
     document.getElementById('btn-mode-abs').classList.toggle('active', m === 'abs');
     pctPanel.style.display = m === 'pct' ? '' : 'none';
     absPanel.style.display = m === 'abs' ? '' : 'none';
-    badge.style.display    = 'none';
-
-    /* table header */
-    thWas.textContent   = m === 'pct' ? 'Було'          : 'Поточна';
-    thWill.textContent  = m === 'pct' ? 'Стане'         : 'Нова ціна';
+    badge.style.display = 'none';
+    thWas.textContent  = m === 'pct' ? 'Було'    : 'Поточна';
+    thWill.textContent = m === 'pct' ? 'Стане'   : 'Нова ціна';
     thDiff.style.display = m === 'pct' ? '' : 'none';
-    thArrow.style.display = '';
-    tblTitle.textContent  = m === 'pct' ? '📊 Ціни: було → стане' : '✏️ Редагувати ціни вручну';
-
-    if (m === 'pct') { refreshPct(); }
-    else             { buildRowsAbs(); }
+    tblTitle.textContent = m === 'pct' ? '📊 Ціни: було → стане' : '✏️ Редагувати ціни вручну';
+    if (m === 'pct') refreshPct();
+    else             buildRowsAbs();
   }
 
-  /* ══ EVENTS ════════════════════════════════════════════════════════════════ */
+  /* ══ EVENTS ══════════════════════════════════════════════════════════════ */
   document.getElementById('btn-mode-pct').addEventListener('click', function(){ switchMode('pct'); });
   document.getElementById('btn-mode-abs').addEventListener('click', function(){ switchMode('abs'); });
 
   inp.addEventListener('input',  refreshPct);
   inp.addEventListener('change', refreshPct);
-
   document.getElementById('btn-plus').addEventListener('click', function(){
-    inp.value = Math.round(((parseFloat(inp.value) || 0) + 5) * 10) / 10;
-    refreshPct();
+    inp.value = Math.round(((parseFloat(inp.value) || 0) + 5) * 10) / 10; refreshPct();
   });
   document.getElementById('btn-minus').addEventListener('click', function(){
-    inp.value = Math.round(((parseFloat(inp.value) || 0) - 5) * 10) / 10;
-    refreshPct();
+    inp.value = Math.round(((parseFloat(inp.value) || 0) - 5) * 10) / 10; refreshPct();
   });
-
   document.querySelectorAll('.qpct').forEach(function(btn){
-    btn.addEventListener('click', function(){
-      inp.value = parseFloat(btn.dataset.v);
-      refreshPct();
-    });
+    btn.addEventListener('click', function(){ inp.value = parseFloat(btn.dataset.v); refreshPct(); });
   });
 
   document.getElementById('bulk-price-form').addEventListener('submit', function(e){
-    if (mode === 'pct') {
+    if (mode === 'abs') {
+      collectAbsPrices();
+      if (!confirm('Зберегти нові ціни для ' + COUNT + ' лістингів?\nЦе буде записано в лог.'))
+        { e.preventDefault(); return; }
+      /* record selected qtys as empty (abs mode doesn't use it) */
+      fSelQtys.value = '';
+    } else {
       var delta = parseFloat(fDelta.value || '0');
       if (!delta) { e.preventDefault(); return; }
+      /* store which qty tiers are selected */
+      var selQ = getSelQtys();
+      fSelQtys.value = selQ ? selQ.join(',') : '';
       var sign = delta > 0 ? '+' : '';
-      if (!confirm('Застосувати ' + sign + delta.toFixed(1) + '% до ' + COUNT + ' лістингів?\nЦе буде записано в лог.')) {
-        e.preventDefault();
-      }
-    } else {
-      if (!confirm('Зберегти нові ціни для ' + COUNT + ' лістингів?\nЦе буде записано в лог.')) {
-        e.preventDefault();
-      }
+      if (!confirm('Застосувати ' + sign + delta.toFixed(1) + '% до ' + COUNT + ' лістингів?\nЦе буде записано в лог.'))
+        { e.preventDefault(); return; }
     }
   });
 
