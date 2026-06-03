@@ -1580,35 +1580,38 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             updated = pushed = err = skipped = 0
 
             if mode == 'abs':
-                # ── absolute price edit (prices come as JSON map) ────────────
-                import json as _json
-                abs_map = {}
-                try:
-                    abs_map = _json.loads(request.POST.get('abs_prices_json', '{}') or '{}')
-                except Exception:
-                    pass
+                # ── absolute price edit: one price per qty tier, applied to all listings ──
+                # POST contains abs_tier_{qty} = new_price for each checked tier
+                abs_tier_map = {}
+                for key, val in request.POST.items():
+                    if key.startswith('abs_tier_'):
+                        try:
+                            qty = int(key[len('abs_tier_'):])
+                            abs_tier_map[qty] = round(float(str(val).replace(',', '.')), 4)
+                        except (ValueError, TypeError):
+                            pass
+
+                if not abs_tier_map:
+                    self.message_user(request, "⚠️ Не вибрано жодного тиру для зміни.", messages.WARNING)
+                    return
 
                 for listing in queryset.select_related('product'):
                     old_prices = list(listing.dk_prices or [])
                     if not old_prices:
                         skipped += 1
                         continue
-                    listing_map = abs_map.get(str(listing.pk), {})
-                    if not listing_map:
-                        skipped += 1
-                        continue
                     new_prices = []
                     changed = False
-                    for ti, tier in enumerate(old_prices):
-                        raw = listing_map.get(str(ti))
-                        try:
-                            new_val = round(float(str(raw).replace(',', '.') if raw is not None else ''), 4)
-                        except (ValueError, TypeError):
-                            new_val = round(float(tier.get('price', 0)), 4)
+                    for tier in old_prices:
+                        qty = tier.get('qty')
                         old_val = round(float(tier.get('price', 0)), 4)
-                        if abs(new_val - old_val) > 1e-6:
-                            changed = True
-                        new_prices.append({'qty': tier['qty'], 'price': new_val})
+                        if qty in abs_tier_map:
+                            new_val = abs_tier_map[qty]
+                            if abs(new_val - old_val) > 1e-6:
+                                changed = True
+                        else:
+                            new_val = old_val
+                        new_prices.append({'qty': qty, 'price': new_val})
                     if not changed:
                         skipped += 1
                         continue
@@ -1635,7 +1638,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                             logger.warning("bulk_prices push abs %s: %s", listing.pk, exc)
                             err += 1
                 if updated:
-                    msg = f"✅ Ціни (вручну) оновлено для {updated} лістингів"
+                    tiers_str = ', '.join(f'{q} шт → {v}' for q, v in sorted(abs_tier_map.items()))
+                    msg = f"✅ Ціни ({tiers_str}) оновлено для {updated} лістингів"
                     if pushed:
                         msg += f", {pushed} опубліковано на DigiKey"
                     self.message_user(request, msg + ".", messages.SUCCESS)

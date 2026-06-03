@@ -15,21 +15,26 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
   background:transparent; color:var(--text-muted,#9aafbe); transition:all .15s;
 }
 .bp-mode-btn.active { background:var(--accent,#1a6fc4); color:#fff; border-color:var(--accent,#1a6fc4); }
-.bp-abs-input {
-  width:110px; background:var(--bg-input,#141f2b); color:var(--text,#c9d8e4);
-  border:1px solid var(--border-strong,#243347); border-radius:3px;
-  padding:4px 8px; font-size:12px; font-family:monospace; text-align:right;
-  box-sizing:border-box;
-}
-.bp-abs-input:focus { outline:none; border-color:var(--accent,#58a6ff); box-shadow:0 0 0 2px rgba(88,166,255,.2); }
 .qty-chk-lbl {
   display:inline-flex; align-items:center; gap:5px; cursor:pointer;
   padding:4px 10px; border-radius:4px; font-size:12px; font-weight:600;
   border:1px solid var(--border-strong,#243347);
-  background:var(--bg-hover,#1e2d40); color:var(--text,#c9d8e4);
-  transition:background .12s;
+  background:var(--bg-hover,#1e2d40); color:var(--text,#c9d8e4); transition:background .12s;
 }
 .qty-chk-lbl:has(input:checked) { background:rgba(88,166,255,.15); border-color:var(--accent,#58a6ff); color:#58a6ff; }
+.abs-tier-row {
+  display:flex; align-items:center; gap:12px; padding:8px 0;
+  border-bottom:1px solid var(--border-strong,#243347);
+}
+.abs-tier-row:last-child { border-bottom:none; }
+.abs-price-inp {
+  width:130px; background:var(--bg-input,#141f2b); color:var(--text,#c9d8e4);
+  border:1px solid var(--border-strong,#243347); border-radius:4px;
+  padding:6px 10px; font-size:14px; font-family:monospace; font-weight:700;
+  text-align:right; box-sizing:border-box;
+}
+.abs-price-inp:focus { outline:none; border-color:var(--accent,#58a6ff); box-shadow:0 0 0 2px rgba(88,166,255,.2); }
+.abs-price-inp:disabled { opacity:.35; }
 </style>
 {% endblock %}
 
@@ -38,13 +43,12 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
 
 <form method="post" id="bulk-price-form">
   {% csrf_token %}
-  <input type="hidden" name="action"          value="action_bulk_prices">
-  <input type="hidden" name="apply"           value="1">
-  <input type="hidden" name="select_across"   value="0">
-  <input type="hidden" name="mode"            id="f-mode"        value="pct">
-  <input type="hidden" name="delta_pct"       id="f-delta-pct"   value="0">
-  <input type="hidden" name="selected_qtys"   id="f-sel-qtys"    value="">
-  <input type="hidden" name="abs_prices_json" id="f-abs-json"    value="{}">
+  <input type="hidden" name="action"        value="action_bulk_prices">
+  <input type="hidden" name="apply"         value="1">
+  <input type="hidden" name="select_across" value="0">
+  <input type="hidden" name="mode"          id="f-mode"      value="pct">
+  <input type="hidden" name="delta_pct"     id="f-delta-pct" value="0">
+  <input type="hidden" name="selected_qtys" id="f-sel-qtys"  value="">
   {% for pk in pks %}
   <input type="hidden" name="_selected_action" value="{{ pk }}">
   {% endfor %}
@@ -64,7 +68,6 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
       Зміна цін (%)
     </label>
 
-    <!-- Spinner -->
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
       <div style="display:flex;align-items:stretch;border:1px solid var(--border-strong,#243347);
                   border-radius:6px;overflow:hidden;height:42px">
@@ -86,7 +89,6 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
             font-size:14px;font-weight:700;font-family:monospace"></span>
     </div>
 
-    <!-- Quick buttons -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px">
       <button type="button" class="qpct" data-v="-25"
               style="padding:5px 11px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;
@@ -109,22 +111,32 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
                      border:1px solid var(--border-strong,#243347);background:rgba(46,125,50,.12);color:#a5d6a7">+25%</button>
     </div>
 
-    <!-- Qty tier filter -->
-    <div id="qty-filter-wrap" style="display:none">
+    <!-- Qty tier filter (built by JS) -->
+    <div id="pct-qty-wrap" style="display:none">
       <div style="font-size:11px;font-weight:600;color:var(--text-muted,#9aafbe);
                   text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">
         Застосувати до тирів (кількість):
       </div>
-      <div id="qty-chk-row" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <div id="pct-qty-row" style="display:flex;gap:6px;flex-wrap:wrap"></div>
     </div>
   </div>
 
-  <!-- ══════════════ ABS hint ══════════════ -->
+  <!-- ══════════════ ABS panel ══════════════ -->
   <div id="abs-panel" style="display:none;background:var(--bg-card,#1a2535);
               border:1px solid var(--border-strong,#243347);border-radius:8px;
-              padding:14px 20px;margin-bottom:20px;max-width:600px;
-              font-size:13px;color:var(--text-muted,#9aafbe)">
-    Введіть нові ціни в колонці <strong style="color:var(--text,#c9d8e4)">Нова ціна</strong>. Незмінені поля залишаться як є.
+              padding:20px 24px;margin-bottom:20px;max-width:600px">
+
+    <div style="font-size:12px;font-weight:600;color:var(--text-muted,#9aafbe);
+                text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">
+      Нові ціни для всіх {{ count }} лістингів
+    </div>
+
+    <!-- Per-tier rows: [checkbox] [N шт label] [price input] [→ applied to X listings] -->
+    <div id="abs-tiers-wrap">
+      <div style="color:var(--text-muted,#9aafbe);font-size:12px;font-style:italic">
+        Ціни не завантажено — натисніть 📥 Стягнути поля з DigiKey.
+      </div>
+    </div>
   </div>
 
   <label style="cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;
@@ -146,13 +158,13 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
       <div style="font-size:12px;color:var(--text-muted,#9aafbe);line-height:1.5">
         Відкрийте лістинг і натисніть
         <strong style="color:var(--text,#c9d8e4)">📥 Стягнути поля з DigiKey</strong>
-        щоб завантажити актуальні ціни.
+        щоб завантажити ціни.
       </div>
     </div>
   </div>
   {% endif %}
 
-  <!-- ── Preview / Edit table ── -->
+  <!-- ── Preview table ── -->
   <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
               border-radius:8px;margin-bottom:20px;overflow-x:auto">
     <div style="padding:12px 16px;border-bottom:1px solid var(--border-strong,#243347)">
@@ -165,9 +177,9 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
                      font-weight:600;border-bottom:1px solid var(--border-strong,#243347)">SKU</th>
           <th style="padding:7px 10px;text-align:center;color:var(--text-muted,#9aafbe);
                      font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:56px">Від шт.</th>
-          <th id="th-was" style="padding:7px 12px;text-align:right;color:var(--text-muted,#9aafbe);
-                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:110px">Було</th>
-          <th id="th-arrow" style="padding:7px 4px;text-align:center;color:var(--text-muted,#9aafbe);
+          <th style="padding:7px 12px;text-align:right;color:var(--text-muted,#9aafbe);
+                     font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:110px">Поточна</th>
+          <th style="padding:7px 4px;text-align:center;color:var(--text-muted,#9aafbe);
                      font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:20px">→</th>
           <th id="th-will" style="padding:7px 12px;text-align:right;color:var(--text-muted,#9aafbe);
                      font-weight:600;border-bottom:1px solid var(--border-strong,#243347);width:120px">Стане</th>
@@ -191,240 +203,309 @@ input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:
 
 <script>
 (function(){
-  var LISTINGS = {{ listings_json|safe }};
-  var COUNT    = {{ count }};
-
-  var inp      = document.getElementById('inp-delta');
-  var fDelta   = document.getElementById('f-delta-pct');
-  var fMode    = document.getElementById('f-mode');
-  var fSelQtys = document.getElementById('f-sel-qtys');
-  var fAbsJson = document.getElementById('f-abs-json');
-  var tbody    = document.getElementById('preview-tbody');
-  var applyBtn = document.getElementById('apply-btn');
-  var badge    = document.getElementById('delta-badge');
-  var pctPanel = document.getElementById('pct-panel');
-  var absPanel = document.getElementById('abs-panel');
-  var tblTitle = document.getElementById('tbl-title');
-  var thWas    = document.getElementById('th-was');
-  var thArrow  = document.getElementById('th-arrow');
-  var thWill   = document.getElementById('th-will');
-  var thDiff   = document.getElementById('th-diff');
-  var qtyWrap  = document.getElementById('qty-filter-wrap');
-  var qtyRow   = document.getElementById('qty-chk-row');
+  var LISTINGS    = {{ listings_json|safe }};
+  var COUNT       = {{ count }};
+  var inp         = document.getElementById('inp-delta');
+  var fDelta      = document.getElementById('f-delta-pct');
+  var fMode       = document.getElementById('f-mode');
+  var fSelQtys    = document.getElementById('f-sel-qtys');
+  var tbody       = document.getElementById('preview-tbody');
+  var applyBtn    = document.getElementById('apply-btn');
+  var badge       = document.getElementById('delta-badge');
+  var pctPanel    = document.getElementById('pct-panel');
+  var absPanel    = document.getElementById('abs-panel');
+  var tblTitle    = document.getElementById('tbl-title');
+  var thWill      = document.getElementById('th-will');
+  var thDiff      = document.getElementById('th-diff');
+  var pctQtyWrap  = document.getElementById('pct-qty-wrap');
+  var pctQtyRow   = document.getElementById('pct-qty-row');
+  var absTiersWrap = document.getElementById('abs-tiers-wrap');
 
   var mode = 'pct';
   var HAS_PRICES = LISTINGS.some(function(l){ return l.prices && l.prices.length; });
 
-  /* ── Collect unique qty values across all listings ── */
+  /* ── collect unique qty tiers across all listings ── */
   var allQtys = [];
   LISTINGS.forEach(function(l){
-    (l.prices || []).forEach(function(t){
+    (l.prices||[]).forEach(function(t){
       if (allQtys.indexOf(t.qty) === -1) allQtys.push(t.qty);
     });
   });
   allQtys.sort(function(a,b){ return a-b; });
 
-  /* ── Build qty checkboxes ── */
-  if (allQtys.length > 1) {
-    qtyWrap.style.display = '';
-    allQtys.forEach(function(qty){
-      var lbl = document.createElement('label');
-      lbl.className = 'qty-chk-lbl';
-      var chk = document.createElement('input');
-      chk.type = 'checkbox'; chk.className = 'qty-chk';
-      chk.value = String(qty); chk.checked = true;
-      chk.addEventListener('change', refreshPct);
-      lbl.appendChild(chk);
-      lbl.appendChild(document.createTextNode(' ' + qty + ' шт'));
-      qtyRow.appendChild(lbl);
-    });
-  }
-
-  /* ── Helpers ── */
+  /* ── helpers ── */
   function f2(v){ return parseFloat(v).toFixed(2).replace('.', ','); }
-
-  function getSelQtys() {
-    var chks = document.querySelectorAll('.qty-chk');
-    if (!chks.length) return null; /* no filter = apply to all */
-    var sel = [];
-    chks.forEach(function(c){ if (c.checked) sel.push(parseInt(c.value)); });
-    return sel.length === chks.length ? null : sel; /* null = all selected */
-  }
-
-  function setApply(on) {
+  function setApply(on){
     applyBtn.disabled = !on;
     applyBtn.style.opacity = on ? '1' : '.4';
     applyBtn.style.cursor  = on ? 'pointer' : 'not-allowed';
   }
 
-  /* ══ PCT MODE ═══════════════════════════════════════════════════════════ */
-  function buildRowsPct(delta) {
+  /* ════════════════════════════════ PCT MODE ════════════════════════════════ */
+
+  /* Build pct qty checkboxes */
+  if (allQtys.length > 1) {
+    pctQtyWrap.style.display = '';
+    allQtys.forEach(function(qty){
+      var lbl = document.createElement('label');
+      lbl.className = 'qty-chk-lbl';
+      var chk = document.createElement('input');
+      chk.type = 'checkbox'; chk.className = 'pct-qty-chk';
+      chk.value = String(qty); chk.checked = true;
+      chk.addEventListener('change', refreshPct);
+      lbl.appendChild(chk);
+      lbl.appendChild(document.createTextNode(' ' + qty + ' шт'));
+      pctQtyRow.appendChild(lbl);
+    });
+  }
+
+  function getPctSelQtys(){
+    var chks = document.querySelectorAll('.pct-qty-chk');
+    if (!chks.length) return null;
+    var sel = [];
+    chks.forEach(function(c){ if(c.checked) sel.push(parseInt(c.value)); });
+    return sel.length === chks.length ? null : sel;
+  }
+
+  function buildRowsPct(delta){
     tbody.innerHTML = '';
-    if (!LISTINGS.length) {
-      tbody.innerHTML = '<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--text-muted)">Немає лістингів</td></tr>';
+    if (!LISTINGS.length){
+      tbody.innerHTML='<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--text-muted)">Немає лістингів</td></tr>';
       return;
     }
-    var mult    = 1 + delta / 100;
-    var clr     = delta > 0 ? '#66bb6a' : delta < 0 ? '#ef5350' : 'var(--text,#c9d8e4)';
-    var selQtys = getSelQtys(); /* null = all tiers */
+    var mult    = 1 + delta/100;
+    var clr     = delta>0?'#66bb6a':delta<0?'#ef5350':'var(--text,#c9d8e4)';
+    var selQtys = getPctSelQtys();
 
-    LISTINGS.forEach(function(listing, li){
-      var prices = listing.prices || [];
-      if (!prices.length) {
-        var tr = document.createElement('tr'); tr.className = 'tier-row';
-        tr.innerHTML = '<td style="padding:7px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4)">' + listing.sku + '</td>' +
+    LISTINGS.forEach(function(listing,li){
+      var prices = listing.prices||[];
+      if (!prices.length){
+        var tr=document.createElement('tr'); tr.className='tier-row';
+        tr.innerHTML='<td style="padding:7px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4)">'+listing.sku+'</td>'+
           '<td colspan="5" style="padding:7px 12px;color:#ef9a9a;font-size:12px;font-style:italic">⚠️ немає цін — стягніть дані з DigiKey</td>';
         tbody.appendChild(tr);
       } else {
-        prices.forEach(function(tier, ti){
-          var apply = !selQtys || selQtys.indexOf(tier.qty) !== -1;
-          var oldP  = parseFloat(tier.price || 0);
-          var newP  = apply ? oldP * mult : oldP;
-          var diff  = newP - oldP;
-          var p0    = ti === 0 ? '7' : '3';
-          var rowClr = apply ? clr : 'var(--text-muted,#9aafbe)';
-          var tr = document.createElement('tr'); tr.className = 'tier-row';
-          tr.innerHTML =
-            '<td style="padding:'+p0+'px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4);white-space:nowrap">' +
-              (ti === 0 ? listing.sku : '') + '</td>' +
-            '<td style="padding:'+p0+'px 10px;text-align:center;color:' + (apply ? 'var(--text,#c9d8e4)' : 'var(--text-muted,#9aafbe)') + '">' + tier.qty + '</td>' +
-            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;color:var(--text,#c9d8e4)">' + f2(oldP) + '</td>' +
-            '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">' + (apply ? '→' : '·') + '</td>' +
-            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-weight:700;color:' + rowClr + '">' + f2(newP) + '</td>' +
-            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-size:11px;color:' + rowClr + '">' +
-              (apply && delta !== 0 ? (diff >= 0 ? '+' : '') + f2(diff) : '—') + '</td>';
+        prices.forEach(function(tier,ti){
+          var apply = !selQtys || selQtys.indexOf(tier.qty)!==-1;
+          var oldP  = parseFloat(tier.price||0);
+          var newP  = apply ? oldP*mult : oldP;
+          var diff  = newP-oldP;
+          var p0    = ti===0?'7':'3';
+          var rc    = apply ? clr : 'var(--text-muted,#9aafbe)';
+          var tr=document.createElement('tr'); tr.className='tier-row';
+          tr.innerHTML=
+            '<td style="padding:'+p0+'px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4);white-space:nowrap">'+(ti===0?listing.sku:'')+'</td>'+
+            '<td style="padding:'+p0+'px 10px;text-align:center;color:'+(apply?'var(--text,#c9d8e4)':'var(--text-muted,#9aafbe)')+'">'+tier.qty+'</td>'+
+            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;color:var(--text,#c9d8e4)">'+f2(oldP)+'</td>'+
+            '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">'+(apply?'→':'·')+'</td>'+
+            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-weight:700;color:'+rc+'">'+f2(newP)+'</td>'+
+            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-size:11px;color:'+rc+'">'+(apply&&delta!==0?(diff>=0?'+':'')+f2(diff):'—')+'</td>';
           tbody.appendChild(tr);
         });
       }
-      if (li < LISTINGS.length - 1) {
-        var sep = document.createElement('tr'); sep.className = 'grp-sep';
-        sep.innerHTML = '<td colspan="6"></td>'; tbody.appendChild(sep);
+      if (li<LISTINGS.length-1){
+        var sep=document.createElement('tr'); sep.className='grp-sep';
+        sep.innerHTML='<td colspan="6"></td>'; tbody.appendChild(sep);
       }
     });
   }
 
-  function refreshPct() {
+  function refreshPct(){
     var raw = parseFloat(inp.value);
-    fDelta.value = isNaN(raw) ? '0' : String(raw);
-    var ok = !isNaN(raw) && raw !== 0 && HAS_PRICES;
-    if (!isNaN(raw) && raw !== 0) {
-      var sign = raw > 0 ? '+' : '';
-      badge.style.cssText = 'display:inline;padding:4px 12px;border-radius:5px;font-size:14px;font-weight:700;font-family:monospace;' +
-        'color:' + (raw > 0 ? '#66bb6a' : '#ef5350') + ';' +
-        'background:' + (raw > 0 ? 'rgba(46,125,50,.18)' : 'rgba(198,40,40,.18)') + ';' +
-        'border:1px solid ' + (raw > 0 ? '#2e7d32' : '#c62828') + ';';
-      badge.textContent = sign + raw.toFixed(1) + '%';
-    } else {
-      badge.style.display = 'none';
-    }
+    fDelta.value = isNaN(raw)?'0':String(raw);
+    var ok = !isNaN(raw) && raw!==0 && HAS_PRICES;
+    if (!isNaN(raw) && raw!==0){
+      var sign=raw>0?'+':'';
+      badge.style.cssText='display:inline;padding:4px 12px;border-radius:5px;font-size:14px;font-weight:700;font-family:monospace;'+
+        'color:'+(raw>0?'#66bb6a':'#ef5350')+';'+
+        'background:'+(raw>0?'rgba(46,125,50,.18)':'rgba(198,40,40,.18)')+';'+
+        'border:1px solid '+(raw>0?'#2e7d32':'#c62828')+';';
+      badge.textContent=sign+raw.toFixed(1)+'%';
+    } else { badge.style.display='none'; }
     setApply(ok);
-    buildRowsPct(isNaN(raw) ? 0 : raw);
+    buildRowsPct(isNaN(raw)?0:raw);
   }
 
-  /* ══ ABS MODE ════════════════════════════════════════════════════════════ */
-  function buildRowsAbs() {
-    tbody.innerHTML = '';
-    if (!LISTINGS.length) {
-      tbody.innerHTML = '<tr><td colspan="5" style="padding:14px;text-align:center;color:var(--text-muted)">Немає лістингів</td></tr>';
-      setApply(false); return;
+  /* ════════════════════════════════ ABS MODE ════════════════════════════════ */
+
+  /* absPriceMap: qty → current input value (number), null if unchecked */
+  var absPriceMap = {};
+
+  function getAbsNewPrice(qty){
+    /* average existing price for this qty tier across all listings */
+    var vals=[], n=0;
+    LISTINGS.forEach(function(l){
+      (l.prices||[]).forEach(function(t){
+        if (t.qty===qty){ vals.push(parseFloat(t.price||0)); n++; }
+      });
+    });
+    if (!n) return 0;
+    var avg = vals.reduce(function(a,b){return a+b;},0)/n;
+    return parseFloat(avg.toFixed(2));
+  }
+
+  function buildAbsTiers(){
+    absTiersWrap.innerHTML='';
+    if (!allQtys.length){
+      absTiersWrap.innerHTML='<div style="color:var(--text-muted,#9aafbe);font-size:12px;font-style:italic">Ціни не завантажено — натисніть 📥 Стягнути поля з DigiKey.</div>';
+      return;
     }
-    var anyRow = false;
-    LISTINGS.forEach(function(listing, li){
-      var prices = listing.prices || [];
-      if (!prices.length) {
-        var tr = document.createElement('tr'); tr.className = 'tier-row';
-        tr.innerHTML = '<td style="padding:7px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4)">' + listing.sku + '</td>' +
-          '<td colspan="4" style="padding:7px 12px;color:#ef9a9a;font-size:12px;font-style:italic">⚠️ немає цін — стягніть дані з DigiKey</td>';
+    allQtys.forEach(function(qty){
+      var defaultPrice = getAbsNewPrice(qty);
+      /* count how many listings have this tier */
+      var listingsWithTier = LISTINGS.filter(function(l){ return (l.prices||[]).some(function(t){return t.qty===qty;}); }).length;
+
+      var row = document.createElement('div');
+      row.className = 'abs-tier-row';
+      row.dataset.qty = qty;
+
+      var chk = document.createElement('input');
+      chk.type='checkbox'; chk.checked=false;
+      chk.style.cssText='width:16px;height:16px;cursor:pointer;flex-shrink:0';
+
+      var lbl = document.createElement('label');
+      lbl.style.cssText='display:flex;align-items:center;gap:8px;cursor:pointer;flex:1';
+
+      var qtySpan = document.createElement('span');
+      qtySpan.style.cssText='font-size:13px;font-weight:700;color:var(--text,#c9d8e4);width:70px;white-space:nowrap';
+      qtySpan.textContent=qty+' шт';
+
+      var priceInp = document.createElement('input');
+      priceInp.type='number'; priceInp.step='0.01'; priceInp.min='0';
+      priceInp.name='abs_tier_'+qty;
+      priceInp.className='abs-price-inp';
+      priceInp.value=defaultPrice.toFixed(2);
+      priceInp.disabled=true;
+
+      var hint = document.createElement('span');
+      hint.style.cssText='font-size:11px;color:var(--text-muted,#9aafbe)';
+      hint.textContent='→ '+listingsWithTier+' лістинги(ів)';
+
+      chk.addEventListener('change', function(){
+        priceInp.disabled = !chk.checked;
+        if (chk.checked) priceInp.focus();
+        refreshAbs();
+      });
+      priceInp.addEventListener('input', refreshAbs);
+      priceInp.addEventListener('change', refreshAbs);
+
+      lbl.appendChild(chk);
+      lbl.appendChild(qtySpan);
+      lbl.appendChild(priceInp);
+      lbl.appendChild(hint);
+      row.appendChild(lbl);
+      absTiersWrap.appendChild(row);
+    });
+  }
+
+  function getAbsMap(){
+    /* returns {qty: newPrice} for checked tiers, absent key = unchanged */
+    var map={};
+    absTiersWrap.querySelectorAll('.abs-tier-row').forEach(function(row){
+      var chk=row.querySelector('input[type=checkbox]');
+      var inp=row.querySelector('.abs-price-inp');
+      if (chk&&chk.checked&&inp&&!inp.disabled){
+        map[parseInt(row.dataset.qty)]=parseFloat(inp.value)||0;
+      }
+    });
+    return map;
+  }
+
+  function buildRowsAbs(absMap){
+    tbody.innerHTML='';
+    if (!LISTINGS.length){
+      tbody.innerHTML='<tr><td colspan="6" style="padding:14px;text-align:center;color:var(--text-muted)">Немає лістингів</td></tr>';
+      return;
+    }
+    var anyChange=Object.keys(absMap).length>0;
+    LISTINGS.forEach(function(listing,li){
+      var prices=listing.prices||[];
+      if (!prices.length){
+        var tr=document.createElement('tr'); tr.className='tier-row';
+        tr.innerHTML='<td style="padding:7px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4)">'+listing.sku+'</td>'+
+          '<td colspan="5" style="padding:7px 12px;color:#ef9a9a;font-size:12px;font-style:italic">⚠️ немає цін</td>';
         tbody.appendChild(tr);
       } else {
-        prices.forEach(function(tier, ti){
-          var oldP = parseFloat(tier.price || 0);
-          var p0   = ti === 0 ? '7' : '3';
-          var tr   = document.createElement('tr'); tr.className = 'tier-row';
-          /* data-pk and data-ti are the safe key — no name collision possible */
-          tr.innerHTML =
-            '<td style="padding:'+p0+'px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4);white-space:nowrap">' +
-              (ti === 0 ? listing.sku : '') + '</td>' +
-            '<td style="padding:'+p0+'px 10px;text-align:center;color:var(--text-muted,#9aafbe)">' + tier.qty + '</td>' +
-            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;color:var(--text,#c9d8e4)">' + f2(oldP) + '</td>' +
-            '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">→</td>' +
-            '<td style="padding:'+p0+'px 8px;text-align:right">' +
-              '<input class="bp-abs-input" type="number" step="0.01" min="0" ' +
-                'data-pk="' + listing.pk + '" data-ti="' + ti + '" ' +
-                'value="' + oldP.toFixed(2) + '">' +
-            '</td>';
+        prices.forEach(function(tier,ti){
+          var oldP=parseFloat(tier.price||0);
+          var newP=absMap.hasOwnProperty(tier.qty)?absMap[tier.qty]:oldP;
+          var changed=Math.abs(newP-oldP)>1e-6;
+          var diff=newP-oldP;
+          var p0=ti===0?'7':'3';
+          var clr=changed?(diff>0?'#66bb6a':'#ef5350'):'var(--text-muted,#9aafbe)';
+          var tr=document.createElement('tr'); tr.className='tier-row';
+          tr.innerHTML=
+            '<td style="padding:'+p0+'px 12px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4);white-space:nowrap">'+(ti===0?listing.sku:'')+'</td>'+
+            '<td style="padding:'+p0+'px 10px;text-align:center;color:'+(changed?'var(--text,#c9d8e4)':'var(--text-muted,#9aafbe)')+'">'+tier.qty+'</td>'+
+            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;color:var(--text,#c9d8e4)">'+f2(oldP)+'</td>'+
+            '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">'+(changed?'→':'·')+'</td>'+
+            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-weight:700;color:'+clr+'">'+f2(newP)+'</td>'+
+            '<td style="padding:'+p0+'px 12px;text-align:right;font-family:monospace;font-size:11px;color:'+clr+'">'+(changed?(diff>=0?'+':'')+f2(diff):'—')+'</td>';
           tbody.appendChild(tr);
-          anyRow = true;
         });
       }
-      if (li < LISTINGS.length - 1) {
-        var sep = document.createElement('tr'); sep.className = 'grp-sep';
-        sep.innerHTML = '<td colspan="5"></td>'; tbody.appendChild(sep);
+      if (li<LISTINGS.length-1){
+        var sep=document.createElement('tr'); sep.className='grp-sep';
+        sep.innerHTML='<td colspan="6"></td>'; tbody.appendChild(sep);
       }
     });
-    setApply(anyRow);
   }
 
-  /* Collect abs prices into hidden JSON field before submit */
-  function collectAbsPrices() {
-    var map = {};
-    tbody.querySelectorAll('input.bp-abs-input[data-pk]').forEach(function(inp){
-      var pk = inp.dataset.pk;
-      var ti = inp.dataset.ti;
-      if (!map[pk]) map[pk] = {};
-      map[pk][ti] = parseFloat(inp.value) || 0;
-    });
-    fAbsJson.value = JSON.stringify(map);
+  function refreshAbs(){
+    var absMap=getAbsMap();
+    buildRowsAbs(absMap);
+    setApply(Object.keys(absMap).length>0 && HAS_PRICES);
   }
 
-  /* ══ MODE SWITCH ═════════════════════════════════════════════════════════ */
-  function switchMode(m) {
-    mode = m;
-    fMode.value = m;
-    document.getElementById('btn-mode-pct').classList.toggle('active', m === 'pct');
-    document.getElementById('btn-mode-abs').classList.toggle('active', m === 'abs');
-    pctPanel.style.display = m === 'pct' ? '' : 'none';
-    absPanel.style.display = m === 'abs' ? '' : 'none';
-    badge.style.display = 'none';
-    thWas.textContent  = m === 'pct' ? 'Було'    : 'Поточна';
-    thWill.textContent = m === 'pct' ? 'Стане'   : 'Нова ціна';
-    thDiff.style.display = m === 'pct' ? '' : 'none';
-    tblTitle.textContent = m === 'pct' ? '📊 Ціни: було → стане' : '✏️ Редагувати ціни вручну';
-    if (m === 'pct') refreshPct();
-    else             buildRowsAbs();
+  /* ════════════════════════════════ MODE SWITCH ══════════════════════════════ */
+  function switchMode(m){
+    mode=m; fMode.value=m;
+    document.getElementById('btn-mode-pct').classList.toggle('active', m==='pct');
+    document.getElementById('btn-mode-abs').classList.toggle('active', m==='abs');
+    pctPanel.style.display = m==='pct'?'':'none';
+    absPanel.style.display = m==='abs'?'':'none';
+    badge.style.display='none';
+    thWill.textContent = 'Стане';
+    thDiff.style.display='';
+    tblTitle.textContent = m==='pct'?'📊 Ціни: було → стане':'📊 Ціни: поточні → нові';
+    if (m==='pct'){ refreshPct(); }
+    else           { buildAbsTiers(); refreshAbs(); }
   }
 
-  /* ══ EVENTS ══════════════════════════════════════════════════════════════ */
+  /* ════════════════════════════════ EVENTS ═══════════════════════════════════ */
   document.getElementById('btn-mode-pct').addEventListener('click', function(){ switchMode('pct'); });
   document.getElementById('btn-mode-abs').addEventListener('click', function(){ switchMode('abs'); });
 
   inp.addEventListener('input',  refreshPct);
   inp.addEventListener('change', refreshPct);
   document.getElementById('btn-plus').addEventListener('click', function(){
-    inp.value = Math.round(((parseFloat(inp.value) || 0) + 5) * 10) / 10; refreshPct();
+    inp.value=Math.round(((parseFloat(inp.value)||0)+5)*10)/10; refreshPct();
   });
   document.getElementById('btn-minus').addEventListener('click', function(){
-    inp.value = Math.round(((parseFloat(inp.value) || 0) - 5) * 10) / 10; refreshPct();
+    inp.value=Math.round(((parseFloat(inp.value)||0)-5)*10)/10; refreshPct();
   });
   document.querySelectorAll('.qpct').forEach(function(btn){
-    btn.addEventListener('click', function(){ inp.value = parseFloat(btn.dataset.v); refreshPct(); });
+    btn.addEventListener('click', function(){ inp.value=parseFloat(btn.dataset.v); refreshPct(); });
   });
 
   document.getElementById('bulk-price-form').addEventListener('submit', function(e){
-    if (mode === 'abs') {
-      collectAbsPrices();
-      if (!confirm('Зберегти нові ціни для ' + COUNT + ' лістингів?\nЦе буде записано в лог.'))
+    if (mode==='abs'){
+      var absMap=getAbsMap();
+      if (!Object.keys(absMap).length){ e.preventDefault(); return; }
+      var tiers=Object.keys(absMap).map(function(q){return q+' шт → '+f2(absMap[q]);}).join(', ');
+      if (!confirm('Зберегти нові ціни ('+tiers+') для '+COUNT+' лістингів?\nЦе буде записано в лог.'))
         { e.preventDefault(); return; }
-      /* record selected qtys as empty (abs mode doesn't use it) */
-      fSelQtys.value = '';
+      /* disable unchecked inputs so they are not submitted */
+      absTiersWrap.querySelectorAll('.abs-price-inp').forEach(function(inp){
+        if (inp.disabled) inp.name=''; /* strip name so browser skips it */
+      });
     } else {
-      var delta = parseFloat(fDelta.value || '0');
-      if (!delta) { e.preventDefault(); return; }
-      /* store which qty tiers are selected */
-      var selQ = getSelQtys();
-      fSelQtys.value = selQ ? selQ.join(',') : '';
-      var sign = delta > 0 ? '+' : '';
-      if (!confirm('Застосувати ' + sign + delta.toFixed(1) + '% до ' + COUNT + ' лістингів?\nЦе буде записано в лог.'))
+      var delta=parseFloat(fDelta.value||'0');
+      if (!delta){ e.preventDefault(); return; }
+      var selQ=getPctSelQtys();
+      fSelQtys.value=selQ?selQ.join(','):'';
+      var sign=delta>0?'+':'';
+      if (!confirm('Застосувати '+sign+delta.toFixed(1)+'% до '+COUNT+' лістингів?\nЦе буде записано в лог.'))
         { e.preventDefault(); return; }
     }
   });
