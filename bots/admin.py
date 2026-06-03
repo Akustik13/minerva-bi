@@ -1880,7 +1880,17 @@ Rules:
         except Exception as exc:
             return JsonResponse({'error': str(exc)}, status=500)
 
-        # ── 7. Save analysis log ───────────────────────────────────────────────
+        # ── 7. Deduplicate quality_issues (AI sometimes repeats same field) ──────
+        seen_qi_keys: set = set()
+        deduped_qi = []
+        for qi in (result.get('quality_issues') or []):
+            key = (qi.get('field') or (qi.get('issue') or '')[:60])
+            if key not in seen_qi_keys:
+                seen_qi_keys.add(key)
+                deduped_qi.append(qi)
+        result['quality_issues'] = deduped_qi[:5]
+
+        # ── 8. Save analysis log ───────────────────────────────────────────────
         log_obj = AIAnalysisLog.objects.create(
             listing=listing,
             run_by=request.user.get_username() if request.user else '',

@@ -197,7 +197,8 @@
     // opts: { showIgnore, showFixed, isHistory }
     opts = opts || {};
     var isIgnored = IGNORED_FIELDS.indexOf(qi.field) >= 0;
-    var isFixed   = opts.showFixed && qi.field && CURR_PROBLEM.indexOf(qi.field) < 0;
+    // Only mark local checks as "fixed" — AI issues can't be reliably verified this way
+    var isFixed   = opts.showFixed && qi.local && qi.field && CURR_PROBLEM.indexOf(qi.field) < 0;
     var localBadge   = qi.local ? '<span class="local-badge">локально</span>' : '';
     var ignoredBadge = isIgnored ? '<span class="ignored-badge">ігнорується</span>' : '';
     var fixedBadge   = isFixed   ? '<span class="fixed-badge">✓ Виправлено</span>' : '';

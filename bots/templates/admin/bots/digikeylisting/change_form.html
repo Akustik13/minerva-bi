@@ -220,6 +220,17 @@ body.dk-edit .dk-view-val      { display: none !important; }
   animation: dkHighlight 2s ease-out forwards;
   border-color: #00bfa5 !important;
 }
+@keyframes dkRowPulse {
+  0%   { outline-color: rgba(0,191,165,.8); background: rgba(0,191,165,.08); }
+  70%  { outline-color: rgba(0,191,165,.4); }
+  100% { outline-color: transparent; background: transparent; }
+}
+.dk-row-focus {
+  outline: 2px solid #00bfa5;
+  outline-offset: 3px;
+  border-radius: 5px;
+  animation: dkRowPulse 2.5s ease-out forwards;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Product preview card (after pull)
@@ -865,17 +876,22 @@ document.addEventListener('DOMContentLoaded', function() {
 
   /* Field highlight from ai_advisor link (#id_fieldname) */
   if (location.hash && location.hash.length > 1) {
-    var targetId = location.hash.slice(1);
-    var targetEl = document.getElementById(targetId) ||
-                   document.querySelector('[name="' + targetId.replace(/^id_/, '') + '"]');
-    if (targetEl) {
+    var _hashId = location.hash.slice(1);
+    var _hashEl = document.getElementById(_hashId) ||
+                  document.querySelector('[name="' + _hashId.replace(/^id_/, '') + '"]');
+    if (_hashEl) {
+      history.replaceState(null, '', location.pathname + location.search);
       setTimeout(function() {
         dkEnterEdit();
-        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        dkHighlight(targetEl);
-        targetEl.focus();
-        history.replaceState(null, '', location.pathname + location.search);
-      }, 200);
+        var _row = _hashEl.closest('.form-row') || _hashEl.closest('fieldset') || _hashEl.parentNode;
+        if (_row) {
+          _row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          _row.classList.add('dk-row-focus');
+          setTimeout(function() { _row.classList.remove('dk-row-focus'); }, 3000);
+        }
+        dkHighlight(_hashEl);
+        if (_hashEl.offsetParent !== null) _hashEl.focus();
+      }, 400);
     }
   }
 });
