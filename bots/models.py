@@ -447,6 +447,49 @@ class DigiKeyPriceLog(models.Model):
         return f"{self.listing.product.sku} {sign}{self.delta_pct:.1f}% @ {self.applied_at:%Y-%m-%d %H:%M}"
 
 
+class AIAnalysisLog(models.Model):
+    """Зберігає кожен запуск AI-аналізу лістингу: рекомендації, якість, знімок продажів та outcome."""
+
+    listing   = models.ForeignKey(
+        DigiKeyListing, on_delete=models.CASCADE,
+        related_name='ai_analyses', verbose_name='Лістинг',
+    )
+    run_at = models.DateTimeField('Проведено', auto_now_add=True, db_index=True)
+    run_by = models.CharField('Користувач', max_length=150, blank=True, default='')
+
+    # ── AI output ────────────────────────────────────────────────────────────
+    strategy             = models.CharField('Стратегія', max_length=30, blank=True)
+    strategy_name        = models.CharField('Назва стратегії', max_length=120, blank=True)
+    quality_score        = models.SmallIntegerField('Оцінка якості', null=True, blank=True)
+    quality_summary      = models.CharField('Резюме якості', max_length=300, blank=True)
+    recommended_prices   = models.JSONField('Рекомендовані ціни', default=list)
+    quality_issues       = models.JSONField('Проблеми якості', default=list)
+    local_issues         = models.JSONField('Локальні перевірки', default=list)
+    expected_impact      = models.CharField('Очікуваний ефект', max_length=300, blank=True)
+    post_change_advice   = models.CharField('Порада після зміни', max_length=300, blank=True)
+    price_change_summary = models.CharField('Зміна цін (резюме)', max_length=200, blank=True)
+    skipped_ai           = models.BooleanField('AI не викликався', default=False)
+
+    # ── Context snapshot at time of analysis ─────────────────────────────────
+    prices_before  = models.JSONField('Ціни на момент аналізу', default=list)
+    sales_snapshot = models.JSONField('Знімок продажів', default=dict)
+
+    # ── Outcome tracking ─────────────────────────────────────────────────────
+    prices_applied  = models.BooleanField('Ціни застосовані', default=False)
+    applied_at      = models.DateTimeField('Застосовано', null=True, blank=True)
+    applied_by      = models.CharField('Застосував', max_length=150, blank=True, default='')
+    outcome_checked = models.BooleanField('Результат перевірено', default=False)
+    outcome_notes   = models.TextField('Нотатки результату', blank=True, default='')
+
+    class Meta:
+        verbose_name        = 'AI Аналіз'
+        verbose_name_plural = 'AI Аналізи'
+        ordering            = ['-run_at']
+
+    def __str__(self):
+        return f"{self.listing.product.sku} AI [{self.run_at:%Y-%m-%d %H:%M}] Q={self.quality_score}"
+
+
 class Bot(models.Model):
     """Бот для автоматизації (парсинг, синхронізація, тощо)."""
     

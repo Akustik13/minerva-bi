@@ -7,7 +7,7 @@ from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing, BotTask, DigiKeyPriceLog
+from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing, BotTask, DigiKeyPriceLog, AIAnalysisLog
 
 
 @admin.register(Bot)
@@ -1215,6 +1215,50 @@ class BotLogAdmin(admin.ModelAdmin):
     message_short.short_description = "Повідомлення"
 
 
+# ── Local quality pre-checks (no AI, no tokens) ───────────────────────────────
+
+def _local_quality_checks(listing) -> list:
+    """Fast rule-based checks. Run before AI to detect obvious issues instantly."""
+    issues = []
+
+    def issue(field, severity, text, fix):
+        issues.append({'field': field, 'severity': severity, 'issue': text, 'fix': fix, 'local': True})
+
+    title = listing.dk_title or ''
+    if not title:
+        issue('dk_title', 'error', 'Назва відсутня', 'Додайте назву товару')
+    elif len(title) < 20:
+        issue('dk_title', 'warning', f'Назва коротка ({len(title)} символів)', 'Розширте назву до 40+ символів')
+
+    if not (listing.dk_description or '').strip():
+        issue('dk_description', 'warning', 'Опис відсутній', 'Додайте технічний опис')
+
+    if not listing.dk_prices:
+        issue('dk_prices', 'error', 'Цінові тири не задані', 'Додайте хоча б одну ціну для публікації')
+
+    if not (listing.dk_manufacturer or '').strip():
+        issue('dk_manufacturer', 'warning', 'Виробник не вказаний', 'Вкажіть назву виробника')
+
+    moq = listing.dk_min_order_qty or 1
+    if moq > 50:
+        issue('dk_min_order_qty', 'warning', f'MOQ = {moq} шт. — може відлякувати', 'Розгляньте зниження до 1–10 шт.')
+
+    if not listing.dk_image_url:
+        issue('dk_image_url', 'info', 'Немає фото товару', 'Додайте URL зображення для кращих конверсій')
+
+    if listing.category_type == 'filter':
+        for field, label in [
+            ('fa_center_frequency', 'Центральна частота'),
+            ('fa_bandwidth_3db',    'Смуга пропускання -3 дБ'),
+            ('fa_insertion_loss',   'Вносимі втрати'),
+            ('fa_filter_type',      'Тип фільтра'),
+        ]:
+            if not getattr(listing, field, None):
+                issue(field, 'warning', f'{label} не заповнена', f'Вкажіть {label.lower()} — ключовий параметр пошуку')
+
+    return issues
+
+
 # ── DigiKey Marketplace Listings ──────────────────────────────────────────────
 
 @admin.register(DigiKeyListing)
@@ -1571,8 +1615,23 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     # ── AI Pricing Advisor ────────────────────────────────────────────────────
 
     def ai_advisor_view(self, request, pk):
+        import json as _json
         from django.shortcuts import get_object_or_404
         listing = get_object_or_404(DigiKeyListing.objects.select_related('product'), pk=pk)
+        history = list(
+            AIAnalysisLog.objects.filter(listing=listing)
+            .order_by('-run_at')[:10]
+            .values(
+                'id', 'run_at', 'strategy_name', 'quality_score',
+                'prices_applied', 'applied_at', 'skipped_ai',
+                'recommended_prices', 'price_change_summary',
+                'outcome_checked', 'outcome_notes',
+            )
+        )
+        for h in history:
+            h['run_at'] = h['run_at'].strftime('%Y-%m-%d %H:%M')
+            h['applied_at'] = h['applied_at'].strftime('%Y-%m-%d %H:%M') if h['applied_at'] else ''
+        local_issues = _local_quality_checks(listing)
         ctx = dict(
             self.admin_site.each_context(request),
             title=f'🤖 AI Порадник — {listing.product.sku}',
@@ -1580,6 +1639,10 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             opts=self.model._meta,
             run_url=reverse('admin:bots_digikeylisting_ai_run', args=[pk]),
             change_url=reverse('admin:bots_digikeylisting_change', args=[pk]),
+            history_json=_json.dumps(history, ensure_ascii=False),
+            local_issues_json=_json.dumps(local_issues, ensure_ascii=False),
+            local_issue_count=len(local_issues),
+            local_error_count=sum(1 for i in local_issues if i['severity'] == 'error'),
         )
         return render(request, 'admin/bots/digikeylisting/ai_advisor.html', ctx)
 
@@ -1595,7 +1658,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
         listing = get_object_or_404(DigiKeyListing.objects.select_related('product'), pk=pk)
 
-        # ── Apply recommended prices (from advisor "Apply" button) ─────────────
+        # ── Apply recommended prices ───────────────────────────────────────────
         if request.POST.get('apply_prices') == '1':
             try:
                 new_prices = []
@@ -1606,19 +1669,36 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 new_prices.sort(key=lambda x: x['qty'])
                 if not new_prices:
                     return JsonResponse({'error': 'Ціни не передані'}, status=400)
+                old_prices = list(listing.dk_prices or [])
                 listing.dk_prices = new_prices
                 listing.save(update_fields=['dk_prices'])
                 try:
-                    from bots.models import DigiKeyPriceLog
                     DigiKeyPriceLog.objects.create(
                         listing=listing,
                         delta_pct=None,
-                        old_prices=listing.dk_prices,
+                        old_prices=old_prices,
                         new_prices=new_prices,
                         user=request.user.get_username() if request.user else 'ai_advisor',
                     )
                 except Exception:
                     pass
+                # Mark the latest analysis log for this listing as applied
+                log_id = request.POST.get('log_id')
+                from django.utils import timezone as _tz
+                if log_id:
+                    AIAnalysisLog.objects.filter(pk=log_id, listing=listing).update(
+                        prices_applied=True,
+                        applied_at=_tz.now(),
+                        applied_by=request.user.get_username() if request.user else '',
+                    )
+                else:
+                    AIAnalysisLog.objects.filter(
+                        listing=listing, prices_applied=False
+                    ).order_by('-run_at')[:1].update(
+                        prices_applied=True,
+                        applied_at=_tz.now(),
+                        applied_by=request.user.get_username() if request.user else '',
+                    )
                 return JsonResponse({'ok': True, 'prices_applied': True})
             except Exception as exc:
                 return JsonResponse({'error': str(exc)}, status=500)
@@ -1678,10 +1758,18 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             'sync_status':      listing.sync_status,
         }
 
-        # ── 4. Build Claude prompt ─────────────────────────────────────────────
-        prompt = f"""You are a DigiKey marketplace pricing and listing quality expert.
+        # ── 4. Local pre-checks (no tokens) ───────────────────────────────────
+        local_issues = _local_quality_checks(listing)
+        local_issues_text = ''
+        if local_issues:
+            local_issues_text = (
+                "\n=== LOCAL PRE-CHECKS (already found — do NOT repeat these in quality_issues) ===\n"
+                + json.dumps(local_issues, ensure_ascii=False)
+                + "\nFocus your quality_issues on NON-OBVIOUS problems not listed above.\n"
+            )
 
-Analyze this DigiKey listing and provide pricing recommendations and quality audit.
+        # ── 5. Build Claude prompt ─────────────────────────────────────────────
+        prompt = f"""You are a DigiKey marketplace pricing and listing quality expert.
 
 === LISTING DATA ===
 {json.dumps(listing_ctx, ensure_ascii=False, indent=2)}
@@ -1691,23 +1779,19 @@ Analyze this DigiKey listing and provide pricing recommendations and quality aud
 
 === PRICE CHANGE HISTORY ===
 {json.dumps(price_logs, ensure_ascii=False, indent=2)}
-
+{local_issues_text}
 === YOUR TASK ===
 Respond ONLY with a valid JSON object. No markdown. No text outside the JSON.
-Keep every string value under 120 characters. Do not use newlines inside strings.
+Keep every string value under 120 characters. No literal newlines inside strings.
 
 {{
   "strategy": "bulk_volume" | "small_batch" | "balanced",
   "strategy_name": "Назва (до 40 символів, укр)",
   "strategy_explanation": "Чому ця стратегія (до 120 символів, укр)",
-  "recommended_prices": [
-    {{"qty": 1, "price": 0.00, "note": "до 80 символів, укр"}}
-  ],
-  "price_change_summary": "напр. '-5% для 1шт, -12% для 100шт' (укр, до 80 символів)",
-  "expected_impact": "Що очікувати (до 120 символів, укр)",
-  "quality_issues": [
-    {{"field": "назва поля", "severity": "error|warning|info", "issue": "до 100 символів, укр", "fix": "до 100 символів, укр"}}
-  ],
+  "recommended_prices": [{{"qty": 1, "price": 0.00, "note": "до 80 символів, укр"}}],
+  "price_change_summary": "напр. '-5% для 1шт' (укр, до 80 символів)",
+  "expected_impact": "до 120 символів, укр",
+  "quality_issues": [{{"field": "поле", "severity": "error|warning|info", "issue": "до 100 символів, укр", "fix": "до 100 символів, укр"}}],
   "quality_score": 7,
   "quality_summary": "до 120 символів, укр",
   "post_change_advice": "до 120 символів, укр"
@@ -1715,13 +1799,12 @@ Keep every string value under 120 characters. Do not use newlines inside strings
 
 Rules:
 - recommended_prices: use same qty breaks as current_prices (or propose if empty)
-- quality_issues: max 5 items, most important first
+- quality_issues: max 5 non-obvious issues (local pre-checks already cover basics)
+- quality_score: include penalty for local issues count ({len(local_issues)} found)
 - Zero sales → suggest competitive entry pricing
-- RF filters → check fa_* attribute completeness
-- Concrete prices (numbers, not ranges)
 - All text in Ukrainian"""
 
-        # ── 5. Call Claude API ─────────────────────────────────────────────────
+        # ── 6. Call Claude API ─────────────────────────────────────────────────
         try:
             import anthropic, re as _re
             from strategy.models import AISettings
@@ -1730,33 +1813,54 @@ Rules:
                 model='claude-sonnet-4-6',
                 max_tokens=4096,
                 system=(
-                    "You are a JSON API. "
-                    "Output ONLY a single valid JSON object — no markdown, no code fences, "
-                    "no text before or after the JSON. "
-                    "Every string value must fit on one line — no literal newlines inside strings. "
-                    "Keep all string values concise (under 120 characters each)."
+                    "You are a JSON API. Output ONLY a single valid JSON object — "
+                    "no markdown, no code fences, no text before or after the JSON. "
+                    "Every string value on one line. Max 120 chars per string value."
                 ),
                 messages=[{'role': 'user', 'content': prompt}],
             )
             raw = response.content[0].text.strip()
-            # Slice to the outermost { ... }
             s = raw.find('{')
             e = raw.rfind('}')
             if s == -1 or e <= s:
-                raise ValueError(f"No JSON object in response: {raw[:300]}")
+                raise ValueError(f"No JSON in response: {raw[:300]}")
             raw = raw[s:e + 1]
             try:
                 result = json.loads(raw)
             except json.JSONDecodeError:
-                # Sanitise literal control chars that sneak into string values
                 cleaned = _re.sub(r'(?<!\\)[\n\r\t]', ' ', raw)
                 result = json.loads(cleaned)
         except json.JSONDecodeError as exc:
-            return JsonResponse({'error': f'JSON parse error: {exc}  —  raw: {raw[:300]}'}, status=500)
+            return JsonResponse({'error': f'JSON parse error: {exc} — raw: {raw[:300]}'}, status=500)
         except Exception as exc:
             return JsonResponse({'error': str(exc)}, status=500)
 
-        return JsonResponse({'ok': True, 'result': result, 'listing': listing_ctx, 'sales': sales_ctx})
+        # ── 7. Save analysis log ───────────────────────────────────────────────
+        log_obj = AIAnalysisLog.objects.create(
+            listing=listing,
+            run_by=request.user.get_username() if request.user else '',
+            strategy=result.get('strategy', ''),
+            strategy_name=result.get('strategy_name', '')[:120],
+            quality_score=result.get('quality_score'),
+            quality_summary=result.get('quality_summary', '')[:300],
+            recommended_prices=result.get('recommended_prices', []),
+            quality_issues=result.get('quality_issues', []),
+            local_issues=local_issues,
+            expected_impact=result.get('expected_impact', '')[:300],
+            post_change_advice=result.get('post_change_advice', '')[:300],
+            price_change_summary=result.get('price_change_summary', '')[:200],
+            prices_before=list(listing.dk_prices or []),
+            sales_snapshot=sales_ctx,
+        )
+
+        return JsonResponse({
+            'ok': True,
+            'result': result,
+            'local_issues': local_issues,
+            'listing': listing_ctx,
+            'sales': sales_ctx,
+            'log_id': log_obj.pk,
+        })
 
     # ── Bulk action: sync quantities ──────────────────────────────────────────
 
@@ -2417,3 +2521,55 @@ class DigiKeyPriceLogAdmin(admin.ModelAdmin):
             '  |  '.join(parts),
         )
     prices_summary.short_description = 'Ціни (було→стало)'
+
+
+@admin.register(AIAnalysisLog)
+class AIAnalysisLogAdmin(admin.ModelAdmin):
+    list_display  = ('listing_sku', 'run_at', 'run_by', 'quality_score_badge',
+                     'strategy_name', 'applied_badge', 'local_issues_count')
+    list_filter   = ('strategy', 'prices_applied', 'skipped_ai', 'run_at')
+    search_fields = ('listing__product__sku', 'run_by')
+    ordering      = ('-run_at',)
+    readonly_fields = (
+        'listing', 'run_at', 'run_by', 'strategy', 'strategy_name',
+        'quality_score', 'quality_summary', 'recommended_prices',
+        'quality_issues', 'local_issues', 'expected_impact',
+        'post_change_advice', 'price_change_summary',
+        'prices_before', 'sales_snapshot',
+        'prices_applied', 'applied_at', 'applied_by', 'skipped_ai',
+    )
+
+    def listing_sku(self, obj):
+        url = reverse('admin:bots_digikeylisting_change', args=[obj.listing_id])
+        return format_html('<a href="{}">{}</a>', url, obj.listing.product.sku)
+    listing_sku.short_description = 'Лістинг'
+    listing_sku.admin_order_field = 'listing__product__sku'
+
+    def quality_score_badge(self, obj):
+        s = obj.quality_score
+        if s is None:
+            return format_html('<span style="color:var(--text-muted)">—</span>')
+        color = '#66bb6a' if s >= 8 else '#ffa726' if s >= 5 else '#ef5350'
+        return format_html(
+            '<span style="font-weight:700;color:{}">{}/10</span>', color, s)
+    quality_score_badge.short_description = 'Якість'
+    quality_score_badge.admin_order_field = 'quality_score'
+
+    def applied_badge(self, obj):
+        if obj.prices_applied:
+            return format_html(
+                '<span style="color:#66bb6a;font-size:11px;font-weight:700">✓ {}</span>',
+                obj.applied_at.strftime('%d.%m %H:%M') if obj.applied_at else '',
+            )
+        return format_html('<span style="color:var(--text-muted);font-size:11px">—</span>')
+    applied_badge.short_description = 'Застосовано'
+    applied_badge.admin_order_field = 'prices_applied'
+
+    def local_issues_count(self, obj):
+        n = len(obj.local_issues or [])
+        if n == 0:
+            return format_html('<span style="color:#66bb6a">✓</span>')
+        errors = sum(1 for i in (obj.local_issues or []) if i.get('severity') == 'error')
+        color = '#ef5350' if errors else '#ffa726'
+        return format_html('<span style="color:{};font-weight:700">{} проблем</span>', color, n)
+    local_issues_count.short_description = 'Локал. перевірки'

@@ -5,48 +5,64 @@
 
 {% block content %}
 <style>
-.ai-card{background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:20px 24px;margin-bottom:18px}
-.ai-card-title{font-size:12px;font-weight:700;color:var(--text-muted,#9aafbe);text-transform:uppercase;letter-spacing:.6px;margin-bottom:14px}
-.sev-error{background:rgba(198,40,40,.15);border-left:3px solid #ef5350;padding:10px 14px;border-radius:4px;margin-bottom:8px}
-.sev-warning{background:rgba(245,127,23,.12);border-left:3px solid #ffa726;padding:10px 14px;border-radius:4px;margin-bottom:8px}
-.sev-info{background:rgba(21,101,192,.12);border-left:3px solid #42a5f5;padding:10px 14px;border-radius:4px;margin-bottom:8px}
-.price-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border-strong,#243347)}
+.ai-card{background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:16px 20px;margin-bottom:16px}
+.ai-card-title{font-size:11px;font-weight:700;color:var(--text-muted,#9aafbe);text-transform:uppercase;letter-spacing:.6px;margin-bottom:12px}
+.sev-error{background:rgba(198,40,40,.15);border-left:3px solid #ef5350;padding:9px 13px;border-radius:4px;margin-bottom:7px}
+.sev-warning{background:rgba(245,127,23,.12);border-left:3px solid #ffa726;padding:9px 13px;border-radius:4px;margin-bottom:7px}
+.sev-info{background:rgba(21,101,192,.12);border-left:3px solid #42a5f5;padding:9px 13px;border-radius:4px;margin-bottom:7px}
+.price-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border-strong,#243347)}
 .price-row:last-child{border-bottom:none}
 .badge-strategy{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
-.score-bar{height:8px;border-radius:4px;background:var(--border-strong,#243347);overflow:hidden;margin-top:6px}
-.score-fill{height:100%;border-radius:4px;transition:width .6s ease}
-#ai-spinner{display:none;align-items:center;gap:14px;padding:32px 0;justify-content:center}
-.spin{width:36px;height:36px;border:3px solid var(--border-strong,#243347);border-top-color:#42a5f5;border-radius:50%;animation:spin .8s linear infinite}
+.score-bar{height:6px;border-radius:3px;background:var(--border-strong,#243347);overflow:hidden;margin-top:5px}
+.score-fill{height:100%;border-radius:3px;transition:width .6s ease}
+#ai-spinner{display:none;align-items:center;gap:14px;padding:28px 0;justify-content:center}
+.spin{width:32px;height:32px;border:3px solid var(--border-strong,#243347);border-top-color:#42a5f5;border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 #results-wrap{display:none}
-#error-wrap{display:none;background:rgba(198,40,40,.15);border:1px solid #ef5350;border-radius:8px;padding:16px 20px;margin-bottom:18px;color:#ef9a9a}
+#error-wrap{display:none;background:rgba(198,40,40,.12);border:1px solid #ef5350;border-radius:8px;padding:14px 18px;margin-bottom:16px;color:#ef9a9a}
+.hist-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border-strong,#243347);font-size:12px}
+.hist-row:last-child{border-bottom:none}
+.local-badge{display:inline-block;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;margin-left:5px;vertical-align:middle;background:rgba(21,101,192,.2);color:#42a5f5;border:1px solid rgba(21,101,192,.3)}
 </style>
 
 <!-- Header -->
-<h1 style="margin-bottom:6px">🤖 AI Порадник
+<h1 style="margin-bottom:4px">🤖 AI Порадник
   <span style="font-size:14px;color:var(--text-muted);font-weight:400;margin-left:8px">{{ listing.product.sku }}</span>
 </h1>
-<p style="margin-bottom:18px;color:var(--text-muted,#9aafbe);font-size:13px">
+<p style="margin-bottom:16px;color:var(--text-muted,#9aafbe);font-size:13px">
   {{ listing.dk_title|default:listing.product.sku }}
-  &nbsp;·&nbsp;
-  <a href="{{ change_url }}" style="color:var(--text-muted)">← Назад до лістингу</a>
+  &nbsp;·&nbsp;<a href="{{ change_url }}" style="color:var(--text-muted)">← Назад до лістингу</a>
+  &nbsp;·&nbsp;<a href="{% url 'admin:bots_aianalysislog_changelist' %}?listing__id__exact={{ listing.pk }}"
+                 style="color:var(--text-muted);font-size:11px">📋 Всі аналізи</a>
 </p>
 
+<!-- ── Local pre-checks (instant, no AI) ─────────────────────────────────── -->
+{% if local_issue_count %}
+<div class="ai-card" style="{% if local_error_count %}border-color:rgba(198,40,40,.4){% else %}border-color:rgba(245,127,23,.3){% endif %}">
+  <div class="ai-card-title">
+    ⚡ Локальні перевірки
+    <span style="margin-left:6px;font-size:11px;font-weight:400;color:var(--text-muted)">(без AI, миттєво)</span>
+    <span style="float:right;font-weight:700;color:{% if local_error_count %}#ef5350{% else %}#ffa726{% endif %}">
+      {{ local_issue_count }} проблем{% if local_error_count %}, з них {{ local_error_count }} критичних{% endif %}
+    </span>
+  </div>
+  <div id="local-issues-wrap"></div>
+</div>
+{% endif %}
+
 <!-- Run button -->
-<div id="run-wrap" style="margin-bottom:24px">
+<div style="margin-bottom:22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
   <button id="btn-run" class="button default"
           style="padding:10px 28px;font-size:14px;font-weight:700">
-    🤖 Запустити аналіз
+    🤖 Запустити AI-аналіз
   </button>
-  <span style="margin-left:12px;font-size:12px;color:var(--text-muted,#9aafbe)">
-    Аналіз займає ~10–20 секунд
-  </span>
+  <span style="font-size:12px;color:var(--text-muted)">~10–20 сек · економія токенів: {{ local_issue_count }} базових перевірок вже виконано локально</span>
 </div>
 
 <!-- Spinner -->
 <div id="ai-spinner">
   <div class="spin"></div>
-  <span style="color:var(--text-muted,#9aafbe);font-size:14px">Аналіз триває… Claude обробляє дані продажів та лістинг</span>
+  <span style="color:var(--text-muted);font-size:14px">Claude аналізує цінову стратегію…</span>
 </div>
 
 <!-- Error -->
@@ -54,66 +70,72 @@
 
 <!-- Results -->
 <div id="results-wrap">
-
-  <!-- Strategy card -->
   <div class="ai-card" id="card-strategy">
-    <div class="ai-card-title">📊 Стратегія ціноутворення</div>
+    <div class="ai-card-title">📊 Стратегія</div>
     <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
-      <div style="flex:1;min-width:220px">
+      <div style="flex:1;min-width:200px">
         <div style="margin-bottom:8px">
           <span id="badge-strategy" class="badge-strategy"></span>
           <span id="strategy-name" style="font-size:16px;font-weight:700;color:var(--text,#c9d8e4);margin-left:10px"></span>
         </div>
-        <p id="strategy-explanation" style="color:var(--text-muted,#9aafbe);font-size:13px;line-height:1.6;margin:0"></p>
+        <p id="strategy-explanation" style="color:var(--text-muted);font-size:13px;line-height:1.6;margin:0"></p>
       </div>
-      <div id="sales-summary" style="min-width:180px;background:var(--bg-hover,#1e2d40);border-radius:8px;padding:12px 16px;font-size:12px;color:var(--text-muted)"></div>
+      <div id="sales-summary" style="min-width:170px;background:var(--bg-hover,#1e2d40);border-radius:8px;padding:11px 15px;font-size:12px;color:var(--text-muted)"></div>
     </div>
-    <p id="expected-impact" style="margin:12px 0 0;font-size:12px;color:var(--text-muted,#9aafbe);border-top:1px solid var(--border-strong,#243347);padding-top:10px"></p>
+    <p id="expected-impact" style="margin:10px 0 0;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border-strong,#243347);padding-top:9px"></p>
   </div>
 
-  <!-- Recommended prices card -->
   <div class="ai-card" id="card-prices">
     <div class="ai-card-title">💰 Рекомендовані ціни</div>
-    <p id="price-change-summary" style="font-size:12px;color:var(--text-muted,#9aafbe);margin-bottom:14px"></p>
-    <div id="price-rows" style="margin-bottom:16px"></div>
+    <p id="price-change-summary" style="font-size:12px;color:var(--text-muted);margin-bottom:12px"></p>
+    <div id="price-rows" style="margin-bottom:14px"></div>
     <button id="btn-apply-prices" class="button"
-            style="padding:8px 22px;font-size:13px;font-weight:700;
-                   background:rgba(46,125,50,.25);color:#66bb6a;border:1px solid rgba(46,125,50,.4);
-                   border-radius:6px;cursor:pointer">
+            style="padding:7px 20px;font-size:13px;font-weight:700;
+                   background:rgba(46,125,50,.2);color:#66bb6a;
+                   border:1px solid rgba(46,125,50,.4);border-radius:6px;cursor:pointer">
       ✅ Застосувати рекомендовані ціни
     </button>
     <span id="apply-status" style="margin-left:10px;font-size:12px;color:var(--text-muted)"></span>
   </div>
 
-  <!-- Quality audit card -->
   <div class="ai-card" id="card-quality">
-    <div class="ai-card-title">🔍 Аудит якості лістингу</div>
-    <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px">
+    <div class="ai-card-title">🔍 Аудит якості (AI + локальні)</div>
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px">
       <div style="flex:1">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
           <span style="font-size:13px;font-weight:600;color:var(--text,#c9d8e4)">Оцінка якості</span>
-          <span id="quality-score-val" style="font-size:22px;font-weight:800;color:#66bb6a"></span>
+          <span id="quality-score-val" style="font-size:22px;font-weight:800"></span>
         </div>
         <div class="score-bar"><div id="quality-score-fill" class="score-fill"></div></div>
       </div>
     </div>
-    <p id="quality-summary" style="font-size:13px;color:var(--text-muted,#9aafbe);margin-bottom:14px"></p>
+    <p id="quality-summary" style="font-size:13px;color:var(--text-muted);margin-bottom:12px"></p>
     <div id="quality-issues"></div>
   </div>
 
-  <!-- Post-change advice -->
   <div class="ai-card" id="card-advice">
-    <div class="ai-card-title">📈 Моніторинг після зміни цін</div>
+    <div class="ai-card-title">📈 Моніторинг після зміни</div>
     <p id="post-change-advice" style="font-size:13px;color:var(--text,#c9d8e4);line-height:1.7;margin:0"></p>
   </div>
+</div>
 
-</div><!-- /results-wrap -->
+<!-- ── History ─────────────────────────────────────────────────────────────── -->
+<div class="ai-card" id="card-history" style="margin-top:8px">
+  <div class="ai-card-title">
+    🕐 Історія аналізів
+    <span id="hist-count" style="float:right;font-weight:400;color:var(--text-muted)"></span>
+  </div>
+  <div id="history-wrap">
+    <p style="color:var(--text-muted);font-size:12px">Ще немає аналізів для цього лістингу.</p>
+  </div>
+</div>
 
 <script>
 (function(){
   var RUN_URL    = "{{ run_url }}";
-  var CHANGE_URL = "{{ change_url }}";
   var CSRF       = "{{ csrf_token }}";
+  var HISTORY    = {{ history_json|safe }};
+  var LOCAL      = {{ local_issues_json|safe }};
 
   var btnRun     = document.getElementById('btn-run');
   var spinner    = document.getElementById('ai-spinner');
@@ -123,27 +145,62 @@
   var applyStatus= document.getElementById('apply-status');
 
   var lastRecommended = [];
+  var lastLogId = null;
 
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  var stratColors = {
+    bulk_volume: {bg:'rgba(46,125,50,.2)',  color:'#66bb6a', label:'📦 Оптовий обʼєм'},
+    small_batch: {bg:'rgba(21,101,192,.2)', color:'#42a5f5', label:'🎯 Малі партії'},
+    balanced:    {bg:'rgba(123,31,162,.2)', color:'#ce93d8', label:'⚖️ Збалансована'},
+  };
+
+  // ── Render local pre-checks ─────────────────────────────────────────────────
+  function renderIssues(issues, container, showLocalBadge){
+    container.innerHTML = '';
+    if (!issues || !issues.length){
+      container.innerHTML = '<p style="color:#66bb6a;font-size:12px">✅ Проблем не знайдено</p>';
+      return;
+    }
+    issues.forEach(function(qi){
+      var div = document.createElement('div');
+      div.className = 'sev-' + (qi.severity || 'info');
+      var badge = (showLocalBadge && qi.local) ? '<span class="local-badge">локально</span>' : '';
+      div.innerHTML =
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
+          '<span style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text,#c9d8e4)">' + esc(qi.field||'') + '</span>' + badge +
+          '<span style="font-size:10px;font-weight:600;text-transform:uppercase;opacity:.6;margin-left:auto">' + esc(qi.severity||'') + '</span>' +
+        '</div>' +
+        '<div style="font-size:12px;color:var(--text,#c9d8e4);margin-bottom:3px">' + esc(qi.issue||'') + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted)">💡 ' + esc(qi.fix||'') + '</div>';
+      container.appendChild(div);
+    });
+  }
+
+  var localWrap = document.getElementById('local-issues-wrap');
+  if (localWrap) renderIssues(LOCAL, localWrap, false);
+
+  // ── Run AI analysis ─────────────────────────────────────────────────────────
   btnRun.addEventListener('click', function(){
     btnRun.disabled = true;
     spinner.style.display = 'flex';
     errWrap.style.display = 'none';
     results.style.display = 'none';
+    lastLogId = null;
 
     fetch(RUN_URL, {
-      method: 'POST',
-      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
-      body: ''
+      method:'POST',
+      headers:{'X-CSRFToken':CSRF,'Content-Type':'application/x-www-form-urlencoded'},
+      body:''
     })
     .then(function(r){ return r.json(); })
     .then(function(data){
       spinner.style.display = 'none';
       btnRun.disabled = false;
-      if (!data.ok){
-        showError(data.error || 'Невідома помилка');
-        return;
-      }
-      renderResults(data.result, data.sales, data.listing);
+      if (!data.ok){ showError(data.error || 'Невідома помилка'); return; }
+      lastLogId = data.log_id || null;
+      renderResults(data.result, data.sales, data.local_issues || []);
+      refreshHistory(data.result, data.log_id);
     })
     .catch(function(e){
       spinner.style.display = 'none';
@@ -157,15 +214,7 @@
     errWrap.innerHTML = '<strong>❌ Помилка:</strong> ' + esc(msg);
   }
 
-  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-  function renderResults(r, sales, listing){
-    // Strategy badge
-    var stratColors = {
-      bulk_volume:  {bg:'rgba(46,125,50,.2)',color:'#66bb6a',label:'📦 Оптовий обʼєм'},
-      small_batch:  {bg:'rgba(21,101,192,.2)',color:'#42a5f5',label:'🎯 Малі партії'},
-      balanced:     {bg:'rgba(123,31,162,.2)',color:'#ce93d8',label:'⚖️ Збалансована'}
-    };
+  function renderResults(r, sales, localIss){
     var sc = stratColors[r.strategy] || stratColors['balanced'];
     var badge = document.getElementById('badge-strategy');
     badge.textContent = sc.label;
@@ -177,23 +226,19 @@
     document.getElementById('strategy-explanation').textContent = r.strategy_explanation || '';
     document.getElementById('expected-impact').textContent = '💡 ' + (r.expected_impact || '');
 
-    // Sales summary box
     var ss = document.getElementById('sales-summary');
     if (sales && !sales.error){
       ss.innerHTML =
-        '<div style="font-weight:700;color:var(--text,#c9d8e4);margin-bottom:8px">📦 Продажі (90 днів)</div>'+
-        row('Замовлень', sales.order_count)+
-        row('Кількість', sales.total_qty + ' шт.')+
-        row('Виручка', '~$' + sales.total_revenue_usd)+
-        row('Сер. замовлення', sales.avg_qty_per_order + ' шт.');
+        '<div style="font-weight:700;color:var(--text);margin-bottom:7px">📦 Продажі (90 днів)</div>' +
+        sRow('Замовлень', sales.order_count) +
+        sRow('Кількість', sales.total_qty + ' шт.') +
+        sRow('Виручка', '~$' + sales.total_revenue_usd) +
+        sRow('Сер. замовл.', sales.avg_qty_per_order + ' шт.');
     } else {
       ss.innerHTML = '<span style="color:var(--text-muted)">Дані продажів недоступні</span>';
     }
 
-    // Price change summary
     document.getElementById('price-change-summary').textContent = r.price_change_summary || '';
-
-    // Recommended price rows
     lastRecommended = r.recommended_prices || [];
     var priceRows = document.getElementById('price-rows');
     priceRows.innerHTML = '';
@@ -201,77 +246,58 @@
       var d = document.createElement('div');
       d.className = 'price-row';
       d.innerHTML =
-        '<span style="width:70px;font-size:13px;font-weight:700;color:var(--text,#c9d8e4)">від '+p.qty+' шт.</span>'+
-        '<span style="font-size:18px;font-weight:800;color:#66bb6a;min-width:80px">$'+Number(p.price).toFixed(4)+'</span>'+
-        '<span style="font-size:12px;color:var(--text-muted,#9aafbe);flex:1">'+esc(p.note||'')+'</span>';
+        '<span style="width:70px;font-size:13px;font-weight:700;color:var(--text)">від '+p.qty+' шт.</span>' +
+        '<span style="font-size:17px;font-weight:800;color:#66bb6a;min-width:80px">$'+Number(p.price).toFixed(4)+'</span>' +
+        '<span style="font-size:11px;color:var(--text-muted);flex:1">'+esc(p.note||'')+'</span>';
       priceRows.appendChild(d);
     });
 
-    // Quality score
     var score = parseInt(r.quality_score) || 0;
-    document.getElementById('quality-score-val').textContent = score + '/10';
-    var fill = document.getElementById('quality-score-fill');
     var fillColor = score >= 8 ? '#66bb6a' : score >= 5 ? '#ffa726' : '#ef5350';
-    fill.style.width = (score * 10) + '%';
-    fill.style.background = fillColor;
+    document.getElementById('quality-score-val').textContent = score + '/10';
     document.getElementById('quality-score-val').style.color = fillColor;
+    document.getElementById('quality-score-fill').style.width = (score * 10) + '%';
+    document.getElementById('quality-score-fill').style.background = fillColor;
     document.getElementById('quality-summary').textContent = r.quality_summary || '';
 
-    // Quality issues
-    var qi = document.getElementById('quality-issues');
-    qi.innerHTML = '';
-    if (!r.quality_issues || !r.quality_issues.length){
-      qi.innerHTML = '<p style="color:#66bb6a;font-size:13px">✅ Серйозних проблем не знайдено</p>';
-    } else {
-      r.quality_issues.forEach(function(issue){
-        var div = document.createElement('div');
-        div.className = 'sev-' + (issue.severity || 'info');
-        div.innerHTML =
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
-          '<span style="font-size:11px;font-weight:700;font-family:monospace;color:var(--text,#c9d8e4)">'+esc(issue.field||'')+'</span>'+
-          '<span style="font-size:10px;font-weight:600;text-transform:uppercase;opacity:.7">'+esc(issue.severity||'')+'</span>'+
-          '</div>'+
-          '<div style="font-size:13px;color:var(--text,#c9d8e4);margin-bottom:4px">'+esc(issue.issue||'')+'</div>'+
-          '<div style="font-size:11px;color:var(--text-muted,#9aafbe)">💡 '+esc(issue.fix||'')+'</div>';
-        qi.appendChild(div);
-      });
-    }
+    // Merge AI issues + local issues (dedupe by field)
+    var aiIssues  = r.quality_issues || [];
+    var allIssues = aiIssues.concat(localIss.filter(function(li){
+      return !aiIssues.some(function(ai){ return ai.field === li.field; });
+    }));
+    renderIssues(allIssues, document.getElementById('quality-issues'), true);
 
-    // Post-change advice
     document.getElementById('post-change-advice').textContent = r.post_change_advice || '';
-
     results.style.display = 'block';
   }
 
-  function row(label, val){
-    return '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
-      '<span>'+esc(label)+'</span>'+
-      '<span style="font-weight:600;color:var(--text,#c9d8e4)">'+esc(String(val))+'</span>'+
+  function sRow(label, val){
+    return '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
+      '<span>' + esc(label) + '</span>' +
+      '<span style="font-weight:600;color:var(--text)">' + esc(String(val)) + '</span>' +
       '</div>';
   }
 
-  // Apply recommended prices
+  // ── Apply prices ────────────────────────────────────────────────────────────
   applyBtn.addEventListener('click', function(){
-    if (!lastRecommended.length){ return; }
-
-    var confirmed = confirm(
-      'Застосувати рекомендовані ціни для цього лістингу?\n\n' +
-      lastRecommended.map(function(p){ return 'від '+p.qty+' шт. → $'+Number(p.price).toFixed(4); }).join('\n')
-    );
-    if (!confirmed){ return; }
+    if (!lastRecommended.length) return;
+    if (!confirm('Застосувати рекомендовані ціни?\n\n' +
+        lastRecommended.map(function(p){ return 'від '+p.qty+' шт. → $'+Number(p.price).toFixed(4); }).join('\n')
+    )) return;
 
     applyBtn.disabled = true;
     applyStatus.textContent = 'Зберігаємо…';
     applyStatus.style.color = 'var(--text-muted)';
 
-    var body = 'apply_prices=1&csrf_middleware_token=' + encodeURIComponent(CSRF);
+    var body = 'apply_prices=1';
+    if (lastLogId) body += '&log_id=' + lastLogId;
     lastRecommended.forEach(function(p){
       body += '&price_' + p.qty + '=' + encodeURIComponent(Number(p.price).toFixed(4));
     });
 
     fetch(RUN_URL, {
-      method: 'POST',
-      headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded'},
+      method:'POST',
+      headers:{'X-CSRFToken':CSRF,'Content-Type':'application/x-www-form-urlencoded'},
       body: body
     })
     .then(function(r){ return r.json(); })
@@ -280,21 +306,71 @@
       if (data.ok && data.prices_applied){
         applyStatus.textContent = '✅ Ціни збережено!';
         applyStatus.style.color = '#66bb6a';
-      } else if (data.error) {
-        applyStatus.textContent = '❌ ' + data.error;
-        applyStatus.style.color = '#ef5350';
+        // Mark latest history row as applied
+        if (HISTORY.length && !HISTORY[0].prices_applied){
+          HISTORY[0].prices_applied = true;
+          HISTORY[0].applied_at = 'щойно';
+          renderHistory();
+        }
       } else {
-        applyStatus.textContent = '✅ Готово';
-        applyStatus.style.color = '#66bb6a';
+        applyStatus.textContent = '❌ ' + (data.error || 'Помилка');
+        applyStatus.style.color = '#ef5350';
       }
     })
     .catch(function(e){
       applyBtn.disabled = false;
-      applyStatus.textContent = '❌ Помилка: ' + e.message;
+      applyStatus.textContent = '❌ ' + e.message;
       applyStatus.style.color = '#ef5350';
     });
   });
 
+  // ── History ─────────────────────────────────────────────────────────────────
+  function refreshHistory(result, logId){
+    var newEntry = {
+      id: logId,
+      run_at: 'щойно',
+      run_by: '',
+      strategy_name: result.strategy_name || '',
+      quality_score: result.quality_score || null,
+      prices_applied: false,
+      applied_at: '',
+      price_change_summary: result.price_change_summary || '',
+    };
+    HISTORY.unshift(newEntry);
+    if (HISTORY.length > 10) HISTORY.pop();
+    renderHistory();
+  }
+
+  function renderHistory(){
+    var wrap = document.getElementById('history-wrap');
+    var cnt  = document.getElementById('hist-count');
+    cnt.textContent = HISTORY.length + ' запис(ів)';
+    if (!HISTORY.length){
+      wrap.innerHTML = '<p style="color:var(--text-muted);font-size:12px">Ще немає аналізів.</p>';
+      return;
+    }
+    wrap.innerHTML = '';
+    HISTORY.forEach(function(h){
+      var sc    = parseInt(h.quality_score) || 0;
+      var sCol  = sc >= 8 ? '#66bb6a' : sc >= 5 ? '#ffa726' : '#ef5350';
+      var stratCols = stratColors;
+      var div = document.createElement('div');
+      div.className = 'hist-row';
+      div.innerHTML =
+        '<span style="color:var(--text-muted);white-space:nowrap;min-width:120px">' + esc(h.run_at) + '</span>' +
+        '<span style="flex:1;color:var(--text);font-weight:600">' + esc(h.strategy_name || '—') + '</span>' +
+        (sc ? '<span style="font-weight:700;color:'+sCol+';white-space:nowrap">'+sc+'/10</span>' : '') +
+        '<span style="white-space:nowrap;min-width:80px;text-align:right">' +
+          (h.prices_applied
+            ? '<span style="color:#66bb6a;font-weight:700">✓ застосовано</span>' + (h.applied_at ? ' <span style="color:var(--text-muted);font-size:10px">'+esc(h.applied_at)+'</span>' : '')
+            : '<span style="color:var(--text-muted)">не застосовано</span>'
+          ) +
+        '</span>';
+      wrap.appendChild(div);
+    });
+  }
+
+  renderHistory();
 })();
 </script>
 {% endblock %}
