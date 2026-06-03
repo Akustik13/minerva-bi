@@ -6,6 +6,7 @@ from django.urls import reverse, path
 from django.shortcuts import redirect, render
 from django.contrib import messages
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from .models import Bot, BotLog, DigiKeyConfig, DigiKeyListing, BotTask
 
 
@@ -1117,7 +1118,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
 }})();
 </script>"""
 
-        return format_html('{}{}', format_html(tasks_html), format_html(script))
+        return mark_safe(tasks_html + script)
     task_status_panel.short_description = "📊 Фонові завдання"
 
     def marketplace_auth_status(self, obj):
@@ -1623,12 +1624,31 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     def stock_qty_readonly(self, obj):
         if obj and obj.pk:
             qty = obj.get_stock_qty()
-            color = 'var(--ok)' if qty > 0 else 'var(--err)'
+            wh_color = 'var(--ok)' if qty > 0 else 'var(--err)'
+
+            dk_qty = obj.dk_quantity_available
+            if dk_qty is not None:
+                dk_color  = '#4caf50' if dk_qty > 0 else '#e53935'
+                dk_part   = format_html(
+                    ' &nbsp;·&nbsp; '
+                    '<span style="color:{};font-weight:600">{} шт.</span>'
+                    '<span style="color:var(--text-muted);margin-left:6px;font-size:12px">'
+                    '(показано на DigiKey)</span>',
+                    dk_color, dk_qty,
+                )
+            else:
+                dk_part = format_html(
+                    ' &nbsp;·&nbsp; '
+                    '<span style="color:var(--text-muted);font-size:12px">'
+                    'DigiKey: не синхронізовано</span>'
+                )
+
             return format_html(
                 '<strong style="color:{};font-size:15px">{} шт.</strong>'
                 '<span style="color:var(--text-muted);margin-left:8px;font-size:12px">'
-                '(поточний залишок зі складу)</span>',
-                color, qty
+                '(наш склад)</span>'
+                '{}',
+                wh_color, qty, dk_part,
             )
         return '—'
     stock_qty_readonly.short_description = 'Поточний залишок'

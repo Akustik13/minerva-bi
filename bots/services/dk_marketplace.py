@@ -455,6 +455,14 @@ def import_offers_from_dk(task=None) -> dict:
         update_flds = ['dk_offer_id', 'dk_product_id', 'sync_status',
                        'last_synced_at', 'last_error']
 
+        qty_available = offer.get('quantityAvailable')
+        if qty_available is not None:
+            try:
+                listing.dk_quantity_available = int(qty_available)
+                update_flds.append('dk_quantity_available')
+            except (TypeError, ValueError):
+                pass
+
         if offer.get('title') and not listing.dk_title:
             listing.dk_title = offer['title'][:200]
             update_flds.append('dk_title')

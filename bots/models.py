@@ -259,6 +259,8 @@ class DigiKeyListing(models.Model):
                                                      help_text='Кількість днів від замовлення до відправки')
     dk_qty_alert     = models.PositiveIntegerField('Мін. залишок (алерт)', default=3,
                                                     help_text='При залишку нижче цього — DigiKey виводить попередження')
+    dk_quantity_available = models.IntegerField('Залишок на DigiKey', null=True, blank=True,
+                                                help_text='Кількість, яку бачить покупець на DigiKey (оновлюється при імпорті)')
     dk_is_active     = models.BooleanField('Активне на DigiKey', default=True)
 
     # ── Volume pricing (up to 9 tiers) ────────────────────────────────────────

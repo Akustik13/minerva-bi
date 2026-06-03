@@ -411,6 +411,9 @@ function dkBuildViewValues() {
     /* Skip rows that already have a view-val element */
     if (row.querySelector('.dk-view-val')) return;
 
+    /* Skip rows with custom widget tables — they manage their own view display */
+    if (row.querySelector('.dk-prices-wrap') || row.querySelector('.dk-attrs-wrap')) return;
+
     var inputs    = row.querySelectorAll('input:not([type=hidden]):not([type=checkbox]), textarea');
     var selects   = row.querySelectorAll('select');
     var checkboxes = row.querySelectorAll('input[type=checkbox]');
