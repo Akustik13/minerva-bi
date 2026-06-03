@@ -347,9 +347,19 @@ body.dk-edit .dk-view-val      { display: none !important; }
   font-weight: 600; font-size: 11px; text-transform: uppercase;
   letter-spacing: .5px; border-bottom: 2px solid var(--border-strong, #243347);
 }
-.dk-attrs-table th:first-child { width: 240px; }
+.dk-attrs-table th:first-child { width: 270px; }
 .dk-attrs-table td { padding: 4px 8px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; word-break: break-word; }
-.dk-attr-code { font-family: monospace; font-size: 12px; color: var(--text-muted, #9aafbe); padding: 5px 14px; white-space: nowrap; }
+.dk-attr-code { font-family: monospace; font-size: 12px; color: var(--text-muted, #9aafbe); padding: 5px 14px 2px; white-space: nowrap; }
+.dk-attr-label { display: block; font-family: inherit; font-size: 11px; color: var(--text, #c9d8e4); padding: 0 14px 4px; font-weight: 500; }
+.dk-attr-unit  { font-size: 10px; color: var(--text-muted, #9aafbe); margin-left: 4px; font-weight: 400; }
+.dk-attr-tip {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: rgba(88,166,255,.15); color: #58a6ff;
+  font-size: 10px; font-style: normal; cursor: help;
+  margin-left: 5px; vertical-align: middle; flex-shrink: 0;
+  border: 1px solid rgba(88,166,255,.25);
+}
 .dk-attr-val input {
   width: 100%; background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
   border: 1px solid var(--border-strong, #243347); border-radius: 3px;
@@ -779,6 +789,67 @@ function dkPricesRebuild(tiers) {
 /* ════════════════════════════════════════════════════════════════════════════
    Attributes editor
 ════════════════════════════════════════════════════════════════════════════ */
+
+/* DigiKey attribute code → {label (укр), unit, desc} */
+var DK_ATTR_INFO = {
+  /* ── Numeric DigiKey Marketplace API codes ─────────────────────────────── */
+  '16':  {label:'Корпус / Case',          unit:'',     desc:'Стандартний корпус і тип кріплення компонента'},
+  '21':  {label:'Тип фільтра',            unit:'',     desc:'LC, SAW, BAW, Cavity, Diplexer, Bandpass тощо'},
+  '46':  {label:'Розміри',                unit:'мм',   desc:'Габаритні розміри корпусу (Д×Ш×В)'},
+  '69':  {label:'Тип монтажу',            unit:'',     desc:'SMD (поверхневий) або Through Hole (наскрізний)'},
+  '139': {label:'Частота',                unit:'МГц',  desc:'Центральна частота або діапазон роботи'},
+  '327': {label:'Вносимі втрати',         unit:'дБ',   desc:'Затухання сигналу всередині смуги пропускання (менше — краще)'},
+  '398': {label:'Смуга пропускання',      unit:'МГц',  desc:'Ширина смуги пропускання на рівні -3 дБ'},
+  '428': {label:'Пульсація (Ripple)',      unit:'дБ',   desc:'Нерівномірність АЧХ всередині смуги (менше — краще)'},
+  '966': {label:'Висота (макс.)',          unit:'мм',   desc:'Максимальна висота компонента'},
+  /* ── Human-readable ProductSearch API params ───────────────────────────── */
+  'Antenna Type':           {label:'Тип антени',          unit:'',     desc:'PCB Trace, Whip, Patch, Helical, Monopole тощо'},
+  'Gain':                   {label:'Підсилення',           unit:'дБі',  desc:'Коефіцієнт підсилення антени відносно ізотропного випромінювача'},
+  'VSWR':                   {label:'КСХ',                  unit:'',     desc:'Коефіцієнт стоячої хвилі — якість узгодження. Норма: < 2,0'},
+  'Return Loss':            {label:'Зворотні втрати',      unit:'дБ',   desc:'Частка відбитої потужності. Норма: > 15 дБ (|S11| < -15 дБ)'},
+  'Frequency Range':        {label:'Діапазон частот',      unit:'МГц',  desc:'Робочий діапазон частот (від — до)'},
+  'Center Frequency':       {label:'Центральна частота',   unit:'МГц',  desc:'Центральна частота смуги пропускання фільтра'},
+  'Bandwidth':              {label:'Смуга пропускання',    unit:'МГц',  desc:'Ширина смуги на рівні -3 дБ від максимуму'},
+  'Insertion Loss':         {label:'Вносимі втрати',       unit:'дБ',   desc:'Затухання у смузі пропускання (чим менше — тим краще)'},
+  'Filter Type':            {label:'Тип фільтра',          unit:'',     desc:'LC, SAW, BAW, Cavity, Bandpass, Lowpass тощо'},
+  'Ripple':                 {label:'Пульсація',             unit:'дБ',   desc:'Нерівномірність АЧХ всередині смуги пропускання'},
+  'Attenuation':            {label:'Затухання',             unit:'дБ',   desc:'Рівень придушення сигналів поза смугою (більше — краще)'},
+  'Impedance':              {label:'Імпеданс',              unit:'Ом',   desc:'Характеристичний імпеданс. Стандарт: 50 Ом для RF'},
+  'Mounting Type':          {label:'Тип монтажу',           unit:'',     desc:'SMD, Through Hole, Free Standing'},
+  'Package / Case':         {label:'Корпус',                unit:'',     desc:'Стандартний корпус компонента та спосіб кріплення'},
+  'Size / Dimension':       {label:'Розміри',               unit:'',     desc:'Габаритні розміри у форматі Д × Ш × В'},
+  'Height - Max':           {label:'Висота (макс.)',         unit:'мм',   desc:'Максимальна висота встановленого компонента'},
+  'Operating Temperature':  {label:'Робоча температура',    unit:'°C',   desc:'Допустимий діапазон температур під час роботи'},
+  'Series':                 {label:'Серія',                  unit:'',     desc:'Продуктова серія виробника'},
+  'Packaging':              {label:'Упаковка',               unit:'',     desc:'Cut Tape, Reel (стрічка), Tube, Tray тощо'},
+  'Connector Type':         {label:'Тип роз\'єму',           unit:'',     desc:'SMA, N-type, BNC, IPEX/U.FL, TNC, MCX тощо'},
+  'Cable Type':             {label:'Тип кабелю',             unit:'',     desc:'RG-58, RG-174, LMR-100, RG-316 тощо'},
+  'Cable Length':           {label:'Довжина кабелю',         unit:'',     desc:'Довжина кабелю у метрах або дюймах'},
+  'Power Rating':           {label:'Допустима потужність',   unit:'Вт',   desc:'Максимальна потужність, яку може розсіяти компонент'},
+  'Noise Figure':           {label:'Коефіцієнт шуму',        unit:'дБ',   desc:'NF підсилювача або компонента (чим менше — тим краще)'},
+  'Directivity':            {label:'Напрямленість',           unit:'',     desc:'Omnidirectional (всеспрямована) або Directional (напрямлена)'},
+  'Polarization':           {label:'Поляризація',             unit:'',     desc:'Linear (лінійна), Circular (кругова) тощо'},
+  'Applications':           {label:'Застосування',            unit:'',     desc:'Типові галузі або сценарії використання'},
+  'Voltage - Supply':       {label:'Напруга живлення',        unit:'В',    desc:'Діапазон напруги живлення компонента'},
+  'Current - Supply':       {label:'Струм живлення',          unit:'мА',   desc:'Споживаний струм при типових умовах'},
+  'Number of Positions':    {label:'Кількість контактів',     unit:'',     desc:'Кількість контактних позицій роз\'єму'},
+  'Contact Finish':         {label:'Покриття контактів',      unit:'',     desc:'Gold (золото), Tin (олово), Silver (срібло) тощо'},
+  'Dielectric Constant':    {label:'Діелектрична проникність',unit:'',     desc:'εr матеріалу субстрату'},
+  'Isolation':              {label:'Ізоляція між портами',    unit:'дБ',   desc:'Розв\'язка між портами (більше — краще)'},
+  'Phase Noise':            {label:'Фазовий шум',             unit:'дБц/Гц', desc:'Шум генератора відносно несучої (менше — краще)'},
+  'Frequency Stability':    {label:'Стабільність частоти',    unit:'ppm',  desc:'Відхилення частоти від номінальної в ppm'},
+  'Output Power':           {label:'Вихідна потужність',      unit:'дБм',  desc:'Потужність вихідного сигналу'},
+};
+
+function dkAttrInfoHtml(code) {
+  var info = DK_ATTR_INFO[code];
+  if (!info) return '';
+  var tip = info.desc + (info.unit ? ' · ' + info.unit : '');
+  return '<span class="dk-attr-label">' + dkEsc(info.label) +
+         (info.unit ? '<span class="dk-attr-unit">(' + dkEsc(info.unit) + ')</span>' : '') +
+         '<i class="dk-attr-tip" title="' + dkEsc(tip) + '">i</i></span>';
+}
+
 var _aTbody = null, _aTa = null;
 
 function dkAttrsInit() {
@@ -814,7 +885,9 @@ function dkAttrsRebuild(obj) {
     var val = obj[code];
     var tr = document.createElement('tr');
     tr.innerHTML =
-      '<td class="dk-attr-code">'+dkEsc(code)+'</td>'+
+      '<td class="dk-attr-code" style="vertical-align:top">' +
+        dkEsc(code) + dkAttrInfoHtml(code) +
+      '</td>'+
       '<td class="dk-attr-val"><input type="text" data-code="'+dkEsc(code)+'" value="'+
         dkEsc(String(val===null||val===undefined?'':val))+'" autocomplete="off"></td>';
     tr.querySelector('input').addEventListener('input', _aSync);
