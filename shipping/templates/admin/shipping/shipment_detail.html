@@ -569,6 +569,13 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
                 data-url="{{ label_display_url }}"
                 data-filename=""
                 title="{% trans 'Зберегти на ПК' %}">💾</button>
+              {% if label_a4_url %}
+              <a href="{{ label_a4_url }}" target="_blank" class="sd-label-link"
+                 style="background:#1565c0;color:#fff;padding:3px 10px;border-radius:4px;
+                        font-size:12px;text-decoration:none">
+                🖨️ A4
+              </a>
+              {% endif %}
               <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
             </span>
           </div>

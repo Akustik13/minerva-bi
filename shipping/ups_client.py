@@ -824,17 +824,19 @@ class UPSClient:
                 customs_b64 = img['GraphicImage']
                 break
 
-        # Convert GIF label to A4 PDF
+        # Convert GIF label to A4 PDF, keep original GIF for re-generation
+        gif_b64 = label_b64
         if label_b64:
-            label_b64   = _gif_label_to_a4_pdf(label_b64)
+            label_b64    = _gif_label_to_a4_pdf(label_b64)
             label_format = 'PDF'
 
         return {
-            'tracking_number': tracking,
-            'shipment_id':     results_data.get('ShipmentIdentificationNumber', ''),
-            'label_base64':    label_b64,
-            'label_format':    label_format,
-            'customs_base64':  customs_b64,
+            'tracking_number':  tracking,
+            'shipment_id':      results_data.get('ShipmentIdentificationNumber', ''),
+            'label_base64':     label_b64,     # A4 PDF
+            'label_gif_base64': gif_b64,       # original GIF from UPS
+            'label_format':     label_format,
+            'customs_base64':   customs_b64,
             'total_charge':    Decimal(charges.get('MonetaryValue', '0')),
             'currency':        charges.get('CurrencyCode', 'EUR'),
             'service_code':    service_code,

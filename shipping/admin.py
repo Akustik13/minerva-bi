@@ -1190,6 +1190,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_detail",
             ),
             path(
+                "<int:shipment_id>/label-a4/",
+                self.admin_site.admin_view(self.label_a4_view),
+                name="shipping_shipment_label_a4",
+            ),
+            path(
                 "<int:shipment_id>/set-status/",
                 self.admin_site.admin_view(self.set_status_view),
                 name="shipping_shipment_set_status",
@@ -2546,6 +2551,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "account_owner":    rv.get("accountOwner", ""),
             }
 
+        # A4 label URL (only if GIF source exists)
+        _label_a4_url = ''
+        if shipment.label_url:
+            _gif_rel  = shipment.label_url.lstrip('/media/').rsplit('.', 1)[0] + '.gif'
+            _gif_path = os.path.join(django_settings.MEDIA_ROOT, _gif_rel)
+            if os.path.exists(_gif_path):
+                _label_a4_url = reverse('admin:shipping_shipment_label_a4', args=[shipment.pk])
+
         # For Jumingo: always route label download through base64 proxy view
         _label_display_url = shipment.label_url or ""
         if is_jumingo and shipment.jumingo_order_number:
@@ -2579,6 +2592,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "tracking_url":              _tracking_url,
             "jumingo_order":             jumingo_order,
             "label_display_url":         _label_display_url,
+            "label_a4_url":              _label_a4_url,
         })
 
     # ── Створення SalesOrder з відправлення ──────────────────────────────────
@@ -2825,6 +2839,45 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return JsonResponse({"ok": True, "created": [], "msg": "Всі товари вже мають упаковку"})
         return JsonResponse({"ok": True, "created": created,
                              "msg": f"Створено {len(created)} запис(ів) упаковки"})
+
+    def label_a4_view(self, request, shipment_id):
+        """GET — generate A4 PDF from stored UPS GIF label and return inline."""
+        import base64 as _b64_mod
+        from django.http import HttpResponse
+        from shipping.ups_client import _gif_label_to_a4_pdf
+
+        try:
+            shipment = Shipment.objects.get(pk=shipment_id)
+        except Shipment.DoesNotExist:
+            return HttpResponse('Відправку не знайдено', status=404)
+
+        if not shipment.label_url:
+            return HttpResponse('Мітка відсутня', status=404)
+
+        # Derive GIF path: same base name as PDF label but .gif extension
+        label_media_rel = shipment.label_url.lstrip('/media/')
+        gif_rel  = label_media_rel.rsplit('.', 1)[0] + '.gif'
+        gif_path = os.path.join(django_settings.MEDIA_ROOT, gif_rel)
+
+        if not os.path.exists(gif_path):
+            return HttpResponse(
+                'GIF-джерело недоступне для цієї відправки.\n'
+                'Ця функція працює для відправок, створених після оновлення системи.',
+                status=404,
+                content_type='text/plain; charset=utf-8',
+            )
+
+        with open(gif_path, 'rb') as f:
+            gif_b64 = _b64_mod.b64encode(f.read()).decode()
+
+        pdf_b64  = _gif_label_to_a4_pdf(gif_b64)
+        pdf_bytes = _b64_mod.b64decode(pdf_b64)
+
+        tracking = shipment.tracking_number or str(shipment_id)
+        filename = f'label_a4_{tracking}.pdf'
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
+        return response
 
     def save_labels_to_docs_view(self, request, shipment_id):
         """POST — saves shipping PDFs into media/orders/{source}/{order_number}/.
@@ -3604,6 +3657,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             logger.info('UPS label saved: %s', fpath)
             _copy_shipment_file_local(fpath, shipment)
             _copy_shipment_file_to_order_docs(fpath, shipment)
+
+            # Зберегти оригінальний GIF для повторної генерації A4
+            if result.get('label_gif_base64'):
+                gif_fname = f'ups_{shipment.pk}_{result["tracking_number"]}.gif'
+                gif_fpath = os.path.join(label_dir, gif_fname)
+                with open(gif_fpath, 'wb') as f:
+                    f.write(_b64.b64decode(result['label_gif_base64']))
+                logger.info('UPS label GIF saved: %s', gif_fpath)
 
         # Зберегти митну декларацію (комерційний інвойс)
         if result.get('customs_base64'):
