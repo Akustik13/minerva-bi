@@ -32,17 +32,17 @@
             onclick="dkPullFromDigiKey()">
       📥 Стягнути з DigiKey
     </button>
-    <a href="{{ publish_url }}" class="dk-btn dk-btn-publish"
-       onclick="return confirm('{% if original.dk_offer_id %}Оновити лістинг на DigiKey?{% else %}Опублікувати товар на DigiKey Marketplace?{% endif %}')">
+    <button type="button" class="dk-btn dk-btn-publish"
+            onclick="dkPublishClick()">
       {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати{% endif %}
-    </a>
+    </button>
     {% if original.sync_status == 'staged' and not original.dk_offer_id %}
     <a href="{{ create_offer_url }}" class="dk-btn dk-btn-offer"
        onclick="return confirm('Спробувати створити Offer?')">
       📦 Створити Offer
     </a>
     {% endif %}
-    <button type="button" class="dk-btn dk-btn-cancel" onclick="dkCancel()">
+    <button type="button" class="dk-btn dk-btn-cancel dk-btn-cancel-red" onclick="dkCancel()">
       ✕ Скасувати
     </button>
     <span id="dkStatus" style="display:none;align-items:center;gap:6px;font-size:13px">
@@ -54,6 +54,35 @@
     {% elif original.sync_status == 'error' and original.last_error %}
     <span class="dk-bar-note dk-note-error">❌ {{ original.last_error|truncatechars:100 }}</span>
     {% endif %}
+  </div>
+
+  {# ── PUBLISH CONFIRM MODAL ─────────────────────────────────────────────── #}
+  <div id="dkPublishModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);
+       z-index:9999;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:10px;padding:28px 32px;max-width:440px;width:90%;
+                box-shadow:0 12px 40px rgba(0,0,0,.35)">
+      <h3 style="margin:0 0 8px;font-size:17px;color:#212121">⚠️ Незбережені зміни</h3>
+      <p style="color:#546e7a;margin:0 0 22px;font-size:14px;line-height:1.5">
+        Форма містить незбережені зміни.<br>Що зробити перед публікацією на DigiKey?
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button onclick="dkModalSaveAndPublish()"
+                style="padding:10px 16px;background:#1565c0;color:#fff;border:none;border-radius:6px;
+                       font-size:14px;cursor:pointer;text-align:left">
+          💾&nbsp; Зберегти і оновити на DigiKey
+        </button>
+        <button onclick="dkModalSaveOnly()"
+                style="padding:10px 16px;background:#f5f5f5;color:#212121;border:1px solid #e0e0e0;
+                       border-radius:6px;font-size:14px;cursor:pointer;text-align:left">
+          💾&nbsp; Тільки зберегти (без публікації)
+        </button>
+        <button onclick="dkModalDismiss()"
+                style="padding:10px 16px;background:#fff;color:#c62828;border:1px solid #ef9a9a;
+                       border-radius:6px;font-size:14px;cursor:pointer;text-align:left">
+          ✕&nbsp; Відхилити (залишити без змін)
+        </button>
+      </div>
+    </div>
   </div>
 
   {% endif %}
@@ -164,7 +193,8 @@ body.dk-edit .dk-view-val      { display: none !important; }
 .dk-btn-publish { background: #2e7d32; }
 .dk-btn-sync    { background: #1565c0; }
 .dk-btn-offer   { background: #e65100; }
-.dk-btn-cancel  { background: var(--bg-hover, #2a3d55); border: 1px solid var(--border-strong, #243347); }
+.dk-btn-cancel      { background: var(--bg-hover, #2a3d55); border: 1px solid var(--border-strong, #243347); }
+.dk-btn-cancel-red  { background: #c62828 !important; border-color: #b71c1c !important; color: #fff !important; }
 
 .dk-bar-hint { font-size: 12px; color: var(--text-muted, #9aafbe); margin-left: auto; }
 .dk-bar-note { font-size: 12px; font-style: italic; margin-left: auto; }
@@ -292,7 +322,7 @@ body.dk-edit .dk-view-val      { display: none !important; }
 ═══════════════════════════════════════════════════════════════════════════ */
 .dk-attrs-wrap { margin: 4px 0 8px; }
 .dk-attrs-table {
-  border-collapse: collapse; width: 100%; max-width: 700px; font-size: 13px;
+  border-collapse: collapse; width: 100%; max-width: 900px; font-size: 13px;
 }
 .dk-attrs-table th {
   text-align: left; padding: 5px 12px;
@@ -364,6 +394,50 @@ var DK_FIELD_MAP = {
 /* ════════════════════════════════════════════════════════════════════════════
    View / Edit mode
 ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Dirty tracking + Publish modal ─────────────────────────────────────── */
+var _formDirty   = false;
+var _publishUrl  = '{{ publish_url|default:"" }}';
+var _isExisting  = {{ original.dk_offer_id|yesno:"true,false" }};
+
+(function() {
+  /* Mark form as dirty on any user input */
+  document.addEventListener('input',  function() { _formDirty = true; });
+  document.addEventListener('change', function() { _formDirty = true; });
+})();
+
+function dkPublishClick() {
+  if (_formDirty) {
+    document.getElementById('dkPublishModal').style.display = 'flex';
+  } else {
+    var msg = _isExisting ? 'Оновити лістинг на DigiKey?' : 'Опублікувати товар на DigiKey Marketplace?';
+    if (confirm(msg)) window.location.href = _publishUrl;
+  }
+}
+
+function dkModalDismiss() {
+  document.getElementById('dkPublishModal').style.display = 'none';
+}
+
+function _dkGetForm() {
+  return document.getElementById('content-main').querySelector('form') ||
+         document.querySelector('form');
+}
+
+function dkModalSaveAndPublish() {
+  var form = _dkGetForm();
+  var inp  = document.createElement('input');
+  inp.type  = 'hidden';
+  inp.name  = '_dk_save_and_publish';
+  inp.value = '1';
+  form.appendChild(inp);
+  form.submit();
+}
+
+function dkModalSaveOnly() {
+  dkModalDismiss();
+  _dkGetForm().submit();
+}
 
 function dkEnterView() {
   document.body.classList.remove('dk-edit');
@@ -702,7 +776,7 @@ function dkAttrsInit() {
   wrap.className = 'dk-attrs-wrap';
   wrap.innerHTML =
     '<table class="dk-attrs-table"><thead><tr>'+
-      '<th style="width:220px">Атрибут</th><th>Значення</th>'+
+      '<th style="width:260px">Атрибут</th><th>Значення</th>'+
     '</tr></thead><tbody class="dk-atbody"></tbody></table>'+
     '<div class="dk-attrs-empty" id="dkAttrsEmpty" style="display:none">'+
       'Порожньо — натисніть 📥 Стягнути поля з DigiKey.'+

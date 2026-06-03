@@ -1260,7 +1260,6 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         ('💰 Цінові тири (JSON)', {
             'fields': ('dk_prices',),
             'description': 'Керуй цінами через візуальний редактор нижче. JSON оновлюється автоматично.',
-            'classes': ('collapse',),
         }),
         ('📋 Обов\'язкові атрибути DigiKey', {
             'fields': ('dk_packaging', 'dk_lifecycle_status'),
@@ -1307,6 +1306,23 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             obj.last_error     = ''
             obj.last_synced_at = None
         super().save_model(request, obj, form, change)
+
+    def response_change(self, request, obj):
+        if '_dk_save_and_publish' in request.POST:
+            from bots.services.dk_marketplace import publish_listing, DKMarketplaceError
+            try:
+                publish_listing(obj)
+                messages.success(
+                    request,
+                    f"✅ Збережено і опубліковано на DigiKey. "
+                    f"Product ID: {obj.dk_product_id} | Offer ID: {obj.dk_offer_id}"
+                )
+            except DKMarketplaceError as exc:
+                messages.error(request, f"❌ Збережено, але помилка публікації: {exc}")
+            except Exception as exc:
+                messages.error(request, f"❌ Збережено, але помилка: {exc}")
+            return redirect(reverse('admin:bots_digikeylisting_change', args=[obj.pk]))
+        return super().response_change(request, obj)
 
     # ── change_view: inject buttons ───────────────────────────────────────────
 
