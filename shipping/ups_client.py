@@ -14,6 +14,7 @@ api_url='sandbox'|'' for production).
   Void:     DELETE /api/shipments/v2409/void/cancel/{shipmentId}
 """
 import base64
+import io
 import logging
 import time
 import unicodedata
@@ -75,6 +76,42 @@ def _get_ups_carrier():
             'Account Number (Connection UUID).'
         )
     return c
+
+
+def _gif_label_to_a4_pdf(gif_b64: str) -> str:
+    """Convert a base64 UPS GIF shipping label to a base64 A4 PDF using Pillow."""
+    try:
+        from PIL import Image
+
+        DPI    = 200
+        A4_W   = int(8.27  * DPI)   # 1654 px
+        A4_H   = int(11.69 * DPI)   # 2338 px
+        MARGIN = int(0.39  * DPI)   # ~10 mm
+
+        gif_bytes = base64.b64decode(gif_b64)
+        label     = Image.open(io.BytesIO(gif_bytes)).convert('RGB')
+
+        # Rotate landscape labels to portrait
+        if label.width > label.height:
+            label = label.rotate(90, expand=True)
+
+        # Scale to fit within A4 minus margins
+        max_w, max_h = A4_W - 2 * MARGIN, A4_H - 2 * MARGIN
+        label.thumbnail((max_w, max_h), Image.LANCZOS)
+
+        # Paste centered on white A4 canvas
+        canvas = Image.new('RGB', (A4_W, A4_H), 'white')
+        x = (A4_W - label.width)  // 2
+        y = (A4_H - label.height) // 2
+        canvas.paste(label, (x, y))
+
+        buf = io.BytesIO()
+        canvas.save(buf, format='PDF', resolution=DPI)
+        return base64.b64encode(buf.getvalue()).decode()
+
+    except Exception:
+        logger.exception("_gif_label_to_a4_pdf failed, returning original GIF base64")
+        return gif_b64  # fallback: return original
 
 
 class UPSClient:
@@ -625,7 +662,7 @@ class UPSClient:
         """
         pickup  = from_address or self._default_shipper()  # physical pickup (can be US)
         account = self._default_shipper()                  # carrier account holder (always DE)
-        label_format = 'PDF'
+        label_format = 'GIF'  # request GIF; we convert to A4 PDF after
 
         shipment = {
             # Shipper = account holder (billing) — always carrier's DE address + ShipperNumber
@@ -767,6 +804,11 @@ class UPSClient:
             if img.get('GraphicImage'):
                 customs_b64 = img['GraphicImage']
                 break
+
+        # Convert GIF label to A4 PDF
+        if label_b64:
+            label_b64   = _gif_label_to_a4_pdf(label_b64)
+            label_format = 'PDF'
 
         return {
             'tracking_number': tracking,
