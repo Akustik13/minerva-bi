@@ -1676,31 +1676,35 @@ Rules:
 
         # ── 5. Call Claude API ─────────────────────────────────────────────────
         try:
-            import anthropic
+            import anthropic, re as _re
             from strategy.models import AISettings
             client = anthropic.Anthropic(api_key=AISettings.get().anthropic_api_key)
-            # Prefill assistant turn with "{" — forces Claude to produce pure JSON
-            # without any surrounding text or markdown fences.
             response = client.messages.create(
                 model='claude-sonnet-4-6',
                 max_tokens=2048,
-                messages=[
-                    {'role': 'user',      'content': prompt},
-                    {'role': 'assistant', 'content': '{'},
-                ],
+                system=(
+                    "You are a JSON API. "
+                    "Output ONLY a single valid JSON object — no markdown, no code fences, "
+                    "no text before or after the JSON. "
+                    "All string values must be on one line (no literal newlines inside strings)."
+                ),
+                messages=[{'role': 'user', 'content': prompt}],
             )
-            raw = '{' + response.content[0].text
+            raw = response.content[0].text.strip()
+            # Slice to the outermost { ... }
+            s = raw.find('{')
+            e = raw.rfind('}')
+            if s == -1 or e <= s:
+                raise ValueError(f"No JSON object in response: {raw[:300]}")
+            raw = raw[s:e + 1]
             try:
                 result = json.loads(raw)
             except json.JSONDecodeError:
-                # Fallback: find outermost {...} and sanitise embedded newlines
-                import re as _re
-                m = _re.search(r'\{[\s\S]*\}', raw)
-                if not m:
-                    raise ValueError(f"Claude did not return JSON. Raw: {raw[:400]}")
-                # Replace unescaped literal newlines inside JSON string values
-                cleaned = _re.sub(r'(?<!\\)\n', ' ', m.group(0))
+                # Sanitise literal control chars that sneak into string values
+                cleaned = _re.sub(r'(?<!\\)[\n\r\t]', ' ', raw)
                 result = json.loads(cleaned)
+        except json.JSONDecodeError as exc:
+            return JsonResponse({'error': f'JSON parse error: {exc}  —  raw: {raw[:300]}'}, status=500)
         except Exception as exc:
             return JsonResponse({'error': str(exc)}, status=500)
 
