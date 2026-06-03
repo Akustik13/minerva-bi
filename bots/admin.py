@@ -1005,7 +1005,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             finished = t.finished_at.strftime('%H:%M:%S') if (t and t.finished_at) else ''
 
             if status == 'running':
-                icon = '⏳'; color = '#ff9800'
+                icon = '⏳'; color = '#e65100'
                 info = f'Запущено о {started} · {progress}'
                 cancel_btn = (
                     f'<button onclick="dkCancelTask(\'{name}\')" '
@@ -1014,25 +1014,25 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     f'⛔ Зупинити</button>'
                 )
             elif status == 'done':
-                icon = '✅'; color = '#4caf50'
+                icon = '✅'; color = '#2e7d32'
                 info = f'Завершено о {finished} · {message}'
                 cancel_btn = ''
             elif status == 'error':
-                icon = '❌'; color = '#e53935'
+                icon = '❌'; color = '#b71c1c'
                 info = f'Помилка о {finished} · {message}'
                 cancel_btn = ''
             else:
-                icon = '💤'; color = '#9aafbe'
+                icon = '💤'; color = '#78909c'
                 info = 'Не запускалось'
                 cancel_btn = ''
 
             tasks_html += (
-                f'<div id="dkTask_{name}" style="display:flex;align-items:center;gap:8px;'
-                f'padding:6px 10px;margin:4px 0;border-radius:6px;background:rgba(0,0,0,.15);'
-                f'font-size:13px;color:#cfd8dc">'
-                f'<span style="min-width:160px;font-weight:bold">{label}</span>'
-                f'<span style="color:{color}">{icon}</span>'
-                f'<span id="dkTaskInfo_{name}" style="color:#b0bec5;flex:1">{info}</span>'
+                f'<div id="dkTask_{name}" style="display:flex;align-items:flex-start;gap:8px;'
+                f'padding:8px 12px;margin:4px 0;border-radius:6px;'
+                f'background:#f5f5f5;border:1px solid #e0e0e0;font-size:13px;color:#212121">'
+                f'<span style="min-width:180px;font-weight:bold;color:#212121">{label}</span>'
+                f'<span style="color:{color};font-size:15px">{icon}</span>'
+                f'<span id="dkTaskInfo_{name}" style="color:#37474f;flex:1;word-break:break-word">{info}</span>'
                 f'{cancel_btn}'
                 f'</div>'
             )
@@ -1059,7 +1059,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
     var taskEl = document.getElementById('dkTask_' + name);
     if (!infoEl) return;
     var icons   = {{idle:'💤', running:'⏳', done:'✅', error:'❌'}};
-    var colors  = {{idle:'#9aafbe', running:'#ff9800', done:'#4caf50', error:'#e53935'}};
+    var colors  = {{idle:'#78909c', running:'#e65100', done:'#2e7d32', error:'#b71c1c'}};
     var icon    = icons[d.status] || '❓';
     var color   = colors[d.status] || '#ccc';
     var iconEl  = taskEl.querySelector('span[style*="color"]');
