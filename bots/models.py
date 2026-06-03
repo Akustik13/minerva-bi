@@ -329,6 +329,10 @@ class DigiKeyListing(models.Model):
         'Остання зміна цін (%)', null=True, blank=True,
         help_text='Останній застосований масовий відсоток зміни цін (наприклад +10 або -5).'
     )
+    dk_price_min = models.FloatField(
+        'Ціна (1 шт.)', null=True, blank=True, db_index=True,
+        help_text='Автоматично: ціна за 1 шт. з dk_prices (для сортування)'
+    )
 
     # ── Sync status ────────────────────────────────────────────────────────────
     sync_status    = models.CharField('Статус', max_length=20,
@@ -363,6 +367,19 @@ class DigiKeyListing(models.Model):
         if self.dk_quantity_override is not None:
             return self.dk_quantity_override
         return self.get_stock_qty()
+
+    def save(self, *args, **kwargs):
+        # Keep dk_price_min synced for fast DB-level sorting
+        try:
+            tiers = [t for t in (self.dk_prices or []) if t.get('price') not in (None, '')]
+            if tiers:
+                min_qty_tier = min(tiers, key=lambda t: int(t.get('qty') or 0))
+                self.dk_price_min = float(min_qty_tier['price'])
+            else:
+                self.dk_price_min = None
+        except Exception:
+            self.dk_price_min = None
+        super().save(*args, **kwargs)
 
     def get_prices_api(self):
         """Prices list for API: [{"quantityBreak": N, "price": X.XX}, ...]"""

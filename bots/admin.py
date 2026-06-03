@@ -1222,7 +1222,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     change_form_template = 'admin/bots/digikeylisting/change_form.html'
 
     list_display   = ('product_sku_link', 'dk_title', 'category_type',
-                      'stock_qty_display', 'dk_qty_display',
+                      'stock_qty_display', 'dk_qty_display', 'price_min_display',
                       'sync_status_badge', 'price_delta_badge',
                       'last_synced_at', 'publish_btn')
     list_filter    = ('sync_status', 'category_type', 'dk_is_active')
@@ -1335,6 +1335,30 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 messages.error(request, f"❌ Збережено, але помилка: {exc}")
             return redirect(reverse('admin:bots_digikeylisting_change', args=[obj.pk]))
         return super().response_change(request, obj)
+
+    # ── Queryset: annotate stock qty for sorting ──────────────────────────────
+
+    def get_queryset(self, request):
+        from django.db.models import OuterRef, Subquery, DecimalField
+        from django.db.models.functions import Coalesce
+        try:
+            from inventory.models import InventoryTransaction
+            from django.db.models import Sum
+            stock_subq = (
+                InventoryTransaction.objects
+                .filter(product_id=OuterRef('product_id'))
+                .values('product_id')
+                .annotate(total=Sum('qty'))
+                .values('total')
+            )
+            return super().get_queryset(request).annotate(
+                _stock_qty=Coalesce(
+                    Subquery(stock_subq, output_field=DecimalField()),
+                    0,
+                )
+            )
+        except Exception:
+            return super().get_queryset(request)
 
     # ── changelist_view: inject pull-task toolbar context ─────────────────────
 
@@ -2165,6 +2189,23 @@ Rules:
         color = 'var(--ok)' if qty > 0 else 'var(--err)'
         return format_html('<span style="color:{};font-weight:600">{} шт.</span>', color, qty)
     stock_qty_display.short_description = 'Склад'
+    stock_qty_display.admin_order_field = '_stock_qty'
+
+    def price_min_display(self, obj):
+        p = obj.dk_price_min
+        if p is None:
+            return format_html('<span style="color:var(--text-muted);font-size:11px">—</span>')
+        color = '#c9d8e4'
+        tiers = obj.dk_prices or []
+        if len(tiers) > 1:
+            return format_html(
+                '<span style="font-weight:700;color:{}">${}</span>'
+                '<span style="color:var(--text-muted);font-size:10px;margin-left:2px">…</span>',
+                color, f'{p:.4f}',
+            )
+        return format_html('<span style="font-weight:700;color:{}">${}</span>', color, f'{p:.4f}')
+    price_min_display.short_description = 'Ціна (1 шт.)'
+    price_min_display.admin_order_field = 'dk_price_min'
 
     def dk_qty_display(self, obj):
         if obj.dk_quantity_override is not None:
