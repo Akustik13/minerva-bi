@@ -302,9 +302,10 @@ def publish_listing(listing) -> str:
             'Продукт в черзі на перевірку DigiKey. '
             'Після затвердження натисніть 📦 Створити Offer.'
         )
+        listing.last_error_at  = None
         listing.save(update_fields=[
             'dk_product_id', 'dk_offer_id',
-            'sync_status', 'last_synced_at', 'last_error',
+            'sync_status', 'last_synced_at', 'last_error', 'last_error_at',
         ])
         return status
     except Exception as exc:
@@ -338,7 +339,8 @@ def create_offer_for_listing(listing) -> None:
     listing.sync_status    = DigiKeyListing.SYNC_PUBLISHED
     listing.last_synced_at = timezone.now()
     listing.last_error     = ''
-    listing.save(update_fields=['dk_offer_id', 'sync_status', 'last_synced_at', 'last_error'])
+    listing.last_error_at  = None
+    listing.save(update_fields=['dk_offer_id', 'sync_status', 'last_synced_at', 'last_error', 'last_error_at'])
 
 
 def sync_quantity(listing) -> None:
@@ -350,7 +352,8 @@ def sync_quantity(listing) -> None:
     update_offer(config, listing)
     listing.last_synced_at = timezone.now()
     listing.last_error     = ''
-    listing.save(update_fields=['last_synced_at', 'last_error'])
+    listing.last_error_at  = None
+    listing.save(update_fields=['last_synced_at', 'last_error', 'last_error_at'])
 
 
 def fetch_supplier_uuid(config) -> dict:
@@ -502,9 +505,10 @@ def import_offers_from_dk(task=None) -> dict:
         listing.sync_status    = DigiKeyListing.SYNC_PUBLISHED
         listing.last_synced_at = timezone.now()
         listing.last_error     = ''
+        listing.last_error_at  = None
 
         update_flds = ['dk_offer_id', 'dk_product_id', 'sync_status',
-                       'last_synced_at', 'last_error']
+                       'last_synced_at', 'last_error', 'last_error_at']
 
         qty_available = offer.get('quantityAvailable')
         if qty_available is not None:
@@ -937,9 +941,12 @@ def pull_product_fields(listing) -> dict:
             except (TypeError, ValueError):
                 pass
 
-    if changed:
-        listing.save(update_fields=changed)
-        logger.info("DK pull OK SKU=%s changed=%s", sku, changed)
+    from django.utils import timezone as _tz_pull
+    listing.last_error    = ''
+    listing.last_error_at = None
+    changed_all = list(changed) + ['last_error', 'last_error_at']
+    listing.save(update_fields=changed_all)
+    logger.info("DK pull OK SKU=%s changed=%s", sku, changed)
 
     return {
         'changed':     changed,
