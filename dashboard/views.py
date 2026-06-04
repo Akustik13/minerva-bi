@@ -201,6 +201,30 @@ def dashboard(request):
     except Exception:
         rev_by_month = []
 
+    # Fill every calendar month in [date_from, date_to] so the chart always
+    # shows the full selected range, not only months that have orders.
+    from datetime import date as _date
+    _ym  = _date(date_from.year, date_from.month, 1)
+    _end = _date(date_to.year,   date_to.month,   1)
+    _all_months = []
+    while _ym <= _end:
+        _all_months.append(_ym)
+        _ym = _date(_ym.year + (_ym.month == 12), (_ym.month % 12) + 1, 1)
+
+    _rev_lookup = {}
+    for r in rev_by_month:
+        _key = r['month']
+        if hasattr(_key, 'date'):   # datetime → date
+            _key = _key.date()
+        if hasattr(_key, 'replace'):
+            _key = _key.replace(day=1)
+        _rev_lookup[_key] = r
+
+    rev_by_month = [
+        _rev_lookup.get(m, {'month': m, 'revenue': 0, 'orders': 0})
+        for m in _all_months
+    ]
+
     chart_months   = [str(r['month'])[:7] for r in rev_by_month]
     chart_rev      = [float(r['revenue'] or 0) for r in rev_by_month]
     chart_orders_m = [int(r['orders'] or 0) for r in rev_by_month]

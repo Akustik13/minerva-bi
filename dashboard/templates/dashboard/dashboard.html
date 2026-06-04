@@ -400,7 +400,7 @@ function setPreset(days) {
     <div class="card">
       <div class="card-head">
         <span class="card-title"><span class="ico">📈</span> Виручка по місяцях (€)</span>
-        <span class="card-sub">вся історія</span>
+        <span class="card-sub">{{ period_label }}</span>
       </div>
       <div class="card-body">
         <div class="chart-wrap"><canvas id="chartRevMonth"></canvas></div>
@@ -766,28 +766,38 @@ const chartGeoRev   = {{ chart_geo_orders|safe }};
 const chartCatLbls  = {{ chart_cat_labels|safe }};
 const chartCatRev   = {{ chart_cat_qty|safe }};
 
+/* Derived fill colours (add transparency suffix to hex or use rgba) */
+const BLUE_A40 = _light ? 'rgba(9,105,218,0.40)'   : 'rgba(88,166,255,0.22)';
+const GOLD_A50 = _light ? 'rgba(124,92,0,0.50)'     : 'rgba(201,168,76,0.30)';
+const _tickCfg = { font: { size: 10 }, color: Chart.defaults.color };
+
 new Chart(document.getElementById('chartRevMonth'), {
   type: 'bar',
   data: {
     labels: chartMonths,
     datasets: [{
       label: 'Виручка €', data: chartRev,
-      backgroundColor: GOLDA, borderColor: GOLD, borderWidth: 2,
-      borderRadius: 4, yAxisID: 'y',
+      backgroundColor: BLUE_A40, borderColor: BLUE,
+      borderWidth: 1.5, borderRadius: 5, yAxisID: 'y', order: 2,
     }, {
       label: 'Замовлення', data: chartOrdersM, type: 'line',
-      borderColor: BLUE, backgroundColor: 'transparent', borderWidth: 2,
-      pointRadius: 3, pointBackgroundColor: BLUE, tension: 0.4, yAxisID: 'y2',
+      borderColor: ORANGE, backgroundColor: 'transparent', borderWidth: 2,
+      pointRadius: 3, pointBackgroundColor: ORANGE,
+      pointBorderColor: _chartBg, pointBorderWidth: 1.5,
+      tension: 0.35, yAxisID: 'y2', order: 1,
     }]
   },
   options: {
     responsive: true, maintainAspectRatio: true,
     interaction: { mode: 'index', intersect: false },
-    plugins: { legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 } } } },
+    plugins: {
+      legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 }, padding: 12 } },
+      tooltip: { callbacks: { title: items => items[0].label } },
+    },
     scales: {
-      x: { grid: { color: _gridColor }, ticks: { font: { size: 10 } } },
-      y:  { grid: { color: _gridColor }, ticks: { font: { size: 10 }, callback: v => '€'+v.toLocaleString() } },
-      y2: { position: 'right', grid: { display: false }, ticks: { font: { size: 10 } } },
+      x:  { grid: { color: _gridColor }, ticks: { ..._tickCfg, maxRotation: 45 } },
+      y:  { grid: { color: _gridColor }, ticks: { ..._tickCfg, callback: v => '€'+v.toLocaleString() }, beginAtZero: true },
+      y2: { position: 'right', grid: { display: false }, ticks: { ..._tickCfg }, beginAtZero: true },
     }
   }
 });
@@ -798,21 +808,24 @@ new Chart(document.getElementById('chartDayOrd'), {
     labels: chartDays,
     datasets: [{
       label: 'Замовлення', data: chartDayOrd,
-      borderColor: BLUE, backgroundColor: BLUEA, borderWidth: 2,
-      fill: true, tension: 0.4, pointRadius: 2,
+      borderColor: BLUE, backgroundColor: BLUE_A40,
+      borderWidth: 2, fill: true, tension: 0.4,
+      pointRadius: chartDayOrd.length > 60 ? 0 : 3,
+      pointBackgroundColor: BLUE,
     }]
   },
   options: {
     responsive: true, maintainAspectRatio: true,
     plugins: { legend: { display: false } },
     scales: {
-      x: { grid: { color: _gridColor }, ticks: { maxTicksLimit: 10, font: { size: 10 } } },
-      y: { grid: { color: _gridColor }, beginAtZero: true, ticks: { font: { size: 10 } } },
+      x: { grid: { color: _gridColor }, ticks: { ..._tickCfg, maxTicksLimit: 10 } },
+      y: { grid: { color: _gridColor }, beginAtZero: true, ticks: _tickCfg },
     }
   }
 });
 
-const GEO_COLORS = [GOLD, BLUE, GREEN, ORANGE, PURPLE, RED, '#39d353', '#ff7b72'];
+const GEO_COLORS = [BLUE, ORANGE, GREEN, PURPLE, GOLD, RED,
+                    _light?'#0e7490':'#22d3ee', _light?'#6d28d9':'#a78bfa'];
 new Chart(document.getElementById('chartGeo'), {
   type: 'doughnut',
   data: {
@@ -828,7 +841,7 @@ new Chart(document.getElementById('chartGeo'), {
   }
 });
 
-const CAT_COLORS = [BLUE, GOLD, GREEN, PURPLE, ORANGE];
+const CAT_COLORS = [BLUE, ORANGE, GREEN, PURPLE, GOLD, RED];
 new Chart(document.getElementById('chartCat'), {
   type: 'doughnut',
   data: {
