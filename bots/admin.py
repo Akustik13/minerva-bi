@@ -1702,12 +1702,20 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 if not new_prices:
                     return JsonResponse({'error': 'Ціни не передані'}, status=400)
                 old_prices = list(listing.dk_prices or [])
+                # Compute delta_pct from min-qty tier (for changelist badge)
+                try:
+                    old_min = min((float(t['price']) for t in old_prices if t.get('price')), default=None)
+                    new_min = min((float(t['price']) for t in new_prices if t.get('price')), default=None)
+                    computed_delta = round((new_min - old_min) / old_min * 100, 2) if old_min else None
+                except Exception:
+                    computed_delta = None
                 listing.dk_prices = new_prices
-                listing.save(update_fields=['dk_prices'])
+                listing.price_delta_pct = computed_delta
+                listing.save(update_fields=['dk_prices', 'price_delta_pct'])
                 try:
                     DigiKeyPriceLog.objects.create(
                         listing=listing,
-                        delta_pct=None,
+                        delta_pct=computed_delta,
                         old_prices=old_prices,
                         new_prices=new_prices,
                         user=request.user.get_username() if request.user else 'ai_advisor',
@@ -2350,16 +2358,15 @@ Rules:
     def price_min_display(self, obj):
         p = obj.dk_price_min
         if p is None:
-            return format_html('<span style="color:var(--text-muted);font-size:11px">—</span>')
-        color = '#c9d8e4'
+            return format_html('<span style="color:var(--text-muted,#9aafbe);font-size:11px">—</span>')
         tiers = obj.dk_prices or []
-        if len(tiers) > 1:
-            return format_html(
-                '<span style="font-weight:700;color:{}">${}</span>'
-                '<span style="color:var(--text-muted);font-size:10px;margin-left:2px">…</span>',
-                color, f'{p:.4f}',
-            )
-        return format_html('<span style="font-weight:700;color:{}">${}</span>', color, f'{p:.4f}')
+        suffix = format_html(
+            '<span style="color:var(--text-muted,#6c757d);font-size:10px;margin-left:2px">…</span>'
+        ) if len(tiers) > 1 else ''
+        return format_html(
+            '<span style="font-weight:700;color:var(--dk-price-color,#1565c0)">${}</span>{}',
+            f'{p:.4f}', suffix,
+        )
     price_min_display.short_description = 'Ціна (1 шт.)'
     price_min_display.admin_order_field = 'dk_price_min'
 
@@ -2469,6 +2476,12 @@ Rules:
     def sync_status_badge(self, obj):
         color, icon = self._STATUS_COLORS.get(obj.sync_status, ('#607d8b', '?'))
         label = obj.get_sync_status_display()
+        if obj.sync_status == 'error' and obj.last_error:
+            tip = obj.last_error[:300]
+            return format_html(
+                '<span style="color:{};font-weight:600;cursor:help" title="{}">{} {}</span>',
+                color, tip, icon, label,
+            )
         return format_html(
             '<span style="color:{};font-weight:600">{} {}</span>', color, icon, label
         )

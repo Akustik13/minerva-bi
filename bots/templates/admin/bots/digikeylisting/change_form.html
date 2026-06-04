@@ -349,9 +349,7 @@ body.dk-edit .dk-view-val      { display: none !important; }
 }
 .dk-attrs-table th:first-child { width: 270px; }
 .dk-attrs-table td { padding: 4px 8px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; word-break: break-word; }
-.dk-attr-code { font-family: monospace; font-size: 12px; color: var(--text-muted, #9aafbe); padding: 5px 14px 2px; white-space: nowrap; }
-.dk-attr-label { display: block; font-family: inherit; font-size: 11px; color: var(--text, #c9d8e4); padding: 0 14px 4px; font-weight: 500; }
-.dk-attr-unit  { font-size: 10px; color: var(--text-muted, #9aafbe); margin-left: 4px; font-weight: 400; }
+.dk-attr-code { font-family: monospace; font-size: 12px; color: var(--text-muted, #9aafbe); padding: 5px 14px; white-space: nowrap; }
 .dk-attr-tip {
   display: inline-flex; align-items: center; justify-content: center;
   width: 14px; height: 14px; border-radius: 50%;
@@ -844,10 +842,8 @@ var DK_ATTR_INFO = {
 function dkAttrInfoHtml(code) {
   var info = DK_ATTR_INFO[code];
   if (!info) return '';
-  var tip = info.desc + (info.unit ? ' · ' + info.unit : '');
-  return '<span class="dk-attr-label">' + dkEsc(info.label) +
-         (info.unit ? '<span class="dk-attr-unit">(' + dkEsc(info.unit) + ')</span>' : '') +
-         '<i class="dk-attr-tip" title="' + dkEsc(tip) + '">i</i></span>';
+  var tip = info.label + (info.unit ? ' (' + info.unit + ')' : '') + ' — ' + info.desc;
+  return ' <i class="dk-attr-tip" title="' + dkEsc(tip) + '">i</i>';
 }
 
 var _aTbody = null, _aTa = null;
@@ -885,9 +881,7 @@ function dkAttrsRebuild(obj) {
     var val = obj[code];
     var tr = document.createElement('tr');
     tr.innerHTML =
-      '<td class="dk-attr-code" style="vertical-align:top">' +
-        dkEsc(code) + dkAttrInfoHtml(code) +
-      '</td>'+
+      '<td class="dk-attr-code">' + dkEsc(code) + dkAttrInfoHtml(code) + '</td>'+
       '<td class="dk-attr-val"><input type="text" data-code="'+dkEsc(code)+'" value="'+
         dkEsc(String(val===null||val===undefined?'':val))+'" autocomplete="off"></td>';
     tr.querySelector('input').addEventListener('input', _aSync);

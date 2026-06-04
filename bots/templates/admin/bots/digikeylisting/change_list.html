@@ -53,6 +53,11 @@
 
 <style>
 @keyframes dkpullspin { to { transform:rotate(360deg); } }
+/* Price color: dark blue in light theme, light blue in dark theme */
+:root { --dk-price-color: #1565c0; }
+@media (prefers-color-scheme: dark) { :root { --dk-price-color: #64b5f6; } }
+/* Django dark theme overrides --dk-price-color via body class */
+body.dark { --dk-price-color: #64b5f6; }
 </style>
 
 <script>
