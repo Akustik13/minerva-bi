@@ -944,8 +944,16 @@ def pull_product_fields(listing) -> dict:
     from django.utils import timezone as _tz_pull
     listing.last_error    = ''
     listing.last_error_at = None
-    changed_all = list(changed) + ['last_error', 'last_error_at']
-    listing.save(update_fields=changed_all)
+    extra_fields = ['last_error', 'last_error_at']
+    if listing.sync_status == DigiKeyListing.SYNC_ERROR:
+        if listing.dk_offer_id:
+            listing.sync_status = DigiKeyListing.SYNC_PUBLISHED
+        elif listing.dk_product_id:
+            listing.sync_status = DigiKeyListing.SYNC_STAGED
+        else:
+            listing.sync_status = DigiKeyListing.SYNC_DRAFT
+        extra_fields.append('sync_status')
+    listing.save(update_fields=list(changed) + extra_fields)
     logger.info("DK pull OK SKU=%s changed=%s", sku, changed)
 
     return {
