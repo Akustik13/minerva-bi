@@ -348,9 +348,17 @@
   const ok     = cv('--ok');
   const warn   = cv('--warn');
   const err    = cv('--err');
+  const _light = document.documentElement.getAttribute('data-theme') === 'light';
 
-  /* Palette — enough for up to 6 years */
-  const palette = [accent, gold, ok, warn, err, dim];
+  /* Apply theme-aware defaults so axis ticks / tooltips are legible in both themes */
+  Chart.defaults.color      = muted || (_light ? '#4b5563' : '#7d8590');
+  Chart.defaults.borderColor = border;
+  Chart.defaults.font.family = "'Manrope', sans-serif";
+
+  /* Palette — use CSS-var colors; in light theme gold is borderline so swap to accent for slot 1 */
+  const palette = _light
+    ? [accent, cv('--gold-l') || '#7c5c00', ok, warn, err, dim]
+    : [accent, gold, ok, warn, err, dim];
 
   /* ── Shared chart config ── */
   const gridCfg = { color: border, drawTicks: false };

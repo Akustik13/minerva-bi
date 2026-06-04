@@ -205,6 +205,14 @@
   .chart-wrap canvas { max-height:180px; }
   .filter-sep { display:none; }
 }
+/* ── Badge colors: light theme overrides (dark colors for readability on white) ── */
+[data-theme="light"] .b-blue   { color:#0969da; }
+[data-theme="light"] .b-green  { color:#1a7f37; }
+[data-theme="light"] .b-orange { color:#9a6700; }
+[data-theme="light"] .b-red    { color:#cf222e; }
+[data-theme="light"] .b-purple { color:#5a2c9b; }
+[data-theme="light"] .b-gray   { color:#4b5563; }
+[data-theme="light"] .b-gold   { color:#7c5c00; }
 </style>
 {% endblock %}
 
@@ -270,6 +278,16 @@ function setPreset(days) {
   document.getElementById('inp-to').value   = fmt(today);
   document.getElementById('filter-form').submit();
 }
+// Highlight the active preset button based on current date range
+(function() {
+  var from = new Date('{{ date_from_str }}');
+  var to   = new Date('{{ date_to_str }}');
+  var diff = Math.round((to - from) / 86400000);
+  document.querySelectorAll('.pb').forEach(function(btn) {
+    var m = (btn.getAttribute('onclick') || '').match(/setPreset\((\d+)\)/);
+    if (m && parseInt(m[1]) === diff) btn.classList.add('active');
+  });
+})();
 </script>
 
 <!-- Quick actions -->
@@ -508,7 +526,7 @@ function setPreset(days) {
             </span>
           </div>
           <div class="mini-bar">
-            <div class="mini-bar-fill" style="width:{{ s.orders|default:0 }}%;background:{% if s.source == 'digikey' %}var(--accent){% elif s.source == 'nova_post' %}var(--warn){% else %}var(--text-muted){% endif %}"></div>
+            <div class="mini-bar-fill" style="width:{{ s.pct|default:0 }}%;background:{% if s.source == 'digikey' %}var(--accent){% elif s.source == 'nova_post' %}var(--warn){% else %}var(--text-muted){% endif %}"></div>
           </div>
         </div>
         {% empty %}
@@ -643,7 +661,7 @@ function setPreset(days) {
   <div class="card" style="margin-bottom:16px">
     <div class="card-head">
       <span class="card-title"><span class="ico">🔥</span> Найпопулярніші товари</span>
-      <span class="card-sub">за кількістю замовлень · {{ days }} днів</span>
+      <span class="card-sub">за кількістю замовлень · {{ period_days }} днів</span>
     </div>
     <div class="card-body" style="padding:0">
       <table class="t">
@@ -720,20 +738,23 @@ function setPreset(days) {
 <script>
 const _cs = getComputedStyle(document.documentElement);
 const _cv = k => _cs.getPropertyValue(k).trim();
-Chart.defaults.color = _cv('--text-dim') || '#7d8590';
-Chart.defaults.borderColor = _cv('--border') || 'rgba(255,255,255,0.07)';
+const _theme = document.documentElement.getAttribute('data-theme') || 'dark';
+const _light = _theme === 'light';
+Chart.defaults.color = _cv('--text-dim') || (_light ? '#6b7280' : '#7d8590');
+Chart.defaults.borderColor = _cv('--border') || (_light ? 'rgba(0,0,0,.08)' : 'rgba(255,255,255,0.07)');
 Chart.defaults.font.family = "'Manrope', sans-serif";
-const _chartBg = _cv('--bg-card') || '#161b22';
-const _gridColor = _cv('--border') || 'rgba(255,255,255,0.04)';
+const _chartBg   = _cv('--bg-card')  || (_light ? '#ffffff' : '#161b22');
+const _gridColor = _cv('--border')   || (_light ? 'rgba(0,0,0,.07)' : 'rgba(255,255,255,0.04)');
 
-const GOLD   = '#c9a84c';
-const GOLDA  = 'rgba(201,168,76,0.15)';
-const BLUE   = '#58a6ff';
-const BLUEA  = 'rgba(88,166,255,0.12)';
-const GREEN  = '#3fb950';
-const ORANGE = '#e3b341';
-const RED    = '#f85149';
-const PURPLE = '#bc8cff';
+/* Theme-adaptive chart palette — readable in both dark and light themes */
+const GOLD   = _light ? (_cv('--gold-l') || '#7c5c00') : '#c9a84c';
+const GOLDA  = _light ? 'rgba(124,92,0,0.30)'          : 'rgba(201,168,76,0.15)';
+const BLUE   = _light ? (_cv('--accent') || '#0969da') : '#58a6ff';
+const BLUEA  = _light ? 'rgba(9,105,218,0.25)'         : 'rgba(88,166,255,0.12)';
+const GREEN  = _light ? (_cv('--ok')   || '#1a7f37')   : '#3fb950';
+const ORANGE = _light ? (_cv('--warn') || '#9a6700')   : '#e3b341';
+const RED    = _light ? (_cv('--err')  || '#cf222e') : '#f85149';
+const PURPLE = _light ? '#5a2c9b'                    : '#bc8cff';
 
 const chartMonths   = {{ chart_months|safe }};
 const chartRev      = {{ chart_rev|safe }};
@@ -802,7 +823,7 @@ new Chart(document.getElementById('chartGeo'), {
     responsive: true, maintainAspectRatio: true, cutout: '65%',
     plugins: {
       legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 }, padding: 8 } },
-      tooltip: { callbacks: { label: ctx => ' €' + ctx.parsed.toLocaleString() } }
+      tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed.toLocaleString() + ' зам.' } }
     }
   }
 });
@@ -818,7 +839,7 @@ new Chart(document.getElementById('chartCat'), {
     responsive: true, maintainAspectRatio: true, cutout: '60%',
     plugins: {
       legend: { position: 'right', labels: { boxWidth: 10, font: { size: 10 }, padding: 8 } },
-      tooltip: { callbacks: { label: ctx => ' €' + ctx.parsed.toLocaleString() } }
+      tooltip: { callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed.toLocaleString() + ' шт.' } }
     }
   }
 });
