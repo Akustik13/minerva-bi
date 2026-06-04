@@ -944,7 +944,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     setTimeout(function() {
       dkEnterEdit();
-      void document.body.offsetHeight; // force layout after class change
+      void document.body.offsetHeight; // force reflow so inputs become visible
 
       /* 1. Standard Django form input */
       var _el = document.getElementById(_hashId) ||
@@ -959,37 +959,33 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (!_el && !_row) return;
 
-      /* Scroll */
-      var _anchor = _row || _el.closest('.form-row') || _el.parentNode;
-      if (_anchor) _anchor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      /* Target container to scroll to + measure */
+      var _anchor = _row || (_el && (_el.closest('.form-row') || _el.parentNode));
+      if (!_anchor) return;
 
-      /* Highlight via inline style (works regardless of overflow/outline clipping) */
-      function dkFlash(target) {
-        if (!target) return;
-        target.style.transition = 'none';
-        target.style.background = 'rgba(0,191,165,.22)';
-        target.style.boxShadow  = '0 0 0 3px rgba(0,191,165,.7), inset 0 0 0 1px rgba(0,191,165,.4)';
-        target.style.borderRadius = '5px';
-        setTimeout(function() {
-          target.style.transition = 'background 2s ease-out, box-shadow 2s ease-out';
-          target.style.background = '';
-          target.style.boxShadow  = '';
-        }, 900);
-      }
+      /* Scroll instantly so getBoundingClientRect() is accurate */
+      _anchor.scrollIntoView({ block: 'center' });
 
-      dkFlash(_row || _el.closest('.form-row') || _el.parentNode);
+      /* Fixed-position overlay — never clipped by overflow:hidden on ancestors */
+      var rect = _anchor.getBoundingClientRect();
+      var ov = document.createElement('div');
+      ov.style.cssText =
+        'position:fixed;top:' + rect.top + 'px;left:' + rect.left + 'px;' +
+        'width:' + rect.width + 'px;height:' + Math.max(rect.height, 24) + 'px;' +
+        'background:rgba(0,191,165,.18);border:2px solid #00bfa5;' +
+        'border-radius:6px;pointer-events:none;z-index:9999;box-sizing:border-box;opacity:1;';
+      document.body.appendChild(ov);
+      /* Hold then fade */
+      void ov.offsetHeight;
+      setTimeout(function() {
+        ov.style.transition = 'opacity 2s ease-out';
+        ov.style.opacity = '0';
+      }, 900);
+      setTimeout(function() { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 3000);
 
-      /* Also highlight the actual input/select */
-      if (_el && _el.tagName !== 'TR') {
-        _el.style.transition = 'none';
-        _el.style.borderColor = '#00bfa5';
-        _el.style.boxShadow   = '0 0 0 2px rgba(0,191,165,.5)';
-        setTimeout(function() {
-          _el.style.transition  = 'border-color 2s, box-shadow 2s';
-          _el.style.borderColor = '';
-          _el.style.boxShadow   = '';
-        }, 900);
-        if (_el.offsetParent !== null) _el.focus();
+      /* Focus input if visible */
+      if (_el && _el !== _anchor && _el.tagName !== 'TR' && _el.offsetParent !== null) {
+        _el.focus();
       }
     }, 500);
   }
