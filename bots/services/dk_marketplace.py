@@ -308,9 +308,15 @@ def publish_listing(listing) -> str:
         ])
         return status
     except Exception as exc:
-        listing.sync_status = DigiKeyListing.SYNC_ERROR
-        listing.last_error  = str(exc)
-        listing.save(update_fields=['sync_status', 'last_error'])
+        from django.utils import timezone as _tz
+        _now = _tz.now()
+        listing.sync_status  = DigiKeyListing.SYNC_ERROR
+        listing.last_error   = str(exc)
+        listing.last_error_at = _now
+        _log = list(listing.error_log or [])
+        _log.append({'at': _now.isoformat(), 'message': str(exc)[:500]})
+        listing.error_log = _log[-20:]
+        listing.save(update_fields=['sync_status', 'last_error', 'last_error_at', 'error_log'])
         raise
 
 

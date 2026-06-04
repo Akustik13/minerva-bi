@@ -1288,7 +1288,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         'dk_product_id', 'dk_offer_id',
-        'sync_status', 'last_synced_at', 'last_error',
+        'sync_status', 'last_synced_at', 'last_error', 'last_error_at',
+        'error_log_display',
         'created_at', 'updated_at',
         'stock_qty_readonly', 'dk_attributes_table',
     )
@@ -1335,7 +1336,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         ('📊 Статус синхронізації', {
             'fields': (
                 'dk_product_id', 'dk_offer_id',
-                'sync_status', 'last_synced_at', 'last_error',
+                'sync_status', 'last_synced_at', 'last_error', 'last_error_at',
+                'error_log_display',
                 'created_at', 'updated_at',
             ),
             'classes': ('collapse',),
@@ -1949,9 +1951,15 @@ Rules:
                 publish_listing(listing)
                 ok += 1
             except Exception as exc:
-                listing.sync_status = DigiKeyListing.SYNC_ERROR
-                listing.last_error  = str(exc)
-                listing.save(update_fields=['sync_status', 'last_error'])
+                from django.utils import timezone as _tz2
+                _now2 = _tz2.now()
+                listing.sync_status   = DigiKeyListing.SYNC_ERROR
+                listing.last_error    = str(exc)
+                listing.last_error_at = _now2
+                _l2 = list(listing.error_log or [])
+                _l2.append({'at': _now2.isoformat(), 'message': str(exc)[:500]})
+                listing.error_log = _l2[-20:]
+                listing.save(update_fields=['sync_status', 'last_error', 'last_error_at', 'error_log'])
                 logger.warning("bulk_publish failed %s: %s", listing.product.sku, exc)
                 err += 1
         if ok:
@@ -2260,9 +2268,15 @@ Rules:
                     except Exception as exc:
                         err += 1
                         try:
-                            listing.sync_status = DigiKeyListing.SYNC_ERROR
-                            listing.last_error  = str(exc)[:500]
-                            listing.save(update_fields=['sync_status', 'last_error'])
+                            from django.utils import timezone as _tz3
+                            _now3 = _tz3.now()
+                            listing.sync_status   = DigiKeyListing.SYNC_ERROR
+                            listing.last_error    = str(exc)[:500]
+                            listing.last_error_at = _now3
+                            _l3 = list(listing.error_log or [])
+                            _l3.append({'at': _now3.isoformat(), 'message': str(exc)[:500]})
+                            listing.error_log = _l3[-20:]
+                            listing.save(update_fields=['sync_status', 'last_error', 'last_error_at', 'error_log'])
                         except Exception:
                             pass
                         logger.warning("bulk_pull pk=%s: %s", pk, exc)
@@ -2487,6 +2501,27 @@ Rules:
         )
     sync_status_badge.short_description = 'Статус'
     sync_status_badge.admin_order_field = 'sync_status'
+
+    def error_log_display(self, obj):
+        log = obj.error_log if obj.error_log else []
+        if not log:
+            return mark_safe('<span style="color:#9aafbe;font-size:12px">— немає записів —</span>')
+        rows = []
+        for entry in reversed(log):
+            at  = entry.get('at', '')
+            msg = entry.get('message', '')
+            rows.append(
+                '<tr>'
+                f'<td style="white-space:nowrap;color:#9aafbe;font-size:11px;padding:2px 8px 2px 0">{at}</td>'
+                f'<td style="font-size:12px;color:#e57373;word-break:break-word">{msg}</td>'
+                '</tr>'
+            )
+        return mark_safe(
+            '<table style="border-collapse:collapse;width:100%">'
+            + ''.join(rows)
+            + '</table>'
+        )
+    error_log_display.short_description = 'Журнал помилок'
 
     def publish_btn(self, obj):
         if not obj.pk:
