@@ -2861,8 +2861,8 @@ Rules:
         return format_html(
             '<span style="color:{};background:{};border:1px solid {};'
             'border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap">'
-            '{}{:.1f}%</span>',
-            color, bg, border, sign, d,
+            '{}</span>',
+            color, bg, border, f'{sign}{d:.1f}%',
         )
     price_delta_badge.short_description = 'Δ Ціна'
     price_delta_badge.admin_order_field = 'price_delta_pct'
