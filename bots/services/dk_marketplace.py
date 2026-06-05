@@ -709,8 +709,12 @@ def _build_attributes_dict(additional_fields: list) -> dict:
     return result
 
 
-# Filter model-field ↔ DK attribute code mapping (codes from DigiKey Custom Fields API)
+# Filter model-field ↔ DK attribute key mapping.
+# Numeric codes: from Marketplace API additionalFields.
+# Human-readable keys: from ProductSearch Parameters[] — stored verbatim in dk_attributes.
+# Later keys win if both are present; last writer wins in _set (harmless).
 _FILTER_ATTR_MAP = {
+    # Numeric codes (Marketplace additionalFields)
     '139': 'fa_frequency',
     '398': 'fa_bandwidth',
     '21':  'fa_filter_type',
@@ -720,6 +724,18 @@ _FILTER_ATTR_MAP = {
     '16':  'fa_package_case',
     '46':  'fa_size_dimension',
     '966': 'fa_height_max',
+    # Human-readable keys (ProductSearch Parameters)
+    'Frequency':           'fa_frequency',
+    'Center Frequency':    'fa_frequency',
+    'Frequency Range':     'fa_frequency',
+    'Bandwidth':           'fa_bandwidth',
+    'Filter Type':         'fa_filter_type',
+    'Ripple':              'fa_ripple',
+    'Insertion Loss':      'fa_insertion_loss',
+    'Mounting Type':       'fa_mounting_type',
+    'Package / Case':      'fa_package_case',
+    'Size / Dimension':    'fa_size_dimension',
+    'Height - Max':        'fa_height_max',
 }
 
 # Auto-detect category_type from DK category name keywords

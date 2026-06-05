@@ -387,6 +387,31 @@ body.dk-edit .dk-view-val      { display: none !important; }
 .dk-required-empty select {
   border-color: #c62828 !important; box-shadow: 0 0 0 1px #c62828 !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Auto-fill highlight — persistent badge + teal border after 📥 DK pull
+   Cleared when the user edits the field or saves.
+═══════════════════════════════════════════════════════════════════════════ */
+.dk-autofill-badge {
+  display: inline-flex; align-items: center;
+  background: rgba(0,191,165,.13); color: #00bfa5;
+  border: 1px solid rgba(0,191,165,.4); border-radius: 4px;
+  font-size: 10px; font-weight: 700; padding: 1px 6px;
+  margin-left: 8px; vertical-align: middle; cursor: help; white-space: nowrap;
+}
+/* Persistent teal border on the actual input */
+.dk-autofill-row input:not(.dk-qty):not(.dk-price):not([data-code]),
+.dk-autofill-row textarea:not([name="dk_attributes"]):not([name="dk_prices"]),
+.dk-autofill-row select {
+  border-color: #00bfa5 !important;
+  box-shadow: 0 0 0 1px rgba(0,191,165,.2) !important;
+}
+/* Outline for attrs/prices special widgets */
+.dk-autofill-wrap {
+  outline: 1px solid rgba(0,191,165,.45);
+  border-radius: 4px;
+  outline-offset: 2px;
+}
 </style>
 
 <script>
@@ -606,24 +631,38 @@ function dkPullFromDigiKey() {
       return;
     }
 
-    var fields = data.data || {};
+    var fields     = data.data || {};
+    var changedSet = {};
+    (data.changed || []).forEach(function(f) { changedSet[f] = true; });
 
-    /* Fill text fields */
+    /* Fill text fields + mark auto-filled ones */
     Object.keys(DK_FIELD_MAP).forEach(function(key) {
       var el = document.getElementById(DK_FIELD_MAP[key]);
       if (!el || fields[key] === undefined || fields[key] === null) return;
       var nv = String(fields[key]);
       if (el.value !== nv) { el.value = nv; dkHighlight(el); }
+      if (changedSet[key]) {
+        var row = el.closest('.form-row') || el.closest('.field-box') || el.parentNode;
+        if (row) dkMarkAutofill(row, el);
+      }
     });
 
     /* Attrs editor */
     if (fields.dk_attributes && typeof fields.dk_attributes === 'object') {
       dkAttrsRebuild(fields.dk_attributes);
+      if (changedSet['dk_attributes']) {
+        var aw = document.querySelector('.dk-attrs-wrap');
+        if (aw) dkMarkAutofillWrap(aw);
+      }
     }
 
     /* Price table */
     if (Array.isArray(fields.dk_prices) && fields.dk_prices.length) {
       dkPricesRebuild(fields.dk_prices);
+      if (changedSet['dk_prices']) {
+        var pw = document.querySelector('.dk-prices-wrap');
+        if (pw) dkMarkAutofillWrap(pw);
+      }
     }
 
     /* Re-adapt UI sections to the (possibly updated) category */
@@ -655,6 +694,36 @@ function dkHighlight(el) {
   row.classList.remove('dk-field-updated');
   void row.offsetWidth;
   row.classList.add('dk-field-updated');
+}
+
+/* ── Auto-fill mark / clear ──────────────────────────────────────────────── */
+function dkMarkAutofill(row, el) {
+  row.classList.add('dk-autofill-row');
+  _dkAutofillBadge(row);
+  if (el) {
+    el.addEventListener('input',  function() { _dkClearAutofillRow(row); }, {once: true});
+    el.addEventListener('change', function() { _dkClearAutofillRow(row); }, {once: true});
+  }
+}
+function dkMarkAutofillWrap(wrap) {
+  wrap.classList.add('dk-autofill-wrap');
+  var row = wrap.closest('.form-row');
+  if (row) _dkAutofillBadge(row);
+}
+function _dkAutofillBadge(row) {
+  var lbl = row.querySelector('label');
+  if (lbl && !lbl.querySelector('.dk-autofill-badge')) {
+    var b = document.createElement('span');
+    b.className = 'dk-autofill-badge';
+    b.title = 'Заповнено автоматично з DigiKey — перевірте перед збереженням';
+    b.textContent = '🔄 DK';
+    lbl.appendChild(b);
+  }
+}
+function _dkClearAutofillRow(row) {
+  row.classList.remove('dk-autofill-row');
+  var b = row.querySelector('.dk-autofill-badge');
+  if (b) b.remove();
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
