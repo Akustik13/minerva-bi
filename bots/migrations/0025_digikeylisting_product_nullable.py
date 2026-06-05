@@ -6,7 +6,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('bots', '0024_error_log_fields'),
-        ('inventory', '0028_product_tech_attributes'),
+        ('inventory', '0027_incoming_shipment'),
     ]
 
     operations = [
