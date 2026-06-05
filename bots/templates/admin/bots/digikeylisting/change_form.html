@@ -66,6 +66,13 @@
     <button type="button" class="dk-btn dk-btn-cancel dk-btn-cancel-red" onclick="dkCancel()">
       ✕ Скасувати
     </button>
+    {% if validate_attrs_url %}
+    <button type="button" class="dk-btn" id="dkValidateBtn"
+            style="background:rgba(255,152,0,.15);color:#ffa726;border:1px solid rgba(255,152,0,.4)"
+            onclick="dkValidateAttrs()">
+      🔍 Перевірити атрибути
+    </button>
+    {% endif %}
     <span id="dkStatus" style="display:none;align-items:center;gap:6px;font-size:13px">
       <span id="dkStatusIcon">⏳</span>
       <span id="dkStatusMsg"></span>
@@ -306,6 +313,40 @@ body.dk-edit .dk-view-val      { display: none !important; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Attribute validation panel
+═══════════════════════════════════════════════════════════════════════════ */
+#dkValidateResult {
+  display: none; margin: 10px 0 0;
+  padding: 14px 16px;
+  background: var(--bg-card, #1a2535);
+  border: 1px solid rgba(255,152,0,.4); border-left: 4px solid #ffa726;
+  border-radius: 6px; font-size: 13px; max-width: 860px;
+}
+#dkValidateResult h4 { margin: 0 0 10px; font-size: 13px; color: var(--text, #c9d8e4); }
+.dkv-table { border-collapse: collapse; width: 100%; font-size: 12px; }
+.dkv-table th {
+  text-align: left; padding: 5px 10px;
+  background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
+  font-size: 11px; text-transform: uppercase; letter-spacing: .4px;
+  border-bottom: 1px solid var(--border-strong, #243347);
+}
+.dkv-table td { padding: 5px 10px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; }
+.dkv-ok  { color: #66bb6a; font-weight: 700; }
+.dkv-err { color: #ef5350; font-weight: 700; }
+.dkv-code { font-family: monospace; color: var(--text-muted, #9aafbe); }
+.dkv-avail { margin-top: 12px; font-size: 11px; color: var(--text-muted, #9aafbe); }
+.dkv-avail details summary { cursor: pointer; color: #42a5f5; }
+.dkv-avail-list { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.dkv-avail-code {
+  display: inline-block; padding: 1px 7px;
+  background: rgba(66,165,245,.1); color: #42a5f5;
+  border: 1px solid rgba(66,165,245,.3); border-radius: 8px; font-size: 11px; font-family: monospace;
+  cursor: default;
+}
+.dkv-close { float: right; cursor: pointer; color: var(--text-muted, #9aafbe); font-size: 16px; line-height: 1; padding: 0 2px; }
+.dkv-close:hover { color: var(--text, #c9d8e4); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Price table
 ═══════════════════════════════════════════════════════════════════════════ */
 .dk-prices-wrap { margin: 4px 0 8px; }
@@ -462,9 +503,10 @@ var DK_FIELD_MAP = {
 ════════════════════════════════════════════════════════════════════════════ */
 
 /* ── Dirty tracking + Publish modal ─────────────────────────────────────── */
-var _formDirty   = false;
-var _publishUrl  = '{{ publish_url|default:"" }}';
-var _isExisting  = {{ original.dk_offer_id|yesno:"true,false" }};
+var _formDirty         = false;
+var _publishUrl        = '{{ publish_url|default:"" }}';
+var _isExisting        = {{ original.dk_offer_id|yesno:"true,false" }};
+var VALIDATE_ATTRS_URL = '{{ validate_attrs_url|default:"" }}';
 
 (function() {
   /* Mark form as dirty on any user input */
@@ -709,6 +751,113 @@ function dkHighlight(el) {
   row.classList.remove('dk-field-updated');
   void row.offsetWidth;
   row.classList.add('dk-field-updated');
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Attribute validation
+════════════════════════════════════════════════════════════════════════════ */
+function dkValidateAttrs() {
+  if (!VALIDATE_ATTRS_URL) return;
+  var btn = document.getElementById('dkValidateBtn');
+  var panel = document.getElementById('dkValidateResult');
+  if (!panel) return;
+  btn.disabled = true;
+  btn.textContent = '⏳ Перевірка…';
+
+  var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  fetch(VALIDATE_ATTRS_URL, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrf },
+    credentials: 'same-origin',
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    btn.disabled = false;
+    btn.textContent = '🔍 Перевірити атрибути';
+    if (!d.ok) {
+      panel.innerHTML = '<span class="dkv-close" onclick="document.getElementById(\'dkValidateResult\').style.display=\'none\'">✕</span>' +
+        '<h4>❌ Помилка</h4><p style="color:#ef5350;font-size:12px">' + dkEsc(d.error || 'Невідома помилка') + '</p>';
+      panel.style.display = 'block';
+      return;
+    }
+
+    var allOk = d.fields.every(function(f) { return f.valid; });
+    var errCount = d.fields.filter(function(f) { return !f.valid; }).length;
+
+    var rows = d.fields.map(function(f) {
+      var status = f.valid
+        ? '<span class="dkv-ok">✓ OK</span>'
+        : '<span class="dkv-err">✗ Недійсний код</span>';
+      var dkName = f.valid && f.dk_name ? ' <span style="color:var(--text-muted,#9aafbe);font-size:11px">('+dkEsc(f.dk_name)+')</span>' : '';
+      return '<tr>' +
+        '<td class="dkv-code">' + dkEsc(f.code) + '</td>' +
+        '<td>' + dkEsc(f.value) + '</td>' +
+        '<td>' + status + dkName + '</td>' +
+        '</tr>';
+    }).join('');
+
+    var summary = allOk
+      ? '<div style="color:#66bb6a;font-weight:600;margin-bottom:8px">✅ Всі ' + d.fields.length + ' полів — коди дійсні</div>'
+      : '<div style="color:#ef5350;font-weight:600;margin-bottom:8px">⚠ ' + errCount + ' з ' + d.fields.length + ' полів мають недійсні коди</div>';
+
+    var availHtml = '';
+    if (d.available_codes && d.available_codes.length) {
+      var codeList = d.available_codes.map(function(c) {
+        return '<span class="dkv-avail-code" title="' + dkEsc(c.name) + '">' + dkEsc(c.code) + '</span>';
+      }).join('');
+      availHtml = '<div class="dkv-avail"><details><summary>📋 Доступні коди з DigiKey API (' + d.available_codes.length + ' шт., ' + d.total_custom_fields + ' всього)</summary>' +
+        '<div class="dkv-avail-list">' + codeList + '</div>' +
+        '</details></div>';
+    } else {
+      availHtml = '<div class="dkv-avail" style="color:#ffa726">⚠ DigiKey не повернув жодного дійсного коду — можливо, Custom Fields API не налаштовано для цього облікового запису.</div>';
+    }
+
+    panel.innerHTML =
+      '<span class="dkv-close" onclick="document.getElementById(\'dkValidateResult\').style.display=\'none\'">✕</span>' +
+      '<h4>🔍 Перевірка additionalFields</h4>' +
+      summary +
+      (d.fields.length ? '<table class="dkv-table"><thead><tr><th>Код</th><th>Значення</th><th>Статус</th></tr></thead><tbody>' + rows + '</tbody></table>' : '<p style="color:var(--text-muted,#9aafbe);font-size:12px">Немає полів для відправки (або категорія не «filter»).</p>') +
+      availHtml;
+
+    panel.style.display = 'block';
+    panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    /* Highlight invalid fa_* rows in the form */
+    d.fields.forEach(function(f) {
+      if (f.valid) return;
+      /* Map numeric code back to field name via DK_FIELD_MAP */
+      var codeToField = {'139':'fa_frequency','398':'fa_bandwidth','21':'fa_filter_type',
+        '428':'fa_ripple','327':'fa_insertion_loss','69':'fa_mounting_type',
+        '16':'fa_package_case','46':'fa_size_dimension','966':'fa_height_max'};
+      var fieldName = codeToField[f.code];
+      if (fieldName) {
+        var el = document.getElementById('id_' + fieldName);
+        if (el) {
+          var row = el.closest('.form-row') || el.parentNode;
+          if (row) { row.style.outline = '2px solid #ef5350'; row.style.borderRadius = '4px'; }
+        }
+      }
+    });
+    /* Clear highlights for valid fields */
+    d.fields.forEach(function(f) {
+      if (!f.valid) return;
+      var codeToField = {'139':'fa_frequency','398':'fa_bandwidth','21':'fa_filter_type',
+        '428':'fa_ripple','327':'fa_insertion_loss','69':'fa_mounting_type',
+        '16':'fa_package_case','46':'fa_size_dimension','966':'fa_height_max'};
+      var fieldName = codeToField[f.code];
+      if (fieldName) {
+        var el = document.getElementById('id_' + fieldName);
+        if (el) {
+          var row = el.closest('.form-row') || el.parentNode;
+          if (row) { row.style.outline = ''; }
+        }
+      }
+    });
+  })
+  .catch(function(e) {
+    btn.disabled = false;
+    btn.textContent = '🔍 Перевірити атрибути';
+    alert('Помилка: ' + e.message);
+  });
 }
 
 /* ── Auto-fill mark / clear ──────────────────────────────────────────────── */
@@ -1060,12 +1209,16 @@ document.addEventListener('DOMContentLoaded', function() {
     chk(); el.addEventListener('input', chk); el.addEventListener('change', chk);
   });
 
-  /* Inject preview card before first fieldset */
+  /* Inject preview card and validate result panel before first fieldset */
   var anchor = document.querySelector('.module.aligned') || document.querySelector('fieldset');
   if (anchor) {
     var card = document.createElement('div');
     card.id = 'dkPreviewCard';
     anchor.parentNode.insertBefore(card, anchor);
+
+    var validatePanel = document.createElement('div');
+    validatePanel.id = 'dkValidateResult';
+    anchor.parentNode.insertBefore(validatePanel, anchor);
   }
 
   /* Adapt UI to category */

@@ -1475,6 +1475,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['create_product_url'] = reverse(
                 'admin:bots_digikeylisting_create_product', args=[object_id]
             )
+            extra_context['validate_attrs_url'] = reverse(
+                'admin:bots_digikeylisting_validate_attrs', args=[object_id]
+            )
             # For list of existing sync status choices — used in template
             extra_context['sync_choices'] = DigiKeyListing.SYNC_CHOICES
         return super().changeform_view(request, object_id, form_url, extra_context)
@@ -1536,6 +1539,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/create-product/',
                  self.admin_site.admin_view(self.create_product_view),
                  name='bots_digikeylisting_create_product'),
+            path('<int:pk>/validate-attrs/',
+                 self.admin_site.admin_view(self.validate_attrs_view),
+                 name='bots_digikeylisting_validate_attrs'),
         ]
         return custom + urls
 
@@ -2546,6 +2552,54 @@ Rules:
             f'✅ Картку складу «{sku}» створено і прив\'язано. Перевірте і відредагуйте деталі.'
         )
         return redirect(reverse('admin:inventory_product_change', args=[product.pk]))
+
+    def validate_attrs_view(self, request, pk):
+        """Validate listing's additionalFields against DigiKey Custom Fields API."""
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        from bots.services.dk_marketplace import fetch_custom_fields, DKMarketplaceError
+
+        listing = get_object_or_404(DigiKeyListing, pk=pk)
+        try:
+            config = DigiKeyConfig.get()
+            custom_fields = fetch_custom_fields(config)
+        except DKMarketplaceError as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': f'Помилка API: {e}'})
+
+        # Build lookup: code → name
+        valid_codes = {}
+        for cf in custom_fields:
+            code = str(cf.get('code') or cf.get('id') or '').strip()
+            name = str(cf.get('name') or cf.get('label') or cf.get('displayName') or '').strip()
+            if code:
+                valid_codes[code] = name
+
+        # Determine what would be sent
+        if listing.category_type == 'filter':
+            would_send = listing.get_filter_attributes_api()
+        else:
+            would_send = listing.get_common_attributes_api()
+
+        results = []
+        for item in would_send:
+            code = str(item.get('code', ''))
+            results.append({
+                'code': code,
+                'value': str(item.get('value', '')),
+                'valid': code in valid_codes,
+                'dk_name': valid_codes.get(code, ''),
+            })
+
+        return JsonResponse({
+            'ok': True,
+            'fields': results,
+            'available_codes': [
+                {'code': k, 'name': v} for k, v in sorted(valid_codes.items())
+            ],
+            'total_custom_fields': len(custom_fields),
+        })
 
     def inventory_check_view(self, request):
         """Show inventory status for all DigiKey listings (grouped by category)."""
