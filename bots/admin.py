@@ -1299,6 +1299,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     autocomplete_fields = ('product',)
     actions        = [
         'action_sync_qty',
+        'action_check_staged',
         'action_bulk_pull',
         'action_bulk_ai_analysis',
         'action_bulk_publish',
@@ -1483,6 +1484,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['pull_product_url'] = reverse(
                 'admin:bots_digikeylisting_pull_product', args=[object_id]
             )
+            extra_context['check_staged_url'] = reverse(
+                'admin:bots_digikeylisting_check_staged', args=[object_id]
+            )
             extra_context['ai_advisor_url'] = reverse(
                 'admin:bots_digikeylisting_ai_advisor', args=[object_id]
             )
@@ -1568,6 +1572,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('check-new/cancel/',
                  self.admin_site.admin_view(self.check_new_cancel_view),
                  name='bots_digikeylisting_check_new_cancel'),
+            path('<int:pk>/check-staged/',
+                 self.admin_site.admin_view(self.check_staged_view),
+                 name='bots_digikeylisting_check_staged'),
             path('inventory-check/',
                  self.admin_site.admin_view(self.inventory_check_view),
                  name='bots_digikeylisting_inventory_check'),
@@ -1661,6 +1668,30 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             )
         except DKMarketplaceError as exc:
             messages.error(request, f"❌ Помилка створення Offer: {exc}")
+        except Exception as exc:
+            messages.error(request, f"❌ Помилка: {exc}")
+        return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
+
+    def check_staged_view(self, request, pk):
+        """Check whether a staged product has been approved by DigiKey and promote if so."""
+        from bots.services.dk_marketplace import check_staged_listing, DKMarketplaceError
+        listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+        sku = listing.product.sku
+        try:
+            result = check_staged_listing(listing)
+            if result == 'published':
+                messages.success(
+                    request,
+                    f"✅ {sku} — затверджено DigiKey! Offer створено: {listing.dk_offer_id}. "
+                    f"Товар тепер активний у маркетплейсі."
+                )
+            else:
+                messages.info(
+                    request,
+                    f"⏳ {sku} — ще на перевірці DigiKey. Спробуйте пізніше."
+                )
+        except DKMarketplaceError as exc:
+            messages.error(request, f"❌ Помилка перевірки статусу: {exc}")
         except Exception as exc:
             messages.error(request, f"❌ Помилка: {exc}")
         return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
@@ -2401,6 +2432,39 @@ Rules:
 
     PULL_TASK_NAME = 'bulk_pull_dk'
 
+    @admin.action(description='🔄 Перевірити staged → published (DigiKey)')
+    def action_check_staged(self, request, queryset):
+        """For staged listings: try to create offer. Promotes to published if approved."""
+        from bots.services.dk_marketplace import check_staged_listing, DKMarketplaceError
+        staged_qs = queryset.filter(sync_status=DigiKeyListing.SYNC_STAGED)
+        count = staged_qs.count()
+        if not count:
+            self.message_user(request, "⚠️ Немає лістингів зі статусом '⏳ Очікує затвердження'.",
+                              messages.WARNING)
+            return
+        promoted = still_pending = errors = 0
+        promoted_skus = []
+        for listing in staged_qs.select_related('product'):
+            try:
+                result = check_staged_listing(listing)
+                if result == 'published':
+                    promoted += 1
+                    promoted_skus.append(listing.product.sku)
+                else:
+                    still_pending += 1
+            except Exception:
+                errors += 1
+
+        parts = []
+        if promoted:
+            parts.append(f"✅ Затверджено і опубліковано: {promoted} ({', '.join(promoted_skus)})")
+        if still_pending:
+            parts.append(f"⏳ Ще на перевірці: {still_pending}")
+        if errors:
+            parts.append(f"❌ Помилок: {errors}")
+        level = messages.SUCCESS if promoted else (messages.WARNING if still_pending else messages.ERROR)
+        self.message_user(request, " | ".join(parts) or "Нічого не змінилось", level)
+
     @admin.action(description='⬇️ Стягнути дані з DigiKey (масово)')
     def action_bulk_pull(self, request, queryset):
         import threading, json as _json
@@ -2415,7 +2479,7 @@ Rules:
         task.set_progress(_json.dumps({'done': 0, 'total': total, 'sku': '', 'err': 0}))
 
         def _run():
-            from bots.services.dk_marketplace import pull_product_fields
+            from bots.services.dk_marketplace import pull_product_fields, check_staged_listing
             done = err = 0
             try:
                 for pk in pks:
@@ -2425,7 +2489,11 @@ Rules:
                         listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
                         sku     = listing.product.sku
                         task.set_progress(_json.dumps({'done': done, 'total': total, 'sku': sku, 'err': err}))
-                        pull_product_fields(listing)
+                        if listing.sync_status == DigiKeyListing.SYNC_STAGED:
+                            # Staged: try to promote instead of pull (product not in Products API yet)
+                            check_staged_listing(listing)
+                        else:
+                            pull_product_fields(listing)
                         done += 1
                     except InterruptedError:
                         raise

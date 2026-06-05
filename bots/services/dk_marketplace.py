@@ -343,6 +343,46 @@ def create_offer_for_listing(listing) -> None:
     listing.save(update_fields=['dk_offer_id', 'sync_status', 'last_synced_at', 'last_error', 'last_error_at'])
 
 
+def check_staged_listing(listing) -> str:
+    """Check if a staged product has been approved by DigiKey.
+
+    Tries to create/update the offer. If DigiKey accepts → listing is promoted
+    to 'published'. If still pending review → stays 'staged'.
+
+    Returns: 'published' | 'staged'
+    """
+    from django.utils import timezone
+    from bots.models import DigiKeyConfig
+
+    config = DigiKeyConfig.get()
+    if not listing.dk_product_id:
+        raise DKMarketplaceError("Product ID відсутній — спочатку опублікуй продукт.")
+
+    try:
+        if listing.dk_offer_id:
+            update_offer(config, listing)
+        else:
+            offer_id = create_offer(config, listing)
+            listing.dk_offer_id = offer_id
+
+        listing.sync_status    = DigiKeyListing.SYNC_PUBLISHED
+        listing.last_synced_at = timezone.now()
+        listing.last_error     = ''
+        listing.last_error_at  = None
+        listing.save(update_fields=[
+            'dk_offer_id', 'sync_status', 'last_synced_at', 'last_error', 'last_error_at',
+        ])
+        return 'published'
+
+    except DKMarketplaceError as exc:
+        msg = str(exc).lower()
+        # DigiKey rejects offer creation while product is still in review queue
+        if any(kw in msg for kw in ('not approved', 'pending', 'review', 'staged',
+                                    'not found', 'does not exist', '404', '400')):
+            return 'staged'
+        raise
+
+
 def sync_quantity(listing) -> None:
     """Update only quantityAvailable (and price) on existing offer."""
     from django.utils import timezone

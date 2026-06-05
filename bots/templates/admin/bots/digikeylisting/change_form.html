@@ -57,7 +57,14 @@
             onclick="dkPublishClick()">
       {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати{% endif %}
     </button>
-    {% if original.sync_status == 'staged' and not original.dk_offer_id %}
+    {% if original.sync_status == 'staged' %}
+    <a href="{% url 'admin:bots_digikeylisting_check_staged' original.pk %}"
+       class="dk-btn"
+       style="background:rgba(33,150,243,.15);color:#42a5f5;border:1px solid rgba(33,150,243,.3)"
+       onclick="return confirm('Перевірити чи затвердив DigiKey продукт?\n\nЯкщо затверджено — offer створюється автоматично.')">
+      🔄 Перевірити статус DigiKey
+    </a>
+    {% elif not original.dk_offer_id and original.dk_product_id %}
     <a href="{{ create_offer_url }}" class="dk-btn dk-btn-offer"
        onclick="return confirm('Спробувати створити Offer?')">
       📦 Створити Offer
