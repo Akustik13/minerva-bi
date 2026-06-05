@@ -162,6 +162,7 @@
   var CSRF             = "{{ csrf_token }}";
   var DELETE_LOG_BASE  = "{{ delete_log_base_url }}";
   var IGNORE_FIELD_URL = "{{ ignore_field_url }}";
+  var QUICK_FILL_URL   = "{{ quick_fill_url }}";
   var HISTORY          = {{ history_json|safe }};
   var LOCAL            = {{ local_issues_json|safe }};
   var IGNORED_FIELDS   = {{ ignored_fields_json|safe }};
@@ -188,6 +189,10 @@
   /* ── Field link helper ──────────────────────────────────────────────────── */
   function fieldLink(fieldName) {
     if (!fieldName) return '';
+    if (fieldName.startsWith('attr:')) {
+      var attrKey = fieldName.slice(5);
+      return '<span class="field-link" title="dk_attributes[' + esc(attrKey) + ']">attr: ' + esc(attrKey) + '</span>';
+    }
     return '<a class="field-link" href="' + esc(CHANGE_URL) + '#id_' + esc(fieldName) + '"' +
            ' target="_blank" title="Перейти до поля у формі">' + esc(fieldName) + '</a>';
   }
@@ -212,6 +217,18 @@
       }
     }
 
+    var fillBtn = '';
+    if (opts.showQuickFill && qi.suggested_value && !isIgnored && !isFixed) {
+      fillBtn = '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span style="font-size:11px;color:var(--text-muted)">Рекомендовано: ' +
+          '<code style="background:rgba(255,167,38,.15);color:#ffa726;padding:1px 7px;border-radius:3px;font-size:11px">' +
+            esc(qi.suggested_value) + '</code></span>' +
+        '<button class="btn-quick-fill" data-field="'+esc(qi.field)+'" data-value="'+esc(qi.suggested_value)+'" ' +
+          'style="padding:2px 10px;font-size:11px;cursor:pointer;border-radius:4px;white-space:nowrap;' +
+          'background:rgba(245,127,23,.15);color:#ffa726;border:1px solid rgba(245,127,23,.3)">⚡ Заповнити</button>' +
+      '</div>';
+    }
+
     var cls = 'sev-' + (qi.severity || 'info') + (isIgnored ? ' issue-ignored' : '');
     return '<div class="'+cls+'" data-field="'+esc(qi.field||'')+'">' +
       '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px">' +
@@ -220,7 +237,7 @@
       '</div>' +
       '<div style="font-size:12px;color:var(--text,#c9d8e4);margin-bottom:3px">' + esc(qi.issue||'') + '</div>' +
       '<div style="font-size:11px;color:var(--text-muted)">💡 ' + esc(qi.fix||'') + '</div>' +
-      ignoreBtn +
+      fillBtn + ignoreBtn +
     '</div>';
   }
 
@@ -239,11 +256,57 @@
         btn.addEventListener('click', function() { doIgnore(btn.dataset.field); });
       });
     }
+    /* Attach quick-fill listeners */
+    if (opts && opts.showQuickFill) {
+      container.querySelectorAll('.btn-quick-fill').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          doQuickFill(btn.dataset.field, btn.dataset.value, btn);
+        });
+      });
+    }
   }
 
   /* ── Local pre-checks ───────────────────────────────────────────────────── */
   var localWrap = document.getElementById('local-issues-wrap');
-  renderIssues(LOCAL, localWrap, { showIgnore: true });
+  renderIssues(LOCAL, localWrap, { showIgnore: true, showQuickFill: true });
+
+  /* ── Quick-fill ─────────────────────────────────────────────────────────── */
+  function doQuickFill(field, value, btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    fetch(QUICK_FILL_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'field=' + encodeURIComponent(field) + '&value=' + encodeURIComponent(value),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        btn.textContent = '✅ Заповнено';
+        btn.style.color = '#66bb6a';
+        btn.style.background = 'rgba(46,125,50,.15)';
+        btn.style.borderColor = 'rgba(46,125,50,.3)';
+        /* Remove this issue from LOCAL so it disappears on next re-render */
+        var idx = LOCAL.findIndex(function(i) { return i.field === field; });
+        if (idx >= 0) LOCAL.splice(idx, 1);
+        setTimeout(function() {
+          renderIssues(LOCAL, localWrap, { showIgnore: true, showQuickFill: true });
+          /* Update counter */
+          var cl = document.getElementById('local-count-label');
+          if (cl) cl.textContent = LOCAL.length + ' проблем';
+        }, 800);
+      } else {
+        btn.disabled = false;
+        btn.textContent = '⚡ Заповнити';
+        alert('Помилка: ' + (data.error || 'невідома'));
+      }
+    })
+    .catch(function(e) {
+      btn.disabled = false;
+      btn.textContent = '⚡ Заповнити';
+      alert('Помилка: ' + e.message);
+    });
+  }
 
   /* ── Ignore / unignore ──────────────────────────────────────────────────── */
   function doIgnore(field) {
@@ -257,7 +320,7 @@
       if (!data.ok) return;
       IGNORED_FIELDS = data.ignored_fields;
       /* Re-render local issues */
-      renderIssues(LOCAL, localWrap, { showIgnore: true });
+      renderIssues(LOCAL, localWrap, { showIgnore: true, showQuickFill: true });
       /* Re-render results if visible */
       if (results.style.display !== 'none') {
         var qiWrap = document.getElementById('quality-issues');

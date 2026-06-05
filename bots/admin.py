@@ -1222,10 +1222,16 @@ def _local_quality_checks(listing, ignored_fields=None) -> list:
     ignored = set(ignored_fields or [])
     issues = []
 
-    def issue(field, severity, text, fix):
+    def issue(field, severity, text, fix, suggested_value=None):
         if field in ignored:
             return
-        issues.append({'field': field, 'severity': severity, 'issue': text, 'fix': fix, 'local': True})
+        # Skip check if the model field doesn't exist (schema may have changed)
+        if field and not field.startswith('attr:') and not hasattr(listing, field):
+            return
+        entry = {'field': field, 'severity': severity, 'issue': text, 'fix': fix, 'local': True}
+        if suggested_value is not None:
+            entry['suggested_value'] = suggested_value
+        issues.append(entry)
 
     title = listing.dk_title or ''
     if not title:
@@ -1249,6 +1255,15 @@ def _local_quality_checks(listing, ignored_fields=None) -> list:
     if not listing.dk_image_url:
         issue('dk_image_url', 'info', 'Немає фото товару', 'Додайте URL зображення для кращих конверсій')
 
+    if not (listing.dk_lifecycle_status or '').strip():
+        issue('dk_lifecycle_status', 'warning', 'Lifecycle статус не вказаний',
+              'Вкажіть статус товару в DigiKey', suggested_value='Active')
+
+    if not (listing.dk_packaging or '').strip():
+        issue('dk_packaging', 'warning', 'Упаковка не вказана',
+              'Вкажіть тип упаковки (Cut Tape, Reel, Tube тощо)', suggested_value='Cut Tape')
+
+    attrs = listing.dk_attributes or {}
     if listing.category_type == 'filter':
         for field, label in [
             ('fa_frequency',      'Частота'),
@@ -1256,7 +1271,12 @@ def _local_quality_checks(listing, ignored_fields=None) -> list:
             ('fa_filter_type',    'Тип фільтра'),
         ]:
             if not getattr(listing, field, None):
-                issue(field, 'warning', f'{label} не заповнена', f'Вкажіть {label.lower()} — ключовий параметр пошуку')
+                issue(field, 'warning', f'{label} не заповнена',
+                      f'Вкажіть {label.lower()} — ключовий параметр пошуку')
+        # RoHS in dk_attributes (not a model field — use attr: prefix)
+        if not attrs.get('rohsStatus'):
+            issue('attr:rohsStatus', 'warning', 'RoHS статус не вказаний',
+                  'Більшість RF фільтрів є RoHS Compliant', suggested_value='Compliant')
 
     return issues
 
@@ -1473,6 +1493,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/ignore-field/',
                  self.admin_site.admin_view(self.ignore_field_view),
                  name='bots_digikeylisting_ignore_field'),
+            path('<int:pk>/quick-fill/',
+                 self.admin_site.admin_view(self.quick_fill_view),
+                 name='bots_digikeylisting_quick_fill'),
             path('pull-task/status/',
                  self.admin_site.admin_view(self.pull_task_status_view),
                  name='bots_digikeylisting_pull_task_status'),
@@ -1675,6 +1698,32 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         listing.save(update_fields=['ignored_quality_fields'])
         return JsonResponse({'ok': True, 'added': added, 'ignored_fields': ignored})
 
+    def quick_fill_view(self, request, pk):
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        if request.method != 'POST':
+            return JsonResponse({'error': 'POST required'}, status=405)
+        field = request.POST.get('field', '').strip()
+        value = request.POST.get('value', '').strip()
+        if not field or not value:
+            return JsonResponse({'ok': False, 'error': "field і value обов'язкові"})
+        listing = get_object_or_404(DigiKeyListing, pk=pk)
+        try:
+            if field.startswith('attr:'):
+                attr_key = field[5:]
+                attrs = dict(listing.dk_attributes or {})
+                attrs[attr_key] = value
+                listing.dk_attributes = attrs
+                listing.save(update_fields=['dk_attributes'])
+            else:
+                if not hasattr(listing, field):
+                    return JsonResponse({'ok': False, 'error': f'Поле {field} не існує'})
+                setattr(listing, field, value)
+                listing.save(update_fields=[field])
+            return JsonResponse({'ok': True})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+
     def ai_advisor_view(self, request, pk):
         import json as _json
         from django.shortcuts import get_object_or_404
@@ -1705,8 +1754,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             opts=self.model._meta,
             run_url=reverse('admin:bots_digikeylisting_ai_run', args=[pk]),
             change_url=reverse('admin:bots_digikeylisting_change', args=[pk]),
-            delete_log_base_url=reverse('admin:bots_digikeylisting_ai_log_delete', args=[pk, 0]).rstrip('0').rstrip('/') + '/',
+            delete_log_base_url=reverse('admin:bots_digikeylisting_ai_log_delete', args=[pk, 0])[:-len('0/delete/')],
             ignore_field_url=reverse('admin:bots_digikeylisting_ignore_field', args=[pk]),
+            quick_fill_url=reverse('admin:bots_digikeylisting_quick_fill', args=[pk]),
             history_json=_json.dumps(history, ensure_ascii=False),
             local_issues_json=_json.dumps(local_issues, ensure_ascii=False),
             ignored_fields_json=_json.dumps(ignored_fields, ensure_ascii=False),
