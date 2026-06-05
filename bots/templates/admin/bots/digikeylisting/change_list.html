@@ -28,6 +28,89 @@
   </span>
 </div>
 
+{# ── Check-new task toolbar ───────────────────────────────────────────────── #}
+<div id="cn-toolbar" style="
+  display:none;position:sticky;top:0;z-index:901;
+  background:linear-gradient(90deg,#0d1e2e 0%,#0e2035 100%);
+  border-bottom:2px solid #00695c;
+  padding:10px 20px;align-items:center;gap:14px;
+  box-shadow:0 3px 14px rgba(0,0,0,.5);
+">
+  <div style="font-size:19px;flex-shrink:0">🔍</div>
+  <span style="font-size:13px;font-weight:700;color:#c9d8e4;flex:1">
+    Перевірка нових лістингів DigiKey…
+  </span>
+  <button id="cn-stop-btn" onclick="cnStop()"
+          style="padding:6px 16px;background:rgba(198,40,40,.2);color:#ef5350;
+                 border:1px solid rgba(198,40,40,.4);border-radius:6px;
+                 font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0">
+    ⛔ Зупинити
+  </button>
+  <div style="width:18px;height:18px;border:2px solid rgba(255,255,255,.12);
+              border-top-color:#00bfa5;border-radius:50%;flex-shrink:0;
+              animation:dkpullspin .7s linear infinite"></div>
+</div>
+
+<div id="cn-done" style="display:none;background:#0a2218;
+     border-bottom:2px solid #2e7d32;padding:10px 20px;
+     align-items:center;gap:12px;">
+  <span id="cn-done-msg" style="font-size:13px;font-weight:700;color:#a5d6a7;flex:1"></span>
+  <button onclick="document.getElementById('cn-done').style.display='none'"
+          style="font-size:18px;background:none;border:none;color:#9aafbe;cursor:pointer">✕</button>
+</div>
+
+<script>
+(function(){
+  var CN_STATUS_URL = "{{ check_new_status_url }}";
+  var CN_CANCEL_URL = "{{ check_new_cancel_url }}";
+  var toolbar    = document.getElementById('cn-toolbar');
+  var doneBanner = document.getElementById('cn-done');
+  var pollTimer  = null;
+  var wasRunning = false;
+
+  function onData(data) {
+    if (data.status === 'running') {
+      wasRunning = true;
+      toolbar.style.display = 'flex';
+      doneBanner.style.display = 'none';
+      if (!pollTimer) pollTimer = setInterval(poll, 2000);
+    } else {
+      toolbar.style.display = 'none';
+      if (wasRunning) {
+        wasRunning = false;
+        clearInterval(pollTimer); pollTimer = null;
+        document.getElementById('cn-done-msg').textContent = data.message || '✅ Завершено';
+        doneBanner.style.display = 'flex';
+        setTimeout(function(){ doneBanner.style.display = 'none'; }, 15000);
+      }
+    }
+  }
+
+  function poll() {
+    fetch(CN_STATUS_URL, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .then(function(r){ return r.json(); })
+      .then(onData)
+      .catch(function(){});
+  }
+
+  window.cnStop = function() {
+    var btn = document.getElementById('cn-stop-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Скасовуємо…';
+    fetch(CN_CANCEL_URL, {headers:{'X-Requested-With':'XMLHttpRequest'}}).catch(function(){});
+  };
+
+  {% if check_new_task_active %}
+  wasRunning = true;
+  toolbar.style.display = 'flex';
+  pollTimer = setInterval(poll, 2000);
+  poll();
+  {% else %}
+  poll();
+  {% endif %}
+})();
+</script>
+
 {# ── Bulk-pull progress toolbar ────────────────────────────────────────────── #}
 <div id="pull-toolbar" style="
   display:none;position:sticky;top:0;z-index:900;

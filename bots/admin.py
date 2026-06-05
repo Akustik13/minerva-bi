@@ -1424,6 +1424,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         extra_context['pull_task_cancel_url']    = reverse('admin:bots_digikeylisting_pull_task_cancel')
         extra_context['check_new_url']           = reverse('admin:bots_digikeylisting_check_new')
         extra_context['inventory_check_url']     = reverse('admin:bots_digikeylisting_inventory_check')
+        extra_context['check_new_status_url']    = reverse('admin:bots_digikeylisting_check_new_status')
+        extra_context['check_new_cancel_url']    = reverse('admin:bots_digikeylisting_check_new_cancel')
         try:
             t = BotTask.objects.get(name=self.PULL_TASK_NAME)
             extra_context['pull_task_active']  = t.status == BotTask.RUNNING
@@ -1433,6 +1435,13 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['pull_task_active']  = False
             extra_context['pull_task_message'] = ''
             extra_context['pull_task_status']  = 'idle'
+        try:
+            cn = BotTask.objects.get(name='check_new_listings')
+            extra_context['check_new_task_active']  = cn.status == BotTask.RUNNING
+            extra_context['check_new_task_message'] = cn.message or ''
+        except BotTask.DoesNotExist:
+            extra_context['check_new_task_active']  = False
+            extra_context['check_new_task_message'] = ''
         return super().changelist_view(request, extra_context)
 
     # ── change_view: inject buttons ───────────────────────────────────────────
@@ -1508,9 +1517,18 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('check-new-from-dk/',
                  self.admin_site.admin_view(self.check_new_listings_view),
                  name='bots_digikeylisting_check_new'),
+            path('check-new/status/',
+                 self.admin_site.admin_view(self.check_new_status_view),
+                 name='bots_digikeylisting_check_new_status'),
+            path('check-new/cancel/',
+                 self.admin_site.admin_view(self.check_new_cancel_view),
+                 name='bots_digikeylisting_check_new_cancel'),
             path('inventory-check/',
                  self.admin_site.admin_view(self.inventory_check_view),
                  name='bots_digikeylisting_inventory_check'),
+            path('<int:pk>/sync-inv-to-dk/',
+                 self.admin_site.admin_view(self.sync_inv_to_dk_view),
+                 name='bots_digikeylisting_sync_inv_to_dk'),
         ]
         return custom + urls
 
@@ -2440,6 +2458,44 @@ Rules:
         messages.info(request, "⏳ Перевірку нових лістингів запущено у фоні.")
         return redirect(reverse('admin:bots_digikeylisting_changelist'))
 
+    def check_new_status_view(self, request):
+        from django.http import JsonResponse
+        try:
+            t = BotTask.objects.get(name='check_new_listings')
+            return JsonResponse({'status': t.status, 'message': t.message or ''})
+        except BotTask.DoesNotExist:
+            return JsonResponse({'status': 'idle', 'message': ''})
+
+    def check_new_cancel_view(self, request):
+        from django.http import JsonResponse
+        updated = BotTask.objects.filter(
+            name='check_new_listings', status=BotTask.RUNNING
+        ).update(cancel_requested=True)
+        return JsonResponse({'ok': bool(updated)})
+
+    def sync_inv_to_dk_view(self, request, pk):
+        """Copy product.tech_attributes → listing.dk_attributes (Inventory → DigiKey direction)."""
+        from django.http import JsonResponse
+        listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.GET.get('ajax') == '1'
+        product = listing.product
+        if not product:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Немає продукту'})
+            return redirect(reverse('admin:bots_digikeylisting_inventory_check'))
+        attrs = dict(product.tech_attributes or {})
+        if not attrs:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Немає тех. атрибутів у продукті. Спочатку заповніть технічні атрибути складу.'})
+            messages.warning(request, 'Немає тех. атрибутів у продукті.')
+            return redirect(reverse('admin:bots_digikeylisting_inventory_check'))
+        listing.dk_attributes = attrs
+        listing.save(update_fields=['dk_attributes'])
+        if is_ajax:
+            return JsonResponse({'ok': True, 'count': len(attrs)})
+        messages.success(request, f'Синхронізовано {len(attrs)} атрибутів: Склад → DigiKey для {product.sku}.')
+        return redirect(reverse('admin:bots_digikeylisting_inventory_check'))
+
     def inventory_check_view(self, request):
         """Show inventory status for all DigiKey listings (grouped by category)."""
         from django.db.models import Sum
@@ -2477,7 +2533,8 @@ Rules:
                 'has_dk_attrs': bool(listing.dk_attributes),
                 'changelist_url': reverse('admin:bots_digikeylisting_change', args=[listing.pk]),
                 'product_url': reverse('admin:inventory_product_change', args=[p.pk]) if p else '',
-                'sync_url': reverse('admin:bots_digikeylisting_sync_attrs', args=[listing.pk]),
+                'sync_url':     reverse('admin:bots_digikeylisting_sync_attrs', args=[listing.pk]),
+                'sync_inv_url': reverse('admin:bots_digikeylisting_sync_inv_to_dk', args=[listing.pk]),
             })
 
         ctx = dict(
