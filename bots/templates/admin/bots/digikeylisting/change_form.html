@@ -925,14 +925,26 @@ function dkAttrsInit() {
   wrap.className = 'dk-attrs-wrap';
   wrap.innerHTML =
     '<table class="dk-attrs-table"><thead><tr>'+
-      '<th>Атрибут</th><th>Значення</th>'+
+      '<th>Атрибут</th><th>Значення</th><th style="width:36px" class="dk-edit-col"></th>'+
     '</tr></thead><tbody class="dk-atbody"></tbody></table>'+
     '<div class="dk-attrs-empty" id="dkAttrsEmpty" style="display:none">'+
       'Порожньо — натисніть 📥 Стягнути поля з DigiKey.'+
+    '</div>'+
+    '<div class="dk-prices-footer">'+
+      '<button type="button" class="dk-add-btn" id="dkAddAttr">+ Додати атрибут</button>'+
+      '{% if sync_attrs_url %}<button type="button" class="dk-add-btn" id="dkSyncAttrsBtn" style="background:rgba(0,105,92,.2);color:#00bfa5;border-color:rgba(0,105,92,.4)" onclick="dkSyncAttrs()">🔄 Sync → Склад</button>{% endif %}'+
+      '<span style="font-size:12px;color:var(--text-muted,#9aafbe)">Редагуйте або синхронізуйте з DigiKey</span>'+
     '</div>';
 
   _aTa.parentNode.insertBefore(wrap, _aTa);
   _aTbody = wrap.querySelector('.dk-atbody');
+
+  wrap.querySelector('#dkAddAttr').addEventListener('click', function() {
+    _aAddRow('', '');
+    var newRow = _aTbody.lastElementChild;
+    if (newRow) newRow.querySelector('.dk-attr-key-inp').focus();
+    _aSync();
+  });
 
   var ex = {};
   try { var r = _aTa.value.trim(); if (r) ex = JSON.parse(r); } catch(e) {}
@@ -946,24 +958,66 @@ function dkAttrsRebuild(obj) {
   var emEl = document.getElementById('dkAttrsEmpty');
   if (!keys.length) { if (emEl) emEl.style.display='block'; if (_aTa) _aTa.value='{}'; return; }
   if (emEl) emEl.style.display='none';
-  keys.forEach(function(code) {
-    var val = obj[code];
-    var tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td class="dk-attr-code">' + dkEsc(code) + dkAttrInfoHtml(code) + '</td>'+
-      '<td class="dk-attr-val"><input type="text" data-code="'+dkEsc(code)+'" value="'+
-        dkEsc(String(val===null||val===undefined?'':val))+'" autocomplete="off"></td>';
-    tr.querySelector('input').addEventListener('input', _aSync);
-    _aTbody.appendChild(tr);
-  });
+  keys.forEach(function(code) { _aAddRow(code, obj[code]); });
   _aSync();
+}
+
+function _aAddRow(code, val) {
+  var tr = document.createElement('tr');
+  var info = dkAttrInfoHtml(code);
+  tr.innerHTML =
+    '<td class="dk-attr-code" style="padding:0 4px"><input type="text" class="dk-attr-key-inp" data-orig-code="'+dkEsc(code)+'" value="'+dkEsc(code)+'" placeholder="код / назва" autocomplete="off" style="width:100%;font-family:monospace;font-size:12px;background:var(--bg-input,#141f2b);color:var(--text-muted,#9aafbe);border:1px solid var(--border-strong,#243347);border-radius:3px;padding:4px 8px;box-sizing:border-box"></td>'+
+    '<td class="dk-attr-val"><input type="text" data-code="'+dkEsc(code)+'" value="'+
+      dkEsc(String(val===null||val===undefined?'':val))+'" autocomplete="off"></td>'+
+    '<td class="dk-edit-col"><button type="button" class="dk-del-row">×</button></td>';
+  tr.querySelector('.dk-del-row').addEventListener('click', function() {
+    tr.remove();
+    var emEl = document.getElementById('dkAttrsEmpty');
+    if (emEl) emEl.style.display = _aTbody.rows.length === 0 ? 'block' : 'none';
+    _aSync();
+  });
+  tr.querySelector('.dk-attr-key-inp').addEventListener('input', _aSync);
+  tr.querySelector('[data-code]').addEventListener('input', _aSync);
+  _aTbody.appendChild(tr);
+  var emEl = document.getElementById('dkAttrsEmpty');
+  if (emEl) emEl.style.display = 'none';
 }
 
 function _aSync() {
   if (!_aTbody || !_aTa) return;
   var o = {};
-  _aTbody.querySelectorAll('input[data-code]').forEach(function(inp) { o[inp.dataset.code]=inp.value; });
+  _aTbody.querySelectorAll('tr').forEach(function(tr) {
+    var ki = tr.querySelector('.dk-attr-key-inp');
+    var vi = tr.querySelector('.dk-attr-val input');
+    if (ki && vi && ki.value.trim()) {
+      o[ki.value.trim()] = vi.value;
+    }
+  });
   _aTa.value = JSON.stringify(o);
+}
+
+function dkSyncAttrs() {
+  var url = '{{ sync_attrs_url|default:"" }}';
+  if (!url) return;
+  if (!confirm('Скопіювати атрибути лістингу → склад? Поточні атрибути товару буде замінено.')) return;
+  fetch(url + '?ajax=1', {
+    credentials: 'same-origin',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      var statusEl = document.getElementById('dkStatusMsg');
+      var iconEl   = document.getElementById('dkStatusIcon');
+      var wrapEl   = document.getElementById('dkStatus');
+      if (wrapEl) wrapEl.style.display = 'inline-flex';
+      if (iconEl) iconEl.textContent = '✅';
+      if (statusEl) { statusEl.textContent = 'Синхронізовано ' + d.count + ' атрибутів → склад'; statusEl.style.color = '#00bfa5'; }
+    } else {
+      alert('Помилка: ' + (d.error || 'невідома'));
+    }
+  })
+  .catch(function(e) { alert('Помилка: ' + e.message); });
 }
 
 /* ════════════════════════════════════════════════════════════════════════════

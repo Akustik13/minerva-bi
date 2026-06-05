@@ -1,1 +1,174 @@
 {% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+/* Hide raw tech_attributes textarea, keep container visible */
+.field-tech_attributes > .flex-container,
+.field-tech_attributes textarea { display: none !important; }
+.field-tech_attributes { display: block !important; }
+
+/* Attrs table */
+.inv-attrs-wrap { margin: 4px 0 8px; width: 100%; }
+.inv-attrs-table {
+  border-collapse: collapse; width: 100%; font-size: 13px; table-layout: fixed;
+}
+.inv-attrs-table th {
+  text-align: left; padding: 6px 14px;
+  background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
+  font-weight: 600; font-size: 11px; text-transform: uppercase;
+  letter-spacing: .5px; border-bottom: 2px solid var(--border-strong, #243347);
+}
+.inv-attrs-table th:first-child { width: 270px; }
+.inv-attrs-table td { padding: 4px 8px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; word-break: break-word; }
+.inv-attr-key input, .inv-attr-val input {
+  width: 100%; background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347); border-radius: 3px;
+  padding: 5px 10px; font-size: 13px; box-sizing: border-box;
+}
+.inv-attr-key input:focus, .inv-attr-val input:focus {
+  outline: none; border-color: var(--accent, #58a6ff);
+  box-shadow: 0 0 0 2px rgba(88,166,255,.2);
+}
+.inv-del-row {
+  background: none; border: none; color: var(--text-dim, #607d8b);
+  cursor: pointer; font-size: 18px; padding: 0 6px; transition: color .1s;
+}
+.inv-del-row:hover { color: var(--err, #e53935); }
+.inv-attrs-footer { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.inv-add-btn {
+  background: var(--bg-hover, #1e2d40); color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347); border-radius: 4px;
+  padding: 5px 14px; font-size: 12px; cursor: pointer; transition: background .15s;
+}
+.inv-add-btn:hover { background: var(--bg-card, #1a2535); }
+.inv-attrs-empty { color: var(--text-muted, #9aafbe); font-size: 12px; font-style: italic; padding: 8px 10px; }
+.inv-sync-btn {
+  padding: 5px 14px; font-size: 12px; cursor: pointer; border-radius: 4px;
+  background: rgba(0,105,92,.2); color: #00bfa5;
+  border: 1px solid rgba(0,105,92,.4); transition: background .15s;
+}
+.inv-sync-btn:hover { background: rgba(0,105,92,.35); }
+.inv-sync-status { font-size: 12px; color: var(--text-muted, #9aafbe); margin-left: 6px; }
+</style>
+
+<script>
+var _invATbody = null, _invATa = null;
+
+function invAttrsInit() {
+  _invATa = document.querySelector('[name="tech_attributes"]');
+  if (!_invATa) return;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'inv-attrs-wrap';
+  wrap.innerHTML =
+    '<table class="inv-attrs-table"><thead><tr>' +
+      '<th>Параметр</th><th>Значення</th><th style="width:36px"></th>' +
+    '</tr></thead><tbody class="inv-atbody"></tbody></table>' +
+    '<div class="inv-attrs-empty" id="invAttrsEmpty" style="display:none">' +
+      'Порожньо — додайте параметри або синхронізуйте з DigiKey лістингом.' +
+    '</div>' +
+    '<div class="inv-attrs-footer">' +
+      '<button type="button" class="inv-add-btn" id="invAddAttr">+ Додати параметр</button>' +
+      '<button type="button" class="inv-sync-btn" id="invSyncBtn" style="display:none">🔄 Синх з DigiKey</button>' +
+      '<span class="inv-sync-status" id="invSyncStatus"></span>' +
+    '</div>';
+
+  _invATa.parentNode.insertBefore(wrap, _invATa);
+  _invATbody = wrap.querySelector('.inv-atbody');
+
+  wrap.querySelector('#invAddAttr').addEventListener('click', function() {
+    _invAddRow('', '');
+    var newRow = _invATbody.lastElementChild;
+    if (newRow) newRow.querySelector('.inv-key-inp').focus();
+    _invSync();
+  });
+
+  var ex = {};
+  try { var r = _invATa.value.trim(); if (r && r !== '{}') ex = JSON.parse(r); } catch(e) {}
+  if (Object.keys(ex).length) {
+    Object.keys(ex).sort().forEach(function(k) { _invAddRow(k, ex[k]); });
+  }
+  _invSync();
+  _invUpdateEmpty();
+}
+
+function _invAddRow(key, val) {
+  var tr = document.createElement('tr');
+  tr.innerHTML =
+    '<td class="inv-attr-key"><input type="text" class="inv-key-inp" value="' + _invEsc(key) + '" placeholder="Назва параметру" autocomplete="off"></td>' +
+    '<td class="inv-attr-val"><input type="text" class="inv-val-inp" value="' + _invEsc(String(val===null||val===undefined?'':val)) + '" placeholder="Значення" autocomplete="off"></td>' +
+    '<td><button type="button" class="inv-del-row">×</button></td>';
+  tr.querySelector('.inv-del-row').addEventListener('click', function() {
+    tr.remove(); _invSync(); _invUpdateEmpty();
+  });
+  tr.querySelector('.inv-key-inp').addEventListener('input', _invSync);
+  tr.querySelector('.inv-val-inp').addEventListener('input', _invSync);
+  _invATbody.appendChild(tr);
+  _invUpdateEmpty();
+}
+
+function _invSync() {
+  if (!_invATbody || !_invATa) return;
+  var o = {};
+  _invATbody.querySelectorAll('tr').forEach(function(tr) {
+    var k = tr.querySelector('.inv-key-inp');
+    var v = tr.querySelector('.inv-val-inp');
+    if (k && v && k.value.trim()) o[k.value.trim()] = v.value;
+  });
+  _invATa.value = JSON.stringify(o);
+}
+
+function _invUpdateEmpty() {
+  var emEl = document.getElementById('invAttrsEmpty');
+  if (!emEl || !_invATbody) return;
+  emEl.style.display = _invATbody.rows.length === 0 ? 'block' : 'none';
+}
+
+function _invEsc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ── Sync from DigiKey listing ─────────────────────────────────────────── */
+(function() {
+  var SYNC_URL = '{{ sync_attrs_url|default:"" }}';
+  var CSRF = document.cookie.match(/csrftoken=([^;]+)/);
+  CSRF = CSRF ? CSRF[1] : '';
+
+  document.addEventListener('DOMContentLoaded', function() {
+    invAttrsInit();
+    var syncBtn = document.getElementById('invSyncBtn');
+    var syncSt  = document.getElementById('invSyncStatus');
+    if (syncBtn && SYNC_URL) {
+      syncBtn.style.display = 'inline-block';
+      syncBtn.addEventListener('click', function() {
+        if (!confirm('Синхронізувати атрибути з DigiKey лістингу? Поточні значення буде замінено.')) return;
+        syncBtn.disabled = true;
+        if (syncSt) syncSt.textContent = '⏳ Синхронізація…';
+        fetch(SYNC_URL + '?ajax=1', {
+          headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF },
+          credentials: 'same-origin',
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          syncBtn.disabled = false;
+          if (data.ok) {
+            if (syncSt) { syncSt.textContent = '✅ Синхронізовано'; syncSt.style.color = '#00bfa5'; }
+            while (_invATbody.firstChild) _invATbody.removeChild(_invATbody.firstChild);
+            Object.keys(data.attrs || {}).sort().forEach(function(k) { _invAddRow(k, data.attrs[k]); });
+            _invSync(); _invUpdateEmpty();
+          } else {
+            if (syncSt) { syncSt.textContent = '❌ ' + (data.error || 'Помилка'); syncSt.style.color = '#ef5350'; }
+          }
+        })
+        .catch(function(e) {
+          syncBtn.disabled = false;
+          if (syncSt) { syncSt.textContent = '❌ ' + e.message; syncSt.style.color = '#ef5350'; }
+        });
+      });
+    }
+  });
+})();
+</script>
+{% endblock %}

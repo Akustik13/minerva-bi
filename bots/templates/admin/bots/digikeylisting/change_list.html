@@ -3,6 +3,31 @@
 
 {% block content %}
 
+{# ── Check-new + Inventory-check toolbar ──────────────────────────────────── #}
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;
+            background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:6px">
+  <a href="{{ check_new_url }}"
+     onclick="return confirm('Перевірити нові лістинги з DigiKey та синхронізувати? Це займе кілька хвилин.')"
+     style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:#00695c;
+            color:#fff;border-radius:5px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">
+    🔍 Перевірити нові лістинги з DigiKey
+  </a>
+  <a href="{{ inventory_check_url }}"
+     style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:#1565c0;
+            color:#fff;border-radius:5px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">
+    📊 Звірити зі складом
+  </a>
+  <a href="{{ inventory_check_url }}?category=filter"
+     style="display:inline-flex;align-items:center;gap:5px;padding:7px 14px;background:rgba(21,101,192,.25);
+            color:#42a5f5;border:1px solid rgba(21,101,192,.4);border-radius:5px;font-size:12px;
+            font-weight:600;text-decoration:none;white-space:nowrap">
+    📡 Фільтри → склад
+  </a>
+  <span style="font-size:12px;color:var(--text-muted,#9aafbe);margin-left:auto">
+    💡 «Перевірити» = import + create нових в фоні
+  </span>
+</div>
+
 {# ── Bulk-pull progress toolbar ────────────────────────────────────────────── #}
 <div id="pull-toolbar" style="
   display:none;position:sticky;top:0;z-index:900;

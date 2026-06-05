@@ -1021,7 +1021,24 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         ("🏷️ Етикетка DYMO", {"fields": ("label_detail",)}),
         ("⚙️ Quick actions", {"fields": ("set_stock_link",)}),
         ("📝 Notes",          {"fields": ("notes",)}),
+        ("📡 Технічні атрибути", {
+            "fields": ("tech_attributes",),
+        }),
     )
+
+    def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
+        extra_context = extra_context or {}
+        if object_id:
+            try:
+                from bots.models import DigiKeyListing
+                listing = DigiKeyListing.objects.filter(product_id=object_id).first()
+                if listing:
+                    extra_context['sync_attrs_url'] = reverse(
+                        'admin:bots_digikeylisting_sync_attrs', args=[listing.pk]
+                    )
+            except Exception:
+                pass
+        return super().changeform_view(request, object_id, form_url, extra_context)
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)

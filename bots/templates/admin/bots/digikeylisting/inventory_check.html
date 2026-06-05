@@ -1,0 +1,178 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+.ic-card{background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:8px;padding:14px 18px;margin-bottom:16px}
+.ic-table{border-collapse:collapse;width:100%;font-size:13px}
+.ic-table th{text-align:left;padding:7px 12px;background:var(--bg-hover,#1e2d40);color:var(--text-muted,#9aafbe);font-size:11px;text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--border-strong,#243347);white-space:nowrap}
+.ic-table td{padding:6px 10px;border-bottom:1px solid var(--border-strong,#243347);vertical-align:middle}
+.ic-table tr:hover td{background:rgba(255,255,255,.02)}
+.ic-ok  {color:#66bb6a;font-weight:700}
+.ic-warn{color:#ffa726;font-weight:700}
+.ic-err {color:#ef5350;font-weight:700}
+.ic-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.ic-badge-ok  {background:rgba(102,187,106,.15);color:#66bb6a;border:1px solid rgba(102,187,106,.3)}
+.ic-badge-warn{background:rgba(255,167,38,.12);color:#ffa726;border:1px solid rgba(255,167,38,.3)}
+.ic-badge-err {background:rgba(239,83,80,.12);color:#ef5350;border:1px solid rgba(239,83,80,.3)}
+.ic-link{color:var(--link-fg,#58a6ff);text-decoration:none;font-size:12px}
+.ic-link:hover{text-decoration:underline}
+.ic-sync-btn{padding:3px 10px;font-size:11px;cursor:pointer;border-radius:4px;white-space:nowrap;
+  background:rgba(0,105,92,.2);color:#00bfa5;border:1px solid rgba(0,105,92,.4)}
+.ic-sync-btn:hover{background:rgba(0,105,92,.35)}
+.ic-filter-bar{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+</style>
+
+<h1 style="margin-bottom:6px">{{ title }}</h1>
+<p style="color:var(--text-muted,#9aafbe);font-size:13px;margin-bottom:16px">
+  Перевірка: чи всі DigiKey лістинги мають правильно налаштовані товари на складі.
+  &nbsp;·&nbsp;
+  <a href="{% url 'admin:bots_digikeylisting_changelist' %}" style="color:var(--text-muted)">← Лістинги</a>
+</p>
+
+<!-- Filter bar -->
+<div class="ic-filter-bar">
+  <form method="get" style="display:flex;gap:8px;align-items:center">
+    <label style="font-size:12px;color:var(--text-muted)">Категорія:</label>
+    <select name="category" style="background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);border:1px solid var(--border-strong,#243347);border-radius:4px;padding:4px 8px;font-size:12px">
+      <option value="">— всі —</option>
+      {% for val, label in cat_choices %}
+        <option value="{{ val }}" {% if filter_category == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="button" style="padding:4px 14px;font-size:12px">Фільтр</button>
+  </form>
+  <span style="font-size:12px;color:var(--text-muted)">{{ items|length }} лістингів</span>
+</div>
+
+<!-- Stats summary -->
+{% with ok_count=0 warn_count=0 err_count=0 %}
+<div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+  {% for item in items %}
+    {% if item.stock <= 0 or not item.has_price %}{% else %}{% endif %}
+  {% endfor %}
+</div>
+{% endwith %}
+
+{% if not items %}
+<div class="ic-card" style="color:var(--text-muted);text-align:center;padding:24px">
+  Немає лістингів для відображення.
+</div>
+{% else %}
+<div class="ic-card" style="padding:0;overflow:hidden">
+<table class="ic-table">
+  <thead>
+    <tr>
+      <th>SKU</th>
+      <th>Назва (DigiKey)</th>
+      <th>Кат.</th>
+      <th style="text-align:right">Залишок</th>
+      <th>Ціна продажу</th>
+      <th>Тех. атрибути</th>
+      <th>DK атрибути</th>
+      <th>Статус</th>
+      <th>Дії</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for item in items %}
+    {% with p=item.product l=item.listing %}
+    <tr>
+      <td style="font-family:monospace;white-space:nowrap">
+        <a href="{{ item.changelist_url }}" class="ic-link" title="DigiKey лістинг">{{ p.sku }}</a>
+        {% if item.product_url %}&nbsp;<a href="{{ item.product_url }}" class="ic-link" title="Склад" style="opacity:.6">🏭</a>{% endif %}
+      </td>
+      <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--text-muted)">
+        {{ l.dk_title|default:p.name|default:"—" }}
+      </td>
+      <td>
+        <span class="ic-badge {% if l.category_type == 'filter' %}ic-badge-ok{% elif l.category_type == 'other' %}ic-badge-warn{% else %}ic-badge-ok{% endif %}">
+          {{ l.get_category_type_display|default:l.category_type }}
+        </span>
+      </td>
+      <td style="text-align:right;font-weight:700;{% if item.stock <= 0 %}color:#ef5350{% elif item.stock < 10 %}color:#ffa726{% else %}color:#66bb6a{% endif %}">
+        {{ item.stock|floatformat:0 }}
+      </td>
+      <td>
+        {% if item.has_price %}
+          <span class="ic-ok">✓ {{ p.sale_price }} {{ p.currency|default:"EUR" }}</span>
+        {% else %}
+          <span class="ic-err">✗ не вказано</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if item.has_attrs %}
+          <span class="ic-ok">✓ {{ p.tech_attributes|length }} пар.</span>
+        {% elif item.has_dk_attrs %}
+          <span class="ic-warn">⚠ є в DK</span>
+        {% else %}
+          <span style="color:var(--text-muted)">—</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if item.has_dk_attrs %}
+          <span class="ic-ok">✓ {{ l.dk_attributes|length }} пар.</span>
+        {% else %}
+          <span class="ic-warn">⚠ порожньо</span>
+        {% endif %}
+      </td>
+      <td>
+        {% if item.stock <= 0 and not item.has_price %}
+          <span class="ic-badge ic-badge-err">❌ Немає залишку + ціни</span>
+        {% elif item.stock <= 0 %}
+          <span class="ic-badge ic-badge-warn">⚠ Нема залишку</span>
+        {% elif not item.has_price %}
+          <span class="ic-badge ic-badge-warn">⚠ Немає ціни</span>
+        {% else %}
+          <span class="ic-badge ic-badge-ok">✓ ОК</span>
+        {% endif %}
+      </td>
+      <td style="white-space:nowrap">
+        {% if item.has_dk_attrs and not item.has_attrs %}
+        <button class="ic-sync-btn" onclick="icSyncAttrs(this,'{{ item.sync_url }}','{{ p.sku }}')"
+                title="Скопіювати атрибути DigiKey → склад">🔄 Sync</button>
+        {% elif item.product_url %}
+        <a href="{{ item.product_url }}" class="ic-link">✏️ Склад</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endwith %}
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% endif %}
+
+<script>
+var CSRF = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+
+function icSyncAttrs(btn, url, sku) {
+  if (!confirm('Скопіювати атрибути DigiKey → склад для ' + sku + '?')) return;
+  btn.disabled = true; btn.textContent = '⏳';
+  fetch(url + '?ajax=1', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': CSRF },
+    credentials: 'same-origin',
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.ok) {
+      btn.textContent = '✅ ' + d.count + ' пар.';
+      btn.style.color = '#66bb6a';
+      btn.style.borderColor = 'rgba(102,187,106,.4)';
+    } else {
+      btn.disabled = false;
+      btn.textContent = '❌ Помилка';
+      btn.style.color = '#ef5350';
+      alert('Помилка: ' + (d.error || 'невідома'));
+    }
+  })
+  .catch(function(e) {
+    btn.disabled = false;
+    btn.textContent = '❌';
+    alert('Помилка: ' + e.message);
+  });
+}
+</script>
+{% endblock %}

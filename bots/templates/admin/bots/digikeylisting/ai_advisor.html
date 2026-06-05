@@ -498,7 +498,7 @@
       /* Body */
       var bodyHtml = '<div class="hist-card-body">';
 
-      /* Prices before / after */
+      /* Prices before / after + apply button */
       if (h.recommended_prices && h.recommended_prices.length) {
         bodyHtml += '<div style="margin:10px 0 6px;font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase">💰 Рекомендовані ціни</div>';
         bodyHtml += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">';
@@ -507,6 +507,21 @@
             'border-radius:5px;padding:3px 10px;font-size:12px;font-weight:700">від ' + p.qty + ' шт. → $' + Number(p.price).toFixed(4) + '</span>';
         });
         bodyHtml += '</div>';
+        /* Apply button or applied badge */
+        if (h.prices_applied) {
+          bodyHtml += '<div style="font-size:12px;color:#66bb6a;margin-bottom:8px">✅ Ціни застосовано' +
+            (h.applied_at ? ' <span style="color:var(--text-muted);font-weight:400">' + esc(h.applied_at) + '</span>' : '') +
+            (h.applied_by ? ' · <span style="color:var(--text-muted)">' + esc(h.applied_by) + '</span>' : '') +
+            '</div>';
+        } else {
+          bodyHtml += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+            '<button class="btn-hist-apply" data-log-id="' + (h.id || '') + '" ' +
+              'data-prices="' + esc(JSON.stringify(h.recommended_prices)) + '" ' +
+              'style="padding:5px 16px;font-size:12px;font-weight:700;cursor:pointer;border-radius:5px;' +
+              'background:rgba(46,125,50,.2);color:#66bb6a;border:1px solid rgba(46,125,50,.4)">💰 Застосувати ці ціни</button>' +
+            '<span class="hist-apply-st" style="font-size:12px;color:var(--text-muted)"></span>' +
+            '</div>';
+        }
       }
       if (h.price_change_summary) {
         bodyHtml += '<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">' + esc(h.price_change_summary) + '</div>';
@@ -571,6 +586,50 @@
           e.stopPropagation();
           deleteLog(parseInt(delBtn.dataset.logId), card);
         });
+      }
+
+      /* Apply prices from history */
+      var applyHistBtn = card.querySelector('.btn-hist-apply');
+      if (applyHistBtn) {
+        applyHistBtn.addEventListener('click', (function(btn, entry) {
+          return function() {
+            var prices = JSON.parse(btn.dataset.prices || '[]');
+            var logId  = btn.dataset.logId;
+            var stEl   = btn.parentNode.querySelector('.hist-apply-st');
+            if (!prices.length) return;
+            if (!confirm('Застосувати рекомендовані ціни?\n\n' +
+                prices.map(function(p) { return 'від ' + p.qty + ' шт. → $' + Number(p.price).toFixed(4); }).join('\n')
+            )) return;
+            btn.disabled = true;
+            if (stEl) { stEl.textContent = 'Зберігаємо…'; stEl.style.color = 'var(--text-muted)'; }
+            var body = 'apply_prices=1';
+            if (logId) body += '&log_id=' + logId;
+            prices.forEach(function(p) {
+              body += '&price_' + p.qty + '=' + encodeURIComponent(Number(p.price).toFixed(4));
+            });
+            fetch(RUN_URL, {
+              method: 'POST',
+              headers: { 'X-CSRFToken': CSRF, 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: body,
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.ok && data.prices_applied) {
+                btn.style.display = 'none';
+                if (stEl) { stEl.textContent = '✅ Ціни збережено!'; stEl.style.color = '#66bb6a'; }
+                entry.prices_applied = true;
+                entry.applied_at = 'щойно';
+              } else {
+                btn.disabled = false;
+                if (stEl) { stEl.textContent = '❌ ' + (data.error || 'Помилка'); stEl.style.color = '#ef5350'; }
+              }
+            })
+            .catch(function(e) {
+              btn.disabled = false;
+              if (stEl) { stEl.textContent = '❌ ' + e.message; stEl.style.color = '#ef5350'; }
+            });
+          };
+        })(applyHistBtn, h));
       }
     });
   }

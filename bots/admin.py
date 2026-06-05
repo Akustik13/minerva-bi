@@ -1400,8 +1400,10 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         extra_context = extra_context or {}
-        extra_context['pull_task_status_url'] = reverse('admin:bots_digikeylisting_pull_task_status')
-        extra_context['pull_task_cancel_url']  = reverse('admin:bots_digikeylisting_pull_task_cancel')
+        extra_context['pull_task_status_url']    = reverse('admin:bots_digikeylisting_pull_task_status')
+        extra_context['pull_task_cancel_url']    = reverse('admin:bots_digikeylisting_pull_task_cancel')
+        extra_context['check_new_url']           = reverse('admin:bots_digikeylisting_check_new')
+        extra_context['inventory_check_url']     = reverse('admin:bots_digikeylisting_inventory_check')
         try:
             t = BotTask.objects.get(name=self.PULL_TASK_NAME)
             extra_context['pull_task_active']  = t.status == BotTask.RUNNING
@@ -1436,6 +1438,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             )
             extra_context['ai_advisor_url'] = reverse(
                 'admin:bots_digikeylisting_ai_advisor', args=[object_id]
+            )
+            extra_context['sync_attrs_url'] = reverse(
+                'admin:bots_digikeylisting_sync_attrs', args=[object_id]
             )
             # For list of existing sync status choices — used in template
             extra_context['sync_choices'] = DigiKeyListing.SYNC_CHOICES
@@ -1474,8 +1479,39 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('pull-task/cancel/',
                  self.admin_site.admin_view(self.pull_task_cancel_view),
                  name='bots_digikeylisting_pull_task_cancel'),
+            path('<int:pk>/sync-attrs/',
+                 self.admin_site.admin_view(self.sync_attrs_view),
+                 name='bots_digikeylisting_sync_attrs'),
+            path('check-new-from-dk/',
+                 self.admin_site.admin_view(self.check_new_listings_view),
+                 name='bots_digikeylisting_check_new'),
+            path('inventory-check/',
+                 self.admin_site.admin_view(self.inventory_check_view),
+                 name='bots_digikeylisting_inventory_check'),
         ]
         return custom + urls
+
+    def sync_attrs_view(self, request, pk):
+        """Copy dk_attributes from listing → product.tech_attributes. Supports AJAX."""
+        from django.http import JsonResponse
+        listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.GET.get('ajax') == '1'
+
+        attrs = dict(listing.dk_attributes or {})
+        if not attrs:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Немає атрибутів у лістингу. Спочатку натисніть 📥 Стягнути з DigiKey.'})
+            messages.warning(request, '⚠️ Немає атрибутів для синхронізації.')
+            return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
+
+        product = listing.product
+        product.tech_attributes = attrs
+        product.save(update_fields=['tech_attributes'])
+
+        if is_ajax:
+            return JsonResponse({'ok': True, 'attrs': attrs, 'count': len(attrs)})
+        messages.success(request, f'✅ Синхронізовано {len(attrs)} атрибутів → {product.sku}')
+        return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
 
     def publish_view(self, request, pk):
         from bots.services.dk_marketplace import publish_listing, DKMarketplaceError
@@ -2321,6 +2357,88 @@ Rules:
             name=self.PULL_TASK_NAME, status=BotTask.RUNNING
         ).update(cancel_requested=True)
         return JsonResponse({'ok': bool(updated)})
+
+    def check_new_listings_view(self, request):
+        """Run import_offers + create_listings in background and redirect to changelist."""
+        import threading
+        from bots.services.dk_marketplace import import_offers_from_dk, create_listings_from_offers
+
+        task = BotTask.start('check_new_listings')
+
+        def _run():
+            try:
+                r1 = import_offers_from_dk(task=task)
+                r2 = create_listings_from_offers(task=task)
+                created  = r2.get('created', 0)
+                updated  = r1.get('updated', 0)
+                msg = f"✅ Оновлено {updated} лістингів"
+                if created:
+                    msg += f", створено нових: {created}"
+                else:
+                    msg += ", нових не знайдено"
+                task.finish(msg)
+            except InterruptedError as e:
+                task.finish(f"⛔ {e}")
+            except Exception as exc:
+                task.finish(f"❌ {exc}", error=True)
+                logger.error("check_new_listings FAILED: %s", exc, exc_info=True)
+            finally:
+                from django.db import connection
+                connection.close()
+
+        threading.Thread(target=_run, daemon=True).start()
+        messages.info(request, "⏳ Перевірку нових лістингів запущено у фоні.")
+        return redirect(reverse('admin:bots_digikeylisting_changelist'))
+
+    def inventory_check_view(self, request):
+        """Show inventory status for all DigiKey listings (grouped by category)."""
+        from django.db.models import Sum
+        from inventory.models import InventoryTransaction
+
+        qs = DigiKeyListing.objects.select_related('product').order_by(
+            'category_type', 'product__sku'
+        )
+        if request.GET.get('category'):
+            qs = qs.filter(category_type=request.GET['category'])
+
+        # Batch-fetch stock for all products
+        product_ids = [l.product_id for l in qs if l.product_id]
+        stock_map = {}
+        if product_ids:
+            rows = (
+                InventoryTransaction.objects
+                .filter(product_id__in=product_ids)
+                .exclude(tx_type='reserved')
+                .values('product_id')
+                .annotate(total=Sum('qty'))
+            )
+            stock_map = {r['product_id']: float(r['total'] or 0) for r in rows}
+
+        items = []
+        for listing in qs:
+            p = listing.product
+            stock = stock_map.get(p.pk, 0) if p else 0
+            items.append({
+                'listing': listing,
+                'product': p,
+                'stock': stock,
+                'has_price': bool(p and p.sale_price),
+                'has_attrs': bool(p and p.tech_attributes),
+                'has_dk_attrs': bool(listing.dk_attributes),
+                'changelist_url': reverse('admin:bots_digikeylisting_change', args=[listing.pk]),
+                'product_url': reverse('admin:inventory_product_change', args=[p.pk]) if p else '',
+                'sync_url': reverse('admin:bots_digikeylisting_sync_attrs', args=[listing.pk]),
+            })
+
+        ctx = dict(
+            self.admin_site.each_context(request),
+            title='📊 Звірка зі складом',
+            opts=self.model._meta,
+            items=items,
+            filter_category=request.GET.get('category', ''),
+            cat_choices=DigiKeyListing.CAT_CHOICES,
+        )
+        return render(request, 'admin/bots/digikeylisting/inventory_check.html', ctx)
 
     @admin.action(description='🤖 AI-аналіз ціноутворення (масово)')
     def action_bulk_ai_analysis(self, request, queryset):

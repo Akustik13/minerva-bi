@@ -95,6 +95,10 @@ class Product(models.Model):
                                                  help_text="При залишку нижче цього значення — дозамовити")
     lead_time_days = models.PositiveSmallIntegerField("Термін поставки (дні)", null=True, blank=True)
     notes = models.TextField(blank=True, default="")
+    tech_attributes = models.JSONField(
+        "Технічні атрибути", default=dict, blank=True,
+        help_text="Технічні параметри компонента (частота, смуга, тип тощо). Синхронізується з DigiKey лістингом."
+    )
     is_active = models.BooleanField(default=True)
 
     # ── Митне оформлення ─────────────────────────────────────────────────────
