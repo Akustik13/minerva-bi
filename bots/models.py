@@ -236,7 +236,8 @@ class DigiKeyListing(models.Model):
 
     product = models.OneToOneField(
         'inventory.Product', on_delete=models.CASCADE,
-        related_name='dk_listing', verbose_name='Товар'
+        related_name='dk_listing', verbose_name='Товар',
+        null=True, blank=True,
     )
     category_type = models.CharField(
         'Категорія', max_length=20, choices=CAT_CHOICES, default='other'
@@ -357,17 +358,20 @@ class DigiKeyListing(models.Model):
         ordering            = ['product__sku']
 
     def __str__(self):
-        return f"{self.product.sku} [{self.get_sync_status_display()}]"
+        sku = self.product.sku if self.product_id else '—'
+        return f"{sku} [{self.get_sync_status_display()}]"
 
     def get_supplier_sku(self):
-        return self.dk_supplier_sku or self.product.sku
+        return self.dk_supplier_sku or (self.product.sku if self.product_id else '')
 
     def get_stock_qty(self):
         """Поточний залишок на складі (з InventoryTransaction)."""
+        if not self.product_id:
+            return 0
         from django.db.models import Sum
         from inventory.models import InventoryTransaction
         result = InventoryTransaction.objects.filter(
-            product=self.product
+            product_id=self.product_id
         ).aggregate(total=Sum('qty'))
         return max(0, int(result['total'] or 0))
 

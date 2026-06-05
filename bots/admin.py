@@ -1373,6 +1373,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             obj.sync_status    = DigiKeyListing.SYNC_DRAFT
             obj.last_error     = ''
             obj.last_synced_at = None
+            obj.product        = None  # copy is unlinked — bind to inventory later
         super().save_model(request, obj, form, change)
 
     def response_change(self, request, obj):
@@ -1471,6 +1472,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['sync_attrs_url'] = reverse(
                 'admin:bots_digikeylisting_sync_attrs', args=[object_id]
             )
+            extra_context['create_product_url'] = reverse(
+                'admin:bots_digikeylisting_create_product', args=[object_id]
+            )
             # For list of existing sync status choices — used in template
             extra_context['sync_choices'] = DigiKeyListing.SYNC_CHOICES
         return super().changeform_view(request, object_id, form_url, extra_context)
@@ -1529,6 +1533,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/sync-inv-to-dk/',
                  self.admin_site.admin_view(self.sync_inv_to_dk_view),
                  name='bots_digikeylisting_sync_inv_to_dk'),
+            path('<int:pk>/create-product/',
+                 self.admin_site.admin_view(self.create_product_view),
+                 name='bots_digikeylisting_create_product'),
         ]
         return custom + urls
 
@@ -1543,6 +1550,12 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             if is_ajax:
                 return JsonResponse({'ok': False, 'error': 'Немає атрибутів у лістингу. Спочатку натисніть 📥 Стягнути з DigiKey.'})
             messages.warning(request, '⚠️ Немає атрибутів для синхронізації.')
+            return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
+
+        if not listing.product_id:
+            if is_ajax:
+                return JsonResponse({'ok': False, 'error': 'Лістинг не прив\'язаний до товару складу.'})
+            messages.warning(request, '⚠️ Лістинг не прив\'язаний до товару складу.')
             return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
 
         product = listing.product
@@ -1767,7 +1780,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         current_problem_fields = [i['field'] for i in all_current_issues]
         ctx = dict(
             self.admin_site.each_context(request),
-            title=f'🤖 AI Порадник — {listing.product.sku}',
+            title=f'🤖 AI Порадник — {listing.product.sku if listing.product_id else "(без SKU)"}',
             listing=listing,
             opts=self.model._meta,
             run_url=reverse('admin:bots_digikeylisting_ai_run', args=[pk]),
@@ -2496,6 +2509,44 @@ Rules:
         messages.success(request, f'Синхронізовано {len(attrs)} атрибутів: Склад → DigiKey для {product.sku}.')
         return redirect(reverse('admin:bots_digikeylisting_inventory_check'))
 
+    def create_product_view(self, request, pk):
+        """Create an inventory.Product from this listing's data and link them."""
+        from django.shortcuts import get_object_or_404
+        from inventory.models import Product
+
+        listing = get_object_or_404(DigiKeyListing, pk=pk)
+
+        if listing.product_id:
+            messages.warning(request, 'Лістинг вже прив\'язаний до товару складу.')
+            return redirect(reverse('admin:bots_digikeylisting_change', args=[pk]))
+
+        # Build a unique SKU based on dk_supplier_sku
+        base_sku = (listing.dk_supplier_sku or '').strip() or f'DK-{pk}'
+        sku = base_sku
+        suffix = 1
+        while Product.objects.filter(sku=sku).exists():
+            sku = f'{base_sku}-{suffix}'
+            suffix += 1
+
+        cat_map = {'filter': 'rf_filter', 'other': 'other'}
+        product = Product(
+            sku=sku,
+            name=listing.dk_title or sku,
+            manufacturer=listing.dk_manufacturer or '',
+            category=cat_map.get(listing.category_type, 'other'),
+            tech_attributes=listing.dk_attributes or {},
+        )
+        product.save()
+
+        listing.product = product
+        listing.save(update_fields=['product'])
+
+        messages.success(
+            request,
+            f'✅ Картку складу «{sku}» створено і прив\'язано. Перевірте і відредагуйте деталі.'
+        )
+        return redirect(reverse('admin:inventory_product_change', args=[product.pk]))
+
     def inventory_check_view(self, request):
         """Show inventory status for all DigiKey listings (grouped by category)."""
         from django.db.models import Sum
@@ -2577,7 +2628,15 @@ Rules:
     # ── Display helpers ───────────────────────────────────────────────────────
 
     def product_sku_link(self, obj):
-        listing_url  = reverse('admin:bots_digikeylisting_change', args=[obj.pk])
+        listing_url = reverse('admin:bots_digikeylisting_change', args=[obj.pk])
+        if not obj.product_id:
+            create_url = reverse('admin:bots_digikeylisting_create_product', args=[obj.pk])
+            return format_html(
+                '<a href="{}" style="color:var(--err)">⚠ Без SKU</a>'
+                '&nbsp;<a href="{}" title="Створити картку складу"'
+                ' style="color:#ffa726;font-size:11px">🏭+</a>',
+                listing_url, create_url,
+            )
         inventory_url = reverse('admin:inventory_product_change', args=[obj.product_id])
         return format_html(
             '<a href="{}">{}</a>'
@@ -2588,6 +2647,8 @@ Rules:
     product_sku_link.admin_order_field = 'product__sku'
 
     def stock_qty_display(self, obj):
+        if not obj.product_id:
+            return format_html('<span style="color:var(--text-muted)">—</span>')
         qty = obj.get_stock_qty()
         color = 'var(--ok)' if qty > 0 else 'var(--err)'
         return format_html('<span style="color:{};font-weight:600">{} шт.</span>', color, qty)
@@ -2644,6 +2705,11 @@ Rules:
     price_delta_badge.admin_order_field = 'price_delta_pct'
 
     def stock_qty_readonly(self, obj):
+        if obj and obj.pk and not obj.product_id:
+            return format_html(
+                '<span style="color:var(--text-muted);font-size:13px">'
+                '— товар не прив\'язаний —</span>'
+            )
         if obj and obj.pk:
             wh_qty   = obj.get_stock_qty()
             wh_color = '#388e3c' if wh_qty > 0 else '#c62828'

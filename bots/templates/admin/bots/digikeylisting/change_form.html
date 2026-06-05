@@ -17,6 +17,14 @@
     <button type="button" class="dk-btn dk-btn-edit" onclick="dkEnterEdit()">
       ✏️ Редагувати
     </button>
+    {% if not original.product_id %}
+    <a href="{{ create_product_url }}"
+       onclick="return confirm('Створити нову картку товару на складі і прив\'язати до цього лістингу?\nSKU буде встановлено з поля «Supplier SKU».')"
+       class="dk-btn"
+       style="background:rgba(0,105,92,.2);color:#00bfa5;border:1px solid rgba(0,105,92,.4)">
+      🏭 Створити на складі
+    </a>
+    {% else %}
     {% if original.dk_offer_id %}
     <a href="{{ sync_qty_url }}" class="dk-btn dk-btn-sync"
        onclick="return confirm('Оновити залишок складу на DigiKey?')">
@@ -29,7 +37,14 @@
       🤖 AI Порада
     </a>
     {% endif %}
-    <span class="dk-bar-hint">Режим перегляду — натисни «Редагувати» щоб змінити поля</span>
+    {% endif %}
+    <span class="dk-bar-hint">
+      {% if not original.product_id %}
+        ⚠️ Лістинг не прив'язаний до товару складу
+      {% else %}
+        Режим перегляду — натисни «Редагувати» щоб змінити поля
+      {% endif %}
+    </span>
   </div>
 
   {# ── EDIT MODE BAR ─────────────────────────────────────────────────────── #}
