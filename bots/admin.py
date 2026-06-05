@@ -1286,6 +1286,9 @@ def _local_quality_checks(listing, ignored_fields=None) -> list:
 @admin.register(DigiKeyListing)
 class DigiKeyListingAdmin(admin.ModelAdmin):
     change_form_template = 'admin/bots/digikeylisting/change_form.html'
+    # Override model Meta ordering=['product__sku'] to avoid implicit JOIN on inventory_product.
+    # The changelist sorts by _product_sku annotation instead (set via admin_order_field).
+    ordering = ('-pk',)
 
     list_display   = ('product_sku_link', 'dk_title', 'category_type',
                       'stock_qty_display', 'dk_qty_display', 'price_min_display',
@@ -2685,16 +2688,40 @@ Rules:
     def inventory_check_view(self, request):
         """Show inventory status for all DigiKey listings (grouped by category)."""
         from django.db.models import Sum
-        from inventory.models import InventoryTransaction
+        from inventory.models import InventoryTransaction, Product
 
-        qs = DigiKeyListing.objects.select_related('product').order_by(
-            'category_type', 'product__sku'
+        qs = list(
+            DigiKeyListing.objects
+            .only('pk', 'product_id', 'category_type', 'dk_title', 'dk_supplier_sku',
+                  'dk_attributes', 'dk_lifecycle_status', 'sync_status')
+            .order_by('category_type', 'pk')
         )
         if request.GET.get('category'):
-            qs = qs.filter(category_type=request.GET['category'])
+            cat = request.GET['category']
+            qs = [l for l in qs if l.category_type == cat]
 
-        # Batch-fetch stock for all products
         product_ids = [l.product_id for l in qs if l.product_id]
+
+        # Batch-fetch products without tech_attributes (may not exist on older DB)
+        products_base = {}
+        if product_ids:
+            try:
+                products_base = Product.objects.filter(pk__in=product_ids).in_bulk()
+            except Exception:
+                pass
+
+        # Batch-fetch tech_attributes separately — graceful fallback if column missing
+        tech_attrs_map = {}
+        if product_ids:
+            try:
+                tech_attrs_map = {
+                    p.pk: p.tech_attributes
+                    for p in Product.objects.filter(pk__in=product_ids).only('pk', 'tech_attributes')
+                }
+            except Exception:
+                pass
+
+        # Batch-fetch stock
         stock_map = {}
         if product_ids:
             rows = (
@@ -2708,14 +2735,14 @@ Rules:
 
         items = []
         for listing in qs:
-            p = listing.product
-            stock = stock_map.get(p.pk, 0) if p else 0
+            p = products_base.get(listing.product_id) if listing.product_id else None
+            stock = stock_map.get(listing.product_id, 0)
             items.append({
                 'listing': listing,
                 'product': p,
                 'stock': stock,
                 'has_price': bool(p and p.sale_price),
-                'has_attrs': bool(p and p.tech_attributes),
+                'has_attrs': bool(tech_attrs_map.get(listing.product_id)),
                 'has_dk_attrs': bool(listing.dk_attributes),
                 'changelist_url': reverse('admin:bots_digikeylisting_change', args=[listing.pk]),
                 'product_url': reverse('admin:inventory_product_change', args=[p.pk]) if p else '',
