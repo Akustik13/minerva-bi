@@ -1398,6 +1398,13 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         from django.db.models import OuterRef, Subquery, Sum, DecimalField, Value
         from django.db.models.functions import Coalesce
+        # Eager-load product (avoids N+1); defer tech_attributes to avoid
+        # "column does not exist" if inventory/0028 migration wasn't applied yet.
+        qs = super().get_queryset(request).select_related('product')
+        try:
+            qs = qs.defer('product__tech_attributes')
+        except Exception:
+            pass
         try:
             from inventory.models import InventoryTransaction
             _out = DecimalField(max_digits=18, decimal_places=3)
@@ -1408,14 +1415,14 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 .annotate(total=Sum('qty'))
                 .values('total')[:1]
             )
-            return super().get_queryset(request).annotate(
+            return qs.annotate(
                 _stock_qty=Coalesce(
                     Subquery(stock_subq, output_field=_out),
                     Value(0, output_field=_out),
                 )
             )
         except Exception:
-            return super().get_queryset(request)
+            return qs
 
     # ── changelist_view: inject pull-task toolbar context ─────────────────────
 
@@ -1480,6 +1487,28 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             )
             # For list of existing sync status choices — used in template
             extra_context['sync_choices'] = DigiKeyListing.SYNC_CHOICES
+        else:
+            # Add page — inject copy-from-listing selector
+            import json as _json
+            extra_context['copy_data_url'] = reverse('admin:bots_digikeylisting_copy_data')
+            _cat_map = dict(DigiKeyListing.CAT_CHOICES)
+            extra_context['existing_listings_json'] = _json.dumps([
+                {
+                    'pk': l.pk,
+                    'label': (
+                        (l.product.sku if l.product_id else (l.dk_supplier_sku or f'DK-{l.pk}'))
+                        + ' — '
+                        + (l.dk_title[:40] if l.dk_title else '(без назви)')
+                        + ' ['
+                        + _cat_map.get(l.category_type, l.category_type)
+                        + ']'
+                    ),
+                }
+                for l in DigiKeyListing.objects
+                    .select_related('product')
+                    .order_by('product__sku', 'dk_supplier_sku')
+                    .defer('product__tech_attributes')[:200]
+            ], ensure_ascii=False)
         return super().changeform_view(request, object_id, form_url, extra_context)
 
     def get_urls(self):
@@ -1542,6 +1571,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/validate-attrs/',
                  self.admin_site.admin_view(self.validate_attrs_view),
                  name='bots_digikeylisting_validate_attrs'),
+            path('copy-data/',
+                 self.admin_site.admin_view(self.copy_data_view),
+                 name='bots_digikeylisting_copy_data'),
         ]
         return custom + urls
 
@@ -2552,6 +2584,49 @@ Rules:
             f'✅ Картку складу «{sku}» створено і прив\'язано. Перевірте і відредагуйте деталі.'
         )
         return redirect(reverse('admin:inventory_product_change', args=[product.pk]))
+
+    def copy_data_view(self, request):
+        """Return all copyable fields of a listing as JSON for the add-form prefill."""
+        from django.http import JsonResponse
+        pk = request.GET.get('pk') or request.POST.get('pk')
+        if not pk:
+            return JsonResponse({'ok': False, 'error': 'pk required'})
+        try:
+            listing = DigiKeyListing.objects.select_related('product').get(pk=pk)
+        except DigiKeyListing.DoesNotExist:
+            return JsonResponse({'ok': False, 'error': 'Not found'})
+        data = {
+            'category_type':      listing.category_type,
+            'dk_category_id':     listing.dk_category_id,
+            'dk_category_name':   listing.dk_category_name,
+            'dk_title':           listing.dk_title,
+            'dk_description':     listing.dk_description,
+            'dk_manufacturer':    listing.dk_manufacturer,
+            'dk_image_url':       listing.dk_image_url,
+            'dk_datasheet_url':   listing.dk_datasheet_url,
+            'dk_supplier_sku':    listing.dk_supplier_sku,
+            'dk_min_order_qty':   listing.dk_min_order_qty,
+            'dk_lead_time_days':  listing.dk_lead_time_days,
+            'dk_qty_alert':       listing.dk_qty_alert,
+            'dk_prices':          listing.dk_prices,
+            'dk_packaging':       listing.dk_packaging,
+            'dk_lifecycle_status': listing.dk_lifecycle_status,
+            'dk_attributes':      listing.dk_attributes,
+            'fa_frequency':       listing.fa_frequency,
+            'fa_bandwidth':       listing.fa_bandwidth,
+            'fa_filter_type':     listing.fa_filter_type,
+            'fa_ripple':          listing.fa_ripple,
+            'fa_insertion_loss':  listing.fa_insertion_loss,
+            'fa_mounting_type':   listing.fa_mounting_type,
+            'fa_package_case':    listing.fa_package_case,
+            'fa_size_dimension':  listing.fa_size_dimension,
+            'fa_height_max':      listing.fa_height_max,
+            'dk_is_active':       listing.dk_is_active,
+        }
+        # Fields that need manual entry (not copied to avoid collision)
+        # product, dk_product_id, dk_offer_id, sync_status — intentionally excluded
+        return JsonResponse({'ok': True, 'data': data,
+                             'source_sku': listing.product.sku if listing.product_id else listing.dk_supplier_sku})
 
     def validate_attrs_view(self, request, pk):
         """Validate listing's additionalFields against DigiKey Custom Fields API."""

@@ -347,6 +347,36 @@ body.dk-edit .dk-view-val      { display: none !important; }
 .dkv-close:hover { color: var(--text, #c9d8e4); }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   Copy-from-listing panel (add form)
+═══════════════════════════════════════════════════════════════════════════ */
+#dkCopyPanel {
+  margin: 0 0 14px;
+  padding: 14px 18px;
+  background: var(--bg-card, #1a2535);
+  border: 1px solid rgba(88,166,255,.35); border-left: 4px solid #1565c0;
+  border-radius: 6px; font-size: 13px;
+}
+#dkCopyPanel h4 { margin: 0 0 10px; font-size: 13px; color: var(--text, #c9d8e4); }
+#dkCopySelect {
+  background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347); border-radius: 4px;
+  padding: 6px 10px; font-size: 13px; min-width: 280px; max-width: 480px;
+}
+#dkCopyBtn {
+  background: #1565c0; color: #fff; border: none; border-radius: 5px;
+  padding: 7px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+  margin-left: 8px;
+}
+#dkCopyBtn:disabled { opacity: .55; cursor: not-allowed; }
+#dkCopyBtn:hover:not(:disabled) { filter: brightness(1.15); }
+#dkCopyMsg { font-size: 12px; margin-left: 10px; color: var(--text-muted, #9aafbe); }
+.dk-copy-warn {
+  margin-top: 10px; font-size: 12px; padding: 6px 10px;
+  background: rgba(255,167,38,.1); border: 1px solid rgba(255,167,38,.35);
+  border-radius: 4px; color: #ffa726;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    Price table
 ═══════════════════════════════════════════════════════════════════════════ */
 .dk-prices-wrap { margin: 4px 0 8px; }
@@ -751,6 +781,119 @@ function dkHighlight(el) {
   row.classList.remove('dk-field-updated');
   void row.offsetWidth;
   row.classList.add('dk-field-updated');
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   Copy-from-listing (add form prefill)
+════════════════════════════════════════════════════════════════════════════ */
+var COPY_DATA_URL = '{{ copy_data_url|default:"" }}';
+var _COPY_LISTINGS = {{ existing_listings_json|default:"[]"|safe }};
+
+function dkBuildCopyPanel() {
+  if (!COPY_DATA_URL) return '';
+  var opts = '<option value="">— виберіть існуючий лістинг —</option>';
+  _COPY_LISTINGS.forEach(function(l) {
+    opts += '<option value="' + l.pk + '">' + dkEsc(l.label) + '</option>';
+  });
+  return '<h4>📋 Скопіювати поля з існуючого лістингу</h4>' +
+    '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">' +
+    '<select id="dkCopySelect">' + opts + '</select>' +
+    '<button type="button" id="dkCopyBtn" onclick="dkCopyFrom()" disabled>📋 Скопіювати поля</button>' +
+    '<span id="dkCopyMsg"></span>' +
+    '</div>' +
+    '<div class="dk-copy-warn">⚠️ Поля «Товар», «DK Product ID», «DK Offer ID» та «Статус» не копіюються — вкажіть вручну. Змініть «Supplier SKU», «Назву» і «Опис» перед публікацією.</div>';
+}
+
+(function() {
+  document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'dkCopySelect') {
+      document.getElementById('dkCopyBtn').disabled = !e.target.value;
+    }
+  });
+})();
+
+function dkCopyFrom() {
+  var sel = document.getElementById('dkCopySelect');
+  var pk  = sel ? sel.value : '';
+  if (!pk) return;
+  var btn = document.getElementById('dkCopyBtn');
+  var msg = document.getElementById('dkCopyMsg');
+  btn.disabled = true;
+  btn.textContent = '⏳…';
+  if (msg) { msg.textContent = 'Завантаження…'; msg.style.color = 'var(--text-muted,#9aafbe)'; }
+
+  var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  fetch(COPY_DATA_URL + '?pk=' + encodeURIComponent(pk), {
+    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRFToken': csrf },
+    credentials: 'same-origin',
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    btn.disabled = false;
+    btn.textContent = '📋 Скопіювати поля';
+    if (!d.ok) {
+      if (msg) { msg.textContent = '❌ ' + (d.error || 'Помилка'); msg.style.color = '#ef5350'; }
+      return;
+    }
+    var fields = d.data || {};
+    var filled = 0;
+
+    /* Standard text/select fields */
+    Object.keys(DK_FIELD_MAP).forEach(function(key) {
+      if (fields[key] === undefined || fields[key] === null) return;
+      var el = document.getElementById(DK_FIELD_MAP[key]);
+      if (!el) return;
+      var val = String(fields[key]);
+      if (el.tagName === 'SELECT') {
+        for (var i = 0; i < el.options.length; i++) {
+          if (el.options[i].value === val) { el.selectedIndex = i; break; }
+        }
+      } else {
+        el.value = val;
+      }
+      dkHighlight(el);
+      filled++;
+    });
+
+    /* Bool: dk_is_active */
+    var cbActive = document.getElementById('id_dk_is_active');
+    if (cbActive && fields.dk_is_active !== undefined) {
+      cbActive.checked = !!fields.dk_is_active;
+    }
+
+    /* Numeric fields */
+    ['dk_min_order_qty','dk_lead_time_days','dk_qty_alert'].forEach(function(name) {
+      var el = document.querySelector('[name="' + name + '"]');
+      if (el && fields[name] !== undefined) { el.value = fields[name]; dkHighlight(el); filled++; }
+    });
+
+    /* Prices */
+    if (Array.isArray(fields.dk_prices) && fields.dk_prices.length) {
+      dkPricesRebuild(fields.dk_prices);
+      var pw = document.querySelector('.dk-prices-wrap');
+      if (pw) dkMarkAutofillWrap(pw);
+      filled++;
+    }
+
+    /* Attributes */
+    if (fields.dk_attributes && typeof fields.dk_attributes === 'object' && Object.keys(fields.dk_attributes).length) {
+      dkAttrsRebuild(fields.dk_attributes);
+      var aw = document.querySelector('.dk-attrs-wrap');
+      if (aw) dkMarkAutofillWrap(aw);
+      filled++;
+    }
+
+    dkAdaptToCategory();
+    if (msg) {
+      msg.textContent = '✅ Скопійовано з «' + dkEsc(d.source_sku || '') + '» — перевірте виділені поля';
+      msg.style.color = '#00bfa5';
+    }
+  })
+  .catch(function(e) {
+    btn.disabled = false;
+    btn.textContent = '📋 Скопіювати поля';
+    if (msg) { msg.textContent = '❌ ' + e.message; msg.style.color = '#ef5350'; }
+  });
 }
 
 /* ════════════════════════════════════════════════════════════════════════════
@@ -1219,13 +1362,26 @@ document.addEventListener('DOMContentLoaded', function() {
     var validatePanel = document.createElement('div');
     validatePanel.id = 'dkValidateResult';
     anchor.parentNode.insertBefore(validatePanel, anchor);
+
+    {% if copy_data_url %}
+    /* Inject copy-from-listing panel (add form only) */
+    var copyPanel = document.createElement('div');
+    copyPanel.id = 'dkCopyPanel';
+    copyPanel.innerHTML = dkBuildCopyPanel();
+    anchor.parentNode.insertBefore(copyPanel, anchor);
+    {% endif %}
   }
+
 
   /* Adapt UI to category */
   dkAdaptToCategory();
 
-  /* Start in VIEW mode */
+  /* Start in VIEW mode for existing objects, EDIT mode for add form */
+  {% if copy_data_url %}
+  dkEnterEdit();
+  {% else %}
   dkEnterView();
+  {% endif %}
 
   /* Field highlight from ai_advisor link (#id_fieldname) */
   if (location.hash && location.hash.length > 1) {
