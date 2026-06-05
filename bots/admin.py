@@ -1396,13 +1396,19 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
     # ── Queryset: annotate stock qty for sorting ──────────────────────────────
 
     def get_queryset(self, request):
-        from django.db.models import OuterRef, Subquery, Sum, DecimalField, Value
+        from django.db.models import OuterRef, Subquery, Sum, DecimalField, Value, CharField
         from django.db.models.functions import Coalesce
-        # Eager-load product (avoids N+1); defer tech_attributes to avoid
-        # "column does not exist" if inventory/0028 migration wasn't applied yet.
-        qs = super().get_queryset(request).select_related('product')
+        qs = super().get_queryset(request)
+        # Use Subquery instead of select_related to avoid JOIN on inventory_product
+        # (select_related would pull tech_attributes column which may not exist yet).
         try:
-            qs = qs.defer('product__tech_attributes')
+            from inventory.models import Product
+            qs = qs.annotate(
+                _product_sku=Subquery(
+                    Product.objects.filter(pk=OuterRef('product_id')).values('sku')[:1],
+                    output_field=CharField(),
+                )
+            )
         except Exception:
             pass
         try:
@@ -1415,14 +1421,15 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 .annotate(total=Sum('qty'))
                 .values('total')[:1]
             )
-            return qs.annotate(
+            qs = qs.annotate(
                 _stock_qty=Coalesce(
                     Subquery(stock_subq, output_field=_out),
                     Value(0, output_field=_out),
                 )
             )
         except Exception:
-            return qs
+            pass
+        return qs
 
     # ── changelist_view: inject pull-task toolbar context ─────────────────────
 
@@ -1496,7 +1503,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 {
                     'pk': l.pk,
                     'label': (
-                        (l.product.sku if l.product_id else (l.dk_supplier_sku or f'DK-{l.pk}'))
+                        (l.dk_supplier_sku or (f'ID-{l.product_id}' if l.product_id else f'DK-{l.pk}'))
                         + ' — '
                         + (l.dk_title[:40] if l.dk_title else '(без назви)')
                         + ' ['
@@ -1505,9 +1512,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                     ),
                 }
                 for l in DigiKeyListing.objects
-                    .select_related('product')
-                    .order_by('product__sku', 'dk_supplier_sku')
-                    .defer('product__tech_attributes')[:200]
+                    .only('pk', 'product_id', 'dk_supplier_sku', 'dk_title', 'category_type')
+                    .order_by('dk_supplier_sku')[:200]
             ], ensure_ascii=False)
         return super().changeform_view(request, object_id, form_url, extra_context)
 
@@ -2767,13 +2773,14 @@ Rules:
                 listing_url, create_url,
             )
         inventory_url = reverse('admin:inventory_product_change', args=[obj.product_id])
+        sku = getattr(obj, '_product_sku', None) or '—'
         return format_html(
             '<a href="{}">{}</a>'
             '&nbsp;<a href="{}" title="Картка складу" style="color:var(--text-muted);font-size:11px">🏭</a>',
-            listing_url, obj.product.sku, inventory_url,
+            listing_url, sku, inventory_url,
         )
     product_sku_link.short_description = 'Товар (SKU)'
-    product_sku_link.admin_order_field = 'product__sku'
+    product_sku_link.admin_order_field = '_product_sku'
 
     def stock_qty_display(self, obj):
         if not obj.product_id:
