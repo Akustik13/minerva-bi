@@ -1347,14 +1347,48 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         ('📋 Обов\'язкові атрибути DigiKey', {
             'fields': ('dk_packaging', 'dk_lifecycle_status'),
             'description': (
-                'Заповнюються автоматично при натисканні «📥 Стягнути поля з DigiKey».'
+                '<b>Packaging</b> — тип пакування. Допустимі значення: '
+                '<code>Tape &amp; Reel (TR)</code>, <code>Cut Tape (CT)</code>, '
+                '<code>Bulk</code>, <code>Digi-Reel®</code>. '
+                'Приклад: <code>Cut Tape (CT)</code><br>'
+                '<b>Product Life Cycle Status</b> — статус. Допустимі: '
+                '<code>Active</code>, <code>Obsolete</code>, '
+                '<code>Last Time Buy</code>, <code>Not For New Design</code>. '
+                'Зазвичай <code>Active</code>.'
             ),
         }),
-        ('📡 Технічні атрибути DigiKey', {
+        ('📡 Технічні атрибути (RF Filter)', {
+            'fields': (
+                'fa_frequency', 'fa_bandwidth', 'fa_filter_type',
+                'fa_ripple', 'fa_insertion_loss', 'fa_mounting_type',
+                'fa_package_case', 'fa_size_dimension', 'fa_height_max',
+            ),
+            'description': (
+                'Параметри для категорії <b>RF Filter</b> (category_type = filter). '
+                'Передаються в DigiKey як <code>additionalFields</code>. '
+                'Для інших категорій (кабелі, антени) використовуй таблицю нижче. '
+                'Кожне непорожнє поле відправляється в API при публікації.<br>'
+                '<b>Формати:</b> '
+                'Frequency — <code>1.12GHz Center</code> або <code>915MHz</code>; '
+                'Bandwidth — <code>210MHz</code>; '
+                'Filter Type — <code>Band Pass</code> / <code>Band Stop</code> / '
+                '<code>Low Pass</code> / <code>High Pass</code> / <code>Notch</code>; '
+                'Ripple / Insertion Loss — <code>1.6dB</code>; '
+                'Mounting Type — <code>Free Hanging (In-Line)</code>; '
+                'Package/Case — <code>Inline, SMA Connection, F and M</code>; '
+                'Size/Dimension — <code>1.496" L x 1.338" W (38mm x 34mm)</code>; '
+                'Height — <code>0.063" (1.60mm)</code>.'
+            ),
+        }),
+        ('📡 Всі атрибути DigiKey (JSON)', {
             'fields': ('dk_attributes',),
             'description': (
-                'Всі технічні атрибути товару з DigiKey (Antenna Type, Gain, Frequency Range, VSWR тощо). '
-                'Редагуються через таблицю нижче. Заповнюються кнопкою «📥 Стягнути поля з DigiKey».'
+                'Всі технічні атрибути товару — числові коди DigiKey та їх значення. '
+                'Для <b>кабелів</b> і <b>антен</b> тут зберігаються атрибути '
+                'Style (91), Connector (726/727), Length (77), Cable Type (321) тощо. '
+                '<b>Всі записи з числовими ключами передаються в DigiKey при публікації!</b> '
+                'Заповнюється автоматично кнопкою «📥 Стягнути з DigiKey» '
+                'або імпортом з Excel. Формат: <code>{"139": "1.12GHz", "91": "U.FL to MHF4"}</code>'
             ),
         }),
         ('📊 Статус синхронізації', {
@@ -1445,6 +1479,8 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         extra_context['inventory_check_url']     = reverse('admin:bots_digikeylisting_inventory_check')
         extra_context['check_new_status_url']    = reverse('admin:bots_digikeylisting_check_new_status')
         extra_context['check_new_cancel_url']    = reverse('admin:bots_digikeylisting_check_new_cancel')
+        extra_context['excel_create_url']        = reverse('admin:bots_digikeylisting_excel_create')
+        extra_context['excel_parse_url']         = reverse('admin:bots_digikeylisting_excel_parse')
         try:
             t = BotTask.objects.get(name=self.PULL_TASK_NAME)
             extra_context['pull_task_active']  = t.status == BotTask.RUNNING
@@ -1499,8 +1535,36 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['validate_attrs_url'] = reverse(
                 'admin:bots_digikeylisting_validate_attrs', args=[object_id]
             )
+            extra_context['excel_import_attrs_url'] = reverse(
+                'admin:bots_digikeylisting_excel_import_attrs', args=[object_id]
+            )
+            extra_context['excel_parse_url'] = reverse('admin:bots_digikeylisting_excel_parse')
             # For list of existing sync status choices — used in template
             extra_context['sync_choices'] = DigiKeyListing.SYNC_CHOICES
+            # Help: attribute code table (code, name, category, example)
+            extra_context['help_attr_table'] = [
+                ('139',  'Frequency',           'Filter',    '1.12GHz Center'),
+                ('398',  'Bandwidth',            'Filter',    '210MHz'),
+                ('21',   'Filter Type',          'Filter',    'Band Pass'),
+                ('428',  'Ripple',               'Filter',    '1.6dB'),
+                ('327',  'Insertion Loss',        'Filter',    '4dB'),
+                ('69',   'Mounting Type',         'Filter',    'Free Hanging (In-Line)'),
+                ('16',   'Package / Case',        'Filter',    'Inline, SMA, F and M'),
+                ('46',   'Size / Dimension',      'Filter',    '1.496" L x 1.338" W'),
+                ('966',  'Height - Max',          'Filter',    '0.063" (1.60mm)'),
+                ('91',   'Style',                 'Cable',     'UMCC gen 2 to MHF4'),
+                ('726',  '1st Connector',         'Cable',     'U.FL Plug, Right Angle'),
+                ('2490', '1st Contact Gender',    'Cable',     'Female'),
+                ('727',  '2nd Connector',         'Cable',     'MHF4 Right Angle'),
+                ('2491', '2nd Contact Gender',    'Cable',     'Female'),
+                ('77',   'Length',                'Cable',     '9.843" (250.00mm)'),
+                ('321',  'Cable Type',            'Cable',     '1.13mm OD Coaxial Cable'),
+                ('2492', 'Cable Impedance',       'Cable',     '50 Ohms'),
+                ('2157', 'Frequency - Max',       'Cable',     '6 GHz'),
+                ('37',   'Color',                 'Cable',     'White'),
+                ('5',    'Features',              'Cable',     'FEP 64 wire'),
+                ('255',  'Operating Temperature', 'Cable',     '-25°C ~ 125°C'),
+            ]
         else:
             # Add page — inject copy-from-listing selector
             import json as _json
@@ -1590,6 +1654,15 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('copy-data/',
                  self.admin_site.admin_view(self.copy_data_view),
                  name='bots_digikeylisting_copy_data'),
+            path('excel-parse/',
+                 self.admin_site.admin_view(self.excel_parse_view),
+                 name='bots_digikeylisting_excel_parse'),
+            path('excel-create/',
+                 self.admin_site.admin_view(self.excel_create_view),
+                 name='bots_digikeylisting_excel_create'),
+            path('<int:pk>/excel-import/',
+                 self.admin_site.admin_view(self.excel_import_attrs_view),
+                 name='bots_digikeylisting_excel_import_attrs'),
         ]
         return custom + urls
 
@@ -2728,11 +2801,8 @@ Rules:
             if code:
                 valid_codes[code] = name
 
-        # Determine what would be sent
-        if listing.category_type == 'filter':
-            would_send = listing.get_filter_attributes_api()
-        else:
-            would_send = listing.get_common_attributes_api()
+        # Determine what would be sent (all categories)
+        would_send = listing.get_all_attributes_api()
 
         results = []
         for item in would_send:
@@ -2752,6 +2822,178 @@ Rules:
             ],
             'total_custom_fields': len(custom_fields),
         })
+
+    # ── Excel import views ────────────────────────────────────────────────────
+
+    def excel_parse_view(self, request):
+        """AJAX POST: parse uploaded Excel, return list of product rows as JSON."""
+        from django.http import JsonResponse
+        from bots.services.excel_import import parse_dk_excel
+
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'error': 'POST required'})
+        uploaded = request.FILES.get('file')
+        if not uploaded:
+            return JsonResponse({'ok': False, 'error': 'Файл не завантажено'})
+
+        result = parse_dk_excel(uploaded)
+        if result.get('error'):
+            return JsonResponse({'ok': False, 'error': result['error']})
+
+        rows_out = []
+        for r in result['rows']:
+            rows_out.append({
+                'sku':            r['sku'],
+                'image_url':      r['image_url'],
+                'datasheet_url':  r['datasheet_url'],
+                'description':    r['description'][:200] if r['description'] else '',
+                'price':          r['price'],
+                'moq':            r['moq'],
+                'lead_time':      r['lead_time'],
+                'dk_quantity':    r['dk_quantity'],
+                'attrs':          r['attrs'],
+                'fa_fields':      r['fa_fields'],
+            })
+        return JsonResponse({'ok': True, 'format': result['format'], 'rows': rows_out})
+
+    def excel_import_attrs_view(self, request, pk):
+        """POST: apply one Excel row's data to an existing listing."""
+        from django.http import JsonResponse
+        from django.shortcuts import get_object_or_404
+        import json as _json
+        from bots.services.excel_import import apply_row_to_listing
+
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'error': 'POST required'})
+
+        listing = get_object_or_404(DigiKeyListing, pk=pk)
+        try:
+            row = _json.loads(request.body)
+        except Exception:
+            return JsonResponse({'ok': False, 'error': 'Invalid JSON body'})
+
+        changed = apply_row_to_listing(row, listing)
+        if changed:
+            listing.save(update_fields=changed)
+
+        return JsonResponse({'ok': True, 'changed': changed})
+
+    def excel_create_view(self, request):
+        """GET/POST page: create DigiKeyListing records from uploaded Excel."""
+        from django.http import JsonResponse
+        from bots.services.excel_import import parse_dk_excel, apply_row_to_listing
+
+        ctx = dict(
+            self.admin_site.each_context(request),
+            title='📊 Створити лістинги з Excel',
+            opts=self.model._meta,
+        )
+
+        if request.method == 'GET':
+            return render(request, 'admin/bots/digikeylisting/excel_create.html', ctx)
+
+        # POST — handle file or confirm
+        action = request.POST.get('action', 'parse')
+
+        if action == 'parse':
+            uploaded = request.FILES.get('file')
+            if not uploaded:
+                ctx['error'] = 'Файл не вибрано'
+                return render(request, 'admin/bots/digikeylisting/excel_create.html', ctx)
+            result = parse_dk_excel(uploaded)
+            if result.get('error'):
+                ctx['error'] = result['error']
+                return render(request, 'admin/bots/digikeylisting/excel_create.html', ctx)
+
+            # Enrich rows with existence info
+            skus_in_file = [r['sku'] for r in result['rows']]
+            existing_skus = set(
+                DigiKeyListing.objects
+                .filter(dk_supplier_sku__in=skus_in_file)
+                .values_list('dk_supplier_sku', flat=True)
+            )
+            # Also check by product.sku
+            from inventory.models import Product
+            products_by_sku = {
+                p.sku: p for p in Product.objects.filter(sku__in=skus_in_file).only('pk', 'sku', 'name')
+            }
+            enriched = []
+            for r in result['rows']:
+                enriched.append({
+                    **r,
+                    'exists':      r['sku'] in existing_skus,
+                    'has_product': r['sku'] in products_by_sku,
+                    'product_name': (products_by_sku[r['sku']].name if r['sku'] in products_by_sku else ''),
+                })
+            import json as _json
+            ctx['rows_json'] = _json.dumps(enriched, ensure_ascii=False)
+            ctx['rows']      = enriched
+            ctx['fmt']       = result['format']
+            ctx['total']     = len(enriched)
+            return render(request, 'admin/bots/digikeylisting/excel_create.html', ctx)
+
+        if action == 'create':
+            import json as _json
+            rows_json = request.POST.get('rows_json', '[]')
+            selected  = set(request.POST.getlist('selected'))
+            try:
+                all_rows = _json.loads(rows_json)
+            except Exception:
+                ctx['error'] = 'Помилка даних форми'
+                return render(request, 'admin/bots/digikeylisting/excel_create.html', ctx)
+
+            from inventory.models import Product
+            created = updated = skipped = 0
+            errors  = []
+            for r in all_rows:
+                sku = r.get('sku', '')
+                if sku not in selected:
+                    continue
+                try:
+                    # Find or create product
+                    try:
+                        product = Product.objects.get(sku=sku)
+                    except Product.DoesNotExist:
+                        product = None
+                    except Product.MultipleObjectsReturned:
+                        errors.append(f'{sku}: дублі SKU на складі')
+                        continue
+
+                    # Find existing listing
+                    listing = None
+                    try:
+                        listing = DigiKeyListing.objects.get(dk_supplier_sku=sku)
+                    except DigiKeyListing.DoesNotExist:
+                        if product:
+                            try:
+                                listing = DigiKeyListing.objects.get(product=product)
+                            except DigiKeyListing.DoesNotExist:
+                                pass
+
+                    if listing is None:
+                        listing = DigiKeyListing(
+                            product=product,
+                            dk_supplier_sku=sku,
+                            sync_status=DigiKeyListing.SYNC_DRAFT,
+                            category_type=r.get('format', 'other') if r.get('format') in ('filter', 'cable', 'antenna', 'connector') else 'other',
+                        )
+
+                    changed = apply_row_to_listing(r, listing)
+                    if listing.pk:
+                        if changed:
+                            listing.save(update_fields=changed)
+                        updated += 1
+                    else:
+                        listing.save()
+                        created += 1
+                except Exception as exc:
+                    errors.append(f'{sku}: {exc}')
+
+            ctx['result'] = {'created': created, 'updated': updated, 'skipped': skipped, 'errors': errors}
+            return render(request, 'admin/bots/digikeylisting/excel_create.html', ctx)
+
+        ctx['error'] = 'Невідома дія'
+        return render(request, 'admin/bots/digikeylisting/excel_create.html', ctx)
 
     def inventory_check_view(self, request):
         """Show inventory status for all DigiKey listings (grouped by category)."""

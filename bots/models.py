@@ -437,6 +437,28 @@ class DigiKeyListing(models.Model):
                 attrs.append({"code": code, "type": "String", "value": val})
         return attrs
 
+    def get_all_attributes_api(self):
+        """additionalFields for DigiKey upsert — all category types.
+
+        Sends: common (packaging + lifecycle) + category-specific model fields
+        (fa_* for filter) + all numeric-coded entries from dk_attributes that
+        are not already included. Works for filter, cable, antenna, connector, other.
+        """
+        if self.category_type == 'filter':
+            attrs = self.get_filter_attributes_api()
+        else:
+            attrs = self.get_common_attributes_api()
+
+        added_codes = {a['code'] for a in attrs}
+        for code, value in (self.dk_attributes or {}).items():
+            code_str = str(code)
+            if (code_str.isdigit()
+                    and code_str not in added_codes
+                    and value not in (None, '', '-')):
+                attrs.append({"code": code_str, "type": "String", "value": str(value)})
+                added_codes.add(code_str)
+        return attrs
+
 
 class DigiKeyPriceLog(models.Model):
     """Лог масових змін цін DigiKey лістингу."""

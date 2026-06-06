@@ -1,0 +1,215 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Створити лістинги з Excel{% endblock %}
+
+{% block content %}
+<style>
+.xls-card {
+  background: var(--bg-card,#1a2535);
+  border: 1px solid var(--border-strong,#243347);
+  border-radius: 8px;
+  padding: 24px 28px;
+  margin-bottom: 20px;
+}
+.xls-h { font-size: 16px; font-weight: 700; color: var(--text,#c9d8e4); margin: 0 0 14px; }
+.xls-label { font-size: 13px; color: var(--text-muted,#9aafbe); margin-bottom: 6px; display: block; }
+.xls-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none;
+}
+.xls-btn-primary { background: #1565c0; color: #fff; }
+.xls-btn-green   { background: #2e7d32; color: #fff; }
+.xls-btn-outline { background: transparent; color: var(--text-muted,#9aafbe); border: 1px solid var(--border-strong,#243347); }
+.xls-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.xls-table th { text-align: left; padding: 7px 10px; background: rgba(255,255,255,.05); color: var(--text-muted,#9aafbe); border-bottom: 1px solid var(--border-strong,#243347); }
+.xls-table td { padding: 7px 10px; border-bottom: 1px solid rgba(255,255,255,.04); color: var(--text,#c9d8e4); vertical-align: top; }
+.xls-table tr:hover td { background: var(--bg-hover,#1e2d40); }
+.badge-exists  { background: rgba(255,152,0,.15);  color: #ffa726; border: 1px solid rgba(255,152,0,.35);  padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.badge-new     { background: rgba(46,125,50,.15);   color: #81c784; border: 1px solid rgba(46,125,50,.35);  padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.badge-noprod  { background: rgba(198,40,40,.12);   color: #ef5350; border: 1px solid rgba(198,40,40,.3);   padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+.badge-ok      { background: rgba(33,150,243,.12);  color: #42a5f5; border: 1px solid rgba(33,150,243,.3);  padding: 2px 6px; border-radius: 3px; font-size: 11px; }
+input[type=file] {
+  font-size: 13px; color: var(--text,#c9d8e4);
+  background: var(--bg-input,#141f2b); border: 1px solid var(--border-strong,#243347);
+  border-radius: 4px; padding: 7px 10px; width: 100%; box-sizing: border-box;
+  margin-bottom: 14px;
+}
+</style>
+
+<h1 style="font-size:20px;color:var(--text,#c9d8e4);margin:0 0 20px">
+  📊 Створити лістинги з Excel
+</h1>
+
+{% if error %}
+<div style="background:rgba(198,40,40,.12);border:1px solid rgba(198,40,40,.3);
+            border-radius:6px;padding:12px 16px;margin-bottom:20px;color:#ef5350;font-size:13px">
+  ❌ {{ error }}
+</div>
+{% endif %}
+
+{% if result %}
+{# ── Step 3: results ─────────────────────────────────────────────────────── #}
+<div class="xls-card">
+  <div class="xls-h">✅ Результат</div>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px">
+    <div style="background:rgba(46,125,50,.12);border:1px solid rgba(46,125,50,.3);border-radius:6px;padding:14px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#81c784">{{ result.created }}</div>
+      <div style="font-size:12px;color:var(--text-muted,#9aafbe);margin-top:4px">Створено</div>
+    </div>
+    <div style="background:rgba(33,150,243,.12);border:1px solid rgba(33,150,243,.3);border-radius:6px;padding:14px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#42a5f5">{{ result.updated }}</div>
+      <div style="font-size:12px;color:var(--text-muted,#9aafbe);margin-top:4px">Оновлено</div>
+    </div>
+    <div style="background:rgba(198,40,40,.12);border:1px solid rgba(198,40,40,.3);border-radius:6px;padding:14px;text-align:center">
+      <div style="font-size:28px;font-weight:700;color:#ef5350">{{ result.errors|length }}</div>
+      <div style="font-size:12px;color:var(--text-muted,#9aafbe);margin-top:4px">Помилок</div>
+    </div>
+  </div>
+  {% if result.errors %}
+  <div style="background:rgba(198,40,40,.08);border:1px solid rgba(198,40,40,.25);
+              border-radius:6px;padding:12px 16px;margin-bottom:14px">
+    <div style="font-size:12px;font-weight:700;color:#ef5350;margin-bottom:8px">Помилки:</div>
+    {% for e in result.errors %}
+    <div style="font-size:12px;color:#ef5350;padding:2px 0">• {{ e }}</div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <div style="display:flex;gap:12px">
+    <a href="{% url 'admin:bots_digikeylisting_changelist' %}" class="xls-btn xls-btn-primary">
+      ← До списку лістингів
+    </a>
+    <a href="{% url 'admin:bots_digikeylisting_excel_create' %}" class="xls-btn xls-btn-outline">
+      📊 Ще один імпорт
+    </a>
+  </div>
+</div>
+
+{% elif rows %}
+{# ── Step 2: preview table + confirm ────────────────────────────────────── #}
+<div class="xls-card">
+  <div class="xls-h">Знайдено {{ total }} рядків (формат: {{ fmt }})</div>
+  <p style="font-size:13px;color:var(--text-muted,#9aafbe);margin:0 0 14px">
+    Вибери рядки для створення/оновлення. Рядки з позначкою
+    <span class="badge-exists">існує</span> оновлять наявний лістинг.
+    <span class="badge-noprod">без SKU</span> — товар не знайдено на складі (лістинг створюється без прив'язки).
+  </p>
+
+  <div style="margin-bottom:12px;display:flex;gap:10px">
+    <button onclick="xlsSelectAll(true)"  class="xls-btn xls-btn-outline" style="padding:5px 12px;font-size:12px">✓ Всі</button>
+    <button onclick="xlsSelectAll(false)" class="xls-btn xls-btn-outline" style="padding:5px 12px;font-size:12px">✗ Жодного</button>
+    <span id="xlsCount" style="font-size:12px;color:var(--text-muted,#9aafbe);align-self:center"></span>
+  </div>
+
+  <form method="post" action="{% url 'admin:bots_digikeylisting_excel_create' %}">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create">
+    <input type="hidden" name="rows_json" value="{{ rows_json }}">
+
+    <div style="overflow-x:auto;margin-bottom:16px">
+    <table class="xls-table">
+      <thead>
+        <tr>
+          <th style="width:36px"><input type="checkbox" id="xlsAllChk" onchange="xlsSelectAll(this.checked)"></th>
+          <th>SKU</th>
+          <th>Товар на складі</th>
+          <th>Статус</th>
+          <th>Ціна</th>
+          <th>MOQ</th>
+          <th>DK Qty</th>
+          <th>Атрибутів</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td><input type="checkbox" name="selected" value="{{ r.sku }}" class="xls-chk"
+                     onchange="xlsUpdateCount()" checked></td>
+          <td style="font-family:monospace;font-size:11px;color:#81c784">{{ r.sku }}</td>
+          <td style="font-size:11px">
+            {% if r.has_product %}
+              <span style="color:#42a5f5">{{ r.product_name|truncatechars:30 }}</span>
+            {% else %}
+              <span class="badge-noprod">не знайдено</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.exists %}
+              <span class="badge-exists">існує</span>
+            {% else %}
+              <span class="badge-new">новий</span>
+            {% endif %}
+          </td>
+          <td style="color:#ffa726">{% if r.price %}${{ r.price }}{% else %}—{% endif %}</td>
+          <td>{% if r.moq %}{{ r.moq }}{% else %}—{% endif %}</td>
+          <td>{% if r.dk_quantity %}{{ r.dk_quantity }}{% else %}—{% endif %}</td>
+          <td style="color:var(--text-muted,#9aafbe)">{{ r.attrs|length }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+
+    <div style="display:flex;gap:12px">
+      <button type="submit" class="xls-btn xls-btn-green" id="xlsCreateBtn">
+        ✅ Створити / Оновити вибрані
+      </button>
+      <a href="{% url 'admin:bots_digikeylisting_excel_create' %}" class="xls-btn xls-btn-outline">
+        ← Назад
+      </a>
+    </div>
+  </form>
+</div>
+
+{% else %}
+{# ── Step 1: upload form ─────────────────────────────────────────────────── #}
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+<div class="xls-card">
+  <div class="xls-h">📂 Завантаж Excel-файл</div>
+  <form method="post" action="{% url 'admin:bots_digikeylisting_excel_create' %}"
+        enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="parse">
+    <label class="xls-label">Вибери файл DigiKey Excel:</label>
+    <input type="file" name="file" accept=".xlsx,.xls">
+    <button type="submit" class="xls-btn xls-btn-primary">
+      📊 Завантажити і переглянути
+    </button>
+  </form>
+</div>
+
+<div class="xls-card">
+  <div class="xls-h">📘 Підтримувані формати</div>
+  <div style="font-size:13px;color:var(--text,#c9d8e4);line-height:1.8">
+    <b style="color:#81c784">FILTERS</b> (<code>*_FILTERS.xlsx</code>)<br>
+    Рядок 2 — заголовки: ID FULL, Frequency (139), Bandwidth (398), Filter Type (21),
+    Ripple (428), Insertion Loss (327), Mounting Type (69), Package/Case (16),
+    Size/Dimension (46), Height (966), PHOTO LINK, DATASHEET LINK, Preis, DESCRIPTION,
+    Break Quantity 1 (MOQ), Leadtime To Ship.<br><br>
+    <b style="color:#42a5f5">CABLES</b> (<code>*_CABLES.xlsx</code>)<br>
+    Рядок 2 — заголовки: ID FULL, Style (91), 1st Connector (726),
+    1st Contact Gender (2490), 2nd Connector (727), Length (77), Cable Type (321),
+    Cable Impedance (2492), Frequency-Max (2157), Color (37), Features (5),
+    Operating Temperature (255), Preis, DESCRIPTION.<br><br>
+    <b style="color:var(--text-muted,#9aafbe)">Колонки з числовим кодом в дужках</b>
+    парсяться автоматично і записуються в <code>dk_attributes</code>.
+  </div>
+</div>
+</div>
+{% endif %}
+
+<script>
+function xlsSelectAll(checked) {
+  document.querySelectorAll('.xls-chk').forEach(function(c) { c.checked = checked; });
+  document.getElementById('xlsAllChk').checked = checked;
+  xlsUpdateCount();
+}
+function xlsUpdateCount() {
+  var n = document.querySelectorAll('.xls-chk:checked').length;
+  var el = document.getElementById('xlsCount');
+  if (el) el.textContent = 'Вибрано: ' + n;
+}
+document.addEventListener('DOMContentLoaded', xlsUpdateCount);
+</script>
+{% endblock %}

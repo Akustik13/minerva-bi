@@ -109,11 +109,8 @@ def upsert_product(config, listing) -> str:
     token = get_marketplace_token(config)
     url   = f"{_base_url(config)}{_PRODUCTS_BASE}/products/stage/upsert"
 
-    # Build additionalFields based on category
-    if listing.category_type == 'filter':
-        additional_fields = listing.get_filter_attributes_api()
-    else:
-        additional_fields = []
+    # Build additionalFields for all category types
+    additional_fields = listing.get_all_attributes_api()
 
     if not config.marketplace_supplier_id:
         raise DKMarketplaceError(

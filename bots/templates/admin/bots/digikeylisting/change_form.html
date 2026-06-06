@@ -80,6 +80,18 @@
       🔍 Перевірити атрибути
     </button>
     {% endif %}
+    {% if excel_import_attrs_url %}
+    <button type="button" class="dk-btn" id="dkExcelImportBtn"
+            style="background:rgba(46,125,50,.15);color:#81c784;border:1px solid rgba(46,125,50,.4)"
+            onclick="dkOpenExcelImport()">
+      📊 Імпорт з Excel
+    </button>
+    {% endif %}
+    <button type="button" class="dk-btn"
+            style="background:rgba(100,100,150,.12);color:var(--text-muted,#9aafbe);border:1px solid rgba(100,100,150,.25)"
+            onclick="dkToggleHelp()" title="Довідка: публікація продукту">
+      ❓ Довідка
+    </button>
     <span id="dkStatus" style="display:none;align-items:center;gap:6px;font-size:13px">
       <span id="dkStatusIcon">⏳</span>
       <span id="dkStatusMsg"></span>
@@ -116,6 +128,151 @@
                        border-radius:6px;font-size:14px;cursor:pointer;text-align:left">
           ✕&nbsp; Відхилити (залишити без змін)
         </button>
+      </div>
+    </div>
+  </div>
+
+  {# ── EXCEL IMPORT MODAL ────────────────────────────────────────────────── #}
+  {% if excel_import_attrs_url %}
+  <div id="dkExcelModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+       z-index:10000;align-items:flex-start;justify-content:center;padding-top:60px;overflow-y:auto">
+    <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+                border-radius:10px;padding:28px 32px;max-width:720px;width:95%;
+                box-shadow:0 12px 40px rgba(0,0,0,.5)">
+      <h3 style="margin:0 0 6px;font-size:17px;color:var(--text,#c9d8e4)">📊 Імпорт атрибутів з Excel</h3>
+      <p style="color:var(--text-muted,#9aafbe);margin:0 0 18px;font-size:13px">
+        Вибери Excel-файл (FILTERS або CABLES формат DigiKey).
+        Система знайде рядок з SKU <b>{{ original.dk_supplier_sku|default:original.product.sku|default:"цього лістингу" }}</b>
+        і заповнить поля форми.
+      </p>
+      <div id="dkExcelStep1">
+        <label style="display:block;margin-bottom:8px;font-size:13px;color:var(--text,#c9d8e4)">
+          Файл Excel:
+        </label>
+        <input type="file" id="dkExcelFile" accept=".xlsx,.xls"
+               style="margin-bottom:14px;font-size:13px;color:var(--text,#c9d8e4);
+                      background:var(--bg-input,#141f2b);border:1px solid var(--border-strong,#243347);
+                      border-radius:4px;padding:6px 10px;width:100%;box-sizing:border-box">
+        <div style="display:flex;gap:10px">
+          <button onclick="dkExcelParse()"
+                  style="padding:10px 20px;background:#2e7d32;color:#fff;border:none;
+                         border-radius:6px;font-size:14px;cursor:pointer">
+            📂 Завантажити і знайти SKU
+          </button>
+          <button onclick="dkCloseExcelImport()"
+                  style="padding:10px 16px;background:transparent;color:var(--text-muted,#9aafbe);
+                         border:1px solid var(--border-strong,#243347);border-radius:6px;
+                         font-size:14px;cursor:pointer">
+            Скасувати
+          </button>
+        </div>
+        <div id="dkExcelParseStatus" style="margin-top:12px;font-size:13px;color:var(--text-muted,#9aafbe)"></div>
+      </div>
+      <div id="dkExcelStep2" style="display:none">
+        <div id="dkExcelMatchInfo" style="margin-bottom:16px;font-size:13px;
+             padding:12px;background:rgba(46,125,50,.12);border:1px solid rgba(46,125,50,.3);
+             border-radius:6px;color:#81c784"></div>
+        <div id="dkExcelPreview" style="margin-bottom:16px;overflow-x:auto"></div>
+        <div style="display:flex;gap:10px">
+          <button onclick="dkExcelApply()"
+                  style="padding:10px 20px;background:#1565c0;color:#fff;border:none;
+                         border-radius:6px;font-size:14px;cursor:pointer">
+            ✅ Застосувати і зберегти
+          </button>
+          <button onclick="dkExcelBack()"
+                  style="padding:10px 16px;background:transparent;color:var(--text-muted,#9aafbe);
+                         border:1px solid var(--border-strong,#243347);border-radius:6px;
+                         font-size:14px;cursor:pointer">
+            ← Назад
+          </button>
+        </div>
+        <div id="dkExcelApplyStatus" style="margin-top:12px;font-size:13px"></div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# ── HELP PANEL ────────────────────────────────────────────────────────── #}
+  <div id="dkHelpPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);
+       z-index:10000;align-items:flex-start;justify-content:center;padding-top:50px;overflow-y:auto">
+    <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+                border-radius:10px;padding:30px 36px;max-width:780px;width:95%;
+                box-shadow:0 12px 40px rgba(0,0,0,.5);margin-bottom:40px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h3 style="margin:0;font-size:18px;color:var(--text,#c9d8e4)">📘 Довідка: Публікація продукту на DigiKey</h3>
+        <button onclick="dkToggleHelp()"
+                style="background:transparent;border:none;color:var(--text-muted,#9aafbe);
+                       font-size:20px;cursor:pointer;padding:0 4px">✕</button>
+      </div>
+
+      <h4 style="color:#42a5f5;margin:0 0 10px;font-size:14px">🔄 Схема публікації (5 кроків)</h4>
+      <div style="background:rgba(33,150,243,.08);border:1px solid rgba(33,150,243,.2);
+                  border-radius:8px;padding:16px;margin-bottom:20px;font-size:13px;
+                  color:var(--text,#c9d8e4);line-height:1.8">
+        <b>1. Заповни форму</b> — Title, Description, Category ID, атрибути, ціни.<br>
+        <b>2. Натисни «🚀 Опублікувати»</b> → надсилається <code>POST /products/stage/upsert</code>.<br>
+        &nbsp;&nbsp;&nbsp;Товар потрапляє до DigiKey PIM (черга перевірки). Зберігається <code>dk_product_id</code>.<br>
+        <b>3. Очікуй затвердження DigiKey</b> — від кількох годин до кількох днів.<br>
+        &nbsp;&nbsp;&nbsp;Статус лістингу: <span style="color:#ffa726">⏳ staged</span><br>
+        <b>4. Натисни «🔄 Перевірити статус DigiKey»</b> — система намагається створити Offer.<br>
+        &nbsp;&nbsp;&nbsp;Якщо DigiKey схвалив → Offer створюється, статус стає <span style="color:#66bb6a">✅ published</span><br>
+        <b>5. Готово</b> — продукт видимий покупцям на DigiKey Marketplace.
+      </div>
+
+      <h4 style="color:#42a5f5;margin:0 0 10px;font-size:14px">📦 Що передається в DigiKey при «Опублікувати»</h4>
+      <div style="font-size:13px;color:var(--text,#c9d8e4);margin-bottom:20px;line-height:1.7">
+        <b>Product (upsert)</b>: <code>partNumber</code>, <code>categoryId</code>, <code>description</code>,
+        <code>manufacturer</code>, <code>imageUrl</code>, <code>additionalFields</code><br>
+        <b>additionalFields включає:</b><br>
+        &nbsp;• <code>packaging</code> + <code>productLifecycleStatus</code> — завжди<br>
+        &nbsp;• <code>fa_*</code> поля (для category_type = filter: 139, 398, 21, 428, 327, 69, 16, 46, 966)<br>
+        &nbsp;• <b>Всі числові коди з таблиці «Всі атрибути DigiKey»</b> — для кабелів, антен і т.д.<br>
+        <b>Offer (після схвалення)</b>: <code>supplierSku</code>, <code>title</code>,
+        <code>prices</code>, <code>quantityAvailable</code>, <code>minOrderQuantity</code>, <code>leadTimeToShip</code>
+      </div>
+
+      <h4 style="color:#42a5f5;margin:0 0 10px;font-size:14px">📡 Коди атрибутів DigiKey</h4>
+      <table style="width:100%;font-size:12px;border-collapse:collapse;margin-bottom:20px">
+        <thead>
+          <tr style="background:rgba(255,255,255,.05)">
+            <th style="text-align:left;padding:6px 10px;color:var(--text-muted,#9aafbe)">Код</th>
+            <th style="text-align:left;padding:6px 10px;color:var(--text-muted,#9aafbe)">Назва</th>
+            <th style="text-align:left;padding:6px 10px;color:var(--text-muted,#9aafbe)">Категорія</th>
+            <th style="text-align:left;padding:6px 10px;color:var(--text-muted,#9aafbe)">Приклад</th>
+          </tr>
+        </thead>
+        <tbody style="color:var(--text,#c9d8e4)">
+          {% for row in help_attr_table %}
+          <tr style="border-top:1px solid var(--border-strong,#243347)">
+            <td style="padding:5px 10px;font-family:monospace;color:#81c784">{{ row.0 }}</td>
+            <td style="padding:5px 10px">{{ row.1 }}</td>
+            <td style="padding:5px 10px;color:var(--text-muted,#9aafbe)">{{ row.2 }}</td>
+            <td style="padding:5px 10px;font-family:monospace;font-size:11px;color:#ffa726">{{ row.3 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" style="padding:10px;color:var(--text-muted,#9aafbe)">Таблицю завантажено статично</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <h4 style="color:#42a5f5;margin:0 0 10px;font-size:14px">📊 Імпорт з Excel</h4>
+      <div style="font-size:13px;color:var(--text,#c9d8e4);line-height:1.7;margin-bottom:20px">
+        <b>Кнопка «📊 Імпорт з Excel» (на цій сторінці)</b> — імпортує атрибути, ціну,
+        фото/датагарт для <i>цього конкретного</i> лістингу з рядка Excel де SKU співпадає.<br>
+        <b>Кнопка «📊 Створити з Excel» (на списку)</b> — масовий імпорт:
+        читає всі рядки Excel → вибираєш які SKU створити → системи створює DigiKeyListing записи.<br>
+        <b>Підтримувані формати:</b>
+        <code>*_FILTERS.xlsx</code> (cols: Frequency/Bandwidth/Filter Type…) і
+        <code>*_CABLES.xlsx</code> (cols: Style/Connector/Length/Cable Type…).
+        Колонки з форматом «Name (код)» парсяться автоматично.
+      </div>
+
+      <h4 style="color:#42a5f5;margin:0 0 10px;font-size:14px">⚠️ Типові помилки</h4>
+      <div style="font-size:13px;color:var(--text,#c9d8e4);line-height:1.7">
+        <b>staged але offer не створився</b> — DigiKey ще не затвердив продукт. Чекай і перевіряй.<br>
+        <b>401 Marketplace token</b> — токен протермінований. Зайди в Налаштування DigiKey → Marketplace OAuth → авторизуй.<br>
+        <b>400 existingProductId not found</b> — старий Product ID невалідний. Очисти поле і опублікуй знову.<br>
+        <b>Атрибути не передаються</b> — перевір: числові коди в «Всі атрибути DigiKey» (не порожні), категорія вибрана правильно.
       </div>
     </div>
   </div>
@@ -1443,6 +1600,133 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     }, 500);
   }
+});
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Excel Import Modal
+═══════════════════════════════════════════════════════════════════════════ */
+var _dkExcelRow = null;
+var _dkExcelParseUrl  = '{{ excel_parse_url|default:"" }}';
+var _dkExcelApplyUrl  = '{{ excel_import_attrs_url|default:"" }}';
+var _dkCurrentSku     = '{{ original.dk_supplier_sku|default:original.product.sku|default:"" }}';
+
+function dkOpenExcelImport() {
+  var m = document.getElementById('dkExcelModal');
+  if (!m) return;
+  _dkExcelRow = null;
+  document.getElementById('dkExcelStep1').style.display = '';
+  document.getElementById('dkExcelStep2').style.display = 'none';
+  document.getElementById('dkExcelParseStatus').textContent = '';
+  document.getElementById('dkExcelFile').value = '';
+  m.style.display = 'flex';
+}
+function dkCloseExcelImport() {
+  var m = document.getElementById('dkExcelModal');
+  if (m) m.style.display = 'none';
+}
+function dkExcelBack() {
+  document.getElementById('dkExcelStep1').style.display = '';
+  document.getElementById('dkExcelStep2').style.display = 'none';
+}
+
+function dkExcelParse() {
+  var fileInput = document.getElementById('dkExcelFile');
+  var status    = document.getElementById('dkExcelParseStatus');
+  if (!fileInput.files.length) {
+    status.textContent = '⚠️ Вибери файл Excel';
+    return;
+  }
+  status.textContent = '⏳ Завантажую і парсю файл…';
+  var fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+  fetch(_dkExcelParseUrl, {method: 'POST', body: fd})
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) { status.textContent = '❌ ' + data.error; return; }
+      var rows = data.rows;
+      var matched = rows.filter(function(r) { return r.sku === _dkCurrentSku; });
+      if (!matched.length) {
+        // Try partial match
+        matched = rows.filter(function(r) { return r.sku && _dkCurrentSku && (r.sku.indexOf(_dkCurrentSku) !== -1 || _dkCurrentSku.indexOf(r.sku) !== -1); });
+      }
+      if (!matched.length) {
+        var skus = rows.slice(0, 8).map(function(r) { return r.sku; }).join(', ');
+        status.textContent = '⚠️ SKU «' + _dkCurrentSku + '» не знайдено. Знайдено: ' + (rows.length) + ' рядків (' + skus + '…)';
+        return;
+      }
+      _dkExcelRow = matched[0];
+      status.textContent = '';
+      var info = document.getElementById('dkExcelMatchInfo');
+      info.innerHTML = '✅ Знайдено SKU <b>' + _dkExcelRow.sku + '</b> у файлі формату <b>' + data.format + '</b>';
+      // Build preview table
+      var preview = '<table style="width:100%;font-size:12px;border-collapse:collapse">';
+      preview += '<tr style="background:rgba(255,255,255,.06)"><th style="text-align:left;padding:5px 8px;color:var(--text-muted,#9aafbe)">Поле</th><th style="text-align:left;padding:5px 8px;color:var(--text-muted,#9aafbe)">Значення</th></tr>';
+      var fields = [
+        ['Фото URL', _dkExcelRow.image_url],
+        ['Datasheet URL', _dkExcelRow.datasheet_url],
+        ['Опис', (_dkExcelRow.description||'').substring(0,80)],
+        ['Ціна (1 шт.)', _dkExcelRow.price],
+        ['MOQ', _dkExcelRow.moq],
+        ['Lead Time (дні)', _dkExcelRow.lead_time],
+        ['DK Qty', _dkExcelRow.dk_quantity],
+      ];
+      // fa_fields
+      var fa = _dkExcelRow.fa_fields || {};
+      var faLabels = {fa_frequency:'Frequency',fa_bandwidth:'Bandwidth',fa_filter_type:'Filter Type',fa_ripple:'Ripple',fa_insertion_loss:'Insertion Loss',fa_mounting_type:'Mounting Type',fa_package_case:'Package/Case',fa_size_dimension:'Size/Dim',fa_height_max:'Height Max'};
+      Object.keys(fa).forEach(function(k) { fields.push([faLabels[k]||k, fa[k]]); });
+      // attrs
+      var attrs = _dkExcelRow.attrs || {};
+      var attrKeys = Object.keys(attrs).filter(function(k) { return !(fa['fa_frequency'] && k==='139'); });
+      if (attrKeys.length) fields.push(['Числові коди', attrKeys.map(function(k){return k+'='+attrs[k];}).join(', ')]);
+      fields.forEach(function(f) {
+        if (f[1] === null || f[1] === undefined || f[1] === '') return;
+        preview += '<tr style="border-top:1px solid var(--border-strong,#243347)"><td style="padding:5px 8px;color:var(--text-muted,#9aafbe)">' + f[0] + '</td><td style="padding:5px 8px;color:var(--text,#c9d8e4);word-break:break-all">' + f[1] + '</td></tr>';
+      });
+      preview += '</table>';
+      document.getElementById('dkExcelPreview').innerHTML = preview;
+      document.getElementById('dkExcelStep1').style.display = 'none';
+      document.getElementById('dkExcelStep2').style.display = '';
+      document.getElementById('dkExcelApplyStatus').textContent = '';
+    })
+    .catch(function(e) { status.textContent = '❌ ' + e; });
+}
+
+function dkExcelApply() {
+  if (!_dkExcelRow || !_dkExcelApplyUrl) return;
+  var status = document.getElementById('dkExcelApplyStatus');
+  status.textContent = '⏳ Зберігаю…';
+  fetch(_dkExcelApplyUrl, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}'},
+    body: JSON.stringify(_dkExcelRow),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.ok) { status.textContent = '❌ ' + data.error; return; }
+    status.style.color = '#81c784';
+    status.textContent = '✅ Збережено! Оновлено полів: ' + (data.changed||[]).length + '. Сторінка перезавантажиться…';
+    setTimeout(function() { window.location.reload(); }, 1500);
+  })
+  .catch(function(e) { status.textContent = '❌ ' + e; });
+}
+
+/* Help panel toggle */
+function dkToggleHelp() {
+  var p = document.getElementById('dkHelpPanel');
+  if (!p) return;
+  p.style.display = (p.style.display === 'none' || !p.style.display) ? 'flex' : 'none';
+}
+
+/* Close modals on backdrop click */
+document.addEventListener('click', function(e) {
+  ['dkExcelModal', 'dkHelpPanel'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && e.target === el) {
+      el.style.display = 'none';
+    }
+  });
 });
 </script>
 {% endblock %}

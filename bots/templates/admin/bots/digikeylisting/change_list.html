@@ -23,6 +23,15 @@
             font-weight:600;text-decoration:none;white-space:nowrap">
     📡 Фільтри → склад
   </a>
+  {% if excel_create_url %}
+  <a href="{{ excel_create_url }}"
+     style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;
+            background:rgba(46,125,50,.2);color:#81c784;
+            border:1px solid rgba(46,125,50,.4);border-radius:5px;font-size:13px;
+            font-weight:600;text-decoration:none;white-space:nowrap">
+    📊 Створити з Excel
+  </a>
+  {% endif %}
   <span style="font-size:12px;color:var(--text-muted,#9aafbe);margin-left:auto">
     💡 «Перевірити» = import + create нових в фоні
   </span>
