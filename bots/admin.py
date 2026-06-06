@@ -1380,6 +1380,65 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         }),
     )
 
+    # ── Dynamic fieldsets — context-aware attribute description ───────────────
+
+    _ATTR_HINTS = {
+        'filter': (
+            '<b>RF Filter:</b> '
+            '<code>139</code>=Frequency, <code>398</code>=Bandwidth, '
+            '<code>21</code>=Filter Type, <code>428</code>=Ripple, '
+            '<code>327</code>=Insertion Loss, <code>69</code>=Mounting Type, '
+            '<code>16</code>=Package/Case, <code>46</code>=Size/Dimension, '
+            '<code>966</code>=Height Max.<br>'
+            '<i>Приклад: {"139": "1.12GHz Center", "21": "Band Pass", "327": "4dB"}</i>'
+        ),
+        'cable': (
+            '<b>Cable Assembly:</b> '
+            '<code>91</code>=Style, <code>726</code>=1st Connector, '
+            '<code>2490</code>=1st Gender, <code>727</code>=2nd Connector, '
+            '<code>2491</code>=2nd Gender, <code>77</code>=Length, '
+            '<code>321</code>=Cable Type, <code>2492</code>=Cable Impedance, '
+            '<code>2493</code>=Connector Impedance, <code>2157</code>=Freq Max, '
+            '<code>37</code>=Color, <code>5</code>=Features, '
+            '<code>255</code>=Operating Temperature.<br>'
+            '<i>Приклад: {"91": "U.FL to MHF4", "77": "9.843\\" (250mm)", "2492": "50 Ohms"}</i>'
+        ),
+        'antenna': (
+            '<b>Antenna:</b> Коди залежать від підтипу антени. '
+            'Натисни «📥 Стягнути з DigiKey» — атрибути заповняться автоматично.<br>'
+            'Типові поля: Antenna Type, Gain (dBi), VSWR, Frequency Range, '
+            'Connector Type, Mounting Type, Impedance (50 Ohm), Polarization.'
+        ),
+        'connector': (
+            '<b>Connector:</b> Натисни «📥 Стягнути з DigiKey» для автозаповнення.<br>'
+            'Типові поля: Connector Type, Number of Positions, Contact Finish, '
+            'Gender, Mounting Type, Series, Mating Cycles.'
+        ),
+    }
+
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = super().get_fieldsets(request, obj)
+        if obj is None:
+            return fieldsets
+        cat = obj.category_type or 'other'
+        hint = self._ATTR_HINTS.get(cat, (
+            'Натисни «📥 Стягнути з DigiKey» — атрибути заповняться автоматично.<br>'
+            'Формат: <code>{"числовий_код": "значення"}</code>. '
+            'Всі числові ключі передаються в DigiKey при публікації як additionalFields.'
+        ))
+        base_desc = (
+            'Числові коди DigiKey і їх значення. '
+            '<b>Всі числові ключі передаються в DigiKey при публікації.</b><br>'
+            f'{hint}<br>'
+            'Заповнюється кнопкою «📥 Стягнути з DigiKey» або імпортом з Excel.'
+        )
+        result = []
+        for name, options in fieldsets:
+            if name == '📡 Технічні атрибути DigiKey':
+                options = dict(options, description=base_desc)
+            result.append((name, options))
+        return result
+
     # ── Save / copy ───────────────────────────────────────────────────────────
 
     def save_model(self, request, obj, form, change):
