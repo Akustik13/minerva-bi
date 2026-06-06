@@ -1357,38 +1357,16 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
                 'Зазвичай <code>Active</code>.'
             ),
         }),
-        ('📡 Технічні атрибути (RF Filter)', {
-            'fields': (
-                'fa_frequency', 'fa_bandwidth', 'fa_filter_type',
-                'fa_ripple', 'fa_insertion_loss', 'fa_mounting_type',
-                'fa_package_case', 'fa_size_dimension', 'fa_height_max',
-            ),
-            'description': (
-                'Параметри для категорії <b>RF Filter</b> (category_type = filter). '
-                'Передаються в DigiKey як <code>additionalFields</code>. '
-                'Для інших категорій (кабелі, антени) використовуй таблицю нижче. '
-                'Кожне непорожнє поле відправляється в API при публікації.<br>'
-                '<b>Формати:</b> '
-                'Frequency — <code>1.12GHz Center</code> або <code>915MHz</code>; '
-                'Bandwidth — <code>210MHz</code>; '
-                'Filter Type — <code>Band Pass</code> / <code>Band Stop</code> / '
-                '<code>Low Pass</code> / <code>High Pass</code> / <code>Notch</code>; '
-                'Ripple / Insertion Loss — <code>1.6dB</code>; '
-                'Mounting Type — <code>Free Hanging (In-Line)</code>; '
-                'Package/Case — <code>Inline, SMA Connection, F and M</code>; '
-                'Size/Dimension — <code>1.496" L x 1.338" W (38mm x 34mm)</code>; '
-                'Height — <code>0.063" (1.60mm)</code>.'
-            ),
-        }),
-        ('📡 Всі атрибути DigiKey (JSON)', {
+        ('📡 Технічні атрибути DigiKey', {
             'fields': ('dk_attributes',),
             'description': (
-                'Всі технічні атрибути товару — числові коди DigiKey та їх значення. '
-                'Для <b>кабелів</b> і <b>антен</b> тут зберігаються атрибути '
-                'Style (91), Connector (726/727), Length (77), Cable Type (321) тощо. '
-                '<b>Всі записи з числовими ключами передаються в DigiKey при публікації!</b> '
-                'Заповнюється автоматично кнопкою «📥 Стягнути з DigiKey» '
-                'або імпортом з Excel. Формат: <code>{"139": "1.12GHz", "91": "U.FL to MHF4"}</code>'
+                'Всі технічні параметри товару у форматі <code>{"код": "значення"}</code>. '
+                '<b>Всі числові коди передаються в DigiKey при публікації</b> як additionalFields.<br>'
+                '<b>RF Filter:</b> 139=Frequency, 398=Bandwidth, 21=Filter Type, 428=Ripple, '
+                '327=Insertion Loss, 69=Mounting Type, 16=Package/Case, 46=Size/Dim, 966=Height.<br>'
+                '<b>Cables:</b> 91=Style, 726=1st Connector, 727=2nd Connector, 77=Length, '
+                '321=Cable Type, 2492=Impedance, 2157=Freq-Max, 37=Color, 255=Temp.<br>'
+                'Заповнюється кнопкою «📥 Стягнути з DigiKey» або імпортом з Excel.'
             ),
         }),
         ('📊 Статус синхронізації', {
