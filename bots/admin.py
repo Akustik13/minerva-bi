@@ -3224,18 +3224,14 @@ Rules:
     price_min_display.admin_order_field = 'dk_price_min'
 
     def dk_qty_display(self, obj):
-        if obj.dk_quantity_override is not None:
-            qty = obj.dk_quantity_override
-            color = '#66bb6a' if qty > 0 else '#ef5350'
-            return format_html(
-                '<span title="Ручне значення (override)" style="color:{};font-weight:700">{}</span>'
-                '<span title="Ручне значення (override)" style="color:var(--text-muted);font-size:10px;margin-left:3px">✏️</span>',
-                color, qty,
-            )
-        qty = obj.dk_quantity_available
+        qty = obj.dk_quantity_override if obj.dk_quantity_override is not None else obj.dk_quantity_available
         if qty is not None:
             color = '#66bb6a' if qty > 0 else '#ef5350'
-            return format_html('<span style="color:{};font-weight:600">{}</span>', color, qty)
+            return format_html(
+                '<span style="color:{};font-weight:700">{}</span>'
+                '<span style="color:var(--text-muted);font-size:10px;margin-left:2px">шт.</span>',
+                color, qty,
+            )
         return format_html('<span style="color:var(--text-muted);font-size:11px">—</span>')
     dk_qty_display.short_description = 'DigiKey'
     dk_qty_display.admin_order_field = 'dk_quantity_override'
