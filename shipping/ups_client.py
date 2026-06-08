@@ -97,11 +97,11 @@ def _gif_label_to_a4_pdf(gif_b64: str) -> str:
         gif_bytes = base64.b64decode(gif_b64)
         label     = Image.open(io.BytesIO(gif_bytes)).convert('RGB')
 
-        # Rotate landscape labels to portrait
-        if label.width > label.height:
-            label = label.rotate(90, expand=True)
+        # Rotate portrait labels 90° → landscape so label fills the A4 half width
+        if label.height > label.width:
+            label = label.rotate(-90, expand=True)
 
-        # Scale to fit within the TOP HALF of A4 minus margins
+        # Scale to fill the TOP HALF of A4 minus margins
         max_w = A4_W   - 2 * MARGIN
         max_h = HALF_H - 2 * MARGIN
         label.thumbnail((max_w, max_h), Image.LANCZOS)

@@ -450,11 +450,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
         🚚 {% trans "Відправлення" %}
       </a>
-      {# Склад chip — green if affects_stock, red if not #}
+      {# Склад chip — shows actual stock count per product #}
       {% if order.affects_stock %}
-        <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                     background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32">
-          ✅ {% trans "Склад" %}
+        <span class="sv-stock-chip" data-order-id="{{ order.pk }}"
+              style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                     background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32;
+                     cursor:default;white-space:nowrap">
+          <span class="sv-stock-txt">✅ {% trans "Склад" %}</span>
         </span>
       {% else %}
         <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
@@ -1216,6 +1218,31 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
   });
 })();
 {% endif %}
+
+// ── Stock chip: show actual inventory quantity per order ─────────────────────
+(function() {
+  var stockData = {{ sv_order_stock_json|default:"{}"|safe }};
+  document.querySelectorAll('.sv-stock-chip').forEach(function(chip) {
+    var oid = String(chip.dataset.orderId || '');
+    var lines = stockData[oid];
+    if (!lines || !lines.length) return;
+    var allOk = lines.every(function(l) { return l.stock >= l.need; });
+    var txt = chip.querySelector('.sv-stock-txt');
+    if (!txt) return;
+    if (lines.length === 1) {
+      var l = lines[0];
+      txt.textContent = (allOk ? '✅' : '⚠️') + ' ' + l.stock + ' шт.';
+    } else {
+      var covered = lines.filter(function(l) { return l.stock >= l.need; }).length;
+      txt.textContent = (allOk ? '✅' : '⚠️') + ' Склад: ' + covered + '/' + lines.length;
+    }
+    if (!allOk) {
+      chip.style.background = 'rgba(255,152,0,.15)';
+      chip.style.color = '#ffa726';
+      chip.style.borderColor = '#e65100';
+    }
+  });
+})();
 
 // ── dlDocFile: trigger browser download for document files ────────────────────
 window.dlDocFile = function(url, name) {

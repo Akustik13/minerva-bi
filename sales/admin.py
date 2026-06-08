@@ -516,7 +516,46 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         extra_context['sv_label_open_mode']  = _ss.label_open_mode
         extra_context['sv_dymo_open_mode']   = _ss.dymo_open_mode
 
-        return super().changelist_view(request, extra_context=extra_context)
+        response = super().changelist_view(request, extra_context=extra_context)
+
+        # Batch-fetch stock for every product on current page — 2 queries total
+        if hasattr(response, 'context_data'):
+            cl = response.context_data.get('cl')
+            if cl and cl.result_list:
+                import json as _json
+                from .models import SalesOrderLine
+                from django.db.models import Sum
+                try:
+                    from inventory.models import InventoryTransaction
+                    order_pks = [o.pk for o in cl.result_list]
+                    line_data = list(
+                        SalesOrderLine.objects.filter(
+                            order_id__in=order_pks, product_id__isnull=False
+                        ).values('order_id', 'product_id', 'qty')
+                    )
+                    product_ids = list({lp['product_id'] for lp in line_data})
+                    stock_map = {}
+                    if product_ids:
+                        rows = (
+                            InventoryTransaction.objects
+                            .filter(product_id__in=product_ids)
+                            .values('product_id')
+                            .annotate(total=Sum('qty'))
+                        )
+                        stock_map = {r['product_id']: max(0, int(r['total'] or 0)) for r in rows}
+                    order_stock = {}
+                    for lp in line_data:
+                        oid = str(lp['order_id'])
+                        order_stock.setdefault(oid, []).append({
+                            'pid':   lp['product_id'],
+                            'need':  int(lp['qty'] or 0),
+                            'stock': stock_map.get(lp['product_id'], 0),
+                        })
+                    response.context_data['sv_order_stock_json'] = _json.dumps(order_stock)
+                except Exception:
+                    response.context_data['sv_order_stock_json'] = '{}'
+
+        return response
     date_hierarchy = "order_date"
     actions        = [
         export_sales_excel,
