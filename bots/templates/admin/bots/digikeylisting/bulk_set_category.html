@@ -1,0 +1,167 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Змінити категорію — DigiKey лістинги{% endblock %}
+
+{% block content %}
+<h1 style="font-size:20px;color:var(--text,#c9d8e4);margin:0 0 20px">
+  🏷️ Змінити категорію
+  <span style="font-size:14px;color:var(--text-muted,#9aafbe);font-weight:400">({{ count }} лістингів)</span>
+</h1>
+
+<form method="post" id="cat-form">
+  {% csrf_token %}
+  <input type="hidden" name="action"        value="action_bulk_set_category">
+  <input type="hidden" name="apply"         value="1">
+  <input type="hidden" name="select_across" value="0">
+  {% for pk in pks %}
+  <input type="hidden" name="_selected_action" value="{{ pk }}">
+  {% endfor %}
+
+  {# ── Category selector ── #}
+  <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+              border-radius:8px;padding:20px 24px;margin-bottom:20px;max-width:600px">
+    <div style="font-size:12px;font-weight:600;color:var(--text-muted,#9aafbe);
+                text-transform:uppercase;letter-spacing:.4px;margin-bottom:14px">
+      Нова категорія для всіх {{ count }} лістингів
+    </div>
+
+    <div style="display:flex;flex-wrap:wrap;gap:10px">
+      {% for val, label in cat_choices %}
+      <label id="cat-btn-{{ val }}"
+             style="display:flex;align-items:center;gap:8px;padding:10px 18px;
+                    border:1.5px solid var(--border-strong,#243347);border-radius:6px;
+                    cursor:pointer;font-size:13px;font-weight:600;
+                    color:var(--text-muted,#9aafbe);background:var(--bg-hover,#1e2d40);
+                    transition:border-color .15s,color .15s,background .15s">
+        <input type="radio" name="new_category" value="{{ val }}"
+               style="display:none" onchange="catSelect('{{ val }}')">
+        {{ label }}
+      </label>
+      {% endfor %}
+    </div>
+    <div id="cat-hint" style="font-size:12px;color:var(--text-muted,#9aafbe);margin-top:12px;min-height:18px"></div>
+  </div>
+
+  {# ── Preview table ── #}
+  <div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);
+              border-radius:8px;margin-bottom:20px;overflow-x:auto">
+    <div style="padding:11px 16px;border-bottom:1px solid var(--border-strong,#243347)">
+      <span style="font-size:13px;font-weight:600;color:var(--text,#c9d8e4)">📋 Поточна категорія → Нова</span>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead>
+        <tr style="background:var(--bg-hover,#1e2d40)">
+          <th style="padding:7px 14px;text-align:left;color:var(--text-muted,#9aafbe);font-weight:600;
+                     border-bottom:1px solid var(--border-strong,#243347)">SKU</th>
+          <th style="padding:7px 14px;text-align:left;color:var(--text-muted,#9aafbe);font-weight:600;
+                     border-bottom:1px solid var(--border-strong,#243347);max-width:240px">Назва</th>
+          <th style="padding:7px 12px;text-align:center;color:var(--text-muted,#9aafbe);font-weight:600;
+                     border-bottom:1px solid var(--border-strong,#243347);width:140px">Зараз</th>
+          <th style="padding:7px 4px;text-align:center;color:var(--text-muted,#9aafbe);font-weight:600;
+                     border-bottom:1px solid var(--border-strong,#243347);width:20px">→</th>
+          <th style="padding:7px 12px;text-align:center;color:var(--text-muted,#9aafbe);font-weight:600;
+                     border-bottom:1px solid var(--border-strong,#243347);width:160px">Стане</th>
+        </tr>
+      </thead>
+      <tbody id="cat-tbody"></tbody>
+    </table>
+  </div>
+
+  {# ── Submit ── #}
+  <div style="display:flex;align-items:center;gap:14px">
+    <button type="submit" id="apply-btn" class="button default" disabled
+            style="padding:10px 26px;font-size:13px;font-weight:700;opacity:.4;cursor:not-allowed">
+      ✅ Застосувати до {{ count }} лістингів
+    </button>
+    <a href="../" style="color:var(--text-muted);font-size:13px">Скасувати</a>
+  </div>
+</form>
+
+<script>
+(function(){
+  var ROWS = {{ rows_json|safe }};
+  var CATS = {
+    {% for val, label in cat_choices %}'{{ val }}': '{{ label }}',{% endfor %}
+  };
+  var CAT_COLORS = {
+    'filter':    '#42a5f5',
+    'cable':     '#81c784',
+    'antenna':   '#ffa726',
+    'connector': '#ce93d8',
+    'other':     '#9aafbe',
+  };
+  var CAT_HINTS = {
+    'filter':    'RF Filter — атрибути: Frequency, Bandwidth, Filter Type та ін.',
+    'cable':     'Cable Assembly — атрибути: Style, 1st Connector, Length та ін.',
+    'antenna':   'Antenna — антени та випромінювачі.',
+    'connector': 'Connector / Adapter — роз\'єми та перехідники.',
+    'other':     'Інше — загальна категорія без специфічних атрибутів.',
+  };
+
+  var tbody   = document.getElementById('cat-tbody');
+  var applyBtn= document.getElementById('apply-btn');
+  var hintEl  = document.getElementById('cat-hint');
+  var selected = null;
+
+  function badge(val, label){
+    var c = CAT_COLORS[val] || '#9aafbe';
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;'
+      + 'background:' + c + '22;color:' + c + ';border:1px solid ' + c + '44">' + label + '</span>';
+  }
+
+  function buildRows(){
+    tbody.innerHTML = '';
+    ROWS.forEach(function(r){
+      var tr = document.createElement('tr');
+      var newLabel = selected ? (CATS[selected] || selected) : '—';
+      var newBadge = selected ? badge(selected, newLabel)
+        : '<span style="color:var(--text-muted,#9aafbe)">—</span>';
+      var same = selected && selected === r.cat;
+      tr.style.opacity = same ? '.45' : '1';
+      tr.innerHTML =
+        '<td style="padding:7px 14px;font-family:monospace;font-weight:700;color:var(--text,#c9d8e4)">' + r.sku + '</td>'
+        + '<td style="padding:7px 14px;color:var(--text-muted,#9aafbe);font-size:11px;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + r.title + '">' + r.title + '</td>'
+        + '<td style="padding:7px 12px;text-align:center">' + badge(r.cat, r.cat_label) + '</td>'
+        + '<td style="padding:0 4px;text-align:center;color:var(--text-muted,#9aafbe)">→</td>'
+        + '<td style="padding:7px 12px;text-align:center">' + newBadge + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  window.catSelect = function(val){
+    selected = val;
+    // Update button styles
+    Object.keys(CATS).forEach(function(v){
+      var lbl = document.getElementById('cat-btn-' + v);
+      if (!lbl) return;
+      if (v === val){
+        var c = CAT_COLORS[v] || '#42a5f5';
+        lbl.style.borderColor = c;
+        lbl.style.color       = c;
+        lbl.style.background  = c + '22';
+      } else {
+        lbl.style.borderColor = 'var(--border-strong,#243347)';
+        lbl.style.color       = 'var(--text-muted,#9aafbe)';
+        lbl.style.background  = 'var(--bg-hover,#1e2d40)';
+      }
+    });
+    hintEl.textContent = CAT_HINTS[val] || '';
+    applyBtn.disabled = false;
+    applyBtn.style.opacity = '1';
+    applyBtn.style.cursor  = 'pointer';
+    buildRows();
+  };
+
+  document.getElementById('cat-form').addEventListener('submit', function(e){
+    if (!selected){ e.preventDefault(); return; }
+    var label = CATS[selected] || selected;
+    var changed = ROWS.filter(function(r){ return r.cat !== selected; }).length;
+    if (!confirm('Змінити категорію на «' + label + '» для ' + changed + ' лістингів (з ' + ROWS.length + ' обраних)?'))
+      e.preventDefault();
+  });
+
+  buildRows();
+})();
+</script>
+{% endblock %}

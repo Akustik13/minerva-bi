@@ -1307,6 +1307,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'action_bulk_deactivate',
         'action_bulk_prices',
         'action_bulk_stock',
+        'action_bulk_set_category',
     ]
     save_as        = True
 
@@ -2538,6 +2539,48 @@ Rules:
             'listings_json': json.dumps(listings_data, ensure_ascii=False),
             'pks':           list(queryset.values_list('pk', flat=True)),
             'opts':          self.model._meta,
+        })
+
+    # ── Bulk action: change category ─────────────────────────────────────────
+
+    @admin.action(description='🏷️ Змінити категорію (масово)')
+    def action_bulk_set_category(self, request, queryset):
+        import json
+        from django.template.response import TemplateResponse
+
+        if 'apply' in request.POST:
+            new_cat = request.POST.get('new_category', '')
+            valid = dict(DigiKeyListing.CAT_CHOICES)
+            if new_cat not in valid:
+                self.message_user(request, "❌ Невідома категорія.", messages.ERROR)
+                return
+            ids = request.POST.getlist('_selected_action')
+            updated = DigiKeyListing.objects.filter(pk__in=ids).update(category_type=new_cat)
+            self.message_user(
+                request,
+                f"✅ Категорію змінено на «{valid[new_cat]}» для {updated} лістингів.",
+                messages.SUCCESS,
+            )
+            return
+
+        cat_map = dict(DigiKeyListing.CAT_CHOICES)
+        rows = []
+        for listing in queryset.select_related('product'):
+            rows.append({
+                'pk':        listing.pk,
+                'sku':       listing.product.sku if listing.product else str(listing.pk),
+                'title':     (listing.dk_title or '')[:45],
+                'cat':       listing.category_type,
+                'cat_label': cat_map.get(listing.category_type, listing.category_type),
+            })
+
+        return TemplateResponse(request, 'admin/bots/digikeylisting/bulk_set_category.html', {
+            'title':      'Змінити категорію',
+            'count':      len(rows),
+            'pks':        [r['pk'] for r in rows],
+            'rows_json':  json.dumps(rows, ensure_ascii=False),
+            'cat_choices': DigiKeyListing.CAT_CHOICES,
+            'opts':       self.model._meta,
         })
 
     PULL_TASK_NAME = 'bulk_pull_dk'
