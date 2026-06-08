@@ -3228,8 +3228,8 @@ Rules:
             qty = obj.dk_quantity_override
             color = '#66bb6a' if qty > 0 else '#ef5350'
             return format_html(
-                '<span style="color:{};font-weight:700">{}</span>'
-                '<span style="color:var(--text-muted);font-size:10px;margin-left:3px">ов.</span>',
+                '<span title="Ручне значення (override)" style="color:{};font-weight:700">{}</span>'
+                '<span title="Ручне значення (override)" style="color:var(--text-muted);font-size:10px;margin-left:3px">✏️</span>',
                 color, qty,
             )
         qty = obj.dk_quantity_available
