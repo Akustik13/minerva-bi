@@ -1535,6 +1535,20 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             # Auto-sync shipping fields from active shipment (GET only)
             if obj and request.method == "GET":
                 _sync_order_from_active_shipment(obj)
+            # Linked invoices panel
+            if obj and obj.pk:
+                try:
+                    from shipping.models import Invoice as _Inv
+                    extra_context["order_invoices"] = list(
+                        _Inv.objects.filter(
+                            digikey_order_no=obj.order_number
+                        ).order_by("-invoice_number").values(
+                            "pk", "invoice_number", "invoice_date",
+                            "total_amount", "subtotal", "pdf_file",
+                        )
+                    )
+                except Exception:
+                    extra_context["order_invoices"] = []
         except Exception:
             pass
         return super().change_view(request, object_id, form_url, extra_context)

@@ -1113,6 +1113,34 @@ document.addEventListener('DOMContentLoaded',function(){
 </div>
 {% endif %}
 
+{% if order_invoices %}
+<!-- ── Linked invoices panel ── -->
+<div style="margin-top:12px;padding:12px 14px;border:1px solid rgba(201,168,76,.25);border-radius:8px;
+            background:rgba(201,168,76,.04)">
+  <div style="font-size:11px;font-weight:700;color:#c9a84c;letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase">
+    🧾 Інвойси
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px">
+  {% for inv in order_invoices %}
+    <div style="display:flex;align-items:center;gap:6px;background:var(--bg-card,#1a2535);
+                border:1px solid rgba(201,168,76,.2);border-radius:6px;padding:6px 10px">
+      <span style="font-size:12px;font-weight:600;color:var(--text,#c9d8e4)">#{{ inv.invoice_number }}</span>
+      {% if inv.invoice_date %}
+      <span style="font-size:11px;color:var(--text-muted,#607d8b)">{{ inv.invoice_date|date:"d.m.Y" }}</span>
+      {% endif %}
+      <span style="font-size:12px;font-family:monospace;color:#4caf50">{{ inv.total_amount|floatformat:2 }} USD</span>
+      <a href="/invoices/{{ inv.pk }}/"
+         style="font-size:11px;color:var(--link-fg,#58a6ff);text-decoration:none" target="_blank">деталі</a>
+      {% if inv.pdf_file %}
+      <a href="/invoices/{{ inv.pk }}/pdf/"
+         style="font-size:11px;color:var(--link-fg,#58a6ff);text-decoration:none" target="_blank">PDF</a>
+      {% endif %}
+    </div>
+  {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% if notify_customer_url %}
 <!-- ── Customer notification modal ── -->
 <div id="nc-modal" style="display:none;position:fixed;inset:0;z-index:9999;
