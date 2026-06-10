@@ -73,7 +73,7 @@
     <li>
       <button type="button" id="dk-fetch-tracking-btn"
               onclick="dkFetchTracking('{{ digikey_fetch_tracking_url }}')"
-              title="{% trans 'Запитати трекінг-номер і кур'єра з DigiKey Marketplace API та вставити в поля форми. Після цього натисніть Зберегти.' %}"
+              title="{% trans "Запитати трекінг-номер і кур'єра з DigiKey Marketplace API та вставити в поля форми. Після цього натисніть Зберегти." %}"
               style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
                      font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
         🔄 Трекінг з DigiKey
@@ -84,7 +84,7 @@
     <li>
       <button type="button" id="push-to-shipping-btn"
               onclick="pushToShipping('/admin/sales/salesorder/{{ original.pk }}/push-to-shipping/')"
-              title="{% trans 'Якщо картки відправлення немає — створить нову в розділі Доставка з трекінг-номером. Якщо вже є — оновить трекінг і кур'єра. Після цього кнопка стане посиланням на картку Shipment.' %}"
+              title="{% trans "Якщо картки відправлення немає — створить нову в розділі Доставка з трекінг-номером. Якщо вже є — оновить трекінг і кур'єра. Після цього кнопка стане посиланням на картку Shipment." %}"
               style="background:var(--ok,#2e7d32);color:#fff;padding:6px 14px;border-radius:6px;
                      font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
         📦 Відстежувати
