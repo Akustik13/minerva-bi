@@ -82,14 +82,21 @@ def invoice_fetch_preview(request, dk_order_no):
     """
     GET /invoices/fetch/<dk_order_no>/ — fetch order data from DigiKey API for preview.
     Returns JSON order_data if available, or error for manual fallback.
+    Add ?debug=1 to also get the raw shipping address fields from the API.
     """
     from shipping.services.invoice_service import _fetch_digikey_order
     try:
         data = _fetch_digikey_order(dk_order_no)
-        return JsonResponse({"ok": True, "order_data": data})
+        resp = {"ok": True, "order_data": data}
+        if request.GET.get("debug"):
+            resp["_debug_shipping_address"] = data.pop("_raw_shipping_address", {})
+        else:
+            data.pop("_raw_shipping_address", None)
+        return JsonResponse(resp)
     except ValueError as e:
         return JsonResponse({"error": str(e), "needs_manual": True}, status=422)
     except Exception as e:
+        logger.exception("invoice_fetch_preview error for %s", dk_order_no)
         return JsonResponse({"error": str(e), "needs_manual": True}, status=500)
 
 

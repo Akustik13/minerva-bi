@@ -88,37 +88,42 @@ def _fetch_digikey_order(order_id: str) -> dict:
         raise ValueError(f"Order {order_id!r} not found in DigiKey Marketplace.")
 
     o = orders[0]
+    logger.debug("DK order raw: %s", o)
     cust = o.get("customer") or {}
     ship_addr = cust.get("shippingAddress") or {}
-    bill_addr = cust.get("billingAddress") or {}
 
-    # Build contact name
-    contact_parts = [
-        ship_addr.get("firstName", ""),
-        ship_addr.get("lastName", ""),
-    ]
+    # Contact name: firstName + lastName, fallback to name
+    contact_parts = [ship_addr.get("firstName", ""), ship_addr.get("lastName", "")]
     contact = " ".join(p for p in contact_parts if p).strip() or ship_addr.get("name", "")
 
-    # city_zip: "CITY, POSTALCODE"
-    city = ship_addr.get("city", "")
+    # Address: street1, optionally append street2 on same line
+    street1 = ship_addr.get("street1", "")
+    street2 = ship_addr.get("street2", "")
+    address1 = f"{street1}, {street2}".strip(", ") if street2 else street1
+
+    # city_zip: "CITY, POSTALCODE" — if city empty try street3 / state as fallback
+    city   = ship_addr.get("city", "") or ship_addr.get("street3", "") or ship_addr.get("state", "")
     postal = ship_addr.get("postalCode", "")
-    city_zip = f"{city}, {postal}".strip(", ") if (city or postal) else ""
+    if city and postal:
+        city_zip = f"{city}, {postal}"
+    elif city:
+        city_zip = city
+    else:
+        city_zip = postal
 
-    # VAT from billingAddress companyName or taxId-style additionalFields
-    vat_id = bill_addr.get("taxId", "") or ""
-    if not vat_id:
-        for af in o.get("additionalFields") or []:
-            if "vat" in af.get("code", "").lower() or "tax" in af.get("code", "").lower():
-                vat_id = str(af.get("value", ""))
-                break
+    # VAT: Marketplace Orders API does not expose customer VAT — leave blank.
+    # Do NOT read additionalFields (they contain numeric 0 values that become "0.0").
+    vat_id = ""
 
+    # Items: use productCategoryName as description (matches DigiKey product page)
     items = []
     for line in o.get("orderDetails") or []:
         qty = float(line.get("adjustedQuantity") or line.get("quantity") or 1)
         unit_price = float(line.get("unitPrice") or 0)
         part_no = line.get("supplierSku") or line.get("productPartNumber") or ""
         description = (
-            line.get("productDescription")
+            line.get("productCategoryName")
+            or line.get("productDescription")
             or line.get("offerDescription")
             or ""
         )
@@ -134,19 +139,21 @@ def _fetch_digikey_order(order_id: str) -> dict:
 
     return {
         "digikey_order_no": o.get("businessId", order_id),
-        "order_date": _fmt_date(o.get("createDateUtc")),
+        "order_date":   _fmt_date(o.get("createDateUtc")),
         "shipment_date": _fmt_date(o.get("shippedDateUtc")),
         "items": items,
-        "discount_amount": -abs(discount) if discount else 0.0,
+        "discount_amount":  -abs(discount) if discount else 0.0,
         "shipping_charges": shipping,
         "shipped_to": {
             "company":  ship_addr.get("companyName", ""),
             "contact":  contact,
-            "address1": ship_addr.get("street1", ""),
+            "address1": address1,
             "city_zip": city_zip,
             "country":  ship_addr.get("countryCode", ""),
             "vat_id":   vat_id,
         },
+        # raw snapshot for debug (not used by generate())
+        "_raw_shipping_address": ship_addr,
     }
 
 
