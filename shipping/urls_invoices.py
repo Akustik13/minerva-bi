@@ -11,5 +11,11 @@ urlpatterns = [
     path("<int:pk>/pdf/",                v.invoice_pdf_view,      name="invoice_pdf"),
     path("<int:pk>/download/",           v.invoice_download,      name="invoice_download"),
     path("<int:pk>/delete/",             v.invoice_delete,        name="invoice_delete"),
-    path("<int:pk>/update-recipient/",   v.invoice_update_recipient, name="invoice_update_recipient"),
+    path("<int:pk>/update-recipient/",   v.invoice_update_recipient,   name="invoice_update_recipient"),
+    # Template management
+    path("templates/",                   v.invoice_templates_list,     name="invoice_templates_list"),
+    path("templates/upload/",            v.invoice_template_upload,    name="invoice_template_upload"),
+    path("templates/<str:name>/download/", v.invoice_template_download, name="invoice_template_download"),
+    path("templates/<str:name>/activate/", v.invoice_template_activate, name="invoice_template_activate"),
+    path("templates/<str:name>/delete/",   v.invoice_template_delete,   name="invoice_template_delete"),
 ]

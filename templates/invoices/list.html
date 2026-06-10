@@ -256,6 +256,38 @@
     </div>
   </div>
 
+  <!-- ── Template management panel ── -->
+  <div id="tplPanel" style="background:var(--bg-card);border:1px solid var(--border);
+       border-radius:var(--radius);margin-bottom:20px;overflow:hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                padding:12px 18px;cursor:pointer;user-select:none;
+                border-bottom:1px solid transparent" id="tplPanelHeader">
+      <span style="font-size:13px;font-weight:600;color:var(--text-dim)">
+        ⚙️ Шаблон інвойсу
+        <span id="tplActiveLabel" style="font-size:11px;color:var(--text-muted);margin-left:8px"></span>
+      </span>
+      <span id="tplPanelChevron" style="color:var(--text-muted);font-size:12px">▼</span>
+    </div>
+    <div id="tplPanelBody" style="display:none;padding:16px 18px">
+      <!-- Template list -->
+      <div id="tplList" style="margin-bottom:14px"></div>
+      <!-- Upload form -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:8px;font-weight:600">
+          📤 Завантажити новий шаблон (.docx)
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="file" id="tplFileInput" accept=".docx"
+                 style="font-size:12px;color:var(--text)">
+          <button class="btn-sm" onclick="uploadTemplate()" style="padding:7px 14px;font-size:12px">
+            ⬆️ Завантажити
+          </button>
+          <span id="tplUploadMsg" style="font-size:11px;color:var(--ok)"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   {% if invoices %}
   <div class="mv-table-wrap">
     <table class="mv-table" id="invTable">
@@ -1047,6 +1079,106 @@ function setLoading(id, loading, label) {
   btn.disabled = loading;
   btn.innerHTML = loading ? `<span class="spinner"></span>${label}` : label;
 }
+
+// ── Template management ──────────────────────────────────────────────────
+(function() {
+  const header = document.getElementById('tplPanelHeader');
+  const body   = document.getElementById('tplPanelBody');
+  const chev   = document.getElementById('tplPanelChevron');
+
+  header.addEventListener('click', function() {
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : '';
+    chev.textContent   = open ? '▼' : '▲';
+    header.style.borderBottomColor = open ? 'transparent' : 'var(--border)';
+    if (!open) loadTemplates();
+  });
+
+  function renderTemplates(list) {
+    const activeItem = list.find(t => t.is_active);
+    document.getElementById('tplActiveLabel').textContent =
+      activeItem ? ('активний: ' + (activeItem.is_default
+        ? activeItem.name + ' (дефолтний)' : activeItem.name)) : '';
+
+    document.getElementById('tplList').innerHTML = list.map(t => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;
+                  border-bottom:1px solid var(--border);flex-wrap:wrap">
+        <span style="font-size:20px">${t.is_default ? '📄' : '📝'}</span>
+        <span style="font-size:12px;color:var(--text);flex:1;min-width:160px">
+          ${t.name}
+          ${t.is_default ? '<span style="font-size:10px;color:var(--text-muted);margin-left:4px">(дефолтний)</span>' : ''}
+        </span>
+        <span style="font-size:11px;color:var(--text-muted);white-space:nowrap">${t.size_kb} KB</span>
+        ${t.is_active
+          ? '<span style="font-size:11px;background:rgba(76,175,80,.15);color:#4caf50;border:1px solid rgba(76,175,80,.3);border-radius:4px;padding:2px 8px">✅ активний</span>'
+          : `<button class="btn-sm" onclick="activateTpl('${t.name}')" style="font-size:11px;padding:4px 10px">Встановити активним</button>`
+        }
+        <a href="/invoices/templates/${encodeURIComponent(t.name)}/download/"
+           class="btn-sm" style="font-size:11px;padding:4px 10px">⬇️ Завантажити</a>
+        ${!t.is_default
+          ? `<button class="btn-sm danger" onclick="deleteTpl('${t.name}')" style="font-size:11px;padding:4px 10px">🗑️</button>`
+          : ''
+        }
+      </div>
+    `).join('');
+  }
+
+  function loadTemplates() {
+    fetch('/invoices/templates/')
+      .then(r => r.json())
+      .then(d => renderTemplates(d.templates || []))
+      .catch(() => {});
+  }
+
+  window.activateTpl = function(name) {
+    fetch('/invoices/templates/' + encodeURIComponent(name) + '/activate/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+    })
+    .then(r => r.json())
+    .then(d => { if (d.ok) renderTemplates(d.templates); else alert(d.error); })
+    .catch(() => {});
+  };
+
+  window.deleteTpl = function(name) {
+    if (!confirm('Видалити шаблон "' + name + '"?')) return;
+    fetch('/invoices/templates/' + encodeURIComponent(name) + '/delete/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+    })
+    .then(r => r.json())
+    .then(d => { if (d.ok) renderTemplates(d.templates); else alert(d.error); })
+    .catch(() => {});
+  };
+
+  window.uploadTemplate = function() {
+    const f = document.getElementById('tplFileInput').files[0];
+    if (!f) { alert('Оберіть .docx файл'); return; }
+    const fd = new FormData();
+    fd.append('template_file', f);
+    const msg = document.getElementById('tplUploadMsg');
+    msg.style.color = 'var(--text-muted)';
+    msg.textContent = 'Завантаження…';
+    fetch('/invoices/templates/upload/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: fd,
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (d.ok) {
+        msg.style.color = 'var(--ok)';
+        msg.textContent = '✓ Завантажено';
+        document.getElementById('tplFileInput').value = '';
+        renderTemplates(d.templates);
+      } else {
+        msg.style.color = 'var(--err)';
+        msg.textContent = d.error || 'Помилка';
+      }
+    })
+    .catch(() => { msg.style.color = 'var(--err)'; msg.textContent = 'Помилка мережі'; });
+  };
+})();
 
 // Auto-open modal if ?auto=ORDER_NUMBER is in URL
 (function() {

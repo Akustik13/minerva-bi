@@ -322,3 +322,87 @@ def invoice_delete(request, pk):
         messages.success(request, f"Invoice #{inv.invoice_number} видалено.")
         return redirect("invoice_list")
     return render(request, "invoices/confirm_delete.html", {"inv": inv})
+
+
+# ── Invoice template management ────────────────────────────────────────────
+
+@_staff
+def invoice_templates_list(request):
+    """GET — return JSON list of available invoice templates."""
+    from shipping.services.invoice_service import list_invoice_templates
+    return JsonResponse({"templates": list_invoice_templates()})
+
+
+@_staff
+@require_POST
+def invoice_template_upload(request):
+    """POST multipart — upload a new .docx template."""
+    from shipping.services.invoice_service import _tpl_dir, list_invoice_templates
+    f = request.FILES.get("template_file")
+    if not f:
+        return JsonResponse({"error": "Файл не вибрано"}, status=400)
+    if not f.name.lower().endswith(".docx"):
+        return JsonResponse({"error": "Тільки .docx файли"}, status=400)
+    dest = _tpl_dir() / f.name
+    with open(dest, "wb") as out:
+        for chunk in f.chunks():
+            out.write(chunk)
+    return JsonResponse({"ok": True, "templates": list_invoice_templates()})
+
+
+@_staff
+def invoice_template_download(request, name):
+    """GET — download a template by filename."""
+    from shipping.services.invoice_service import (
+        _tpl_dir, DEFAULT_TEMPLATE_NAME, DEFAULT_TEMPLATE_PATH,
+    )
+    if name == DEFAULT_TEMPLATE_NAME:
+        path = DEFAULT_TEMPLATE_PATH
+    else:
+        path = _tpl_dir() / name
+    if not path.exists() or ".." in name:
+        raise Http404
+    return FileResponse(
+        open(path, "rb"),
+        as_attachment=True,
+        filename=name,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+
+@_staff
+@require_POST
+def invoice_template_activate(request, name):
+    """POST — set a custom template as active (or '' to revert to default)."""
+    from shipping.services.invoice_service import (
+        _tpl_dir, DEFAULT_TEMPLATE_NAME, set_active_template_name, list_invoice_templates,
+    )
+    if name == DEFAULT_TEMPLATE_NAME:
+        set_active_template_name("")
+    else:
+        if not (_tpl_dir() / name).exists() or ".." in name:
+            return JsonResponse({"error": "Шаблон не знайдено"}, status=404)
+        set_active_template_name(name)
+    return JsonResponse({"ok": True, "templates": list_invoice_templates()})
+
+
+@_staff
+@require_POST
+def invoice_template_delete(request, name):
+    """POST — delete a custom template (default cannot be deleted)."""
+    from shipping.services.invoice_service import (
+        _tpl_dir, DEFAULT_TEMPLATE_NAME, get_active_template_name,
+        set_active_template_name, list_invoice_templates,
+    )
+    if name == DEFAULT_TEMPLATE_NAME:
+        return JsonResponse({"error": "Дефолтний шаблон видалити неможна"}, status=403)
+    if ".." in name:
+        return JsonResponse({"error": "Неприпустиме ім'я"}, status=400)
+    path = _tpl_dir() / name
+    if not path.exists():
+        return JsonResponse({"error": "Шаблон не знайдено"}, status=404)
+    # If this was the active template, revert to default
+    if get_active_template_name() == name:
+        set_active_template_name("")
+    path.unlink()
+    return JsonResponse({"ok": True, "templates": list_invoice_templates()})

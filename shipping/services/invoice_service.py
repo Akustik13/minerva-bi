@@ -235,9 +235,62 @@ def push_invoice_number_to_digikey(order_id: str, invoice_number: str) -> bool:
         return False
 
 
+# ── Invoice template management ────────────────────────────────────────────
+
+DEFAULT_TEMPLATE_NAME = "invoice_template.docx"
+DEFAULT_TEMPLATE_PATH = Path(settings.BASE_DIR) / "shipping" / "templates_docx" / DEFAULT_TEMPLATE_NAME
+
+
+def _tpl_dir() -> Path:
+    d = Path(settings.MEDIA_ROOT) / "invoice_templates"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def get_active_template_name() -> str:
+    """Returns active custom template filename, or '' for default."""
+    marker = _tpl_dir() / "_active.txt"
+    if marker.exists():
+        name = marker.read_text().strip()
+        if name and (_tpl_dir() / name).exists():
+            return name
+    return ""
+
+
+def set_active_template_name(name: str):
+    (_tpl_dir() / "_active.txt").write_text(name)
+
+
+def get_active_template_path() -> Path:
+    name = get_active_template_name()
+    if name:
+        return _tpl_dir() / name
+    return DEFAULT_TEMPLATE_PATH
+
+
+def list_invoice_templates() -> list:
+    """Returns sorted list of template dicts."""
+    active = get_active_template_name()
+    result = [{
+        "name":       DEFAULT_TEMPLATE_NAME,
+        "is_default": True,
+        "is_active":  active == "",
+        "size_kb":    round(DEFAULT_TEMPLATE_PATH.stat().st_size / 1024, 1)
+                      if DEFAULT_TEMPLATE_PATH.exists() else 0,
+    }]
+    for f in sorted(_tpl_dir().glob("*.docx")):
+        result.append({
+            "name":       f.name,
+            "is_default": False,
+            "is_active":  f.name == active,
+            "size_kb":    round(f.stat().st_size / 1024, 1),
+        })
+    return result
+
+
 class InvoiceService:
 
-    TEMPLATE_PATH = Path(settings.BASE_DIR) / "shipping" / "templates_docx" / "invoice_template.docx"
+    TEMPLATE_PATH = DEFAULT_TEMPLATE_PATH
     OUTPUT_DIR    = Path(settings.MEDIA_ROOT) / "invoices"
 
     @classmethod
@@ -285,7 +338,7 @@ class InvoiceService:
 
         cls.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         output_path = cls.OUTPUT_DIR / f"Invoice_{invoice_number}.docx"
-        generate(order_dict, output_path, cls.TEMPLATE_PATH)
+        generate(order_dict, output_path, get_active_template_path())
 
         # Convert to PDF via LibreOffice (non-fatal if unavailable)
         pdf_path = convert_docx_to_pdf(output_path, cls.OUTPUT_DIR)
