@@ -5290,6 +5290,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     status_badge.short_description = _("Статус")
 
     def status_col(self, obj):
+        from django.utils import timezone as tz
         colors = {
             "draft":       ("#607d8b", "⬜"), "submitted":   ("#2196f3", "📤"),
             "label_ready": ("#00bcd4", "🏷️"), "in_transit":  ("#ff9800", "🚚"),
@@ -5301,15 +5302,61 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             '<span style="color:{};font-weight:600;white-space:nowrap">{} {}</span>',
             color, icon, obj.get_status_display()
         )
+
+        def _days_word(n):
+            if n % 10 == 1 and n % 100 != 11:
+                return f"{n} день"
+            if 2 <= n % 10 <= 4 and not (12 <= n % 100 <= 14):
+                return f"{n} дні"
+            return f"{n} днів"
+
         if obj.status == "delivered":
-            # Показуємо дату доставки
-            if obj.delivered_at:
+            start = obj.submitted_at or obj.created_at
+            if obj.delivered_at and start:
+                days = max(0, (obj.delivered_at - start).days)
                 d = obj.delivered_at.strftime("%d.%m.%Y")
+                sub = f"{d} · доставлено за {_days_word(days)}"
+            elif obj.delivered_at:
+                sub = obj.delivered_at.strftime("%d.%m.%Y")
+            else:
+                sub = ""
+            if sub:
                 return format_html(
-                    '{}<br><small style="color:#4caf50;opacity:.8">{}</small>', main, d
+                    '{}<br><small style="color:#4caf50;opacity:.85;font-size:10px">{}</small>',
+                    main, sub,
                 )
             return main
-        # Не доставлено — показуємо очікувану дату або статус від перевізника
+
+        if obj.status == "in_transit":
+            start = obj.submitted_at or obj.created_at
+            if start:
+                days = max(0, (tz.now() - start).days)
+                transit_hint = f"в дорозі {_days_word(days)}"
+            else:
+                transit_hint = ""
+            # secondary line: ETA or carrier label or transit days
+            sub = ""
+            if obj.carrier_eta:
+                eta_str = obj.carrier_eta.strftime("%d.%m.%Y")
+                sub = f"Очік. {eta_str}"
+                if transit_hint:
+                    sub += f" · {transit_hint}"
+            elif obj.carrier_status_label:
+                label = obj.carrier_status_label
+                sub = label if len(label) <= 30 else label[:28] + "…"
+                if transit_hint:
+                    sub += f" · {transit_hint}"
+            elif transit_hint:
+                sub = transit_hint
+            if sub:
+                return format_html(
+                    '{}<br><small style="color:#ff9800;opacity:.85;font-size:10px;'
+                    'white-space:normal;max-width:170px;display:inline-block">{}</small>',
+                    main, sub,
+                )
+            return main
+
+        # Інші статуси — очікувана дата або carrier label
         sub = ""
         if obj.carrier_eta:
             sub = "Очік. " + obj.carrier_eta.strftime("%d.%m.%Y")
