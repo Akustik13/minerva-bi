@@ -267,9 +267,6 @@ class InvoiceService:
             created_by         = user,
         )
 
-        # Try to push invoice number back to DigiKey (non-fatal)
-        push_invoice_number_to_digikey(order_data["digikey_order_no"], invoice_number)
-
         return inv
 
 
