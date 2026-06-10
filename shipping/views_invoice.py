@@ -25,7 +25,9 @@ def _staff(view_fn):
 @_staff
 def invoice_list(request):
     from django.db.models import F, ExpressionWrapper, DecimalField as DField, Sum
-    invoices = (
+    from sales.models import SalesOrder
+
+    invoices = list(
         Invoice.objects
         .select_related("sales_order", "created_by")
         .annotate(
@@ -36,6 +38,25 @@ def invoice_list(request):
         )
         .order_by("-invoice_number")
     )
+
+    # Auto-link invoices that have digikey_order_no but no sales_order FK
+    unlinked = [inv for inv in invoices if not inv.sales_order_id and inv.digikey_order_no]
+    if unlinked:
+        dk_numbers = [inv.digikey_order_no for inv in unlinked]
+        orders_by_no = {
+            o.order_number: o
+            for o in SalesOrder.objects.filter(order_number__in=dk_numbers)
+        }
+        to_update = []
+        for inv in unlinked:
+            order = orders_by_no.get(inv.digikey_order_no)
+            if order:
+                inv.sales_order = order
+                inv.sales_order_id = order.pk
+                to_update.append(inv)
+        if to_update:
+            Invoice.objects.bulk_update(to_update, ["sales_order"])
+
     agg = Invoice.objects.aggregate(sum_subtotal=Sum('subtotal'), sum_total=Sum('total_amount'))
     return render(request, "invoices/list.html", {
         "invoices":     invoices,
