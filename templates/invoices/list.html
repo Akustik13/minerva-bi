@@ -642,11 +642,18 @@
     <p style="font-size:12px;color:var(--text-muted);margin-bottom:18px">
       До скількох знаків округлити ціни перед генерацією інвойсу?
     </p>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button onclick="applyRound(2)"    class="btn-gold" style="padding:8px 18px;font-size:13px">2 знаки (за замовчуванням)</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+      <button onclick="applyRound(2)"    class="btn-gold" style="padding:8px 18px;font-size:13px">2 знаки (за замовч.)</button>
       <button onclick="applyRound(3)"    class="btn-sec"  style="padding:8px 14px;font-size:13px">3 знаки</button>
       <button onclick="applyRound(4)"    class="btn-sec"  style="padding:8px 14px;font-size:13px">4 знаки</button>
       <button onclick="applyRound(null)" class="btn-sec"  style="padding:8px 14px;font-size:13px">Без округлення</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--border-str);padding-top:12px">
+      <span style="font-size:12px;color:var(--text-dim);white-space:nowrap">Або вкажіть кількість знаків:</span>
+      <input id="roundCustomInput" type="number" min="0" max="10" value="2"
+             style="width:64px;padding:6px 8px;background:var(--bg);border:1px solid var(--border-str);
+                    border-radius:4px;color:var(--text);font-size:13px;text-align:center">
+      <button onclick="applyRoundCustom()" class="btn-sec" style="padding:7px 14px;font-size:13px">✓ Застосувати</button>
     </div>
   </div>
 </div>
@@ -684,6 +691,11 @@ function applyRound(decimals) {
   const od = _roundOrderData(_pendingRoundOd, decimals);
   _currentOrderData = od;
   renderPreview(od);
+}
+function applyRoundCustom() {
+  const raw = parseInt(document.getElementById('roundCustomInput').value, 10);
+  const decimals = (isNaN(raw) || raw < 0) ? 2 : Math.min(raw, 10);
+  applyRound(decimals);
 }
 
 document.getElementById('btnGenerate').onclick = () => openModal();
