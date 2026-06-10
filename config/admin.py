@@ -644,19 +644,36 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
 
     # ── Telegram preview helpers ───────────────────────────────────────────────
 
+    # CSS injected once per page; duplicate injections are harmless (idempotent CSS)
+    _TG_PREVIEW_STYLE = (
+        '<style>'
+        '.mv-tg-bubble{background:#17212b;color:#e8f0f7;border:1px solid #2b5278}'
+        '.mv-tg-bubble code{background:#1e3a5f;color:#aecaf8;padding:1px 5px;border-radius:4px}'
+        '.mv-tg-dim{color:#8ab4d1}'
+        '.mv-tg-green{color:#7dd47d}'
+        '[data-theme="light"] .mv-tg-bubble{background:#eaf2fc;color:#1a2b3c;border-color:#b8d4ee}'
+        '[data-theme="light"] .mv-tg-bubble code{background:#c8e0f5;color:#1a3a5c}'
+        '[data-theme="light"] .mv-tg-dim{color:#3a6a8a}'
+        '[data-theme="light"] .mv-tg-green{color:#2e7d32}'
+        '[data-theme="minerva"] .mv-tg-bubble{background:#1a2535;color:#c9d8e4;border-color:#243347}'
+        '[data-theme="minerva"] .mv-tg-bubble code{background:#1e3048;color:#9ec4e8}'
+        '[data-theme="minerva"] .mv-tg-dim{color:#7a9fb8}'
+        '</style>'
+    )
+
     @staticmethod
     def _tg_preview_card(html_lines: list, order_number: str) -> str:
-        """Render Telegram-style preview card from a list of HTML line strings."""
+        """Render Telegram-style preview card (theme-aware via CSS classes)."""
         from django.utils.safestring import mark_safe
         from django.utils.html import escape
         body = mark_safe('<br>'.join(html_lines))
         return (
+            NotificationSettingsAdmin._TG_PREVIEW_STYLE +
             f'<div style="font-size:11px;color:var(--text-dim,#607d8b);margin-bottom:6px">'
-            f'Приклад на основі замовлення <b>{escape(order_number)}</b></div>'
-            f'<div style="background:#17212b;color:#e8f0f7;border-radius:12px;'
+            f'Приклад · замовлення <b>{escape(order_number)}</b></div>'
+            f'<div class="mv-tg-bubble" style="border-radius:12px;'
             f'padding:16px 20px;font-family:system-ui,sans-serif;font-size:13px;'
-            f'line-height:1.8;max-width:520px;border:1px solid #2b5278;'
-            f'margin-bottom:12px">{body}</div>'
+            f'line-height:1.8;max-width:520px;margin-bottom:12px">{body}</div>'
         )
 
     def _build_order_preview_lines(self, order, mode='new_order', ns=None):
@@ -731,15 +748,15 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 pass
 
         L = []
-        L.append(f'🏛️ <b style="color:#e8f0f7">{escape(cname)}</b>')
+        L.append(f'🏛️ <b>{escape(cname)}</b>')
         if mode == 'dk_confirm':
-            L.append(f'✅ <b>DigiKey: авто-підтверджено</b> · <i style="color:#8ab4d1">{now_str}</i>')
+            L.append(f'✅ <b>DigiKey: авто-підтверджено</b> · <i class="mv-tg-dim">{now_str}</i>')
         else:
-            L.append(f'🆕 <b>Нове замовлення</b> · <i style="color:#8ab4d1">{now_str}</i>')
+            L.append(f'🆕 <b>Нове замовлення</b> · <i class="mv-tg-dim">{now_str}</i>')
         L.append('')
         L.append(
-            f'📋 <code style="background:#1e3a5f;padding:1px 5px;border-radius:4px">'
-            f'{escape(order.order_number)}</code> · {escape(order.source or "digikey")}'
+            f'📋 <code>{escape(order.order_number)}</code>'
+            f' · {escape(order.source or "digikey")}'
         )
         L.append(f'👤 <b>{client}</b>')
         if _inc_crm and crm_orders is not None:
@@ -750,12 +767,12 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
             dl_warn = ' ⚠️' if days_left is not None and days_left <= 2 else ''
             L.append(
                 f'📦 Дедлайн: <b>{deadline_str}</b>'
-                f' <span style="color:#8ab4d1">({escape(days_left_str)})</span>{dl_warn}'
+                f' <span class="mv-tg-dim">({escape(days_left_str)})</span>{dl_warn}'
             )
         if total_str:
-            L.append(f'💰 <b style="color:#7dd47d">{escape(total_str)}</b>')
+            L.append(f'💰 <b class="mv-tg-green">{escape(total_str)}</b>')
         if mode == 'dk_confirm':
-            L.append(f'🤖 <i style="color:#8ab4d1">Підтверджено автоматично (always)</i>')
+            L.append(f'🤖 <i class="mv-tg-dim">Підтверджено автоматично (always)</i>')
 
         # Products
         try:
@@ -776,7 +793,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                     qty_str = str(qty)
                 curr = escape(ol.currency or getattr(order, 'currency', '') or '')
 
-                # stock for new_order mode
+                # stock icon for new_order mode
+                stock = None
                 stock_icon = '•'
                 if mode == 'new_order' and _inc_stock and p:
                     try:
@@ -787,40 +805,30 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                     except Exception:
                         pass
 
-                L.append(
-                    f'{stock_icon} <code style="background:#1e3a5f;padding:1px 5px;'
-                    f'border-radius:4px">{sku}</code>'
-                )
+                L.append(f'{stock_icon} <code>{sku}</code>')
                 L.append(f'&nbsp;&nbsp;&nbsp;📦 × <b>{qty_str} шт</b>')
                 if ol.unit_price:
                     L.append(
-                        f'&nbsp;&nbsp;&nbsp;💵 <span style="color:#8ab4d1">'
+                        f'&nbsp;&nbsp;&nbsp;💵 <span class="mv-tg-dim">'
                         f'{float(ol.unit_price):.2f} {curr}/шт</span>'
                     )
-                if mode == 'new_order' and _inc_stock and p:
-                    try:
-                        from inventory.models import InventoryTransaction as _IT2
-                        from django.db.models import Sum as _S2
-                        stk = int(_IT2.objects.filter(product=p).aggregate(t=_S2('qty'))['t'] or 0)
-                        icon2 = '✅' if stk >= (ol.qty or 0) else '❌'
-                        L.append(f'&nbsp;&nbsp;&nbsp;🏪 склад: <b>{stk} шт</b> {icon2}')
-                    except Exception:
-                        pass
+                if _inc_stock and stock is not None:
+                    icon2 = '✅' if stock >= (ol.qty or 0) else '❌'
+                    L.append(f'&nbsp;&nbsp;&nbsp;🏪 склад: <b>{stock} шт</b> {icon2}')
                 if _inc_ds and p and getattr(p, 'datasheet_url', ''):
                     L.append(
                         f'&nbsp;&nbsp;&nbsp;📄 <a href="{escape(p.datasheet_url)}" '
-                        f'style="color:#6ab4f5">Datasheet</a>'
+                        f'class="mv-tg-dim">Datasheet</a>'
                     )
         if _inc_img and order_lines:
             imgs = [
-                p.image_url or ''
+                ol.product.image_url
                 for ol in order_lines
-                for p in [ol.product]
-                if p and getattr(p, 'image_url', '')
+                if ol.product and getattr(ol.product, 'image_url', '')
             ]
             if imgs:
                 L.append(
-                    f'<br><span style="color:#607d8b;font-size:11px">'
+                    f'<br><span class="mv-tg-dim" style="font-size:11px">'
                     f'🖼️ {len(imgs)} фото надійде окремим альбомом</span>'
                 )
         return L
