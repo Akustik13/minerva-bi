@@ -48,7 +48,14 @@ def invoice_list(request):
 def invoice_detail(request, pk):
     inv = get_object_or_404(Invoice, pk=pk)
     gross_amount = inv.subtotal - inv.discount_amount - inv.shipping_charges
-    return render(request, "invoices/detail.html", {"inv": inv, "gross_amount": gross_amount})
+    discount_pct = None
+    if inv.discount_amount and gross_amount:
+        discount_pct = abs(inv.discount_amount / gross_amount * 100)
+    return render(request, "invoices/detail.html", {
+        "inv": inv,
+        "gross_amount": gross_amount,
+        "discount_pct": discount_pct,
+    })
 
 
 @_staff

@@ -256,7 +256,7 @@
       <tr class="disc">
         <td class="fl">Знижка</td>
         <td class="fv">{{ inv.discount_amount|floatformat:2 }} USD</td>
-        <td class="fn">Знижка від DigiKey Marketplace</td>
+        <td class="fn">Знижка від DigiKey Marketplace{% if discount_pct %} ({{ discount_pct|floatformat:1 }}%){% endif %}</td>
       </tr>
       {% endif %}
       {% if inv.shipping_charges %}
