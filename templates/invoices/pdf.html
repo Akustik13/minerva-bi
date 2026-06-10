@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Invoice #{{ inv.invoice_number }}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 12px;
+    color: #1a1a2e;
+    background: #fff;
+    padding: 32px 40px;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  /* Print styles */
+  @media print {
+    body { padding: 0; max-width: none; }
+    .no-print { display: none !important; }
+    @page { margin: 15mm 15mm 15mm 15mm; size: A4; }
+  }
+
+  /* Top bar (screen only) */
+  .no-print {
+    background: #1a2535;
+    color: #c9d8e4;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: -32px -40px 32px;
+  }
+  .no-print a { color: #c9a84c; text-decoration: none; font-size: 13px; }
+  .btn-print {
+    margin-left: auto;
+    background: linear-gradient(135deg, #c9a84c, #a07830);
+    color: #1a1000;
+    border: none;
+    border-radius: 5px;
+    padding: 7px 18px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* Invoice layout */
+  .inv-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid #1a2535;
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+  }
+  .inv-header .brand {
+    font-family: 'Cinzel', Georgia, serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: #1a2535;
+    letter-spacing: 1px;
+  }
+  .inv-header .brand .sub {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 11px;
+    color: #607d8b;
+    font-weight: 400;
+    letter-spacing: 0;
+    margin-top: 3px;
+  }
+  .inv-title {
+    text-align: right;
+  }
+  .inv-title .label {
+    font-family: 'Cinzel', Georgia, serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: #1a2535;
+    letter-spacing: 2px;
+  }
+  .inv-title .num {
+    font-size: 13px;
+    color: #607d8b;
+    margin-top: 4px;
+  }
+
+  /* Metadata row */
+  .meta-row {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    background: #f4f7fa;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+  }
+  .meta-item .m-label {
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 2px;
+  }
+  .meta-item .m-val {
+    font-size: 12px;
+    color: #1a2535;
+    font-weight: 600;
+  }
+
+  /* Addresses */
+  .addr-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
+  .addr-box {
+    border: 1px solid #e0e8f0;
+    border-radius: 6px;
+    padding: 14px 16px;
+  }
+  .addr-box .addr-label {
+    font-size: 10px;
+    color: #90a4ae;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #e0e8f0;
+    padding-bottom: 5px;
+  }
+  .addr-box .addr-company { font-weight: 700; font-size: 13px; color: #1a2535; margin-bottom: 4px; }
+  .addr-box .addr-line { font-size: 12px; color: #37474f; line-height: 1.6; }
+  .addr-box .addr-vat { font-size: 11px; color: #607d8b; margin-top: 5px; }
+
+  /* Line items table */
+  .items-section { margin-bottom: 20px; }
+  .section-title {
+    font-family: 'Cinzel', Georgia, serif;
+    font-size: 12px;
+    color: #1a2535;
+    letter-spacing: .5px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #1a2535;
+    padding-bottom: 4px;
+  }
+  table.items { width: 100%; border-collapse: collapse; }
+  table.items th {
+    background: #1a2535;
+    color: #c9d8e4;
+    font-size: 10px;
+    padding: 7px 10px;
+    text-align: left;
+    letter-spacing: .3px;
+  }
+  table.items th.r { text-align: right; }
+  table.items td {
+    font-size: 11px;
+    padding: 7px 10px;
+    border-bottom: 1px solid #e0e8f0;
+    color: #37474f;
+    vertical-align: top;
+  }
+  table.items td.r { text-align: right; font-family: monospace; color: #1a2535; }
+  table.items tr:nth-child(even) td { background: #f8fafc; }
+  table.items tr:last-child td { border-bottom: none; }
+
+  /* Totals */
+  .totals-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 24px;
+  }
+  table.totals { width: 280px; border-collapse: collapse; }
+  table.totals td { font-size: 12px; padding: 5px 10px; }
+  table.totals .t-label { color: #607d8b; text-align: right; padding-right: 16px; }
+  table.totals .t-val { text-align: right; font-family: monospace; color: #1a2535; }
+  table.totals .t-disc .t-val { color: #e53935; }
+  table.totals .t-total { border-top: 2px solid #1a2535; }
+  table.totals .t-total td { font-weight: 700; color: #1a2535; font-size: 13px; padding-top: 8px; }
+
+  /* Footer note */
+  .inv-footer {
+    border-top: 1px solid #e0e8f0;
+    padding-top: 12px;
+    font-size: 10px;
+    color: #90a4ae;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="no-print">
+  <a href="/invoices/{{ inv.pk }}/">← Деталі</a>
+  <a href="/invoices/">Invoices</a>
+  {% if inv.docx_file %}
+  <a href="/invoices/{{ inv.pk }}/download/">⬇ .docx</a>
+  {% endif %}
+  <button class="btn-print" onclick="window.print()">🖨️ Друк / Зберегти PDF</button>
+</div>
+
+<!-- INVOICE HEADER -->
+<div class="inv-header">
+  <div class="brand">
+    SEVSKIY GMBH
+    <div class="sub">Stettiner Str. 1 · 06886 Lutherstadt Wittenberg · DE<br>VAT DE353200793</div>
+  </div>
+  <div class="inv-title">
+    <div class="label">INVOICE</div>
+    <div class="num">#{{ inv.invoice_number }}</div>
+  </div>
+</div>
+
+<!-- METADATA -->
+<div class="meta-row">
+  <div class="meta-item">
+    <div class="m-label">Invoice Date</div>
+    <div class="m-val">{{ inv.invoice_date|date:"d.m.Y" }}</div>
+  </div>
+  <div class="meta-item">
+    <div class="m-label">Order Date</div>
+    <div class="m-val">{{ inv.order_date|date:"d.m.Y" }}</div>
+  </div>
+  {% if inv.shipment_date %}
+  <div class="meta-item">
+    <div class="m-label">Ship Date</div>
+    <div class="m-val">{{ inv.shipment_date|date:"d.m.Y" }}</div>
+  </div>
+  {% endif %}
+  <div class="meta-item">
+    <div class="m-label">DigiKey Order</div>
+    <div class="m-val" style="font-family:monospace">{{ inv.digikey_order_no }}</div>
+  </div>
+</div>
+
+<!-- ADDRESSES -->
+<div class="addr-row">
+  <div class="addr-box">
+    <div class="addr-label">Seller / Verkäufer</div>
+    <div class="addr-company">Sevskiy GmbH</div>
+    <div class="addr-line">
+      Stettiner Str. 1<br>
+      06886 Lutherstadt Wittenberg<br>
+      Germany
+    </div>
+    <div class="addr-vat">VAT: DE353200793</div>
+  </div>
+  <div class="addr-box">
+    <div class="addr-label">Buyer / Käufer</div>
+    <div class="addr-company">{{ inv.shipped_to_company }}</div>
+    {% if inv.shipped_to_vat %}
+    <div class="addr-vat">VAT: {{ inv.shipped_to_vat }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- LINE ITEMS -->
+{% if inv.line_items %}
+<div class="items-section">
+  <div class="section-title">Line Items</div>
+  <table class="items">
+    <thead>
+      <tr>
+        <th style="width:22%">Part No.</th>
+        <th>Description</th>
+        <th class="r" style="width:8%">Qty</th>
+        <th class="r" style="width:14%">Unit Price</th>
+        <th class="r" style="width:14%">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in inv.line_items %}
+      <tr>
+        <td style="font-family:monospace;font-size:10px">{{ item.part_no }}</td>
+        <td>{{ item.description }}</td>
+        <td class="r">{{ item.qty }}</td>
+        <td class="r">{{ item.unit_price|floatformat:2 }}</td>
+        <td class="r" data-qty="{{ item.qty }}" data-price="{{ item.unit_price }}" class="amt-cell"></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<!-- TOTALS -->
+<div class="totals-wrap">
+  <table class="totals">
+    <tr>
+      <td class="t-label">Subtotal (items)</td>
+      <td class="t-val">{{ inv.subtotal|floatformat:2 }} USD</td>
+    </tr>
+    {% if inv.discount_amount %}
+    <tr class="t-disc">
+      <td class="t-label">Discount</td>
+      <td class="t-val">{{ inv.discount_amount|floatformat:2 }} USD</td>
+    </tr>
+    {% endif %}
+    {% if inv.shipping_charges %}
+    <tr>
+      <td class="t-label">Shipping</td>
+      <td class="t-val">{{ inv.shipping_charges|floatformat:2 }} USD</td>
+    </tr>
+    {% endif %}
+    <tr>
+      <td class="t-label">VAT 19%</td>
+      <td class="t-val">{{ inv.vat_amount|floatformat:2 }} USD</td>
+    </tr>
+    <tr class="t-total">
+      <td class="t-label">TOTAL</td>
+      <td class="t-val">{{ inv.total_amount|floatformat:2 }} USD</td>
+    </tr>
+  </table>
+</div>
+
+<!-- FOOTER -->
+<div class="inv-footer">
+  Sevskiy GmbH · Stettiner Str. 1 · 06886 Lutherstadt Wittenberg · Germany · VAT DE353200793<br>
+  Generated by Minerva BI
+</div>
+
+<script>
+  // Compute line item amounts client-side
+  document.querySelectorAll('[data-qty][data-price]').forEach(function(td) {
+    var qty   = parseFloat(td.getAttribute('data-qty')   || 0);
+    var price = parseFloat(td.getAttribute('data-price') || 0);
+    td.textContent = (qty * price).toFixed(2) + ' USD';
+  });
+  // Auto-open print dialog if ?print=1 in URL
+  if (new URLSearchParams(location.search).get('print') === '1') {
+    window.addEventListener('load', function() { setTimeout(function() { window.print(); }, 400); });
+  }
+</script>
+</body>
+</html>

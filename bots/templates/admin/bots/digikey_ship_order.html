@@ -171,16 +171,38 @@
     </div>
     {% endif %}
 
+    <!-- Invoice banner -->
+    {% if existing_invoice %}
+    <div style="background:rgba(76,175,80,.12);border:1px solid rgba(76,175,80,.3);border-radius:6px;
+                padding:10px 14px;margin-bottom:16px;font-size:13px;color:#a5d6a7;display:flex;
+                align-items:center;gap:12px;flex-wrap:wrap">
+      ✅ Інвойс <strong>#{{ existing_invoice.invoice_number }}</strong>
+      ({{ existing_invoice.total_amount }} USD) вже згенеровано.
+      <a href="/invoices/{{ existing_invoice.pk }}/" target="_blank"
+         style="color:#c9a84c;font-size:12px">Переглянути ↗</a>
+      <a href="/invoices/{{ existing_invoice.pk }}/pdf/" target="_blank"
+         style="color:#c9a84c;font-size:12px">🖨️ PDF ↗</a>
+    </div>
+    {% elif is_eu %}
+    <div style="background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.3);border-radius:6px;
+                padding:10px 14px;margin-bottom:16px;font-size:13px;color:#ffcc80">
+      ⚠️ Для ЄС-замовлення інвойс ще не згенеровано.
+      <a href="/invoices/?auto={{ order.order_number }}" target="_blank"
+         style="color:#c9a84c;font-weight:600">Згенерувати інвойс ↗</a>
+    </div>
+    {% endif %}
+
     <!-- Invoice number -->
     <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
         Номер рахунку постачальника (Supplier Invoice Number)
       </label>
       <input type="text" name="invoice_number"
+             value="{% if existing_invoice %}{{ existing_invoice.invoice_number }}{% endif %}"
              placeholder="INV-2026-001"
              style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
-                    border:1px solid var(--border-strong);border-radius:4px;
-                    color:var(--text);font-size:13px;box-sizing:border-box">
+                    border:1px solid {% if existing_invoice %}rgba(76,175,80,.6){% else %}var(--border-strong){% endif %};
+                    border-radius:4px;color:var(--text);font-size:13px;box-sizing:border-box">
     </div>
 
     {% if is_eu %}
@@ -192,10 +214,11 @@
                      padding:1px 6px;border-radius:3px;margin-left:4px">🇪🇺 ЄС</span>
       </label>
       <input type="number" name="net_vat_invoice_amount"
+             value="{% if existing_invoice %}{{ existing_invoice.subtotal }}{% endif %}"
              placeholder="0.00" min="0" step="0.01"
              style="width:100%;max-width:200px;padding:8px 12px;background:var(--bg-input);
-                    border:1px solid var(--border-strong);border-radius:4px;
-                    color:var(--text);font-size:13px;box-sizing:border-box">
+                    border:1px solid {% if existing_invoice %}rgba(76,175,80,.6){% else %}var(--border-strong){% endif %};
+                    border-radius:4px;color:var(--text);font-size:13px;box-sizing:border-box">
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
         Чиста сума рахунку-фактури (без ПДВ), у валюті замовлення.
       </div>

@@ -8,6 +8,7 @@ urlpatterns = [
     path("generate/",                    v.invoice_generate,      name="invoice_generate"),
     path("register/",                    v.invoice_register,      name="invoice_register"),
     path("fetch/<str:dk_order_no>/",     v.invoice_fetch_preview, name="invoice_fetch_preview"),
+    path("<int:pk>/pdf/",                v.invoice_pdf_view,      name="invoice_pdf"),
     path("<int:pk>/download/",           v.invoice_download,      name="invoice_download"),
     path("<int:pk>/delete/",             v.invoice_delete,        name="invoice_delete"),
 ]

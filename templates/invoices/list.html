@@ -687,7 +687,19 @@ document.getElementById('btnFetch').onclick = async function() {
     const data = await resp.json();
     if (resp.ok && data.ok) {
       _currentOrderData = data.order_data;
-      renderPreview(data.order_data);
+      if (data.existing_invoice) {
+        const ei = data.existing_invoice;
+        showAlert(
+          `⚠️ Інвойс <strong>#${ei.number}</strong> вже існує для цього замовлення (${ei.total} USD). ` +
+          `<a href="${ei.detail_url}" target="_blank" style="color:var(--gold)">Переглянути</a> · ` +
+          `<button onclick="renderPreview(_currentOrderData);clearAlert()" ` +
+          `style="background:none;border:none;color:var(--gold);cursor:pointer;` +
+          `text-decoration:underline;font-size:13px;padding:0">Перегенерувати</button>`,
+          'info'
+        );
+      } else {
+        renderPreview(data.order_data);
+      }
     } else if (data.needs_manual) {
       showAlert('DigiKey API недоступний або токен відсутній. Заповніть дані вручну.', 'info');
       showManualSection(no);

@@ -129,12 +129,27 @@ def invoice_fetch_preview(request, dk_order_no):
             resp["_debug_shipping_address"] = data.pop("_raw_shipping_address", {})
         else:
             data.pop("_raw_shipping_address", None)
+        # Check if an invoice already exists for this DK order number
+        existing = Invoice.objects.filter(digikey_order_no=dk_order_no).order_by("-invoice_date").first()
+        if existing:
+            resp["existing_invoice"] = {
+                "number":     existing.invoice_number,
+                "pk":         existing.pk,
+                "total":      str(existing.total_amount),
+                "detail_url": f"/invoices/{existing.pk}/",
+            }
         return JsonResponse(resp)
     except ValueError as e:
         return JsonResponse({"error": str(e), "needs_manual": True}, status=422)
     except Exception as e:
         logger.exception("invoice_fetch_preview error for %s", dk_order_no)
         return JsonResponse({"error": str(e), "needs_manual": True}, status=500)
+
+
+@_staff
+def invoice_pdf_view(request, pk):
+    inv = get_object_or_404(Invoice, pk=pk)
+    return render(request, "invoices/pdf.html", {"inv": inv})
 
 
 @_staff

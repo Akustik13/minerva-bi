@@ -98,8 +98,9 @@
   </div>
 
   <div class="actions">
+    <a href="/invoices/{{ inv.pk }}/pdf/" class="btn-gold" target="_blank">🖨️ PDF / Друк</a>
     {% if inv.docx_file %}
-    <a href="/invoices/{{ inv.pk }}/download/" class="btn-gold">⬇ Завантажити .docx</a>
+    <a href="/invoices/{{ inv.pk }}/download/" class="btn-sec">⬇ .docx</a>
     {% endif %}
     <a href="/invoices/" class="btn-sec">← Назад до списку</a>
     <form method="post" action="/invoices/{{ inv.pk }}/delete/" style="margin:0" onsubmit="return confirm('Видалити інвойс #{{ inv.invoice_number }}?')">

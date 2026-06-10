@@ -358,17 +358,30 @@ def digikey_ship_order(request, order_pk):
     }
     is_eu = (order.addr_country or "").upper() in EU_COUNTRIES
 
+    # Auto-fill invoice fields from existing Invoice record
+    existing_invoice = None
+    try:
+        from shipping.models import Invoice as _Inv
+        existing_invoice = (
+            _Inv.objects.filter(digikey_order_no=order.order_number)
+            .order_by("-invoice_date")
+            .first()
+        )
+    except Exception:
+        pass
+
     from django.template.response import TemplateResponse
     return TemplateResponse(request, "admin/bots/digikey_ship_order.html", {
-        "title":         f"Р’С–РґРїСЂР°РІРёС‚Рё #{order.order_number} РЅР° DigiKey",
-        "order":         order,
-        "config":        config,
-        "has_token":     has_token,
-        "carriers":      carriers,
-        "order_details": order_details,
-        "supplier_id":   supplier_id,
+        "title":            f"Відправити #{order.order_number} на DigiKey",
+        "order":            order,
+        "config":           config,
+        "has_token":        has_token,
+        "carriers":         carriers,
+        "order_details":    order_details,
+        "supplier_id":      supplier_id,
         "is_eu":            is_eu,
         "preset_carrier_id": preset_carrier_id,
+        "existing_invoice": existing_invoice,
     })
 
 

@@ -281,6 +281,7 @@ class InvoiceService:
             total_amount       = T["total"],
             shipped_to_company = order_data["shipped_to"].get("company", ""),
             shipped_to_vat     = order_data["shipped_to"].get("vat_id", ""),
+            line_items         = order_data.get("items") or [],
             docx_file          = f"invoices/Invoice_{invoice_number}.docx",
             created_by         = user,
         )
