@@ -159,7 +159,7 @@ def _send_telegram(ns, text):
         return json.loads(resp.read())
 
 
-def _send_telegram_photo(ns, photo_url, caption):
+def _send_telegram_photo(ns, photo_url, caption=''):
     """Send a photo via Telegram Bot API (caption max 1024 chars)."""
     url  = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendPhoto'
     if len(caption) > 1024:
@@ -173,6 +173,37 @@ def _send_telegram_photo(ns, photo_url, caption):
     req = urllib.request.Request(url, data, {'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=10) as resp:
         return json.loads(resp.read())
+
+
+def _send_telegram_media_group(ns, photo_urls: list):
+    """Send up to 10 photos as a Telegram album (sendMediaGroup)."""
+    url   = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendMediaGroup'
+    media = [{'type': 'photo', 'media': u} for u in photo_urls[:10]]
+    data  = json.dumps({
+        'chat_id': ns.telegram_chat_id,
+        'media':   media,
+    }).encode('utf-8')
+    req = urllib.request.Request(url, data, {'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read())
+
+
+def _send_tg_images(ns, lines_data: list):
+    """Send product images as Telegram album (2+) or single photo (1). Silent on error."""
+    images = [
+        _abs_url(ld.get('image', ''))
+        for ld in lines_data
+        if _abs_url(ld.get('image', '')).startswith('http')
+    ]
+    if not images:
+        return
+    try:
+        if len(images) == 1:
+            _send_telegram_photo(ns, images[0])
+        else:
+            _send_telegram_media_group(ns, images)
+    except Exception:
+        pass
 
 
 # ── Email HTML builder ─────────────────────────────────────────────────────────
@@ -622,8 +653,8 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
     if not ns:
         return
 
-    send_tg    = ns.telegram_enabled and ns.new_order_telegram
-    send_email = ns.email_enabled    and ns.new_order_email
+    send_tg    = ns.telegram_enabled and getattr(ns, 'dk_auto_confirm_telegram', ns.new_order_telegram)
+    send_email = ns.email_enabled    and getattr(ns, 'dk_auto_confirm_email',    ns.new_order_email)
     if not send_tg and not send_email:
         return
 
@@ -736,6 +767,13 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
     except Exception:
         pass
 
+    _inc_crm      = getattr(ns, 'notify_include_crm_count',  True)
+    _inc_stock    = getattr(ns, 'notify_include_stock_info', True)
+    _inc_deadline = getattr(ns, 'notify_include_deadline',   True)
+    _inc_ds       = getattr(ns, 'notify_include_datasheet',  True)
+    _inc_total    = getattr(ns, 'notify_include_total',      True)
+    _inc_images   = getattr(ns, 'notify_include_images',     True)
+
     if send_tg:
         try:
             _cname = _get_company_name()
@@ -744,14 +782,14 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
             tg.append('')
             tg.append(f'📋 <code>{sale.order_number}</code> · digikey')
             tg.append(f'👤 <b>{client}</b>')
-            if crm_orders is not None:
+            if _inc_crm and crm_orders is not None:
                 tg.append(f'   📊 Замовлень всього: <b>{crm_orders}</b>')
             if destination:
                 tg.append(f'📍 {destination}')
-            if deadline_str:
+            if _inc_deadline and deadline_str:
                 dl_warn = ' ⚠️' if days_left is not None and days_left <= 2 else ''
                 tg.append(f'📦 Дедлайн: <b>{deadline_str}</b> ({days_left_str}){dl_warn}')
-            if total_str:
+            if _inc_total and total_str:
                 tg.append(f'💰 <b>{total_str}</b>')
             tg.append(f'🤖 <i>Підтверджено автоматично ({mode_label})</i>')
 
@@ -767,22 +805,13 @@ def notify_digikey_auto_confirmed(sale, mode: str, raw_order: dict = None):
                     line_lines.append(f'   📦 × <b>{qty_str} шт</b>')
                     if ld.get('unit_price'):
                         line_lines.append(f'   💵 {ld["unit_price"]:.2f} {curr}/шт'.strip())
-                    if ld.get('datasheet'):
+                    if _inc_ds and ld.get('datasheet'):
                         line_lines.append(f'   📄 <a href="{ld["datasheet"]}">Datasheet</a>')
                     tg.append('\n'.join(line_lines))
 
-            tg_text = '\n'.join(tg)
-            first_image = next(
-                (ld['image'] for ld in lines_data if ld.get('image', '').startswith('http')),
-                ''
-            )
-            if first_image:
-                try:
-                    _send_telegram_photo(ns, first_image, tg_text)
-                except Exception:
-                    _send_telegram(ns, tg_text)
-            else:
-                _send_telegram(ns, tg_text)
+            _send_telegram(ns, '\n'.join(tg))
+            if _inc_images:
+                _send_tg_images(ns, lines_data)
         except Exception:
             pass
 
@@ -1071,6 +1100,13 @@ def notify_new_order(order, is_test: bool = False):
     except Exception:
         pass
 
+    _inc_crm      = getattr(ns, 'notify_include_crm_count',  True)
+    _inc_stock    = getattr(ns, 'notify_include_stock_info', True)
+    _inc_deadline = getattr(ns, 'notify_include_deadline',   True)
+    _inc_ds       = getattr(ns, 'notify_include_datasheet',  True)
+    _inc_total    = getattr(ns, 'notify_include_total',      True)
+    _inc_images   = getattr(ns, 'notify_include_images',     True)
+
     if send_email:
         try:
             # ── Products table ───────────────────────────────────────────────
@@ -1078,15 +1114,15 @@ def notify_new_order(order, is_test: bool = False):
             if lines_data:
                 rows = ''
                 for ld in lines_data:
-                    if ld['in_stock'] is True:
+                    if _inc_stock and ld['in_stock'] is True:
                         stock_cell = f'<span style="color:#2e7d32;white-space:nowrap">✅ {ld["stock"]} шт</span>'
-                    elif ld['in_stock'] is False:
+                    elif _inc_stock and ld['in_stock'] is False:
                         stock_cell = (
                             f'<span style="color:#c62828;white-space:nowrap">❌ {ld["stock"]} / {ld["qty"]} шт</span>'
                         )
                     else:
                         stock_cell = '—'
-                    ds = ld.get('datasheet', '')
+                    ds = ld.get('datasheet', '') if _inc_ds else ''
                     sku_cell = (
                         f'<a href="{ds}" style="color:#1565c0;font-family:monospace;font-size:12px;'
                         f'text-decoration:none" title="📄 Datasheet">{ld["sku"]} 📄</a>'
@@ -1157,13 +1193,13 @@ def notify_new_order(order, is_test: bool = False):
 
             # ── Extra block ───────────────────────────────────────────────────
             meta = ''
-            if total_str:
+            if _inc_total and total_str:
                 meta += f'<br><b>💰 Сума:</b> <b style="color:#1565c0">{total_str}</b>'
-            if crm_orders is not None:
+            if _inc_crm and crm_orders is not None:
                 meta += f'<br><b>📊 Замовлень від клієнта:</b> <b style="color:#1565c0">{crm_orders}</b>'
             if destination:
                 meta += f'<br><b>📍 Куди:</b> {destination}'
-            if deadline_str:
+            if _inc_deadline and deadline_str:
                 dl_color = '#c62828' if days_left is not None and days_left <= 2 else '#2e7d32'
                 meta += (
                     f'<br><b>📦 Дедлайн:</b> {deadline_str}'
@@ -1190,14 +1226,14 @@ def notify_new_order(order, is_test: bool = False):
             # ── Order info ─────────────────────────────────────────────────
             tg.append(f'📋 <code>{order.order_number}</code> · {order.source}')
             tg.append(f'👤 <b>{client}</b>')
-            if crm_orders is not None:
+            if _inc_crm and crm_orders is not None:
                 tg.append(f'   📊 Замовлень всього: <b>{crm_orders}</b>')
             if destination:
                 tg.append(f'📍 {destination}')
-            if deadline_str:
+            if _inc_deadline and deadline_str:
                 dl_warn = ' ⚠️' if days_left is not None and days_left <= 2 else ''
                 tg.append(f'📦 Дедлайн: <b>{deadline_str}</b> ({days_left_str}){dl_warn}')
-            if total_str:
+            if _inc_total and total_str:
                 tg.append(f'💰 <b>{total_str}</b>')
 
             # ── Products ───────────────────────────────────────────────────
@@ -1205,7 +1241,8 @@ def notify_new_order(order, is_test: bool = False):
                 tg.append('')
                 tg.append('📦 <b>Товари:</b>')
                 for ld in lines_data:
-                    icon = '✅' if ld['in_stock'] is True else ('❌' if ld['in_stock'] is False else '•')
+                    icon = ('✅' if _inc_stock and ld['in_stock'] is True else
+                            ('❌' if _inc_stock and ld['in_stock'] is False else '•'))
                     curr = ld.get('currency', '')
                     name_part = f' — {ld["name"]}' if ld['name'] not in ('—', '', None) else ''
                     qty_val = ld["qty"] or 0
@@ -1214,26 +1251,17 @@ def notify_new_order(order, is_test: bool = False):
                     lines.append(f'   📦 × <b>{qty_str} шт</b>')
                     if ld.get('unit_price'):
                         lines.append(f'   💵 {ld["unit_price"]:.2f} {curr}/шт'.strip())
-                    if ld['in_stock'] is True:
+                    if _inc_stock and ld['in_stock'] is True:
                         lines.append(f'   🏪 склад: <b>{ld["stock"]} шт</b> ✅')
-                    elif ld['in_stock'] is False:
+                    elif _inc_stock and ld['in_stock'] is False:
                         lines.append(f'   🏪 склад: <b>{ld["stock"]} шт</b> ❌')
-                    if ld.get('datasheet'):
+                    if _inc_ds and ld.get('datasheet'):
                         lines.append(f'   📄 <a href="{ld["datasheet"]}">Datasheet</a>')
                     tg.append('\n'.join(lines))
 
-            tg_text = '\n'.join(tg)
-            first_image = next(
-                (_abs_url(ld['image']) for ld in lines_data if ld.get('image')),
-                ''
-            )
-            if first_image and first_image.startswith('http'):
-                try:
-                    _send_telegram_photo(ns, first_image, tg_text)
-                except Exception:
-                    _send_telegram(ns, tg_text)
-            else:
-                _send_telegram(ns, tg_text)
+            _send_telegram(ns, '\n'.join(tg))
+            if _inc_images:
+                _send_tg_images(ns, lines_data)
         except Exception:
             pass
 

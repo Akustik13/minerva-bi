@@ -453,6 +453,45 @@ class NotificationSettings(models.Model):
         help_text="Надсилати Telegram коли надходить нове замовлення.",
     )
 
+    # ── DigiKey auto-confirm alerts ───────────────────────────────────────────
+    dk_auto_confirm_email = models.BooleanField(
+        "Email: DigiKey авто-підтвердження", default=False,
+        help_text="Надсилати email коли DigiKey замовлення підтверджено автоматично. "
+                  "Окремо від «Нове замовлення» — щоб уникнути дублювання.",
+    )
+    dk_auto_confirm_telegram = models.BooleanField(
+        "Telegram: DigiKey авто-підтвердження", default=True,
+        help_text="Надсилати Telegram коли DigiKey замовлення підтверджено автоматично. "
+                  "Окремо від «Нове замовлення» — щоб уникнути дублювання.",
+    )
+
+    # ── Notification content options ──────────────────────────────────────────
+    notify_include_crm_count = models.BooleanField(
+        "📊 Кількість замовлень клієнта (CRM)", default=True,
+        help_text="Показувати скільки всього замовлень від цього клієнта в CRM.",
+    )
+    notify_include_stock_info = models.BooleanField(
+        "🏪 Стан складу", default=True,
+        help_text="Показувати наявність товарів на складі (✅ є / ❌ не вистачає).",
+    )
+    notify_include_deadline = models.BooleanField(
+        "📦 Дедлайн відправки", default=True,
+        help_text="Показувати дедлайн відправки та кількість днів, що залишились.",
+    )
+    notify_include_datasheet = models.BooleanField(
+        "📄 Посилання на Datasheet", default=True,
+        help_text="Додавати посилання на технічну документацію для кожного товару.",
+    )
+    notify_include_total = models.BooleanField(
+        "💰 Сума замовлення", default=True,
+        help_text="Показувати загальну суму замовлення.",
+    )
+    notify_include_images = models.BooleanField(
+        "🖼️ Фото товарів у Telegram", default=True,
+        help_text="Надсилати зображення товарів після текстового повідомлення. "
+                  "Кілька товарів — альбомом (до 10 фото).",
+    )
+
     # ── Status change alerts ───────────────────────────────────────────────────
     status_change_email = models.BooleanField(
         "Email: зміна статусу", default=False,
