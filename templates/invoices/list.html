@@ -266,6 +266,7 @@
           <th>Дата інвойсу</th>
           <th>Дата замовлення</th>
           <th>Отримувач</th>
+          <th style="text-align:right">Без ПДВ, USD</th>
           <th style="text-align:right">Разом, USD</th>
           <th>Файл</th>
           <th>Дії</th>
@@ -282,6 +283,7 @@
             {{ inv.shipped_to_company }}
             {% if inv.shipped_to_vat %}<br><span style="font-size:11px;color:var(--text-muted)">{{ inv.shipped_to_vat }}</span>{% endif %}
           </td>
+          <td style="text-align:right;font-family:monospace">{{ inv.subtotal }}</td>
           <td style="text-align:right;font-family:monospace">{{ inv.total_amount }}</td>
           <td>
             {% if inv.docx_file %}
@@ -902,6 +904,7 @@ function addTableRow(data) {
     <td><strong style="color:var(--gold)">${data.invoice_number}</strong></td>
     <td style="font-family:monospace;font-size:12px">${data.digikey_order_no||''}</td>
     <td>${today}</td><td>—</td><td>—</td>
+    <td style="text-align:right;font-family:monospace">${data.subtotal||'—'}</td>
     <td style="text-align:right;font-family:monospace">${data.total_amount}</td>
     <td><span class="badge-file">✅ docx</span></td>
     <td><div class="actions">
@@ -924,6 +927,15 @@ function setLoading(id, loading, label) {
   btn.disabled = loading;
   btn.innerHTML = loading ? `<span class="spinner"></span>${label}` : label;
 }
+
+// Auto-open modal if ?auto=ORDER_NUMBER is in URL
+(function() {
+  const autoNo = new URLSearchParams(location.search).get('auto');
+  if (!autoNo) return;
+  openModal();
+  document.getElementById('dkOrderNo').value = autoNo;
+  document.getElementById('btnFetch').click();
+})();
 </script>
 </body>
 </html>

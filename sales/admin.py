@@ -1509,12 +1509,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["digikey_ship_url"] = f"/bots/digikey/ship/{obj.pk}/"
             if obj and obj.source == "digikey":
                 extra_context["digikey_fetch_tracking_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-fetch-tracking/"
-            # EU Invoice button (shown for all orders, especially DigiKey EU)
+            # EU Invoice button — repurposed to open /invoices/ with order pre-filled
             if obj and obj.pk:
                 extra_context["eu_invoice_suggest_url"]  = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/suggest/"
                 extra_context["eu_invoice_generate_url"] = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/generate/"
                 extra_context["eu_invoice_number"]       = obj.eu_invoice_number
                 extra_context["order_source"]            = obj.source
+                extra_context["order_number_for_invoice"] = obj.order_number or ""
             # Customer shipment notification button
             if obj and obj.pk:
                 try:

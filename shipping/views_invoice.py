@@ -71,6 +71,7 @@ def invoice_generate(request):
             "ok": True,
             "invoice_id":     inv.pk,
             "invoice_number": inv.invoice_number,
+            "subtotal":       str(inv.subtotal),
             "total_amount":   str(inv.total_amount),
             "download_url":   f"/invoices/{inv.pk}/download/",
             "detail_url":     f"/invoices/{inv.pk}/",
