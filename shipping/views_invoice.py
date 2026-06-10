@@ -24,8 +24,24 @@ def _staff(view_fn):
 
 @_staff
 def invoice_list(request):
-    invoices = Invoice.objects.select_related("sales_order", "created_by").order_by("-invoice_number")
-    return render(request, "invoices/list.html", {"invoices": invoices})
+    from django.db.models import F, ExpressionWrapper, DecimalField as DField, Sum
+    invoices = (
+        Invoice.objects
+        .select_related("sales_order", "created_by")
+        .annotate(
+            gross_amount=ExpressionWrapper(
+                F('subtotal') - F('discount_amount') - F('shipping_charges'),
+                output_field=DField(max_digits=12, decimal_places=2),
+            )
+        )
+        .order_by("-invoice_number")
+    )
+    agg = Invoice.objects.aggregate(sum_subtotal=Sum('subtotal'), sum_total=Sum('total_amount'))
+    return render(request, "invoices/list.html", {
+        "invoices":     invoices,
+        "sum_subtotal": agg["sum_subtotal"] or 0,
+        "sum_total":    agg["sum_total"] or 0,
+    })
 
 
 @_staff
@@ -69,12 +85,19 @@ def invoice_generate(request):
         )
         return JsonResponse({
             "ok": True,
-            "invoice_id":     inv.pk,
-            "invoice_number": inv.invoice_number,
-            "subtotal":       str(inv.subtotal),
-            "total_amount":   str(inv.total_amount),
-            "download_url":   f"/invoices/{inv.pk}/download/",
-            "detail_url":     f"/invoices/{inv.pk}/",
+            "invoice_id":         inv.pk,
+            "invoice_number":     inv.invoice_number,
+            "digikey_order_no":   inv.digikey_order_no,
+            "order_date":         inv.order_date.strftime("%d.%m.%Y") if inv.order_date else "—",
+            "shipped_to_company": inv.shipped_to_company,
+            "shipped_to_vat":     inv.shipped_to_vat,
+            "subtotal":           str(inv.subtotal),
+            "discount_amount":    str(inv.discount_amount),
+            "shipping_charges":   str(inv.shipping_charges),
+            "vat_amount":         str(inv.vat_amount),
+            "total_amount":       str(inv.total_amount),
+            "download_url":       f"/invoices/{inv.pk}/download/",
+            "detail_url":         f"/invoices/{inv.pk}/",
         })
     except ValueError as e:
         # API unavailable or order not found — return error so UI can show manual form

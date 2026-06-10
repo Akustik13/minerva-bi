@@ -258,7 +258,7 @@
 
   {% if invoices %}
   <div class="mv-table-wrap">
-    <table class="mv-table">
+    <table class="mv-table" id="invTable">
       <thead>
         <tr>
           <th>#</th>
@@ -280,11 +280,15 @@
           <td>{{ inv.invoice_date|date:"d.m.Y" }}</td>
           <td>{{ inv.order_date|date:"d.m.Y" }}</td>
           <td>
-            {{ inv.shipped_to_company }}
-            {% if inv.shipped_to_vat %}<br><span style="font-size:11px;color:var(--text-muted)">{{ inv.shipped_to_vat }}</span>{% endif %}
+            <strong>{{ inv.shipped_to_company }}</strong>
+            {% if inv.shipped_to_vat %}<br><span style="font-size:11px;color:var(--text-muted)">VAT: {{ inv.shipped_to_vat }}</span>{% endif %}
+            {% if inv.sales_order %}<br><a href="/admin/sales/salesorder/{{ inv.sales_order.pk }}/change/" style="font-size:10px;color:var(--link)">↗ {{ inv.sales_order.order_number }}</a>{% endif %}
           </td>
-          <td style="text-align:right;font-family:monospace">{{ inv.subtotal }}</td>
-          <td style="text-align:right;font-family:monospace">{{ inv.total_amount }}</td>
+          <td style="text-align:right;white-space:nowrap">
+            <span style="font-family:monospace">{{ inv.subtotal|floatformat:2 }}</span>
+            <span class="help-tip" style="font-size:11px" data-tip="Позиції:    {{ inv.gross_amount|floatformat:2 }} USD&#10;Знижка:     {{ inv.discount_amount|floatformat:2 }} USD&#10;Доставка:   {{ inv.shipping_charges|floatformat:2 }} USD&#10;─────────────────&#10;Без ПДВ:   {{ inv.subtotal|floatformat:2 }} USD&#10;ПДВ 19%:   {{ inv.vat_amount|floatformat:2 }} USD&#10;─────────────────&#10;РАЗОМ:     {{ inv.total_amount|floatformat:2 }} USD">ℹ️</span>
+          </td>
+          <td style="text-align:right;font-family:monospace;font-weight:600;color:var(--gold)">{{ inv.total_amount|floatformat:2 }}</td>
           <td>
             {% if inv.docx_file %}
               <span class="badge-file">✅ docx</span>
@@ -304,6 +308,16 @@
         </tr>
         {% endfor %}
       </tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5" style="text-align:right;padding:12px 16px;color:var(--text-dim);font-size:12px;border-top:2px solid var(--border-str)">
+            Всього інвойсів: <strong style="color:var(--text)">{{ invoices|length }}</strong>
+          </td>
+          <td style="text-align:right;font-family:monospace;font-weight:700;color:var(--gold);padding:12px 16px;border-top:2px solid var(--border-str)" id="sumSubtotal">{{ sum_subtotal|floatformat:2 }}</td>
+          <td style="text-align:right;font-family:monospace;font-weight:700;color:var(--gold);padding:12px 16px;border-top:2px solid var(--border-str)" id="sumTotal">{{ sum_total|floatformat:2 }}</td>
+          <td colspan="2" style="border-top:2px solid var(--border-str)"></td>
+        </tr>
+      </tfoot>
     </table>
   </div>
   {% else %}
@@ -895,17 +909,45 @@ async function deleteInvoice(pk, num) {
 }
 
 function addTableRow(data) {
-  const tbody = document.querySelector('.mv-table tbody');
-  if (!tbody) return;
+  const tbody = document.querySelector('#invTable tbody');
+  if (!tbody) { location.reload(); return; }
+
   const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const sub  = parseFloat(data.subtotal  || 0);
+  const disc = parseFloat(data.discount_amount  || 0);
+  const ship = parseFloat(data.shipping_charges || 0);
+  const vat  = parseFloat(data.vat_amount       || 0);
+  const tot  = parseFloat(data.total_amount     || 0);
+  const gross = (sub - disc - ship).toFixed(2);
+
+  const tip = [
+    `Позиції:    ${gross} USD`,
+    `Знижка:     ${disc.toFixed(2)} USD`,
+    `Доставка:   ${ship.toFixed(2)} USD`,
+    `─────────────────`,
+    `Без ПДВ:   ${sub.toFixed(2)} USD`,
+    `ПДВ 19%:   ${vat.toFixed(2)} USD`,
+    `─────────────────`,
+    `РАЗОМ:     ${tot.toFixed(2)} USD`,
+  ].join('&#10;');
+
+  const vatBadge = data.shipped_to_vat
+    ? `<br><span style="font-size:11px;color:var(--text-muted)">VAT: ${data.shipped_to_vat}</span>`
+    : '';
+
   const tr = document.createElement('tr');
   tr.id = `row-${data.invoice_id}`;
   tr.innerHTML = `
     <td><strong style="color:var(--gold)">${data.invoice_number}</strong></td>
-    <td style="font-family:monospace;font-size:12px">${data.digikey_order_no||''}</td>
-    <td>${today}</td><td>—</td><td>—</td>
-    <td style="text-align:right;font-family:monospace">${data.subtotal||'—'}</td>
-    <td style="text-align:right;font-family:monospace">${data.total_amount}</td>
+    <td style="font-family:monospace;font-size:12px">${data.digikey_order_no||'—'}</td>
+    <td>${today}</td>
+    <td>${data.order_date||'—'}</td>
+    <td><strong>${data.shipped_to_company||'—'}</strong>${vatBadge}</td>
+    <td style="text-align:right;white-space:nowrap">
+      <span style="font-family:monospace">${sub.toFixed(2)}</span>
+      <span class="help-tip" style="font-size:11px" data-tip="${tip}">ℹ️</span>
+    </td>
+    <td style="text-align:right;font-family:monospace;font-weight:600;color:var(--gold)">${tot.toFixed(2)}</td>
     <td><span class="badge-file">✅ docx</span></td>
     <td><div class="actions">
       <a href="${data.download_url}" class="btn-sm">⬇ docx</a>
@@ -913,6 +955,12 @@ function addTableRow(data) {
       <button class="btn-sm danger" onclick="deleteInvoice(${data.invoice_id},'${data.invoice_number}')">🗑</button>
     </div></td>`;
   tbody.prepend(tr);
+
+  // Update footer totals
+  const stEl = document.getElementById('sumSubtotal');
+  const ttEl = document.getElementById('sumTotal');
+  if (stEl) stEl.textContent = (parseFloat(stEl.textContent || 0) + sub).toFixed(2);
+  if (ttEl) ttEl.textContent = (parseFloat(ttEl.textContent || 0) + tot).toFixed(2);
 }
 
 function showAlert(msg, type) {
