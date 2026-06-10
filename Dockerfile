@@ -5,15 +5,27 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Enable contrib repo for ttf-mscorefonts-installer (Calibri substitute etc.)
+RUN sed -i 's/Components: main$/Components: main contrib non-free/' \
+        /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/ main$/ main contrib non-free/' /etc/apt/sources.list 2>/dev/null || true
+
+# Accept Microsoft fonts EULA non-interactively
+RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" \
+    | debconf-set-selections
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     postgresql-client \
     fonts-dejavu-core \
     fonts-liberation \
     fonts-open-sans \
+    ttf-mscorefonts-installer \
+    fontconfig \
     git \
     gettext \
     libreoffice-writer \
+    && fc-cache -f -v \
     && rm -rf /var/lib/apt/lists/* \
     && git config --global --add safe.directory /app
 
