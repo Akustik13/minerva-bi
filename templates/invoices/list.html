@@ -594,9 +594,65 @@
   </div>
 </div>
 
+<!-- ── Rounding dialog ── -->
+<div id="roundBackdrop" style="display:none;position:fixed;inset:0;z-index:10000;
+     background:rgba(0,0,0,.6);align-items:center;justify-content:center">
+  <div style="background:var(--bg-card);border:1px solid var(--border-str);
+              border-radius:12px;padding:28px;width:min(480px,95vw);
+              box-shadow:0 8px 32px rgba(0,0,0,.5)">
+    <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:8px">
+      ⚠️ Ціни з більше ніж 2 знаками після коми
+    </div>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:4px">
+      Деякі позиції мають
+      <strong id="roundMaxDecLabel" style="color:var(--text)"></strong> знаків після коми.
+    </p>
+    <p style="font-size:12px;color:var(--text-muted);margin-bottom:18px">
+      До скількох знаків округлити ціни перед генерацією інвойсу?
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button onclick="applyRound(2)"    class="btn-gold" style="padding:8px 18px;font-size:13px">2 знаки (за замовчуванням)</button>
+      <button onclick="applyRound(3)"    class="btn-sec"  style="padding:8px 14px;font-size:13px">3 знаки</button>
+      <button onclick="applyRound(4)"    class="btn-sec"  style="padding:8px 14px;font-size:13px">4 знаки</button>
+      <button onclick="applyRound(null)" class="btn-sec"  style="padding:8px 14px;font-size:13px">Без округлення</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
 let _currentOrderData = null;
+let _pendingRoundOd   = null;
+
+function _countDecimals(val) {
+  const s = String(parseFloat(val));
+  const dot = s.indexOf('.');
+  return dot === -1 ? 0 : s.length - dot - 1;
+}
+function _maxPriceDecimals(items) {
+  return (items || []).reduce((m, it) => Math.max(m, _countDecimals(it.unit_price || 0)), 0);
+}
+function _roundOrderData(od, decimals) {
+  if (decimals === null) return od;
+  return Object.assign({}, od, {
+    items: (od.items || []).map(it =>
+      Object.assign({}, it, { unit_price: parseFloat(parseFloat(it.unit_price || 0).toFixed(decimals)) })
+    )
+  });
+}
+function maybeAskRounding(od) {
+  const maxDec = _maxPriceDecimals(od.items);
+  if (maxDec <= 2) { renderPreview(od); return; }
+  _pendingRoundOd = od;
+  document.getElementById('roundMaxDecLabel').textContent = maxDec;
+  document.getElementById('roundBackdrop').style.display = 'flex';
+}
+function applyRound(decimals) {
+  document.getElementById('roundBackdrop').style.display = 'none';
+  const od = _roundOrderData(_pendingRoundOd, decimals);
+  _currentOrderData = od;
+  renderPreview(od);
+}
 
 document.getElementById('btnGenerate').onclick = () => openModal();
 document.getElementById('modalClose').onclick  = () => closeModal();
@@ -694,13 +750,13 @@ document.getElementById('btnFetch').onclick = async function() {
         showAlert(
           `⚠️ Інвойс <strong>#${ei.number}</strong> вже існує для цього замовлення (${ei.total} USD). ` +
           `<a href="${ei.detail_url}" target="_blank" style="color:var(--gold)">Переглянути</a> · ` +
-          `<button onclick="renderPreview(_currentOrderData);clearAlert()" ` +
+          `<button onclick="maybeAskRounding(_currentOrderData);clearAlert()" ` +
           `style="background:none;border:none;color:var(--gold);cursor:pointer;` +
           `text-decoration:underline;font-size:13px;padding:0">Перегенерувати</button>`,
           'info'
         );
       } else {
-        renderPreview(data.order_data);
+        maybeAskRounding(data.order_data);
       }
     } else if (data.needs_manual) {
       showAlert('DigiKey API недоступний або токен відсутній. Заповніть дані вручну.', 'info');
