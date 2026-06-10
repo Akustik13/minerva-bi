@@ -362,7 +362,6 @@ def digikey_ship_order(request, order_pk):
     existing_invoice = None
     inv_net_amount = None
     try:
-        from decimal import Decimal as _D
         from django.db.models import Q
         from shipping.models import Invoice as _Inv
         existing_invoice = (
@@ -373,11 +372,7 @@ def digikey_ship_order(request, order_pk):
             .first()
         )
         if existing_invoice:
-            # subtotal = pre-VAT net; fall back to total/1.19 if subtotal is 0
-            if existing_invoice.subtotal:
-                inv_net_amount = existing_invoice.subtotal
-            elif existing_invoice.total_amount:
-                inv_net_amount = (existing_invoice.total_amount / _D("1.19")).quantize(_D("0.01"))
+            inv_net_amount = existing_invoice.subtotal
     except Exception:
         pass
 
