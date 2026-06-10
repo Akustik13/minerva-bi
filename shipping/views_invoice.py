@@ -275,6 +275,30 @@ def invoice_register(request):
 
 
 @_staff
+@require_POST
+def invoice_update_recipient(request, pk):
+    """POST JSON — update shipped_to_json + shipped_to_vat for an existing invoice."""
+    inv = get_object_or_404(Invoice, pk=pk)
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({"error": "Invalid JSON"}, status=400)
+    shipped_to = {
+        "company":  body.get("company", inv.shipped_to_company or ""),
+        "contact":  body.get("contact", ""),
+        "address1": body.get("address1", ""),
+        "city_zip": body.get("city_zip", ""),
+        "country":  body.get("country", ""),
+        "vat_id":   body.get("vat_id", ""),
+    }
+    inv.shipped_to_json    = shipped_to
+    inv.shipped_to_company = shipped_to["company"]
+    inv.shipped_to_vat     = shipped_to["vat_id"]
+    inv.save(update_fields=["shipped_to_json", "shipped_to_company", "shipped_to_vat"])
+    return JsonResponse({"ok": True})
+
+
+@_staff
 def invoice_delete(request, pk):
     inv = get_object_or_404(Invoice, pk=pk)
     if request.method == "POST":

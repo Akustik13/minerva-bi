@@ -160,8 +160,13 @@
         </div>
       </div>
       <div>
-        <h2>Отримувач</h2>
-        <div class="addr-block">
+        <h2 style="display:flex;align-items:center;justify-content:space-between">
+          Отримувач
+          <button type="button" onclick="toggleRecipientEdit()"
+                  style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:0"
+                  title="Редагувати отримувача">✏️</button>
+        </h2>
+        <div id="recipient-view" class="addr-block">
           <div class="company">{{ inv.shipped_to_company }}</div>
           {% with st=inv.shipped_to_json %}
             {% if st.contact %}
@@ -180,6 +185,30 @@
           {% if inv.shipped_to_vat %}
           <div><span class="vat-badge">VAT {{ inv.shipped_to_vat }}</span></div>
           {% endif %}
+        </div>
+        <!-- Inline edit form -->
+        <div id="recipient-edit" style="display:none">
+          <div style="display:grid;gap:8px">
+            {% with st=inv.shipped_to_json %}
+            <input id="re-company"  placeholder="Компанія"  value="{{ inv.shipped_to_company }}"
+                   style="background:var(--bg);border:1px solid var(--border-str);border-radius:4px;padding:6px 8px;color:var(--text);font-size:12px;width:100%">
+            <input id="re-contact"  placeholder="Контакт"   value="{{ st.contact }}"
+                   style="background:var(--bg);border:1px solid var(--border-str);border-radius:4px;padding:6px 8px;color:var(--text);font-size:12px;width:100%">
+            <input id="re-address1" placeholder="Адреса"    value="{{ st.address1 }}"
+                   style="background:var(--bg);border:1px solid var(--border-str);border-radius:4px;padding:6px 8px;color:var(--text);font-size:12px;width:100%">
+            <input id="re-city_zip" placeholder="Місто, індекс" value="{{ st.city_zip }}"
+                   style="background:var(--bg);border:1px solid var(--border-str);border-radius:4px;padding:6px 8px;color:var(--text);font-size:12px;width:100%">
+            <input id="re-country"  placeholder="Країна"    value="{{ st.country }}"
+                   style="background:var(--bg);border:1px solid var(--border-str);border-radius:4px;padding:6px 8px;color:var(--text);font-size:12px;width:100%">
+            <input id="re-vat_id"   placeholder="VAT ID"    value="{{ inv.shipped_to_vat }}"
+                   style="background:var(--bg);border:1px solid var(--border-str);border-radius:4px;padding:6px 8px;color:var(--text);font-size:12px;width:100%">
+            {% endwith %}
+          </div>
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button type="button" onclick="saveRecipient()" class="btn-gold" style="padding:7px 16px;font-size:12px">Зберегти</button>
+            <button type="button" onclick="toggleRecipientEdit()" class="btn-sec" style="padding:7px 16px;font-size:12px">Скасувати</button>
+          </div>
+          <div id="re-msg" style="font-size:11px;margin-top:6px;color:var(--ok)"></div>
         </div>
       </div>
     </div>
@@ -278,6 +307,58 @@ document.querySelectorAll('[data-qty][data-price]').forEach(function(td) {
   var price = parseFloat(td.getAttribute('data-price') || 0);
   td.textContent = (qty * price).toFixed(2) + ' USD';
 });
+
+function toggleRecipientEdit() {
+  var view = document.getElementById('recipient-view');
+  var edit = document.getElementById('recipient-edit');
+  var hidden = view.style.display === 'none';
+  view.style.display = hidden ? '' : 'none';
+  edit.style.display = hidden ? 'none' : 'block';
+  document.getElementById('re-msg').textContent = '';
+}
+
+function saveRecipient() {
+  var payload = {
+    company:  document.getElementById('re-company').value,
+    contact:  document.getElementById('re-contact').value,
+    address1: document.getElementById('re-address1').value,
+    city_zip: document.getElementById('re-city_zip').value,
+    country:  document.getElementById('re-country').value,
+    vat_id:   document.getElementById('re-vat_id').value,
+  };
+  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+  fetch('/invoices/{{ inv.pk }}/update-recipient/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrf ? csrf[1] : '',
+    },
+    body: JSON.stringify(payload),
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (data.ok) {
+      // Update the view block without page reload
+      var v = document.getElementById('recipient-view');
+      v.innerHTML =
+        '<div class="company">' + (payload.company || '') + '</div>' +
+        (payload.contact  ? '<div class="arow"><span class="alabel">Контакт</span><span class="aval">' + payload.contact  + '</span></div>' : '') +
+        (payload.address1 ? '<div class="arow"><span class="alabel">Адреса</span><span class="aval">'   + payload.address1 + '</span></div>' : '') +
+        (payload.city_zip ? '<div class="arow"><span class="alabel">Місто</span><span class="aval">'    + payload.city_zip + '</span></div>' : '') +
+        (payload.country  ? '<div class="arow"><span class="alabel">Країна</span><span class="aval">'   + payload.country  + '</span></div>' : '') +
+        (payload.vat_id   ? '<div><span class="vat-badge">VAT ' + payload.vat_id + '</span></div>'     : '');
+      document.getElementById('re-msg').textContent = '✓ Збережено';
+      setTimeout(toggleRecipientEdit, 800);
+    } else {
+      document.getElementById('re-msg').style.color = 'var(--err)';
+      document.getElementById('re-msg').textContent = data.error || 'Помилка';
+    }
+  })
+  .catch(function() {
+    document.getElementById('re-msg').style.color = 'var(--err)';
+    document.getElementById('re-msg').textContent = 'Помилка мережі';
+  });
+}
 </script>
 </body>
 </html>

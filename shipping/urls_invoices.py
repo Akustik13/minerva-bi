@@ -11,4 +11,5 @@ urlpatterns = [
     path("<int:pk>/pdf/",                v.invoice_pdf_view,      name="invoice_pdf"),
     path("<int:pk>/download/",           v.invoice_download,      name="invoice_download"),
     path("<int:pk>/delete/",             v.invoice_delete,        name="invoice_delete"),
+    path("<int:pk>/update-recipient/",   v.invoice_update_recipient, name="invoice_update_recipient"),
 ]
