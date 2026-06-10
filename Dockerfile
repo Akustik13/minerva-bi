@@ -36,4 +36,23 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 COPY docker_fonts/ /usr/share/fonts/truetype/calibri/
 RUN fc-cache -f -v
 
+# LibreOffice profile: disable image compression in PDF export (keep full resolution)
+RUN mkdir -p /opt/lo_profile/user && printf '<?xml version="1.0" encoding="UTF-8"?>\n\
+<oor:items xmlns:oor="http://openoffice.org/2001/registry"\n\
+           xmlns:xs="http://www.w3.org/2001/XMLSchema"\n\
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">\n\
+  <item oor:path="/org.openoffice.Office.Common/Filter/PDF/Export">\n\
+    <prop oor:name="Quality" oor:op="fuse"><value>95</value></prop>\n\
+  </item>\n\
+  <item oor:path="/org.openoffice.Office.Common/Filter/PDF/Export">\n\
+    <prop oor:name="ReduceImageResolution" oor:op="fuse"><value>false</value></prop>\n\
+  </item>\n\
+  <item oor:path="/org.openoffice.Office.Common/Filter/PDF/Export">\n\
+    <prop oor:name="MaxImageResolution" oor:op="fuse"><value>600</value></prop>\n\
+  </item>\n\
+  <item oor:path="/org.openoffice.Office.Common/Filter/PDF/Export">\n\
+    <prop oor:name="EmbedStandardFonts" oor:op="fuse"><value>true</value></prop>\n\
+  </item>\n\
+</oor:items>' > /opt/lo_profile/user/registrymodifications.xcu
+
 COPY . /app

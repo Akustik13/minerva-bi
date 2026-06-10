@@ -26,6 +26,7 @@ def convert_docx_to_pdf(docx_path: Path, output_dir: Path) -> Path | None:
         result = subprocess.run(
             [
                 "libreoffice", "--headless",
+                "-env:UserInstallation=file:///opt/lo_profile",
                 "--convert-to", "pdf",
                 "--outdir", str(output_dir),
                 str(docx_path),
