@@ -8,6 +8,46 @@ from django.db import models
 from django.utils import timezone
 
 
+class Invoice(models.Model):
+    """Інвойс Sevskiy GmbH → DigiKey Marketplace."""
+
+    digikey_order_no   = models.CharField("DigiKey Order No.", max_length=50, db_index=True)
+    sales_order        = models.ForeignKey(
+        "sales.SalesOrder", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="invoices",
+        verbose_name="Замовлення",
+    )
+    invoice_number     = models.CharField("Номер інвойсу", max_length=20, unique=True)
+    invoice_date       = models.DateField("Дата інвойсу", auto_now_add=True)
+    order_date         = models.DateField("Дата замовлення")
+    shipment_date      = models.DateField("Дата відправки", null=True, blank=True)
+
+    subtotal           = models.DecimalField("Subtotal", max_digits=10, decimal_places=2, default=0)
+    discount_amount    = models.DecimalField("Знижка", max_digits=10, decimal_places=2, default=0)
+    shipping_charges   = models.DecimalField("Доставка", max_digits=10, decimal_places=2, default=0)
+    vat_amount         = models.DecimalField("ПДВ (VAT)", max_digits=10, decimal_places=2, default=0)
+    total_amount       = models.DecimalField("Разом з ПДВ", max_digits=10, decimal_places=2, default=0)
+
+    shipped_to_company = models.CharField("Компанія отримувача", max_length=200)
+    shipped_to_vat     = models.CharField("VAT ID отримувача", max_length=50, blank=True, default="")
+
+    docx_file          = models.FileField("Файл .docx", upload_to="invoices/", null=True, blank=True)
+
+    created_by         = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="Автор",
+    )
+    created_at         = models.DateTimeField("Створено", auto_now_add=True)
+
+    class Meta:
+        verbose_name        = "Інвойс"
+        verbose_name_plural = "Інвойси"
+        ordering            = ["-invoice_number"]
+
+    def __str__(self):
+        return f"Invoice #{self.invoice_number} — {self.digikey_order_no}"
+
+
 class Carrier(models.Model):
     """Перевізник / платформа доставки з API-налаштуваннями."""
 

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice #{{ inv.invoice_number }} — Minerva BI</title>
+<style>
+  :root {
+    --bg:#0d1520;--bg-card:#1a2535;--border:#1e3a5f;--border-str:#2b5278;
+    --text:#c9d8e4;--text-dim:#7a9fb8;--text-muted:#4a7a9b;
+    --gold:#c9a84c;--gold-dim:#a07830;--ok:#4caf50;--err:#e53935;
+    --radius:8px;--font-serif:'Cinzel',Georgia,serif;
+  }
+  [data-theme="light"]{--bg:#f0f4f8;--bg-card:#fff;--border:#c8d8e8;--border-str:#98b8d0;--text:#1a2b3c;--text-dim:#3a6a8a;--text-muted:#6a9ab8;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh}
+  .mv-topbar{background:var(--bg-card);border-bottom:1px solid var(--border-str);padding:12px 24px;display:flex;align-items:center;gap:12px}
+  .mv-topbar a{color:var(--text-dim);text-decoration:none;font-size:13px}.mv-topbar a:hover{color:var(--text)}.sep{color:var(--text-muted)}
+  .mv-page{padding:32px 24px;max-width:900px;margin:0 auto}
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:20px}
+  h1{font-family:var(--font-serif);color:var(--gold);font-size:24px;margin-bottom:6px}
+  h2{font-family:var(--font-serif);color:var(--gold);font-size:16px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:6px}
+  .meta{display:flex;gap:32px;flex-wrap:wrap;margin-bottom:24px}
+  .meta-item .label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+  .meta-item .val{font-size:14px;color:var(--text)}
+  .meta-item .val.mono{font-family:monospace}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .kv-list .kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
+  .kv-list .kv:last-child{border-bottom:none}
+  .kv-list .k{color:var(--text-muted)}
+  .kv-list .v{color:var(--text);text-align:right;font-family:monospace;font-size:12px}
+  table.items-tbl{width:100%;border-collapse:collapse}
+  table.items-tbl th{font-size:11px;color:var(--gold);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-str);font-family:var(--font-serif);letter-spacing:.3px}
+  table.items-tbl td{font-size:13px;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  table.items-tbl tr:last-child td{border-bottom:none}
+  .totals-tbl{margin-top:16px;margin-left:auto;width:300px}
+  .totals-tbl td{font-size:13px;padding:5px 8px;font-family:monospace}
+  .totals-tbl .lbl{color:var(--text-muted);text-align:right;padding-right:20px}
+  .totals-tbl .total-row td{border-top:1px solid var(--border-str);font-weight:bold;color:var(--gold);padding-top:9px}
+  .actions{display:flex;gap:10px;margin-top:24px;flex-wrap:wrap}
+  .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold-dim));color:#1a1000;border:none;border-radius:6px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:opacity .2s}.btn-gold:hover{opacity:.85}
+  .btn-sec{background:var(--bg-card);border:1px solid var(--border-str);border-radius:6px;padding:9px 18px;font-size:13px;color:var(--text-dim);text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s,color .15s}.btn-sec:hover{background:var(--border);color:var(--text)}
+  .btn-danger{border-color:var(--err);color:var(--err)}.btn-danger:hover{background:rgba(229,57,53,.12)!important}
+  .tag{display:inline-block;background:rgba(76,175,80,.15);color:var(--ok);border:1px solid rgba(76,175,80,.3);border-radius:4px;padding:2px 8px;font-size:11px;font-family:monospace}
+  .disc{color:var(--err)}
+</style>
+</head>
+<body>
+<div class="mv-topbar">
+  <a href="/admin/">← Minerva</a>
+  <span class="sep">/</span>
+  <a href="/invoices/">Invoices</a>
+  <span class="sep">/</span>
+  <span>#{{ inv.invoice_number }}</span>
+</div>
+
+<div class="mv-page">
+  <div class="card">
+    <h1>Invoice #{{ inv.invoice_number }}</h1>
+
+    <div class="meta">
+      <div class="meta-item"><div class="label">DigiKey Order</div><div class="val mono">{{ inv.digikey_order_no }}</div></div>
+      <div class="meta-item"><div class="label">Дата інвойсу</div><div class="val">{{ inv.invoice_date|date:"d.m.Y" }}</div></div>
+      <div class="meta-item"><div class="label">Дата замовлення</div><div class="val">{{ inv.order_date|date:"d.m.Y" }}</div></div>
+      {% if inv.shipment_date %}<div class="meta-item"><div class="label">Дата відправки</div><div class="val">{{ inv.shipment_date|date:"d.m.Y" }}</div></div>{% endif %}
+      {% if inv.sales_order %}<div class="meta-item"><div class="label">Замовлення CRM</div><div class="val"><a href="/admin/sales/salesorder/{{ inv.sales_order.pk }}/change/" style="color:var(--gold)">{{ inv.sales_order.order_number }}</a></div></div>{% endif %}
+      {% if inv.created_by %}<div class="meta-item"><div class="label">Автор</div><div class="val">{{ inv.created_by.get_full_name|default:inv.created_by.username }}</div></div>{% endif %}
+    </div>
+
+    <div class="two-col">
+      <div>
+        <h2>Відправник</h2>
+        <div class="kv-list">
+          <div class="kv"><span class="k">Компанія</span><span class="v">Sevskiy GmbH</span></div>
+          <div class="kv"><span class="k">Адреса</span><span class="v">Stettiner Str. 1, Lutherstadt Wittenberg, 06886, DE</span></div>
+          <div class="kv"><span class="k">VAT</span><span class="v">DE353200793</span></div>
+        </div>
+      </div>
+      <div>
+        <h2>Отримувач</h2>
+        <div class="kv-list">
+          <div class="kv"><span class="k">Компанія</span><span class="v">{{ inv.shipped_to_company }}</span></div>
+          {% if inv.shipped_to_vat %}<div class="kv"><span class="k">VAT</span><span class="v">{{ inv.shipped_to_vat }}</span></div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Фінансовий підсумок</h2>
+    <table class="totals-tbl">
+      <tr><td class="lbl">Subtotal</td><td>{{ inv.subtotal }} USD</td></tr>
+      <tr><td class="lbl">Знижка</td><td class="disc">{{ inv.discount_amount }} USD</td></tr>
+      <tr><td class="lbl">Доставка</td><td>{{ inv.shipping_charges }} USD</td></tr>
+      <tr><td class="lbl">VAT 19%</td><td>{{ inv.vat_amount }} USD</td></tr>
+      <tr class="total-row"><td class="lbl">TOTAL</td><td>{{ inv.total_amount }} USD</td></tr>
+    </table>
+  </div>
+
+  <div class="actions">
+    {% if inv.docx_file %}
+    <a href="/invoices/{{ inv.pk }}/download/" class="btn-gold">⬇ Завантажити .docx</a>
+    {% endif %}
+    <a href="/invoices/" class="btn-sec">← Назад до списку</a>
+    <form method="post" action="/invoices/{{ inv.pk }}/delete/" style="margin:0" onsubmit="return confirm('Видалити інвойс #{{ inv.invoice_number }}?')">
+      {% csrf_token %}
+      <button type="submit" class="btn-sec btn-danger">🗑 Видалити</button>
+    </form>
+  </div>
+</div>
+</body>
+</html>

@@ -888,6 +888,7 @@ window.MV_GROUPS = [
       { href:'/admin/shipping/addressbook/',               icon:'📖', label:'Адресна книга',     app:'shipping' },
       { href:'/admin/shipping/shipment/add-tracking/',     icon:'📡', label:'Додати трекінг',    app:'shipping' },
       { href:'/admin/shipping/carrier/',                   icon:'🚛', label:'Перевізники',       app:'shipping', model:'Carrier' },
+      { href:'/invoices/',                                 icon:'🧾', label:'Інвойси',           app:'shipping' },
     ], apps:['shipping'] },
   { id:'inventory', icon:'📦', label:'📦 Склад',
     links:[
@@ -1181,6 +1182,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/admin/shipping/shipment/dhl-track-lookup/': 'shipping',
     '/admin/shipping/shipment/order-tracking/':   'shipping',
     '/admin/shipping/carrier/':                   'shipping',
+    '/invoices/':                                 'shipping',
   };
   var _curPath = window.location.pathname;
   var _activeGroup = null;

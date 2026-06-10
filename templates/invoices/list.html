@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="uk" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoices — Minerva BI</title>
+<style>
+  :root {
+    --bg:         #0d1520;
+    --bg-card:    #1a2535;
+    --border:     #1e3a5f;
+    --border-str: #2b5278;
+    --text:       #c9d8e4;
+    --text-dim:   #7a9fb8;
+    --text-muted: #4a7a9b;
+    --gold:       #c9a84c;
+    --gold-dim:   #a07830;
+    --ok:         #4caf50;
+    --err:        #e53935;
+    --link:       #5ba8d4;
+    --radius:     8px;
+    --font-serif: 'Cinzel', Georgia, serif;
+  }
+  [data-theme="light"] {
+    --bg:         #f0f4f8;
+    --bg-card:    #ffffff;
+    --border:     #c8d8e8;
+    --border-str: #98b8d0;
+    --text:       #1a2b3c;
+    --text-dim:   #3a6a8a;
+    --text-muted: #6a9ab8;
+    --link:       #1565c0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+
+  .mv-topbar {
+    background: var(--bg-card);
+    border-bottom: 1px solid var(--border-str);
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .mv-topbar a { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+  .mv-topbar a:hover { color: var(--text); }
+  .mv-topbar .sep { color: var(--text-muted); }
+
+  .mv-page { padding: 32px 24px; max-width: 1200px; margin: 0 auto; }
+
+  .mv-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+  }
+  .mv-header h1 {
+    font-family: var(--font-serif);
+    font-size: 26px;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+  .mv-header .sub { font-size: 13px; color: var(--text-dim); margin-top: 4px; }
+
+  .btn-gold {
+    background: linear-gradient(135deg, var(--gold), var(--gold-dim));
+    color: #1a1000;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: opacity .2s;
+  }
+  .btn-gold:hover { opacity: .85; }
+
+  .btn-sm {
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border-str);
+    background: var(--bg-card);
+    color: var(--text-dim);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: background .15s, color .15s;
+  }
+  .btn-sm:hover { background: var(--border); color: var(--text); }
+  .btn-sm.danger:hover { background: #3a1515; color: var(--err); border-color: var(--err); }
+
+  .mv-table-wrap {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .mv-table { width: 100%; border-collapse: collapse; }
+  .mv-table th {
+    background: rgba(201,168,76,.08);
+    color: var(--gold);
+    font-family: var(--font-serif);
+    font-size: 12px;
+    letter-spacing: .5px;
+    padding: 12px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-str);
+  }
+  .mv-table td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+    vertical-align: middle;
+  }
+  .mv-table tr:last-child td { border-bottom: none; }
+  .mv-table tr:hover td { background: rgba(255,255,255,.03); }
+
+  .badge-file { color: var(--ok); font-size: 12px; }
+  .badge-no-file { color: var(--text-muted); font-size: 12px; }
+
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-state p { font-size: 14px; }
+
+  /* ── Modal ─────────────────────────────────────────────────────────────── */
+  .modal-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,.65);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--bg-card);
+    border: 1px solid var(--border-str);
+    border-radius: 12px;
+    width: 560px;
+    max-width: 96vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 28px;
+    position: relative;
+  }
+  .modal-close {
+    position: absolute; top: 14px; right: 16px;
+    background: none; border: none;
+    color: var(--text-dim); font-size: 20px; cursor: pointer;
+  }
+  .modal h2 { font-family: var(--font-serif); color: var(--gold); font-size: 18px; margin-bottom: 20px; }
+
+  .field-row { margin-bottom: 16px; }
+  .field-row label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; }
+  .field-row input, .field-row textarea, .field-row select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border-str);
+    border-radius: 5px;
+    color: var(--text);
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  .field-row input:focus, .field-row textarea:focus {
+    outline: none;
+    border-color: var(--gold);
+  }
+  .field-row textarea { resize: vertical; min-height: 80px; }
+
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .step { margin-bottom: 24px; }
+  .step-header { font-size: 13px; color: var(--text-dim); margin-bottom: 12px;
+                 border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+
+  .preview-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 16px;
+  }
+  .preview-box .prow { display: flex; justify-content: space-between; padding: 3px 0; }
+  .preview-box .prow .plabel { color: var(--text-muted); }
+  .preview-box .prow .pval  { color: var(--text); font-family: monospace; font-size: 11px; }
+  .preview-box .ptable { width: 100%; margin-top: 8px; border-collapse: collapse; }
+  .preview-box .ptable th { color: var(--text-muted); font-size: 11px; text-align: left; padding: 3px 4px; }
+  .preview-box .ptable td { font-size: 11px; padding: 3px 4px; border-top: 1px solid var(--border); color: var(--text); }
+
+  .alert { padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-bottom: 14px; }
+  .alert-err  { background: rgba(229,57,53,.12); border: 1px solid rgba(229,57,53,.3); color: #ef9a9a; }
+  .alert-ok   { background: rgba(76,175,80,.12); border: 1px solid rgba(76,175,80,.3); color: #a5d6a7; }
+  .alert-info { background: rgba(33,150,243,.1); border: 1px solid rgba(33,150,243,.3); color: #90caf9; }
+
+  .manual-section { display: none; }
+  .manual-section.visible { display: block; }
+
+  .spinner { display: inline-block; width: 14px; height: 14px;
+    border: 2px solid rgba(201,168,76,.3); border-top-color: var(--gold);
+    border-radius: 50%; animation: spin .7s linear infinite; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .success-block { text-align: center; padding: 20px 0; }
+  .success-block .big { font-size: 48px; }
+  .success-block h3 { font-family: var(--font-serif); color: var(--gold); margin: 12px 0 6px; }
+  .success-block p { color: var(--text-dim); font-size: 13px; margin-bottom: 20px; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+</head>
+<body>
+
+<div class="mv-topbar">
+  <a href="/admin/">← Minerva BI</a>
+  <span class="sep">/</span>
+  <span>Invoices</span>
+</div>
+
+<div class="mv-page">
+  <div class="mv-header">
+    <div>
+      <h1>📄 Invoices</h1>
+      <div class="sub">Інвойси Sevskiy GmbH → DigiKey Marketplace</div>
+    </div>
+    <button class="btn-gold" id="btnGenerate">＋ Згенерувати інвойс</button>
+  </div>
+
+  {% if invoices %}
+  <div class="mv-table-wrap">
+    <table class="mv-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>DigiKey Order</th>
+          <th>Дата інвойсу</th>
+          <th>Дата замовлення</th>
+          <th>Отримувач</th>
+          <th style="text-align:right">Разом, USD</th>
+          <th>Файл</th>
+          <th>Дії</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr id="row-{{ inv.pk }}">
+          <td><strong style="color:var(--gold)">{{ inv.invoice_number }}</strong></td>
+          <td style="font-family:monospace;font-size:12px">{{ inv.digikey_order_no }}</td>
+          <td>{{ inv.invoice_date|date:"d.m.Y" }}</td>
+          <td>{{ inv.order_date|date:"d.m.Y" }}</td>
+          <td>
+            {{ inv.shipped_to_company }}
+            {% if inv.shipped_to_vat %}<br><span style="font-size:11px;color:var(--text-muted)">{{ inv.shipped_to_vat }}</span>{% endif %}
+          </td>
+          <td style="text-align:right;font-family:monospace">{{ inv.total_amount }}</td>
+          <td>
+            {% if inv.docx_file %}
+              <span class="badge-file">✅ docx</span>
+            {% else %}
+              <span class="badge-no-file">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="actions">
+              {% if inv.docx_file %}
+              <a href="/invoices/{{ inv.pk }}/download/" class="btn-sm" title="Завантажити">⬇ docx</a>
+              {% endif %}
+              <a href="/invoices/{{ inv.pk }}/" class="btn-sm" title="Деталі">🔍</a>
+              <button class="btn-sm danger" onclick="deleteInvoice({{ inv.pk }}, '{{ inv.invoice_number }}')" title="Видалити">🗑</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">📄</div>
+    <p>Інвойсів ще немає. Натисніть <strong>«Згенерувати інвойс»</strong>, щоб створити перший.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- ── Generate Modal ──────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <button class="modal-close" id="modalClose">✕</button>
+    <h2>Новий інвойс</h2>
+
+    <div id="stepFetch">
+      <div class="step">
+        <div class="step-header">1. DigiKey Order No.</div>
+        <div class="field-row">
+          <label>Номер замовлення DigiKey (напр. 99674401)</label>
+          <input type="text" id="dkOrderNo" placeholder="99674401" autocomplete="off">
+        </div>
+        <button class="btn-gold" id="btnFetch" style="width:100%">
+          🔍 Отримати дані з DigiKey API
+        </button>
+      </div>
+
+      <div id="alertBox"></div>
+
+      <div id="previewSection" style="display:none">
+        <div class="step-header">2. Перевірте дані замовлення</div>
+        <div class="preview-box" id="previewBox"></div>
+        <button class="btn-gold" id="btnConfirm" style="width:100%">
+          ✅ Підтвердити та згенерувати інвойс
+        </button>
+      </div>
+
+      <div class="manual-section" id="manualSection">
+        <div class="step-header">✏️ Ручне введення даних</div>
+        <div class="field-row">
+          <label>DigiKey Order No.</label>
+          <input type="text" id="m_order_no" placeholder="99674401">
+        </div>
+        <div class="row2">
+          <div class="field-row">
+            <label>Дата замовлення (MM/DD/YYYY)</label>
+            <input type="text" id="m_order_date" placeholder="06/10/2026">
+          </div>
+          <div class="field-row">
+            <label>Дата відправки (MM/DD/YYYY)</label>
+            <input type="text" id="m_ship_date" placeholder="06/11/2026">
+          </div>
+        </div>
+        <div class="step-header" style="margin-top:8px">Отримувач</div>
+        <div class="row2">
+          <div class="field-row">
+            <label>Компанія</label>
+            <input type="text" id="m_company" placeholder="SENSOFUSION OY">
+          </div>
+          <div class="field-row">
+            <label>Контактна особа</label>
+            <input type="text" id="m_contact" placeholder="AKI NYYSSOLA">
+          </div>
+        </div>
+        <div class="field-row">
+          <label>Адреса (вулиця)</label>
+          <input type="text" id="m_address1" placeholder="KOIVULEHDONTIE 20A">
+        </div>
+        <div class="row2">
+          <div class="field-row">
+            <label>Місто, індекс</label>
+            <input type="text" id="m_city_zip" placeholder="VANTAA, 01510">
+          </div>
+          <div class="field-row">
+            <label>Країна (ISO 2/3)</label>
+            <input type="text" id="m_country" placeholder="FIN">
+          </div>
+        </div>
+        <div class="field-row">
+          <label>VAT ID</label>
+          <input type="text" id="m_vat_id" placeholder="FI27577221">
+        </div>
+        <div class="step-header" style="margin-top:8px">Фінанси</div>
+        <div class="row2">
+          <div class="field-row">
+            <label>Знижка (від'ємне, напр. -39.90)</label>
+            <input type="number" id="m_discount" placeholder="-39.90" step="0.01">
+          </div>
+          <div class="field-row">
+            <label>Доставка, USD</label>
+            <input type="number" id="m_shipping" placeholder="29.95" step="0.01">
+          </div>
+        </div>
+        <div class="step-header" style="margin-top:8px">Позиції замовлення</div>
+        <div id="itemsContainer"></div>
+        <button type="button" class="btn-sm" style="margin-bottom:14px" onclick="addItemRow()">＋ Додати позицію</button>
+        <button class="btn-gold" id="btnManualSubmit" style="width:100%">
+          ✅ Згенерувати інвойс (ручне введення)
+        </button>
+      </div>
+    </div>
+
+    <div id="stepSuccess" style="display:none">
+      <div class="success-block">
+        <div class="big">✅</div>
+        <h3 id="successTitle"></h3>
+        <p id="successSub"></p>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <a id="btnDownload" href="#" class="btn-gold">⬇ Завантажити .docx</a>
+          <button class="btn-sm" onclick="location.reload()">🔄 Закрити та оновити</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+let _currentOrderData = null;
+
+document.getElementById('btnGenerate').onclick = () => openModal();
+document.getElementById('modalClose').onclick  = () => closeModal();
+document.getElementById('modalBackdrop').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+function openModal() {
+  document.getElementById('modalBackdrop').classList.add('open');
+  resetModal();
+}
+function closeModal() {
+  document.getElementById('modalBackdrop').classList.remove('open');
+}
+function resetModal() {
+  document.getElementById('stepFetch').style.display = '';
+  document.getElementById('stepSuccess').style.display = 'none';
+  document.getElementById('previewSection').style.display = 'none';
+  document.getElementById('manualSection').classList.remove('visible');
+  document.getElementById('alertBox').innerHTML = '';
+  document.getElementById('dkOrderNo').value = '';
+  _currentOrderData = null;
+}
+
+// ── Fetch from API ─────────────────────────────────────────────────────────
+document.getElementById('btnFetch').onclick = async function() {
+  const no = document.getElementById('dkOrderNo').value.trim();
+  if (!no) { showAlert('Введіть номер замовлення DigiKey.', 'err'); return; }
+
+  setLoading('btnFetch', true, '🔍 Отримати дані з DigiKey API');
+  clearAlert();
+
+  try {
+    const resp = await fetch(`/invoices/fetch/${encodeURIComponent(no)}/`, {
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    });
+    const data = await resp.json();
+    if (resp.ok && data.ok) {
+      _currentOrderData = data.order_data;
+      renderPreview(data.order_data);
+    } else if (data.needs_manual) {
+      showAlert('DigiKey API недоступний або токен відсутній. Заповніть дані вручну.', 'info');
+      showManualSection(no);
+    } else {
+      showAlert(data.error || 'Помилка API', 'err');
+    }
+  } catch(e) {
+    showAlert('Мережева помилка: ' + e.message, 'err');
+  } finally {
+    setLoading('btnFetch', false, '🔍 Отримати дані з DigiKey API');
+  }
+};
+
+function renderPreview(od) {
+  const box = document.getElementById('previewBox');
+  const st = od.shipped_to || {};
+  const items = od.items || [];
+  const itemsHtml = `
+    <table class="ptable">
+      <thead><tr><th>SKU</th><th>Опис</th><th>Qty</th><th>Unit Price</th></tr></thead>
+      <tbody>
+        ${items.map(it=>`<tr>
+          <td>${it.part_no||''}</td>
+          <td>${it.description||''}</td>
+          <td style="text-align:center">${it.qty}</td>
+          <td style="text-align:right">${parseFloat(it.unit_price||0).toFixed(2)}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+  box.innerHTML = `
+    <div class="prow"><span class="plabel">DK Order No.</span><span class="pval">${od.digikey_order_no}</span></div>
+    <div class="prow"><span class="plabel">Order Date</span><span class="pval">${od.order_date}</span></div>
+    <div class="prow"><span class="plabel">Ship Date</span><span class="pval">${od.shipment_date||'—'}</span></div>
+    <div class="prow"><span class="plabel">Отримувач</span><span class="pval">${st.company||''}</span></div>
+    <div class="prow"><span class="plabel">Адреса</span><span class="pval">${st.address1||''}, ${st.city_zip||''}, ${st.country||''}</span></div>
+    <div class="prow"><span class="plabel">VAT ID</span><span class="pval">${st.vat_id||'—'}</span></div>
+    <div class="prow"><span class="plabel">Знижка</span><span class="pval">${parseFloat(od.discount_amount||0).toFixed(2)} USD</span></div>
+    <div class="prow"><span class="plabel">Доставка</span><span class="pval">${parseFloat(od.shipping_charges||0).toFixed(2)} USD</span></div>
+    ${itemsHtml}`;
+  document.getElementById('previewSection').style.display = '';
+}
+
+// ── Confirm generate ───────────────────────────────────────────────────────
+document.getElementById('btnConfirm').onclick = async function() {
+  if (!_currentOrderData) return;
+  const no = document.getElementById('dkOrderNo').value.trim();
+  setLoading('btnConfirm', true, '✅ Підтвердити та згенерувати інвойс');
+  await submitGenerate(no, _currentOrderData);
+  setLoading('btnConfirm', false, '✅ Підтвердити та згенерувати інвойс');
+};
+
+// ── Manual submit ──────────────────────────────────────────────────────────
+document.getElementById('btnManualSubmit').onclick = async function() {
+  const no = document.getElementById('m_order_no').value.trim() || document.getElementById('dkOrderNo').value.trim();
+  if (!no) { showAlert('Вкажіть номер замовлення.', 'err'); return; }
+  const items = collectItems();
+  if (!items.length) { showAlert('Додайте хоча б одну позицію.', 'err'); return; }
+  const manualData = {
+    digikey_order_no: no,
+    order_date:   document.getElementById('m_order_date').value.trim() || new Date().toLocaleDateString('en-US',{month:'2-digit',day:'2-digit',year:'numeric'}),
+    shipment_date:document.getElementById('m_ship_date').value.trim(),
+    items,
+    discount_amount:  parseFloat(document.getElementById('m_discount').value) || 0,
+    shipping_charges: parseFloat(document.getElementById('m_shipping').value) || 0,
+    shipped_to: {
+      company:  document.getElementById('m_company').value.trim(),
+      contact:  document.getElementById('m_contact').value.trim(),
+      address1: document.getElementById('m_address1').value.trim(),
+      city_zip: document.getElementById('m_city_zip').value.trim(),
+      country:  document.getElementById('m_country').value.trim(),
+      vat_id:   document.getElementById('m_vat_id').value.trim(),
+    }
+  };
+  setLoading('btnManualSubmit', true, '✅ Згенерувати інвойс');
+  await submitGenerate(no, manualData, true);
+  setLoading('btnManualSubmit', false, '✅ Згенерувати інвойс');
+};
+
+async function submitGenerate(dk_order_no, orderData, isManual=false) {
+  clearAlert();
+  try {
+    const body = { digikey_order_no: dk_order_no };
+    if (isManual || orderData) {
+      body.manual = true;
+      body.order_data = orderData;
+    }
+    const resp = await fetch('/invoices/generate/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': CSRF,
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json();
+    if (resp.ok && data.ok) {
+      showSuccess(data);
+      // Add row to table without reload
+      addTableRow(data);
+    } else if (data.needs_manual && !isManual) {
+      showAlert(data.error, 'info');
+      showManualSection(dk_order_no);
+    } else {
+      showAlert(data.error || 'Помилка генерації', 'err');
+    }
+  } catch(e) {
+    showAlert('Мережева помилка: ' + e.message, 'err');
+  }
+}
+
+function showSuccess(data) {
+  document.getElementById('stepFetch').style.display = 'none';
+  document.getElementById('stepSuccess').style.display = '';
+  document.getElementById('successTitle').textContent = `Invoice #${data.invoice_number}`;
+  document.getElementById('successSub').textContent = `Разом: ${data.total_amount} USD`;
+  document.getElementById('btnDownload').href = data.download_url;
+}
+
+function showManualSection(no) {
+  const ms = document.getElementById('manualSection');
+  ms.classList.add('visible');
+  document.getElementById('m_order_no').value = no;
+  if (!document.getElementById('itemsContainer').children.length) addItemRow();
+}
+
+// Item rows
+let _itemIdx = 0;
+function addItemRow() {
+  const idx = _itemIdx++;
+  const div = document.createElement('div');
+  div.className = 'row2';
+  div.id = `item_${idx}`;
+  div.innerHTML = `
+    <div class="field-row"><label>Part No.</label><input type="text" id="ipart_${idx}" placeholder="3228-AN..."></div>
+    <div class="field-row"><label>Опис</label><input type="text" id="idesc_${idx}" placeholder="RF Antennas"></div>
+    <div class="field-row"><label>Qty</label><input type="number" id="iqty_${idx}" value="1" step="1" min="1"></div>
+    <div class="field-row" style="position:relative">
+      <label>Unit Price, USD</label>
+      <input type="number" id="iprice_${idx}" placeholder="79.69" step="0.01">
+      <button type="button" style="position:absolute;top:24px;right:6px;background:none;border:none;color:var(--err);cursor:pointer;font-size:16px" onclick="document.getElementById('item_${idx}').remove()">✕</button>
+    </div>`;
+  document.getElementById('itemsContainer').appendChild(div);
+}
+
+function collectItems() {
+  const items = [];
+  document.querySelectorAll('[id^="ipart_"]').forEach(el => {
+    const idx = el.id.replace('ipart_', '');
+    const part_no = el.value.trim();
+    const description = document.getElementById(`idesc_${idx}`)?.value.trim() || '';
+    const qty = parseFloat(document.getElementById(`iqty_${idx}`)?.value) || 1;
+    const unit_price = parseFloat(document.getElementById(`iprice_${idx}`)?.value) || 0;
+    items.push({ part_no, description, qty, unit_price });
+  });
+  return items;
+}
+
+// Delete invoice
+async function deleteInvoice(pk, num) {
+  if (!confirm(`Видалити Invoice #${num}?`)) return;
+  const resp = await fetch(`/invoices/${pk}/delete/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': CSRF, 'X-Requested-With': 'XMLHttpRequest' },
+  });
+  if (resp.ok) {
+    const row = document.getElementById(`row-${pk}`);
+    if (row) row.remove();
+  }
+}
+
+function addTableRow(data) {
+  const tbody = document.querySelector('.mv-table tbody');
+  if (!tbody) return;
+  const today = new Date().toLocaleDateString('uk-UA', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const tr = document.createElement('tr');
+  tr.id = `row-${data.invoice_id}`;
+  tr.innerHTML = `
+    <td><strong style="color:var(--gold)">${data.invoice_number}</strong></td>
+    <td style="font-family:monospace;font-size:12px">${data.digikey_order_no||''}</td>
+    <td>${today}</td><td>—</td><td>—</td>
+    <td style="text-align:right;font-family:monospace">${data.total_amount}</td>
+    <td><span class="badge-file">✅ docx</span></td>
+    <td><div class="actions">
+      <a href="${data.download_url}" class="btn-sm">⬇ docx</a>
+      <a href="${data.detail_url}" class="btn-sm">🔍</a>
+      <button class="btn-sm danger" onclick="deleteInvoice(${data.invoice_id},'${data.invoice_number}')">🗑</button>
+    </div></td>`;
+  tbody.prepend(tr);
+}
+
+function showAlert(msg, type) {
+  const colors = { err: 'alert-err', ok: 'alert-ok', info: 'alert-info' };
+  document.getElementById('alertBox').innerHTML =
+    `<div class="alert ${colors[type]||'alert-info'}">${msg}</div>`;
+}
+function clearAlert() { document.getElementById('alertBox').innerHTML = ''; }
+function setLoading(id, loading, label) {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.innerHTML = loading ? `<span class="spinner"></span>${label}` : label;
+}
+</script>
+</body>
+</html>

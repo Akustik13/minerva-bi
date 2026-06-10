@@ -114,6 +114,7 @@ urlpatterns = [
     path("calendar/", include("calendar_app.urls")),
     path("bots/", include("bots.urls")),
     path("documents/", include("documents.urls")),
+    path("invoices/", include("shipping.urls_invoices")),
     path("api/v1/", include("api.urls")),
     path("api-auth/", include("rest_framework.urls")),
 ] + [
