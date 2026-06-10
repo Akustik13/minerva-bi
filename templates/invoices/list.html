@@ -238,7 +238,10 @@
       <h1>📄 Invoices</h1>
       <div class="sub">Інвойси Sevskiy GmbH → DigiKey Marketplace</div>
     </div>
-    <button class="btn-gold" id="btnGenerate">＋ Згенерувати інвойс</button>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn-gold" id="btnGenerate">＋ Згенерувати інвойс</button>
+      <button class="btn-sm" id="btnRegister" style="padding:9px 16px;font-size:13px">📁 Додати існуючий</button>
+    </div>
   </div>
 
   {% if invoices %}
@@ -405,6 +408,56 @@
   </div>
 </div>
 
+<!-- ── Register Existing Invoice Modal ────────────────────────────────────── -->
+<div class="modal-backdrop" id="regBackdrop">
+  <div class="modal">
+    <button class="modal-close" id="regClose">✕</button>
+    <h2>📁 Додати існуючий інвойс</h2>
+    <p style="font-size:13px;color:var(--text-dim);margin-bottom:20px">
+      Реєструє інвойс у базі даних щоб нумерація нових інвойсів продовжувалась правильно.
+    </p>
+
+    <div id="regAlert"></div>
+
+    <div class="row2">
+      <div class="field-row">
+        <label>Номер інвойсу *</label>
+        <input type="text" id="reg_number" placeholder="10235" autofocus>
+      </div>
+      <div class="field-row">
+        <label>DigiKey Order No.</label>
+        <input type="text" id="reg_dk_no" placeholder="99674401">
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field-row">
+        <label>Дата замовлення (дд.мм.рррр)</label>
+        <input type="text" id="reg_order_date" placeholder="08.06.2026">
+      </div>
+      <div class="field-row">
+        <label>Сума (USD)</label>
+        <input type="number" id="reg_total" placeholder="0.00" step="0.01">
+      </div>
+    </div>
+    <div class="field-row">
+      <label>Компанія отримувача</label>
+      <input type="text" id="reg_company" placeholder="SENSOFUSION OY">
+    </div>
+    <div class="field-row">
+      <label>VAT ID отримувача</label>
+      <input type="text" id="reg_vat" placeholder="FI27577221">
+    </div>
+    <div class="field-row">
+      <label>Файл .docx (необов'язково)</label>
+      <input type="file" id="reg_file" accept=".docx"
+             style="background:var(--bg);border:1px solid var(--border-str);border-radius:5px;color:var(--text);padding:6px 10px;width:100%">
+    </div>
+    <button class="btn-gold" id="btnRegSubmit" style="width:100%;margin-top:8px">
+      ✅ Зареєструвати інвойс
+    </button>
+  </div>
+</div>
+
 <script>
 const CSRF = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
 let _currentOrderData = null;
@@ -414,6 +467,59 @@ document.getElementById('modalClose').onclick  = () => closeModal();
 document.getElementById('modalBackdrop').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeModal();
 });
+
+// Register modal
+document.getElementById('btnRegister').onclick = () => {
+  document.getElementById('regBackdrop').classList.add('open');
+  document.getElementById('reg_number').focus();
+};
+document.getElementById('regClose').onclick = () => document.getElementById('regBackdrop').classList.remove('open');
+document.getElementById('regBackdrop').addEventListener('click', e => {
+  if (e.target === e.currentTarget) document.getElementById('regBackdrop').classList.remove('open');
+});
+
+document.getElementById('btnRegSubmit').onclick = async function() {
+  const num = document.getElementById('reg_number').value.trim();
+  if (!num) { showRegAlert('Введіть номер інвойсу.', 'err'); return; }
+
+  const fd = new FormData();
+  fd.append('invoice_number',     num);
+  fd.append('digikey_order_no',   document.getElementById('reg_dk_no').value.trim());
+  fd.append('order_date',         document.getElementById('reg_order_date').value.trim());
+  fd.append('total_amount',       document.getElementById('reg_total').value.trim() || '0');
+  fd.append('shipped_to_company', document.getElementById('reg_company').value.trim());
+  fd.append('shipped_to_vat',     document.getElementById('reg_vat').value.trim());
+  const file = document.getElementById('reg_file').files[0];
+  if (file) fd.append('docx_file', file);
+
+  setLoading('btnRegSubmit', true, '✅ Зареєструвати інвойс');
+  try {
+    const resp = await fetch('/invoices/register/', {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: fd,
+    });
+    const data = await resp.json();
+    if (resp.ok && data.ok) {
+      document.getElementById('regBackdrop').classList.remove('open');
+      showRegAlert('', '');
+      // Reload to show new row with correct data
+      location.reload();
+    } else {
+      showRegAlert(data.error || 'Помилка', 'err');
+    }
+  } catch(e) {
+    showRegAlert('Мережева помилка: ' + e.message, 'err');
+  } finally {
+    setLoading('btnRegSubmit', false, '✅ Зареєструвати інвойс');
+  }
+};
+
+function showRegAlert(msg, type) {
+  const colors = { err: 'alert-err', ok: 'alert-ok', info: 'alert-info' };
+  document.getElementById('regAlert').innerHTML = msg
+    ? `<div class="alert ${colors[type]||'alert-info'}">${msg}</div>` : '';
+}
 
 function openModal() {
   document.getElementById('modalBackdrop').classList.add('open');

@@ -118,6 +118,79 @@ def invoice_download(request, pk):
 
 
 @_staff
+@require_POST
+def invoice_register(request):
+    """
+    Register an existing invoice (file already exists, just add DB record for correct numbering).
+    Accepts multipart/form-data:
+      invoice_number, digikey_order_no, order_date, shipped_to_company, total_amount
+      docx_file (optional upload)
+    """
+    from datetime import date as _date
+
+    def _g(k, default=""):
+        return request.POST.get(k, default).strip()
+
+    invoice_number = _g("invoice_number")
+    if not invoice_number:
+        return JsonResponse({"error": "Номер інвойсу обов'язковий"}, status=400)
+
+    if Invoice.objects.filter(invoice_number=invoice_number).exists():
+        return JsonResponse({"error": f"Інвойс #{invoice_number} вже є в базі"}, status=409)
+
+    def _parse(s):
+        if not s:
+            return None
+        for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%m/%d/%Y"):
+            try:
+                from datetime import datetime
+                return datetime.strptime(s, fmt).date()
+            except ValueError:
+                pass
+        return None
+
+    order_date_raw = _g("order_date")
+    order_date = _parse(order_date_raw) or _date.today()
+
+    total_raw = _g("total_amount", "0")
+    try:
+        from decimal import Decimal
+        total = Decimal(total_raw.replace(",", "."))
+    except Exception:
+        total = Decimal("0")
+
+    docx_field = None
+    uploaded = request.FILES.get("docx_file")
+    if uploaded:
+        # Save to MEDIA/invoices/
+        from django.core.files.storage import default_storage
+        fname = f"invoices/Invoice_{invoice_number}.docx"
+        default_storage.save(fname, uploaded)
+        docx_field = fname
+
+    inv = Invoice.objects.create(
+        invoice_number     = invoice_number,
+        digikey_order_no   = _g("digikey_order_no"),
+        order_date         = order_date,
+        shipped_to_company = _g("shipped_to_company"),
+        shipped_to_vat     = _g("shipped_to_vat"),
+        total_amount       = total,
+        subtotal           = total,
+        docx_file          = docx_field,
+        created_by         = request.user,
+    )
+
+    return JsonResponse({
+        "ok": True,
+        "invoice_id":     inv.pk,
+        "invoice_number": inv.invoice_number,
+        "total_amount":   str(inv.total_amount),
+        "download_url":   f"/invoices/{inv.pk}/download/" if docx_field else None,
+        "detail_url":     f"/invoices/{inv.pk}/",
+    })
+
+
+@_staff
 def invoice_delete(request, pk):
     inv = get_object_or_404(Invoice, pk=pk)
     if request.method == "POST":
