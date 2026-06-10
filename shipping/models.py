@@ -30,6 +30,7 @@ class Invoice(models.Model):
 
     shipped_to_company = models.CharField("Компанія отримувача", max_length=200)
     shipped_to_vat     = models.CharField("VAT ID отримувача", max_length=50, blank=True, default="")
+    shipped_to_json    = models.JSONField("Адреса отримувача (повна)", default=dict, blank=True)
 
     line_items         = models.JSONField("Позиції", default=list, blank=True)
     docx_file          = models.FileField("Файл .docx", upload_to="invoices/", null=True, blank=True)

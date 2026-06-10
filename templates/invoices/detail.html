@@ -8,106 +8,276 @@
   :root {
     --bg:#0d1520;--bg-card:#1a2535;--border:#1e3a5f;--border-str:#2b5278;
     --text:#c9d8e4;--text-dim:#7a9fb8;--text-muted:#4a7a9b;
-    --gold:#c9a84c;--gold-dim:#a07830;--ok:#4caf50;--err:#e53935;
+    --gold:#c9a84c;--gold-dim:#a07830;--ok:#4caf50;--err:#e53935;--link:#5ba8d4;
     --radius:8px;--font-serif:'Cinzel',Georgia,serif;
   }
-  [data-theme="light"]{--bg:#f0f4f8;--bg-card:#fff;--border:#c8d8e8;--border-str:#98b8d0;--text:#1a2b3c;--text-dim:#3a6a8a;--text-muted:#6a9ab8;}
+  [data-theme="light"]{--bg:#f0f4f8;--bg-card:#fff;--border:#c8d8e8;--border-str:#98b8d0;--text:#1a2b3c;--text-dim:#3a6a8a;--text-muted:#6a9ab8;--link:#1565c0;}
   *{box-sizing:border-box;margin:0;padding:0}
   body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;min-height:100vh}
-  .mv-topbar{background:var(--bg-card);border-bottom:1px solid var(--border-str);padding:12px 24px;display:flex;align-items:center;gap:12px}
-  .mv-topbar a{color:var(--text-dim);text-decoration:none;font-size:13px}.mv-topbar a:hover{color:var(--text)}.sep{color:var(--text-muted)}
-  .mv-page{padding:32px 24px;max-width:900px;margin:0 auto}
-  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:20px}
-  h1{font-family:var(--font-serif);color:var(--gold);font-size:24px;margin-bottom:6px}
-  h2{font-family:var(--font-serif);color:var(--gold);font-size:16px;margin-bottom:14px;border-bottom:1px solid var(--border);padding-bottom:6px}
-  .meta{display:flex;gap:32px;flex-wrap:wrap;margin-bottom:24px}
-  .meta-item .label{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
-  .meta-item .val{font-size:14px;color:var(--text)}
+
+  .mv-topbar{background:var(--bg-card);border-bottom:1px solid var(--border-str);padding:12px 24px;
+             display:flex;align-items:center;gap:12px}
+  .mv-topbar a{color:var(--text-dim);text-decoration:none;font-size:13px}
+  .mv-topbar a:hover{color:var(--text)}
+  .sep{color:var(--text-muted)}
+
+  .mv-page{padding:28px 24px;max-width:960px;margin:0 auto}
+
+  /* Card */
+  .card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+        padding:24px 28px;margin-bottom:18px}
+
+  /* Section header */
+  h1{font-family:var(--font-serif);color:var(--gold);font-size:24px;letter-spacing:1px;margin-bottom:4px}
+  .inv-sub{font-size:12px;color:var(--text-muted);margin-bottom:20px}
+  h2{font-family:var(--font-serif);color:var(--gold);font-size:14px;letter-spacing:.5px;
+     border-bottom:1px solid var(--border);padding-bottom:6px;margin-bottom:14px}
+
+  /* Meta chips */
+  .meta{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px}
+  .meta-item .label{font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+  .meta-item .val{font-size:13px;color:var(--text);font-weight:500}
   .meta-item .val.mono{font-family:monospace}
+
+  /* Two column addresses */
   .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px}
-  .kv-list .kv{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:13px}
-  .kv-list .kv:last-child{border-bottom:none}
-  .kv-list .k{color:var(--text-muted)}
-  .kv-list .v{color:var(--text);text-align:right;font-family:monospace;font-size:12px}
+  @media(max-width:600px){.two-col{grid-template-columns:1fr}}
+
+  .addr-block{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:16px}
+  .addr-block .company{font-size:14px;font-weight:700;color:var(--text);margin-bottom:8px}
+  .addr-block .arow{display:flex;gap:8px;margin-bottom:4px;font-size:12px;align-items:baseline}
+  .addr-block .alabel{color:var(--text-muted);min-width:70px;flex-shrink:0;font-size:11px}
+  .addr-block .aval{color:var(--text-dim);font-family:monospace}
+  .addr-block .vat-badge{
+    display:inline-block;background:rgba(201,168,76,.12);color:var(--gold);
+    border:1px solid rgba(201,168,76,.3);border-radius:4px;padding:2px 8px;
+    font-size:11px;font-family:monospace;margin-top:6px
+  }
+
+  /* Line items table */
   table.items-tbl{width:100%;border-collapse:collapse}
-  table.items-tbl th{font-size:11px;color:var(--gold);text-align:left;padding:8px 10px;border-bottom:1px solid var(--border-str);font-family:var(--font-serif);letter-spacing:.3px}
-  table.items-tbl td{font-size:13px;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  table.items-tbl th{font-size:11px;color:var(--gold);text-align:left;padding:8px 10px;
+                     border-bottom:1px solid var(--border-str);font-family:var(--font-serif);letter-spacing:.3px}
+  table.items-tbl th.r{text-align:right}
+  table.items-tbl td{font-size:12px;padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--text-dim)}
+  table.items-tbl td.mono{font-family:monospace;color:var(--text)}
+  table.items-tbl td.r{text-align:right;font-family:monospace;color:var(--text)}
   table.items-tbl tr:last-child td{border-bottom:none}
-  .totals-tbl{margin-top:16px;margin-left:auto;width:300px}
-  .totals-tbl td{font-size:13px;padding:5px 8px;font-family:monospace}
-  .totals-tbl .lbl{color:var(--text-muted);text-align:right;padding-right:20px}
-  .totals-tbl .total-row td{border-top:1px solid var(--border-str);font-weight:bold;color:var(--gold);padding-top:9px}
-  .actions{display:flex;gap:10px;margin-top:24px;flex-wrap:wrap}
-  .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold-dim));color:#1a1000;border:none;border-radius:6px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:opacity .2s}.btn-gold:hover{opacity:.85}
-  .btn-sec{background:var(--bg-card);border:1px solid var(--border-str);border-radius:6px;padding:9px 18px;font-size:13px;color:var(--text-dim);text-decoration:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:background .15s,color .15s}.btn-sec:hover{background:var(--border);color:var(--text)}
+  table.items-tbl tr:hover td{background:rgba(255,255,255,.025)}
+
+  /* Financial breakdown */
+  .fin-table{width:100%;max-width:520px;border-collapse:collapse;margin-top:4px}
+  .fin-table td{padding:6px 12px;font-size:13px;vertical-align:middle}
+  .fin-table .fl{color:var(--text-muted)}
+  .fin-table .fv{text-align:right;font-family:monospace;color:var(--text);min-width:110px}
+  .fin-table .fn{font-size:11px;color:var(--text-muted);padding-left:16px;font-style:italic}
+  .fin-table .disc .fv{color:var(--err)}
+  .fin-table .sep td{border-top:1px solid var(--border-str);padding-top:10px}
+  .fin-table .subtotal-row td{padding-top:10px}
+  .fin-table .subtotal-row .fl{color:var(--text);font-weight:600}
+  .fin-table .subtotal-row .fv{color:var(--text);font-weight:600;font-size:14px}
+  .fin-table .total-row td{border-top:2px solid var(--gold);padding-top:10px;padding-bottom:4px}
+  .fin-table .total-row .fl{color:var(--gold);font-weight:700;font-size:15px}
+  .fin-table .total-row .fv{color:var(--gold);font-weight:700;font-size:15px}
+  .fin-arrow{color:var(--text-muted);font-size:14px;padding:0 4px}
+
+  /* Action buttons */
+  .actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .btn-gold{background:linear-gradient(135deg,var(--gold),var(--gold-dim));color:#1a1000;border:none;
+            border-radius:6px;padding:9px 18px;font-size:13px;font-weight:600;cursor:pointer;
+            text-decoration:none;display:inline-flex;align-items:center;gap:6px;transition:opacity .2s}
+  .btn-gold:hover{opacity:.85}
+  .btn-sec{background:var(--bg-card);border:1px solid var(--border-str);border-radius:6px;padding:9px 18px;
+           font-size:13px;color:var(--text-dim);text-decoration:none;cursor:pointer;
+           display:inline-flex;align-items:center;gap:6px;transition:background .15s,color .15s}
+  .btn-sec:hover{background:var(--border);color:var(--text)}
   .btn-danger{border-color:var(--err);color:var(--err)}.btn-danger:hover{background:rgba(229,57,53,.12)!important}
-  .tag{display:inline-block;background:rgba(76,175,80,.15);color:var(--ok);border:1px solid rgba(76,175,80,.3);border-radius:4px;padding:2px 8px;font-size:11px;font-family:monospace}
-  .disc{color:var(--err)}
 </style>
 </head>
 <body>
+
 <div class="mv-topbar">
   <a href="/admin/">← Minerva</a>
   <span class="sep">/</span>
   <a href="/invoices/">Invoices</a>
   <span class="sep">/</span>
-  <span>#{{ inv.invoice_number }}</span>
+  <span style="color:var(--gold)">#{{ inv.invoice_number }}</span>
 </div>
 
 <div class="mv-page">
+
+  <!-- ── Header ── -->
   <div class="card">
     <h1>Invoice #{{ inv.invoice_number }}</h1>
+    <div class="inv-sub">Sevskiy GmbH → DigiKey Marketplace</div>
 
     <div class="meta">
-      <div class="meta-item"><div class="label">DigiKey Order</div><div class="val mono">{{ inv.digikey_order_no }}</div></div>
-      <div class="meta-item"><div class="label">Дата інвойсу</div><div class="val">{{ inv.invoice_date|date:"d.m.Y" }}</div></div>
-      <div class="meta-item"><div class="label">Дата замовлення</div><div class="val">{{ inv.order_date|date:"d.m.Y" }}</div></div>
-      {% if inv.shipment_date %}<div class="meta-item"><div class="label">Дата відправки</div><div class="val">{{ inv.shipment_date|date:"d.m.Y" }}</div></div>{% endif %}
-      {% if inv.sales_order %}<div class="meta-item"><div class="label">Замовлення CRM</div><div class="val"><a href="/admin/sales/salesorder/{{ inv.sales_order.pk }}/change/" style="color:var(--gold)">{{ inv.sales_order.order_number }}</a></div></div>{% endif %}
-      {% if inv.created_by %}<div class="meta-item"><div class="label">Автор</div><div class="val">{{ inv.created_by.get_full_name|default:inv.created_by.username }}</div></div>{% endif %}
+      <div class="meta-item">
+        <div class="label">DigiKey Order</div>
+        <div class="val mono">{{ inv.digikey_order_no }}</div>
+      </div>
+      <div class="meta-item">
+        <div class="label">Дата інвойсу</div>
+        <div class="val">{{ inv.invoice_date|date:"d.m.Y" }}</div>
+      </div>
+      <div class="meta-item">
+        <div class="label">Дата замовлення</div>
+        <div class="val">{{ inv.order_date|date:"d.m.Y" }}</div>
+      </div>
+      {% if inv.shipment_date %}
+      <div class="meta-item">
+        <div class="label">Дата відправки</div>
+        <div class="val">{{ inv.shipment_date|date:"d.m.Y" }}</div>
+      </div>
+      {% endif %}
+      {% if inv.sales_order %}
+      <div class="meta-item">
+        <div class="label">Замовлення CRM</div>
+        <div class="val">
+          <a href="/admin/sales/salesorder/{{ inv.sales_order.pk }}/change/"
+             style="color:var(--link)">{{ inv.sales_order.order_number }}</a>
+        </div>
+      </div>
+      {% endif %}
+      {% if inv.created_by %}
+      <div class="meta-item">
+        <div class="label">Автор</div>
+        <div class="val">{{ inv.created_by.get_full_name|default:inv.created_by.username }}</div>
+      </div>
+      {% endif %}
     </div>
 
+    <!-- ── Addresses ── -->
     <div class="two-col">
       <div>
         <h2>Відправник</h2>
-        <div class="kv-list">
-          <div class="kv"><span class="k">Компанія</span><span class="v">Sevskiy GmbH</span></div>
-          <div class="kv"><span class="k">Адреса</span><span class="v">Stettiner Str. 1, Lutherstadt Wittenberg, 06886, DE</span></div>
-          <div class="kv"><span class="k">VAT</span><span class="v">DE353200793</span></div>
+        <div class="addr-block">
+          <div class="company">Sevskiy GmbH</div>
+          <div class="arow"><span class="alabel">Адреса</span><span class="aval">Stettiner Str. 1</span></div>
+          <div class="arow"><span class="alabel">Місто</span><span class="aval">06886 Lutherstadt Wittenberg</span></div>
+          <div class="arow"><span class="alabel">Країна</span><span class="aval">Germany (DE)</span></div>
+          <div><span class="vat-badge">VAT DE353200793</span></div>
         </div>
       </div>
       <div>
         <h2>Отримувач</h2>
-        <div class="kv-list">
-          <div class="kv"><span class="k">Компанія</span><span class="v">{{ inv.shipped_to_company }}</span></div>
-          {% if inv.shipped_to_vat %}<div class="kv"><span class="k">VAT</span><span class="v">{{ inv.shipped_to_vat }}</span></div>{% endif %}
+        <div class="addr-block">
+          <div class="company">{{ inv.shipped_to_company }}</div>
+          {% with st=inv.shipped_to_json %}
+            {% if st.contact %}
+            <div class="arow"><span class="alabel">Контакт</span><span class="aval">{{ st.contact }}</span></div>
+            {% endif %}
+            {% if st.address1 %}
+            <div class="arow"><span class="alabel">Адреса</span><span class="aval">{{ st.address1 }}</span></div>
+            {% endif %}
+            {% if st.city_zip %}
+            <div class="arow"><span class="alabel">Місто</span><span class="aval">{{ st.city_zip }}</span></div>
+            {% endif %}
+            {% if st.country %}
+            <div class="arow"><span class="alabel">Країна</span><span class="aval">{{ st.country }}</span></div>
+            {% endif %}
+          {% endwith %}
+          {% if inv.shipped_to_vat %}
+          <div><span class="vat-badge">VAT {{ inv.shipped_to_vat }}</span></div>
+          {% endif %}
         </div>
       </div>
     </div>
   </div>
 
+  <!-- ── Line Items ── -->
+  {% if inv.line_items %}
+  <div class="card">
+    <h2>Позиції замовлення</h2>
+    <table class="items-tbl">
+      <thead>
+        <tr>
+          <th>Part No.</th>
+          <th>Опис / Категорія</th>
+          <th class="r">Qty</th>
+          <th class="r">Unit Price</th>
+          <th class="r">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in inv.line_items %}
+        <tr>
+          <td class="mono" style="font-size:11px">{{ item.part_no }}</td>
+          <td>{{ item.description }}</td>
+          <td class="r mono">{{ item.qty }}</td>
+          <td class="r mono">{{ item.unit_price|floatformat:2 }}</td>
+          <td class="r mono" data-qty="{{ item.qty }}" data-price="{{ item.unit_price }}"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  <!-- ── Financial Summary ── -->
   <div class="card">
     <h2>Фінансовий підсумок</h2>
-    <table class="totals-tbl">
-      <tr><td class="lbl">Subtotal</td><td>{{ inv.subtotal }} USD</td></tr>
-      <tr><td class="lbl">Знижка</td><td class="disc">{{ inv.discount_amount }} USD</td></tr>
-      <tr><td class="lbl">Доставка</td><td>{{ inv.shipping_charges }} USD</td></tr>
-      <tr><td class="lbl">VAT 19%</td><td>{{ inv.vat_amount }} USD</td></tr>
-      <tr class="total-row"><td class="lbl">TOTAL</td><td>{{ inv.total_amount }} USD</td></tr>
+    <table class="fin-table">
+      <tr>
+        <td class="fl">Позиції (Gross)</td>
+        <td class="fv">{{ gross_amount|floatformat:2 }} USD</td>
+        <td class="fn">Σ qty × unit price по всіх позиціях</td>
+      </tr>
+      {% if inv.discount_amount %}
+      <tr class="disc">
+        <td class="fl">Знижка</td>
+        <td class="fv">{{ inv.discount_amount|floatformat:2 }} USD</td>
+        <td class="fn">Знижка від DigiKey Marketplace</td>
+      </tr>
+      {% endif %}
+      {% if inv.shipping_charges %}
+      <tr>
+        <td class="fl">Доставка</td>
+        <td class="fv">{{ inv.shipping_charges|floatformat:2 }} USD</td>
+        <td class="fn">Вартість доставки</td>
+      </tr>
+      {% endif %}
+      <tr class="sep subtotal-row">
+        <td class="fl">Без ПДВ (Net)</td>
+        <td class="fv">{{ inv.subtotal|floatformat:2 }} USD</td>
+        <td class="fn">= Gross + Знижка + Доставка</td>
+      </tr>
+      <tr>
+        <td class="fl">ПДВ 19%</td>
+        <td class="fv">{{ inv.vat_amount|floatformat:2 }} USD</td>
+        <td class="fn">19% від {{ inv.subtotal|floatformat:2 }} USD</td>
+      </tr>
+      <tr class="total-row">
+        <td class="fl">TOTAL</td>
+        <td class="fv">{{ inv.total_amount|floatformat:2 }} USD</td>
+        <td class="fn">= Без ПДВ + VAT</td>
+      </tr>
     </table>
   </div>
 
+  <!-- ── Actions ── -->
   <div class="actions">
-    <a href="/invoices/{{ inv.pk }}/pdf/" class="btn-gold" target="_blank">🖨️ PDF / Друк</a>
+    <a href="/invoices/{{ inv.pk }}/pdf/" class="btn-gold" target="_blank">🖨️ PDF</a>
     {% if inv.docx_file %}
     <a href="/invoices/{{ inv.pk }}/download/" class="btn-sec">⬇ .docx</a>
     {% endif %}
     <a href="/invoices/" class="btn-sec">← Назад до списку</a>
-    <form method="post" action="/invoices/{{ inv.pk }}/delete/" style="margin:0" onsubmit="return confirm('Видалити інвойс #{{ inv.invoice_number }}?')">
+    <form method="post" action="/invoices/{{ inv.pk }}/delete/" style="margin:0"
+          onsubmit="return confirm('Видалити інвойс #{{ inv.invoice_number }}?')">
       {% csrf_token %}
       <button type="submit" class="btn-sec btn-danger">🗑 Видалити</button>
     </form>
   </div>
+
 </div>
+
+<script>
+// Compute line item amounts client-side
+document.querySelectorAll('[data-qty][data-price]').forEach(function(td) {
+  var qty   = parseFloat(td.getAttribute('data-qty')   || 0);
+  var price = parseFloat(td.getAttribute('data-price') || 0);
+  td.textContent = (qty * price).toFixed(2) + ' USD';
+});
+</script>
 </body>
 </html>
