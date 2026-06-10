@@ -6,7 +6,7 @@
     <li>
       <a href="/admin/accounting/invoice/add/?order={{ original.pk }}"
          class="historylink"
-         title="{% trans 'Відкрити рахунок-фактуру в модулі Accounting' %}"
+         title="{% trans 'Відкрити або створити рахунок-фактуру для цього замовлення в модулі Accounting' %}"
          style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
                 text-decoration:none;font-weight:bold;display:inline-block;white-space:nowrap">
         💰 {% trans "Рахунок" %}
@@ -16,7 +16,7 @@
     <li>
       <button type="button" id="sv-sync-inv-btn"
               onclick="svSyncInventory({{ original.pk }})"
-              title="{% trans 'Порівняти рядки замовлення з транзакціями складу та виправити розбіжності' %}"
+              title="{% trans 'Порівняти позиції замовлення з рухами на складі та усунути розбіжності в кількостях' %}"
               style="background:#e65100;color:#fff;padding:6px 14px;border-radius:6px;
                      font-weight:bold;border:none;cursor:pointer;font-size:13px;white-space:nowrap">
         🔄 {% trans "Синхронізувати склад" %}
@@ -28,7 +28,7 @@
     <li>
       <a id="eu-inv-btn"
          href="/invoices/?auto={{ order_number_for_invoice }}"
-         title="{% trans 'Згенерувати інвойс Sevskiy GmbH для DigiKey Marketplace (відкриється у новій вкладці з авто-заповненням)' %}"
+         title="{% trans 'Відкрити генератор інвойсів Sevskiy GmbH → DigiKey Marketplace з авто-заповненням номера замовлення' %}"
          style="background:#7b1fa2;color:#fff;padding:6px 14px;border-radius:6px;
                 font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px;
                 text-decoration:none;display:inline-block">
@@ -40,7 +40,7 @@
     <li>
       <a href="{{ digikey_packlist_url }}" target="_blank"
          class="historylink"
-         title="{% trans 'Відкрити пакувальний лист для DigiKey Marketplace' %}"
+         title="{% trans 'Згенерувати пакувальний лист (Pack List) для відправлення через DigiKey Marketplace' %}"
          style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
                 text-decoration:none;font-weight:bold;display:inline-block;white-space:nowrap">
         📦 Pack List (DigiKey)
@@ -62,7 +62,7 @@
     <li>
       <a href="{{ digikey_ship_url }}"
          class="historylink"
-         title="{% trans 'Позначити відправлення в DigiKey Marketplace API — введення трекінгу, інвойсу, кількостей' %}"
+         title="{% trans 'Відкрити форму відправлення DigiKey: вказати трекінг UPS/FedEx, номер інвойсу та підтвердити відвантаження через Marketplace API' %}"
          style="background:#e65100;color:#fff;padding:6px 14px;border-radius:6px;
                 text-decoration:none;font-weight:bold;display:inline-block;white-space:nowrap">
         📤 Відправити на DigiKey
@@ -73,7 +73,7 @@
     <li>
       <button type="button" id="dk-fetch-tracking-btn"
               onclick="dkFetchTracking('{{ digikey_fetch_tracking_url }}')"
-              title="{% trans 'Отримати номер відстеження та статус з DigiKey Marketplace і зберегти в замовлення' %}"
+              title="{% trans 'Запитати трекінг-номер і кур'єра з DigiKey Marketplace API та вставити в поля форми. Після цього натисніть Зберегти.' %}"
               style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
                      font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
         🔄 Трекінг з DigiKey
@@ -84,7 +84,7 @@
     <li>
       <button type="button" id="push-to-shipping-btn"
               onclick="pushToShipping('/admin/sales/salesorder/{{ original.pk }}/push-to-shipping/')"
-              title="{% trans 'Створити або оновити Shipment з трекінгом та відкрити сторінку відстеження' %}"
+              title="{% trans 'Якщо картки відправлення немає — створить нову в розділі Доставка з трекінг-номером. Якщо вже є — оновить трекінг і кур'єра. Після цього кнопка стане посиланням на картку Shipment.' %}"
               style="background:var(--ok,#2e7d32);color:#fff;padding:6px 14px;border-radius:6px;
                      font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px">
         📦 Відстежувати
@@ -254,6 +254,12 @@
 </script>
 <script>
 function pushToShipping(url) {
+  const trackEl = document.getElementById('id_tracking_number');
+  const trackNo = trackEl ? trackEl.value.trim() : '';
+  const msg = trackNo
+    ? `Створити або оновити картку відправлення у розділі Доставка.\n\nТрекінг-номер: ${trackNo}\n\nЯкщо картки ще немає — буде створена нова.\nЯкщо вже існує — трекінг і кур'єра буде оновлено.\n\nПродовжити?`
+    : 'Створити або оновити картку відправлення у розділі Доставка.\n\nПродовжити?';
+  if (!confirm(msg)) return;
   const btn = document.getElementById('push-to-shipping-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Створення...'; }
   const csrf = (document.cookie.split(';').find(c => c.trim().startsWith('csrftoken=')) || '').split('=')[1] || '';
@@ -277,6 +283,7 @@ function pushToShipping(url) {
     });
 }
 function dkFetchTracking(url) {
+  if (!confirm('Запитати трекінг-номер і кур\'єра з DigiKey Marketplace API та автоматично вставити в поля форми.\n\nВажливо: дані форми не збережуться — після оновлення потрібно натиснути «Зберегти» вручну.\n\nПродовжити?')) return;
   const btn = document.getElementById('dk-fetch-tracking-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Запит...'; }
   const csrf = (document.cookie.split(';').find(c => c.trim().startsWith('csrftoken=')) || '').split('=')[1] || '';
