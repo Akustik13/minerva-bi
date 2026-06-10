@@ -377,6 +377,18 @@
         <button class="btn-gold" id="btnFetch" style="width:100%">
           🔍 Отримати дані з DigiKey API
         </button>
+        <!-- Recent DK orders picker -->
+        <div id="recentOrdersWrap" style="margin-top:14px;display:none">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;
+                      text-transform:uppercase;margin-bottom:6px">
+            Останні замовлення DigiKey
+            <span id="recentEuToggle" style="cursor:pointer;color:var(--link);margin-left:8px;font-weight:400;text-transform:none">
+              Показати всі
+            </span>
+          </div>
+          <div id="recentOrdersList" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);
+               border-radius:6px;background:var(--bg)"></div>
+        </div>
       </div>
 
       <div id="alertBox"></div>
@@ -490,9 +502,18 @@
         </div>
         <!-- ── end calculator ────────────────────────────────────────────── -->
 
-        <button class="btn-gold" id="btnConfirm" style="width:100%">
-          ✅ Підтвердити та згенерувати інвойс
-        </button>
+        <div style="display:flex;gap:10px;margin-top:0">
+          <button class="btn-gold" id="btnConfirm" style="flex:1">
+            ✅ Підтвердити та згенерувати інвойс
+          </button>
+          <button class="btn-sec" id="btnRegenerate" style="white-space:nowrap"
+                  title="Змінити округлення, повернутись до вибору параметрів">
+            🔄 Перегенерувати
+          </button>
+        </div>
+        <div id="dupWarnBox" style="display:none;margin-top:8px;padding:10px 14px;
+             border-radius:6px;background:rgba(229,57,53,.1);border:1px solid rgba(229,57,53,.3);
+             font-size:12px;color:var(--err)"></div>
       </div>
 
       <div class="manual-section" id="manualSection">
@@ -1198,6 +1219,118 @@ function setLoading(id, loading, label) {
     .catch(() => { msg.style.color = 'var(--err)'; msg.textContent = 'Помилка мережі'; });
   };
 })();
+
+// ── Recent DK orders picker ───────────────────────────────────────────────
+let _recentOrders = [];
+let _showAllRecent = false;
+
+function loadRecentOrders() {
+  fetch('/invoices/dk-orders/')
+    .then(r => r.json())
+    .then(d => {
+      _recentOrders = d.orders || [];
+      renderRecentOrders();
+      if (_recentOrders.length) {
+        document.getElementById('recentOrdersWrap').style.display = '';
+      }
+    })
+    .catch(() => {});
+}
+
+function renderRecentOrders() {
+  const list = document.getElementById('recentOrdersList');
+  let rows = _showAllRecent ? _recentOrders : _recentOrders.filter(o => o.is_eu);
+  if (!rows.length) {
+    list.innerHTML = '<div style="padding:10px 12px;font-size:12px;color:var(--text-muted)">Немає замовлень</div>';
+    return;
+  }
+  list.innerHTML = rows.map(o => `
+    <div onclick="pickOrder('${o.order_number}')"
+         style="display:flex;align-items:center;gap:8px;padding:8px 12px;cursor:pointer;
+                border-bottom:1px solid var(--border);transition:background .1s"
+         onmouseover="this.style.background='var(--border)'"
+         onmouseout="this.style.background=''">
+      <span style="font-family:monospace;font-size:12px;color:var(--text);min-width:80px">${o.order_number}</span>
+      <span style="font-size:11px;color:var(--text-muted);min-width:72px">${o.order_date}</span>
+      <span style="font-size:11px;color:var(--text-dim);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${o.company || '—'}</span>
+      <span style="font-size:10px;background:rgba(33,150,243,.15);color:#42a5f5;
+                   padding:1px 6px;border-radius:3px;white-space:nowrap">${o.country}</span>
+      ${o.has_invoice
+        ? `<a href="/invoices/${o.invoice_pk}/" target="_blank" onclick="event.stopPropagation()"
+              style="font-size:10px;color:var(--ok);white-space:nowrap">✅ #${o.invoice_number}</a>`
+        : '<span style="font-size:10px;color:var(--text-muted)">без інвойсу</span>'
+      }
+    </div>
+  `).join('');
+}
+
+function pickOrder(no) {
+  document.getElementById('dkOrderNo').value = no;
+  document.getElementById('btnFetch').click();
+}
+
+document.getElementById('recentEuToggle').addEventListener('click', function() {
+  _showAllRecent = !_showAllRecent;
+  this.textContent = _showAllRecent ? 'Тільки ЄС' : 'Показати всі';
+  renderRecentOrders();
+});
+
+// Load recent orders when modal opens
+const _origOpenModal = openModal;
+openModal = function() {
+  _origOpenModal();
+  loadRecentOrders();
+};
+
+// ── Regenerate button ─────────────────────────────────────────────────────
+document.getElementById('btnRegenerate').addEventListener('click', function() {
+  if (!_currentOrderData) return;
+  // Re-open rounding dialog if needed, else re-render preview directly
+  _pendingRoundOd = _currentOrderData;
+  const maxDec = _maxPriceDecimals(_currentOrderData.items);
+  if (maxDec > 2) {
+    document.getElementById('roundMaxDecLabel').textContent = maxDec;
+    document.getElementById('roundBackdrop').style.display = 'flex';
+  } else {
+    // Just re-render to allow invoice number change
+    renderPreview(_currentOrderData);
+  }
+  document.getElementById('dupWarnBox').style.display = 'none';
+});
+
+// ── Duplicate invoice number check before generate ────────────────────────
+const _origBtnConfirm = document.getElementById('btnConfirm');
+_origBtnConfirm.addEventListener('click', async function(e) {
+  // Intercept only if we haven't already confirmed
+  if (this.dataset.confirmed === '1') {
+    this.dataset.confirmed = '0';
+    return; // proceed normally via existing handler
+  }
+  const numEl = document.getElementById('p_invoice_number');
+  const num = numEl ? numEl.value.trim() : '';
+  if (!num) return;
+  try {
+    const r = await fetch(`/invoices/check-number/?number=${encodeURIComponent(num)}`);
+    const d = await r.json();
+    if (d.exists) {
+      e.stopImmediatePropagation();
+      const box = document.getElementById('dupWarnBox');
+      box.style.display = '';
+      box.innerHTML = `⚠️ Інвойс з номером <strong>#${num}</strong> вже існує. ` +
+        `<a href="${d.detail_url}" target="_blank" style="color:var(--err);font-weight:700">Переглянути</a> · ` +
+        `<button onclick="forceGenerate()" style="background:none;border:none;color:var(--err);` +
+        `cursor:pointer;text-decoration:underline;font-size:12px;padding:0">` +
+        `Згенерувати все одно</button>`;
+    }
+  } catch(_) {}
+}, true); // capture phase to run before existing handler
+
+function forceGenerate() {
+  document.getElementById('dupWarnBox').style.display = 'none';
+  const btn = document.getElementById('btnConfirm');
+  btn.dataset.confirmed = '1';
+  btn.click();
+}
 
 // Auto-open modal if ?auto=ORDER_NUMBER is in URL
 (function() {

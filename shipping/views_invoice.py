@@ -324,6 +324,68 @@ def invoice_delete(request, pk):
     return render(request, "invoices/confirm_delete.html", {"inv": inv})
 
 
+@_staff
+def invoice_dk_orders(request):
+    """GET — recent DigiKey EU SalesOrders for the order picker in the invoice modal."""
+    EU = {
+        "AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI",
+        "FR","GR","HR","HU","IE","IT","LT","LU","LV","MT",
+        "NL","PL","PT","RO","SE","SI","SK",
+    }
+    try:
+        from sales.models import SalesOrder
+        from django.db.models import Q as _Q
+
+        orders_qs = (
+            SalesOrder.objects
+            .filter(source="digikey")
+            .order_by("-order_date", "-pk")
+            [:60]
+        )
+        # Fetch existing invoices for these orders in one query
+        order_pks = [o.pk for o in orders_qs]
+        existing = {}
+        try:
+            for inv in Invoice.objects.filter(sales_order_id__in=order_pks).values(
+                "sales_order_id", "pk", "invoice_number"
+            ):
+                existing[inv["sales_order_id"]] = inv
+        except Exception:
+            pass
+
+        result = []
+        for o in orders_qs:
+            inv_data = existing.get(o.pk)
+            result.append({
+                "order_number": o.order_number,
+                "order_date":   o.order_date.strftime("%d.%m.%Y") if o.order_date else "—",
+                "company":      o.ship_company or o.ship_name or "",
+                "country":      o.addr_country or "",
+                "is_eu":        (o.addr_country or "").upper() in EU,
+                "has_invoice":  bool(inv_data),
+                "invoice_number": inv_data["invoice_number"] if inv_data else None,
+                "invoice_pk":   inv_data["pk"] if inv_data else None,
+            })
+        return JsonResponse({"orders": result})
+    except Exception as e:
+        logger.exception("invoice_dk_orders error")
+        return JsonResponse({"orders": [], "error": str(e)})
+
+
+@_staff
+def invoice_check_number(request):
+    """GET ?number=X — check if invoice with that number already exists."""
+    number = (request.GET.get("number") or "").strip()
+    if not number:
+        return JsonResponse({"exists": False})
+    inv = Invoice.objects.filter(invoice_number=number).first()
+    if inv:
+        return JsonResponse({"exists": True, "pk": inv.pk,
+                             "invoice_number": inv.invoice_number,
+                             "detail_url": f"/invoices/{inv.pk}/"})
+    return JsonResponse({"exists": False})
+
+
 # ── Invoice template management ────────────────────────────────────────────
 
 @_staff
