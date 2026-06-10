@@ -33,6 +33,7 @@ class Invoice(models.Model):
 
     line_items         = models.JSONField("Позиції", default=list, blank=True)
     docx_file          = models.FileField("Файл .docx", upload_to="invoices/", null=True, blank=True)
+    pdf_file           = models.FileField("Файл .pdf",  upload_to="invoices/", null=True, blank=True)
 
     created_by         = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,

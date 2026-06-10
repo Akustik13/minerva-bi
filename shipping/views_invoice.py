@@ -96,6 +96,7 @@ def invoice_generate(request):
             "shipping_charges":   str(inv.shipping_charges),
             "vat_amount":         str(inv.vat_amount),
             "total_amount":       str(inv.total_amount),
+            "pdf_url":            f"/invoices/{inv.pk}/pdf/",
             "download_url":       f"/invoices/{inv.pk}/download/",
             "detail_url":         f"/invoices/{inv.pk}/",
         })
@@ -148,7 +149,37 @@ def invoice_fetch_preview(request, dk_order_no):
 
 @_staff
 def invoice_pdf_view(request, pk):
+    from pathlib import Path
+    from shipping.services.invoice_service import convert_docx_to_pdf
+
     inv = get_object_or_404(Invoice, pk=pk)
+
+    # 1. Serve stored PDF if available
+    if inv.pdf_file:
+        pdf_path = Path(settings.MEDIA_ROOT) / str(inv.pdf_file)
+        if pdf_path.exists():
+            return FileResponse(
+                open(pdf_path, "rb"),
+                content_type="application/pdf",
+                filename=f"Invoice_{inv.invoice_number}.pdf",
+            )
+
+    # 2. Convert from .docx on-the-fly (for older invoices without stored PDF)
+    if inv.docx_file:
+        docx_path = Path(settings.MEDIA_ROOT) / str(inv.docx_file)
+        if docx_path.exists():
+            output_dir = Path(settings.MEDIA_ROOT) / "invoices"
+            pdf_path = convert_docx_to_pdf(docx_path, output_dir)
+            if pdf_path and pdf_path.exists():
+                inv.pdf_file = f"invoices/{pdf_path.name}"
+                inv.save(update_fields=["pdf_file"])
+                return FileResponse(
+                    open(pdf_path, "rb"),
+                    content_type="application/pdf",
+                    filename=f"Invoice_{inv.invoice_number}.pdf",
+                )
+
+    # 3. Fallback: printable HTML page
     return render(request, "invoices/pdf.html", {"inv": inv})
 
 

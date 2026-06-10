@@ -298,8 +298,9 @@
           </td>
           <td>
             <div class="actions">
+              <a href="/invoices/{{ inv.pk }}/pdf/" class="btn-sm" target="_blank" title="PDF">🖨️</a>
               {% if inv.docx_file %}
-              <a href="/invoices/{{ inv.pk }}/download/" class="btn-sm" title="Завантажити">⬇ docx</a>
+              <a href="/invoices/{{ inv.pk }}/download/" class="btn-sm" title="Завантажити .docx">⬇</a>
               {% endif %}
               <a href="/invoices/{{ inv.pk }}/" class="btn-sm" title="Деталі">🔍</a>
               <button class="btn-sm danger" onclick="deleteInvoice({{ inv.pk }}, '{{ inv.invoice_number }}')" title="Видалити">🗑</button>
@@ -533,7 +534,8 @@
         <h3 id="successTitle"></h3>
         <p id="successSub"></p>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
-          <a id="btnDownload" href="#" class="btn-gold">⬇ Завантажити .docx</a>
+          <a id="btnPdf" href="#" class="btn-gold" target="_blank">🖨️ PDF</a>
+          <a id="btnDownload" href="#" class="btn-sm">⬇ .docx</a>
           <button class="btn-sm" onclick="location.reload()">🔄 Закрити та оновити</button>
         </div>
       </div>
@@ -865,7 +867,8 @@ function showSuccess(data) {
   document.getElementById('stepSuccess').style.display = '';
   document.getElementById('successTitle').textContent = `Invoice #${data.invoice_number}`;
   document.getElementById('successSub').textContent = `Разом: ${data.total_amount} USD`;
-  document.getElementById('btnDownload').href = data.download_url;
+  document.getElementById('btnPdf').href      = data.pdf_url      || (data.detail_url + 'pdf/');
+  document.getElementById('btnDownload').href = data.download_url || '#';
 }
 
 function showManualSection(no) {
@@ -962,7 +965,8 @@ function addTableRow(data) {
     <td style="text-align:right;font-family:monospace;font-weight:600;color:var(--gold)">${tot.toFixed(2)}</td>
     <td><span class="badge-file">✅ docx</span></td>
     <td><div class="actions">
-      <a href="${data.download_url}" class="btn-sm">⬇ docx</a>
+      <a href="${data.pdf_url||data.detail_url+'pdf/'}" class="btn-sm" target="_blank" title="PDF">🖨️</a>
+      <a href="${data.download_url}" class="btn-sm" title=".docx">⬇</a>
       <a href="${data.detail_url}" class="btn-sm">🔍</a>
       <button class="btn-sm danger" onclick="deleteInvoice(${data.invoice_id},'${data.invoice_number}')">🗑</button>
     </div></td>`;

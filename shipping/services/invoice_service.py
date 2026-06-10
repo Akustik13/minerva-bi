@@ -15,6 +15,37 @@ logger = logging.getLogger(__name__)
 _ORDERS_API_BASE = "/Sales/Marketplace2/Orders/v1"
 
 
+def convert_docx_to_pdf(docx_path: Path, output_dir: Path) -> Path | None:
+    """
+    Convert .docx → .pdf via LibreOffice headless.
+    Returns Path to the generated PDF, or None on failure.
+    libreoffice-writer must be installed in the container (it is — see Dockerfile).
+    """
+    import subprocess
+    try:
+        result = subprocess.run(
+            [
+                "libreoffice", "--headless",
+                "--convert-to", "pdf",
+                "--outdir", str(output_dir),
+                str(docx_path),
+            ],
+            capture_output=True,
+            timeout=60,
+        )
+        if result.returncode == 0:
+            pdf_path = output_dir / (docx_path.stem + ".pdf")
+            if pdf_path.exists():
+                logger.debug("PDF generated: %s", pdf_path)
+                return pdf_path
+        logger.warning("LibreOffice exit %s: %s", result.returncode, result.stderr[:200])
+    except FileNotFoundError:
+        logger.warning("libreoffice not found in PATH — PDF generation skipped")
+    except Exception as e:
+        logger.warning("convert_docx_to_pdf error: %s", e)
+    return None
+
+
 def get_next_invoice_number() -> str:
     """Auto-increment invoice number: max(DB, files in MEDIA/invoices/) + 1."""
     from shipping.models import Invoice
@@ -256,6 +287,9 @@ class InvoiceService:
         output_path = cls.OUTPUT_DIR / f"Invoice_{invoice_number}.docx"
         generate(order_dict, output_path, cls.TEMPLATE_PATH)
 
+        # Convert to PDF via LibreOffice (non-fatal if unavailable)
+        pdf_path = convert_docx_to_pdf(output_path, cls.OUTPUT_DIR)
+
         T = totals(order_dict)
 
         # Link to existing SalesOrder by digikey_order_no if found
@@ -283,6 +317,7 @@ class InvoiceService:
             shipped_to_vat     = order_data["shipped_to"].get("vat_id", ""),
             line_items         = order_data.get("items") or [],
             docx_file          = f"invoices/Invoice_{invoice_number}.docx",
+            pdf_file           = f"invoices/Invoice_{invoice_number}.pdf" if pdf_path else None,
             created_by         = user,
         )
 
