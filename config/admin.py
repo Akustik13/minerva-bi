@@ -240,7 +240,8 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
 
     readonly_fields = (
         "alert_actions", "last_alert_sent",
-        "new_order_test_actions",
+        "new_order_preview",
+        "dk_confirm_preview",
         "digest_actions", "digest_last_sent",
         "imap_actions", "imap_last_fetched",
         "weekly_digest_actions", "weekly_digest_last_sent",
@@ -294,7 +295,7 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         ("📬 Нові замовлення", {
             "fields": (
                 ("new_order_email", "new_order_telegram"),
-                "new_order_test_actions",
+                "new_order_preview",
             ),
             "description": (
                 "Миттєве сповіщення при надходженні нового замовлення (з будь-якого джерела). "
@@ -304,25 +305,12 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
         ("🤖 DigiKey авто-підтвердження", {
             "fields": (
                 ("dk_auto_confirm_email", "dk_auto_confirm_telegram"),
+                "dk_confirm_preview",
             ),
             "description": (
-                "Сповіщення коли DigiKey замовлення підтверджено автоматично системою. "
-                "Окремий прапор — щоб не отримувати дві картки на одне DigiKey замовлення. "
-                "Якщо увімкнено «Нові замовлення» і «DigiKey авто» одночасно — прийде 2 повідомлення. "
-                "Рекомендація: увімкніть одне з двох.\n\n"
-                "Приклад Telegram:\n"
-                "🏛️ Sevskiy GmbH\n"
-                "✅ DigiKey: авто-підтверджено · 09.06.2026 16:01\n\n"
-                "📋 99705503 · digikey\n"
-                "👤 UNIVERSITY COLLEGE LONDON\n"
-                "   📊 Замовлень всього: 1\n"
-                "📍 Велика Британія\n"
-                "📦 Дедлайн: 24.06.2026 (15 дн.)\n"
-                "💰 97.97 USD\n"
-                "🤖 Підтверджено автоматично (always)\n\n"
-                "📦 Товари:\n"
-                "• AN220207-001\n"
-                "   📦 × 2 шт · 💵 48.98 USD/шт · 📄 Datasheet"
+                "Окремий прапор від «Нові замовлення» — щоб уникнути дублювання. "
+                "Рекомендація: увімкніть одне з двох. "
+                "Нижче — живий приклад на основі реального замовлення з БД."
             ),
         }),
         ("⚙️ Вміст сповіщень (Нові замовлення + DigiKey)", {
@@ -554,6 +542,11 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 name="config_notificationsettings_test_new_order",
             ),
             path(
+                "<int:pk>/test-dk-confirm/",
+                self.admin_site.admin_view(self._test_dk_confirm),
+                name="config_notificationsettings_test_dk_confirm",
+            ),
+            path(
                 "<int:pk>/send-digest/",
                 self.admin_site.admin_view(self._send_digest),
                 name="config_notificationsettings_send_digest",
@@ -649,25 +642,295 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
             messages.error(request, f"❌ Помилка: {e}")
         return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
 
-    def new_order_test_actions(self, obj):
+    # ── Telegram preview helpers ───────────────────────────────────────────────
+
+    @staticmethod
+    def _tg_preview_card(html_lines: list, order_number: str) -> str:
+        """Render Telegram-style preview card from a list of HTML line strings."""
+        from django.utils.safestring import mark_safe
+        from django.utils.html import escape
+        body = mark_safe('<br>'.join(html_lines))
+        return (
+            f'<div style="font-size:11px;color:var(--text-dim,#607d8b);margin-bottom:6px">'
+            f'Приклад на основі замовлення <b>{escape(order_number)}</b></div>'
+            f'<div style="background:#17212b;color:#e8f0f7;border-radius:12px;'
+            f'padding:16px 20px;font-family:system-ui,sans-serif;font-size:13px;'
+            f'line-height:1.8;max-width:520px;border:1px solid #2b5278;'
+            f'margin-bottom:12px">{body}</div>'
+        )
+
+    def _build_order_preview_lines(self, order, mode='new_order', ns=None):
+        """Build HTML lines for Telegram preview from a real order."""
+        from django.utils import timezone
+        from django.utils.html import escape
+        from django.db.models import Sum
+
+        _CNAMES = {
+            'AT':'Австрія','BE':'Бельгія','BG':'Болгарія','CH':'Швейцарія','CY':'Кіпр',
+            'CZ':'Чехія','DE':'Німеччина','DK':'Данія','EE':'Естонія','ES':'Іспанія',
+            'FI':'Фінляндія','FR':'Франція','GB':'Велика Британія','GR':'Греція',
+            'HR':'Хорватія','HU':'Угорщина','IE':'Ірландія','IT':'Італія','LT':'Литва',
+            'LU':'Люксембург','LV':'Латвія','MT':'Мальта','NL':'Нідерланди','NO':'Норвегія',
+            'PL':'Польща','PT':'Португалія','RO':'Румунія','SE':'Швеція','SI':'Словенія',
+            'SK':'Словаччина','UA':'Україна','US':'США','CA':'Канада','AU':'Австралія',
+            'JP':'Японія','CN':'Китай','TR':'Туреччина',
+        }
+
+        try:
+            from config.models import SystemSettings
+            cname = SystemSettings.get().company_name or 'Minerva'
+        except Exception:
+            cname = 'Minerva'
+
+        _g = lambda f, d=True: getattr(ns, f, d) if ns else d
+        _inc_crm      = _g('notify_include_crm_count')
+        _inc_deadline = _g('notify_include_deadline')
+        _inc_total    = _g('notify_include_total')
+        _inc_stock    = _g('notify_include_stock_info')
+        _inc_ds       = _g('notify_include_datasheet')
+        _inc_img      = _g('notify_include_images')
+
+        client      = escape(order.client or order.email or '—')
+        cc          = (getattr(order, 'addr_country', '') or '').strip().upper()
+        destination = escape(_CNAMES.get(cc, cc))
+        now_str     = timezone.now().strftime('%d.%m.%Y %H:%M')
+
+        # CRM
+        crm_orders = None
+        if _inc_crm:
+            try:
+                cust = order.crm_customer
+                if cust:
+                    crm_orders = cust.total_orders()
+            except Exception:
+                pass
+
+        # Deadline
+        deadline_str = days_left_str = ''
+        days_left = None
+        if _inc_deadline and order.shipping_deadline:
+            deadline_str = order.shipping_deadline.strftime('%d.%m.%Y')
+            days_left = (order.shipping_deadline - timezone.now().date()).days
+            if days_left > 1:
+                days_left_str = f'{days_left} дн.'
+            elif days_left == 1:
+                days_left_str = 'Завтра ⚠️'
+            elif days_left == 0:
+                days_left_str = 'Сьогодні! ⚠️'
+            else:
+                days_left_str = f'Прострочено ({-days_left} дн.) 🔴'
+
+        # Total
+        total_str = ''
+        if _inc_total:
+            try:
+                t = order.lines.aggregate(s=Sum('total_price'))['s']
+                if t:
+                    total_str = f'{float(t):.2f} {order.currency or ""}'.strip()
+            except Exception:
+                pass
+
+        L = []
+        L.append(f'🏛️ <b style="color:#e8f0f7">{escape(cname)}</b>')
+        if mode == 'dk_confirm':
+            L.append(f'✅ <b>DigiKey: авто-підтверджено</b> · <i style="color:#8ab4d1">{now_str}</i>')
+        else:
+            L.append(f'🆕 <b>Нове замовлення</b> · <i style="color:#8ab4d1">{now_str}</i>')
+        L.append('')
+        L.append(
+            f'📋 <code style="background:#1e3a5f;padding:1px 5px;border-radius:4px">'
+            f'{escape(order.order_number)}</code> · {escape(order.source or "digikey")}'
+        )
+        L.append(f'👤 <b>{client}</b>')
+        if _inc_crm and crm_orders is not None:
+            L.append(f'&nbsp;&nbsp;&nbsp;📊 Замовлень всього: <b>{crm_orders}</b>')
+        if destination:
+            L.append(f'📍 {destination}')
+        if deadline_str:
+            dl_warn = ' ⚠️' if days_left is not None and days_left <= 2 else ''
+            L.append(
+                f'📦 Дедлайн: <b>{deadline_str}</b>'
+                f' <span style="color:#8ab4d1">({escape(days_left_str)})</span>{dl_warn}'
+            )
+        if total_str:
+            L.append(f'💰 <b style="color:#7dd47d">{escape(total_str)}</b>')
+        if mode == 'dk_confirm':
+            L.append(f'🤖 <i style="color:#8ab4d1">Підтверджено автоматично (always)</i>')
+
+        # Products
+        try:
+            order_lines = list(order.lines.select_related('product').all())
+        except Exception:
+            order_lines = []
+
+        if order_lines:
+            L.append('')
+            L.append('📦 <b>Товари:</b>')
+            for ol in order_lines:
+                p   = ol.product
+                sku = escape((p.sku if p else getattr(ol, 'sku_raw', None)) or '—')
+                qty = ol.qty or 0
+                try:
+                    qty_str = str(int(qty)) if float(qty) == int(float(qty)) else str(qty)
+                except Exception:
+                    qty_str = str(qty)
+                curr = escape(ol.currency or getattr(order, 'currency', '') or '')
+
+                # stock for new_order mode
+                stock_icon = '•'
+                if mode == 'new_order' and _inc_stock and p:
+                    try:
+                        from django.db.models import Sum as _S
+                        from inventory.models import InventoryTransaction as _IT
+                        stock = int(_IT.objects.filter(product=p).aggregate(t=_S('qty'))['t'] or 0)
+                        stock_icon = '✅' if stock >= (ol.qty or 0) else '❌'
+                    except Exception:
+                        pass
+
+                L.append(
+                    f'{stock_icon} <code style="background:#1e3a5f;padding:1px 5px;'
+                    f'border-radius:4px">{sku}</code>'
+                )
+                L.append(f'&nbsp;&nbsp;&nbsp;📦 × <b>{qty_str} шт</b>')
+                if ol.unit_price:
+                    L.append(
+                        f'&nbsp;&nbsp;&nbsp;💵 <span style="color:#8ab4d1">'
+                        f'{float(ol.unit_price):.2f} {curr}/шт</span>'
+                    )
+                if mode == 'new_order' and _inc_stock and p:
+                    try:
+                        from inventory.models import InventoryTransaction as _IT2
+                        from django.db.models import Sum as _S2
+                        stk = int(_IT2.objects.filter(product=p).aggregate(t=_S2('qty'))['t'] or 0)
+                        icon2 = '✅' if stk >= (ol.qty or 0) else '❌'
+                        L.append(f'&nbsp;&nbsp;&nbsp;🏪 склад: <b>{stk} шт</b> {icon2}')
+                    except Exception:
+                        pass
+                if _inc_ds and p and getattr(p, 'datasheet_url', ''):
+                    L.append(
+                        f'&nbsp;&nbsp;&nbsp;📄 <a href="{escape(p.datasheet_url)}" '
+                        f'style="color:#6ab4f5">Datasheet</a>'
+                    )
+        if _inc_img and order_lines:
+            imgs = [
+                p.image_url or ''
+                for ol in order_lines
+                for p in [ol.product]
+                if p and getattr(p, 'image_url', '')
+            ]
+            if imgs:
+                L.append(
+                    f'<br><span style="color:#607d8b;font-size:11px">'
+                    f'🖼️ {len(imgs)} фото надійде окремим альбомом</span>'
+                )
+        return L
+
+    def _test_dk_confirm(self, request, pk):
+        from django.contrib import messages
+        from sales.models import SalesOrder
+        from dashboard.notifications import notify_digikey_auto_confirmed
+        order_ref = request.GET.get('order_ref', '').strip()
+        if order_ref:
+            order = SalesOrder.objects.filter(order_number=order_ref).first()
+            if not order:
+                messages.error(request, f"❌ Замовлення «{order_ref}» не знайдено.")
+                return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        else:
+            order = (
+                SalesOrder.objects
+                .filter(source__icontains='digikey')
+                .order_by('-order_date', '-pk')
+                .first()
+            ) or SalesOrder.objects.order_by('-order_date', '-pk').first()
+        if not order:
+            messages.warning(request, "⚠️ Немає замовлень для тесту.")
+            return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+        try:
+            notify_digikey_auto_confirmed(order, mode='always')
+            messages.success(
+                request,
+                f"✅ Тест DigiKey авто-підтвердження надіслано · {order.order_number}."
+            )
+        except Exception as e:
+            messages.error(request, f"❌ Помилка: {e}")
+        return redirect(reverse("admin:config_notificationsettings_change", args=[1]))
+
+    def _preview_widget(self, obj, mode, input_id, url_suffix, btn_label, btn_color='#0088cc'):
+        """Render preview card + test button for a given mode."""
+        from django.utils.safestring import mark_safe
+        from django.utils.html import escape
+        from sales.models import SalesOrder
+
+        if mode == 'dk_confirm':
+            order = (
+                SalesOrder.objects
+                .prefetch_related('lines__product')
+                .filter(source__icontains='digikey')
+                .order_by('-order_date', '-pk')
+                .first()
+            ) or SalesOrder.objects.prefetch_related('lines__product').order_by('-order_date', '-pk').first()
+        else:
+            order = (
+                SalesOrder.objects
+                .prefetch_related('lines__product')
+                .order_by('-order_date', '-pk')
+                .first()
+            )
+
+        if not order:
+            no_data = '<span style="color:var(--text-dim)">Немає замовлень у БД для прикладу</span>'
+            return mark_safe(no_data)
+
+        lines = self._build_order_preview_lines(order, mode=mode, ns=obj)
+        card  = self._tg_preview_card(lines, order.order_number)
+
+        placeholder = (
+            '№ DigiKey замовлення (або порожньо = останнє DigiKey)'
+            if mode == 'dk_confirm'
+            else '№ замовлення (або порожньо = останнє)'
+        )
+
+        controls = (
+            f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+            f'<input type="text" id="{input_id}"'
+            f' placeholder="{escape(placeholder)}"'
+            f' style="padding:7px 10px;border:1px solid var(--border-strong,#2a3f52);'
+            f'border-radius:6px;background:var(--bg-input,#141f2b);'
+            f'color:var(--text,#c9d8e4);font-size:13px;width:320px">'
+            f'<button type="button"'
+            f' onclick="var v=document.getElementById(\'{input_id}\').value.trim();'
+            f'window.location.href=\'../{url_suffix}/\'+(v?\'?order_ref=\'+encodeURIComponent(v):\'\');"'
+            f' style="padding:8px 18px;background:{btn_color};color:#fff;border:none;'
+            f'border-radius:6px;font-weight:600;font-size:13px;cursor:pointer">'
+            f'{btn_label}</button>'
+            f'</div>'
+        )
+
+        return mark_safe(card + controls)
+
+    def new_order_preview(self, obj):
         if not obj or not obj.pk:
             return "—"
-        return format_html(
-            '<span style="display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap">'
-            '<input type="text" id="mv_test_order_ref"'
-            ' placeholder="№ замовлення (або порожньо = останнє)"'
-            ' style="padding:7px 10px;border:1px solid var(--border-strong,#2a3f52);'
-            'border-radius:6px;background:var(--bg-input,#141f2b);'
-            'color:var(--text,#c9d8e4);font-size:13px;width:260px">'
-            '<button type="button"'
-            ' onclick="var v=document.getElementById(\'mv_test_order_ref\').value.trim();'
-            'window.location.href=\'../test-new-order/\'+(v?\'?order_ref=\'+encodeURIComponent(v):\'\');"'
-            ' style="padding:8px 18px;background:#2e7d32;color:#fff;border:none;'
-            'border-radius:6px;font-weight:600;font-size:13px;cursor:pointer">'
-            '🧪 Надіслати тест</button>'
-            '</span>'
+        return self._preview_widget(
+            obj, mode='new_order',
+            input_id='mv_no_order_ref',
+            url_suffix='test-new-order',
+            btn_label='📱 Надіслати тест',
+            btn_color='#2e7d32',
         )
-    new_order_test_actions.short_description = "Тест нового замовлення"
+    new_order_preview.short_description = "Приклад повідомлення"
+
+    def dk_confirm_preview(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        return self._preview_widget(
+            obj, mode='dk_confirm',
+            input_id='mv_dk_order_ref',
+            url_suffix='test-dk-confirm',
+            btn_label='📱 Надіслати тест',
+            btn_color='#0088cc',
+        )
+    dk_confirm_preview.short_description = "Приклад повідомлення"
 
     def _send_digest(self, request, pk):
         from django.contrib import messages
