@@ -5315,26 +5315,41 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if obj.delivered_at and start:
                 days = max(0, (obj.delivered_at - start).days)
                 d = obj.delivered_at.strftime("%d.%m.%Y")
+                # green = on time, red = late (compare to ETA if available)
+                if obj.carrier_eta:
+                    late = obj.delivered_at.date() > obj.carrier_eta
+                    day_color = "#f44336" if late else "#4caf50"
+                else:
+                    day_color = "#4caf50"
                 sub = f"{d} · доставлено за {_days_word(days)}"
             elif obj.delivered_at:
                 sub = obj.delivered_at.strftime("%d.%m.%Y")
+                day_color = "#4caf50"
             else:
                 sub = ""
+                day_color = "#4caf50"
             if sub:
                 return format_html(
-                    '{}<br><small style="color:#4caf50;opacity:.85;font-size:10px">{}</small>',
-                    main, sub,
+                    '{}<br><small style="color:{};opacity:.85;font-size:10px">{}</small>',
+                    main, day_color, sub,
                 )
             return main
 
         if obj.status == "in_transit":
+            today = tz.now().date()
             start = obj.submitted_at or obj.created_at
             if start:
                 days = max(0, (tz.now() - start).days)
                 transit_hint = f"в дорозі {_days_word(days)}"
+                # green = within ETA, red = overdue
+                if obj.carrier_eta:
+                    day_color = "#f44336" if today > obj.carrier_eta else "#4caf50"
+                else:
+                    day_color = "#ff9800"  # neutral orange — no ETA to compare
             else:
                 transit_hint = ""
-            # secondary line: ETA or carrier label or transit days
+                day_color = "#ff9800"
+            # secondary line: ETA + days count, or carrier label + days count
             sub = ""
             if obj.carrier_eta:
                 eta_str = obj.carrier_eta.strftime("%d.%m.%Y")
@@ -5350,9 +5365,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 sub = transit_hint
             if sub:
                 return format_html(
-                    '{}<br><small style="color:#ff9800;opacity:.85;font-size:10px;'
+                    '{}<br><small style="color:{};opacity:.9;font-weight:600;font-size:10px;'
                     'white-space:normal;max-width:170px;display:inline-block">{}</small>',
-                    main, sub,
+                    main, day_color, sub,
                 )
             return main
 
