@@ -848,10 +848,49 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 f'</td></tr>'
             )
 
+        # Linked invoices section
+        inv_rows = ''
+        try:
+            from django.db.models import Q as _Q
+            from shipping.models import Invoice as _Inv
+            inv_qs = _Inv.objects.filter(
+                _Q(sales_order=obj) | _Q(digikey_order_no=obj.order_number)
+            ).order_by("-invoice_number")
+            for inv in inv_qs:
+                inv_rows += (
+                    f'<tr style="border-bottom:1px solid var(--border-strong,#2a3f52)">'
+                    f'<td style="padding:8px 4px 8px 0">'
+                    f'<a href="/invoices/{inv.pk}/" target="_blank"'
+                    f' style="color:var(--text,#c9d8e4);text-decoration:none"'
+                    f' data-doc-pdf="/invoices/{inv.pk}/pdf/" data-doc-name="Invoice_{inv.invoice_number}.pdf">'
+                    f'🧾 Invoice #{inv.invoice_number}</a></td>'
+                    f'<td style="padding:8px 4px;text-align:right;color:var(--text-muted,#9aafbe);font-size:11px;white-space:nowrap">'
+                    f'{inv.total_amount:.2f} USD</td>'
+                    f'<td style="padding:8px 0;text-align:right;white-space:nowrap">'
+                    f'<a href="/invoices/{inv.pk}/pdf/" target="_blank"'
+                    f' style="background:#417690;color:#fff;text-decoration:none;padding:5px 10px;'
+                    f'border-radius:3px;font-size:11px;margin-right:4px">PDF</a>'
+                    f'<a href="/invoices/{inv.pk}/" target="_blank"'
+                    f' style="background:#2e7d32;color:#fff;text-decoration:none;padding:5px 10px;'
+                    f'border-radius:3px;font-size:11px">деталі</a>'
+                    f'</td></tr>'
+                )
+        except Exception:
+            pass
+
+        inv_section = ''
+        if inv_rows:
+            inv_section = (
+                f'<div style="color:#c9a84c;font-weight:bold;margin:14px 0 8px;font-size:13px">'
+                f'🧾 Інвойси</div>'
+                f'<table style="width:100%;border-collapse:collapse">{inv_rows}</table>'
+            )
+
         return (
             f'<div style="color:var(--text-muted,#9aafbe);font-weight:bold;margin-bottom:10px;font-size:13px">'
             f'📁 Завантажені документи ({len(files)})</div>'
             f'<table style="width:100%;border-collapse:collapse">{rows}</table>'
+            f'{inv_section}'
         )
 
     def documents_list(self, obj):
@@ -1538,10 +1577,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             # Linked invoices panel
             if obj and obj.pk:
                 try:
+                    from django.db.models import Q as _Q
                     from shipping.models import Invoice as _Inv
                     extra_context["order_invoices"] = list(
                         _Inv.objects.filter(
-                            digikey_order_no=obj.order_number
+                            _Q(sales_order=obj) | _Q(digikey_order_no=obj.order_number)
                         ).order_by("-invoice_number").values(
                             "pk", "invoice_number", "invoice_date",
                             "total_amount", "subtotal", "pdf_file",

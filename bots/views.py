@@ -361,9 +361,12 @@ def digikey_ship_order(request, order_pk):
     # Auto-fill invoice fields from existing Invoice record
     existing_invoice = None
     try:
+        from django.db.models import Q
         from shipping.models import Invoice as _Inv
         existing_invoice = (
-            _Inv.objects.filter(digikey_order_no=order.order_number)
+            _Inv.objects.filter(
+                Q(sales_order=order) | Q(digikey_order_no=order.order_number)
+            )
             .order_by("-invoice_date")
             .first()
         )
