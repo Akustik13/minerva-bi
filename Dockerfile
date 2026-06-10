@@ -32,4 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
+# Calibri fonts (proprietary — not committed to git, must be present in docker_fonts/)
+COPY docker_fonts/ /usr/share/fonts/truetype/calibri/
+RUN fc-cache -f -v
+
 COPY . /app

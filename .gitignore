@@ -1,3 +1,6 @@
+# ── Proprietary fonts (copy manually to docker_fonts/) ──
+docker_fonts/
+
 # ── Python ──────────────────────────────────────────────
 __pycache__/
 *.py[cod]
