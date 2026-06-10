@@ -379,15 +379,18 @@
         </button>
         <!-- Recent DK orders picker -->
         <div id="recentOrdersWrap" style="margin-top:14px;display:none">
-          <div style="font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;
-                      text-transform:uppercase;margin-bottom:6px">
+          <div onclick="toggleRecentOrders()" style="display:flex;align-items:center;gap:8px;cursor:pointer;
+                      font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.5px;
+                      text-transform:uppercase;margin-bottom:0;user-select:none">
+            <span id="recentChevron" style="font-size:10px">▶</span>
             Останні замовлення DigiKey
-            <span id="recentEuToggle" style="cursor:pointer;color:var(--link);margin-left:8px;font-weight:400;text-transform:none">
-              Показати всі
+            <span id="recentEuToggle" style="cursor:pointer;color:var(--link);margin-left:4px;font-weight:400;
+                      text-transform:none" onclick="event.stopPropagation();toggleEuFilter()">
+              Тільки ЄС
             </span>
           </div>
-          <div id="recentOrdersList" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);
-               border-radius:6px;background:var(--bg)"></div>
+          <div id="recentOrdersList" style="display:none;margin-top:6px;max-height:220px;overflow-y:auto;
+               border:1px solid var(--border);border-radius:6px;background:var(--bg)"></div>
         </div>
       </div>
 
@@ -1237,6 +1240,18 @@ function loadRecentOrders() {
     .catch(() => {});
 }
 
+function toggleRecentOrders() {
+  const list = document.getElementById('recentOrdersList');
+  const chev = document.getElementById('recentChevron');
+  const open = list.style.display !== 'none';
+  list.style.display = open ? 'none' : '';
+  chev.textContent = open ? '▶' : '▼';
+}
+function toggleEuFilter() {
+  _showAllRecent = !_showAllRecent;
+  document.getElementById('recentEuToggle').textContent = _showAllRecent ? 'Тільки ЄС' : 'Показати всі';
+  renderRecentOrders();
+}
 function renderRecentOrders() {
   const list = document.getElementById('recentOrdersList');
   let rows = _showAllRecent ? _recentOrders : _recentOrders.filter(o => o.is_eu);
@@ -1269,11 +1284,6 @@ function pickOrder(no) {
   document.getElementById('btnFetch').click();
 }
 
-document.getElementById('recentEuToggle').addEventListener('click', function() {
-  _showAllRecent = !_showAllRecent;
-  this.textContent = _showAllRecent ? 'Тільки ЄС' : 'Показати всі';
-  renderRecentOrders();
-});
 
 // Load recent orders when modal opens
 const _origOpenModal = openModal;
