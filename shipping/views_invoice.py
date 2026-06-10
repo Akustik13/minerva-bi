@@ -57,9 +57,15 @@ def invoice_generate(request):
     if body.get("manual") and body.get("order_data"):
         manual_data = body["order_data"]
 
+    invoice_number_override = (body.get("invoice_number") or "").strip() or None
+    vat_id_override = (body.get("vat_id") or "").strip() or None
+
     try:
         inv = InvoiceService.generate_from_digikey_order(
-            dk_order_no, request.user, manual_data=manual_data
+            dk_order_no, request.user,
+            manual_data=manual_data,
+            invoice_number=invoice_number_override,
+            vat_id=vat_id_override,
         )
         return JsonResponse({
             "ok": True,
@@ -75,6 +81,13 @@ def invoice_generate(request):
     except Exception as e:
         logger.exception("invoice_generate error for order %s", dk_order_no)
         return JsonResponse({"error": str(e)}, status=500)
+
+
+@_staff
+def invoice_next_number(request):
+    """GET /invoices/next-number/ — suggest next invoice number."""
+    from shipping.services.invoice_service import get_next_invoice_number
+    return JsonResponse({"number": get_next_invoice_number()})
 
 
 @_staff

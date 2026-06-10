@@ -4,6 +4,7 @@ from shipping import views_invoice as v
 urlpatterns = [
     path("",                             v.invoice_list,          name="invoice_list"),
     path("<int:pk>/",                    v.invoice_detail,        name="invoice_detail"),
+    path("next-number/",                 v.invoice_next_number,   name="invoice_next_number"),
     path("generate/",                    v.invoice_generate,      name="invoice_generate"),
     path("register/",                    v.invoice_register,      name="invoice_register"),
     path("fetch/<str:dk_order_no>/",     v.invoice_fetch_preview, name="invoice_fetch_preview"),

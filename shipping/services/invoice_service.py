@@ -210,11 +210,17 @@ class InvoiceService:
     OUTPUT_DIR    = Path(settings.MEDIA_ROOT) / "invoices"
 
     @classmethod
-    def generate_from_digikey_order(cls, dk_order_no: str, user, manual_data: dict | None = None):
+    def generate_from_digikey_order(
+        cls, dk_order_no: str, user,
+        manual_data: dict | None = None,
+        invoice_number: str | None = None,
+        vat_id: str | None = None,
+    ):
         """
         Generate an invoice from a DigiKey order number.
-        - manual_data: if provided, skip API call and use this dict directly
-          (same structure as _fetch_digikey_order output).
+        - manual_data: skip API call, use this dict directly
+        - invoice_number: override auto-generated number
+        - vat_id: manually supplied VAT ID (API doesn't return it)
         Returns Invoice instance.
         """
         from shipping.models import Invoice
@@ -226,7 +232,12 @@ class InvoiceService:
         else:
             order_data = _fetch_digikey_order(dk_order_no)
 
-        invoice_number = get_next_invoice_number()
+        if vat_id is not None:
+            order_data = dict(order_data)
+            order_data["shipped_to"] = dict(order_data.get("shipped_to") or {})
+            order_data["shipped_to"]["vat_id"] = vat_id
+
+        invoice_number = invoice_number or get_next_invoice_number()
         today = date.today().strftime("%m/%d/%Y")
 
         order_dict = {
