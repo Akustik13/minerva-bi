@@ -214,7 +214,7 @@
                      padding:1px 6px;border-radius:3px;margin-left:4px">🇪🇺 ЄС</span>
       </label>
       <input type="number" name="net_vat_invoice_amount"
-             value="{% if existing_invoice %}{{ existing_invoice.subtotal }}{% endif %}"
+             value="{% if inv_net_amount %}{{ inv_net_amount }}{% endif %}"
              placeholder="0.00" min="0" step="0.01"
              style="width:100%;max-width:200px;padding:8px 12px;background:var(--bg-input);
                     border:1px solid {% if existing_invoice %}rgba(76,175,80,.6){% else %}var(--border-strong){% endif %};

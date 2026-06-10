@@ -870,6 +870,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     f'<a href="/invoices/{inv.pk}/pdf/" target="_blank"'
                     f' style="background:#417690;color:#fff;text-decoration:none;padding:5px 10px;'
                     f'border-radius:3px;font-size:11px;margin-right:4px">PDF</a>'
+                    + (
+                    f'<a href="/invoices/{inv.pk}/download/"'
+                    f' style="background:#5d4037;color:#fff;text-decoration:none;padding:5px 10px;'
+                    f'border-radius:3px;font-size:11px;margin-right:4px">.docx</a>'
+                    if inv.docx_file else ''
+                    ) +
                     f'<a href="/invoices/{inv.pk}/" target="_blank"'
                     f' style="background:#2e7d32;color:#fff;text-decoration:none;padding:5px 10px;'
                     f'border-radius:3px;font-size:11px">деталі</a>'
