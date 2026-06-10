@@ -372,7 +372,7 @@ def digikey_ship_order(request, order_pk):
             .first()
         )
         if existing_invoice:
-            inv_net_amount = existing_invoice.subtotal
+            inv_net_amount = f"{existing_invoice.subtotal:.2f}"
     except Exception:
         pass
 
