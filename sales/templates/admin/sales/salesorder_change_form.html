@@ -1128,7 +1128,7 @@ document.addEventListener('DOMContentLoaded',function(){
       {% if inv.invoice_date %}
       <span style="font-size:11px;color:var(--text-muted,#607d8b)">{{ inv.invoice_date|date:"d.m.Y" }}</span>
       {% endif %}
-      <span style="font-size:12px;font-family:monospace;color:#4caf50">{{ inv.total_amount|floatformat:2 }} USD</span>
+      <span style="font-size:12px;font-family:monospace;color:#4caf50">{{ inv.subtotal|floatformat:2 }} USD без ПДВ</span>
       <a href="/invoices/{{ inv.pk }}/"
          style="font-size:11px;color:var(--link-fg,#58a6ff);text-decoration:none" target="_blank">деталі</a>
       {% if inv.pdf_file %}

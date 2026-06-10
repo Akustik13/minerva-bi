@@ -177,7 +177,7 @@
                 padding:10px 14px;margin-bottom:16px;font-size:13px;color:#a5d6a7;display:flex;
                 align-items:center;gap:12px;flex-wrap:wrap">
       ✅ Інвойс <strong>#{{ existing_invoice.invoice_number }}</strong>
-      ({{ existing_invoice.total_amount }} USD) вже згенеровано.
+      ({{ existing_invoice.subtotal }} USD без ПДВ) вже згенеровано.
       <a href="/invoices/{{ existing_invoice.pk }}/" target="_blank"
          style="color:#c9a84c;font-size:12px">Переглянути ↗</a>
       <a href="/invoices/{{ existing_invoice.pk }}/pdf/" target="_blank"

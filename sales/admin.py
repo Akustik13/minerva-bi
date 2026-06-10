@@ -865,7 +865,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     f' data-doc-pdf="/invoices/{inv.pk}/pdf/" data-doc-name="Invoice_{inv.invoice_number}.pdf">'
                     f'🧾 Invoice #{inv.invoice_number}</a></td>'
                     f'<td style="padding:8px 4px;text-align:right;color:var(--text-muted,#9aafbe);font-size:11px;white-space:nowrap">'
-                    f'{inv.total_amount:.2f} USD</td>'
+                    f'{inv.subtotal:.2f} USD без ПДВ</td>'
                     f'<td style="padding:8px 0;text-align:right;white-space:nowrap">'
                     f'<a href="/invoices/{inv.pk}/pdf/" target="_blank"'
                     f' style="background:#417690;color:#fff;text-decoration:none;padding:5px 10px;'
