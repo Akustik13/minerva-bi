@@ -1062,17 +1062,47 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             f'💰 Рахунок</a>'
         )
         if obj.order_number:
-            inv_url = f"/invoices/?auto={obj.order_number}"
-            extra_links_html += (
-                f'<a href="{inv_url}" target="_blank"'
-                f' style="display:inline-flex;align-items:center;gap:6px;'
-                f'background:#7b1fa2;color:#fff;padding:7px 14px;border-radius:7px;'
-                f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;'
-                f'margin-right:8px;margin-bottom:8px">'
-                f'🧾 Invoice'
-                + (f' #{obj.eu_invoice_number}' if obj.eu_invoice_number else '')
-                + '</a>'
+            inv_url      = f"/invoices/?auto={obj.order_number}"
+            inv_save_url = f"/admin/sales/salesorder/{obj.pk}/doc/invoice-save/"
+            # Check if a shipping Invoice already exists
+            inv_exists = False
+            inv_label_extra = ''
+            try:
+                from shipping.models import Invoice as _Inv
+                linked = (
+                    _Inv.objects.filter(sales_order=obj).order_by('-pk').first()
+                    or _Inv.objects.filter(digikey_order_no=obj.order_number).order_by('-pk').first()
+                )
+                if linked:
+                    inv_exists = True
+                    inv_label_extra = f' #{linked.invoice_number}'
+            except Exception:
+                pass
+            inv_label = f'🧾 Invoice{inv_label_extra}'
+            inv_title = (
+                'Вже є інвойс — зберегти PDF в документи замовлення'
+                if inv_exists else
+                'Відкрити генератор інвойсів'
             )
+            extra_links_html += (
+                f'<span style="display:inline-flex;align-items:stretch;border-radius:7px;'
+                f'overflow:hidden;margin-right:8px;margin-bottom:8px">'
+                f'<a href="{inv_url}" target="_blank"'
+                f' style="background:#7b1fa2;color:#fff;padding:7px 14px;'
+                f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">'
+                f'{inv_label}</a>'
+            )
+            if inv_exists:
+                extra_links_html += (
+                    f'<button type="button"'
+                    f' data-save-url="{inv_save_url}" data-doc-id="inv"'
+                    f' onclick="_docSave(this)"'
+                    f' title="{inv_title}"'
+                    f' style="background:#7b1fa2;color:#fff;border:none;'
+                    f'border-left:1px solid rgba(255,255,255,.3);'
+                    f'padding:7px 11px;cursor:pointer;font-size:13px">💾</button>'
+                )
+            extra_links_html += '</span>'
         if obj.source == 'digikey':
             pk_url      = f"/bots/digikey/packlist/{obj.pk}/"
             pk_save_url = f"/bots/digikey/packlist/{obj.pk}/?action=save"
@@ -2282,6 +2312,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                  self.admin_site.admin_view(self.push_to_shipping_view),
                  name='sales_salesorder_push_to_shipping'),
             # EU Invoice: suggest next number + generate PDF
+            # Save EU/Shipping invoice PDF to order docs folder
+            path('<int:pk>/doc/invoice-save/',
+                 self.admin_site.admin_view(self.doc_invoice_save_view),
+                 name='sales_salesorder_doc_invoice_save'),
             path('<int:pk>/eu-invoice/suggest/',
                  self.admin_site.admin_view(self.eu_invoice_suggest_view),
                  name='sales_salesorder_eu_invoice_suggest'),
@@ -2388,6 +2422,69 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             "created": created,
             "shipment_pk": shipment.pk,
             "shipment_url": f"/admin/shipping/shipment/{shipment.pk}/change/",
+        })
+
+    def doc_invoice_save_view(self, request, pk):
+        """AJAX GET — копіює PDF інвойсу (shipping.Invoice) в папку документів замовлення."""
+        from django.http import JsonResponse
+        from django.conf import settings
+        from pathlib import Path
+        from datetime import date as _date
+
+        order = get_object_or_404(SalesOrder, pk=pk)
+
+        # Find linked invoice — by FK first, then by order_number
+        try:
+            from shipping.models import Invoice
+            inv = (
+                Invoice.objects.filter(sales_order=order).order_by('-pk').first()
+                or Invoice.objects.filter(digikey_order_no=order.order_number).order_by('-pk').first()
+            )
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=500)
+
+        if not inv:
+            return JsonResponse({'ok': False, 'error': 'Інвойс не знайдено для цього замовлення'}, status=404)
+
+        # Resolve PDF path — prefer stored pdf_file, fallback to convert from docx
+        pdf_bytes = None
+        if inv.pdf_file:
+            p = Path(settings.MEDIA_ROOT) / str(inv.pdf_file)
+            if p.exists():
+                pdf_bytes = p.read_bytes()
+
+        if not pdf_bytes and inv.docx_file:
+            docx_path = Path(settings.MEDIA_ROOT) / str(inv.docx_file)
+            if docx_path.exists():
+                try:
+                    from shipping.services.invoice_service import convert_docx_to_pdf
+                    out_dir = Path(settings.MEDIA_ROOT) / 'invoices'
+                    pdf_path = convert_docx_to_pdf(docx_path, out_dir)
+                    if pdf_path and pdf_path.exists():
+                        pdf_bytes = pdf_path.read_bytes()
+                        inv.pdf_file = f"invoices/{pdf_path.name}"
+                        inv.save(update_fields=['pdf_file'])
+                except Exception as e:
+                    return JsonResponse({'ok': False, 'error': f'PDF конвертація: {e}'}, status=500)
+
+        if not pdf_bytes:
+            return JsonResponse({'ok': False, 'error': 'PDF файл інвойсу не знайдено'}, status=404)
+
+        # Save to order docs folder
+        filename = f"Invoice_{inv.invoice_number}.pdf"
+        dest_dir = settings.MEDIA_ROOT / 'orders' / (order.source or 'manual') / order.order_number
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        (dest_dir / filename).write_bytes(pdf_bytes)
+        rel_url = f"{settings.MEDIA_URL}orders/{order.source or 'manual'}/{order.order_number}/{filename}"
+
+        return JsonResponse({
+            'ok': True,
+            'filename': filename,
+            'url': rel_url,
+            'order_number': order.order_number,
+            'source_slug': order.source or 'manual',
+            'date_str': _date.today().strftime('%Y-%m-%d'),
+            'local': {},
         })
 
     def eu_invoice_suggest_view(self, request, pk):
