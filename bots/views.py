@@ -230,6 +230,26 @@ def digikey_packlist(request, order_pk):
         )
 
     filename = f"DigiKey_PackList_{order.order_number}.pdf"
+
+    # ?action=save — зберегти в media/orders/digikey/{order_number}/ і повернути JSON
+    if request.GET.get("action") == "save":
+        from django.conf import settings
+        from django.http import JsonResponse
+        from datetime import date as _date
+        dest_dir = settings.MEDIA_ROOT / 'orders' / 'digikey' / order.order_number
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        (dest_dir / filename).write_bytes(pdf_bytes)
+        rel_url = f"{settings.MEDIA_URL}orders/digikey/{order.order_number}/{filename}"
+        return JsonResponse({
+            'ok': True,
+            'filename': filename,
+            'url': rel_url,
+            'order_number': order.order_number,
+            'source_slug': 'digikey',
+            'date_str': _date.today().strftime('%Y-%m-%d'),
+            'local': {},
+        })
+
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response

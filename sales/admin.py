@@ -1074,14 +1074,23 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 + '</a>'
             )
         if obj.source == 'digikey':
-            pk_url = f"/bots/digikey/packlist/{obj.pk}/"
+            pk_url      = f"/bots/digikey/packlist/{obj.pk}/"
+            pk_save_url = f"/bots/digikey/packlist/{obj.pk}/?action=save"
             extra_links_html += (
+                f'<span style="display:inline-flex;align-items:stretch;border-radius:7px;'
+                f'overflow:hidden;margin-right:8px;margin-bottom:8px">'
                 f'<a href="{pk_url}" target="_blank"'
-                f' style="display:inline-flex;align-items:center;gap:6px;'
-                f'background:#1565c0;color:#fff;padding:7px 14px;border-radius:7px;'
-                f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;'
-                f'margin-right:8px;margin-bottom:8px">'
+                f' style="background:#1565c0;color:#fff;padding:7px 14px;'
+                f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">'
                 f'📦 Pack List (DigiKey)</a>'
+                f'<button type="button"'
+                f' data-save-url="{pk_save_url}" data-doc-id="dkpl"'
+                f' onclick="_docSave(this)"'
+                f' title="Зберегти Pack List в документи замовлення"'
+                f' style="background:#1565c0;color:#fff;border:none;'
+                f'border-left:1px solid rgba(255,255,255,.3);'
+                f'padding:7px 11px;cursor:pointer;font-size:13px">💾</button>'
+                f'</span>'
             )
         if extra_links_html:
             extra_links_html = (
