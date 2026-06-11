@@ -1052,6 +1052,15 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
         # ── Marketplace / invoice quick-links ───────────────────────────────
         extra_links_html = ''
+        acct_url = f"/admin/accounting/invoice/add/?order={obj.pk}"
+        extra_links_html += (
+            f'<a href="{acct_url}"'
+            f' style="display:inline-flex;align-items:center;gap:6px;'
+            f'background:#1565c0;color:#fff;padding:7px 14px;border-radius:7px;'
+            f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;'
+            f'margin-right:8px;margin-bottom:8px">'
+            f'💰 Рахунок</a>'
+        )
         if obj.order_number:
             inv_url = f"/invoices/?auto={obj.order_number}"
             extra_links_html += (

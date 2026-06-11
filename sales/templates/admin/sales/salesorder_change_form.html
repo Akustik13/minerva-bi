@@ -3,15 +3,6 @@
 
 {% block object-tools-items %}
   {% if original and original.pk %}
-    <li>
-      <a href="/admin/accounting/invoice/add/?order={{ original.pk }}"
-         class="historylink"
-         title="{% trans 'Відкрити або створити рахунок-фактуру для цього замовлення в модулі Accounting' %}"
-         style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
-                text-decoration:none;font-weight:bold;display:inline-block;white-space:nowrap">
-        💰 {% trans "Рахунок" %}
-      </a>
-    </li>
     {% if original.affects_stock %}
     <li>
       <button type="button" id="sv-sync-inv-btn"
