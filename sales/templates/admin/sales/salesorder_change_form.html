@@ -1103,6 +1103,23 @@ document.addEventListener('DOMContentLoaded',function(){
 
 {% block submit_buttons_bottom %}
 {{ block.super }}
+{% if digikey_not_confirmed and original %}
+<!-- ── DigiKey NOT confirmed warning ── -->
+<div style="margin:10px 0 4px;padding:12px 16px;border:1px solid rgba(255,152,0,.45);border-radius:8px;
+            background:rgba(255,152,0,.07);display:flex;align-items:flex-start;gap:12px">
+  <span style="font-size:20px;line-height:1.2">⚠️</span>
+  <div>
+    <div style="font-size:13px;font-weight:700;color:#ff9800;margin-bottom:4px">
+      Відправку не підтверджено на DigiKey Marketplace
+    </div>
+    <div style="font-size:12px;color:var(--text-muted,#9aafbe);line-height:1.5">
+      Трек-номер <strong style="color:var(--text,#c9d8e4);font-family:monospace">{{ original.tracking_number }}</strong> є,
+      але відправлення ще не підтверджено через DigiKey Marketplace API.<br>
+      Натисни <strong>📤 Confirm Shipment on DigiKey</strong> щоб підтвердити.
+    </div>
+  </div>
+</div>
+{% endif %}
 {% if digikey_already_shipped and original %}
 <!-- ── DigiKey shipment confirmed panel ── -->
 <div style="margin:10px 0 4px;padding:12px 16px;border:1px solid rgba(76,175,80,.35);border-radius:8px;

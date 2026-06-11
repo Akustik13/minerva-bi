@@ -1552,7 +1552,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 extra_context["digikey_packlist_url"] = f"/bots/digikey/packlist/{obj.pk}/"
             if obj and obj.source == "digikey" and obj.status in ("processing", "shipped"):
                 extra_context["digikey_ship_url"] = f"/bots/digikey/ship/{obj.pk}/"
-                extra_context["digikey_already_shipped"] = (obj.status == "shipped")
+                dk_confirmed = (obj.status == "shipped" and obj.status_source == "DigiKey Marketplace")
+                extra_context["digikey_already_shipped"] = dk_confirmed
+                extra_context["digikey_not_confirmed"] = (
+                    not dk_confirmed and bool(obj.tracking_number)
+                )
             if obj and obj.source == "digikey":
                 extra_context["digikey_fetch_tracking_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-fetch-tracking/"
             # EU Invoice button — repurposed to open /invoices/ with order pre-filled

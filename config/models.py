@@ -742,6 +742,24 @@ class NotificationSettings(models.Model):
         "Місячний звіт: останній", null=True, blank=True,
     )
 
+    # ── DigiKey unconfirmed shipment alert ────────────────────────────────────
+    dk_unconfirmed_alert_enabled = models.BooleanField(
+        "Сповіщення: непідтверджена відправка на DigiKey", default=True,
+        help_text=(
+            "Якщо замовлення відправлено (є трек-номер), але не підтверджено "
+            "через DigiKey Marketplace Ship API — надіслати нагадування."
+        ),
+    )
+    dk_unconfirmed_alert_hours = models.PositiveSmallIntegerField(
+        "Через скільки годин нагадувати", default=24,
+        help_text="Нагадування надсилається якщо з моменту відправлення пройшло більше N годин без підтвердження на DigiKey.",
+    )
+    dk_unconfirmed_alert_email = models.BooleanField("Email нагадування", default=True)
+    dk_unconfirmed_alert_telegram = models.BooleanField("Telegram нагадування", default=True)
+    dk_unconfirmed_last_sent = models.DateTimeField(
+        "Останнє нагадування", null=True, blank=True,
+    )
+
     class Meta:
         verbose_name = "Налаштування сповіщень"
         verbose_name_plural = "Налаштування сповіщень"
