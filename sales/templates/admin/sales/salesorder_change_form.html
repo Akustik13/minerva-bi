@@ -1103,6 +1103,61 @@ document.addEventListener('DOMContentLoaded',function(){
 
 {% block submit_buttons_bottom %}
 {{ block.super }}
+{% if digikey_already_shipped and original %}
+<!-- ── DigiKey shipment confirmed panel ── -->
+<div style="margin:10px 0 4px;padding:12px 16px;border:1px solid rgba(76,175,80,.35);border-radius:8px;
+            background:rgba(76,175,80,.06)">
+  <div style="font-size:11px;font-weight:700;color:#4caf50;letter-spacing:.5px;margin-bottom:10px;text-transform:uppercase">
+    ✅ Підтверджено на DigiKey Marketplace
+  </div>
+  <div style="display:flex;flex-wrap:wrap;gap:16px;font-size:12px">
+    {% if original.tracking_number %}
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Tracking Number</span>
+      <span style="font-family:monospace;font-weight:600;color:var(--text,#c9d8e4)">{{ original.tracking_number }}</span>
+    </div>
+    {% endif %}
+    {% if original.shipping_courier %}
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Carrier</span>
+      <span style="font-weight:600;color:var(--text,#c9d8e4)">{{ original.shipping_courier }}</span>
+    </div>
+    {% endif %}
+    {% if original.shipped_at %}
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Ship Date</span>
+      <span style="color:var(--text,#c9d8e4)">{{ original.shipped_at|date:"d.m.Y" }}</span>
+    </div>
+    {% endif %}
+    {% if original.eu_invoice_number %}
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Supplier Invoice Number</span>
+      <span style="font-family:monospace;color:#c9a84c;font-weight:600">{{ original.eu_invoice_number }}</span>
+    </div>
+    {% endif %}
+    {% if order_invoices %}{% with inv=order_invoices.0 %}
+    {% if inv.subtotal %}
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Net Invoice Amount 🇪🇺</span>
+      <span style="font-family:monospace;font-weight:600;color:#4caf50">{{ inv.subtotal|floatformat:2 }} USD</span>
+    </div>
+    {% endif %}{% endwith %}{% endif %}
+    {% if original.tracking_number %}
+    <div style="display:flex;align-items:flex-end">
+      <a href="https://www.ups.com/track?tracknum={{ original.tracking_number }}"
+         target="_blank" rel="noopener"
+         style="font-size:11px;color:#4caf50;text-decoration:none;padding:3px 10px;
+                border:1px solid rgba(76,175,80,.4);border-radius:4px">
+        🔗 Track
+      </a>
+    </div>
+    {% endif %}
+  </div>
+  <div style="margin-top:8px;font-size:10px;color:var(--text-dim,#607d8b)">
+    <a href="{{ digikey_ship_url }}" style="color:var(--text-dim,#607d8b)">✏️ Змінити деталі відправлення</a>
+  </div>
+</div>
+{% endif %}
 {% if original and original.pk %}
 <div style="margin-top:16px;padding:14px 0 4px;border-top:1px solid #243347;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
   <a id="mv-ship-btn"
@@ -1153,55 +1208,6 @@ document.addEventListener('DOMContentLoaded',function(){
       {% endif %}
     </div>
   {% endfor %}
-  </div>
-</div>
-{% endif %}
-
-{% if digikey_already_shipped and original %}
-<!-- ── DigiKey shipment confirmed panel ── -->
-<div style="margin-top:12px;padding:12px 14px;border:1px solid rgba(76,175,80,.3);border-radius:8px;
-            background:rgba(76,175,80,.05)">
-  <div style="font-size:11px;font-weight:700;color:#4caf50;letter-spacing:.5px;margin-bottom:10px;text-transform:uppercase">
-    ✅ Підтверджено на DigiKey Marketplace
-  </div>
-  <div style="display:flex;flex-wrap:wrap;gap:12px;font-size:12px">
-    {% if original.tracking_number %}
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Трек-номер</span>
-      <span style="font-family:monospace;font-weight:600;color:var(--text,#c9d8e4)">{{ original.tracking_number }}</span>
-    </div>
-    {% endif %}
-    {% if original.shipping_courier %}
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Перевізник</span>
-      <span style="font-weight:600;color:var(--text,#c9d8e4)">{{ original.shipping_courier }}</span>
-    </div>
-    {% endif %}
-    {% if original.shipped_at %}
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Дата відправлення</span>
-      <span style="color:var(--text,#c9d8e4)">{{ original.shipped_at|date:"d.m.Y" }}</span>
-    </div>
-    {% endif %}
-    {% if original.eu_invoice_number %}
-    <div style="display:flex;flex-direction:column;gap:2px">
-      <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Інвойс DigiKey</span>
-      <span style="font-family:monospace;color:#c9a84c;font-weight:600">{{ original.eu_invoice_number }}</span>
-    </div>
-    {% endif %}
-    {% if original.tracking_number %}
-    <div style="display:flex;align-items:flex-end">
-      <a href="https://www.ups.com/track?tracknum={{ original.tracking_number }}"
-         target="_blank" rel="noopener"
-         style="font-size:11px;color:#4caf50;text-decoration:none;padding:3px 8px;
-                border:1px solid rgba(76,175,80,.4);border-radius:4px">
-        🔗 Відстежити
-      </a>
-    </div>
-    {% endif %}
-  </div>
-  <div style="margin-top:8px;font-size:10px;color:var(--text-dim,#607d8b)">
-    <a href="{{ digikey_ship_url }}" style="color:var(--text-dim,#607d8b)">✏️ Змінити деталі відправлення</a>
   </div>
 </div>
 {% endif %}
