@@ -1064,8 +1064,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         if obj.order_number:
             inv_url      = f"/invoices/?auto={obj.order_number}"
             inv_save_url = f"/admin/sales/salesorder/{obj.pk}/doc/invoice-save/"
-            # Check if a shipping Invoice already exists
-            inv_exists = False
+            # Show invoice number on button if already exists
             inv_label_extra = ''
             try:
                 from shipping.models import Invoice as _Inv
@@ -1074,16 +1073,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     or _Inv.objects.filter(digikey_order_no=obj.order_number).order_by('-pk').first()
                 )
                 if linked:
-                    inv_exists = True
                     inv_label_extra = f' #{linked.invoice_number}'
             except Exception:
                 pass
             inv_label = f'🧾 Invoice{inv_label_extra}'
-            inv_title = (
-                'Вже є інвойс — зберегти PDF в документи замовлення'
-                if inv_exists else
-                'Відкрити генератор інвойсів'
-            )
             extra_links_html += (
                 f'<span style="display:inline-flex;align-items:stretch;border-radius:7px;'
                 f'overflow:hidden;margin-right:8px;margin-bottom:8px">'
@@ -1091,18 +1084,15 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 f' style="background:#7b1fa2;color:#fff;padding:7px 14px;'
                 f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap">'
                 f'{inv_label}</a>'
+                f'<button type="button"'
+                f' data-save-url="{inv_save_url}" data-doc-id="inv"'
+                f' onclick="_docSave(this)"'
+                f' title="Зберегти PDF інвойсу в документи (генерує якщо нема)"'
+                f' style="background:#7b1fa2;color:#fff;border:none;'
+                f'border-left:1px solid rgba(255,255,255,.3);'
+                f'padding:7px 11px;cursor:pointer;font-size:13px">💾</button>'
+                f'</span>'
             )
-            if inv_exists:
-                extra_links_html += (
-                    f'<button type="button"'
-                    f' data-save-url="{inv_save_url}" data-doc-id="inv"'
-                    f' onclick="_docSave(this)"'
-                    f' title="{inv_title}"'
-                    f' style="background:#7b1fa2;color:#fff;border:none;'
-                    f'border-left:1px solid rgba(255,255,255,.3);'
-                    f'padding:7px 11px;cursor:pointer;font-size:13px">💾</button>'
-                )
-            extra_links_html += '</span>'
         if obj.source == 'digikey':
             pk_url      = f"/bots/digikey/packlist/{obj.pk}/"
             pk_save_url = f"/bots/digikey/packlist/{obj.pk}/?action=save"
@@ -1206,6 +1196,10 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             'fetch(url,{headers:{"X-Requested-With":"XMLHttpRequest"}})'
             '.then(r=>r.json())'
             '.then(d=>{'
+            'if(d.already_exists){'
+            'btn.textContent="ℹ️";btn.title=d.error||"Вже існує";'
+            'setTimeout(()=>{btn.disabled=false;btn.textContent="💾";},3000);'
+            'return;}'
             'if(d.ok){'
             'btn.textContent="✅";'
             'var pk=document.getElementById("order-docs-panel")?.dataset.pk;'
@@ -2425,7 +2419,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         })
 
     def doc_invoice_save_view(self, request, pk):
-        """AJAX GET — копіює PDF інвойсу (shipping.Invoice) в папку документів замовлення."""
+        """AJAX GET — якщо інвойс є: повідомляє 'вже існує'. Якщо нема: генерує і зберігає PDF."""
         from django.http import JsonResponse
         from django.conf import settings
         from pathlib import Path
@@ -2433,7 +2427,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
         order = get_object_or_404(SalesOrder, pk=pk)
 
-        # Find linked invoice — by FK first, then by order_number
+        # ── Перевіряємо чи є вже інвойс ────────────────────────────────────
         try:
             from shipping.models import Invoice
             inv = (
@@ -2443,10 +2437,26 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception as e:
             return JsonResponse({'ok': False, 'error': str(e)}, status=500)
 
-        if not inv:
-            return JsonResponse({'ok': False, 'error': 'Інвойс не знайдено для цього замовлення'}, status=404)
+        if inv:
+            # Вже існує — просто повідомляємо
+            return JsonResponse({
+                'ok': False,
+                'already_exists': True,
+                'invoice_number': inv.invoice_number,
+                'error': f'Вже існує #{inv.invoice_number}',
+            })
 
-        # Resolve PDF path — prefer stored pdf_file, fallback to convert from docx
+        # ── Інвойсу нема — генеруємо автоматично ────────────────────────────
+        if not order.order_number:
+            return JsonResponse({'ok': False, 'error': 'Немає номера замовлення'}, status=400)
+
+        try:
+            from shipping.services.invoice_service import InvoiceService
+            inv = InvoiceService.generate_from_digikey_order(order.order_number, request.user)
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': f'Генерація інвойсу: {e}'}, status=500)
+
+        # ── Отримуємо PDF байти ─────────────────────────────────────────────
         pdf_bytes = None
         if inv.pdf_file:
             p = Path(settings.MEDIA_ROOT) / str(inv.pdf_file)
@@ -2468,9 +2478,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     return JsonResponse({'ok': False, 'error': f'PDF конвертація: {e}'}, status=500)
 
         if not pdf_bytes:
-            return JsonResponse({'ok': False, 'error': 'PDF файл інвойсу не знайдено'}, status=404)
+            return JsonResponse({'ok': False, 'error': 'PDF не вдалось отримати після генерації'}, status=500)
 
-        # Save to order docs folder
+        # ── Зберігаємо в папку документів замовлення ────────────────────────
         filename = f"Invoice_{inv.invoice_number}.pdf"
         dest_dir = settings.MEDIA_ROOT / 'orders' / (order.source or 'manual') / order.order_number
         dest_dir.mkdir(parents=True, exist_ok=True)
