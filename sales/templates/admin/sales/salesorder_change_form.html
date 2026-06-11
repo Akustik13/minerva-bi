@@ -24,29 +24,6 @@
     </li>
     {% endif %}
   {% endif %}
-  {% if eu_invoice_suggest_url %}
-    <li>
-      <a id="eu-inv-btn"
-         href="/invoices/?auto={{ order_number_for_invoice }}"
-         title="{% trans 'Відкрити генератор інвойсів Sevskiy GmbH → DigiKey Marketplace з авто-заповненням номера замовлення' %}"
-         style="background:#7b1fa2;color:#fff;padding:6px 14px;border-radius:6px;
-                font-weight:bold;border:none;cursor:pointer;white-space:nowrap;font-size:13px;
-                text-decoration:none;display:inline-block">
-        🧾 Invoice{% if eu_invoice_number %} #{{ eu_invoice_number }}{% endif %}
-      </a>
-    </li>
-  {% endif %}
-  {% if digikey_packlist_url %}
-    <li>
-      <a href="{{ digikey_packlist_url }}" target="_blank"
-         class="historylink"
-         title="{% trans 'Згенерувати пакувальний лист (Pack List) для відправлення через DigiKey Marketplace' %}"
-         style="background:#1565c0;color:#fff;padding:6px 14px;border-radius:6px;
-                text-decoration:none;font-weight:bold;display:inline-block;white-space:nowrap">
-        📦 Pack List (DigiKey)
-      </a>
-    </li>
-  {% endif %}
   {% if digikey_confirm_url %}
     <li>
       <a href="{{ digikey_confirm_url }}"

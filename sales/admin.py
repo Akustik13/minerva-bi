@@ -1049,6 +1049,38 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         )
 
         base = f"/admin/sales/salesorder/{obj.pk}/doc"
+
+        # ── Marketplace / invoice quick-links ───────────────────────────────
+        extra_links_html = ''
+        if obj.order_number:
+            inv_url = f"/invoices/?auto={obj.order_number}"
+            extra_links_html += (
+                f'<a href="{inv_url}" target="_blank"'
+                f' style="display:inline-flex;align-items:center;gap:6px;'
+                f'background:#7b1fa2;color:#fff;padding:7px 14px;border-radius:7px;'
+                f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;'
+                f'margin-right:8px;margin-bottom:8px">'
+                f'🧾 Invoice'
+                + (f' #{obj.eu_invoice_number}' if obj.eu_invoice_number else '')
+                + '</a>'
+            )
+        if obj.source == 'digikey':
+            pk_url = f"/bots/digikey/packlist/{obj.pk}/"
+            extra_links_html += (
+                f'<a href="{pk_url}" target="_blank"'
+                f' style="display:inline-flex;align-items:center;gap:6px;'
+                f'background:#1565c0;color:#fff;padding:7px 14px;border-radius:7px;'
+                f'text-decoration:none;font-size:13px;font-weight:600;white-space:nowrap;'
+                f'margin-right:8px;margin-bottom:8px">'
+                f'📦 Pack List (DigiKey)</a>'
+            )
+        if extra_links_html:
+            extra_links_html = (
+                f'<div style="margin-bottom:8px;padding-bottom:10px;'
+                f'border-bottom:1px solid var(--border-strong,#2a3f52)">'
+                f'{extra_links_html}</div>'
+            )
+
         docs = [
             (f"{base}/packing-list/", f"{base}/packing-list/?action=save",
              "📋 Пакувальний лист", "#1976d2", "pl", pl_panel),
@@ -1191,7 +1223,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             '}'
             '</script>'
         )
-        return mark_safe(js + ''.join(parts))
+        return mark_safe(js + extra_links_html + ''.join(parts))
 
     doc_buttons.short_description = "📄 Генерація документів"
 
