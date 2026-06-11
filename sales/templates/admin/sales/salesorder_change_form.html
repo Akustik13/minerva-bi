@@ -1180,7 +1180,7 @@ document.addEventListener('DOMContentLoaded',function(){
     {% if original.shipped_at %}
     <div style="display:flex;flex-direction:column;gap:2px">
       <span style="color:var(--text-dim,#607d8b);font-size:10px;text-transform:uppercase;letter-spacing:.5px">Дата відправлення</span>
-      <span style="color:var(--text,#c9d8e4)">{{ original.shipped_at|date:"d.m.Y H:i" }}</span>
+      <span style="color:var(--text,#c9d8e4)">{{ original.shipped_at|date:"d.m.Y" }}</span>
     </div>
     {% endif %}
     {% if original.eu_invoice_number %}
