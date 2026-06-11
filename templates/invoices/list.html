@@ -285,6 +285,32 @@
           <span id="tplUploadMsg" style="font-size:11px;color:var(--ok)"></span>
         </div>
       </div>
+      <!-- Variables reference -->
+      <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:12px;color:var(--text-dim);font-weight:600">📋 Змінні шаблону</span>
+          <a href="/invoices/template-sample/" target="_blank" class="btn-sm"
+             style="font-size:11px;padding:4px 10px" title="Згенерувати демо-інвойс із прикладовими даними">
+            ⬇️ Демо-інвойс (.docx)
+          </a>
+        </div>
+        <table style="width:100%;font-size:11px;border-collapse:collapse">
+          <thead><tr>
+            <th style="text-align:left;padding:4px 8px;color:var(--text-dim);border-bottom:1px solid var(--border)">Поле в шаблоні</th>
+            <th style="text-align:left;padding:4px 8px;color:var(--text-dim);border-bottom:1px solid var(--border)">Звідки береться</th>
+            <th style="text-align:left;padding:4px 8px;color:var(--text-dim);border-bottom:1px solid var(--border)">Приклад</th>
+          </tr></thead>
+          <tbody style="color:var(--text)">
+            {% for row in template_vars %}
+            <tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:4px 8px;font-family:monospace;color:var(--gold)">{{ row.field }}</td>
+              <td style="padding:4px 8px;color:var(--text-muted)">{{ row.source }}</td>
+              <td style="padding:4px 8px;font-family:monospace;font-size:10px">{{ row.example }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -313,6 +339,10 @@
           <td>{{ inv.order_date|date:"d.m.Y" }}</td>
           <td>
             <strong>{{ inv.shipped_to_company }}</strong>
+            {% with addr=inv.shipped_to_json %}
+              {% if addr.contact %}<br><span style="font-size:11px;color:var(--text-muted)">{{ addr.contact }}</span>{% endif %}
+              {% if addr.country %}<br><span style="font-size:11px;color:var(--text-dim)">🌍 {{ addr.city_zip }} {{ addr.country }}</span>{% endif %}
+            {% endwith %}
             {% if inv.shipped_to_vat %}<br><span style="font-size:11px;color:var(--text-muted)">VAT: {{ inv.shipped_to_vat }}</span>{% endif %}
             {% if inv.sales_order %}<br><a href="/admin/sales/salesorder/{{ inv.sales_order.pk }}/change/" style="font-size:10px;color:var(--link)">↗ {{ inv.sales_order.order_number }}</a>{% endif %}
           </td>

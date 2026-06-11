@@ -143,9 +143,13 @@ def _fetch_digikey_order(order_id: str) -> dict:
     else:
         city_zip = postal
 
-    # VAT: Marketplace Orders API does not expose customer VAT — leave blank.
-    # Do NOT read additionalFields (they contain numeric 0 values that become "0.0").
-    vat_id = ""
+    # VAT: read "tax-exempt-id" from additionalFields (string type only)
+    additional = {
+        f["code"]: f.get("value", "")
+        for f in (o.get("additionalFields") or [])
+        if f.get("type") == "String"
+    }
+    vat_id = str(additional.get("tax-exempt-id") or "").strip()
 
     # Items: use productCategoryName as description (matches DigiKey product page)
     items = []

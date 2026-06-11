@@ -14,6 +14,7 @@ urlpatterns = [
     path("<int:pk>/update-recipient/",   v.invoice_update_recipient,   name="invoice_update_recipient"),
     path("dk-orders/",                   v.invoice_dk_orders,           name="invoice_dk_orders"),
     path("check-number/",                v.invoice_check_number,        name="invoice_check_number"),
+    path("template-sample/",             v.invoice_template_sample,    name="invoice_template_sample"),
     # Template management
     path("templates/",                   v.invoice_templates_list,     name="invoice_templates_list"),
     path("templates/upload/",            v.invoice_template_upload,    name="invoice_template_upload"),

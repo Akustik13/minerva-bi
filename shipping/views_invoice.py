@@ -58,10 +58,32 @@ def invoice_list(request):
             Invoice.objects.bulk_update(to_update, ["sales_order"])
 
     agg = Invoice.objects.aggregate(sum_subtotal=Sum('subtotal'), sum_total=Sum('total_amount'))
+
+    template_vars = [
+        {"field": "invoice_number",       "source": "Авто (макс+1 з БД)",         "example": "10235"},
+        {"field": "invoice_date",         "source": "Сьогоднішня дата",            "example": "06/10/2026"},
+        {"field": "digikey_order_no",     "source": "DigiKey businessId",          "example": "99705097"},
+        {"field": "order_date",           "source": "DigiKey createDateUtc",       "example": "06/09/2026"},
+        {"field": "shipment_date",        "source": "DigiKey shippedDateUtc",      "example": "06/10/2026"},
+        {"field": "shipped_to.company",   "source": "shippingAddress.companyName", "example": "NOVY TELECOM S.R.O."},
+        {"field": "shipped_to.contact",   "source": "shippingAddress firstName+lastName", "example": "MARTIN HUJA"},
+        {"field": "shipped_to.address1",  "source": "shippingAddress street1[+street2]",  "example": "NAD KOVARNOU 185"},
+        {"field": "shipped_to.city_zip",  "source": "shippingAddress city+postalCode",    "example": "KNEZEVES, 25268"},
+        {"field": "shipped_to.country",   "source": "shippingAddress countryCode",        "example": "CZE"},
+        {"field": "shipped_to.vat_id",    "source": "additionalFields[tax-exempt-id]",    "example": "CZ28481968"},
+        {"field": "items[].part_no",      "source": "orderDetails[].supplierSku",         "example": "CA-MHF4-MC1.13-100-MHF4"},
+        {"field": "items[].description",  "source": "orderDetails[].productCategoryName", "example": "Coaxial Cables (RF)"},
+        {"field": "items[].qty",          "source": "orderDetails[].adjustedQuantity",    "example": "6"},
+        {"field": "items[].unit_price",   "source": "orderDetails[].unitPrice",           "example": "5.99"},
+        {"field": "discount_amount",      "source": "adjustedTotalDiscountFee (від'ємне)", "example": "-26.94"},
+        {"field": "shipping_charges",     "source": "adjustedShippingPrice",              "example": "29.95"},
+    ]
+
     return render(request, "invoices/list.html", {
-        "invoices":     invoices,
-        "sum_subtotal": agg["sum_subtotal"] or 0,
-        "sum_total":    agg["sum_total"] or 0,
+        "invoices":      invoices,
+        "sum_subtotal":  agg["sum_subtotal"] or 0,
+        "sum_total":     agg["sum_total"] or 0,
+        "template_vars": template_vars,
     })
 
 
@@ -405,6 +427,30 @@ def invoice_check_number(request):
                              "invoice_number": inv.invoice_number,
                              "detail_url": f"/invoices/{inv.pk}/"})
     return JsonResponse({"exists": False})
+
+
+# ── Demo invoice (sample data) ─────────────────────────────────────────────
+
+@_staff
+def invoice_template_sample(request):
+    """Download a sample .docx generated from SAMPLE_ORDER — shows all variable placeholders."""
+    import tempfile
+    from django.http import HttpResponse
+    from shipping.services.generate_invoice import generate, SAMPLE_ORDER
+    from shipping.services.invoice_service import get_active_template_path
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "Invoice_SAMPLE.docx"
+        generate(SAMPLE_ORDER, out, get_active_template_path())
+        data = out.read_bytes()
+
+    response = HttpResponse(
+        data,
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+    response["Content-Disposition"] = 'attachment; filename="Invoice_SAMPLE.docx"'
+    return response
 
 
 # ── Invoice template management ────────────────────────────────────────────
