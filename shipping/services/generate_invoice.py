@@ -252,6 +252,131 @@ def generate(order: dict, output_path: Path, template: Path = TEMPLATE_PATH) -> 
     return output_path
 
 
+# ── PLACEHOLDER GENERATOR (для демо — ставить назви змінних) ─────────────────
+def _item_row_text(pos, part_no, desc, qty_s, price_s, amount_s):
+    """Текстова версія item_row — всі значення вже як рядки."""
+    return (
+        f'<w:tr>'
+        f'<w:tc><w:tcPr><w:tcW w:w="585" w:type="dxa"/>{_b(left=False)}</w:tcPr>'
+        f'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>{pos}</w:t></w:r></w:p></w:tc>'
+        f'<w:tc><w:tcPr><w:tcW w:w="4609" w:type="dxa"/>{_b()}</w:tcPr>'
+        f'<w:p><w:r><w:rPr><w:b/><w:bCs/></w:rPr><w:t>{part_no}</w:t></w:r></w:p>'
+        f'<w:p><w:r><w:t>{desc}</w:t></w:r></w:p></w:tc>'
+        f'<w:tc><w:tcPr><w:tcW w:w="1276" w:type="dxa"/>{_b()}<w:vAlign w:val="center"/></w:tcPr>'
+        f'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t>{qty_s}</w:t></w:r></w:p></w:tc>'
+        f'<w:tc><w:tcPr><w:tcW w:w="1276" w:type="dxa"/>{_b()}<w:vAlign w:val="center"/></w:tcPr>'
+        f'<w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>{price_s}</w:t></w:r></w:p></w:tc>'
+        f'<w:tc><w:tcPr><w:tcW w:w="1275" w:type="dxa"/>{_b(right=False)}<w:vAlign w:val="center"/></w:tcPr>'
+        f'<w:p><w:pPr><w:jc w:val="right"/></w:pPr><w:r><w:t>{amount_s}</w:t></w:r></w:p></w:tc>'
+        f'</w:tr>'
+    )
+
+
+def generate_placeholder(output_path: Path, template: Path = TEMPLATE_PATH) -> Path:
+    """Генерує .docx з шаблону, підставляючи назви змінних замість реальних значень."""
+    work = Path(tempfile.mkdtemp(prefix="inv_placeholder_"))
+    try:
+        with zipfile.ZipFile(template, 'r') as z:
+            z.extractall(work)
+
+        # ── Header: Invoice No. ───────────────────────────────────────────────
+        hdr_path = work / "word" / "header1.xml"
+        hdr = hdr_path.read_text(encoding="utf-8")
+        hdr = re.sub(
+            r'<w:t>Invoice No\.: 102</w:t></w:r>'
+            r'<w:r w:rsidR="00FF4223"><w:rPr>.*?</w:rPr><w:t>34</w:t></w:r>',
+            '<w:t>Invoice No.: {{invoice_number}}</w:t></w:r>',
+            hdr, flags=re.DOTALL
+        )
+        hdr_path.write_text(hdr, encoding="utf-8")
+
+        # ── Document ──────────────────────────────────────────────────────────
+        doc_path = work / "word" / "document.xml"
+        doc = doc_path.read_text(encoding="utf-8")
+
+        doc = doc.replace(">99674401<", ">{{digikey_order_no}}<")
+
+        doc = re.sub(
+            r'Your Order Date: \d</w:t>.*?/2026</w:t>',
+            'Your Order Date: {{order_date}}</w:t>',
+            doc, flags=re.DOTALL, count=1
+        )
+
+        # Invoice number in body (two-run split)
+        doc = doc.replace(
+            '<w:t>102</w:t></w:r><w:r w:rsidR="00FF4223">',
+            '<w:t>{{invoice_number}}</w:t></w:r><w:r w:rsidR="00FF4223_DEL">'
+        )
+        doc = re.sub(
+            r'<w:r w:rsidR="00FF4223_DEL">[^<]*<w:rPr>.*?</w:rPr><w:t>34</w:t></w:r>',
+            '', doc, flags=re.DOTALL
+        )
+        doc = re.sub(r'<w:t>102</w:t>.*?<w:t>34</w:t>',
+                     '<w:t>{{invoice_number}}</w:t>', doc, count=1, flags=re.DOTALL)
+
+        doc = re.sub(
+            r'Our Invoice Date: 0</w:t>.*?/2026</w:t>',
+            'Our Invoice Date: {{invoice_date}}</w:t>',
+            doc, flags=re.DOTALL
+        )
+
+        doc = re.sub(
+            r'Date of shipment: </w:t>.*?/2026</w:t>',
+            'Date of shipment: {{shipment_date}}</w:t>',
+            doc, flags=re.DOTALL
+        )
+        doc = re.sub(r'Date of shipment: \d{2}/\d{2}/\d{4}',
+                     'Date of shipment: {{shipment_date}}', doc)
+
+        doc = doc.replace("LOG.IN SRL",             "{{shipped_to.company}}")
+        doc = doc.replace("FILIBERTO\xa0LANCIOTTI", "{{shipped_to.contact}}")
+        doc = doc.replace("VIA AURELIA, 714",        "{{shipped_to.address1}}")
+        doc = doc.replace("ROMA,\xa000165\xa0ITA",   "{{shipped_to.city_zip}} {{shipped_to.country}}")
+        doc = doc.replace("IT01520721000",            "{{shipped_to.vat_id}}")
+
+        # ── Table rows ────────────────────────────────────────────────────────
+        rows  = _item_row_text(1,
+                               "{{items[i].part_no}}",
+                               "{{items[i].description}}",
+                               "{{items[i].qty}}",
+                               "{{items[i].unit_price}}",
+                               "{{items[i].amount}}")
+        rows += simple_row("Discount {{discount_pct}}%",   "{{discount_amount}}")
+        rows += simple_row("Shipping Charges",              "{{shipping_charges}}")
+        rows += simple_row("Total Amount without VAT",      "{{subtotal}}")
+        rows += simple_row("VAT 19% ",                      "{{vat_amount}}")
+        rows += simple_row("Total Amount with VAT",         "{{total_amount}}", bold=True)
+
+        doc = re.sub(
+            r'(<w:t>Amount, USD</w:t>.*?</w:tr>)(.*?)(<\s*/w:tbl>)',
+            lambda m: m.group(1) + rows + m.group(3),
+            doc, flags=re.DOTALL, count=1
+        )
+
+        doc_path.write_text(doc, encoding="utf-8")
+
+        # ── Repack ────────────────────────────────────────────────────────────
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = output_path.with_suffix(".tmp.docx")
+        with zipfile.ZipFile(tmp, 'w', zipfile.ZIP_DEFLATED) as z:
+            for p in ("[Content_Types].xml", "_rels/.rels"):
+                f = work / p
+                if f.exists():
+                    z.write(f, p)
+            for f in work.rglob("*"):
+                if f.is_file():
+                    arc = f.relative_to(work).as_posix()
+                    if arc not in ("[Content_Types].xml", "_rels/.rels"):
+                        z.write(f, arc)
+        if output_path.exists():
+            output_path.unlink()
+        tmp.rename(output_path)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    return output_path
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(description="Sevskiy Invoice Generator")

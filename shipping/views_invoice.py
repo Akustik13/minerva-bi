@@ -431,98 +431,24 @@ def invoice_check_number(request):
 
 # ── Demo invoice — template variables reference ─────────────────────────────
 
-TEMPLATE_VARS = [
-    # (variable_name, description, example)
-    ("{{invoice_number}}",     "Номер інвойсу",                         "10235"),
-    ("{{invoice_date}}",       "Дата інвойсу (MM/DD/YYYY)",             "06/10/2026"),
-    ("{{digikey_order_no}}",   "Номер замовлення DigiKey",              "99680001"),
-    ("{{order_date}}",         "Дата замовлення (MM/DD/YYYY)",          "06/09/2026"),
-    ("{{shipment_date}}",      "Дата відправлення (MM/DD/YYYY)",        "06/10/2026"),
-    ("{{shipped_to.company}}", "Компанія отримувача",                   "TEST COMPANY GMBH"),
-    ("{{shipped_to.contact}}", "Контактна особа",                       "MAX MUSTERMANN"),
-    ("{{shipped_to.address1}}","Адреса (вулиця)",                       "MUSTERSTRASSE 1"),
-    ("{{shipped_to.city_zip}}","Місто та поштовий індекс",              "10115 BERLIN"),
-    ("{{shipped_to.country}}", "Країна (2-літерний код)",               "DE"),
-    ("{{shipped_to.vat_id}}",  "VAT ID отримувача",                     "DE123456789"),
-    ("{{items[].part_no}}",    "Артикул товару (рядок таблиці)",        "3228-AN220201-04A-ND"),
-    ("{{items[].description}}","Опис товару (рядок таблиці)",           "RF Antennas"),
-    ("{{items[].qty}}",        "Кількість (рядок таблиці)",             "2,0"),
-    ("{{items[].unit_price}}", "Ціна за одиницю USD (рядок таблиці)",  "79.69"),
-    ("{{discount_amount}}",    "Знижка (від'ємне число, USD)",          "-39.85"),
-    ("{{shipping_charges}}",   "Вартість доставки (USD)",               "29.95"),
-    ("— subtotal —",           "Сума без ПДВ (розраховується авто)",    "69,79"),
-    ("— vat_amount —",         "ПДВ 19% (розраховується авто)",        "13,26"),
-    ("— total_amount —",       "Загальна сума з ПДВ (авто)",           "83,05"),
-]
-
 @_staff
 def invoice_template_sample(request):
-    """Download a .docx reference showing all available template variables."""
-    import io
+    """Download the active invoice template with variable placeholders instead of real data."""
+    import tempfile
     from django.http import HttpResponse
-    from docx import Document
-    from docx.shared import Pt, RGBColor, Cm
-    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from shipping.services.generate_invoice import generate_placeholder
+    from shipping.services.invoice_service import get_active_template_path
 
-    doc = Document()
-
-    # Title
-    title = doc.add_heading("Invoice Template — Змінні шаблону", level=1)
-    title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-
-    doc.add_paragraph(
-        "Цей документ показує всі доступні змінні для шаблону інвойсу. "
-        "Використовуйте ці назви у своєму Word-шаблоні (.docx)."
-    )
-    doc.add_paragraph()
-
-    # Table
-    table = doc.add_table(rows=1, cols=3)
-    table.style = "Table Grid"
-
-    # Header row
-    hdr = table.rows[0].cells
-    for i, text in enumerate(["Змінна", "Опис", "Приклад значення"]):
-        p = hdr[i].paragraphs[0]
-        run = p.add_run(text)
-        run.bold = True
-        run.font.size = Pt(10)
-
-    # Set column widths
-    for i, width in enumerate([Cm(6), Cm(7), Cm(5)]):
-        for cell in table.columns[i].cells:
-            cell.width = width
-
-    # Data rows
-    for var, desc, example in TEMPLATE_VARS:
-        row = table.add_row().cells
-        # Variable name — monospace style
-        p0 = row[0].paragraphs[0]
-        run0 = p0.add_run(var)
-        run0.font.name = "Courier New"
-        run0.font.size = Pt(9)
-        if not var.startswith("—"):
-            run0.font.color.rgb = RGBColor(0x7B, 0x1F, 0xA2)
-
-        # Description
-        p1 = row[1].paragraphs[0]
-        p1.add_run(desc).font.size = Pt(9)
-
-        # Example
-        p2 = row[2].paragraphs[0]
-        run2 = p2.add_run(example)
-        run2.font.size = Pt(9)
-        run2.font.color.rgb = RGBColor(0x2E, 0x7D, 0x32)
-
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "Invoice_Template_Placeholders.docx"
+        generate_placeholder(out, get_active_template_path())
+        data = out.read_bytes()
 
     response = HttpResponse(
-        buf.read(),
+        data,
         content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
-    response["Content-Disposition"] = 'attachment; filename="Invoice_Template_Variables.docx"'
+    response["Content-Disposition"] = 'attachment; filename="Invoice_Template_Placeholders.docx"'
     return response
 
 
