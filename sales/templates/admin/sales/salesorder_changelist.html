@@ -266,6 +266,20 @@ document.addEventListener('DOMContentLoaded', function () {
                      border:1px solid var(--border-strong);background:var(--bg-input);
                      white-space:nowrap;cursor:default">🔌 {{ order.status_source }}</span>
         {% endif %}
+        {# DigiKey shipment confirmation badge #}
+        {% if order.source == "digikey" and order.tracking_number %}
+          {% if order.status_source == "DigiKey Marketplace" %}
+          <span title="Відправлення підтверджено на DigiKey Marketplace"
+                style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;
+                       color:#4caf50;border:1px solid rgba(76,175,80,.4);background:rgba(76,175,80,.08);
+                       white-space:nowrap;cursor:default">✅ DK</span>
+          {% else %}
+          <span title="Трек-номер є, але відправлення НЕ підтверджено на DigiKey Marketplace"
+                style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;
+                       color:#ff9800;border:1px solid rgba(255,152,0,.4);background:rgba(255,152,0,.08);
+                       white-space:nowrap;cursor:default">⚠️ DK</span>
+          {% endif %}
+        {% endif %}
         {# Flag toggle #}
         <button type="button" class="sv-flag-btn {% if order.is_flagged %}sv-flagged{% endif %}"
                 data-pk="{{ order.pk }}"
