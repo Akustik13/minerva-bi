@@ -1053,14 +1053,19 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     t["is_new"] = False
 
                 # Enrich with local order & customer data (not saved to cache)
-                on = str(t.get("orderNumber", ""))
-                order = orders.get(on)
-                if order:
-                    t["_order_pk"] = order.pk
-                    cust = order.customer
-                    t["_customer_company"] = (cust.company or "") if cust else ""
-                    t["_customer_name"]    = (cust.name    or "") if cust else ""
-                else:
+                try:
+                    on = str(t.get("orderNumber", ""))
+                    order = orders.get(on)
+                    if order:
+                        t["_order_pk"] = order.pk
+                        cust = order.customer
+                        t["_customer_company"] = (cust.company or "") if cust else ""
+                        t["_customer_name"]    = (cust.name    or "") if cust else ""
+                    else:
+                        t["_order_pk"] = None
+                        t["_customer_company"] = ""
+                        t["_customer_name"]    = ""
+                except Exception:
                     t["_order_pk"] = None
                     t["_customer_company"] = ""
                     t["_customer_name"]    = ""
@@ -1070,9 +1075,12 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
 
         # ── Serve from DB cache if available ──────────────────────────────────
         if not refresh and config.msg_topics_cache:
-            topics = _inject_is_new(list(config.msg_topics_cache))
-            cache_at = config.msg_cache_at.isoformat() if config.msg_cache_at else None
-            return JsonResponse({"topics": topics, "cache_at": cache_at, "from_cache": True})
+            try:
+                topics = _inject_is_new(list(config.msg_topics_cache))
+                cache_at = config.msg_cache_at.isoformat() if config.msg_cache_at else None
+                return JsonResponse({"topics": topics, "cache_at": cache_at, "from_cache": True})
+            except Exception as e:
+                return JsonResponse({"error": f"Помилка кешу: {e}"}, status=500)
 
         # ── Fresh fetch from DigiKey ───────────────────────────────────────────
         if not token:
