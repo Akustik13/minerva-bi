@@ -311,6 +311,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 name="bots_digikeyconfig_messages_reply",
             ),
             path(
+                "messages/<str:topic_id>/mark-read/",
+                self.admin_site.admin_view(self.messages_mark_read_view),
+                name="bots_digikeyconfig_messages_mark_read",
+            ),
+            path(
                 "messages/new-topic/",
                 self.admin_site.admin_view(self.messages_new_topic_view),
                 name="bots_digikeyconfig_messages_new_topic",
@@ -991,13 +996,14 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         config, token = self._get_messages_token()
         ctx = self.admin_site.each_context(request)
         ctx.update({
-            "title":        "💬 DigiKey Messages Hub",
-            "config":       config,
-            "authorized":   token is not None,
-            "api_url":      reverse("admin:bots_digikeyconfig_messages_api"),
-            "reply_base":   "/admin/bots/digikeyconfig/messages/",
-            "new_topic_url": reverse("admin:bots_digikeyconfig_messages_new_topic"),
-            "opts":         DigiKeyConfig._meta,
+            "title":          "💬 DigiKey Messages Hub",
+            "config":         config,
+            "authorized":     token is not None,
+            "api_url":        reverse("admin:bots_digikeyconfig_messages_api"),
+            "reply_base":     "/admin/bots/digikeyconfig/messages/",
+            "mark_read_base": "/admin/bots/digikeyconfig/messages/",
+            "new_topic_url":  reverse("admin:bots_digikeyconfig_messages_new_topic"),
+            "opts":           DigiKeyConfig._meta,
         })
         return render(request, "admin/bots/digikeyconfig/messages.html", ctx)
 
@@ -1009,14 +1015,30 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
 
         refresh = request.GET.get("refresh") == "1"
 
+        def _inject_is_new(topics):
+            """Inject server-computed is_new based on DigiKeyMessageSeen table."""
+            from bots.models import DigiKeyMessageSeen
+            seen_map = {s.topic_id: s.last_message_id
+                        for s in DigiKeyMessageSeen.objects.all()}
+            for t in topics:
+                tid = str(t.get("id", ""))
+                convo = t.get("conversation") or []
+                if convo:
+                    last = convo[-1]
+                    last_id = str(last.get("id", ""))
+                    t["is_new"] = (
+                        last.get("sender") == "Customer"
+                        and last_id != seen_map.get(tid, "")
+                    )
+                else:
+                    t["is_new"] = False
+            return topics
+
         # ── Serve from DB cache if available ──────────────────────────────────
         if not refresh and config.msg_topics_cache:
+            topics = _inject_is_new(list(config.msg_topics_cache))
             cache_at = config.msg_cache_at.isoformat() if config.msg_cache_at else None
-            return JsonResponse({
-                "topics": config.msg_topics_cache,
-                "cache_at": cache_at,
-                "from_cache": True,
-            })
+            return JsonResponse({"topics": topics, "cache_at": cache_at, "from_cache": True})
 
         # ── Fresh fetch from DigiKey ───────────────────────────────────────────
         if not token:
@@ -1039,12 +1061,13 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     t["orderNumber"] = order_number
                     result.append(t)
 
-            # Save to cache
+            # Save to cache (raw, without is_new — injected on serve)
             from django.utils import timezone
             config.msg_topics_cache = result
             config.msg_cache_at = timezone.now()
             config.save(update_fields=["msg_topics_cache", "msg_cache_at"])
 
+            result = _inject_is_new(result)
             return JsonResponse({
                 "topics": result,
                 "cache_at": config.msg_cache_at.isoformat(),
@@ -1052,6 +1075,25 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             })
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
+
+    def messages_mark_read_view(self, request, topic_id):
+        """POST /admin/bots/digikeyconfig/messages/<topic_id>/mark-read/"""
+        from django.http import JsonResponse
+        from bots.models import DigiKeyMessageSeen
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        import json
+        try:
+            body = json.loads(request.body)
+        except Exception:
+            body = {}
+        last_message_id = (body.get("last_message_id") or "").strip()
+        if not last_message_id:
+            return JsonResponse({"error": "last_message_id required"}, status=400)
+        seen, _ = DigiKeyMessageSeen.objects.get_or_create(topic_id=str(topic_id))
+        seen.last_message_id = last_message_id
+        seen.save()
+        return JsonResponse({"ok": True})
 
     def messages_reply_view(self, request, topic_id):
         """POST /admin/bots/digikeyconfig/messages/{topic_id}/reply/"""

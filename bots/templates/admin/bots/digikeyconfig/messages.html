@@ -101,9 +101,8 @@
       </div>
     </div>
     <div class="dkm-sort-bar">
-      Сортування:
-      <button class="dkm-sort-btn active" id="sort-btn-new" onclick="dkmSetSort('new')">🔴 Непрочитані</button>
-      <button class="dkm-sort-btn" id="sort-btn-date" onclick="dkmSetSort('date')">🕒 Дата</button>
+      <button class="dkm-sort-btn" id="sort-btn-new" onclick="dkmSetSort('new')">🔴 Непрочитані</button>
+      <button class="dkm-sort-btn active" id="sort-btn-date" onclick="dkmSetSort('date')">🕒 Нові → Старі ↓</button>
     </div>
     <div id="dkm-topics-list"><div class="dkm-loading">Завантаження…</div></div>
   </div>
@@ -126,22 +125,17 @@
 </div>
 
 <script>
-const API_URL      = "{{ api_url }}";
-const REPLY_BASE   = "{{ reply_base }}";
-const NEW_TOPIC_URL = "{{ new_topic_url }}";
-const CSRF         = "{{ csrf_token }}";
+const API_URL        = "{{ api_url }}";
+const REPLY_BASE     = "{{ reply_base }}";
+const MARK_READ_BASE = "{{ mark_read_base }}";
+const NEW_TOPIC_URL  = "{{ new_topic_url }}";
+const CSRF           = "{{ csrf_token }}";
 
 let _currentTopicId = null;
 let _allTopics      = [];
-let _sortMode       = 'new';  // 'new' | 'date'
+let _sortMode       = 'date_desc';  // 'date_desc' | 'date_asc' | 'new'
 
 // ── Sort helpers ─────────────────────────────────────────────────────────────
-
-function _topicIsNew(t) {
-  const convo = t.conversation || [];
-  if (!convo.length) return false;
-  return convo[convo.length - 1].sender === 'Customer';
-}
 
 function _topicDate(t) {
   if (t.lastUpdateDateUtc) {
@@ -155,18 +149,31 @@ function _topicDate(t) {
 function _sortTopics(topics) {
   return [...topics].sort((a, b) => {
     if (_sortMode === 'new') {
-      const aN = _topicIsNew(a), bN = _topicIsNew(b);
+      // NEW first, then newest date
+      const aN = a.is_new || false, bN = b.is_new || false;
       if (aN !== bN) return aN ? -1 : 1;
     }
-    return _topicDate(b) - _topicDate(a);  // newest first
+    const diff = _topicDate(b) - _topicDate(a);
+    return _sortMode === 'date_asc' ? -diff : diff;
   });
 }
 
 function dkmSetSort(mode) {
-  _sortMode = mode;
-  document.querySelectorAll('.dkm-sort-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById('sort-btn-' + mode).classList.add('active');
+  if (mode === 'date') {
+    // Toggle direction
+    _sortMode = _sortMode === 'date_desc' ? 'date_asc' : 'date_desc';
+  } else {
+    _sortMode = mode;
+  }
+  _updateSortBar();
   _renderTopicList(_allTopics);
+}
+
+function _updateSortBar() {
+  document.getElementById('sort-btn-new').classList.toggle('active', _sortMode === 'new');
+  document.getElementById('sort-btn-date').classList.toggle('active', _sortMode !== 'new');
+  const dateBtn = document.getElementById('sort-btn-date');
+  dateBtn.textContent = _sortMode === 'date_asc' ? '🕒 Старі → Нові ↑' : '🕒 Нові → Старі ↓';
 }
 
 // ── Load ─────────────────────────────────────────────────────────────────────
@@ -197,6 +204,7 @@ function dkmLoad(refresh) {
       cacheEl.textContent = '';
     }
 
+    _updateSortBar();
     _renderTopicList(_allTopics);
     // Restore previously open topic after refresh
     if (prevTopicId) {
@@ -234,7 +242,7 @@ function _renderTopicList(topics) {
     const convo  = t.conversation || [];
     const last   = convo.length ? convo[convo.length - 1] : null;
     const preview = last ? (last.content || '').substring(0, 65) : '—';
-    const isNew  = last && last.sender === 'Customer';
+    const isNew  = t.is_new || false;  // server-computed via DigiKeyMessageSeen
     const badge  = isNew ? '<span class="dkm-badge-new">NEW</span>' : '';
     const date   = last ? _fmtDate(last.createDateUtc) : (t.lastUpdateDateUtc ? _fmtDate(t.lastUpdateDateUtc) : '');
     const orderLabel = t.orderNumber ? '#' + t.orderNumber : (t.orderId ? t.orderId.substring(0, 8) + '…' : '—');
@@ -267,6 +275,23 @@ function dkmOpenTopic(topicId) {
   document.getElementById('dkm-topic-header').style.display = 'flex';
   _setReplyEnabled(true);
   _renderConvo(t.conversation || []);
+
+  // Mark as read if topic has a new customer message
+  if (t.is_new) {
+    const convo = t.conversation || [];
+    const last = convo.length ? convo[convo.length - 1] : null;
+    if (last && last.id) {
+      // Optimistic: clear badge immediately in data + DOM
+      t.is_new = false;
+      if (el) { const b = el.querySelector('.dkm-badge-new'); if (b) b.remove(); }
+      // Persist to server
+      fetch(MARK_READ_BASE + topicId + '/mark-read/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+        body: JSON.stringify({last_message_id: last.id}),
+      }).catch(() => {});
+    }
+  }
 }
 
 // ── Reply enable/disable ──────────────────────────────────────────────────────
