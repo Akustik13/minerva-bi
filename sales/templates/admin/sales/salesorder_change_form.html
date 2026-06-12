@@ -151,7 +151,7 @@
               align-items:center;justify-content:space-between;cursor:pointer"
        onclick="this.parentElement.querySelector('.dk-actions-body').style.display=
                 this.parentElement.querySelector('.dk-actions-body').style.display==='none'?'block':'none'">
-    <span style="font-size:13px;font-weight:700;color:#90caf9">🔧 DigiKey API Actions</span>
+    <span style="font-size:13px;font-weight:700;color:var(--link-fg)">🔧 DigiKey API Actions</span>
     <span style="font-size:11px;color:var(--text-dim)">▾</span>
   </div>
   <div class="dk-actions-body" style="padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
@@ -204,7 +204,7 @@
   <div style="border-top:1px solid rgba(21,101,192,.25)">
     <div style="padding:8px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer"
          onclick="dkmToggle()">
-      <span style="font-size:13px;font-weight:600;color:#90caf9">
+      <span style="font-size:13px;font-weight:600;color:var(--link-fg)">
         💬 Повідомлення DigiKey
         <span id="dkm-badge" style="background:#1565c0;color:#fff;border-radius:10px;
               font-size:10px;padding:1px 7px;margin-left:6px;display:none">0</span>
@@ -216,8 +216,8 @@
       <div id="dkm-convo-wrap" style="margin-top:10px"></div>
       <div id="dkm-reply-wrap" style="display:none;margin-top:8px;display:none">
         <textarea id="dkm-reply-ta" rows="3"
-          style="width:100%;box-sizing:border-box;background:var(--bg-input,#141f2b);
-                 color:var(--text,#c9d8e4);border:1px solid var(--border-strong,#243347);
+          style="width:100%;box-sizing:border-box;background:var(--bg-input);
+                 color:var(--text);border:1px solid var(--border-strong);
                  border-radius:6px;padding:8px;font-size:13px;font-family:inherit;resize:vertical"></textarea>
         <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">
           <button type="button" onclick="dkmSendReply()"
@@ -231,18 +231,18 @@
             ➕ Нова тема
           </button>
           <a href="{% url 'admin:bots_digikeyconfig_messages' %}" target="_blank"
-             style="color:#90caf9;font-size:12px;align-self:center">↗ Повний хаб</a>
+             style="color:var(--link-fg);font-size:12px;align-self:center">↗ Повний хаб</a>
         </div>
         <div id="dkm-new-topic-form" style="display:none;margin-top:10px;
-             padding:10px;border:1px solid var(--border-strong,#243347);border-radius:6px">
+             padding:10px;border:1px solid var(--border-strong);border-radius:6px">
           <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:6px">➕ Нова тема</div>
           <input type="text" id="dkm-nt-title" placeholder="Назва теми"
             style="width:100%;box-sizing:border-box;margin-bottom:6px;
-                   background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);
+                   background:var(--bg-input);color:var(--text);
                    border:1px solid var(--border-strong);border-radius:4px;padding:6px 9px;font-size:12px">
           <textarea id="dkm-nt-content" rows="3" placeholder="Текст повідомлення…"
-            style="width:100%;box-sizing:border-box;background:var(--bg-input,#141f2b);
-                   color:var(--text,#c9d8e4);border:1px solid var(--border-strong);
+            style="width:100%;box-sizing:border-box;background:var(--bg-input);
+                   color:var(--text);border:1px solid var(--border-strong);
                    border-radius:4px;padding:6px 9px;font-size:12px;font-family:inherit;resize:vertical"></textarea>
           <div style="display:flex;gap:6px;margin-top:6px">
             <button type="button" onclick="dkmCreateTopic()"
@@ -1211,13 +1211,14 @@ document.addEventListener('DOMContentLoaded',function(){
 {% if digikey_messages_url %}
 <style>
 .dkm-msg{padding:8px 12px;border-radius:8px;font-size:12px;line-height:1.5;max-width:80%;margin-bottom:6px}
-.dkm-msg-customer{background:var(--bg-hover,#1e2d40);border:1px solid var(--border-strong,#243347);align-self:flex-start}
+.dkm-msg-customer{background:var(--bg-hover);border:1px solid var(--border-strong);
+  color:var(--text);align-self:flex-start}
 .dkm-msg-supplier{background:#1565c0;color:#fff;align-self:flex-end}
 .dkm-msg-meta{font-size:10px;opacity:.65;margin-top:3px}
-.dkm-topic-btn{display:block;width:100%;text-align:left;background:var(--bg-hover,#1e2d40);
-  border:1px solid var(--border-strong,#243347);color:var(--text,#c9d8e4);border-radius:5px;
+.dkm-topic-btn{display:block;width:100%;text-align:left;background:var(--bg-hover);
+  border:1px solid var(--border-strong);color:var(--text);border-radius:5px;
   padding:7px 10px;margin-bottom:4px;cursor:pointer;font-size:12px}
-.dkm-topic-btn.active,.dkm-topic-btn:hover{background:rgba(21,101,192,.3)}
+.dkm-topic-btn.active,.dkm-topic-btn:hover{background:rgba(21,101,192,.15);border-color:#1565c0}
 </style>
 <script>
 (function(){

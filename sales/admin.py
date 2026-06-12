@@ -2847,7 +2847,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             return config, None
 
     def digikey_messages_view(self, request, pk):
-        """GET — JSON список тем розмов для цього замовлення."""
+        """GET — JSON список тем розмов (всіх або для цього замовлення).
+
+        DigiKey Messages API фільтрує по UUID замовлення, а не по order_number.
+        Завантажуємо всі теми і фільтруємо на стороні сервера по order_number.
+        """
         from django.http import JsonResponse
         from bots.services.digikey_messages import get_topics, get_topic
         order = get_object_or_404(SalesOrder, pk=pk)
@@ -2856,13 +2860,12 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         config, token = self._dk_messages_token()
         if not token:
             return JsonResponse({"error": "Marketplace не авторизовано"}, status=401)
-        # DigiKey API приймає UUID замовлення, але у нас order_number — числовий рядок.
-        # Спробуємо передати як OrderId і повернути результат.
         try:
-            data = get_topics(config, token, order_id=order.order_number, max_results=20)
+            # Завантажуємо всі теми (без фільтра orderId — він приймає UUID, а не order_number)
+            data = get_topics(config, token, order_id=None, max_results=100)
             items = data if isinstance(data, list) else data.get("items", data.get("topics", []))
             result = []
-            for t in items[:20]:
+            for t in items:
                 tid = str(t.get("id", ""))
                 if not tid:
                     continue
