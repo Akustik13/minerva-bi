@@ -145,10 +145,47 @@ class DigiKeyConfig(models.Model):
                   "(напр. 3228)"
     )
 
+    # ── Messages notifications ────────────────────────────────────────────────
+    msg_check_enabled = models.BooleanField(
+        "Авто-перевірка повідомлень", default=False,
+        help_text="Автоматично перевіряти нові повідомлення від покупців DigiKey"
+    )
+    msg_check_interval = models.PositiveSmallIntegerField(
+        "Інтервал перевірки (хвилин)", default=15,
+        help_text="Рекомендовано: 5–60 хв. Cron: python manage.py check_digikey_messages"
+    )
+    msg_notify_telegram = models.BooleanField(
+        "Сповіщення в Telegram", default=True,
+        help_text="Надсилати в Telegram при новому повідомленні від покупця"
+    )
+    msg_notify_email = models.BooleanField(
+        "Сповіщення на Email", default=True,
+        help_text="Надсилати Email при новому повідомленні від покупця"
+    )
+    msg_last_checked_at = models.DateTimeField(
+        "Остання перевірка повідомлень", null=True, blank=True
+    )
+
     @classmethod
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# ── DigiKey message seen tracker ──────────────────────────────────────────────
+
+class DigiKeyMessageSeen(models.Model):
+    """Зберігає id останнього побаченого повідомлення по кожній темі — для нотифікацій."""
+    topic_id        = models.CharField("Topic ID", max_length=64, unique=True)
+    last_message_id = models.CharField("Last Message ID", max_length=64, blank=True, default="")
+    last_seen_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = "DigiKey Message Seen"
+        verbose_name_plural = "DigiKey Messages Seen"
+
+    def __str__(self):
+        return f"Topic {self.topic_id}"
 
 
 # ── Background task tracker ───────────────────────────────────────────────────

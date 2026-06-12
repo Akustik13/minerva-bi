@@ -106,11 +106,13 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
     readonly_fields = (
         "last_synced_at",
         "last_pulled_at",
+        "msg_last_checked_at",
         "access_token_preview",
         "token_expires_at",
         "marketplace_auth_status",
         "action_buttons",
         "task_status_panel",
+        "messages_panel",
         "oauth_url_display",
         "webhook_url_display",
     )
@@ -153,6 +155,15 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "description": (
                 "Автоматично оновлює дані лістингів (ціни, назви, атрибути) з DigiKey за розкладом. "
                 "Додай до cron: <code>python manage.py pull_dk_listings</code>"
+            ),
+        }),
+        ("💬 Повідомлення DigiKey", {
+            "fields": ("messages_panel", "msg_check_enabled", "msg_check_interval",
+                       "msg_notify_telegram", "msg_notify_email", "msg_last_checked_at"),
+            "description": (
+                "Читайте та відповідайте на повідомлення покупців DigiKey Marketplace. "
+                "Авто-перевірка запускається командою: "
+                "<code>python manage.py check_digikey_messages</code>"
             ),
         }),
         ("🔌 Дії", {
@@ -282,6 +293,26 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "task-cancel/",
                 self.admin_site.admin_view(self.task_cancel_view),
                 name="bots_digikeyconfig_task_cancel",
+            ),
+            path(
+                "messages/",
+                self.admin_site.admin_view(self.messages_hub_view),
+                name="bots_digikeyconfig_messages",
+            ),
+            path(
+                "messages/api/",
+                self.admin_site.admin_view(self.messages_api_view),
+                name="bots_digikeyconfig_messages_api",
+            ),
+            path(
+                "messages/<str:topic_id>/reply/",
+                self.admin_site.admin_view(self.messages_reply_view),
+                name="bots_digikeyconfig_messages_reply",
+            ),
+            path(
+                "messages/new-topic/",
+                self.admin_site.admin_view(self.messages_new_topic_view),
+                name="bots_digikeyconfig_messages_new_topic",
             ),
         ]
         return custom + urls
@@ -939,6 +970,113 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         updated = BotTask.objects.filter(name=name, status='running').update(cancel_requested=True)
         return JsonResponse({'ok': bool(updated)})
 
+    # ── Messages Hub views ────────────────────────────────────────────────────
+
+    def _get_messages_token(self):
+        """Повертає (config, token) або (config, None) якщо не авторизовано."""
+        from bots.services.digikey import get_marketplace_token
+        config = DigiKeyConfig.get()
+        if not config.marketplace_refresh_token:
+            return config, None
+        try:
+            token = get_marketplace_token(config)
+            return config, token
+        except Exception:
+            return config, None
+
+    def messages_hub_view(self, request):
+        """GET /admin/bots/digikeyconfig/messages/ — повний чат-хаб."""
+        from django.shortcuts import render
+        config, token = self._get_messages_token()
+        ctx = self.admin_site.each_context(request)
+        ctx.update({
+            "title":        "💬 DigiKey Messages Hub",
+            "config":       config,
+            "authorized":   token is not None,
+            "api_url":      reverse("admin:bots_digikeyconfig_messages_api"),
+            "reply_base":   "/admin/bots/digikeyconfig/messages/",
+            "new_topic_url": reverse("admin:bots_digikeyconfig_messages_new_topic"),
+            "opts":         DigiKeyConfig._meta,
+        })
+        return render(request, "admin/bots/digikeyconfig/messages.html", ctx)
+
+    def messages_api_view(self, request):
+        """GET /admin/bots/digikeyconfig/messages/api/?order_id=... — JSON список тем."""
+        from django.http import JsonResponse
+        from bots.services.digikey_messages import get_all_topics_paginated, get_topic
+        config, token = self._get_messages_token()
+        if not token:
+            return JsonResponse({"error": "Не авторизовано"}, status=401)
+        order_id = request.GET.get("order_id", "")
+        try:
+            from bots.services.digikey_messages import get_topics
+            data = get_topics(config, token, order_id=order_id or None, max_results=50)
+            items = data if isinstance(data, list) else data.get("items", data.get("topics", []))
+            # Для кожної теми отримуємо повну розмову
+            result = []
+            for t in items[:30]:
+                tid = str(t.get("id", ""))
+                if not tid:
+                    continue
+                try:
+                    full = get_topic(config, token, tid)
+                    result.append(full)
+                except Exception:
+                    result.append(t)
+            return JsonResponse({"topics": result})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    def messages_reply_view(self, request, topic_id):
+        """POST /admin/bots/digikeyconfig/messages/{topic_id}/reply/"""
+        from django.http import JsonResponse
+        from bots.services.digikey_messages import reply, get_topic
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        import json
+        try:
+            body = json.loads(request.body)
+        except Exception:
+            body = {}
+        content = (body.get("content") or "").strip()
+        if not content:
+            return JsonResponse({"error": "Порожнє повідомлення"}, status=400)
+        config, token = self._get_messages_token()
+        if not token:
+            return JsonResponse({"error": "Не авторизовано"}, status=401)
+        try:
+            msg = reply(config, token, topic_id, content,
+                        sender="Supplier", recipient="Customer")
+            full = get_topic(config, token, topic_id)
+            return JsonResponse({"ok": True, "topic": full})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    def messages_new_topic_view(self, request):
+        """POST /admin/bots/digikeyconfig/messages/new-topic/"""
+        from django.http import JsonResponse
+        from bots.services.digikey_messages import create_topic
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        import json
+        try:
+            body = json.loads(request.body)
+        except Exception:
+            body = {}
+        order_id = (body.get("order_id") or "").strip()
+        topic_title = (body.get("topic") or "").strip() or "Запит від постачальника"
+        content = (body.get("content") or "").strip()
+        if not order_id or not content:
+            return JsonResponse({"error": "order_id і content обов'язкові"}, status=400)
+        config, token = self._get_messages_token()
+        if not token:
+            return JsonResponse({"error": "Не авторизовано"}, status=401)
+        try:
+            topic = create_topic(config, token, order_id, topic_title, content)
+            return JsonResponse({"ok": True, "topic": topic})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
     # ── Readonly display fields ───────────────────────────────────────────────
 
     def action_buttons(self, obj):
@@ -996,6 +1134,24 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             create_listings_url, s,
         )
     action_buttons.short_description = "Дії"
+
+    def messages_panel(self, obj):
+        hub_url = reverse("admin:bots_digikeyconfig_messages")
+        authorized = bool(obj and obj.marketplace_refresh_token)
+        if not authorized:
+            return format_html(
+                '<span style="color:var(--text-dim)">⚠️ Потрібна Marketplace OAuth авторизація</span>'
+            )
+        last = obj.msg_last_checked_at
+        last_str = last.strftime("%d.%m.%Y %H:%M") if last else "ніколи"
+        return format_html(
+            '<a href="{}" style="background:#1565c0;color:#fff;padding:6px 16px;'
+            'border-radius:4px;text-decoration:none;font-weight:600;font-size:13px">'
+            '💬 Відкрити Messages Hub</a>'
+            '&nbsp;<span style="color:var(--text-dim);font-size:11px">Остання перевірка: {}</span>',
+            hub_url, last_str,
+        )
+    messages_panel.short_description = "Повідомлення"
 
     def task_status_panel(self, obj):
         status_url = reverse('admin:bots_digikeyconfig_task_status')

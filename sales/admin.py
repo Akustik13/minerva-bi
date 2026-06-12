@@ -1633,6 +1633,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 )
             if obj and obj.source == "digikey":
                 extra_context["digikey_fetch_tracking_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-fetch-tracking/"
+                extra_context["digikey_messages_url"]       = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/"
+                extra_context["digikey_messages_reply_base"] = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/"
+                extra_context["digikey_messages_new_topic_url"] = f"/admin/sales/salesorder/{obj.pk}/digikey-messages/new-topic/"
             # EU Invoice button — repurposed to open /invoices/ with order pre-filled
             if obj and obj.pk:
                 extra_context["eu_invoice_suggest_url"]  = f"/admin/sales/salesorder/{obj.pk}/eu-invoice/suggest/"
@@ -2324,6 +2327,16 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/notify-order-confirm/',
                  self.admin_site.admin_view(self.notify_order_confirm_view),
                  name='sales_salesorder_notify_order_confirm'),
+            # DigiKey Messages (per-order)
+            path('<int:pk>/digikey-messages/',
+                 self.admin_site.admin_view(self.digikey_messages_view),
+                 name='sales_salesorder_digikey_messages'),
+            path('<int:pk>/digikey-messages/<str:topic_id>/reply/',
+                 self.admin_site.admin_view(self.digikey_messages_reply_view),
+                 name='sales_salesorder_digikey_messages_reply'),
+            path('<int:pk>/digikey-messages/new-topic/',
+                 self.admin_site.admin_view(self.digikey_messages_new_topic_view),
+                 name='sales_salesorder_digikey_messages_new_topic'),
         ]
         return custom_urls + urls
 
@@ -2819,6 +2832,99 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 return JsonResponse({'ok': False, 'error': str(e)})
 
         return JsonResponse({'ok': False, 'error': 'Method not allowed'}, status=405)
+
+    # ── DigiKey Messages (per-order) ──────────────────────────────────────────
+
+    def _dk_messages_token(self):
+        from bots.models import DigiKeyConfig
+        from bots.services.digikey import get_marketplace_token
+        config = DigiKeyConfig.get()
+        if not config.marketplace_refresh_token:
+            return config, None
+        try:
+            return config, get_marketplace_token(config)
+        except Exception:
+            return config, None
+
+    def digikey_messages_view(self, request, pk):
+        """GET — JSON список тем розмов для цього замовлення."""
+        from django.http import JsonResponse
+        from bots.services.digikey_messages import get_topics, get_topic
+        order = get_object_or_404(SalesOrder, pk=pk)
+        if order.source != "digikey" or not order.order_number:
+            return JsonResponse({"topics": []})
+        config, token = self._dk_messages_token()
+        if not token:
+            return JsonResponse({"error": "Marketplace не авторизовано"}, status=401)
+        # DigiKey API приймає UUID замовлення, але у нас order_number — числовий рядок.
+        # Спробуємо передати як OrderId і повернути результат.
+        try:
+            data = get_topics(config, token, order_id=order.order_number, max_results=20)
+            items = data if isinstance(data, list) else data.get("items", data.get("topics", []))
+            result = []
+            for t in items[:20]:
+                tid = str(t.get("id", ""))
+                if not tid:
+                    continue
+                try:
+                    full = get_topic(config, token, tid)
+                    result.append(full)
+                except Exception:
+                    result.append(t)
+            return JsonResponse({"topics": result, "order_number": order.order_number})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    def digikey_messages_reply_view(self, request, pk, topic_id):
+        """POST — відповісти на тему."""
+        from django.http import JsonResponse
+        from bots.services.digikey_messages import reply, get_topic
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        import json as _json
+        body = {}
+        try:
+            body = _json.loads(request.body)
+        except Exception:
+            pass
+        content = (body.get("content") or "").strip()
+        if not content:
+            return JsonResponse({"error": "Порожнє повідомлення"}, status=400)
+        config, token = self._dk_messages_token()
+        if not token:
+            return JsonResponse({"error": "Не авторизовано"}, status=401)
+        try:
+            reply(config, token, topic_id, content, sender="Supplier", recipient="Customer")
+            full = get_topic(config, token, topic_id)
+            return JsonResponse({"ok": True, "topic": full})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    def digikey_messages_new_topic_view(self, request, pk):
+        """POST — створити нову тему."""
+        from django.http import JsonResponse
+        from bots.services.digikey_messages import create_topic
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        import json as _json
+        order = get_object_or_404(SalesOrder, pk=pk)
+        body = {}
+        try:
+            body = _json.loads(request.body)
+        except Exception:
+            pass
+        topic_title = (body.get("topic") or "").strip() or "Запит від постачальника"
+        content = (body.get("content") or "").strip()
+        if not content:
+            return JsonResponse({"error": "content обов'язковий"}, status=400)
+        config, token = self._dk_messages_token()
+        if not token:
+            return JsonResponse({"error": "Не авторизовано"}, status=401)
+        try:
+            topic = create_topic(config, token, order.order_number, topic_title, content)
+            return JsonResponse({"ok": True, "topic": topic})
+        except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
 
     def sync_inventory_view(self, request, pk):
         """
