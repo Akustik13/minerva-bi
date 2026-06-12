@@ -268,7 +268,7 @@ function _renderTopicList(topics) {
     const tid    = _esc(t.id || '');
     const active = String(t.id) === String(_currentTopicId) ? ' active' : '';
     html += `<div class="dkm-topic-item${active}" onclick="dkmOpenTopic('${tid}')" id="dkm-ti-${tid}">
-      <div class="dkm-topic-order" style="display:flex;align-items:center;gap:6px">${orderEl} ${badge}</div>
+      <div class="dkm-topic-order" style="display:flex;align-items:center;gap:6px">${orderEl}<span>${t._flag_html || ''}</span> ${badge}</div>
       ${custLine}
       <div class="dkm-topic-title">${_esc(t.topic || '—')}</div>
       <div class="dkm-topic-preview">${_esc(preview)}</div>

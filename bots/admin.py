@@ -1068,14 +1068,22 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                         cust = customers.get(order.customer_key or "")
                         t["_customer_company"] = (cust.company or "") if cust else ""
                         t["_customer_name"]    = (cust.name    or "") if cust else ""
+                        country = (cust.country or "") if cust else ""
+                        if country:
+                            from config.country_utils import country_flag_html
+                            t["_flag_html"] = country_flag_html(country)
+                        else:
+                            t["_flag_html"] = ""
                     else:
                         t["_order_pk"] = None
                         t["_customer_company"] = ""
                         t["_customer_name"]    = ""
+                        t["_flag_html"]        = ""
                 except Exception:
                     t["_order_pk"] = None
                     t["_customer_company"] = ""
                     t["_customer_name"]    = ""
+                    t["_flag_html"]        = ""
 
             topics.sort(key=_topic_sort_key, reverse=True)
             return topics
