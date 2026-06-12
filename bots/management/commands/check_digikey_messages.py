@@ -75,14 +75,24 @@ class Command(BaseCommand):
 
             # Перевіряємо що останнє повідомлення від покупця (Customer)
             if last_msg.get("sender", "").lower() == "customer":
+                customer_name = ""
+                if order_number:
+                    from sales.models import SalesOrder
+                    ord_obj = SalesOrder.objects.filter(
+                        order_number=str(order_number)
+                    ).select_related("customer").first()
+                    if ord_obj and ord_obj.customer:
+                        customer_name = ord_obj.customer.name or ""
                 new_messages.append({
-                    "topic_id":    topic_id,
-                    "topic_title": full.get("topic", "—"),
-                    "order_id":    str(full.get("orderId", "")),
-                    "order_number": order_number,
-                    "content":     last_msg.get("content", "")[:300],
-                    "sender":      last_msg.get("sender", ""),
-                    "created_at":  last_msg.get("createDateUtc", ""),
+                    "topic_id":      topic_id,
+                    "topic_title":   full.get("topic", "—"),
+                    "order_id":      str(full.get("orderId", "")),
+                    "order_number":  order_number,
+                    "content":       last_msg.get("content", "")[:300],
+                    "sender":        last_msg.get("sender", ""),
+                    "sender_name":   last_msg.get("senderName", ""),
+                    "customer_name": customer_name,
+                    "created_at":    last_msg.get("createDateUtc", ""),
                 })
 
             # Оновлюємо seen незалежно від sender (щоб не спамити)
@@ -114,6 +124,18 @@ class Command(BaseCommand):
                 _notify_email(config, msg, notif)
 
 
+def _fmt_utc(dt_str: str) -> str:
+    """ISO UTC → '12.06.2026 15:06'."""
+    if not dt_str:
+        return ""
+    try:
+        from django.utils.dateparse import parse_datetime
+        dt = parse_datetime(dt_str)
+        return dt.strftime("%d.%m.%Y %H:%M") if dt else dt_str
+    except Exception:
+        return dt_str
+
+
 def _notify_telegram(config, msg: dict):
     """Надсилає Telegram сповіщення про нове повідомлення."""
     try:
@@ -124,16 +146,25 @@ def _notify_telegram(config, msg: dict):
         order_no = msg.get("order_number") or msg.get("order_id", "")
         if order_no:
             from sales.models import SalesOrder
-            order = SalesOrder.objects.filter(order_number=order_no).first()
+            order = SalesOrder.objects.filter(order_number=str(order_no)).first()
             if order:
                 base = getattr(settings, "PUBLIC_BASE_URL", config.public_base_url or "")
                 order_url = f"\n🔗 {base}/admin/sales/salesorder/{order.pk}/change/"
 
+        who = (
+            msg.get("sender_name")
+            or msg.get("customer_name")
+            or msg.get("sender", "Customer")
+        )
+        ts = _fmt_utc(msg.get("created_at", ""))
+        ts_line = f"\n🕒 {ts}" if ts else ""
+
         text = (
             f"💬 <b>Нове повідомлення DigiKey</b>\n"
             f"📋 Тема: {msg['topic_title']}\n"
-            f"🛒 Замовлення: {msg['order_id']}\n"
-            f"👤 Від: {msg['sender']}\n\n"
+            f"🛒 Замовлення: #{order_no}\n"
+            f"👤 Від: {who}"
+            f"{ts_line}\n\n"
             f"{msg['content']}"
             f"{order_url}"
         )
@@ -153,12 +184,22 @@ def _notify_email(config, msg: dict, notif=None):
         if not ns or not ns.email_enabled:
             return
 
+        order_no = msg.get("order_number") or msg.get("order_id", "")
+        who = (
+            msg.get("sender_name")
+            or msg.get("customer_name")
+            or msg.get("sender", "Customer")
+        )
+        ts = _fmt_utc(msg.get("created_at", ""))
+        ts_line = f"<br><b>Час:</b> {ts}" if ts else ""
+
         subject = f"💬 Нове повідомлення DigiKey: {msg['topic_title']}"
         html_body = (
             f"<p>Нове повідомлення від покупця в DigiKey Marketplace.</p>"
             f"<p><b>Тема:</b> {msg['topic_title']}<br>"
-            f"<b>Замовлення:</b> {msg['order_id']}<br>"
-            f"<b>Від:</b> {msg['sender']}</p>"
+            f"<b>Замовлення:</b> #{order_no}<br>"
+            f"<b>Від:</b> {who}"
+            f"{ts_line}</p>"
             f"<p><b>Повідомлення:</b><br>{msg['content']}</p>"
         )
 
