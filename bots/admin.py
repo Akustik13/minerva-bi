@@ -1002,18 +1002,29 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         return render(request, "admin/bots/digikeyconfig/messages.html", ctx)
 
     def messages_api_view(self, request):
-        """GET /admin/bots/digikeyconfig/messages/api/?order_id=... — JSON список тем."""
+        """GET /admin/bots/digikeyconfig/messages/api/ — JSON список тем (cache-first).
+        ?refresh=1 — force fresh fetch from DigiKey and update cache."""
         from django.http import JsonResponse
-        from bots.services.digikey_messages import get_all_topics_paginated, get_topic
         config, token = self._get_messages_token()
+
+        refresh = request.GET.get("refresh") == "1"
+
+        # ── Serve from DB cache if available ──────────────────────────────────
+        if not refresh and config.msg_topics_cache:
+            cache_at = config.msg_cache_at.isoformat() if config.msg_cache_at else None
+            return JsonResponse({
+                "topics": config.msg_topics_cache,
+                "cache_at": cache_at,
+                "from_cache": True,
+            })
+
+        # ── Fresh fetch from DigiKey ───────────────────────────────────────────
         if not token:
-            return JsonResponse({"error": "Не авторизовано"}, status=401)
-        order_id = request.GET.get("order_id", "")
+            return JsonResponse({"error": "Не авторизовано — потрібна OAuth авторизація"}, status=401)
         try:
-            from bots.services.digikey_messages import get_topics
-            data = get_topics(config, token, order_id=order_id or None, max_results=50)
+            from bots.services.digikey_messages import get_topics, get_topic
+            data = get_topics(config, token, order_id=None, max_results=50)
             items = data.get("messageTopicItems", []) if isinstance(data, dict) else data
-            # Для кожної теми отримуємо повну розмову
             result = []
             for t in items[:50]:
                 tid = str(t.get("id", ""))
@@ -1022,12 +1033,23 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     continue
                 try:
                     full = get_topic(config, token, tid)
-                    full["orderNumber"] = order_number  # list item has numeric orderNumber; full topic only has UUID orderId
+                    full["orderNumber"] = order_number
                     result.append(full)
                 except Exception:
                     t["orderNumber"] = order_number
                     result.append(t)
-            return JsonResponse({"topics": result})
+
+            # Save to cache
+            from django.utils import timezone
+            config.msg_topics_cache = result
+            config.msg_cache_at = timezone.now()
+            config.save(update_fields=["msg_topics_cache", "msg_cache_at"])
+
+            return JsonResponse({
+                "topics": result,
+                "cache_at": config.msg_cache_at.isoformat(),
+                "from_cache": False,
+            })
         except Exception as e:
             return JsonResponse({"error": str(e)}, status=500)
 

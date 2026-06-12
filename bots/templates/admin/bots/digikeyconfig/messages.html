@@ -78,9 +78,11 @@
   <div class="dkm-filters">
     <input type="text" id="dkm-filter-order" placeholder="Фільтр по Order #…" style="width:180px"
            oninput="dkmFilterLocal(this.value)">
-    <button class="dkm-btn" onclick="dkmLoad()">🔄 Оновити</button>
+    <button class="dkm-btn" onclick="dkmLoad(false)">📂 Відкрити</button>
+    <button class="dkm-btn" onclick="dkmLoad(true)" style="background:#546e7a">🔄 Оновити з DigiKey</button>
     <button class="dkm-btn dkm-btn-green" onclick="dkmShowNewTopic()">➕ Нова тема</button>
     <span id="dkm-status" style="font-size:12px;color:var(--text-dim)"></span>
+    <span id="dkm-cache-info" style="font-size:11px;color:var(--text-dim);margin-left:4px"></span>
   </div>
 </div>
 
@@ -169,23 +171,38 @@ function dkmSetSort(mode) {
 
 // ── Load ─────────────────────────────────────────────────────────────────────
 
-function dkmLoad() {
-  document.getElementById('dkm-status').textContent = 'Завантаження…';
+function dkmLoad(refresh) {
+  const url = API_URL + (refresh ? '?refresh=1' : '');
+  document.getElementById('dkm-status').textContent = refresh ? 'Завантаження з DigiKey…' : 'Завантаження…';
   document.getElementById('dkm-topics-list').innerHTML = '<div class="dkm-loading">Завантаження…</div>';
-  document.getElementById('dkm-convo').innerHTML = '<div class="dkm-empty">Оберіть тему зліва</div>';
-  document.getElementById('dkm-topic-header').style.display = 'none';
-  _setReplyEnabled(false);
-  _currentTopicId = null;
 
-  fetch(API_URL).then(r => r.json()).then(data => {
+  fetch(url).then(r => r.json()).then(data => {
     if (data.error) {
       document.getElementById('dkm-status').textContent = '❌ ' + data.error;
-      document.getElementById('dkm-topics-list').innerHTML = '<div class="dkm-loading">Помилка: ' + data.error + '</div>';
+      document.getElementById('dkm-topics-list').innerHTML = '<div class="dkm-loading">Помилка: ' + _esc(data.error) + '</div>';
+      // If fresh fetch fails but we have cache, fall back to cache
+      if (refresh && !_allTopics.length) dkmLoad(false);
       return;
     }
+    const prevTopicId = _currentTopicId;
     _allTopics = data.topics || [];
     document.getElementById('dkm-status').textContent = `Тем: ${_allTopics.length}`;
+
+    // Show cache info
+    const cacheEl = document.getElementById('dkm-cache-info');
+    if (data.cache_at) {
+      const fromCache = data.from_cache !== false;
+      cacheEl.textContent = (fromCache ? '📦 Кеш: ' : '✅ Оновлено: ') + _fmtDate(data.cache_at);
+    } else {
+      cacheEl.textContent = '';
+    }
+
     _renderTopicList(_allTopics);
+    // Restore previously open topic after refresh
+    if (prevTopicId) {
+      const t = _allTopics.find(x => String(x.id) === String(prevTopicId));
+      if (t) dkmOpenTopic(prevTopicId);
+    }
   }).catch(e => {
     document.getElementById('dkm-status').textContent = '❌ ' + e;
   });
@@ -362,7 +379,7 @@ function _fmtDate(s) {
   } catch(e) { return s; }
 }
 
-document.addEventListener('DOMContentLoaded', dkmLoad);
+document.addEventListener('DOMContentLoaded', () => dkmLoad(false));
 </script>
 {% endif %}
 {% endblock %}

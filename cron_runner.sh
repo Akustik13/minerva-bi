@@ -14,6 +14,7 @@ EMAIL_SYNC_INTERVAL="${EMAIL_SYNC_INTERVAL:-300}"
 SCHEDULED_INTERVAL="${SCHEDULED_INTERVAL:-120}"
 CALENDAR_REMINDER_INTERVAL="${CALENDAR_REMINDER_INTERVAL:-120}"
 BRIEFING_HOUR="${BRIEFING_HOUR:-08}"
+MSG_CHECK_INTERVAL="${MSG_CHECK_INTERVAL:-900}"   # 15 хв — перевірка повідомлень DigiKey
 
 echo "⏳ Waiting for PostgreSQL..."
 until pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" \
@@ -21,19 +22,21 @@ until pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" \
   sleep 2
 done
 echo "✅ PostgreSQL ready — cron runner started"
-echo "   track_shipments     every ${TRACK_INTERVAL}s"
-echo "   sync_digikey_orders interval controlled by DigiKeyConfig in DB"
-echo "   send_digest         time/frequency controlled by NotificationSettings in DB"
-echo "   morning_briefing    daily at ${BRIEFING_HOUR}:00"
+echo "   track_shipments         every ${TRACK_INTERVAL}s"
+echo "   sync_digikey_orders     interval controlled by DigiKeyConfig in DB"
+echo "   send_digest             time/frequency controlled by NotificationSettings in DB"
+echo "   morning_briefing        daily at ${BRIEFING_HOUR}:00"
 echo "   send_reminders          every ${REMINDER_INTERVAL}s"
 echo "   sync_email              every ${EMAIL_SYNC_INTERVAL}s"
 echo "   send_calendar_reminders every ${CALENDAR_REMINDER_INTERVAL}s"
+echo "   check_digikey_messages  every ${MSG_CHECK_INTERVAL}s"
 
 LAST_TRACK=0
 LAST_REMINDER=0
 LAST_EMAIL_SYNC=0
 LAST_SCHEDULED=0
 LAST_CALENDAR=0
+LAST_MSG_CHECK=0
 last_briefing_day=""
 
 while true; do
@@ -86,6 +89,12 @@ while true; do
   if [ $((NOW - LAST_CALENDAR)) -ge "$CALENDAR_REMINDER_INTERVAL" ]; then
     python manage.py send_calendar_reminders 2>&1 || true
     LAST_CALENDAR=$(date +%s)
+  fi
+
+  # ── DigiKey Messages — перевірка кожні MSG_CHECK_INTERVAL секунд ─────────
+  if [ $((NOW - LAST_MSG_CHECK)) -ge "$MSG_CHECK_INTERVAL" ]; then
+    python manage.py check_digikey_messages 2>&1 || true
+    LAST_MSG_CHECK=$(date +%s)
   fi
 
   sleep 60

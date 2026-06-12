@@ -80,8 +80,9 @@ services:
     environment:
       <<: *django_env
       # Інтервали в секундах (override тут якщо потрібно)
-      TRACK_INTERVAL: "300"    # 5 хв — авто-трекінг відправлень
-      SYNC_INTERVAL:  "1800"   # 30 хв — DigiKey синхронізація
+      TRACK_INTERVAL:      "300"   # 5 хв — авто-трекінг відправлень
+      SYNC_INTERVAL:       "1800"  # 30 хв — DigiKey синхронізація
+      MSG_CHECK_INTERVAL:  "900"   # 15 хв — перевірка повідомлень DigiKey (≥ msg_check_interval у хвилинах × 60)
     entrypoint: ["sh", "/app/cron_runner.sh"]
     volumes: *app_volumes
     depends_on:

@@ -152,10 +152,17 @@ class DigiKeyConfig(models.Model):
     )
     msg_check_interval = models.PositiveSmallIntegerField(
         "Інтервал перевірки (хвилин)", default=15,
-        help_text="Рекомендовано: 5–60 хв. Cron: python manage.py check_digikey_messages"
+        help_text="Рекомендовано: 5–60 хв. Використовується cron_runner (MSG_CHECK_INTERVAL)."
     )
     msg_last_checked_at = models.DateTimeField(
         "Остання перевірка повідомлень", null=True, blank=True
+    )
+    msg_topics_cache = models.JSONField(
+        "Кеш повідомлень", null=True, blank=True, default=None,
+        help_text="Зберігається автоматично після check_digikey_messages або оновлення в хабі."
+    )
+    msg_cache_at = models.DateTimeField(
+        "Кеш оновлено", null=True, blank=True
     )
 
     @classmethod

@@ -43,9 +43,11 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Знайдено {len(topics)} тем.")
         new_messages = []
+        topics_cache = []  # will be stored in DigiKeyConfig for hub caching
 
         for topic in topics:
             topic_id = str(topic.get("id", ""))
+            order_number = topic.get("orderNumber", "")
             if not topic_id:
                 continue
 
@@ -54,6 +56,10 @@ class Command(BaseCommand):
                 full = get_topic(config, token, topic_id)
             except Exception:
                 continue
+
+            # Inject orderNumber (not in full topic response, only in list item)
+            full["orderNumber"] = order_number
+            topics_cache.append(full)
 
             conversation = full.get("conversation", [])
             if not conversation:
@@ -73,6 +79,7 @@ class Command(BaseCommand):
                     "topic_id":    topic_id,
                     "topic_title": full.get("topic", "—"),
                     "order_id":    str(full.get("orderId", "")),
+                    "order_number": order_number,
                     "content":     last_msg.get("content", "")[:300],
                     "sender":      last_msg.get("sender", ""),
                     "created_at":  last_msg.get("createDateUtc", ""),
@@ -82,8 +89,11 @@ class Command(BaseCommand):
             seen.last_message_id = last_msg_id
             seen.save()
 
-        config.msg_last_checked_at = timezone.now()
-        config.save(update_fields=["msg_last_checked_at"])
+        now = timezone.now()
+        config.msg_last_checked_at = now
+        config.msg_topics_cache = topics_cache
+        config.msg_cache_at = now
+        config.save(update_fields=["msg_last_checked_at", "msg_topics_cache", "msg_cache_at"])
 
         if not new_messages:
             self.stdout.write("✅ Нових повідомлень від покупців немає.")
@@ -111,8 +121,7 @@ def _notify_telegram(config, msg: dict):
         from django.conf import settings
 
         order_url = ""
-        # Спробуємо знайти замовлення за order_id (DigiKey order number)
-        order_no = msg.get("order_id", "")
+        order_no = msg.get("order_number") or msg.get("order_id", "")
         if order_no:
             from sales.models import SalesOrder
             order = SalesOrder.objects.filter(order_number=order_no).first()
