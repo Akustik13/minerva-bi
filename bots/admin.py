@@ -320,6 +320,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.messages_new_topic_view),
                 name="bots_digikeyconfig_messages_new_topic",
             ),
+            path(
+                "messages/ai/",
+                self.admin_site.admin_view(self.messages_ai_view),
+                name="bots_digikeyconfig_messages_ai",
+            ),
         ]
         return custom + urls
 
@@ -1003,6 +1008,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             "reply_base":     "/admin/bots/digikeyconfig/messages/",
             "mark_read_base": "/admin/bots/digikeyconfig/messages/",
             "new_topic_url":  reverse("admin:bots_digikeyconfig_messages_new_topic"),
+            "ai_url":         reverse("admin:bots_digikeyconfig_messages_ai"),
             "opts":           DigiKeyConfig._meta,
         })
         return render(request, "admin/bots/digikeyconfig/messages.html", ctx)
@@ -1203,6 +1209,69 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             topic = create_topic(config, token, order_id, topic_title, content)
             return JsonResponse({"ok": True, "topic": topic})
         except Exception as e:
+            return JsonResponse({"error": str(e)}, status=500)
+
+    def messages_ai_view(self, request):
+        """POST /admin/bots/digikeyconfig/messages/ai/ — AI reply generation or translation."""
+        from django.http import JsonResponse
+        import json
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        try:
+            body = json.loads(request.body)
+        except Exception:
+            return JsonResponse({"error": "Invalid JSON"}, status=400)
+        mode = body.get("mode", "reply")
+        try:
+            import anthropic
+            from strategy.models import AISettings
+            ai_settings = AISettings.get()
+            if not ai_settings.anthropic_api_key:
+                return JsonResponse({"error": "API ключ Anthropic не налаштований у AISettings"}, status=400)
+            client = anthropic.Anthropic(api_key=ai_settings.anthropic_api_key)
+            if mode == "reply":
+                conversation = body.get("conversation", [])
+                user_prompt = (body.get("prompt") or "").strip()
+                conv_text = "\n\n".join(
+                    f"{m.get('sender', '?')}: {(m.get('content', '') or '').strip()}"
+                    for m in conversation
+                )
+                system = (
+                    "You are a professional business email assistant for Sevskiy GmbH, a DigiKey Marketplace seller. "
+                    "Write professional, concise, polite English replies to buyer messages. "
+                    "Sign as: Best regards,\nSevskiy GmbH\n"
+                    "Reply ONLY with the email text, no meta-commentary or explanations."
+                )
+                user_msg = f"Conversation:\n\n{conv_text}"
+                if user_prompt:
+                    user_msg += f"\n\nInstruction: {user_prompt}"
+                user_msg += "\n\nWrite a professional reply."
+                resp = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=600,
+                    system=system,
+                    messages=[{"role": "user", "content": user_msg}],
+                )
+                text = resp.content[0].text.strip()
+            elif mode == "translate":
+                text_to_translate = (body.get("text") or "").strip()
+                if not text_to_translate:
+                    return JsonResponse({"error": "text is required"}, status=400)
+                resp = client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=600,
+                    messages=[{
+                        "role": "user",
+                        "content": f"Translate the following text to Ukrainian. Return only the translation, no explanations:\n\n{text_to_translate}",
+                    }],
+                )
+                text = resp.content[0].text.strip()
+            else:
+                return JsonResponse({"error": f"Unknown mode: {mode}"}, status=400)
+            return JsonResponse({"ok": True, "text": text})
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).exception("AI messages view error")
             return JsonResponse({"error": str(e)}, status=500)
 
     # ── Readonly display fields ───────────────────────────────────────────────

@@ -64,6 +64,20 @@
   color:var(--text-dim);font-size:11px;padding:2px 8px;cursor:pointer}
 .dkm-sort-btn.active{background:var(--bg-hover);color:var(--text);font-weight:600}
 #dkm-topics-list{flex:1;overflow-y:auto;min-height:0}
+.dkm-ai-panel{padding:10px 14px;border-top:1px dashed var(--border-strong);
+  background:var(--bg-card);display:none;flex-direction:column;gap:6px;flex-shrink:0}
+.dkm-ai-panel.open{display:flex}
+.dkm-ai-panel textarea{background:var(--bg-input);color:var(--text);
+  border:1px solid var(--border-strong);border-radius:6px;padding:8px 10px;
+  font-size:12px;resize:none;height:48px;font-family:inherit;width:100%;box-sizing:border-box}
+.dkm-ai-result{background:var(--bg-hover);border:1px solid var(--border-strong);
+  border-radius:6px;padding:10px;font-size:12px;color:var(--text);white-space:pre-wrap;
+  max-height:200px;overflow-y:auto;display:none}
+.dkm-translate-btn{background:none;border:none;cursor:pointer;font-size:10px;
+  color:var(--text-dim);padding:1px 4px;border-radius:3px;opacity:.6}
+.dkm-translate-btn:hover{opacity:1;background:var(--bg-hover)}
+.dkm-translated-text{font-size:11px;color:var(--text-dim);margin-top:4px;
+  font-style:italic;display:none}
 </style>
 {% endblock %}
 
@@ -119,7 +133,23 @@
     <!-- Reply row — always visible, disabled until topic selected -->
     <div class="dkm-reply" id="dkm-reply-row">
       <textarea id="dkm-reply-text" placeholder="Оберіть тему для відповіді…" disabled></textarea>
-      <button class="dkm-btn" id="dkm-send-btn" onclick="dkmSendReply()" disabled>📤 Надіслати</button>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <button class="dkm-btn" id="dkm-send-btn" onclick="dkmSendReply()" disabled>📤 Надіслати</button>
+        <button class="dkm-btn" id="dkm-ai-toggle-btn" onclick="dkmToggleAi()" disabled
+                style="background:#6a1b9a">✨ AI</button>
+      </div>
+    </div>
+    <!-- AI Panel -->
+    <div class="dkm-ai-panel" id="dkm-ai-panel">
+      <div style="font-size:11px;color:var(--text-dim);font-weight:600">✨ AI-асистент DigiKey</div>
+      <textarea id="dkm-ai-prompt" placeholder="Інструкція для відповіді (необов'язково): напр. «вибачся і запропонуй повернення»…"></textarea>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button class="dkm-btn" onclick="dkmAiReply()" style="background:#6a1b9a">✨ Генерувати відповідь</button>
+        <button class="dkm-btn" onclick="dkmAiInsert()" id="dkm-ai-insert-btn"
+                style="background:#2e7d32;display:none">📋 Вставити у відповідь</button>
+        <span id="dkm-ai-status" style="font-size:11px;color:var(--text-dim)"></span>
+      </div>
+      <div class="dkm-ai-result" id="dkm-ai-result"></div>
     </div>
   </div>
 </div>
@@ -129,6 +159,7 @@ const API_URL        = "{{ api_url }}";
 const REPLY_BASE     = "{{ reply_base }}";
 const MARK_READ_BASE = "{{ mark_read_base }}";
 const NEW_TOPIC_URL  = "{{ new_topic_url }}";
+const AI_URL         = "{{ ai_url }}";
 const CSRF           = "{{ csrf_token }}";
 
 let _currentTopicId = null;
@@ -317,12 +348,14 @@ function dkmOpenTopic(topicId) {
 // ── Reply enable/disable ──────────────────────────────────────────────────────
 
 function _setReplyEnabled(enabled) {
-  const ta  = document.getElementById('dkm-reply-text');
-  const btn = document.getElementById('dkm-send-btn');
+  const ta    = document.getElementById('dkm-reply-text');
+  const btn   = document.getElementById('dkm-send-btn');
+  const aiBtn = document.getElementById('dkm-ai-toggle-btn');
   ta.disabled  = !enabled;
   btn.disabled = !enabled;
+  if (aiBtn) aiBtn.disabled = !enabled;
   ta.placeholder = enabled ? 'Ваша відповідь…' : 'Оберіть тему для відповіді…';
-  if (!enabled) ta.value = '';
+  if (!enabled) { ta.value = ''; _hideAiPanel(); }
 }
 
 // ── Render conversation ───────────────────────────────────────────────────────
@@ -331,16 +364,24 @@ function _renderConvo(msgs) {
   const convo = document.getElementById('dkm-convo');
   if (!msgs.length) { convo.innerHTML = '<div class="dkm-empty">Повідомлень немає</div>'; return; }
   let html = '';
-  msgs.forEach(m => {
+  msgs.forEach((m, idx) => {
     const isSupplier = m.sender === 'Supplier';
     const cls = isSupplier ? 'dkm-msg-supplier' : (m.sender === 'Operator' ? 'dkm-msg-operator' : 'dkm-msg-customer');
-    html += `<div class="dkm-msg ${cls}">
+    const escapedContent = _esc(m.content || '');
+    const msgId = 'dkmsg-' + idx;
+    html += `<div class="dkm-msg ${cls}" id="${msgId}">
       <div class="dkm-msg-sender">${_esc(m.sender || '?')} → ${_esc(m.recipient || '?')}</div>
-      <div style="white-space:pre-wrap">${_esc(m.content || '')}</div>
-      <div class="dkm-msg-date">${_fmtDate(m.createDateUtc)}</div>
+      <div style="white-space:pre-wrap">${escapedContent}</div>
+      <div class="dkm-translated-text" id="${msgId}-tr"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <button class="dkm-translate-btn" onclick="dkmTranslateMsg(this,'${msgId}')" title="Перекласти">🌐 UA</button>
+        <span class="dkm-msg-date">${_fmtDate(m.createDateUtc)}</span>
+      </div>
     </div>`;
   });
+  // Store raw messages for translate access
   convo.innerHTML = html;
+  convo._msgs = msgs;
   convo.scrollTop = convo.scrollHeight;
 }
 
@@ -409,6 +450,101 @@ function dkmCreateTopic() {
       alert('❌ ' + (d.error || 'Помилка'));
     }
   }).catch(e => alert('❌ ' + e));
+}
+
+// ── AI agent ──────────────────────────────────────────────────────────────────
+
+function dkmToggleAi() {
+  const panel = document.getElementById('dkm-ai-panel');
+  const isOpen = panel.classList.toggle('open');
+  const btn = document.getElementById('dkm-ai-toggle-btn');
+  btn.style.background = isOpen ? '#4a148c' : '#6a1b9a';
+  if (!isOpen) _hideAiPanel();
+}
+
+function _hideAiPanel() {
+  const panel = document.getElementById('dkm-ai-panel');
+  if (panel) panel.classList.remove('open');
+  const btn = document.getElementById('dkm-ai-toggle-btn');
+  if (btn) btn.style.background = '#6a1b9a';
+  const res = document.getElementById('dkm-ai-result');
+  if (res) res.style.display = 'none';
+  const ins = document.getElementById('dkm-ai-insert-btn');
+  if (ins) ins.style.display = 'none';
+}
+
+function dkmAiReply() {
+  if (!_currentTopicId) return;
+  const t = _allTopics.find(x => String(x.id) === String(_currentTopicId));
+  if (!t) return;
+  const prompt = (document.getElementById('dkm-ai-prompt').value || '').trim();
+  const statusEl = document.getElementById('dkm-ai-status');
+  const resultEl = document.getElementById('dkm-ai-result');
+  const insBtn   = document.getElementById('dkm-ai-insert-btn');
+  statusEl.textContent = '⏳ Генерую…';
+  resultEl.style.display = 'none';
+  insBtn.style.display = 'none';
+
+  fetch(AI_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({mode: 'reply', conversation: t.conversation || [], prompt}),
+  }).then(r => r.json()).then(d => {
+    statusEl.textContent = '';
+    if (d.ok) {
+      resultEl.textContent = d.text;
+      resultEl.style.display = 'block';
+      insBtn.style.display = 'inline-block';
+    } else {
+      statusEl.textContent = '❌ ' + (d.error || 'Помилка');
+    }
+  }).catch(e => { statusEl.textContent = '❌ ' + e; });
+}
+
+function dkmAiInsert() {
+  const text = document.getElementById('dkm-ai-result').textContent;
+  if (!text) return;
+  const ta = document.getElementById('dkm-reply-text');
+  ta.value = text;
+  ta.focus();
+}
+
+function dkmTranslateMsg(btn, msgId) {
+  const convo = document.getElementById('dkm-convo');
+  if (!convo._msgs) return;
+  const idx = parseInt(msgId.replace('dkmsg-', ''));
+  const m = convo._msgs[idx];
+  if (!m) return;
+  const trEl = document.getElementById(msgId + '-tr');
+  if (!trEl) return;
+  // Toggle: if already shown, hide
+  if (trEl.style.display === 'block') {
+    trEl.style.display = 'none';
+    btn.textContent = '🌐 UA';
+    return;
+  }
+  // If already translated, just show
+  if (trEl.dataset.translated) {
+    trEl.style.display = 'block';
+    btn.textContent = '🌐 ×';
+    return;
+  }
+  btn.textContent = '⏳';
+  fetch(AI_URL, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({mode: 'translate', text: m.content || ''}),
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      trEl.textContent = '🇺🇦 ' + d.text;
+      trEl.dataset.translated = '1';
+      trEl.style.display = 'block';
+      btn.textContent = '🌐 ×';
+    } else {
+      btn.textContent = '🌐 UA';
+      alert('❌ ' + (d.error || 'Помилка перекладу'));
+    }
+  }).catch(e => { btn.textContent = '🌐 UA'; alert('❌ ' + e); });
 }
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
