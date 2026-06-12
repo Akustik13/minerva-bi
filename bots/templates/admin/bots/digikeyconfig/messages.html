@@ -138,12 +138,10 @@ let _sortMode       = 'date_desc';  // 'date_desc' | 'date_asc' | 'new'
 // ── Sort helpers ─────────────────────────────────────────────────────────────
 
 function _topicDate(t) {
-  if (t.lastUpdateDateUtc) {
-    try { const ts = new Date(t.lastUpdateDateUtc).getTime(); if (!isNaN(ts)) return ts; } catch(e) {}
-  }
+  // Sort only by last conversation message date, NOT lastUpdateDateUtc
+  // (lastUpdateDateUtc reflects system/DHL updates, not customer messages)
   const convo = t.conversation || [];
   if (!convo.length) return 0;
-  // Use max across all messages — handles both oldest-first and newest-first API orders
   let maxTs = 0;
   for (const m of convo) {
     try { const ts = new Date(m.createDateUtc).getTime(); if (!isNaN(ts) && ts > maxTs) maxTs = ts; } catch(e) {}
@@ -250,11 +248,12 @@ function _renderTopicList(topics) {
   let html = '';
   sorted.forEach(t => {
     const convo  = t.conversation || [];
-    const last   = convo.length ? convo[convo.length - 1] : null;
+    // Pick message with the newest createDateUtc (handles both API sort orders)
+    const last   = convo.length ? convo.reduce((a, b) => ((a.createDateUtc || '') > (b.createDateUtc || '') ? a : b)) : null;
     const preview = last ? (last.content || '').substring(0, 65) : '—';
     const isNew  = t.is_new || false;  // server-computed via DigiKeyMessageSeen
     const badge  = isNew ? '<span class="dkm-badge-new">NEW</span>' : '';
-    const date   = last ? _fmtDate(last.createDateUtc) : (t.lastUpdateDateUtc ? _fmtDate(t.lastUpdateDateUtc) : '');
+    const date   = last ? _fmtDate(last.createDateUtc) : '';
     const orderLabel = t.orderNumber ? '#' + t.orderNumber : (t.orderId ? t.orderId.substring(0, 8) + '…' : '—');
     const tid    = _esc(t.id || '');
     const active = String(t.id) === String(_currentTopicId) ? ' active' : '';

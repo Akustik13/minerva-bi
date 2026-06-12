@@ -1016,15 +1016,10 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         refresh = request.GET.get("refresh") == "1"
 
         def _topic_sort_key(t):
-            """Max date across lastUpdateDateUtc and all conversation messages (ISO str sorts correctly)."""
-            dates = []
-            lu = t.get("lastUpdateDateUtc") or ""
-            if lu:
-                dates.append(lu)
-            for m in (t.get("conversation") or []):
-                d = m.get("createDateUtc") or ""
-                if d:
-                    dates.append(d)
+            """Max createDateUtc across conversation messages only (ignores lastUpdateDateUtc —
+            that field reflects system/DHL updates, not customer messages)."""
+            dates = [m.get("createDateUtc") or "" for m in (t.get("conversation") or [])]
+            dates = [d for d in dates if d]
             return max(dates) if dates else ""
 
         def _inject_is_new(topics):
