@@ -3090,10 +3090,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if pl_path.exists():
                 pdf_paths.append(pl_path)
 
-        # ── 2. Invoice (EU) або Customs (non-EU) ─────────────────────────────
-        if order and order.order_number:
+        # ── 2. Invoice (EU) або Customs (non-EU) — лише для DigiKey ─────────────
+        if order and order.order_number and order.source == "digikey":
             if is_eu:
-                # ── Invoice ──
+                # ── Invoice (генеруємо якщо нема) ──
                 try:
                     from shipping.models import Invoice as _Inv
                     inv = (
@@ -3103,7 +3103,6 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     if not inv:
                         from shipping.services.invoice_service import InvoiceService
                         inv = InvoiceService.generate_from_digikey_order(order.order_number, request.user)
-                    # Get PDF bytes
                     inv_pdf: Path | None = None
                     if inv.pdf_file:
                         p = Path(_s.MEDIA_ROOT) / str(inv.pdf_file)
@@ -3117,7 +3116,6 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             inv.pdf_file = f"invoices/{cp.name}"
                             inv.save(update_fields=["pdf_file"])
                             inv_pdf = cp
-                    # Copy to order docs folder
                     if inv_pdf:
                         inv_name = f"Invoice_{inv.invoice_number}.pdf"
                         inv_dest = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / inv_name
@@ -3129,7 +3127,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 except Exception as e:
                     errors.append(f"Invoice: {e}")
             else:
-                # ── Customs (CN23) ──
+                # ── Customs/CN23 (генеруємо якщо нема) ──
                 cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
                 cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
                 if not cn_path.exists():
@@ -3142,6 +3140,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                         errors.append(f"Customs: {e}")
                 if cn_path.exists():
                     pdf_paths.append(cn_path)
+
+        # ── 2b. Не-DigiKey + за межами ЄС → митна якщо є (не генеруємо) ────────
+        elif order and order.order_number and not is_eu:
+            cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
+            cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
+            if cn_path.exists():
+                pdf_paths.append(cn_path)
+            elif shipment.customs_url:
+                # fallback: customs_url на shipment (напр. Jumingo)
+                cu_rel  = shipment.customs_url.lstrip("/media/")
+                cu_path = Path(_s.MEDIA_ROOT) / cu_rel
+                if cu_path.exists():
+                    pdf_paths.append(cu_path)
 
         # ── 3. Carrier label ─────────────────────────────────────────────────
         if shipment.label_url:
