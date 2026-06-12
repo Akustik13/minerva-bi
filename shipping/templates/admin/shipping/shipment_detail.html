@@ -579,21 +579,6 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
               <span class="sd-local-status" style="font-size:11px;color:var(--text-dim)"></span>
             </span>
           </div>
-          <div class="sd-info-row">
-            <span class="sd-info-key">{% trans "Друк усього" %}</span>
-            <span class="sd-info-val">
-              <a href="{% url 'admin:shipping_shipment_print_all' shipment.pk %}"
-                 target="_blank"
-                 style="display:inline-flex;align-items:center;gap:6px;
-                        background:#1b5e20;color:#fff;padding:6px 16px;border-radius:6px;
-                        text-decoration:none;font-weight:600;font-size:13px">
-                🖨️ {% trans "Друкувати всі документи" %}
-              </a>
-              <span style="font-size:11px;color:var(--text-dim);margin-left:8px">
-                {% trans "Пак-ліст + Інвойс/Митна + Етикетка → один PDF" %}
-              </span>
-            </span>
-          </div>
           {% endif %}
           {% if shipment.customs_url %}
           <div class="sd-info-row">
@@ -612,6 +597,23 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
           <div class="sd-info-row">
             <span class="sd-info-key">{% trans "ID відправлення" %}</span>
             <span class="sd-info-val sd-mono sd-small">{{ shipment.carrier_shipment_id|truncatechars:36 }}</span>
+          </div>
+          {% endif %}
+          {% if label_display_url %}
+          <div class="sd-info-row">
+            <span class="sd-info-key">{% trans "Друк усього" %}</span>
+            <span class="sd-info-val">
+              <a href="{% url 'admin:shipping_shipment_print_all' shipment.pk %}"
+                 target="_blank"
+                 style="display:inline-flex;align-items:center;gap:6px;
+                        background:#1b5e20;color:#fff;padding:6px 16px;border-radius:6px;
+                        text-decoration:none;font-weight:600;font-size:13px">
+                🖨️ {% trans "Друкувати всі документи" %}
+              </a>
+              <span style="font-size:11px;color:var(--text-dim);margin-left:8px">
+                {% trans "Пак-ліст + Інвойс/Митна + Етикетка → один PDF" %}
+              </span>
+            </span>
           </div>
           {% endif %}
           {% if shipment.selected_tariff_id %}
