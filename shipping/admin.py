@@ -3169,13 +3169,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 errors.append(f"Етикетка не знайдена: {lbl_path}")
 
         if not pdf_paths:
+            err_html = "".join(f"<li>❌ {e}</li>" for e in errors) or "<li>Документи відсутні</li>"
             return HttpResponse(
-                f"<h3>Немає PDF для друку</h3><pre>{'<br>'.join(errors) or 'Документи відсутні'}</pre>",
+                f"<h3 style='font-family:sans-serif'>Немає PDF для друку</h3><ul style='font-family:monospace'>{err_html}</ul>",
                 content_type="text/html; charset=utf-8",
                 status=404,
             )
 
         # ── 4. Merge PDFs ─────────────────────────────────────────────────────
+        merged = b""
         try:
             from pypdf import PdfWriter, PdfReader
             writer = PdfWriter()
@@ -3191,10 +3193,37 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             out_buf.seek(0)
             merged = out_buf.read()
         except ImportError:
-            # pypdf not installed — return first PDF only
             merged = pdf_paths[0].read_bytes()
 
         order_no = (order.order_number if order else str(shipment_id))
+
+        # ── 5. Якщо є помилки — показати діагностику, а не тихо пропустити ────
+        if errors:
+            ok_rows = "".join(
+                f"<li>✅ {p.name}</li>" for p in pdf_paths
+            )
+            err_rows = "".join(f"<li>❌ {e}</li>" for e in errors)
+            pdf_b64 = ""
+            if merged:
+                import base64 as _b64
+                pdf_b64 = _b64.b64encode(merged).decode()
+            embed = (
+                f'<h3 style="margin-top:24px">Попередній перегляд (часткове злиття)</h3>'
+                f'<iframe src="data:application/pdf;base64,{pdf_b64}" '
+                f'style="width:100%;height:70vh;border:1px solid #555"></iframe>'
+                if pdf_b64 else ""
+            )
+            html = (
+                f"<html><head><meta charset='utf-8'>"
+                f"<style>body{{font-family:sans-serif;padding:20px;background:#111;color:#ddd}}"
+                f"li{{margin:4px 0;font-family:monospace}}</style></head><body>"
+                f"<h2>⚠️ Деякі документи не вдалось отримати</h2>"
+                f"<h3>Знайдено ({len(pdf_paths)}):</h3><ul>{ok_rows}</ul>"
+                f"<h3>Помилки ({len(errors)}):</h3><ul>{err_rows}</ul>"
+                f"{embed}</body></html>"
+            )
+            return HttpResponse(html, content_type="text/html; charset=utf-8", status=207)
+
         response = HttpResponse(merged, content_type="application/pdf")
         response["Content-Disposition"] = f'inline; filename="PrintAll_{order_no}.pdf"'
         return response
