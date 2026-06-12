@@ -3045,11 +3045,17 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         """
         GET — збирає всі потрібні PDF (етикетка + пак-ліст/інвойс/митна),
         генерує відсутні, об'єднує в один PDF і повертає для друку.
+        GET ?debug=1 — повертає HTML-діагностику незалежно від результату.
         """
         import io
+        import logging
         from django.http import HttpResponse
         from django.conf import settings as _s
         from pathlib import Path
+
+        _log = logging.getLogger("shipping.print_all")
+        debug = request.GET.get("debug") == "1"
+        log: list[str] = []  # крок-за-кроком для debug
 
         EU_COUNTRIES = {
             "AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI",
@@ -3065,10 +3071,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         dest_country = (shipment.recipient_country or "").upper()
         is_eu        = dest_country in EU_COUNTRIES
 
+        log.append(f"shipment={shipment_id} order={order} source={getattr(order,'source','—')} "
+                   f"order_no={getattr(order,'order_number','—')} country={dest_country} eu={is_eu}")
+        log.append(f"label_url={shipment.label_url!r}  MEDIA_ROOT={_s.MEDIA_ROOT}")
+        _log.info("[print_all] %s", log[-2])
+        _log.info("[print_all] %s", log[-1])
+
         # ── 1. DigiKey Pack List ──────────────────────────────────────────────
         if order and order.source == "digikey" and order.order_number:
             pl_name = f"DigiKey_PackList_{order.order_number}.pdf"
             pl_path = _s.MEDIA_ROOT / "orders" / "digikey" / order.order_number / pl_name
+            log.append(f"[PL] path={pl_path}  exists={pl_path.exists()}")
+            _log.info("[print_all] %s", log[-1])
             if not pl_path.exists():
                 try:
                     from bots.models import DigiKeyConfig
@@ -3085,10 +3099,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     buf = generate_digikey_packing_list(api_order, supplier)
                     pl_path.parent.mkdir(parents=True, exist_ok=True)
                     pl_path.write_bytes(buf.getvalue())
+                    log.append(f"[PL] generated OK → {pl_path.name}")
                 except Exception as e:
+                    log.append(f"[PL] ERROR: {e}")
+                    _log.exception("[print_all] Pack List generation failed")
                     errors.append(f"Pack List: {e}")
             if pl_path.exists():
                 pdf_paths.append(pl_path)
+                log.append(f"[PL] added to queue")
+            else:
+                log.append(f"[PL] skipped — file missing after attempt")
+                errors.append(f"Pack List: файл не знайдено: {pl_path}")
+        else:
+            log.append(f"[PL] skipped — not DigiKey (source={getattr(order,'source','—')})")
 
         # ── 2. Invoice (EU) або Customs (non-EU) — лише для DigiKey ─────────────
         if order and order.order_number and order.source == "digikey":
@@ -3100,12 +3123,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                         _Inv.objects.filter(sales_order=order).order_by("-pk").first()
                         or _Inv.objects.filter(digikey_order_no=order.order_number).order_by("-pk").first()
                     )
+                    log.append(f"[INV] found={inv}")
                     if not inv:
                         from shipping.services.invoice_service import InvoiceService
                         inv = InvoiceService.generate_from_digikey_order(order.order_number, request.user)
+                        log.append(f"[INV] generated #{inv.invoice_number}")
                     inv_pdf: Path | None = None
                     if inv.pdf_file:
                         p = Path(_s.MEDIA_ROOT) / str(inv.pdf_file)
+                        log.append(f"[INV] pdf_file={p}  exists={p.exists()}")
                         if p.exists():
                             inv_pdf = p
                     if not inv_pdf and inv.docx_file:
@@ -3116,6 +3142,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             inv.pdf_file = f"invoices/{cp.name}"
                             inv.save(update_fields=["pdf_file"])
                             inv_pdf = cp
+                            log.append(f"[INV] converted docx→pdf: {cp}")
                     if inv_pdf:
                         inv_name = f"Invoice_{inv.invoice_number}.pdf"
                         inv_dest = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / inv_name
@@ -3124,36 +3151,49 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                             import shutil as _sh
                             _sh.copy2(str(inv_pdf), str(inv_dest))
                         pdf_paths.append(inv_dest)
+                        log.append(f"[INV] added to queue: {inv_dest.name}")
+                    else:
+                        log.append(f"[INV] no PDF available")
+                        errors.append("Invoice: PDF не знайдено/не сконвертовано")
                 except Exception as e:
+                    log.append(f"[INV] ERROR: {e}")
+                    _log.exception("[print_all] Invoice failed")
                     errors.append(f"Invoice: {e}")
             else:
                 # ── Customs/CN23 (генеруємо якщо нема) ──
                 cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
                 cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
+                log.append(f"[CN23] path={cn_path}  exists={cn_path.exists()}")
                 if not cn_path.exists():
                     try:
                         from sales.doc_generators import generate_customs
                         buf = generate_customs(order)
                         cn_path.parent.mkdir(parents=True, exist_ok=True)
                         cn_path.write_bytes(buf.getvalue())
+                        log.append(f"[CN23] generated OK")
                     except Exception as e:
+                        log.append(f"[CN23] ERROR: {e}")
                         errors.append(f"Customs: {e}")
                 if cn_path.exists():
                     pdf_paths.append(cn_path)
+                    log.append(f"[CN23] added to queue")
 
         # ── 2b. Не-DigiKey + за межами ЄС → митна якщо є (не генеруємо) ────────
         elif order and order.order_number and not is_eu:
             cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
             cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
+            log.append(f"[CN2b] path={cn_path}  exists={cn_path.exists()}")
             if cn_path.exists():
                 pdf_paths.append(cn_path)
+                log.append(f"[CN2b] added")
             elif shipment.customs_url:
-                # fallback: customs_url на shipment (напр. Jumingo)
                 _cu_url = shipment.customs_url
                 _ci = _cu_url.find("/media/")
                 cu_path = Path(_s.MEDIA_ROOT) / (_cu_url[_ci + 7:] if _ci >= 0 else _cu_url.lstrip("/"))
+                log.append(f"[CN2b] customs_url path={cu_path}  exists={cu_path.exists()}")
                 if cu_path.exists():
                     pdf_paths.append(cu_path)
+                    log.append(f"[CN2b] added from customs_url")
 
         # ── 3. Carrier label ─────────────────────────────────────────────────
         if shipment.label_url:
@@ -3163,66 +3203,78 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 lbl_path = Path(_s.MEDIA_ROOT) / _lbl_url[_idx + 7:]
             else:
                 lbl_path = Path(_s.MEDIA_ROOT) / _lbl_url.lstrip("/")
+            log.append(f"[LBL] url={_lbl_url!r}  path={lbl_path}  exists={lbl_path.exists()}")
+            _log.info("[print_all] %s", log[-1])
             if lbl_path.exists():
                 pdf_paths.append(lbl_path)
+                log.append(f"[LBL] added to queue")
             else:
                 errors.append(f"Етикетка не знайдена: {lbl_path}")
+                log.append(f"[LBL] NOT FOUND")
+        else:
+            log.append(f"[LBL] label_url is empty — skipped")
+
+        log.append(f"pdf_paths ({len(pdf_paths)}): {[p.name for p in pdf_paths]}")
+        log.append(f"errors ({len(errors)}): {errors}")
+        _log.info("[print_all] %s", log[-2])
+        _log.info("[print_all] %s", log[-1])
+
+        def _debug_html(extra=""):
+            rows = "".join(f"<li style='margin:3px 0'>{l}</li>" for l in log)
+            return HttpResponse(
+                f"<html><head><meta charset='utf-8'><style>"
+                f"body{{font-family:monospace;font-size:13px;padding:20px;background:#0d1117;color:#c9d1d9}}"
+                f"li{{margin:2px 0}}</style></head><body>"
+                f"<h2 style='font-family:sans-serif'>🔍 Print-All Debug — shipment #{shipment_id}</h2>"
+                f"<ul>{rows}</ul>{extra}</body></html>",
+                content_type="text/html; charset=utf-8",
+            )
 
         if not pdf_paths:
-            err_html = "".join(f"<li>❌ {e}</li>" for e in errors) or "<li>Документи відсутні</li>"
-            return HttpResponse(
-                f"<h3 style='font-family:sans-serif'>Немає PDF для друку</h3><ul style='font-family:monospace'>{err_html}</ul>",
-                content_type="text/html; charset=utf-8",
-                status=404,
-            )
+            return _debug_html()
 
         # ── 4. Merge PDFs ─────────────────────────────────────────────────────
         merged = b""
+        pypdf_ok = False
         try:
             from pypdf import PdfWriter, PdfReader
+            pypdf_ok = True
             writer = PdfWriter()
             for p in pdf_paths:
                 try:
                     reader = PdfReader(str(p))
-                    for page in reader.pages:
+                    writer.add_page(reader.pages[0] if len(reader.pages) == 1 else reader.pages[0])
+                    for page in reader.pages[1:]:
                         writer.add_page(page)
+                    log.append(f"[MERGE] ✅ {p.name} ({len(reader.pages)} стор.)")
                 except Exception as e:
-                    errors.append(f"{p.name}: {e}")
+                    log.append(f"[MERGE] ❌ {p.name}: {e}")
+                    errors.append(f"Merge {p.name}: {e}")
             out_buf = io.BytesIO()
             writer.write(out_buf)
             out_buf.seek(0)
             merged = out_buf.read()
         except ImportError:
+            log.append("[MERGE] pypdf not installed — returning first PDF only")
+            errors.append("pypdf не встановлено — повертається лише перший PDF")
             merged = pdf_paths[0].read_bytes()
+
+        log.append(f"merged size={len(merged)} bytes  pypdf={pypdf_ok}")
+        _log.info("[print_all] %s", log[-1])
 
         order_no = (order.order_number if order else str(shipment_id))
 
-        # ── 5. Якщо є помилки — показати діагностику, а не тихо пропустити ────
-        if errors:
-            ok_rows = "".join(
-                f"<li>✅ {p.name}</li>" for p in pdf_paths
-            )
-            err_rows = "".join(f"<li>❌ {e}</li>" for e in errors)
-            pdf_b64 = ""
-            if merged:
-                import base64 as _b64
-                pdf_b64 = _b64.b64encode(merged).decode()
+        # ── 5. debug=1 → завжди показати діагностику ─────────────────────────
+        if debug or errors:
+            import base64 as _b64
+            pdf_b64 = _b64.b64encode(merged).decode() if merged else ""
             embed = (
-                f'<h3 style="margin-top:24px">Попередній перегляд (часткове злиття)</h3>'
+                f'<br><h3 style="font-family:sans-serif">Попередній перегляд PDF</h3>'
                 f'<iframe src="data:application/pdf;base64,{pdf_b64}" '
                 f'style="width:100%;height:70vh;border:1px solid #555"></iframe>'
                 if pdf_b64 else ""
             )
-            html = (
-                f"<html><head><meta charset='utf-8'>"
-                f"<style>body{{font-family:sans-serif;padding:20px;background:#111;color:#ddd}}"
-                f"li{{margin:4px 0;font-family:monospace}}</style></head><body>"
-                f"<h2>⚠️ Деякі документи не вдалось отримати</h2>"
-                f"<h3>Знайдено ({len(pdf_paths)}):</h3><ul>{ok_rows}</ul>"
-                f"<h3>Помилки ({len(errors)}):</h3><ul>{err_rows}</ul>"
-                f"{embed}</body></html>"
-            )
-            return HttpResponse(html, content_type="text/html; charset=utf-8", status=207)
+            return _debug_html(embed)
 
         response = HttpResponse(merged, content_type="application/pdf")
         response["Content-Disposition"] = f'inline; filename="PrintAll_{order_no}.pdf"'
