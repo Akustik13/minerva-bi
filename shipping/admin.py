@@ -3077,13 +3077,67 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         _log.info("[print_all] %s", log[-2])
         _log.info("[print_all] %s", log[-1])
 
-        # ── 1. DigiKey Pack List ──────────────────────────────────────────────
-        if order and order.source == "digikey" and order.order_number:
-            pl_name = f"DigiKey_PackList_{order.order_number}.pdf"
-            pl_path = _s.MEDIA_ROOT / "orders" / "digikey" / order.order_number / pl_name
-            log.append(f"[PL] path={pl_path}  exists={pl_path.exists()}")
+        # Збираємо кожен тип окремо, потім складаємо в порядку: Етикетка → Митна → Пак-ліст
+        doc_label:   Path | None = None
+        doc_customs: Path | None = None
+        doc_packlist: Path | None = None
+
+        # ── Carrier label ────────────────────────────────────────────────────
+        if shipment.label_url:
+            _lbl_url = shipment.label_url
+            _idx = _lbl_url.find("/media/")
+            _lp = Path(_s.MEDIA_ROOT) / (_lbl_url[_idx + 7:] if _idx >= 0 else _lbl_url.lstrip("/"))
+            log.append(f"[LBL] url={_lbl_url!r}  path={_lp}  exists={_lp.exists()}")
             _log.info("[print_all] %s", log[-1])
-            if not pl_path.exists():
+            if _lp.exists():
+                doc_label = _lp
+                log.append(f"[LBL] found")
+            else:
+                errors.append(f"Етикетка не знайдена: {_lp}")
+                log.append(f"[LBL] NOT FOUND")
+        else:
+            log.append(f"[LBL] label_url is empty — skipped")
+
+        # ── Customs (non-EU) ─────────────────────────────────────────────────
+        if not is_eu:
+            _cn_found = False
+            if shipment.customs_url:
+                _cu = shipment.customs_url
+                _ci = _cu.find("/media/")
+                _cp = Path(_s.MEDIA_ROOT) / (_cu[_ci + 7:] if _ci >= 0 else _cu.lstrip("/"))
+                log.append(f"[CN] customs_url path={_cp}  exists={_cp.exists()}")
+                if _cp.exists():
+                    doc_customs = _cp
+                    log.append(f"[CN] found from shipment.customs_url")
+                    _cn_found = True
+            if not _cn_found and order and order.order_number:
+                # fallback: DigiKey auto-generated або з папки замовлення
+                _cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
+                _cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / _cn_name
+                log.append(f"[CN] fallback path={_cn_path}  exists={_cn_path.exists()}")
+                if not _cn_path.exists() and order.source == "digikey":
+                    try:
+                        from sales.doc_generators import generate_customs
+                        buf = generate_customs(order)
+                        _cn_path.parent.mkdir(parents=True, exist_ok=True)
+                        _cn_path.write_bytes(buf.getvalue())
+                        log.append(f"[CN] generated OK")
+                    except Exception as e:
+                        log.append(f"[CN] ERROR: {e}")
+                        errors.append(f"Customs: {e}")
+                if _cn_path.exists():
+                    doc_customs = _cn_path
+                    log.append(f"[CN] found fallback")
+        else:
+            log.append(f"[CN] EU — митна не додається")
+
+        # ── DigiKey Pack List ────────────────────────────────────────────────
+        if order and order.source == "digikey" and order.order_number:
+            _pl_name = f"DigiKey_PackList_{order.order_number}.pdf"
+            _pl_path = _s.MEDIA_ROOT / "orders" / "digikey" / order.order_number / _pl_name
+            log.append(f"[PL] path={_pl_path}  exists={_pl_path.exists()}")
+            _log.info("[print_all] %s", log[-1])
+            if not _pl_path.exists():
                 try:
                     from bots.models import DigiKeyConfig
                     from bots.services.digikey import get_marketplace_token, _fetch_marketplace_order
@@ -3097,94 +3151,26 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     supplier  = {"name": cs.name or "", "street": cs.addr_street or "",
                                  "city_zip": city_zip, "country": cs.addr_country or ""}
                     buf = generate_digikey_packing_list(api_order, supplier)
-                    pl_path.parent.mkdir(parents=True, exist_ok=True)
-                    pl_path.write_bytes(buf.getvalue())
-                    log.append(f"[PL] generated OK → {pl_path.name}")
+                    _pl_path.parent.mkdir(parents=True, exist_ok=True)
+                    _pl_path.write_bytes(buf.getvalue())
+                    log.append(f"[PL] generated OK")
                 except Exception as e:
                     log.append(f"[PL] ERROR: {e}")
                     _log.exception("[print_all] Pack List generation failed")
                     errors.append(f"Pack List: {e}")
-            if pl_path.exists():
-                pdf_paths.append(pl_path)
-                log.append(f"[PL] added to queue")
+            if _pl_path.exists():
+                doc_packlist = _pl_path
+                log.append(f"[PL] found")
             else:
-                log.append(f"[PL] skipped — file missing after attempt")
-                errors.append(f"Pack List: файл не знайдено: {pl_path}")
+                log.append(f"[PL] skipped — file missing")
+                errors.append(f"Pack List: файл не знайдено: {_pl_path}")
         else:
             log.append(f"[PL] skipped — not DigiKey (source={getattr(order,'source','—')})")
 
-        # ── 2. Customs (non-EU) — лише для DigiKey; EU: без інвойсу ────────────
-        if order and order.order_number and order.source == "digikey":
-            if is_eu:
-                log.append(f"[INV] EU — інвойс не додається до друку")
-            else:
-                # ── Customs/CN23 — пріоритет: shipment.customs_url (від UPS/DHL API) ──
-                cn_added = False
-                if shipment.customs_url:
-                    _cu = shipment.customs_url
-                    _ci = _cu.find("/media/")
-                    cu_path = Path(_s.MEDIA_ROOT) / (_cu[_ci + 7:] if _ci >= 0 else _cu.lstrip("/"))
-                    log.append(f"[CN23] customs_url path={cu_path}  exists={cu_path.exists()}")
-                    if cu_path.exists():
-                        pdf_paths.append(cu_path)
-                        log.append(f"[CN23] added from shipment.customs_url (UPS/DHL)")
-                        cn_added = True
-                if not cn_added:
-                    cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
-                    cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
-                    log.append(f"[CN23] fallback path={cn_path}  exists={cn_path.exists()}")
-                    if not cn_path.exists():
-                        try:
-                            from sales.doc_generators import generate_customs
-                            buf = generate_customs(order)
-                            cn_path.parent.mkdir(parents=True, exist_ok=True)
-                            cn_path.write_bytes(buf.getvalue())
-                            log.append(f"[CN23] generated OK")
-                        except Exception as e:
-                            log.append(f"[CN23] ERROR: {e}")
-                            errors.append(f"Customs: {e}")
-                    if cn_path.exists():
-                        pdf_paths.append(cn_path)
-                        log.append(f"[CN23] added fallback auto-generated")
-
-        # ── 2b. Не-DigiKey + за межами ЄС → митна якщо є (не генеруємо) ────────
-        elif order and order.order_number and not is_eu:
-            cn2b_added = False
-            if shipment.customs_url:
-                _cu_url = shipment.customs_url
-                _ci = _cu_url.find("/media/")
-                cu_path = Path(_s.MEDIA_ROOT) / (_cu_url[_ci + 7:] if _ci >= 0 else _cu_url.lstrip("/"))
-                log.append(f"[CN2b] customs_url path={cu_path}  exists={cu_path.exists()}")
-                if cu_path.exists():
-                    pdf_paths.append(cu_path)
-                    log.append(f"[CN2b] added from customs_url")
-                    cn2b_added = True
-            if not cn2b_added:
-                cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
-                cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
-                log.append(f"[CN2b] fallback path={cn_path}  exists={cn_path.exists()}")
-                if cn_path.exists():
-                    pdf_paths.append(cn_path)
-                    log.append(f"[CN2b] added fallback")
-
-        # ── 3. Carrier label ─────────────────────────────────────────────────
-        if shipment.label_url:
-            _lbl_url = shipment.label_url
-            _idx = _lbl_url.find("/media/")
-            if _idx >= 0:
-                lbl_path = Path(_s.MEDIA_ROOT) / _lbl_url[_idx + 7:]
-            else:
-                lbl_path = Path(_s.MEDIA_ROOT) / _lbl_url.lstrip("/")
-            log.append(f"[LBL] url={_lbl_url!r}  path={lbl_path}  exists={lbl_path.exists()}")
-            _log.info("[print_all] %s", log[-1])
-            if lbl_path.exists():
-                pdf_paths.append(lbl_path)
-                log.append(f"[LBL] added to queue")
-            else:
-                errors.append(f"Етикетка не знайдена: {lbl_path}")
-                log.append(f"[LBL] NOT FOUND")
-        else:
-            log.append(f"[LBL] label_url is empty — skipped")
+        # ── Порядок: Етикетка → Митна → Пак-ліст ───────────────────────────
+        for _doc in (doc_label, doc_customs, doc_packlist):
+            if _doc is not None:
+                pdf_paths.append(_doc)
 
         log.append(f"pdf_paths ({len(pdf_paths)}): {[p.name for p in pdf_paths]}")
         log.append(f"errors ({len(errors)}): {errors}")
