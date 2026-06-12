@@ -3160,33 +3160,39 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     _log.exception("[print_all] Invoice failed")
                     errors.append(f"Invoice: {e}")
             else:
-                # ── Customs/CN23 (генеруємо якщо нема) ──
-                cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
-                cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
-                log.append(f"[CN23] path={cn_path}  exists={cn_path.exists()}")
-                if not cn_path.exists():
-                    try:
-                        from sales.doc_generators import generate_customs
-                        buf = generate_customs(order)
-                        cn_path.parent.mkdir(parents=True, exist_ok=True)
-                        cn_path.write_bytes(buf.getvalue())
-                        log.append(f"[CN23] generated OK")
-                    except Exception as e:
-                        log.append(f"[CN23] ERROR: {e}")
-                        errors.append(f"Customs: {e}")
-                if cn_path.exists():
-                    pdf_paths.append(cn_path)
-                    log.append(f"[CN23] added to queue")
+                # ── Customs/CN23 — пріоритет: shipment.customs_url (від UPS/DHL API) ──
+                cn_added = False
+                if shipment.customs_url:
+                    _cu = shipment.customs_url
+                    _ci = _cu.find("/media/")
+                    cu_path = Path(_s.MEDIA_ROOT) / (_cu[_ci + 7:] if _ci >= 0 else _cu.lstrip("/"))
+                    log.append(f"[CN23] customs_url path={cu_path}  exists={cu_path.exists()}")
+                    if cu_path.exists():
+                        pdf_paths.append(cu_path)
+                        log.append(f"[CN23] added from shipment.customs_url (UPS/DHL)")
+                        cn_added = True
+                if not cn_added:
+                    cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
+                    cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
+                    log.append(f"[CN23] fallback path={cn_path}  exists={cn_path.exists()}")
+                    if not cn_path.exists():
+                        try:
+                            from sales.doc_generators import generate_customs
+                            buf = generate_customs(order)
+                            cn_path.parent.mkdir(parents=True, exist_ok=True)
+                            cn_path.write_bytes(buf.getvalue())
+                            log.append(f"[CN23] generated OK")
+                        except Exception as e:
+                            log.append(f"[CN23] ERROR: {e}")
+                            errors.append(f"Customs: {e}")
+                    if cn_path.exists():
+                        pdf_paths.append(cn_path)
+                        log.append(f"[CN23] added fallback auto-generated")
 
         # ── 2b. Не-DigiKey + за межами ЄС → митна якщо є (не генеруємо) ────────
         elif order and order.order_number and not is_eu:
-            cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
-            cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
-            log.append(f"[CN2b] path={cn_path}  exists={cn_path.exists()}")
-            if cn_path.exists():
-                pdf_paths.append(cn_path)
-                log.append(f"[CN2b] added")
-            elif shipment.customs_url:
+            cn2b_added = False
+            if shipment.customs_url:
                 _cu_url = shipment.customs_url
                 _ci = _cu_url.find("/media/")
                 cu_path = Path(_s.MEDIA_ROOT) / (_cu_url[_ci + 7:] if _ci >= 0 else _cu_url.lstrip("/"))
@@ -3194,6 +3200,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 if cu_path.exists():
                     pdf_paths.append(cu_path)
                     log.append(f"[CN2b] added from customs_url")
+                    cn2b_added = True
+            if not cn2b_added:
+                cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
+                cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
+                log.append(f"[CN2b] fallback path={cn_path}  exists={cn_path.exists()}")
+                if cn_path.exists():
+                    pdf_paths.append(cn_path)
+                    log.append(f"[CN2b] added fallback")
 
         # ── 3. Carrier label ─────────────────────────────────────────────────
         if shipment.label_url:
