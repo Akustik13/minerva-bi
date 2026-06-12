@@ -140,7 +140,12 @@ def _notify_telegram(config, msg: dict):
     """Надсилає Telegram сповіщення про нове повідомлення."""
     try:
         from dashboard.notifications import _send_telegram
+        from config.models import NotificationSettings
         from django.conf import settings
+
+        ns = NotificationSettings.objects.filter(pk=1).first()
+        if not ns or not ns.telegram_enabled:
+            return
 
         order_url = ""
         order_no = msg.get("order_number") or msg.get("order_id", "")
@@ -168,7 +173,7 @@ def _notify_telegram(config, msg: dict):
             f"{msg['content']}"
             f"{order_url}"
         )
-        _send_telegram(text)
+        _send_telegram(ns, text)
     except Exception as e:
         import logging
         logging.getLogger(__name__).exception("Telegram notify failed: %s", e)
