@@ -1030,13 +1030,20 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             seen_map = {s.topic_id: s.last_message_id
                         for s in DigiKeyMessageSeen.objects.all()}
 
-            # Batch fetch matching orders + customers
+            # Batch fetch matching orders (SalesOrder links to Customer via customer_key)
+            from crm.models import Customer
             order_numbers = [str(t.get("orderNumber", "")) for t in topics if t.get("orderNumber")]
             orders = {
                 o.order_number: o
-                for o in SalesOrder.objects.filter(
-                    order_number__in=order_numbers
-                ).select_related("customer")
+                for o in SalesOrder.objects.filter(order_number__in=order_numbers)
+                          .only("id", "order_number", "customer_key")
+            }
+            # Batch fetch customers by external_key
+            cust_keys = [o.customer_key for o in orders.values() if o.customer_key]
+            customers = {
+                c.external_key: c
+                for c in Customer.objects.filter(external_key__in=cust_keys)
+                          .only("external_key", "name", "company")
             }
 
             for t in topics:
@@ -1058,7 +1065,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     order = orders.get(on)
                     if order:
                         t["_order_pk"] = order.pk
-                        cust = order.customer
+                        cust = customers.get(order.customer_key or "")
                         t["_customer_company"] = (cust.company or "") if cust else ""
                         t["_customer_name"]    = (cust.name    or "") if cust else ""
                     else:
