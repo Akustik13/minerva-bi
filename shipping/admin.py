@@ -3113,52 +3113,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         else:
             log.append(f"[PL] skipped — not DigiKey (source={getattr(order,'source','—')})")
 
-        # ── 2. Invoice (EU) або Customs (non-EU) — лише для DigiKey ─────────────
+        # ── 2. Customs (non-EU) — лише для DigiKey; EU: без інвойсу ────────────
         if order and order.order_number and order.source == "digikey":
             if is_eu:
-                # ── Invoice (генеруємо якщо нема) ──
-                try:
-                    from shipping.models import Invoice as _Inv
-                    inv = (
-                        _Inv.objects.filter(sales_order=order).order_by("-pk").first()
-                        or _Inv.objects.filter(digikey_order_no=order.order_number).order_by("-pk").first()
-                    )
-                    log.append(f"[INV] found={inv}")
-                    if not inv:
-                        from shipping.services.invoice_service import InvoiceService
-                        inv = InvoiceService.generate_from_digikey_order(order.order_number, request.user)
-                        log.append(f"[INV] generated #{inv.invoice_number}")
-                    inv_pdf: Path | None = None
-                    if inv.pdf_file:
-                        p = Path(_s.MEDIA_ROOT) / str(inv.pdf_file)
-                        log.append(f"[INV] pdf_file={p}  exists={p.exists()}")
-                        if p.exists():
-                            inv_pdf = p
-                    if not inv_pdf and inv.docx_file:
-                        from shipping.services.invoice_service import convert_docx_to_pdf
-                        out_dir = Path(_s.MEDIA_ROOT) / "invoices"
-                        cp = convert_docx_to_pdf(Path(_s.MEDIA_ROOT) / str(inv.docx_file), out_dir)
-                        if cp and cp.exists():
-                            inv.pdf_file = f"invoices/{cp.name}"
-                            inv.save(update_fields=["pdf_file"])
-                            inv_pdf = cp
-                            log.append(f"[INV] converted docx→pdf: {cp}")
-                    if inv_pdf:
-                        inv_name = f"Invoice_{inv.invoice_number}.pdf"
-                        inv_dest = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / inv_name
-                        inv_dest.parent.mkdir(parents=True, exist_ok=True)
-                        if not inv_dest.exists():
-                            import shutil as _sh
-                            _sh.copy2(str(inv_pdf), str(inv_dest))
-                        pdf_paths.append(inv_dest)
-                        log.append(f"[INV] added to queue: {inv_dest.name}")
-                    else:
-                        log.append(f"[INV] no PDF available")
-                        errors.append("Invoice: PDF не знайдено/не сконвертовано")
-                except Exception as e:
-                    log.append(f"[INV] ERROR: {e}")
-                    _log.exception("[print_all] Invoice failed")
-                    errors.append(f"Invoice: {e}")
+                log.append(f"[INV] EU — інвойс не додається до друку")
             else:
                 # ── Customs/CN23 — пріоритет: shipment.customs_url (від UPS/DHL API) ──
                 cn_added = False
