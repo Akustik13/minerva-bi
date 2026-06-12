@@ -3149,19 +3149,24 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 pdf_paths.append(cn_path)
             elif shipment.customs_url:
                 # fallback: customs_url на shipment (напр. Jumingo)
-                cu_rel  = shipment.customs_url.lstrip("/media/")
-                cu_path = Path(_s.MEDIA_ROOT) / cu_rel
+                _cu_url = shipment.customs_url
+                _ci = _cu_url.find("/media/")
+                cu_path = Path(_s.MEDIA_ROOT) / (_cu_url[_ci + 7:] if _ci >= 0 else _cu_url.lstrip("/"))
                 if cu_path.exists():
                     pdf_paths.append(cu_path)
 
         # ── 3. Carrier label ─────────────────────────────────────────────────
         if shipment.label_url:
-            lbl_rel  = shipment.label_url.lstrip("/media/")
-            lbl_path = Path(_s.MEDIA_ROOT) / lbl_rel
+            _lbl_url = shipment.label_url
+            _idx = _lbl_url.find("/media/")
+            if _idx >= 0:
+                lbl_path = Path(_s.MEDIA_ROOT) / _lbl_url[_idx + 7:]
+            else:
+                lbl_path = Path(_s.MEDIA_ROOT) / _lbl_url.lstrip("/")
             if lbl_path.exists():
                 pdf_paths.append(lbl_path)
             else:
-                errors.append("Етикетка перевізника не знайдена на диску")
+                errors.append(f"Етикетка не знайдена: {lbl_path}")
 
         if not pdf_paths:
             return HttpResponse(
