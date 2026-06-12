@@ -48,45 +48,70 @@ class Command(BaseCommand):
         self.stdout.write("Отримуємо список тем повідомлень...")
         try:
             token = get_marketplace_token(config)
-            topics = get_all_topics_paginated(config, token, max_total=100)
+            list_items = get_all_topics_paginated(config, token, max_total=100)
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"❌ Помилка API: {e}"))
             return
 
-        self.stdout.write(f"Знайдено {len(topics)} тем.")
-        new_messages = []
-        topics_cache = []  # will be stored in DigiKeyConfig for hub caching
+        self.stdout.write(f"Знайдено {len(list_items)} тем.")
 
-        for topic in topics:
-            topic_id = str(topic.get("id", ""))
-            order_number = topic.get("orderNumber", "")
+        # Build lookup from existing cache to avoid re-fetching unchanged topics
+        existing_cache = {
+            str(t.get("id", "")): t
+            for t in (config.msg_topics_cache or [])
+            if t.get("id")
+        }
+
+        new_messages = []
+        new_cache = []
+        fetched_count = 0
+        cached_count = 0
+
+        for item in list_items:
+            topic_id = str(item.get("id", ""))
+            order_number = item.get("orderNumber", "")
+            last_upd = item.get("lastUpdateDateUtc", "")
             if not topic_id:
                 continue
 
-            # Отримуємо повну розмову
+            cached = existing_cache.get(topic_id)
+
+            # Skip full fetch if lastUpdateDateUtc hasn't changed
+            if cached and last_upd and cached.get("lastUpdateDateUtc") == last_upd:
+                new_cache.append(cached)
+                cached_count += 1
+                continue
+
+            # Fetch fresh full topic
             try:
                 full = get_topic(config, token, topic_id)
+                fetched_count += 1
             except Exception:
+                if cached:
+                    new_cache.append(cached)  # keep stale cache as fallback
                 continue
 
             # Inject list-item fields not present in full topic response
             full["orderNumber"] = order_number
-            last_upd = topic.get("lastUpdateDateUtc", "")
             if last_upd:
                 full.setdefault("lastUpdateDateUtc", last_upd)
-            topics_cache.append(full)
+            new_cache.append(full)
 
             conversation = full.get("conversation", [])
             if not conversation:
                 continue
 
-            last_msg = conversation[-1]
+            # Use message with max date (handles both API sort orders)
+            last_msg = max(conversation, key=lambda m: m.get("createDateUtc") or "")
             last_msg_id = str(last_msg.get("id", ""))
 
             seen, _ = DigiKeyMessageSeen.objects.get_or_create(topic_id=topic_id)
 
             if seen.last_message_id == last_msg_id:
-                continue  # нічого нового
+                # Оновлюємо seen (щоб не спамити якщо відповідь від Supplier)
+                seen.last_message_id = last_msg_id
+                seen.save()
+                continue
 
             # Перевіряємо що останнє повідомлення від покупця (Customer)
             if last_msg.get("sender", "").lower() == "customer":
@@ -110,13 +135,14 @@ class Command(BaseCommand):
                     "created_at":    last_msg.get("createDateUtc", ""),
                 })
 
-            # Оновлюємо seen незалежно від sender (щоб не спамити)
             seen.last_message_id = last_msg_id
             seen.save()
 
+        self.stdout.write(f"  API: {fetched_count} оновлено, {cached_count} з кешу.")
+
         now = timezone.now()
         config.msg_last_checked_at = now
-        config.msg_topics_cache = topics_cache
+        config.msg_topics_cache = new_cache
         config.msg_cache_at = now
         config.save(update_fields=["msg_last_checked_at", "msg_topics_cache", "msg_cache_at"])
 
@@ -130,7 +156,7 @@ class Command(BaseCommand):
         notif = NotificationSettings.objects.filter(pk=1).first()
 
         for msg in new_messages:
-            self.stdout.write(f"  Topic: {msg['topic_title']} | Order: {msg['order_id']}")
+            self.stdout.write(f"  Topic: {msg['topic_title']} | Order: {msg['order_number']}")
             self.stdout.write(f"  {msg['content'][:100]}")
 
             if notif and notif.dk_msg_notify_telegram:
