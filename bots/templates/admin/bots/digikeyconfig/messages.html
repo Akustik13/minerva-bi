@@ -6,55 +6,64 @@
 {% block extrahead %}
 {{ block.super }}
 <style>
-.dkm-wrap{display:flex;gap:0;height:calc(100vh - 160px);overflow:hidden}
-.dkm-sidebar{width:300px;min-width:220px;border-right:1px solid var(--border-strong);
-  overflow-y:auto;flex-shrink:0;background:var(--bg-card)}
-.dkm-main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.dkm-wrap{display:flex;gap:0;height:calc(100vh - 230px);min-height:420px;overflow:hidden}
+.dkm-sidebar{width:310px;min-width:220px;border-right:1px solid var(--border-strong);
+  overflow-y:auto;flex-shrink:0;background:var(--bg-card);display:flex;flex-direction:column}
+.dkm-main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0}
 .dkm-filters{padding:10px 14px;border-bottom:1px solid var(--border-strong);
   display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg-card)}
 .dkm-filters input,.dkm-filters select{
   background:var(--bg-input);color:var(--text);
   border:1px solid var(--border-strong);border-radius:4px;padding:5px 9px;font-size:13px}
 .dkm-topic-item{padding:10px 14px;border-bottom:1px solid var(--border-strong);
-  cursor:pointer;transition:background .15s;color:var(--text)}
+  cursor:pointer;transition:background .15s;color:var(--text);flex-shrink:0}
 .dkm-topic-item:hover,.dkm-topic-item.active{background:var(--bg-hover)}
-.dkm-topic-order{font-size:10px;color:var(--text-dim);font-family:monospace}
+.dkm-topic-order{font-size:10px;color:var(--text-dim);font-family:monospace;display:flex;align-items:center;gap:4px}
 .dkm-topic-title{font-size:13px;font-weight:600;color:var(--text);margin:2px 0}
 .dkm-topic-preview{font-size:11px;color:var(--text-muted);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:270px}
 .dkm-topic-meta{font-size:10px;color:var(--text-dim);margin-top:3px}
 .dkm-badge-new{background:#e53935;color:#fff;border-radius:10px;
-  font-size:10px;padding:1px 6px;margin-left:6px;font-weight:700}
-.dkm-convo{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
-.dkm-msg{max-width:72%;padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.5}
+  font-size:10px;padding:1px 6px;font-weight:700}
+.dkm-convo{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.dkm-msg{max-width:75%;padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.5}
 .dkm-msg-customer{align-self:flex-start;background:var(--bg-hover);
   border:1px solid var(--border-strong);color:var(--text)}
+.dkm-msg-operator{align-self:flex-start;background:var(--bg-hover);
+  border:1px solid var(--border-strong);color:var(--text);opacity:.8}
 .dkm-msg-supplier{align-self:flex-end;background:#1565c0;color:#fff}
 .dkm-msg-sender{font-size:10px;opacity:.7;margin-bottom:4px;font-weight:600;letter-spacing:.3px}
 .dkm-msg-date{font-size:10px;opacity:.6;margin-top:4px;text-align:right}
-.dkm-reply{padding:10px 14px;border-top:1px solid var(--border-strong);
-  display:flex;gap:8px;background:var(--bg-card)}
+.dkm-reply{padding:10px 14px;border-top:2px solid var(--border-strong);
+  display:flex;gap:8px;background:var(--bg-card);flex-shrink:0}
 .dkm-reply textarea{flex:1;background:var(--bg-input);color:var(--text);
   border:1px solid var(--border-strong);border-radius:6px;padding:8px 10px;
   font-size:13px;resize:none;height:62px;font-family:inherit}
+.dkm-reply textarea:disabled{opacity:.45;cursor:not-allowed}
 .dkm-btn{background:#1565c0;color:#fff;border:none;border-radius:6px;
   padding:8px 16px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap}
-.dkm-btn:hover{background:#1976d2}
+.dkm-btn:hover:not(:disabled){background:#1976d2}
+.dkm-btn:disabled{opacity:.45;cursor:not-allowed}
 .dkm-btn-green{background:#2e7d32}
-.dkm-btn-green:hover{background:#388e3c}
+.dkm-btn-green:hover:not(:disabled){background:#388e3c}
+.dkm-btn-sm{padding:5px 10px;font-size:11px}
 .dkm-empty{color:var(--text-dim);text-align:center;padding:40px;font-size:14px}
-.dkm-new-topic-panel{padding:14px;border-bottom:1px solid var(--border-strong)}
+.dkm-new-topic-panel{padding:14px;border-bottom:1px solid var(--border-strong);flex-shrink:0}
 .dkm-new-topic-panel input,.dkm-new-topic-panel textarea{
   width:100%;box-sizing:border-box;margin-bottom:6px;
   background:var(--bg-input);color:var(--text);
   border:1px solid var(--border-strong);border-radius:4px;padding:6px 9px;font-size:12px}
-.dkm-header{padding:12px 16px;border-bottom:1px solid var(--border-strong);
-  font-size:14px;font-weight:700;color:var(--text);
-  display:flex;align-items:center;gap:10px}
 .dkm-loading{color:var(--text-dim);text-align:center;padding:30px;font-size:13px}
 #dkm-topic-header{padding:10px 16px;border-bottom:1px solid var(--border-strong);
-  font-size:13px;font-weight:600;color:var(--text);
+  font-size:13px;font-weight:600;color:var(--text);flex-shrink:0;
   display:flex;align-items:center;justify-content:space-between;gap:10px}
+.dkm-sort-bar{padding:6px 14px;border-bottom:1px solid var(--border-strong);
+  display:flex;gap:6px;align-items:center;font-size:11px;color:var(--text-dim);flex-shrink:0;
+  background:var(--bg-card)}
+.dkm-sort-btn{background:none;border:1px solid var(--border-strong);border-radius:4px;
+  color:var(--text-dim);font-size:11px;padding:2px 8px;cursor:pointer}
+.dkm-sort-btn.active{background:var(--bg-hover);color:var(--text);font-weight:600}
+#dkm-topics-list{flex:1;overflow-y:auto;min-height:0}
 </style>
 {% endblock %}
 
@@ -67,8 +76,9 @@
 
 <div style="padding:0 0 8px">
   <div class="dkm-filters">
-    <input type="text" id="dkm-filter-order" placeholder="Фільтр по Order ID…" style="width:200px">
-    <button class="dkm-btn" onclick="dkmLoad()">🔍 Завантажити</button>
+    <input type="text" id="dkm-filter-order" placeholder="Фільтр по Order #…" style="width:180px"
+           oninput="dkmFilterLocal(this.value)">
+    <button class="dkm-btn" onclick="dkmLoad()">🔄 Оновити</button>
     <button class="dkm-btn dkm-btn-green" onclick="dkmShowNewTopic()">➕ Нова тема</button>
     <span id="dkm-status" style="font-size:12px;color:var(--text-dim)"></span>
   </div>
@@ -79,7 +89,7 @@
   <div class="dkm-sidebar">
     <div id="dkm-new-topic-panel" style="display:none" class="dkm-new-topic-panel">
       <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">➕ Нова тема</div>
-      <input type="text" id="nt-order" placeholder="Order ID (UUID DigiKey)">
+      <input type="text" id="nt-order" placeholder="Order UUID DigiKey">
       <input type="text" id="nt-title" placeholder="Назва теми (до 50 символів)">
       <textarea id="nt-content" placeholder="Текст повідомлення…" style="height:70px"></textarea>
       <div style="display:flex;gap:6px">
@@ -87,6 +97,11 @@
         <button class="dkm-btn" onclick="document.getElementById('dkm-new-topic-panel').style.display='none'"
                 style="background:#546e7a">✕</button>
       </div>
+    </div>
+    <div class="dkm-sort-bar">
+      Сортування:
+      <button class="dkm-sort-btn active" id="sort-btn-new" onclick="dkmSetSort('new')">🔴 Непрочитані</button>
+      <button class="dkm-sort-btn" id="sort-btn-date" onclick="dkmSetSort('date')">🕒 Дата</button>
     </div>
     <div id="dkm-topics-list"><div class="dkm-loading">Завантаження…</div></div>
   </div>
@@ -100,35 +115,72 @@
     <div class="dkm-convo" id="dkm-convo">
       <div class="dkm-empty">Оберіть тему зліва</div>
     </div>
-    <div class="dkm-reply" id="dkm-reply-row" style="display:none">
-      <textarea id="dkm-reply-text" placeholder="Ваша відповідь…"></textarea>
-      <button class="dkm-btn" onclick="dkmSendReply()">📤 Надіслати</button>
+    <!-- Reply row — always visible, disabled until topic selected -->
+    <div class="dkm-reply" id="dkm-reply-row">
+      <textarea id="dkm-reply-text" placeholder="Оберіть тему для відповіді…" disabled></textarea>
+      <button class="dkm-btn" id="dkm-send-btn" onclick="dkmSendReply()" disabled>📤 Надіслати</button>
     </div>
   </div>
 </div>
 
 <script>
-const API_URL  = "{{ api_url }}";
-const REPLY_BASE = "{{ reply_base }}";
+const API_URL      = "{{ api_url }}";
+const REPLY_BASE   = "{{ reply_base }}";
 const NEW_TOPIC_URL = "{{ new_topic_url }}";
-const CSRF = "{{ csrf_token }}";
+const CSRF         = "{{ csrf_token }}";
 
 let _currentTopicId = null;
-let _allTopics = [];
+let _allTopics      = [];
+let _sortMode       = 'new';  // 'new' | 'date'
+
+// ── Sort helpers ─────────────────────────────────────────────────────────────
+
+function _topicIsNew(t) {
+  const convo = t.conversation || [];
+  if (!convo.length) return false;
+  return convo[convo.length - 1].sender === 'Customer';
+}
+
+function _topicDate(t) {
+  if (t.lastUpdateDateUtc) {
+    try { return new Date(t.lastUpdateDateUtc).getTime(); } catch(e) {}
+  }
+  const convo = t.conversation || [];
+  if (!convo.length) return 0;
+  try { return new Date(convo[convo.length - 1].createDateUtc).getTime(); } catch(e) { return 0; }
+}
+
+function _sortTopics(topics) {
+  return [...topics].sort((a, b) => {
+    if (_sortMode === 'new') {
+      const aN = _topicIsNew(a), bN = _topicIsNew(b);
+      if (aN !== bN) return aN ? -1 : 1;
+    }
+    return _topicDate(b) - _topicDate(a);  // newest first
+  });
+}
+
+function dkmSetSort(mode) {
+  _sortMode = mode;
+  document.querySelectorAll('.dkm-sort-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('sort-btn-' + mode).classList.add('active');
+  _renderTopicList(_allTopics);
+}
+
+// ── Load ─────────────────────────────────────────────────────────────────────
 
 function dkmLoad() {
-  const orderId = document.getElementById('dkm-filter-order').value.trim();
   document.getElementById('dkm-status').textContent = 'Завантаження…';
   document.getElementById('dkm-topics-list').innerHTML = '<div class="dkm-loading">Завантаження…</div>';
   document.getElementById('dkm-convo').innerHTML = '<div class="dkm-empty">Оберіть тему зліва</div>';
-  document.getElementById('dkm-reply-row').style.display = 'none';
   document.getElementById('dkm-topic-header').style.display = 'none';
+  _setReplyEnabled(false);
+  _currentTopicId = null;
 
-  let url = API_URL + (orderId ? '?order_id=' + encodeURIComponent(orderId) : '');
-  fetch(url).then(r => r.json()).then(data => {
+  fetch(API_URL).then(r => r.json()).then(data => {
     if (data.error) {
       document.getElementById('dkm-status').textContent = '❌ ' + data.error;
-      document.getElementById('dkm-topics-list').innerHTML = '<div class="dkm-loading">Помилка</div>';
+      document.getElementById('dkm-topics-list').innerHTML = '<div class="dkm-loading">Помилка: ' + data.error + '</div>';
       return;
     }
     _allTopics = data.topics || [];
@@ -139,22 +191,41 @@ function dkmLoad() {
   });
 }
 
+// ── Filter (client-side by orderNumber) ──────────────────────────────────────
+
+function dkmFilterLocal(q) {
+  q = q.trim().toLowerCase();
+  if (!q) { _renderTopicList(_allTopics); return; }
+  const filtered = _allTopics.filter(t =>
+    String(t.orderNumber || '').toLowerCase().includes(q) ||
+    String(t.orderId || '').toLowerCase().includes(q) ||
+    String(t.topic || '').toLowerCase().includes(q)
+  );
+  _renderTopicList(filtered);
+}
+
+// ── Render topic list ─────────────────────────────────────────────────────────
+
 function _renderTopicList(topics) {
-  if (!topics.length) {
+  const sorted = _sortTopics(topics);
+  if (!sorted.length) {
     document.getElementById('dkm-topics-list').innerHTML = '<div class="dkm-empty">Повідомлень немає</div>';
     return;
   }
   let html = '';
-  topics.forEach((t, i) => {
-    const convo = t.conversation || [];
-    const last = convo.length ? convo[convo.length-1] : null;
-    const preview = last ? (last.content || '').substring(0, 60) : '—';
-    const isCustomer = last && last.sender === 'Customer';
-    const badge = isCustomer ? '<span class="dkm-badge-new">NEW</span>' : '';
-    const date = last ? _fmtDate(last.createDateUtc) : '';
-    html += `<div class="dkm-topic-item" onclick="dkmOpenTopic(${i})" id="dkm-t-${i}">
-      <div class="dkm-topic-order">${t.orderId||'—'}${badge}</div>
-      <div class="dkm-topic-title">${_esc(t.topic||'—')}</div>
+  sorted.forEach(t => {
+    const convo  = t.conversation || [];
+    const last   = convo.length ? convo[convo.length - 1] : null;
+    const preview = last ? (last.content || '').substring(0, 65) : '—';
+    const isNew  = last && last.sender === 'Customer';
+    const badge  = isNew ? '<span class="dkm-badge-new">NEW</span>' : '';
+    const date   = last ? _fmtDate(last.createDateUtc) : (t.lastUpdateDateUtc ? _fmtDate(t.lastUpdateDateUtc) : '');
+    const orderLabel = t.orderNumber ? '#' + t.orderNumber : (t.orderId ? t.orderId.substring(0, 8) + '…' : '—');
+    const tid    = _esc(t.id || '');
+    const active = String(t.id) === String(_currentTopicId) ? ' active' : '';
+    html += `<div class="dkm-topic-item${active}" onclick="dkmOpenTopic('${tid}')" id="dkm-ti-${tid}">
+      <div class="dkm-topic-order">${orderLabel} ${badge}</div>
+      <div class="dkm-topic-title">${_esc(t.topic || '—')}</div>
       <div class="dkm-topic-preview">${_esc(preview)}</div>
       <div class="dkm-topic-meta">${convo.length} повід. · ${date}</div>
     </div>`;
@@ -162,21 +233,37 @@ function _renderTopicList(topics) {
   document.getElementById('dkm-topics-list').innerHTML = html;
 }
 
-function dkmOpenTopic(idx) {
-  const t = _allTopics[idx];
+// ── Open topic ────────────────────────────────────────────────────────────────
+
+function dkmOpenTopic(topicId) {
+  const t = _allTopics.find(x => String(x.id) === String(topicId));
   if (!t) return;
   _currentTopicId = t.id;
-  // Highlight
+
   document.querySelectorAll('.dkm-topic-item').forEach(el => el.classList.remove('active'));
-  const el = document.getElementById('dkm-t-' + idx);
+  const el = document.getElementById('dkm-ti-' + topicId);
   if (el) el.classList.add('active');
 
+  const orderLabel = t.orderNumber ? 'Order #' + t.orderNumber : 'Order: ' + (t.orderId || '—');
   document.getElementById('dkm-topic-title-label').textContent = t.topic || '—';
-  document.getElementById('dkm-topic-order-label').textContent = 'Order: ' + (t.orderId||'—');
+  document.getElementById('dkm-topic-order-label').textContent = orderLabel;
   document.getElementById('dkm-topic-header').style.display = 'flex';
-  document.getElementById('dkm-reply-row').style.display = 'flex';
+  _setReplyEnabled(true);
   _renderConvo(t.conversation || []);
 }
+
+// ── Reply enable/disable ──────────────────────────────────────────────────────
+
+function _setReplyEnabled(enabled) {
+  const ta  = document.getElementById('dkm-reply-text');
+  const btn = document.getElementById('dkm-send-btn');
+  ta.disabled  = !enabled;
+  btn.disabled = !enabled;
+  ta.placeholder = enabled ? 'Ваша відповідь…' : 'Оберіть тему для відповіді…';
+  if (!enabled) ta.value = '';
+}
+
+// ── Render conversation ───────────────────────────────────────────────────────
 
 function _renderConvo(msgs) {
   const convo = document.getElementById('dkm-convo');
@@ -184,10 +271,10 @@ function _renderConvo(msgs) {
   let html = '';
   msgs.forEach(m => {
     const isSupplier = m.sender === 'Supplier';
-    const cls = isSupplier ? 'dkm-msg-supplier' : 'dkm-msg-customer';
+    const cls = isSupplier ? 'dkm-msg-supplier' : (m.sender === 'Operator' ? 'dkm-msg-operator' : 'dkm-msg-customer');
     html += `<div class="dkm-msg ${cls}">
-      <div class="dkm-msg-sender">${m.sender||'?'} → ${m.recipient||'?'}</div>
-      <div>${_esc(m.content||'')}</div>
+      <div class="dkm-msg-sender">${_esc(m.sender || '?')} → ${_esc(m.recipient || '?')}</div>
+      <div style="white-space:pre-wrap">${_esc(m.content || '')}</div>
       <div class="dkm-msg-date">${_fmtDate(m.createDateUtc)}</div>
     </div>`;
   });
@@ -195,30 +282,31 @@ function _renderConvo(msgs) {
   convo.scrollTop = convo.scrollHeight;
 }
 
+// ── Send reply ────────────────────────────────────────────────────────────────
+
 function dkmSendReply() {
   if (!_currentTopicId) return;
   const text = document.getElementById('dkm-reply-text').value.trim();
   if (!text) return;
-  const btn = document.querySelector('#dkm-reply-row button');
+  const btn = document.getElementById('dkm-send-btn');
   btn.disabled = true; btn.textContent = '⏳';
 
   fetch(REPLY_BASE + _currentTopicId + '/reply/', {
     method: 'POST',
-    headers: {'Content-Type':'application/json','X-CSRFToken': CSRF},
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
     body: JSON.stringify({content: text}),
   }).then(r => r.json()).then(d => {
     btn.disabled = false; btn.textContent = '📤 Надіслати';
     if (d.ok) {
       document.getElementById('dkm-reply-text').value = '';
-      // Update topic in list and re-render convo
       const idx = _allTopics.findIndex(t => String(t.id) === String(_currentTopicId));
       if (idx >= 0 && d.topic) {
         _allTopics[idx] = d.topic;
         _renderConvo(d.topic.conversation || []);
         _renderTopicList(_allTopics);
-        // Re-activate
+        // Re-highlight active item after re-render
         setTimeout(() => {
-          const el = document.getElementById('dkm-t-' + idx);
+          const el = document.getElementById('dkm-ti-' + _currentTopicId);
           if (el) el.classList.add('active');
         }, 0);
       }
@@ -231,6 +319,8 @@ function dkmSendReply() {
   });
 }
 
+// ── New topic ─────────────────────────────────────────────────────────────────
+
 function dkmShowNewTopic() {
   const p = document.getElementById('dkm-new-topic-panel');
   p.style.display = p.style.display === 'none' ? 'block' : 'none';
@@ -240,24 +330,26 @@ function dkmCreateTopic() {
   const orderId  = document.getElementById('nt-order').value.trim();
   const title    = document.getElementById('nt-title').value.trim();
   const content  = document.getElementById('nt-content').value.trim();
-  if (!orderId || !content) { alert('Order ID і текст повідомлення обов\'язкові'); return; }
+  if (!orderId || !content) { alert('Order UUID і текст повідомлення обов\'язкові'); return; }
 
   fetch(NEW_TOPIC_URL, {
     method: 'POST',
-    headers: {'Content-Type':'application/json','X-CSRFToken': CSRF},
-    body: JSON.stringify({order_id: orderId, topic: title||'Запит від постачальника', content}),
+    headers: {'Content-Type': 'application/json', 'X-CSRFToken': CSRF},
+    body: JSON.stringify({order_id: orderId, topic: title || 'Запит від постачальника', content}),
   }).then(r => r.json()).then(d => {
     if (d.ok) {
       document.getElementById('dkm-new-topic-panel').style.display = 'none';
       document.getElementById('nt-order').value = '';
       document.getElementById('nt-title').value = '';
       document.getElementById('nt-content').value = '';
-      dkmLoad(); // reload list
+      dkmLoad();
     } else {
       alert('❌ ' + (d.error || 'Помилка'));
     }
   }).catch(e => alert('❌ ' + e));
 }
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
 
 function _esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -266,11 +358,10 @@ function _fmtDate(s) {
   if (!s) return '';
   try {
     const d = new Date(s);
-    return d.toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
-  } catch { return s; }
+    return d.toLocaleString('uk-UA', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+  } catch(e) { return s; }
 }
 
-// Auto-load on page open
 document.addEventListener('DOMContentLoaded', dkmLoad);
 </script>
 {% endif %}

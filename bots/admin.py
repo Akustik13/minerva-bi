@@ -1015,14 +1015,17 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             items = data.get("messageTopicItems", []) if isinstance(data, dict) else data
             # Для кожної теми отримуємо повну розмову
             result = []
-            for t in items[:30]:
+            for t in items[:50]:
                 tid = str(t.get("id", ""))
+                order_number = t.get("orderNumber", "")
                 if not tid:
                     continue
                 try:
                     full = get_topic(config, token, tid)
+                    full["orderNumber"] = order_number  # list item has numeric orderNumber; full topic only has UUID orderId
                     result.append(full)
                 except Exception:
+                    t["orderNumber"] = order_number
                     result.append(t)
             return JsonResponse({"topics": result})
         except Exception as e:
