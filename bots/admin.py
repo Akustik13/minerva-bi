@@ -1023,10 +1023,22 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             return max(dates) if dates else ""
 
         def _inject_is_new(topics):
-            """Inject server-computed is_new based on DigiKeyMessageSeen table."""
+            """Inject is_new + order/customer info into each topic (single batch DB query)."""
             from bots.models import DigiKeyMessageSeen
+            from sales.models import SalesOrder
+
             seen_map = {s.topic_id: s.last_message_id
                         for s in DigiKeyMessageSeen.objects.all()}
+
+            # Batch fetch matching orders + customers
+            order_numbers = [str(t.get("orderNumber", "")) for t in topics if t.get("orderNumber")]
+            orders = {
+                o.order_number: o
+                for o in SalesOrder.objects.filter(
+                    order_number__in=order_numbers
+                ).select_related("customer")
+            }
+
             for t in topics:
                 tid = str(t.get("id", ""))
                 convo = t.get("conversation") or []
@@ -1039,6 +1051,20 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     )
                 else:
                     t["is_new"] = False
+
+                # Enrich with local order & customer data (not saved to cache)
+                on = str(t.get("orderNumber", ""))
+                order = orders.get(on)
+                if order:
+                    t["_order_pk"] = order.pk
+                    cust = order.customer
+                    t["_customer_company"] = (cust.company or "") if cust else ""
+                    t["_customer_name"]    = (cust.name    or "") if cust else ""
+                else:
+                    t["_order_pk"] = None
+                    t["_customer_company"] = ""
+                    t["_customer_name"]    = ""
+
             topics.sort(key=_topic_sort_key, reverse=True)
             return topics
 

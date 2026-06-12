@@ -254,11 +254,22 @@ function _renderTopicList(topics) {
     const isNew  = t.is_new || false;  // server-computed via DigiKeyMessageSeen
     const badge  = isNew ? '<span class="dkm-badge-new">NEW</span>' : '';
     const date   = last ? _fmtDate(last.createDateUtc) : '';
-    const orderLabel = t.orderNumber ? '#' + t.orderNumber : (t.orderId ? t.orderId.substring(0, 8) + '…' : '—');
+    const orderNum = t.orderNumber ? '#' + t.orderNumber : (t.orderId ? t.orderId.substring(0, 8) + '…' : '—');
+    const orderEl = t._order_pk
+      ? `<a href="/admin/sales/salesorder/${t._order_pk}/change/" target="_blank"
+            style="color:var(--link-fg);font-size:15px;font-weight:700;text-decoration:none"
+            onclick="event.stopPropagation()">${_esc(orderNum)}</a>`
+      : `<span style="font-size:15px;font-weight:700">${_esc(orderNum)}</span>`;
+    const company  = _esc(t._customer_company || '');
+    const custName = _esc(t._customer_name    || '');
+    const custLine = (company || custName)
+      ? `<div style="font-size:11px;color:var(--text-dim);margin-top:1px">${company}${company && custName ? ' · ' : ''}${custName}</div>`
+      : '';
     const tid    = _esc(t.id || '');
     const active = String(t.id) === String(_currentTopicId) ? ' active' : '';
     html += `<div class="dkm-topic-item${active}" onclick="dkmOpenTopic('${tid}')" id="dkm-ti-${tid}">
-      <div class="dkm-topic-order">${orderLabel} ${badge}</div>
+      <div class="dkm-topic-order" style="display:flex;align-items:center;gap:6px">${orderEl} ${badge}</div>
+      ${custLine}
       <div class="dkm-topic-title">${_esc(t.topic || '—')}</div>
       <div class="dkm-topic-preview">${_esc(preview)}</div>
       <div class="dkm-topic-meta">${convo.length} повід. · ${date}</div>
