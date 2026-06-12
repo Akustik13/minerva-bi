@@ -1195,6 +1195,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_label_a4",
             ),
             path(
+                "<int:shipment_id>/print-all/",
+                self.admin_site.admin_view(self.print_all_view),
+                name="shipping_shipment_print_all",
+            ),
+            path(
                 "<int:shipment_id>/set-status/",
                 self.admin_site.admin_view(self.set_status_view),
                 name="shipping_shipment_set_status",
@@ -3033,6 +3038,150 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             + (f" · Замовлення {order.order_number} теж оновлено." if order_fields else ""),
         )
         return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+
+    # ── Print All Documents ───────────────────────────────────────────────────
+
+    def print_all_view(self, request, shipment_id):
+        """
+        GET — збирає всі потрібні PDF (етикетка + пак-ліст/інвойс/митна),
+        генерує відсутні, об'єднує в один PDF і повертає для друку.
+        """
+        import io
+        from django.http import HttpResponse
+        from django.conf import settings as _s
+        from pathlib import Path
+
+        EU_COUNTRIES = {
+            "AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI",
+            "FR","GR","HR","HU","IE","IT","LT","LU","LV","MT",
+            "NL","PL","PT","RO","SE","SI","SK",
+        }
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order    = shipment.order
+        pdf_paths: list[Path] = []
+        errors:    list[str]  = []
+
+        dest_country = (shipment.recipient_country or "").upper()
+        is_eu        = dest_country in EU_COUNTRIES
+
+        # ── 1. DigiKey Pack List ──────────────────────────────────────────────
+        if order and order.source == "digikey" and order.order_number:
+            pl_name = f"DigiKey_PackList_{order.order_number}.pdf"
+            pl_path = _s.MEDIA_ROOT / "orders" / "digikey" / order.order_number / pl_name
+            if not pl_path.exists():
+                try:
+                    from bots.models import DigiKeyConfig
+                    from bots.services.digikey import get_marketplace_token, _fetch_marketplace_order
+                    from bots.services.digikey_pdf import generate_digikey_packing_list
+                    from accounting.models import CompanySettings
+                    config    = DigiKeyConfig.get()
+                    token     = get_marketplace_token(config)
+                    api_order = _fetch_marketplace_order(config, order.order_number, token)
+                    cs        = CompanySettings.get()
+                    city_zip  = " ".join(filter(None, [cs.addr_zip, cs.addr_city])).strip()
+                    supplier  = {"name": cs.name or "", "street": cs.addr_street or "",
+                                 "city_zip": city_zip, "country": cs.addr_country or ""}
+                    buf = generate_digikey_packing_list(api_order, supplier)
+                    pl_path.parent.mkdir(parents=True, exist_ok=True)
+                    pl_path.write_bytes(buf.getvalue())
+                except Exception as e:
+                    errors.append(f"Pack List: {e}")
+            if pl_path.exists():
+                pdf_paths.append(pl_path)
+
+        # ── 2. Invoice (EU) або Customs (non-EU) ─────────────────────────────
+        if order and order.order_number:
+            if is_eu:
+                # ── Invoice ──
+                try:
+                    from shipping.models import Invoice as _Inv
+                    inv = (
+                        _Inv.objects.filter(sales_order=order).order_by("-pk").first()
+                        or _Inv.objects.filter(digikey_order_no=order.order_number).order_by("-pk").first()
+                    )
+                    if not inv:
+                        from shipping.services.invoice_service import InvoiceService
+                        inv = InvoiceService.generate_from_digikey_order(order.order_number, request.user)
+                    # Get PDF bytes
+                    inv_pdf: Path | None = None
+                    if inv.pdf_file:
+                        p = Path(_s.MEDIA_ROOT) / str(inv.pdf_file)
+                        if p.exists():
+                            inv_pdf = p
+                    if not inv_pdf and inv.docx_file:
+                        from shipping.services.invoice_service import convert_docx_to_pdf
+                        out_dir = Path(_s.MEDIA_ROOT) / "invoices"
+                        cp = convert_docx_to_pdf(Path(_s.MEDIA_ROOT) / str(inv.docx_file), out_dir)
+                        if cp and cp.exists():
+                            inv.pdf_file = f"invoices/{cp.name}"
+                            inv.save(update_fields=["pdf_file"])
+                            inv_pdf = cp
+                    # Copy to order docs folder
+                    if inv_pdf:
+                        inv_name = f"Invoice_{inv.invoice_number}.pdf"
+                        inv_dest = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / inv_name
+                        inv_dest.parent.mkdir(parents=True, exist_ok=True)
+                        if not inv_dest.exists():
+                            import shutil as _sh
+                            _sh.copy2(str(inv_pdf), str(inv_dest))
+                        pdf_paths.append(inv_dest)
+                except Exception as e:
+                    errors.append(f"Invoice: {e}")
+            else:
+                # ── Customs (CN23) ──
+                cn_name = f"CustomsDeclaration-{order.order_number}.pdf"
+                cn_path = _s.MEDIA_ROOT / "orders" / (order.source or "manual") / order.order_number / cn_name
+                if not cn_path.exists():
+                    try:
+                        from sales.doc_generators import generate_customs
+                        buf = generate_customs(order)
+                        cn_path.parent.mkdir(parents=True, exist_ok=True)
+                        cn_path.write_bytes(buf.getvalue())
+                    except Exception as e:
+                        errors.append(f"Customs: {e}")
+                if cn_path.exists():
+                    pdf_paths.append(cn_path)
+
+        # ── 3. Carrier label ─────────────────────────────────────────────────
+        if shipment.label_url:
+            lbl_rel  = shipment.label_url.lstrip("/media/")
+            lbl_path = Path(_s.MEDIA_ROOT) / lbl_rel
+            if lbl_path.exists():
+                pdf_paths.append(lbl_path)
+            else:
+                errors.append("Етикетка перевізника не знайдена на диску")
+
+        if not pdf_paths:
+            return HttpResponse(
+                f"<h3>Немає PDF для друку</h3><pre>{'<br>'.join(errors) or 'Документи відсутні'}</pre>",
+                content_type="text/html; charset=utf-8",
+                status=404,
+            )
+
+        # ── 4. Merge PDFs ─────────────────────────────────────────────────────
+        try:
+            from pypdf import PdfWriter, PdfReader
+            writer = PdfWriter()
+            for p in pdf_paths:
+                try:
+                    reader = PdfReader(str(p))
+                    for page in reader.pages:
+                        writer.add_page(page)
+                except Exception as e:
+                    errors.append(f"{p.name}: {e}")
+            out_buf = io.BytesIO()
+            writer.write(out_buf)
+            out_buf.seek(0)
+            merged = out_buf.read()
+        except ImportError:
+            # pypdf not installed — return first PDF only
+            merged = pdf_paths[0].read_bytes()
+
+        order_no = (order.order_number if order else str(shipment_id))
+        response = HttpResponse(merged, content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="PrintAll_{order_no}.pdf"'
+        return response
 
     # ── DHL Cancel ───────────────────────────────────────────────────────────
 
