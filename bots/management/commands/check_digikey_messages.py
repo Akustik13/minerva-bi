@@ -57,8 +57,11 @@ class Command(BaseCommand):
             except Exception:
                 continue
 
-            # Inject orderNumber (not in full topic response, only in list item)
+            # Inject list-item fields not present in full topic response
             full["orderNumber"] = order_number
+            last_upd = topic.get("lastUpdateDateUtc", "")
+            if last_upd:
+                full.setdefault("lastUpdateDateUtc", last_upd)
             topics_cache.append(full)
 
             conversation = full.get("conversation", [])

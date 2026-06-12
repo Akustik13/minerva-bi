@@ -1053,9 +1053,12 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 order_number = t.get("orderNumber", "")
                 if not tid:
                     continue
+                last_upd = t.get("lastUpdateDateUtc", "")
                 try:
                     full = get_topic(config, token, tid)
                     full["orderNumber"] = order_number
+                    if last_upd:
+                        full.setdefault("lastUpdateDateUtc", last_upd)
                     result.append(full)
                 except Exception:
                     t["orderNumber"] = order_number
