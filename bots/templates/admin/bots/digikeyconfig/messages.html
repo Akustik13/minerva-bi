@@ -199,7 +199,7 @@ function dkmLoad(refresh) {
     const cacheEl = document.getElementById('dkm-cache-info');
     if (data.cache_at) {
       const fromCache = data.from_cache !== false;
-      cacheEl.textContent = (fromCache ? '📦 Кеш: ' : '✅ Оновлено: ') + _fmtDate(data.cache_at);
+      cacheEl.textContent = (fromCache ? '💾 З БД: ' : '✅ Оновлено: ') + _fmtDate(data.cache_at);
     } else {
       cacheEl.textContent = '';
     }
