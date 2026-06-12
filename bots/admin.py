@@ -1015,6 +1015,18 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
 
         refresh = request.GET.get("refresh") == "1"
 
+        def _topic_sort_key(t):
+            """Max date across lastUpdateDateUtc and all conversation messages (ISO str sorts correctly)."""
+            dates = []
+            lu = t.get("lastUpdateDateUtc") or ""
+            if lu:
+                dates.append(lu)
+            for m in (t.get("conversation") or []):
+                d = m.get("createDateUtc") or ""
+                if d:
+                    dates.append(d)
+            return max(dates) if dates else ""
+
         def _inject_is_new(topics):
             """Inject server-computed is_new based on DigiKeyMessageSeen table."""
             from bots.models import DigiKeyMessageSeen
@@ -1024,7 +1036,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 tid = str(t.get("id", ""))
                 convo = t.get("conversation") or []
                 if convo:
-                    last = convo[-1]
+                    last = max(convo, key=lambda m: m.get("createDateUtc") or "")
                     last_id = str(last.get("id", ""))
                     t["is_new"] = (
                         last.get("sender") == "Customer"
@@ -1032,6 +1044,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     )
                 else:
                     t["is_new"] = False
+            topics.sort(key=_topic_sort_key, reverse=True)
             return topics
 
         # ── Serve from DB cache if available ──────────────────────────────────

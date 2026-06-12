@@ -77,7 +77,7 @@
 <div style="padding:0 0 8px">
   <div class="dkm-filters">
     <input type="text" id="dkm-filter-order" placeholder="Фільтр по Order #…" style="width:180px"
-           oninput="dkmFilterLocal(this.value)">
+           oninput="dkmFilterLocal(this.value); localStorage.setItem('dkm-filter', this.value)">
     <button class="dkm-btn" onclick="dkmLoad(false)">📂 Відкрити</button>
     <button class="dkm-btn" onclick="dkmLoad(true)" style="background:#546e7a">🔄 Оновити з DigiKey</button>
     <button class="dkm-btn dkm-btn-green" onclick="dkmShowNewTopic()">➕ Нова тема</button>
@@ -139,11 +139,16 @@ let _sortMode       = 'date_desc';  // 'date_desc' | 'date_asc' | 'new'
 
 function _topicDate(t) {
   if (t.lastUpdateDateUtc) {
-    try { return new Date(t.lastUpdateDateUtc).getTime(); } catch(e) {}
+    try { const ts = new Date(t.lastUpdateDateUtc).getTime(); if (!isNaN(ts)) return ts; } catch(e) {}
   }
   const convo = t.conversation || [];
   if (!convo.length) return 0;
-  try { return new Date(convo[convo.length - 1].createDateUtc).getTime(); } catch(e) { return 0; }
+  // Use max across all messages — handles both oldest-first and newest-first API orders
+  let maxTs = 0;
+  for (const m of convo) {
+    try { const ts = new Date(m.createDateUtc).getTime(); if (!isNaN(ts) && ts > maxTs) maxTs = ts; } catch(e) {}
+  }
+  return maxTs;
 }
 
 function _sortTopics(topics) {
@@ -205,7 +210,12 @@ function dkmLoad(refresh) {
     }
 
     _updateSortBar();
-    _renderTopicList(_allTopics);
+    const savedQ = (document.getElementById('dkm-filter-order') || {}).value || '';
+    if (savedQ.trim()) {
+      dkmFilterLocal(savedQ);
+    } else {
+      _renderTopicList(_allTopics);
+    }
     // Restore previously open topic after refresh
     if (prevTopicId) {
       const t = _allTopics.find(x => String(x.id) === String(prevTopicId));
@@ -404,7 +414,14 @@ function _fmtDate(s) {
   } catch(e) { return s; }
 }
 
-document.addEventListener('DOMContentLoaded', () => dkmLoad(false));
+document.addEventListener('DOMContentLoaded', () => {
+  const savedFilter = localStorage.getItem('dkm-filter') || '';
+  if (savedFilter) {
+    const inp = document.getElementById('dkm-filter-order');
+    if (inp) inp.value = savedFilter;
+  }
+  dkmLoad(false);
+});
 </script>
 {% endif %}
 {% endblock %}
