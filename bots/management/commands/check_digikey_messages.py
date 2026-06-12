@@ -91,14 +91,17 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"🔔 Нових повідомлень: {len(new_messages)}"))
 
+        from config.models import NotificationSettings
+        notif = NotificationSettings.objects.filter(pk=1).first()
+
         for msg in new_messages:
             self.stdout.write(f"  Topic: {msg['topic_title']} | Order: {msg['order_id']}")
             self.stdout.write(f"  {msg['content'][:100]}")
 
-            if config.msg_notify_telegram:
+            if notif and notif.dk_msg_notify_telegram:
                 _notify_telegram(config, msg)
-            if config.msg_notify_email:
-                _notify_email(config, msg)
+            if notif and notif.dk_msg_notify_email:
+                _notify_email(config, msg, notif)
 
 
 def _notify_telegram(config, msg: dict):
@@ -131,19 +134,34 @@ def _notify_telegram(config, msg: dict):
         logging.getLogger(__name__).exception("Telegram notify failed: %s", e)
 
 
-def _notify_email(config, msg: dict):
+def _notify_email(config, msg: dict, notif=None):
     """Надсилає Email сповіщення про нове повідомлення."""
     try:
-        from dashboard.notifications import _send_email
+        from dashboard.notifications import _send_event_email
+        from config.models import NotificationSettings
+
+        ns = notif or NotificationSettings.objects.filter(pk=1).first()
+        if not ns or not ns.email_enabled:
+            return
+
         subject = f"💬 Нове повідомлення DigiKey: {msg['topic_title']}"
-        body = (
+        html_body = (
             f"<p>Нове повідомлення від покупця в DigiKey Marketplace.</p>"
             f"<p><b>Тема:</b> {msg['topic_title']}<br>"
             f"<b>Замовлення:</b> {msg['order_id']}<br>"
             f"<b>Від:</b> {msg['sender']}</p>"
             f"<p><b>Повідомлення:</b><br>{msg['content']}</p>"
         )
-        _send_email(subject, body)
+
+        # Override recipients if DK-specific list is set
+        dk_to = (ns.dk_msg_notify_email_to or '').strip()
+        if dk_to:
+            import copy
+            ns_copy = copy.copy(ns)
+            ns_copy.email_to = dk_to
+            _send_event_email(ns_copy, subject, html_body)
+        else:
+            _send_event_email(ns, subject, html_body)
     except Exception as e:
         import logging
         logging.getLogger(__name__).exception("Email notify failed: %s", e)

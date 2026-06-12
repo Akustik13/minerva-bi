@@ -2861,11 +2861,13 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         if not token:
             return JsonResponse({"error": "Marketplace не авторизовано"}, status=401)
         try:
-            # Завантажуємо всі теми (без фільтра orderId — він приймає UUID, а не order_number)
+            # API OrderId приймає UUID, а не order_number — завантажуємо всі і фільтруємо за orderNumber
             data = get_topics(config, token, order_id=None, max_results=100)
-            items = data if isinstance(data, list) else data.get("items", data.get("topics", []))
+            items = data.get("messageTopicItems", []) if isinstance(data, dict) else data
+            # Filter to this order by numeric orderNumber
+            order_items = [t for t in items if str(t.get("orderNumber", "")) == str(order.order_number)]
             result = []
-            for t in items:
+            for t in order_items:
                 tid = str(t.get("id", ""))
                 if not tid:
                     continue

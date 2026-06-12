@@ -159,11 +159,12 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         }),
         ("💬 Повідомлення DigiKey", {
             "fields": ("messages_panel", "msg_check_enabled", "msg_check_interval",
-                       "msg_notify_telegram", "msg_notify_email", "msg_last_checked_at"),
+                       "msg_last_checked_at"),
             "description": (
                 "Читайте та відповідайте на повідомлення покупців DigiKey Marketplace. "
-                "Авто-перевірка запускається командою: "
-                "<code>python manage.py check_digikey_messages</code>"
+                "Авто-перевірка: <code>python manage.py check_digikey_messages</code>. "
+                "Налаштування сповіщень (Telegram / Email) — у розділі "
+                "<a href='/admin/config/notificationsettings/1/change/'>Сповіщення → 💬 DigiKey повідомлення</a>."
             ),
         }),
         ("🔌 Дії", {
@@ -1011,7 +1012,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         try:
             from bots.services.digikey_messages import get_topics
             data = get_topics(config, token, order_id=order_id or None, max_results=50)
-            items = data if isinstance(data, list) else data.get("items", data.get("topics", []))
+            items = data.get("messageTopicItems", []) if isinstance(data, dict) else data
             # Для кожної теми отримуємо повну розмову
             result = []
             for t in items[:30]:

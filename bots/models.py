@@ -145,7 +145,7 @@ class DigiKeyConfig(models.Model):
                   "(напр. 3228)"
     )
 
-    # ── Messages notifications ────────────────────────────────────────────────
+    # ── Messages check settings ───────────────────────────────────────────────
     msg_check_enabled = models.BooleanField(
         "Авто-перевірка повідомлень", default=False,
         help_text="Автоматично перевіряти нові повідомлення від покупців DigiKey"
@@ -153,14 +153,6 @@ class DigiKeyConfig(models.Model):
     msg_check_interval = models.PositiveSmallIntegerField(
         "Інтервал перевірки (хвилин)", default=15,
         help_text="Рекомендовано: 5–60 хв. Cron: python manage.py check_digikey_messages"
-    )
-    msg_notify_telegram = models.BooleanField(
-        "Сповіщення в Telegram", default=True,
-        help_text="Надсилати в Telegram при новому повідомленні від покупця"
-    )
-    msg_notify_email = models.BooleanField(
-        "Сповіщення на Email", default=True,
-        help_text="Надсилати Email при новому повідомленні від покупця"
     )
     msg_last_checked_at = models.DateTimeField(
         "Остання перевірка повідомлень", null=True, blank=True

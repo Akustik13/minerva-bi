@@ -107,7 +107,7 @@ def get_all_topics_paginated(config, token: str, max_total: int = 200) -> list:
     page_size = 50
     while len(all_topics) < max_total:
         data = get_topics(config, token, offset=offset, max_results=page_size)
-        items = data if isinstance(data, list) else data.get("items", data.get("topics", []))
+        items = data.get("messageTopicItems", []) if isinstance(data, dict) else data
         if not items:
             break
         all_topics.extend(items)
