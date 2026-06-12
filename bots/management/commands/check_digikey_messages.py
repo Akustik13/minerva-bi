@@ -29,6 +29,18 @@ class Command(BaseCommand):
             self.stdout.write("msg_check_enabled=False — пропускаємо. Використай --force щоб запустити.")
             return
 
+        # Self-throttle: check interval from DB (like sync_digikey_orders)
+        if not options["force"] and config.msg_last_checked_at and config.msg_check_interval:
+            elapsed = (timezone.now() - config.msg_last_checked_at).total_seconds() / 60
+            if elapsed < config.msg_check_interval:
+                remaining = int(config.msg_check_interval - elapsed)
+                self.stdout.write(
+                    f"⏸ Ще рано ({int(elapsed)} хв тому, "
+                    f"інтервал {config.msg_check_interval} хв). "
+                    f"Наступна через ~{remaining} хв."
+                )
+                return
+
         if not config.marketplace_access_token and not config.marketplace_refresh_token:
             self.stdout.write(self.style.ERROR("❌ Marketplace token відсутній — потрібна OAuth авторизація"))
             return
