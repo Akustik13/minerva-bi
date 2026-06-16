@@ -277,8 +277,8 @@
       <div class="ct-po-sum-head">
         <span class="po-label">{{ po.code }}</span>
         <span class="po-count">{{ po.lines.count }} {% trans "позицій" %}</span>
-        {% if po._rfq_tmpl_name %}
-        <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg-hover);color:var(--text-dim);border:1px solid var(--border-strong);white-space:nowrap" title="{% trans "Шаблон листа" %}">📧 {{ po._rfq_tmpl_name }}</span>
+        {% if po.rfq_tmpl_name %}
+        <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg-hover);color:var(--text-dim);border:1px solid var(--border-strong);white-space:nowrap" title="{% trans "Шаблон листа" %}">📧 {{ po.rfq_tmpl_name }}</span>
         {% endif %}
 
         <!-- Supplier selector -->

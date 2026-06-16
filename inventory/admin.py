@@ -1044,7 +1044,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             matched = _match_template(po_lines)
             tmpl_name = matched.name if matched else None
             po_template_map[po.pk] = tmpl_name
-            po._rfq_tmpl_name = tmpl_name  # annotate for template access
+            po.rfq_tmpl_name = tmpl_name  # annotate for template access
             for line in po_lines:
                 if not line.product_id:
                     continue
