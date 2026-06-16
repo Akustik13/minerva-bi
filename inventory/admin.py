@@ -209,6 +209,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                  name='inventory_reorderproxy_cart_count'),
             path('cart/add-one/', self.admin_site.admin_view(self.cart_add_one_view),
                  name='inventory_reorderproxy_cart_add_one'),
+            path('cart/send-email/', self.admin_site.admin_view(self.cart_send_email_view),
+                 name='inventory_reorderproxy_cart_send_email'),
         ] + super().get_urls()
 
     def supply_view(self, request):
@@ -1392,6 +1394,74 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'body': body,
             'image_b64': image_b64,
         })
+
+    def cart_send_email_view(self, request):
+        """POST: send RFQ email via SMTP (NotificationSettings)."""
+        from django.http import JsonResponse
+        import json as _json
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+        try:
+            data = _json.loads(request.body or b'{}')
+        except Exception:
+            return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
+
+        to_addr   = (data.get('to') or '').strip()
+        subject   = (data.get('subject') or '').strip()
+        body_text = (data.get('body') or '').strip()
+        image_b64 = (data.get('image_b64') or '').strip()
+
+        if not to_addr:
+            return JsonResponse({'ok': False, 'error': 'Не вказано адресу отримувача'})
+        if not body_text:
+            return JsonResponse({'ok': False, 'error': 'Тіло листа порожнє'})
+
+        try:
+            from config.models import NotificationSettings as _NS
+            ns = _NS.get()
+            if not ns.email_host_user:
+                return JsonResponse({'ok': False, 'error': 'SMTP не налаштований — заповніть Налаштування повідомлень'})
+
+            from django.core.mail import get_connection, EmailMultiAlternatives
+            conn = get_connection(
+                backend='django.core.mail.backends.smtp.EmailBackend',
+                host=ns.email_host,
+                port=ns.email_port,
+                username=ns.email_host_user,
+                password=ns.email_host_password,
+                use_tls=ns.email_use_tls,
+                use_ssl=ns.email_use_ssl,
+                fail_silently=False,
+            )
+            from_email = (ns.email_from or ns.email_host_user).strip()
+
+            # Build HTML body: plain text wrapped in <pre> + optional inline image
+            pre_style = (
+                'font-family:monospace;font-size:13px;white-space:pre-wrap;'
+                'line-height:1.5;color:#222'
+            )
+            html_body = f'<pre style="{pre_style}">{body_text}</pre>'
+            if image_b64:
+                html_body += (
+                    f'<div style="margin-top:16px">'
+                    f'<img src="{image_b64}" alt="Cable diagram" '
+                    f'style="max-width:480px;border-radius:4px">'
+                    f'</div>'
+                )
+
+            msg = EmailMultiAlternatives(
+                subject=subject or 'Order Request',
+                body=body_text,
+                from_email=from_email,
+                to=[a.strip() for a in to_addr.split(',') if a.strip()],
+                connection=conn,
+            )
+            msg.attach_alternative(html_body, 'text/html')
+            msg.send()
+        except Exception as exc:
+            return JsonResponse({'ok': False, 'error': str(exc)})
+
+        return JsonResponse({'ok': True})
 
     def cart_count_view(self, request):
         """GET: return JSON with cart item count (for persistent header badge)."""
