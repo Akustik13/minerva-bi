@@ -448,6 +448,74 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 f'<tbody>{body}</tbody>'
                 '</table>'
             )
+            # ── Sales history section ─────────────────────────────────────────
+            sales_html = ''
+            try:
+                from sales.models import SalesOrderLine as _SOL
+                sold_lines = list(
+                    _SOL.objects.filter(product_id=product_pk)
+                    .select_related('order')
+                    .order_by('-order__order_date', '-pk')[:30]
+                )
+                if sold_lines:
+                    _SOURCE_ICONS = {
+                        'digikey': '🔵 DigiKey',
+                        'dk':      '🔵 DigiKey',
+                        'amazon':  '🟠 Amazon',
+                        'ebay':    '🟡 eBay',
+                        'manual':  '✏️ Вручну',
+                    }
+                    TH2 = ('color:var(--text-dim);font-size:10px;font-weight:700;'
+                           'padding:4px 8px;border-bottom:1px solid var(--border-strong)')
+                    srows = []
+                    for sl in sold_lines:
+                        o = sl.order
+                        date_str = o.order_date.strftime('%d.%m.%Y') if o.order_date else '—'
+                        customer = (o.contact_name or o.client or '').strip()[:35] or '—'
+                        src_slug = (o.source or '').lower()
+                        src_label = _SOURCE_ICONS.get(src_slug, f'📦 {o.source}')
+                        qty_v = abs(float(sl.qty))
+                        order_url = f'/admin/sales/salesorder/{o.pk}/change/'
+                        srows.append(
+                            f'<tr>'
+                            f'<td style="color:var(--text-dim);font-size:11px;white-space:nowrap;padding:4px 8px">{escape(date_str)}</td>'
+                            f'<td style="padding:4px 8px;font-weight:600">'
+                            f'<a href="{order_url}" target="_blank" style="color:var(--link-fg);text-decoration:none">'
+                            f'{escape(customer)}</a></td>'
+                            f'<td style="text-align:right;font-weight:700;color:#ef5350;padding:4px 8px;font-family:monospace">'
+                            f'−{qty_v:g}</td>'
+                            f'<td style="font-size:11px;color:var(--text-dim);padding:4px 8px">'
+                            f'<a href="{order_url}" target="_blank" style="color:var(--text-dim);text-decoration:none">'
+                            f'{escape(o.order_number)}</a></td>'
+                            f'<td style="font-size:11px;padding:4px 8px">{src_label}</td>'
+                            f'</tr>'
+                        )
+                    scroll_style = 'max-height:180px;overflow-y:auto' if len(srows) > 6 else ''
+                    TH_row = (
+                        f'<th style="{TH2};text-align:left">' + str(_('ДАТА')) + '</th>'
+                        f'<th style="{TH2};text-align:left">' + str(_('ЗАМОВНИК')) + '</th>'
+                        f'<th style="{TH2};text-align:right">' + str(_('К-СТЬ')) + '</th>'
+                        f'<th style="{TH2};text-align:left">№</th>'
+                        f'<th style="{TH2};text-align:left">' + str(_('ДЖЕРЕЛО')) + '</th>'
+                    )
+                    inner_table = (
+                        f'<table style="width:100%;border-collapse:collapse;font-size:12px">'
+                        f'<thead><tr>{TH_row}</tr></thead>'
+                        f'<tbody>{"".join(srows)}</tbody>'
+                        f'</table>'
+                    )
+                    sales_html = (
+                        f'<div style="margin-top:14px;border-top:1px solid var(--border-strong);padding-top:10px">'
+                        f'<div style="font-size:11px;font-weight:700;text-transform:uppercase;'
+                        f'letter-spacing:.5px;color:var(--text-muted);margin-bottom:7px">'
+                        f'🛒 ' + str(_('Історія продажів')) + f'</div>'
+                        f'<div style="{scroll_style}">{inner_table}</div>'
+                        f'</div>'
+                    )
+            except Exception:
+                pass
+            html = html + sales_html
+
         except Exception as exc:
             html = f'<p style="color:#ef5350">' + str(_('Помилка:')) + f' {escape(str(exc))}</p>'
         return HttpResponse(html)
