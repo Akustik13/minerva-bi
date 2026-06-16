@@ -1778,8 +1778,12 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         except Exception:
             self._cached_labels = set()
         extra = extra_context or {}
-        extra['dk_sync_status_url'] = reverse('admin:inventory_product_dk_sync_status')
-        extra['dk_sync_cancel_url'] = reverse('admin:inventory_product_dk_sync_cancel')
+        try:
+            extra['dk_sync_status_url'] = reverse('admin:inventory_product_dk_sync_status')
+            extra['dk_sync_cancel_url'] = reverse('admin:inventory_product_dk_sync_cancel')
+        except Exception:
+            extra['dk_sync_status_url'] = ''
+            extra['dk_sync_cancel_url'] = ''
         return super().changelist_view(request, extra)
 
     # ── Computed columns ──────────────────────────────────────────────────────
