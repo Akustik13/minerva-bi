@@ -452,12 +452,55 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             sales_html = ''
             try:
                 from sales.models import SalesOrderLine as _SOL
+                from django.utils import timezone as _tz
+                from datetime import timedelta as _td
+
+                # Full-history aggregates (2 queries)
+                agg_all = (
+                    _SOL.objects.filter(product_id=product_pk)
+                    .aggregate(total_qty=_Sum('qty'), total_orders=_Sum('order_id'))
+                )
+                total_qty    = float(agg_all.get('total_qty') or 0)
+                total_orders = _SOL.objects.filter(product_id=product_pk).values('order_id').distinct().count()
+
+                since_90 = (_tz.now() - _td(days=90)).date()
+                qty_90 = float(
+                    _SOL.objects.filter(product_id=product_pk, order__order_date__gte=since_90)
+                    .aggregate(s=_Sum('qty'))['s'] or 0
+                )
+
+                since_30 = (_tz.now() - _td(days=30)).date()
+                qty_30 = float(
+                    _SOL.objects.filter(product_id=product_pk, order__order_date__gte=since_30)
+                    .aggregate(s=_Sum('qty'))['s'] or 0
+                )
+
+                uniq_customers = (
+                    _SOL.objects.filter(product_id=product_pk)
+                    .exclude(order__client='').values('order__client').distinct().count()
+                )
+
+                # Demand rating based on last-90-days sales per month
+                monthly_rate = qty_90 / 3.0
+                if monthly_rate >= 50:
+                    demand = '🔥 Топ'
+                elif monthly_rate >= 10:
+                    demand = '📈 Активний'
+                elif monthly_rate >= 1:
+                    demand = '📦 Помірний'
+                elif total_qty > 0:
+                    demand = '💤 Рідко'
+                else:
+                    demand = '⚪ Немає продажів'
+
+                # Last 30 rows for the table
                 sold_lines = list(
                     _SOL.objects.filter(product_id=product_pk)
                     .select_related('order')
                     .order_by('-order__order_date', '-pk')[:30]
                 )
-                if sold_lines:
+
+                if sold_lines or total_qty > 0:
                     _SOURCE_ICONS = {
                         'digikey': '🔵 DigiKey',
                         'dk':      '🔵 DigiKey',
@@ -465,6 +508,25 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                         'ebay':    '🟡 eBay',
                         'manual':  '✏️ Вручну',
                     }
+
+                    # ── Stats chips ───────────────────────────────────────────
+                    chip = ('display:inline-flex;align-items:center;gap:5px;'
+                            'background:var(--bg-input);border:1px solid var(--border-strong);'
+                            'border-radius:12px;padding:3px 10px;font-size:11px;'
+                            'color:var(--text-muted);white-space:nowrap')
+                    chip_val = 'font-weight:800;color:var(--text)'
+                    chips_html = (
+                        f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
+                        f'<span style="{chip}">{demand}</span>'
+                        f'<span style="{chip}">' + str(_('Замовлень:')) + f' <b style="{chip_val}">{total_orders}</b></span>'
+                        f'<span style="{chip}">' + str(_('Всього продано:')) + f' <b style="{chip_val}">{int(total_qty):g} шт.</b></span>'
+                        f'<span style="{chip}">' + str(_('За 30 днів:')) + f' <b style="{chip_val}">{int(qty_30):g} шт.</b></span>'
+                        f'<span style="{chip}">' + str(_('За 90 днів:')) + f' <b style="{chip_val}">{int(qty_90):g} шт.</b></span>'
+                        f'<span style="{chip}">👥 ' + str(_('Клієнтів:')) + f' <b style="{chip_val}">{uniq_customers}</b></span>'
+                        f'</div>'
+                    )
+
+                    # ── Table rows ────────────────────────────────────────────
                     TH2 = ('color:var(--text-dim);font-size:10px;font-weight:700;'
                            'padding:4px 8px;border-bottom:1px solid var(--border-strong)')
                     srows = []
@@ -490,26 +552,43 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                             f'<td style="font-size:11px;padding:4px 8px">{src_label}</td>'
                             f'</tr>'
                         )
-                    scroll_style = 'max-height:180px;overflow-y:auto' if len(srows) > 6 else ''
-                    TH_row = (
-                        f'<th style="{TH2};text-align:left">' + str(_('ДАТА')) + '</th>'
-                        f'<th style="{TH2};text-align:left">' + str(_('ЗАМОВНИК')) + '</th>'
-                        f'<th style="{TH2};text-align:right">' + str(_('К-СТЬ')) + '</th>'
-                        f'<th style="{TH2};text-align:left">№</th>'
-                        f'<th style="{TH2};text-align:left">' + str(_('ДЖЕРЕЛО')) + '</th>'
-                    )
-                    inner_table = (
-                        f'<table style="width:100%;border-collapse:collapse;font-size:12px">'
-                        f'<thead><tr>{TH_row}</tr></thead>'
-                        f'<tbody>{"".join(srows)}</tbody>'
-                        f'</table>'
-                    )
+
+                    if srows:
+                        scroll_style = 'max-height:180px;overflow-y:auto' if len(srows) > 6 else ''
+                        TH_row = (
+                            f'<th style="{TH2};text-align:left">' + str(_('ДАТА')) + '</th>'
+                            f'<th style="{TH2};text-align:left">' + str(_('ЗАМОВНИК')) + '</th>'
+                            f'<th style="{TH2};text-align:right">' + str(_('К-СТЬ')) + '</th>'
+                            f'<th style="{TH2};text-align:left">№</th>'
+                            f'<th style="{TH2};text-align:left">' + str(_('ДЖЕРЕЛО')) + '</th>'
+                        )
+                        inner_table = (
+                            f'<table style="width:100%;border-collapse:collapse;font-size:12px">'
+                            f'<thead><tr>{TH_row}</tr></thead>'
+                            f'<tbody>{"".join(srows)}</tbody>'
+                            f'</table>'
+                        )
+                        n_label = str(_('рядків')) if len(srows) != 1 else str(_('рядок'))
+                        table_block = (
+                            f'<details style="margin-top:4px">'
+                            f'<summary style="cursor:pointer;font-size:11px;color:var(--link-fg);'
+                            f'font-weight:600;user-select:none;list-style:none;'
+                            f'display:inline-flex;align-items:center;gap:4px">'
+                            f'▶ ' + str(_('Показати деталі')) + f' ({len(srows)} {n_label})'
+                            f'</summary>'
+                            f'<div style="{scroll_style};margin-top:6px">{inner_table}</div>'
+                            f'</details>'
+                        )
+                    else:
+                        table_block = f'<p style="color:var(--text-dim);font-size:12px;margin:0">' + str(_('Продажів немає')) + '</p>'
+
                     sales_html = (
                         f'<div style="margin-top:14px;border-top:1px solid var(--border-strong);padding-top:10px">'
                         f'<div style="font-size:11px;font-weight:700;text-transform:uppercase;'
-                        f'letter-spacing:.5px;color:var(--text-muted);margin-bottom:7px">'
+                        f'letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px">'
                         f'🛒 ' + str(_('Історія продажів')) + f'</div>'
-                        f'<div style="{scroll_style}">{inner_table}</div>'
+                        f'{chips_html}'
+                        f'{table_block}'
                         f'</div>'
                     )
             except Exception:
