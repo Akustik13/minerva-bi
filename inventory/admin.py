@@ -613,14 +613,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         po = PurchaseOrder.objects.filter(status='draft').order_by('pk').first()
         if not po:
-            supplier = Supplier.objects.first()
-            if not supplier:
-                self.message_user(
-                    request, _("❌ Спочатку створіть хоча б одного постачальника."), messages.ERROR,
-                )
-                return
             po = PurchaseOrder.objects.create(
-                supplier=supplier,
+                supplier=Supplier.objects.first(),  # None is fine — nullable now
                 status='draft',
                 order_date=timezone.now().date(),
                 notes="Кошик замовлень",
@@ -707,9 +701,10 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         elif action == 'change_supplier':
             po_pk = request.POST.get('po_pk')
-            supplier_pk = request.POST.get('supplier_pk')
+            supplier_pk = request.POST.get('supplier_pk') or ''
             try:
-                PurchaseOrder.objects.filter(pk=po_pk, status='draft').update(supplier_id=int(supplier_pk))
+                sid = int(supplier_pk) if supplier_pk.strip() else None
+                PurchaseOrder.objects.filter(pk=po_pk, status='draft').update(supplier_id=sid)
             except Exception:
                 pass
 
@@ -791,7 +786,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             f"{s.rfq_email_signature}"
         )
 
-        supplier_email = po.supplier.email if po.supplier_id else ''
+        supplier_email = (po.supplier.email if po.supplier_id and po.supplier else '') or ''
 
         return JsonResponse({
             'ok': True,

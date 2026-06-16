@@ -264,7 +264,8 @@ class PurchaseOrder(models.Model):
         RECEIVED = "received", "Received"
         CANCELLED = "cancelled", "Cancelled"
 
-    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name="purchase_orders")
+    supplier = models.ForeignKey(Supplier, on_delete=models.PROTECT, related_name="purchase_orders",
+                                null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.DRAFT)
     code = models.CharField(max_length=32, unique=True, null=True, blank=True)
     order_date = models.DateField(default=timezone.now)
