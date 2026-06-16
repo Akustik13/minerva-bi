@@ -554,14 +554,15 @@ function ctToggleEmail(poPk) {
           const subjEl = document.getElementById('email-subj-' + poPk);
           if (!toEl.value && d.to) toEl.value = d.to;
           if (d.subject) subjEl.value = d.subject;
-          if (d.image_b64) {
-            const imgWrap = document.getElementById('email-img-' + poPk);
-            const imgEl   = document.getElementById('email-img-el-' + poPk);
-            imgEl.src = d.image_b64;
+          const imgEl = document.getElementById('email-img-el-' + poPk);
+          if (imgEl) {
+            imgEl.dataset.signature    = d.signature   || '';
+            imgEl.dataset.htmlTable    = d.html_table  || '';
             imgEl.dataset.diagramInBody = d.diagram_in_body ? '1' : '0';
-            imgEl.dataset.signature = d.signature || '';
-            imgEl.dataset.htmlTable = d.html_table || '';
-            imgWrap.style.display = 'block';
+          }
+          if (d.image_b64 && imgEl) {
+            imgEl.src = d.image_b64;
+            document.getElementById('email-img-' + poPk).style.display = 'block';
           }
         } else { bodyEl.value = '❌ ' + (d.error || '?'); }
       }).catch(e => { bodyEl.value = '❌ ' + e; });
