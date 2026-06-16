@@ -12,3 +12,76 @@
   </li>
   {{ block.super }}
 {% endblock %}
+
+{% block content %}
+{% if dk_sync_status_url %}
+<div id="mv-dk-sync-banner" style="display:none;align-items:center;gap:12px;
+     padding:10px 16px;margin-bottom:12px;border-radius:8px;font-size:13px;
+     background:var(--bg-card);border:1px solid var(--border-strong)">
+  <span id="mv-dk-icon" style="font-size:16px">⏳</span>
+  <span id="mv-dk-info" style="flex:1;color:var(--text)"></span>
+  <button id="mv-dk-cancel" type="button" onclick="mvDkCancel()"
+    style="display:none;background:#c62828;color:#fff;border:none;border-radius:4px;
+           padding:4px 12px;cursor:pointer;font-size:12px;font-weight:600">⛔ Зупинити</button>
+</div>
+<script>
+(function(){
+  var STATUS_URL = '{{ dk_sync_status_url }}';
+  var CANCEL_URL = '{{ dk_sync_cancel_url }}';
+  var _timer = null;
+
+  function poll(){
+    fetch(STATUS_URL, {credentials:'same-origin'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var banner = document.getElementById('mv-dk-sync-banner');
+        var icon   = document.getElementById('mv-dk-icon');
+        var info   = document.getElementById('mv-dk-info');
+        var cancel = document.getElementById('mv-dk-cancel');
+        if (!banner) return;
+
+        var icons = {idle:'💤', running:'⏳', done:'✅', error:'❌'};
+        icon.textContent = icons[d.status] || '❓';
+
+        if (d.status === 'running') {
+          banner.style.display = 'flex';
+          cancel.style.display = 'inline-block';
+          var p = d.progress || {};
+          var done  = p.done  !== undefined ? p.done  : '?';
+          var total = p.total !== undefined ? p.total : '?';
+          var sku   = p.sku   ? ' · ' + p.sku : '';
+          var errs  = p.err   ? ' · ⚠️ ' + p.err + ' помилок' : '';
+          info.textContent = 'Синхронізація з DigiKey: ' + done + '/' + total + sku + errs
+                             + (d.started ? ' · запущено о ' + d.started : '');
+          if (!_timer) _timer = setInterval(poll, 2000);
+        } else if (d.status === 'done' || d.status === 'error') {
+          banner.style.display = 'flex';
+          cancel.style.display = 'none';
+          info.textContent = d.message || (d.status === 'done' ? '✅ Готово' : '❌ Помилка');
+          if (_timer) { clearInterval(_timer); _timer = null; }
+          setTimeout(function(){ banner.style.display = 'none'; }, 8000);
+        } else {
+          banner.style.display = 'none';
+          cancel.style.display = 'none';
+          if (_timer) { clearInterval(_timer); _timer = null; }
+        }
+      }).catch(function(){});
+  }
+
+  window.mvDkCancel = function(){
+    fetch(CANCEL_URL, {method:'POST', credentials:'same-origin',
+      headers:{'X-CSRFToken': document.cookie.match(/csrftoken=([^;]+)/)?.[1]||''}})
+      .then(function(r){return r.json();})
+      .then(function(d){ if(d.ok){ document.getElementById('mv-dk-cancel').style.display='none'; } })
+      .catch(function(){});
+  };
+
+  document.addEventListener('DOMContentLoaded', function(){
+    poll();
+    _timer = setInterval(poll, 2000);
+  });
+})();
+</script>
+{% endif %}
+{{ block.super }}
+{% endblock %}

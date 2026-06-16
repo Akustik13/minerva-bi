@@ -57,10 +57,11 @@ def _get_monthly_sales(product, months=3):
         return 0
 
 
-def _reorder(product, stock=None, sales_3m_total=None):
+def _reorder(product, stock=None, sales_period_total=None, period_days=90):
     """Повертає dict з аналізом reorder.
     stock: optional pre-computed stock (from queryset annotation)
-    sales_3m_total: optional pre-computed 3-month sales qty (from annotation)
+    sales_period_total: optional pre-computed sales qty for `period_days`
+    period_days: length of the sales period in days (default 90 = 3 months)
     """
     if stock is None:
         stock = _get_stock(product)
@@ -69,8 +70,9 @@ def _reorder(product, stock=None, sales_3m_total=None):
     # Від'ємний stock = борг — для розрахунків вважаємо 0
     stock_calc = max(0.0, stock)
 
-    if sales_3m_total is not None:
-        monthly = float(sales_3m_total) / 3
+    if sales_period_total is not None:
+        months = max(1, period_days) / 30.0
+        monthly = float(sales_period_total) / months
     else:
         monthly = _get_monthly_sales(product, months=3)
     if monthly <= 0:
@@ -98,7 +100,41 @@ def _reorder(product, stock=None, sales_3m_total=None):
     }
 
 
-# ── Фільтр по статусу ─────────────────────────────────────────────────────────
+# ── Фільтри аналізу ───────────────────────────────────────────────────────────
+
+class SalesPeriodFilter(admin.SimpleListFilter):
+    title = _("Період аналізу продажів")
+    parameter_name = "analysis_period"
+
+    def lookups(self, request, model_admin):
+        return [
+            ("30",  _("30 днів (1 міс)")),
+            ("60",  _("60 днів (2 міс)")),
+            ("90",  _("90 днів / 3 міс")),
+            ("180", _("180 днів / 6 міс")),
+            ("365", _("365 днів / рік")),
+        ]
+
+    def queryset(self, request, queryset):
+        return queryset  # handled in get_queryset via request.GET
+
+
+class SalesSourceFilter(admin.SimpleListFilter):
+    title = _("Джерело продажів")
+    parameter_name = "sales_source"
+
+    def lookups(self, request, model_admin):
+        try:
+            from sales.models import SalesSource
+            result = [("all", _("— всі джерела —"))]
+            result += [(s.slug, s.name) for s in SalesSource.objects.order_by("name")]
+            return result
+        except Exception:
+            return []
+
+    def queryset(self, request, queryset):
+        return queryset  # handled in get_queryset via request.GET
+
 
 class ReorderStatusFilter(admin.SimpleListFilter):
     title = _("Статус запасів")
@@ -132,12 +168,16 @@ class ReorderProxy(Product):
 @admin.register(ReorderProxy)
 class ReorderAnalysisAdmin(admin.ModelAdmin):
 
+    change_list_template = "admin/inventory/reorderproxy/change_list.html"
+
     list_display = (
         "sku", "name_col", "category",
-        "stock_col", "monthly_col", "months_left_col",
-        "reorder_col", "status_col", "po_btn",
+        "stock_col", "reserved_col", "available_col",
+        "monthly_col", "months_left_col",
+        "reorder_col", "status_col",
+        "history_toggle_btn",
     )
-    list_filter  = ("category", "kind", ReorderStatusFilter)
+    list_filter  = ("category", "kind", SalesPeriodFilter, SalesSourceFilter, ReorderStatusFilter)
     search_fields = ("sku", "name")
     ordering     = ("sku",)
     actions      = ["bulk_create_po", "add_to_cart"]
@@ -444,30 +484,67 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'po_status':   po.status,
         })
 
+    def changelist_view(self, request, extra_context=None):
+        # Cache analysis params so display methods can access them per-request
+        try:
+            self._analysis_days = int(request.GET.get('analysis_period') or 90)
+            self._analysis_days = max(7, min(365, self._analysis_days))
+        except (ValueError, TypeError):
+            self._analysis_days = 90
+        self._sales_source = request.GET.get('sales_source') or ''
+
+        cart_url = reverse('admin:inventory_reorderproxy_cart')
+        cart_count = PurchaseOrderLine.objects.filter(purchase_order__status='draft').count()
+        extra = extra_context or {}
+        extra.update({
+            'cart_url': cart_url,
+            'cart_count': cart_count,
+            'analysis_days': self._analysis_days,
+        })
+        return super().changelist_view(request, extra)
+
     def get_queryset(self, request):
-        from django.db.models import OuterRef, Subquery, ExpressionWrapper, DecimalField, Value
+        from django.db.models import OuterRef, Subquery, Value
         from django.db.models.functions import Coalesce
         from django.utils import timezone
         from datetime import timedelta
         try:
             from sales.models import SalesOrderLine
-            since_3m = (timezone.now() - timedelta(days=90)).date()
+
+            days = max(7, min(365, int(request.GET.get('analysis_period') or 90)))
+            since = (timezone.now() - timedelta(days=days)).date()
+            source_slug = (request.GET.get('sales_source') or '').strip()
+
             stock_subq = (
                 InventoryTransaction.objects.filter(product=OuterRef('pk'))
                 .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
                 .values('product').annotate(t=Sum('qty')).values('t')
             )
-            sales_subq = (
+
+            reserved_subq = (
                 SalesOrderLine.objects.filter(
                     product=OuterRef('pk'),
-                    order__order_date__gte=since_3m,
+                    order__affects_stock=True,
+                ).exclude(
+                    order__status__in=['shipped', 'delivered', 'cancelled']
                 ).values('product').annotate(t=Sum('qty')).values('t')
             )
+
+            sales_qs = SalesOrderLine.objects.filter(
+                product=OuterRef('pk'),
+                order__order_date__gte=since,
+                order__affects_stock=True,
+            )
+            if source_slug and source_slug != 'all':
+                sales_qs = sales_qs.filter(order__source__slug=source_slug)
+            sales_subq = sales_qs.values('product').annotate(t=Sum('qty')).values('t')
+
             return (
                 super().get_queryset(request).filter(is_active=True)
                 .annotate(
                     _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
-                    _sales_3m=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
+                    _reserved_total=Coalesce(Subquery(reserved_subq), Value(Decimal('0'))),
+                    _sales_period=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
                 )
             )
         except Exception:
@@ -480,12 +557,14 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
     def _get_reorder_cached(self, obj):
         if not hasattr(obj, '_reorder_cache'):
-            s = getattr(obj, '_stock_total', None)
-            s3m = getattr(obj, '_sales_3m', None)
+            s      = getattr(obj, '_stock_total', None)
+            s_per  = getattr(obj, '_sales_period', None)
+            days   = getattr(self, '_analysis_days', 90)
             obj._reorder_cache = _reorder(
                 obj,
                 stock=float(s) if s is not None else None,
-                sales_3m_total=float(s3m) if s3m is not None else None,
+                sales_period_total=float(s_per) if s_per is not None else None,
+                period_days=days,
             )
         return obj._reorder_cache
 
@@ -499,13 +578,42 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     stock_col.short_description = _("На складі")
     stock_col.admin_order_field = '_stock_total'
 
+    def reserved_col(self, obj):
+        r = float(getattr(obj, '_reserved_total', None) or 0)
+        if r <= 0:
+            return format_html('<span style="opacity:.4">—</span>')
+        return format_html('<span style="color:#9c27b0;font-weight:700">📌 {}</span>', int(r))
+    reserved_col.short_description = _("Резерв")
+    reserved_col.admin_order_field = '_reserved_total'
+
+    def available_col(self, obj):
+        s = float(getattr(obj, '_stock_total', None) or 0)
+        r = float(getattr(obj, '_reserved_total', None) or 0)
+        avail = s - r
+        if avail <= 0:
+            return format_html('<b style="color:#f44336">{}</b>', int(avail))
+        elif avail < 5:
+            return format_html('<span style="color:#ff9800">{}</span>', int(avail))
+        return format_html('<span style="color:#4caf50">{}</span>', int(avail))
+    available_col.short_description = _("Доступно")
+
+    def history_toggle_btn(self, obj):
+        return format_html(
+            '<button type="button" class="mv-hist-btn" data-pk="{}" '
+            'style="background:transparent;border:1px solid var(--border-strong);'
+            'border-radius:4px;padding:2px 8px;cursor:pointer;font-size:12px;'
+            'color:var(--text-muted)" title="Показати/сховати рух товару">📋</button>',
+            obj.pk
+        )
+    history_toggle_btn.short_description = _("Рух")
+
     def monthly_col(self, obj):
         d = self._get_reorder_cached(obj)
         if not d['monthly']:
             return format_html('<span style="opacity:.4">—</span>')
         return format_html('{}/міс', d['monthly'])
     monthly_col.short_description = _("Прод./міс")
-    monthly_col.admin_order_field = '_sales_3m'
+    monthly_col.admin_order_field = '_sales_period'
 
     def months_left_col(self, obj):
         d = self._get_reorder_cached(obj)
@@ -546,7 +654,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     status_col.short_description = _("Статус")
 
     def po_btn(self, obj):
-        d = _reorder(obj)
+        d = self._get_reorder_cached(obj)
         if not d['reorder_qty']:
             return "—"
         url = f"/admin/inventory/purchaseorder/add/?product={obj.pk}&qty={d['reorder_qty']}"
@@ -555,14 +663,6 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'border-radius:6px;text-decoration:none;font-size:11px;white-space:nowrap">'
             '+ PO</a>', url)
     po_btn.short_description = _("Дія")
-
-    def changelist_view(self, request, extra_context=None):
-        cart_url = reverse('admin:inventory_reorderproxy_cart')
-        cart_count = PurchaseOrderLine.objects.filter(purchase_order__status='draft').count()
-        extra = extra_context or {}
-        extra['cart_url'] = cart_url
-        extra['cart_count'] = cart_count
-        return super().changelist_view(request, extra)
 
     def bulk_create_po(self, request, queryset):
         """Масово додати всі відібрані товари до одного draft PO."""
@@ -1319,54 +1419,120 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         }),
     )
 
-    def bulk_sync_digikey_attrs(self, request, queryset):
-        """Pull tech_attributes from DigiKey API for selected products."""
+    DK_SYNC_TASK = 'product_dk_attr_sync'
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        return [
+            path('dk-sync-status/', self.admin_site.admin_view(self._dk_sync_status_view),
+                 name='inventory_product_dk_sync_status'),
+            path('dk-sync-cancel/', self.admin_site.admin_view(self._dk_sync_cancel_view),
+                 name='inventory_product_dk_sync_cancel'),
+        ] + urls
+
+    def _dk_sync_status_view(self, request):
+        import json as _json
+        from django.http import JsonResponse
         try:
-            from bots.models import DigiKeyListing
+            from bots.models import BotTask
+            t = BotTask.objects.get(name=self.DK_SYNC_TASK)
+            try:
+                prog = _json.loads(t.progress) if t.progress else {}
+            except Exception:
+                prog = {'text': t.progress}
+            return JsonResponse({
+                'status':   t.status,
+                'progress': prog,
+                'message':  t.message or '',
+                'started':  t.started_at.strftime('%H:%M:%S') if t.started_at else '',
+                'finished': t.finished_at.strftime('%H:%M:%S') if t.finished_at else '',
+            })
+        except Exception:
+            return JsonResponse({'status': 'idle', 'progress': {}, 'message': '', 'started': '', 'finished': ''})
+
+    def _dk_sync_cancel_view(self, request):
+        from django.http import JsonResponse
+        try:
+            from bots.models import BotTask
+            updated = BotTask.objects.filter(
+                name=self.DK_SYNC_TASK, status=BotTask.RUNNING
+            ).update(cancel_requested=True)
+            return JsonResponse({'ok': bool(updated)})
+        except Exception:
+            return JsonResponse({'ok': False})
+
+    def bulk_sync_digikey_attrs(self, request, queryset):
+        """Pull tech_attributes from DigiKey API in a background thread (non-blocking)."""
+        import threading, json as _json
+        try:
+            from bots.models import BotTask, DigiKeyListing
             from bots.services.dk_marketplace import pull_product_fields, DKMarketplaceError
         except ImportError:
             self.message_user(request, "❌ Модуль bots недоступний.", messages.ERROR)
             return
 
+        if BotTask.objects.filter(name=self.DK_SYNC_TASK, status=BotTask.RUNNING).exists():
+            self.message_user(request, "⚠️ Синхронізація вже виконується у фоні.", messages.WARNING)
+            return
+
         product_pks = list(queryset.values_list('pk', flat=True))
-        listing_map = {
-            l.product_id: l
-            for l in DigiKeyListing.objects.filter(product_id__in=product_pks).select_related('product')
-        }
+        total = len(product_pks)
+        task = BotTask.start(self.DK_SYNC_TASK)
+        task.set_progress(_json.dumps({'done': 0, 'total': total, 'sku': '', 'err': 0}))
 
-        synced, no_listing, not_found, errors = [], [], [], []
-
-        for product in queryset:
-            listing = listing_map.get(product.pk)
-            if not listing:
-                no_listing.append(product.sku)
-                continue
+        def _run():
+            done = err = 0
             try:
-                pull_product_fields(listing)
-                attrs = dict(listing.dk_attributes or {})
-                if not attrs:
-                    not_found.append(product.sku)
-                    continue
-                product.tech_attributes = attrs
-                product.save(update_fields=['tech_attributes'])
-                synced.append(product.sku)
-            except DKMarketplaceError as e:
-                not_found.append(product.sku)
-            except Exception as e:
-                errors.append(f"{product.sku}: {e}")
+                listing_map = {
+                    l.product_id: l
+                    for l in DigiKeyListing.objects.filter(product_id__in=product_pks).select_related('product')
+                }
+                for pk in product_pks:
+                    if task.is_cancelled():
+                        raise InterruptedError(f"⛔ Скасовано після {done}/{total}")
+                    try:
+                        product = Product.objects.get(pk=pk)
+                        sku = product.sku
+                        task.set_progress(_json.dumps({'done': done, 'total': total, 'sku': sku, 'err': err}))
+                        listing = listing_map.get(pk)
+                        if not listing:
+                            err += 1
+                        else:
+                            pull_product_fields(listing)
+                            attrs = dict(listing.dk_attributes or {})
+                            if attrs:
+                                product.tech_attributes = attrs
+                                product.save(update_fields=['tech_attributes'])
+                                done += 1
+                            else:
+                                err += 1
+                    except InterruptedError:
+                        raise
+                    except Exception:
+                        err += 1
+                    task.set_progress(_json.dumps({'done': done, 'total': total, 'sku': '', 'err': err}))
+                msg = f"✅ Готово: {done}/{total} оновлено"
+                if err:
+                    msg += f", ⚠️ {err} пропущено/помилок"
+                task.finish(msg)
+            except InterruptedError as e:
+                task.finish(str(e))
+            except Exception as exc:
+                task.finish(f"❌ {exc}", error=True)
+            finally:
+                from django.db import connection as _conn
+                _conn.close()
 
-        parts = []
-        if synced:
-            parts.append(f"✅ Синхронізовано {len(synced)}: {', '.join(synced)}")
-        if no_listing:
-            parts.append(f"⚠️ Немає DK лістингу ({len(no_listing)}): {', '.join(no_listing)}")
-        if not_found:
-            parts.append(f"❌ Не знайдено на DigiKey ({len(not_found)}): {', '.join(not_found)}")
-        if errors:
-            parts.append(f"❌ Помилки: {'; '.join(errors)}")
-
-        lvl = messages.SUCCESS if synced else (messages.WARNING if no_listing or not_found else messages.ERROR)
-        self.message_user(request, " | ".join(parts) or "Нічого не оброблено.", lvl)
+        threading.Thread(target=_run, daemon=True).start()
+        self.message_user(
+            request,
+            mark_safe(
+                f'⏳ Синхронізація {total} товарів запущена у фоні. '
+                f'Прогрес відображається у верхній панелі сторінки.'
+            ),
+            messages.INFO,
+        )
 
     bulk_sync_digikey_attrs.short_description = "🔄 Синх технічних атрибутів з DigiKey"
 
@@ -1449,7 +1615,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             self._cached_labels = {f.stem.upper() for f in labels_dir.glob('*.dymo')}
         except Exception:
             self._cached_labels = set()
-        return super().changelist_view(request, extra_context)
+        extra = extra_context or {}
+        extra['dk_sync_status_url'] = reverse('admin:inventory_product_dk_sync_status')
+        extra['dk_sync_cancel_url'] = reverse('admin:inventory_product_dk_sync_cancel')
+        return super().changelist_view(request, extra)
 
     # ── Computed columns ──────────────────────────────────────────────────────
 

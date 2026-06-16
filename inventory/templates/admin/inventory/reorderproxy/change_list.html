@@ -12,3 +12,68 @@
   </li>
   {{ block.super }}
 {% endblock %}
+
+{% block content %}
+{{ block.super }}
+<style>
+  .mv-hist-row { background: var(--bg-card, #1a2535) !important; }
+  .mv-hist-row td { padding: 0 !important; }
+  .mv-hist-inner { padding: 8px 16px 16px 48px; }
+  .mv-hist-btn.active { background: var(--bg-hover, #1e2d40) !important; color: var(--accent, #58a6ff) !important; }
+  #mv-period-bar { display:flex; align-items:center; gap:8px; padding:6px 0 2px;
+                   font-size:12px; color:var(--text-muted); }
+  #mv-period-bar strong { color:var(--text); }
+</style>
+
+<script>
+(function(){
+  const HIST_URL = '/admin/inventory/reorderproxy/supply/history/';
+  const cache = {};
+
+  function toggleHistory(btn) {
+    const pk = btn.dataset.pk;
+    const tr = btn.closest('tr');
+    const existingRow = document.getElementById('mv-hist-' + pk);
+
+    if (existingRow) {
+      existingRow.remove();
+      btn.classList.remove('active');
+      return;
+    }
+
+    btn.classList.add('active');
+    btn.textContent = '⏳';
+
+    const fetchOrCache = cache[pk]
+      ? Promise.resolve(cache[pk])
+      : fetch(HIST_URL + pk + '/').then(r => r.text()).then(html => { cache[pk] = html; return html; });
+
+    fetchOrCache.then(html => {
+      const cols = tr.querySelectorAll('td,th').length || 12;
+      const histRow = document.createElement('tr');
+      histRow.id = 'mv-hist-' + pk;
+      histRow.className = 'mv-hist-row';
+      histRow.innerHTML = '<td colspan="' + cols + '"><div class="mv-hist-inner">' + html + '</div></td>';
+      tr.after(histRow);
+      btn.textContent = '📋';
+    }).catch(() => {
+      btn.textContent = '📋';
+      btn.classList.remove('active');
+    });
+  }
+
+  document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.mv-hist-btn');
+    if (btn) { e.preventDefault(); toggleHistory(btn); }
+  });
+
+  // Period info bar
+  const days = {{ analysis_days|default:90 }};
+  const bar = document.createElement('p');
+  bar.id = 'mv-period-bar';
+  bar.innerHTML = '📅 {% trans "Аналіз продажів за" %}: <strong>' + days + ' {% trans "днів" %}</strong>';
+  const resultList = document.getElementById('result_list');
+  if (resultList) resultList.before(bar);
+})();
+</script>
+{% endblock %}
