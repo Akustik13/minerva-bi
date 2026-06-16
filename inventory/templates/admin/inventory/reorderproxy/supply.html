@@ -346,12 +346,21 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           {% endif %}
         </td>
         <!-- Incoming -->
-        <td style="text-align:right">
+        <td style="text-align:right;white-space:nowrap">
           {% if row.ordered_incoming > 0 %}
-            <span class="sv-num" style="color:#66bb6a" title="{% trans 'Вже замовлено' %}">+{{ row.ordered_incoming|floatformat:"0" }}</span>
+            <span title="{% trans 'Вже замовлено' %}"
+                  style="display:inline-flex;align-items:center;gap:3px;
+                         color:#66bb6a;font-weight:700;font-size:13px">
+              📦 {{ row.ordered_incoming|floatformat:"0" }}
+            </span>
           {% endif %}
           {% if row.draft_incoming > 0 %}
-            <span class="sv-num" style="color:var(--text-dim)" title="{% trans 'У кошику, але ще не замовлено' %}">+{{ row.draft_incoming|floatformat:"0" }}</span>
+            {% if row.ordered_incoming > 0 %}<br>{% endif %}
+            <span title="{% trans 'У кошику, але ще не замовлено' %}"
+                  style="display:inline-flex;align-items:center;gap:3px;
+                         color:var(--text-dim);font-weight:700;font-size:13px">
+              🛒 {{ row.draft_incoming|floatformat:"0" }}
+            </span>
           {% endif %}
           {% if row.ordered_incoming == 0 and row.draft_incoming == 0 %}
             <span class="sv-dim">—</span>
