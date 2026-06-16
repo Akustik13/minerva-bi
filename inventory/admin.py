@@ -1010,10 +1010,42 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         from .models import ProductCategory
         cat_map = {c.slug: c.name for c in ProductCategory.objects.all()}
 
+        # Pre-fetch all RFQ templates once for template-matching per PO
+        all_rfq_templates = list(
+            RFQEmailTemplate.objects.select_related('category').order_by('pk')
+        )
+        _cat_slug_tmpl = {t.category.slug: t for t in all_rfq_templates if t.category_id}
+        _cable_tmpl = next((t for t in all_rfq_templates if t.use_cable_columns), None)
+        _default_tmpl = next((t for t in all_rfq_templates if not t.category_id), None)
+
+        def _match_template(po_lines):
+            cat_slugs_set = set()
+            has_cable = False
+            for ln in po_lines:
+                if not ln.product_id:
+                    continue
+                cat = (ln.product.category or '').strip()
+                if cat:
+                    cat_slugs_set.add(cat)
+                if self._CABLE_SKU_RE.match(ln.product.sku or ''):
+                    has_cable = True
+            for slug in cat_slugs_set:
+                if slug in _cat_slug_tmpl:
+                    return _cat_slug_tmpl[slug]
+            if has_cable and _cable_tmpl:
+                return _cable_tmpl
+            return _default_tmpl
+
         # Flat list of all lines across all draft POs for the unified table
+        po_template_map = {}  # po.pk → template name or None
         all_lines = []
         for po in draft_pos:
-            for line in po.lines.all():
+            po_lines = list(po.lines.all())
+            matched = _match_template(po_lines)
+            tmpl_name = matched.name if matched else None
+            po_template_map[po.pk] = tmpl_name
+            po._rfq_tmpl_name = tmpl_name  # annotate for template access
+            for line in po_lines:
                 if not line.product_id:
                     continue
                 cat_slug = line.product.category or 'other'
@@ -1042,6 +1074,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'cart_action_url': reverse('admin:inventory_reorderproxy_cart_action'),
             'cart_email_url': reverse('admin:inventory_reorderproxy_cart_email'),
             'analysis_url': reverse('admin:inventory_reorderproxy_changelist'),
+            'po_template_map': po_template_map,
         }
         return render(request, 'admin/inventory/reorderproxy/cart.html', context)
 
@@ -1218,6 +1251,38 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         lines.append(sep)
         return '\n'.join(lines)
 
+    @staticmethod
+    def _make_html_table(header, rows):
+        """Return a styled HTML table suitable for email."""
+        if not rows:
+            return ''
+        cell_style = (
+            'border:1px solid #bdc3c7;padding:6px 10px;'
+            'font-family:Arial,sans-serif;font-size:13px;'
+            'white-space:nowrap;color:#222'
+        )
+        th_style = (
+            'border:1px solid #bdc3c7;padding:6px 10px;'
+            'font-family:Arial,sans-serif;font-size:13px;'
+            'background:#2d6fa6;color:#fff;font-weight:600;'
+            'white-space:nowrap'
+        )
+        ths = ''.join(f'<th style="{th_style}">{h}</th>' for h in header)
+        trs = ''
+        for i, row in enumerate(rows):
+            bg = '#f0f4f8' if i % 2 == 0 else '#ffffff'
+            tds = ''.join(
+                f'<td style="{cell_style};background:{bg}">{c}</td>'
+                for c in row
+            )
+            trs += f'<tr>{tds}</tr>'
+        return (
+            f'<table style="border-collapse:collapse;margin:8px 0">'
+            f'<thead><tr>{ths}</tr></thead>'
+            f'<tbody>{trs}</tbody>'
+            f'</table>'
+        )
+
     def cart_email_view(self, request):
         """GET/POST: generate RFQ email text for a draft PO."""
         from django.http import JsonResponse
@@ -1300,6 +1365,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 other_lines.append(line)
 
         parts = []
+        html_parts = []  # parallel HTML table parts for rich email
 
         # ── Cable table ───────────────────────────────────────────────────────
         if cable_lines:
@@ -1319,8 +1385,10 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                     str(int(line.qty_ordered)),
                 ])
             parts.append(self._make_table(cable_header, cable_rows))
+            html_parts.append(self._make_html_table(cable_header, cable_rows))
             if footer_note:
                 parts.append(footer_note)
+                html_parts.append(f'<p style="font-family:Arial,sans-serif;font-size:13px;color:#444">{footer_note}</p>')
 
         # ── Non-cable table ───────────────────────────────────────────────────
         if other_lines:
@@ -1360,8 +1428,10 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 cols.append(str(int(line.qty_ordered)))
                 rows.append(cols)
             parts.append(self._make_table(header, rows))
+            html_parts.append(self._make_html_table(header, rows))
 
         table_block = '\n\n'.join(parts) if parts else '(no items)'
+        html_table_block = ''.join(html_parts)  # ready-made HTML tables for send view
 
         body = (
             f"{greeting}\n\n"
@@ -1407,6 +1477,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'signature': signature_text,
             'image_b64': image_b64,
             'diagram_in_body': diagram_in_body,
+            'html_table': html_table_block,
         })
 
     def cart_send_email_view(self, request):
@@ -1426,6 +1497,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         signature_text  = (data.get('signature') or '').strip()
         image_b64       = (data.get('image_b64') or '').strip()
         diagram_in_body = bool(data.get('diagram_in_body', True))
+        html_table      = (data.get('html_table') or '').strip()
 
         if not to_addr:
             return JsonResponse({'ok': False, 'error': 'Не вказано адресу отримувача'})
@@ -1465,8 +1537,29 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                     f'</div>'
                 )
 
-            # Split body: everything before the signature line
-            if signature_text and body_text.endswith(signature_text):
+            # Build HTML body: if we have an HTML table, replace the ASCII table block
+            # with proper HTML, keeping greeting/intro/signature as <pre> blocks
+            if html_table and signature_text and body_text.endswith(signature_text):
+                body_pre = body_text[: -len(signature_text)].rstrip('\n')
+                # Split off greeting+intro (everything before the first '+---') from body_pre
+                table_sep = '+'
+                table_start = body_pre.find('\n' + table_sep)
+                if table_start != -1:
+                    pre_part = body_pre[:table_start].strip()
+                    html_body = (
+                        f'<pre style="{pre_style}">{pre_part}</pre>'
+                        + html_table
+                        + img_html
+                        + f'<pre style="{pre_style}">{signature_text}</pre>'
+                    )
+                else:
+                    html_body = (
+                        f'<pre style="{pre_style}">{body_pre}</pre>'
+                        + html_table
+                        + img_html
+                        + f'<pre style="{pre_style}">{signature_text}</pre>'
+                    )
+            elif signature_text and body_text.endswith(signature_text):
                 body_pre = body_text[: -len(signature_text)].rstrip('\n')
                 html_body = (
                     f'<pre style="{pre_style}">{body_pre}</pre>'
@@ -1474,7 +1567,6 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                     + f'<pre style="{pre_style}">{signature_text}</pre>'
                 )
             else:
-                # Fallback: image after full body
                 html_body = f'<pre style="{pre_style}">{body_text}</pre>' + img_html
 
             msg = EmailMultiAlternatives(

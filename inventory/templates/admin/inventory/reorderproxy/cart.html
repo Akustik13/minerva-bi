@@ -277,6 +277,9 @@
       <div class="ct-po-sum-head">
         <span class="po-label">{{ po.code }}</span>
         <span class="po-count">{{ po.lines.count }} {% trans "позицій" %}</span>
+        {% if po._rfq_tmpl_name %}
+        <span style="font-size:10px;padding:2px 7px;border-radius:10px;background:var(--bg-hover);color:var(--text-dim);border:1px solid var(--border-strong);white-space:nowrap" title="{% trans "Шаблон листа" %}">📧 {{ po._rfq_tmpl_name }}</span>
+        {% endif %}
 
         <!-- Supplier selector -->
         <form method="post" action="{{ cart_action_url }}" style="display:inline-flex;gap:6px;align-items:center">
@@ -557,6 +560,7 @@ function ctToggleEmail(poPk) {
             imgEl.src = d.image_b64;
             imgEl.dataset.diagramInBody = d.diagram_in_body ? '1' : '0';
             imgEl.dataset.signature = d.signature || '';
+            imgEl.dataset.htmlTable = d.html_table || '';
             imgWrap.style.display = 'block';
           }
         } else { bodyEl.value = '❌ ' + (d.error || '?'); }
@@ -581,6 +585,7 @@ function ctSendEmail(poPk) {
   const image_b64      = (imgEl && imgEl.src && imgEl.src.startsWith('data:')) ? imgEl.src : '';
   const diagram_in_body = imgEl ? imgEl.dataset.diagramInBody !== '0' : true;
   const signature       = imgEl ? (imgEl.dataset.signature || '') : '';
+  const html_table      = imgEl ? (imgEl.dataset.htmlTable || '') : '';
   const btn     = document.getElementById('ct-send-btn-' + poPk);
   const status  = document.getElementById('ct-send-status-' + poPk);
   if (!to)   { if (status) status.innerHTML = '<span style="color:#ef5350">❌ Вкажіть адресу отримувача</span>'; return; }
@@ -595,7 +600,7 @@ function ctSendEmail(poPk) {
       'Content-Type': 'application/json',
       'X-CSRFToken': csrf ? csrf[1] : '',
     },
-    body: JSON.stringify({ to, subject: subj, body, signature, image_b64, diagram_in_body }),
+    body: JSON.stringify({ to, subject: subj, body, signature, image_b64, diagram_in_body, html_table }),
   })
   .then(r => r.json())
   .then(d => {
