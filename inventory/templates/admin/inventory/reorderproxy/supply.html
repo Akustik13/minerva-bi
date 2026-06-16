@@ -230,14 +230,16 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
     <div class="sv-chip" id="chip-inc">{% trans "З приходом:" %} <span id="cnt-inc">0</span></div>
   </div>
 
-  <!-- Filters -->
-  <div class="sv-filters">
+  <!-- Status filters -->
+  <div class="sv-filters" id="sv-status-filters">
     <button class="sv-filter-btn active" onclick="svFilter('all', this)">📋 {% trans "Всі" %}</button>
     <button class="sv-filter-btn" onclick="svFilter('empty', this)">🚫 {% trans "Відсутні" %}</button>
     <button class="sv-filter-btn" onclick="svFilter('critical', this)">⚠️ {% trans "Критичні" %}</button>
     <button class="sv-filter-btn" onclick="svFilter('reserved', this)">📋 {% trans "В резерві" %}</button>
     <button class="sv-filter-btn" onclick="svFilter('incoming', this)">📦 {% trans "Очікується" %}</button>
   </div>
+  <!-- Category filters (built by JS) -->
+  <div class="sv-filters" id="sv-cat-filters" style="margin-top:4px"></div>
 
   <!-- Search -->
   <div class="sv-search-wrap">
@@ -587,21 +589,56 @@ var _svi = {
   /* ── Filter ── */
   var st = loadState();
   var activeFilter = st.filter || 'all';
-  var activeSearch = st.search || '';
-  var sortCol      = st.sortCol || 'lastdate';
-  var sortDir      = st.sortDir !== undefined ? st.sortDir : -1;
+  var activeSearch   = st.search   || '';
+  var activeCategory = st.cat      || '';
+  var sortCol        = st.sortCol  || 'lastdate';
+  var sortDir        = st.sortDir !== undefined ? st.sortDir : -1;
 
   window.svFilter = function(f, btn) {
     activeFilter = f;
-    document.querySelectorAll('.sv-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    document.querySelectorAll('#sv-status-filters .sv-filter-btn').forEach(function(b) { b.classList.remove('active'); });
     btn.classList.add('active');
-    saveState({filter: activeFilter, search: activeSearch, sortCol: sortCol, sortDir: sortDir});
+    saveState({filter: activeFilter, search: activeSearch, cat: activeCategory, sortCol: sortCol, sortDir: sortDir});
     applyVisibility();
   };
 
+  window.svCatFilter = function(cat, btn) {
+    activeCategory = cat;
+    document.querySelectorAll('#sv-cat-filters .sv-filter-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    saveState({filter: activeFilter, search: activeSearch, cat: activeCategory, sortCol: sortCol, sortDir: sortDir});
+    applyVisibility();
+  };
+
+  /* Build category buttons from data-cat attributes */
+  (function buildCatFilters() {
+    var catSet = {};
+    rows.forEach(function(r) {
+      var c = (r.dataset.cat || '').trim();
+      if (c) catSet[c] = true;
+    });
+    var cats = Object.keys(catSet).sort();
+    var wrap = document.getElementById('sv-cat-filters');
+    if (!wrap || !cats.length) return;
+
+    var allBtn = document.createElement('button');
+    allBtn.className = 'sv-filter-btn' + (activeCategory === '' ? ' active' : '');
+    allBtn.textContent = '🗂 {% trans "Всі категорії" %}';
+    allBtn.onclick = function() { svCatFilter('', allBtn); };
+    wrap.appendChild(allBtn);
+
+    cats.forEach(function(cat) {
+      var btn = document.createElement('button');
+      btn.className = 'sv-filter-btn' + (activeCategory === cat ? ' active' : '');
+      btn.textContent = cat;
+      btn.onclick = function() { svCatFilter(cat, btn); };
+      wrap.appendChild(btn);
+    });
+  })();
+
   window.svSearch = function(q) {
     activeSearch = q.toLowerCase().trim();
-    saveState({filter: activeFilter, search: activeSearch, sortCol: sortCol, sortDir: sortDir});
+    saveState({filter: activeFilter, search: activeSearch, cat: activeCategory, sortCol: sortCol, sortDir: sortDir});
     applyVisibility();
   };
 
@@ -615,13 +652,14 @@ var _svi = {
     else if (activeFilter === 'critical') filterOk = stock <= reorder && reorder > 0;
     else if (activeFilter === 'reserved') filterOk = reserved > 0;
     else if (activeFilter === 'incoming') filterOk = incoming > 0;
+    var catOk = !activeCategory || (r.dataset.cat || '') === activeCategory;
     var searchOk = true;
     if (activeSearch) {
       searchOk = (r.dataset.sku || '').indexOf(activeSearch) !== -1 ||
                  (r.dataset.name || '').indexOf(activeSearch) !== -1 ||
                  (r.dataset.cat || '').indexOf(activeSearch) !== -1;
     }
-    return filterOk && searchOk;
+    return filterOk && catOk && searchOk;
   }
 
   function applyVisibility() {
