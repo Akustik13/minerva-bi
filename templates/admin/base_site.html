@@ -562,9 +562,12 @@
 }
 #branding   { grid-column: 1; min-width: 0; }
 #user-tools {
-  grid-column: 3; min-width: 0; white-space: nowrap;
-  display: flex !important; align-items: center !important; gap: 4px;
+  grid-column: 3; min-width: 0;
+  display: flex !important; align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 4px; white-space: nowrap; flex-wrap: nowrap;
 }
+#user-tools * { white-space: nowrap; flex-shrink: 0; }
 
 #minerva-motto {
   grid-column: 2;
