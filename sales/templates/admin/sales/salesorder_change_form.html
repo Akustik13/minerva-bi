@@ -807,7 +807,7 @@ window.mvApplyPackaging = function(sourceBtn, auto) {
   try { recs = JSON.parse(sourceBtn.dataset.packRecs); } catch(e) { return; }
   if (!recs || !recs.length) return;
 
-  var prefix = 'orderpackaging_set';
+  var prefix = 'packaging_used';
   var totalEl = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
   var initEl  = document.getElementById('id_' + prefix + '-INITIAL_FORMS');
   if (!totalEl || !initEl) {
@@ -857,7 +857,7 @@ window.mvApplyPackaging = function(sourceBtn, auto) {
 };
 
 function _showPackAutoNotice() {
-  var group = document.getElementById('orderpackaging_set-group');
+  var group = document.getElementById('packaging_used-group');
   if (!group || document.getElementById('mv-pack-auto-notice')) return;
   var notice = document.createElement('div');
   notice.id = 'mv-pack-auto-notice';
@@ -879,7 +879,7 @@ document.addEventListener('DOMContentLoaded', function() {
   var panelBtn = document.getElementById('mv-pack-apply-btn');
   if (!panelBtn) return;  /* No recommendation — nothing to inject */
 
-  var addRowTd = document.querySelector('#orderpackaging_set-group .add-row td');
+  var addRowTd = document.querySelector('#packaging_used-group .add-row td');
   if (addRowTd) {
     var inlineBtn = document.createElement('button');
     inlineBtn.type = 'button';
@@ -895,7 +895,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   /* Auto-apply if no existing packaging records */
-  var initEl = document.getElementById('id_orderpackaging_set-INITIAL_FORMS');
+  var initEl = document.getElementById('id_packaging_used-INITIAL_FORMS');
   var initForms = initEl ? (parseInt(initEl.value) || 0) : 0;
   if (initForms === 0) {
     setTimeout(function() { mvApplyPackaging(panelBtn, true); }, 400);
@@ -922,7 +922,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function _packagingOk() {
     /* Returns true if packaging is confirmed or no recommendation exists */
-    var totalEl = document.getElementById('id_orderpackaging_set-TOTAL_FORMS');
+    var totalEl = document.getElementById('id_packaging_used-TOTAL_FORMS');
     if (!totalEl) return true;  /* Inline not present — pass */
     var total = parseInt(totalEl.value) || 0;
     if (total > 0) return true; /* Has rows (saved or just added) */
