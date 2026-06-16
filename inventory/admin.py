@@ -497,6 +497,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             return format_html('<b style="color:#ff9800">⚠️ {}</b>', int(s))
         return format_html('<b style="color:#4caf50">{}</b>', int(s))
     stock_col.short_description = _("На складі")
+    stock_col.admin_order_field = '_stock_total'
 
     def monthly_col(self, obj):
         d = self._get_reorder_cached(obj)
@@ -504,6 +505,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             return format_html('<span style="opacity:.4">—</span>')
         return format_html('{}/міс', d['monthly'])
     monthly_col.short_description = _("Прод./міс")
+    monthly_col.admin_order_field = '_sales_3m'
 
     def months_left_col(self, obj):
         d = self._get_reorder_cached(obj)
