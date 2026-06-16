@@ -2337,8 +2337,57 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             path('<int:pk>/digikey-messages/new-topic/',
                  self.admin_site.admin_view(self.digikey_messages_new_topic_view),
                  name='sales_salesorder_digikey_messages_new_topic'),
+            # AJAX: stock availability check (returns JSON per line)
+            path('<int:pk>/stock-avail/',
+                 self.admin_site.admin_view(self.stock_avail_view),
+                 name='sales_salesorder_stock_avail'),
         ]
         return custom_urls + urls
+
+    def stock_avail_view(self, request, pk):
+        """AJAX GET: returns stock availability per line for an order."""
+        from django.http import JsonResponse
+        from inventory.models import InventoryTransaction, Product as _Product
+        order = get_object_or_404(SalesOrder, pk=pk)
+        lines = list(order.lines.select_related('product').all())
+        if not lines:
+            return JsonResponse({'ok': True, 'lines': [], 'ok_count': 0, 'bad_count': 0})
+
+        result = []
+        ok_count = bad_count = 0
+        for line in lines:
+            if not line.product_id:
+                bad_count += 1
+                result.append({
+                    'sku': line.sku_raw or '?', 'name': '—', 'product_pk': None,
+                    'needed': float(line.qty or 0), 'stock': 0,
+                    'status': 'missing',
+                })
+                continue
+            p = line.product
+            agg = InventoryTransaction.objects.filter(
+                product=p).exclude(
+                tx_type=InventoryTransaction.TxType.RESERVED
+            ).aggregate(total=Sum('qty'))
+            stock = float(agg['total'] or 0)
+            needed = float(line.qty or 0)
+            if stock >= needed:
+                status = 'ok'
+                ok_count += 1
+            elif stock > 0:
+                status = 'low'
+                bad_count += 1
+            else:
+                status = 'empty'
+                bad_count += 1
+            result.append({
+                'sku': p.sku, 'name': p.name, 'product_pk': p.pk,
+                'needed': int(needed), 'stock': int(stock),
+                'status': status,
+                'short': max(0, int(needed - stock)),
+            })
+        return JsonResponse({'ok': True, 'lines': result,
+                             'ok_count': ok_count, 'bad_count': bad_count})
 
     def flag_order_view(self, request, pk):
         from django.http import JsonResponse

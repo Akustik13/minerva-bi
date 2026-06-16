@@ -464,19 +464,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
         🚚 {% trans "Відправлення" %}
       </a>
-      {# Склад chip — shows actual stock count per product #}
+      {# Склад chip — clickable, loads stock availability via AJAX #}
       {% if order.affects_stock %}
-        <span class="sv-stock-chip" data-order-id="{{ order.pk }}"
-              style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                     background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32;
-                     cursor:default;white-space:nowrap">
-          <span class="sv-stock-txt">✅ {% trans "Склад" %}</span>
-        </span>
-      {% else %}
-        <span style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                     background:rgba(198,40,40,.12);color:#ef5350;border:1px solid #c62828">
-          ❌ {% trans "Немає" %}
-        </span>
+        <button type="button"
+                class="sv-stock-chip"
+                data-order-pk="{{ order.pk }}"
+                onclick="event.stopPropagation();svStockChipClick(this)"
+                style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
+                       background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32;
+                       cursor:pointer;white-space:nowrap;font-family:inherit">
+          ✅ {% trans "Склад" %}
+        </button>
       {% endif %}
       {% endif %}
 
@@ -1301,6 +1299,202 @@ if (!window._cexDelDocDef) {
                           btn.disabled = false; btn.textContent = '🗑️'; });
   };
 }
+</script>
+
+<!-- ── Stock availability popup ── -->
+<div id="sv-stock-pop" style="display:none;position:fixed;z-index:99999;
+     background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#2a3f52);
+     border-radius:10px;padding:0;box-shadow:0 8px 32px rgba(0,0,0,.55);
+     min-width:340px;max-width:520px;overflow:hidden">
+  <div style="display:flex;align-items:center;justify-content:space-between;
+       padding:10px 14px;background:var(--bg-input,#141f2b);
+       border-bottom:1px solid var(--border-strong)">
+    <span style="font-size:12px;font-weight:700;color:var(--text-muted)">📦 {% trans "Залишки на складі" %}</span>
+    <button onclick="svStockPopClose()" type="button"
+            style="background:none;border:none;color:var(--text-dim);
+                   font-size:16px;cursor:pointer;padding:0 4px;line-height:1">✕</button>
+  </div>
+  <div id="sv-stock-pop-body" style="padding:12px 14px">
+    <span style="color:var(--text-dim);font-size:12px">⏳ {% trans "Завантаження..." %}</span>
+  </div>
+</div>
+
+<script>
+(function(){
+  var pop      = document.getElementById('sv-stock-pop');
+  var popBody  = document.getElementById('sv-stock-pop-body');
+  var CART_URL = '/admin/inventory/reorderproxy/cart/add-one/';
+  var _cache   = {};
+
+  function getCsrf() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  window.svStockPopClose = function() {
+    pop.style.display = 'none';
+  };
+
+  document.addEventListener('click', function(e) {
+    if (!pop.contains(e.target) && !e.target.closest('.sv-stock-chip')) {
+      pop.style.display = 'none';
+    }
+  });
+
+  function posPop(btn) {
+    var r = btn.getBoundingClientRect();
+    var pw = 360;
+    var left = r.left + window.scrollX;
+    var top  = r.bottom + window.scrollY + 6;
+    if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+    pop.style.left = left + 'px';
+    pop.style.top  = top + 'px';
+  }
+
+  function renderData(d, btn) {
+    var lines = d.lines || [];
+    var hasBad = d.bad_count > 0;
+    var summaryColor = hasBad ? '#ef5350' : '#4caf50';
+    var summaryIcon  = hasBad ? '⚠️' : '✅';
+    var summaryText  = hasBad
+      ? '{% trans "Є проблеми з наявністю!" %}'
+      : '{% trans "Всі товари є на складі" %}';
+
+    /* Update the chip badge */
+    var total = lines.length;
+    var ok    = d.ok_count;
+    if (hasBad) {
+      btn.style.background = 'rgba(198,40,40,.15)';
+      btn.style.color      = '#ef5350';
+      btn.style.borderColor= '#c62828';
+      btn.textContent = '⚠️ {% trans "Склад" %}: ' + ok + '/' + total;
+    } else {
+      btn.style.background = 'rgba(46,125,50,.15)';
+      btn.style.color      = '#4caf50';
+      btn.style.borderColor= '#2e7d32';
+      btn.textContent = '✅ {% trans "Склад" %}';
+    }
+
+    /* Build popup body */
+    var rows = lines.map(function(l) {
+      var icon, color;
+      if (l.status === 'ok') {
+        icon = '✅'; color = '#4caf50';
+      } else if (l.status === 'low') {
+        icon = '⚠️'; color = '#ff9800';
+      } else {
+        icon = '🚫'; color = '#ef5350';
+      }
+      var stockTxt = l.status === 'ok'
+        ? icon + ' ' + l.stock + ' {% trans "шт." %}'
+        : icon + ' ' + l.stock + ' / {% trans "треба" %} ' + l.needed;
+
+      var cartBtn = '';
+      if (l.product_pk && l.short > 0) {
+        cartBtn = '<button type="button" '
+          + 'data-pk="' + l.product_pk + '" data-qty="' + l.short + '" '
+          + 'onclick="svStockCartAdd(this)" '
+          + 'style="margin-left:6px;padding:2px 8px;background:#1565c0;color:#fff;'
+          + 'border:none;border-radius:4px;font-size:10px;font-weight:600;'
+          + 'cursor:pointer;white-space:nowrap">🛒 +' + l.short + '</button>';
+      }
+
+      return '<tr style="border-bottom:1px solid rgba(128,128,128,.07)">'
+        + '<td style="padding:6px 8px;font-family:monospace;font-size:11px;'
+        +            'color:var(--text);white-space:nowrap">' + escHtml(l.sku) + '</td>'
+        + '<td style="padding:6px 8px;font-size:11px;color:var(--text-muted);'
+        +            'max-width:140px;overflow:hidden;text-overflow:ellipsis;'
+        +            'white-space:nowrap">' + escHtml(l.name) + '</td>'
+        + '<td style="padding:6px 8px;text-align:right;font-size:12px;'
+        +            'font-weight:700;white-space:nowrap">' + l.needed + '</td>'
+        + '<td style="padding:6px 8px;font-size:11px;color:' + color + ';'
+        +            'font-weight:700;white-space:nowrap">' + stockTxt + cartBtn + '</td>'
+        + '</tr>';
+    }).join('');
+
+    var TH = 'padding:5px 8px;font-size:10px;font-weight:700;color:var(--text-dim);'
+           + 'border-bottom:1px solid var(--border-strong);text-align:left';
+
+    popBody.innerHTML =
+      '<div style="font-size:12px;font-weight:700;color:' + summaryColor + ';'
+    +              'margin-bottom:10px;padding:6px 10px;background:' + summaryColor + '18;'
+    +              'border-radius:6px;border-left:3px solid ' + summaryColor + '">'
+    + summaryIcon + ' ' + summaryText + '</div>'
+    + '<div style="overflow-x:auto">'
+    + '<table style="width:100%;border-collapse:collapse">'
+    + '<thead><tr>'
+    + '<th style="' + TH + '">SKU</th>'
+    + '<th style="' + TH + '">{% trans "Назва" %}</th>'
+    + '<th style="' + TH + ';text-align:right">{% trans "Потрібно" %}</th>'
+    + '<th style="' + TH + '">{% trans "Склад" %}</th>'
+    + '</tr></thead>'
+    + '<tbody>' + rows + '</tbody>'
+    + '</table></div>';
+  }
+
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  window.svStockChipClick = function(btn) {
+    var orderPk = btn.dataset.orderPk;
+    if (!orderPk) return;
+
+    posPop(btn);
+    pop.style.display = 'block';
+
+    if (_cache[orderPk]) { renderData(_cache[orderPk], btn); return; }
+
+    popBody.innerHTML = '<span style="color:var(--text-dim);font-size:12px">⏳ {% trans "Завантаження..." %}</span>';
+
+    fetch('/admin/sales/salesorder/' + orderPk + '/stock-avail/', {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        _cache[orderPk] = d;
+        renderData(d, btn);
+      })
+      .catch(function(){
+        popBody.innerHTML = '<span style="color:#ef5350">{% trans "Помилка мережі" %}</span>';
+      });
+  };
+
+  window.svStockCartAdd = function(btn) {
+    var pk  = btn.dataset.pk;
+    var qty = btn.dataset.qty;
+    btn.disabled = true;
+    btn.textContent = '⏳';
+    var fd = new FormData();
+    fd.append('product_pk', pk);
+    fd.append('qty', qty);
+    fetch(CART_URL, {
+      method:'POST', body:fd, credentials:'same-origin',
+      headers:{'X-CSRFToken': getCsrf()},
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        btn.textContent = '✅';
+        btn.style.background = '#2e7d32';
+        /* update cart badge in header */
+        var hBadge = document.getElementById('mv-cart-badge');
+        var hBtn   = document.getElementById('mv-cart-btn');
+        if (hBadge && d.cart_total > 0) {
+          hBadge.textContent = d.cart_total;
+          hBadge.style.display = 'inline-block';
+          if (hBtn) { hBtn.style.borderColor='#2e7d32'; hBtn.style.color='#4caf50'; }
+        }
+      } else {
+        btn.textContent = '❌';
+        btn.disabled = false;
+      }
+    })
+    .catch(function(){
+      btn.textContent = '❌';
+      btn.disabled = false;
+    });
+  };
+})();
 </script>
 
 {% endblock %}
