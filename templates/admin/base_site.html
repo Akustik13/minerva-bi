@@ -562,12 +562,9 @@
 }
 #branding   { grid-column: 1; min-width: 0; }
 #user-tools {
-  grid-column: 3; min-width: 0;
-  display: flex !important; align-items: center !important;
-  justify-content: flex-end !important;
-  gap: 4px; white-space: nowrap; flex-wrap: nowrap;
+  grid-column: 3; min-width: 0; white-space: nowrap;
+  text-align: right;
 }
-#user-tools * { white-space: nowrap; flex-shrink: 0; }
 
 #minerva-motto {
   grid-column: 2;
@@ -1509,55 +1506,27 @@ document.addEventListener('DOMContentLoaded', function(){
 </a>
 {% endblock %}
 
-{% block usertools %}
+{% block userlinks %}
 {{ block.super }}
-<span style="opacity:.3;margin:0 2px">|</span>
-<!-- ── Cart + Lang group ── -->
-<div style="display:inline-flex;align-items:center;gap:4px">
+ |
 <a id="mv-cart-btn" href="/admin/inventory/reorderproxy/cart/"
    title="Кошик замовлень"
    style="display:inline-flex;align-items:center;gap:4px;
-          padding:3px 9px;border-radius:5px;text-decoration:none;flex-shrink:0;
+          padding:2px 8px;border-radius:5px;text-decoration:none;
           background:transparent;border:1px solid var(--border-strong);
           font-size:12px;font-weight:600;color:var(--text-muted);
-          line-height:1;transition:all .15s;white-space:nowrap">
+          line-height:1;transition:all .15s;white-space:nowrap;vertical-align:middle">
   <span style="font-size:13px;line-height:1">🛒</span>
   <span id="mv-cart-badge" style="display:none;background:#2e7d32;color:#fff;
         border-radius:8px;padding:0 5px;font-size:11px;font-weight:800;line-height:16px"></span>
 </a>
-<script>
-(function(){
-  function _updateCartBadge(){
-    fetch('/admin/inventory/reorderproxy/cart/count/',{credentials:'same-origin'})
-      .then(function(r){return r.json();})
-      .then(function(d){
-        var badge = document.getElementById('mv-cart-badge');
-        var btn   = document.getElementById('mv-cart-btn');
-        if(!badge||!btn) return;
-        if(d.count > 0){
-          badge.textContent = d.count;
-          badge.style.display = 'inline-block';
-          btn.style.borderColor = '#2e7d32';
-          btn.style.color = '#4caf50';
-          btn.style.background = 'rgba(46,125,50,.12)';
-        } else {
-          badge.style.display = 'none';
-          btn.style.borderColor = '';
-          btn.style.color = '';
-          btn.style.background = '';
-        }
-      }).catch(function(){});
-  }
-  document.addEventListener('DOMContentLoaded', _updateCartBadge);
-})();
-</script>
-<div id="mv-lang-sw" style="position:relative;display:inline-flex;align-items:center">
+<div id="mv-lang-sw" style="position:relative;display:inline-flex;align-items:center;vertical-align:middle">
   <button type="button" onclick="mvToggleLang(event)"
-    style="padding:3px 9px;border-radius:5px;font-size:12px;border:1px solid var(--border-strong);
-           background:var(--bg-card);cursor:pointer;color:var(--text-muted)">
+    style="padding:2px 8px;border-radius:5px;font-size:12px;border:1px solid var(--border-strong);
+           background:transparent;cursor:pointer;color:var(--text-muted)">
     🌐 {{ CURRENT_LANGUAGE|upper }}
   </button>
-  <div id="mv-lang-menu" style="display:none;position:absolute;top:32px;right:0;
+  <div id="mv-lang-menu" style="display:none;position:absolute;top:30px;right:0;
        background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;
        overflow:hidden;min-width:150px;z-index:10000;box-shadow:0 4px 16px rgba(0,0,0,.4)">
     {% for code, name in LANGUAGES %}
@@ -1570,8 +1539,27 @@ document.addEventListener('DOMContentLoaded', function(){
     {% endfor %}
   </div>
 </div>
-</div><!-- end cart+lang group -->
 <script>
+(function(){
+  function _updateCartBadge(){
+    fetch('/admin/inventory/reorderproxy/cart/count/',{credentials:'same-origin'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var badge=document.getElementById('mv-cart-badge');
+        var btn=document.getElementById('mv-cart-btn');
+        if(!badge||!btn)return;
+        if(d.count>0){
+          badge.textContent=d.count;badge.style.display='inline-block';
+          btn.style.borderColor='#2e7d32';btn.style.color='#4caf50';
+          btn.style.background='rgba(46,125,50,.12)';
+        }else{
+          badge.style.display='none';
+          btn.style.borderColor='';btn.style.color='';btn.style.background='';
+        }
+      }).catch(function(){});
+  }
+  document.addEventListener('DOMContentLoaded',_updateCartBadge);
+})();
 function mvToggleLang(e){e.stopPropagation();var m=document.getElementById('mv-lang-menu');m.style.display=m.style.display==='none'?'block':'none';}
 document.addEventListener('click',function(){var m=document.getElementById('mv-lang-menu');if(m)m.style.display='none';});
 </script>
