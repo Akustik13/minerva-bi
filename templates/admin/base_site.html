@@ -1507,17 +1507,18 @@ document.addEventListener('DOMContentLoaded', function(){
 {% endblock %}
 
 {% block usertools %}
-<!-- ── Persistent Cart Button ── -->
+<!-- ── Cart + Lang group ── -->
+<div style="display:inline-flex;align-items:center;gap:4px;margin-right:6px">
 <a id="mv-cart-btn" href="/admin/inventory/reorderproxy/cart/"
    title="Кошик замовлень"
-   style="position:relative;display:inline-flex;align-items:center;gap:5px;
-          padding:5px 11px;border-radius:20px;text-decoration:none;flex-shrink:0;
-          background:transparent;border:1.5px solid var(--border-strong);
-          font-size:13px;font-weight:600;color:var(--text-muted);
+   style="display:inline-flex;align-items:center;gap:4px;
+          padding:4px 10px;border-radius:6px;text-decoration:none;flex-shrink:0;
+          background:transparent;border:1px solid var(--border-strong);
+          font-size:12px;font-weight:600;color:var(--text-muted);
           line-height:1;transition:all .15s;white-space:nowrap">
-  <span style="font-size:15px;line-height:1">🛒</span>
+  <span style="font-size:14px;line-height:1">🛒</span>
   <span id="mv-cart-badge" style="display:none;background:#2e7d32;color:#fff;
-        border-radius:10px;padding:1px 6px;font-size:11px;font-weight:800;line-height:16px"></span>
+        border-radius:8px;padding:0 5px;font-size:11px;font-weight:800;line-height:16px"></span>
 </a>
 <script>
 (function(){
@@ -1532,8 +1533,8 @@ document.addEventListener('DOMContentLoaded', function(){
           badge.textContent = d.count;
           badge.style.display = 'inline-block';
           btn.style.borderColor = '#2e7d32';
-          btn.style.color = '#fff';
-          btn.style.background = 'rgba(46,125,50,.18)';
+          btn.style.color = '#4caf50';
+          btn.style.background = 'rgba(46,125,50,.12)';
         } else {
           badge.style.display = 'none';
           btn.style.borderColor = '';
@@ -1545,7 +1546,7 @@ document.addEventListener('DOMContentLoaded', function(){
   document.addEventListener('DOMContentLoaded', _updateCartBadge);
 })();
 </script>
-<div id="mv-lang-sw" style="position:relative;display:inline-flex;align-items:center;margin-right:8px">
+<div id="mv-lang-sw" style="position:relative;display:inline-flex;align-items:center">
   <button type="button" onclick="mvToggleLang(event)"
     style="padding:4px 9px;border-radius:6px;font-size:12px;border:1px solid var(--border-strong);
            background:var(--bg-card);cursor:pointer;color:var(--text-muted)">
@@ -1564,6 +1565,7 @@ document.addEventListener('DOMContentLoaded', function(){
     {% endfor %}
   </div>
 </div>
+</div><!-- end cart+lang group -->
 <script>
 function mvToggleLang(e){e.stopPropagation();var m=document.getElementById('mv-lang-menu');m.style.display=m.style.display==='none'?'block':'none';}
 document.addEventListener('click',function(){var m=document.getElementById('mv-lang-menu');if(m)m.style.display='none';});
