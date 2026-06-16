@@ -1,0 +1,393 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}🛒 Кошик замовлень{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+#content-main { max-width: none !important; }
+.ct-wrap { padding: 16px 24px 80px; }
+
+/* Breadcrumb */
+.ct-bc { font-size: 12px; color: var(--text-dim); margin-bottom: 14px; }
+.ct-bc a { color: var(--link-fg); text-decoration: none; }
+.ct-bc a:hover { text-decoration: underline; }
+
+/* Page header */
+.ct-hdr { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; flex-wrap: wrap; }
+.ct-hdr h1 { font-size: 22px; font-weight: 800; color: var(--text); margin: 0; flex: 1; }
+
+/* PO card */
+.ct-po-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+.ct-po-head {
+  background: var(--bg-card-2, #1e2d40);
+  border-bottom: 1px solid var(--border-strong);
+  padding: 12px 18px;
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.ct-po-head .po-label {
+  font-weight: 800; font-size: 15px; color: var(--text);
+}
+.ct-po-head .supplier-sel {
+  background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 5px; padding: 4px 8px; font-size: 13px;
+}
+.ct-po-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.ct-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700;
+  cursor: pointer; border: none; text-decoration: none; white-space: nowrap;
+  transition: opacity .15s;
+}
+.ct-btn:hover { opacity: .85; }
+.ct-btn-email { background: #1565c0; color: #fff; }
+.ct-btn-confirm { background: #2e7d32; color: #fff; }
+.ct-btn-clear { background: #c62828; color: #fff; }
+.ct-btn-copy { background: var(--bg-card-2,#243347); color: var(--text); border: 1px solid var(--border-strong); }
+.ct-btn-send { background: #0277bd; color: #fff; }
+
+/* Lines table */
+.ct-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ct-table th {
+  text-align: left; color: var(--text-dim); font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+  padding: 8px 12px; border-bottom: 1px solid var(--border-strong);
+}
+.ct-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-strong); color: var(--text); }
+.ct-table tr:last-child td { border-bottom: none; }
+.ct-table tr:hover td { background: var(--bg-hover); }
+.ct-qty-inp {
+  width: 70px; background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 4px; padding: 3px 6px; font-size: 13px; text-align: right;
+}
+.ct-del-btn {
+  background: none; border: none; cursor: pointer; color: var(--text-dim); font-size: 14px; padding: 2px 6px;
+}
+.ct-del-btn:hover { color: #ef5350; }
+
+/* Empty state */
+.ct-empty {
+  text-align: center; padding: 60px 20px; color: var(--text-dim);
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px;
+}
+.ct-empty .ct-empty-icon { font-size: 48px; margin-bottom: 12px; }
+.ct-empty h2 { color: var(--text-muted); margin: 0 0 8px; }
+.ct-empty a { color: var(--link-fg); }
+
+/* Email panel */
+.ct-email-panel {
+  display: none;
+  margin: 0; padding: 16px 18px;
+  border-top: 1px solid var(--border-strong);
+  background: var(--bg-hover);
+}
+.ct-email-panel.active { display: block; }
+.ct-email-row { display: flex; gap: 8px; margin-bottom: 10px; align-items: flex-start; }
+.ct-email-label { min-width: 60px; font-size: 11px; font-weight: 700; color: var(--text-dim); padding-top: 7px; text-transform: uppercase; }
+.ct-email-inp {
+  flex: 1; background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 5px; padding: 5px 10px; font-size: 13px;
+}
+.ct-email-body {
+  flex: 1; background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 5px; padding: 8px 10px; font-size: 12px;
+  font-family: monospace; min-height: 180px; resize: vertical;
+}
+.ct-email-actions { display: flex; gap: 8px; margin-top: 10px; }
+
+/* Confirm dialog */
+.ct-confirm-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  z-index: 9999; align-items: center; justify-content: center;
+}
+.ct-confirm-overlay.active { display: flex; }
+.ct-confirm-box {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 28px 32px; max-width: 400px; width: 90%; text-align: center;
+}
+.ct-confirm-box h2 { font-size: 18px; color: var(--text); margin: 0 0 12px; }
+.ct-confirm-box p { color: var(--text-muted); font-size: 14px; margin: 0 0 20px; }
+.ct-confirm-btns { display: flex; gap: 10px; justify-content: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ct-wrap">
+
+  <!-- Breadcrumb -->
+  <div class="ct-bc">
+    <a href="{% url 'admin:index' %}">Minerva</a> ›
+    <a href="{{ analysis_url }}">{% trans "Аналіз запасів" %}</a> ›
+    {% trans "Кошик замовлень" %}
+  </div>
+
+  <!-- Header -->
+  <div class="ct-hdr">
+    <h1>🛒 {% trans "Кошик замовлень" %}</h1>
+    <a href="{{ analysis_url }}" class="ct-btn ct-btn-copy">← {% trans "До аналізу" %}</a>
+    <a href="{% url 'admin:inventory_inventorysettings_change' 1 %}"
+       class="ct-btn ct-btn-copy" style="margin-left:0">⚙️ {% trans "Налаштування Email" %}</a>
+  </div>
+
+  {% if not draft_pos %}
+    <!-- Empty state -->
+    <div class="ct-empty">
+      <div class="ct-empty-icon">🛒</div>
+      <h2>{% trans "Кошик порожній" %}</h2>
+      <p>{% trans "Оберіть товари в аналізі запасів і натисніть «🛒 Додати до кошика»." %}</p>
+      <p><a href="{{ analysis_url }}">← {% trans "Перейти до аналізу запасів" %}</a></p>
+    </div>
+  {% else %}
+    {% for po in draft_pos %}
+    <div class="ct-po-card" id="po-card-{{ po.pk }}">
+
+      <!-- PO header row -->
+      <div class="ct-po-head">
+        <span class="po-label">📋 {{ po.code }}</span>
+
+        <!-- Supplier selector -->
+        <form method="post" action="{{ cart_action_url }}" style="display:inline-flex;gap:6px;align-items:center">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="change_supplier">
+          <input type="hidden" name="po_pk" value="{{ po.pk }}">
+          <select name="supplier_pk" class="supplier-sel" onchange="this.form.submit()">
+            {% for sup in suppliers %}
+              <option value="{{ sup.pk }}" {% if sup.pk == po.supplier_id %}selected{% endif %}>{{ sup.name }}</option>
+            {% endfor %}
+          </select>
+        </form>
+
+        <div class="ct-po-actions">
+          <button type="button" class="ct-btn ct-btn-email"
+                  onclick="ctToggleEmail({{ po.pk }})">
+            📧 {% trans "Сформувати Email" %}
+          </button>
+          <button type="button" class="ct-btn ct-btn-confirm"
+                  onclick="ctConfirm({{ po.pk }}, '{{ po.code }}')">
+            ✅ {% trans "Підтвердити замовлення" %}
+          </button>
+          <button type="button" class="ct-btn ct-btn-clear"
+                  onclick="ctClear({{ po.pk }}, '{{ po.code }}')">
+            🗑️ {% trans "Очистити" %}
+          </button>
+        </div>
+      </div>
+
+      <!-- Lines table -->
+      <table class="ct-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>SKU</th>
+            <th>{% trans "Назва" %}</th>
+            <th style="text-align:right">{% trans "Кількість" %}</th>
+            <th style="text-align:right">{% trans "Ціна" %}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for line in po.lines.all %}
+          {% if line.product %}
+          <tr id="line-{{ line.pk }}">
+            <td style="color:var(--text-dim)">{{ forloop.counter }}</td>
+            <td><code style="font-size:12px">{{ line.product.sku }}</code></td>
+            <td>{{ line.product.name|default:line.description }}</td>
+            <td style="text-align:right">
+              <form method="post" action="{{ cart_action_url }}" style="display:inline-flex;gap:4px;align-items:center">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_qty">
+                <input type="hidden" name="line_pk" value="{{ line.pk }}">
+                <input type="number" name="qty" class="ct-qty-inp"
+                       value="{{ line.qty_ordered|floatformat:0 }}" min="1" step="1"
+                       onblur="this.form.submit()">
+              </form>
+            </td>
+            <td style="text-align:right;color:var(--text-muted)">
+              {% if line.unit_price %}{{ line.unit_price }} {{ po.currency }}{% else %}—{% endif %}
+            </td>
+            <td>
+              <form method="post" action="{{ cart_action_url }}" style="display:inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="remove_line">
+                <input type="hidden" name="line_pk" value="{{ line.pk }}">
+                <button type="submit" class="ct-del-btn" title="{% trans 'Видалити рядок' %}">✕</button>
+              </form>
+            </td>
+          </tr>
+          {% endif %}
+          {% empty %}
+          <tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">
+            {% trans "Немає позицій" %}
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <!-- Email panel -->
+      <div class="ct-email-panel" id="email-panel-{{ po.pk }}">
+        <div style="font-size:11px;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">
+          📧 {% trans "Email замовлення" %}
+        </div>
+        <div class="ct-email-row">
+          <span class="ct-email-label">Кому</span>
+          <input type="email" class="ct-email-inp" id="email-to-{{ po.pk }}"
+                 value="{{ po.supplier.email|default:'' }}" placeholder="supplier@example.com">
+        </div>
+        <div class="ct-email-row">
+          <span class="ct-email-label">Тема</span>
+          <input type="text" class="ct-email-inp" id="email-subj-{{ po.pk }}"
+                 value="{{ settings.rfq_email_subject }}">
+        </div>
+        <div class="ct-email-row">
+          <span class="ct-email-label">Текст</span>
+          <textarea class="ct-email-body" id="email-body-{{ po.pk }}"
+                    placeholder="Завантаження..."></textarea>
+        </div>
+        <div class="ct-email-actions">
+          <button class="ct-btn ct-btn-copy" onclick="ctCopyEmail({{ po.pk }})">
+            📋 {% trans "Копіювати текст" %}
+          </button>
+          <button class="ct-btn ct-btn-send" onclick="ctMailto({{ po.pk }})">
+            📤 {% trans "Відкрити в Email-клієнті" %}
+          </button>
+        </div>
+      </div>
+
+    </div><!-- /ct-po-card -->
+    {% endfor %}
+  {% endif %}
+
+</div><!-- /ct-wrap -->
+
+<!-- Confirm modal -->
+<div class="ct-confirm-overlay" id="ct-confirm-overlay">
+  <div class="ct-confirm-box">
+    <h2 id="ct-confirm-title">✅ Підтвердити?</h2>
+    <p id="ct-confirm-text"></p>
+    <div class="ct-confirm-btns">
+      <button class="ct-btn ct-btn-confirm" id="ct-confirm-ok-btn">{% trans "Підтвердити" %}</button>
+      <button class="ct-btn ct-btn-copy" onclick="ctCloseConfirm()">{% trans "Скасувати" %}</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clear modal -->
+<div class="ct-confirm-overlay" id="ct-clear-overlay">
+  <div class="ct-confirm-box">
+    <h2>🗑️ {% trans "Очистити кошик?" %}</h2>
+    <p id="ct-clear-text"></p>
+    <div class="ct-confirm-btns">
+      <button class="ct-btn ct-btn-clear" id="ct-clear-ok-btn">{% trans "Очистити" %}</button>
+      <button class="ct-btn ct-btn-copy" onclick="ctCloseClear()">{% trans "Скасувати" %}</button>
+    </div>
+  </div>
+</div>
+
+<form method="post" action="{{ cart_action_url }}" id="ct-action-form" style="display:none">
+  {% csrf_token %}
+  <input type="hidden" name="action" id="ct-form-action">
+  <input type="hidden" name="po_pk" id="ct-form-po-pk">
+</form>
+
+<script>
+const CT_EMAIL_URL = "{{ cart_email_url }}";
+
+// Toggle email panel
+function ctToggleEmail(poPk) {
+  const panel = document.getElementById('email-panel-' + poPk);
+  const isActive = panel.classList.contains('active');
+  if (isActive) {
+    panel.classList.remove('active');
+    return;
+  }
+  panel.classList.add('active');
+  // Load body if textarea is empty or has placeholder text
+  const bodyEl = document.getElementById('email-body-' + poPk);
+  if (!bodyEl.value.trim()) {
+    bodyEl.value = '⏳ Завантаження...';
+    fetch(CT_EMAIL_URL + '?po=' + poPk)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ok) {
+          bodyEl.value = data.body;
+          const toEl = document.getElementById('email-to-' + poPk);
+          const subjEl = document.getElementById('email-subj-' + poPk);
+          if (!toEl.value && data.to) toEl.value = data.to;
+          if (!subjEl.value && data.subject) subjEl.value = data.subject;
+        } else {
+          bodyEl.value = '❌ Помилка: ' + (data.error || '?');
+        }
+      })
+      .catch(e => { bodyEl.value = '❌ ' + e; });
+  }
+}
+
+// Copy email body to clipboard
+function ctCopyEmail(poPk) {
+  const bodyEl = document.getElementById('email-body-' + poPk);
+  navigator.clipboard.writeText(bodyEl.value).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✅ Скопійовано';
+    setTimeout(() => { btn.textContent = orig; }, 1800);
+  });
+}
+
+// Open mailto link
+function ctMailto(poPk) {
+  const to = document.getElementById('email-to-' + poPk).value;
+  const subj = document.getElementById('email-subj-' + poPk).value;
+  const body = document.getElementById('email-body-' + poPk).value;
+  const link = 'mailto:' + encodeURIComponent(to)
+    + '?subject=' + encodeURIComponent(subj)
+    + '&body=' + encodeURIComponent(body);
+  window.open(link, '_self');
+}
+
+// Confirm modal
+function ctConfirm(poPk, poCode) {
+  document.getElementById('ct-confirm-title').textContent = '✅ Підтвердити замовлення?';
+  document.getElementById('ct-confirm-text').textContent =
+    'Замовлення ' + poCode + ' буде переведено в статус «Ordered». Це означає що товари реально замовлено постачальнику.';
+  document.getElementById('ct-confirm-ok-btn').onclick = function() {
+    document.getElementById('ct-form-action').value = 'confirm_po';
+    document.getElementById('ct-form-po-pk').value = poPk;
+    document.getElementById('ct-action-form').submit();
+  };
+  document.getElementById('ct-confirm-overlay').classList.add('active');
+}
+function ctCloseConfirm() {
+  document.getElementById('ct-confirm-overlay').classList.remove('active');
+}
+
+// Clear modal
+function ctClear(poPk, poCode) {
+  document.getElementById('ct-clear-text').textContent =
+    'Всі позиції кошика ' + poCode + ' будуть видалені назавжди.';
+  document.getElementById('ct-clear-ok-btn').onclick = function() {
+    document.getElementById('ct-form-action').value = 'clear_po';
+    document.getElementById('ct-form-po-pk').value = poPk;
+    document.getElementById('ct-action-form').submit();
+  };
+  document.getElementById('ct-clear-overlay').classList.add('active');
+}
+function ctCloseClear() {
+  document.getElementById('ct-clear-overlay').classList.remove('active');
+}
+
+// Close modals on overlay click
+document.getElementById('ct-confirm-overlay').addEventListener('click', function(e) {
+  if (e.target === this) ctCloseConfirm();
+});
+document.getElementById('ct-clear-overlay').addEventListener('click', function(e) {
+  if (e.target === this) ctCloseClear();
+});
+</script>
+{% endblock %}

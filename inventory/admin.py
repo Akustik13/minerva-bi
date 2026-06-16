@@ -140,7 +140,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
     list_filter  = ("category", "kind", ReorderStatusFilter)
     search_fields = ("sku", "name")
     ordering     = ("sku",)
-    actions      = ["bulk_create_po"]
+    actions      = ["bulk_create_po", "add_to_cart"]
 
     def has_add_permission(self, request):    return False
     def has_change_permission(self, request, obj=None): return False
@@ -157,6 +157,12 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             path('supply/receive/',
                  self.admin_site.admin_view(self.supply_receive_view),
                  name='inventory_reorderproxy_supply_receive'),
+            path('cart/', self.admin_site.admin_view(self.cart_view),
+                 name='inventory_reorderproxy_cart'),
+            path('cart/action/', self.admin_site.admin_view(self.cart_action_view),
+                 name='inventory_reorderproxy_cart_action'),
+            path('cart/email/', self.admin_site.admin_view(self.cart_email_view),
+                 name='inventory_reorderproxy_cart_email'),
         ] + super().get_urls()
 
     def supply_view(self, request):
@@ -546,6 +552,14 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             '+ PO</a>', url)
     po_btn.short_description = _("Дія")
 
+    def changelist_view(self, request, extra_context=None):
+        cart_url = reverse('admin:inventory_reorderproxy_cart')
+        cart_count = PurchaseOrderLine.objects.filter(purchase_order__status='draft').count()
+        extra = extra_context or {}
+        extra['cart_url'] = cart_url
+        extra['cart_count'] = cart_count
+        return super().changelist_view(request, extra)
+
     def bulk_create_po(self, request, queryset):
         """Масово додати всі відібрані товари до одного draft PO."""
         po = PurchaseOrder.objects.filter(status='draft').first()
@@ -590,6 +604,199 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             messages.SUCCESS,
         )
     bulk_create_po.short_description = _("📦 Додати до PO (чернетка)")
+
+    def add_to_cart(self, request, queryset):
+        """Add selected products to the procurement cart (draft PO)."""
+        import json as _json
+
+        po = PurchaseOrder.objects.filter(status='draft').order_by('pk').first()
+        if not po:
+            supplier = Supplier.objects.first()
+            if not supplier:
+                self.message_user(
+                    request, _("❌ Спочатку створіть хоча б одного постачальника."), messages.ERROR,
+                )
+                return
+            po = PurchaseOrder.objects.create(
+                supplier=supplier,
+                status='draft',
+                order_date=timezone.now().date(),
+                notes="Кошик замовлень",
+            )
+
+        added = 0
+        for product in queryset:
+            d = _reorder(product)
+            qty = d['reorder_qty'] or 1
+            line, created = PurchaseOrderLine.objects.get_or_create(
+                purchase_order=po,
+                product=product,
+                defaults={
+                    'qty_ordered': qty,
+                    'description': product.sku,
+                    'unit_price': product.purchase_price,
+                },
+            )
+            if not created:
+                line.qty_ordered = qty
+                line.save(update_fields=['qty_ordered'])
+            added += 1
+
+        cart_url = reverse('admin:inventory_reorderproxy_cart')
+        self.message_user(
+            request,
+            mark_safe(
+                f'✅ Додано {added} позицій до кошика. '
+                f'<a href="{cart_url}" style="font-weight:700">🛒 Відкрити кошик →</a>'
+            ),
+            messages.SUCCESS,
+        )
+    add_to_cart.short_description = _("🛒 Додати до кошика")
+
+    # ── Cart views ────────────────────────────────────────────────────────────
+
+    def cart_view(self, request):
+        """Show procurement cart: all draft POs with their lines."""
+        draft_pos = (
+            PurchaseOrder.objects
+            .filter(status='draft')
+            .prefetch_related('lines__product')
+            .select_related('supplier')
+            .order_by('pk')
+        )
+        suppliers = list(Supplier.objects.order_by('name'))
+        settings = InventorySettings.get()
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': _('🛒 Кошик замовлень'),
+            'subtitle': None,
+            'opts': ReorderProxy._meta,
+            'draft_pos': draft_pos,
+            'suppliers': suppliers,
+            'settings': settings,
+            'cart_action_url': reverse('admin:inventory_reorderproxy_cart_action'),
+            'cart_email_url': reverse('admin:inventory_reorderproxy_cart_email'),
+            'analysis_url': reverse('admin:inventory_reorderproxy_changelist'),
+        }
+        return render(request, 'admin/inventory/reorderproxy/cart.html', context)
+
+    def cart_action_view(self, request):
+        """POST: handle cart mutations (remove line, change supplier, update qty, confirm, clear)."""
+        from django.http import JsonResponse
+
+        if request.method != 'POST':
+            return redirect(reverse('admin:inventory_reorderproxy_cart'))
+
+        action = request.POST.get('action', '')
+
+        if action == 'remove_line':
+            line_pk = request.POST.get('line_pk')
+            PurchaseOrderLine.objects.filter(pk=line_pk).delete()
+
+        elif action == 'update_qty':
+            line_pk = request.POST.get('line_pk')
+            try:
+                qty = Decimal(str(request.POST.get('qty', '0')))
+                if qty > 0:
+                    PurchaseOrderLine.objects.filter(pk=line_pk).update(qty_ordered=qty)
+            except Exception:
+                pass
+
+        elif action == 'change_supplier':
+            po_pk = request.POST.get('po_pk')
+            supplier_pk = request.POST.get('supplier_pk')
+            try:
+                PurchaseOrder.objects.filter(pk=po_pk, status='draft').update(supplier_id=int(supplier_pk))
+            except Exception:
+                pass
+
+        elif action == 'confirm_po':
+            po_pk = request.POST.get('po_pk')
+            PurchaseOrder.objects.filter(pk=po_pk, status='draft').update(status='ordered')
+            messages.success(request, _("✅ Замовлення підтверджено і переведено в статус «Ordered»."))
+
+        elif action == 'clear_po':
+            po_pk = request.POST.get('po_pk')
+            PurchaseOrderLine.objects.filter(purchase_order_id=po_pk).delete()
+            PurchaseOrder.objects.filter(pk=po_pk, status='draft').delete()
+            messages.success(request, _("🗑️ Кошик очищено."))
+
+        return redirect(reverse('admin:inventory_reorderproxy_cart'))
+
+    def cart_email_view(self, request):
+        """GET/POST: generate RFQ email text for a draft PO."""
+        from django.http import JsonResponse
+
+        po_pk = request.GET.get('po') or request.POST.get('po')
+        try:
+            po = PurchaseOrder.objects.prefetch_related('lines__product').select_related('supplier').get(
+                pk=po_pk, status='draft',
+            )
+        except PurchaseOrder.DoesNotExist:
+            return JsonResponse({'ok': False, 'error': 'PO not found'}, status=404)
+
+        s = InventorySettings.get()
+        lines = [l for l in po.lines.all() if l.product_id]
+
+        # Build table
+        rows = []
+        for i, line in enumerate(lines, 1):
+            p = line.product
+            cols = []
+            if s.rfq_show_item_no:
+                cols.append(str(i))
+            if s.rfq_show_sku:
+                cols.append(p.sku)
+            cols.append(p.name or p.sku)
+            if s.rfq_show_cable_params and p.tech_attributes:
+                attrs_str = ', '.join(f"{k}: {v}" for k, v in p.tech_attributes.items() if v)
+                cols.append(attrs_str)
+            cols.append(str(int(line.qty_ordered)))
+            rows.append(cols)
+
+        # Header row
+        header = []
+        if s.rfq_show_item_no:
+            header.append('No.')
+        if s.rfq_show_sku:
+            header.append('SKU / Art.-Nr.')
+        header.append('Bezeichnung / Description')
+        if s.rfq_show_cable_params:
+            header.append('Parameter')
+        header.append('Menge / Qty')
+
+        if not rows:
+            table = '(no items)'
+        else:
+            # Align columns
+            col_widths = [max(len(header[c]), max(len(r[c]) for r in rows))
+                          for c in range(len(header))]
+            sep = '+' + '+'.join('-' * (w + 2) for w in col_widths) + '+'
+
+            def _row_str(cells):
+                return '|' + '|'.join(f' {c:<{col_widths[i]}} ' for i, c in enumerate(cells)) + '|'
+
+            table_lines = [sep, _row_str(header), sep]
+            for row in rows:
+                table_lines.append(_row_str(row))
+            table_lines.append(sep)
+            table = '\n'.join(table_lines)
+
+        body = (
+            f"{s.rfq_email_greeting}\n\n"
+            f"{table}\n\n"
+            f"{s.rfq_email_signature}"
+        )
+
+        supplier_email = po.supplier.email if po.supplier_id else ''
+
+        return JsonResponse({
+            'ok': True,
+            'to': supplier_email,
+            'subject': s.rfq_email_subject,
+            'body': body,
+        })
 
 
 # ── Стандартні admin класи (без змін) ─────────────────────────────────────────
@@ -2053,6 +2260,20 @@ class InventorySettingsAdmin(admin.ModelAdmin):
         }),
         ("📍 Загальні параметри", {
             "fields": ("default_location", "low_stock_alert_enabled"),
+        }),
+        ("📧 RFQ Email — шаблон листа замовлення", {
+            "fields": (
+                "rfq_email_subject",
+                "rfq_email_greeting",
+                "rfq_email_signature",
+                "rfq_show_item_no",
+                "rfq_show_sku",
+                "rfq_show_cable_params",
+            ),
+            "description": (
+                "Налаштування шаблону листа для замовлення товарів постачальнику. "
+                "Використовується в <b>🛒 Кошику замовлень</b> при натисканні «📧 Сформувати Email»."
+            ),
         }),
         ("🖼️ Кешування медіа (Datasheet / Фото)", {
             "fields": ("media_cache_panel",),

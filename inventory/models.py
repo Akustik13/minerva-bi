@@ -367,6 +367,37 @@ class InventorySettings(models.Model):
         ),
     )
 
+    # ── RFQ / Email замовлення ────────────────────────────────────────────────
+    rfq_show_sku = models.BooleanField(
+        "Показувати SKU в листі",
+        default=True,
+    )
+    rfq_show_item_no = models.BooleanField(
+        "Показувати №пп",
+        default=True,
+    )
+    rfq_show_cable_params = models.BooleanField(
+        "Показувати технічні параметри (cable params)",
+        default=False,
+        help_text="Додає стовпець з tech_attributes до таблиці в листі.",
+    )
+    rfq_email_subject = models.CharField(
+        "Тема листа",
+        max_length=255,
+        default="Bestellung / Order Request",
+    )
+    rfq_email_greeting = models.TextField(
+        "Вступний текст",
+        default=(
+            "Sehr geehrte Damen und Herren,\n\n"
+            "hiermit möchten wir folgende Artikel bestellen:"
+        ),
+    )
+    rfq_email_signature = models.TextField(
+        "Підпис",
+        default="Mit freundlichen Grüßen",
+    )
+
     class Meta:
         verbose_name = _("Налаштування складу")
         verbose_name_plural = _("⚙️ Налаштування складу")
