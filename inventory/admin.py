@@ -1404,6 +1404,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'to': supplier_email,
             'subject': subject_text,
             'body': body,
+            'signature': signature_text,
             'image_b64': image_b64,
             'diagram_in_body': diagram_in_body,
         })
@@ -1419,10 +1420,11 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         except Exception:
             return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
-        to_addr        = (data.get('to') or '').strip()
-        subject        = (data.get('subject') or '').strip()
-        body_text      = (data.get('body') or '').strip()
-        image_b64      = (data.get('image_b64') or '').strip()
+        to_addr         = (data.get('to') or '').strip()
+        subject         = (data.get('subject') or '').strip()
+        body_text       = (data.get('body') or '').strip()
+        signature_text  = (data.get('signature') or '').strip()
+        image_b64       = (data.get('image_b64') or '').strip()
         diagram_in_body = bool(data.get('diagram_in_body', True))
 
         if not to_addr:
@@ -1449,19 +1451,31 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             )
             from_email = (ns.email_from or ns.email_host_user).strip()
 
-            # Build HTML body: plain text wrapped in <pre> + optional inline image
+            # Build HTML body: split at signature to insert image before it
             pre_style = (
                 'font-family:monospace;font-size:13px;white-space:pre-wrap;'
                 'line-height:1.5;color:#222'
             )
-            html_body = f'<pre style="{pre_style}">{body_text}</pre>'
+            img_html = ''
             if image_b64 and diagram_in_body:
-                html_body += (
-                    f'<div style="margin-top:16px">'
+                img_html = (
+                    f'<div style="margin:16px 0">'
                     f'<img src="{image_b64}" alt="Cable diagram" '
                     f'style="max-width:480px;border-radius:4px">'
                     f'</div>'
                 )
+
+            # Split body: everything before the signature line
+            if signature_text and body_text.endswith(signature_text):
+                body_pre = body_text[: -len(signature_text)].rstrip('\n')
+                html_body = (
+                    f'<pre style="{pre_style}">{body_pre}</pre>'
+                    + img_html
+                    + f'<pre style="{pre_style}">{signature_text}</pre>'
+                )
+            else:
+                # Fallback: image after full body
+                html_body = f'<pre style="{pre_style}">{body_text}</pre>' + img_html
 
             msg = EmailMultiAlternatives(
                 subject=subject or 'Order Request',
