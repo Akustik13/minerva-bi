@@ -510,22 +510,48 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                     }
 
                     # ── Stats chips ───────────────────────────────────────────
-                    chip = ('display:inline-flex;align-items:center;gap:5px;'
-                            'background:var(--bg-input);border:1px solid var(--border-strong);'
-                            'border-radius:12px;padding:3px 10px;font-size:11px;'
-                            'color:var(--text-muted);white-space:nowrap')
-                    chip_val = 'font-weight:800;color:var(--text)'
-                    dim = 'font-size:10px;opacity:.6'
-                    all_time = f'<span style="{dim}">({str(_("за весь період"))})</span>'
+                    def _chip(bg, border, label, value, sub=''):
+                        sub_html = (f'<span style="font-size:10px;opacity:.55;margin-left:1px">'
+                                    f'{sub}</span>') if sub else ''
+                        return (
+                            f'<span style="display:inline-flex;flex-direction:column;'
+                            f'align-items:center;justify-content:center;'
+                            f'background:{bg};border:1px solid {border};'
+                            f'border-radius:10px;padding:5px 12px;font-size:10px;'
+                            f'color:var(--text-muted);white-space:nowrap;min-width:70px;'
+                            f'text-align:center;gap:1px">'
+                            f'<b style="font-size:15px;font-weight:800;color:var(--text);'
+                            f'line-height:1.1">{value}</b>'
+                            f'<span style="font-size:10px;letter-spacing:.3px">{label}</span>'
+                            f'{sub_html}'
+                            f'</span>'
+                        )
+
+                    demand_colors = {
+                        '🔥 Топ':           ('#2e7d32', '#388e3c', '#4caf50'),
+                        '📈 Активний':      ('#1565c0', '#1976d2', '#64b5f6'),
+                        '📦 Помірний':      ('#4a148c', '#6a1b9a', '#ce93d8'),
+                        '💤 Рідко':         ('#37474f', '#455a64', '#90a4ae'),
+                        '⚪ Немає продажів': ('#263238', '#37474f', '#78909c'),
+                    }
+                    d_bg, d_border, d_text = demand_colors.get(demand, ('#37474f', '#455a64', '#90a4ae'))
+                    demand_chip = (
+                        f'<span style="display:inline-flex;align-items:center;'
+                        f'background:{d_bg}22;border:1px solid {d_border};'
+                        f'border-radius:10px;padding:5px 14px;font-size:12px;'
+                        f'color:{d_text};font-weight:700;white-space:nowrap">'
+                        f'{demand}</span>'
+                    )
+                    dim = 'за весь період'
                     chips_html = (
-                        f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
-                        f'<span style="{chip}">{demand}</span>'
-                        f'<span style="{chip}">' + str(_('Замовлень:')) + f' <b style="{chip_val}">{total_orders}</b> {all_time}</span>'
-                        f'<span style="{chip}">' + str(_('Продано:')) + f' <b style="{chip_val}">{int(total_qty):g} шт.</b> {all_time}</span>'
-                        f'<span style="{chip}">' + str(_('За 30 днів:')) + f' <b style="{chip_val}">{int(qty_30):g} шт.</b></span>'
-                        f'<span style="{chip}">' + str(_('За 90 днів:')) + f' <b style="{chip_val}">{int(qty_90):g} шт.</b></span>'
-                        f'<span style="{chip}">👥 ' + str(_('Клієнтів:')) + f' <b style="{chip_val}">{uniq_customers}</b> {all_time}</span>'
-                        f'</div>'
+                        f'<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">'
+                        + demand_chip
+                        + _chip('rgba(33,150,243,.10)', '#1565c0', str(_('замовлень')),        total_orders,        dim)
+                        + _chip('rgba(156,39,176,.10)', '#6a1b9a', str(_('продано шт.')),      f'{int(total_qty):g}', dim)
+                        + _chip('rgba(255,152,0,.10)',  '#e65100', str(_('за 30 днів')),       f'{int(qty_30):g} шт.', '')
+                        + _chip('rgba(255,193,7,.10)',  '#f57f17', str(_('за 90 днів')),       f'{int(qty_90):g} шт.', '')
+                        + _chip('rgba(0,150,136,.10)',  '#00695c', str(_('👥 клієнтів')),      uniq_customers,      dim)
+                        + f'</div>'
                     )
 
                     # ── Table rows ────────────────────────────────────────────
