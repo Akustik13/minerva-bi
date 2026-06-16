@@ -1291,59 +1291,84 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
     # ── Readonly display fields ───────────────────────────────────────────────
 
     def action_buttons(self, obj):
-        test_url       = reverse("admin:bots_digikeyconfig_test")
-        sync_url       = reverse("admin:bots_digikeyconfig_sync")
-        clear_url      = reverse("admin:bots_digikeyconfig_clear_token")
-        po_url         = reverse("admin:bots_digikeyconfig_po_lookup")
-        products_url   = reverse("admin:bots_digikeyconfig_products")
-        debug_url      = reverse("admin:bots_digikeyconfig_debug")
-        oauth_url      = reverse("admin:bots_digikeyconfig_oauth_start")
-        mkorders_url   = reverse("admin:bots_digikeyconfig_marketplace_orders")
-        reconcile_url  = reverse("admin:bots_digikeyconfig_reconcile")
-        log_url        = reverse("admin:bots_digikeyconfig_api_log")
-        supplier_uuid_url  = reverse("admin:bots_digikeyconfig_fetch_supplier_uuid")
-        custom_fields_url  = reverse("admin:bots_digikeyconfig_custom_fields")
-        import_offers_url    = reverse("admin:bots_digikeyconfig_import_offers")
-        create_listings_url  = reverse("admin:bots_digikeyconfig_create_listings")
+        from django.utils.safestring import mark_safe
 
-        authorized     = bool(obj and obj.marketplace_refresh_token)
-        auth_label     = "✅ Marketplace авторизовано" if authorized else "🔑 Авторизувати Marketplace"
-        auth_color     = "#2e7d32" if authorized else "#e65100"
+        test_url            = reverse("admin:bots_digikeyconfig_test")
+        sync_url            = reverse("admin:bots_digikeyconfig_sync")
+        clear_url           = reverse("admin:bots_digikeyconfig_clear_token")
+        po_url              = reverse("admin:bots_digikeyconfig_po_lookup")
+        products_url        = reverse("admin:bots_digikeyconfig_products")
+        debug_url           = reverse("admin:bots_digikeyconfig_debug")
+        oauth_url           = reverse("admin:bots_digikeyconfig_oauth_start")
+        mkorders_url        = reverse("admin:bots_digikeyconfig_marketplace_orders")
+        reconcile_url       = reverse("admin:bots_digikeyconfig_reconcile")
+        log_url             = reverse("admin:bots_digikeyconfig_api_log")
+        supplier_uuid_url   = reverse("admin:bots_digikeyconfig_fetch_supplier_uuid")
+        custom_fields_url   = reverse("admin:bots_digikeyconfig_custom_fields")
+        import_offers_url   = reverse("admin:bots_digikeyconfig_import_offers")
+        create_listings_url = reverse("admin:bots_digikeyconfig_create_listings")
+        messages_url        = reverse("admin:bots_digikeyconfig_messages")
 
-        s = 'color:#fff;padding:6px 14px;border-radius:4px;text-decoration:none;display:inline-block;margin:3px 4px 3px 0;white-space:nowrap'
-        return format_html(
-            '<div style="line-height:2.4">'
-            '<a href="{}" style="background:#1565c0;{}">🔌 Тест з\'єднання</a>'
-            '<a href="{}" style="background:#455a64;{}">🗑️ Скинути токени</a>'
-            '<a href="{}" style="background:#00695c;{}">📦 Компоненти</a>'
-            '<a href="{}" style="background:#6a1b9a;{}">🔍 Пошук за PO</a>'
-            '<a href="{}" style="background:#37474f;{}">🔬 Debug</a>'
-            '<a href="{}" style="background:#4a148c;{}">📋 API Лог</a>'
-            '<br>'
-            '<a href="{}" style="background:{};{}">Marketplace: {}</a>'
-            '<a href="{}" style="background:#1565c0;{}">📋 Marketplace замовлення</a>'
-            '<a href="{}" style="background:#2e7d32;{}">🔄 Синхронізувати</a>'
-            '<a href="{}" style="background:#f57c00;{}">🔍 Звірити з DigiKey</a>'
-            '<a href="{}" style="background:#00838f;{}">🪪 Отримати Supplier UUID</a>'
-            '<a href="{}" style="background:#4527a0;{}">📋 Custom Fields</a>'
-            '<a href="{}" style="background:#00695c;{}">📥 Імпорт офферів</a>'
-            '<a href="{}" style="background:#00838f;{}">🆕 Створити лістинги з DigiKey</a>'
-            '</div>',
-            test_url, s,
-            clear_url, s,
-            products_url, s,
-            po_url, s,
-            debug_url, s,
-            log_url, s,
-            oauth_url, auth_color, s, auth_label,
-            mkorders_url, s,
-            sync_url, s,
-            reconcile_url, s,
-            supplier_uuid_url, s,
-            custom_fields_url, s,
-            import_offers_url, s,
-            create_listings_url, s,
+        authorized = bool(obj and obj.marketplace_refresh_token)
+        auth_label = "✅ Авторизовано" if authorized else "🔑 Авторизувати"
+        auth_color = "#2e7d32" if authorized else "#e65100"
+        auth_icon  = "✅" if authorized else "⚠️"
+
+        def btn(url, label, color):
+            return (
+                f'<a href="{url}" style="background:{color};color:#fff;padding:6px 13px;'
+                f'border-radius:4px;text-decoration:none;display:inline-block;'
+                f'margin:2px 4px 2px 0;white-space:nowrap;font-size:13px;font-weight:500">'
+                f'{label}</a>'
+            )
+
+        def group(title, accent, *buttons):
+            inner = "".join(buttons)
+            return (
+                f'<div style="margin-bottom:8px;padding:9px 12px;'
+                f'background:var(--bg-card);border:1px solid var(--border-strong);'
+                f'border-left:3px solid {accent};border-radius:6px">'
+                f'<div style="font-size:10px;font-weight:700;color:{accent};'
+                f'letter-spacing:.6px;text-transform:uppercase;margin-bottom:6px">{title}</div>'
+                f'<div style="line-height:2.2">{inner}</div>'
+                f'</div>'
+            )
+
+        html = (
+            group(
+                f"🔐 Авторизація Marketplace {auth_icon}",
+                auth_color,
+                btn(oauth_url,  auth_label,              auth_color),
+                btn(clear_url,  "🗑️ Скинути токени",     "#546e7a"),
+            ) +
+            group(
+                "🛒 Замовлення",
+                "#1565c0",
+                btn(mkorders_url,  "📋 Замовлення",            "#1565c0"),
+                btn(sync_url,      "🔄 Синхронізувати",        "#2e7d32"),
+                btn(reconcile_url, "🔍 Звірити з DigiKey",     "#f57c00"),
+                btn(messages_url,  "💬 Messages Hub",           "#00838f"),
+            ) +
+            group(
+                "📦 Лістинги",
+                "#4527a0",
+                btn(import_offers_url,   "📥 Імпорт офферів",           "#00695c"),
+                btn(create_listings_url, "🆕 Створити лістинги",         "#00838f"),
+                btn(custom_fields_url,   "📋 Custom Fields",             "#4527a0"),
+                btn(supplier_uuid_url,   "🪪 Supplier UUID",             "#006064"),
+                btn(products_url,        "📦 Компоненти",                "#00695c"),
+            ) +
+            group(
+                "🔧 Технічні",
+                "#455a64",
+                btn(test_url,  "🔌 Тест з'єднання", "#1565c0"),
+                btn(debug_url, "🔬 Debug",           "#37474f"),
+                btn(log_url,   "📋 API Лог",         "#4a148c"),
+                btn(po_url,    "🔍 Пошук за PO",     "#6a1b9a"),
+            )
         )
+        return mark_safe(f'<div style="max-width:680px">{html}</div>')
+
     action_buttons.short_description = "Дії"
 
     def messages_panel(self, obj):
