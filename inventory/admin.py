@@ -965,6 +965,45 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         return redirect(reverse('admin:inventory_reorderproxy_cart'))
 
+    # Keys from tech_attributes that are internal/non-display (skipped in email columns)
+    _RFQ_ATTR_SKIP = frozenset({
+        'datasheetUrl', 'packaging', 'productLifecycleStatus',
+        'productLifecycleStatusCode', 'ean', 'manufacturerPartNumber',
+        'marketPlaceStatus', 'exportControlClassNumber', 'unitPrice',
+        'minimumOrderQuantity', 'factoryStockAvailable', 'tariffDescription',
+    })
+
+    # Human-friendly short column headers for common DigiKey attribute keys
+    _RFQ_ATTR_LABELS = {
+        'Cable Length':           'Length',
+        'Cable Diameter':         'Thickness',
+        'Cable Assembly':         'Assembly',
+        'Cable Type':             'Cable Type',
+        'Connector 1 Type':       'End 1',
+        'Connector 2 Type':       'End 2',
+        'Connector Type':         'Connector',
+        'Contact Finish':         'Finish',
+        'Color':                  'Color',
+        'Frequency':              'Freq.',
+        'Frequency Range':        'Freq. Range',
+        'Center Frequency':       'Ctr Freq.',
+        'Bandwidth':              'BW',
+        'Filter Type':            'Filter Type',
+        'Ripple':                 'Ripple',
+        'Insertion Loss':         'Ins. Loss',
+        'Antenna Type':           'Ant. Type',
+        'Gain':                   'Gain',
+        'VSWR':                   'VSWR',
+        'Mounting Type':          'Mount',
+        'Package / Case':         'Package',
+        'Size / Dimension':       'Size',
+        'Height - Max':           'Height',
+        'Number of Positions':    'Positions',
+        'Shield Type':            'Shield',
+        'Features':               'Features',
+        'Impedance':              'Impedance',
+    }
+
     def cart_email_view(self, request):
         """GET/POST: generate RFQ email text for a draft PO."""
         from django.http import JsonResponse
@@ -980,31 +1019,47 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         s = InventorySettings.get()
         lines = [l for l in po.lines.all() if l.product_id]
 
-        # Build table
+        # ── Collect attribute columns (dynamic, from tech_attributes) ────────
+        # Only when rfq_show_cable_params is enabled; skip internal/numeric keys
+        attr_keys = []  # ordered list of raw attr keys to include as columns
+        if s.rfq_show_cable_params:
+            seen = {}
+            for line in lines:
+                attrs = line.product.tech_attributes or {}
+                for k in attrs:
+                    if k in seen:
+                        continue
+                    # Skip internal keys and numeric (code-based) keys
+                    if k in self._RFQ_ATTR_SKIP or k.isdigit():
+                        continue
+                    seen[k] = True
+                    attr_keys.append(k)
+
+        # ── Build rows ────────────────────────────────────────────────────────
         rows = []
         for i, line in enumerate(lines, 1):
             p = line.product
+            attrs = p.tech_attributes or {}
             cols = []
             if s.rfq_show_item_no:
                 cols.append(str(i))
             if s.rfq_show_sku:
                 cols.append(p.sku)
             cols.append(p.name or p.sku)
-            if s.rfq_show_cable_params and p.tech_attributes:
-                attrs_str = ', '.join(f"{k}: {v}" for k, v in p.tech_attributes.items() if v)
-                cols.append(attrs_str)
+            for k in attr_keys:
+                cols.append(str(attrs.get(k, '')))
             cols.append(str(int(line.qty_ordered)))
             rows.append(cols)
 
-        # Header row
+        # ── Header row ────────────────────────────────────────────────────────
         header = []
         if s.rfq_show_item_no:
             header.append('No.')
         if s.rfq_show_sku:
             header.append('SKU / Art.-Nr.')
         header.append('Bezeichnung / Description')
-        if s.rfq_show_cable_params:
-            header.append('Parameter')
+        for k in attr_keys:
+            header.append(self._RFQ_ATTR_LABELS.get(k, k))
         header.append('Menge / Qty')
 
         if not rows:
@@ -1758,7 +1813,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             obj._reorder_cache = _reorder(
                 obj,
                 stock=float(s) if s is not None else None,
-                sales_3m_total=float(s3m) if s3m is not None else None,
+                sales_period_total=float(s3m) if s3m is not None else None,
             )
         return obj._reorder_cache
 
@@ -1969,7 +2024,19 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         if not obj.pk:
             return format_html('<span style="color:var(--text-dim,#607d8b)">{}</span>',
                                _("Збережіть товар спочатку"))
+        try:
+            return self._movement_history_inner(obj)
+        except Exception as exc:
+            import traceback
+            tb = traceback.format_exc()
+            return mark_safe(
+                f'<details style="color:#ef5350;font-size:12px">'
+                f'<summary>⚠️ Помилка відображення руху товару: {exc}</summary>'
+                f'<pre style="font-size:10px;overflow:auto;max-height:200px">{tb}</pre>'
+                f'</details>'
+            )
 
+    def _movement_history_inner(self, obj):
         from django.utils.timezone import localtime as _localtime
         txs = list(
             InventoryTransaction.objects.filter(product=obj)
