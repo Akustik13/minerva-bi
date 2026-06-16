@@ -378,6 +378,10 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
         <!-- Actions -->
         <td onclick="event.stopPropagation()">
           <div class="sv-actions">
+            <button type="button" class="sv-btn sv-qadd-btn"
+               data-pk="{{ p.pk }}" data-sku="{{ p.sku }}"
+               style="background:#0d47a1;color:#fff"
+               title="{% trans "Додати в кошик замовлень" %}">🛒+</button>
             <a href="/admin/inventory/purchaseorder/add/?product={{ p.pk }}"
                class="sv-btn sv-btn-po" title="{% trans "Створити замовлення постачальнику" %}">+ PO</a>
             <a href="/admin/inventory/inventorytransaction/add/?product={{ p.pk }}"
@@ -906,6 +910,118 @@ var _svi = {
     var trigger = e.target.closest('[data-ds-trigger]');
     if (!trigger) return;
     if (!popup.contains(e.relatedTarget)) scheduleHide();
+  });
+})();
+</script>
+
+<!-- ── Quick-add to cart ── -->
+<style>
+#sv-qadd-pop {
+  display:none; position:fixed; z-index:99999;
+  background:var(--bg-card,#1a2535); border:1px solid var(--border-strong,#2a3f52);
+  border-radius:10px; padding:14px 16px 12px;
+  box-shadow:0 8px 32px rgba(0,0,0,.5); min-width:220px;
+}
+#sv-qadd-pop h4 { margin:0 0 10px; font-size:13px; color:var(--text,#c9d8e4);
+  font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; }
+#sv-qadd-pop .sv-qadd-row { display:flex; align-items:center; gap:8px; }
+#sv-qadd-qty {
+  width:70px; padding:5px 8px; border-radius:6px; border:1px solid var(--border-strong);
+  background:var(--bg-input,#141f2b); color:var(--text,#c9d8e4);
+  font-size:14px; font-weight:700; text-align:center;
+}
+#sv-qadd-ok { flex:1; padding:6px 0; background:#1565c0; color:#fff; border:none;
+  border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; }
+#sv-qadd-ok:hover { background:#1976d2; }
+#sv-qadd-cancel { padding:6px 10px; background:transparent; color:var(--text-muted);
+  border:1px solid var(--border-strong); border-radius:6px; font-size:12px; cursor:pointer; }
+#sv-qadd-feedback { font-size:11px; color:#4caf50; margin-top:6px; min-height:14px; }
+</style>
+<div id="sv-qadd-pop">
+  <h4 id="sv-qadd-title">Додати в кошик</h4>
+  <div class="sv-qadd-row">
+    <input id="sv-qadd-qty" type="number" min="1" step="1" value="1">
+    <button id="sv-qadd-ok" type="button">🛒 Додати</button>
+    <button id="sv-qadd-cancel" type="button">✕</button>
+  </div>
+  <div id="sv-qadd-feedback"></div>
+</div>
+<script>
+(function(){
+  var ADD_URL = '/admin/inventory/reorderproxy/cart/add-one/';
+  var pop      = document.getElementById('sv-qadd-pop');
+  var qtyInput = document.getElementById('sv-qadd-qty');
+  var feedback = document.getElementById('sv-qadd-feedback');
+  var titleEl  = document.getElementById('sv-qadd-title');
+  var activePk = null;
+
+  function getCsrf() {
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  function openPop(btn) {
+    var pk  = btn.dataset.pk;
+    var sku = btn.dataset.sku || pk;
+    if (activePk === pk && pop.style.display !== 'none') { closePop(); return; }
+    activePk = pk;
+    titleEl.textContent = 'Додати в кошик: ' + sku;
+    qtyInput.value = '1';
+    feedback.textContent = '';
+    var r = btn.getBoundingClientRect();
+    var pw = 240;
+    var left = r.left + window.scrollX;
+    var top  = r.bottom + window.scrollY + 6;
+    if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+    pop.style.left = left + 'px';
+    pop.style.top  = top + 'px';
+    pop.style.display = 'block';
+    qtyInput.focus(); qtyInput.select();
+  }
+
+  function closePop() { pop.style.display = 'none'; activePk = null; }
+
+  function doAdd() {
+    var qty = parseFloat(qtyInput.value);
+    if (!qty || qty <= 0 || !activePk) return;
+    var pk = activePk;
+    feedback.textContent = '⏳ …';
+    var fd = new FormData();
+    fd.append('product_pk', pk);
+    fd.append('qty', qty);
+    fetch(ADD_URL, {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: {'X-CSRFToken': getCsrf()},
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) { feedback.textContent = '❌ ' + (d.error || 'Помилка'); return; }
+      feedback.textContent = '✅ Додано! У кошику: ' + d.in_cart;
+      /* update header cart badge */
+      var hBadge = document.getElementById('mv-cart-badge');
+      var hBtn   = document.getElementById('mv-cart-btn');
+      if (hBadge && d.cart_total > 0) {
+        hBadge.textContent = d.cart_total;
+        hBadge.style.display = 'inline-block';
+        if (hBtn) { hBtn.style.borderColor='#2e7d32'; hBtn.style.color='#4caf50'; hBtn.style.background='rgba(46,125,50,.12)'; }
+      }
+      setTimeout(closePop, 900);
+    })
+    .catch(function(){ feedback.textContent = '❌ Мережева помилка'; });
+  }
+
+  document.getElementById('sv-tbody').addEventListener('click', function(e){
+    var btn = e.target.closest('.sv-qadd-btn');
+    if (btn) { e.stopPropagation(); openPop(btn); }
+  });
+  document.addEventListener('click', function(e){
+    if (!pop.contains(e.target) && !e.target.closest('.sv-qadd-btn')) closePop();
+  });
+  document.getElementById('sv-qadd-ok').addEventListener('click', doAdd);
+  document.getElementById('sv-qadd-cancel').addEventListener('click', closePop);
+  qtyInput.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') doAdd();
+    if (e.key === 'Escape') closePop();
   });
 })();
 </script>
