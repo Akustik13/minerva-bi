@@ -655,7 +655,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
     def cart_view(self, request):
         """Show procurement cart: all draft POs with their lines."""
-        draft_pos = (
+        draft_pos = list(
             PurchaseOrder.objects
             .filter(status='draft')
             .prefetch_related('lines__product')
@@ -665,12 +665,37 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         suppliers = list(Supplier.objects.order_by('name'))
         settings = InventorySettings.get()
 
+        # Build category name map (slug → display name)
+        from .models import ProductCategory
+        cat_map = {c.slug: c.name for c in ProductCategory.objects.all()}
+
+        # Flat list of all lines across all draft POs for the unified table
+        all_lines = []
+        for po in draft_pos:
+            for line in po.lines.all():
+                if not line.product_id:
+                    continue
+                cat_slug = line.product.category or 'other'
+                all_lines.append({
+                    'pk': line.pk,
+                    'product': line.product,
+                    'qty_ordered': line.qty_ordered,
+                    'unit_price': line.unit_price,
+                    'po': po,
+                    'po_currency': po.currency,
+                    'supplier_pk': po.supplier_id or '',
+                    'supplier_name': po.supplier.name if po.supplier_id else '—',
+                    'category_slug': cat_slug,
+                    'category_name': cat_map.get(cat_slug, cat_slug),
+                })
+
         context = {
             **self.admin_site.each_context(request),
             'title': _('🛒 Кошик замовлень'),
             'subtitle': None,
             'opts': ReorderProxy._meta,
             'draft_pos': draft_pos,
+            'all_lines': all_lines,
             'suppliers': suppliers,
             'settings': settings,
             'cart_action_url': reverse('admin:inventory_reorderproxy_cart_action'),
@@ -720,6 +745,61 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             PurchaseOrderLine.objects.filter(purchase_order_id=po_pk).delete()
             PurchaseOrder.objects.filter(pk=po_pk, status='draft').delete()
             messages.success(request, _("🗑️ Кошик очищено."))
+
+        elif action == 'bulk_delete':
+            line_pks = request.POST.getlist('line_pks')
+            if line_pks:
+                affected_po_pks = list(
+                    PurchaseOrderLine.objects.filter(pk__in=line_pks)
+                    .values_list('purchase_order_id', flat=True).distinct()
+                )
+                PurchaseOrderLine.objects.filter(pk__in=line_pks).delete()
+                for po in PurchaseOrder.objects.filter(pk__in=affected_po_pks, status='draft'):
+                    if not po.lines.exists():
+                        po.delete()
+                messages.success(request, _(f"🗑️ Видалено {len(line_pks)} позицій."))
+
+        elif action == 'bulk_set_qty':
+            line_pks = request.POST.getlist('line_pks')
+            try:
+                qty = Decimal(str(request.POST.get('qty', '0')))
+                if qty > 0 and line_pks:
+                    PurchaseOrderLine.objects.filter(pk__in=line_pks).update(qty_ordered=qty)
+                    messages.success(request, _(f"✅ Кількість {qty:g} встановлено для {len(line_pks)} позицій."))
+            except Exception:
+                pass
+
+        elif action == 'bulk_assign_supplier':
+            line_pks = request.POST.getlist('line_pks')
+            supplier_pk = request.POST.get('supplier_pk') or ''
+            if line_pks:
+                sid = int(supplier_pk) if supplier_pk.strip() else None
+                target_po = PurchaseOrder.objects.filter(status='draft', supplier_id=sid).first()
+                if not target_po:
+                    target_po = PurchaseOrder.objects.create(
+                        supplier_id=sid,
+                        status='draft',
+                        order_date=timezone.now().date(),
+                        notes="Кошик замовлень",
+                    )
+                moved = 0
+                for line in PurchaseOrderLine.objects.filter(pk__in=line_pks).select_related('product'):
+                    if line.purchase_order_id == target_po.pk:
+                        continue
+                    existing = target_po.lines.filter(product_id=line.product_id).first()
+                    if existing:
+                        existing.qty_ordered += line.qty_ordered
+                        existing.save(update_fields=['qty_ordered'])
+                        line.delete()
+                    else:
+                        line.purchase_order = target_po
+                        line.save(update_fields=['purchase_order'])
+                    moved += 1
+                for po in PurchaseOrder.objects.filter(status='draft').exclude(pk=target_po.pk):
+                    if not po.lines.exists():
+                        po.delete()
+                sup_name = target_po.supplier.name if target_po.supplier_id else '—'
+                messages.success(request, _(f"✅ Переміщено {moved} позицій до «{sup_name}»."))
 
         return redirect(reverse('admin:inventory_reorderproxy_cart'))
 
