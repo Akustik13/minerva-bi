@@ -802,7 +802,7 @@ window.dlDocFile = function(url, name) {
 
 <script>
 /* ── Packaging auto-fill from recommendation ── */
-window.mvApplyPackaging = function(sourceBtn) {
+window.mvApplyPackaging = function(sourceBtn, auto) {
   var recs;
   try { recs = JSON.parse(sourceBtn.dataset.packRecs); } catch(e) { return; }
   if (!recs || !recs.length) return;
@@ -811,7 +811,7 @@ window.mvApplyPackaging = function(sourceBtn) {
   var totalEl = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
   var initEl  = document.getElementById('id_' + prefix + '-INITIAL_FORMS');
   if (!totalEl || !initEl) {
-    alert('⚠️ Inline «Фактична упаковка» не знайдено на сторінці.');
+    if (!auto) alert('⚠️ Inline «Фактична упаковка» не знайдено на сторінці.');
     return;
   }
   var initForms  = parseInt(initEl.value)  || 0;
@@ -832,12 +832,17 @@ window.mvApplyPackaging = function(sourceBtn) {
       var idx = initForms + r;
       if (idx >= total) break;
       var rec = recs[r];
-      var pkgSel = document.getElementById('id_' + prefix + '-' + idx + '-packaging');
-      var qtyInp = document.getElementById('id_' + prefix + '-' + idx + '-qty_boxes');
-      var wgtInp = document.getElementById('id_' + prefix + '-' + idx + '-actual_weight_g');
+      var pkgSel  = document.getElementById('id_' + prefix + '-' + idx + '-packaging');
+      var qtyInp  = document.getElementById('id_' + prefix + '-' + idx + '-qty_boxes');
+      var wgtInp  = document.getElementById('id_' + prefix + '-' + idx + '-actual_weight_g');
+      var noteInp = document.getElementById('id_' + prefix + '-' + idx + '-notes');
       if (pkgSel) { pkgSel.value = String(rec.pk); pkgSel.dispatchEvent(new Event('change', {bubbles:true})); }
       if (qtyInp) { qtyInp.value = rec.qty_boxes; qtyInp.dispatchEvent(new Event('change', {bubbles:true})); }
       if (wgtInp && rec.weight_g) { wgtInp.value = rec.weight_g; wgtInp.dispatchEvent(new Event('change', {bubbles:true})); }
+      /* Auto-fill: mark notes so user knows to verify */
+      if (auto && noteInp && !noteInp.value) {
+        noteInp.value = '🤖 Авто з рекомендації — перевір';
+      }
     }
     /* Update both buttons (panel + inline) */
     [sourceBtn, document.getElementById('mv-pack-inline-btn')].forEach(function(b) {
@@ -846,28 +851,55 @@ window.mvApplyPackaging = function(sourceBtn) {
       b.style.background = '#2e7d32';
       b.disabled = true;
     });
+    /* Show auto-fill notice banner */
+    if (auto) _showPackAutoNotice();
   }, 150);
 };
 
-/* Inject recommendation button next to "Додати ще" in the packaging inline */
+function _showPackAutoNotice() {
+  var group = document.getElementById('orderpackaging_set-group');
+  if (!group || document.getElementById('mv-pack-auto-notice')) return;
+  var notice = document.createElement('div');
+  notice.id = 'mv-pack-auto-notice';
+  notice.style.cssText = (
+    'padding:8px 14px;background:#1a3a2a;border:1px solid #2e7d32;border-radius:6px;' +
+    'font-size:12px;color:#81c784;margin:0 0 10px;display:flex;align-items:center;gap:8px'
+  );
+  notice.innerHTML = (
+    '<span style="font-size:16px">🤖</span>' +
+    '<span><b>Упаковку заповнено автоматично</b> з рекомендацій. ' +
+    'Перевір дані та за потреби відкоригуй перед збереженням.</span>'
+  );
+  group.insertBefore(notice, group.firstChild);
+}
+
+/* Inject recommendation button next to "Додати ще" in the packaging inline.
+   Also auto-applies recommendation if inline is empty (new order or no packaging yet). */
 document.addEventListener('DOMContentLoaded', function() {
   var panelBtn = document.getElementById('mv-pack-apply-btn');
   if (!panelBtn) return;  /* No recommendation — nothing to inject */
 
   var addRowTd = document.querySelector('#orderpackaging_set-group .add-row td');
-  if (!addRowTd) return;
+  if (addRowTd) {
+    var inlineBtn = document.createElement('button');
+    inlineBtn.type = 'button';
+    inlineBtn.id   = 'mv-pack-inline-btn';
+    inlineBtn.textContent = '📦 З рекомендацій';
+    inlineBtn.style.cssText = (
+      'margin-left:14px;background:#1565c0;color:#fff;border:none;' +
+      'border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;' +
+      'cursor:pointer;vertical-align:middle'
+    );
+    inlineBtn.onclick = function() { mvApplyPackaging(panelBtn, false); };
+    addRowTd.appendChild(inlineBtn);
+  }
 
-  var inlineBtn = document.createElement('button');
-  inlineBtn.type = 'button';
-  inlineBtn.id   = 'mv-pack-inline-btn';
-  inlineBtn.textContent = '📦 З рекомендацій';
-  inlineBtn.style.cssText = (
-    'margin-left:14px;background:#1565c0;color:#fff;border:none;' +
-    'border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;' +
-    'cursor:pointer;vertical-align:middle'
-  );
-  inlineBtn.onclick = function() { mvApplyPackaging(panelBtn); };
-  addRowTd.appendChild(inlineBtn);
+  /* Auto-apply if no existing packaging records */
+  var initEl = document.getElementById('id_orderpackaging_set-INITIAL_FORMS');
+  var initForms = initEl ? (parseInt(initEl.value) || 0) : 0;
+  if (initForms === 0) {
+    setTimeout(function() { mvApplyPackaging(panelBtn, true); }, 400);
+  }
 });
 
 (function(){
