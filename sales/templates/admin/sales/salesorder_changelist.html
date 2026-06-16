@@ -1326,7 +1326,7 @@ if (!window._cexDelDocDef) {
 <div id="sv-stock-pop" style="display:none;position:fixed;z-index:99999;
      background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#2a3f52);
      border-radius:10px;padding:0;box-shadow:0 8px 32px rgba(0,0,0,.55);
-     min-width:340px;max-width:520px;overflow:hidden">
+     min-width:560px;max-width:860px;overflow:hidden">
   <div style="display:flex;align-items:center;justify-content:space-between;
        padding:10px 14px;background:var(--bg-input,#141f2b);
        border-bottom:1px solid var(--border-strong)">
@@ -1364,10 +1364,11 @@ if (!window._cexDelDocDef) {
 
   function posPop(btn) {
     var r = btn.getBoundingClientRect();
-    var pw = 360;
+    var pw = 580;
     var left = r.left + window.scrollX;
     var top  = r.bottom + window.scrollY + 6;
     if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+    if (left < 8) left = 8;
     pop.style.left = left + 'px';
     pop.style.top  = top + 'px';
   }
@@ -1433,7 +1434,6 @@ if (!window._cexDelDocDef) {
         + '<td style="padding:6px 8px;font-family:monospace;font-size:11px;'
         +            'color:var(--text);white-space:nowrap">' + escHtml(l.sku) + '</td>'
         + '<td style="padding:6px 8px;font-size:11px;color:var(--text-muted);'
-        +            'max-width:140px;overflow:hidden;text-overflow:ellipsis;'
         +            'white-space:nowrap">' + escHtml(l.name) + '</td>'
         + '<td style="padding:6px 8px;text-align:right;font-size:12px;'
         +            'font-weight:700;white-space:nowrap">' + l.needed + '</td>'
