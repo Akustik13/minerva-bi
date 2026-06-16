@@ -1504,6 +1504,48 @@ document.addEventListener('DOMContentLoaded', function(){
 {% endblock %}
 
 {% block usertools %}
+<!-- ── Persistent Cart Button ── -->
+<a id="mv-cart-btn" href="/admin/inventory/reorderproxy/cart/"
+   title="Кошик замовлень"
+   style="position:relative;display:inline-flex;align-items:center;justify-content:center;
+          width:34px;height:34px;margin-right:6px;border-radius:8px;text-decoration:none;
+          background:var(--bg-card);border:1px solid var(--border-strong);
+          font-size:17px;color:var(--text-muted);transition:background .15s,color .15s;
+          vertical-align:middle">
+  🛒
+  <span id="mv-cart-badge"
+        style="display:none;position:absolute;top:-6px;right:-6px;
+               background:#2e7d32;color:#fff;border-radius:50%;
+               min-width:18px;height:18px;font-size:10px;font-weight:800;
+               line-height:18px;text-align:center;padding:0 3px;
+               border:2px solid var(--header-bg,#1a3352);"></span>
+</a>
+<script>
+(function(){
+  function _updateCartBadge(){
+    fetch('/admin/inventory/reorderproxy/cart/count/',{credentials:'same-origin'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var badge = document.getElementById('mv-cart-badge');
+        var btn   = document.getElementById('mv-cart-btn');
+        if(!badge||!btn) return;
+        if(d.count > 0){
+          badge.textContent = d.count;
+          badge.style.display = 'block';
+          btn.style.color = '#fff';
+          btn.style.background = '#1b5e20';
+          btn.style.borderColor = '#2e7d32';
+        } else {
+          badge.style.display = 'none';
+          btn.style.color = '';
+          btn.style.background = '';
+          btn.style.borderColor = '';
+        }
+      }).catch(function(){});
+  }
+  document.addEventListener('DOMContentLoaded', _updateCartBadge);
+})();
+</script>
 <div id="mv-lang-sw" style="position:relative;display:inline-flex;align-items:center;margin-right:8px">
   <button type="button" onclick="mvToggleLang(event)"
     style="padding:4px 9px;border-radius:6px;font-size:12px;border:1px solid var(--border-strong);

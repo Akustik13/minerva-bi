@@ -163,6 +163,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                  name='inventory_reorderproxy_cart_action'),
             path('cart/email/', self.admin_site.admin_view(self.cart_email_view),
                  name='inventory_reorderproxy_cart_email'),
+            path('cart/count/', self.admin_site.admin_view(self.cart_count_view),
+                 name='inventory_reorderproxy_cart_count'),
         ] + super().get_urls()
 
     def supply_view(self, request):
@@ -797,6 +799,12 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             'subject': s.rfq_email_subject,
             'body': body,
         })
+
+    def cart_count_view(self, request):
+        """GET: return JSON with cart item count (for persistent header badge)."""
+        from django.http import JsonResponse
+        count = PurchaseOrderLine.objects.filter(purchase_order__status='draft').count()
+        return JsonResponse({'count': count})
 
 
 # ── Стандартні admin класи (без змін) ─────────────────────────────────────────
