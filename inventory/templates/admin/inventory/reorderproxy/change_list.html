@@ -23,51 +23,180 @@
   #mv-period-bar { display:flex; align-items:center; gap:8px; padding:6px 0 2px;
                    font-size:12px; color:var(--text-muted); }
   #mv-period-bar strong { color:var(--text); }
+
+  /* Quick-add popover */
+  #mv-qadd-pop {
+    display:none; position:fixed; z-index:99999;
+    background:var(--bg-card,#1a2535);
+    border:1px solid var(--border-strong,#2a3f52);
+    border-radius:10px; padding:14px 16px 12px;
+    box-shadow:0 8px 32px rgba(0,0,0,.5);
+    min-width:220px;
+  }
+  #mv-qadd-pop h4 {
+    margin:0 0 10px; font-size:13px; color:var(--text,#c9d8e4);
+    font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  #mv-qadd-pop .mv-row { display:flex; align-items:center; gap:8px; }
+  #mv-qadd-qty {
+    width:70px; padding:5px 8px; border-radius:6px; border:1px solid var(--border-strong);
+    background:var(--bg-input,#141f2b); color:var(--text,#c9d8e4);
+    font-size:14px; font-weight:700; text-align:center;
+  }
+  #mv-qadd-ok {
+    flex:1; padding:6px 0; background:#1565c0; color:#fff; border:none;
+    border-radius:6px; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  #mv-qadd-ok:hover { background:#1976d2; }
+  #mv-qadd-cancel {
+    padding:6px 10px; background:transparent; color:var(--text-muted);
+    border:1px solid var(--border-strong); border-radius:6px;
+    font-size:12px; cursor:pointer;
+  }
+  #mv-qadd-feedback { font-size:11px; color:#4caf50; margin-top:6px; min-height:14px; }
 </style>
+
+<!-- Quick-add popover -->
+<div id="mv-qadd-pop">
+  <h4 id="mv-qadd-title">Додати в кошик</h4>
+  <div class="mv-row">
+    <input id="mv-qadd-qty" type="number" min="1" step="1" value="1">
+    <button id="mv-qadd-ok" type="button">🛒 Додати</button>
+    <button id="mv-qadd-cancel" type="button">✕</button>
+  </div>
+  <div id="mv-qadd-feedback"></div>
+</div>
 
 <script>
 (function(){
+  /* ── History expand ──────────────────────────────────────────── */
   const HIST_URL = '/admin/inventory/reorderproxy/supply/history/';
-  const cache = {};
+  const histCache = {};
 
   function toggleHistory(btn) {
     const pk = btn.dataset.pk;
     const tr = btn.closest('tr');
     const existingRow = document.getElementById('mv-hist-' + pk);
-
-    if (existingRow) {
-      existingRow.remove();
-      btn.classList.remove('active');
-      return;
-    }
-
+    if (existingRow) { existingRow.remove(); btn.classList.remove('active'); return; }
     btn.classList.add('active');
     btn.textContent = '⏳';
-
-    const fetchOrCache = cache[pk]
-      ? Promise.resolve(cache[pk])
-      : fetch(HIST_URL + pk + '/').then(r => r.text()).then(html => { cache[pk] = html; return html; });
-
-    fetchOrCache.then(html => {
-      const cols = tr.querySelectorAll('td,th').length || 12;
-      const histRow = document.createElement('tr');
-      histRow.id = 'mv-hist-' + pk;
-      histRow.className = 'mv-hist-row';
-      histRow.innerHTML = '<td colspan="' + cols + '"><div class="mv-hist-inner">' + html + '</div></td>';
-      tr.after(histRow);
+    const p = histCache[pk]
+      ? Promise.resolve(histCache[pk])
+      : fetch(HIST_URL + pk + '/').then(r => r.text()).then(h => { histCache[pk] = h; return h; });
+    p.then(html => {
+      const cols = tr.querySelectorAll('td,th').length || 14;
+      const row = document.createElement('tr');
+      row.id = 'mv-hist-' + pk;
+      row.className = 'mv-hist-row';
+      row.innerHTML = '<td colspan="' + cols + '"><div class="mv-hist-inner">' + html + '</div></td>';
+      tr.after(row);
       btn.textContent = '📋';
-    }).catch(() => {
-      btn.textContent = '📋';
-      btn.classList.remove('active');
-    });
+    }).catch(() => { btn.textContent = '📋'; btn.classList.remove('active'); });
   }
 
+  /* ── Quick-add popover ──────────────────────────────────────── */
+  const ADD_URL  = '/admin/inventory/reorderproxy/cart/add-one/';
+  const pop      = document.getElementById('mv-qadd-pop');
+  const qtyInput = document.getElementById('mv-qadd-qty');
+  const feedback = document.getElementById('mv-qadd-feedback');
+  const title    = document.getElementById('mv-qadd-title');
+  let activePk   = null;
+  let activeBtn  = null;
+
+  function getCsrf() {
+    const m = document.cookie.match(/csrftoken=([^;]+)/);
+    return m ? m[1] : '';
+  }
+
+  function positionPop(btn) {
+    const r = btn.getBoundingClientRect();
+    const pw = 230;
+    let left = r.left + window.scrollX;
+    let top  = r.bottom + window.scrollY + 6;
+    if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+    pop.style.left = left + 'px';
+    pop.style.top  = top + 'px';
+  }
+
+  function openPop(btn) {
+    if (activeBtn === btn && pop.style.display !== 'none') { closePop(); return; }
+    activePk  = btn.dataset.pk;
+    activeBtn = btn;
+    const sku = btn.closest('tr').querySelector('td')?.textContent?.trim() || 'товар';
+    title.textContent = 'Додати в кошик: ' + sku;
+    qtyInput.value = btn.dataset.default || '1';
+    feedback.textContent = '';
+    positionPop(btn);
+    pop.style.display = 'block';
+    qtyInput.focus();
+    qtyInput.select();
+  }
+
+  function closePop() {
+    pop.style.display = 'none';
+    activeBtn = null;
+    activePk  = null;
+  }
+
+  function doAdd() {
+    const qty = parseFloat(qtyInput.value);
+    if (!qty || qty <= 0 || !activePk) return;
+    const btn = activeBtn;
+    feedback.textContent = '⏳ …';
+    const fd = new FormData();
+    fd.append('product_pk', activePk);
+    fd.append('qty', qty);
+    fetch(ADD_URL, {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: {'X-CSRFToken': getCsrf()},
+    })
+    .then(r => r.json())
+    .then(d => {
+      if (!d.ok) { feedback.textContent = '❌ ' + (d.error || 'Помилка'); return; }
+      feedback.textContent = '✅ Додано! У кошику: ' + d.in_cart;
+      /* update cart_col badge for this row */
+      const cartCell = document.getElementById('mv-cart-cell-' + activePk);
+      if (cartCell) {
+        cartCell.innerHTML =
+          '<span style="color:#fff;background:#1565c0;border-radius:8px;' +
+          'padding:1px 7px;font-size:11px;font-weight:700">🛒 ' + d.in_cart + '</span>';
+      }
+      /* update header badge */
+      const hBadge = document.getElementById('mv-cart-badge');
+      if (hBadge && d.cart_total > 0) {
+        hBadge.textContent = d.cart_total;
+        hBadge.style.display = 'inline-block';
+        const hBtn = document.getElementById('mv-cart-btn');
+        if (hBtn) {
+          hBtn.style.borderColor = '#2e7d32';
+          hBtn.style.color = '#4caf50';
+          hBtn.style.background = 'rgba(46,125,50,.12)';
+        }
+      }
+      setTimeout(closePop, 900);
+    })
+    .catch(() => { feedback.textContent = '❌ Мережева помилка'; });
+  }
+
+  /* Events */
   document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.mv-hist-btn');
-    if (btn) { e.preventDefault(); toggleHistory(btn); }
+    const histBtn = e.target.closest('.mv-hist-btn');
+    if (histBtn) { e.preventDefault(); toggleHistory(histBtn); return; }
+
+    const addBtn = e.target.closest('.mv-qadd-btn');
+    if (addBtn) { e.stopPropagation(); openPop(addBtn); return; }
+
+    if (!pop.contains(e.target)) closePop();
   });
 
-  // Period info bar
+  document.getElementById('mv-qadd-ok').addEventListener('click', doAdd);
+  document.getElementById('mv-qadd-cancel').addEventListener('click', closePop);
+  qtyInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doAdd();
+    if (e.key === 'Escape') closePop();
+  });
+
+  /* Period info bar */
   const days = {{ analysis_days|default:90 }};
   const bar = document.createElement('p');
   bar.id = 'mv-period-bar';

@@ -175,6 +175,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         "stock_col", "reserved_col", "available_col",
         "monthly_col", "months_left_col",
         "reorder_col", "status_col",
+        "cart_col", "quick_add_btn",
         "history_toggle_btn",
     )
     list_filter  = ("category", "kind", SalesPeriodFilter, SalesSourceFilter, ReorderStatusFilter)
@@ -205,6 +206,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                  name='inventory_reorderproxy_cart_email'),
             path('cart/count/', self.admin_site.admin_view(self.cart_count_view),
                  name='inventory_reorderproxy_cart_count'),
+            path('cart/add-one/', self.admin_site.admin_view(self.cart_add_one_view),
+                 name='inventory_reorderproxy_cart_add_one'),
         ] + super().get_urls()
 
     def supply_view(self, request):
@@ -539,12 +542,27 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 sales_qs = sales_qs.filter(order__source__slug=source_slug)
             sales_subq = sales_qs.values('product').annotate(t=Sum('qty')).values('t')
 
+            cart_subq = (
+                PurchaseOrderLine.objects.filter(
+                    product=OuterRef('pk'),
+                    purchase_order__status='draft',
+                ).values('product').annotate(t=Sum('qty_ordered')).values('t')
+            )
+            ordered_subq = (
+                PurchaseOrderLine.objects.filter(
+                    product=OuterRef('pk'),
+                    purchase_order__status__in=['ordered', 'partial'],
+                ).values('product').annotate(t=Sum('qty_ordered')).values('t')
+            )
+
             return (
                 super().get_queryset(request).filter(is_active=True)
                 .annotate(
                     _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
                     _reserved_total=Coalesce(Subquery(reserved_subq), Value(Decimal('0'))),
                     _sales_period=Coalesce(Subquery(sales_subq), Value(Decimal('0'))),
+                    _in_cart_qty=Coalesce(Subquery(cart_subq), Value(Decimal('0'))),
+                    _ordered_qty=Coalesce(Subquery(ordered_subq), Value(Decimal('0'))),
                 )
             )
         except Exception:
@@ -750,6 +768,40 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             messages.SUCCESS,
         )
     add_to_cart.short_description = _("🛒 Додати до кошика")
+
+    # ── Inline cart columns ───────────────────────────────────────────────────
+
+    def cart_col(self, obj):
+        in_cart = int(getattr(obj, '_in_cart_qty', 0) or 0)
+        ordered = int(getattr(obj, '_ordered_qty', 0) or 0)
+        inner = ''
+        if in_cart:
+            inner += (
+                f'<span style="color:#fff;background:#1565c0;border-radius:8px;'
+                f'padding:1px 7px;font-size:11px;font-weight:700" title="У кошику (чернетка)">🛒 {in_cart}</span>'
+            )
+        if ordered:
+            inner += (
+                f'<span style="color:#fff;background:#2e7d32;border-radius:8px;'
+                f'padding:1px 7px;font-size:11px;font-weight:700" title="Вже замовлено">📦 {ordered}</span>'
+            )
+        if not inner:
+            inner = '<span style="opacity:.35">—</span>'
+        return mark_safe(f'<span id="mv-cart-cell-{obj.pk}">{inner}</span>')
+    cart_col.short_description = _("Кошик / Замов.")
+    cart_col.admin_order_field = '_in_cart_qty'
+
+    def quick_add_btn(self, obj):
+        default_qty = self._get_reorder_cached(obj).get('reorder_qty') or 1
+        return format_html(
+            '<button type="button" class="mv-qadd-btn" '
+            'data-pk="{}" data-default="{}" '
+            'style="background:#0d47a1;color:#fff;border:none;border-radius:6px;'
+            'padding:3px 10px;cursor:pointer;font-size:12px;white-space:nowrap;'
+            'font-weight:600" title="Швидко додати в кошик">🛒+</button>',
+            obj.pk, default_qty,
+        )
+    quick_add_btn.short_description = _("Додати")
 
     # ── Cart views ────────────────────────────────────────────────────────────
 
@@ -982,6 +1034,51 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         from django.http import JsonResponse
         count = PurchaseOrderLine.objects.filter(purchase_order__status='draft').count()
         return JsonResponse({'count': count})
+
+    def cart_add_one_view(self, request):
+        """POST: add a single product to the draft cart with specified qty."""
+        from django.http import JsonResponse
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+        try:
+            product_pk = int(request.POST.get('product_pk', 0))
+            qty = Decimal(str(request.POST.get('qty', '1')))
+            if qty <= 0:
+                raise ValueError('qty must be > 0')
+        except (ValueError, Exception) as e:
+            return JsonResponse({'ok': False, 'error': str(e)}, status=400)
+
+        product = get_object_or_404(Product, pk=product_pk)
+
+        po = PurchaseOrder.objects.filter(status='draft').order_by('pk').first()
+        if not po:
+            po = PurchaseOrder.objects.create(
+                supplier=Supplier.objects.first(),
+                status='draft',
+                order_date=timezone.now().date(),
+                notes="Кошик замовлень",
+            )
+
+        line, created = PurchaseOrderLine.objects.get_or_create(
+            purchase_order=po,
+            product=product,
+            defaults={
+                'qty_ordered': qty,
+                'description': product.sku,
+                'unit_price': product.purchase_price,
+            },
+        )
+        if not created:
+            line.qty_ordered += qty
+            line.save(update_fields=['qty_ordered'])
+
+        in_cart = int(
+            PurchaseOrderLine.objects.filter(
+                product=product, purchase_order__status='draft'
+            ).aggregate(t=Sum('qty_ordered'))['t'] or 0
+        )
+        cart_total = PurchaseOrderLine.objects.filter(purchase_order__status='draft').count()
+        return JsonResponse({'ok': True, 'in_cart': in_cart, 'cart_total': cart_total})
 
 
 # ── Стандартні admin класи (без змін) ─────────────────────────────────────────
