@@ -323,6 +323,11 @@
           <span class="ct-email-label">Текст</span>
           <textarea class="ct-email-body" id="email-body-{{ po.pk }}" placeholder="Завантаження..."></textarea>
         </div>
+        <div id="email-img-{{ po.pk }}" style="display:none;margin-top:8px">
+          <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">📎 {% trans "Схема кабелю (drag into email):" %}</div>
+          <img id="email-img-el-{{ po.pk }}" src="" alt="cable diagram"
+               style="max-width:100%;border-radius:6px;border:1px solid var(--border-strong)">
+        </div>
         <div class="ct-email-acts">
           <button class="ct-btn ct-btn-muted" onclick="ctCopyEmail({{ po.pk }})">📋 {% trans "Копіювати" %}</button>
           <button class="ct-btn ct-btn-send" onclick="ctMailto({{ po.pk }})">📤 {% trans "Відкрити в Email-клієнті" %}</button>
@@ -543,6 +548,12 @@ function ctToggleEmail(poPk) {
           const subjEl = document.getElementById('email-subj-' + poPk);
           if (!toEl.value   && d.to)      toEl.value   = d.to;
           if (!subjEl.value && d.subject) subjEl.value = d.subject;
+          if (d.image_b64) {
+            const imgWrap = document.getElementById('email-img-' + poPk);
+            const imgEl   = document.getElementById('email-img-el-' + poPk);
+            imgEl.src = d.image_b64;
+            imgWrap.style.display = 'block';
+          }
         } else { bodyEl.value = '❌ ' + (d.error || '?'); }
       }).catch(e => { bodyEl.value = '❌ ' + e; });
   }

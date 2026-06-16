@@ -552,8 +552,63 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                             'stock': stock_map.get(lp['product_id'], 0),
                         })
                     response.context_data['sv_order_stock_json'] = _json.dumps(order_stock)
+
+                    # Batch-fetch active PO info for deadline warning
+                    from inventory.models import PurchaseOrderLine as _POLine
+                    from datetime import date as _date
+                    po_lines_raw = []
+                    if product_ids:
+                        po_lines_raw = list(
+                            _POLine.objects.filter(
+                                product_id__in=product_ids,
+                                purchase_order__status='ordered',
+                            ).values('product_id', 'purchase_order__expected_date')
+                        )
+                    # product → earliest expected_date (None = on order, no date)
+                    po_by_pid: dict = {}
+                    for pl in po_lines_raw:
+                        pid = pl['product_id']
+                        ed  = pl['purchase_order__expected_date']
+                        if pid not in po_by_pid:
+                            po_by_pid[pid] = ed
+                        elif ed is not None:
+                            if po_by_pid[pid] is None or ed < po_by_pid[pid]:
+                                po_by_pid[pid] = ed
+
+                    # deadline per active order
+                    deadline_map = {
+                        o.pk: o.shipping_deadline
+                        for o in cl.result_list
+                        if o.shipping_deadline and o.status in ('received', 'processing')
+                    }
+
+                    order_po: dict = {}
+                    for lp in line_data:
+                        pid = lp['product_id']
+                        if pid not in po_by_pid:
+                            continue
+                        oid = str(lp['order_id'])
+                        if oid not in order_po:
+                            order_po[oid] = {'has_po': True, 'expected_date': None, 'is_late': False}
+                        ed = po_by_pid[pid]
+                        if ed is not None:
+                            cur = order_po[oid]['expected_date']
+                            if cur is None or ed > cur:
+                                order_po[oid]['expected_date'] = ed
+
+                    today = _date.today()
+                    for oid_str, d in order_po.items():
+                        oid_int = int(oid_str)
+                        deadline = deadline_map.get(oid_int)
+                        ed = d['expected_date']
+                        if ed and deadline and ed > deadline:
+                            d['is_late'] = True
+                        d['expected_date'] = ed.strftime('%d.%m.%Y') if ed else ''
+
+                    response.context_data['sv_order_po_json'] = _json.dumps(order_po)
                 except Exception:
                     response.context_data['sv_order_stock_json'] = '{}'
+                    response.context_data['sv_order_po_json'] = '{}'
 
         return response
     date_hierarchy = "order_date"

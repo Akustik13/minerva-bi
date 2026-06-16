@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from core.mixins import AuditableMixin
 from decimal import Decimal, InvalidOperation
+import re
 import uuid
 import json
 import os
@@ -1141,6 +1142,12 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         return redirect(reverse('admin:inventory_reorderproxy_cart'))
 
     # Keys from tech_attributes that are internal/non-display (skipped in email columns)
+    # Regex for cable SKU: CA-{end1}-MC{thickness}-{length_mm}-{end2}
+    _CABLE_SKU_RE = re.compile(
+        r'^CA-(?P<end1>[^-]+)-MC(?P<thick>[0-9.]+)-(?P<len>[0-9]+)-(?P<end2>[^-]+)$',
+        re.IGNORECASE,
+    )
+
     _RFQ_ATTR_SKIP = frozenset({
         'datasheetUrl', 'packaging', 'productLifecycleStatus',
         'productLifecycleStatusCode', 'ean', 'manufacturerPartNumber',
@@ -1179,6 +1186,35 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         'Impedance':              'Impedance',
     }
 
+    @staticmethod
+    def _parse_cable_sku(sku, regex):
+        m = regex.match(sku or '')
+        if not m:
+            return None
+        return {
+            'end1': m.group('end1').upper(),
+            'end2': m.group('end2').upper(),
+            'thick': m.group('thick'),
+            'length_mm': int(m.group('len')),
+        }
+
+    @staticmethod
+    def _make_table(header, rows):
+        if not rows:
+            return '(no items)'
+        col_widths = [max(len(header[c]), max(len(r[c]) for r in rows))
+                      for c in range(len(header))]
+        sep = '+' + '+'.join('-' * (w + 2) for w in col_widths) + '+'
+
+        def _row_str(cells):
+            return '|' + '|'.join(f' {c:<{col_widths[i]}} ' for i, c in enumerate(cells)) + '|'
+
+        lines = [sep, _row_str(header), sep]
+        for row in rows:
+            lines.append(_row_str(row))
+        lines.append(sep)
+        return '\n'.join(lines)
+
     def cart_email_view(self, request):
         """GET/POST: generate RFQ email text for a draft PO."""
         from django.http import JsonResponse
@@ -1193,80 +1229,122 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         s = InventorySettings.get()
         lines = [l for l in po.lines.all() if l.product_id]
+        supplier = po.supplier if po.supplier_id else None
 
-        # ── Collect attribute columns (dynamic, from tech_attributes) ────────
-        # Only when rfq_show_cable_params is enabled; skip internal/numeric keys
-        attr_keys = []  # ordered list of raw attr keys to include as columns
-        if s.rfq_show_cable_params:
-            seen = {}
-            for line in lines:
-                attrs = line.product.tech_attributes or {}
-                for k in attrs:
-                    if k in seen:
-                        continue
-                    # Skip internal keys and numeric (code-based) keys
-                    if k in self._RFQ_ATTR_SKIP or k.isdigit():
-                        continue
-                    seen[k] = True
-                    attr_keys.append(k)
-
-        # ── Build rows ────────────────────────────────────────────────────────
-        rows = []
-        for i, line in enumerate(lines, 1):
-            p = line.product
-            attrs = p.tech_attributes or {}
-            cols = []
-            if s.rfq_show_item_no:
-                cols.append(str(i))
-            if s.rfq_show_sku:
-                cols.append(p.sku)
-            cols.append(p.name or p.sku)
-            for k in attr_keys:
-                cols.append(str(attrs.get(k, '')))
-            cols.append(str(int(line.qty_ordered)))
-            rows.append(cols)
-
-        # ── Header row ────────────────────────────────────────────────────────
-        header = []
-        if s.rfq_show_item_no:
-            header.append('No.')
-        if s.rfq_show_sku:
-            header.append('SKU / Art.-Nr.')
-        header.append('Bezeichnung / Description')
-        for k in attr_keys:
-            header.append(self._RFQ_ATTR_LABELS.get(k, k))
-        header.append('Menge / Qty')
-
-        if not rows:
-            table = '(no items)'
+        # ── Greeting ─────────────────────────────────────────────────────────
+        contact = (supplier.contact_person or '').strip() if supplier else ''
+        if contact:
+            greeting = f"Hi {contact},"
         else:
-            # Align columns
-            col_widths = [max(len(header[c]), max(len(r[c]) for r in rows))
-                          for c in range(len(header))]
-            sep = '+' + '+'.join('-' * (w + 2) for w in col_widths) + '+'
+            greeting = s.rfq_email_greeting
 
-            def _row_str(cells):
-                return '|' + '|'.join(f' {c:<{col_widths[i]}} ' for i, c in enumerate(cells)) + '|'
+        # ── Detect cable lines ────────────────────────────────────────────────
+        cable_lines = []
+        other_lines = []
+        for line in lines:
+            parsed = self._parse_cable_sku(line.product.sku, self._CABLE_SKU_RE)
+            if parsed is not None:
+                cable_lines.append((line, parsed))
+            else:
+                other_lines.append(line)
 
-            table_lines = [sep, _row_str(header), sep]
-            for row in rows:
-                table_lines.append(_row_str(row))
-            table_lines.append(sep)
-            table = '\n'.join(table_lines)
+        parts = []
+
+        # ── Cable table ───────────────────────────────────────────────────────
+        if cable_lines:
+            cable_header = ['Item No.', 'Cable length', 'Cable thickness',
+                            '1st cable end', '2nd cable end', 'Color', 'Quantity, pcs']
+            cable_rows = []
+            for i, (line, parsed) in enumerate(cable_lines, 1):
+                attrs = line.product.tech_attributes or {}
+                color = attrs.get('Color') or 'Black'
+                cable_rows.append([
+                    str(i),
+                    f"{parsed['length_mm']} mm",
+                    f"{parsed['thick']} mm",
+                    parsed['end1'],
+                    parsed['end2'],
+                    color,
+                    str(int(line.qty_ordered)),
+                ])
+            parts.append(self._make_table(cable_header, cable_rows))
+            parts.append(
+                "Please note that the cable length L is measured between "
+                "the centers of the connectors."
+            )
+
+        # ── Non-cable table ───────────────────────────────────────────────────
+        if other_lines:
+            # Collect dynamic attribute columns from tech_attributes
+            attr_keys = []
+            if s.rfq_show_cable_params:
+                seen: dict = {}
+                for line in other_lines:
+                    for k in (line.product.tech_attributes or {}):
+                        if k not in seen and k not in self._RFQ_ATTR_SKIP and not k.isdigit():
+                            seen[k] = True
+                            attr_keys.append(k)
+
+            header = []
+            if s.rfq_show_item_no:
+                header.append('No.')
+            if s.rfq_show_sku:
+                header.append('SKU / Art.-Nr.')
+            header.append('Bezeichnung / Description')
+            for k in attr_keys:
+                header.append(self._RFQ_ATTR_LABELS.get(k, k))
+            header.append('Menge / Qty')
+
+            offset = len(cable_lines) + 1
+            rows = []
+            for i, line in enumerate(other_lines, offset):
+                p = line.product
+                attrs = p.tech_attributes or {}
+                cols = []
+                if s.rfq_show_item_no:
+                    cols.append(str(i))
+                if s.rfq_show_sku:
+                    cols.append(p.sku)
+                cols.append(p.name or p.sku)
+                for k in attr_keys:
+                    cols.append(str(attrs.get(k, '')))
+                cols.append(str(int(line.qty_ordered)))
+                rows.append(cols)
+            parts.append(self._make_table(header, rows))
+
+        table_block = '\n\n'.join(parts) if parts else '(no items)'
 
         body = (
-            f"{s.rfq_email_greeting}\n\n"
-            f"{table}\n\n"
+            f"{greeting}\n\n"
+            f"I have a new urgent RFQ:\n\n"
+            f"{table_block}\n\n"
             f"{s.rfq_email_signature}"
         )
 
-        supplier_email = (po.supplier.email if po.supplier_id and po.supplier else '') or ''
+        # ── Cable diagram image (base64) ──────────────────────────────────────
+        image_b64 = ''
+        if cable_lines:
+            import base64
+            from django.conf import settings as django_settings
+            for candidate in [
+                os.path.join(django_settings.BASE_DIR, 'static', 'images', 'cable_diagram.png'),
+                os.path.join(django_settings.BASE_DIR, 'static', 'images', 'cable_diagram.jpg'),
+            ]:
+                if os.path.isfile(candidate):
+                    ext = os.path.splitext(candidate)[1].lstrip('.').lower()
+                    mime = 'image/jpeg' if ext in ('jpg', 'jpeg') else 'image/png'
+                    with open(candidate, 'rb') as f:
+                        image_b64 = f'data:{mime};base64,{base64.b64encode(f.read()).decode()}'
+                    break
+
+        supplier_email = (supplier.email if supplier else '') or ''
 
         return JsonResponse({
             'ok': True,
             'to': supplier_email,
             'subject': s.rfq_email_subject,
             'body': body,
+            'image_b64': image_b64,
         })
 
     def cart_count_view(self, request):

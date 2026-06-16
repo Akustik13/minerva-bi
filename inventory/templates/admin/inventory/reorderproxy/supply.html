@@ -391,6 +391,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           <div class="sv-actions">
             <button type="button" class="sv-btn sv-qadd-btn"
                data-pk="{{ p.pk }}" data-sku="{{ p.sku }}"
+               onclick="event.stopPropagation(); svQaddOpen(this)"
                style="background:#0d47a1;color:#fff"
                title="{% trans "Додати в кошик замовлень" %}">🛒+</button>
             <a href="/admin/inventory/purchaseorder/add/?product={{ p.pk }}"
@@ -1057,10 +1058,8 @@ var _svi = {
     .catch(function(){ feedback.textContent = '❌ Мережева помилка'; });
   }
 
-  document.getElementById('sv-tbody').addEventListener('click', function(e){
-    var btn = e.target.closest('.sv-qadd-btn');
-    if (btn) { e.stopPropagation(); openPop(btn); }
-  });
+  window.svQaddOpen = openPop;
+
   document.addEventListener('click', function(e){
     if (!pop.contains(e.target) && !e.target.closest('.sv-qadd-btn')) closePop();
   });

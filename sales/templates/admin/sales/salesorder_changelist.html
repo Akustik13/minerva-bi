@@ -297,6 +297,7 @@ document.addEventListener('DOMContentLoaded', function () {
         {% if order.status == 'received' or order.status == 'processing' %}{% with ds=order.deadline_status %}{% if ds %}
           <span style="color:{{ ds.color }};font-size:11px">{{ ds.icon }} {% trans "Дедлайн" %} {{ order.shipping_deadline|date:"d.m.Y" }} — {{ ds.label }}</span>
         {% endif %}{% endwith %}{% endif %}
+        <span id="sv-po-warn-{{ order.pk }}" style="font-size:11px"></span>
         {% if order.shipped_at %}
           <span style="color:var(--text-muted)">📬 {% trans "Відправлено:" %} <strong style="color:#2e7d32">{{ order.shipped_at|date:"d.m.Y" }}</strong></span>
         {% endif %}
@@ -469,11 +470,12 @@ document.addEventListener('DOMContentLoaded', function () {
         <button type="button"
                 class="sv-stock-chip"
                 data-order-pk="{{ order.pk }}"
+                data-order-id="{{ order.pk }}"
                 onclick="event.stopPropagation();svStockChipClick(this)"
                 style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
                        background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32;
                        cursor:pointer;white-space:nowrap;font-family:inherit">
-          ✅ {% trans "Склад" %}
+          <span class="sv-stock-txt">✅ {% trans "Склад" %}</span>
         </button>
       {% endif %}
       {% endif %}
@@ -1249,10 +1251,29 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
       txt.textContent = (allOk ? '✅' : '⚠️') + ' Склад: ' + covered + '/' + lines.length;
     }
     if (!allOk) {
-      chip.style.background = 'rgba(255,152,0,.15)';
-      chip.style.color = '#ffa726';
-      chip.style.borderColor = '#e65100';
+      chip.style.background = 'rgba(198,40,40,.15)';
+      chip.style.color      = '#ef5350';
+      chip.style.borderColor = '#c62828';
     }
+  });
+})();
+
+// ── PO incoming warning: show expected delivery vs deadline ──────────────────
+(function() {
+  var poData = {{ sv_order_po_json|default:"{}"|safe }};
+  Object.keys(poData).forEach(function(oid) {
+    var d = poData[oid];
+    var el = document.getElementById('sv-po-warn-' + oid);
+    if (!el || !d.has_po) return;
+    var html;
+    if (d.is_late) {
+      html = '<span style="color:#ef5350;font-weight:600">⚠️ {% trans "Замовлено, затримка! Очікується" %} ' + d.expected_date + '</span>';
+    } else if (d.expected_date) {
+      html = '<span style="color:var(--text-dim)">📦 {% trans "Товар замовлено, очікується" %} ' + d.expected_date + '</span>';
+    } else {
+      html = '<span style="color:var(--text-dim)">📦 {% trans "Товар замовлено" %}</span>';
+    }
+    el.innerHTML = html;
   });
 })();
 
@@ -1363,16 +1384,17 @@ if (!window._cexDelDocDef) {
     /* Update the chip badge */
     var total = lines.length;
     var ok    = d.ok_count;
+    var txtEl = btn.querySelector('.sv-stock-txt') || btn;
     if (hasBad) {
       btn.style.background = 'rgba(198,40,40,.15)';
       btn.style.color      = '#ef5350';
       btn.style.borderColor= '#c62828';
-      btn.textContent = '⚠️ {% trans "Склад" %}: ' + ok + '/' + total;
+      txtEl.textContent = '⚠️ {% trans "Склад" %}: ' + ok + '/' + total;
     } else {
       btn.style.background = 'rgba(46,125,50,.15)';
       btn.style.color      = '#4caf50';
       btn.style.borderColor= '#2e7d32';
-      btn.textContent = '✅ {% trans "Склад" %}';
+      txtEl.textContent = '✅ {% trans "Склад" %}';
     }
 
     /* Build popup body */
