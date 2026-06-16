@@ -382,6 +382,7 @@ document.addEventListener('DOMContentLoaded', function () {
           <th style="padding:5px 8px;text-align:left;font-weight:600">{% trans "Артикул" %}</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600">📄</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600;white-space:nowrap">🏷️ {% trans "Етикетка" %}</th>
+          <th style="padding:5px 8px;text-align:center;font-weight:600;white-space:nowrap">{% trans "Склад" %}</th>
           <th style="padding:5px 8px;text-align:center;font-weight:600">{% trans "К-сть" %}</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">{% trans "Ціна" %}</th>
           <th style="padding:5px 8px;text-align:right;font-weight:600">{% trans "Сума" %}</th>
@@ -423,6 +424,10 @@ document.addEventListener('DOMContentLoaded', function () {
           <td style="padding:6px 8px;text-align:center">
             {% if lsku %}<span class="sv-lbl-btn sv-lbl-off sv-line-lbl" data-sku="{{ lsku }}" data-qty="{{ lqty }}">🏷️</span>{% else %}—{% endif %}
           </td>
+          <td style="padding:6px 8px;text-align:center;font-size:11px;white-space:nowrap"
+              {% if line.product_id %}data-sv-stock-ord="{{ order.pk }}" data-sv-stock-pid="{{ line.product.pk }}"{% endif %}>
+            <span style="color:var(--text-dim)">—</span>
+          </td>
           <td style="padding:6px 8px;text-align:center;font-weight:600">
             {% if line.qty == line.qty|floatformat:"0"|add:"0" %}{{ line.qty|floatformat:"0" }}{% else %}{{ line.qty }}{% endif %}
           </td>
@@ -438,7 +443,7 @@ document.addEventListener('DOMContentLoaded', function () {
       </tbody>
       <tfoot>
         <tr style="border-top:2px solid var(--border-strong)">
-          <td colspan="5" style="padding:7px 8px;text-align:right;color:var(--text-muted);font-size:12px">{% trans "Разом:" %}</td>
+          <td colspan="6" style="padding:7px 8px;text-align:right;color:var(--text-muted);font-size:12px">{% trans "Разом:" %}</td>
           <td style="padding:7px 8px;text-align:right;font-size:15px;font-weight:800;color:#2e7d32;white-space:nowrap">
             {% with t=order.order_total %}{% if t %}{{ t|floatformat:"2" }} {{ lines.0.currency|default:order.currency }}{% else %}—{% endif %}{% endwith %}
           </td>
@@ -1255,6 +1260,26 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
       chip.style.color      = '#ef5350';
       chip.style.borderColor = '#c62828';
     }
+  });
+})();
+
+// ── Stock column: fill per-line stock cells from batch data ─────────────────
+(function() {
+  var stockData = {{ sv_order_stock_json|default:"{}"|safe }};
+  Object.keys(stockData).forEach(function(oid) {
+    (stockData[oid] || []).forEach(function(l) {
+      var cell = document.querySelector(
+        '[data-sv-stock-ord="' + oid + '"][data-sv-stock-pid="' + l.pid + '"]'
+      );
+      if (!cell) return;
+      if (l.stock >= l.need) {
+        cell.innerHTML = '<span style="color:var(--text-dim)">' + l.stock + ' шт.</span>';
+      } else if (l.stock > 0) {
+        cell.innerHTML = '<span style="color:#ff9800;font-weight:700" title="Потрібно: ' + l.need + '">⚠️ ' + l.stock + '/' + l.need + '</span>';
+      } else {
+        cell.innerHTML = '<span style="color:#ef5350;font-weight:700" title="Потрібно: ' + l.need + '">❌ 0</span>';
+      }
+    });
   });
 })();
 
