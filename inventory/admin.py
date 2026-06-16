@@ -515,14 +515,16 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                             'border-radius:12px;padding:3px 10px;font-size:11px;'
                             'color:var(--text-muted);white-space:nowrap')
                     chip_val = 'font-weight:800;color:var(--text)'
+                    dim = 'font-size:10px;opacity:.6'
+                    all_time = f'<span style="{dim}">({str(_("за весь період"))})</span>'
                     chips_html = (
                         f'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
                         f'<span style="{chip}">{demand}</span>'
-                        f'<span style="{chip}">' + str(_('Замовлень:')) + f' <b style="{chip_val}">{total_orders}</b></span>'
-                        f'<span style="{chip}">' + str(_('Всього продано:')) + f' <b style="{chip_val}">{int(total_qty):g} шт.</b></span>'
+                        f'<span style="{chip}">' + str(_('Замовлень:')) + f' <b style="{chip_val}">{total_orders}</b> {all_time}</span>'
+                        f'<span style="{chip}">' + str(_('Продано:')) + f' <b style="{chip_val}">{int(total_qty):g} шт.</b> {all_time}</span>'
                         f'<span style="{chip}">' + str(_('За 30 днів:')) + f' <b style="{chip_val}">{int(qty_30):g} шт.</b></span>'
                         f'<span style="{chip}">' + str(_('За 90 днів:')) + f' <b style="{chip_val}">{int(qty_90):g} шт.</b></span>'
-                        f'<span style="{chip}">👥 ' + str(_('Клієнтів:')) + f' <b style="{chip_val}">{uniq_customers}</b></span>'
+                        f'<span style="{chip}">👥 ' + str(_('Клієнтів:')) + f' <b style="{chip_val}">{uniq_customers}</b> {all_time}</span>'
                         f'</div>'
                     )
 
