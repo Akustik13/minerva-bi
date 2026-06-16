@@ -441,6 +441,11 @@ class RFQEmailTemplate(models.Model):
         "Схема / зображення", upload_to='rfq_diagrams/', null=True, blank=True,
         help_text="Вставляється після таблиці в панелі Email кошика",
     )
+    diagram_in_body = models.BooleanField(
+        "Вставити схему в тіло листа", default=True,
+        help_text="Якщо увімкнено — зображення буде вбудоване в HTML-листі. "
+                  "Якщо вимкнено — показується тільки як прев'ю у панелі кошика.",
+    )
 
     class Meta:
         verbose_name = "Шаблон RFQ Email"

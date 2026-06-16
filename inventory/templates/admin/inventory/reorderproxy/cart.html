@@ -555,6 +555,7 @@ function ctToggleEmail(poPk) {
             const imgWrap = document.getElementById('email-img-' + poPk);
             const imgEl   = document.getElementById('email-img-el-' + poPk);
             imgEl.src = d.image_b64;
+            imgEl.dataset.diagramInBody = d.diagram_in_body ? '1' : '0';
             imgWrap.style.display = 'block';
           }
         } else { bodyEl.value = '❌ ' + (d.error || '?'); }
@@ -576,7 +577,8 @@ function ctSendEmail(poPk) {
   const subj    = document.getElementById('email-subj-' + poPk)?.value.trim();
   const body    = document.getElementById('email-body-' + poPk)?.value.trim();
   const imgEl   = document.getElementById('email-img-el-' + poPk);
-  const image_b64 = (imgEl && imgEl.src && imgEl.src.startsWith('data:')) ? imgEl.src : '';
+  const image_b64      = (imgEl && imgEl.src && imgEl.src.startsWith('data:')) ? imgEl.src : '';
+  const diagram_in_body = imgEl ? imgEl.dataset.diagramInBody !== '0' : true;
   const btn     = document.getElementById('ct-send-btn-' + poPk);
   const status  = document.getElementById('ct-send-status-' + poPk);
   if (!to)   { if (status) status.innerHTML = '<span style="color:#ef5350">❌ Вкажіть адресу отримувача</span>'; return; }
@@ -591,7 +593,7 @@ function ctSendEmail(poPk) {
       'Content-Type': 'application/json',
       'X-CSRFToken': csrf ? csrf[1] : '',
     },
-    body: JSON.stringify({ to, subject: subj, body, image_b64 }),
+    body: JSON.stringify({ to, subject: subj, body, image_b64, diagram_in_body }),
   })
   .then(r => r.json())
   .then(d => {

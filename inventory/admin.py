@@ -1237,16 +1237,26 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         # ── Find best matching RFQ email template ─────────────────────────────
         # 1. Collect category slugs of products in this PO
         cat_slugs = set()
+        has_cable_sku = False
         for line in lines:
             cat = (line.product.category or '').strip()
             if cat:
                 cat_slugs.add(cat)
+            if self._CABLE_SKU_RE.match(line.product.sku or ''):
+                has_cable_sku = True
 
-        # 2. Try to find template matching any category slug
+        # 2. Try template matching any product category slug
         tmpl = None
         if cat_slugs:
             tmpl = (RFQEmailTemplate.objects
                     .filter(category__slug__in=cat_slugs)
+                    .select_related('category')
+                    .first())
+
+        # 2b. If category slug didn't match but cable SKUs detected → use cable template
+        if tmpl is None and has_cable_sku:
+            tmpl = (RFQEmailTemplate.objects
+                    .filter(use_cable_columns=True)
                     .select_related('category')
                     .first())
 
@@ -1387,12 +1397,15 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         supplier_email = (supplier.email if supplier else '') or ''
 
+        diagram_in_body = tmpl.diagram_in_body if tmpl and tmpl.diagram else True
+
         return JsonResponse({
             'ok': True,
             'to': supplier_email,
             'subject': subject_text,
             'body': body,
             'image_b64': image_b64,
+            'diagram_in_body': diagram_in_body,
         })
 
     def cart_send_email_view(self, request):
@@ -1406,10 +1419,11 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         except Exception:
             return JsonResponse({'ok': False, 'error': 'Invalid JSON'}, status=400)
 
-        to_addr   = (data.get('to') or '').strip()
-        subject   = (data.get('subject') or '').strip()
-        body_text = (data.get('body') or '').strip()
-        image_b64 = (data.get('image_b64') or '').strip()
+        to_addr        = (data.get('to') or '').strip()
+        subject        = (data.get('subject') or '').strip()
+        body_text      = (data.get('body') or '').strip()
+        image_b64      = (data.get('image_b64') or '').strip()
+        diagram_in_body = bool(data.get('diagram_in_body', True))
 
         if not to_addr:
             return JsonResponse({'ok': False, 'error': 'Не вказано адресу отримувача'})
@@ -1441,7 +1455,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'line-height:1.5;color:#222'
             )
             html_body = f'<pre style="{pre_style}">{body_text}</pre>'
-            if image_b64:
+            if image_b64 and diagram_in_body:
                 html_body += (
                     f'<div style="margin-top:16px">'
                     f'<img src="{image_b64}" alt="Cable diagram" '
@@ -3097,7 +3111,7 @@ class RFQEmailTemplateAdmin(admin.ModelAdmin):
     list_display_links = ('name',)
     list_select_related = ('category',)
     fields = ('name', 'category', 'subject', 'greeting', 'intro',
-              'signature', 'footer_note', 'use_cable_columns', 'diagram')
+              'signature', 'footer_note', 'use_cable_columns', 'diagram', 'diagram_in_body')
 
     def has_diagram(self, obj):
         return bool(obj.diagram)
