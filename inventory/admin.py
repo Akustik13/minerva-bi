@@ -28,6 +28,7 @@ from .models import (
     InventoryTransaction, ProductComponent,
     Supplier, PurchaseOrder, PurchaseOrderLine,
     ProductCategory, InventorySettings, IncomingShipment,
+    RFQEmailTemplate,
 )
 from shipping.models import ProductPackaging
 
@@ -1231,19 +1232,57 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         lines = [l for l in po.lines.all() if l.product_id]
         supplier = po.supplier if po.supplier_id else None
 
-        # ── Greeting ─────────────────────────────────────────────────────────
+        # ── Find best matching RFQ email template ─────────────────────────────
+        # 1. Collect category slugs of products in this PO
+        cat_slugs = set()
+        for line in lines:
+            cat = (line.product.category or '').strip()
+            if cat:
+                cat_slugs.add(cat)
+
+        # 2. Try to find template matching any category slug
+        tmpl = None
+        if cat_slugs:
+            tmpl = (RFQEmailTemplate.objects
+                    .filter(category__slug__in=cat_slugs)
+                    .select_related('category')
+                    .first())
+
+        # 3. Fall back to default template (category=None)
+        if tmpl is None:
+            tmpl = RFQEmailTemplate.objects.filter(category__isnull=True).first()
+
+        # ── Resolve template fields ───────────────────────────────────────────
         contact = (supplier.contact_person or '').strip() if supplier else ''
-        if contact:
-            greeting = f"Hi {contact},"
+
+        if tmpl:
+            subject_text = tmpl.subject
+            if contact:
+                greeting = tmpl.greeting.replace('{contact_person}', contact)
+            else:
+                greeting = (tmpl.greeting
+                            .replace(', {contact_person}', '')
+                            .replace('{contact_person}', 'Sir/Madam'))
+            intro_text = tmpl.intro
+            signature_text = tmpl.signature
+            footer_note = tmpl.footer_note
+            use_cable = tmpl.use_cable_columns
         else:
-            greeting = s.rfq_email_greeting
+            # Legacy fallback — use InventorySettings fields
+            subject_text = s.rfq_email_subject
+            greeting = f"Hi {contact}," if contact else s.rfq_email_greeting
+            intro_text = "I have a new urgent RFQ:"
+            signature_text = s.rfq_email_signature
+            footer_note = ("Please note that the cable length L is measured "
+                           "between the centers of the connectors.")
+            use_cable = True
 
         # ── Detect cable lines ────────────────────────────────────────────────
         cable_lines = []
         other_lines = []
         for line in lines:
             parsed = self._parse_cable_sku(line.product.sku, self._CABLE_SKU_RE)
-            if parsed is not None:
+            if parsed is not None and use_cable:
                 cable_lines.append((line, parsed))
             else:
                 other_lines.append(line)
@@ -1268,10 +1307,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                     str(int(line.qty_ordered)),
                 ])
             parts.append(self._make_table(cable_header, cable_rows))
-            parts.append(
-                "Please note that the cable length L is measured between "
-                "the centers of the connectors."
-            )
+            if footer_note:
+                parts.append(footer_note)
 
         # ── Non-cable table ───────────────────────────────────────────────────
         if other_lines:
@@ -1316,15 +1353,24 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
 
         body = (
             f"{greeting}\n\n"
-            f"I have a new urgent RFQ:\n\n"
+            f"{intro_text}\n\n"
             f"{table_block}\n\n"
-            f"{s.rfq_email_signature}"
+            f"{signature_text}"
         )
 
-        # ── Cable diagram image (base64) ──────────────────────────────────────
+        # ── Diagram image (base64) ────────────────────────────────────────────
+        import base64
         image_b64 = ''
-        if cable_lines:
-            import base64
+        if tmpl and tmpl.diagram:
+            try:
+                with open(tmpl.diagram.path, 'rb') as f:
+                    raw = f.read()
+                ext = tmpl.diagram.name.rsplit('.', 1)[-1].lower()
+                mime = 'image/jpeg' if ext in ('jpg', 'jpeg') else 'image/png'
+                image_b64 = f'data:{mime};base64,{base64.b64encode(raw).decode()}'
+            except Exception:
+                pass
+        elif cable_lines:
             from django.conf import settings as django_settings
             for candidate in [
                 os.path.join(django_settings.BASE_DIR, 'static', 'images', 'cable_diagram.png'),
@@ -1342,7 +1388,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         return JsonResponse({
             'ok': True,
             'to': supplier_email,
-            'subject': s.rfq_email_subject,
+            'subject': subject_text,
             'body': body,
             'image_b64': image_b64,
         })
@@ -2973,6 +3019,22 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         return redirect(reverse("admin:inventory_product_import_excel"))
 
 
+# ── RFQ Email Templates ────────────────────────────────────────────────────────
+
+@admin.register(RFQEmailTemplate)
+class RFQEmailTemplateAdmin(admin.ModelAdmin):
+    list_display = ('name', 'category', 'subject', 'use_cable_columns', 'has_diagram')
+    list_display_links = ('name',)
+    list_select_related = ('category',)
+    fields = ('name', 'category', 'subject', 'greeting', 'intro',
+              'signature', 'footer_note', 'use_cable_columns', 'diagram')
+
+    def has_diagram(self, obj):
+        return bool(obj.diagram)
+    has_diagram.boolean = True
+    has_diagram.short_description = 'Схема'
+
+
 # ── Inventory Settings ─────────────────────────────────────────────────────────
 
 @admin.register(InventorySettings)
@@ -2998,18 +3060,16 @@ class InventorySettingsAdmin(admin.ModelAdmin):
         ("📍 Загальні параметри", {
             "fields": ("default_location", "low_stock_alert_enabled"),
         }),
-        ("📧 RFQ Email — шаблон листа замовлення", {
+        ("📧 RFQ Email — шаблони листів замовлення", {
             "fields": (
-                "rfq_email_subject",
-                "rfq_email_greeting",
-                "rfq_email_signature",
                 "rfq_show_item_no",
                 "rfq_show_sku",
-                "rfq_show_cable_params",
+                "rfq_email_templates_panel",
             ),
             "description": (
-                "Налаштування шаблону листа для замовлення товарів постачальнику. "
-                "Використовується в <b>🛒 Кошику замовлень</b> при натисканні «📧 Сформувати Email»."
+                "Налаштування шаблонів листів для замовлення товарів постачальнику. "
+                "Використовується в <b>🛒 Кошику замовлень</b> при натисканні «📧 Сформувати Email». "
+                "Кожна категорія може мати власний шаблон."
             ),
         }),
         ("🖼️ Кешування медіа (Datasheet / Фото)", {
@@ -3021,7 +3081,52 @@ class InventorySettingsAdmin(admin.ModelAdmin):
         }),
     )
 
-    readonly_fields = ("media_cache_panel",)
+    readonly_fields = ("media_cache_panel", "rfq_email_templates_panel")
+
+    def rfq_email_templates_panel(self, obj):
+        from django.urls import reverse as _rev
+        templates = RFQEmailTemplate.objects.select_related('category').order_by('category__order', 'name')
+        add_url = _rev('admin:inventory_rfqemailtemplate_add')
+        rows = ''
+        for t in templates:
+            edit_url = _rev('admin:inventory_rfqemailtemplate_change', args=[t.pk])
+            cat_name = t.category.name if t.category_id else '<i>За замовчуванням</i>'
+            cable_badge = ('<span style="background:#1565c0;color:#fff;border-radius:3px;'
+                           'padding:1px 5px;font-size:10px">кабель</span>'
+                           if t.use_cable_columns else '')
+            diagram_badge = '📎' if t.diagram else ''
+            rows += (
+                f'<tr>'
+                f'<td style="padding:4px 8px;color:var(--text)">'
+                f'  <a href="{edit_url}" style="color:var(--link-fg);font-weight:600">{t.name}</a>'
+                f'</td>'
+                f'<td style="padding:4px 8px;color:var(--text-muted)">{cat_name}</td>'
+                f'<td style="padding:4px 8px">{cable_badge} {diagram_badge}</td>'
+                f'<td style="padding:4px 8px;font-family:monospace;font-size:11px;'
+                f'    color:var(--text-dim);max-width:180px;overflow:hidden;'
+                f'    text-overflow:ellipsis;white-space:nowrap">{t.subject}</td>'
+                f'</tr>'
+            )
+        if not rows:
+            rows = '<tr><td colspan="4" style="padding:8px;color:var(--text-dim)">Немає шаблонів</td></tr>'
+        return mark_safe(
+            f'<table style="width:100%;border-collapse:collapse;font-size:12px;'
+            f'             border:1px solid var(--border-strong);border-radius:6px;overflow:hidden">'
+            f'<thead><tr style="background:var(--bg-input)">'
+            f'<th style="padding:6px 8px;text-align:left;color:var(--text-dim);font-size:11px">Назва</th>'
+            f'<th style="padding:6px 8px;text-align:left;color:var(--text-dim);font-size:11px">Категорія</th>'
+            f'<th style="padding:6px 8px;text-align:left;color:var(--text-dim);font-size:11px">Тип</th>'
+            f'<th style="padding:6px 8px;text-align:left;color:var(--text-dim);font-size:11px">Тема</th>'
+            f'</tr></thead>'
+            f'<tbody>{rows}</tbody>'
+            f'</table>'
+            f'<div style="margin-top:8px">'
+            f'<a href="{add_url}" style="display:inline-block;padding:5px 14px;'
+            f'   background:#1565c0;color:#fff;border-radius:5px;text-decoration:none;'
+            f'   font-size:12px;font-weight:600">+ Додати шаблон</a>'
+            f'</div>'
+        )
+    rfq_email_templates_panel.short_description = "Шаблони листів (по категоріях)"
 
     def media_cache_panel(self, obj):
         total  = Product.objects.count()

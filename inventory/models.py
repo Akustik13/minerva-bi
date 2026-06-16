@@ -413,6 +413,45 @@ class InventorySettings(models.Model):
         super().save(*args, **kwargs)
 
 
+class RFQEmailTemplate(models.Model):
+    """Email template for RFQ orders, configurable per product category."""
+    name = models.CharField("Назва шаблону", max_length=100)
+    category = models.ForeignKey(
+        'ProductCategory', on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="Категорія товарів",
+        help_text="Порожньо = шаблон за замовчуванням",
+        related_name='rfq_templates',
+    )
+    subject = models.CharField("Тема листа", max_length=255, default="Order Request")
+    greeting = models.CharField(
+        "Вітання", max_length=255, default="Hi {contact_person},",
+        help_text="{contact_person} замінюється на ім'я контактної особи постачальника",
+    )
+    intro = models.TextField("Текст вступу", default="I have a new urgent RFQ:")
+    signature = models.TextField("Підпис", default="Best regards,")
+    footer_note = models.TextField(
+        "Нотатка після таблиці", blank=True, default="",
+        help_text="Наприклад: 'Please note that cable length L is measured...'",
+    )
+    use_cable_columns = models.BooleanField(
+        "Кабельні колонки", default=False,
+        help_text="Розбирає SKU кабелю (CA-…-MCx.xx-…) та формує окремі колонки: довжина, товщина, з'єднувачі",
+    )
+    diagram = models.ImageField(
+        "Схема / зображення", upload_to='rfq_diagrams/', null=True, blank=True,
+        help_text="Вставляється після таблиці в панелі Email кошика",
+    )
+
+    class Meta:
+        verbose_name = "Шаблон RFQ Email"
+        verbose_name_plural = "\U0001f4e7 Шаблони RFQ Email"
+        ordering = ['category__order', 'name']
+
+    def __str__(self):
+        cat = self.category.name if self.category_id else "За замовчуванням"
+        return f"{self.name} [{cat}]"
+
+
 class IncomingShipment(models.Model):
     """Відстеження вхідних відправлень від постачальників."""
 
