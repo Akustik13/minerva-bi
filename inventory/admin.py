@@ -1276,6 +1276,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     search_fields = ("sku", "sku_short", "name")
     list_filter   = ("category", "kind", "bom_type", "is_active")
     list_per_page = 50
+    actions       = ["bulk_sync_digikey_attrs"]
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail",
@@ -1317,6 +1318,57 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             "fields": ("tech_attributes",),
         }),
     )
+
+    def bulk_sync_digikey_attrs(self, request, queryset):
+        """Pull tech_attributes from DigiKey API for selected products."""
+        try:
+            from bots.models import DigiKeyListing
+            from bots.services.dk_marketplace import pull_product_fields, DKMarketplaceError
+        except ImportError:
+            self.message_user(request, "❌ Модуль bots недоступний.", messages.ERROR)
+            return
+
+        product_pks = list(queryset.values_list('pk', flat=True))
+        listing_map = {
+            l.product_id: l
+            for l in DigiKeyListing.objects.filter(product_id__in=product_pks).select_related('product')
+        }
+
+        synced, no_listing, not_found, errors = [], [], [], []
+
+        for product in queryset:
+            listing = listing_map.get(product.pk)
+            if not listing:
+                no_listing.append(product.sku)
+                continue
+            try:
+                pull_product_fields(listing)
+                attrs = dict(listing.dk_attributes or {})
+                if not attrs:
+                    not_found.append(product.sku)
+                    continue
+                product.tech_attributes = attrs
+                product.save(update_fields=['tech_attributes'])
+                synced.append(product.sku)
+            except DKMarketplaceError as e:
+                not_found.append(product.sku)
+            except Exception as e:
+                errors.append(f"{product.sku}: {e}")
+
+        parts = []
+        if synced:
+            parts.append(f"✅ Синхронізовано {len(synced)}: {', '.join(synced)}")
+        if no_listing:
+            parts.append(f"⚠️ Немає DK лістингу ({len(no_listing)}): {', '.join(no_listing)}")
+        if not_found:
+            parts.append(f"❌ Не знайдено на DigiKey ({len(not_found)}): {', '.join(not_found)}")
+        if errors:
+            parts.append(f"❌ Помилки: {'; '.join(errors)}")
+
+        lvl = messages.SUCCESS if synced else (messages.WARNING if no_listing or not_found else messages.ERROR)
+        self.message_user(request, " | ".join(parts) or "Нічого не оброблено.", lvl)
+
+    bulk_sync_digikey_attrs.short_description = "🔄 Синх технічних атрибутів з DigiKey"
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}

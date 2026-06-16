@@ -561,7 +561,10 @@
   gap: 12px !important;
 }
 #branding   { grid-column: 1; min-width: 0; }
-#user-tools { grid-column: 3; min-width: 0; white-space: nowrap; }
+#user-tools {
+  grid-column: 3; min-width: 0; white-space: nowrap;
+  display: flex !important; align-items: center !important; gap: 4px;
+}
 
 #minerva-motto {
   grid-column: 2;
@@ -1508,16 +1511,15 @@ document.addEventListener('DOMContentLoaded', function(){
 <a id="mv-cart-btn" href="/admin/inventory/reorderproxy/cart/"
    title="Кошик замовлень"
    style="position:relative;display:inline-flex;align-items:center;justify-content:center;
-          width:34px;height:34px;margin-right:6px;border-radius:8px;text-decoration:none;
+          padding:4px 9px;border-radius:7px;text-decoration:none;flex-shrink:0;
           background:var(--bg-card);border:1px solid var(--border-strong);
-          font-size:17px;color:var(--text-muted);transition:background .15s,color .15s;
-          vertical-align:middle">
+          font-size:15px;color:var(--text-muted);transition:background .15s,color .15s,border-color .15s">
   🛒
   <span id="mv-cart-badge"
-        style="display:none;position:absolute;top:-6px;right:-6px;
+        style="display:none;position:absolute;top:-7px;right:-7px;
                background:#2e7d32;color:#fff;border-radius:50%;
-               min-width:18px;height:18px;font-size:10px;font-weight:800;
-               line-height:18px;text-align:center;padding:0 3px;
+               min-width:17px;height:17px;font-size:10px;font-weight:800;
+               line-height:17px;text-align:center;padding:0 3px;
                border:2px solid var(--header-bg,#1a3352);"></span>
 </a>
 <script>
