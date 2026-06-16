@@ -165,6 +165,39 @@ class DigiKeyConfig(models.Model):
         "Кеш оновлено", null=True, blank=True
     )
 
+    # ── API Error Handling & Retry Strategy ───────────────────────────────────
+    api_retry_count = models.PositiveSmallIntegerField(
+        "Кількість спроб при збої", default=3,
+        help_text="Скільки разів повторити запит перед тим як надіслати сповіщення (1–10)"
+    )
+    api_retry_delay = models.PositiveSmallIntegerField(
+        "Затримка між спробами (сек)", default=10,
+        help_text="Секунди між повторними спробами підключення до DigiKey API"
+    )
+    api_notify_on_error = models.BooleanField(
+        "Сповіщати при збоях з'єднання", default=True,
+        help_text="Telegram/Email якщо синк падає після всіх спроб (timeout, network error)"
+    )
+    api_notify_on_reauth = models.BooleanField(
+        "Сповіщати коли потрібна повторна авторизація", default=True,
+        help_text="Якщо refresh_token недійсний — надіслати сповіщення з посиланням на OAuth"
+    )
+    api_notify_telegram = models.BooleanField(
+        "Telegram сповіщення", default=True
+    )
+    api_notify_telegram_mode = models.CharField(
+        "Кому в Telegram", max_length=10,
+        choices=[('group', 'Загальний чат'), ('private', 'Приватно суперадміну')],
+        default='group'
+    )
+    api_notify_email = models.BooleanField(
+        "Email сповіщення", default=True
+    )
+    api_notify_email_to = models.CharField(
+        "Email одержувачів (через кому)", max_length=500, blank=True, default="",
+        help_text="Порожньо = взяти адресу з загальних налаштувань сповіщень"
+    )
+
     @classmethod
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)

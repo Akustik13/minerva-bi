@@ -4,10 +4,12 @@ Management command: sync_digikey_orders
 Запуск:
   python manage.py sync_digikey_orders
   python manage.py sync_digikey_orders --dry-run
+  python manage.py sync_digikey_orders --force
 
 Cron (Synology Docker):
   */30 * * * * docker-compose exec -T web python manage.py sync_digikey_orders
 """
+import time
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -29,7 +31,8 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from bots.models import DigiKeyConfig
-        from bots.services.digikey import sync_orders, DigiKeyAPIError
+        from bots.services.digikey import DigiKeyAPIError
+        from bots.services.api_health import notify_connection_failure, notify_reauth_needed
 
         dry_run = options["dry_run"]
         force   = options["force"]
@@ -41,12 +44,14 @@ class Command(BaseCommand):
             return
 
         if not config.sync_enabled and not force:
-            self.stdout.write("⏸ Синхронізація вимкнена (sync_enabled=False). Використайте --force для ручного запуску.")
+            self.stdout.write(
+                "⏸ Синхронізація вимкнена (sync_enabled=False). "
+                "Використайте --force для ручного запуску."
+            )
             return
 
-        # Перевіряємо інтервал (якщо не --force)
+        # Self-throttle: check interval from DB
         if not force and config.last_synced_at and config.sync_interval_minutes:
-            from django.utils import timezone
             elapsed = (timezone.now() - config.last_synced_at).total_seconds() / 60
             if elapsed < config.sync_interval_minutes:
                 remaining = int(config.sync_interval_minutes - elapsed)
@@ -59,28 +64,82 @@ class Command(BaseCommand):
 
         if dry_run:
             self.stdout.write("🔍 DRY-RUN: дані не будуть збережені в БД.")
-            # Just test connection
             from bots.services.digikey import test_connection
             result = test_connection(config)
             self.stdout.write(result["message"])
             return
 
-        self.stdout.write(f"🔄 Запуск DigiKey синхронізації [{timezone.now().strftime('%Y-%m-%d %H:%M')}]…")
+        use_marketplace = bool(
+            config.marketplace_refresh_token or config.marketplace_access_token
+        )
+        retry_count = max(1, min(10, config.api_retry_count or 3))
+        retry_delay = max(1, config.api_retry_delay or 10)
 
-        try:
-            if config.marketplace_refresh_token or config.marketplace_access_token:
-                from bots.services.digikey import sync_marketplace_orders
-                self.stdout.write("  -> Marketplace API (3-legged OAuth)")
-                stats = sync_marketplace_orders(config)
-            else:
-                self.stdout.write("  -> OrderStatus API (2-legged, legacy)")
-                stats = sync_orders(config)
-        except DigiKeyAPIError as e:
-            self.stderr.write(f"❌ DigiKey API error: {e}")
+        self.stdout.write(
+            f"🔄 Запуск DigiKey синхронізації [{timezone.now().strftime('%Y-%m-%d %H:%M')}]…"
+        )
+        if use_marketplace:
+            self.stdout.write(f"  -> Marketplace API (3-legged OAuth), спроб: {retry_count}")
+        else:
+            self.stdout.write(f"  -> OrderStatus API (2-legged, legacy), спроб: {retry_count}")
+
+        stats = None
+        for attempt in range(1, retry_count + 1):
+            try:
+                if use_marketplace:
+                    from bots.services.digikey import sync_marketplace_orders
+                    stats = sync_marketplace_orders(config)
+                else:
+                    from bots.services.digikey import sync_orders
+                    stats = sync_orders(config)
+                break  # success
+
+            except DigiKeyAPIError as e:
+                err_str = str(e)
+                # 401 / token errors: no retry, notify reauth needed
+                auth_keywords = ('401', 'Unauthorized', 'Token refresh error',
+                                 'не авторизовано', 'invalid_grant')
+                if any(kw.lower() in err_str.lower() for kw in auth_keywords):
+                    self.stderr.write(f"❌ OAuth помилка: {err_str}")
+                    notify_reauth_needed(config, err_str)
+                    return
+                self.stderr.write(
+                    f"⚠️  DigiKey API error (спроба {attempt}/{retry_count}): {err_str}"
+                )
+                if attempt < retry_count:
+                    self.stdout.write(f"   Повтор через {retry_delay}с…")
+                    time.sleep(retry_delay)
+                else:
+                    self.stderr.write(f"❌ Всі {retry_count} спроб невдалі.")
+                    notify_connection_failure(
+                        config, err_str, retry_count, "sync_digikey_orders"
+                    )
+                    return
+
+            except Exception as e:
+                import requests as _req
+                err_str = str(e)
+                is_network = isinstance(e, (
+                    _req.exceptions.ConnectTimeout,
+                    _req.exceptions.ConnectionError,
+                    _req.exceptions.Timeout,
+                ))
+                self.stderr.write(
+                    f"⚠️  Помилка (спроба {attempt}/{retry_count}): {err_str}"
+                )
+                if is_network and attempt < retry_count:
+                    self.stdout.write(f"   Мережева помилка — повтор через {retry_delay}с…")
+                    time.sleep(retry_delay)
+                else:
+                    notify_connection_failure(
+                        config, err_str, attempt, "sync_digikey_orders"
+                    )
+                    if not is_network:
+                        raise
+                    return
+
+        if stats is None:
             return
-        except Exception as e:
-            self.stderr.write(f"❌ Unexpected error: {e}")
-            raise
 
         self.stdout.write(
             f"✅ Готово:\n"
@@ -92,9 +151,7 @@ class Command(BaseCommand):
         )
 
         if stats["unmatched_skus"]:
-            self.stdout.write(
-                "\n⚠️  Товари не знайдено в базі (потрібно додати вручну):"
-            )
+            self.stdout.write("\n⚠️  Товари не знайдено в базі (потрібно додати вручну):")
             for sku in stats["unmatched_skus"]:
                 self.stdout.write(f"   • {sku}")
 
@@ -103,7 +160,6 @@ class Command(BaseCommand):
             for err in stats["errors"]:
                 self.stderr.write(f"   • {err}")
 
-        # Сповіщення якщо були зміни
         if stats["created"] or stats["updated"] or stats["errors"]:
             try:
                 from dashboard.notifications import notify_sync_result

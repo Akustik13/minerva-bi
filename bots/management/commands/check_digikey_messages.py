@@ -45,12 +45,38 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR("❌ Marketplace token відсутній — потрібна OAuth авторизація"))
             return
 
+        from bots.services.api_health import notify_connection_failure, notify_reauth_needed
+        import time as _time
+
+        retry_count = max(1, min(10, config.api_retry_count or 3))
+        retry_delay = max(1, config.api_retry_delay or 10)
+
         self.stdout.write("Отримуємо список тем повідомлень...")
-        try:
-            token = get_marketplace_token(config)
-            list_items = get_all_topics_paginated(config, token, max_total=100)
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"❌ Помилка API: {e}"))
+        list_items = None
+        for attempt in range(1, retry_count + 1):
+            try:
+                token = get_marketplace_token(config)
+                list_items = get_all_topics_paginated(config, token, max_total=100)
+                break
+            except Exception as e:
+                err_str = str(e)
+                auth_keywords = ('401', 'Unauthorized', 'Token refresh error',
+                                 'не авторизовано', 'invalid_grant')
+                if any(kw.lower() in err_str.lower() for kw in auth_keywords):
+                    self.stdout.write(self.style.ERROR(f"❌ OAuth помилка: {err_str}"))
+                    notify_reauth_needed(config, err_str)
+                    return
+                self.stdout.write(self.style.WARNING(
+                    f"⚠️  Помилка API (спроба {attempt}/{retry_count}): {err_str}"
+                ))
+                if attempt < retry_count:
+                    _time.sleep(retry_delay)
+                else:
+                    self.stdout.write(self.style.ERROR(f"❌ Всі {retry_count} спроб невдалі."))
+                    notify_connection_failure(config, err_str, retry_count, "check_digikey_messages")
+                    return
+
+        if list_items is None:
             return
 
         self.stdout.write(f"Знайдено {len(list_items)} тем.")

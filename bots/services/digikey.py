@@ -577,10 +577,15 @@ def refresh_marketplace_token(config) -> str:
     return token
 
 
-def get_marketplace_token(config) -> str:
-    """Повертає актуальний marketplace access_token (з кешу або оновлює через refresh)."""
+def get_marketplace_token(config, force_refresh: bool = False) -> str:
+    """Повертає актуальний marketplace access_token (з кешу або оновлює через refresh).
+
+    force_refresh=True — ігнорує кеш і примусово оновлює токен.
+    Використовується при 401 відповіді (токен відкликано на сервері DigiKey).
+    """
     if (
-        config.marketplace_access_token
+        not force_refresh
+        and config.marketplace_access_token
         and config.marketplace_token_expires_at
         and config.marketplace_token_expires_at > timezone.now() + timedelta(seconds=60)
     ):
@@ -607,6 +612,14 @@ def get_marketplace_orders(config, offset: int = 0, max_results: int = 20,
     resp = logged_request('digikey', 'get_marketplace_orders', 'GET',
                           f"{_base_url(config)}{MARKETPLACE_PATH}", req.get,
                           headers=_headers(config, token), params=params, timeout=30)
+
+    # 401 = token revoked server-side despite valid local expiry → force refresh + retry once
+    if resp.status_code == 401:
+        token = get_marketplace_token(config, force_refresh=True)
+        resp = logged_request('digikey', 'get_marketplace_orders', 'GET',
+                              f"{_base_url(config)}{MARKETPLACE_PATH}", req.get,
+                              headers=_headers(config, token), params=params, timeout=30)
+
     try:
         resp.raise_for_status()
     except req.HTTPError as e:

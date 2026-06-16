@@ -167,6 +167,20 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "<a href='/admin/config/notificationsettings/1/change/'>Сповіщення → 💬 DigiKey повідомлення</a>."
             ),
         }),
+        ("🔔 Сповіщення про збої API", {
+            "fields": (
+                ("api_retry_count", "api_retry_delay"),
+                ("api_notify_on_error", "api_notify_on_reauth"),
+                ("api_notify_telegram", "api_notify_telegram_mode"),
+                ("api_notify_email", "api_notify_email_to"),
+            ),
+            "description": (
+                "Сервер пошти та Telegram-бот налаштовуються в "
+                "<a href='/admin/config/notificationsettings/1/change/'>Загальних налаштуваннях сповіщень</a>. "
+                "Тут вказуємо <b>кому</b> надсилати і <b>стратегію повторів</b> при збоях DigiKey API."
+            ),
+            "classes": ("collapse",),
+        }),
         ("🔌 Дії", {
             "fields": ("action_buttons", "task_status_panel"),
         }),
