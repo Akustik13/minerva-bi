@@ -2400,13 +2400,47 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return custom_urls + urls
 
     def stock_avail_view(self, request, pk):
-        """AJAX GET: returns stock availability per line for an order."""
+        """AJAX GET: stock availability + active PO info per line (batch queries)."""
         from django.http import JsonResponse
-        from inventory.models import InventoryTransaction, Product as _Product
+        from inventory.models import InventoryTransaction, PurchaseOrderLine as _POLine
         order = get_object_or_404(SalesOrder, pk=pk)
         lines = list(order.lines.select_related('product').all())
         if not lines:
             return JsonResponse({'ok': True, 'lines': [], 'ok_count': 0, 'bad_count': 0})
+
+        product_ids = [l.product_id for l in lines if l.product_id]
+
+        # Batch stock query
+        stock_map = {}
+        if product_ids:
+            for row in (
+                InventoryTransaction.objects
+                .filter(product_id__in=product_ids)
+                .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
+                .values('product_id')
+                .annotate(total=Sum('qty'))
+            ):
+                stock_map[row['product_id']] = max(0, int(row['total'] or 0))
+
+        # Batch active PO query — aggregate ordered qty + earliest expected_date per product
+        po_map = {}  # product_id → {qty_ordered, expected_date}
+        if product_ids:
+            for row in (
+                _POLine.objects
+                .filter(product_id__in=product_ids, purchase_order__status='ordered')
+                .values('product_id', 'purchase_order__expected_date', 'qty_ordered')
+            ):
+                pid = row['product_id']
+                ed  = row['purchase_order__expected_date']
+                qty = float(row['qty_ordered'] or 0)
+                if pid not in po_map:
+                    po_map[pid] = {'qty_ordered': qty, 'expected_date': ed}
+                else:
+                    po_map[pid]['qty_ordered'] += qty
+                    # keep the latest expected date (worst-case delivery)
+                    cur_ed = po_map[pid]['expected_date']
+                    if ed is not None and (cur_ed is None or ed > cur_ed):
+                        po_map[pid]['expected_date'] = ed
 
         result = []
         ok_count = bad_count = 0
@@ -2415,31 +2449,29 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 bad_count += 1
                 result.append({
                     'sku': line.sku_raw or '?', 'name': '—', 'product_pk': None,
-                    'needed': float(line.qty or 0), 'stock': 0,
-                    'status': 'missing',
+                    'needed': int(line.qty or 0), 'stock': 0, 'status': 'missing', 'short': 0,
+                    'po_qty': 0, 'po_date': '',
                 })
                 continue
             p = line.product
-            agg = InventoryTransaction.objects.filter(
-                product=p).exclude(
-                tx_type=InventoryTransaction.TxType.RESERVED
-            ).aggregate(total=Sum('qty'))
-            stock = float(agg['total'] or 0)
-            needed = float(line.qty or 0)
+            stock  = stock_map.get(p.pk, 0)
+            needed = int(line.qty or 0)
+            short  = max(0, needed - stock)
             if stock >= needed:
-                status = 'ok'
-                ok_count += 1
+                status = 'ok';  ok_count += 1
             elif stock > 0:
-                status = 'low'
-                bad_count += 1
+                status = 'low'; bad_count += 1
             else:
-                status = 'empty'
-                bad_count += 1
+                status = 'empty'; bad_count += 1
+
+            po_info = po_map.get(p.pk, {})
+            po_qty  = int(po_info.get('qty_ordered') or 0)
+            po_ed   = po_info.get('expected_date')
             result.append({
                 'sku': p.sku, 'name': p.name, 'product_pk': p.pk,
-                'needed': int(needed), 'stock': int(stock),
-                'status': status,
-                'short': max(0, int(needed - stock)),
+                'needed': needed, 'stock': stock, 'status': status, 'short': short,
+                'po_qty': po_qty,
+                'po_date': po_ed.strftime('%d.%m.%Y') if po_ed else '',
             })
         return JsonResponse({'ok': True, 'lines': result,
                              'ok_count': ok_count, 'bad_count': bad_count})

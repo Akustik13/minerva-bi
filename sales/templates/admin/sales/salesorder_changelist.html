@@ -1411,14 +1411,24 @@ if (!window._cexDelDocDef) {
         ? icon + ' ' + l.stock + ' {% trans "шт." %}'
         : icon + ' ' + l.stock + ' / {% trans "треба" %} ' + l.needed;
 
+      /* PO info or cart-add button */
       var cartBtn = '';
-      if (l.product_pk && l.short > 0) {
-        cartBtn = '<button type="button" '
-          + 'data-pk="' + l.product_pk + '" data-qty="' + l.short + '" '
-          + 'onclick="svStockCartAdd(this)" '
-          + 'style="margin-left:6px;padding:2px 8px;background:#1565c0;color:#fff;'
-          + 'border:none;border-radius:4px;font-size:10px;font-weight:600;'
-          + 'cursor:pointer;white-space:nowrap">🛒 +' + l.short + '</button>';
+      if (l.status !== 'ok') {
+        if (l.po_qty > 0) {
+          var poTxt = '🛒 {% trans "Замовлено:" %} ' + l.po_qty + ' {% trans "шт." %}';
+          if (l.po_date) poTxt += ' · {% trans "Очікується:" %} ' + l.po_date;
+          cartBtn = '<span style="margin-left:6px;padding:2px 8px;'
+            + 'background:rgba(21,101,192,.18);color:#64b5f6;'
+            + 'border-radius:4px;font-size:10px;font-weight:600;'
+            + 'white-space:nowrap;display:inline-block">' + poTxt + '</span>';
+        } else if (l.product_pk && l.short > 0) {
+          cartBtn = '<button type="button" '
+            + 'data-pk="' + l.product_pk + '" data-qty="' + l.short + '" '
+            + 'onclick="svStockCartAdd(this)" '
+            + 'style="margin-left:6px;padding:2px 8px;background:#1565c0;color:#fff;'
+            + 'border:none;border-radius:4px;font-size:10px;font-weight:600;'
+            + 'cursor:pointer;white-space:nowrap">🛒 +' + l.short + '</button>';
+        }
       }
 
       return '<tr style="border-bottom:1px solid rgba(128,128,128,.07)">'
