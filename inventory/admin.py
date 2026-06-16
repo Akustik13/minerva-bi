@@ -176,7 +176,6 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         "monthly_col", "months_left_col",
         "reorder_col", "status_col",
         "cart_col", "quick_add_btn",
-        "history_toggle_btn",
     )
     list_filter  = ("category", "kind", SalesPeriodFilter, SalesSourceFilter, ReorderStatusFilter)
     search_fields = ("sku", "name")
@@ -269,8 +268,10 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         except Exception:
             pass
 
-        # Incoming PO qty + details
+        # Incoming PO qty + details (split: draft=cart, ordered/partial=confirmed)
         incoming_map = defaultdict(float)
+        draft_incoming_map = defaultdict(float)
+        ordered_incoming_map = defaultdict(float)
         incoming_detail = defaultdict(list)
         for l in (PurchaseOrderLine.objects
                   .filter(product_id__in=product_pks,
@@ -281,8 +282,12 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             if remaining <= 0:
                 continue
             pk = l.product_id
-            incoming_map[pk] += remaining
             po = l.purchase_order
+            incoming_map[pk] += remaining
+            if po.status == 'draft':
+                draft_incoming_map[pk] += remaining
+            else:
+                ordered_incoming_map[pk] += remaining
             incoming_detail[pk].append({
                 'line_pk':       l.pk,
                 'po_pk':         po.pk,
@@ -290,6 +295,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'supplier':      str(po.supplier) if po.supplier_id else '—',
                 'qty':           remaining,
                 'expected_date': po.expected_date,
+                'is_draft':      po.status == 'draft',
             })
 
         # Last transaction per product (by max id = most recently recorded)
@@ -325,6 +331,8 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'reserved':              reserved,
                 'net_avail':             stock - reserved,
                 'incoming':              incoming,
+                'draft_incoming':        draft_incoming_map[pk],
+                'ordered_incoming':      ordered_incoming_map[pk],
                 'earliest_expected_date': earliest_date,
                 'last_tx':               last_tx_map.get(pk),
                 'reservations':          reservations_detail[pk],
@@ -775,19 +783,21 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
         in_cart = int(getattr(obj, '_in_cart_qty', 0) or 0)
         ordered = int(getattr(obj, '_ordered_qty', 0) or 0)
         inner = ''
-        if in_cart:
-            inner += (
-                f'<span style="color:#fff;background:#1565c0;border-radius:8px;'
-                f'padding:1px 7px;font-size:11px;font-weight:700" title="У кошику (чернетка)">🛒 {in_cart}</span>'
-            )
         if ordered:
             inner += (
                 f'<span style="color:#fff;background:#2e7d32;border-radius:8px;'
-                f'padding:1px 7px;font-size:11px;font-weight:700" title="Вже замовлено">📦 {ordered}</span>'
+                f'padding:1px 7px;font-size:11px;font-weight:700;cursor:default" '
+                f'title="Вже замовлено (ordered/partial)">📦 {ordered}</span>'
+            )
+        if in_cart:
+            inner += (
+                f'<span style="color:var(--text);background:var(--bg-hover);border:1px solid var(--border-strong);'
+                f'border-radius:8px;padding:1px 7px;font-size:11px;font-weight:700;cursor:default" '
+                f'title="У кошику, але ще не замовлено">🛒 {in_cart}</span>'
             )
         if not inner:
             inner = '<span style="opacity:.35">—</span>'
-        return mark_safe(f'<span id="mv-cart-cell-{obj.pk}">{inner}</span>')
+        return mark_safe(f'<span id="mv-cart-cell-{obj.pk}" style="display:inline-flex;gap:4px;align-items:center">{inner}</span>')
     cart_col.short_description = _("Кошик / Замов.")
     cart_col.admin_order_field = '_in_cart_qty'
 

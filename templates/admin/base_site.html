@@ -1507,16 +1507,18 @@ document.addEventListener('DOMContentLoaded', function(){
 {% endblock %}
 
 {% block usertools %}
+{{ block.super }}
+<span style="opacity:.3;margin:0 2px">|</span>
 <!-- ── Cart + Lang group ── -->
-<div style="display:inline-flex;align-items:center;gap:4px;margin-right:6px">
+<div style="display:inline-flex;align-items:center;gap:4px">
 <a id="mv-cart-btn" href="/admin/inventory/reorderproxy/cart/"
    title="Кошик замовлень"
    style="display:inline-flex;align-items:center;gap:4px;
-          padding:4px 10px;border-radius:6px;text-decoration:none;flex-shrink:0;
+          padding:3px 9px;border-radius:5px;text-decoration:none;flex-shrink:0;
           background:transparent;border:1px solid var(--border-strong);
           font-size:12px;font-weight:600;color:var(--text-muted);
           line-height:1;transition:all .15s;white-space:nowrap">
-  <span style="font-size:14px;line-height:1">🛒</span>
+  <span style="font-size:13px;line-height:1">🛒</span>
   <span id="mv-cart-badge" style="display:none;background:#2e7d32;color:#fff;
         border-radius:8px;padding:0 5px;font-size:11px;font-weight:800;line-height:16px"></span>
 </a>
@@ -1548,11 +1550,11 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 <div id="mv-lang-sw" style="position:relative;display:inline-flex;align-items:center">
   <button type="button" onclick="mvToggleLang(event)"
-    style="padding:4px 9px;border-radius:6px;font-size:12px;border:1px solid var(--border-strong);
+    style="padding:3px 9px;border-radius:5px;font-size:12px;border:1px solid var(--border-strong);
            background:var(--bg-card);cursor:pointer;color:var(--text-muted)">
     🌐 {{ CURRENT_LANGUAGE|upper }}
   </button>
-  <div id="mv-lang-menu" style="display:none;position:absolute;top:34px;right:0;
+  <div id="mv-lang-menu" style="display:none;position:absolute;top:32px;right:0;
        background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;
        overflow:hidden;min-width:150px;z-index:10000;box-shadow:0 4px 16px rgba(0,0,0,.4)">
     {% for code, name in LANGUAGES %}
@@ -1570,7 +1572,6 @@ document.addEventListener('DOMContentLoaded', function(){
 function mvToggleLang(e){e.stopPropagation();var m=document.getElementById('mv-lang-menu');m.style.display=m.style.display==='none'?'block':'none';}
 document.addEventListener('click',function(){var m=document.getElementById('mv-lang-menu');if(m)m.style.display='none';});
 </script>
-{{ block.super }}
 {% endblock %}
 
 {% block footer %}
