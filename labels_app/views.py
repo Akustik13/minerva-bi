@@ -71,29 +71,35 @@ def patch_dymo_qty(content: str, qty: int) -> str:
         )
         return f'<Text>{patched}</Text>'
     
-    return re.sub(r'<Text>(.*?QTY.*?)</Text>', replace_qty, content, flags=re.DOTALL)
+    return re.sub(r'<Text>(.*?QTY.*?)</Text>', replace_qty, content, flags=re.DOTALL | re.IGNORECASE)
 
 
 @staff_member_required
 def serve_label(request, sku):
     """Повертає dymo файл для скачування/відкриття."""
     qty = int(request.GET.get('qty', 1))
-    
-    path = get_label_path(sku)
+
+    # CA-* cable SKUs: generate fresh from template so qty + all fields are correct
+    if sku.upper().startswith('CA-'):
+        try:
+            from shipping.services.dymo_label_service import DymoLabelService
+            path = DymoLabelService.generate(sku, qty)
+        except Exception:
+            path = get_label_path(sku)
+    else:
+        path = get_label_path(sku)
+
     if not path:
         raise Http404(f"Етикетка для SKU '{sku}' не знайдена")
-    
+
     with open(path, 'rb') as f:
         content = f.read().decode('utf-8-sig')
-    
-    # Оновлюємо QTY
-    if qty > 0:
+
+    # Non-cable files: patch qty in existing XML
+    if not sku.upper().startswith('CA-') and qty > 0:
         content = patch_dymo_qty(content, qty)
-    
-    response = HttpResponse(
-        content.encode('utf-8'),
-        content_type='application/octet-stream'
-    )
+
+    response = HttpResponse(content.encode('utf-8'), content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="{sku}.dymo"'
     return response
 
