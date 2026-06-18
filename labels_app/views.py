@@ -79,24 +79,14 @@ def serve_label(request, sku):
     """Повертає dymo файл для скачування/відкриття."""
     qty = int(request.GET.get('qty', 1))
 
-    # CA-* cable SKUs: generate fresh from template so qty + all fields are correct
-    if sku.upper().startswith('CA-'):
-        try:
-            from shipping.services.dymo_label_service import DymoLabelService
-            path = DymoLabelService.generate(sku, qty)
-        except Exception:
-            path = get_label_path(sku)
-    else:
-        path = get_label_path(sku)
-
+    path = get_label_path(sku)
     if not path:
         raise Http404(f"Етикетка для SKU '{sku}' не знайдена")
 
     with open(path, 'rb') as f:
         content = f.read().decode('utf-8-sig')
 
-    # Non-cable files: patch qty in existing XML
-    if not sku.upper().startswith('CA-') and qty > 0:
+    if qty > 0:
         content = patch_dymo_qty(content, qty)
 
     response = HttpResponse(content.encode('utf-8'), content_type='application/octet-stream')
