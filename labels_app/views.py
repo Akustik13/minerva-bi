@@ -77,19 +77,21 @@ def patch_dymo_qty(content: str, qty: int) -> str:
 @staff_member_required
 def serve_label(request, sku):
     """Повертає dymo файл для скачування/відкриття."""
-    qty = int(request.GET.get('qty', 1))
+    # qty=0 (default when not provided) → serve raw file without modification
+    qty = int(request.GET.get('qty', 0))
 
     path = get_label_path(sku)
     if not path:
         raise Http404(f"Етикетка для SKU '{sku}' не знайдена")
 
     with open(path, 'rb') as f:
-        content = f.read().decode('utf-8-sig')
+        raw = f.read()
 
     if qty > 0:
-        content = patch_dymo_qty(content, qty)
+        content = patch_dymo_qty(raw.decode('utf-8-sig'), qty)
+        raw = content.encode('utf-8')
 
-    response = HttpResponse(content.encode('utf-8'), content_type='application/octet-stream')
+    response = HttpResponse(raw, content_type='application/octet-stream')
     response['Content-Disposition'] = f'attachment; filename="{sku}.dymo"'
     return response
 

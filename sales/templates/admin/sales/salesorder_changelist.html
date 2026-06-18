@@ -1002,7 +1002,7 @@ function svSetView(mode) {
         var sku = (btn.dataset.sku || '').trim();
         var qty = btn.dataset.qty || '1';
         if (data[sku] && data[sku].found) {
-          var _lurl = '/labels/serve/' + encodeURIComponent(sku) + '/?qty=' + qty;
+          var _lurl = '/labels/serve/' + encodeURIComponent(sku) + '/';
           var a = document.createElement('button');
           a.type = 'button';
           a.title = '🖨️ ' + sku + ' × ' + qty;
@@ -1043,7 +1043,7 @@ function svSetView(mode) {
               .then(function(data) {
                 var ok = data.results && data.results[0] && data.results[0].status !== 'error';
                 if (ok) {
-                  var _lurl2 = '/labels/serve/' + encodeURIComponent(sku) + '/?qty=' + qty;
+                  var _lurl2 = '/labels/serve/' + encodeURIComponent(sku) + '/';
                   var a = document.createElement('button');
                   a.type = 'button';
                   a.title = '🖨️ ' + sku + ' × ' + qty;
