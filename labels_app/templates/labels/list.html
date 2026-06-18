@@ -5,24 +5,37 @@
 {% block content %}
 {% load i18n %}
 
-{# ── Upload widget ────────────────────────────────────────────────────────── #}
-<div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;
-            padding:20px;margin-bottom:24px">
-  <p style="margin:0 0 12px;font-weight:700;font-size:14px">
+{# ── Top action bar ───────────────────────────────────────────────────────── #}
+<div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap">
+  <button type="button" id="openGenModal"
+          style="background:#1565c0;color:#fff;border:none;padding:9px 20px;
+                 border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">
+    🖨️ Згенерувати наклейку
+  </button>
+  <button type="button" id="openUploadPanel"
+          style="background:var(--bg-hover);color:var(--text);border:1px solid var(--border-strong);
+                 padding:9px 16px;border-radius:6px;cursor:pointer;font-size:13px">
+    📤 Завантажити .dymo файл
+  </button>
+</div>
+
+{# ── Upload panel (collapsed by default) ─────────────────────────────────── #}
+<div id="uploadPanel" style="display:none;background:var(--bg-card);border:1px solid var(--border-strong);
+     border-radius:8px;padding:20px;margin-bottom:18px">
+  <p style="margin:0 0 12px;font-weight:700;font-size:13px;color:var(--text-dim)">
     📤 Завантажити або оновити .dymo файли</p>
   <input type="file" id="dymoFiles" multiple accept=".dymo"
-         style="margin-bottom:10px;display:block">
+         style="margin-bottom:10px;display:block;color:var(--text)">
   <button type="button" id="dymoUploadBtn"
-          style="background:#4caf50;color:#fff;border:none;padding:8px 20px;
-                 border-radius:6px;cursor:pointer;font-size:14px;font-weight:700">
+          style="background:#4caf50;color:#fff;border:none;padding:7px 18px;
+                 border-radius:6px;cursor:pointer;font-size:13px;font-weight:700">
     ⬆️ Завантажити на сервер
   </button>
   <div id="dymoResult" style="margin-top:10px;font-size:13px"></div>
 </div>
 
 {# ── Labels table ─────────────────────────────────────────────────────────── #}
-<div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;
-            padding:20px">
+<div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;padding:20px">
   <p style="margin:0 0 12px;font-size:13px;color:var(--text-muted)">
     Знайдено файлів: <b style="color:var(--text)">{{ labels|length }}</b></p>
 
@@ -31,34 +44,54 @@
     <thead>
       <tr style="border-bottom:2px solid var(--border-strong);color:var(--text-muted);
                  font-size:11px;text-transform:uppercase;letter-spacing:.04em">
-        <th style="padding:8px 10px;text-align:left">SKU</th>
+        <th style="padding:8px 10px;text-align:left">SKU / Part No.</th>
         <th style="padding:8px 10px;text-align:left">Файл</th>
         <th style="padding:8px 10px;text-align:right">Розмір</th>
         <th style="padding:8px 10px;text-align:left">Змінено</th>
-        <th style="padding:8px 10px;text-align:center">Дія</th>
+        <th style="padding:8px 10px;text-align:center">Qty</th>
+        <th style="padding:8px 10px;text-align:center">Дії</th>
       </tr>
     </thead>
     <tbody>
       {% for lbl in labels %}
       <tr id="lbl-row-{{ lbl.sku }}" style="border-bottom:1px solid var(--border)">
         <td style="padding:8px 10px;font-family:monospace;font-weight:700;color:var(--text)">
-          {{ lbl.sku }}</td>
+          {{ lbl.sku }}
+          {% if lbl.is_cable %}
+          <span style="font-size:10px;background:#1565c0;color:#fff;border-radius:3px;
+                       padding:1px 5px;margin-left:4px;font-family:sans-serif;font-weight:400">
+            RF cable
+          </span>
+          {% endif %}
+        </td>
         <td style="padding:8px 10px;color:var(--text-muted)">{{ lbl.filename }}</td>
-        <td style="padding:8px 10px;text-align:right;color:var(--text-muted)">
-          {{ lbl.size_kb }} KB</td>
-        <td style="padding:8px 10px;color:var(--text-muted);white-space:nowrap">
-          {{ lbl.modified_fmt }}</td>
+        <td style="padding:8px 10px;text-align:right;color:var(--text-muted)">{{ lbl.size_kb }} KB</td>
+        <td style="padding:8px 10px;color:var(--text-muted);white-space:nowrap">{{ lbl.modified_fmt }}</td>
+        <td style="padding:8px 10px;text-align:center">
+          <input type="number" id="qty-{{ lbl.sku }}" value="1" min="1" max="9999"
+                 style="width:60px;padding:3px 6px;background:var(--bg-input);
+                        border:1px solid var(--border-strong);border-radius:4px;
+                        color:var(--text);text-align:center;font-size:12px">
+        </td>
         <td style="padding:8px 10px;text-align:center;white-space:nowrap">
-          <a href="/labels/serve/{{ lbl.sku }}/?qty=1" target="_blank"
-             style="background:#1565c0;color:#fff;padding:3px 10px;border-radius:4px;
-                    text-decoration:none;font-size:12px;font-weight:600">
-            🖨️ Друкувати
-          </a>
-          <button type="button"
-                  onclick="deleteLabel('{{ lbl.sku }}')"
-                  style="background:var(--err,#c62828);color:#fff;padding:3px 10px;
+          <button type="button" onclick="downloadLabel('{{ lbl.sku }}')"
+                  style="background:#1565c0;color:#fff;padding:4px 10px;border-radius:4px;
+                         border:none;cursor:pointer;font-size:12px;font-weight:600">
+            ⬇️ Завантажити
+          </button>
+          {% if lbl.is_cable %}
+          <button type="button" onclick="regenLabel('{{ lbl.sku }}')"
+                  title="Згенерувати заново"
+                  style="background:var(--bg-hover);color:var(--text);padding:4px 8px;
+                         border-radius:4px;border:1px solid var(--border-strong);
+                         cursor:pointer;font-size:12px;margin-left:4px">
+            🔄
+          </button>
+          {% endif %}
+          <button type="button" onclick="deleteLabel('{{ lbl.sku }}')"
+                  style="background:var(--err,#c62828);color:#fff;padding:4px 8px;
                          border-radius:4px;border:none;cursor:pointer;font-size:12px;
-                         font-weight:600;margin-left:6px">
+                         margin-left:4px">
             🗑️
           </button>
         </td>
@@ -67,64 +100,250 @@
     </tbody>
   </table>
   {% else %}
-    <p style="color:var(--text-muted)">Файлів ще немає.</p>
+    <p style="color:var(--text-muted)">Файлів ще немає. Згенеруйте або завантажте .dymo файл.</p>
   {% endif %}
+</div>
+
+{# ── Generate modal ───────────────────────────────────────────────────────── #}
+<div id="genModal" style="display:none;position:fixed;inset:0;z-index:9999;
+     background:rgba(0,0,0,.6);align-items:center;justify-content:center">
+  <div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:12px;
+              padding:28px;width:100%;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.5);
+              position:relative">
+    <button type="button" onclick="closeGenModal()"
+            style="position:absolute;top:14px;right:16px;background:none;border:none;
+                   font-size:20px;cursor:pointer;color:var(--text-dim)">✕</button>
+
+    <h3 style="margin:0 0 20px;font-size:16px;color:var(--text)">🖨️ Генерація наклейки RF кабелю</h3>
+
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div>
+        <label style="font-size:12px;color:var(--text-dim);font-weight:600;
+                      text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">
+          Part Number</label>
+        <input type="text" id="genPartNo" placeholder="CA-MHF1-MC1.13-175-MHF4"
+               style="width:100%;padding:8px 12px;background:var(--bg-input);
+                      border:1px solid var(--border-strong);border-radius:6px;
+                      color:var(--text);font-family:monospace;font-size:14px;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text-dim);font-weight:600;
+                      text-transform:uppercase;letter-spacing:.05em;display:block;margin-bottom:5px">
+          Кількість (PCS)</label>
+        <input type="number" id="genQty" value="1" min="1" max="9999"
+               style="width:120px;padding:8px 12px;background:var(--bg-input);
+                      border:1px solid var(--border-strong);border-radius:6px;
+                      color:var(--text);font-size:14px">
+      </div>
+    </div>
+
+    {# Preview block #}
+    <div id="genPreview" style="display:none;margin-top:18px;padding:14px;
+         background:var(--bg-input);border-radius:8px;border:1px solid var(--border-strong)">
+      <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:var(--text-dim);
+                text-transform:uppercase;letter-spacing:.05em">Попередній перегляд</p>
+      <table style="font-size:13px;border-collapse:collapse;width:100%">
+        <tr><td style="color:var(--text-dim);padding:2px 8px 2px 0;width:100px">P/N:</td>
+            <td id="pv-pn" style="color:var(--text);font-family:monospace;font-weight:700"></td></tr>
+        <tr><td style="color:var(--text-dim);padding:2px 8px 2px 0">Довжина:</td>
+            <td id="pv-len" style="color:var(--text)"></td></tr>
+        <tr><td style="color:var(--text-dim);padding:2px 8px 2px 0">Коаксіал:</td>
+            <td id="pv-coax" style="color:var(--text)"></td></tr>
+        <tr><td style="color:var(--text-dim);padding:2px 8px 2px 0">1-й роз'єм:</td>
+            <td id="pv-end1" style="color:var(--text)"></td></tr>
+        <tr><td style="color:var(--text-dim);padding:2px 8px 2px 0">2-й роз'єм:</td>
+            <td id="pv-end2" style="color:var(--text)"></td></tr>
+        <tr><td style="color:var(--text-dim);padding:2px 8px 2px 0">Кількість:</td>
+            <td id="pv-qty" style="color:var(--text);font-weight:700"></td></tr>
+      </table>
+    </div>
+
+    <div id="genError" style="display:none;margin-top:12px;padding:8px 12px;
+         background:rgba(198,40,40,.15);border:1px solid var(--err,#c62828);border-radius:6px;
+         color:var(--err,#c62828);font-size:13px"></div>
+
+    <div style="margin-top:20px;display:flex;gap:10px;justify-content:flex-end">
+      <button type="button" onclick="closeGenModal()"
+              style="background:var(--bg-hover);color:var(--text);border:1px solid var(--border-strong);
+                     padding:8px 18px;border-radius:6px;cursor:pointer;font-size:13px">
+        Скасувати
+      </button>
+      <button type="button" id="genBtn" onclick="doGenerate()" disabled
+              style="background:#1565c0;color:#fff;border:none;padding:8px 22px;
+                     border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;
+                     opacity:.5">
+        🖨️ Згенерувати та завантажити
+      </button>
+    </div>
+  </div>
 </div>
 
 <script>
 var csrfToken = '{{ csrf_token }}';
+var _previewTimer = null;
+var _previewOk = false;
+
+/* ── Modal open/close ─────────────────────────────────────────────── */
+document.getElementById('openGenModal').addEventListener('click', function () {
+  document.getElementById('genModal').style.display = 'flex';
+  document.getElementById('genPartNo').focus();
+});
+document.getElementById('openUploadPanel').addEventListener('click', function () {
+  var p = document.getElementById('uploadPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+});
+function closeGenModal() {
+  document.getElementById('genModal').style.display = 'none';
+  document.getElementById('genPreview').style.display = 'none';
+  document.getElementById('genError').style.display = 'none';
+  document.getElementById('genPartNo').value = '';
+  document.getElementById('genQty').value = '1';
+  _previewOk = false;
+  document.getElementById('genBtn').disabled = true;
+  document.getElementById('genBtn').style.opacity = '.5';
+}
+document.getElementById('genModal').addEventListener('click', function (e) {
+  if (e.target === this) closeGenModal();
+});
+
+/* ── Preview (debounced on input) ─────────────────────────────────── */
+function schedulePreview() {
+  clearTimeout(_previewTimer);
+  _previewTimer = setTimeout(fetchPreview, 500);
+}
+function fetchPreview() {
+  var pn  = document.getElementById('genPartNo').value.trim();
+  var qty = parseInt(document.getElementById('genQty').value) || 1;
+  var errEl = document.getElementById('genError');
+  var pvEl  = document.getElementById('genPreview');
+  var btn   = document.getElementById('genBtn');
+  if (!pn) { pvEl.style.display = 'none'; errEl.style.display = 'none'; btn.disabled = true; btn.style.opacity = '.5'; _previewOk = false; return; }
+
+  fetch('/labels/preview/?part_no=' + encodeURIComponent(pn) + '&qty=' + qty)
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.ok) {
+        document.getElementById('pv-pn').textContent   = d.parsed.part_no;
+        document.getElementById('pv-len').textContent  = d.parsed.length;
+        document.getElementById('pv-coax').textContent = d.parsed.coax_type;
+        document.getElementById('pv-end1').textContent = d.parsed.first_end;
+        document.getElementById('pv-end2').textContent = d.parsed.second_end;
+        document.getElementById('pv-qty').textContent  = qty + ' PCS';
+        pvEl.style.display = 'block';
+        errEl.style.display = 'none';
+        _previewOk = true;
+        btn.disabled = false;
+        btn.style.opacity = '1';
+      } else {
+        pvEl.style.display = 'none';
+        errEl.textContent = '❌ ' + d.error;
+        errEl.style.display = 'block';
+        _previewOk = false;
+        btn.disabled = true;
+        btn.style.opacity = '.5';
+      }
+    })
+    .catch(function () {
+      errEl.textContent = '❌ Помилка з\'єднання';
+      errEl.style.display = 'block';
+    });
+}
+document.getElementById('genPartNo').addEventListener('input', schedulePreview);
+document.getElementById('genQty').addEventListener('input', schedulePreview);
+
+/* ── Generate ─────────────────────────────────────────────────────── */
+function doGenerate() {
+  var pn  = document.getElementById('genPartNo').value.trim();
+  var qty = parseInt(document.getElementById('genQty').value) || 1;
+  var btn = document.getElementById('genBtn');
+  if (!pn || !_previewOk) return;
+
+  btn.textContent = '⏳ Генерація...';
+  btn.disabled = true;
+
+  fetch('/labels/generate/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+    body: JSON.stringify({ part_no: pn, qty: qty }),
+  })
+  .then(function (r) { return r.json(); })
+  .then(function (d) {
+    btn.textContent = '🖨️ Згенерувати та завантажити';
+    btn.disabled = false;
+    if (d.ok) {
+      window.location.href = d.download_url;
+      setTimeout(function () { location.reload(); }, 1200);
+    } else {
+      var errEl = document.getElementById('genError');
+      errEl.textContent = '❌ ' + (d.error || 'Невідома помилка');
+      errEl.style.display = 'block';
+    }
+  })
+  .catch(function (e) {
+    btn.textContent = '🖨️ Згенерувати та завантажити';
+    btn.disabled = false;
+    var errEl = document.getElementById('genError');
+    errEl.textContent = '❌ Помилка мережі: ' + e;
+    errEl.style.display = 'block';
+  });
+}
+
+/* ── Download with qty from row ───────────────────────────────────── */
+function downloadLabel(sku) {
+  var qtyEl = document.getElementById('qty-' + sku);
+  var qty   = qtyEl ? (parseInt(qtyEl.value) || 1) : 1;
+  window.location.href = '/labels/serve/' + encodeURIComponent(sku) + '/?qty=' + qty;
+}
+
+/* ── Regen (re-generate from template for CA-* labels) ────────────── */
+function regenLabel(sku) {
+  var qtyEl = document.getElementById('qty-' + sku);
+  var qty   = qtyEl ? (parseInt(qtyEl.value) || 1) : 1;
+  document.getElementById('genPartNo').value = sku;
+  document.getElementById('genQty').value = qty;
+  document.getElementById('genModal').style.display = 'flex';
+  fetchPreview();
+}
 
 /* ── Upload ─────────────────────────────────────────────────────── */
 document.getElementById('dymoUploadBtn').addEventListener('click', function () {
   var input  = document.getElementById('dymoFiles');
   var result = document.getElementById('dymoResult');
-  if (!input.files.length) {
-    result.innerHTML = '<span style="color:var(--err)">Оберіть файли!</span>';
-    return;
-  }
+  if (!input.files.length) { result.innerHTML = '<span style="color:var(--err)">Оберіть файли!</span>'; return; }
   var fd = new FormData();
   for (var i = 0; i < input.files.length; i++) fd.append('labels', input.files[i]);
   result.innerHTML = '⏳ Завантаження...';
-  fetch('/labels/upload/', { method: 'POST', headers: {'X-CSRFToken': csrfToken}, body: fd })
+  fetch('/labels/upload/', { method: 'POST', headers: { 'X-CSRFToken': csrfToken }, body: fd })
     .then(function (r) { return r.json(); })
     .then(function (data) {
       var html = '<ul style="margin:5px 0;padding-left:20px">';
       data.results.forEach(function (r) {
         var icon  = r.status === 'created' ? '✅' : r.status === 'updated' ? '🔄' : '❌';
-        var color = r.status === 'error'   ? 'var(--err)' : 'var(--ok)';
+        var color = r.status === 'error' ? 'var(--err)' : 'var(--ok)';
         html += '<li style="color:' + color + '">' + icon + ' ' + r.name + ': ' + r.status;
         if (r.size)         html += ' (' + (r.size / 1024).toFixed(1) + ' KB)';
         if (r.replaced_old) html += ' <span style="color:var(--text-dim);font-size:11px">(видалено: ' + r.replaced_old + ')</span>';
         html += '</li>';
       });
-      html += '</ul><button onclick="location.reload()" '
-            + 'style="background:#1976d2;color:#fff;border:none;padding:6px 14px;'
-            + 'border-radius:4px;cursor:pointer;margin-top:6px">🔄 Оновити сторінку</button>';
+      html += '</ul><button onclick="location.reload()" style="background:#1976d2;color:#fff;'
+            + 'border:none;padding:6px 14px;border-radius:4px;cursor:pointer;margin-top:6px">🔄 Оновити</button>';
       result.innerHTML = html;
     })
-    .catch(function (e) {
-      result.innerHTML = '<span style="color:var(--err)">Помилка: ' + e + '</span>';
-    });
+    .catch(function (e) { result.innerHTML = '<span style="color:var(--err)">Помилка: ' + e + '</span>'; });
 });
 
 /* ── Delete ─────────────────────────────────────────────────────── */
 function deleteLabel(sku) {
   if (!confirm('Видалити етикетку ' + sku + '?')) return;
   fetch('/labels/delete/' + encodeURIComponent(sku) + '/', {
-    method: 'POST',
-    headers: {'X-CSRFToken': csrfToken},
+    method: 'POST', headers: { 'X-CSRFToken': csrfToken },
   })
   .then(function (r) { return r.json(); })
   .then(function (data) {
     if (data.ok) {
       var row = document.getElementById('lbl-row-' + sku);
       if (row) row.remove();
-      /* update count */
-      var cnt = document.querySelector('b[style*="color:var(--text)"]');
-      if (cnt) cnt.textContent = parseInt(cnt.textContent || '0') - 1;
-    } else {
-      alert('Помилка: ' + (data.error || 'невідома'));
-    }
+    } else { alert('Помилка: ' + (data.error || 'невідома')); }
   })
   .catch(function (e) { alert('Помилка мережі: ' + e); });
 }

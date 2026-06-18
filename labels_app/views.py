@@ -4,18 +4,15 @@ views.py для системи етикеток DYMO
 Додати в urls.py проекту:
     path('labels/', include('labels.urls')),
 """
-import os
 import re
-import copy
 from pathlib import Path
+from datetime import datetime
+
 from django.conf import settings
 from django.http import HttpResponse, JsonResponse, Http404
 from django.shortcuts import render
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.admin.views.decorators import staff_member_required
-from django.utils.decorators import method_decorator
-from datetime import datetime
-import xml.etree.ElementTree as ET
 
 
 # Папка з етикетками
@@ -185,12 +182,69 @@ def list_labels(request):
     labels = []
     for f in sorted(LABELS_DIR.glob('*.dymo')):
         mtime = f.stat().st_mtime
+        sku = f.stem
         labels.append({
-            'sku': f.stem,
+            'sku': sku,
             'filename': f.name,
             'size_kb': round(f.stat().st_size / 1024, 1),
             'modified_fmt': datetime.fromtimestamp(mtime).strftime('%d.%m.%Y %H:%M'),
+            'is_cable': sku.upper().startswith('CA-'),
         })
     if request.GET.get('json'):
         return JsonResponse({'labels': labels})
     return render(request, 'labels/list.html', {'labels': labels})
+
+
+@staff_member_required
+def preview_cable_label(request):
+    """GET ?part_no=CA-… → JSON with parsed label fields (for modal preview)."""
+    from shipping.services.dymo_label_service import parse_part_number, label_lines
+    part_no = (request.GET.get('part_no') or '').strip()
+    if not part_no:
+        return JsonResponse({'ok': False, 'error': 'part_no required'}, status=400)
+    try:
+        parsed = parse_part_number(part_no)
+        qty = int(request.GET.get('qty') or 1)
+        lines = label_lines(parsed, qty)
+        return JsonResponse({'ok': True, 'parsed': parsed, 'lines': lines})
+    except ValueError as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+
+@staff_member_required
+@csrf_exempt
+def generate_cable_label(request):
+    """POST {part_no, qty} → generate .dymo, return JSON with download_url."""
+    from shipping.services.dymo_label_service import DymoLabelService
+    import json as _json
+
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required'}, status=405)
+
+    try:
+        data = _json.loads(request.body or b'{}')
+    except Exception:
+        data = {}
+
+    part_no = (data.get('part_no') or request.POST.get('part_no') or '').strip()
+    try:
+        qty = int(data.get('qty') or request.POST.get('qty') or 1)
+    except (ValueError, TypeError):
+        qty = 1
+
+    if not part_no:
+        return JsonResponse({'ok': False, 'error': 'part_no required'}, status=400)
+
+    try:
+        path = DymoLabelService.generate(part_no, qty)
+        sku  = path.stem
+        return JsonResponse({
+            'ok':           True,
+            'sku':          sku,
+            'filename':     path.name,
+            'download_url': f'/labels/serve/{sku}/?qty={qty}',
+        })
+    except ValueError as exc:
+        return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+    except Exception as exc:
+        return JsonResponse({'ok': False, 'error': f'Generation failed: {exc}'}, status=500)
