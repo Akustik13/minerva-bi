@@ -157,6 +157,14 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "Додай до cron: <code>python manage.py pull_dk_listings</code>"
             ),
         }),
+        ("📦 Імпорт лістингів", {
+            "fields": ("create_product_if_missing",),
+            "description": (
+                "Налаштування кнопки <b>🆕 Створити лістинги</b>: "
+                "визначає що робити з офферами DigiKey, "
+                "для яких немає відповідного товару на складі."
+            ),
+        }),
         ("💬 Повідомлення DigiKey", {
             "fields": ("messages_panel", "msg_check_enabled", "msg_check_interval",
                        "msg_last_checked_at"),
@@ -956,11 +964,15 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         def _run():
             try:
                 result = create_listings_from_offers(task=task)
-                task.finish(
+                msg = (
                     f"✅ Створено {result['created']} лістингів. "
-                    f"Вже існувало: {result['already_exists']}. "
-                    + (f"SKU без товару: {', '.join(result['no_product'][:20])}" if result['no_product'] else "")
+                    f"Вже існувало: {result['already_exists']}."
                 )
+                if result.get('products_auto_created'):
+                    msg += f" Автоматично створено товарів на складі: {result['products_auto_created']}."
+                if result.get('no_product'):
+                    msg += f" SKU без товару: {', '.join(result['no_product'][:20])}"
+                task.finish(msg)
             except InterruptedError as e:
                 task.finish(f"⛔ {e}")
             except Exception as exc:
@@ -3110,13 +3122,16 @@ Rules:
             try:
                 r1 = import_offers_from_dk(task=task)
                 r2 = create_listings_from_offers(task=task)
-                created  = r2.get('created', 0)
-                updated  = r1.get('updated', 0)
+                created       = r2.get('created', 0)
+                auto_products = r2.get('products_auto_created', 0)
+                updated       = r1.get('updated', 0)
                 msg = f"✅ Оновлено {updated} лістингів"
                 if created:
                     msg += f", створено нових: {created}"
                 else:
                     msg += ", нових не знайдено"
+                if auto_products:
+                    msg += f" (товарів на складі авто-створено: {auto_products})"
                 task.finish(msg)
             except InterruptedError as e:
                 task.finish(f"⛔ {e}")

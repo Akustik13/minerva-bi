@@ -583,7 +583,7 @@ def create_listings_from_offers(task=None) -> dict:
     """Create DigiKeyListing records for DigiKey offers that have no listing in Minerva.
 
     task — optional BotTask instance for progress updates and cancellation.
-    Returns: {created: N, already_exists: M, no_product: [sku, ...]}
+    Returns: {created: N, already_exists: M, no_product: [sku, ...], products_auto_created: N}
     """
     import json
     from django.db import models as _m
@@ -596,12 +596,14 @@ def create_listings_from_offers(task=None) -> dict:
         raise DKMarketplaceError("inventory.Product модель не знайдена")
 
     config = DigiKeyConfig.get()
+    auto_create = config.create_product_if_missing
     offers = fetch_offers(config)
     total  = len(offers)
 
-    created: int       = 0
-    already_exists_cnt = 0
-    no_product: list   = []
+    created: int          = 0
+    already_exists_cnt    = 0
+    no_product: list      = []
+    products_auto_created = 0
 
     for idx, offer in enumerate(offers, 1):
         if task and task.is_cancelled():
@@ -623,8 +625,19 @@ def create_listings_from_offers(task=None) -> dict:
         try:
             product = Product.objects.get(sku=sku)
         except Product.DoesNotExist:
-            no_product.append(sku)
-            continue
+            if not auto_create:
+                no_product.append(sku)
+                continue
+            # Auto-create a Product stub so the listing can be linked immediately
+            product = Product(
+                sku=sku,
+                name=(offer.get('title') or sku)[:200],
+                manufacturer=(offer.get('manufacturer') or '')[:100],
+                category='other',
+            )
+            product.save()
+            products_auto_created += 1
+            logger.info("DK create_listings: auto-created Product sku=%s", sku)
         except Product.MultipleObjectsReturned:
             no_product.append(f"{sku} (дублі SKU)")
             continue
@@ -654,9 +667,14 @@ def create_listings_from_offers(task=None) -> dict:
 
         created += 1
 
-    logger.info("DK create_listings created=%d already=%d no_product=%d",
-                created, already_exists_cnt, len(no_product))
-    return {'created': created, 'already_exists': already_exists_cnt, 'no_product': no_product}
+    logger.info("DK create_listings created=%d already=%d no_product=%d auto_created=%d",
+                created, already_exists_cnt, len(no_product), products_auto_created)
+    return {
+        'created': created,
+        'already_exists': already_exists_cnt,
+        'no_product': no_product,
+        'products_auto_created': products_auto_created,
+    }
 
 
 def fetch_product_by_sku(config, supplier_sku: str,

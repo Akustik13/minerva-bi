@@ -61,6 +61,14 @@ class DigiKeyConfig(models.Model):
             "або виставляється вручну."
         ),
     )
+    create_product_if_missing = models.BooleanField(
+        "Створювати товар якщо нема на складі", default=False,
+        help_text=(
+            "При імпорті лістингів («🆕 Створити лістинги»): якщо товар з таким SKU "
+            "відсутній на складі — автоматично створити картку товару і прив'язати лістинг. "
+            "Якщо вимкнено — SKU без товару пропускаються (виводяться у звіті)."
+        ),
+    )
     use_sandbox = models.BooleanField(
         "Sandbox режим (тестовий)", default=True,
         help_text="sandbox-api.digikey.com — для тестування без реальних замовлень"
