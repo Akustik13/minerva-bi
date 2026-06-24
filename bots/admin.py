@@ -1873,6 +1873,25 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             obj.last_error     = ''
             obj.last_synced_at = None
             obj.product        = None  # copy is unlinked — bind to inventory later
+
+        # Auto-create inventory Product when checkbox is checked on add form
+        if not change and not obj.product_id and request.POST.get('_create_product'):
+            from inventory.models import Product
+            base_sku = (obj.dk_supplier_sku or '').strip() or 'DK-new'
+            sku, suffix = base_sku, 1
+            while Product.objects.filter(sku=sku).exists():
+                sku = f'{base_sku}-{suffix}'
+                suffix += 1
+            product = Product(
+                sku=sku,
+                name=(obj.dk_title or sku)[:200],
+                manufacturer=(obj.dk_manufacturer or '')[:100],
+                category='other',
+            )
+            product.save()
+            obj.product = product
+            messages.success(request, f'📦 Товар «{sku}» автоматично створено на складі.')
+
         super().save_model(request, obj, form, change)
 
     def response_change(self, request, obj):

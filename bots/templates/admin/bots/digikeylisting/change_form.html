@@ -1048,6 +1048,26 @@ function dkCopyFrom() {
     }
 
     dkAdaptToCategory();
+
+    /* Auto-check "create product" if product field is empty after copy */
+    var _cb    = document.getElementById('dk_auto_create');
+    var _pInp  = document.getElementById('id_product');
+    if (_cb && _pInp && !_pInp.value) {
+      _cb.checked = true;
+      var _hint = document.getElementById('dkAutoCreateHint');
+      if (_hint) {
+        var _newSku = fields.dk_supplier_sku || d.source_sku || '';
+        _hint.textContent = _newSku
+          ? 'Буде створено: SKU «' + dkEsc(_newSku) + '» · Назва з поля «Назва (DK)»'
+          : 'SKU та назва беруться з полів «Supplier SKU» і «Назва (DK)»';
+      }
+      var _wrap = document.getElementById('dkAutoCreateWrap');
+      if (_wrap) {
+        _wrap.style.borderColor = 'rgba(0,191,165,.5)';
+        _wrap.style.background  = 'rgba(0,191,165,.07)';
+      }
+    }
+
     if (msg) {
       msg.textContent = '✅ Скопійовано з «' + dkEsc(d.source_sku || '') + '» — перевірте виділені поля';
       msg.style.color = '#00bfa5';
@@ -1533,12 +1553,52 @@ document.addEventListener('DOMContentLoaded', function() {
     copyPanel.id = 'dkCopyPanel';
     copyPanel.innerHTML = dkBuildCopyPanel();
     anchor.parentNode.insertBefore(copyPanel, anchor);
+
+    /* Inject auto-create product checkbox near the Product field */
+    var _prodField = document.getElementById('id_product');
+    if (_prodField) {
+      var _prodRow = _prodField.closest('.form-row') || _prodField.parentNode;
+      if (_prodRow) {
+        var _cbWrap = document.createElement('div');
+        _cbWrap.id = 'dkAutoCreateWrap';
+        _cbWrap.style.cssText =
+          'margin-top:10px;padding:10px 14px;' +
+          'background:rgba(0,105,92,.07);border:1px solid rgba(0,105,92,.25);' +
+          'border-radius:6px;display:flex;align-items:flex-start;gap:10px;';
+        _cbWrap.innerHTML =
+          '<input type="checkbox" id="dk_auto_create" name="_create_product" value="1"' +
+          ' style="width:16px;height:16px;margin-top:2px;cursor:pointer;flex-shrink:0">' +
+          '<label for="dk_auto_create" style="cursor:pointer;font-size:13px;color:var(--text,#c9d8e4);line-height:1.5">' +
+          '<b>📦 Автоматично створити товар на складі</b><br>' +
+          '<span id="dkAutoCreateHint" style="font-size:11px;color:var(--text-muted,#9aafbe)">' +
+          'SKU та назва беруться з полів «Supplier SKU» і «Назва (DK)» після збереження' +
+          '</span></label>';
+        _prodRow.appendChild(_cbWrap);
+      }
+    }
     {% endif %}
   }
 
 
   /* Adapt UI to category */
   dkAdaptToCategory();
+
+  /* Uncheck auto-create if user manually picks a product */
+  {% if copy_data_url %}
+  (function() {
+    var _prodInp = document.getElementById('id_product');
+    var _autoCb  = document.getElementById('dk_auto_create');
+    if (_prodInp && _autoCb) {
+      _prodInp.addEventListener('change', function() {
+        if (_prodInp.value) {
+          _autoCb.checked = false;
+          var w = document.getElementById('dkAutoCreateWrap');
+          if (w) { w.style.borderColor = ''; w.style.background = ''; }
+        }
+      });
+    }
+  })();
+  {% endif %}
 
   /* Start in VIEW mode for existing objects, EDIT mode for add form */
   {% if copy_data_url %}
