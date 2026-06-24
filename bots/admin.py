@@ -955,21 +955,39 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
     def create_listings_view(self, request):
-        """Start create_listings in a background thread, track via BotTask."""
+        """Show filter form (GET) or start background task (POST)."""
+        if request.method == 'GET':
+            from django.template.response import TemplateResponse
+            from bots.models import DigiKeyListing
+            return TemplateResponse(request, 'admin/bots/digikeyconfig/create_listings.html', {
+                'cat_choices': DigiKeyListing.CAT_CHOICES,
+                'prefill_sku': request.GET.get('sku', ''),
+            })
+
         import threading
         from bots.services.dk_marketplace import create_listings_from_offers
+
+        mode = request.POST.get('mode', 'all')
+        filter_sku           = request.POST.get('filter_sku', '').strip() if mode == 'sku' else None
+        filter_category_type = request.POST.get('filter_category_type') if mode == 'category' else None
 
         task = BotTask.start('create_listings')
 
         def _run():
             try:
-                result = create_listings_from_offers(task=task)
+                result = create_listings_from_offers(
+                    task=task,
+                    filter_sku=filter_sku,
+                    filter_category_type=filter_category_type,
+                )
                 msg = (
                     f"✅ Створено {result['created']} лістингів. "
                     f"Вже існувало: {result['already_exists']}."
                 )
+                if result.get('skipped'):
+                    msg += f" Пропущено фільтром: {result['skipped']}."
                 if result.get('products_auto_created'):
-                    msg += f" Автоматично створено товарів на складі: {result['products_auto_created']}."
+                    msg += f" Авто-створено товарів: {result['products_auto_created']}."
                 if result.get('no_product'):
                     msg += f" SKU без товару: {', '.join(result['no_product'][:20])}"
                 task.finish(msg)
@@ -983,7 +1001,8 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 connection.close()
 
         threading.Thread(target=_run, daemon=True).start()
-        self.message_user(request, "⏳ Створення лістингів запущено у фоні.", messages.INFO)
+        mode_label = {'all': 'Всі', 'sku': f'SKU={filter_sku}', 'category': f'Category={filter_category_type}'}.get(mode, mode)
+        self.message_user(request, f"⏳ Створення лістингів [{mode_label}] запущено у фоні.", messages.INFO)
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
     def task_status_view(self, request):

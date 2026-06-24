@@ -1,0 +1,180 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Створити лістинги | DigiKey | Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}">DigiKey Config</a>
+  &rsaquo; Створити лістинги
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+#content { padding: 0 !important; }
+.cl-wrap { max-width: 760px; margin: 0 auto; padding: 32px 24px 80px; }
+
+.cl-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.cl-sub   { font-size: 13px; color: var(--text-dim); margin-bottom: 32px; line-height: 1.5; }
+
+.cl-card {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 12px; padding: 24px 28px; margin-bottom: 20px;
+}
+.cl-card-title { font-size: 13px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 18px; }
+
+/* Radio mode selector */
+.mode-list { display: flex; flex-direction: column; gap: 12px; }
+.mode-item {
+  display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px;
+  border-radius: 8px; border: 2px solid var(--border-strong);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.mode-item:hover  { border-color: var(--accent); }
+.mode-item.active { border-color: var(--accent); background: rgba(88,166,255,.07); }
+.mode-item input[type=radio] { margin-top: 2px; flex-shrink: 0; }
+.mode-label  { font-size: 15px; font-weight: 600; color: var(--text); }
+.mode-hint   { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+/* SKU / Category inputs shown inside mode items */
+.mode-extra { margin-top: 12px; display: none; }
+.mode-extra.visible { display: block; }
+.mode-input {
+  width: 100%; background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 6px; padding: 10px 14px;
+  font-size: 14px; font-family: monospace;
+}
+.mode-input:focus { border-color: var(--accent); outline: none; }
+.mode-select {
+  width: 100%; background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 6px; padding: 10px 14px;
+  font-size: 14px; cursor: pointer;
+}
+.mode-select:focus { border-color: var(--accent); outline: none; }
+
+/* Actions */
+.cl-actions { display: flex; gap: 12px; align-items: center; margin-top: 24px; }
+.cl-btn-run {
+  background: #00838f; color: #fff; border: none; border-radius: 8px;
+  padding: 12px 28px; font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.cl-btn-run:hover { background: #00acc1; }
+.cl-btn-run:disabled { background: var(--border-strong); color: var(--text-dim); cursor: not-allowed; }
+.cl-btn-back {
+  color: var(--text-dim); text-decoration: none; font-size: 13px;
+}
+.cl-btn-back:hover { color: var(--accent); }
+
+/* Info box */
+.cl-info {
+  border-left: 3px solid #607d8b;
+  background: rgba(96,125,139,.08);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  font-size: 12px;
+  color: var(--text-dim);
+  line-height: 1.6;
+  margin-top: 18px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cl-wrap">
+  <div class="cl-title">🆕 Створити лістинги з DigiKey</div>
+  <div class="cl-sub">
+    Знаходить оффери DigiKey Marketplace, для яких ще немає лістингу в Minerva,
+    і створює записи DigiKeyListing. Оберіть режим імпорту:
+  </div>
+
+  <form method="post" id="cl-form">
+    {% csrf_token %}
+
+    <div class="cl-card">
+      <div class="cl-card-title">Режим імпорту</div>
+      <div class="mode-list">
+
+        <!-- ALL -->
+        <label class="mode-item active" id="lbl-all">
+          <input type="radio" name="mode" value="all" checked onchange="setMode('all')">
+          <div>
+            <div class="mode-label">🌐 Всі оффери</div>
+            <div class="mode-hint">Сканує весь DigiKey Marketplace і імпортує всі нові оффери без лістингу</div>
+          </div>
+        </label>
+
+        <!-- BY SKU -->
+        <label class="mode-item" id="lbl-sku">
+          <input type="radio" name="mode" value="sku" onchange="setMode('sku')">
+          <div style="flex:1">
+            <div class="mode-label">🔍 Конкретний SKU</div>
+            <div class="mode-hint">Введіть точний SKU — імпортує тільки цей один оффер</div>
+            <div class="mode-extra" id="extra-sku">
+              <input type="text" name="filter_sku" id="inp-sku"
+                     class="mode-input" placeholder="напр. AN250202-03C-175-MHF1"
+                     autocomplete="off" spellcheck="false"
+                     value="{{ prefill_sku }}">
+            </div>
+          </div>
+        </label>
+
+        <!-- BY CATEGORY -->
+        <label class="mode-item" id="lbl-cat">
+          <input type="radio" name="mode" value="category" onchange="setMode('category')">
+          <div style="flex:1">
+            <div class="mode-label">📂 По типу категорії</div>
+            <div class="mode-hint">Фільтрує оффери за типом товару (визначається з назви на DigiKey)</div>
+            <div class="mode-extra" id="extra-cat">
+              <select name="filter_category_type" id="inp-cat" class="mode-select">
+                {% for value, label in cat_choices %}
+                <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </label>
+
+      </div>
+
+      <div class="cl-info">
+        ℹ️ Налаштування <b>«Створювати товар якщо нема на складі»</b> застосовується до всіх режимів.
+        Увімкніть у налаштуваннях DigiKey Config якщо хочете автоматично додавати товари на склад.
+      </div>
+    </div>
+
+    <div class="cl-actions">
+      <button type="submit" class="cl-btn-run" id="btn-run">🚀 Запустити імпорт</button>
+      <a href="{% url 'admin:bots_digikeyconfig_change' 1 %}" class="cl-btn-back">← Назад до конфігурації</a>
+    </div>
+  </form>
+</div>
+
+<script>
+function setMode(mode) {
+  ['all','sku','cat'].forEach(function(m) {
+    document.getElementById('lbl-' + (m==='cat'?'cat':m)).classList.remove('active');
+  });
+  document.getElementById('extra-sku').classList.remove('visible');
+  document.getElementById('extra-cat').classList.remove('visible');
+
+  var label = {all:'lbl-all', sku:'lbl-sku', category:'lbl-cat'}[mode];
+  if (label) document.getElementById(label).classList.add('active');
+  if (mode === 'sku')      { document.getElementById('extra-sku').classList.add('visible'); document.getElementById('inp-sku').focus(); }
+  if (mode === 'category') { document.getElementById('extra-cat').classList.add('visible'); }
+}
+
+document.getElementById('cl-form').addEventListener('submit', function(e) {
+  var mode = document.querySelector('input[name=mode]:checked').value;
+  if (mode === 'sku' && !document.getElementById('inp-sku').value.trim()) {
+    e.preventDefault();
+    document.getElementById('inp-sku').focus();
+    alert('Введіть SKU');
+    return;
+  }
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-run').textContent = '⏳ Запускаємо…';
+});
+</script>
+{% endblock %}

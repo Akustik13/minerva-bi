@@ -579,13 +579,19 @@ def import_offers_from_dk(task=None) -> dict:
     return {'updated': updated, 'not_found': not_found}
 
 
-def create_listings_from_offers(task=None) -> dict:
+def create_listings_from_offers(
+    task=None,
+    filter_sku: str | None = None,
+    filter_category_type: str | None = None,
+) -> dict:
     """Create DigiKeyListing records for DigiKey offers that have no listing in Minerva.
 
-    task — optional BotTask instance for progress updates and cancellation.
-    Returns: {created: N, already_exists: M, no_product: [sku, ...], products_auto_created: N}
+    filter_sku           — process only this specific supplierSku
+    filter_category_type — process only offers whose title matches this CAT_CHOICES key
+                           (detected via _detect_category_type on the offer title)
+
+    Returns: {created, already_exists, skipped, no_product: [...], products_auto_created}
     """
-    import json
     from django.db import models as _m
     from django.utils import timezone
     from bots.models import DigiKeyConfig, DigiKeyListing
@@ -602,6 +608,7 @@ def create_listings_from_offers(task=None) -> dict:
 
     created: int          = 0
     already_exists_cnt    = 0
+    skipped               = 0
     no_product: list      = []
     products_auto_created = 0
 
@@ -616,19 +623,32 @@ def create_listings_from_offers(task=None) -> dict:
         if task:
             task.set_progress(f"[{idx}/{total}] {sku}")
 
+        # ── Filter by SKU ──────────────────────────────────────────────────────
+        if filter_sku and sku != filter_sku:
+            skipped += 1
+            continue
+
+        # ── Filter by category type (keyword match on offer title) ─────────────
+        if filter_category_type:
+            detected = _detect_category_type(offer.get('title') or '')
+            if detected != filter_category_type:
+                skipped += 1
+                continue
+
+        # ── Skip already-existing listings ─────────────────────────────────────
         if DigiKeyListing.objects.filter(
             _m.Q(dk_supplier_sku=sku) | _m.Q(product__sku=sku)
         ).exists():
             already_exists_cnt += 1
             continue
 
+        # ── Resolve or auto-create Product ────────────────────────────────────
         try:
             product = Product.objects.get(sku=sku)
         except Product.DoesNotExist:
             if not auto_create:
                 no_product.append(sku)
                 continue
-            # Auto-create a Product stub so the listing can be linked immediately
             product = Product(
                 sku=sku,
                 name=(offer.get('title') or sku)[:200],
@@ -667,11 +687,14 @@ def create_listings_from_offers(task=None) -> dict:
 
         created += 1
 
-    logger.info("DK create_listings created=%d already=%d no_product=%d auto_created=%d",
-                created, already_exists_cnt, len(no_product), products_auto_created)
+    logger.info(
+        "DK create_listings created=%d already=%d skipped=%d no_product=%d auto_created=%d",
+        created, already_exists_cnt, skipped, len(no_product), products_auto_created,
+    )
     return {
         'created': created,
         'already_exists': already_exists_cnt,
+        'skipped': skipped,
         'no_product': no_product,
         'products_auto_created': products_auto_created,
     }
