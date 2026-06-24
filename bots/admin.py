@@ -1731,6 +1731,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         'action_bulk_prices',
         'action_bulk_stock',
         'action_bulk_set_category',
+        'action_delete_dk_offers',
     ]
     save_as        = True
 
@@ -3024,6 +3025,53 @@ Rules:
             'cat_choices': DigiKeyListing.CAT_CHOICES,
             'opts':       self.model._meta,
         })
+
+    # ── Bulk action: delete offers on DigiKey ────────────────────────────────
+
+    @admin.action(description='🗑️ Видалити оффер на DigiKey Marketplace')
+    def action_delete_dk_offers(self, request, queryset):
+        from bots.services.dk_marketplace import delete_offer, DKMarketplaceError
+        config = DigiKeyConfig.get()
+
+        with_offer    = queryset.filter(dk_offer_id__gt='')
+        without_offer = queryset.filter(dk_offer_id='').count() + queryset.filter(dk_offer_id__isnull=True).count()
+
+        deleted = err = 0
+        err_details = []
+
+        for listing in with_offer.select_related('product'):
+            offer_id = listing.dk_offer_id
+            try:
+                delete_offer(config, offer_id)
+                listing.dk_offer_id   = ''
+                listing.sync_status   = DigiKeyListing.SYNC_DRAFT
+                listing.save(update_fields=['dk_offer_id', 'sync_status'])
+                deleted += 1
+            except DKMarketplaceError as exc:
+                err += 1
+                sku = listing.product.sku if listing.product else str(listing.pk)
+                err_details.append(f"{sku}: {exc}")
+                logger.warning("delete_offer failed %s: %s", offer_id, exc)
+
+        if deleted:
+            self.message_user(
+                request,
+                f"✅ Видалено {deleted} офер(ів) на DigiKey. Статус скинуто до 'draft'.",
+                messages.SUCCESS,
+            )
+        if without_offer:
+            self.message_user(
+                request,
+                f"⚠️ {without_offer} лістинг(ів) пропущено — відсутній Offer ID.",
+                messages.WARNING,
+            )
+        if err:
+            detail_str = '; '.join(err_details[:5])
+            self.message_user(
+                request,
+                f"❌ Помилки для {err} офер(ів): {detail_str}",
+                messages.ERROR,
+            )
 
     PULL_TASK_NAME = 'bulk_pull_dk'
 

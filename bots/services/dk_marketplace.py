@@ -250,6 +250,27 @@ def update_offer(config, listing) -> None:
     logger.info("DK update_offer OK")
 
 
+def delete_offer(config, offer_id: str) -> None:
+    """DELETE /offers/{offerId}?forceDelete=true — remove offer from DigiKey Marketplace."""
+    import requests as req
+
+    token = get_marketplace_token(config)
+    url   = f"{_base_url(config)}{_OFFERS_BASE}/offers/{offer_id}"
+
+    logger.info("DK delete_offer offer_id=%s", offer_id)
+    resp = req.delete(url, params={'forceDelete': 'true'}, headers=_headers(config, token), timeout=30)
+    try:
+        resp.raise_for_status()
+    except req.HTTPError as e:
+        body = {}
+        try: body = e.response.json()
+        except Exception: pass
+        raise DKMarketplaceError(
+            f"delete_offer {e.response.status_code}: {body}"
+        ) from e
+    logger.info("DK delete_offer OK offer_id=%s", offer_id)
+
+
 # ── High-level actions ────────────────────────────────────────────────────────
 
 _SYNC_STAGED = 'staged'
