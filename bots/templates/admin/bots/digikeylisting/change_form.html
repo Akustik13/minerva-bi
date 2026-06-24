@@ -699,7 +699,7 @@ var DK_FIELD_MAP = {
 /* ── Dirty tracking + Publish modal ─────────────────────────────────────── */
 var _formDirty         = false;
 var _publishUrl        = '{{ publish_url|default:"" }}';
-var _isExisting        = {{ original.dk_offer_id|yesno:"true,false" }};
+var _isExisting        = {% if original and original.dk_offer_id %}true{% else %}false{% endif %};
 var VALIDATE_ATTRS_URL = '{{ validate_attrs_url|default:"" }}';
 
 (function() {
@@ -1609,7 +1609,7 @@ document.addEventListener('DOMContentLoaded', function() {
 var _dkExcelRow = null;
 var _dkExcelParseUrl  = '{{ excel_parse_url|default:"" }}';
 var _dkExcelApplyUrl  = '{{ excel_import_attrs_url|default:"" }}';
-var _dkCurrentSku     = '{{ original.dk_supplier_sku|default:original.product.sku|default:"" }}';
+var _dkCurrentSku     = '{% if original %}{{ original.dk_supplier_sku|default:"" }}{% endif %}';
 
 function dkOpenExcelImport() {
   var m = document.getElementById('dkExcelModal');
