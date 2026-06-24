@@ -32,8 +32,7 @@
     </a>
     {% endif %}
     {% if ai_advisor_url %}
-    <a href="{{ ai_advisor_url }}" class="dk-btn"
-       style="background:rgba(123,31,162,.2);color:#ce93d8;border:1px solid rgba(123,31,162,.4)">
+    <a href="{{ ai_advisor_url }}" class="dk-btn dk-btn-ai">
       🤖 AI Порада
     </a>
     {% endif %}
@@ -59,8 +58,7 @@
     </button>
     {% if original.sync_status == 'staged' %}
     <a href="{% url 'admin:bots_digikeylisting_check_staged' original.pk %}"
-       class="dk-btn"
-       style="background:rgba(33,150,243,.15);color:#42a5f5;border:1px solid rgba(33,150,243,.3)"
+       class="dk-btn dk-btn-status"
        onclick="return confirm('Перевірити чи затвердив DigiKey продукт?\n\nЯкщо затверджено — offer створюється автоматично.')">
       🔄 Перевірити статус DigiKey
     </a>
@@ -74,21 +72,18 @@
       ✕ Скасувати
     </button>
     {% if validate_attrs_url %}
-    <button type="button" class="dk-btn" id="dkValidateBtn"
-            style="background:rgba(255,152,0,.15);color:#ffa726;border:1px solid rgba(255,152,0,.4)"
+    <button type="button" class="dk-btn dk-btn-validate" id="dkValidateBtn"
             onclick="dkValidateAttrs()">
       🔍 Перевірити атрибути
     </button>
     {% endif %}
     {% if excel_import_attrs_url %}
-    <button type="button" class="dk-btn" id="dkExcelImportBtn"
-            style="background:rgba(46,125,50,.15);color:#81c784;border:1px solid rgba(46,125,50,.4)"
+    <button type="button" class="dk-btn dk-btn-excel" id="dkExcelImportBtn"
             onclick="dkOpenExcelImport()">
       📊 Імпорт з Excel
     </button>
     {% endif %}
-    <button type="button" class="dk-btn"
-            style="background:rgba(100,100,150,.12);color:var(--text-muted,#9aafbe);border:1px solid rgba(100,100,150,.25)"
+    <button type="button" class="dk-btn dk-btn-help"
             onclick="dkToggleHelp()" title="Довідка: публікація продукту">
       ❓ Довідка
     </button>
@@ -387,6 +382,11 @@ body.dk-edit .dk-view-val      { display: none !important; }
 .dk-btn-offer   { background: #e65100; }
 .dk-btn-cancel      { background: var(--bg-hover, #2a3d55); border: 1px solid var(--border-strong, #243347); }
 .dk-btn-cancel-red  { background: #c62828 !important; border-color: #b71c1c !important; color: #fff !important; }
+.dk-btn-ai       { background: #6a1b9a; border: 1px solid #7b1fa2; }
+.dk-btn-status   { background: #1565c0; border: 1px solid #1976d2; }
+.dk-btn-validate { background: #e65100; border: 1px solid #f4511e; }
+.dk-btn-excel    { background: #2e7d32; border: 1px solid #388e3c; }
+.dk-btn-help     { background: #37474f; border: 1px solid #455a64; }
 
 .dk-bar-hint { font-size: 12px; color: var(--text-muted, #9aafbe); margin-left: auto; }
 .dk-bar-note { font-size: 12px; font-style: italic; margin-left: auto; }
