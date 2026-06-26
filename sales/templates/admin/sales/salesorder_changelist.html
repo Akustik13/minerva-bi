@@ -1003,13 +1003,24 @@ function svSetView(mode) {
         var qty = btn.dataset.qty || '1';
         if (data[sku] && data[sku].found) {
           var _lurl = '/labels/serve/' + encodeURIComponent(sku) + '/';
+          var _wrap = document.createElement('span');
+          _wrap.style.cssText = 'display:inline-flex;gap:3px;align-items:center';
           var a = document.createElement('button');
           a.type = 'button';
           a.title = '🖨️ ' + sku + ' × ' + qty;
           a.className = 'sv-lbl-btn sv-lbl-on';
           a.textContent = '🖨️ {% trans "Друкувати" %}';
           (function(u,s,q){a.onclick=function(){svDymoOpen(u,s,q);};}(_lurl,sku,qty));
-          btn.parentNode.replaceChild(a, btn);
+          var _dl = document.createElement('button');
+          _dl.type = 'button';
+          _dl.title = '⬇️ {% trans "Скачати" %} ' + sku;
+          _dl.className = 'sv-lbl-btn sv-lbl-on';
+          _dl.style.cssText = 'padding:2px 6px;font-size:11px;opacity:.75';
+          _dl.textContent = '⬇️';
+          (function(u,s,q){_dl.onclick=function(){svDymoDownload(u+'?qty='+q,s);};}(_lurl,sku,qty));
+          _wrap.appendChild(a);
+          _wrap.appendChild(_dl);
+          btn.parentNode.replaceChild(_wrap, btn);
         } else {
           (function(origBtn, sku, qty) {
             var fileInput = document.createElement('input');
@@ -1044,13 +1055,24 @@ function svSetView(mode) {
                 var ok = data.results && data.results[0] && data.results[0].status !== 'error';
                 if (ok) {
                   var _lurl2 = '/labels/serve/' + encodeURIComponent(sku) + '/';
+                  var _wrap2 = document.createElement('span');
+                  _wrap2.style.cssText = 'display:inline-flex;gap:3px;align-items:center';
                   var a = document.createElement('button');
                   a.type = 'button';
                   a.title = '🖨️ ' + sku + ' × ' + qty;
                   a.className = 'sv-lbl-btn sv-lbl-on';
                   a.textContent = '🖨️ {% trans "Друкувати" %}';
                   (function(u,s,q){a.onclick=function(){svDymoOpen(u,s,q);};}(_lurl2,sku,qty));
-                  addBtn.parentNode.replaceChild(a, addBtn);
+                  var _dl2 = document.createElement('button');
+                  _dl2.type = 'button';
+                  _dl2.title = '⬇️ {% trans "Скачати" %} ' + sku;
+                  _dl2.className = 'sv-lbl-btn sv-lbl-on';
+                  _dl2.style.cssText = 'padding:2px 6px;font-size:11px;opacity:.75';
+                  _dl2.textContent = '⬇️';
+                  (function(u,s,q){_dl2.onclick=function(){svDymoDownload(u+'?qty='+q,s);};}(_lurl2,sku,qty));
+                  _wrap2.appendChild(a);
+                  _wrap2.appendChild(_dl2);
+                  addBtn.parentNode.replaceChild(_wrap2, addBtn);
                   document.body.removeChild(fileInput);
                 } else {
                   addBtn.textContent = '❌ {% trans "Помилка" %}';
