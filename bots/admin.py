@@ -2142,6 +2142,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             # Add page — inject copy-from-listing selector
             import json as _json
             extra_context['copy_data_url'] = reverse('admin:bots_digikeylisting_copy_data')
+            extra_context['copy_search_url'] = reverse('admin:bots_digikeylisting_copy_search')
             _cat_map = dict(DigiKeyListing.CAT_CHOICES)
             extra_context['existing_listings_json'] = _json.dumps([
                 {
@@ -2227,6 +2228,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('copy-data/',
                  self.admin_site.admin_view(self.copy_data_view),
                  name='bots_digikeylisting_copy_data'),
+            path('copy-search/',
+                 self.admin_site.admin_view(self.copy_search_view),
+                 name='bots_digikeylisting_copy_search'),
             path('excel-parse/',
                  self.admin_site.admin_view(self.excel_parse_view),
                  name='bots_digikeylisting_excel_parse'),
@@ -3399,6 +3403,28 @@ Rules:
             f'✅ Картку складу «{sku}» створено і прив\'язано. Перевірте і відредагуйте деталі.'
         )
         return redirect(reverse('admin:inventory_product_change', args=[product.pk]))
+
+    def copy_search_view(self, request):
+        """AJAX search for existing listings — used by add-form copy panel."""
+        from django.http import JsonResponse
+        from django.db.models import Q
+        q = request.GET.get('q', '').strip()
+        if len(q) < 2:
+            return JsonResponse({'results': []})
+        _cat_map = dict(DigiKeyListing.CAT_CHOICES)
+        qs = (
+            DigiKeyListing.objects
+            .filter(Q(dk_supplier_sku__icontains=q) | Q(dk_title__icontains=q))
+            .only('pk', 'product_id', 'dk_supplier_sku', 'dk_title', 'category_type')
+            .order_by('dk_supplier_sku')[:60]
+        )
+        results = []
+        for l in qs:
+            sku = l.dk_supplier_sku or (f'ID-{l.product_id}' if l.product_id else f'DK-{l.pk}')
+            title = l.dk_title[:45] if l.dk_title else '(без назви)'
+            cat = _cat_map.get(l.category_type, l.category_type or 'other')
+            results.append({'pk': l.pk, 'label': f'{sku} — {title} [{cat}]'})
+        return JsonResponse({'results': results})
 
     def copy_data_view(self, request):
         """Return all copyable fields of a listing as JSON for the add-form prefill."""
