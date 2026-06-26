@@ -25,6 +25,7 @@ echo "✅ PostgreSQL ready — cron runner started"
 echo "   track_shipments         every ${TRACK_INTERVAL}s"
 echo "   sync_digikey_orders     interval controlled by DigiKeyConfig in DB"
 echo "   check_digikey_messages  interval controlled by DigiKeyConfig in DB"
+echo "   poll_dk_status          interval controlled by DigiKeyConfig.poll_interval_minutes in DB"
 echo "   send_digest             time/frequency controlled by NotificationSettings in DB"
 echo "   morning_briefing        daily at ${BRIEFING_HOUR}:00"
 echo "   send_reminders          every ${REMINDER_INTERVAL}s"
@@ -53,6 +54,9 @@ while true; do
 
   # ── DigiKey Messages — інтервал з БД (msg_check_interval) ──
   python manage.py check_digikey_messages 2>&1 || true
+
+  # ── DigiKey poll staged → published — інтервал з БД (poll_interval_minutes) ──
+  python manage.py poll_dk_status 2>&1 || true
 
   # ── Digest report — час і частота керуються в NotificationSettings ──
   python manage.py send_digest 2>&1 || true
