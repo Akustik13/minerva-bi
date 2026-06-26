@@ -1535,6 +1535,156 @@ function dkAttrInfoHtml(code) {
 
 var _aTbody = null, _aTa = null;
 
+/* Per-category attribute definitions for the picker popup */
+var CATEGORY_ATTR_DEFS = {
+  filter: [
+    {code:'139', name:'Frequency — центральна частота'},
+    {code:'398', name:'Bandwidth — смуга пропускання'},
+    {code:'21',  name:'Filter Type — тип фільтра'},
+    {code:'428', name:'Ripple — пульсація'},
+    {code:'327', name:'Insertion Loss — вносимі втрати'},
+    {code:'69',  name:'Mounting Type — тип монтажу'},
+    {code:'16',  name:'Package / Case — корпус'},
+    {code:'46',  name:'Size / Dimension — розміри'},
+    {code:'966', name:'Height - Max — висота макс.'},
+  ],
+  cable: [
+    {code:'91',   name:'Style — стиль кабелю'},
+    {code:'726',  name:'1st Connector — 1-й роз\'єм'},
+    {code:'2490', name:'1st Contact Gender — 1-й гендер'},
+    {code:'727',  name:'2nd Connector — 2-й роз\'єм'},
+    {code:'2491', name:'2nd Contact Gender — 2-й гендер'},
+    {code:'77',   name:'Length — довжина'},
+    {code:'321',  name:'Cable Type — тип кабелю'},
+    {code:'2492', name:'Cable Impedance — імпеданс кабелю'},
+    {code:'2493', name:'Connector Impedance — імпеданс роз\'єму'},
+    {code:'2157', name:'Frequency - Max — макс. частота'},
+    {code:'37',   name:'Color — колір'},
+    {code:'5',    name:'Features — особливості'},
+    {code:'255',  name:'Operating Temperature — температура'},
+  ],
+  antenna: [
+    {code:'Antenna Type',          name:'Antenna Type — тип антени'},
+    {code:'Gain',                  name:'Gain — підсилення (dBi)'},
+    {code:'VSWR',                  name:'VSWR — КСХ'},
+    {code:'Frequency Range',       name:'Frequency Range — діапазон частот'},
+    {code:'Connector Type',        name:'Connector Type — тип роз\'єму'},
+    {code:'Mounting Type',         name:'Mounting Type — тип монтажу'},
+    {code:'Impedance',             name:'Impedance — імпеданс'},
+    {code:'Polarization',          name:'Polarization — поляризація'},
+    {code:'Applications',          name:'Applications — застосування'},
+    {code:'Operating Temperature', name:'Operating Temperature — температура'},
+  ],
+  connector: [
+    {code:'Connector Type',      name:'Connector Type — тип роз\'єму'},
+    {code:'Number of Positions', name:'Number of Positions — кількість контактів'},
+    {code:'Contact Finish',      name:'Contact Finish — покриття контактів'},
+    {code:'Gender',              name:'Gender — стать роз\'єму'},
+    {code:'Mounting Type',       name:'Mounting Type — тип монтажу'},
+    {code:'Series',              name:'Series — серія'},
+  ],
+};
+
+function _dkGetUsedCodes() {
+  var used = {};
+  if (!_aTbody) return used;
+  _aTbody.querySelectorAll('.dk-attr-key-inp').forEach(function(inp) {
+    if (inp.value.trim()) used[inp.value.trim()] = true;
+  });
+  return used;
+}
+
+var _attrPickerEl = null;
+
+function dkShowAttrPicker(anchorBtn) {
+  /* Close any open picker */
+  if (_attrPickerEl) { _attrPickerEl.remove(); _attrPickerEl = null; }
+
+  var cat  = (document.getElementById('id_category_type') || {}).value || 'other';
+  var defs = CATEGORY_ATTR_DEFS[cat] || [];
+  var used = _dkGetUsedCodes();
+
+  var picker = document.createElement('div');
+  picker.style.cssText =
+    'position:absolute;z-index:9999;background:var(--bg-card,#1a2535);' +
+    'border:1px solid var(--border-strong,#243347);border-radius:6px;' +
+    'box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:280px;max-height:320px;overflow-y:auto;font-size:13px';
+
+  function addRow(code, label, isCustom) {
+    var row = document.createElement('div');
+    var already = !!used[code];
+    row.style.cssText = 'padding:7px 12px;cursor:' + (already ? 'default' : 'pointer') +
+      ';color:' + (already ? 'var(--text-dim,#607d8b)' : 'var(--text,#c9d8e4)') +
+      ';border-bottom:1px solid var(--border-strong,#243347);display:flex;justify-content:space-between;align-items:center';
+    row.innerHTML = '<span>' + dkEsc(label) + '</span>' +
+      (already ? '<span style="font-size:11px;color:var(--text-dim,#607d8b)">вже є</span>' : '');
+    if (!already) {
+      row.addEventListener('mouseenter', function() { row.style.background = 'var(--bg-hover,#1e2d40)'; });
+      row.addEventListener('mouseleave', function() { row.style.background = ''; });
+      row.addEventListener('mousedown', function(ev) {
+        ev.preventDefault();
+        picker.remove(); _attrPickerEl = null;
+        _aAddRow(isCustom ? '' : code, '');
+        var newRow = _aTbody.lastElementChild;
+        if (newRow) {
+          var keyInp = newRow.querySelector('.dk-attr-key-inp');
+          var valInp = newRow.querySelector('.dk-attr-val input');
+          if (keyInp && !isCustom) keyInp.value = code;
+          if (valInp) valInp.focus();
+        }
+        _aSync();
+      });
+    }
+    picker.appendChild(row);
+  }
+
+  if (defs.length) {
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.6px;' +
+      'text-transform:uppercase;color:var(--text-muted,#9aafbe);border-bottom:1px solid var(--border-strong,#243347)';
+    hdr.textContent = 'Атрибути категорії';
+    picker.appendChild(hdr);
+    defs.forEach(function(d) { addRow(d.code, d.name, false); });
+  }
+
+  /* Custom attr option */
+  var customRow = document.createElement('div');
+  customRow.style.cssText = 'padding:7px 12px;cursor:pointer;color:#42a5f5;font-style:italic';
+  customRow.textContent = '+ Свій атрибут (кастомний)';
+  customRow.addEventListener('mouseenter', function() { customRow.style.background = 'var(--bg-hover,#1e2d40)'; });
+  customRow.addEventListener('mouseleave', function() { customRow.style.background = ''; });
+  customRow.addEventListener('mousedown', function(ev) {
+    ev.preventDefault();
+    picker.remove(); _attrPickerEl = null;
+    _aAddRow('', '');
+    var newRow = _aTbody.lastElementChild;
+    if (newRow) newRow.querySelector('.dk-attr-key-inp').focus();
+    _aSync();
+  });
+  picker.appendChild(customRow);
+
+  /* Position below the button */
+  var rect = anchorBtn.getBoundingClientRect();
+  picker.style.top  = (window.scrollY + rect.bottom + 4) + 'px';
+  picker.style.left = (window.scrollX + rect.left) + 'px';
+  picker.style.position = 'fixed';
+  picker.style.top  = (rect.bottom + 4) + 'px';
+  picker.style.left = rect.left + 'px';
+  picker.style.position = 'fixed';
+  document.body.appendChild(picker);
+  _attrPickerEl = picker;
+
+  /* Close on outside click */
+  setTimeout(function() {
+    document.addEventListener('mousedown', function _closePicker(ev) {
+      if (!picker.contains(ev.target) && ev.target !== anchorBtn) {
+        picker.remove(); _attrPickerEl = null;
+        document.removeEventListener('mousedown', _closePicker);
+      }
+    });
+  }, 0);
+}
+
 function dkAttrsInit() {
   _aTa = document.querySelector('[name="dk_attributes"]');
   if (!_aTa) return;
@@ -1557,11 +1707,9 @@ function dkAttrsInit() {
   _aTa.parentNode.insertBefore(wrap, _aTa);
   _aTbody = wrap.querySelector('.dk-atbody');
 
-  wrap.querySelector('#dkAddAttr').addEventListener('click', function() {
-    _aAddRow('', '');
-    var newRow = _aTbody.lastElementChild;
-    if (newRow) newRow.querySelector('.dk-attr-key-inp').focus();
-    _aSync();
+  wrap.querySelector('#dkAddAttr').addEventListener('click', function(e) {
+    e.stopPropagation();
+    dkShowAttrPicker(e.currentTarget);
   });
 
   var ex = {};
@@ -1716,15 +1864,17 @@ document.addEventListener('DOMContentLoaded', function() {
     var _qtyEl = document.querySelector('[name="dk_quantity_override"]');
     if (_qtyEl && (!_qtyEl.value || _qtyEl.value === '0')) _qtyEl.value = '100';
 
-    /* Title ↔ SKU ↔ Datasheet URL — all linked via clean part number */
+    /* Title ↔ SKU ↔ Datasheet URL ↔ Photo URL — all linked via clean part number */
     var _titleInp = document.getElementById('id_dk_title');
     var _skuInp   = document.getElementById('id_dk_supplier_sku');
     var _dsInp    = document.getElementById('id_dk_datasheet_url');
-    var _DS_BASE  = 'https://docs.sevskiy.com/datasheets/download.php?file=';
+    var _imgInp   = document.getElementById('id_dk_image_url');
     var _syncLock = false;
 
-    function _updateDatasheetUrl(sku) {
-      if (_dsInp && sku) _dsInp.value = _DS_BASE + encodeURIComponent(sku) + '.pdf';
+    function _updateLinkedUrls(sku) {
+      if (!sku) return;
+      if (_dsInp) _dsInp.value = 'https://docs.sevskiy.com/datasheets/download.php?file=' + encodeURIComponent(sku) + '.pdf';
+      if (_imgInp) _imgInp.value = 'https://docs.sevskiy.com/pictures/download.php?file=' + encodeURIComponent(sku) + '.jpg';
     }
 
     if (_titleInp) {
@@ -1735,19 +1885,17 @@ document.addEventListener('DOMContentLoaded', function() {
         _titleInp.value = cleaned;
         _syncLock = false;
         if (_skuInp && !_skuInp.value) _skuInp.value = cleaned;
-        _updateDatasheetUrl(_skuInp ? _skuInp.value || cleaned : cleaned);
+        _updateLinkedUrls(_skuInp ? _skuInp.value || cleaned : cleaned);
       });
     }
     if (_skuInp) {
       _skuInp.addEventListener('blur', function() {
         if (_syncLock) return;
         var cleaned = dkCleanPartNo(_skuInp.value);
-        if (cleaned !== _skuInp.value) {
-          _syncLock = true;
-          _skuInp.value = cleaned;
-          _syncLock = false;
-        }
-        _updateDatasheetUrl(cleaned);
+        _syncLock = true;
+        _skuInp.value = cleaned;
+        _syncLock = false;
+        _updateLinkedUrls(cleaned);
       });
     }
 
