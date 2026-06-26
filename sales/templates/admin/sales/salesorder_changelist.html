@@ -612,6 +612,13 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
     var a=document.createElement('a');a.href=url;a.download=(sku||'label')+'.dymo';
     document.body.appendChild(a);a.click();document.body.removeChild(a);
   };
+  window.svCaGenThenOpen=function(u,s,q){
+    fetch('/labels/generate/',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({part_no:s,qty:parseInt(q)||1})
+    }).then(function(r){return r.json();})
+      .then(function(d){svDymoOpen(d.ok?('/labels/serve/'+encodeURIComponent(s)+'/'):u,s,q);})
+      .catch(function(){svDymoOpen(u,s,q);});
+  };
   window.svDymoError=function(url,sku,msg){
     _modal('<div style="background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:10px;padding:24px 28px;max-width:440px;width:90%">'
       +'<div style="font-weight:700;font-size:15px;margin-bottom:8px;color:var(--text,#c9d8e4)">⚠️ {% trans "DYMO недоступний" %}</div>'
@@ -1010,7 +1017,7 @@ function svSetView(mode) {
           a.title = '🖨️ ' + sku + ' × ' + qty;
           a.className = 'sv-lbl-btn sv-lbl-on';
           a.textContent = '🖨️ {% trans "Друкувати" %}';
-          (function(u,s,q){a.onclick=function(){svDymoOpen(u,s,q);};}(_lurl,sku,qty));
+          (function(u,s,q){a.onclick=function(){(s.toUpperCase().startsWith('CA-')?svCaGenThenOpen:svDymoOpen)(u,s,q);};}(_lurl,sku,qty));
           var _dl = document.createElement('button');
           _dl.type = 'button';
           _dl.title = '⬇️ {% trans "Скачати" %} ' + sku;
@@ -1062,7 +1069,7 @@ function svSetView(mode) {
                   a.title = '🖨️ ' + sku + ' × ' + qty;
                   a.className = 'sv-lbl-btn sv-lbl-on';
                   a.textContent = '🖨️ {% trans "Друкувати" %}';
-                  (function(u,s,q){a.onclick=function(){svDymoOpen(u,s,q);};}(_lurl2,sku,qty));
+                  (function(u,s,q){a.onclick=function(){(s.toUpperCase().startsWith('CA-')?svCaGenThenOpen:svDymoOpen)(u,s,q);};}(_lurl2,sku,qty));
                   var _dl2 = document.createElement('button');
                   _dl2.type = 'button';
                   _dl2.title = '⬇️ {% trans "Скачати" %} ' + sku;
