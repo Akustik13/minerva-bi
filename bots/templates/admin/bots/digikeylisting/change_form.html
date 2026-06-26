@@ -2116,10 +2116,12 @@ document.addEventListener('click', function(e) {
 var _SKU_CHECK_URL = '{{ sku_check_url|default:"" }}';
 (function() {
   if (!_SKU_CHECK_URL) return;
-  var _skuFld = document.getElementById('id_dk_supplier_sku');
+  var _skuFld   = document.getElementById('id_dk_supplier_sku');
+  var _prodFld  = document.getElementById('id_product');
+  var _titleFld = document.getElementById('id_dk_title');
   if (!_skuFld) return;
 
-  /* Inject badge span right after the input */
+  /* Inject badge span right after the SKU input */
   var _badge = document.createElement('span');
   _badge.id = 'dkSkuStockBadge';
   _badge.style.cssText = 'display:inline-block;margin-left:10px;font-size:12px;vertical-align:middle';
@@ -2127,12 +2129,64 @@ var _SKU_CHECK_URL = '{{ sku_check_url|default:"" }}';
 
   var _skuCheckTimer = null;
 
-  function _dkCheckSku(sku) {
-    if (!sku) { _badge.innerHTML = ''; return; }
+  /* Set Django admin autocomplete (Select2) product field */
+  function _dkSetProductField(pk, name) {
+    if (!_prodFld) return;
+    /* Re-enable product row in case auto-create had dimmed it */
+    var _prodRow = _prodFld.closest('.form-row') || _prodFld.parentNode;
+    _prodFld.disabled = false;
+    if (_prodRow) _prodRow.style.opacity = '';
+    /* Add option if not already present */
+    if (!_prodFld.querySelector('option[value="' + pk + '"]')) {
+      var _opt = document.createElement('option');
+      _opt.value = pk;
+      _opt.text = name;
+      _prodFld.appendChild(_opt);
+    }
+    _prodFld.value = pk;
+    /* Notify Select2 via django.jQuery if available */
+    if (window.django && django.jQuery) {
+      django.jQuery(_prodFld).val(pk).trigger('change');
+    } else {
+      _prodFld.dispatchEvent(new Event('change'));
+    }
+  }
+
+  /* Lock / unlock "Автоматично створити товар" checkbox */
+  function _dkLockAutoCreate(lock) {
+    var _cb   = document.getElementById('dk_auto_create');
+    var _wrap = document.getElementById('dkAutoCreateWrap');
+    if (!_cb) return;
+    _cb.disabled = lock;
+    if (lock) _cb.checked = false;
+    if (_wrap) {
+      _wrap.style.opacity = lock ? '0.4' : '';
+      _wrap.title = lock ? 'Товар вже є на складі — прив\'язано автоматично' : '';
+    }
+    /* Apply disabled state to product row when unlocking */
+    if (!lock && _prodFld) {
+      var _prodRow = _prodFld.closest('.form-row') || _prodFld.parentNode;
+      _prodFld.disabled = false;
+      if (_prodRow) _prodRow.style.opacity = '';
+    }
+  }
+
+  /* interactive=true → also auto-link product, lock auto-create, fill title
+     interactive=false → only show badge (page load, don't overwrite existing data) */
+  function _dkCheckSku(sku, interactive) {
+    if (!sku) {
+      _badge.innerHTML = '';
+      if (interactive) _dkLockAutoCreate(false);
+      return;
+    }
     fetch(_SKU_CHECK_URL + '?sku=' + encodeURIComponent(sku))
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        if (!data.found) { _badge.innerHTML = ''; return; }
+        if (!data.found) {
+          _badge.innerHTML = '';
+          if (interactive) _dkLockAutoCreate(false);
+          return;
+        }
         var qtyColor = data.qty > 0 ? 'var(--ok,#81c784)' : '#e57373';
         _badge.innerHTML =
           '<span style="background:rgba(56,142,60,.12);border:1px solid rgba(56,142,60,.3);' +
@@ -2140,6 +2194,12 @@ var _SKU_CHECK_URL = '{{ sku_check_url|default:"" }}';
           '📦&nbsp;<span style="color:var(--text-muted)">склад</span>' +
           '&nbsp;·&nbsp;<span style="color:' + qtyColor + ';font-weight:700">Залишок: ' +
           data.qty + ' шт.</span></span>';
+        if (interactive) {
+          _dkSetProductField(data.product_pk, data.name);
+          _dkLockAutoCreate(true);
+          /* Fill title with SKU if empty */
+          if (_titleFld && !_titleFld.value.trim()) _titleFld.value = sku;
+        }
       })
       .catch(function() { _badge.innerHTML = ''; });
   }
@@ -2147,13 +2207,17 @@ var _SKU_CHECK_URL = '{{ sku_check_url|default:"" }}';
   _skuFld.addEventListener('input', function() {
     clearTimeout(_skuCheckTimer);
     var sku = _skuFld.value.trim();
-    if (!sku) { _badge.innerHTML = ''; return; }
+    if (!sku) {
+      _badge.innerHTML = '';
+      _dkLockAutoCreate(false);
+      return;
+    }
     _badge.innerHTML = '<span style="color:var(--text-muted)">⏳</span>';
-    _skuCheckTimer = setTimeout(function() { _dkCheckSku(sku); }, 400);
+    _skuCheckTimer = setTimeout(function() { _dkCheckSku(sku, true); }, 400);
   });
 
-  /* Check current value on page load */
-  if (_skuFld.value.trim()) _dkCheckSku(_skuFld.value.trim());
+  /* Page load: show badge only, no field changes */
+  if (_skuFld.value.trim()) _dkCheckSku(_skuFld.value.trim(), false);
 })();
 </script>
 {% endblock %}
