@@ -1017,7 +1017,7 @@ function svSetView(mode) {
           _dl.className = 'sv-lbl-btn sv-lbl-on';
           _dl.style.cssText = 'padding:2px 6px;font-size:11px;opacity:.75';
           _dl.textContent = '⬇️';
-          (function(u,s,q){_dl.onclick=function(){svDymoDownload(u+'?qty='+q,s);};}(_lurl,sku,qty));
+          (function(u,s){_dl.onclick=function(){svDymoDownload(u,s);};}(_lurl,sku));
           _wrap.appendChild(a);
           _wrap.appendChild(_dl);
           btn.parentNode.replaceChild(_wrap, btn);
@@ -1069,7 +1069,7 @@ function svSetView(mode) {
                   _dl2.className = 'sv-lbl-btn sv-lbl-on';
                   _dl2.style.cssText = 'padding:2px 6px;font-size:11px;opacity:.75';
                   _dl2.textContent = '⬇️';
-                  (function(u,s,q){_dl2.onclick=function(){svDymoDownload(u+'?qty='+q,s);};}(_lurl2,sku,qty));
+                  (function(u,s){_dl2.onclick=function(){svDymoDownload(u,s);};}(_lurl2,sku));
                   _wrap2.appendChild(a);
                   _wrap2.appendChild(_dl2);
                   addBtn.parentNode.replaceChild(_wrap2, addBtn);
