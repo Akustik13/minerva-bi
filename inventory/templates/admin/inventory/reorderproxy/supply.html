@@ -487,7 +487,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                     <td style="white-space:nowrap">
                       <button type="button" class="sv-btn sv-btn-ok"
                               style="font-size:10px;padding:3px 8px"
-                              onclick="svReceive({{ inc.line_pk }}, {{ inc.qty }})">
+                              onclick="svReceive({{ inc.line_pk }}, {{ inc.qty }}, this)">
                         ✓ {% trans "Отримати" %}
                       </button>
                       <button type="button" class="sv-btn"
@@ -495,7 +495,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                               title="{% trans "Ввести іншу кількість" %}"
                               onclick="svReceiveToggle({{ inc.line_pk }})">✏️</button>
                       <div id="rcv-{{ inc.line_pk }}"
-                           style="display:none;margin-top:5px;display:none;
+                           style="display:none;margin-top:5px;
                                   background:var(--bg-input);border:1px solid var(--border-strong);
                                   border-radius:6px;padding:6px 8px">
                         <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px">{% trans "Отримано шт:" %}</div>
@@ -509,7 +509,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                                         padding:4px 6px;font-size:12px">
                           <button type="button" class="sv-btn sv-btn-ok"
                                   style="font-size:11px;padding:3px 9px"
-                                  onclick="svReceiveCustom({{ inc.line_pk }})">✓</button>
+                                  onclick="svReceiveCustom({{ inc.line_pk }}, this)">✓</button>
                           <button type="button"
                                   style="background:none;border:none;color:var(--text-dim);
                                          cursor:pointer;font-size:13px;padding:0 2px"
@@ -784,13 +784,15 @@ var _svi = {
   var RECV_URL = '/admin/inventory/reorderproxy/supply/receive/';
 
   function getCsrf() {
-    var c = document.cookie.split(';').find(function(s){ return s.trim().startsWith('csrftoken='); });
-    return c ? c.trim().split('=')[1] : '';
+    var m = document.cookie.match(/csrftoken=([^;]+)/);
+    if (m) return m[1];
+    var el = document.querySelector('[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
   }
 
-  function doReceive(linePk, qty) {
-    var btn = document.querySelector('[onclick*="svReceive(' + linePk + ',"],' +
-                                     '[onclick*="svReceiveCustom(' + linePk + ')"]');
+  function doReceive(btn, linePk, qty) {
+    var origText = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '⏳'; }
     fetch(RECV_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
@@ -799,26 +801,29 @@ var _svi = {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (d.ok) {
-        location.reload();
+        if (btn) { btn.textContent = '✓✓'; btn.style.background = '#1b5e20'; }
+        setTimeout(function(){ location.reload(); }, 400);
       } else {
+        if (btn) { btn.disabled = false; btn.textContent = origText; }
         alert(_svi.error_prefix + ': ' + (d.error || '?'));
       }
     })
-    .catch(function() { alert(_svi.error_net); });
+    .catch(function(e) {
+      if (btn) { btn.disabled = false; btn.textContent = origText; }
+      alert(_svi.error_net + ': ' + e);
+    });
   }
 
-  window.svReceive = function(linePk, qty) {
-    if (!confirm(_svi.confirm_pre + ' ' + qty + ' ' + _svi.confirm_post)) return;
-    doReceive(linePk, qty);
+  window.svReceive = function(linePk, qty, btn) {
+    doReceive(btn || null, linePk, qty);
   };
 
-  window.svReceiveCustom = function(linePk) {
+  window.svReceiveCustom = function(linePk, btn) {
     var inp = document.getElementById('rcv-qty-' + linePk);
     if (!inp) return;
     var qty = parseFloat(inp.value);
     if (!qty || qty <= 0) { alert(_svi.error_qty); return; }
-    if (!confirm(_svi.confirm_pre + ' ' + qty + ' ' + _svi.confirm_post)) return;
-    doReceive(linePk, qty);
+    doReceive(btn || null, linePk, qty);
   };
 
   window.svReceiveToggle = function(linePk) {

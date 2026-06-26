@@ -3576,6 +3576,39 @@ class PurchaseOrderAdmin(admin.ModelAdmin):
         initial.setdefault('status', 'draft')
         return initial
 
+    def save_model(self, request, obj, form, change):
+        if change and obj.pk:
+            try:
+                obj._old_status = PurchaseOrder.objects.values_list('status', flat=True).get(pk=obj.pk)
+            except PurchaseOrder.DoesNotExist:
+                obj._old_status = None
+        else:
+            obj._old_status = None
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        if (change
+                and obj.status == PurchaseOrder.Status.RECEIVED
+                and getattr(obj, '_old_status', None) != PurchaseOrder.Status.RECEIVED):
+            auto_received = 0
+            for line in obj.lines.all():
+                if line.qty_received < line.qty_ordered:
+                    line.qty_received = line.qty_ordered
+                    line.save()
+                    auto_received += 1
+            if auto_received:
+                if not obj.received_date:
+                    obj.received_date = timezone.now().date()
+                    obj.save(update_fields=['received_date'])
+                from django.contrib import messages as _msg
+                self.message_user(
+                    request,
+                    _("✅ Автоматично зараховано %(n)d позицій на склад.") % {"n": auto_received},
+                    _msg.SUCCESS,
+                )
+
     def status_badge(self, obj):
         colors = {
             'draft': '#607d8b', 'ordered': '#2196f3',
