@@ -2111,5 +2111,49 @@ document.addEventListener('click', function(e) {
     }
   });
 });
+
+/* ═══ Live inventory check for Supplier SKU (DK) field ═══ */
+var _SKU_CHECK_URL = '{{ sku_check_url|default:"" }}';
+(function() {
+  if (!_SKU_CHECK_URL) return;
+  var _skuFld = document.getElementById('id_dk_supplier_sku');
+  if (!_skuFld) return;
+
+  /* Inject badge span right after the input */
+  var _badge = document.createElement('span');
+  _badge.id = 'dkSkuStockBadge';
+  _badge.style.cssText = 'display:inline-block;margin-left:10px;font-size:12px;vertical-align:middle';
+  _skuFld.parentNode.insertBefore(_badge, _skuFld.nextSibling);
+
+  var _skuCheckTimer = null;
+
+  function _dkCheckSku(sku) {
+    if (!sku) { _badge.innerHTML = ''; return; }
+    fetch(_SKU_CHECK_URL + '?sku=' + encodeURIComponent(sku))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.found) { _badge.innerHTML = ''; return; }
+        var qtyColor = data.qty > 0 ? 'var(--ok,#81c784)' : '#e57373';
+        _badge.innerHTML =
+          '<span style="background:rgba(56,142,60,.12);border:1px solid rgba(56,142,60,.3);' +
+          'border-radius:4px;padding:2px 9px;line-height:1.7;">' +
+          '📦&nbsp;<span style="color:var(--text-muted)">склад</span>' +
+          '&nbsp;·&nbsp;<span style="color:' + qtyColor + ';font-weight:700">Залишок: ' +
+          data.qty + ' шт.</span></span>';
+      })
+      .catch(function() { _badge.innerHTML = ''; });
+  }
+
+  _skuFld.addEventListener('input', function() {
+    clearTimeout(_skuCheckTimer);
+    var sku = _skuFld.value.trim();
+    if (!sku) { _badge.innerHTML = ''; return; }
+    _badge.innerHTML = '<span style="color:var(--text-muted)">⏳</span>';
+    _skuCheckTimer = setTimeout(function() { _dkCheckSku(sku); }, 400);
+  });
+
+  /* Check current value on page load */
+  if (_skuFld.value.trim()) _dkCheckSku(_skuFld.value.trim());
+})();
 </script>
 {% endblock %}

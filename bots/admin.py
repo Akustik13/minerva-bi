@@ -2080,6 +2080,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             extra_context['price_currency'] = DigiKeyConfig.get().locale_currency or 'EUR'
         except Exception:
             extra_context['price_currency'] = 'EUR'
+        extra_context['sku_check_url'] = reverse('admin:bots_digikeylisting_sku_check')
         if object_id:
             extra_context['publish_url'] = reverse(
                 'admin:bots_digikeylisting_publish', args=[object_id]
@@ -2231,6 +2232,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('copy-search/',
                  self.admin_site.admin_view(self.copy_search_view),
                  name='bots_digikeylisting_copy_search'),
+            path('sku-check/',
+                 self.admin_site.admin_view(self.sku_check_view),
+                 name='bots_digikeylisting_sku_check'),
             path('excel-parse/',
                  self.admin_site.admin_view(self.excel_parse_view),
                  name='bots_digikeylisting_excel_parse'),
@@ -3425,6 +3429,28 @@ Rules:
             cat = _cat_map.get(l.category_type, l.category_type or 'other')
             results.append({'pk': l.pk, 'label': f'{sku} — {title} [{cat}]'})
         return JsonResponse({'results': results})
+
+    def sku_check_view(self, request):
+        """AJAX: check if a SKU exists in inventory and return current stock qty."""
+        from django.http import JsonResponse
+        from django.db.models import Sum
+        from inventory.models import Product, InventoryTransaction
+        sku = request.GET.get('sku', '').strip()
+        if not sku:
+            return JsonResponse({'found': False})
+        product = Product.objects.filter(sku=sku).first()
+        if not product:
+            return JsonResponse({'found': False})
+        qty_result = InventoryTransaction.objects.filter(
+            product_id=product.pk
+        ).aggregate(total=Sum('qty'))
+        qty = max(0, int(qty_result['total'] or 0))
+        return JsonResponse({
+            'found': True,
+            'qty': qty,
+            'product_pk': product.pk,
+            'name': product.name or sku,
+        })
 
     def copy_data_view(self, request):
         """Return all copyable fields of a listing as JSON for the add-form prefill."""
