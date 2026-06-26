@@ -107,6 +107,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         "last_synced_at",
         "last_pulled_at",
         "last_polled_at",
+        "poll_now_button",
         "msg_last_checked_at",
         "access_token_preview",
         "token_expires_at",
@@ -159,11 +160,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             ),
         }),
         ("🔍 Авто-перевірка статусу (staged → published)", {
-            "fields": ("poll_enabled", "poll_interval_minutes", "last_polled_at"),
+            "fields": ("poll_enabled", "poll_interval_minutes", "last_polled_at", "poll_now_button"),
             "description": (
                 "Автоматично перевіряє чи затвердив DigiKey лістинги зі статусом "
                 "<b>⏳ Очікує затвердження</b> і переводить їх у <b>✅ Опубліковано</b>. "
-                "Додай до cron: <code>python manage.py poll_dk_status</code>"
+                "Cron: <code>python manage.py poll_dk_status</code>"
             ),
         }),
         ("📦 Імпорт лістингів", {
@@ -325,6 +326,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "task-cancel/",
                 self.admin_site.admin_view(self.task_cancel_view),
                 name="bots_digikeyconfig_task_cancel",
+            ),
+            path(
+                "poll-now/",
+                self.admin_site.admin_view(self.poll_now_view),
+                name="bots_digikeyconfig_poll_now",
             ),
             path(
                 "messages/",
@@ -550,6 +556,52 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             messages.error(request, f"❌ DigiKey API: {e}")
         except Exception as e:
             messages.error(request, f"❌ {type(e).__name__}: {e}")
+
+        return redirect(reverse("admin:bots_digikeyconfig_change", args=[1]))
+
+    def poll_now_view(self, request):
+        """Негайна перевірка staged → published без урахування інтервалу."""
+        from bots.services.dk_marketplace import check_staged_listing, DKMarketplaceError
+        from django.utils import timezone as _tz
+
+        cfg = DigiKeyConfig.objects.filter(pk=1).first()
+        staged_qs = DigiKeyListing.objects.filter(
+            sync_status=DigiKeyListing.SYNC_STAGED
+        ).select_related("product")
+        count = staged_qs.count()
+
+        if not count:
+            messages.info(request, "ℹ️ Немає лістингів зі статусом 'Очікує затвердження'.")
+        else:
+            promoted = still_pending = errors = 0
+            promoted_skus = []
+            for listing in staged_qs:
+                sku = listing.product.sku if listing.product else f"pk={listing.pk}"
+                try:
+                    result = check_staged_listing(listing)
+                    if result == "published":
+                        promoted += 1
+                        promoted_skus.append(sku)
+                    else:
+                        still_pending += 1
+                except DKMarketplaceError as exc:
+                    errors += 1
+                    messages.error(request, f"❌ {sku}: {exc}")
+                except Exception as exc:
+                    errors += 1
+                    messages.error(request, f"❌ {sku} ({type(exc).__name__}): {exc}")
+
+            if promoted:
+                messages.success(
+                    request,
+                    f"✅ Затверджено DigiKey: {', '.join(promoted_skus)}. Статус → published."
+                )
+            if still_pending:
+                messages.info(request, f"⏳ Ще очікують затвердження: {still_pending} лістингів.")
+
+        if cfg:
+            cfg.last_polled_at = _tz.now()
+            cfg.save(update_fields=["last_polled_at"])
 
         return redirect(reverse("admin:bots_digikeyconfig_change", args=[1]))
 
@@ -1410,6 +1462,28 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         return mark_safe(f'<div style="max-width:680px">{html}</div>')
 
     action_buttons.short_description = "Дії"
+
+    def poll_now_button(self, obj):
+        from django.utils.safestring import mark_safe
+        url = reverse("admin:bots_digikeyconfig_poll_now")
+        staged_count = DigiKeyListing.objects.filter(
+            sync_status=DigiKeyListing.SYNC_STAGED
+        ).count()
+        badge = (
+            f' <span style="background:#e65100;color:#fff;border-radius:10px;'
+            f'padding:1px 7px;font-size:11px;font-weight:700">{staged_count}</span>'
+            if staged_count else ""
+        )
+        return mark_safe(
+            f'<a href="{url}" style="background:#4527a0;color:#fff;padding:7px 16px;'
+            f'border-radius:4px;text-decoration:none;display:inline-block;'
+            f'font-size:13px;font-weight:500">'
+            f'🔍 Перевірити зараз{badge}</a>'
+            f'<span style="margin-left:12px;font-size:12px;color:var(--text-muted)">'
+            f'Staged лістингів: {staged_count}</span>'
+        )
+
+    poll_now_button.short_description = "Ручна перевірка"
 
     def messages_panel(self, obj):
         hub_url = reverse("admin:bots_digikeyconfig_messages")
