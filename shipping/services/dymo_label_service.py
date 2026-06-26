@@ -42,7 +42,7 @@ def parse_part_number(part_no: str) -> dict:
     return {
         'part_no':    part_no,
         'coax_type':  f'{coax_dia}mm',
-        'length':     f'{length_mm}mm',
+        'length':     f'{int(length_mm)}mm',
         'first_end':  CONNECTOR_MAP.get(first_raw.upper(), first_raw),
         'second_end': CONNECTOR_MAP.get(second_raw.upper(), second_raw),
     }

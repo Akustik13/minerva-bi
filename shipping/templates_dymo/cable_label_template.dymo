@@ -61,22 +61,7 @@
           </Margin>
           <BarcodeFormat>Code128Auto</BarcodeFormat>
           <Data>
-            <MultiDataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString></DataString>
-              <DataString>CA-MHF1-MC1.13-175-MHF4</DataString>
-            </MultiDataString>
+            <DataString>CA-MHF1-MC1.13-175-MHF4</DataString>
           </Data>
           <HorizontalAlignment>Left</HorizontalAlignment>
           <VerticalAlignment>Middle</VerticalAlignment>
@@ -149,8 +134,8 @@
               <TextSpan>
                 <Text>RF coaxial cable</Text>
                 <FontInfo>
-                  <FontName>Noto Sans</FontName>
-                  <FontSize>9.9</FontSize>
+                  <FontName>Arial</FontName>
+                  <FontSize>10.4</FontSize>
                   <IsBold>False</IsBold>
                   <IsItalic>False</IsItalic>
                   <IsUnderline>False</IsUnderline>
@@ -166,8 +151,8 @@
               <TextSpan>
                 <Text>Qty: 112 PCS </Text>
                 <FontInfo>
-                  <FontName>Noto Sans</FontName>
-                  <FontSize>9.9</FontSize>
+                  <FontName>Arial</FontName>
+                  <FontSize>10.4</FontSize>
                   <IsBold>False</IsBold>
                   <IsItalic>False</IsItalic>
                   <IsUnderline>False</IsUnderline>
@@ -183,8 +168,8 @@
               <TextSpan>
                 <Text>Cable type: micro coax 1.13mm, length: 175mm</Text>
                 <FontInfo>
-                  <FontName>Noto Sans</FontName>
-                  <FontSize>9.9</FontSize>
+                  <FontName>Arial</FontName>
+                  <FontSize>10.4</FontSize>
                   <IsBold>False</IsBold>
                   <IsItalic>False</IsItalic>
                   <IsUnderline>False</IsUnderline>
@@ -200,8 +185,8 @@
               <TextSpan>
                 <Text>Compatible with: U.FL-1st end, MHF4-2nd end</Text>
                 <FontInfo>
-                  <FontName>Noto Sans</FontName>
-                  <FontSize>9.9</FontSize>
+                  <FontName>Arial</FontName>
+                  <FontSize>10.4</FontSize>
                   <IsBold>False</IsBold>
                   <IsItalic>False</IsItalic>
                   <IsUnderline>False</IsUnderline>
