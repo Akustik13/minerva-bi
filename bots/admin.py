@@ -157,6 +157,14 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "Додай до cron: <code>python manage.py pull_dk_listings</code>"
             ),
         }),
+        ("🔍 Авто-перевірка статусу (staged → published)", {
+            "fields": ("poll_enabled", "poll_interval_minutes", "last_polled_at"),
+            "description": (
+                "Автоматично перевіряє чи затвердив DigiKey лістинги зі статусом "
+                "<b>⏳ Очікує затвердження</b> і переводить їх у <b>✅ Опубліковано</b>. "
+                "Додай до cron: <code>python manage.py poll_dk_status</code>"
+            ),
+        }),
         ("📦 Імпорт лістингів", {
             "fields": ("create_product_if_missing",),
             "description": (

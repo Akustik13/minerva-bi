@@ -40,6 +40,19 @@ class DigiKeyConfig(models.Model):
         help_text="Рекомендовано: 15–60 хв"
     )
 
+    # ── Авто-перевірка статусу staged → published ─────────────────────────────
+    poll_enabled          = models.BooleanField(
+        "Авто-перевірка статусу (staged → published)", default=False,
+        help_text="Автоматично перевіряти чи затвердив DigiKey лістинги у статусі 'Очікує затвердження'"
+    )
+    poll_interval_minutes = models.PositiveSmallIntegerField(
+        "Інтервал перевірки (хвилин)", default=60,
+        help_text="Рекомендовано: 30–120 хв. Cron: python manage.py poll_dk_status"
+    )
+    last_polled_at = models.DateTimeField(
+        "Остання авто-перевірка статусу", null=True, blank=True
+    )
+
     # ── Авто-стягування даних лістингів з DigiKey ─────────────────────────────
     pull_enabled        = models.BooleanField(
         "Авто-стягування лістингів", default=False,

@@ -52,10 +52,22 @@
             onclick="dkPullFromDigiKey()">
       📥 Стягнути з DigiKey
     </button>
+    {% if original.sync_status == 'staged' %}
+    <button type="button" class="dk-btn dk-btn-publish" disabled
+            style="opacity:.45;cursor:not-allowed" title="Лістинг вже відправлено на перевірку DigiKey — зачекайте затвердження">
+      ⏳ На перевірці…
+    </button>
+    {% elif original.sync_status == 'published' %}
+    <button type="button" class="dk-btn dk-btn-publish" disabled
+            style="opacity:.45;cursor:not-allowed" title="Лістинг вже опубліковано на DigiKey Marketplace">
+      ✅ Опубліковано
+    </button>
+    {% else %}
     <button type="button" class="dk-btn dk-btn-publish"
             onclick="dkPublishClick()">
       {% if original.dk_offer_id %}🔄 Оновити на DigiKey{% else %}🚀 Опублікувати{% endif %}
     </button>
+    {% endif %}
     {% if original.sync_status == 'staged' %}
     <a href="{% url 'admin:bots_digikeylisting_check_staged' original.pk %}"
        class="dk-btn dk-btn-status"
