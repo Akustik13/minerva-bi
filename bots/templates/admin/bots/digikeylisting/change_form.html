@@ -965,6 +965,14 @@ function dkHighlight(el) {
 var COPY_DATA_URL = '{{ copy_data_url|default:"" }}';
 var _COPY_LISTINGS = {{ existing_listings_json|default:"[]"|safe }};
 
+/* Default attribute keys to show per category (empty values added for missing ones) */
+var CATEGORY_DEFAULT_ATTRS = {
+  cable:    {"91":"","726":"","2490":"","727":"","2491":"","77":"","321":"","2492":"","2493":"","2157":"","37":"","5":"","255":""},
+  filter:   {"139":"","398":"","21":"","428":"","327":"","69":"","16":"","46":"","966":""},
+  antenna:  {"Antenna Type":"","Gain":"","VSWR":"","Frequency Range":"","Connector Type":"","Mounting Type":"","Impedance":"","Polarization":"","Applications":"","Operating Temperature":""},
+  connector:{"Connector Type":"","Number of Positions":"","Contact Finish":"","Gender":"","Mounting Type":"","Series":""},
+};
+
 function dkBuildCopyPanel() {
   if (!COPY_DATA_URL) return '';
   var opts = '<option value="">— виберіть існуючий лістинг —</option>';
@@ -972,18 +980,45 @@ function dkBuildCopyPanel() {
     opts += '<option value="' + l.pk + '">' + dkEsc(l.label) + '</option>';
   });
   return '<h4>📋 Скопіювати поля з існуючого лістингу</h4>' +
+    '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">' +
+    '<input type="text" id="dkCopySearch" placeholder="🔍 Пошук по партнамберу або назві..." autocomplete="off"' +
+    ' style="padding:5px 10px;min-width:260px;border:1px solid var(--border-strong,#243347);' +
+    'background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);border-radius:4px;font-size:13px">' +
+    '</div>' +
     '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">' +
-    '<select id="dkCopySelect">' + opts + '</select>' +
+    '<select id="dkCopySelect" style="min-width:340px">' + opts + '</select>' +
     '<button type="button" id="dkCopyBtn" onclick="dkCopyFrom()" disabled>📋 Скопіювати поля</button>' +
     '<span id="dkCopyMsg"></span>' +
     '</div>' +
-    '<div class="dk-copy-warn">⚠️ Поля «Товар», «DK Product ID», «DK Offer ID» та «Статус» не копіюються — вкажіть вручну. Змініть «Supplier SKU», «Назву» і «Опис» перед публікацією.</div>';
+    '<div class="dk-copy-warn">⚠️ Поля «Товар», «DK Product ID», «DK Offer ID» та «Статус» не копіюються. ' +
+    'Виправте «Supplier SKU» та «Назву (DK)» перед публікацією.</div>';
 }
 
 (function() {
+  document.addEventListener('input', function(e) {
+    if (e.target && e.target.id === 'dkCopySearch') {
+      var term = e.target.value.trim().toLowerCase();
+      var sel  = document.getElementById('dkCopySelect');
+      if (!sel) return;
+      while (sel.options.length) sel.remove(0);
+      var defOpt = document.createElement('option');
+      defOpt.value = ''; defOpt.textContent = '— виберіть існуючий лістинг —';
+      sel.appendChild(defOpt);
+      _COPY_LISTINGS.forEach(function(l) {
+        if (!term || l.label.toLowerCase().indexOf(term) >= 0) {
+          var opt = document.createElement('option');
+          opt.value = l.pk; opt.textContent = l.label;
+          sel.appendChild(opt);
+        }
+      });
+      var copyBtn = document.getElementById('dkCopyBtn');
+      if (copyBtn) copyBtn.disabled = true;
+    }
+  });
   document.addEventListener('change', function(e) {
     if (e.target && e.target.id === 'dkCopySelect') {
-      document.getElementById('dkCopyBtn').disabled = !e.target.value;
+      var copyBtn = document.getElementById('dkCopyBtn');
+      if (copyBtn) copyBtn.disabled = !e.target.value;
     }
   });
 })();
@@ -1051,12 +1086,28 @@ function dkCopyFrom() {
       filled++;
     }
 
-    /* Attributes */
-    if (fields.dk_attributes && typeof fields.dk_attributes === 'object' && Object.keys(fields.dk_attributes).length) {
-      dkAttrsRebuild(fields.dk_attributes);
+    /* Attributes — merge source attrs with category defaults (empty rows for missing) */
+    var _catSel = document.getElementById('id_category_type');
+    var _cat = _catSel ? _catSel.value : 'other';
+    var _defaults = CATEGORY_DEFAULT_ATTRS[_cat] || {};
+    var _srcAttrs = (fields.dk_attributes && typeof fields.dk_attributes === 'object') ? fields.dk_attributes : {};
+    var _mergedAttrs = Object.assign({}, _defaults, _srcAttrs);
+    if (Object.keys(_mergedAttrs).length) {
+      dkAttrsRebuild(_mergedAttrs);
       var aw = document.querySelector('.dk-attrs-wrap');
       if (aw) dkMarkAutofillWrap(aw);
       filled++;
+    }
+
+    /* Clear photo URL — should be set manually per product */
+    var _imgEl = document.getElementById('id_dk_image_url');
+    if (_imgEl) _imgEl.value = '';
+
+    /* Supplier SKU ← Title if SKU is empty */
+    var _titleEl = document.getElementById('id_dk_title');
+    var _skuEl   = document.getElementById('id_dk_supplier_sku');
+    if (_skuEl && _titleEl && !_skuEl.value && _titleEl.value) {
+      _skuEl.value = _titleEl.value;
     }
 
     dkAdaptToCategory();
@@ -1595,19 +1646,52 @@ document.addEventListener('DOMContentLoaded', function() {
   /* Adapt UI to category */
   dkAdaptToCategory();
 
-  /* Uncheck auto-create if user manually picks a product */
   {% if copy_data_url %}
   (function() {
-    var _prodInp = document.getElementById('id_product');
-    var _autoCb  = document.getElementById('dk_auto_create');
-    if (_prodInp && _autoCb) {
-      _prodInp.addEventListener('change', function() {
-        if (_prodInp.value) {
-          _autoCb.checked = false;
-          var w = document.getElementById('dkAutoCreateWrap');
-          if (w) { w.style.borderColor = ''; w.style.background = ''; }
-        }
+    /* Quantity default 100 on add form */
+    var _qtyEl = document.querySelector('[name="dk_quantity_override"]');
+    if (_qtyEl && (!_qtyEl.value || _qtyEl.value === '0')) _qtyEl.value = '100';
+
+    /* Title (DK) → Supplier SKU auto-sync on add form */
+    var _titleInp = document.getElementById('id_dk_title');
+    var _skuInp   = document.getElementById('id_dk_supplier_sku');
+    var _skuEdited = false;
+    if (_skuInp) {
+      _skuInp.addEventListener('input', function() { _skuEdited = true; });
+    }
+    if (_titleInp && _skuInp) {
+      _titleInp.addEventListener('input', function() {
+        if (!_skuEdited) _skuInp.value = _titleInp.value;
       });
+    }
+
+    /* Auto-create checkbox → disable/enable Product field */
+    var _prodInp  = document.getElementById('id_product');
+    var _autoCb   = document.getElementById('dk_auto_create');
+    function _applyAutoCreate(checked) {
+      if (!_prodInp) return;
+      var _prodRow = _prodInp.closest('.form-row') || _prodInp.parentNode;
+      if (checked) {
+        _prodInp.disabled = true;
+        if (_prodRow) _prodRow.style.opacity = '0.4';
+      } else {
+        _prodInp.disabled = false;
+        if (_prodRow) _prodRow.style.opacity = '';
+      }
+    }
+    if (_autoCb) {
+      _autoCb.addEventListener('change', function() { _applyAutoCreate(_autoCb.checked); });
+      /* Uncheck if user manually picks a product */
+      if (_prodInp) {
+        _prodInp.addEventListener('change', function() {
+          if (_prodInp.value && _autoCb) {
+            _autoCb.checked = false;
+            _applyAutoCreate(false);
+            var w = document.getElementById('dkAutoCreateWrap');
+            if (w) { w.style.borderColor = ''; w.style.background = ''; }
+          }
+        });
+      }
     }
   })();
   {% endif %}

@@ -1962,19 +1962,28 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         if not change and not obj.product_id and request.POST.get('_create_product'):
             from inventory.models import Product
             base_sku = (obj.dk_supplier_sku or '').strip() or 'DK-new'
-            sku, suffix = base_sku, 1
-            while Product.objects.filter(sku=sku).exists():
-                sku = f'{base_sku}-{suffix}'
-                suffix += 1
-            product = Product(
-                sku=sku,
-                name=(obj.dk_title or sku)[:200],
-                manufacturer=(obj.dk_manufacturer or '')[:100],
-                category='other',
-            )
-            product.save()
-            obj.product = product
-            messages.success(request, f'📦 Товар «{sku}» автоматично створено на складі.')
+            existing = Product.objects.filter(sku=base_sku).first()
+            if existing:
+                obj.product = existing
+                change_url = reverse('admin:inventory_product_change', args=[existing.pk])
+                messages.warning(
+                    request,
+                    mark_safe(
+                        f'⚠️ Товар зі SKU «{base_sku}» вже є на складі — '
+                        f'лістинг прив\'язано до існуючого. '
+                        f'<a href="{change_url}" target="_blank">Відкрити товар ↗</a>'
+                    )
+                )
+            else:
+                product = Product(
+                    sku=base_sku,
+                    name=(obj.dk_title or base_sku)[:200],
+                    manufacturer=(obj.dk_manufacturer or '')[:100],
+                    category='other',
+                )
+                product.save()
+                obj.product = product
+                messages.success(request, f'📦 Товар «{base_sku}» автоматично створено на складі.')
 
         super().save_model(request, obj, form, change)
 
