@@ -616,7 +616,14 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
     fetch('/labels/generate/',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({part_no:s,qty:parseInt(q)||1})
     }).then(function(r){return r.json();})
-      .then(function(d){svDymoOpen(d.ok?('/labels/serve/'+encodeURIComponent(s)+'/'):u,s,q);})
+      .then(function(d){
+        if(d.ok&&d.xml){
+          var mode=typeof window.SV_DYMO_MODE!=='undefined'?window.SV_DYMO_MODE:'download';
+          if(mode==='print'){svDymoPrint(u,s,q,d.xml);}
+          else if(mode==='ask'){svDymoAsk(u,s,q);}
+          else{svDymoDownload(u,s);}
+        }else{svDymoOpen(u,s,q);}
+      })
       .catch(function(){svDymoOpen(u,s,q);});
   };
   window.svDymoError=function(url,sku,msg){
@@ -657,7 +664,17 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
       box.appendChild(rb);
     },50);
   }
-  window.svDymoPrint=function(url,sku,qty){
+  window.svDymoPrint=function(url,sku,qty,labelXmlDirect){
+    function _doprint(printer,labelXml){
+      var fd=new FormData();
+      fd.append('printerName',printer);
+      fd.append('printParamsXml','');
+      fd.append('labelXml',labelXml);
+      fd.append('labelSetXml','');
+      fetch(_DYMO_BASE+'/DYMO/DLS/Printing/PrintLabel',{method:'POST',body:fd})
+      .then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t);});})
+      .catch(function(e){window.svDymoError(url,sku,'{% trans "Помилка друку:" %} '+(e.message||String(e)));});
+    }
     // Step 1: get printers list (REST API, no SDK needed)
     fetch(_DYMO_BASE+'/DYMO/DLS/Printing/GetPrinters')
     .then(function(r){
@@ -668,21 +685,16 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
       var m=xml.match(/<Name>([^<]+)<\/Name>/);
       if(!m){window.svDymoError(url,sku,'{% trans "Принтер DYMO не знайдено. Перевірте підключення USB та що DYMO Connect запущено." %}');return;}
       var printer=m[1];
-      // Step 2: fetch label XML
-      fetch(url)
-      .then(function(r){return r.text();})
-      .then(function(labelXml){
-        // Step 3: print via REST API
-        var fd=new FormData();
-        fd.append('printerName',printer);
-        fd.append('printParamsXml','');
-        fd.append('labelXml',labelXml);
-        fd.append('labelSetXml','');
-        fetch(_DYMO_BASE+'/DYMO/DLS/Printing/PrintLabel',{method:'POST',body:fd})
-        .then(function(r){if(!r.ok)return r.text().then(function(t){throw new Error(t);});})
-        .catch(function(e){window.svDymoError(url,sku,'{% trans "Помилка друку:" %} '+(e.message||String(e)));});
-      })
-      .catch(function(e){window.svDymoError(url,sku,'{% trans "Помилка завантаження мітки:" %} '+e);});
+      if(labelXmlDirect){
+        // Step 2a: use XML passed directly — no extra fetch needed
+        _doprint(printer,labelXmlDirect);
+      } else {
+        // Step 2b: fetch label XML from server
+        fetch(url)
+        .then(function(r){return r.text();})
+        .then(function(labelXml){_doprint(printer,labelXml);})
+        .catch(function(e){window.svDymoError(url,sku,'{% trans "Помилка завантаження мітки:" %} '+e);});
+      }
     })
     .catch(function(e){
       // Try HTTP fallback (old DYMO Label Software)
@@ -693,12 +705,9 @@ window.SV_DYMO_MODE = SV_DYMO_MODE;
         if(!m){window.svDymoError(url,sku,'{% trans "Принтер DYMO не знайдено." %}');return;}
         _loadFW(function(err){
           if(err){window.svDymoError(url,sku,'{% trans "Помилка SDK:" %} '+err);return;}
-          fetch(url).then(function(r){return r.text();}).then(function(lxml){
-            try{
-              var label=window.dymo.label.framework.openLabelXml(lxml);
-              label.print(m[1]);
-            }catch(ex){window.svDymoError(url,sku,'{% trans "Помилка SDK:" %} '+(ex.message||ex));}
-          });
+          var lxml=labelXmlDirect||null;
+          var _print=function(x){try{var l=window.dymo.label.framework.openLabelXml(x);l.print(m[1]);}catch(ex){window.svDymoError(url,sku,'{% trans "Помилка SDK:" %} '+(ex.message||ex));}};
+          if(lxml){_print(lxml);}else{fetch(url).then(function(r){return r.text();}).then(_print);}
         });
       })
       .catch(function(){_dymoCertError(url,sku);});

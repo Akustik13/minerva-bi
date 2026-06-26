@@ -240,6 +240,7 @@ def generate_cable_label(request):
             'ok':           True,
             'sku':          sku,
             'filename':     path.name,
+            'xml':          path.read_text(encoding='utf-8'),
             'download_url': f'/labels/serve/{sku}/?qty={qty}',
         })
     except ValueError as exc:
