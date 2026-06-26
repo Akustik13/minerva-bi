@@ -106,6 +106,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
     readonly_fields = (
         "last_synced_at",
         "last_pulled_at",
+        "last_polled_at",
         "msg_last_checked_at",
         "access_token_preview",
         "token_expires_at",
