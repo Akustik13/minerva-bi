@@ -981,83 +981,115 @@ var CATEGORY_DEFAULT_ATTRS = {
 
 function dkBuildCopyPanel() {
   if (!COPY_DATA_URL) return '';
-  var opts = '<option value="">— виберіть існуючий лістинг —</option>';
-  _COPY_LISTINGS.forEach(function(l) {
-    opts += '<option value="' + l.pk + '">' + dkEsc(l.label) + '</option>';
-  });
-  return '<h4>📋 Скопіювати поля з існуючого лістингу</h4>' +
-    '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px">' +
-    '<input type="text" id="dkCopySearch" placeholder="🔍 Пошук по партнамберу або назві..." autocomplete="off"' +
-    ' style="padding:5px 10px;min-width:260px;border:1px solid var(--border-strong,#243347);' +
-    'background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);border-radius:4px;font-size:13px">' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px">' +
-    '<select id="dkCopySelect" style="min-width:340px">' + opts + '</select>' +
-    '<button type="button" id="dkCopyBtn" onclick="dkCopyFrom()" disabled>📋 Скопіювати поля</button>' +
-    '<span id="dkCopyMsg"></span>' +
+  return (
+    '<h4 style="margin:0 0 8px">📋 Скопіювати поля з існуючого лістингу</h4>' +
+    '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:4px">' +
+      '<div id="dkCopyAcWrap" style="position:relative;min-width:340px;max-width:520px;flex:1">' +
+        '<input type="text" id="dkCopySearch" autocomplete="off"' +
+          ' placeholder="🔍 Введіть партнамбер або назву..."' +
+          ' style="width:100%;box-sizing:border-box;padding:6px 10px;' +
+          'border:1px solid var(--border-strong,#243347);border-radius:4px;' +
+          'background:var(--bg-input,#141f2b);color:var(--text,#c9d8e4);font-size:13px">' +
+        '<div id="dkCopyDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;' +
+          'background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);' +
+          'border-radius:0 0 4px 4px;max-height:260px;overflow-y:auto;z-index:9999;' +
+          'box-shadow:0 6px 20px rgba(0,0,0,.4)"></div>' +
+        '<input type="hidden" id="dkCopySelectedPk" value="">' +
+      '</div>' +
+      '<button type="button" id="dkCopyBtn" onclick="dkCopyFrom()" disabled' +
+        ' style="white-space:nowrap">📋 Скопіювати поля</button>' +
+      '<span id="dkCopyMsg"></span>' +
     '</div>' +
     '<div class="dk-copy-warn">⚠️ Поля «Товар», «DK Product ID», «DK Offer ID» та «Статус» не копіюються. ' +
-    'Виправте «Supplier SKU» та «Назву (DK)» перед публікацією.</div>';
+    'Виправте «Supplier SKU» та «Назву (DK)» перед публікацією.</div>'
+  );
 }
 
 (function() {
   var _searchTimer = null;
 
-  function _dkFillSelect(items) {
-    var sel = document.getElementById('dkCopySelect');
-    if (!sel) return;
-    while (sel.options.length) sel.remove(0);
-    var defOpt = document.createElement('option');
-    defOpt.value = ''; defOpt.textContent = items.length ? '— виберіть лістинг —' : '— нічого не знайдено —';
-    sel.appendChild(defOpt);
+  function _dkShowDropdown(items) {
+    var dd = document.getElementById('dkCopyDropdown');
+    if (!dd) return;
+    dd.innerHTML = '';
+    if (!items.length) {
+      dd.innerHTML = '<div style="padding:8px 12px;color:var(--text-muted,#9aafbe);font-size:13px">Нічого не знайдено</div>';
+      dd.style.display = 'block';
+      return;
+    }
     items.forEach(function(l) {
-      var opt = document.createElement('option');
-      opt.value = l.pk; opt.textContent = l.label;
-      sel.appendChild(opt);
+      var row = document.createElement('div');
+      row.style.cssText = 'padding:7px 12px;cursor:pointer;font-size:13px;color:var(--text,#c9d8e4);' +
+        'border-bottom:1px solid var(--border-strong,#243347);white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+      row.textContent = l.label;
+      row.addEventListener('mousedown', function(ev) { ev.preventDefault(); _dkSelectItem(l); });
+      row.addEventListener('mouseover', function() { row.style.background = 'var(--bg-hover,#1e2d40)'; });
+      row.addEventListener('mouseout',  function() { row.style.background = ''; });
+      dd.appendChild(row);
     });
-    var copyBtn = document.getElementById('dkCopyBtn');
-    if (copyBtn) copyBtn.disabled = true;
+    dd.style.display = 'block';
+  }
+
+  function _dkHideDropdown() {
+    var dd = document.getElementById('dkCopyDropdown');
+    if (dd) dd.style.display = 'none';
+  }
+
+  function _dkSelectItem(l) {
+    var inp = document.getElementById('dkCopySearch');
+    var hid = document.getElementById('dkCopySelectedPk');
+    var btn = document.getElementById('dkCopyBtn');
+    if (inp) inp.value = l.label;
+    if (hid) hid.value = l.pk;
+    if (btn) btn.disabled = false;
+    _dkHideDropdown();
+  }
+
+  function _dkRunSearch(term) {
+    if (term.length < 2) {
+      /* Show first 20 from local cache */
+      _dkShowDropdown(_COPY_LISTINGS.slice(0, 20));
+      return;
+    }
+    fetch(COPY_SEARCH_URL + '?q=' + encodeURIComponent(term), {
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) { _dkShowDropdown(d.results || []); })
+    .catch(function() {
+      var t = term.toLowerCase();
+      _dkShowDropdown(_COPY_LISTINGS.filter(function(l) { return l.label.toLowerCase().indexOf(t) >= 0; }).slice(0, 30));
+    });
   }
 
   document.addEventListener('input', function(e) {
-    if (e.target && e.target.id === 'dkCopySearch') {
-      var term = e.target.value.trim();
-      clearTimeout(_searchTimer);
-      if (!term) { _dkFillSelect(_COPY_LISTINGS); return; }
-      if (term.length < 2) return;
-      _searchTimer = setTimeout(function() {
-        var searchInp = document.getElementById('dkCopySearch');
-        if (searchInp) searchInp.style.borderColor = 'var(--accent,#58a6ff)';
-        fetch(COPY_SEARCH_URL + '?q=' + encodeURIComponent(term), {
-          credentials: 'same-origin',
-          headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-          if (searchInp) searchInp.style.borderColor = '';
-          _dkFillSelect(d.results || []);
-        })
-        .catch(function() {
-          if (searchInp) searchInp.style.borderColor = '';
-          /* Fallback: filter local cache */
-          var t = term.toLowerCase();
-          _dkFillSelect(_COPY_LISTINGS.filter(function(l) { return l.label.toLowerCase().indexOf(t) >= 0; }));
-        });
-      }, 300);
-    }
+    if (!e.target || e.target.id !== 'dkCopySearch') return;
+    var hid = document.getElementById('dkCopySelectedPk');
+    var btn = document.getElementById('dkCopyBtn');
+    if (hid) hid.value = '';
+    if (btn) btn.disabled = true;
+    clearTimeout(_searchTimer);
+    var term = e.target.value.trim();
+    _searchTimer = setTimeout(function() { _dkRunSearch(term); }, 250);
   });
 
-  document.addEventListener('change', function(e) {
-    if (e.target && e.target.id === 'dkCopySelect') {
-      var copyBtn = document.getElementById('dkCopyBtn');
-      if (copyBtn) copyBtn.disabled = !e.target.value;
+  document.addEventListener('focus', function(e) {
+    if (e.target && e.target.id === 'dkCopySearch') {
+      var term = e.target.value.trim();
+      _dkRunSearch(term);
     }
+  }, true);
+
+  document.addEventListener('click', function(e) {
+    var wrap = document.getElementById('dkCopyAcWrap');
+    if (wrap && !wrap.contains(e.target)) _dkHideDropdown();
   });
 })();
 
 function dkCopyFrom() {
-  var sel = document.getElementById('dkCopySelect');
-  var pk  = sel ? sel.value : '';
+  var hid = document.getElementById('dkCopySelectedPk');
+  var pk  = hid ? hid.value : '';
   if (!pk) return;
   var btn = document.getElementById('dkCopyBtn');
   var msg = document.getElementById('dkCopyMsg');
@@ -1699,18 +1731,11 @@ document.addEventListener('DOMContentLoaded', function() {
       _titleInp.addEventListener('blur', function() {
         if (_syncLock) return;
         var cleaned = dkCleanPartNo(_titleInp.value);
-        if (cleaned !== _titleInp.value) {
-          _syncLock = true;
-          _titleInp.value = cleaned;
-          _syncLock = false;
-        }
+        _syncLock = true;
+        _titleInp.value = cleaned;
+        _syncLock = false;
         if (_skuInp && !_skuInp.value) _skuInp.value = cleaned;
         _updateDatasheetUrl(_skuInp ? _skuInp.value || cleaned : cleaned);
-      });
-      _titleInp.addEventListener('input', function() {
-        if (_syncLock) return;
-        var cleaned = dkCleanPartNo(_titleInp.value);
-        if (_skuInp && !_skuInp.value) _skuInp.value = cleaned;
       });
     }
     if (_skuInp) {
