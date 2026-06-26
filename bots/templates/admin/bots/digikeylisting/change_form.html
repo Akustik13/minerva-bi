@@ -1610,46 +1610,28 @@ function dkShowAttrPicker(anchorBtn) {
     'border:1px solid var(--border-strong,#243347);border-radius:6px;' +
     'box-shadow:0 8px 24px rgba(0,0,0,.5);min-width:280px;max-height:320px;overflow-y:auto;font-size:13px';
 
-  function addRow(code, label, isCustom) {
+  function addRow(code, label) {
     var row = document.createElement('div');
-    var already = !!used[code];
-    row.style.cssText = 'padding:7px 12px;cursor:' + (already ? 'default' : 'pointer') +
-      ';color:' + (already ? 'var(--text-dim,#607d8b)' : 'var(--text,#c9d8e4)') +
-      ';border-bottom:1px solid var(--border-strong,#243347);display:flex;justify-content:space-between;align-items:center';
-    row.innerHTML = '<span>' + dkEsc(label) + '</span>' +
-      (already ? '<span style="font-size:11px;color:var(--text-dim,#607d8b)">вже є</span>' : '');
-    if (!already) {
-      row.addEventListener('mouseenter', function() { row.style.background = 'var(--bg-hover,#1e2d40)'; });
-      row.addEventListener('mouseleave', function() { row.style.background = ''; });
-      row.addEventListener('mousedown', function(ev) {
-        ev.preventDefault();
-        picker.remove(); _attrPickerEl = null;
-        _aAddRow(isCustom ? '' : code, '');
-        var newRow = _aTbody.lastElementChild;
-        if (newRow) {
-          var keyInp = newRow.querySelector('.dk-attr-key-inp');
-          var valInp = newRow.querySelector('.dk-attr-val input');
-          if (keyInp && !isCustom) keyInp.value = code;
-          if (valInp) valInp.focus();
-        }
-        _aSync();
-      });
-    }
+    row.style.cssText = 'padding:7px 12px;cursor:pointer;color:var(--text,#c9d8e4);' +
+      'border-bottom:1px solid var(--border-strong,#243347)';
+    row.textContent = label;
+    row.addEventListener('mouseenter', function() { row.style.background = 'var(--bg-hover,#1e2d40)'; });
+    row.addEventListener('mouseleave', function() { row.style.background = ''; });
+    row.addEventListener('mousedown', function(ev) {
+      ev.preventDefault();
+      picker.remove(); _attrPickerEl = null;
+      _aAddRow(code, '');
+      var newRow = _aTbody.lastElementChild;
+      if (newRow) newRow.querySelector('.dk-attr-val input').focus();
+      _aSync();
+    });
     picker.appendChild(row);
   }
 
-  if (defs.length) {
-    var hdr = document.createElement('div');
-    hdr.style.cssText = 'padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.6px;' +
-      'text-transform:uppercase;color:var(--text-muted,#9aafbe);border-bottom:1px solid var(--border-strong,#243347)';
-    hdr.textContent = 'Атрибути категорії';
-    picker.appendChild(hdr);
-    defs.forEach(function(d) { addRow(d.code, d.name, false); });
-  }
-
-  /* Custom attr option */
+  /* Custom attr — always at the top */
   var customRow = document.createElement('div');
-  customRow.style.cssText = 'padding:7px 12px;cursor:pointer;color:#42a5f5;font-style:italic';
+  customRow.style.cssText = 'padding:7px 12px;cursor:pointer;color:#42a5f5;font-style:italic;' +
+    'border-bottom:1px solid var(--border-strong,#243347)';
   customRow.textContent = '+ Свій атрибут (кастомний)';
   customRow.addEventListener('mouseenter', function() { customRow.style.background = 'var(--bg-hover,#1e2d40)'; });
   customRow.addEventListener('mouseleave', function() { customRow.style.background = ''; });
@@ -1662,6 +1644,17 @@ function dkShowAttrPicker(anchorBtn) {
     _aSync();
   });
   picker.appendChild(customRow);
+
+  /* Category attrs — only those not yet added */
+  var available = defs.filter(function(d) { return !used[d.code]; });
+  if (available.length) {
+    var hdr = document.createElement('div');
+    hdr.style.cssText = 'padding:5px 12px;font-size:10px;font-weight:700;letter-spacing:.6px;' +
+      'text-transform:uppercase;color:var(--text-muted,#9aafbe);border-bottom:1px solid var(--border-strong,#243347)';
+    hdr.textContent = 'Атрибути категорії';
+    picker.appendChild(hdr);
+    available.forEach(function(d) { addRow(d.code, d.name, false); });
+  }
 
   /* Position below the button */
   var rect = anchorBtn.getBoundingClientRect();
