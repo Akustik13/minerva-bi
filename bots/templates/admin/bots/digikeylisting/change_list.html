@@ -6,6 +6,11 @@
 {# ── Check-new + Inventory-check toolbar ──────────────────────────────────── #}
 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;
             background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:6px">
+  <a href="{% url 'admin:bots_digikeylisting_add' %}"
+     style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:#c62828;
+            color:#fff;border-radius:5px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">
+    ➕ Додати лістинг
+  </a>
   <a href="{{ check_new_url }}"
      style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:#00695c;
             color:#fff;border-radius:5px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">
