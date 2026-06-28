@@ -337,7 +337,7 @@ class DigiKeyListing(models.Model):
     ]
 
     product = models.OneToOneField(
-        'inventory.Product', on_delete=models.CASCADE,
+        'inventory.Product', on_delete=models.SET_NULL,
         related_name='dk_listing', verbose_name='Товар',
         null=True, blank=True,
     )
