@@ -2181,6 +2181,7 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
         extra_context['check_new_cancel_url']    = reverse('admin:bots_digikeylisting_check_new_cancel')
         extra_context['excel_create_url']        = reverse('admin:bots_digikeylisting_excel_create')
         extra_context['excel_parse_url']         = reverse('admin:bots_digikeylisting_excel_parse')
+        extra_context['add_staged_url']          = reverse('admin:bots_digikeylisting_add_staged')
         try:
             t = BotTask.objects.get(name=self.PULL_TASK_NAME)
             extra_context['pull_task_active']  = t.status == BotTask.RUNNING
@@ -2371,6 +2372,9 @@ class DigiKeyListingAdmin(admin.ModelAdmin):
             path('<int:pk>/excel-import/',
                  self.admin_site.admin_view(self.excel_import_attrs_view),
                  name='bots_digikeylisting_excel_import_attrs'),
+            path('add-staged/',
+                 self.admin_site.admin_view(self.add_staged_view),
+                 name='bots_digikeylisting_add_staged'),
         ]
         return custom + urls
 
@@ -3501,6 +3505,48 @@ Rules:
             name='check_new_listings', status=BotTask.RUNNING
         ).update(cancel_requested=True)
         return JsonResponse({'ok': bool(updated)})
+
+    def add_staged_view(self, request):
+        """GET → form to enter SKU; POST → create staged DigiKeyListing linked to existing Product."""
+        from django.template.response import TemplateResponse
+        from django.http import JsonResponse
+
+        if request.method == 'POST':
+            sku = request.POST.get('sku', '').strip()
+            if not sku:
+                messages.error(request, "SKU не може бути порожнім.")
+                return redirect(request.path)
+
+            from inventory.models import Product
+            try:
+                product = Product.objects.get(sku=sku)
+            except Product.DoesNotExist:
+                messages.error(request, f"Товар зі SKU «{sku}» не знайдений на складі.")
+                return redirect(f"{request.path}?sku={sku}")
+            except Product.MultipleObjectsReturned:
+                messages.error(request, f"Знайдено кілька товарів з SKU «{sku}». Уточніть.")
+                return redirect(f"{request.path}?sku={sku}")
+
+            if DigiKeyListing.objects.filter(product=product).exists():
+                existing = DigiKeyListing.objects.get(product=product)
+                messages.warning(request, f"Лістинг для «{sku}» вже існує.")
+                return redirect(reverse('admin:bots_digikeylisting_change', args=[existing.pk]))
+
+            listing = DigiKeyListing.objects.create(
+                product         = product,
+                dk_supplier_sku = sku,
+                dk_title        = (product.name or sku)[:50],
+                dk_description  = product.name or sku,
+                sync_status     = DigiKeyListing.SYNC_STAGED,
+            )
+            messages.success(request, f"✅ Лістинг для «{sku}» створено зі статусом ⏳ Очікує затвердження.")
+            return redirect(reverse('admin:bots_digikeylisting_change', args=[listing.pk]))
+
+        return TemplateResponse(
+            request,
+            'admin/bots/digikeylisting/add_staged.html',
+            {'prefill_sku': request.GET.get('sku', '')},
+        )
 
     def sync_inv_to_dk_view(self, request, pk):
         """Copy product.tech_attributes → listing.dk_attributes (Inventory → DigiKey direction)."""
