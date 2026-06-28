@@ -160,11 +160,16 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             ),
         }),
         ("🔍 Авто-перевірка статусу (staged → published)", {
-            "fields": ("poll_enabled", "poll_interval_minutes", "last_polled_at", "poll_now_button"),
+            "fields": (
+                "poll_enabled", "poll_interval_minutes", "last_polled_at", "poll_now_button",
+                "poll_notify_telegram", "poll_notify_email", "poll_notify_email_to",
+            ),
             "description": (
                 "Автоматично перевіряє чи затвердив DigiKey лістинги зі статусом "
                 "<b>⏳ Очікує затвердження</b> і переводить їх у <b>✅ Опубліковано</b>. "
-                "Cron: <code>python manage.py poll_dk_status</code>"
+                "Cron: <code>python manage.py poll_dk_status</code><br>"
+                "Канали сповіщень беруть SMTP/Telegram із <b>Налаштувань сповіщень</b> "
+                "(config → NotificationSettings)."
             ),
         }),
         ("📦 Імпорт лістингів", {
@@ -361,6 +366,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                 "messages/ai/",
                 self.admin_site.admin_view(self.messages_ai_view),
                 name="bots_digikeyconfig_messages_ai",
+            ),
+            path(
+                "scan-listings/",
+                self.admin_site.admin_view(self.scan_listings_view),
+                name="bots_digikeyconfig_scan_listings",
             ),
         ]
         return custom + urls
@@ -575,6 +585,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         else:
             promoted = still_pending = errors = 0
             promoted_skus = []
+            promoted_listings_objs = []
             for listing in staged_qs:
                 sku = listing.product.sku if listing.product else f"pk={listing.pk}"
                 try:
@@ -582,6 +593,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     if result == "published":
                         promoted += 1
                         promoted_skus.append(sku)
+                        promoted_listings_objs.append(listing)
                     else:
                         still_pending += 1
                 except DKMarketplaceError as exc:
@@ -596,6 +608,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
                     request,
                     f"✅ Затверджено DigiKey: {', '.join(promoted_skus)}. Статус → published."
                 )
+                try:
+                    from dashboard.notifications import notify_dk_listings_published
+                    notify_dk_listings_published(promoted_listings_objs)
+                except Exception:
+                    pass
             if still_pending:
                 messages.info(request, f"⏳ Ще очікують затвердження: {still_pending} лістингів.")
 
@@ -1066,6 +1083,40 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         self.message_user(request, f"⏳ Створення лістингів [{mode_label}] запущено у фоні.", messages.INFO)
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
+    def scan_listings_view(self, request):
+        """Scan all DigiKey products+offers and create/update missing local listings."""
+        import threading
+        from bots.services.dk_marketplace import scan_missing_listings
+
+        task = BotTask.start('scan_listings')
+
+        def _run():
+            try:
+                result = scan_missing_listings(task=task)
+                msg = (
+                    f"✅ Скановано {result['total']} позицій DigiKey. "
+                    f"Створено: {result['created']}, оновлено: {result['updated']}, "
+                    f"пропущено (немає товару): {result['skipped']}, помилок: {result['errors']}."
+                )
+                if result.get('new_skus'):
+                    skus_preview = ', '.join(result['new_skus'][:15])
+                    if len(result['new_skus']) > 15:
+                        skus_preview += f' … (+{len(result["new_skus"])-15})'
+                    msg += f" Нові SKU: {skus_preview}."
+                task.finish(msg)
+            except InterruptedError as e:
+                task.finish(f"⛔ {e}")
+            except Exception as exc:
+                task.finish(f"❌ {exc}", error=True)
+                logger.error("DK scan_listings FAILED: %s", exc, exc_info=True)
+            finally:
+                from django.db import connection
+                connection.close()
+
+        threading.Thread(target=_run, daemon=True).start()
+        self.message_user(request, "⏳ Сканування DigiKey запущено у фоні.", messages.INFO)
+        return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
+
     def task_status_view(self, request):
         from django.http import JsonResponse
         name = request.GET.get('name', '')
@@ -1399,6 +1450,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         custom_fields_url   = reverse("admin:bots_digikeyconfig_custom_fields")
         import_offers_url   = reverse("admin:bots_digikeyconfig_import_offers")
         create_listings_url = reverse("admin:bots_digikeyconfig_create_listings")
+        scan_listings_url   = reverse("admin:bots_digikeyconfig_scan_listings")
         messages_url        = reverse("admin:bots_digikeyconfig_messages")
 
         authorized = bool(obj and obj.marketplace_refresh_token)
@@ -1444,6 +1496,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             group(
                 "📦 Лістинги",
                 "#4527a0",
+                btn(scan_listings_url,   "🔍 Сканувати всі лістинги",    "#1b5e20"),
                 btn(import_offers_url,   "📥 Імпорт офферів",           "#00695c"),
                 btn(create_listings_url, "🆕 Створити лістинги",         "#00838f"),
                 btn(custom_fields_url,   "📋 Custom Fields",             "#4527a0"),

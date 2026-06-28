@@ -61,12 +61,14 @@ class Command(BaseCommand):
         self.stdout.write(f"Перевіряємо {count} staged лістингів…")
 
         promoted = still_pending = errors = 0
+        promoted_listings = []
         for listing in staged_qs:
             sku = listing.product.sku if listing.product else f"pk={listing.pk}"
             try:
                 result = check_staged_listing(listing)
                 if result == "published":
                     promoted += 1
+                    promoted_listings.append(listing)
                     self.stdout.write(self.style.SUCCESS(f"  ✅ {sku} → published (offer: {listing.dk_offer_id})"))
                 else:
                     still_pending += 1
@@ -80,6 +82,13 @@ class Command(BaseCommand):
 
         cfg.last_polled_at = timezone.now()
         cfg.save(update_fields=["last_polled_at"])
+
+        if promoted_listings:
+            try:
+                from dashboard.notifications import notify_dk_listings_published
+                notify_dk_listings_published(promoted_listings)
+            except Exception as exc:
+                self.stderr.write(f"  ⚠️ Сповіщення не надіслано: {exc}")
 
         self.stdout.write(
             f"\nГотово: затверджено {promoted}, ще очікує {still_pending}, помилок {errors}."

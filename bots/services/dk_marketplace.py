@@ -1104,5 +1104,265 @@ def fetch_custom_fields(config) -> list:
     return all_fields
 
 
+def fetch_all_dk_products(config, max_count: int = 1000) -> list:
+    """GET /products — paginated, returns all product dicts for authenticated supplier."""
+    import requests as req
+
+    token = get_marketplace_token(config)
+    url   = f"{_base_url(config)}{_PRODUCTS_BASE}/products"
+    all_products: list = []
+    offset = 0
+
+    while True:
+        resp = req.get(url, params={'Max': 50, 'Offset': offset},
+                       headers=_headers(config, token), timeout=15)
+        try:
+            resp.raise_for_status()
+        except req.HTTPError as e:
+            body = {}
+            try: body = e.response.json()
+            except Exception: pass
+            raise DKMarketplaceError(f"fetch_all_dk_products {e.response.status_code}: {body}") from e
+
+        data     = resp.json()
+        products = data.get('products', [])
+        all_products.extend(products)
+
+        if len(products) < 50 or len(all_products) >= max_count:
+            break
+        offset += 50
+
+    logger.info("DK fetch_all_dk_products total=%d", len(all_products))
+    return all_products
+
+
+def scan_missing_listings(task=None) -> dict:
+    """Scan all DigiKey products+offers and create/update local DigiKeyListing records.
+
+    Logic:
+    - Fetches ALL products from DK Products API (includes staged/pending ones).
+    - Fetches ALL offers from DK Offers API.
+    - Builds a map {supplierSku: offer} for cross-reference.
+    - For each DK product:
+        - If listing exists locally → updates dk_product_id, status, offer_id.
+        - If listing missing → creates it with correct status:
+            - has offer → sync_status='published'
+            - no offer  → sync_status='staged' (pending DigiKey approval)
+
+    Returns dict with keys: created, updated, skipped, errors.
+    """
+    from django.db import models as _m
+    from django.utils import timezone
+    from bots.models import DigiKeyConfig, DigiKeyListing
+
+    try:
+        from inventory.models import Product
+    except ImportError:
+        raise DKMarketplaceError("inventory.Product not found")
+
+    config = DigiKeyConfig.get()
+
+    # ── Step 1: fetch all offers and build lookup ──────────────────────────────
+    if task:
+        task.set_progress("Стягування офферів з DigiKey…")
+    offers_raw = fetch_offers(config, max_count=1000)
+    # Build lookup by supplierSku (primary) and productId (secondary)
+    offers_by_sku       = {}   # supplierSku → offer dict
+    offers_by_productid = {}   # productId   → offer dict
+    for o in offers_raw:
+        sku  = o.get('supplierSku', '').strip()
+        pid  = o.get('productId', '').strip()
+        if sku:
+            offers_by_sku[sku] = o
+        if pid:
+            offers_by_productid[pid] = o
+
+    # ── Step 2: fetch all products ─────────────────────────────────────────────
+    if task:
+        task.set_progress("Стягування продуктів з DigiKey…")
+    try:
+        dk_products = fetch_all_dk_products(config, max_count=1000)
+    except DKMarketplaceError:
+        # Products API may require special permissions — fall back to offers-only scan
+        dk_products = []
+
+    # Build merged list: products first, then offers for any SKU not in products list
+    # (edge case: offer exists but product was deleted from Products API)
+    seen_skus = set()
+    dk_items  = []   # [{sku, product_id, offer, status}]
+
+    for prod in dk_products:
+        sku  = (prod.get('partNumber') or '').strip()
+        pid  = (prod.get('_id') or prod.get('id') or '').strip()
+        if not sku:
+            continue
+        seen_skus.add(sku)
+        offer = offers_by_sku.get(sku) or (offers_by_productid.get(pid) if pid else None)
+        dk_items.append({'sku': sku, 'product_id': pid, 'offer': offer, 'raw_product': prod})
+
+    # Add offers whose SKUs were not in products list
+    for sku, offer in offers_by_sku.items():
+        if sku not in seen_skus:
+            pid = offer.get('productId', '').strip()
+            dk_items.append({'sku': sku, 'product_id': pid, 'offer': offer, 'raw_product': None})
+            seen_skus.add(sku)
+
+    total   = len(dk_items)
+    created = updated = skipped = errors = 0
+    created_listing_skus: list = []
+
+    for idx, item in enumerate(dk_items, 1):
+        if task and task.is_cancelled():
+            raise InterruptedError("Скасовано")
+
+        sku        = item['sku']
+        product_id = item['product_id']
+        offer      = item['offer']
+        raw_prod   = item['raw_product']
+
+        if task:
+            task.set_progress(f"[{idx}/{total}] {sku}")
+
+        # ── Determine status ───────────────────────────────────────────────────
+        if offer:
+            new_status = DigiKeyListing.SYNC_PUBLISHED
+            offer_id   = offer.get('id', '')
+        else:
+            new_status = DigiKeyListing.SYNC_STAGED
+            offer_id   = ''
+
+        # ── Find existing listing ──────────────────────────────────────────────
+        listing = None
+        try:
+            listing = DigiKeyListing.objects.get(
+                _m.Q(dk_supplier_sku=sku) | _m.Q(product__sku=sku)
+            )
+        except DigiKeyListing.DoesNotExist:
+            pass
+        except DigiKeyListing.MultipleObjectsReturned:
+            listing = DigiKeyListing.objects.filter(
+                _m.Q(dk_supplier_sku=sku) | _m.Q(product__sku=sku)
+            ).first()
+
+        if listing is not None:
+            # ── Update existing ────────────────────────────────────────────────
+            update_flds = ['sync_status', 'last_synced_at']
+            listing.last_synced_at = timezone.now()
+
+            if product_id and listing.dk_product_id != product_id:
+                listing.dk_product_id = product_id
+                update_flds.append('dk_product_id')
+            if offer_id and listing.dk_offer_id != offer_id:
+                listing.dk_offer_id = offer_id
+                update_flds.append('dk_offer_id')
+            # Only promote status (draft→staged, staged→published), never downgrade
+            STATUS_ORDER = {DigiKeyListing.SYNC_DRAFT: 0, DigiKeyListing.SYNC_STAGED: 1,
+                            DigiKeyListing.SYNC_PUBLISHED: 2, DigiKeyListing.SYNC_ERROR: -1}
+            if STATUS_ORDER.get(new_status, 0) > STATUS_ORDER.get(listing.sync_status, 0):
+                listing.sync_status = new_status
+            else:
+                listing.sync_status = listing.sync_status  # no change
+
+            listing.save(update_fields=update_flds)
+            updated += 1
+            continue
+
+        # ── Create new listing ─────────────────────────────────────────────────
+        # Try to find product in local inventory
+        try:
+            product = Product.objects.get(sku=sku)
+        except Product.DoesNotExist:
+            if not config.create_product_if_missing:
+                skipped += 1
+                logger.info("DK scan: no local product for SKU=%s — skipped", sku)
+                continue
+            # Auto-create product stub
+            title = ''
+            if raw_prod:
+                title = (raw_prod.get('title') or '')[:200]
+            elif offer:
+                title = (offer.get('title') or '')[:200]
+            product = Product(sku=sku, name=title or sku, category='other')
+            try:
+                product.save()
+            except Exception as exc:
+                errors += 1
+                logger.warning("DK scan: cannot auto-create product %s: %s", sku, exc)
+                continue
+        except Product.MultipleObjectsReturned:
+            skipped += 1
+            continue
+        except Exception as exc:
+            errors += 1
+            logger.warning("DK scan: unexpected error for %s: %s", sku, exc)
+            continue
+
+        # Build listing fields from raw data
+        title       = ''
+        description = ''
+        is_active   = True
+        moq         = 1
+        lead_time   = 0
+        qty_alert   = 0
+        prices_list = []
+
+        if raw_prod:
+            title       = (raw_prod.get('title') or '')[:200]
+            description = (raw_prod.get('description') or '')[:500]
+        if offer:
+            title       = title or (offer.get('title') or '')[:200]
+            description = description or (offer.get('description') or '')[:500]
+            is_active   = bool(offer.get('isActive', True))
+            moq         = max(1, int(offer.get('minOrderQuantity') or 1))
+            lead_time   = int(offer.get('leadTimeToShip') or 0)
+            qty_alert   = int(offer.get('minQuantityAlert') or 0)
+            raw_prices  = offer.get('prices', [])
+            if raw_prices:
+                prices_list = _parse_dk_price_tiers(raw_prices)
+
+        try:
+            listing = DigiKeyListing.objects.create(
+                product          = product,
+                dk_supplier_sku  = sku,
+                dk_offer_id      = offer_id,
+                dk_product_id    = product_id,
+                dk_title         = title,
+                dk_description   = description,
+                dk_is_active     = is_active,
+                dk_min_order_qty = moq,
+                dk_lead_time_days= lead_time,
+                dk_qty_alert     = qty_alert,
+                dk_prices        = prices_list,
+                sync_status      = new_status,
+                last_synced_at   = timezone.now(),
+            )
+            created += 1
+            created_listing_skus.append(sku)
+            logger.info("DK scan: created listing SKU=%s status=%s", sku, new_status)
+
+            # Best-effort: pull full product details
+            try:
+                pull_product_fields(listing)
+            except Exception:
+                pass
+
+        except Exception as exc:
+            errors += 1
+            logger.warning("DK scan: cannot create listing %s: %s", sku, exc)
+
+    logger.info(
+        "DK scan_missing_listings: total=%d created=%d updated=%d skipped=%d errors=%d",
+        total, created, updated, skipped, errors,
+    )
+    return {
+        'total':    total,
+        'created':  created,
+        'updated':  updated,
+        'skipped':  skipped,
+        'errors':   errors,
+        'new_skus': created_listing_skus,
+    }
+
+
 # Import model reference after definition to avoid circular import
 from bots.models import DigiKeyListing  # noqa: E402

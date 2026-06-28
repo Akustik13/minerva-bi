@@ -1387,6 +1387,129 @@ def notify_status_change(order, old_status, new_status):
             pass
 
 
+# ── DigiKey listing published notification ────────────────────────────────────
+
+def notify_dk_listings_published(promoted_listings: list):
+    """Send Telegram/email when DigiKey approves staged listings.
+
+    promoted_listings — list of DigiKeyListing instances just promoted to 'published'.
+    Respects DigiKeyConfig.poll_notify_telegram / poll_notify_email flags.
+    Email recipients: poll_notify_email_to (fallback: NotificationSettings.email_to).
+    """
+    if not promoted_listings:
+        return
+
+    try:
+        from bots.models import DigiKeyConfig
+        cfg = DigiKeyConfig.objects.filter(pk=1).first()
+    except Exception:
+        return
+
+    if not cfg:
+        return
+
+    ns = _get_ns()
+
+    send_tg    = cfg.poll_notify_telegram and ns and ns.telegram_enabled and bool(ns.telegram_bot_token) and bool(ns.telegram_chat_id)
+    send_email = cfg.poll_notify_email    and ns and ns.email_enabled
+
+    if not send_tg and not send_email:
+        return
+
+    now_str   = timezone.now().strftime('%d.%m.%Y %H:%M')
+    _cname    = _get_company_name()
+    count     = len(promoted_listings)
+
+    # Build listing details
+    sku_lines = []
+    for lst in promoted_listings:
+        sku = lst.product.sku if lst.product_id else f'pk={lst.pk}'
+        name = (lst.product.name if lst.product_id else '') or ''
+        offer = lst.dk_offer_id or '—'
+        sku_lines.append({'sku': sku, 'name': name, 'offer': offer})
+
+    if send_tg:
+        try:
+            tg = [
+                f'🏛️ <b>{_cname}</b>',
+                f'✅ <b>DigiKey: лістинг затверджено</b> · <i>{now_str}</i>',
+                '',
+                f'Затверджено: <b>{count}</b> лістинг{"ів" if count > 1 else ""}',
+                '',
+                '📋 <b>Товари:</b>',
+            ]
+            for item in sku_lines:
+                name_part = f' — {item["name"]}' if item['name'] else ''
+                tg.append(f'• <code>{item["sku"]}</code>{name_part}')
+                tg.append(f'  Offer ID: <code>{item["offer"]}</code>')
+            tg.append('')
+            tg.append(f'🔗 Статус: <b>⏳ Staged → ✅ Published</b>')
+            _send_telegram(ns, '\n'.join(tg))
+        except Exception:
+            pass
+
+    if send_email:
+        try:
+            recipients_raw = cfg.poll_notify_email_to.strip() if cfg.poll_notify_email_to.strip() else (ns.email_to or '')
+            recipients = [e.strip() for e in recipients_raw.split(',') if e.strip()]
+            if not recipients:
+                return
+
+            subject = f'✅ DigiKey: затверджено {count} лістинг{"ів" if count > 1 else ""}'
+
+            rows = ''
+            for i, item in enumerate(sku_lines):
+                bg = '#f9f9f9' if i % 2 == 0 else '#fff'
+                rows += (
+                    f'<tr style="background:{bg}">'
+                    f'<td style="padding:8px 12px;font-family:monospace;font-weight:600;color:#1565c0">{item["sku"]}</td>'
+                    f'<td style="padding:8px 12px;color:#333">{item["name"] or "—"}</td>'
+                    f'<td style="padding:8px 12px;font-family:monospace;font-size:12px;color:#607d8b">{item["offer"]}</td>'
+                    f'</tr>'
+                )
+
+            html = (
+                '<!DOCTYPE html><html><head><meta charset="utf-8"></head>'
+                '<body style="font-family:Arial,sans-serif;background:#f0f2f5;margin:0;padding:20px">'
+                '<div style="max-width:640px;margin:0 auto;background:#fff;border-radius:8px;'
+                'overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.12)">'
+                '<div style="background:#2e7d32;color:#fff;padding:16px 24px">'
+                f'<div style="font-size:17px;font-weight:700">✅ DigiKey: лістинги затверджено</div>'
+                f'<div style="font-size:12px;opacity:.75">{_cname} · {now_str}</div>'
+                '</div>'
+                '<div style="padding:16px 24px">'
+                f'<p style="margin:0 0 12px;font-size:14px;color:#333">'
+                f'DigiKey затвердив <b>{count}</b> лістинг{"ів" if count > 1 else ""} — статус змінено на <b style="color:#2e7d32">✅ Опубліковано</b>.</p>'
+                '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+                '<tr style="background:#e8f5e9;color:#2e7d32;font-weight:600">'
+                '<td style="padding:8px 12px;border-bottom:2px solid #a5d6a7">SKU</td>'
+                '<td style="padding:8px 12px;border-bottom:2px solid #a5d6a7">Назва</td>'
+                '<td style="padding:8px 12px;border-bottom:2px solid #a5d6a7">Offer ID</td>'
+                '</tr>'
+                + rows +
+                '</table>'
+                '</div>'
+                '<div style="padding:12px 24px;border-top:1px solid #eee;font-size:12px;color:#999">'
+                'Minerva Business Intelligence — DigiKey авто-перевірка статусу'
+                '</div>'
+                '</div></body></html>'
+            )
+
+            from django.core.mail import EmailMultiAlternatives
+            from_email = (ns.email_from or ns.email_host_user or 'noreply@minerva.local').strip()
+            msg = EmailMultiAlternatives(
+                subject=subject,
+                body=f'DigiKey затвердив {count} лістингів: ' + ', '.join(i["sku"] for i in sku_lines),
+                from_email=from_email,
+                to=recipients,
+                connection=_smtp_connection(ns),
+            )
+            msg.attach_alternative(html, 'text/html')
+            msg.send()
+        except Exception:
+            pass
+
+
 # ── Shipment status notifications ─────────────────────────────────────────────
 
 _SHIPMENT_STATUS_LABELS = {

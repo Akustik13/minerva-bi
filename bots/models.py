@@ -52,6 +52,18 @@ class DigiKeyConfig(models.Model):
     last_polled_at = models.DateTimeField(
         "Остання авто-перевірка статусу", null=True, blank=True
     )
+    poll_notify_telegram = models.BooleanField(
+        "Telegram — при затвердженні", default=False,
+        help_text="Надіслати Telegram-повідомлення коли DigiKey затвердить лістинг (staged → published)"
+    )
+    poll_notify_email = models.BooleanField(
+        "Email — при затвердженні", default=False,
+        help_text="Надіслати email-повідомлення коли DigiKey затвердить лістинг (staged → published)"
+    )
+    poll_notify_email_to = models.CharField(
+        "Email одержувачів (через кому)", max_length=500, blank=True, default="",
+        help_text="Порожньо = використати адресу з загальних налаштувань сповіщень"
+    )
 
     # ── Авто-стягування даних лістингів з DigiKey ─────────────────────────────
     pull_enabled        = models.BooleanField(
