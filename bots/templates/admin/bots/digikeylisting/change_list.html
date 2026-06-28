@@ -7,7 +7,6 @@
 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;
             background:var(--bg-card,#1a2535);border:1px solid var(--border-strong,#243347);border-radius:6px">
   <a href="{{ check_new_url }}"
-     onclick="return confirm('Перевірити нові лістинги з DigiKey та синхронізувати? Це займе кілька хвилин.')"
      style="display:inline-flex;align-items:center;gap:5px;padding:7px 16px;background:#00695c;
             color:#fff;border-radius:5px;font-size:13px;font-weight:600;text-decoration:none;white-space:nowrap">
     🔍 Перевірити нові лістинги з DigiKey
@@ -46,9 +45,16 @@
   box-shadow:0 3px 14px rgba(0,0,0,.5);
 ">
   <div style="font-size:19px;flex-shrink:0">🔍</div>
-  <span style="font-size:13px;font-weight:700;color:#c9d8e4;flex:1">
-    Перевірка нових лістингів DigiKey…
-  </span>
+  <div style="flex:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:13px;font-weight:700;color:#c9d8e4">
+        Перевірка нових лістингів DigiKey…
+      </span>
+      <span id="cn-counter" style="font-size:12px;color:#4db6ac;font-weight:600;white-space:nowrap"></span>
+      <span id="cn-sku" style="font-size:11px;color:#9aafbe;font-family:monospace;
+                                overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px"></span>
+    </div>
+  </div>
   <button id="cn-stop-btn" onclick="cnStop()"
           style="padding:6px 16px;background:rgba(198,40,40,.2);color:#ef5350;
                  border:1px solid rgba(198,40,40,.4);border-radius:6px;
@@ -77,11 +83,27 @@
   var pollTimer  = null;
   var wasRunning = false;
 
+  function applyCnProgress(prog) {
+    // prog format: "[done/total] sku"
+    var counter = document.getElementById('cn-counter');
+    var skuEl   = document.getElementById('cn-sku');
+    if (!prog) { counter.textContent = ''; skuEl.textContent = ''; return; }
+    var m = prog.match(/^\[(\d+)\/(\d+)\]\s*(.*)/);
+    if (m) {
+      counter.textContent = m[1] + ' / ' + m[2];
+      skuEl.textContent   = m[3] ? ('→ ' + m[3]) : '';
+    } else {
+      counter.textContent = '';
+      skuEl.textContent   = prog;
+    }
+  }
+
   function onData(data) {
     if (data.status === 'running') {
       wasRunning = true;
       toolbar.style.display = 'flex';
       doneBanner.style.display = 'none';
+      applyCnProgress(data.progress || '');
       if (!pollTimer) pollTimer = setInterval(poll, 2000);
     } else {
       toolbar.style.display = 'none';

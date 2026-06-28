@@ -1084,19 +1084,43 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         return redirect(reverse('admin:bots_digikeyconfig_change', args=[1]))
 
     def scan_listings_view(self, request):
-        """Scan all DigiKey products+offers and create/update missing local listings."""
+        """GET → filter form; POST → start background scan."""
+        if request.method == 'GET':
+            from django.template.response import TemplateResponse
+            from bots.models import DigiKeyListing as _DKL
+            return TemplateResponse(
+                request,
+                'admin/bots/digikeyconfig/scan_listings.html',
+                {
+                    'cat_choices': _DKL.CAT_CHOICES,
+                    'prefill_sku': request.GET.get('sku', ''),
+                },
+            )
+
         import threading
         from bots.services.dk_marketplace import scan_missing_listings
+
+        mode       = request.POST.get('mode', 'all')
+        filter_sku = request.POST.get('filter_sku', '').strip() if mode == 'sku' else None
+        since_date = request.POST.get('since_date', '').strip() or None if mode == 'date' else None
+        until_date = request.POST.get('until_date', '').strip() or None if mode == 'date' else None
+        on_missing = request.POST.get('on_missing', 'skip')
 
         task = BotTask.start('scan_listings')
 
         def _run():
             try:
-                result = scan_missing_listings(task=task)
+                result = scan_missing_listings(
+                    task=task,
+                    filter_sku=filter_sku,
+                    since_date=since_date,
+                    until_date=until_date,
+                    on_missing=on_missing,
+                )
                 msg = (
                     f"✅ Скановано {result['total']} позицій DigiKey. "
                     f"Створено: {result['created']}, оновлено: {result['updated']}, "
-                    f"пропущено (немає товару): {result['skipped']}, помилок: {result['errors']}."
+                    f"пропущено: {result['skipped']}, помилок: {result['errors']}."
                 )
                 if result.get('new_skus'):
                     skus_preview = ', '.join(result['new_skus'][:15])
@@ -1519,21 +1543,67 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
     def poll_now_button(self, obj):
         from django.utils.safestring import mark_safe
         url = reverse("admin:bots_digikeyconfig_poll_now")
-        staged_count = DigiKeyListing.objects.filter(
-            sync_status=DigiKeyListing.SYNC_STAGED
-        ).count()
+        staged_qs = (
+            DigiKeyListing.objects.filter(sync_status=DigiKeyListing.SYNC_STAGED)
+            .select_related("product")
+            .order_by("product__sku")
+        )
+        staged_count = staged_qs.count()
         badge = (
             f' <span style="background:#e65100;color:#fff;border-radius:10px;'
             f'padding:1px 7px;font-size:11px;font-weight:700">{staged_count}</span>'
             if staged_count else ""
         )
+
+        # Build staged listings table
+        table_html = ''
+        if staged_count:
+            rows = ''
+            for lst in staged_qs:
+                sku      = lst.product.sku if lst.product_id else f'pk={lst.pk}'
+                edit_url = reverse("admin:bots_digikeylisting_change", args=[lst.pk])
+                title    = lst.dk_title or '—'
+                pid      = lst.dk_product_id or '—'
+                synced   = lst.last_synced_at.strftime('%d.%m %H:%M') if lst.last_synced_at else '—'
+                rows += (
+                    f'<tr style="border-bottom:1px solid var(--border-strong)">'
+                    f'<td style="padding:5px 10px;font-family:monospace;font-weight:600">'
+                    f'<a href="{edit_url}" style="color:var(--link-fg)">{sku}</a></td>'
+                    f'<td style="padding:5px 10px;color:var(--text);font-size:12px;max-width:220px;'
+                    f'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{title}</td>'
+                    f'<td style="padding:5px 10px;font-family:monospace;font-size:11px;'
+                    f'color:var(--text-dim)">{pid[:20]}…' if len(pid) > 20 else
+                    f'<td style="padding:5px 10px;font-family:monospace;font-size:11px;'
+                    f'color:var(--text-dim)">{pid}</td>'
+                    f'<td style="padding:5px 10px;font-size:11px;color:var(--text-muted)'
+                    f';white-space:nowrap">{synced}</td>'
+                    f'</tr>'
+                )
+            table_html = (
+                f'<table style="width:100%;border-collapse:collapse;margin-top:10px;font-size:13px;'
+                f'background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;'
+                f'overflow:hidden">'
+                f'<tr style="background:rgba(69,39,160,.15);font-size:11px;font-weight:700;'
+                f'color:#b39ddb;text-transform:uppercase;letter-spacing:.04em">'
+                f'<th style="padding:6px 10px;text-align:left">SKU</th>'
+                f'<th style="padding:6px 10px;text-align:left">Назва (DK)</th>'
+                f'<th style="padding:6px 10px;text-align:left">Product ID</th>'
+                f'<th style="padding:6px 10px;text-align:left">Синхр.</th>'
+                f'</tr>'
+                f'{rows}'
+                f'</table>'
+            )
+
         return mark_safe(
+            f'<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
             f'<a href="{url}" style="background:#4527a0;color:#fff;padding:7px 16px;'
             f'border-radius:4px;text-decoration:none;display:inline-block;'
             f'font-size:13px;font-weight:500">'
             f'🔍 Перевірити зараз{badge}</a>'
-            f'<span style="margin-left:12px;font-size:12px;color:var(--text-muted)">'
+            f'<span style="font-size:12px;color:var(--text-muted)">'
             f'Staged лістингів: {staged_count}</span>'
+            f'</div>'
+            f'{table_html}'
         )
 
     poll_now_button.short_description = "Ручна перевірка"
@@ -1560,7 +1630,11 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
         status_url = reverse('admin:bots_digikeyconfig_task_status')
         cancel_url = reverse('admin:bots_digikeyconfig_task_cancel')
         tasks_html = ''
-        for name, label in [('import_offers', '📥 Імпорт офферів'), ('create_listings', '🆕 Створити лістинги')]:
+        for name, label in [
+            ('import_offers',   '📥 Імпорт офферів'),
+            ('create_listings', '🆕 Створити лістинги'),
+            ('scan_listings',   '🔍 Сканувати лістинги'),
+        ]:
             try:
                 t = BotTask.objects.get(name=name)
             except BotTask.DoesNotExist:
@@ -1609,7 +1683,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
 (function(){{
   var STATUS_URL = '{status_url}';
   var CANCEL_URL = '{cancel_url}';
-  var TASKS = ['import_offers','create_listings'];
+  var TASKS = ['import_offers','create_listings','scan_listings'];
   var _timer = null;
 
   function pollAll() {{
@@ -3351,26 +3425,50 @@ Rules:
         return JsonResponse({'ok': bool(updated)})
 
     def check_new_listings_view(self, request):
-        """Run import_offers + create_listings in background and redirect to changelist."""
+        """GET → show filter form; POST → start background scan."""
+        if request.method == 'GET':
+            from django.template.response import TemplateResponse
+            return TemplateResponse(
+                request,
+                'admin/bots/digikeylisting/check_new_listings.html',
+                {'prefill_sku': request.GET.get('sku', '')},
+            )
+
         import threading
-        from bots.services.dk_marketplace import import_offers_from_dk, create_listings_from_offers
+        from bots.services.dk_marketplace import scan_missing_listings
+
+        mode       = request.POST.get('mode', 'all')
+        filter_sku = request.POST.get('filter_sku', '').strip() if mode == 'sku' else None
+        since_date = request.POST.get('since_date', '').strip() or None if mode == 'date' else None
+        until_date = request.POST.get('until_date', '').strip() or None if mode == 'date' else None
+        on_missing = request.POST.get('on_missing', 'skip')
 
         task = BotTask.start('check_new_listings')
 
         def _run():
             try:
-                r1 = import_offers_from_dk(task=task)
-                r2 = create_listings_from_offers(task=task)
-                created       = r2.get('created', 0)
-                auto_products = r2.get('products_auto_created', 0)
-                updated       = r1.get('updated', 0)
-                msg = f"✅ Оновлено {updated} лістингів"
-                if created:
-                    msg += f", створено нових: {created}"
-                else:
-                    msg += ", нових не знайдено"
-                if auto_products:
-                    msg += f" (товарів на складі авто-створено: {auto_products})"
+                result = scan_missing_listings(
+                    task=task,
+                    filter_sku=filter_sku,
+                    since_date=since_date,
+                    until_date=until_date,
+                    on_missing=on_missing,
+                )
+                msg = (
+                    f"✅ Скановано {result['total']} позицій DigiKey. "
+                    f"Оновлено: {result['updated']}"
+                )
+                if result['created']:
+                    msg += f", створено нових: {result['created']}"
+                if result['skipped']:
+                    msg += f", пропущено: {result['skipped']}"
+                if result['errors']:
+                    msg += f", помилок: {result['errors']}"
+                if result.get('new_skus'):
+                    skus = ', '.join(result['new_skus'][:10])
+                    if len(result['new_skus']) > 10:
+                        skus += f' +{len(result["new_skus"])-10}'
+                    msg += f". Нові: {skus}"
                 task.finish(msg)
             except InterruptedError as e:
                 task.finish(f"⛔ {e}")
@@ -3389,9 +3487,13 @@ Rules:
         from django.http import JsonResponse
         try:
             t = BotTask.objects.get(name='check_new_listings')
-            return JsonResponse({'status': t.status, 'message': t.message or ''})
+            return JsonResponse({
+                'status':   t.status,
+                'message':  t.message or '',
+                'progress': t.progress or '',
+            })
         except BotTask.DoesNotExist:
-            return JsonResponse({'status': 'idle', 'message': ''})
+            return JsonResponse({'status': 'idle', 'message': '', 'progress': ''})
 
     def check_new_cancel_view(self, request):
         from django.http import JsonResponse

@@ -1136,24 +1136,44 @@ def fetch_all_dk_products(config, max_count: int = 1000) -> list:
     return all_products
 
 
-def scan_missing_listings(task=None) -> dict:
+def scan_missing_listings(
+    task=None,
+    filter_sku: str | None = None,
+    since_date=None,
+    until_date=None,
+    on_missing: str = 'skip',
+) -> dict:
     """Scan all DigiKey products+offers and create/update local DigiKeyListing records.
 
-    Logic:
-    - Fetches ALL products from DK Products API (includes staged/pending ones).
-    - Fetches ALL offers from DK Offers API.
-    - Builds a map {supplierSku: offer} for cross-reference.
-    - For each DK product:
-        - If listing exists locally → updates dk_product_id, status, offer_id.
-        - If listing missing → creates it with correct status:
-            - has offer → sync_status='published'
-            - no offer  → sync_status='staged' (pending DigiKey approval)
+    filter_sku   — process only this SKU (exact match)
+    since_date   — str 'YYYY-MM-DD': only update existing listings where
+                   last_synced_at >= since_date (or is null for new items)
+    until_date   — str 'YYYY-MM-DD': only update listings where last_synced_at <= until_date
+    on_missing   — what to do when DK item has no local listing:
+                   'create' → create listing (and product if create_product_if_missing)
+                   'skip'   → skip silently
+                   'report' → skip but include SKU in result['skipped_skus']
 
-    Returns dict with keys: created, updated, skipped, errors.
+    Returns dict: created, updated, skipped, errors, new_skus, skipped_skus, total.
     """
     from django.db import models as _m
     from django.utils import timezone
     from bots.models import DigiKeyConfig, DigiKeyListing
+
+    # Parse date filters
+    _since = _until = None
+    if since_date:
+        try:
+            from datetime import date as _date
+            _since = _date.fromisoformat(str(since_date))
+        except Exception:
+            pass
+    if until_date:
+        try:
+            from datetime import date as _date
+            _until = _date.fromisoformat(str(until_date))
+        except Exception:
+            pass
 
     try:
         from inventory.models import Product
@@ -1207,9 +1227,14 @@ def scan_missing_listings(task=None) -> dict:
             dk_items.append({'sku': sku, 'product_id': pid, 'offer': offer, 'raw_product': None})
             seen_skus.add(sku)
 
+    # Apply filter_sku early to reduce DK items list
+    if filter_sku:
+        dk_items = [i for i in dk_items if i['sku'] == filter_sku]
+
     total   = len(dk_items)
     created = updated = skipped = errors = 0
     created_listing_skus: list = []
+    skipped_skus: list         = []
 
     for idx, item in enumerate(dk_items, 1):
         if task and task.is_cancelled():
@@ -1245,6 +1270,18 @@ def scan_missing_listings(task=None) -> dict:
             ).first()
 
         if listing is not None:
+            # ── Date filter: skip if listing was synced outside the requested range ──
+            if _since or _until:
+                ls = listing.last_synced_at
+                ls_date = ls.date() if ls else None
+                if ls_date:
+                    if _since and ls_date < _since:
+                        skipped += 1
+                        continue
+                    if _until and ls_date > _until:
+                        skipped += 1
+                        continue
+
             # ── Update existing ────────────────────────────────────────────────
             update_flds = ['sync_status', 'last_synced_at']
             listing.last_synced_at = timezone.now()
@@ -1272,17 +1309,23 @@ def scan_missing_listings(task=None) -> dict:
         try:
             product = Product.objects.get(sku=sku)
         except Product.DoesNotExist:
-            if not config.create_product_if_missing:
+            if on_missing == 'skip':
                 skipped += 1
+                skipped_skus.append(sku)
                 logger.info("DK scan: no local product for SKU=%s — skipped", sku)
                 continue
-            # Auto-create product stub
-            title = ''
+            elif on_missing == 'report':
+                skipped += 1
+                skipped_skus.append(sku)
+                logger.info("DK scan: no local product for SKU=%s — reported (not created)", sku)
+                continue
+            # on_missing == 'create': Auto-create product stub
+            stub_title = ''
             if raw_prod:
-                title = (raw_prod.get('title') or '')[:200]
+                stub_title = (raw_prod.get('title') or '')[:200]
             elif offer:
-                title = (offer.get('title') or '')[:200]
-            product = Product(sku=sku, name=title or sku, category='other')
+                stub_title = (offer.get('title') or '')[:200]
+            product = Product(sku=sku, name=stub_title or sku, category='other')
             try:
                 product.save()
             except Exception as exc:
@@ -1291,6 +1334,7 @@ def scan_missing_listings(task=None) -> dict:
                 continue
         except Product.MultipleObjectsReturned:
             skipped += 1
+            skipped_skus.append(sku)
             continue
         except Exception as exc:
             errors += 1
@@ -1355,12 +1399,13 @@ def scan_missing_listings(task=None) -> dict:
         total, created, updated, skipped, errors,
     )
     return {
-        'total':    total,
-        'created':  created,
-        'updated':  updated,
-        'skipped':  skipped,
-        'errors':   errors,
-        'new_skus': created_listing_skus,
+        'total':       total,
+        'created':     created,
+        'updated':     updated,
+        'skipped':     skipped,
+        'errors':      errors,
+        'new_skus':    created_listing_skus,
+        'skipped_skus': skipped_skus,
     }
 
 

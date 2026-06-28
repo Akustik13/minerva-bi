@@ -1,0 +1,234 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Перевірити нові лістинги | DigiKey | Minerva{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a>
+  &rsaquo; <a href="{% url 'admin:bots_digikeylisting_changelist' %}">DigiKey Лістинги</a>
+  &rsaquo; Перевірити нові лістинги
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+#content { padding: 0 !important; }
+.cl-wrap { max-width: 760px; margin: 0 auto; padding: 32px 24px 80px; }
+
+.cl-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.cl-sub   { font-size: 13px; color: var(--text-dim); margin-bottom: 32px; line-height: 1.5; }
+
+.cl-card {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-radius: 12px; padding: 24px 28px; margin-bottom: 20px;
+}
+.cl-card-title { font-size: 13px; font-weight: 700; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 18px; }
+
+.mode-list { display: flex; flex-direction: column; gap: 12px; }
+.mode-item {
+  display: flex; align-items: flex-start; gap: 14px; padding: 14px 18px;
+  border-radius: 8px; border: 2px solid var(--border-strong);
+  cursor: pointer; transition: border-color .15s, background .15s;
+}
+.mode-item:hover  { border-color: var(--accent); }
+.mode-item.active { border-color: var(--accent); background: rgba(88,166,255,.07); }
+.mode-item input[type=radio] { margin-top: 2px; flex-shrink: 0; }
+.mode-label  { font-size: 15px; font-weight: 600; color: var(--text); }
+.mode-hint   { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+.mode-extra { margin-top: 12px; display: none; }
+.mode-extra.visible { display: block; }
+.mode-input {
+  width: 100%; background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 6px; padding: 10px 14px;
+  font-size: 14px; font-family: monospace; box-sizing: border-box;
+}
+.mode-input:focus { border-color: var(--accent); outline: none; }
+
+.date-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.date-row label { font-size: 12px; color: var(--text-dim); }
+.date-row input[type=date] {
+  background: var(--bg-input); border: 1px solid var(--border-strong);
+  color: var(--text); border-radius: 6px; padding: 8px 12px;
+  font-size: 14px; cursor: pointer;
+}
+.date-row input[type=date]:focus { border-color: var(--accent); outline: none; }
+
+.on-missing-list { display: flex; flex-direction: column; gap: 8px; }
+.om-item {
+  display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px;
+  border-radius: 6px; border: 1px solid var(--border-strong); cursor: pointer;
+  transition: border-color .15s;
+}
+.om-item:hover  { border-color: var(--accent); }
+.om-item.active { border-color: var(--accent); background: rgba(88,166,255,.05); }
+.om-item input[type=radio] { margin-top: 2px; flex-shrink: 0; }
+.om-label { font-size: 14px; font-weight: 600; color: var(--text); }
+.om-hint  { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+
+.cl-actions { display: flex; gap: 12px; align-items: center; margin-top: 24px; }
+.cl-btn-run {
+  background: #00695c; color: #fff; border: none; border-radius: 8px;
+  padding: 12px 28px; font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.cl-btn-run:hover    { background: #00897b; }
+.cl-btn-run:disabled { background: var(--border-strong); color: var(--text-dim); cursor: not-allowed; }
+.cl-btn-back { color: var(--text-dim); text-decoration: none; font-size: 13px; }
+.cl-btn-back:hover   { color: var(--accent); }
+
+.cl-info {
+  border-left: 3px solid var(--text-dim);
+  background: rgba(96,125,139,.08);
+  border-radius: 0 8px 8px 0;
+  padding: 12px 16px;
+  font-size: 12px; color: var(--text-dim); line-height: 1.6; margin-top: 18px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="cl-wrap">
+  <div class="cl-title">🔍 Перевірити нові лістинги з DigiKey</div>
+  <div class="cl-sub">
+    Сканує DigiKey Marketplace (оффери + продукти) та синхронізує з локальною базою.
+    Оберіть що саме перевіряти та що робити з відсутніми товарами.
+  </div>
+
+  <form method="post" id="cl-form">
+    {% csrf_token %}
+
+    <div class="cl-card">
+      <div class="cl-card-title">Фільтр лістингів</div>
+      <div class="mode-list">
+
+        <!-- ALL -->
+        <label class="mode-item active" id="lbl-all">
+          <input type="radio" name="mode" value="all" checked onchange="setMode('all')">
+          <div>
+            <div class="mode-label">🌐 Всі лістинги</div>
+            <div class="mode-hint">Перевіряє весь DigiKey Marketplace — оффери та staged-продукти</div>
+          </div>
+        </label>
+
+        <!-- BY DATE -->
+        <label class="mode-item" id="lbl-date">
+          <input type="radio" name="mode" value="date" onchange="setMode('date')">
+          <div style="flex:1">
+            <div class="mode-label">📅 За датою останньої синхронізації</div>
+            <div class="mode-hint">Оновлює лише лістинги, синхронізовані у вказаний період</div>
+            <div class="mode-extra" id="extra-date">
+              <div class="date-row">
+                <label>від</label>
+                <input type="date" name="since_date" id="inp-since">
+                <label>до</label>
+                <input type="date" name="until_date" id="inp-until">
+              </div>
+            </div>
+          </div>
+        </label>
+
+        <!-- BY SKU -->
+        <label class="mode-item" id="lbl-sku">
+          <input type="radio" name="mode" value="sku" onchange="setMode('sku')">
+          <div style="flex:1">
+            <div class="mode-label">🔍 Конкретний SKU</div>
+            <div class="mode-hint">Перевіряє тільки один SKU (Supplier SKU DigiKey)</div>
+            <div class="mode-extra" id="extra-sku">
+              <input type="text" name="filter_sku" id="inp-sku"
+                     class="mode-input" placeholder="напр. AN250202-03C-175-MHF1"
+                     autocomplete="off" spellcheck="false"
+                     value="{{ prefill_sku }}">
+            </div>
+          </div>
+        </label>
+
+      </div>
+    </div>
+
+    <div class="cl-card">
+      <div class="cl-card-title">Що робити з відсутніми товарами</div>
+      <div class="on-missing-list">
+
+        <label class="om-item" id="om-skip">
+          <input type="radio" name="on_missing" value="skip" checked onchange="setOm('skip')">
+          <div>
+            <div class="om-label">⏭ Пропустити</div>
+            <div class="om-hint">Не створювати нічого — лише оновити вже наявні в Minerva лістинги</div>
+          </div>
+        </label>
+
+        <label class="om-item" id="om-report">
+          <input type="radio" name="on_missing" value="report" onchange="setOm('report')">
+          <div>
+            <div class="om-label">📋 Показати у звіті</div>
+            <div class="om-hint">Не створювати, але зафіксувати SKU у повідомленні після завершення</div>
+          </div>
+        </label>
+
+        <label class="om-item" id="om-create">
+          <input type="radio" name="on_missing" value="create" onchange="setOm('create')">
+          <div>
+            <div class="om-label">➕ Створити новий лістинг</div>
+            <div class="om-hint">Авто-створити DigiKeyListing (і товар на складі якщо потрібно)</div>
+          </div>
+        </label>
+
+      </div>
+
+      <div class="cl-info">
+        ℹ️ «Пропустити» безпечний вибір для першого запуску — перевіряє лише існуючі записи.
+        «Створити» потрібен щоб підтягти продукти, додані вручну на DigiKey Marketplace.
+      </div>
+    </div>
+
+    <div class="cl-actions">
+      <button type="submit" class="cl-btn-run" id="btn-run">🚀 Запустити перевірку</button>
+      <a href="{% url 'admin:bots_digikeylisting_changelist' %}" class="cl-btn-back">← Назад до лістингів</a>
+    </div>
+  </form>
+</div>
+
+<script>
+function setMode(mode) {
+  ['all','date','sku'].forEach(function(m) {
+    document.getElementById('lbl-' + m).classList.remove('active');
+    var ex = document.getElementById('extra-' + m);
+    if (ex) ex.classList.remove('visible');
+  });
+  document.getElementById('lbl-' + mode).classList.add('active');
+  var extra = document.getElementById('extra-' + mode);
+  if (extra) {
+    extra.classList.add('visible');
+    var inp = extra.querySelector('input');
+    if (inp) inp.focus();
+  }
+}
+
+function setOm(val) {
+  ['skip','report','create'].forEach(function(v) {
+    document.getElementById('om-' + v).classList.remove('active');
+  });
+  document.getElementById('om-' + val).classList.add('active');
+}
+
+// Init active state for on_missing
+setOm('skip');
+
+{% if prefill_sku %}
+setMode('sku');
+{% endif %}
+
+document.getElementById('cl-form').addEventListener('submit', function(e) {
+  var mode = document.querySelector('input[name=mode]:checked').value;
+  if (mode === 'sku' && !document.getElementById('inp-sku').value.trim()) {
+    e.preventDefault();
+    document.getElementById('inp-sku').focus();
+    alert('Введіть SKU');
+    return;
+  }
+  document.getElementById('btn-run').disabled = true;
+  document.getElementById('btn-run').textContent = '⏳ Запускаємо…';
+});
+</script>
+{% endblock %}
