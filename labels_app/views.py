@@ -71,7 +71,7 @@ def patch_dymo_qty(content: str, qty: int) -> str:
         )
         return f'<Text>{patched}</Text>'
     
-    return re.sub(r'<Text>(.*?QTY.*?)</Text>', replace_qty, content, flags=re.DOTALL | re.IGNORECASE)
+    return re.sub(r'<Text>([^<]*QTY[^<]*)</Text>', replace_qty, content, flags=re.IGNORECASE)
 
 
 @staff_member_required
