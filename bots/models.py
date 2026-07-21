@@ -197,6 +197,18 @@ class DigiKeyConfig(models.Model):
     msg_cache_at = models.DateTimeField(
         "Кеш оновлено", null=True, blank=True
     )
+    msg_notify_telegram = models.BooleanField(
+        "Telegram — при новому повідомленні", default=False,
+        help_text="Надіслати Telegram-сповіщення коли покупець надсилає нове повідомлення"
+    )
+    msg_notify_email = models.BooleanField(
+        "Email — при новому повідомленні", default=False,
+        help_text="Надіслати email-сповіщення коли покупець надсилає нове повідомлення"
+    )
+    msg_notify_email_to = models.CharField(
+        "Email одержувачів (через кому)", max_length=500, blank=True, default="",
+        help_text="Порожньо = використати адресу з загальних налаштувань сповіщень"
+    )
 
     # ── API Error Handling & Retry Strategy ───────────────────────────────────
     api_retry_count = models.PositiveSmallIntegerField(

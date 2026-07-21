@@ -178,17 +178,14 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"🔔 Нових повідомлень: {len(new_messages)}"))
 
-        from config.models import NotificationSettings
-        notif = NotificationSettings.objects.filter(pk=1).first()
-
         for msg in new_messages:
             self.stdout.write(f"  Topic: {msg['topic_title']} | Order: {msg['order_number']}")
             self.stdout.write(f"  {msg['content'][:100]}")
 
-            if notif and notif.dk_msg_notify_telegram:
+            if config.msg_notify_telegram:
                 _notify_telegram(config, msg)
-            if notif and notif.dk_msg_notify_email:
-                _notify_email(config, msg, notif)
+            if config.msg_notify_email:
+                _notify_email(config, msg)
 
 
 def _fmt_utc(dt_str: str) -> str:
@@ -246,13 +243,13 @@ def _notify_telegram(config, msg: dict):
         logging.getLogger(__name__).exception("Telegram notify failed: %s", e)
 
 
-def _notify_email(config, msg: dict, notif=None):
+def _notify_email(config, msg: dict):
     """Надсилає Email сповіщення про нове повідомлення."""
     try:
         from dashboard.notifications import _send_event_email
         from config.models import NotificationSettings
 
-        ns = notif or NotificationSettings.objects.filter(pk=1).first()
+        ns = NotificationSettings.objects.filter(pk=1).first()
         if not ns or not ns.email_enabled:
             return
 
@@ -275,8 +272,8 @@ def _notify_email(config, msg: dict, notif=None):
             f"<p><b>Повідомлення:</b><br>{msg['content']}</p>"
         )
 
-        # Override recipients if DK-specific list is set
-        dk_to = (ns.dk_msg_notify_email_to or '').strip()
+        # Override recipients if DK-specific list is set on DigiKeyConfig
+        dk_to = (config.msg_notify_email_to or '').strip()
         if dk_to:
             import copy
             ns_copy = copy.copy(ns)

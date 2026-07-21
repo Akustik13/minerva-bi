@@ -313,17 +313,6 @@ class NotificationSettingsAdmin(admin.ModelAdmin):
                 "Нижче — живий приклад на основі реального замовлення з БД."
             ),
         }),
-        ("💬 DigiKey повідомлення від покупців", {
-            "fields": (
-                ("dk_msg_notify_telegram", "dk_msg_notify_email"),
-                "dk_msg_notify_email_to",
-            ),
-            "description": (
-                "Сповіщення коли покупець надсилає нове повідомлення в DigiKey Marketplace. "
-                "Налаштування автоперевірки (інтервал, вмк/вимк) — у DigiKey Config. "
-                "Cron: <code>*/15 * * * * docker-compose exec -T web python manage.py check_digikey_messages</code>"
-            ),
-        }),
         ("⚙️ Вміст сповіщень (Нові замовлення + DigiKey)", {
             "fields": (
                 ("notify_include_total", "notify_include_crm_count"),

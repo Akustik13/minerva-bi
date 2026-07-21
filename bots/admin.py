@@ -181,13 +181,18 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             ),
         }),
         ("💬 Повідомлення DigiKey", {
-            "fields": ("messages_panel", "msg_check_enabled", "msg_check_interval",
-                       "msg_last_checked_at"),
+            "fields": (
+                "messages_panel",
+                ("msg_check_enabled", "msg_check_interval"),
+                "msg_last_checked_at",
+                ("msg_notify_telegram", "msg_notify_email"),
+                "msg_notify_email_to",
+            ),
             "description": (
                 "Читайте та відповідайте на повідомлення покупців DigiKey Marketplace. "
                 "Авто-перевірка: <code>python manage.py check_digikey_messages</code>. "
-                "Налаштування сповіщень (Telegram / Email) — у розділі "
-                "<a href='/admin/config/notificationsettings/1/change/'>Сповіщення → 💬 DigiKey повідомлення</a>."
+                "Telegram-бот та SMTP налаштовуються в "
+                "<a href='/admin/config/notificationsettings/1/change/'>Загальних налаштуваннях сповіщень</a>."
             ),
         }),
         ("🔔 Сповіщення про збої API", {

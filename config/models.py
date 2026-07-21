@@ -742,20 +742,6 @@ class NotificationSettings(models.Model):
         "Місячний звіт: останній", null=True, blank=True,
     )
 
-    # ── DigiKey messages notifications ───────────────────────────────────────
-    dk_msg_notify_telegram = models.BooleanField(
-        "Telegram: нове повідомлення DigiKey", default=True,
-        help_text="Надсилати Telegram при новому повідомленні від покупця DigiKey Marketplace.",
-    )
-    dk_msg_notify_email = models.BooleanField(
-        "Email: нове повідомлення DigiKey", default=False,
-        help_text="Надсилати Email при новому повідомленні від покупця DigiKey Marketplace.",
-    )
-    dk_msg_notify_email_to = models.CharField(
-        "Email-отримувачі (DigiKey повідомлення)", max_length=500, blank=True,
-        help_text="Email-адреси через кому. Якщо порожньо — використовується основний список отримувачів вище.",
-    )
-
     # ── DigiKey unconfirmed shipment alert ────────────────────────────────────
     dk_unconfirmed_alert_enabled = models.BooleanField(
         "Сповіщення: непідтверджена відправка на DigiKey", default=True,
