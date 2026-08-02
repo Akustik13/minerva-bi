@@ -875,6 +875,7 @@ window.MV_GROUPS = [
       { href:'/dashboard/signals/',   icon:'🚨', label:'Сигнали', id:'signals-link' },
       { href:'/dashboard/trends/',    icon:'📈', label:'Тенденції' },
       { href:'/dashboard/analytics/', icon:'🔍', label:'Аналітика' },
+      { href:'/static/minerva_diagrams.html', icon:'🗺', label:'Схеми системи', target:'_blank' },
     ], apps:[] },
   { id:'crm', icon:'👥', label:'👥 CRM',
     links:[
@@ -1269,6 +1270,7 @@ document.addEventListener('DOMContentLoaded', function(){
       a.href = lnk.href;
       a.className = 'mg-link' + (lnk.cls ? ' ' + lnk.cls : '');
       if (lnk.id) a.id = lnk.id;
+      if (lnk.target) a.target = lnk.target;
       a.textContent = lnk.label;
       content.appendChild(a);
     });
