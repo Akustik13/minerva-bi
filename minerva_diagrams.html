@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minerva BI — Схеми системи</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.0/dist/mermaid.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1821;--bg-card:#1a2535;--bg-card2:#111c2b;
+  --text:#c9d8e4;--muted:#9aafbe;--dim:#607d8b;
+  --accent:#4fc3f7;--gold:#e2a84b;--gold-l:#f5cc7a;
+  --border:#243347;--border2:#1a2d40;
+  --ok:#4caf50;--err:#f44336;--warn:#ff9800;
+  --sales:#2d5a2d;--crm:#1e4976;--inv:#5a3a10;
+  --ship:#4a3a6a;--acc:#1e5a3a;--strat:#6a1a3a;
+  --ai:#3a3a7a;--bots:#6a5010;--core:#2a4060;
+  --cfg:#4a3a28;--sys:#3a3a3a;--tasks:#2a5540;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh}
+
+/* HEADER */
+header{background:linear-gradient(135deg,#0d1821 0%,#1a2535 100%);border-bottom:2px solid var(--gold);padding:14px 28px;display:flex;align-items:center;gap:20px}
+header h1{font-size:22px;color:var(--gold);font-weight:800;letter-spacing:2px;text-shadow:0 0 20px rgba(226,168,75,.3)}
+header .sub{color:var(--muted);font-size:12px}
+header .badge{background:rgba(79,195,247,.1);border:1px solid rgba(79,195,247,.3);color:var(--accent);font-size:11px;padding:3px 10px;border-radius:20px;margin-left:auto}
+
+/* TABS */
+.tabs{background:var(--bg-card);border-bottom:1px solid var(--border);display:flex;padding:0 20px;gap:2px;overflow-x:auto}
+.tab-btn{background:none;border:none;color:var(--muted);padding:12px 18px;cursor:pointer;font-size:12.5px;border-bottom:3px solid transparent;transition:all .2s;font-weight:500;white-space:nowrap}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);background:rgba(79,195,247,.05)}
+
+/* CONTENT */
+.tab-pane{display:none;padding:24px;animation:fadeIn .2s ease}
+.tab-pane.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* SECTION TITLE */
+.sec-title{text-align:center;color:var(--gold);font-size:17px;font-weight:700;letter-spacing:2px;margin-bottom:6px}
+.sec-sub{text-align:center;color:var(--muted);font-size:12px;margin-bottom:24px}
+
+/* ARCH DIAGRAM */
+.arch-wrap{max-width:1100px;margin:0 auto}
+.layer{margin-bottom:12px}
+.layer-lbl{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:var(--dim);margin-bottom:8px;padding-left:2px}
+.row{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}
+
+.mod{border-radius:8px;padding:13px 15px;border:1px solid var(--border);flex:1;min-width:130px;transition:border-color .2s,box-shadow .2s;cursor:default}
+.mod:hover{box-shadow:0 0 0 1px var(--accent) inset}
+.mod-name{font-weight:700;font-size:13px;margin-bottom:5px;line-height:1.3}
+.mod-models{font-size:11px;color:var(--muted);line-height:1.7}
+
+/* Module color themes */
+.m-sales{background:#1a2f1a;border-color:var(--sales)}.m-sales .mod-name{color:#81c784}
+.m-crm{background:#122030;border-color:var(--crm)}.m-crm .mod-name{color:#64b5f6}
+.m-inv{background:#201508;border-color:var(--inv)}.m-inv .mod-name{color:#ffb74d}
+.m-ship{background:#18112a;border-color:var(--ship)}.m-ship .mod-name{color:#ce93d8}
+.m-acc{background:#0e1e16;border-color:var(--acc)}.m-acc .mod-name{color:#80cbc4}
+.m-strat{background:#200c18;border-color:var(--strat)}.m-strat .mod-name{color:#f48fb1}
+.m-ai{background:#141428;border-color:var(--ai)}.m-ai .mod-name{color:#9fa8da}
+.m-bots{background:#1e1608;border-color:var(--bots)}.m-bots .mod-name{color:#ffd54f}
+.m-core{background:#0e1828;border-color:var(--core)}.m-core .mod-name{color:#4fc3f7}
+.m-cfg{background:#1a1510;border-color:var(--cfg)}.m-cfg .mod-name{color:#bcaaa4}
+.m-sys{background:#141414;border-color:var(--sys)}.m-sys .mod-name{color:#bdbdbd}
+.m-dash{background:#160e26;border-color:#503a7a}.m-dash .mod-name{color:#b39ddb}
+.m-tasks{background:#0e1e18;border-color:var(--tasks)}.m-tasks .mod-name{color:#a5d6a7}
+.m-api{background:#1a1608;border-color:#5a4a28}.m-api .mod-name{color:#ffcc80}
+.m-imp{background:#0e180e;border-color:#2a5028}.m-imp .mod-name{color:#c8e6c9}
+
+/* Connectors between layers */
+.conn-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;align-items:center;margin:10px 0;min-height:28px}
+.conn{font-size:11px;color:var(--muted);background:var(--bg-card);border:1px solid var(--border2);border-radius:20px;padding:3px 12px;white-space:nowrap}
+.conn-arrow{color:var(--dim);font-size:18px;margin:0 4px}
+
+/* External systems */
+.ext-row{display:flex;gap:10px;flex-wrap:wrap}
+.ext{border:1px dashed #333;border-radius:6px;padding:10px 14px;background:#0a0e12}
+.ext-name{font-weight:600;font-size:12px;color:#777}
+.ext-desc{font-size:11px;color:#444;margin-top:2px}
+
+/* MERMAID */
+.merm-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:24px;overflow-x:auto;margin-bottom:20px}
+.mermaid{text-align:center}
+
+/* Signals grid */
+.sig-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-bottom:24px}
+.sig-card{background:var(--bg-card);border:1px solid var(--border);border-radius:8px;padding:14px 16px;border-left:3px solid var(--accent)}
+.sig-evt{font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px}
+.sig-body{font-size:11.5px;color:var(--muted);line-height:1.7}
+.sig-arrow{color:var(--gold);margin:0 4px}
+.sig-target{color:var(--text);font-weight:600}
+
+/* Legend */
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:20px;padding:12px 16px;background:rgba(255,255,255,.02);border-radius:8px;border:1px solid var(--border)}
+.leg-item{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+.leg-dot{width:11px;height:11px;border-radius:3px;flex-shrink:0}
+
+hr.sep{border:none;border-top:1px solid var(--border);margin:24px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>⚜ MINERVA BI</h1>
+    <div class="sub">Архітектурні схеми системи</div>
+  </div>
+  <div class="badge">Django 5.2 · PostgreSQL 16 · 18 apps · 60+ моделей</div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="sw('arch',this)">🏗 Архітектура</button>
+  <button class="tab-btn" onclick="sw('sales',this)">🛒 Продажі &amp; CRM</button>
+  <button class="tab-btn" onclick="sw('inv',this)">📦 Склад &amp; Постачання</button>
+  <button class="tab-btn" onclick="sw('ship',this)">🚚 Доставка</button>
+  <button class="tab-btn" onclick="sw('sys',this)">🔐 Система &amp; Auth</button>
+  <button class="tab-btn" onclick="sw('flow',this)">⚡ Потік даних</button>
+</div>
+
+<!-- ═══════════════════════ TAB 1: ARCHITECTURE ═══════════════════════ -->
+<div id="tab-arch" class="tab-pane active">
+<div class="arch-wrap">
+  <div class="sec-title">⚜ MINERVA BI — КАРТА МОДУЛІВ</div>
+  <div class="sec-sub">Всі 18 Django-додатків та їх місце в системі</div>
+
+  <!-- External -->
+  <div class="layer">
+    <div class="layer-lbl">🌐 Зовнішні системи та API</div>
+    <div class="ext-row">
+      <div class="ext"><div class="ext-name">DigiKey API</div><div class="ext-desc">Marketplace · лістинги · ціни · замовлення</div></div>
+      <div class="ext"><div class="ext-name">Anthropic Claude</div><div class="ext-desc">LLM · tool use · AI аналіз</div></div>
+      <div class="ext"><div class="ext-name">Telegram Bot API</div><div class="ext-desc">Повідомлення · AI чат · алерти</div></div>
+      <div class="ext"><div class="ext-name">DHL / UPS / FedEx</div><div class="ext-desc">Відправлення · трекінг · мітки</div></div>
+      <div class="ext"><div class="ext-name">SMTP / IMAP</div><div class="ext-desc">Email повідомлення · inbox sync</div></div>
+      <div class="ext"><div class="ext-name">Nova Poshta API</div><div class="ext-desc">Служба доставки (UA)</div></div>
+    </div>
+  </div>
+
+  <div class="conn-row">
+    <span class="conn">↕ DigiKey sync → Bots</span>
+    <span class="conn">↕ AI responses → ai_assistant</span>
+    <span class="conn">↕ Email alerts → config/notifications</span>
+    <span class="conn">↕ carrier API → shipping</span>
+  </div>
+
+  <!-- Bots + AI + AutoImport -->
+  <div class="layer">
+    <div class="layer-lbl">🤖 Інтеграції та автоматизація</div>
+    <div class="row">
+      <div class="mod m-bots" style="flex:1.5">
+        <div class="mod-name">🤖 Bots</div>
+        <div class="mod-models">DigiKeyConfig · DigiKeyListing<br>DigiKeyPriceLog · AIAnalysisLog<br>Bot · BotLog · BotTask<br>DigiKeyMessageSeen</div>
+      </div>
+      <div class="mod m-ai" style="flex:1.5">
+        <div class="mod-name">🧠 AI Assistant</div>
+        <div class="mod-models">AIConversation · AIMessage<br>AIBudgetLog · AISettings<br>Telegram polling bot<br>WebChat · Tool use loop</div>
+      </div>
+      <div class="mod m-imp" style="flex:1">
+        <div class="mod-name">📥 AutoImport</div>
+        <div class="mod-models">AutoImportProfile<br>AutoImportLog<br>Sales / Products<br>Receipt / Adjust</div>
+      </div>
+      <div class="mod m-cfg" style="flex:1.5">
+        <div class="mod-name">🔔 Notifications</div>
+        <div class="mod-models">NotificationSettings<br>Email · Telegram alerts<br>Digests · Customer notify<br>dashboard/notifications.py</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn-row">
+    <span class="conn">Bots → Inventory (Product O2O)</span>
+    <span class="conn">Bots → Sales (order import)</span>
+    <span class="conn">AI → Sales/CRM/Inventory (tool use)</span>
+    <span class="conn">AutoImport → Sales + Inventory</span>
+  </div>
+
+  <!-- MAIN BUSINESS CORE -->
+  <div class="layer">
+    <div class="layer-lbl">💼 Основний бізнес-шар</div>
+    <div class="row">
+      <div class="mod m-crm">
+        <div class="mod-name">👥 CRM</div>
+        <div class="mod-models">Customer · CustomerNote<br>CustomerTimeline<br>RFM-аналіз (computed)<br>SHA256 external_key</div>
+      </div>
+      <div class="mod m-sales">
+        <div class="mod-name">🛒 Sales</div>
+        <div class="mod-models">SalesOrder · SalesOrderLine<br>SalesSource · SalesSettings<br>PDF: Invoice/CN23/Proforma<br>Excel import</div>
+      </div>
+      <div class="mod m-inv">
+        <div class="mod-name">📦 Inventory</div>
+        <div class="mod-models">Product · InventoryTransaction<br>Location · ProductAlias<br>Supplier · PurchaseOrder<br>InventorySettings</div>
+      </div>
+      <div class="mod m-ship">
+        <div class="mod-name">🚚 Shipping</div>
+        <div class="mod-models">Carrier · Shipment<br>ShipmentPackage · Tracking<br>PackagingMaterial<br>AddressBook · Invoice</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn-row">
+    <span class="conn">CRM ←→ Sales (signals: RFM sync on order save)</span>
+    <span class="conn">Sales → Inventory (SalesOrderLine.product FK + stock deduct)</span>
+    <span class="conn">Sales → Shipping (Shipment.order FK)</span>
+    <span class="conn">Sales → Accounting (Invoice.order FK)</span>
+  </div>
+
+  <!-- SECONDARY BUSINESS -->
+  <div class="layer">
+    <div class="layer-lbl">📊 Вторинний бізнес-шар</div>
+    <div class="row">
+      <div class="mod m-strat">
+        <div class="mod-name">♟ Strategy</div>
+        <div class="mod-models">StrategyTemplate · TemplateStep<br>CustomerStrategy · CustomerStep<br>StepLog · Canvas SVG<br>AI Advisor stub</div>
+      </div>
+      <div class="mod m-acc">
+        <div class="mod-name">💰 Accounting</div>
+        <div class="mod-models">Invoice · InvoiceLine · Payment<br>Expense · ExpenseCategory<br>CompanySettings<br>EU invoice numbering</div>
+      </div>
+      <div class="mod m-tasks">
+        <div class="mod-name">✅ Tasks</div>
+        <div class="mod-models">Task<br>→ SalesOrder<br>→ Customer<br>→ Product · CustomerNote</div>
+      </div>
+      <div class="mod m-dash">
+        <div class="mod-name">📈 Dashboard</div>
+        <div class="mod-models">Analytics · Tile pages<br>Chart.js 4.4<br>Revenue · KPIs · Signals<br>Filters: date/source/cat</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn-row">
+    <span class="conn">Strategy → CRM (CustomerStrategy.customer)</span>
+    <span class="conn">Accounting → Sales+CRM (Invoice refs)</span>
+    <span class="conn">Dashboard ← ALL modules (read aggregations)</span>
+    <span class="conn">Tasks → Sales/CRM/Inventory (cross-module links)</span>
+  </div>
+
+  <!-- UTILITIES -->
+  <div class="layer">
+    <div class="layer-lbl">🔧 Утиліти та сервіси</div>
+    <div class="row">
+      <div class="mod m-api">
+        <div class="mod-name">🔌 REST API</div>
+        <div class="mod-models">APIKey · Scopes<br>Orders/Products/Customers<br>Per-key scope auth<br>/api/v1/</div>
+      </div>
+      <div class="mod m-sys">
+        <div class="mod-name">🏷 Labels</div>
+        <div class="mod-models">DYMO 30252/30334<br>Cable label PDF<br>Barcode generation<br>ReportLab</div>
+      </div>
+      <div class="mod m-sys">
+        <div class="mod-name">💾 Backup</div>
+        <div class="mod-models">BackupSettings · BackupLog<br>DB / Media / Full<br>Encrypted .mbackup<br>Fernet + PBKDF2HMAC</div>
+      </div>
+      <div class="mod m-sys">
+        <div class="mod-name">❓ FAQ</div>
+        <div class="mod-models">managed=False (no DB)<br>Accordion docs<br>Support форма<br>localStorage notes</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="conn-row">
+    <span class="conn-arrow">↓</span>
+    <span class="conn">Config налаштовує всі модулі · Core авторизує всі запити</span>
+    <span class="conn-arrow">↓</span>
+  </div>
+
+  <!-- FOUNDATION -->
+  <div class="layer">
+    <div class="layer-lbl">🏛 Фундамент системи</div>
+    <div class="row">
+      <div class="mod m-cfg" style="flex:2">
+        <div class="mod-name">⚙ Config (Singleton моделі)</div>
+        <div class="mod-models">SystemSettings · DocumentSettings · ThemeSettings (23 CSS vars)<br>NotificationSettings · BriefingSettings</div>
+      </div>
+      <div class="mod m-core" style="flex:3">
+        <div class="mod-name">🔐 Core / Auth (3-рівнева система доступу)</div>
+        <div class="mod-models">
+          User · UserProfile (roles) · ModuleBundle (M2M) · ModuleRegistry · TenantAccount<br>
+          AuditLog · AuditableMixin · ModuleAccessMiddleware · context_processors · signals
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:#2d5a2d"></div>Sales</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#1e4976"></div>CRM</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#5a3a10"></div>Inventory</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#4a3a6a"></div>Shipping</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#1e5a3a"></div>Accounting</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#6a1a3a"></div>Strategy</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#3a3a7a"></div>AI Assistant</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#6a5010"></div>Bots</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#2a4060"></div>Core/System</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#4a3a28"></div>Config</div>
+    <div class="leg-item"><div class="leg-dot" style="background:#2a5540"></div>Tasks</div>
+  </div>
+</div>
+</div>
+
+<!-- ═══════════════════════ TAB 2: SALES & CRM ═══════════════════════ -->
+<div id="tab-sales" class="tab-pane">
+  <div class="sec-title">Продажі та CRM — схема зв'язків</div>
+  <div class="sec-sub">SalesOrder, Customer, Strategy, Tasks та пов'язані моделі</div>
+  <div class="merm-wrap">
+<div class="mermaid">
+erDiagram
+    Customer {
+        string external_key PK
+        string name
+        string email
+        string segment
+        string status
+        string source
+    }
+    CustomerNote {
+        int id PK
+        string note_type
+        string subject
+        text body
+        date due_date
+    }
+    CustomerTimeline {
+        int id PK
+        string event_type
+        string title
+        int related_order_id
+        bool is_pinned
+    }
+    SalesOrder {
+        int id PK
+        string order_number
+        string source
+        string status
+        string customer_key
+        date order_date
+        date shipping_deadline
+        bool affects_stock
+        bool is_flagged
+    }
+    SalesOrderLine {
+        int id PK
+        decimal qty
+        decimal unit_price
+        decimal total_price
+        string currency
+    }
+    SalesSource {
+        int id PK
+        string slug UK
+        string name
+        string color
+    }
+    Product {
+        string sku PK
+        string name
+        decimal sale_price
+        int reorder_point
+    }
+    Task {
+        int id PK
+        string title
+        string status
+        string priority
+        date due_date
+    }
+    StrategyTemplate {
+        int id PK
+        string name
+        string behavior_type
+        bool is_active
+    }
+    TemplateStep {
+        int id PK
+        string step_type
+        string title
+        int delay_days
+        int order
+    }
+    CustomerStrategy {
+        int id PK
+        string name
+        string status
+        datetime next_action_at
+    }
+    CustomerStep {
+        int id PK
+        string title
+        string outcome
+        datetime scheduled_at
+    }
+    StepLog {
+        int id PK
+        string outcome
+        text notes
+        datetime logged_at
+    }
+    InvoiceAcc {
+        int id PK
+        string number UK
+        string status
+        decimal total
+        date due_date
+    }
+    InvoiceLine {
+        int id PK
+        string description
+        decimal quantity
+        decimal unit_price
+    }
+    Payment {
+        int id PK
+        date date
+        decimal amount
+        string method
+    }
+
+    Customer ||--o{ CustomerNote : "нотатки"
+    Customer ||--o{ CustomerTimeline : "хронологія"
+    Customer ||--o{ CustomerStrategy : "стратегії"
+    Customer ||--o{ Task : "задачі"
+    Customer ||--o{ InvoiceAcc : "рахунки"
+
+    SalesOrder }o..|| Customer : "customer_key →"
+    SalesOrder ||--o{ SalesOrderLine : "рядки"
+    SalesOrder ||--o{ Task : "задачі"
+    SalesOrder ||--o| InvoiceAcc : "виставлено"
+
+    SalesOrderLine }o--|| Product : "товар"
+
+    StrategyTemplate ||--o{ TemplateStep : "кроки"
+    TemplateStep }o--o| TemplateStep : "наступний крок"
+    StrategyTemplate ||--o{ CustomerStrategy : "запущена як"
+    CustomerStrategy }o--|| Customer : "для клієнта"
+    CustomerStrategy ||--o{ CustomerStep : "кроки"
+    CustomerStrategy }o--o| CustomerStep : "поточний крок"
+    CustomerStep ||--o{ StepLog : "лог"
+
+    InvoiceAcc ||--o{ InvoiceLine : "позиції"
+    InvoiceAcc ||--o{ Payment : "оплати"
+    InvoiceLine }o--o| Product : "товар"
+
+    Task }o--o| CustomerNote : "пов'язана нотатка"
+</div>
+  </div>
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--crm)"></div>Customer — центральна сутність CRM, зв'язок з SalesOrder через customer_key (VARCHAR, не FK)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--sales)"></div>SalesOrder.affects_stock=True — потрапляє в Dashboard. Signals → RFM recalc при збереженні</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--strat)"></div>Strategy: TemplateStep → self-FK для гілок yes/no (decision tree)</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ TAB 3: INVENTORY ═══════════════════════ -->
+<div id="tab-inv" class="tab-pane">
+  <div class="sec-title">Склад та Постачання — схема зв'язків</div>
+  <div class="sec-sub">Product, InventoryTransaction, Supplier, PurchaseOrder, DigiKey</div>
+  <div class="merm-wrap">
+<div class="mermaid">
+erDiagram
+    Product {
+        string sku PK
+        string name
+        string category
+        string kind
+        decimal purchase_price
+        decimal sale_price
+        int reorder_point
+        int lead_time_days
+        bool is_active
+        string hs_code
+        decimal net_weight_g
+    }
+    ProductCategory {
+        int id PK
+        string slug UK
+        string name
+        string customs_hs_code
+        string color
+    }
+    ProductAlias {
+        int id PK
+        string alias UK
+    }
+    ProductComponent {
+        int id PK
+        decimal qty_per
+        bool optional
+        string note
+    }
+    Location {
+        int id PK
+        string code UK
+        string name
+    }
+    InventoryTransaction {
+        int id PK
+        string tx_type
+        decimal qty
+        string ref_doc
+        string external_key UK
+        datetime tx_date
+    }
+    Supplier {
+        int id PK
+        string name UK
+        string email
+        string currency
+        string payment_terms
+    }
+    PurchaseOrder {
+        int id PK
+        string code UK
+        string status
+        date order_date
+        date expected_date
+        decimal total_price
+        string currency
+    }
+    PurchaseOrderLine {
+        int id PK
+        decimal qty_ordered
+        decimal qty_received
+        decimal unit_price
+        string currency
+    }
+    IncomingShipment {
+        int id PK
+        string status
+        string tracking_number
+        date expected_date
+        json tracking_events
+    }
+    DigiKeyListing {
+        int id PK
+        string dk_product_id
+        string sync_status
+        json dk_prices
+        float dk_price_min
+        float price_delta_pct
+        datetime last_synced_at
+    }
+    DigiKeyPriceLog {
+        int id PK
+        float delta_pct
+        json old_prices
+        json new_prices
+        datetime applied_at
+    }
+    AIAnalysisLog {
+        int id PK
+        int quality_score
+        string strategy
+        bool prices_applied
+        datetime run_at
+    }
+    RFQEmailTemplate {
+        int id PK
+        string name
+        string subject
+        bool use_cable_columns
+    }
+    PackagingMaterial {
+        int id PK
+        string name
+        string box_type
+        decimal tare_weight_kg
+        decimal max_weight_kg
+    }
+    ProductPackaging {
+        int id PK
+        int qty_per_box
+        bool is_default
+        int estimated_weight_g
+    }
+
+    Product ||--o{ ProductAlias : "псевдоніми"
+    Product ||--o{ ProductComponent : "компоненти (parent)"
+    ProductComponent }o--|| Product : "компонент (ref)"
+    Product ||--o{ InventoryTransaction : "транзакції"
+    Product ||--|| DigiKeyListing : "DK лістинг (O2O)"
+    Product ||--o{ ProductPackaging : "упаковки"
+    Product ||--o{ PurchaseOrderLine : "рядки закупівлі"
+
+    InventoryTransaction }o--|| Location : "місце зберігання"
+
+    Supplier ||--o{ PurchaseOrder : "виконує"
+    PurchaseOrder ||--o{ PurchaseOrderLine : "позиції"
+    PurchaseOrder ||--o{ IncomingShipment : "відправлення"
+    PurchaseOrderLine }o--o| Product : "товар"
+
+    DigiKeyListing ||--o{ DigiKeyPriceLog : "зміни цін"
+    DigiKeyListing ||--o{ AIAnalysisLog : "AI аналізи"
+
+    ProductCategory ||--o{ RFQEmailTemplate : "шаблон RFQ"
+    ProductPackaging }o--|| PackagingMaterial : "матеріал"
+</div>
+  </div>
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--inv)"></div>Product.sku — primary key (рядок, unique). Центральна сутність складу</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--bots)"></div>DigiKeyListing — O2O з Product через SET_NULL. Sync: DigiKey API → local inventory</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--acc)"></div>ProductComponent: self-referential BOM (Bill of Materials) — parent→children components</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--ship)"></div>IncomingShipment.purchase_order nullable — можна додати поза PO</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ TAB 4: SHIPPING ═══════════════════════ -->
+<div id="tab-ship" class="tab-pane">
+  <div class="sec-title">Доставка — схема зв'язків</div>
+  <div class="sec-sub">Carrier, Shipment, Packaging, Tracking, AddressBook</div>
+  <div class="merm-wrap">
+<div class="mermaid">
+erDiagram
+    Carrier {
+        int id PK
+        string name
+        string carrier_type
+        bool is_active
+        bool is_default
+        string api_key
+        string sender_name
+        string sender_country
+    }
+    Shipment {
+        int id PK
+        string status
+        string tracking_number
+        string carrier_shipment_id
+        decimal weight_kg
+        decimal declared_value
+        string export_reason
+        string insurance_type
+        bool carrier_delayed
+        json customs_articles
+        datetime created_at
+    }
+    ShipmentPackage {
+        int id PK
+        decimal weight_kg
+        decimal length_cm
+        decimal width_cm
+        decimal height_cm
+        int quantity
+    }
+    TrackingRule {
+        int id PK
+        string carrier_type
+        string tracker
+        bool enabled
+        int interval_override
+        string tracking_number_prefix
+    }
+    TrackingAttemptLog {
+        int id PK
+        string tracker
+        bool success
+        string status_found
+        string error
+        int duration_ms
+        datetime created_at
+    }
+    PackagingMaterial {
+        int id PK
+        string name
+        string box_type
+        decimal tare_weight_kg
+        decimal max_weight_kg
+        decimal cost
+    }
+    OrderPackaging {
+        int id PK
+        int qty_boxes
+        int actual_weight_g
+        datetime created_at
+    }
+    AddressBook {
+        int id PK
+        string name
+        string company
+        string category
+        bool is_sender
+        string addr_country
+        int use_count
+    }
+    ShippingInvoice {
+        int id PK
+        string invoice_number UK
+        string digikey_order_no
+        decimal total_amount
+        json line_items
+        string docx_file
+    }
+    SalesOrder {
+        int id PK
+        string order_number
+        string status
+        string client
+    }
+    ShippingSettings {
+        int id PK
+        bool auto_tracking_enabled
+        bool delay_notify_enabled
+        int tracking_interval_minutes
+    }
+
+    Carrier ||--o{ Shipment : "перевозить"
+    Shipment }o--o| SalesOrder : "замовлення (nullable)"
+    Shipment ||--o{ ShipmentPackage : "пакунки"
+    Shipment ||--o{ TrackingAttemptLog : "спроби трекінгу"
+
+    SalesOrder ||--o{ OrderPackaging : "використана упаковка"
+    OrderPackaging }o--|| PackagingMaterial : "матеріал"
+
+    ShippingInvoice }o--o| SalesOrder : "для замовлення"
+</div>
+  </div>
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--ship)"></div>Shipment.order nullable — можна створити відправлення без замовлення (blank shipment)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--sys)"></div>TrackingRule — визначає який tracker/API використовувати для якого carrier_type</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--acc)"></div>ShippingInvoice (shipping.Invoice) — окрема від accounting.Invoice, для DigiKey документів</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--inv)"></div>PackagingMaterial — shared між Shipping (OrderPackaging) та Inventory (ProductPackaging)</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ TAB 5: SYSTEM & AUTH ═══════════════════════ -->
+<div id="tab-sys" class="tab-pane">
+  <div class="sec-title">Система та Авторизація — схема зв'язків</div>
+  <div class="sec-sub">User, UserProfile, Roles, Modules, Audit, Bots, AI</div>
+  <div class="merm-wrap">
+<div class="mermaid">
+erDiagram
+    User {
+        int id PK
+        string username UK
+        string email
+        bool is_staff
+        bool is_superuser
+    }
+    UserProfile {
+        int id PK
+        string role
+        bool ai_enabled
+        bigint telegram_id UK
+        string ai_assistant_role
+        json allowed_modules
+        json denied_models
+        string theme
+        bool can_delete
+        bool can_export
+        bool can_import
+        bool can_view_audit
+        string ai_model
+    }
+    ModuleBundle {
+        int id PK
+        string name UK
+        string color
+        bool is_system
+    }
+    ModuleRegistry {
+        int id PK
+        string app_label UK
+        string name
+        string tier
+        bool is_active
+        int order
+    }
+    TenantAccount {
+        int id PK
+        string status
+        string package
+        date trial_ends_at
+        json active_modules
+        string company_name
+        bool email_verified
+    }
+    AuditLog {
+        int id PK
+        string action
+        string object_repr
+        string object_id
+        string ip_address
+        json extra
+        datetime timestamp
+    }
+    APIKey {
+        int id PK
+        string name
+        string key UK
+        json scopes
+        bool is_active
+        date expires_at
+    }
+    Bot {
+        int id PK
+        string name
+        string bot_type
+        bool is_active
+        bool schedule_enabled
+        string schedule_cron
+        int total_runs
+        int success_runs
+    }
+    BotLog {
+        int id PK
+        string level
+        text message
+        json details
+        int items_processed
+        datetime started_at
+    }
+    AIConversation {
+        int id PK
+        string channel
+        string telegram_chat_id
+        datetime last_message_at
+        int total_input_tokens
+        decimal total_cost_usd
+    }
+    AIMessage {
+        int id PK
+        string role
+        text content
+        string tool_name
+        string model_used
+        decimal cost_usd
+        datetime created_at
+    }
+    AIBudgetLog {
+        int id PK
+        int year
+        int month
+        decimal total_cost_usd
+        int total_requests
+        bool alert_sent
+    }
+    AutoImportProfile {
+        int id PK
+        string name
+        string import_type
+        string source_path
+        string file_mask
+        bool enabled
+        json column_map
+    }
+    AutoImportLog {
+        int id PK
+        datetime ran_at
+        string status
+        int records_created
+        int records_updated
+        string file_hash
+    }
+    BackupLog {
+        int id PK
+        string backup_type
+        string status
+        string file_path
+        bigint file_size
+        datetime created_at
+    }
+
+    User ||--|| UserProfile : "профіль (O2O)"
+    User ||--o{ AuditLog : "дії"
+    User ||--o| TenantAccount : "tenant owner (O2O)"
+    User ||--o{ Bot : "створив"
+
+    UserProfile }o--o| ModuleBundle : "пакет доступу"
+    ModuleBundle }o--o{ ModuleRegistry : "містить модулі (M2M)"
+
+    UserProfile ||--o{ AIConversation : "AI чати"
+    AIConversation ||--o{ AIMessage : "повідомлення"
+
+    Bot ||--o{ BotLog : "логи виконання"
+
+    AutoImportProfile ||--o{ AutoImportLog : "логи запусків"
+</div>
+  </div>
+  <div class="legend">
+    <div class="leg-item"><div class="leg-dot" style="background:var(--core)"></div>3-рівнева система: ModuleRegistry (global) → ModuleBundle/UserProfile (per-user) → Django Auth (per-model CRUD)</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--ai)"></div>UserProfile.can_* поля: None = use role default; True/False = override</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--bots)"></div>Bot.schedule_cron — regex validated cron expression; can_run() checks schedule + is_active</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--cfg)"></div>TenantAccount — stub для майбутнього multi-tenant (поки що не підключений до MIDDLEWARE)</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ TAB 6: DATA FLOW ═══════════════════════ -->
+<div id="tab-flow" class="tab-pane">
+  <div class="sec-title">⚡ Потік даних та Django Signals</div>
+  <div class="sec-sub">Як модулі обмінюються даними та які події тригерять які дії</div>
+
+  <!-- Signals grid -->
+  <div class="sig-grid">
+    <div class="sig-card">
+      <div class="sig-evt">SalesOrder · post_save</div>
+      <div class="sig-body">
+        <span>crm/signals.py</span><span class="sig-arrow">→</span><span class="sig-target">Customer RFM recalc</span><br>
+        Оновлює: segment, rfm_score<br>
+        Створює: CustomerTimeline event<br>
+        Якщо новий order → notify_new_order()
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">SalesOrder · pre_save</div>
+      <div class="sig-body">
+        <span>crm/signals.py</span><span class="sig-arrow">→</span><span class="sig-target">_capture_old_status</span><br>
+        Зберігає instance._old_status<br>
+        Використовується в post_save<br>
+        для порівняння зміни статусу
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">SalesOrder · status змінився</div>
+      <div class="sig-body">
+        <span>dashboard/notifications.py</span><span class="sig-arrow">→</span><span class="sig-target">notify_status_change()</span><br>
+        Email + Telegram алерт<br>
+        Перевіряє NotificationSettings<br>
+        Anti-spam: alert_min_interval_hours
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">StepLog · post_save</div>
+      <div class="sig-body">
+        <span>strategy/signals.py</span><span class="sig-arrow">→</span><span class="sig-target">advance_step()</span><br>
+        Позначає CustomerStep done<br>
+        Перехід до next_step_yes/no<br>
+        При done → rfm_score() update
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">User · post_save</div>
+      <div class="sig-body">
+        <span>core/signals.py</span><span class="sig-arrow">→</span><span class="sig-target">auto-create UserProfile</span><br>
+        Встановлює is_staff=True<br>
+        Роль за замовчуванням: manager<br>
+        sync_user_staff_flag()
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">User · login / logout</div>
+      <div class="sig-body">
+        <span>core/signals.py</span><span class="sig-arrow">→</span><span class="sig-target">AuditLog.log()</span><br>
+        action = 'login' / 'logout'<br>
+        Записує IP адресу<br>
+        via user_logged_in/out signals
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">AuditableMixin · save / delete</div>
+      <div class="sig-body">
+        <span>core/mixins.py</span><span class="sig-arrow">→</span><span class="sig-target">AuditLog create/update/delete</span><br>
+        Для: Customer, SalesOrder<br>
+        Product, InventoryTransaction<br>
+        Shipment, CustomerStrategy
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">DigiKey sync (cron / manual)</div>
+      <div class="sig-body">
+        <span>bots/tasks.py</span><span class="sig-arrow">→</span><span class="sig-target">DigiKeyListing ↔ Product</span><br>
+        Оновлення цін, кількості<br>
+        notify_sync_result() → Email+TG<br>
+        sync_skip_if_no_changes check
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">Shipment tracking (cron)</div>
+      <div class="sig-body">
+        <span>shipping/tracking.py</span><span class="sig-arrow">→</span><span class="sig-target">TrackingAttemptLog + status update</span><br>
+        Запит до carrier/DHL API<br>
+        Оновлює Shipment.status<br>
+        Delay notify якщо carrier_delayed
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">AutoImport (cron)</div>
+      <div class="sig-body">
+        <span>manage.py auto_import</span><span class="sig-arrow">→</span><span class="sig-target">Sales / Inventory</span><br>
+        Тип: sales/products/receipt/adjust<br>
+        Обробляє Excel файли<br>
+        Записує AutoImportLog
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">AI Tool Use (chat)</div>
+      <div class="sig-body">
+        <span>ai_assistant/service.py</span><span class="sig-arrow">→</span><span class="sig-target">Query modules</span><br>
+        get_orders / get_customers<br>
+        get_inventory / get_analytics<br>
+        max 5 iterations, budget guard
+      </div>
+    </div>
+    <div class="sig-card">
+      <div class="sig-evt">Digest / Briefing (cron)</div>
+      <div class="sig-body">
+        <span>config/NotificationSettings</span><span class="sig-arrow">→</span><span class="sig-target">Email + Telegram</span><br>
+        Daily/Weekly/Monthly digest<br>
+        Порядок відвантажень, дедлайни<br>
+        skip_weekends / skip_holidays
+      </div>
+    </div>
+  </div>
+
+  <hr class="sep">
+
+  <!-- Data flow mermaid -->
+  <div class="sec-title" style="margin-bottom:6px">Діаграма потоку даних</div>
+  <div class="sec-sub">Напрямки передачі даних між модулями Minerva</div>
+  <div class="merm-wrap">
+<div class="mermaid">
+flowchart TD
+    subgraph EXT["🌐 Зовнішні системи"]
+        DK["DigiKey API"]
+        ANT["Anthropic Claude"]
+        TG_API["Telegram Bot API"]
+        SMTP["SMTP / IMAP"]
+        DHL["DHL · Carrier APIs"]
+    end
+
+    subgraph INT["🤖 Інтеграції"]
+        BOTS["Bots\n(DigiKeyListing)"]
+        AIMOD["AI Assistant\n(tool use loop)"]
+        AUTOIMP["AutoImport"]
+        NOTIF["Notifications\n(dashboard/notifications.py)"]
+    end
+
+    subgraph BIZ["💼 Бізнес-ядро"]
+        SALES["Sales\nSalesOrder + Lines"]
+        CRM["CRM\nCustomer · RFM"]
+        INV["Inventory\nProduct · Transactions"]
+        SHIP["Shipping\nShipment · Carrier"]
+    end
+
+    subgraph SEC["📊 Вторинний шар"]
+        STRAT["Strategy\nTemplates · Steps"]
+        ACC["Accounting\nInvoice · Payment"]
+        TASKS["Tasks"]
+        DASH["Dashboard\nAnalytics · Charts"]
+    end
+
+    subgraph SYS["🏛 Фундамент"]
+        CORE["Core / Auth\nAuditLog · UserProfile"]
+        CONF["Config\nSettings · Theme"]
+    end
+
+    DK -->|"listings sync"| BOTS
+    ANT -->|"LLM responses"| AIMOD
+    TG_API <-->|"bot messages"| AIMOD
+    TG_API <-->|"alerts"| NOTIF
+    SMTP <-->|"email"| NOTIF
+    DHL -->|"tracking events"| SHIP
+
+    BOTS -->|"Product O2O update"| INV
+    BOTS -->|"order status sync"| SALES
+    AUTOIMP -->|"create orders"| SALES
+    AUTOIMP -->|"update stock"| INV
+    AIMOD -->|"read orders"| SALES
+    AIMOD -->|"read customers"| CRM
+    AIMOD -->|"read stock"| INV
+
+    SALES -->|"post_save signal → RFM"| CRM
+    SALES -->|"SalesOrderLine.product"| INV
+    SALES -->|"Shipment.order FK"| SHIP
+    SALES -->|"Invoice.order FK"| ACC
+    SALES -->|"new order / status change"| NOTIF
+
+    CRM -->|"CustomerStrategy.customer"| STRAT
+    CRM -->|"Invoice.customer"| ACC
+    STRAT -->|"rfm_score() on done"| CRM
+
+    SHIP -->|"shipment events"| NOTIF
+    SHIP -->|"DHL API calls"| DHL
+
+    SALES & CRM & INV & SHIP -->|"aggregations"| DASH
+    TASKS -->|"links"| SALES
+    TASKS -->|"links"| CRM
+
+    CORE -->|"auth · audit · middleware"| SALES
+    CORE -->|"auth · audit · middleware"| CRM
+    CORE -->|"auth · audit · middleware"| INV
+    CONF -->|"system settings"| NOTIF
+    CONF -->|"doc settings"| SALES
+
+    style EXT fill:#0a0e12,stroke:#333,color:#666
+    style INT fill:#0d1015,stroke:#2a2010,color:#c9d8e4
+    style BIZ fill:#0d1015,stroke:#1e4040,color:#c9d8e4
+    style SEC fill:#0d1015,stroke:#243347,color:#c9d8e4
+    style SYS fill:#0e1828,stroke:#2a4060,color:#4fc3f7
+</div>
+  </div>
+</div>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#1a2535',
+    primaryTextColor: '#c9d8e4',
+    primaryBorderColor: '#243347',
+    lineColor: '#4fc3f7',
+    secondaryColor: '#243347',
+    tertiaryColor: '#0d1821',
+    background: '#0d1821',
+    mainBkg: '#1a2535',
+    nodeBorder: '#243347',
+    clusterBkg: '#111c2b',
+    titleColor: '#e2a84b',
+    edgeLabelBackground: '#1a2535',
+    attributeBackgroundColorEven: '#1a2535',
+    attributeBackgroundColorOdd: '#111c2b',
+    fontFamily: 'Segoe UI, system-ui, sans-serif',
+  },
+  er: {
+    diagramPadding: 20,
+    layoutDirection: 'TB',
+    minEntityWidth: 100,
+    minEntityHeight: 75,
+    entityPadding: 15,
+    useMaxWidth: true
+  },
+  flowchart: {
+    useMaxWidth: true,
+    htmlLabels: false,
+    curve: 'basis'
+  }
+});
+
+function sw(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+</body>
+</html>
