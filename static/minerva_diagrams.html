@@ -428,6 +428,7 @@ erDiagram
     SalesOrder ||--o| InvoiceAcc : "виставлено"
 
     SalesOrderLine }o--|| Product : "товар"
+    SalesOrder }o--|| SalesSource : "source"
 
     StrategyTemplate ||--o{ TemplateStep : "кроки"
     StrategyTemplate ||--o{ CustomerStrategy : "запущена як"
