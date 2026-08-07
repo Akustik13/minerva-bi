@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Minerva BI — Схеми системи</title>
+<script>
+function sw(id, btn) {
+  document.querySelectorAll('.tab-pane').forEach(function(el){ el.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(el){ el.classList.remove('active'); });
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -642,14 +650,6 @@ erDiagram
         decimal height_cm
         int quantity
     }
-    TrackingRule {
-        int id PK
-        string carrier_type
-        string tracker
-        bool enabled
-        int interval_override
-        string tracking_number_prefix
-    }
     TrackingAttemptLog {
         int id PK
         string tracker
@@ -673,15 +673,6 @@ erDiagram
         int actual_weight_g
         datetime created_at
     }
-    AddressBook {
-        int id PK
-        string name
-        string company
-        string category
-        bool is_sender
-        string addr_country
-        int use_count
-    }
     ShippingInvoice {
         int id PK
         string invoice_number UK
@@ -696,13 +687,6 @@ erDiagram
         string status
         string client
     }
-    ShippingSettings {
-        int id PK
-        bool auto_tracking_enabled
-        bool delay_notify_enabled
-        int tracking_interval_minutes
-    }
-
     Carrier ||--o{ Shipment : "перевозить"
     Shipment }o--o| SalesOrder : "замовлення (nullable)"
     Shipment ||--o{ ShipmentPackage : "пакунки"
@@ -826,14 +810,6 @@ erDiagram
         decimal cost_usd
         datetime created_at
     }
-    AIBudgetLog {
-        int id PK
-        int year
-        int month
-        decimal total_cost_usd
-        int total_requests
-        bool alert_sent
-    }
     AutoImportProfile {
         int id PK
         string name
@@ -851,19 +827,11 @@ erDiagram
         int records_updated
         string file_hash
     }
-    BackupLog {
-        int id PK
-        string backup_type
-        string status
-        string file_path
-        bigint file_size
-        datetime created_at
-    }
-
     User ||--|| UserProfile : "профіль (O2O)"
     User ||--o{ AuditLog : "дії"
     User ||--o| TenantAccount : "tenant owner (O2O)"
     User ||--o{ Bot : "створив"
+    User ||--o{ APIKey : "API ключі"
 
     UserProfile }o--o| ModuleBundle : "пакет доступу"
     ModuleBundle }o--o{ ModuleRegistry : "містить модулі (M2M)"
@@ -1091,7 +1059,7 @@ flowchart TD
 </div>
 
 <script>
-mermaid.initialize({
+try { mermaid.initialize({
   startOnLoad: true,
   theme: 'dark',
   themeVariables: {
@@ -1124,14 +1092,7 @@ mermaid.initialize({
     htmlLabels: false,
     curve: 'basis'
   }
-});
-
-function sw(id, btn) {
-  document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
-  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-  document.getElementById('tab-' + id).classList.add('active');
-  btn.classList.add('active');
-}
+}); } catch(e) { console.error('Mermaid init error:', e); }
 </script>
 </body>
 </html>
