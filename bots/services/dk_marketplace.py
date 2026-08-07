@@ -166,6 +166,35 @@ def upsert_product(config, listing) -> str:
             logger.info("DK upsert_product (retry) OK product_id=%s", product_id)
             return product_id
 
+        # If DK rejects additionalFields codes — stage without attributes so the
+        # product at least enters the PIM queue; attributes can be corrected manually.
+        if (e.response.status_code == 400
+                and 'field code' in detail.lower()
+                and payload.get('additionalFields')):
+            logger.warning(
+                "DK upsert_product: additionalFields rejected (bad codes), "
+                "retrying without additionalFields. SKU=%s codes=%s",
+                listing.get_supplier_sku(),
+                [f.get('code') for f in payload['additionalFields']],
+            )
+            payload_no_attrs = {k: v for k, v in payload.items() if k != 'additionalFields'}
+            resp3 = req.post(url, json=payload_no_attrs, headers=_headers(config, token), timeout=30)
+            try:
+                resp3.raise_for_status()
+            except req.HTTPError as e3:
+                body3 = {}
+                try: body3 = e3.response.json()
+                except Exception: pass
+                raise DKMarketplaceError(
+                    f"upsert_product {e3.response.status_code}: {body3}"
+                ) from e3
+            data = resp3.json()
+            product_id = data.get("_id") or data.get("id") or ""
+            logger.info(
+                "DK upsert_product (no-attrs retry) OK product_id=%s", product_id
+            )
+            return product_id
+
         raise DKMarketplaceError(
             f"upsert_product {e.response.status_code}: {body}"
         ) from e

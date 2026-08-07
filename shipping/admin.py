@@ -5740,10 +5740,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         # 1. Shipments created via Minerva that have a tracking number
         # Exclude cancelled — вони не потребують трекінгу
+        # Exclude blank shipments (order=None) — no order to display
         minerva_shipments = (
             Shipment.objects
             .exclude(tracking_number="")
             .filter(tracking_number__isnull=False)
+            .filter(order__isnull=False)
             .exclude(status=Shipment.Status.CANCELLED)
             .select_related("carrier", "order")
             .order_by("-created_at")
