@@ -177,7 +177,13 @@ def upsert_product(config, listing) -> str:
                 listing.get_supplier_sku(),
                 [f.get('code') for f in payload['additionalFields']],
             )
-            payload_no_attrs = {**payload, "additionalFields": []}
+            # Keep non-numeric codes (packaging, productLifecycleStatus) —
+            # only drop the category-specific numeric field codes that DK rejected.
+            valid_fields = [
+                f for f in payload["additionalFields"]
+                if not str(f.get("code", "")).isdigit()
+            ]
+            payload_no_attrs = {**payload, "additionalFields": valid_fields}
             resp3 = req.post(url, json=payload_no_attrs, headers=_headers(config, token), timeout=30)
             try:
                 resp3.raise_for_status()
