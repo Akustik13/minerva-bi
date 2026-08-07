@@ -177,7 +177,7 @@ def upsert_product(config, listing) -> str:
                 listing.get_supplier_sku(),
                 [f.get('code') for f in payload['additionalFields']],
             )
-            payload_no_attrs = {k: v for k, v in payload.items() if k != 'additionalFields'}
+            payload_no_attrs = {**payload, "additionalFields": []}
             resp3 = req.post(url, json=payload_no_attrs, headers=_headers(config, token), timeout=30)
             try:
                 resp3.raise_for_status()
