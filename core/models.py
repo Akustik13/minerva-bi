@@ -61,7 +61,8 @@ class AuditLog(models.Model):
         """Convenience factory for creating audit log entries."""
         ip = None
         if request:
-            ip = request.META.get('REMOTE_ADDR')
+            xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+            ip = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR')
             if not user and hasattr(request, 'user') and request.user.is_authenticated:
                 user = request.user
         entry_extra = dict(extra or {})

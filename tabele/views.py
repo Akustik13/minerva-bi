@@ -100,8 +100,8 @@ def register_view(request):
                 password=data['password1'],
                 first_name=name_parts[0] if name_parts else '',
                 last_name=' '.join(name_parts[1:]),
-                is_staff=True,
-                is_active=True,
+                is_staff=False,   # activated only after email verification
+                is_active=False,  # cannot login until email confirmed
             )
 
             trial_end = timezone.now().date() + timezone.timedelta(days=30)
@@ -131,23 +131,27 @@ def register_view(request):
             # Send verification email
             _send_verification_email(user, tenant, token, s)
 
-            # Log registration
+            # Log registration — IP extracted via X-Forwarded-For in AuditLog.log()
+            xff = request.META.get('HTTP_X_FORWARDED_FOR', '')
+            ip = xff.split(',')[0].strip() if xff else request.META.get('REMOTE_ADDR', '')
             AuditLog.log(
                 action='create',
                 module='registration',
                 model_name='TenantAccount',
                 object_id=tenant.pk,
                 object_repr=str(tenant),
+                request=request,
                 extra={
                     'event': 'new_client_registered',
                     'company': data['company_name'],
                     'email': data['email'],
                     'package': data['package'],
+                    'ip': ip,
                 },
             )
 
-            # Notify vendor
-            _notify_vendor_new_client(tenant, s)
+            # Notify vendor (email + Telegram)
+            _notify_vendor_new_client(tenant, s, ip)
 
             return redirect('/register/pending/')
     else:
@@ -189,6 +193,12 @@ def verify_email_view(request, token):
     tenant.activated_at       = timezone.now()
     tenant.verification_token = ''
     tenant.save()
+
+    # Activate the user account only after email confirmation
+    if tenant.owner_user:
+        tenant.owner_user.is_active = True
+        tenant.owner_user.is_staff  = True
+        tenant.owner_user.save(update_fields=['is_active', 'is_staff'])
 
     AuditLog.log(
         action='settings',
@@ -302,25 +312,57 @@ def manifest_view(request):
     }, content_type='application/manifest+json')
 
 
-def _notify_vendor_new_client(tenant, settings_obj):
+def _notify_vendor_new_client(tenant, settings_obj, ip=''):
     from django.core.mail import send_mail
+    from config.models import NotificationSettings
+    import json, urllib.request
+
+    body = (
+        f'Зареєструвався новий клієнт:\n\n'
+        f'Компанія: {tenant.company_name}\n'
+        f'Власник:  {tenant.owner_name} <{tenant.owner_email}>\n'
+        f'Пакет:    {tenant.get_package_display()}\n'
+        f'Країна:   {tenant.company_country}\n'
+        f'IP:       {ip or "невідомий"}\n\n'
+        f'Статус:   Очікує підтвердження email\n\n'
+        f'Керувати: {settings_obj.site_url}/admin/core/tenantaccount/'
+    )
+
+    # Email to vendor
     vendor_email = settings_obj.company_email
-    if not vendor_email:
-        return
+    if vendor_email:
+        try:
+            send_mail(
+                subject=f'🆕 Новий клієнт: {tenant.company_name}',
+                message=body,
+                from_email=settings_obj.from_email,
+                recipient_list=[vendor_email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+    # Telegram to vendor
     try:
-        send_mail(
-            subject=f'Новий клієнт: {tenant.company_name}',
-            message=(
-                f'Зареєструвався новий клієнт:\n\n'
-                f'Компанія: {tenant.company_name}\n'
-                f'Власник:  {tenant.owner_name} <{tenant.owner_email}>\n'
-                f'Пакет:    {tenant.get_package_display()}\n'
-                f'Країна:   {tenant.company_country}\n\n'
-                f'Керувати: {settings_obj.site_url}/admin/core/tenantaccount/'
-            ),
-            from_email=settings_obj.from_email,
-            recipient_list=[vendor_email],
-            fail_silently=True,
-        )
+        ns = NotificationSettings.get()
+        if ns.telegram_enabled and ns.telegram_bot_token and ns.telegram_chat_id:
+            tg_text = (
+                f'🆕 <b>Новий клієнт</b>\n'
+                f'🏢 {tenant.company_name}\n'
+                f'👤 {tenant.owner_name} — {tenant.owner_email}\n'
+                f'📦 {tenant.get_package_display()}\n'
+                f'🌍 {tenant.company_country}\n'
+                f'🌐 IP: <code>{ip or "невідомий"}</code>\n'
+                f'⏳ Очікує підтвердження email'
+            )
+            tg_url = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendMessage'
+            tg_data = json.dumps({
+                'chat_id': ns.telegram_chat_id,
+                'text': tg_text,
+                'parse_mode': 'HTML',
+            }).encode('utf-8')
+            req = urllib.request.Request(tg_url, data=tg_data,
+                                         headers={'Content-Type': 'application/json'})
+            urllib.request.urlopen(req, timeout=5)
     except Exception:
         pass
