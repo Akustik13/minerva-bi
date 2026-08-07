@@ -5,11 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Minerva BI — Схеми системи</title>
 <script>
+var _mDone = {};
 function sw(id, btn) {
   document.querySelectorAll('.tab-pane').forEach(function(el){ el.classList.remove('active'); });
   document.querySelectorAll('.tab-btn').forEach(function(el){ el.classList.remove('active'); });
-  document.getElementById('tab-' + id).classList.add('active');
+  var pane = document.getElementById('tab-' + id);
+  pane.classList.add('active');
   btn.classList.add('active');
+  if (!_mDone[id]) {
+    _mDone[id] = true;
+    var nodes = Array.from(pane.querySelectorAll('.mermaid'));
+    if (nodes.length > 0) {
+      mermaid.run({ nodes: nodes }).catch(function(e){ console.error('Mermaid:', e); });
+    }
+  }
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
@@ -1042,7 +1051,7 @@ flowchart TD
 
 <script>
 try { mermaid.initialize({
-  startOnLoad: true,
+  startOnLoad: false,
   theme: 'dark',
   themeVariables: {
     primaryColor: '#1a2535',
