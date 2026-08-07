@@ -422,7 +422,7 @@ erDiagram
     Customer ||--o{ Task : "задачі"
     Customer ||--o{ InvoiceAcc : "рахунки"
 
-    SalesOrder }o..|| Customer : "customer_key (not FK)"
+    SalesOrder }o--|| Customer : "customer_key (not FK)"
     SalesOrder ||--o{ SalesOrderLine : "рядки"
     SalesOrder ||--o{ Task : "задачі"
     SalesOrder ||--o| InvoiceAcc : "виставлено"
