@@ -600,6 +600,7 @@ erDiagram
     DigiKeyListing ||--o{ DigiKeyPriceLog : "зміни цін"
     DigiKeyListing ||--o{ AIAnalysisLog : "AI аналізи"
 
+    Product }o--o| ProductCategory : "категорія"
     ProductCategory ||--o{ RFQEmailTemplate : "шаблон RFQ"
     ProductPackaging }o--|| PackagingMaterial : "матеріал"
 </div>
@@ -810,23 +811,6 @@ erDiagram
         decimal cost_usd
         datetime created_at
     }
-    AutoImportProfile {
-        int id PK
-        string name
-        string import_type
-        string source_path
-        string file_mask
-        bool enabled
-        json column_map
-    }
-    AutoImportLog {
-        int id PK
-        datetime ran_at
-        string status
-        int records_created
-        int records_updated
-        string file_hash
-    }
     User ||--|| UserProfile : "профіль (O2O)"
     User ||--o{ AuditLog : "дії"
     User ||--o| TenantAccount : "tenant owner (O2O)"
@@ -840,8 +824,6 @@ erDiagram
     AIConversation ||--o{ AIMessage : "повідомлення"
 
     Bot ||--o{ BotLog : "логи виконання"
-
-    AutoImportProfile ||--o{ AutoImportLog : "логи запусків"
 </div>
   </div>
   <div class="legend">
