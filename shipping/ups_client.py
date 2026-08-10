@@ -1121,6 +1121,29 @@ class UPSClient:
             chunks.append(current)
         return chunks[:3]  # UPS allows max 3 address lines
 
+    # Full province/state name → 2-letter UPS code (required for CN, US, CA, AU, MX, BR, IN)
+    _CN_PROVINCES = {
+        'anhui': 'AH', 'beijing': 'BJ', 'chongqing': 'CQ', 'fujian': 'FJ',
+        'gansu': 'GS', 'guangdong': 'GD', 'guangxi': 'GX', 'guizhou': 'GZ',
+        'hainan': 'HI', 'hebei': 'HE', 'heilongjiang': 'HL', 'henan': 'HA',
+        'hubei': 'HB', 'hunan': 'HN', 'jiangsu': 'JS', 'jiangxi': 'JX',
+        'jilin': 'JL', 'liaoning': 'LN', 'inner mongolia': 'NM', 'nei mongol': 'NM',
+        'ningxia': 'NX', 'qinghai': 'QH', 'shaanxi': 'SN', 'shandong': 'SD',
+        'shanghai': 'SH', 'shanxi': 'SX', 'sichuan': 'SC', 'tianjin': 'TJ',
+        'tibet': 'XZ', 'xinjiang': 'XJ', 'yunnan': 'YN', 'zhejiang': 'ZJ',
+        'hong kong': 'HK', 'macao': 'MO', 'macau': 'MO',
+    }
+
+    def _normalize_state(self, state: str, country: str) -> str:
+        """Return 2-letter state/province code. If already short (≤3 chars), return as-is."""
+        s = state.strip()
+        if len(s) <= 3:
+            return s.upper()
+        key = s.lower()
+        if country == 'CN':
+            return self._CN_PROVINCES.get(key, s[:2].upper())
+        return s.upper()
+
     def _fmt_addr(self, addr: dict, addr_fallback: bool = False) -> dict:
         country = (addr.get('country') or 'DE').upper()
         postal  = (addr.get('postal') or '')
@@ -1148,7 +1171,7 @@ class UPSClient:
         elif addr_fallback:
             result['AddressLine'] = ['-']
         if addr.get('state'):
-            result['StateProvinceCode'] = addr['state'].upper()
+            result['StateProvinceCode'] = self._normalize_state(addr['state'], country)
         return result
 
     _PKG_DESCRIPTIONS = {

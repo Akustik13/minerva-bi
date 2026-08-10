@@ -1955,6 +1955,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             or (_scountry and _scountry not in eu_countries)
         )
 
+        # Якщо митниця потрібна але рядків нема — показати 1 порожній рядок
+        if needs_customs and not customs_articles:
+            _cur = shipment.declared_currency or getattr(order, "currency", None) or "USD"
+            _origin = _scountry or "CN"
+            customs_articles = [{"description": "", "quantity": 1, "value": 0.0,
+                                  "currency": _cur, "origin_country": _origin,
+                                  "customs_number": "", "weight_auto": True}]
+
         is_error = shipment.status == Shipment.Status.ERROR
 
         n_articles = len(customs_articles) or 1
