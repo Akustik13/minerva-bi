@@ -4274,6 +4274,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 'currency':         currency,
                 'contents_type':    contents_type,
                 'terms_of_shipment': terms_of_shipment,
+                'items':            [],
             }
 
         return {
