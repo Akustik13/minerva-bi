@@ -4194,6 +4194,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     def _ups_extract_customs(self, shipment) -> dict:
         order = shipment.order
+        order_ref = f'Order #{order.order_number}' if order else (shipment.description or f'Shipment #{shipment.pk}')
         # Пропустити якщо внутрішнє відправлення
         dest = (shipment.recipient_country or '').upper()
         shipper_country = (shipment.sender_country or '').upper()
@@ -4244,7 +4245,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 })
             if items:
                 return {
-                    'description':      f'Order #{order.order_number}',
+                    'description':      order_ref,
                     'value_usd':        sum(i['value'] for i in items),
                     'currency':         (saved_lines[0].get('currency') or currency).upper(),
                     'contents_type':    contents_type,
@@ -4254,7 +4255,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         # ── Fallback: будуємо з рядків замовлення ──────────────────────────
         items = []
-        for line in order.lines.select_related('product').all():
+        for line in (order.lines.select_related('product').all() if order else []):
             product = getattr(line, 'product', None)
             qty = int(getattr(line, 'qty', None) or getattr(line, 'quantity', 1) or 1)
             items.append({
@@ -4268,7 +4269,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         if not items:
             return {
-                'description':      shipment.description or f'Order #{order.order_number}',
+                'description':      shipment.description or order_ref,
                 'value_usd':        float(shipment.declared_value or 0),
                 'currency':         currency,
                 'contents_type':    contents_type,
@@ -4276,7 +4277,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             }
 
         return {
-            'description':      f'Order #{order.order_number}',
+            'description':      order_ref,
             'value_usd':        sum(i['value'] for i in items),
             'currency':         currency,
             'contents_type':    contents_type,
