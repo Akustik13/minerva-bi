@@ -761,10 +761,11 @@ var _svi = {
   }
 
   /* ── Init: restore saved state ── */
-  // Restore filter button
-  document.querySelectorAll('.sv-filter-btn').forEach(function(btn) {
+  // Restore status filter button (category buttons are handled in buildCatFilters)
+  document.querySelectorAll('#sv-status-filters .sv-filter-btn').forEach(function(btn) {
     btn.classList.remove('active');
-    if (btn.getAttribute('onclick').indexOf("'" + activeFilter + "'") !== -1) {
+    var oc = btn.getAttribute('onclick');
+    if (oc && oc.indexOf("'" + activeFilter + "'") !== -1) {
       btn.classList.add('active');
     }
   });
