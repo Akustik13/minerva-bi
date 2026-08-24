@@ -7,10 +7,12 @@ class JLCConfig(models.Model):
     """Singleton — JLCPCB API credentials + sync + notification settings."""
 
     # ── Credentials ──────────────────────────────────────────────────────────
+    app_id      = models.CharField('App ID', max_length=200, blank=True, default='',
+                                   help_text='JLCPCB Developer Portal → App ID (числовий, наприклад 614741474579288066)')
     access_key  = models.CharField('Access Key', max_length=500, blank=True, default='',
                                    help_text='JLCPCB Developer Portal → Access Key')
-    secret_key  = models.CharField('Secret Key', max_length=500, blank=True, default='',
-                                   help_text='JLCPCB Developer Portal → Secret Key')
+    secret_key  = models.CharField('Secret Key / Tokenization Key', max_length=500, blank=True, default='',
+                                   help_text='JLCPCB Developer Portal → Secret Key або Tokenization Key')
     use_sandbox = models.BooleanField('Sandbox режим', default=False,
                                       help_text='Тестовий режим (якщо JLCPCB надав sandbox endpoint)')
 

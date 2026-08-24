@@ -163,7 +163,8 @@ class JLCAPIClient:
     """
     JLCPCB Orders API client.
 
-    Authentication: HMAC-SHA256
+    Base URL: https://api.jlcpcb.com
+    Auth: HMAC-SHA256
       timestamp_ms = str(int(time.time() * 1000))
       signature    = HMAC-SHA256(secret_key, access_key + timestamp_ms)
       Headers:
@@ -171,20 +172,35 @@ class JLCAPIClient:
         X-Timestamp:  <timestamp_ms>
         X-Signature:  <signature>
         Content-Type: application/json
+
+    NOTE: All API endpoints must be "Authorized" in JLCPCB Developer Portal
+    (Requestable APIs → request → wait for approval) before calls will succeed.
     """
 
-    BASE_URL_PROD    = 'https://jlcpcb.com/api/v1'
-    BASE_URL_SANDBOX = 'https://jlcpcb.com/api/v1/sandbox'
+    BASE_URL_PROD    = 'https://api.jlcpcb.com'
+    BASE_URL_SANDBOX = 'https://api.jlcpcb.com/sandbox'
 
-    # Endpoint constants
-    EP_ORDERS     = '/order/list'
-    EP_ORDER      = '/order/detail'
-    EP_TRACKING   = '/order/tracking'
-    EP_PING       = '/ping'
+    # Endpoint candidates — JLCPCB docs may differ; update after first successful test
+    EP_ORDERS     = '/v2/order/list'
+    EP_ORDER      = '/v2/order/detail'
+    EP_TRACKING   = '/v2/order/tracking'
+    EP_PING       = '/v2/health'
 
-    def __init__(self, access_key: str, secret_key: str, use_sandbox: bool = False):
+    # Fallback endpoints to try during test
+    _EP_PROBES = [
+        '/v2/health',
+        '/v1/health',
+        '/health',
+        '/v2/order/list',
+        '/v1/order/list',
+        '/order/list',
+    ]
+
+    def __init__(self, access_key: str, secret_key: str,
+                 app_id: str = '', use_sandbox: bool = False):
         self.access_key = access_key
         self.secret_key = secret_key
+        self.app_id     = app_id
         self.base_url   = self.BASE_URL_SANDBOX if use_sandbox else self.BASE_URL_PROD
 
     # ── Auth ─────────────────────────────────────────────────────────────────
@@ -196,13 +212,16 @@ class JLCAPIClient:
 
     def _headers(self) -> dict:
         ts = str(int(time.time() * 1000))
-        return {
+        h = {
             'X-Access-Key': self.access_key,
             'X-Timestamp':  ts,
             'X-Signature':  self._make_signature(ts),
             'Content-Type': 'application/json',
             'Accept':       'application/json',
         }
+        if self.app_id:
+            h['X-App-Id'] = self.app_id
+        return h
 
     # ── HTTP ──────────────────────────────────────────────────────────────────
 
@@ -250,26 +269,60 @@ class JLCAPIClient:
 
     def test_connection(self) -> dict:
         """
-        Test credentials. Tries /ping, falls back to listing 1 order.
-        Returns {'ok': True/False, 'message': str, 'raw': dict}
+        Probe multiple endpoint candidates to find working API paths.
+        Returns {'ok': bool, 'message': str, 'raw': dict, 'details': list}
         """
-        if not self.access_key or not self.secret_key:
-            return {'ok': False, 'message': 'Access Key або Secret Key не заповнено.', 'raw': {}}
+        if not self.access_key:
+            return {'ok': False, 'message': 'Access Key не заповнено.', 'raw': {}, 'details': []}
 
-        # Try /ping first (lightweight)
-        try:
-            raw = self._request('GET', self.EP_PING, timeout=10)
-            return {'ok': True, 'message': f'✅ З\'єднання успішне. Відповідь: {str(raw)[:120]}', 'raw': raw}
-        except JLCAPIError as e:
-            ping_err = str(e)
-            logger.info('JLCPCB /ping failed (%s), trying /order/list', ping_err)
+        if not self.secret_key:
+            return {
+                'ok': False,
+                'message': (
+                    '⚠️ Secret Key / Tokenization Key не заповнено.\n'
+                    'Знайдіть його на сторінці налаштувань JLCPCB Developer Portal.'
+                ),
+                'raw': {}, 'details': [],
+            }
 
-        # Fallback: list 1 order
-        try:
-            raw = self._request('GET', self.EP_ORDERS, params={'page': 1, 'pageSize': 1}, timeout=10)
-            return {'ok': True, 'message': f'✅ З\'єднання успішне (через /order/list). Замовлень отримано.', 'raw': raw}
-        except JLCAPIError as e:
-            return {'ok': False, 'message': f'❌ Помилка: {e}', 'raw': {}}
+        details = []
+        for ep in self._EP_PROBES:
+            try:
+                params = {'page': 1, 'pageSize': 1} if 'order' in ep else None
+                raw = self._request('GET', ep, params=params, timeout=10)
+                msg = (
+                    f'✅ З\'єднання успішне!\n'
+                    f'Робочий endpoint: {self.base_url}{ep}\n'
+                    f'Відповідь: {str(raw)[:200]}'
+                )
+                return {'ok': True, 'message': msg, 'raw': raw, 'details': details}
+            except JLCAPIError as e:
+                err_str = str(e)
+                details.append(f'{ep}: {err_str[:120]}')
+                logger.debug('JLCPCB probe %s → %s', ep, err_str[:80])
+
+        # All probes failed — build diagnostic message
+        summary = '\n'.join(f'  {d}' for d in details[:6])
+        if any('404' in d for d in details):
+            hint = (
+                '\n\n⚠️ Отримано 404 — швидше за все, жодне API не авторизовано.\n'
+                'Зайди на JLCPCB Developer Portal → Requestable APIs → '
+                'подай заявку на Order API та зачекай підтвердження.'
+            )
+        elif any('401' in d or '403' in d for d in details):
+            hint = (
+                '\n\n⚠️ Помилка авторизації (401/403).\n'
+                'Перевір Access Key та Secret Key / Tokenization Key.'
+            )
+        else:
+            hint = '\n\nПеревір підключення до інтернету та правильність ключів.'
+
+        return {
+            'ok': False,
+            'message': f'❌ Всі endpoints недоступні:\n{summary}{hint}',
+            'raw': {},
+            'details': details,
+        }
 
     def get_orders(self, page: int = 1, page_size: int = 50) -> dict:
         """
@@ -315,6 +368,7 @@ class JLCAPIClient:
         return cls(
             access_key=cfg.access_key,
             secret_key=cfg.secret_key,
+            app_id=cfg.app_id,
             use_sandbox=cfg.use_sandbox,
         )
 

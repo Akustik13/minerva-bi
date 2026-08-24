@@ -55,10 +55,14 @@ class JLCConfigAdmin(admin.ModelAdmin):
 
     fieldsets = (
         ('🔑 JLCPCB API Credentials', {
-            'fields': ('access_key', 'secret_key', 'use_sandbox'),
+            'fields': ('app_id', 'access_key', 'secret_key', 'use_sandbox'),
             'description': (
-                'Ключі отримуються на <a href="https://jlcpcb.com/api" target="_blank">'
-                'JLCPCB Developer Portal</a>. Натисніть <b>Тест з\'єднання</b> після збереження.'
+                'Ключі знаходяться на '
+                '<a href="https://api.jlcpcb.com/console/setting" target="_blank">'
+                'api.jlcpcb.com/console/setting</a>.<br>'
+                '<b>Увага:</b> перед тестом переконайтесь що у розділі '
+                '<b>Requestable APIs</b> подано заявки на Order API — '
+                'без авторизованих API будь-який запит повертає 404.'
             ),
         }),
         ('🔄 Синхронізація', {
@@ -82,7 +86,7 @@ class JLCConfigAdmin(admin.ModelAdmin):
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
-        for field in ('access_key', 'secret_key'):
+        for field in ('access_key', 'secret_key', 'app_id'):
             if field in form.base_fields:
                 form.base_fields[field].widget = PasswordInput(render_value=True)
         return form
