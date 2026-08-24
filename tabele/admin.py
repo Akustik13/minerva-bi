@@ -34,6 +34,7 @@ def _get_app_list(self, request, app_label=None):
         'ai_assistant',     # 🏛️ Minerva AI
         'email_assistant',  # 📧 Email Асистент
         'bots',             # 🤖 Боти та AI
+        'jlcpcb',           # 🔬 JLCPCB виробництво
         'documents',        # 📄 Документи
         'api',        # 🔑 API Ключі
         'config',     # ⚙️ Конфігурація
@@ -57,6 +58,7 @@ def _get_app_list(self, request, app_label=None):
         'config':   ['systemsettings', 'documentsettings', 'notificationsettings', 'themesettings'],
         'api':      ['apikey'],
         'bots':      ['digikeyconfig', 'digikeylisting', 'bot', 'botlog'],
+        'jlcpcb':    ['jlcconfig', 'jlcorder', 'jlcproductmapping'],
         'documents': ['documenttemplate', 'generateddocument'],
     }
 

@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'email_assistant',  # 📧 Email Асистент
     'calendar_app',     # 📅 Календар
     'bots',             # 🤖 Боти та AI
+    'jlcpcb',           # 🔬 JLCPCB виробництво
     'documents',        # 📄 Документи
     'faq',              # ❓ FAQ та підтримка
     'labels_app',       # 🏷️ Етикетки
