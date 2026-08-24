@@ -335,16 +335,24 @@ class JLCAPIClient:
             return {'ok': True, 'message': '\n'.join(lines)}
         except JLCAPIError as e:
             err = str(e)
-            if '404' in err:
-                lines.append('⚠️ PCB API ще не авторизовано (404).')
-                lines.append('   → Зайди на Developer Portal → Requestable APIs →')
-                lines.append('     подай заявки на PCB-related APIs → зачекай підтвердження.')
+            if '403' in err:
+                # 403 = credentials OK, but PCB API not yet approved (still Reviewing)
+                lines.append('⏳ PCB API ще на розгляді (403 — недостатньо прав).')
+                lines.append('   Зайди на Developer Portal → Permission Setting →')
+                lines.append('   зачекай поки статус PCB зміниться з "Reviewing" на "Active".')
+                lines.append('')
+                lines.append('Ключі правильні. Як тільки JLCPCB схвалить — все запрацює.')
+                return {'ok': True, 'message': '\n'.join(lines)}
+            elif '404' in err:
+                lines.append('⚠️ PCB API — endpoint не знайдено (404).')
+                lines.append('   Зайди на Developer Portal → Requestable APIs →')
+                lines.append('   подай заявки на PCB APIs → зачекай підтвердження.')
                 if auth_ok:
-                    lines.append('')
                     lines.append('Ключі правильні — щойно PCB API схвалять, все запрацює.')
                 return {'ok': False, 'message': '\n'.join(lines)}
-            elif '401' in err or '403' in err:
-                lines.append(f'❌ Помилка авторизації для PCB API: {err[:150]}')
+            elif '401' in err:
+                lines.append(f'❌ Помилка авторизації PCB (401): {err[:150]}')
+                lines.append('   Перевір App ID, Access Key та Tokenization Key.')
                 return {'ok': False, 'message': '\n'.join(lines)}
             else:
                 lines.append(f'⚠️ PCB API: {err[:150]}')
