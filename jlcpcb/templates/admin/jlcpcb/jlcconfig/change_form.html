@@ -1,0 +1,106 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block content %}
+{{ block.super }}
+
+{# ── Action panel under the form ── #}
+<style>
+.jlc-panel {
+  background: var(--bg-card, #1a2535);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-top: 24px;
+}
+.jlc-panel h3 {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text, #c9d8e4);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.jlc-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.jlc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 18px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity .15s;
+}
+.jlc-btn:hover { opacity: .85; }
+.jlc-btn-primary  { background: #1565c0; color: #fff; }
+.jlc-btn-success  { background: #2e7d32; color: #fff; }
+.jlc-btn-info     { background: #4a6fa5; color: #fff; }
+.jlc-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.jlc-stat-box {
+  background: var(--bg-input, #141f2b);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 6px;
+  padding: 10px 16px;
+  min-width: 120px;
+  text-align: center;
+}
+.jlc-stat-box .num  { font-size: 24px; font-weight: 700; color: var(--accent, #58a6ff); }
+.jlc-stat-box .lbl  { font-size: 11px; color: var(--text-muted, #9aafbe); margin-top: 2px; }
+.jlc-meta { font-size: 12px; color: var(--text-muted, #9aafbe); margin-top: 10px; }
+</style>
+
+<div class="jlc-panel">
+  <h3>⚡ Дії</h3>
+
+  {# Stats row #}
+  <div class="jlc-stats">
+    <div class="jlc-stat-box">
+      <div class="num">{{ orders_count|default:0 }}</div>
+      <div class="lbl">Всього замовлень</div>
+    </div>
+    <div class="jlc-stat-box">
+      <div class="num">{{ active_orders|default:0 }}</div>
+      <div class="lbl">Активних</div>
+    </div>
+    {% if unmatched_count %}
+    <div class="jlc-stat-box" style="border-color:#c62828">
+      <div class="num" style="color:#ef5350">{{ unmatched_count }}</div>
+      <div class="lbl">Не прив'язано</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="jlc-btn-row">
+    <a href="{{ test_url }}" class="jlc-btn jlc-btn-primary">
+      🔌 Тест з'єднання
+    </a>
+    <a href="{{ sync_url }}" class="jlc-btn jlc-btn-success">
+      🔄 Синхронізувати замовлення
+    </a>
+    <a href="{{ orders_url }}" class="jlc-btn jlc-btn-info">
+      📋 Переглянути замовлення
+    </a>
+  </div>
+
+  {% if jlc_last_synced %}
+  <div class="jlc-meta">Остання синхронізація: {{ jlc_last_synced|date:"d.m.Y H:i" }}</div>
+  {% else %}
+  <div class="jlc-meta">Синхронізація ще не запускалась.</div>
+  {% endif %}
+</div>
+{% endblock %}

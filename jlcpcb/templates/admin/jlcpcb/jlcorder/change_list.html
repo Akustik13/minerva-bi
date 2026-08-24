@@ -1,0 +1,93 @@
+{% extends "admin/change_list.html" %}
+{% load i18n %}
+
+{% block content %}
+<style>
+.jlc-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--bg-card, #1a2535);
+  border: 1px solid var(--border-strong, #243347);
+  border-radius: 8px;
+  margin-bottom: 16px;
+}
+.jlc-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity .15s;
+}
+.jlc-toolbar-btn:hover { opacity: .85; }
+.btn-sync   { background: #2e7d32; color: #fff; }
+.btn-match  { background: #1565c0; color: #fff; }
+.btn-config { background: #4a4a6a; color: #fff; }
+.jlc-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+.jlc-pill {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.jlc-unmatched-warn {
+  background: #c62828;
+  color: #fff;
+  padding: 5px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.jlc-sync-info {
+  font-size: 11px;
+  color: var(--text-muted, #9aafbe);
+}
+</style>
+
+<div class="jlc-toolbar">
+  <a href="{{ jlc_sync_url }}" class="jlc-toolbar-btn btn-sync">🔄 Синхронізувати</a>
+  <a href="{{ jlc_match_url }}" class="jlc-toolbar-btn btn-match">🔍 Авто-матч</a>
+  <a href="{{ jlc_config_url }}" class="jlc-toolbar-btn btn-config">⚙️ Налаштування</a>
+
+  {% if jlc_unmatched_count %}
+    <span class="jlc-unmatched-warn">⚠️ {{ jlc_unmatched_count }} не прив'язано</span>
+  {% endif %}
+
+  {% if jlc_status_summary %}
+  <div class="jlc-status-pills">
+    {% if jlc_status_summary.ordered %}
+      <span class="jlc-pill" style="background:#455a64;color:#fff">📋 Замовл. {{ jlc_status_summary.ordered }}</span>
+    {% endif %}
+    {% if jlc_status_summary.in_production %}
+      <span class="jlc-pill" style="background:#e65100;color:#fff">🏭 Вир-во {{ jlc_status_summary.in_production }}</span>
+    {% endif %}
+    {% if jlc_status_summary.shipped %}
+      <span class="jlc-pill" style="background:#6a1b9a;color:#fff">📦 Відправл. {{ jlc_status_summary.shipped }}</span>
+    {% endif %}
+    {% if jlc_status_summary.delivered %}
+      <span class="jlc-pill" style="background:#1b5e20;color:#fff">🎉 Доставл. {{ jlc_status_summary.delivered }}</span>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if jlc_last_synced %}
+    <span class="jlc-sync-info">Синхр.: {{ jlc_last_synced|date:"d.m H:i" }}</span>
+  {% endif %}
+</div>
+
+{{ block.super }}
+{% endblock %}

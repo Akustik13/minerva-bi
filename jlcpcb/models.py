@@ -7,11 +7,16 @@ class JLCConfig(models.Model):
     """Singleton — JLCPCB API credentials + sync + notification settings."""
 
     # ── Credentials ──────────────────────────────────────────────────────────
-    api_key    = models.CharField('API Ключ', max_length=500, blank=True, default='',
-                                  help_text='JLCPCB Developer Portal → My Apps → API Key')
-    api_secret = models.CharField('API Secret', max_length=500, blank=True, default='')
-    use_sandbox = models.BooleanField('Sandbox режим', default=True,
-                                      help_text='Тестовий режим без реальних запитів до JLCPCB')
+    access_key  = models.CharField('Access Key', max_length=500, blank=True, default='',
+                                   help_text='JLCPCB Developer Portal → Access Key')
+    secret_key  = models.CharField('Secret Key', max_length=500, blank=True, default='',
+                                   help_text='JLCPCB Developer Portal → Secret Key')
+    use_sandbox = models.BooleanField('Sandbox режим', default=False,
+                                      help_text='Тестовий режим (якщо JLCPCB надав sandbox endpoint)')
+
+    # ── Connection log ────────────────────────────────────────────────────────
+    connection_log = models.TextField('Лог підключення', blank=True, default='',
+                                      help_text='Результат останнього тесту / синхронізації')
 
     # ── Sync ─────────────────────────────────────────────────────────────────
     sync_enabled         = models.BooleanField('Авто-синхронізація', default=False,
