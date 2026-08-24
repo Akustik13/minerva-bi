@@ -1,18 +1,30 @@
 """
-jlcpcb/services/api.py — JLCPCB API client
+jlcpcb/services/api.py — JLCPCB Open API client
 
-Auth: HMAC-SHA256 signature
-  Timestamp (ms) + AccessKey → HMAC-SHA256(SecretKey, AccessKey + Timestamp)
-  Headers: X-Access-Key, X-Timestamp, X-Signature, Content-Type: application/json
+Base URL:  https://open.jlcpcb.com
+Auth:      JOP scheme (single Authorization header)
+  Authorization: JOP appid="...",accesskey="...",timestamp="...",nonce="...",signature="..."
+  string-to-sign = "METHOD\n{uri_with_query}\n{timestamp_seconds}\n{nonce}\n{body}\n"
+  signature      = base64(HMAC-SHA256(secret_key, string_to_sign))
 
-Base URL (production): https://jlcpcb.com/api/v1
+PCB endpoints (all POST, body JSON):
+  /overseas/openapi/pcb/getSteelPriceConfig   — GET, no body (used for health check)
+  /overseas/openapi/pcb/order/detail          — POST {"batchNum": "..."}
+  /overseas/openapi/pcb/wip/get               — POST {"batchNum": "..."} (production progress)
+  /overseas/openapi/pcb/audit/get             — POST {"batchNum": "..."} (audit / file review)
+
+NOTE: There is no PCB order list endpoint. Orders are tracked by batch number.
 """
+import base64
 import hashlib
 import hmac
 import json
 import logging
+import secrets
+import string
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Optional
 
@@ -159,69 +171,72 @@ def receive_into_inventory(jlc_order, location_code: str = None, performed_by=No
 
 # ── API Client ────────────────────────────────────────────────────────────────
 
+_NONCE_CHARS = string.ascii_letters + string.digits
+
+
 class JLCAPIClient:
     """
-    JLCPCB Orders API client.
+    JLCPCB Open API client (overseas portal).
 
-    Base URL: https://api.jlcpcb.com
-    Auth: HMAC-SHA256
-      timestamp_ms = str(int(time.time() * 1000))
-      signature    = HMAC-SHA256(secret_key, access_key + timestamp_ms)
-      Headers:
-        X-Access-Key: <access_key>
-        X-Timestamp:  <timestamp_ms>
-        X-Signature:  <signature>
-        Content-Type: application/json
+    Base URL: https://open.jlcpcb.com
+    Auth: JOP scheme — single Authorization header
+      Authorization: JOP appid="...",accesskey="...",timestamp="...",nonce="...",signature="..."
+      string-to-sign: "METHOD\n{path+query}\n{ts_seconds}\n{nonce}\n{body}\n"
+      signature:      base64(HMAC-SHA256(secret_key, string_to_sign))
 
-    NOTE: All API endpoints must be "Authorized" in JLCPCB Developer Portal
-    (Requestable APIs → request → wait for approval) before calls will succeed.
+    PCB order endpoints (POST, JSON body):
+      EP_PCB_CONFIG  GET  /overseas/openapi/pcb/getSteelPriceConfig  ← health check
+      EP_PCB_DETAIL  POST /overseas/openapi/pcb/order/detail  {"batchNum":"W202501..."}
+      EP_PCB_WIP     POST /overseas/openapi/pcb/wip/get       {"batchNum":"..."}
+      EP_PCB_AUDIT   POST /overseas/openapi/pcb/audit/get     {"batchNum":"..."}
+
+    IMPORTANT: There is no PCB order list endpoint.
+    Orders are tracked individually by batch number (batchNum), which is the
+    order number visible in the JLCPCB order history page (e.g. W2025040800001).
     """
 
-    BASE_URL_PROD    = 'https://api.jlcpcb.com'
-    BASE_URL_SANDBOX = 'https://api.jlcpcb.com/sandbox'
+    BASE_URL = 'https://open.jlcpcb.com'
 
-    # Endpoint candidates — JLCPCB docs may differ; update after first successful test
-    EP_ORDERS     = '/v2/order/list'
-    EP_ORDER      = '/v2/order/detail'
-    EP_TRACKING   = '/v2/order/tracking'
-    EP_PING       = '/v2/health'
+    # PCB endpoints
+    EP_PCB_CONFIG = '/overseas/openapi/pcb/getSteelPriceConfig'  # GET — health check
+    EP_PCB_DETAIL = '/overseas/openapi/pcb/order/detail'          # POST by batchNum
+    EP_PCB_WIP    = '/overseas/openapi/pcb/wip/get'               # POST — production WIP
+    EP_PCB_AUDIT  = '/overseas/openapi/pcb/audit/get'             # POST — file audit status
 
-    # Fallback endpoints to try during test
-    _EP_PROBES = [
-        '/v2/health',
-        '/v1/health',
-        '/health',
-        '/v2/order/list',
-        '/v1/order/list',
-        '/order/list',
-    ]
-
-    def __init__(self, access_key: str, secret_key: str,
-                 app_id: str = '', use_sandbox: bool = False):
+    def __init__(self, app_id: str, access_key: str, secret_key: str):
+        self.app_id     = app_id
         self.access_key = access_key
         self.secret_key = secret_key
-        self.app_id     = app_id
-        self.base_url   = self.BASE_URL_SANDBOX if use_sandbox else self.BASE_URL_PROD
 
     # ── Auth ─────────────────────────────────────────────────────────────────
 
-    def _make_signature(self, timestamp_ms: str) -> str:
-        msg = (self.access_key + timestamp_ms).encode('utf-8')
-        key = self.secret_key.encode('utf-8')
-        return hmac.new(key, msg, hashlib.sha256).hexdigest()
+    @staticmethod
+    def _nonce() -> str:
+        return ''.join(secrets.choice(_NONCE_CHARS) for _ in range(32))
 
-    def _headers(self) -> dict:
-        ts = str(int(time.time() * 1000))
-        h = {
-            'X-Access-Key': self.access_key,
-            'X-Timestamp':  ts,
-            'X-Signature':  self._make_signature(ts),
-            'Content-Type': 'application/json',
-            'Accept':       'application/json',
-        }
-        if self.app_id:
-            h['X-App-Id'] = self.app_id
-        return h
+    def _sign(self, method: str, path: str, query: str,
+              body_str: str, timestamp: int, nonce: str) -> str:
+        canonical = f'{path}?{query}' if query else path
+        sts = f'{method.upper()}\n{canonical}\n{timestamp}\n{nonce}\n{body_str}\n'
+        digest = hmac.new(
+            self.secret_key.encode('utf-8'),
+            sts.encode('utf-8'),
+            hashlib.sha256,
+        ).digest()
+        return base64.b64encode(digest).decode('ascii')
+
+    def _authorization(self, method: str, path: str,
+                       query: str = '', body_str: str = '') -> str:
+        ts    = int(time.time())
+        nonce = self._nonce()
+        sig   = self._sign(method, path, query, body_str, ts, nonce)
+        return (
+            f'JOP appid="{self.app_id}",'
+            f'accesskey="{self.access_key}",'
+            f'timestamp="{ts}",'
+            f'nonce="{nonce}",'
+            f'signature="{sig}"'
+        )
 
     # ── HTTP ──────────────────────────────────────────────────────────────────
 
@@ -229,22 +244,28 @@ class JLCAPIClient:
                  params: Optional[dict] = None,
                  body: Optional[dict] = None,
                  timeout: int = 15) -> dict:
-        url = self.base_url + path
+        query    = ''
+        url      = self.BASE_URL + path
         if params:
-            qs = '&'.join(f'{k}={urllib.parse.quote(str(v))}' for k, v in params.items())
-            url = f'{url}?{qs}'
+            query = urllib.parse.urlencode(params)
+            url   = f'{url}?{query}'
 
-        data = json.dumps(body).encode() if body else None
-        req  = urllib.request.Request(url, data=data, headers=self._headers(), method=method)
+        body_str = json.dumps(body, ensure_ascii=False) if body else ''
+        data     = body_str.encode('utf-8') if body_str else None
+
+        headers = {
+            'Authorization': self._authorization(method, path, query, body_str),
+            'Content-Type':  'application/json',
+            'Accept':        'application/json',
+        }
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
 
         try:
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 raw = resp.read().decode('utf-8')
         except urllib.error.HTTPError as e:
             body_err = e.read().decode('utf-8', errors='replace')
-            raise JLCAPIError(
-                f'HTTP {e.code} {e.reason} — {body_err[:300]}'
-            ) from e
+            raise JLCAPIError(f'HTTP {e.code} {e.reason} — {body_err[:400]}') from e
         except urllib.error.URLError as e:
             raise JLCAPIError(f'Connection error: {e.reason}') from e
         except Exception as e:
@@ -255,10 +276,9 @@ class JLCAPIClient:
         except json.JSONDecodeError:
             raise JLCAPIError(f'Invalid JSON response: {raw[:200]}')
 
-        # JLCPCB API wraps data in {"code": 0, "data": {...}, "message": ""}
         if isinstance(result, dict):
-            code = result.get('code', result.get('status', 0))
-            if code not in (0, 200, '0', '200', 'success', None):
+            code = result.get('code', 0)
+            if code not in (0, 200, '0', '200'):
                 msg = result.get('message') or result.get('msg') or str(result)
                 raise JLCAPIError(f'API error {code}: {msg}')
             return result.get('data', result)
@@ -269,96 +289,80 @@ class JLCAPIClient:
 
     def test_connection(self) -> dict:
         """
-        Probe multiple endpoint candidates to find working API paths.
-        Returns {'ok': bool, 'message': str, 'raw': dict, 'details': list}
+        Test credentials by calling the PCB config endpoint (GET, no body).
+        Returns {'ok': bool, 'message': str}
         """
+        if not self.app_id:
+            return {'ok': False, 'message': 'App ID не заповнено.'}
         if not self.access_key:
-            return {'ok': False, 'message': 'Access Key не заповнено.', 'raw': {}, 'details': []}
-
+            return {'ok': False, 'message': 'Access Key не заповнено.'}
         if not self.secret_key:
             return {
                 'ok': False,
                 'message': (
                     '⚠️ Secret Key / Tokenization Key не заповнено.\n'
-                    'Знайдіть його на сторінці налаштувань JLCPCB Developer Portal.'
+                    'Знайдіть його на сторінці налаштувань JLCPCB Developer Portal\n'
+                    '(поле "Tokenization Key" або "Secret Key").'
                 ),
-                'raw': {}, 'details': [],
             }
 
-        details = []
-        for ep in self._EP_PROBES:
-            try:
-                params = {'page': 1, 'pageSize': 1} if 'order' in ep else None
-                raw = self._request('GET', ep, params=params, timeout=10)
-                msg = (
+        try:
+            raw = self._request('GET', self.EP_PCB_CONFIG, timeout=12)
+            preview = str(raw)[:300] if raw else '(порожня відповідь)'
+            return {
+                'ok': True,
+                'message': (
                     f'✅ З\'єднання успішне!\n'
-                    f'Робочий endpoint: {self.base_url}{ep}\n'
-                    f'Відповідь: {str(raw)[:200]}'
+                    f'URL: {self.BASE_URL}{self.EP_PCB_CONFIG}\n'
+                    f'Відповідь: {preview}'
+                ),
+            }
+        except JLCAPIError as e:
+            err = str(e)
+            if '401' in err or '403' in err or 'Unauthorized' in err:
+                hint = (
+                    '\n\n⚠️ Помилка авторизації (401/403).\n'
+                    'Перевір App ID, Access Key та Secret Key / Tokenization Key.\n'
+                    'Переконайся, що API "PCB" авторизовані в Developer Portal\n'
+                    '(Requestable APIs → подай заявку → зачекай підтвердження).'
                 )
-                return {'ok': True, 'message': msg, 'raw': raw, 'details': details}
-            except JLCAPIError as e:
-                err_str = str(e)
-                details.append(f'{ep}: {err_str[:120]}')
-                logger.debug('JLCPCB probe %s → %s', ep, err_str[:80])
+            elif '404' in err:
+                hint = (
+                    '\n\n⚠️ 404 — endpoint не знайдено.\n'
+                    'Можливо JLCPCB змінили шлях. Повідом розробника.'
+                )
+            else:
+                hint = '\n\nПеревір підключення до інтернету та правильність ключів.'
+            return {'ok': False, 'message': f'❌ {err}{hint}'}
 
-        # All probes failed — build diagnostic message
-        summary = '\n'.join(f'  {d}' for d in details[:6])
-        if any('404' in d for d in details):
-            hint = (
-                '\n\n⚠️ Отримано 404 — швидше за все, жодне API не авторизовано.\n'
-                'Зайди на JLCPCB Developer Portal → Requestable APIs → '
-                'подай заявку на Order API та зачекай підтвердження.'
-            )
-        elif any('401' in d or '403' in d for d in details):
-            hint = (
-                '\n\n⚠️ Помилка авторизації (401/403).\n'
-                'Перевір Access Key та Secret Key / Tokenization Key.'
-            )
-        else:
-            hint = '\n\nПеревір підключення до інтернету та правильність ключів.'
-
-        return {
-            'ok': False,
-            'message': f'❌ Всі endpoints недоступні:\n{summary}{hint}',
-            'raw': {},
-            'details': details,
-        }
-
-    def get_orders(self, page: int = 1, page_size: int = 50) -> dict:
+    def get_pcb_order(self, batch_number: str) -> dict:
         """
-        Fetch paginated order list.
-        Returns raw API response dict (contains list + pagination).
-        Expected structure: {'list': [...], 'total': N, 'page': 1, 'pageSize': 50}
+        Get PCB order detail by batch number (visible in JLCPCB order history).
+        Batch number format: W2025040800001
+        Returns raw data dict from API.
         """
-        return self._request('GET', self.EP_ORDERS, params={
-            'page':     page,
-            'pageSize': page_size,
-        })
+        return self._request('POST', self.EP_PCB_DETAIL,
+                              body={'batchNum': batch_number})
 
-    def get_all_orders(self, max_pages: int = 20) -> list:
-        """Fetch all orders across pages."""
-        all_orders = []
-        for p in range(1, max_pages + 1):
-            result = self.get_orders(page=p, page_size=50)
-            items = result if isinstance(result, list) else (
-                result.get('list') or result.get('orders') or result.get('data') or []
-            )
-            if not items:
-                break
-            all_orders.extend(items)
-            total   = result.get('total', 0) if isinstance(result, dict) else 0
-            fetched = len(all_orders)
-            if total and fetched >= total:
-                break
-        return all_orders
+    def get_pcb_wip(self, batch_number: str) -> dict:
+        """Get PCB production progress (WIP stages) by batch number."""
+        return self._request('POST', self.EP_PCB_WIP,
+                              body={'batchNum': batch_number})
 
-    def get_order(self, order_id: str) -> dict:
-        """Fetch single order detail."""
-        return self._request('GET', self.EP_ORDER, params={'orderId': order_id})
+    def get_pcb_audit(self, batch_number: str) -> dict:
+        """Get PCB file audit status by batch number."""
+        return self._request('POST', self.EP_PCB_AUDIT,
+                              body={'batchNum': batch_number})
 
-    def get_tracking(self, order_id: str) -> dict:
-        """Fetch tracking info for an order."""
-        return self._request('GET', self.EP_TRACKING, params={'orderId': order_id})
+    def refresh_order(self, jlc_order) -> dict:
+        """
+        Fetch latest status for a JLCOrder from API and return raw data.
+        Uses jlc_order_number as the JLCPCB batch number.
+        """
+        batch = jlc_order.jlc_order_number or jlc_order.jlc_order_id
+        if not batch:
+            raise JLCAPIError('Batch number (order number) not set on this order.')
+        return self.get_pcb_order(batch)
 
     @classmethod
     def from_config(cls) -> 'JLCAPIClient':
@@ -366,10 +370,9 @@ class JLCAPIClient:
         from jlcpcb.models import JLCConfig
         cfg = JLCConfig.get()
         return cls(
+            app_id=cfg.app_id,
             access_key=cfg.access_key,
             secret_key=cfg.secret_key,
-            app_id=cfg.app_id,
-            use_sandbox=cfg.use_sandbox,
         )
 
 

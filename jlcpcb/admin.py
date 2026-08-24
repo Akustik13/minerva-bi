@@ -58,11 +58,13 @@ class JLCConfigAdmin(admin.ModelAdmin):
             'fields': ('app_id', 'access_key', 'secret_key', 'use_sandbox'),
             'description': (
                 'Ключі знаходяться на '
-                '<a href="https://api.jlcpcb.com/console/setting" target="_blank">'
-                'api.jlcpcb.com/console/setting</a>.<br>'
+                '<a href="https://open.jlcpcb.com/console/setting" target="_blank">'
+                'open.jlcpcb.com/console/setting</a>.<br>'
+                '<b>App ID</b> — числовий ідентифікатор застосунку.<br>'
+                '<b>Access Key</b> — публічний ключ доступу.<br>'
+                '<b>Secret Key / Tokenization Key</b> — секретний ключ для підпису запитів.<br>'
                 '<b>Увага:</b> перед тестом переконайтесь що у розділі '
-                '<b>Requestable APIs</b> подано заявки на Order API — '
-                'без авторизованих API будь-який запит повертає 404.'
+                '<b>Requestable APIs</b> подано заявки та отримано підтвердження (Authorized APIs &gt; 0).'
             ),
         }),
         ('🔄 Синхронізація', {
@@ -196,6 +198,11 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 'jlc_order_id', 'jlc_order_number', 'order_type',
                 'description', 'quantity',
             ),
+            'description': (
+                '⚠️ <b>Номер замовлення (jlc_order_number)</b> — це Batch Number з JLCPCB '
+                '(напр. <code>W2025040800001</code>), видимий в розділі Order History на сайті JLCPCB. '
+                'Без цього поля синхронізація статусу через API неможлива.'
+            ),
         }),
         ('🔄 Статус', {
             'fields': ('local_status', 'jlc_status'),
@@ -293,7 +300,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
         return redirect('admin:jlcpcb_jlcorder_change', pk)
 
     def refresh_order_view(self, request, pk):
-        """Refresh a single order status from JLCPCB API."""
+        """Refresh a single order status from JLCPCB API by batch number."""
         order = get_object_or_404(JLCOrder, pk=pk)
         from .services.api import JLCAPIClient, JLCAPIError, map_jlc_status, status_can_advance
         from .notifications import notify_jlc_status_change
@@ -301,18 +308,28 @@ class JLCOrderAdmin(admin.ModelAdmin):
         if not cfg.access_key:
             messages.warning(request, '⚠️ API ключі не налаштовано в JLCConfig.')
             return redirect('admin:jlcpcb_jlcorder_change', pk)
+        batch = order.jlc_order_number or order.jlc_order_id
+        if not batch:
+            messages.error(request, '❌ Вкажіть номер замовлення (Batch Number) у полі «Номер замовлення».')
+            return redirect('admin:jlcpcb_jlcorder_change', pk)
         try:
-            client  = JLCAPIClient.from_config()
-            raw     = client.get_order(order.jlc_order_id)
-            new_st  = map_jlc_status(raw.get('status', ''))
-            old_st  = order.local_status
+            client = JLCAPIClient.from_config()
+            raw    = client.get_pcb_order(batch)
+            old_st = order.local_status
+            jlc_st = (raw.get('status') or raw.get('orderStatus') or raw.get('pcbStatus', ''))
+            new_st = map_jlc_status(jlc_st)
             order.raw_data   = raw
-            order.jlc_status = raw.get('status', '')
+            order.jlc_status = jlc_st
             if status_can_advance(old_st, new_st):
                 order.local_status = new_st
-                if raw.get('trackingNumber'):
-                    order.tracking_number  = raw['trackingNumber']
-                    order.tracking_carrier = raw.get('carrier', '')
+                tracking = raw.get('trackingNumber') or raw.get('expressNo', '')
+                if tracking:
+                    order.tracking_number  = tracking
+                    order.tracking_carrier = raw.get('carrier') or raw.get('expressCompany', '')
+                if new_st == 'shipped' and not order.shipped_date:
+                    order.shipped_date = timezone.now().date()
+                if new_st == 'delivered' and not order.delivered_date:
+                    order.delivered_date = timezone.now().date()
             order.save()
             messages.success(request, f'✅ Статус оновлено: {order.get_local_status_display()}')
             if old_st != order.local_status and order.local_status != order.last_notified_status:
