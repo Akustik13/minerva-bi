@@ -316,8 +316,22 @@ class JLCAPIClient:
         # Probe 1: JPay balance — verifies credentials regardless of PCB auth
         try:
             raw = self._request('GET', self.EP_JPAY_BALANCE, timeout=12)
-            balance = raw.get('balance') or raw.get('availableBalance') or str(raw)[:100]
-            lines.append(f'✅ Авторизація працює (JPay: баланс = {balance})')
+            jpay_status = raw.get('jpayAccountStatus', -1)
+            balance     = raw.get('accountBalance')
+            frozen      = raw.get('freezeAmount')
+            customer    = raw.get('customerCode', '')
+            if jpay_status == 1:
+                balance_str = f'{balance:.2f} USD' if balance is not None else '0.00 USD'
+                frozen_str  = f'{frozen:.2f}' if frozen else '0.00'
+                lines.append(
+                    f'✅ Авторизація працює — JPay активовано\n'
+                    f'   Клієнт: {customer} | Баланс: {balance_str} | Заморожено: {frozen_str}'
+                )
+            else:
+                lines.append(
+                    f'✅ Авторизація працює — JPay не активовано\n'
+                    f'   Клієнт: {customer} | Щоб побачити баланс: активуй JPay рахунок на сайті JLCPCB'
+                )
             auth_ok = True
         except JLCAPIError as e:
             err = str(e)
