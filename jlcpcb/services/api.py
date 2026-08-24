@@ -203,6 +203,9 @@ class JLCAPIClient:
     EP_PCB_WIP    = '/overseas/openapi/pcb/wip/get'               # POST — production WIP
     EP_PCB_AUDIT  = '/overseas/openapi/pcb/audit/get'             # POST — file audit status
 
+    # Always-authorized endpoint (JPay balance) — used to verify credentials
+    EP_JPAY_BALANCE = '/overseas/openapi/jpay/customerJpayAccount/getAccountDetail'  # GET
+
     def __init__(self, app_id: str, access_key: str, secret_key: str):
         self.app_id     = app_id
         self.access_key = access_key
@@ -289,7 +292,9 @@ class JLCAPIClient:
 
     def test_connection(self) -> dict:
         """
-        Test credentials by calling the PCB config endpoint (GET, no body).
+        Test credentials using two probes:
+        1. JPay balance endpoint — always authorized, verifies auth/credentials
+        2. PCB config endpoint — verifies PCB API is authorized
         Returns {'ok': bool, 'message': str}
         """
         if not self.app_id:
@@ -301,39 +306,49 @@ class JLCAPIClient:
                 'ok': False,
                 'message': (
                     '⚠️ Secret Key / Tokenization Key не заповнено.\n'
-                    'Знайдіть його на сторінці налаштувань JLCPCB Developer Portal\n'
-                    '(поле "Tokenization Key" або "Secret Key").'
+                    'Знайдіть його на Developer Portal → App Setting → Tokenization Key.\n'
+                    'Натисни "Generate" якщо він ще не згенерований.'
                 ),
             }
 
+        lines = []
+
+        # Probe 1: JPay balance — verifies credentials regardless of PCB auth
         try:
-            raw = self._request('GET', self.EP_PCB_CONFIG, timeout=12)
-            preview = str(raw)[:300] if raw else '(порожня відповідь)'
-            return {
-                'ok': True,
-                'message': (
-                    f'✅ З\'єднання успішне!\n'
-                    f'URL: {self.BASE_URL}{self.EP_PCB_CONFIG}\n'
-                    f'Відповідь: {preview}'
-                ),
-            }
+            raw = self._request('GET', self.EP_JPAY_BALANCE, timeout=12)
+            balance = raw.get('balance') or raw.get('availableBalance') or str(raw)[:100]
+            lines.append(f'✅ Авторизація працює (JPay: баланс = {balance})')
+            auth_ok = True
         except JLCAPIError as e:
             err = str(e)
-            if '401' in err or '403' in err or 'Unauthorized' in err:
-                hint = (
-                    '\n\n⚠️ Помилка авторизації (401/403).\n'
-                    'Перевір App ID, Access Key та Secret Key / Tokenization Key.\n'
-                    'Переконайся, що API "PCB" авторизовані в Developer Portal\n'
-                    '(Requestable APIs → подай заявку → зачекай підтвердження).'
-                )
-            elif '404' in err:
-                hint = (
-                    '\n\n⚠️ 404 — endpoint не знайдено.\n'
-                    'Можливо JLCPCB змінили шлях. Повідом розробника.'
-                )
+            if '401' in err or '403' in err or 'Unauthorized' in err or 'sign' in err.lower():
+                lines.append(f'❌ Помилка авторизації: {err[:200]}')
+                lines.append('   → Перевір App ID, Access Key та Tokenization Key.')
+                return {'ok': False, 'message': '\n'.join(lines)}
+            lines.append(f'⚠️ JPay endpoint: {err[:150]}')
+            auth_ok = False
+
+        # Probe 2: PCB config — verifies PCB API is authorized
+        try:
+            self._request('GET', self.EP_PCB_CONFIG, timeout=12)
+            lines.append('✅ PCB API авторизовано — синхронізація доступна!')
+            return {'ok': True, 'message': '\n'.join(lines)}
+        except JLCAPIError as e:
+            err = str(e)
+            if '404' in err:
+                lines.append('⚠️ PCB API ще не авторизовано (404).')
+                lines.append('   → Зайди на Developer Portal → Requestable APIs →')
+                lines.append('     подай заявки на PCB-related APIs → зачекай підтвердження.')
+                if auth_ok:
+                    lines.append('')
+                    lines.append('Ключі правильні — щойно PCB API схвалять, все запрацює.')
+                return {'ok': False, 'message': '\n'.join(lines)}
+            elif '401' in err or '403' in err:
+                lines.append(f'❌ Помилка авторизації для PCB API: {err[:150]}')
+                return {'ok': False, 'message': '\n'.join(lines)}
             else:
-                hint = '\n\nПеревір підключення до інтернету та правильність ключів.'
-            return {'ok': False, 'message': f'❌ {err}{hint}'}
+                lines.append(f'⚠️ PCB API: {err[:150]}')
+                return {'ok': auth_ok, 'message': '\n'.join(lines)}
 
     def get_pcb_order(self, batch_number: str) -> dict:
         """
