@@ -158,6 +158,7 @@ class JLCConfigAdmin(admin.ModelAdmin):
         extra['test_url']        = reverse('admin:jlcpcb_config_test')
         extra['sync_url']        = reverse('admin:jlcpcb_config_sync')
         extra['orders_url']      = reverse('admin:jlcpcb_jlcorder_changelist')
+        extra['add_order_url']   = reverse('admin:jlcpcb_jlcorder_add')
         extra['orders_count']    = JLCOrder.objects.count()
         extra['active_orders']   = JLCOrder.objects.exclude(
             local_status__in=['delivered', 'cancelled']
