@@ -314,23 +314,28 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.error(request, '❌ Вкажіть номер замовлення (Batch Number) у полі «Номер замовлення».')
             return redirect('admin:jlcpcb_jlcorder_change', pk)
         try:
+            from .services.api import extract_pcb_item
             client = JLCAPIClient.from_config()
             raw    = client.get_pcb_order(batch)
+            pcb    = extract_pcb_item(raw)
             old_st = order.local_status
-            jlc_st = (raw.get('status') or raw.get('orderStatus') or raw.get('pcbStatus', ''))
-            new_st = map_jlc_status(jlc_st)
+
+            status_int = pcb.get('orderStatus')
+            new_st     = map_jlc_status(status_int)
             order.raw_data   = raw
-            order.jlc_status = jlc_st
+            order.jlc_status = str(status_int) if status_int is not None else ''
+
+            # Fill description from Gerber file name if blank
+            if not order.description and pcb.get('fileName'):
+                order.description = pcb['fileName']
+
             if status_can_advance(old_st, new_st):
                 order.local_status = new_st
-                tracking = raw.get('trackingNumber') or raw.get('expressNo', '')
-                if tracking:
-                    order.tracking_number  = tracking
-                    order.tracking_carrier = raw.get('carrier') or raw.get('expressCompany', '')
                 if new_st == 'shipped' and not order.shipped_date:
                     order.shipped_date = timezone.now().date()
                 if new_st == 'delivered' and not order.delivered_date:
                     order.delivered_date = timezone.now().date()
+
             order.save()
             messages.success(request, f'✅ Статус оновлено: {order.get_local_status_display()}')
             if old_st != order.local_status and order.local_status != order.last_notified_status:

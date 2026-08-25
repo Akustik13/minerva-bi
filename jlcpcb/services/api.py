@@ -7,13 +7,17 @@ Auth:      JOP scheme (single Authorization header)
   string-to-sign = "METHOD\n{uri_with_query}\n{timestamp_seconds}\n{nonce}\n{body}\n"
   signature      = base64(HMAC-SHA256(secret_key, string_to_sign))
 
-PCB endpoints (all POST, body JSON):
-  /overseas/openapi/pcb/getSteelPriceConfig   — GET, no body (used for health check)
-  /overseas/openapi/pcb/order/detail          — POST {"batchNum": "..."}
-  /overseas/openapi/pcb/wip/get               — POST {"batchNum": "..."} (production progress)
-  /overseas/openapi/pcb/audit/get             — POST {"batchNum": "..."} (audit / file review)
+PCB endpoints (per official docs):
+  POST /overseas/openapi/pcb/order/detail              — {"batchNum":"W202501..."} → order info
+  POST /overseas/openapi/pcb/pageBatchInfoByOrderType  — paginated batch list by date range
+  POST /overseas/openapi/pcb/wip/get                   — {"orderUUID":"..."} → WIP progress
+  POST /overseas/openapi/pcb/audit/get                 — {"key":"..."} → Gerber pre-review
+  GET  /overseas/openapi/pcb/getSteelPriceConfig       — health check (GET, no params)
 
-NOTE: There is no PCB order list endpoint. Orders are tracked by batch number.
+Response structure for order/detail:
+  data.orderItem[0].pcbItem.orderStatus  ← INTEGER (0-5), not string!
+  0=Cancelled, 1=Pending Review, 2=Awaiting Confirmation,
+  3=Confirmed, 4=Submitted to factory (In Production), 5=Shipped
 """
 import base64
 import hashlib
@@ -44,23 +48,17 @@ _STATUS_PRIORITY = {
     'cancelled':     99,
 }
 
-# Raw JLCPCB API statuses → local_status
-# Extend when you see new statuses in raw_data
-JLC_STATUS_MAP = {
-    'Placed':              'ordered',
-    'Reviewing':           'reviewed',
-    'Confirmed':           'reviewed',
-    'Quotation Confirmed': 'reviewed',
-    'In Production':       'in_production',
-    'Manufacturing':       'in_production',
-    'SMT':                 'in_production',
-    'Produced':            'manufactured',
-    'Quality Check':       'manufactured',
-    'Shipped':             'shipped',
-    'Partially Shipped':   'shipped',
-    'Delivered':           'delivered',
-    'Cancelled':           'cancelled',
-    'Refunded':            'cancelled',
+# JLCPCB API orderStatus is an INTEGER (from official docs):
+# 0=Cancelled, 1=Pending Review, 2=Awaiting Confirmation,
+# 3=Confirmed, 4=Submitted to factory, 5=Shipped
+# Note: "delivered" has no API status — use deliveryTime field or manual update
+JLC_INT_STATUS_MAP = {
+    0: 'cancelled',
+    1: 'ordered',        # Pending Review
+    2: 'reviewed',       # Awaiting Confirmation
+    3: 'reviewed',       # Confirmed
+    4: 'in_production',  # Submitted to factory
+    5: 'shipped',
 }
 
 
@@ -72,18 +70,33 @@ def status_can_advance(current: str, new: str) -> bool:
     return _STATUS_PRIORITY.get(new, 0) > _STATUS_PRIORITY.get(current, 0)
 
 
-def map_jlc_status(jlc_raw: str) -> str:
-    """Best-effort mapping; unknown statuses stay 'ordered'."""
-    if not jlc_raw:
+def map_jlc_status(status_int) -> str:
+    """Map API integer orderStatus to local_status. Accepts int or string int."""
+    if status_int is None:
         return 'ordered'
-    if jlc_raw in JLC_STATUS_MAP:
-        return JLC_STATUS_MAP[jlc_raw]
-    # case-insensitive fallback
-    for k, v in JLC_STATUS_MAP.items():
-        if k.lower() == jlc_raw.lower():
-            return v
-    logger.warning('Unknown JLCPCB status: %r — treating as ordered', jlc_raw)
-    return 'ordered'
+    try:
+        return JLC_INT_STATUS_MAP.get(int(status_int), 'ordered')
+    except (TypeError, ValueError):
+        logger.warning('Unexpected JLCPCB orderStatus value: %r', status_int)
+        return 'ordered'
+
+
+def extract_pcb_item(raw: dict) -> dict:
+    """
+    Navigate nested order/detail response to find pcbItem.
+    Response: data.orderItem[N].pcbItem (orderType=1 for PCB, 3 for Stencil)
+    Returns pcbItem dict or {}.
+    """
+    items = raw.get('orderItem', [])
+    for item in items:
+        if item.get('orderType') == 1:   # PCB
+            return item.get('pcbItem') or {}
+    # fallback: return first pcbItem found
+    for item in items:
+        pcb = item.get('pcbItem')
+        if pcb:
+            return pcb
+    return {}
 
 
 # ── Product matching ──────────────────────────────────────────────────────────
@@ -197,11 +210,12 @@ class JLCAPIClient:
 
     BASE_URL = 'https://open.jlcpcb.com'
 
-    # PCB endpoints
-    EP_PCB_CONFIG = '/overseas/openapi/pcb/getSteelPriceConfig'  # GET — health check
-    EP_PCB_DETAIL = '/overseas/openapi/pcb/order/detail'          # POST by batchNum
-    EP_PCB_WIP    = '/overseas/openapi/pcb/wip/get'               # POST — production WIP
-    EP_PCB_AUDIT  = '/overseas/openapi/pcb/audit/get'             # POST — file audit status
+    # PCB endpoints (per official docs)
+    EP_PCB_CONFIG     = '/overseas/openapi/pcb/getSteelPriceConfig'          # GET — health check
+    EP_PCB_DETAIL     = '/overseas/openapi/pcb/order/detail'                 # POST {"batchNum":"..."}
+    EP_PCB_BATCH_LIST = '/overseas/openapi/pcb/pageBatchInfoByOrderType'     # POST — paginated order list
+    EP_PCB_WIP        = '/overseas/openapi/pcb/wip/get'                      # POST {"orderUUID":"..."}
+    EP_PCB_AUDIT      = '/overseas/openapi/pcb/audit/get'                    # POST {"key":"..."} Gerber review
 
     # Always-authorized endpoint (JPay balance) — used to verify credentials
     EP_JPAY_BALANCE = '/overseas/openapi/jpay/customerJpayAccount/getAccountDetail'  # GET
@@ -374,31 +388,56 @@ class JLCAPIClient:
 
     def get_pcb_order(self, batch_number: str) -> dict:
         """
-        Get PCB order detail by batch number (visible in JLCPCB order history).
-        Batch number format: W2025040800001
-        Returns raw data dict from API.
+        Get PCB order detail by batch number.
+        Batch number format: W2025040800001 (visible in JLCPCB Order History).
+        Returns the raw data dict (contains orderItem list with pcbItem nested inside).
+        Use extract_pcb_item(raw) to get the PCB-specific fields.
         """
         return self._request('POST', self.EP_PCB_DETAIL,
                               body={'batchNum': batch_number})
 
-    def get_pcb_wip(self, batch_number: str) -> dict:
-        """Get PCB production progress (WIP stages) by batch number."""
-        return self._request('POST', self.EP_PCB_WIP,
-                              body={'batchNum': batch_number})
+    def get_pcb_batch_list(self, date_from: str, date_to: str,
+                           page: int = 1, page_size: int = 50) -> dict:
+        """
+        Paginated list of PCB batch numbers in a date range.
+        date_from / date_to: 'yyyy-MM-dd HH:mm:ss'
+        Returns the raw data dict with 'list' of {batchNum, orderTypeInfos}.
+        """
+        return self._request('POST', self.EP_PCB_BATCH_LIST, body={
+            'pageNum':         page,
+            'pageSize':        min(page_size, 50),
+            'orderType':       'order_pcb',
+            'createTimeStart': date_from,
+            'createTimeEnd':   date_to,
+        })
 
-    def get_pcb_audit(self, batch_number: str) -> dict:
-        """Get PCB file audit status by batch number."""
-        return self._request('POST', self.EP_PCB_AUDIT,
-                              body={'batchNum': batch_number})
+    def get_all_pcb_batch_numbers(self, date_from: str, date_to: str) -> list:
+        """Fetch all PCB batch numbers in the given date range (auto-paginate)."""
+        batch_nums = []
+        page = 1
+        while True:
+            result = self.get_pcb_batch_list(date_from, date_to, page=page, page_size=50)
+            items = result.get('list', [])
+            batch_nums.extend(item['batchNum'] for item in items if item.get('batchNum'))
+            total = result.get('total', 0)
+            if len(batch_nums) >= total or not items:
+                break
+            page += 1
+        return batch_nums
+
+    def get_pcb_wip(self, order_uuid: str) -> dict:
+        """Get PCB production progress (WIP stages) by orderUUID (from order detail)."""
+        return self._request('POST', self.EP_PCB_WIP,
+                              body={'orderUUID': order_uuid})
 
     def refresh_order(self, jlc_order) -> dict:
         """
-        Fetch latest status for a JLCOrder from API and return raw data.
-        Uses jlc_order_number as the JLCPCB batch number.
+        Fetch latest data for a JLCOrder. Returns raw data dict.
+        Caller should use extract_pcb_item(raw) to get orderStatus (int) etc.
         """
         batch = jlc_order.jlc_order_number or jlc_order.jlc_order_id
         if not batch:
-            raise JLCAPIError('Batch number (order number) not set on this order.')
+            raise JLCAPIError('Batch number (jlc_order_number) not set on this order.')
         return self.get_pcb_order(batch)
 
     @classmethod
