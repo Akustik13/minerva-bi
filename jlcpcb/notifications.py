@@ -114,20 +114,52 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
     icon      = _STATUS_ICONS.get(new_status, '📋')
     company   = _get_company_name()
 
+    # Product / description line
     product_info = ''
     if order.product_id:
         product_info = f'\n🏷 Товар: <b>{order.product.sku}</b>'
     elif order.description:
         product_info = f'\n📄 {order.description[:80]}'
 
-    tracking_info = ''
-    if order.tracking_number:
-        carrier = f' ({order.tracking_carrier})' if order.tracking_carrier else ''
-        tracking_info = f'\n🔍 Трекінг: <code>{order.tracking_number}</code>{carrier}'
-        if order.tracking_url:
-            tracking_info += f'\n<a href="{order.tracking_url}">Відстежити посилку</a>'
+    # Shipping method (from model field or raw_data fallback)
+    shipping_method = order.tracking_carrier or ''
+    if not shipping_method and isinstance(getattr(order, 'raw_data', None), dict):
+        shipping_method = order.raw_data.get('shippingMethod', '')
 
-    # Show "test" label when old==new (manual force send)
+    # Expected delivery date
+    eta_line = ''
+    eta_plain = ''
+    if order.expected_date:
+        try:
+            months_uk = ['', 'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
+                         'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня']
+            d = order.expected_date
+            eta_str = f'{d.day} {months_uk[d.month]} {d.year}'
+        except Exception:
+            eta_str = str(order.expected_date)
+        eta_line  = f'\n📅 Очікувана доставка: <b>{eta_str}</b>'
+        eta_plain = f'Очікувана доставка: {eta_str}\n'
+
+    # Tracking / carrier block
+    tracking_info  = ''
+    tracking_plain = ''
+    if order.tracking_number:
+        carrier_str = f' ({shipping_method})' if shipping_method else ''
+        tracking_info  = f'\n🔍 Трекінг: <code>{order.tracking_number}</code>{carrier_str}'
+        tracking_plain = f'Трекінг: {order.tracking_number}{carrier_str}\n'
+        if order.tracking_url:
+            tracking_info  += f'\n<a href="{order.tracking_url}">🔗 Відстежити посилку</a>'
+            tracking_plain += f'Відстежити: {order.tracking_url}\n'
+    else:
+        # No tracking yet — show shipping method and hint
+        if shipping_method:
+            tracking_info  = f'\n🚚 Перевізник: <b>{shipping_method}</b>'
+            tracking_plain = f'Перевізник: {shipping_method}\n'
+        if new_status == 'shipped':
+            tracking_info  += '\n⚠️ Трекінг-номер не вказано — перевір email від JLCPCB'
+            tracking_plain += 'Трекінг-номер буде у листі від JLCPCB. Введи його в картку замовлення.\n'
+
+    # Status line
     status_line = (
         f'\nСтатус: <b>{new_label}</b> (поточний)'
         if old_status == new_status
@@ -137,9 +169,10 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
     tg_text = (
         f'{icon} <b>JLCPCB — {new_label}</b>\n'
         f'Замовлення: <code>{order.jlc_order_id}</code>\n'
-        f'Кількість: {order.quantity} шт.'
+        f'Кількість: <b>{order.quantity}</b> шт.'
         f'{product_info}'
         f'{status_line}'
+        f'{eta_line}'
         f'{tracking_info}\n'
         f'<i>{company}</i>'
     )
@@ -152,11 +185,7 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
     )
     if order.description:
         email_body += f'Опис: {order.description}\n'
-    if order.tracking_number:
-        carrier = f' ({order.tracking_carrier})' if order.tracking_carrier else ''
-        email_body += f'Трекінг: {order.tracking_number}{carrier}\n'
-        if order.tracking_url:
-            email_body += f'Відстежити: {order.tracking_url}\n'
+    email_body += eta_plain + tracking_plain
 
     if cfg.notify_telegram:
         _send_telegram(tg_text)

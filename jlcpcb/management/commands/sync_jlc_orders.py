@@ -148,12 +148,13 @@ class Command(BaseCommand):
                 self.stdout.write(f'  {batch}: no pcbItem in response, skip')
                 continue
 
-            status_int    = pcb.get('orderStatus')
-            new_status    = map_jlc_status(status_int)
-            file_name     = pcb.get('fileName', '')
-            quantity      = pcb.get('count', 1) or 1
-            delivery_time = pcb.get('deliveryTime')   # DHL estimated delivery datetime str
-            price         = pcb.get('price')
+            status_int      = pcb.get('orderStatus')
+            new_status      = map_jlc_status(status_int)
+            file_name       = pcb.get('fileName', '')
+            quantity        = pcb.get('count', 1) or 1
+            delivery_time   = pcb.get('deliveryTime')   # DHL estimated delivery datetime str
+            price           = pcb.get('price')
+            shipping_method = raw.get('shippingMethod', '')  # e.g. "DHL EXPRESS"
 
             # Parse expected_date from deliveryTime field
             expected_date = None
@@ -168,14 +169,15 @@ class Command(BaseCommand):
             order, is_created = JLCOrder.objects.get_or_create(
                 jlc_order_number=batch,
                 defaults={
-                    'jlc_order_id':  batch,
-                    'local_status':  new_status,
-                    'jlc_status':    str(status_int) if status_int is not None else '',
-                    'description':   file_name,
-                    'quantity':      quantity,
-                    'total_price':   price,
-                    'expected_date': expected_date,
-                    'raw_data':      raw,
+                    'jlc_order_id':    batch,
+                    'local_status':    new_status,
+                    'jlc_status':      str(status_int) if status_int is not None else '',
+                    'description':     file_name,
+                    'quantity':        quantity,
+                    'total_price':     price,
+                    'expected_date':   expected_date,
+                    'tracking_carrier': shipping_method,
+                    'raw_data':        raw,
                 },
             )
 
@@ -199,6 +201,9 @@ class Command(BaseCommand):
                 if expected_date and not order.expected_date:
                     order.expected_date = expected_date
                     update_fields.append('expected_date')
+                if shipping_method and not order.tracking_carrier:
+                    order.tracking_carrier = shipping_method
+                    update_fields.append('tracking_carrier')
 
                 # Update description if blank and try auto-match
                 if not order.description and file_name:
