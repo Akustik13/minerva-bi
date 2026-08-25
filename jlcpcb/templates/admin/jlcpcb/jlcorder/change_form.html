@@ -3,146 +3,280 @@
 
 {% block content %}
 <style>
-.jlc-order-panel {
-  margin-bottom: 20px;
-}
-.jlc-order-panel .module-title {
-  font-size: 13px;
-  font-weight: 700;
+/* ── Action panel ── */
+.jlc-order-panel { margin-bottom: 16px; }
+.jlc-order-panel .module-title,
+.jlc-detail-panel .module-title {
+  font-size: 13px; font-weight: 700;
   padding: 8px 12px;
   background: var(--darkened-bg, #f8f8f8);
   border-bottom: 1px solid var(--border-color, #ccc);
   color: var(--body-fg, #333);
   border-radius: 4px 4px 0 0;
 }
-.jlc-order-inner {
-  padding: 14px 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.jlc-order-info {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  font-size: 13px;
-}
+.jlc-order-inner  { padding: 14px 16px 12px; display:flex; flex-direction:column; gap:12px; }
+.jlc-detail-inner { padding: 14px 16px 14px; display:flex; flex-direction:column; gap:16px; }
+
+/* Chips */
+.jlc-order-info { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .jlc-info-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border: 1px solid var(--border-color, #ccc);
-  border-radius: 12px;
-  font-size: 12px;
-  color: var(--body-fg, #333);
-  background: var(--darkened-bg, #f8f8f8);
+  display:inline-flex; align-items:center; gap:5px;
+  padding:4px 10px; border:1px solid var(--border-color,#ccc);
+  border-radius:12px; font-size:12px;
+  color:var(--body-fg,#333); background:var(--darkened-bg,#f8f8f8);
 }
-.jlc-order-btn-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
+.jlc-chip-warn { border-color:#c62828 !important; color:#c62828 !important; }
+.jlc-chip-ok   { border-color:#2e7d32 !important; color:#2e7d32 !important; }
+
+/* Buttons */
+.jlc-order-btn-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .jlc-o-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 7px 14px;
-  border: none;
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  text-decoration: none;
-  color: #fff !important;
-  transition: opacity .15s;
-  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  display:inline-flex; align-items:center; gap:5px;
+  padding:7px 14px; border:none; border-radius:5px;
+  font-size:12px; font-weight:600; cursor:pointer;
+  text-decoration:none; color:#fff !important;
+  transition:opacity .15s; box-shadow:0 1px 3px rgba(0,0,0,.2);
 }
-.jlc-o-btn:hover { opacity: .85; }
-.jlc-o-btn-refresh  { background: #1565c0; }
-.jlc-o-btn-notify   { background: #00695c; }
-.jlc-o-btn-receive  { background: #2e7d32; }
-.jlc-o-btn-match    { background: #e65100; }
-.jlc-o-btn-track    { background: #546e7a; }
-.jlc-o-btn-ignore   { background: #616161; }
-.jlc-divider { width: 1px; height: 28px; background: var(--border-color, #ccc); margin: 0 4px; }
-.jlc-order-hint {
-  font-size: 11px;
-  color: var(--body-quiet-color, #666);
-  line-height: 1.5;
+.jlc-o-btn:hover { opacity:.85; }
+.jlc-o-btn-refresh { background:#1565c0; }
+.jlc-o-btn-notify  { background:#00695c; }
+.jlc-o-btn-receive { background:#2e7d32; }
+.jlc-o-btn-match   { background:#e65100; }
+.jlc-o-btn-track   { background:#546e7a; }
+.jlc-o-btn-ignore  { background:#616161; }
+.jlc-divider { width:1px; height:28px; background:var(--border-color,#ccc); margin:0 4px; }
+.jlc-order-hint { font-size:11px; color:var(--body-quiet-color,#666); line-height:1.6; }
+
+/* ── Detail panel ── */
+.jlc-detail-panel { margin-bottom: 20px; }
+.jlc-kv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px 16px;
+}
+.jlc-kv {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.jlc-kv .k {
+  font-size: 10px; text-transform: uppercase; letter-spacing:.05em;
+  color: var(--body-quiet-color,#666);
+}
+.jlc-kv .v {
+  font-size: 13px; font-weight: 600; color: var(--body-fg,#333);
+}
+.jlc-section-title {
+  font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--body-quiet-color,#888);
+  padding-bottom: 6px; border-bottom: 1px solid var(--border-color,#eee);
+}
+
+/* Sub-orders table */
+.jlc-sub-table {
+  width: 100%; border-collapse: collapse; font-size: 12px;
+}
+.jlc-sub-table th {
+  text-align: left; padding: 6px 8px;
+  background: var(--darkened-bg,#f4f4f4);
+  border-bottom: 2px solid var(--border-color,#ddd);
+  font-size: 11px; text-transform: uppercase; letter-spacing:.05em;
+  color: var(--body-quiet-color,#666);
+}
+.jlc-sub-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--border-color,#eee);
+  vertical-align: top;
+}
+.jlc-sub-table tr:last-child td { border-bottom: none; }
+.jlc-sub-table tr:hover td { background: var(--darkened-bg,#f9f9f9); }
+.jlc-status-badge {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 8px; border-radius:10px;
+  font-size:11px; font-weight:600;
+}
+.st-shipped      { background:#6a1b9a22; color:#6a1b9a; }
+.st-cancelled    { background:#61616122; color:#616161; }
+.st-in_production{ background:#e6510022; color:#e65100; }
+.st-ordered      { background:#607d8b22; color:#607d8b; }
+.st-delivered    { background:#2e7d3222; color:#2e7d32; }
+.st-reviewed     { background:#1565c022; color:#1565c0; }
+.jlc-cancel-reason {
+  font-size: 11px; color: #c62828;
+  margin-top: 3px; line-height: 1.4;
+}
+.jlc-spec-pill {
+  display: inline-block; padding: 1px 7px;
+  background: var(--darkened-bg,#f0f0f0);
+  border: 1px solid var(--border-color,#ddd);
+  border-radius: 8px; font-size: 11px;
+  color: var(--body-fg,#444);
+  margin: 1px 2px 1px 0;
 }
 </style>
 
 {% if jlc_order %}
-{# ── Order action panel BEFORE the form ── #}
+
+{# ── ACTION PANEL ── #}
 <div class="jlc-order-panel module">
   <div class="module-title">⚡ Дії — {{ jlc_order.jlc_order_id }}</div>
   <div class="jlc-order-inner">
 
-    {# Status chips #}
     <div class="jlc-order-info">
       <span class="jlc-info-chip">
         {% if jlc_order.local_status == 'ordered' %}📋{% elif jlc_order.local_status == 'reviewed' %}🔍{% elif jlc_order.local_status == 'in_production' %}🏭{% elif jlc_order.local_status == 'shipped' %}📦{% elif jlc_order.local_status == 'delivered' %}🎉{% elif jlc_order.local_status == 'cancelled' %}❌{% else %}✅{% endif %}
         <strong>{{ jlc_order.get_local_status_display }}</strong>
       </span>
       {% if jlc_order.product_id %}
-      <span class="jlc-info-chip">🏷 {{ jlc_order.product.sku }}</span>
+      <span class="jlc-info-chip jlc-chip-ok">🏷 {{ jlc_order.product.sku }}</span>
       {% elif is_unmatched %}
-      <span class="jlc-info-chip" style="border-color:#c62828;color:#c62828">⚠️ Товар не прив'язано</span>
+      <span class="jlc-info-chip jlc-chip-warn">⚠️ Товар не прив'язано</span>
       {% endif %}
       {% if jlc_order.tracking_number %}
-      <span class="jlc-info-chip">📍 {{ jlc_order.tracking_number }}{% if jlc_order.tracking_carrier %} ({{ jlc_order.tracking_carrier }}){% endif %}</span>
+      <span class="jlc-info-chip">📍 {{ jlc_order.tracking_number }}{% if jlc_order.tracking_carrier %} ({{ jlc_order.tracking_carrier }}){% elif jlc_shipping_method %} ({{ jlc_shipping_method }}){% endif %}</span>
+      {% endif %}
+      {% if jlc_order.expected_date %}
+      <span class="jlc-info-chip">📅 ETA {{ jlc_order.expected_date|date:"d.m.Y" }}</span>
       {% endif %}
       {% if jlc_order.quantity %}
       <span class="jlc-info-chip">🔢 {{ jlc_order.quantity }} шт.</span>
       {% endif %}
     </div>
 
-    {# Action buttons #}
     <div class="jlc-order-btn-row">
-
       {% if has_api_keys %}
       <a href="{{ refresh_url }}" class="jlc-o-btn jlc-o-btn-refresh">🔄 Оновити статус з API</a>
       {% endif %}
-
       <a href="{{ send_notification_url }}" class="jlc-o-btn jlc-o-btn-notify"
          title="Надіслати поточний статус на Telegram / Email">🔔 Надіслати сповіщення</a>
-
       {% if can_receive %}
       <div class="jlc-divider"></div>
       <a href="{{ receive_url }}" class="jlc-o-btn jlc-o-btn-receive">📥 Прийняти на склад</a>
       {% endif %}
-
       {% if is_unmatched %}
       <div class="jlc-divider"></div>
       <a href="{{ match_url }}" class="jlc-o-btn jlc-o-btn-match">🔍 Авто-прив'язати</a>
       {% endif %}
-
       <div class="jlc-divider"></div>
       <a href="{{ set_track_only_url }}" class="jlc-o-btn jlc-o-btn-track">👁 Тільки трекінг</a>
       <a href="{{ set_ignored_url }}" class="jlc-o-btn jlc-o-btn-ignore">🚫 Ігнорувати</a>
-
     </div>
 
-    {# Context hints #}
     <div class="jlc-order-hint">
-      {% if not has_api_keys %}
-        ⚠️ API ключі не налаштовано — оновлення статусу з JLCPCB недоступне.
-      {% endif %}
-      {% if not notify_configured %}
-        ℹ️ Канали сповіщень (Telegram / Email) не налаштовано в JLCConfig.
-      {% endif %}
-      {% if can_receive %}
-        ✅ Замовлення доставлено — можна прийняти на склад.
-      {% elif jlc_order.local_status == 'delivered' and not jlc_order.product_id %}
-        ℹ️ Для прийому на склад спочатку прив'яжіть товар.
-      {% endif %}
+      {% if not has_api_keys %}⚠️ API ключі не налаштовано.{% endif %}
+      {% if not notify_configured %}ℹ️ Канали сповіщень не налаштовано в JLCConfig.{% endif %}
+      {% if can_receive %}✅ Замовлення доставлено — можна прийняти на склад.{% endif %}
+      {% if jlc_order.local_status == 'delivered' and not jlc_order.product_id %}ℹ️ Для прийому прив'яжіть товар.{% endif %}
     </div>
+  </div>
+</div>
+
+{# ── DETAIL PANEL (from raw_data) ── #}
+{% if jlc_sub_orders or jlc_shipping_method %}
+<div class="jlc-detail-panel module">
+  <div class="module-title">📋 Деталі замовлення JLCPCB</div>
+  <div class="jlc-detail-inner">
+
+    {# Shipping & payment summary #}
+    {% if jlc_shipping_method or jlc_total_money or jlc_carriage or jlc_payment or jlc_address %}
+    <div>
+      <div class="jlc-section-title">Доставка та оплата</div>
+      <div class="jlc-kv-grid" style="margin-top:10px">
+        {% if jlc_shipping_method %}
+        <div class="jlc-kv">
+          <span class="k">Перевізник</span>
+          <span class="v">🚚 {{ jlc_shipping_method }}</span>
+        </div>
+        {% endif %}
+        {% if jlc_total_money %}
+        <div class="jlc-kv">
+          <span class="k">Сплачено</span>
+          <span class="v">💰 {{ jlc_total_money }} USD</span>
+        </div>
+        {% endif %}
+        {% if jlc_carriage %}
+        <div class="jlc-kv">
+          <span class="k">Доставка</span>
+          <span class="v">{{ jlc_carriage }} USD</span>
+        </div>
+        {% endif %}
+        {% if jlc_payment %}
+        <div class="jlc-kv">
+          <span class="k">Спосіб оплати</span>
+          <span class="v">{{ jlc_payment }}</span>
+        </div>
+        {% endif %}
+        {% if jlc_address %}
+        <div class="jlc-kv" style="grid-column: span 2">
+          <span class="k">Адреса доставки</span>
+          <span class="v">📍 {{ jlc_address }}</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Sub-orders table #}
+    {% if jlc_sub_orders %}
+    <div>
+      <div class="jlc-section-title">Позиції замовлення ({{ jlc_sub_orders|length }})</div>
+      <table class="jlc-sub-table" style="margin-top:10px">
+        <thead>
+          <tr>
+            <th>Файл / Код</th>
+            <th>Статус</th>
+            <th>К-сть</th>
+            <th>Замовлено</th>
+            <th>ETA доставки</th>
+            <th>Ціна</th>
+            <th>Специфікація</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sub in jlc_sub_orders %}
+          <tr>
+            <td>
+              <strong style="font-family:monospace;font-size:12px">{{ sub.file_name }}</strong>
+              {% if sub.produce_code %}<br><span style="color:var(--body-quiet-color,#888);font-size:11px">{{ sub.produce_code }}</span>{% endif %}
+            </td>
+            <td>
+              <span class="jlc-status-badge st-{{ sub.status_key }}">
+                {{ sub.status_icon }} {{ sub.status_label }}
+              </span>
+              {% if sub.cancel %}
+              <div class="jlc-cancel-reason">⚠️ {{ sub.cancel }}</div>
+              {% endif %}
+            </td>
+            <td style="font-weight:600">{{ sub.count }}</td>
+            <td style="white-space:nowrap;font-size:11px">{{ sub.order_date }}</td>
+            <td style="white-space:nowrap;font-size:11px">
+              {% if sub.delivery_time %}
+              📅 {{ sub.delivery_time }}
+              {% else %}—{% endif %}
+            </td>
+            <td style="white-space:nowrap">
+              {% if sub.price %}{{ sub.price }} USD{% else %}—{% endif %}
+            </td>
+            <td>
+              {% if sub.size %}<span class="jlc-spec-pill">📐 {{ sub.size }}</span>{% endif %}
+              {% if sub.layers %}<span class="jlc-spec-pill">{{ sub.layers }}L</span>{% endif %}
+              {% if sub.thickness %}<span class="jlc-spec-pill">{{ sub.thickness }}мм</span>{% endif %}
+              {% if sub.color %}<span class="jlc-spec-pill" style="color:{% if sub.color == 'Green' %}#2e7d32{% elif sub.color == 'Red' %}#c62828{% elif sub.color == 'Blue' %}#1565c0{% elif sub.color == 'Black' %}#212121{% else %}inherit{% endif %}">■ {{ sub.color }}</span>{% endif %}
+              {% if sub.surface %}<span class="jlc-spec-pill">{{ sub.surface }}</span>{% endif %}
+              {% if sub.material %}<span class="jlc-spec-pill" title="{{ sub.material }}">{{ sub.material|truncatechars:20 }}</span>{% endif %}
+              {% if sub.copper %}<span class="jlc-spec-pill">Cu {{ sub.copper }} oz</span>{% endif %}
+              {% if sub.half_hole == 'yes' %}<span class="jlc-spec-pill">Half-hole</span>{% endif %}
+              {% if sub.build_time %}<span class="jlc-spec-pill">⏱ {{ sub.build_time }}г</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
 
   </div>
 </div>
+{% endif %}
+
 {% endif %}
 
 {{ block.super }}

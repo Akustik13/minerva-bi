@@ -126,17 +126,28 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
     if not shipping_method and isinstance(getattr(order, 'raw_data', None), dict):
         shipping_method = order.raw_data.get('shippingMethod', '')
 
-    # Expected delivery date
+    # Expected delivery date — from model field or raw_data fallback
     eta_line = ''
     eta_plain = ''
-    if order.expected_date:
+    expected_date = order.expected_date
+    if not expected_date and isinstance(getattr(order, 'raw_data', None), dict):
+        for _item in order.raw_data.get('orderItem', []):
+            dt_str = (_item.get('pcbItem') or {}).get('deliveryTime')
+            if dt_str:
+                try:
+                    from datetime import date as _date, datetime as _datetime
+                    expected_date = _datetime.strptime(dt_str[:10], '%Y-%m-%d').date()
+                except Exception:
+                    pass
+                break
+    if expected_date:
         try:
             months_uk = ['', 'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
                          'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня']
-            d = order.expected_date
+            d = expected_date
             eta_str = f'{d.day} {months_uk[d.month]} {d.year}'
         except Exception:
-            eta_str = str(order.expected_date)
+            eta_str = str(expected_date)
         eta_line  = f'\n📅 Очікувана доставка: <b>{eta_str}</b>'
         eta_plain = f'Очікувана доставка: {eta_str}\n'
 

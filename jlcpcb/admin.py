@@ -492,15 +492,72 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 and float(obj.received_qty) < obj.quantity
             )
             extra['is_unmatched'] = obj.mapping_status == JLCOrder.MappingStatus.UNMATCHED
-            extra['refresh_url']            = reverse('admin:jlcpcb_jlcorder_refresh', args=[obj.pk])
-            extra['receive_url']            = reverse('admin:jlcpcb_jlcorder_receive', args=[obj.pk])
-            extra['match_url']              = reverse('admin:jlcpcb_jlcorder_match', args=[obj.pk])
-            extra['set_track_only_url']     = reverse('admin:jlcpcb_jlcorder_set_track_only', args=[obj.pk])
-            extra['set_ignored_url']        = reverse('admin:jlcpcb_jlcorder_set_ignored', args=[obj.pk])
-            extra['send_notification_url']  = reverse('admin:jlcpcb_jlcorder_send_notification', args=[obj.pk])
+            extra['refresh_url']           = reverse('admin:jlcpcb_jlcorder_refresh', args=[obj.pk])
+            extra['receive_url']           = reverse('admin:jlcpcb_jlcorder_receive', args=[obj.pk])
+            extra['match_url']             = reverse('admin:jlcpcb_jlcorder_match', args=[obj.pk])
+            extra['set_track_only_url']    = reverse('admin:jlcpcb_jlcorder_set_track_only', args=[obj.pk])
+            extra['set_ignored_url']       = reverse('admin:jlcpcb_jlcorder_set_ignored', args=[obj.pk])
+            extra['send_notification_url'] = reverse('admin:jlcpcb_jlcorder_send_notification', args=[obj.pk])
             cfg = JLCConfig.get()
             extra['has_api_keys']      = bool(cfg.access_key and cfg.secret_key)
             extra['notify_configured'] = bool(cfg.notify_telegram or cfg.notify_email)
+
+            # Parse raw_data for rich display
+            raw = obj.raw_data if isinstance(obj.raw_data, dict) else {}
+            extra['jlc_raw']           = raw
+            extra['jlc_shipping_method'] = raw.get('shippingMethod', '')
+            extra['jlc_total_money']   = raw.get('totalMoney')
+            extra['jlc_carriage']      = raw.get('totalCarriageMoney')
+            extra['jlc_payment']       = raw.get('paymentMethod', '')
+            addr = raw.get('orderAddress') or {}
+            extra['jlc_address'] = ', '.join(
+                p for p in [addr.get('linkAddress'), addr.get('city'),
+                             addr.get('province'), addr.get('country')] if p
+            )
+
+            from .services.api import map_jlc_status
+            _STATUS_UK = {
+                'ordered': 'Замовлено', 'reviewed': 'Перевірено',
+                'in_production': 'У виробництві', 'manufactured': 'Виготовлено',
+                'shipped': 'Відправлено', 'delivered': 'Доставлено', 'cancelled': 'Скасовано',
+            }
+            _STATUS_ICON = {
+                'ordered': '📋', 'reviewed': '🔍', 'in_production': '🏭',
+                'manufactured': '✅', 'shipped': '📦', 'delivered': '🎉', 'cancelled': '❌',
+            }
+            sub_orders = []
+            for item in raw.get('orderItem', []):
+                pcb = item.get('pcbItem') or {}
+                if not pcb:
+                    continue
+                st_int = pcb.get('orderStatus')
+                st_key = map_jlc_status(st_int)
+                cancel = pcb.get('cancelReason') or ''
+                # Strip HTML tags from cancelReason
+                import re
+                cancel = re.sub(r'<[^>]+>', '', cancel).strip()
+                sub_orders.append({
+                    'file_name':    pcb.get('fileName', '—'),
+                    'produce_code': pcb.get('produceCode', ''),
+                    'count':        pcb.get('count', 0),
+                    'status_key':   st_key,
+                    'status_label': _STATUS_UK.get(st_key, st_key),
+                    'status_icon':  _STATUS_ICON.get(st_key, ''),
+                    'order_date':   (pcb.get('orderDate') or '')[:10],
+                    'delivery_time': (pcb.get('deliveryTime') or '')[:16].replace('T', ' '),
+                    'price':        pcb.get('price'),
+                    'size':         f"{pcb.get('width')}×{pcb.get('length')} мм" if pcb.get('width') else '',
+                    'layers':       pcb.get('layer', ''),
+                    'thickness':    pcb.get('thickness', ''),
+                    'color':        pcb.get('pcbColor', ''),
+                    'surface':      pcb.get('surfaceFinish', ''),
+                    'material':     pcb.get('materialDetails', ''),
+                    'copper':       pcb.get('copperWeight', ''),
+                    'half_hole':    pcb.get('halfHole', ''),
+                    'build_time':   pcb.get('buildTime', ''),
+                    'cancel':       cancel,
+                })
+            extra['jlc_sub_orders'] = sub_orders
         return super().change_view(request, object_id, form_url, extra_context=extra)
 
     # ── Bulk actions ──────────────────────────────────────────────────────────
