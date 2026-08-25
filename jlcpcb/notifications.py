@@ -92,18 +92,22 @@ def _resolve_email_recipients(cfg) -> list[str]:
     return []
 
 
-def notify_jlc_status_change(order, old_status: str, new_status: str) -> None:
-    """Send email + Telegram when JLC order status changes."""
+def notify_jlc_status_change(order, old_status: str, new_status: str,
+                              force: bool = False) -> None:
+    """Send email + Telegram when JLC order status changes.
+
+    force=True bypasses per-event flag checks (used for manual test sends).
+    """
     from jlcpcb.models import JLCConfig
     cfg = JLCConfig.get()
 
-    # Check if this event type is enabled
-    if new_status == 'shipped' and not cfg.notify_on_shipped:
-        return
-    if new_status == 'delivered' and not cfg.notify_on_delivered:
-        return
-    if new_status not in ('shipped', 'delivered') and not cfg.notify_on_status_change:
-        return
+    if not force:
+        if new_status == 'shipped' and not cfg.notify_on_shipped:
+            return
+        if new_status == 'delivered' and not cfg.notify_on_delivered:
+            return
+        if new_status not in ('shipped', 'delivered') and not cfg.notify_on_status_change:
+            return
 
     old_label = _STATUS_LABELS_UK.get(old_status, old_status)
     new_label = _STATUS_LABELS_UK.get(new_status, new_status)
@@ -117,18 +121,25 @@ def notify_jlc_status_change(order, old_status: str, new_status: str) -> None:
         product_info = f'\n📄 {order.description[:80]}'
 
     tracking_info = ''
-    if new_status == 'shipped' and order.tracking_number:
+    if order.tracking_number:
         carrier = f' ({order.tracking_carrier})' if order.tracking_carrier else ''
         tracking_info = f'\n🔍 Трекінг: <code>{order.tracking_number}</code>{carrier}'
         if order.tracking_url:
             tracking_info += f'\n<a href="{order.tracking_url}">Відстежити посилку</a>'
+
+    # Show "test" label when old==new (manual force send)
+    status_line = (
+        f'\nСтатус: <b>{new_label}</b> (поточний)'
+        if old_status == new_status
+        else f'\nСтатус: {old_label} → <b>{new_label}</b>'
+    )
 
     tg_text = (
         f'{icon} <b>JLCPCB — {new_label}</b>\n'
         f'Замовлення: <code>{order.jlc_order_id}</code>\n'
         f'Кількість: {order.quantity} шт.'
         f'{product_info}'
-        f'\nСтатус: {old_label} → <b>{new_label}</b>'
+        f'{status_line}'
         f'{tracking_info}\n'
         f'<i>{company}</i>'
     )
@@ -136,12 +147,12 @@ def notify_jlc_status_change(order, old_status: str, new_status: str) -> None:
     email_subject = f'[{company}] JLCPCB {new_label}: {order.jlc_order_id}'
     email_body = (
         f'Замовлення JLCPCB {order.jlc_order_id}\n'
-        f'Статус: {old_label} → {new_label}\n'
+        f'Статус: {new_label}\n'
         f'Кількість: {order.quantity} шт.\n'
     )
     if order.description:
         email_body += f'Опис: {order.description}\n'
-    if new_status == 'shipped' and order.tracking_number:
+    if order.tracking_number:
         carrier = f' ({order.tracking_carrier})' if order.tracking_carrier else ''
         email_body += f'Трекінг: {order.tracking_number}{carrier}\n'
         if order.tracking_url:
@@ -155,5 +166,69 @@ def notify_jlc_status_change(order, old_status: str, new_status: str) -> None:
         if recipients:
             _send_email(email_subject, email_body, recipients)
 
-    order.last_notified_status = new_status
-    order.save(update_fields=['last_notified_status', 'updated_at'])
+    if not force:
+        order.last_notified_status = new_status
+        order.save(update_fields=['last_notified_status', 'updated_at'])
+
+
+def notify_jlc_active_orders_summary() -> dict:
+    """Send a Telegram+email summary of all active JLCPCB orders.
+
+    Returns dict with keys: telegram (bool), email (bool), count (int).
+    """
+    from jlcpcb.models import JLCConfig, JLCOrder
+    cfg = JLCConfig.get()
+    company = _get_company_name()
+
+    active = list(
+        JLCOrder.objects.exclude(
+            local_status__in=['delivered', 'cancelled']
+        ).select_related('product').order_by('order_date')
+    )
+
+    if not active:
+        tg_text    = f'📋 <b>JLCPCB</b> — активних замовлень немає.\n<i>{company}</i>'
+        email_body = 'JLCPCB — активних замовлень немає.'
+    else:
+        lines = [f'📋 <b>JLCPCB — Активні замовлення: {len(active)}</b>']
+        lines.append('─' * 30)
+        for o in active:
+            icon  = _STATUS_ICONS.get(o.local_status, '📋')
+            label = _STATUS_LABELS_UK.get(o.local_status, o.local_status)
+            name  = (
+                o.product.sku if o.product_id
+                else (o.description[:35] if o.description else o.jlc_order_id)
+            )
+            tracking = f' | 📍 <code>{o.tracking_number}</code>' if o.tracking_number else ''
+            lines.append(f'{icon} <code>{o.jlc_order_id}</code>\n   {name} — <b>{label}</b>{tracking}')
+        lines.append(f'─' * 30)
+        lines.append(f'<i>{company}</i>')
+        tg_text = '\n'.join(lines)
+
+        plain_lines = [f'JLCPCB — Активні замовлення: {len(active)}', '']
+        for o in active:
+            label = _STATUS_LABELS_UK.get(o.local_status, o.local_status)
+            name  = (
+                o.product.sku if o.product_id
+                else (o.description[:35] if o.description else o.jlc_order_id)
+            )
+            tracking = f' | Трекінг: {o.tracking_number}' if o.tracking_number else ''
+            plain_lines.append(f'{o.jlc_order_id} — {name} — {label}{tracking}')
+        email_body = '\n'.join(plain_lines)
+
+    tg_sent    = False
+    email_sent = False
+
+    if cfg.notify_telegram:
+        tg_sent = _send_telegram(tg_text)
+
+    if cfg.notify_email:
+        recipients = _resolve_email_recipients(cfg)
+        if recipients:
+            email_sent = _send_email(
+                f'[{company}] JLCPCB — Статус замовлень',
+                email_body,
+                recipients,
+            )
+
+    return {'telegram': tg_sent, 'email': email_sent, 'count': len(active)}

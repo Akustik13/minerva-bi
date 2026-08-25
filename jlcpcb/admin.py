@@ -112,6 +112,9 @@ class JLCConfigAdmin(admin.ModelAdmin):
             path('sync-orders/',
                  self.admin_site.admin_view(self.sync_orders_view),
                  name='jlcpcb_config_sync'),
+            path('status-report/',
+                 self.admin_site.admin_view(self.status_report_view),
+                 name='jlcpcb_config_status_report'),
         ]
         return custom + urls
 
@@ -153,17 +156,31 @@ class JLCConfigAdmin(admin.ModelAdmin):
             messages.error(request, f'❌ Помилка синхронізації: {e}')
         return redirect('admin:jlcpcb_jlcconfig_change', JLCConfig.get().pk)
 
+    def status_report_view(self, request):
+        from .notifications import notify_jlc_active_orders_summary
+        result = notify_jlc_active_orders_summary()
+        if result['count'] == 0:
+            messages.info(request, 'ℹ️ Активних замовлень немає.')
+        else:
+            channels = [ch for ch, ok in [('Telegram', result['telegram']), ('Email', result['email'])] if ok]
+            if channels:
+                messages.success(request, f'✅ Звіт надіслано: {", ".join(channels)} ({result["count"]} замовлень)')
+            else:
+                messages.warning(request, f'⚠️ {result["count"]} активних замовлень — канали сповіщень не налаштовано.')
+        return redirect('admin:jlcpcb_jlcconfig_change', JLCConfig.get().pk)
+
     def change_view(self, request, object_id, form_url='', extra_context=None):
         extra = extra_context or {}
-        extra['test_url']        = reverse('admin:jlcpcb_config_test')
-        extra['sync_url']        = reverse('admin:jlcpcb_config_sync')
-        extra['orders_url']      = reverse('admin:jlcpcb_jlcorder_changelist')
-        extra['add_order_url']   = reverse('admin:jlcpcb_jlcorder_add')
-        extra['orders_count']    = JLCOrder.objects.count()
-        extra['active_orders']   = JLCOrder.objects.exclude(
+        extra['test_url']           = reverse('admin:jlcpcb_config_test')
+        extra['sync_url']           = reverse('admin:jlcpcb_config_sync')
+        extra['status_report_url']  = reverse('admin:jlcpcb_config_status_report')
+        extra['orders_url']         = reverse('admin:jlcpcb_jlcorder_changelist')
+        extra['add_order_url']      = reverse('admin:jlcpcb_jlcorder_add')
+        extra['orders_count']       = JLCOrder.objects.count()
+        extra['active_orders']      = JLCOrder.objects.exclude(
             local_status__in=['delivered', 'cancelled']
         ).count()
-        extra['unmatched_count'] = JLCOrder.objects.filter(
+        extra['unmatched_count']    = JLCOrder.objects.filter(
             mapping_status=JLCOrder.MappingStatus.UNMATCHED
         ).count()
         cfg = JLCConfig.get()
@@ -176,6 +193,7 @@ class JLCConfigAdmin(admin.ModelAdmin):
 @admin.register(JLCOrder)
 class JLCOrderAdmin(admin.ModelAdmin):
     change_list_template = 'admin/jlcpcb/jlcorder/change_list.html'
+    change_form_template = 'admin/jlcpcb/jlcorder/change_form.html'
 
     list_display = (
         'jlc_order_id_link', 'order_type', 'description_short',
@@ -257,6 +275,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('run-match/',
                  self.admin_site.admin_view(self.run_match_view),
                  name='jlcpcb_jlcorder_run_match'),
+            path('<int:pk>/send-notification/',
+                 self.admin_site.admin_view(self.send_notification_view),
+                 name='jlcpcb_jlcorder_send_notification'),
         ]
         return custom + urls
 
@@ -366,6 +387,23 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.error(request, f'❌ {e}')
         return redirect('admin:jlcpcb_jlcorder_changelist')
 
+    def send_notification_view(self, request, pk):
+        """Send current order status to Telegram/email immediately (test/manual)."""
+        order = get_object_or_404(JLCOrder, pk=pk)
+        from .notifications import notify_jlc_status_change
+        cfg = JLCConfig.get()
+        if not cfg.notify_telegram and not cfg.notify_email:
+            messages.warning(request, '⚠️ Сповіщення вимкнено в налаштуваннях JLCConfig.')
+        else:
+            notify_jlc_status_change(order, order.local_status, order.local_status, force=True)
+            channels = []
+            if cfg.notify_telegram:
+                channels.append('Telegram')
+            if cfg.notify_email:
+                channels.append('Email')
+            messages.success(request, f'🔔 Сповіщення надіслано: {", ".join(channels)} — {order.jlc_order_id}')
+        return redirect('admin:jlcpcb_jlcorder_change', pk)
+
     # ── List display ──────────────────────────────────────────────────────────
 
     @admin.display(description='Замовлення', ordering='jlc_order_id')
@@ -445,7 +483,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
     def change_view(self, request, object_id, form_url='', extra_context=None):
         extra = extra_context or {}
-        obj   = JLCOrder.objects.filter(pk=object_id).first()
+        obj   = JLCOrder.objects.filter(pk=object_id).select_related('product').first()
         if obj:
             extra['jlc_order'] = obj
             extra['can_receive'] = (
@@ -454,9 +492,15 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 and float(obj.received_qty) < obj.quantity
             )
             extra['is_unmatched'] = obj.mapping_status == JLCOrder.MappingStatus.UNMATCHED
-            extra['refresh_url']  = reverse('admin:jlcpcb_jlcorder_refresh', args=[obj.pk])
+            extra['refresh_url']            = reverse('admin:jlcpcb_jlcorder_refresh', args=[obj.pk])
+            extra['receive_url']            = reverse('admin:jlcpcb_jlcorder_receive', args=[obj.pk])
+            extra['match_url']              = reverse('admin:jlcpcb_jlcorder_match', args=[obj.pk])
+            extra['set_track_only_url']     = reverse('admin:jlcpcb_jlcorder_set_track_only', args=[obj.pk])
+            extra['set_ignored_url']        = reverse('admin:jlcpcb_jlcorder_set_ignored', args=[obj.pk])
+            extra['send_notification_url']  = reverse('admin:jlcpcb_jlcorder_send_notification', args=[obj.pk])
             cfg = JLCConfig.get()
-            extra['has_api_keys'] = bool(cfg.access_key and cfg.secret_key)
+            extra['has_api_keys']      = bool(cfg.access_key and cfg.secret_key)
+            extra['notify_configured'] = bool(cfg.notify_telegram or cfg.notify_email)
         return super().change_view(request, object_id, form_url, extra_context=extra)
 
     # ── Bulk actions ──────────────────────────────────────────────────────────

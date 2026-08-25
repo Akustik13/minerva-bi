@@ -1,0 +1,149 @@
+{% extends "admin/change_form.html" %}
+{% load i18n %}
+
+{% block content %}
+<style>
+.jlc-order-panel {
+  margin-bottom: 20px;
+}
+.jlc-order-panel .module-title {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 12px;
+  background: var(--darkened-bg, #f8f8f8);
+  border-bottom: 1px solid var(--border-color, #ccc);
+  color: var(--body-fg, #333);
+  border-radius: 4px 4px 0 0;
+}
+.jlc-order-inner {
+  padding: 14px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.jlc-order-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.jlc-info-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--body-fg, #333);
+  background: var(--darkened-bg, #f8f8f8);
+}
+.jlc-order-btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.jlc-o-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  color: #fff !important;
+  transition: opacity .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+}
+.jlc-o-btn:hover { opacity: .85; }
+.jlc-o-btn-refresh  { background: #1565c0; }
+.jlc-o-btn-notify   { background: #00695c; }
+.jlc-o-btn-receive  { background: #2e7d32; }
+.jlc-o-btn-match    { background: #e65100; }
+.jlc-o-btn-track    { background: #546e7a; }
+.jlc-o-btn-ignore   { background: #616161; }
+.jlc-divider { width: 1px; height: 28px; background: var(--border-color, #ccc); margin: 0 4px; }
+.jlc-order-hint {
+  font-size: 11px;
+  color: var(--body-quiet-color, #666);
+  line-height: 1.5;
+}
+</style>
+
+{% if jlc_order %}
+{# ── Order action panel BEFORE the form ── #}
+<div class="jlc-order-panel module">
+  <div class="module-title">⚡ Дії — {{ jlc_order.jlc_order_id }}</div>
+  <div class="jlc-order-inner">
+
+    {# Status chips #}
+    <div class="jlc-order-info">
+      <span class="jlc-info-chip">
+        {% if jlc_order.local_status == 'ordered' %}📋{% elif jlc_order.local_status == 'reviewed' %}🔍{% elif jlc_order.local_status == 'in_production' %}🏭{% elif jlc_order.local_status == 'shipped' %}📦{% elif jlc_order.local_status == 'delivered' %}🎉{% elif jlc_order.local_status == 'cancelled' %}❌{% else %}✅{% endif %}
+        <strong>{{ jlc_order.get_local_status_display }}</strong>
+      </span>
+      {% if jlc_order.product_id %}
+      <span class="jlc-info-chip">🏷 {{ jlc_order.product.sku }}</span>
+      {% elif is_unmatched %}
+      <span class="jlc-info-chip" style="border-color:#c62828;color:#c62828">⚠️ Товар не прив'язано</span>
+      {% endif %}
+      {% if jlc_order.tracking_number %}
+      <span class="jlc-info-chip">📍 {{ jlc_order.tracking_number }}{% if jlc_order.tracking_carrier %} ({{ jlc_order.tracking_carrier }}){% endif %}</span>
+      {% endif %}
+      {% if jlc_order.quantity %}
+      <span class="jlc-info-chip">🔢 {{ jlc_order.quantity }} шт.</span>
+      {% endif %}
+    </div>
+
+    {# Action buttons #}
+    <div class="jlc-order-btn-row">
+
+      {% if has_api_keys %}
+      <a href="{{ refresh_url }}" class="jlc-o-btn jlc-o-btn-refresh">🔄 Оновити статус з API</a>
+      {% endif %}
+
+      <a href="{{ send_notification_url }}" class="jlc-o-btn jlc-o-btn-notify"
+         title="Надіслати поточний статус на Telegram / Email">🔔 Надіслати сповіщення</a>
+
+      {% if can_receive %}
+      <div class="jlc-divider"></div>
+      <a href="{{ receive_url }}" class="jlc-o-btn jlc-o-btn-receive">📥 Прийняти на склад</a>
+      {% endif %}
+
+      {% if is_unmatched %}
+      <div class="jlc-divider"></div>
+      <a href="{{ match_url }}" class="jlc-o-btn jlc-o-btn-match">🔍 Авто-прив'язати</a>
+      {% endif %}
+
+      <div class="jlc-divider"></div>
+      <a href="{{ set_track_only_url }}" class="jlc-o-btn jlc-o-btn-track">👁 Тільки трекінг</a>
+      <a href="{{ set_ignored_url }}" class="jlc-o-btn jlc-o-btn-ignore">🚫 Ігнорувати</a>
+
+    </div>
+
+    {# Context hints #}
+    <div class="jlc-order-hint">
+      {% if not has_api_keys %}
+        ⚠️ API ключі не налаштовано — оновлення статусу з JLCPCB недоступне.
+      {% endif %}
+      {% if not notify_configured %}
+        ℹ️ Канали сповіщень (Telegram / Email) не налаштовано в JLCConfig.
+      {% endif %}
+      {% if can_receive %}
+        ✅ Замовлення доставлено — можна прийняти на склад.
+      {% elif jlc_order.local_status == 'delivered' and not jlc_order.product_id %}
+        ℹ️ Для прийому на склад спочатку прив'яжіть товар.
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+{% endif %}
+
+{{ block.super }}
+{% endblock %}
