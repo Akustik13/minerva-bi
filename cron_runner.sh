@@ -6,6 +6,7 @@
 #
 # Інтервали (секунди):
 #   TRACK_INTERVAL  — авто-трекінг відправлень (default: 300 = 5 хв)
+#   sync_jlc_orders         — інтервал читається з JLCConfig.sync_interval_hours в БД
 #   sync_digikey_orders     — інтервал читається з DigiKeyConfig.sync_interval_minutes в БД
 #   check_digikey_messages  — інтервал читається з DigiKeyConfig.msg_check_interval в БД
 
@@ -23,6 +24,7 @@ until pg_isready -h "${DB_HOST:-db}" -p "${DB_PORT:-5432}" \
 done
 echo "✅ PostgreSQL ready — cron runner started"
 echo "   track_shipments         every ${TRACK_INTERVAL}s"
+echo "   sync_jlc_orders         interval controlled by JLCConfig.sync_interval_hours in DB"
 echo "   sync_digikey_orders     interval controlled by DigiKeyConfig in DB"
 echo "   check_digikey_messages  interval controlled by DigiKeyConfig in DB"
 echo "   poll_dk_status          interval controlled by DigiKeyConfig.poll_interval_minutes in DB"
@@ -48,6 +50,9 @@ while true; do
     python manage.py track_shipments 2>&1 || true
     LAST_TRACK=$(date +%s)
   fi
+
+  # ── JLCPCB синхронізація — інтервал з JLCConfig.sync_interval_hours в БД ──
+  python manage.py sync_jlc_orders 2>&1 || true
 
   # ── DigiKey синхронізація — інтервал з БД ────────────────
   python manage.py sync_digikey_orders 2>&1 || true
