@@ -272,6 +272,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('run-sync/',
                  self.admin_site.admin_view(self.run_sync_view),
                  name='jlcpcb_jlcorder_run_sync'),
+            path('run-sync-period/',
+                 self.admin_site.admin_view(self.run_sync_period_view),
+                 name='jlcpcb_jlcorder_run_sync_period'),
             path('run-match/',
                  self.admin_site.admin_view(self.run_match_view),
                  name='jlcpcb_jlcorder_run_match'),
@@ -377,6 +380,36 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.success(request, f'✅ {buf.getvalue()[:300] or "Синхронізацію завершено."}')
         except Exception as e:
             messages.error(request, f'❌ {e}')
+        return redirect('admin:jlcpcb_jlcorder_changelist')
+
+    def run_sync_period_view(self, request):
+        """Sync with specific period from GET params: ?days=30 or ?date_from=&date_to="""
+        from django.core.management import call_command
+        from io import StringIO
+        buf  = StringIO()
+        days = None
+        date_from = request.GET.get('date_from', '').strip()
+        date_to   = request.GET.get('date_to',   '').strip()
+        try:
+            if date_from and date_to:
+                # Custom range — convert to days from today
+                from datetime import date
+                d_from = date.fromisoformat(date_from)
+                d_to   = date.fromisoformat(date_to)
+                days   = (date.today() - d_from).days + 1
+                label  = f'{date_from} → {date_to}'
+            else:
+                days  = int(request.GET.get('days', 90))
+                label = f'{days} днів'
+            call_command('sync_jlc_orders', '--force', f'--days={days}', stdout=buf)
+            out = buf.getvalue() or 'Синхронізацію завершено.'
+            messages.success(request, f'✅ Синхронізація ({label}): {out[:300]}')
+            cfg = JLCConfig.get()
+            ts  = timezone.now().strftime('%d.%m.%Y %H:%M:%S')
+            cfg.connection_log = f'[{ts}] Sync ({label})\n{out[:500]}\n' + cfg.connection_log[:700]
+            cfg.save(update_fields=['connection_log'])
+        except Exception as e:
+            messages.error(request, f'❌ Помилка синхронізації: {e}')
         return redirect('admin:jlcpcb_jlcorder_changelist')
 
     def run_match_view(self, request):
@@ -486,8 +519,12 @@ class JLCOrderAdmin(admin.ModelAdmin):
     def changelist_view(self, request, extra_context=None):
         extra = extra_context or {}
         cfg   = JLCConfig.get()
-        extra['jlc_sync_url']       = reverse('admin:jlcpcb_jlcorder_run_sync')
-        extra['jlc_match_url']      = reverse('admin:jlcpcb_jlcorder_run_match')
+        from datetime import timedelta, date as _date
+        extra['jlc_sync_url']        = reverse('admin:jlcpcb_jlcorder_run_sync')
+        extra['jlc_sync_period_url'] = reverse('admin:jlcpcb_jlcorder_run_sync_period')
+        extra['jlc_match_url']       = reverse('admin:jlcpcb_jlcorder_run_match')
+        extra['today']               = _date.today().isoformat()
+        extra['today_minus_90']      = (_date.today() - timedelta(days=90)).isoformat()
         extra['jlc_config_url']     = reverse('admin:jlcpcb_jlcconfig_change', args=[1])
         extra['jlc_sync_enabled']   = cfg.sync_enabled
         extra['jlc_last_synced']    = cfg.last_synced_at

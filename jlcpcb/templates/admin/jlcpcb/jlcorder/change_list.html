@@ -1,18 +1,28 @@
 {% extends "admin/change_list.html" %}
 {% load i18n %}
 
+{# Move Django's "Add" button into our toolbar — hide the default object-tools #}
+{% block object-tools %}{% endblock %}
+
 {% block content %}
 <style>
 .jlc-toolbar {
   display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--darkened-bg, #f8f8f8);
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 6px;
+  margin-bottom: 14px;
+}
+
+/* ── Row 1: main action buttons ── */
+.jlc-tb-row {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px;
-  background: var(--darkened-bg, #f8f8f8);
-  border: 1px solid var(--border-color, #ccc);
-  border-radius: 4px;
-  margin-bottom: 14px;
 }
 .jlc-tb-btn {
   display: inline-flex;
@@ -33,6 +43,7 @@
 .btn-sync   { background: #2e7d32; }
 .btn-match  { background: #1565c0; }
 .btn-config { background: #546e7a; }
+.btn-add    { background: #6a1b9a; }
 
 .jlc-pills {
   display: flex;
@@ -61,43 +72,133 @@
   color: var(--body-quiet-color, #666);
   white-space: nowrap;
 }
+
+/* ── Row 2: period selector ── */
+.jlc-period-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color, #ddd);
+}
+.jlc-period-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--body-quiet-color, #777);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-right: 2px;
+}
+.jlc-preset {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--body-fg, #333);
+  background: var(--body-bg, #fff);
+  transition: background .12s, color .12s, border-color .12s;
+}
+.jlc-preset:hover {
+  background: #2e7d32;
+  color: #fff !important;
+  border-color: #2e7d32;
+}
+.jlc-period-sep {
+  color: var(--body-quiet-color, #aaa);
+  font-size: 12px;
+}
+.jlc-date-form {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.jlc-date-input {
+  padding: 3px 8px;
+  border: 1px solid var(--border-color, #ccc);
+  border-radius: 4px;
+  font-size: 12px;
+  background: var(--body-bg, #fff);
+  color: var(--body-fg, #333);
+  width: 120px;
+}
+.jlc-date-go {
+  padding: 4px 12px;
+  background: #2e7d32;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.jlc-date-go:hover { opacity: .85; }
 </style>
 
 <div class="jlc-toolbar">
-  <a href="{{ jlc_sync_url }}"   class="jlc-tb-btn btn-sync">🔄 Синхронізувати</a>
-  <a href="{{ jlc_match_url }}"  class="jlc-tb-btn btn-match">🔍 Авто-матч</a>
-  <a href="{{ jlc_config_url }}" class="jlc-tb-btn btn-config">⚙️ Налаштування</a>
 
-  {% if jlc_unmatched_count %}
-    <span class="jlc-warn-badge">⚠️ {{ jlc_unmatched_count }} не прив'язано</span>
-  {% endif %}
+  {# ── Row 1: action buttons + status summary ── #}
+  <div class="jlc-tb-row">
+    <a href="{{ jlc_sync_url }}"   class="jlc-tb-btn btn-sync">🔄 Синхронізувати</a>
+    <a href="{{ jlc_match_url }}"  class="jlc-tb-btn btn-match">🔍 Авто-матч</a>
+    <a href="{{ jlc_config_url }}" class="jlc-tb-btn btn-config">⚙️ Налаштування</a>
+    <a href="add/"                 class="jlc-tb-btn btn-add">➕ Додати замовлення</a>
 
-  {% if jlc_status_summary %}
-  <div class="jlc-pills">
-    {% if jlc_status_summary.ordered %}
-      <span class="jlc-pill" style="background:#546e7a">📋 {{ jlc_status_summary.ordered }}</span>
+    {% if jlc_unmatched_count %}
+      <span class="jlc-warn-badge">⚠️ {{ jlc_unmatched_count }} не прив'язано</span>
     {% endif %}
-    {% if jlc_status_summary.reviewed %}
-      <span class="jlc-pill" style="background:#1565c0">🔍 {{ jlc_status_summary.reviewed }}</span>
+
+    {% if jlc_status_summary %}
+    <div class="jlc-pills">
+      {% if jlc_status_summary.ordered %}
+        <span class="jlc-pill" style="background:#607d8b">📋 {{ jlc_status_summary.ordered }}</span>
+      {% endif %}
+      {% if jlc_status_summary.reviewed %}
+        <span class="jlc-pill" style="background:#1565c0">🔍 {{ jlc_status_summary.reviewed }}</span>
+      {% endif %}
+      {% if jlc_status_summary.in_production %}
+        <span class="jlc-pill" style="background:#e65100">🏭 {{ jlc_status_summary.in_production }}</span>
+      {% endif %}
+      {% if jlc_status_summary.manufactured %}
+        <span class="jlc-pill" style="background:#2e7d32">✅ {{ jlc_status_summary.manufactured }}</span>
+      {% endif %}
+      {% if jlc_status_summary.shipped %}
+        <span class="jlc-pill" style="background:#6a1b9a">📦 {{ jlc_status_summary.shipped }}</span>
+      {% endif %}
+      {% if jlc_status_summary.delivered %}
+        <span class="jlc-pill" style="background:#1b5e20">🎉 {{ jlc_status_summary.delivered }}</span>
+      {% endif %}
+    </div>
     {% endif %}
-    {% if jlc_status_summary.in_production %}
-      <span class="jlc-pill" style="background:#e65100">🏭 {{ jlc_status_summary.in_production }}</span>
-    {% endif %}
-    {% if jlc_status_summary.manufactured %}
-      <span class="jlc-pill" style="background:#2e7d32">✅ {{ jlc_status_summary.manufactured }}</span>
-    {% endif %}
-    {% if jlc_status_summary.shipped %}
-      <span class="jlc-pill" style="background:#6a1b9a">📦 {{ jlc_status_summary.shipped }}</span>
-    {% endif %}
-    {% if jlc_status_summary.delivered %}
-      <span class="jlc-pill" style="background:#1b5e20">🎉 {{ jlc_status_summary.delivered }}</span>
+
+    {% if jlc_last_synced %}
+      <span class="jlc-sync-ts">{{ jlc_last_synced|date:"d.m H:i" }}</span>
     {% endif %}
   </div>
-  {% endif %}
 
-  {% if jlc_last_synced %}
-    <span class="jlc-sync-ts">{{ jlc_last_synced|date:"d.m H:i" }}</span>
-  {% endif %}
+  {# ── Row 2: period selector ── #}
+  <div class="jlc-period-row">
+    <span class="jlc-period-label">🗓 Синк за:</span>
+    <a href="{{ jlc_sync_period_url }}?days=30"  class="jlc-preset">1 міс</a>
+    <a href="{{ jlc_sync_period_url }}?days=90"  class="jlc-preset">3 міс</a>
+    <a href="{{ jlc_sync_period_url }}?days=180" class="jlc-preset">6 міс</a>
+    <a href="{{ jlc_sync_period_url }}?days=365" class="jlc-preset">1 рік</a>
+    <span class="jlc-period-sep">|</span>
+    <form method="get" action="{{ jlc_sync_period_url }}" class="jlc-date-form">
+      <input type="date" name="date_from" class="jlc-date-input" placeholder="від"
+             value="{{ today_minus_90 }}">
+      <span style="font-size:12px;color:var(--body-quiet-color,#888)">→</span>
+      <input type="date" name="date_to" class="jlc-date-input" placeholder="до"
+             value="{{ today }}">
+      <button type="submit" class="jlc-date-go">▶ Синк</button>
+    </form>
+  </div>
+
 </div>
 
 {{ block.super }}
