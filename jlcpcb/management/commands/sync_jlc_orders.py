@@ -193,10 +193,13 @@ class Command(BaseCommand):
                         order.auto_matched_sku = product.sku
                         order.save(update_fields=['product', 'mapping_status', 'auto_matched_sku', 'updated_at'])
                         self.stdout.write(f'    → Matched {product.sku} ({match_type})')
+                # Notify for newly discovered orders whose status was not yet sent
+                if new_status not in ('cancelled',) and not order.last_notified_status:
+                    notify_jlc_status_change(order, '', new_status)
             else:
                 old_status = order.local_status
 
-                # Update expected_date if we now have it
+                # Update expected_date / tracking_carrier if now available
                 update_fields = ['raw_data', 'jlc_status', 'description', 'updated_at']
                 if expected_date and not order.expected_date:
                     order.expected_date = expected_date
@@ -220,6 +223,7 @@ class Command(BaseCommand):
                 order.jlc_status = str(status_int) if status_int is not None else ''
 
                 if status_can_advance(old_status, new_status):
+                    # Status advanced → save + notify
                     order.local_status = new_status
                     if new_status == 'shipped' and not order.shipped_date:
                         order.shipped_date = timezone.now().date()
@@ -236,7 +240,13 @@ class Command(BaseCommand):
                         receive_into_inventory(order)
                 else:
                     order.save(update_fields=update_fields)
-                    self.stdout.write(f'  {batch}: no change ({old_status})')
+                    # Status unchanged but never notified → send now
+                    if (new_status not in ('cancelled',)
+                            and order.last_notified_status != new_status):
+                        self.stdout.write(f'  {batch}: sending missed notification ({new_status})')
+                        notify_jlc_status_change(order, new_status, new_status)
+                    else:
+                        self.stdout.write(f'  {batch}: no change ({old_status})')
 
         cfg.last_synced_at = timezone.now()
         cfg.save(update_fields=['last_synced_at'])
@@ -250,65 +260,76 @@ class Command(BaseCommand):
     # ─────────────────────────────────────────────────────────────────────────
 
     def _check_dhl(self, cfg, options):
-        """Check DHL tracking for all shipped JLC orders with tracking_number."""
+        """
+        Phase 2a — DHL tracking: for shipped orders with tracking_number, check DHL API.
+        Phase 2b — Overdue detection: shipped orders where expected_date < today-3d
+                   and no tracking → auto-mark delivered.
+        """
         if options.get('skip_dhl'):
             return
 
+        from datetime import timedelta
         from jlcpcb.models import JLCOrder
-        from jlcpcb.services.api import receive_into_inventory, status_can_advance
+        from jlcpcb.services.api import receive_into_inventory
         from jlcpcb.notifications import notify_jlc_status_change
 
-        # Get DHL API key from Carrier config
+        def _do_deliver(order, source: str):
+            old = order.local_status
+            order.local_status   = JLCOrder.LocalStatus.DELIVERED
+            order.delivered_date = timezone.now().date()
+            order.save(update_fields=['local_status', 'delivered_date', 'updated_at'])
+            self.stdout.write(self.style.SUCCESS(
+                f'    ✅ {order.jlc_order_id}: shipped → delivered ({source})'
+            ))
+            notify_jlc_status_change(order, old, 'delivered')
+            if (cfg.auto_receive_on_delivered and order.product_id
+                    and float(order.received_qty) < order.quantity):
+                tx = receive_into_inventory(order)
+                if tx:
+                    self.stdout.write(f'    📦 Auto-received {tx.qty} pcs → inventory')
+
+        shipped = JLCOrder.objects.filter(local_status=JLCOrder.LocalStatus.SHIPPED)
+
+        # ── 2a: DHL tracking ──────────────────────────────────────────────────
         dhl_api_key = self._get_dhl_api_key()
-        if not dhl_api_key:
+        shipped_dhl = shipped.exclude(tracking_number='').exclude(tracking_number__isnull=True)
+
+        if dhl_api_key and shipped_dhl.exists():
+            self.stdout.write(f'  DHL Tracking: checking {shipped_dhl.count()} order(s)...')
+            from shipping.services.dhl_track import track as dhl_track
+            for order in shipped_dhl:
+                result = dhl_track(order.tracking_number, dhl_api_key)
+                if result.get('error'):
+                    self.stdout.write(f'    {order.jlc_order_id}: {result["error"]}')
+                    continue
+                dhl_status = result.get('status_code', '')
+                self.stdout.write(
+                    f'    {order.jlc_order_id} [{order.tracking_number}]: '
+                    f'{result.get("status_icon","")} {result.get("status_label", dhl_status)}'
+                )
+                if dhl_status == 'delivered':
+                    _do_deliver(order, 'DHL confirmed')
+        elif not dhl_api_key:
             self.stdout.write('  DHL Tracking: no api key — skip (set track_api_key on DHL Carrier)')
-            return
 
-        shipped_with_tracking = JLCOrder.objects.filter(
-            local_status=JLCOrder.LocalStatus.SHIPPED,
-        ).exclude(tracking_number='').exclude(tracking_number__isnull=True)
-
-        if not shipped_with_tracking.exists():
-            self.stdout.write('  DHL Tracking: no shipped orders with tracking number.')
-            return
-
-        self.stdout.write(f'  DHL Tracking: checking {shipped_with_tracking.count()} order(s)...')
-
-        from shipping.services.dhl_track import track as dhl_track
-
-        for order in shipped_with_tracking:
-            result = dhl_track(order.tracking_number, dhl_api_key)
-
-            if result.get('error'):
-                self.stdout.write(f'    {order.jlc_order_id} [{order.tracking_number}]: {result["error"]}')
-                continue
-
-            dhl_status = result.get('status_code', '')
-            label      = result.get('status_label', dhl_status)
-            self.stdout.write(
-                f'    {order.jlc_order_id} [{order.tracking_number}]: '
-                f'{result.get("status_icon","")} {label}'
-            )
-
-            if dhl_status == 'delivered':
-                old_status = order.local_status
-                order.local_status    = JLCOrder.LocalStatus.DELIVERED
-                order.delivered_date  = timezone.now().date()
-                order.save(update_fields=['local_status', 'delivered_date', 'updated_at'])
-
-                self.stdout.write(self.style.SUCCESS(
-                    f'    ✅ {order.jlc_order_id}: shipped → delivered (DHL confirmed)'
-                ))
-
-                if order.local_status != order.last_notified_status:
-                    notify_jlc_status_change(order, old_status, 'delivered')
-
-                if (cfg.auto_receive_on_delivered
-                        and order.product_id
-                        and float(order.received_qty) < order.quantity):
-                    tx = receive_into_inventory(order)
-                    if tx:
-                        self.stdout.write(f'    📦 Auto-received {tx.qty} pcs → inventory')
+        # ── 2b: Overdue detection (no tracking, expected_date + 3 days < today) ─
+        cutoff = timezone.now().date() - timedelta(days=3)
+        overdue = shipped.filter(
+            expected_date__isnull=False,
+            expected_date__lt=cutoff,
+        ).filter(
+            tracking_number__isnull=True
+        ) | shipped.filter(
+            expected_date__isnull=False,
+            expected_date__lt=cutoff,
+            tracking_number='',
+        )
+        overdue = overdue.distinct()
+        if overdue.exists():
+            self.stdout.write(f'  Overdue (no tracking): {overdue.count()} order(s) past ETA+3d')
+            for order in overdue:
+                self.stdout.write(f'    {order.jlc_order_id}: ETA was {order.expected_date} — marking delivered')
+                _do_deliver(order, f'ETA {order.expected_date} passed')
 
     def _get_dhl_api_key(self) -> str:
         """Get DHL Unified Tracking API key from Carrier config."""

@@ -278,6 +278,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('<int:pk>/send-notification/',
                  self.admin_site.admin_view(self.send_notification_view),
                  name='jlcpcb_jlcorder_send_notification'),
+            path('<int:pk>/mark-delivered/',
+                 self.admin_site.admin_view(self.mark_delivered_view),
+                 name='jlcpcb_jlcorder_mark_delivered'),
         ]
         return custom + urls
 
@@ -386,6 +389,27 @@ class JLCOrderAdmin(admin.ModelAdmin):
         except Exception as e:
             messages.error(request, f'❌ {e}')
         return redirect('admin:jlcpcb_jlcorder_changelist')
+
+    def mark_delivered_view(self, request, pk):
+        """Manually mark a shipped order as delivered."""
+        order = get_object_or_404(JLCOrder, pk=pk)
+        if order.local_status not in (JLCOrder.LocalStatus.SHIPPED, JLCOrder.LocalStatus.MANUFACTURED):
+            messages.warning(request, '⚠️ Позначити доставленим можна лише для відправлених замовлень.')
+            return redirect('admin:jlcpcb_jlcorder_change', pk)
+        old_status = order.local_status
+        order.local_status   = JLCOrder.LocalStatus.DELIVERED
+        order.delivered_date = timezone.now().date()
+        order.save(update_fields=['local_status', 'delivered_date', 'updated_at'])
+        messages.success(request, f'✅ {order.jlc_order_id} позначено як доставлено.')
+        from .notifications import notify_jlc_status_change
+        notify_jlc_status_change(order, old_status, 'delivered')
+        cfg = JLCConfig.get()
+        if cfg.auto_receive_on_delivered and order.product_id and float(order.received_qty) < order.quantity:
+            from .services.api import receive_into_inventory
+            tx = receive_into_inventory(order, performed_by=request.user)
+            if tx:
+                messages.success(request, f'📦 Авто-прийом: {tx.qty} шт. {order.product.sku} додано на склад.')
+        return redirect('admin:jlcpcb_jlcorder_change', pk)
 
     def send_notification_view(self, request, pk):
         """Send current order status to Telegram/email immediately (test/manual)."""
@@ -498,9 +522,15 @@ class JLCOrderAdmin(admin.ModelAdmin):
             extra['set_track_only_url']    = reverse('admin:jlcpcb_jlcorder_set_track_only', args=[obj.pk])
             extra['set_ignored_url']       = reverse('admin:jlcpcb_jlcorder_set_ignored', args=[obj.pk])
             extra['send_notification_url'] = reverse('admin:jlcpcb_jlcorder_send_notification', args=[obj.pk])
+            extra['mark_delivered_url']    = reverse('admin:jlcpcb_jlcorder_mark_delivered', args=[obj.pk])
             cfg = JLCConfig.get()
             extra['has_api_keys']      = bool(cfg.access_key and cfg.secret_key)
             extra['notify_configured'] = bool(cfg.notify_telegram or cfg.notify_email)
+            extra['is_overdue_shipped'] = (
+                obj.local_status in (JLCOrder.LocalStatus.SHIPPED, JLCOrder.LocalStatus.MANUFACTURED)
+                and obj.expected_date is not None
+                and obj.expected_date < timezone.now().date()
+            )
 
             # Parse raw_data for rich display
             raw = obj.raw_data if isinstance(obj.raw_data, dict) else {}

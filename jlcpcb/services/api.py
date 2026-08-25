@@ -84,14 +84,18 @@ def map_jlc_status(status_int) -> str:
 def extract_pcb_item(raw: dict) -> dict:
     """
     Navigate nested order/detail response to find pcbItem.
-    Response: data.orderItem[N].pcbItem (orderType=1 for PCB, 3 for Stencil)
+    orderType: 0=batch PCB, 1=prototype/sample PCB, 3=Stencil
     Returns pcbItem dict or {}.
     """
     items = raw.get('orderItem', [])
-    for item in items:
-        if item.get('orderType') == 1:   # PCB
-            return item.get('pcbItem') or {}
-    # fallback: return first pcbItem found
+    # Prefer prototype (1) then batch (0), skip stencil (3)
+    for order_type in (1, 0):
+        for item in items:
+            if item.get('orderType') == order_type:
+                pcb = item.get('pcbItem') or {}
+                if pcb:
+                    return pcb
+    # Final fallback: any pcbItem
     for item in items:
         pcb = item.get('pcbItem')
         if pcb:
