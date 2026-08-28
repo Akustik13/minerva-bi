@@ -401,32 +401,82 @@ class JLCAPIClient:
                               body={'batchNum': batch_number})
 
     def get_pcb_batch_list(self, date_from: str, date_to: str,
-                           page: int = 1, page_size: int = 50) -> dict:
+                           page: int = 1, page_size: int = 50,
+                           order_type: int = None) -> dict:
         """
         Paginated list of PCB batch numbers in a date range.
         date_from / date_to: 'yyyy-MM-dd HH:mm:ss'
+        order_type: integer — 0=batch PCB, 1=prototype/sample PCB, 3=Stencil.
+            Pass None to omit the filter (fetch all types if API allows).
         Returns the raw data dict with 'list' of {batchNum, orderTypeInfos}.
         """
-        return self._request('POST', self.EP_PCB_BATCH_LIST, body={
+        body = {
             'pageNum':         page,
             'pageSize':        min(page_size, 50),
-            'orderType':       'order_pcb',
             'createTimeStart': date_from,
             'createTimeEnd':   date_to,
-        })
+        }
+        if order_type is not None:
+            body['orderType'] = order_type
+        return self._request('POST', self.EP_PCB_BATCH_LIST, body=body)
+
+    def _fetch_batch_page(self, date_from: str, date_to: str,
+                          page: int, order_type: int = None) -> tuple:
+        """Returns (batch_nums_page: list, total: int)."""
+        result = self.get_pcb_batch_list(date_from, date_to,
+                                          page=page, page_size=50,
+                                          order_type=order_type)
+        items = result.get('list') or result.get('records') or []
+        total = result.get('total') or result.get('totalCount') or 0
+        nums  = [item['batchNum'] for item in items if item.get('batchNum')]
+        return nums, int(total)
 
     def get_all_pcb_batch_numbers(self, date_from: str, date_to: str) -> list:
-        """Fetch all PCB batch numbers in the given date range (auto-paginate)."""
+        """
+        Fetch all PCB batch numbers in the given date range (auto-paginate).
+        Tries each PCB order type (1=prototype, 0=batch, 3=stencil) separately
+        because the JLCPCB API filters by orderType (integer, not string).
+        Falls back to a no-filter call if typed calls fail.
+        """
+        seen       = set()
         batch_nums = []
-        page = 1
-        while True:
-            result = self.get_pcb_batch_list(date_from, date_to, page=page, page_size=50)
-            items = result.get('list', [])
-            batch_nums.extend(item['batchNum'] for item in items if item.get('batchNum'))
-            total = result.get('total', 0)
-            if len(batch_nums) >= total or not items:
-                break
-            page += 1
+
+        # JLCPCB order types: 1=prototype/sample, 0=batch PCB, 3=stencil
+        for otype in (1, 0, 3):
+            page = 1
+            while True:
+                try:
+                    nums, total = self._fetch_batch_page(date_from, date_to,
+                                                         page, order_type=otype)
+                except JLCAPIError as e:
+                    logger.warning('pageBatchInfoByOrderType orderType=%s page=%s: %s', otype, page, e)
+                    break
+                for n in nums:
+                    if n not in seen:
+                        seen.add(n)
+                        batch_nums.append(n)
+                if not nums or len(seen) >= total:
+                    break
+                page += 1
+
+        # Fallback: try without orderType filter (API may not require it)
+        if not batch_nums:
+            logger.info('Typed batch-list returned nothing — retrying without orderType filter')
+            page = 1
+            while True:
+                try:
+                    nums, total = self._fetch_batch_page(date_from, date_to, page)
+                except JLCAPIError as e:
+                    logger.warning('pageBatchInfoByOrderType (no filter) page=%s: %s', page, e)
+                    break
+                for n in nums:
+                    if n not in seen:
+                        seen.add(n)
+                        batch_nums.append(n)
+                if not nums or len(seen) >= total:
+                    break
+                page += 1
+
         return batch_nums
 
     def get_pcb_wip(self, order_uuid: str) -> dict:
