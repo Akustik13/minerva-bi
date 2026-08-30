@@ -167,6 +167,19 @@ class Command(BaseCommand):
                 self.stdout.write(f'  {batch}: no pcbItem in response, skip')
                 continue
 
+            # Extract orderUUID from orderFileUrl for WIP progress queries
+            if '_order_uuid' not in raw:
+                order_file_url = pcb.get('orderFileUrl', '')
+                if order_file_url:
+                    try:
+                        import urllib.parse as _up
+                        qs = _up.parse_qs(_up.urlparse(order_file_url).query)
+                        uid = qs.get('uuid', [''])[0]
+                        if uid:
+                            raw['_order_uuid'] = uid
+                    except Exception:
+                        pass
+
             status_int      = pcb.get('orderStatus')
             new_status      = map_jlc_status(status_int)
             file_name       = pcb.get('fileName', '')
@@ -298,10 +311,46 @@ class Command(BaseCommand):
             f'JLCPCB sync complete. New: {created}, Updated: {updated}, Errors: {errors}'
         ))
 
+        # ── Phase 1.5: WIP production progress for in-production orders ─────────
+        self._check_wip(client)
+
         # ── Phase 2: DHL tracking for shipped orders ──────────────────────────
         self._check_dhl(cfg, options)
 
     # ─────────────────────────────────────────────────────────────────────────
+
+    def _check_wip(self, client):
+        """Fetch production step progress for all in-production orders."""
+        from jlcpcb.models import JLCOrder
+        from jlcpcb.services.api import JLCAPIError
+
+        in_prod = JLCOrder.objects.filter(local_status=JLCOrder.LocalStatus.IN_PRODUCTION)
+        if not in_prod.exists():
+            return
+
+        self.stdout.write(f'  WIP progress: checking {in_prod.count()} in-production order(s)...')
+        for order in in_prod:
+            raw = order.raw_data if isinstance(order.raw_data, dict) else {}
+            order_uuid = (raw.get('_order_uuid') or
+                          order.jlc_order_number or
+                          order.jlc_order_id)
+            if not order_uuid:
+                continue
+            try:
+                wip = client.get_pcb_wip(order_uuid)
+                if isinstance(wip, list):
+                    steps = wip
+                else:
+                    steps = wip.get('date') or wip.get('data') or []
+                if isinstance(steps, list) and steps:
+                    raw['production_steps'] = steps
+                    order.raw_data = raw
+                    order.save(update_fields=['raw_data', 'updated_at'])
+                    self.stdout.write(
+                        f'    {order.jlc_order_id}: {len(steps)} step(s) done'
+                    )
+            except JLCAPIError as e:
+                self.stdout.write(f'    {order.jlc_order_id}: WIP — {e}')
 
     def _check_dhl(self, cfg, options):
         """

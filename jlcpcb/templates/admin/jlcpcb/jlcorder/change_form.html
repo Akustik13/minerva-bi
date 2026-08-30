@@ -110,6 +110,36 @@
   font-size: 11px; color: #c62828;
   margin-top: 3px; line-height: 1.4;
 }
+
+/* ── WIP production progress ── */
+.jlc-wip-bar-wrap {
+  background: var(--darkened-bg,#f0f0f0);
+  border-radius: 6px; height: 10px; overflow: hidden;
+  margin: 10px 0 6px;
+}
+.jlc-wip-bar-fill {
+  height: 100%; border-radius: 6px;
+  background: linear-gradient(90deg,#e65100,#fb8c00);
+  transition: width .4s ease;
+}
+.jlc-wip-steps {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 10px;
+}
+.jlc-wip-step {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; padding: 4px 6px; border-radius: 4px;
+}
+.jlc-wip-step.done { background: #2e7d3210; }
+.jlc-wip-step .wip-dot {
+  font-size: 14px; flex-shrink: 0; width: 20px; text-align: center;
+}
+.jlc-wip-step .wip-name {
+  flex: 1; font-weight: 500; color: var(--body-fg,#333);
+}
+.jlc-wip-step .wip-time {
+  font-size: 11px; color: var(--body-quiet-color,#888);
+  white-space: nowrap; font-family: monospace;
+}
 .jlc-spec-pill {
   display: inline-block; padding: 1px 7px;
   background: var(--darkened-bg,#f0f0f0);
@@ -229,6 +259,28 @@
           <span class="v">📍 {{ jlc_address }}</span>
         </div>
         {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# Production progress (WIP) #}
+    {% if production_steps %}
+    <div>
+      <div class="jlc-section-title">
+        🏭 Хід виробництва — {{ production_steps|length }} / 16 кроків
+        <span style="float:right;font-weight:700;color:#e65100">{{ wip_percent }}%</span>
+      </div>
+      <div class="jlc-wip-bar-wrap">
+        <div class="jlc-wip-bar-fill" style="width:{{ wip_percent }}%"></div>
+      </div>
+      <div class="jlc-wip-steps">
+        {% for step in production_steps %}
+        <div class="jlc-wip-step done">
+          <span class="wip-dot">✅</span>
+          <span class="wip-name">{{ step.technicsProcessName }}</span>
+          <span class="wip-time">{{ step.beginTime|slice:":16" }}</span>
+        </div>
+        {% endfor %}
       </div>
     </div>
     {% endif %}

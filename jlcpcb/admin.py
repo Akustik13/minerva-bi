@@ -631,6 +631,15 @@ class JLCOrderAdmin(admin.ModelAdmin):
                     'cancel':       cancel,
                 })
             extra['jlc_sub_orders'] = sub_orders
+
+            # Production progress (WIP)
+            production_steps = raw.get('production_steps') or []
+            extra['production_steps'] = production_steps
+            _TOTAL_STEPS = 16
+            extra['wip_percent'] = min(
+                round(len(production_steps) / _TOTAL_STEPS * 100), 99
+            ) if production_steps else 0
+
         return super().change_view(request, object_id, form_url, extra_context=extra)
 
     # ── Bulk actions ──────────────────────────────────────────────────────────
