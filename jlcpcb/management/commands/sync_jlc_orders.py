@@ -93,12 +93,22 @@ class Command(BaseCommand):
             batch_nums_to_sync = [options['batch_num']]
             self.stdout.write(f'Syncing single batch: {options["batch_num"]}')
         else:
-            days      = options['days'] or cfg.sync_days_back or 30
-            date_to   = timezone.now()
-            date_from = date_to - timedelta(days=days)
-            fmt       = '%Y-%m-%d %H:%M:%S'
+            days    = options['days'] or cfg.sync_days_back or 30
+            fmt     = '%Y-%m-%d %H:%M:%S'
+            date_to = timezone.now()
+
+            # Discovery window: from last_synced_at (incremental) or full days (first/manual)
+            if options['days'] or not cfg.last_synced_at:
+                # Explicit --days or first-ever sync → full window
+                date_from   = date_to - timedelta(days=days)
+                window_desc = f'last {days} days'
+            else:
+                # Incremental: look back only to previous sync (+ 1h overlap)
+                date_from   = cfg.last_synced_at - timedelta(hours=1)
+                window_desc = f'since last sync ({date_from.strftime("%d.%m %H:%M")})'
+
             self.stdout.write(
-                f'Fetching PCB batch list for last {days} days '
+                f'Fetching PCB batch list {window_desc} '
                 f'({date_from.strftime(fmt)} → {date_to.strftime(fmt)})...'
             )
             try:
@@ -109,7 +119,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'Failed to fetch batch list: {e}'))
                 batch_nums_to_sync = []
 
-            # Include existing active orders not in the discovered list
+            # Always include existing active orders (status refresh regardless of age)
             existing_active = list(
                 JLCOrder.objects.exclude(
                     local_status__in=[JLCOrder.LocalStatus.DELIVERED, JLCOrder.LocalStatus.CANCELLED]
