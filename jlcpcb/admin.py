@@ -223,11 +223,6 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 'jlc_order_id', 'jlc_order_number', 'order_type',
                 'description', 'quantity',
             ),
-            'description': (
-                '⚠️ <b>Номер замовлення (jlc_order_number)</b> — це Batch Number з JLCPCB '
-                '(напр. <code>W2025040800001</code>), видимий в розділі Order History на сайті JLCPCB. '
-                'Без цього поля синхронізація статусу через API неможлива.'
-            ),
         }),
         ('🔄 Статус', {
             'fields': ('local_status', 'jlc_status'),
