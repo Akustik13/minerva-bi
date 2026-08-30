@@ -224,6 +224,11 @@
       <div class="jlc-divider"></div>
       <a href="{{ set_track_only_url }}" class="jlc-o-btn jlc-o-btn-track">👁 Тільки трекінг</a>
       <a href="{{ set_ignored_url }}" class="jlc-o-btn jlc-o-btn-ignore">🚫 Ігнорувати</a>
+
+      {% if has_pcb_param %}
+      <div class="jlc-divider"></div>
+      <a href="{{ reorder_url }}" class="jlc-o-btn" style="background:#00838f">🔁 Повторне замовлення</a>
+      {% endif %}
     </div>
 
     {% if is_overdue_shipped %}
@@ -241,6 +246,37 @@
     </div>
   </div>
 </div>
+
+{# ── Gerber PCB preview ── #}
+{% if gerber_top or gerber_bottom %}
+<div class="jlc-detail-panel module" style="margin-bottom:16px">
+  <div class="module-title">🖼 PCB Preview</div>
+  <div style="display:flex;gap:16px;padding:14px 16px;flex-wrap:wrap">
+    {% if gerber_top %}
+    <div style="text-align:center">
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+                  color:var(--body-quiet-color,#888);margin-bottom:6px">Top Layer</div>
+      <img src="{{ gerber_top }}" alt="Gerber Top"
+           style="max-width:220px;max-height:220px;border-radius:6px;
+                  border:1px solid var(--border-color,#ccc);background:#0a1420;
+                  display:block"
+           onerror="this.parentElement.style.display='none'">
+    </div>
+    {% endif %}
+    {% if gerber_bottom %}
+    <div style="text-align:center">
+      <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;
+                  color:var(--body-quiet-color,#888);margin-bottom:6px">Bottom Layer</div>
+      <img src="{{ gerber_bottom }}" alt="Gerber Bottom"
+           style="max-width:220px;max-height:220px;border-radius:6px;
+                  border:1px solid var(--border-color,#ccc);background:#0a1420;
+                  display:block"
+           onerror="this.parentElement.style.display='none'">
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
 {# ── WIP production progress panel ── #}
 {% if production_steps %}

@@ -36,7 +36,7 @@ class Command(BaseCommand):
         from jlcpcb.services.api import (
             JLCAPIClient, JLCAPIError,
             find_product_for_jlc_name, map_jlc_status, status_can_advance,
-            receive_into_inventory, extract_pcb_item,
+            receive_into_inventory, extract_pcb_item, _extract_gerber_images,
         )
         from jlcpcb.notifications import notify_jlc_status_change
 
@@ -208,6 +208,9 @@ class Command(BaseCommand):
                     ).date()
                 except (ValueError, TypeError):
                     pass
+
+            # Extract gerber preview images if available in pcbItem
+            _extract_gerber_images(pcb, raw)
 
             order, is_created = JLCOrder.objects.get_or_create(
                 jlc_order_number=batch,
@@ -442,7 +445,7 @@ class Command(BaseCommand):
                 self.stdout.write(f'    {order.jlc_order_id}: ETA was {order.expected_date} — marking delivered')
                 _do_deliver(order, f'ETA {order.expected_date} passed')
 
-    def _get_dhl_api_key(self) -> str:
+    def _get_dhl_api_key(self) -> str:  # noqa: D102
         """Get DHL Unified Tracking API key from Carrier config."""
         try:
             from shipping.models import Carrier

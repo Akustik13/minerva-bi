@@ -1,13 +1,13 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block title %}Нове PCB замовлення — Gerber{% endblock %}
+{% block title %}{% if prefill_order_id %}Reorder — {{ prefill_order_id }}{% else %}Нове PCB замовлення — Gerber{% endif %}{% endblock %}
 
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Головна</a> &rsaquo;
   <a href="{{ orders_url }}">Замовлення JLCPCB</a> &rsaquo;
-  Нове замовлення з Gerber
+  {% if prefill_order_id %}Повторне замовлення — {{ prefill_order_id }}{% else %}Нове замовлення з Gerber{% endif %}
 </div>
 {% endblock %}
 
@@ -395,6 +395,16 @@
     ❌ API ключі JLCPCB не налаштовано.
     <a href="{% url 'admin:jlcpcb_jlcconfig_change' 1 %}" style="color:var(--err)">Перейти до налаштувань →</a>
   </div>
+  {% endif %}
+
+  {% if prefill_order_id %}
+  <div class="jq-warn" style="margin-bottom:14px">
+    🔁 Повторне замовлення на основі <strong>{{ prefill_order_id }}</strong> — параметри плати передзаповнено.
+    Завантажте Gerber файл та натисніть «Analyze &amp; Get Quote».
+  </div>
+  {% endif %}
+  {% if prefill_params %}
+  <script>window.GERBER_PREFILL = {{ prefill_params }};</script>
   {% endif %}
 
   {# ══════ PCB Specifications ══════ #}
@@ -957,14 +967,74 @@ const p = {
   achieveDate:         120,
 };
 
-let gFileKey   = '';
-let gShipList  = [];
+let gFileKey    = '';
+let gShipList   = [];
 let gAchieveList = [];
-let gBasePrice = 0;
+let gBasePrice  = 0;
 let gSelectedFile = null;
+let gGerberTop  = '';
+let gGerberBottom = '';
 
 const ANALYZE_URL = '{{ analyze_url }}';
 const CREATE_URL  = '{{ create_url }}';
+
+/* ── Prefill from reorder ───────────────────────────────────────────────── */
+function applyPrefill(params) {
+  const mappings = {
+    baseMaterial:        ['grp-material', 'numInt'],
+    layer:               ['grp-layer',    'numInt'],
+    qty:                 ['grp-qty',      'numInt'],
+    differentDesign:     ['grp-design',   'numInt'],
+    panelFlag:           ['grp-panel',    'numInt'],
+    pcbColor:            ['grp-color',    'numInt'],
+    silkscreenColor:     ['grp-silk',     'numInt'],
+    surfaceFinish:       ['grp-surface',  'numInt'],
+    copperWeight:        ['grp-copper',   'numInt'],
+    innerCopperWeight:   ['grp-inner-copper', 'numInt'],
+    viaCovering:         ['grp-via',      'numInt'],
+    flyingProbeTest:     ['grp-probe',    'numInt'],
+    goldFinger:          ['grp-gold',     'numInt'],
+    boardOutlineTolerance: ['grp-tolerance', 'numInt'],
+    impedanceFlag:       ['grp-impedance','numInt'],
+    minViaHoleSizeAndDiameter: ['grp-viahole', 'numInt'],
+    markOnPcb:           ['grp-mark',     'numInt'],
+    autoConfirmProductionFile: ['grp-autoconfirm', 'numInt'],
+  };
+  for (const [key, [grpId]] of Object.entries(mappings)) {
+    if (params[key] === undefined) continue;
+    const grp = document.getElementById(grpId);
+    if (!grp) continue;
+    const val = String(params[key]);
+    grp.querySelectorAll('.jq-pill,.jq-color-pill').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.val === val);
+    });
+    p[key] = params[key];
+  }
+  // Thickness (float comparison)
+  if (params.thickness !== undefined) {
+    const grp = document.getElementById('grp-thickness');
+    if (grp) {
+      grp.querySelectorAll('.jq-pill').forEach(btn => {
+        btn.classList.toggle('active', parseFloat(btn.dataset.val) === parseFloat(params.thickness));
+      });
+      p.thickness = parseFloat(params.thickness);
+    }
+  }
+  // Numeric inputs
+  if (params.width)  { document.getElementById('fld-width').value  = params.width;  p.width  = params.width; }
+  if (params.length) { document.getElementById('fld-length').value = params.length; p.length = params.length; }
+  if (params.qty) {
+    const grp = document.getElementById('grp-qty');
+    const found = grp && [...grp.querySelectorAll('.jq-pill')].some(b => parseInt(b.dataset.val) === parseInt(params.qty));
+    if (!found) { document.getElementById('qty-custom').value = params.qty; p.qty = params.qty; }
+  }
+  if (params.layer) onLayerChange();
+  if (params.remarks) document.getElementById('fld-remark').value = params.remarks;
+}
+
+if (window.GERBER_PREFILL) {
+  document.addEventListener('DOMContentLoaded', () => applyPrefill(window.GERBER_PREFILL));
+}
 
 /* ── Section toggle ─────────────────────────────────────────────────────── */
 window.toggleSection = function(id) {
@@ -1133,10 +1203,12 @@ async function doAnalyze() {
 
 /* ── Show quote result ──────────────────────────────────────────────────── */
 function showResult(d) {
-  gFileKey     = d.file_key || '';
-  gShipList    = d.ship_list || [];
-  gAchieveList = d.achieve_list || [];
-  gBasePrice   = parseFloat(d.price) || 0;
+  gFileKey      = d.file_key || '';
+  gGerberTop    = d.gerber_top || '';
+  gGerberBottom = d.gerber_bottom || '';
+  gShipList     = d.ship_list || [];
+  gAchieveList  = d.achieve_list || [];
+  gBasePrice    = parseFloat(d.price) || 0;
 
   document.getElementById('jq-file-key').value       = gFileKey;
   document.getElementById('jq-pcb-param-json').value = JSON.stringify(d.pcb_param || {});
@@ -1305,6 +1377,8 @@ async function doCreate() {
         shipping_address: addr,
         shipping_method:  shipMethod,
         achieve_date:     achDate,
+        gerber_top:       gGerberTop,
+        gerber_bottom:    gGerberBottom,
       }),
     });
     const data = await resp.json();

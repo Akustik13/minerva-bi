@@ -110,6 +110,31 @@ def extract_pcb_item(raw: dict) -> dict:
     return {}
 
 
+# ── Gerber image extraction ───────────────────────────────────────────────────
+
+# Known field names that JLCPCB API may use for board preview images in pcbItem
+_GERBER_TOP_FIELDS    = ('gerberTop', 'gerberTopUrl', 'topImageUrl', 'topImage', 'pcbTopImageUrl')
+_GERBER_BOTTOM_FIELDS = ('gerberBottom', 'gerberBottomUrl', 'bottomImageUrl', 'bottomImage', 'pcbBottomImageUrl')
+
+
+def _extract_gerber_images(pcb: dict, raw: dict) -> None:
+    """
+    Try to extract gerber preview image URLs from pcbItem and write into raw.
+    Preserves previously-stored Gerber-flow images (won't overwrite if API has none).
+    """
+    top = next((pcb.get(f) for f in _GERBER_TOP_FIELDS if pcb.get(f)), None)
+    bot = next((pcb.get(f) for f in _GERBER_BOTTOM_FIELDS if pcb.get(f)), None)
+    # Also check root-level response fields (some endpoints return them at top level)
+    if not top:
+        top = next((raw.get(f) for f in _GERBER_TOP_FIELDS if raw.get(f)), None)
+    if not bot:
+        bot = next((raw.get(f) for f in _GERBER_BOTTOM_FIELDS if raw.get(f)), None)
+    if top:
+        raw['gerber_top'] = top
+    if bot:
+        raw['gerber_bottom'] = bot
+
+
 # ── Product matching ──────────────────────────────────────────────────────────
 
 def find_product_for_jlc_name(jlc_name: str):

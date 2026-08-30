@@ -202,7 +202,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
     change_form_template = 'admin/jlcpcb/jlcorder/change_form.html'
 
     list_display = (
-        'jlc_order_id_link', 'order_type', 'description_short',
+        'gerber_thumb', 'jlc_order_id_link', 'order_type', 'description_short',
         'quantity', 'status_badge', 'mapping_badge',
         'product_link', 'tracking_display',
         'order_date', 'shipped_date',
@@ -295,6 +295,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('gerber/create/',
                  self.admin_site.admin_view(self.gerber_create_view),
                  name='jlcpcb_gerber_create'),
+            path('gerber/<int:pk>/reorder/',
+                 self.admin_site.admin_view(self.gerber_reorder_view),
+                 name='jlcpcb_gerber_reorder'),
         ]
         return custom + urls
 
@@ -352,10 +355,19 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.error(request, '❌ Вкажіть номер замовлення (Batch Number) у полі «Номер замовлення».')
             return redirect('admin:jlcpcb_jlcorder_change', pk)
         try:
-            from .services.api import extract_pcb_item
+            from .services.api import extract_pcb_item, _extract_gerber_images
             client = JLCAPIClient.from_config()
             raw    = client.get_pcb_order(batch)
             pcb    = extract_pcb_item(raw)
+            # Preserve gerber preview images from previous Gerber-flow or extract from API
+            prev_raw = order.raw_data if isinstance(order.raw_data, dict) else {}
+            if prev_raw.get('gerber_top') and not raw.get('gerber_top'):
+                raw['gerber_top'] = prev_raw['gerber_top']
+            if prev_raw.get('gerber_bottom') and not raw.get('gerber_bottom'):
+                raw['gerber_bottom'] = prev_raw['gerber_bottom']
+            if prev_raw.get('pcb_param') and not raw.get('pcb_param'):
+                raw['pcb_param'] = prev_raw['pcb_param']
+            _extract_gerber_images(pcb, raw)
             old_st = order.local_status
 
             status_int = pcb.get('orderStatus')
@@ -606,6 +618,8 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
         pcb_param    = data.get('pcb_param') or {}
         achieve_date = data.get('achieve_date')
+        gerber_top    = (data.get('gerber_top') or '').strip()
+        gerber_bottom = (data.get('gerber_bottom') or '').strip()
 
         try:
             client = JLCAPIClient.from_config()
@@ -624,6 +638,14 @@ class JLCOrderAdmin(admin.ModelAdmin):
             except (ValueError, TypeError):
                 order_date = date.today()
 
+            # Augment result with gerber preview images and pcb_param for future use
+            stored_raw = dict(result)
+            stored_raw['pcb_param']    = pcb_param
+            if gerber_top:
+                stored_raw['gerber_top'] = gerber_top
+            if gerber_bottom:
+                stored_raw['gerber_bottom'] = gerber_bottom
+
             jlc_order = JLCOrder.objects.create(
                 jlc_order_id=order_id,
                 jlc_order_number=batch_num,
@@ -631,7 +653,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 quantity=pcb_param.get('qty', 1),
                 local_status=JLCOrder.LocalStatus.ORDERED,
                 order_date=order_date,
-                raw_data=result,
+                raw_data=stored_raw,
             )
             return JsonResponse({
                 'ok':        True,
@@ -642,6 +664,47 @@ class JLCOrderAdmin(admin.ModelAdmin):
             return JsonResponse({'ok': False, 'error': str(exc)})
         except Exception as exc:
             return JsonResponse({'ok': False, 'error': f'Помилка створення замовлення: {exc}'})
+
+    def gerber_reorder_view(self, request, pk):
+        """Open Gerber order form pre-filled with params from an existing order."""
+        from django.template.response import TemplateResponse
+        order = get_object_or_404(JLCOrder, pk=pk)
+        cfg = JLCConfig.get()
+
+        raw = order.raw_data if isinstance(order.raw_data, dict) else {}
+        pcb_param = raw.get('pcb_param') or {}
+
+        # If no stored pcb_param, try to reconstruct from pcbItem
+        if not pcb_param:
+            from .services.api import extract_pcb_item
+            pcb = extract_pcb_item(raw)
+            if pcb:
+                _color_map = {'Green': 0, 'Red': 1, 'Yellow': 2, 'Blue': 3,
+                              'White': 4, 'Black': 5, 'Purple': 6}
+                _surface_map = {'HASL(with lead)': 0, 'LeadFree HASL': 1,
+                                'HASL Lead-Free': 1, 'ENIG': 2, 'OSP': 3}
+                pcb_param = {
+                    'layer':         pcb.get('layer', 2),
+                    'qty':           pcb.get('count', 5),
+                    'width':         pcb.get('width', 100),
+                    'length':        pcb.get('length', 100),
+                    'thickness':     pcb.get('thickness', 1.6),
+                    'pcbColor':      _color_map.get(pcb.get('pcbColor', 'Green'), 0),
+                    'surfaceFinish': _surface_map.get(pcb.get('surfaceFinish', ''), 1),
+                    'copperWeight':  pcb.get('copperWeight', 1),
+                }
+
+        return TemplateResponse(request, 'admin/jlcpcb/gerber_order.html', {
+            **self.admin_site.each_context(request),
+            'title':           'Повторне замовлення',
+            'analyze_url':     reverse('admin:jlcpcb_gerber_analyze'),
+            'create_url':      reverse('admin:jlcpcb_gerber_create'),
+            'orders_url':      reverse('admin:jlcpcb_jlcorder_changelist'),
+            'has_api_keys':    bool(cfg.access_key and cfg.secret_key),
+            'opts':            JLCOrder._meta,
+            'prefill_params':  json.dumps(pcb_param),
+            'prefill_order_id': order.jlc_order_id,
+        })
 
     # ── List display ──────────────────────────────────────────────────────────
 
@@ -695,6 +758,24 @@ class JLCOrderAdmin(admin.ModelAdmin):
             )
         return format_html('<span style="font-family:monospace">{}</span>{}',
                            obj.tracking_number, carrier)
+
+    @admin.display(description='PCB')
+    def gerber_thumb(self, obj):
+        raw = obj.raw_data if isinstance(obj.raw_data, dict) else {}
+        top = raw.get('gerber_top', '')
+        if top:
+            return format_html(
+                '<img src="{}" width="52" height="52" '
+                'style="object-fit:contain;border-radius:4px;'
+                'background:#0a1420;border:1px solid #243347;display:block" '
+                'alt="PCB" onerror="this.style.display=\'none\'">',
+                top,
+            )
+        return format_html(
+            '<span style="display:flex;align-items:center;justify-content:center;'
+            'width:52px;height:52px;border-radius:4px;border:1px dashed #555;'
+            'color:#555;font-size:18px">🔲</span>'
+        )
 
     # ── changelist with toolbar ───────────────────────────────────────────────
 
@@ -752,9 +833,19 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 and obj.expected_date < timezone.now().date()
             )
 
+            # Reorder button
+            raw_check = obj.raw_data if isinstance(obj.raw_data, dict) else {}
+            extra['reorder_url']  = reverse('admin:jlcpcb_gerber_reorder', args=[obj.pk])
+            extra['has_pcb_param'] = bool(
+                raw_check.get('pcb_param') or
+                any(item.get('pcbItem') for item in raw_check.get('orderItem', []))
+            )
+
             # Parse raw_data for rich display
             raw = obj.raw_data if isinstance(obj.raw_data, dict) else {}
             extra['jlc_raw']           = raw
+            extra['gerber_top']    = raw.get('gerber_top', '')
+            extra['gerber_bottom'] = raw.get('gerber_bottom', '')
             extra['jlc_shipping_method'] = raw.get('shippingMethod', '')
             extra['jlc_total_money']   = raw.get('totalDummyMoney')  # merchandise cost
             extra['jlc_paid_money']    = raw.get('totalMoney')       # actually charged (after credits)
