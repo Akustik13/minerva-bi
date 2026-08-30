@@ -402,78 +402,48 @@ class JLCAPIClient:
 
     def get_pcb_batch_list(self, date_from: str, date_to: str,
                            page: int = 1, page_size: int = 50,
-                           order_type: int = None) -> dict:
+                           order_type: str = 'order_pcb') -> dict:
         """
         Paginated list of PCB batch numbers in a date range.
         date_from / date_to: 'yyyy-MM-dd HH:mm:ss'
-        order_type: integer — 0=batch PCB, 1=prototype/sample PCB, 3=Stencil.
-            Pass None to omit the filter (fetch all types if API allows).
-        Returns the raw data dict with 'list' of {batchNum, orderTypeInfos}.
+        order_type: 'order_pcb' (PCB orders) or 'order_steel' (stencil orders) — per API docs.
+        Returns raw data dict with 'list', 'total', 'pages'.
         """
-        body = {
+        return self._request('POST', self.EP_PCB_BATCH_LIST, body={
             'pageNum':         page,
             'pageSize':        min(page_size, 50),
+            'orderType':       order_type,
             'createTimeStart': date_from,
             'createTimeEnd':   date_to,
-        }
-        if order_type is not None:
-            body['orderType'] = order_type
-        return self._request('POST', self.EP_PCB_BATCH_LIST, body=body)
-
-    def _fetch_batch_page(self, date_from: str, date_to: str,
-                          page: int, order_type: int = None) -> tuple:
-        """Returns (batch_nums_page: list, total: int)."""
-        result = self.get_pcb_batch_list(date_from, date_to,
-                                          page=page, page_size=50,
-                                          order_type=order_type)
-        items = result.get('list') or result.get('records') or []
-        total = result.get('total') or result.get('totalCount') or 0
-        nums  = [item['batchNum'] for item in items if item.get('batchNum')]
-        return nums, int(total)
+        })
 
     def get_all_pcb_batch_numbers(self, date_from: str, date_to: str) -> list:
         """
-        Fetch all PCB batch numbers in the given date range (auto-paginate).
-        Tries each PCB order type (1=prototype, 0=batch, 3=stencil) separately
-        because the JLCPCB API filters by orderType (integer, not string).
-        Falls back to a no-filter call if typed calls fail.
+        Fetch all batch numbers (PCB + stencil) in the given date range.
+        Paginates using the 'pages' field from the API response.
+        Per docs, orderType must be 'order_pcb' or 'order_steel' (string).
         """
         seen       = set()
         batch_nums = []
 
-        # JLCPCB order types: 1=prototype/sample, 0=batch PCB, 3=stencil
-        for otype in (1, 0, 3):
+        for otype in ('order_pcb', 'order_steel'):
             page = 1
             while True:
                 try:
-                    nums, total = self._fetch_batch_page(date_from, date_to,
-                                                         page, order_type=otype)
+                    result = self.get_pcb_batch_list(date_from, date_to,
+                                                     page=page, order_type=otype)
                 except JLCAPIError as e:
-                    logger.warning('pageBatchInfoByOrderType orderType=%s page=%s: %s', otype, page, e)
+                    logger.warning('pageBatchInfoByOrderType orderType=%s page=%s: %s',
+                                   otype, page, e)
                     break
-                for n in nums:
-                    if n not in seen:
+                items      = result.get('list', [])
+                total_pages = result.get('pages', 1) or 1
+                for item in items:
+                    n = item.get('batchNum')
+                    if n and n not in seen:
                         seen.add(n)
                         batch_nums.append(n)
-                if not nums or len(seen) >= total:
-                    break
-                page += 1
-
-        # Fallback: try without orderType filter (API may not require it)
-        if not batch_nums:
-            logger.info('Typed batch-list returned nothing — retrying without orderType filter')
-            page = 1
-            while True:
-                try:
-                    nums, total = self._fetch_batch_page(date_from, date_to, page)
-                except JLCAPIError as e:
-                    logger.warning('pageBatchInfoByOrderType (no filter) page=%s: %s', page, e)
-                    break
-                for n in nums:
-                    if n not in seen:
-                        seen.add(n)
-                        batch_nums.append(n)
-                if not nums or len(seen) >= total:
+                if not items or page >= total_pages:
                     break
                 page += 1
 

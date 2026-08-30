@@ -43,6 +43,14 @@ class JLCConfig(models.Model):
     notify_on_status_change = models.BooleanField('Сповіщення: будь-яка зміна статусу', default=True)
     notify_on_delivered     = models.BooleanField('Сповіщення: доставлено', default=True)
     notify_telegram         = models.BooleanField('Telegram', default=True)
+    telegram_personal_chat_id = models.CharField(
+        'Telegram Personal Chat ID', max_length=50, blank=True, default='',
+        help_text=(
+            'Особистий Chat ID для JLCPCB сповіщень (наприклад: 123456789). '
+            'Отримайте у @userinfobot в Telegram. '
+            'Якщо порожньо — використовується Chat ID з загальних налаштувань (канал).'
+        ),
+    )
     notify_email            = models.BooleanField('Email', default=False)
     notify_email_to         = models.CharField(
         'Email одержувачів (через кому)', max_length=500, blank=True, default='',

@@ -199,6 +199,15 @@ class Command(BaseCommand):
             else:
                 old_status = order.local_status
 
+                # Manually-delivered orders are final — never let API roll them back.
+                # Only update raw API data for audit, skip all status logic.
+                if old_status == JLCOrder.LocalStatus.DELIVERED:
+                    order.raw_data   = raw
+                    order.jlc_status = str(status_int) if status_int is not None else ''
+                    order.save(update_fields=['raw_data', 'jlc_status', 'updated_at'])
+                    self.stdout.write(f'  {batch}: delivered (locked) — API says {new_status}, skip')
+                    continue
+
                 # Update expected_date / tracking_carrier if now available
                 update_fields = ['raw_data', 'jlc_status', 'description', 'updated_at']
                 if expected_date and not order.expected_date:
@@ -217,6 +226,7 @@ class Command(BaseCommand):
                             order.product          = product
                             order.mapping_status   = JLCOrder.MappingStatus.MATCHED
                             order.auto_matched_sku = product.sku
+                            update_fields += ['product', 'mapping_status', 'auto_matched_sku']
                             self.stdout.write(f'    → Matched {product.sku} ({match_type})')
 
                 order.raw_data   = raw

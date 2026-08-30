@@ -40,8 +40,13 @@ _STATUS_COLORS = {
 def _get_telegram_token_and_chat() -> tuple[str, str]:
     try:
         from config.models import NotificationSettings
-        s = NotificationSettings.get()
-        return s.telegram_bot_token or '', s.telegram_chat_id or ''
+        from jlcpcb.models import JLCConfig
+        ns      = NotificationSettings.get()
+        token   = ns.telegram_bot_token or ''
+        jlc_cfg = JLCConfig.get()
+        # Personal chat ID takes priority over the global channel
+        chat_id = jlc_cfg.telegram_personal_chat_id or ns.telegram_chat_id or ''
+        return token, chat_id
     except Exception:
         return '', ''
 

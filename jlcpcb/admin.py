@@ -76,7 +76,13 @@ class JLCConfigAdmin(admin.ModelAdmin):
         ('🔔 Сповіщення', {
             'fields': (
                 'notify_on_shipped', 'notify_on_status_change', 'notify_on_delivered',
-                'notify_telegram', 'notify_email', 'notify_email_to',
+                'notify_telegram', 'telegram_personal_chat_id',
+                'notify_email', 'notify_email_to',
+            ),
+            'description': (
+                '💡 <b>Telegram Personal Chat ID</b>: відкрийте <b>@userinfobot</b> у Telegram '
+                'і надішліть йому будь-яке повідомлення — він поверне ваш Chat ID. '
+                'Якщо поле порожнє — сповіщення йдуть в канал із загальних налаштувань.'
             ),
         }),
         ('📋 Лог підключення', {
