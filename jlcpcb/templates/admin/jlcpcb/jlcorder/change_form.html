@@ -242,6 +242,78 @@
   </div>
 </div>
 
+{# ── WIP production progress panel ── #}
+{% if production_steps %}
+<div class="jlc-detail-panel module">
+  <div class="module-title">
+    🏭 Хід виробництва
+    <span style="float:right;font-weight:700;color:#e65100;font-size:13px">{{ wip_percent }}%</span>
+  </div>
+  <div class="jlc-detail-inner">
+    <div>
+      <div style="font-size:11px;color:var(--body-quiet-color,#888);margin-bottom:6px">
+        Завершено {{ production_steps|length }} з 16 кроків виробництва
+      </div>
+      <div class="jlc-wip-bar-wrap">
+        <div class="jlc-wip-bar-fill" style="width:{{ wip_percent }}%"></div>
+      </div>
+      <div class="jlc-wip-steps" style="margin-top:12px">
+        {% for step in production_steps %}
+        <div class="jlc-wip-step done">
+          <span class="wip-dot">✅</span>
+          <span class="wip-name">{{ step.technicsProcessName }}</span>
+          <span class="wip-time">{{ step.beginTime|slice:":16" }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── DHL tracking panel ── #}
+{% if dhl_events %}
+<div class="jlc-detail-panel module">
+  <div class="module-title">
+    🚚 DHL трекінг
+    {% if dhl_updated_at %}<span style="float:right;font-weight:400;font-size:11px;color:var(--body-quiet-color,#888)">оновлено {{ dhl_updated_at|slice:":16" }}</span>{% endif %}
+  </div>
+  <div class="jlc-detail-inner">
+    {% if dhl_origin or dhl_dest or dhl_status_desc %}
+    <div class="jlc-kv-grid">
+      {% if dhl_status_desc %}
+      <div class="jlc-kv">
+        <span class="k">Останній статус</span>
+        <span class="v">{{ dhl_status_desc }}</span>
+      </div>
+      {% endif %}
+      {% if dhl_origin %}
+      <div class="jlc-kv">
+        <span class="k">Відправлення</span>
+        <span class="v">📍 {{ dhl_origin }}</span>
+      </div>
+      {% endif %}
+      {% if dhl_dest %}
+      <div class="jlc-kv">
+        <span class="k">Призначення</span>
+        <span class="v">🏠 {{ dhl_dest }}</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="jlc-dhl-events">
+      {% for ev in dhl_events %}
+      <div class="jlc-dhl-event{% if ev.status_code == 'delivered' %} ev-delivered{% elif ev.status_code == 'transit' %} ev-transit{% elif ev.status_code == 'out-for-delivery' %} ev-out{% endif %}">
+        <div class="jlc-dhl-ev-ts">{{ ev.ts|slice:":16"|cut:"T" }}</div>
+        <div class="jlc-dhl-ev-desc">{{ ev.desc }}</div>
+        {% if ev.location %}<div class="jlc-dhl-ev-loc">📍 {{ ev.location }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {# ── DETAIL PANEL (from raw_data) ── #}
 {% if jlc_sub_orders or jlc_shipping_method %}
 <div class="jlc-detail-panel module">
@@ -283,54 +355,6 @@
           <span class="v">📍 {{ jlc_address }}</span>
         </div>
         {% endif %}
-      </div>
-    </div>
-    {% endif %}
-
-    {# DHL tracking events #}
-    {% if dhl_events %}
-    <div>
-      <div class="jlc-section-title">
-        🚚 DHL трекінг — {{ dhl_status_desc|default:dhl_status }}
-        {% if dhl_updated_at %}<span style="float:right;font-weight:400;font-size:10px;color:var(--body-quiet-color,#888)">оновлено {{ dhl_updated_at|slice:":16" }}</span>{% endif %}
-      </div>
-      {% if dhl_origin or dhl_dest %}
-      <div style="font-size:11px;color:var(--body-quiet-color,#888);margin:6px 0 2px">
-        {% if dhl_origin %}📍 {{ dhl_origin }}{% endif %}
-        {% if dhl_origin and dhl_dest %} → {% endif %}
-        {% if dhl_dest %}🏠 {{ dhl_dest }}{% endif %}
-      </div>
-      {% endif %}
-      <div class="jlc-dhl-events">
-        {% for ev in dhl_events %}
-        <div class="jlc-dhl-event{% if ev.status_code == 'delivered' %} ev-delivered{% elif ev.status_code == 'transit' %} ev-transit{% elif ev.status_code == 'out-for-delivery' %} ev-out{% endif %}">
-          <div class="jlc-dhl-ev-ts">{{ ev.ts|slice:":16"|cut:"T" }}</div>
-          <div class="jlc-dhl-ev-desc">{{ ev.desc }}</div>
-          {% if ev.location %}<div class="jlc-dhl-ev-loc">📍 {{ ev.location }}</div>{% endif %}
-        </div>
-        {% endfor %}
-      </div>
-    </div>
-    {% endif %}
-
-    {# Production progress (WIP) #}
-    {% if production_steps %}
-    <div>
-      <div class="jlc-section-title">
-        🏭 Хід виробництва — {{ production_steps|length }} / 16 кроків
-        <span style="float:right;font-weight:700;color:#e65100">{{ wip_percent }}%</span>
-      </div>
-      <div class="jlc-wip-bar-wrap">
-        <div class="jlc-wip-bar-fill" style="width:{{ wip_percent }}%"></div>
-      </div>
-      <div class="jlc-wip-steps">
-        {% for step in production_steps %}
-        <div class="jlc-wip-step done">
-          <span class="wip-dot">✅</span>
-          <span class="wip-name">{{ step.technicsProcessName }}</span>
-          <span class="wip-time">{{ step.beginTime|slice:":16" }}</span>
-        </div>
-        {% endfor %}
       </div>
     </div>
     {% endif %}
