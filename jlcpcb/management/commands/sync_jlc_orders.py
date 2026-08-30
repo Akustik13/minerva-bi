@@ -342,31 +342,22 @@ class Command(BaseCommand):
             uuids_to_try = [u for u in [batch_uuid, file_uuid] if u]
             if not uuids_to_try:
                 continue
-            found_steps = False
             for order_uuid in uuids_to_try:
                 try:
                     wip = client.get_pcb_wip(order_uuid)
-                    if isinstance(wip, list):
-                        steps = wip
-                    else:
-                        steps = wip.get('date') or wip.get('data') or []
-                    self.stdout.write(
-                        f'    {order.jlc_order_id} [uuid={order_uuid[:20]}...]: '
-                        f'WIP raw={repr(wip)[:120]}'
+                    steps = wip if isinstance(wip, list) else (
+                        wip.get('date') or wip.get('data') or []
                     )
                     if isinstance(steps, list) and steps:
                         raw['production_steps'] = steps
                         order.raw_data = raw
                         order.save(update_fields=['raw_data', 'updated_at'])
                         self.stdout.write(
-                            f'    {order.jlc_order_id}: {len(steps)} step(s) saved'
+                            f'    {order.jlc_order_id}: {len(steps)} WIP step(s) saved'
                         )
-                        found_steps = True
                         break
                 except JLCAPIError as e:
-                    self.stdout.write(f'    {order.jlc_order_id} [uuid={order_uuid[:20]}]: WIP error — {e}')
-            if not found_steps:
-                self.stdout.write(f'    {order.jlc_order_id}: WIP — no steps returned')
+                    self.stdout.write(f'    {order.jlc_order_id}: WIP error — {e}')
 
     def _check_dhl(self, cfg, options):
         """
