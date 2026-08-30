@@ -503,18 +503,34 @@ class JLCOrderAdmin(admin.ModelAdmin):
             return JsonResponse({'ok': False, 'error': 'Тільки .zip або .rar файли підтримуються'})
 
         try:
+            layer = int(request.POST.get('layer', 2))
             pcb_param = {
-                'layer':           int(request.POST.get('layer', 2)),
-                'qty':             int(request.POST.get('qty', 5)),
-                'width':           float(request.POST.get('width', 100)),
-                'length':          float(request.POST.get('length', 100)),
-                'thickness':       float(request.POST.get('thickness', 1.6)),
-                'pcbColor':        int(request.POST.get('pcb_color', 0)),
-                'surfaceFinish':   int(request.POST.get('surface_finish', 1)),
-                'copperWeight':    int(request.POST.get('copper_weight', 1)),
-                'panelFlag':       0,
-                'flyingProbeTest': 2,
+                'baseMaterial':               int(request.POST.get('base_material', 0)),
+                'layer':                      layer,
+                'width':                      float(request.POST.get('width', 100)),
+                'length':                     float(request.POST.get('length', 100)),
+                'qty':                        int(request.POST.get('qty', 5)),
+                'differentDesign':            int(request.POST.get('different_design', 1)),
+                'panelFlag':                  int(request.POST.get('panel_flag', 0)),
+                'thickness':                  float(request.POST.get('thickness', 1.6)),
+                'pcbColor':                   int(request.POST.get('pcb_color', 0)),
+                'silkscreenColor':            int(request.POST.get('silkscreen_color', 0)),
+                'surfaceFinish':              int(request.POST.get('surface_finish', 1)),
+                'copperWeight':               int(request.POST.get('copper_weight', 1)),
+                'flyingProbeTest':            int(request.POST.get('flying_probe_test', 2)),
+                'goldFinger':                 int(request.POST.get('gold_finger', 0)),
+                'boardOutlineTolerance':      int(request.POST.get('board_outline_tolerance', 1)),
+                'impedanceFlag':              int(request.POST.get('impedance_flag', 0)),
+                'viaCovering':                int(request.POST.get('via_covering', 0)),
+                'markOnPcb':                  int(request.POST.get('mark_on_pcb', 0)),
+                'autoConfirmProductionFile':  int(request.POST.get('auto_confirm', 1)),
             }
+            # inner copper only meaningful for multilayer
+            if layer > 2:
+                pcb_param['innerCopperWeight'] = int(request.POST.get('inner_copper_weight', 1))
+            remarks = request.POST.get('remarks', '').strip()
+            if remarks:
+                pcb_param['remarks'] = remarks
             achieve_date = int(request.POST.get('achieve_date', 120))
             country      = request.POST.get('country', 'DE')
         except (ValueError, TypeError) as exc:

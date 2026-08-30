@@ -13,169 +13,269 @@
 
 {% block extrahead %}{{ block.super }}
 <style>
-.gbr-wrap { max-width: 860px; padding-bottom: 40px; }
-
-.gbr-card {
-  background: var(--bg-card, #1a2535);
-  border: 1px solid var(--border-strong, #243347);
-  border-radius: 8px;
-  padding: 20px 22px;
-  margin-bottom: 18px;
-}
-.gbr-card-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text, #c9d8e4);
-  margin: 0 0 16px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border-strong, #243347);
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.jq-page {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  gap: 20px;
+  align-items: flex-start;
+  max-width: 1200px;
+  padding-bottom: 40px;
 }
-.gbr-step-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--link-fg, #58a6ff);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
+.jq-form { flex: 1 1 0; min-width: 0; }
+.jq-sidebar {
+  width: 280px;
   flex-shrink: 0;
+  position: sticky;
+  top: 16px;
+}
+@media (max-width: 900px) {
+  .jq-page { flex-direction: column; }
+  .jq-sidebar { width: 100%; position: static; }
 }
 
-/* Params grid */
-.gbr-params-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px 20px;
+/* ── Card / Section ─────────────────────────────────────────────────────── */
+.jq-card {
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-strong, #d0d7de);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  overflow: hidden;
 }
-@media (max-width: 600px) {
-  .gbr-params-grid { grid-template-columns: 1fr; }
+.jq-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--bg-card, #fff);
+  border-bottom: 1px solid var(--border-strong, #d0d7de);
 }
-.gbr-span2 { grid-column: span 2; }
-.gbr-field label {
-  display: block;
+.jq-section-head:hover { background: var(--bg-hover, #f6f8fa); }
+.jq-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text, #24292f);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.jq-section-arrow {
+  font-size: 12px;
+  color: var(--text-dim, #57606a);
+  transition: transform .2s;
+}
+.jq-section-body { padding: 4px 0; }
+.jq-section-body.collapsed { display: none; }
+
+/* ── Field Row ───────────────────────────────────────────────────────────── */
+.jq-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-strong, #d0d7de);
+}
+.jq-row:last-child { border-bottom: none; }
+.jq-row-label {
+  flex: 0 0 160px;
+  padding-top: 6px;
+  font-size: 12px;
+  color: var(--text, #24292f);
+  font-weight: 500;
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+.jq-row-label .tip {
+  color: var(--text-dim, #57606a);
+  cursor: help;
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim, #607d8b);
-  text-transform: uppercase;
-  letter-spacing: .04em;
-  margin-bottom: 6px;
+  line-height: 1.6;
+  position: relative;
+}
+.jq-row-ctrl { flex: 1 1 0; }
+@media (max-width: 600px) {
+  .jq-row { flex-direction: column; gap: 6px; }
+  .jq-row-label { flex: none; padding-top: 0; }
 }
 
-/* Option buttons (layers, qty, copper) */
-.gbr-opt-row {
+/* ── Pills (option buttons) ──────────────────────────────────────────────── */
+.jq-pills {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
 }
-.gbr-opt-btn {
+.jq-pill {
   padding: 4px 12px;
-  border: 1px solid var(--border-strong, #243347);
+  border: 1px solid var(--border-strong, #d0d7de);
   border-radius: 4px;
-  background: var(--bg-input, #141f2b);
-  color: var(--text, #c9d8e4);
+  background: var(--bg-input, #f6f8fa);
+  color: var(--text, #24292f);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  transition: background .12s, border-color .12s, color .12s;
+  transition: border-color .12s, background .12s, color .12s;
+  white-space: nowrap;
 }
-.gbr-opt-btn.active, .gbr-opt-btn:hover {
-  background: var(--link-fg, #1976d2);
-  border-color: var(--link-fg, #1976d2);
-  color: #fff;
+.jq-pill:hover {
+  border-color: var(--link-fg, #0969da);
+  color: var(--link-fg, #0969da);
+}
+.jq-pill.active {
+  border: 2px solid var(--link-fg, #0969da);
+  background: rgba(9, 105, 218, .07);
+  color: var(--link-fg, #0969da);
+  font-weight: 600;
 }
 
-/* Color buttons */
-.gbr-color-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.gbr-color-btn {
+/* Color pills */
+.jq-color-pill {
   padding: 5px 14px;
-  border-radius: 4px;
   border: 2px solid transparent;
+  border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: box-shadow .12s, border-color .12s;
+  transition: outline .1s;
 }
-.gbr-color-btn.active {
+.jq-color-pill.active {
   outline: 3px solid var(--body-fg, #333);
   outline-offset: 2px;
-  box-shadow: inset 0 0 0 2px rgba(255,255,255,.35);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.3);
 }
 
-/* Inputs / selects */
-.gbr-input, .gbr-select {
+/* ── Input / Select / Textarea ───────────────────────────────────────────── */
+.jq-input, .jq-select, .jq-textarea {
   padding: 5px 8px;
-  border: 1px solid var(--border-strong, #243347);
+  border: 1px solid var(--border-strong, #d0d7de);
   border-radius: 4px;
-  background: var(--bg-input, #141f2b);
-  color: var(--text, #c9d8e4);
-  font-size: 13px;
-  width: 100%;
+  background: var(--bg-input, #f6f8fa);
+  color: var(--text, #24292f);
+  font-size: 12px;
   box-sizing: border-box;
 }
-.gbr-input:focus, .gbr-select:focus {
+.jq-input:focus, .jq-select:focus, .jq-textarea:focus {
   outline: none;
-  border-color: var(--link-fg, #1976d2);
+  border-color: var(--link-fg, #0969da);
 }
-.gbr-dim-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.gbr-dim-row .gbr-input { width: 80px; }
-.gbr-dim-note {
+.jq-dim-row { display: flex; align-items: center; gap: 6px; }
+.jq-dim-row .jq-input { width: 80px; }
+.jq-dim-note {
   font-size: 10px;
-  color: var(--text-dim, #607d8b);
+  color: var(--text-dim, #57606a);
   margin-top: 4px;
 }
+.jq-sub-note {
+  font-size: 10px;
+  color: var(--text-dim, #57606a);
+  margin-top: 3px;
+}
 
-/* Dropzone */
-.gbr-dropzone {
-  border: 2px dashed var(--border-strong, #243347);
+/* ── Dropzone ────────────────────────────────────────────────────────────── */
+.jq-dropzone {
+  border: 2px dashed var(--border-strong, #d0d7de);
   border-radius: 8px;
-  padding: 28px 20px;
+  padding: 24px;
   text-align: center;
   cursor: pointer;
-  margin-top: 16px;
   transition: border-color .15s, background .15s;
-  user-select: none;
 }
-.gbr-dropzone:hover, .gbr-dropzone.drag-over {
-  border-color: var(--link-fg, #1976d2);
-  background: var(--bg-hover, #1e2d40);
+.jq-dropzone:hover, .jq-dropzone.drag-over {
+  border-color: var(--link-fg, #0969da);
+  background: var(--bg-hover, #f6f8fa);
 }
-.gbr-dz-icon { font-size: 28px; margin-bottom: 6px; }
-.gbr-dz-label {
-  font-size: 13px;
-  color: var(--text-dim, #607d8b);
-}
-.gbr-dz-label small { font-size: 11px; }
-.gbr-dz-chosen {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ok, #4caf50);
-}
-.gbr-dz-chosen span { font-size: 11px; font-weight: 400; color: var(--text-dim, #607d8b); }
+.jq-dz-icon { font-size: 26px; margin-bottom: 6px; }
+.jq-dz-text { font-size: 13px; color: var(--text-dim, #57606a); }
+.jq-dz-chosen { font-size: 13px; font-weight: 600; color: var(--ok, #1a7f37); }
+.jq-dz-chosen small { font-weight: 400; color: var(--text-dim, #57606a); }
 
-/* Actions */
-.gbr-actions {
+/* Analyze btn (below dropzone) */
+.jq-analyze-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 18px;
-  flex-wrap: wrap;
+  padding: 14px 16px;
 }
-.gbr-btn {
-  padding: 9px 20px;
+
+/* ── Sidebar card ────────────────────────────────────────────────────────── */
+.jq-sb-card {
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-strong, #d0d7de);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.jq-sb-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dim, #57606a);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+.jq-sb-price-main {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text, #24292f);
+}
+.jq-sb-price-sub {
+  font-size: 12px;
+  color: var(--text-dim, #57606a);
+  margin-bottom: 10px;
+}
+.jq-sb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+.jq-sb-table td {
+  padding: 3px 0;
+  color: var(--text, #24292f);
+  border-bottom: 1px solid var(--border-strong, #d0d7de);
+}
+.jq-sb-table td:last-child { text-align: right; font-weight: 600; }
+.jq-sb-table tr:last-child td { border-bottom: none; }
+
+.jq-sb-sep {
+  border: none;
+  border-top: 1px solid var(--border-strong, #d0d7de);
+  margin: 10px 0;
+}
+
+/* Build time pills in sidebar */
+.jq-sb-pills { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+.jq-sb-pill {
+  padding: 3px 10px;
+  border: 1px solid var(--border-strong, #d0d7de);
+  border-radius: 4px;
+  background: var(--bg-input, #f6f8fa);
+  color: var(--text, #24292f);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.jq-sb-pill:hover { border-color: var(--link-fg, #0969da); }
+.jq-sb-pill.active {
+  border: 2px solid var(--link-fg, #0969da);
+  background: rgba(9,105,218,.07);
+  color: var(--link-fg, #0969da);
+  font-weight: 600;
+}
+
+.jq-sb-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0 14px;
+}
+.jq-sb-total-label { font-size: 13px; font-weight: 600; color: var(--text, #24292f); }
+.jq-sb-total-val { font-size: 22px; font-weight: 700; color: var(--ok, #1a7f37); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.jq-btn {
+  padding: 8px 18px;
   border: none;
   border-radius: 5px;
   font-size: 13px;
@@ -186,558 +286,766 @@
   gap: 6px;
   transition: opacity .15s;
 }
-.gbr-btn:disabled { opacity: .4; cursor: not-allowed; }
-.gbr-btn:not(:disabled):hover { opacity: .85; }
-.gbr-btn-primary { background: #1976d2; color: #fff; }
-.gbr-btn-success { background: #2e7d32; color: #fff; }
-.gbr-btn-danger  { background: #c62828; color: #fff; }
-.gbr-btn-ghost   { background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
-                   border: 1px solid var(--border-strong, #243347); }
-.gbr-status {
-  font-size: 12px;
-  color: var(--text-dim, #607d8b);
-}
-.gbr-status.err { color: var(--err, #f44336); }
-.gbr-status.ok  { color: var(--ok, #4caf50); }
+.jq-btn:disabled { opacity: .38; cursor: not-allowed; }
+.jq-btn:not(:disabled):hover { opacity: .85; }
+.jq-btn-primary { background: var(--link-fg, #0969da); color: #fff; }
+.jq-btn-order   { background: #c62828; color: #fff; width: 100%; justify-content: center; font-size: 14px; padding: 10px; }
+.jq-btn-ghost   { background: var(--bg-input, #f6f8fa); color: var(--text, #24292f);
+                  border: 1px solid var(--border-strong, #d0d7de); }
+.jq-status { font-size: 12px; color: var(--text-dim, #57606a); }
+.jq-status.err { color: var(--err, #cf222e); }
+.jq-status.ok  { color: var(--ok, #1a7f37); }
 
-/* Spinner */
-@keyframes gbr-spin { to { transform: rotate(360deg); } }
-.gbr-spinner {
-  display: inline-block;
-  width: 14px; height: 14px;
-  border: 2px solid currentColor;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: gbr-spin .7s linear infinite;
-  vertical-align: middle;
+/* ── Preview images ──────────────────────────────────────────────────────── */
+.jq-preview-row { display: flex; gap: 12px; margin-bottom: 14px; }
+.jq-preview-item { flex: 1; text-align: center; }
+.jq-preview-label {
+  font-size: 10px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--text-dim, #57606a); margin-bottom: 4px;
+}
+.jq-preview-img {
+  max-width: 100%; max-height: 150px; border-radius: 5px;
+  border: 1px solid var(--border-strong, #d0d7de);
+}
+.jq-preview-ph {
+  width: 100%; height: 100px;
+  border: 1px dashed var(--border-strong, #d0d7de); border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-dim, #57606a); font-size: 20px;
 }
 
-/* Preview images */
-.gbr-preview-row {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 18px;
-  flex-wrap: wrap;
-}
-.gbr-preview-item {
-  flex: 1;
-  min-width: 180px;
-  text-align: center;
-}
-.gbr-preview-label {
+/* ── Warn / No-keys ──────────────────────────────────────────────────────── */
+.jq-warn {
+  background: rgba(158,119,0,.08);
+  border: 1px solid rgba(158,119,0,.3);
+  border-radius: 5px;
+  padding: 9px 14px;
   font-size: 11px;
-  font-weight: 600;
-  color: var(--text-dim, #607d8b);
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  margin-bottom: 6px;
-}
-.gbr-preview-img {
-  max-width: 100%;
-  max-height: 220px;
-  border-radius: 6px;
-  border: 1px solid var(--border-strong, #243347);
-  background: #0a0e14;
-}
-.gbr-preview-ph {
-  width: 100%;
-  height: 160px;
-  border: 1px dashed var(--border-strong, #243347);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-dim, #607d8b);
-  font-size: 22px;
-}
-
-/* Price block */
-.gbr-price-main {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--text, #c9d8e4);
+  color: #7d6000;
   margin-bottom: 10px;
 }
-.gbr-price-main span { font-size: 14px; font-weight: 400; color: var(--text-dim, #607d8b); }
-.gbr-price-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-  margin-bottom: 14px;
-}
-.gbr-price-table td {
-  padding: 3px 0;
-  color: var(--text, #c9d8e4);
-  border-bottom: 1px solid var(--border-strong, #243347);
-}
-.gbr-price-table td:last-child {
-  text-align: right;
-  font-weight: 600;
-}
-.gbr-price-table tr:last-child td { border-bottom: none; }
-
-/* Options row (shipping + date) */
-.gbr-options-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px 20px;
+[data-theme="dark"] .jq-warn { color: #f6be00; background: rgba(246,190,0,.08); border-color: rgba(246,190,0,.3); }
+.jq-no-keys {
+  background: rgba(207,34,46,.07);
+  border: 1px solid rgba(207,34,46,.3);
+  border-radius: 6px;
+  padding: 12px 16px;
+  color: var(--err, #cf222e);
+  font-size: 13px;
   margin-bottom: 16px;
 }
-@media (max-width: 500px) {
-  .gbr-options-row { grid-template-columns: 1fr; }
+
+/* ── Success card ────────────────────────────────────────────────────────── */
+.jq-success { text-align: center; padding: 28px 20px; }
+.jq-success-icon { font-size: 44px; margin-bottom: 10px; }
+.jq-success-title { font-size: 18px; font-weight: 700; color: var(--ok, #1a7f37); margin-bottom: 4px; }
+.jq-success-batch { font-size: 14px; font-family: monospace; color: var(--text, #24292f); margin-bottom: 18px; }
+
+/* ── Spinner ─────────────────────────────────────────────────────────────── */
+@keyframes jq-spin { to { transform: rotate(360deg); } }
+.jq-spinner {
+  display: inline-block; width: 13px; height: 13px;
+  border: 2px solid currentColor; border-top-color: transparent;
+  border-radius: 50%; animation: jq-spin .7s linear infinite; vertical-align: middle;
 }
 
-/* Total */
-.gbr-total-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--bg-hover, #1e2d40);
-  border-radius: 5px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.gbr-total-label {
-  font-size: 12px;
-  color: var(--text-dim, #607d8b);
-  font-weight: 600;
-  text-transform: uppercase;
-}
-.gbr-total-val {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--ok, #4caf50);
-}
-
-/* Address form */
-.gbr-addr-summary {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--link-fg, #58a6ff);
-  cursor: pointer;
-  padding: 8px 0;
-  user-select: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.gbr-addr-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 14px;
-  margin-top: 12px;
-}
-@media (max-width: 500px) {
-  .gbr-addr-grid { grid-template-columns: 1fr; }
-}
-.gbr-addr-span2 { grid-column: span 2; }
-.gbr-addr-label {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text-dim, #607d8b);
-  text-transform: uppercase;
-  margin-bottom: 3px;
-}
-
-/* Success card */
-.gbr-success-card {
+/* ── Step 1 tip banner ───────────────────────────────────────────────────── */
+.jq-upload-banner {
+  background: var(--bg-hover, #f6f8fa);
+  border: 1px solid var(--border-strong, #d0d7de);
+  border-radius: 8px;
+  padding: 22px 20px;
   text-align: center;
-  padding: 30px 20px;
-}
-.gbr-success-icon { font-size: 48px; margin-bottom: 12px; }
-.gbr-success-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--ok, #4caf50);
+  color: var(--text-dim, #57606a);
+  font-size: 13px;
   margin-bottom: 6px;
 }
-.gbr-success-batchnum {
-  font-size: 15px;
-  font-family: monospace;
-  color: var(--text, #c9d8e4);
-  margin-bottom: 20px;
+.jq-upload-banner .big { font-size: 24px; margin-bottom: 6px; }
+
+/* Address grid */
+.jq-addr-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin-top: 10px;
+}
+@media (max-width: 500px) { .jq-addr-grid { grid-template-columns: 1fr; } }
+.jq-addr-span2 { grid-column: span 2; }
+.jq-addr-label { font-size: 10px; font-weight: 600; color: var(--text-dim, #57606a); text-transform: uppercase; margin-bottom: 3px; }
+.jq-addr-summary {
+  font-size: 12px; font-weight: 600; color: var(--link-fg, #0969da);
+  cursor: pointer; display: flex; align-items: center; gap: 5px;
+  padding: 8px 0; user-select: none;
 }
 
-/* Warning */
-.gbr-warn {
-  background: rgba(246,190,0,.08);
-  border: 1px solid rgba(246,190,0,.3);
-  border-radius: 5px;
-  padding: 10px 14px;
-  font-size: 12px;
-  color: #f6be00;
-  margin-bottom: 16px;
-}
-
-/* No API keys warning */
-.gbr-no-keys {
-  background: rgba(244,67,54,.08);
-  border: 1px solid rgba(244,67,54,.3);
-  border-radius: 6px;
-  padding: 14px 18px;
-  color: var(--err, #f44336);
-  font-size: 13px;
-  margin-bottom: 18px;
-}
+/* Coupon row */
+.jq-coupon-row { display: flex; gap: 6px; }
+.jq-coupon-row .jq-input { flex: 1; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="gbr-wrap">
+<div class="jq-page">
 
-{% if not has_api_keys %}
-<div class="gbr-no-keys">
-  ❌ API ключі JLCPCB не налаштовано.
-  <a href="{% url 'admin:jlcpcb_jlcconfig_change' 1 %}" style="color:var(--err)">Перейти до налаштувань →</a>
-</div>
-{% endif %}
+{# ─────────────────────────── LEFT: Form ─────────────────────────── #}
+<div class="jq-form">
 
-{# ── STEP 1 ── #}
-<div class="gbr-card" id="card-step1">
-  <h3 class="gbr-card-title">
-    <span class="gbr-step-num">1</span>
-    Параметри плати та файл Gerber
-  </h3>
+  {% if not has_api_keys %}
+  <div class="jq-no-keys">
+    ❌ API ключі JLCPCB не налаштовано.
+    <a href="{% url 'admin:jlcpcb_jlcconfig_change' 1 %}" style="color:var(--err)">Перейти до налаштувань →</a>
+  </div>
+  {% endif %}
 
-  <div class="gbr-params-grid">
+  {# ══════ PCB Specifications ══════ #}
+  <div class="jq-card">
+    <div class="jq-section-head" onclick="toggleSection('spec')">
+      <span class="jq-section-title">🖥 PCB Specifications</span>
+      <span class="jq-section-arrow" id="arrow-spec">∧</span>
+    </div>
+    <div class="jq-section-body" id="body-spec">
 
-    {# Layers #}
-    <div class="gbr-field">
-      <label>Шари</label>
-      <div class="gbr-opt-row" id="grp-layer">
-        <button type="button" class="gbr-opt-btn" data-val="1">1</button>
-        <button type="button" class="gbr-opt-btn active" data-val="2">2</button>
-        <button type="button" class="gbr-opt-btn" data-val="4">4</button>
-        <button type="button" class="gbr-opt-btn" data-val="6">6</button>
-        <button type="button" class="gbr-opt-btn" data-val="8">8</button>
+      {# Base Material #}
+      <div class="jq-row">
+        <div class="jq-row-label">Base Material <span class="tip" title="FR4 for most projects. Rogers/PTFE for RF. Aluminum for LEDs.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-material">
+            <button type="button" class="jq-pill active" data-val="0">FR-4</button>
+            <button type="button" class="jq-pill" data-val="1">Aluminum</button>
+            <button type="button" class="jq-pill" data-val="2">Flexible</button>
+            <button type="button" class="jq-pill" data-val="3">Copper Core</button>
+            <button type="button" class="jq-pill" data-val="4">Rogers</button>
+            <button type="button" class="jq-pill" data-val="5">PTFE Teflon</button>
+          </div>
+        </div>
+      </div>
+
+      {# Layers #}
+      <div class="jq-row">
+        <div class="jq-row-label">Layers <span class="tip" title="Number of copper layers.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-layer">
+            <button type="button" class="jq-pill" data-val="1">1</button>
+            <button type="button" class="jq-pill active" data-val="2">2</button>
+            <button type="button" class="jq-pill" data-val="4">4</button>
+            <button type="button" class="jq-pill" data-val="6">6</button>
+            <button type="button" class="jq-pill" data-val="8">8</button>
+            <button type="button" class="jq-pill" data-val="10">10</button>
+            <button type="button" class="jq-pill" data-val="12">12</button>
+          </div>
+        </div>
+      </div>
+
+      {# Dimensions #}
+      <div class="jq-row">
+        <div class="jq-row-label">Dimensions (mm) <span class="tip" title="Width × Length. Can be read from Gerber automatically.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-dim-row">
+            <input type="number" id="fld-width" class="jq-input" value="100" min="1" step="0.1" style="width:80px">
+            <span style="color:var(--text-dim)">×</span>
+            <input type="number" id="fld-length" class="jq-input" value="100" min="1" step="0.1" style="width:80px">
+            <span style="font-size:11px;color:var(--text-dim)">mm</span>
+          </div>
+          <div class="jq-dim-note">Leave 100×100 — JLCPCB reads dimensions from Gerber</div>
+        </div>
+      </div>
+
+      {# Quantity #}
+      <div class="jq-row">
+        <div class="jq-row-label">PCB Qty <span class="tip" title="Number of boards to produce.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-qty">
+            <button type="button" class="jq-pill active" data-val="5">5</button>
+            <button type="button" class="jq-pill" data-val="10">10</button>
+            <button type="button" class="jq-pill" data-val="15">15</button>
+            <button type="button" class="jq-pill" data-val="20">20</button>
+            <button type="button" class="jq-pill" data-val="25">25</button>
+            <button type="button" class="jq-pill" data-val="30">30</button>
+            <button type="button" class="jq-pill" data-val="40">40</button>
+            <button type="button" class="jq-pill" data-val="50">50</button>
+            <button type="button" class="jq-pill" data-val="75">75</button>
+            <button type="button" class="jq-pill" data-val="100">100</button>
+            <button type="button" class="jq-pill" data-val="125">125</button>
+            <button type="button" class="jq-pill" data-val="150">150</button>
+            <button type="button" class="jq-pill" data-val="200">200</button>
+            <button type="button" class="jq-pill" data-val="250">250</button>
+            <button type="button" class="jq-pill" data-val="300">300</button>
+          </div>
+          <input type="number" id="qty-custom" class="jq-input" placeholder="Custom qty"
+                 style="margin-top:6px;width:120px" min="1">
+        </div>
+      </div>
+
+      {# Different Design #}
+      <div class="jq-row">
+        <div class="jq-row-label">Different Design <span class="tip" title="Number of different PCB designs on one panel.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-design">
+            <button type="button" class="jq-pill active" data-val="1">1</button>
+            <button type="button" class="jq-pill" data-val="2">2</button>
+            <button type="button" class="jq-pill" data-val="3">3</button>
+            <button type="button" class="jq-pill" data-val="4">4</button>
+          </div>
+        </div>
+      </div>
+
+      {# Delivery Format #}
+      <div class="jq-row">
+        <div class="jq-row-label">Delivery Format <span class="tip" title="Single: one board per unit. Panel: multiple boards panelized.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-panel">
+            <button type="button" class="jq-pill active" data-val="0">Single PCB</button>
+            <button type="button" class="jq-pill" data-val="1">Panel by Customer</button>
+            <button type="button" class="jq-pill" data-val="2">Panel by JLCPCB</button>
+          </div>
+        </div>
+      </div>
+
+      {# Thickness #}
+      <div class="jq-row">
+        <div class="jq-row-label">PCB Thickness <span class="tip" title="Board thickness in mm. 1.6mm is most common.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-thickness">
+            <button type="button" class="jq-pill" data-val="0.4">0.4</button>
+            <button type="button" class="jq-pill" data-val="0.6">0.6</button>
+            <button type="button" class="jq-pill" data-val="0.8">0.8</button>
+            <button type="button" class="jq-pill" data-val="1.0">1.0</button>
+            <button type="button" class="jq-pill" data-val="1.2">1.2</button>
+            <button type="button" class="jq-pill active" data-val="1.6">1.6</button>
+            <button type="button" class="jq-pill" data-val="2.0">2.0</button>
+          </div>
+          <div class="jq-sub-note">mm</div>
+        </div>
+      </div>
+
+      {# PCB Color #}
+      <div class="jq-row">
+        <div class="jq-row-label">PCB Color <span class="tip" title="Solder mask color.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-color">
+            <button type="button" class="jq-color-pill active" data-val="0"
+                    style="background:#007a00;color:#fff">Green</button>
+            <button type="button" class="jq-color-pill" data-val="1"
+                    style="background:#c62828;color:#fff">Red</button>
+            <button type="button" class="jq-color-pill" data-val="2"
+                    style="background:#e6a800;color:#000">Yellow</button>
+            <button type="button" class="jq-color-pill" data-val="3"
+                    style="background:#1565c0;color:#fff">Blue</button>
+            <button type="button" class="jq-color-pill" data-val="4"
+                    style="background:#e8e8e8;color:#333;border:2px solid #bbb">White</button>
+            <button type="button" class="jq-color-pill" data-val="5"
+                    style="background:#212121;color:#fff">Black</button>
+            <button type="button" class="jq-color-pill" data-val="6"
+                    style="background:#6a1b9a;color:#fff">Purple</button>
+          </div>
+        </div>
+      </div>
+
+      {# Silkscreen #}
+      <div class="jq-row">
+        <div class="jq-row-label">Silkscreen <span class="tip" title="Silkscreen layer color.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-silk">
+            <button type="button" class="jq-pill active" data-val="0">White</button>
+            <button type="button" class="jq-pill" data-val="1">Black</button>
+          </div>
+        </div>
+      </div>
+
+      {# Surface Finish #}
+      <div class="jq-row">
+        <div class="jq-row-label">Surface Finish <span class="tip" title="HASL Lead-Free is RoHS compliant. ENIG for fine-pitch components.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-surface">
+            <button type="button" class="jq-pill active" data-val="1">HASL (Lead-Free)</button>
+            <button type="button" class="jq-pill" data-val="0">HASL (with Lead)</button>
+            <button type="button" class="jq-pill" data-val="2">ENIG</button>
+            <button type="button" class="jq-pill" data-val="3">OSP</button>
+          </div>
+        </div>
+      </div>
+
+      {# Outer Cu Weight #}
+      <div class="jq-row">
+        <div class="jq-row-label">Outer Cu Weight <span class="tip" title="Outer layer copper thickness. 1oz is standard.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-copper">
+            <button type="button" class="jq-pill active" data-val="1">1 oz</button>
+            <button type="button" class="jq-pill" data-val="2">2 oz</button>
+          </div>
+        </div>
+      </div>
+
+      {# Inner Cu Weight (shown for layer > 2) #}
+      <div class="jq-row" id="row-inner-copper" style="display:none">
+        <div class="jq-row-label">Inner Cu Weight <span class="tip" title="Inner layer copper thickness (for multilayer boards).">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-inner-copper">
+            <button type="button" class="jq-pill active" data-val="1">0.5 oz</button>
+            <button type="button" class="jq-pill" data-val="2">1 oz</button>
+          </div>
+        </div>
+      </div>
+
+      {# Via Covering #}
+      <div class="jq-row">
+        <div class="jq-row-label">Via Covering <span class="tip" title="How vias are treated. Tented=covered with mask. Plugged=filled.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-via">
+            <button type="button" class="jq-pill active" data-val="0">Tented</button>
+            <button type="button" class="jq-pill" data-val="1">Untented</button>
+            <button type="button" class="jq-pill" data-val="2">Plugged</button>
+            <button type="button" class="jq-pill" data-val="3">Epoxy Filled</button>
+            <button type="button" class="jq-pill" data-val="4">Copper paste</button>
+          </div>
+        </div>
+      </div>
+
+      {# Flying Probe Test #}
+      <div class="jq-row">
+        <div class="jq-row-label">Flying Probe Test <span class="tip" title="Electrical testing. Recommended for production.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-probe">
+            <button type="button" class="jq-pill" data-val="0">No</button>
+            <button type="button" class="jq-pill active" data-val="2">Yes</button>
+          </div>
+        </div>
+      </div>
+
+    </div>{# /body-spec #}
+  </div>{# /card spec #}
+
+  {# ══════ High-spec Options ══════ #}
+  <div class="jq-card">
+    <div class="jq-section-head" onclick="toggleSection('highspec')">
+      <span class="jq-section-title">⚡ High-spec Options</span>
+      <span class="jq-section-arrow" id="arrow-highspec">∧</span>
+    </div>
+    <div class="jq-section-body" id="body-highspec">
+
+      {# Gold Fingers #}
+      <div class="jq-row">
+        <div class="jq-row-label">Gold Fingers <span class="tip" title="Edge connectors plated with gold.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-gold">
+            <button type="button" class="jq-pill active" data-val="0">No</button>
+            <button type="button" class="jq-pill" data-val="1">Yes</button>
+          </div>
+        </div>
+      </div>
+
+      {# Board Outline Tolerance #}
+      <div class="jq-row">
+        <div class="jq-row-label">Board Outline Tol. <span class="tip" title="Routing/outline milling accuracy.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-tolerance">
+            <button type="button" class="jq-pill active" data-val="1">±0.2mm (Regular)</button>
+            <button type="button" class="jq-pill" data-val="2">±0.1mm (Precision)</button>
+          </div>
+        </div>
+      </div>
+
+      {# Impedance Control #}
+      <div class="jq-row">
+        <div class="jq-row-label">Impedance Control <span class="tip" title="Controlled impedance for RF/high-speed signals.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-impedance">
+            <button type="button" class="jq-pill active" data-val="0">No</button>
+            <button type="button" class="jq-pill" data-val="1">Yes</button>
+          </div>
+        </div>
+      </div>
+
+      {# Min Via Hole Size #}
+      <div class="jq-row">
+        <div class="jq-row-label">Min Via Hole Size <span class="tip" title="Smallest via drill size in your design.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-viahole">
+            <button type="button" class="jq-pill active" data-val="0">0.3mm</button>
+            <button type="button" class="jq-pill" data-val="1">0.25mm</button>
+            <button type="button" class="jq-pill" data-val="2">0.2mm</button>
+          </div>
+        </div>
+      </div>
+
+    </div>{# /body-highspec #}
+  </div>{# /card highspec #}
+
+  {# ══════ Advanced Options (collapsed) ══════ #}
+  <div class="jq-card">
+    <div class="jq-section-head" onclick="toggleSection('advanced')">
+      <span class="jq-section-title">🔩 Advanced Options</span>
+      <span class="jq-section-arrow" id="arrow-advanced">∨</span>
+    </div>
+    <div class="jq-section-body collapsed" id="body-advanced">
+
+      {# Mark on PCB #}
+      <div class="jq-row">
+        <div class="jq-row-label">Mark on PCB <span class="tip" title="JLCPCB order number marking on the PCB.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-mark">
+            <button type="button" class="jq-pill active" data-val="0">Accept</button>
+            <button type="button" class="jq-pill" data-val="1">Specify Location</button>
+          </div>
+        </div>
+      </div>
+
+      {# Confirm Production File #}
+      <div class="jq-row">
+        <div class="jq-row-label">Confirm Prod. File <span class="tip" title="Auto-confirm production files without manual review.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <div class="jq-pills" id="grp-autoconfirm">
+            <button type="button" class="jq-pill active" data-val="1">Yes</button>
+            <button type="button" class="jq-pill" data-val="0">No (manual review)</button>
+          </div>
+        </div>
+      </div>
+
+      {# PCB Remark #}
+      <div class="jq-row">
+        <div class="jq-row-label">PCB Remark <span class="tip" title="Additional notes for the manufacturer.">ⓘ</span></div>
+        <div class="jq-row-ctrl">
+          <textarea id="fld-remark" class="jq-textarea" rows="2"
+                    style="width:100%;resize:vertical"
+                    placeholder="Special requirements or notes…"></textarea>
+        </div>
+      </div>
+
+    </div>{# /body-advanced #}
+  </div>{# /card advanced #}
+
+  {# ══════ Gerber File Upload ══════ #}
+  <div class="jq-card">
+    <div class="jq-section-head" style="cursor:default">
+      <span class="jq-section-title">📁 Gerber File</span>
+    </div>
+    <div class="jq-section-body">
+      <div style="padding:12px 16px">
+        <div id="jq-dropzone" class="jq-dropzone">
+          <div id="jq-dz-prompt">
+            <div class="jq-dz-icon">📁</div>
+            <div class="jq-dz-text">
+              Drag &amp; drop Gerber file here<br>
+              <small>or click to browse (.zip or .rar)</small>
+            </div>
+          </div>
+          <div id="jq-dz-chosen" class="jq-dz-chosen" style="display:none">
+            ✅ <span id="jq-dz-name"></span>
+            <small id="jq-dz-size"></small>
+          </div>
+          <input type="file" id="jq-file-input" accept=".zip,.rar" style="display:none">
+        </div>
+      </div>
+      <div class="jq-analyze-row">
+        <button type="button" id="jq-analyze-btn" class="jq-btn jq-btn-primary" disabled>
+          🔍 Analyze &amp; Get Quote
+        </button>
+        <span id="jq-analyze-status" class="jq-status"></span>
       </div>
     </div>
+  </div>
 
-    {# Quantity #}
-    <div class="gbr-field">
-      <label>Кількість (шт)</label>
-      <div class="gbr-opt-row" id="grp-qty">
-        <button type="button" class="gbr-opt-btn active" data-val="5">5</button>
-        <button type="button" class="gbr-opt-btn" data-val="10">10</button>
-        <button type="button" class="gbr-opt-btn" data-val="25">25</button>
-        <button type="button" class="gbr-opt-btn" data-val="50">50</button>
-        <button type="button" class="gbr-opt-btn" data-val="100">100</button>
+  {# ══════ Step 2: Gerber Preview (hidden until analyzed) ══════ #}
+  <div class="jq-card" id="card-preview" style="display:none">
+    <div class="jq-section-head" style="cursor:default">
+      <span class="jq-section-title">🔬 Gerber Preview</span>
+    </div>
+    <div class="jq-section-body">
+      <div style="padding:12px 16px">
+        <div class="jq-preview-row">
+          <div class="jq-preview-item">
+            <div class="jq-preview-label">Top Layer</div>
+            <div class="jq-preview-ph" id="jq-ph-top">⬜</div>
+            <img id="jq-img-top" class="jq-preview-img" src="" alt="Top"
+                 style="display:none"
+                 onerror="this.style.display='none';document.getElementById('jq-ph-top').style.display='flex'">
+          </div>
+          <div class="jq-preview-item">
+            <div class="jq-preview-label">Bottom Layer</div>
+            <div class="jq-preview-ph" id="jq-ph-bottom">⬛</div>
+            <img id="jq-img-bottom" class="jq-preview-img" src="" alt="Bottom"
+                 style="display:none"
+                 onerror="this.style.display='none';document.getElementById('jq-ph-bottom').style.display='flex'">
+          </div>
+        </div>
       </div>
-      <input type="number" id="qty-custom" class="gbr-input" placeholder="або введіть"
-             style="margin-top:6px;width:120px" min="1">
+    </div>
+  </div>
+
+  {# ══════ Address (shown when placing order) ══════ #}
+  <div class="jq-card" id="card-address" style="display:none">
+    <div class="jq-section-head" onclick="toggleAddr()">
+      <span class="jq-section-title">📫 Shipping Address</span>
+      <span class="jq-section-arrow" id="arrow-addr">∧</span>
+    </div>
+    <div class="jq-section-body" id="body-addr">
+      <div style="padding:12px 16px">
+        <div class="jq-addr-grid">
+          <div>
+            <div class="jq-addr-label">First Name *</div>
+            <input type="text" id="addr-first" class="jq-input" style="width:100%" placeholder="First name">
+          </div>
+          <div>
+            <div class="jq-addr-label">Last Name *</div>
+            <input type="text" id="addr-last" class="jq-input" style="width:100%" placeholder="Last name">
+          </div>
+          <div class="jq-addr-span2">
+            <div class="jq-addr-label">Company</div>
+            <input type="text" id="addr-company" class="jq-input" style="width:100%" placeholder="Company (optional)">
+          </div>
+          <div class="jq-addr-span2">
+            <div class="jq-addr-label">Street Address *</div>
+            <input type="text" id="addr-street" class="jq-input" style="width:100%" placeholder="Street address">
+          </div>
+          <div>
+            <div class="jq-addr-label">Postal Code *</div>
+            <input type="text" id="addr-zip" class="jq-input" style="width:100%" placeholder="Postal code">
+          </div>
+          <div>
+            <div class="jq-addr-label">City *</div>
+            <input type="text" id="addr-city" class="jq-input" style="width:100%" placeholder="City">
+          </div>
+          <div>
+            <div class="jq-addr-label">Country (ISO-2) *</div>
+            <input type="text" id="addr-country" class="jq-input" style="width:100%;text-transform:uppercase"
+                   value="DE" maxlength="2" placeholder="DE">
+          </div>
+          <div>
+            <div class="jq-addr-label">State / Province</div>
+            <input type="text" id="addr-province" class="jq-input" style="width:100%" placeholder="State or Province">
+          </div>
+          <div class="jq-addr-span2">
+            <div class="jq-addr-label">Phone *</div>
+            <input type="tel" id="addr-phone" class="jq-input" style="width:100%" placeholder="+491234567890">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>{# /jq-form #}
+
+{# ─────────────────────────── RIGHT: Sidebar ─────────────────────────── #}
+<div class="jq-sidebar">
+
+  {# Quote card — before analysis #}
+  <div class="jq-sb-card" id="sb-before">
+    <div class="jq-upload-banner">
+      <div class="big">💰</div>
+      Upload your Gerber file and click <b>Analyze &amp; Get Quote</b> to see the price.
+    </div>
+  </div>
+
+  {# Quote result card — after analysis #}
+  <div id="sb-quote" style="display:none">
+
+    {# PCB Cost #}
+    <div class="jq-sb-card">
+      <div class="jq-sb-title">PCB Cost</div>
+      <div class="jq-sb-price-main" id="sb-price-main">—</div>
+      <div class="jq-sb-price-sub" id="sb-price-sub">USD (excl. shipping)</div>
+      <table class="jq-sb-table" id="sb-cost-table">
+        <tbody id="sb-cost-rows"></tbody>
+      </table>
     </div>
 
-    {# Dimensions #}
-    <div class="gbr-field">
-      <label>Розміри (мм) W × L</label>
-      <div class="gbr-dim-row">
-        <input type="number" id="fld-width" class="gbr-input" value="100" min="1" step="0.1">
-        <span style="color:var(--text-dim)">×</span>
-        <input type="number" id="fld-length" class="gbr-input" value="100" min="1" step="0.1">
-      </div>
-      <div class="gbr-dim-note">Якщо не знаєте — залиште 100×100, JLCPCB зчитає з Gerber</div>
+    {# Build Time #}
+    <div class="jq-sb-card">
+      <div class="jq-sb-title">Build Time</div>
+      <div class="jq-sb-pills" id="sb-achieve-pills"></div>
+      <div class="jq-sub-note" id="sb-achieve-note"></div>
     </div>
 
-    {# Thickness #}
-    <div class="gbr-field">
-      <label>Товщина (мм)</label>
-      <select id="fld-thickness" class="gbr-select">
-        <option value="0.4">0.4 мм</option>
-        <option value="0.6">0.6 мм</option>
-        <option value="0.8">0.8 мм</option>
-        <option value="1.0">1.0 мм</option>
-        <option value="1.2">1.2 мм</option>
-        <option value="1.6" selected>1.6 мм (стандарт)</option>
-        <option value="2.0">2.0 мм</option>
+    {# Shipping #}
+    <div class="jq-sb-card">
+      <div class="jq-sb-title">Shipping</div>
+      <select id="sb-ship-select" class="jq-select" style="width:100%;margin-bottom:6px" onchange="updateTotal()">
       </select>
+      <div class="jq-sub-note" id="sb-ship-note"></div>
     </div>
 
-    {# Color #}
-    <div class="gbr-field gbr-span2">
-      <label>Колір маски</label>
-      <div class="gbr-color-row" id="grp-color">
-        <button type="button" class="gbr-color-btn active" data-val="0"
-                style="background:#007a00;color:#fff">Green</button>
-        <button type="button" class="gbr-color-btn" data-val="1"
-                style="background:#c62828;color:#fff">Red</button>
-        <button type="button" class="gbr-color-btn" data-val="2"
-                style="background:#f9a825;color:#000">Yellow</button>
-        <button type="button" class="gbr-color-btn" data-val="3"
-                style="background:#1565c0;color:#fff">Blue</button>
-        <button type="button" class="gbr-color-btn" data-val="4"
-                style="background:#e8e8e8;color:#333;border:2px solid #ccc">White</button>
-        <button type="button" class="gbr-color-btn" data-val="5"
-                style="background:#212121;color:#fff">Black</button>
-        <button type="button" class="gbr-color-btn" data-val="6"
-                style="background:#6a1b9a;color:#fff">Purple</button>
+    {# Coupon #}
+    <div class="jq-sb-card">
+      <div class="jq-sb-title">Coupon</div>
+      <div class="jq-coupon-row">
+        <input type="text" class="jq-input" placeholder="Enter coupon code" id="fld-coupon">
+        <button type="button" class="jq-btn jq-btn-ghost" onclick="alert('Coupon validation not supported via API')">Apply</button>
       </div>
     </div>
 
-    {# Surface finish #}
-    <div class="gbr-field">
-      <label>Фінішне покриття</label>
-      <select id="fld-surface" class="gbr-select">
-        <option value="1" selected>HASL Lead-Free (рекомендовано)</option>
-        <option value="0">HASL Lead</option>
-        <option value="2">ENIG (Immersion Gold)</option>
-      </select>
-    </div>
+    {# Total + Order button #}
+    <div class="jq-sb-card">
+      <div class="jq-sb-total">
+        <span class="jq-sb-total-label">Total</span>
+        <span class="jq-sb-total-val" id="sb-total-val">—</span>
+      </div>
 
-    {# Copper weight #}
-    <div class="gbr-field">
-      <label>Товщина міді</label>
-      <div class="gbr-opt-row" id="grp-copper">
-        <button type="button" class="gbr-opt-btn active" data-val="1">1 oz</button>
-        <button type="button" class="gbr-opt-btn" data-val="2">2 oz</button>
+      <div class="jq-warn" id="sb-key-warn">
+        ⏱ fileKey expires after some time. If you see error 2500 — go back and re-upload.
+      </div>
+
+      <div style="margin-bottom:8px">
+        <span class="jq-status" id="jq-order-status"></span>
+      </div>
+
+      <button type="button" id="jq-order-btn" class="jq-btn jq-btn-order">
+        📦 Place Order on JLCPCB
+      </button>
+      <div style="margin-top:8px;text-align:center">
+        <button type="button" class="jq-btn jq-btn-ghost" style="font-size:11px;padding:5px 12px"
+                onclick="resetToStep1()">
+          ← Change Parameters
+        </button>
       </div>
     </div>
 
-    {# Build time #}
-    <div class="gbr-field">
-      <label>Термін виготовлення</label>
-      <div class="gbr-opt-row" id="grp-achieve">
-        <button type="button" class="gbr-opt-btn" data-val="24">24г (Rush)</button>
-        <button type="button" class="gbr-opt-btn" data-val="48">48г</button>
-        <button type="button" class="gbr-opt-btn active" data-val="120">120г (Standard)</button>
-        <button type="button" class="gbr-opt-btn" data-val="168">168г</button>
-      </div>
-    </div>
+  </div>{# /sb-quote #}
 
-  </div>{# /params-grid #}
-
-  {# File drop zone #}
-  <div id="gbr-dropzone" class="gbr-dropzone">
-    <div id="gbr-dz-prompt">
-      <div class="gbr-dz-icon">📁</div>
-      <div class="gbr-dz-label">
-        Перетягніть Gerber файл сюди<br>
-        <small>або клацніть для вибору (.zip або .rar)</small>
-      </div>
-    </div>
-    <div id="gbr-dz-chosen" class="gbr-dz-chosen" style="display:none">
-      ✅ <span id="gbr-dz-name"></span>
-      <span id="gbr-dz-size"></span>
-    </div>
-    <input type="file" id="gbr-file-input" accept=".zip,.rar" style="display:none">
-  </div>
-
-  <div class="gbr-actions">
-    <button type="button" id="gbr-analyze-btn" class="gbr-btn gbr-btn-primary" disabled>
-      🔍 Аналізувати та розрахувати ціну
-    </button>
-    <span id="gbr-analyze-status" class="gbr-status"></span>
-  </div>
-</div>
-
-{# ── STEP 2: Quote result ── #}
-<div class="gbr-card" id="card-step2" style="display:none">
-  <h3 class="gbr-card-title">
-    <span class="gbr-step-num">2</span>
-    Результат аналізу та ціна
-  </h3>
-
-  {# Gerber previews #}
-  <div class="gbr-preview-row">
-    <div class="gbr-preview-item">
-      <div class="gbr-preview-label">Top Layer</div>
-      <div class="gbr-preview-ph" id="gbr-ph-top">⬜</div>
-      <img id="gbr-img-top" src="" class="gbr-preview-img" alt="Gerber Top"
-           style="display:none" onerror="this.style.display='none';
-             document.getElementById('gbr-ph-top').style.display='flex'">
-    </div>
-    <div class="gbr-preview-item">
-      <div class="gbr-preview-label">Bottom Layer</div>
-      <div class="gbr-preview-ph" id="gbr-ph-bottom">⬛</div>
-      <img id="gbr-img-bottom" src="" class="gbr-preview-img" alt="Gerber Bottom"
-           style="display:none" onerror="this.style.display='none';
-             document.getElementById('gbr-ph-bottom').style.display='flex'">
-    </div>
-  </div>
-
-  {# Price breakdown #}
-  <div id="gbr-price-main" class="gbr-price-main"></div>
-  <table class="gbr-price-table" id="gbr-price-table">
-    <tbody id="gbr-price-rows"></tbody>
-  </table>
-
-  {# Shipping + achieve_date #}
-  <div class="gbr-options-row">
-    <div class="gbr-field">
-      <label>Метод доставки</label>
-      <select id="gbr-ship-select" class="gbr-select" onchange="updateTotal()"></select>
-    </div>
-    <div class="gbr-field">
-      <label>Термін виробництва</label>
-      <select id="gbr-achieve-select" class="gbr-select" onchange="updateTotal()"></select>
-    </div>
-  </div>
-
-  <div class="gbr-total-row">
-    <span class="gbr-total-label">Орієнтовна сума (PCB + доставка)</span>
-    <span class="gbr-total-val" id="gbr-total-val">—</span>
-  </div>
-
-  {# Shipping address (collapsible) #}
-  <div style="margin-bottom:16px">
-    <div class="gbr-addr-summary" id="addr-toggle" onclick="toggleAddr()">
-      ▶ 📫 Адреса доставки (обов'язково)
-    </div>
-    <div id="addr-form" style="display:none">
-      <div class="gbr-addr-grid">
-        <div>
-          <div class="gbr-addr-label">Ім'я *</div>
-          <input type="text" id="addr-first" class="gbr-input" placeholder="First name">
-        </div>
-        <div>
-          <div class="gbr-addr-label">Прізвище *</div>
-          <input type="text" id="addr-last" class="gbr-input" placeholder="Last name">
-        </div>
-        <div class="gbr-addr-span2">
-          <div class="gbr-addr-label">Компанія</div>
-          <input type="text" id="addr-company" class="gbr-input" placeholder="Company name (optional)">
-        </div>
-        <div class="gbr-addr-span2">
-          <div class="gbr-addr-label">Адреса *</div>
-          <input type="text" id="addr-street" class="gbr-input" placeholder="Street address">
-        </div>
-        <div>
-          <div class="gbr-addr-label">Поштовий індекс *</div>
-          <input type="text" id="addr-zip" class="gbr-input" placeholder="Postal code">
-        </div>
-        <div>
-          <div class="gbr-addr-label">Місто *</div>
-          <input type="text" id="addr-city" class="gbr-input" placeholder="City">
-        </div>
-        <div>
-          <div class="gbr-addr-label">Країна (ISO-2) *</div>
-          <input type="text" id="addr-country" class="gbr-input" value="DE" maxlength="2"
-                 placeholder="DE" style="text-transform:uppercase">
-        </div>
-        <div>
-          <div class="gbr-addr-label">Провінція/Земля</div>
-          <input type="text" id="addr-province" class="gbr-input" placeholder="State / Province">
-        </div>
-        <div class="gbr-addr-span2">
-          <div class="gbr-addr-label">Телефон *</div>
-          <input type="tel" id="addr-phone" class="gbr-input" placeholder="+491234567890">
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="gbr-warn" id="gbr-key-warn" style="display:none">
-    ⏱ fileKey дійсний обмежений час. Якщо сесія закінчилась (помилка 2500) —
-    поверніться до кроку 1 і завантажте Gerber знову.
-  </div>
-
-  <input type="hidden" id="gbr-file-key">
-  <input type="hidden" id="gbr-pcb-param-json">
-
-  <div class="gbr-actions">
-    <button type="button" id="gbr-order-btn" class="gbr-btn gbr-btn-danger">
-      📦 Замовити на JLCPCB
-    </button>
-    <button type="button" class="gbr-btn gbr-btn-ghost"
-            onclick="document.getElementById('card-step2').style.display='none';
-                     document.getElementById('card-step1').scrollIntoView({behavior:'smooth'})">
-      ← Змінити параметри
-    </button>
-    <span id="gbr-order-status" class="gbr-status"></span>
-  </div>
-</div>
-
-{# ── SUCCESS ── #}
-<div class="gbr-card" id="card-success" style="display:none">
-  <div class="gbr-success-card">
-    <div class="gbr-success-icon">🎉</div>
-    <div class="gbr-success-title">Замовлення розміщено!</div>
-    <div class="gbr-success-batchnum" id="gbr-success-batch"></div>
-    <div style="display:flex;justify-content:center;gap:12px;flex-wrap:wrap">
-      <a id="gbr-success-link" href="#" class="gbr-btn gbr-btn-success">
-        Відкрити замовлення →
+  {# Success card #}
+  <div class="jq-sb-card" id="sb-success" style="display:none">
+    <div class="jq-success">
+      <div class="jq-success-icon">🎉</div>
+      <div class="jq-success-title">Order Placed!</div>
+      <div class="jq-success-batch" id="sb-batch-num"></div>
+      <a id="sb-order-link" href="#" class="jq-btn jq-btn-primary" style="margin-bottom:8px;width:100%;justify-content:center">
+        View Order →
       </a>
-      <a href="{{ orders_url }}" class="gbr-btn gbr-btn-ghost">
-        Список замовлень
+      <a href="{{ orders_url }}" class="jq-btn jq-btn-ghost" style="width:100%;justify-content:center;margin-bottom:6px">
+        All Orders
       </a>
-      <button type="button" class="gbr-btn gbr-btn-ghost"
+      <button type="button" class="jq-btn jq-btn-ghost" style="width:100%;justify-content:center"
               onclick="location.reload()">
-        ➕ Нове замовлення
+        ➕ New Order
       </button>
     </div>
   </div>
-</div>
 
-</div>{# /gbr-wrap #}
+</div>{# /jq-sidebar #}
+
+</div>{# /jq-page #}
+
+{# Hidden fields #}
+<input type="hidden" id="jq-file-key">
+<input type="hidden" id="jq-pcb-param-json">
 
 <script>
 (function(){
 
-/* ── State ── */
-const p = { layer:2, qty:5, width:100, length:100, thickness:1.6,
-            pcbColor:0, surfaceFinish:1, copperWeight:1, achieveDate:120 };
-let gFileKey = '';
-let gPcbParam = {};
-let gShipList = [];
+/* ── State ─────────────────────────────────────────────────────────────── */
+const p = {
+  baseMaterial:        0,
+  layer:               2,
+  width:               100,
+  length:              100,
+  qty:                 5,
+  differentDesign:     1,
+  panelFlag:           0,
+  thickness:           1.6,
+  pcbColor:            0,
+  silkscreenColor:     0,
+  surfaceFinish:       1,
+  copperWeight:        1,
+  innerCopperWeight:   1,
+  viaCovering:         0,
+  flyingProbeTest:     2,
+  goldFinger:          0,
+  boardOutlineTolerance: 1,
+  impedanceFlag:       0,
+  minViaHoleSizeAndDiameter: 0,
+  markOnPcb:           0,
+  autoConfirmProductionFile: 1,
+  achieveDate:         120,
+};
+
+let gFileKey   = '';
+let gShipList  = [];
 let gAchieveList = [];
 let gBasePrice = 0;
 let gSelectedFile = null;
+
 const ANALYZE_URL = '{{ analyze_url }}';
 const CREATE_URL  = '{{ create_url }}';
 
-/* ── Param button groups ── */
-function initGroup(id, key) {
-  const grp = document.getElementById(id);
+/* ── Section toggle ─────────────────────────────────────────────────────── */
+window.toggleSection = function(id) {
+  const body  = document.getElementById('body-' + id);
+  const arrow = document.getElementById('arrow-' + id);
+  if (!body) return;
+  const collapsed = body.classList.toggle('collapsed');
+  arrow.textContent = collapsed ? '∨' : '∧';
+};
+
+/* ── Address toggle ─────────────────────────────────────────────────────── */
+window.toggleAddr = function() {
+  const body  = document.getElementById('body-addr');
+  const arrow = document.getElementById('arrow-addr');
+  const collapsed = body.classList.toggle('collapsed');
+  arrow.textContent = collapsed ? '∨' : '∧';
+};
+
+/* ── Generic pill group init ─────────────────────────────────────────────── */
+function initPills(groupId, key, transform) {
+  const grp = document.getElementById(groupId);
   if (!grp) return;
-  grp.querySelectorAll('.gbr-opt-btn').forEach(btn => {
+  grp.querySelectorAll('.jq-pill,.jq-color-pill').forEach(btn => {
     btn.addEventListener('click', () => {
-      grp.querySelectorAll('.gbr-opt-btn').forEach(b => b.classList.remove('active'));
+      grp.querySelectorAll('.jq-pill,.jq-color-pill').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      p[key] = isNaN(btn.dataset.val) ? btn.dataset.val : Number(btn.dataset.val);
-      if (id === 'grp-qty') { document.getElementById('qty-custom').value = ''; }
+      const raw = btn.dataset.val;
+      p[key] = transform ? transform(raw) : (isNaN(raw) ? raw : Number(raw));
+      if (key === 'layer') onLayerChange();
     });
   });
 }
-initGroup('grp-layer', 'layer');
-initGroup('grp-qty', 'qty');
-initGroup('grp-copper', 'copperWeight');
-initGroup('grp-achieve', 'achieveDate');
 
-/* Color buttons */
-const colorGrp = document.getElementById('grp-color');
-colorGrp.querySelectorAll('.gbr-color-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    colorGrp.querySelectorAll('.gbr-color-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    p.pcbColor = Number(btn.dataset.val);
-  });
-});
+function numInt(v)   { return parseInt(v); }
+function numFloat(v) { return parseFloat(v); }
 
-/* Custom qty input */
+initPills('grp-material',    'baseMaterial',    numInt);
+initPills('grp-layer',       'layer',           numInt);
+initPills('grp-qty',         'qty',             numInt);
+initPills('grp-design',      'differentDesign', numInt);
+initPills('grp-panel',       'panelFlag',       numInt);
+initPills('grp-thickness',   'thickness',       numFloat);
+initPills('grp-color',       'pcbColor',        numInt);
+initPills('grp-silk',        'silkscreenColor', numInt);
+initPills('grp-surface',     'surfaceFinish',   numInt);
+initPills('grp-copper',      'copperWeight',    numInt);
+initPills('grp-inner-copper','innerCopperWeight', numInt);
+initPills('grp-via',         'viaCovering',     numInt);
+initPills('grp-probe',       'flyingProbeTest', numInt);
+initPills('grp-gold',        'goldFinger',      numInt);
+initPills('grp-tolerance',   'boardOutlineTolerance', numInt);
+initPills('grp-impedance',   'impedanceFlag',   numInt);
+initPills('grp-viahole',     'minViaHoleSizeAndDiameter', numInt);
+initPills('grp-mark',        'markOnPcb',       numInt);
+initPills('grp-autoconfirm', 'autoConfirmProductionFile', numInt);
+
+/* Show/hide inner copper weight for multilayer */
+function onLayerChange() {
+  const row = document.getElementById('row-inner-copper');
+  row.style.display = p.layer > 2 ? '' : 'none';
+}
+
+/* Custom qty */
 document.getElementById('qty-custom').addEventListener('input', e => {
   const v = parseInt(e.target.value);
   if (v > 0) {
     p.qty = v;
-    document.querySelectorAll('#grp-qty .gbr-opt-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('#grp-qty .jq-pill').forEach(b => b.classList.remove('active'));
   }
 });
 
-/* Thickness select */
-document.getElementById('fld-thickness').addEventListener('change', e => {
-  p.thickness = parseFloat(e.target.value);
-});
-/* Surface finish */
-document.getElementById('fld-surface').addEventListener('change', e => {
-  p.surfaceFinish = parseInt(e.target.value);
-});
-/* Width / length */
-document.getElementById('fld-width').addEventListener('input', e => { p.width = parseFloat(e.target.value) || 100; });
+/* Dimension inputs */
+document.getElementById('fld-width').addEventListener('input',  e => { p.width  = parseFloat(e.target.value) || 100; });
 document.getElementById('fld-length').addEventListener('input', e => { p.length = parseFloat(e.target.value) || 100; });
 
-/* ── File drop zone ── */
-const dropzone  = document.getElementById('gbr-dropzone');
-const fileInput = document.getElementById('gbr-file-input');
+/* Remark */
+document.getElementById('fld-remark').addEventListener('input', e => { p.remarks = e.target.value; });
+
+/* ── Dropzone ───────────────────────────────────────────────────────────── */
+const dropzone  = document.getElementById('jq-dropzone');
+const fileInput = document.getElementById('jq-file-input');
 
 dropzone.addEventListener('click', () => fileInput.click());
 dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
@@ -752,37 +1060,56 @@ fileInput.addEventListener('change', e => { if (e.target.files[0]) setFile(e.tar
 
 function setFile(f) {
   if (!f.name.match(/\.(zip|rar)$/i)) {
-    setStatus('analyze', 'Тільки .zip або .rar файли', 'err'); return;
+    setStatus('analyze', 'Only .zip or .rar files are supported', 'err'); return;
   }
   gSelectedFile = f;
-  document.getElementById('gbr-dz-prompt').style.display = 'none';
-  document.getElementById('gbr-dz-chosen').style.display = '';
-  document.getElementById('gbr-dz-name').textContent = f.name;
-  document.getElementById('gbr-dz-size').textContent = ' (' + (f.size/1024).toFixed(0) + ' KB)';
-  document.getElementById('gbr-analyze-btn').disabled = false;
+  document.getElementById('jq-dz-prompt').style.display = 'none';
+  document.getElementById('jq-dz-chosen').style.display = '';
+  document.getElementById('jq-dz-name').textContent = f.name;
+  document.getElementById('jq-dz-size').textContent = ' (' + (f.size/1024).toFixed(0) + ' KB)';
+  document.getElementById('jq-analyze-btn').disabled = false;
   setStatus('analyze', '', '');
 }
 
-/* ── Analyze ── */
-document.getElementById('gbr-analyze-btn').addEventListener('click', doAnalyze);
+/* ── Analyze ─────────────────────────────────────────────────────────────── */
+document.getElementById('jq-analyze-btn').addEventListener('click', doAnalyze);
 
 async function doAnalyze() {
   if (!gSelectedFile) return;
-  const btn = document.getElementById('gbr-analyze-btn');
+  const btn = document.getElementById('jq-analyze-btn');
   btn.disabled = true;
-  setStatus('analyze', '<span class="gbr-spinner"></span> Завантаження файлу та аналіз…', '');
+  setStatus('analyze', '<span class="jq-spinner"></span> Uploading &amp; analyzing…', '');
 
   const fd = new FormData();
   fd.append('gerber_file', gSelectedFile);
-  fd.append('layer', p.layer);
-  fd.append('qty', p.qty);
-  fd.append('width', p.width);
-  fd.append('length', p.length);
-  fd.append('thickness', p.thickness);
-  fd.append('pcb_color', p.pcbColor);
-  fd.append('surface_finish', p.surfaceFinish);
-  fd.append('copper_weight', p.copperWeight);
-  fd.append('achieve_date', p.achieveDate);
+
+  /* PCB Specifications */
+  fd.append('base_material',     p.baseMaterial);
+  fd.append('layer',             p.layer);
+  fd.append('width',             p.width);
+  fd.append('length',            p.length);
+  fd.append('qty',               p.qty);
+  fd.append('different_design',  p.differentDesign);
+  fd.append('panel_flag',        p.panelFlag);
+  fd.append('thickness',         p.thickness);
+  fd.append('pcb_color',         p.pcbColor);
+  fd.append('silkscreen_color',  p.silkscreenColor);
+  fd.append('surface_finish',    p.surfaceFinish);
+  fd.append('copper_weight',     p.copperWeight);
+  fd.append('inner_copper_weight', p.innerCopperWeight);
+  fd.append('via_covering',      p.viaCovering);
+  fd.append('flying_probe_test', p.flyingProbeTest);
+  /* High-spec */
+  fd.append('gold_finger',       p.goldFinger);
+  fd.append('board_outline_tolerance', p.boardOutlineTolerance);
+  fd.append('impedance_flag',    p.impedanceFlag);
+  fd.append('min_via_hole',      p.minViaHoleSizeAndDiameter);
+  /* Advanced */
+  fd.append('mark_on_pcb',       p.markOnPcb);
+  fd.append('auto_confirm',      p.autoConfirmProductionFile);
+  fd.append('remarks',           p.remarks || '');
+  /* Build time */
+  fd.append('achieve_date',      p.achieveDate);
 
   try {
     const resp = await fetch(ANALYZE_URL, {
@@ -799,193 +1126,210 @@ async function doAnalyze() {
       btn.disabled = false;
     }
   } catch(e) {
-    setStatus('analyze', '❌ Помилка з\'єднання: ' + e.message, 'err');
+    setStatus('analyze', '❌ Connection error: ' + e.message, 'err');
     btn.disabled = false;
   }
 }
 
-/* ── Show quote result ── */
+/* ── Show quote result ──────────────────────────────────────────────────── */
 function showResult(d) {
-  gFileKey    = d.file_key || '';
-  gPcbParam   = d.pcb_param || {};
-  gShipList   = d.ship_list || [];
-  gAchieveList= d.achieve_list || [];
-  gBasePrice  = parseFloat(d.price) || 0;
+  gFileKey     = d.file_key || '';
+  gShipList    = d.ship_list || [];
+  gAchieveList = d.achieve_list || [];
+  gBasePrice   = parseFloat(d.price) || 0;
 
-  document.getElementById('gbr-file-key').value       = gFileKey;
-  document.getElementById('gbr-pcb-param-json').value = JSON.stringify(gPcbParam);
+  document.getElementById('jq-file-key').value       = gFileKey;
+  document.getElementById('jq-pcb-param-json').value = JSON.stringify(d.pcb_param || {});
 
-  /* Gerber images */
+  /* Gerber previews */
   function loadImg(imgId, phId, src) {
     const img = document.getElementById(imgId);
     const ph  = document.getElementById(phId);
     if (src) {
-      img.onload  = () => { img.style.display=''; ph.style.display='none'; };
-      img.onerror = () => { img.style.display='none'; ph.style.display='flex'; };
+      img.onload  = () => { img.style.display = ''; ph.style.display = 'none'; };
+      img.onerror = () => { img.style.display = 'none'; ph.style.display = 'flex'; };
       img.src = src;
     }
   }
-  loadImg('gbr-img-top',    'gbr-ph-top',    d.gerber_top);
-  loadImg('gbr-img-bottom', 'gbr-ph-bottom', d.gerber_bottom);
+  loadImg('jq-img-top',    'jq-ph-top',    d.gerber_top);
+  loadImg('jq-img-bottom', 'jq-ph-bottom', d.gerber_bottom);
+  document.getElementById('card-preview').style.display = '';
 
-  /* Price summary */
+  /* Price */
+  document.getElementById('sb-price-main').textContent = '$' + gBasePrice.toFixed(2);
+  document.getElementById('sb-price-sub').textContent  = 'USD (excl. shipping)';
   const cost = d.pcb_cost || {};
-  document.getElementById('gbr-price-main').innerHTML =
-    '$' + gBasePrice.toFixed(2) + ' <span>USD (без доставки)</span>';
-
   const rows = [
-    ['PCB виробництво', cost.projectFee],
-    ['Складання панелей', cost.spellFee],
-    ['Тестування', cost.testsFee],
-    ['Разом PCB', cost.totalFee || cost.dummyMoney || gBasePrice],
-  ].filter(r => r[1] != null && r[1] !== 0);
-  document.getElementById('gbr-price-rows').innerHTML = rows.map(r =>
+    ['PCB Production', cost.projectFee],
+    ['Panel Assembly', cost.spellFee],
+    ['Electrical Test', cost.testsFee],
+    ['Total PCB', cost.totalFee || cost.dummyMoney || gBasePrice],
+  ].filter(r => r[1] != null && parseFloat(r[1]) !== 0);
+  document.getElementById('sb-cost-rows').innerHTML = rows.map(r =>
     `<tr><td>${r[0]}</td><td>$${parseFloat(r[1]).toFixed(2)}</td></tr>`
   ).join('');
   if (d.weight) {
-    document.getElementById('gbr-price-rows').innerHTML +=
-      `<tr><td>Вага</td><td>${d.weight} г</td></tr>`;
+    document.getElementById('sb-cost-rows').innerHTML +=
+      `<tr><td>Weight</td><td>${d.weight} g</td></tr>`;
+  }
+
+  /* Build time pills */
+  const achieveContainer = document.getElementById('sb-achieve-pills');
+  achieveContainer.innerHTML = '';
+  if (gAchieveList.length) {
+    gAchieveList.forEach((a, i) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'jq-sb-pill' + (i === 0 ? ' active' : '');
+      const fee = (a.fee && parseFloat(a.fee) > 0) ? ` +$${parseFloat(a.fee).toFixed(2)}` : '';
+      btn.textContent = a.achieveDate + 'h' + fee;
+      btn.dataset.val = a.achieveDate;
+      btn.dataset.fee = parseFloat(a.fee) || 0;
+      btn.addEventListener('click', () => {
+        achieveContainer.querySelectorAll('.jq-sb-pill').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        p.achieveDate = parseInt(btn.dataset.val);
+        updateTotal();
+      });
+      achieveContainer.appendChild(btn);
+    });
+    if (gAchieveList[0]) p.achieveDate = parseInt(gAchieveList[0].achieveDate);
+  } else {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'jq-sb-pill active';
+    btn.textContent = p.achieveDate + 'h (Standard)';
+    btn.dataset.val = p.achieveDate;
+    btn.dataset.fee = 0;
+    achieveContainer.appendChild(btn);
   }
 
   /* Shipping select */
-  const shipSel = document.getElementById('gbr-ship-select');
+  const shipSel = document.getElementById('sb-ship-select');
   shipSel.innerHTML = '';
   if (gShipList.length) {
     gShipList.forEach(s => {
       const opt = document.createElement('option');
       opt.value = s.shippingMethod || s.shipMethod || '';
-      const cost_str = s.freightCost != null ? ` +$${parseFloat(s.freightCost).toFixed(2)}` : '';
-      const days_str = s.deliveryDays ? ` (~${s.deliveryDays} днів)` : '';
-      opt.textContent = (s.shippingMethod || s.shipMethod || 'Unknown') + cost_str + days_str;
+      const costStr = s.freightCost != null ? ` +$${parseFloat(s.freightCost).toFixed(2)}` : '';
+      const daysStr = s.deliveryDays ? ` (~${s.deliveryDays} days)` : '';
+      opt.textContent = (s.shippingMethod || s.shipMethod || 'Unknown') + costStr + daysStr;
       opt.dataset.cost = parseFloat(s.freightCost) || 0;
       shipSel.appendChild(opt);
     });
   } else {
-    shipSel.innerHTML = '<option value="">— оберіть після запиту —</option>';
-  }
-
-  /* Achieve date select */
-  const dateSel = document.getElementById('gbr-achieve-select');
-  dateSel.innerHTML = '';
-  if (gAchieveList.length) {
-    gAchieveList.forEach(a => {
-      const opt = document.createElement('option');
-      opt.value = a.achieveDate;
-      const fee_str = (a.fee && parseFloat(a.fee) > 0) ? ` +$${parseFloat(a.fee).toFixed(2)}` : '';
-      opt.textContent = a.achieveDate + 'г' + fee_str;
-      opt.dataset.fee = parseFloat(a.fee) || 0;
-      dateSel.appendChild(opt);
-    });
-  } else {
-    const opt = document.createElement('option');
-    opt.value = p.achieveDate;
-    opt.textContent = p.achieveDate + 'г (стандарт)';
-    dateSel.appendChild(opt);
+    shipSel.innerHTML = '<option value="">— select after analyzing —</option>';
   }
 
   updateTotal();
 
-  /* Show step 2 */
-  document.getElementById('gbr-key-warn').style.display = '';
-  document.getElementById('card-step2').style.display = '';
-  document.getElementById('card-step2').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  /* Show sidebar quote, address form */
+  document.getElementById('sb-before').style.display = 'none';
+  document.getElementById('sb-quote').style.display  = '';
+  document.getElementById('card-address').style.display = '';
+
+  /* Scroll to preview */
+  document.getElementById('card-preview').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function updateTotal() {
-  const shipSel   = document.getElementById('gbr-ship-select');
-  const dateSel   = document.getElementById('gbr-achieve-select');
-  const shipCost  = parseFloat(shipSel.selectedOptions[0]?.dataset.cost || 0);
-  const dateFee   = parseFloat(dateSel.selectedOptions[0]?.dataset.fee  || 0);
-  const total     = gBasePrice + shipCost + dateFee;
-  document.getElementById('gbr-total-val').textContent =
+  const shipSel  = document.getElementById('sb-ship-select');
+  const shipCost = parseFloat(shipSel.selectedOptions[0]?.dataset.cost || 0);
+  const achieveBtn = document.querySelector('#sb-achieve-pills .jq-sb-pill.active');
+  const dateFee  = parseFloat(achieveBtn?.dataset.fee || 0);
+  const total    = gBasePrice + shipCost + dateFee;
+  document.getElementById('sb-total-val').textContent =
     isNaN(total) || total === 0 ? '—' : '$' + total.toFixed(2) + ' USD';
 }
 
-/* ── Address toggle ── */
-window.toggleAddr = function() {
-  const form = document.getElementById('addr-form');
-  const tog  = document.getElementById('addr-toggle');
-  const open = form.style.display !== 'none';
-  form.style.display = open ? 'none' : '';
-  tog.textContent = (open ? '▶' : '▼') + ' 📫 Адреса доставки (обов\'язково)';
+/* Reset to step 1 */
+window.resetToStep1 = function() {
+  document.getElementById('card-preview').style.display  = 'none';
+  document.getElementById('card-address').style.display  = 'none';
+  document.getElementById('sb-quote').style.display      = 'none';
+  document.getElementById('sb-before').style.display     = '';
+  document.getElementById('jq-analyze-btn').disabled     = false;
+  document.querySelector('.jq-card').scrollIntoView({ behavior: 'smooth' });
 };
 
-/* ── Create order ── */
-document.getElementById('gbr-order-btn').addEventListener('click', doCreate);
+/* ── Place order ─────────────────────────────────────────────────────────── */
+document.getElementById('jq-order-btn').addEventListener('click', doCreate);
 
 async function doCreate() {
-  const btn = document.getElementById('gbr-order-btn');
+  const btn = document.getElementById('jq-order-btn');
 
-  const fileKey = document.getElementById('gbr-file-key').value.trim();
+  const fileKey = document.getElementById('jq-file-key').value.trim();
   if (!fileKey) {
-    setStatus('order', '❌ fileKey відсутній — завантажте Gerber знову', 'err'); return;
+    setStatus('order', '❌ fileKey missing — re-upload Gerber', 'err'); return;
   }
 
-  /* Collect address */
   const addr = {
-    firstName:         document.getElementById('addr-first').value.trim(),
-    lastName:          document.getElementById('addr-last').value.trim(),
-    companyName:       document.getElementById('addr-company').value.trim(),
-    streetAddress:     document.getElementById('addr-street').value.trim(),
-    city:              document.getElementById('addr-city').value.trim(),
-    country:           document.getElementById('addr-country').value.trim().toUpperCase(),
-    province:          document.getElementById('addr-province').value.trim(),
-    postalCode:        document.getElementById('addr-zip').value.trim(),
+    firstName:          document.getElementById('addr-first').value.trim(),
+    lastName:           document.getElementById('addr-last').value.trim(),
+    companyName:        document.getElementById('addr-company').value.trim(),
+    streetAddress:      document.getElementById('addr-street').value.trim(),
+    city:               document.getElementById('addr-city').value.trim(),
+    country:            document.getElementById('addr-country').value.trim().toUpperCase(),
+    province:           document.getElementById('addr-province').value.trim(),
+    postalCode:         document.getElementById('addr-zip').value.trim(),
     cellOrMobileNumber: document.getElementById('addr-phone').value.trim(),
-    addressLine2:      '',
+    addressLine2:       '',
   };
   if (!addr.firstName || !addr.lastName || !addr.streetAddress || !addr.city || !addr.country || !addr.postalCode) {
-    setStatus('order', '❌ Заповніть обов\'язкові поля адреси (відкрийте секцію «Адреса доставки»)', 'err');
-    if (document.getElementById('addr-form').style.display === 'none') toggleAddr();
+    setStatus('order', '❌ Fill in required address fields', 'err');
+    const addrBody = document.getElementById('body-addr');
+    if (addrBody.classList.contains('collapsed')) toggleAddr();
+    document.getElementById('card-address').scrollIntoView({ behavior: 'smooth' });
     return;
   }
 
-  const shipSel  = document.getElementById('gbr-ship-select');
-  const dateSel  = document.getElementById('gbr-achieve-select');
-  const shipMethod = shipSel.value;
-  const achDate    = parseInt(dateSel.value) || null;
+  const shipSel     = document.getElementById('sb-ship-select');
+  const shipMethod  = shipSel.value;
+  const achieveBtn  = document.querySelector('#sb-achieve-pills .jq-sb-pill.active');
+  const achDate     = achieveBtn ? parseInt(achieveBtn.dataset.val) : null;
 
   btn.disabled = true;
-  setStatus('order', '<span class="gbr-spinner"></span> Розміщення замовлення…', '');
+  setStatus('order', '<span class="jq-spinner"></span> Placing order…', '');
 
   let pcbParam = {};
-  try { pcbParam = JSON.parse(document.getElementById('gbr-pcb-param-json').value || '{}'); }
+  try { pcbParam = JSON.parse(document.getElementById('jq-pcb-param-json').value || '{}'); }
   catch(_) {}
 
   try {
     const resp = await fetch(CREATE_URL, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
       body: JSON.stringify({
-        file_key: fileKey,
-        pcb_param: pcbParam,
+        file_key:         fileKey,
+        pcb_param:        pcbParam,
         shipping_address: addr,
-        shipping_method: shipMethod,
-        achieve_date: achDate,
+        shipping_method:  shipMethod,
+        achieve_date:     achDate,
       }),
     });
     const data = await resp.json();
     if (data.ok) {
-      document.getElementById('gbr-success-batch').textContent = 'Номер замовлення: ' + data.batch_num;
-      document.getElementById('gbr-success-link').href = data.order_url;
-      document.getElementById('card-success').style.display = '';
-      document.getElementById('card-success').scrollIntoView({ behavior: 'smooth' });
+      document.getElementById('sb-batch-num').textContent = 'Order: ' + data.batch_num;
+      document.getElementById('sb-order-link').href = data.order_url;
+      document.getElementById('sb-quote').style.display   = 'none';
+      document.getElementById('sb-success').style.display = '';
       setStatus('order', '', '');
     } else {
       setStatus('order', '❌ ' + data.error, 'err');
       btn.disabled = false;
     }
   } catch(e) {
-    setStatus('order', '❌ Помилка з\'єднання: ' + e.message, 'err');
+    setStatus('order', '❌ Connection error: ' + e.message, 'err');
     btn.disabled = false;
   }
 }
 
-/* ── Helpers ── */
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
 function setStatus(which, html, cls) {
-  const el = document.getElementById('gbr-' + which + '-status');
+  const el = document.getElementById('jq-' + which + '-status');
+  if (!el) return;
   el.innerHTML = html;
-  el.className = 'gbr-status' + (cls ? ' ' + cls : '');
+  el.className = 'jq-status' + (cls ? ' ' + cls : '');
 }
 
 function getCsrf() {
