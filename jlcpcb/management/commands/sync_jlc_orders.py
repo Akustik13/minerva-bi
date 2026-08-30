@@ -336,26 +336,37 @@ class Command(BaseCommand):
         self.stdout.write(f'  WIP progress: checking {in_prod.count()} in-production order(s)...')
         for order in in_prod:
             raw = order.raw_data if isinstance(order.raw_data, dict) else {}
-            order_uuid = (raw.get('_order_uuid') or
-                          order.jlc_order_number or
-                          order.jlc_order_id)
-            if not order_uuid:
+            # Try batchNum first (most likely orderUUID), then file UUID as fallback
+            file_uuid  = raw.get('_order_uuid', '')
+            batch_uuid = order.jlc_order_number or order.jlc_order_id
+            uuids_to_try = [u for u in [batch_uuid, file_uuid] if u]
+            if not uuids_to_try:
                 continue
-            try:
-                wip = client.get_pcb_wip(order_uuid)
-                if isinstance(wip, list):
-                    steps = wip
-                else:
-                    steps = wip.get('date') or wip.get('data') or []
-                if isinstance(steps, list) and steps:
-                    raw['production_steps'] = steps
-                    order.raw_data = raw
-                    order.save(update_fields=['raw_data', 'updated_at'])
+            found_steps = False
+            for order_uuid in uuids_to_try:
+                try:
+                    wip = client.get_pcb_wip(order_uuid)
+                    if isinstance(wip, list):
+                        steps = wip
+                    else:
+                        steps = wip.get('date') or wip.get('data') or []
                     self.stdout.write(
-                        f'    {order.jlc_order_id}: {len(steps)} step(s) done'
+                        f'    {order.jlc_order_id} [uuid={order_uuid[:20]}...]: '
+                        f'WIP raw={repr(wip)[:120]}'
                     )
-            except JLCAPIError as e:
-                self.stdout.write(f'    {order.jlc_order_id}: WIP — {e}')
+                    if isinstance(steps, list) and steps:
+                        raw['production_steps'] = steps
+                        order.raw_data = raw
+                        order.save(update_fields=['raw_data', 'updated_at'])
+                        self.stdout.write(
+                            f'    {order.jlc_order_id}: {len(steps)} step(s) saved'
+                        )
+                        found_steps = True
+                        break
+                except JLCAPIError as e:
+                    self.stdout.write(f'    {order.jlc_order_id} [uuid={order_uuid[:20]}]: WIP error — {e}')
+            if not found_steps:
+                self.stdout.write(f'    {order.jlc_order_id}: WIP — no steps returned')
 
     def _check_dhl(self, cfg, options):
         """
