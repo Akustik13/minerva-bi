@@ -632,6 +632,14 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 })
             extra['jlc_sub_orders'] = sub_orders
 
+            # DHL tracking events
+            extra['dhl_events']      = raw.get('dhl_events') or []
+            extra['dhl_status']      = raw.get('dhl_status', '')
+            extra['dhl_status_desc'] = raw.get('dhl_status_desc', '')
+            extra['dhl_origin']      = raw.get('dhl_origin', '')
+            extra['dhl_dest']        = raw.get('dhl_dest', '')
+            extra['dhl_updated_at']  = raw.get('dhl_updated_at', '')
+
             # Production progress (WIP)
             production_steps = raw.get('production_steps') or []
             extra['production_steps'] = production_steps

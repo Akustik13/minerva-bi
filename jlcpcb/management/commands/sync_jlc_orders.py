@@ -400,8 +400,19 @@ class Command(BaseCommand):
                     f'    {order.jlc_order_id} [{order.tracking_number}]: '
                     f'{result.get("status_icon","")} {result.get("status_label", dhl_status)}'
                 )
+                # Store DHL tracking events in raw_data for display in admin
+                raw = order.raw_data if isinstance(order.raw_data, dict) else {}
+                raw['dhl_events']     = result.get('events') or []
+                raw['dhl_status']     = dhl_status
+                raw['dhl_status_desc'] = result.get('status_desc', '')
+                raw['dhl_origin']     = result.get('origin', '')
+                raw['dhl_dest']       = result.get('destination', '')
+                raw['dhl_updated_at'] = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+                order.raw_data = raw
                 if dhl_status == 'delivered':
                     _do_deliver(order, 'DHL confirmed')
+                else:
+                    order.save(update_fields=['raw_data', 'updated_at'])
         elif not dhl_api_key:
             self.stdout.write('  DHL Tracking: no api key — skip (set track_api_key on DHL Carrier)')
 

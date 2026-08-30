@@ -111,6 +111,30 @@
   margin-top: 3px; line-height: 1.4;
 }
 
+/* ── DHL tracking events ── */
+.jlc-dhl-events {
+  display: flex; flex-direction: column; gap: 0; margin-top: 10px;
+  border-left: 2px solid var(--border-color,#ddd); padding-left: 14px;
+}
+.jlc-dhl-event {
+  position: relative; padding: 5px 0 5px 4px; font-size: 12px;
+}
+.jlc-dhl-event::before {
+  content: '';
+  position: absolute; left: -19px; top: 10px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border-color,#ccc);
+}
+.jlc-dhl-event.ev-delivered::before { background: #2e7d32; }
+.jlc-dhl-event.ev-transit::before   { background: #ff9800; }
+.jlc-dhl-event.ev-out::before       { background: #2196f3; }
+.jlc-dhl-ev-ts {
+  font-size: 11px; color: var(--body-quiet-color,#888);
+  font-family: monospace; white-space: nowrap;
+}
+.jlc-dhl-ev-desc { font-weight: 500; color: var(--body-fg,#333); }
+.jlc-dhl-ev-loc  { font-size: 11px; color: var(--body-quiet-color,#888); }
+
 /* ── WIP production progress ── */
 .jlc-wip-bar-wrap {
   background: var(--darkened-bg,#f0f0f0);
@@ -259,6 +283,32 @@
           <span class="v">📍 {{ jlc_address }}</span>
         </div>
         {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# DHL tracking events #}
+    {% if dhl_events %}
+    <div>
+      <div class="jlc-section-title">
+        🚚 DHL трекінг — {{ dhl_status_desc|default:dhl_status }}
+        {% if dhl_updated_at %}<span style="float:right;font-weight:400;font-size:10px;color:var(--body-quiet-color,#888)">оновлено {{ dhl_updated_at|slice:":16" }}</span>{% endif %}
+      </div>
+      {% if dhl_origin or dhl_dest %}
+      <div style="font-size:11px;color:var(--body-quiet-color,#888);margin:6px 0 2px">
+        {% if dhl_origin %}📍 {{ dhl_origin }}{% endif %}
+        {% if dhl_origin and dhl_dest %} → {% endif %}
+        {% if dhl_dest %}🏠 {{ dhl_dest }}{% endif %}
+      </div>
+      {% endif %}
+      <div class="jlc-dhl-events">
+        {% for ev in dhl_events %}
+        <div class="jlc-dhl-event{% if ev.status_code == 'delivered' %} ev-delivered{% elif ev.status_code == 'transit' %} ev-transit{% elif ev.status_code == 'out-for-delivery' %} ev-out{% endif %}">
+          <div class="jlc-dhl-ev-ts">{{ ev.ts|slice:":16"|cut:"T" }}</div>
+          <div class="jlc-dhl-ev-desc">{{ ev.desc }}</div>
+          {% if ev.location %}<div class="jlc-dhl-ev-loc">📍 {{ ev.location }}</div>{% endif %}
+        </div>
+        {% endfor %}
       </div>
     </div>
     {% endif %}
