@@ -574,7 +574,8 @@ class JLCOrderAdmin(admin.ModelAdmin):
             raw = obj.raw_data if isinstance(obj.raw_data, dict) else {}
             extra['jlc_raw']           = raw
             extra['jlc_shipping_method'] = raw.get('shippingMethod', '')
-            extra['jlc_total_money']   = raw.get('totalMoney')
+            extra['jlc_total_money']   = raw.get('totalDummyMoney')  # merchandise cost
+            extra['jlc_paid_money']    = raw.get('totalMoney')       # actually charged (after credits)
             extra['jlc_carriage']      = raw.get('totalCarriageMoney')
             extra['jlc_payment']       = raw.get('paymentMethod', '')
             addr = raw.get('orderAddress') or {}

@@ -333,7 +333,7 @@
         {% endif %}
         {% if jlc_total_money %}
         <div class="jlc-kv">
-          <span class="k">Сплачено</span>
+          <span class="k">Ціна товарів</span>
           <span class="v">💰 {{ jlc_total_money }} USD</span>
         </div>
         {% endif %}
@@ -341,6 +341,12 @@
         <div class="jlc-kv">
           <span class="k">Доставка</span>
           <span class="v">{{ jlc_carriage }} USD</span>
+        </div>
+        {% endif %}
+        {% if jlc_paid_money %}
+        <div class="jlc-kv">
+          <span class="k">Фактично сплачено</span>
+          <span class="v" title="Після знижок/кредитів JLCPCB">{{ jlc_paid_money }} USD</span>
         </div>
         {% endif %}
         {% if jlc_payment %}

@@ -246,9 +246,14 @@ class Command(BaseCommand):
                 # Manually-delivered orders are final — never let API roll them back.
                 # Only update raw API data for audit, skip all status logic.
                 if old_status == JLCOrder.LocalStatus.DELIVERED:
+                    upd = ['raw_data', 'jlc_status', 'updated_at']
                     order.raw_data   = raw
                     order.jlc_status = str(status_int) if status_int is not None else ''
-                    order.save(update_fields=['raw_data', 'jlc_status', 'updated_at'])
+                    # Fix order_date if it was incorrectly set to sync time
+                    if order_date and order.order_date != order_date:
+                        order.order_date = order_date
+                        upd.append('order_date')
+                    order.save(update_fields=upd)
                     self.stdout.write(f'  {batch}: delivered (locked) — API says {new_status}, skip')
                     continue
 
