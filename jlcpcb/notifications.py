@@ -371,7 +371,7 @@ def _build_jlc_html(order, old_status: str, new_status: str,
       {"" if eta_str or not est_ship_label else f"""
       <tr>
         <td style="padding:6px 0;color:#888;font-size:12px">Розрахункова відправка</td>
-        <td style="padding:6px 0;font-weight:700;color:#1565c0">🏭 {est_ship_label}</td>
+        <td style="padding:6px 0;font-weight:700;color:#1565c0">⏳ {est_ship_label}</td>
       </tr>"""}
     </table>
   </div>
@@ -449,7 +449,7 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
     if eta_str:
         eta_line = f'\n📅 Очікувана доставка: <b>{eta_str}</b>'
     elif est_ship_label:
-        eta_line = f'\n🏭 Розрахункова відправка: <b>{est_ship_label}</b>'
+        eta_line = f'\n⏳ Розрахункова відправка: <b>{est_ship_label}</b>'
     else:
         eta_line = ''
 
