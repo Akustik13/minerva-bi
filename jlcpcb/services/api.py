@@ -436,8 +436,8 @@ class JLCAPIClient:
                     logger.warning('pageBatchInfoByOrderType orderType=%s page=%s: %s',
                                    otype, page, e)
                     break
-                items      = result.get('list', [])
-                total_pages = result.get('pages', 1) or 1
+                items       = result.get('list') or []
+                total_pages = result.get('pages') or 1
                 for item in items:
                     n = item.get('batchNum')
                     if n and n not in seen:
