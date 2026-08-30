@@ -138,6 +138,37 @@ def _extract_expected_date(order):
     return None
 
 
+def _calc_estimated_ship_date(order):
+    """
+    Calculate estimated ship date = orderDate + buildTime hours.
+    Returns (date, label_str) or (None, '').
+    Used when no deliveryTime/tracking data is available yet.
+    """
+    raw = getattr(order, 'raw_data', None)
+    if not isinstance(raw, dict):
+        return None, ''
+    for item in raw.get('orderItem', []):
+        pcb = item.get('pcbItem') or {}
+        order_date_str = pcb.get('orderDate')
+        build_time     = pcb.get('buildTime')
+        if not order_date_str or not build_time:
+            continue
+        try:
+            from datetime import datetime as _dt, timedelta
+            order_dt   = _dt.strptime(order_date_str[:19], '%Y-%m-%d %H:%M:%S')
+            ship_dt    = order_dt + timedelta(hours=int(build_time))
+            months_uk  = ['', 'січня', 'лютого', 'березня', 'квітня', 'травня', 'червня',
+                          'липня', 'серпня', 'вересня', 'жовтня', 'листопада', 'грудня']
+            label = (
+                f'{ship_dt.day} {months_uk[ship_dt.month]} {ship_dt.year}'
+                f' (~{build_time}г виготовлення)'
+            )
+            return ship_dt.date(), label
+        except Exception:
+            pass
+    return None, ''
+
+
 def _extract_shipping_method(order) -> str:
     if order.tracking_carrier:
         return order.tracking_carrier
@@ -151,7 +182,8 @@ def _extract_shipping_method(order) -> str:
 
 def _build_jlc_html(order, old_status: str, new_status: str,
                     company: str, eta_str: str,
-                    shipping_method: str) -> str:
+                    shipping_method: str,
+                    est_ship_label: str = '') -> str:
     from django.utils import timezone as tz
 
     status_color = _STATUS_COLORS.get(new_status, '#546e7a')
@@ -336,6 +368,11 @@ def _build_jlc_html(order, old_status: str, new_status: str,
         <td style="padding:6px 0;color:#888;font-size:12px">Очікувана доставка</td>
         <td style="padding:6px 0;font-weight:700;color:#e65100">📅 {eta_str}</td>
       </tr>"""}
+      {"" if eta_str or not est_ship_label else f"""
+      <tr>
+        <td style="padding:6px 0;color:#888;font-size:12px">Розрахункова відправка</td>
+        <td style="padding:6px 0;font-weight:700;color:#1565c0">🏭 {est_ship_label}</td>
+      </tr>"""}
     </table>
   </div>
 
@@ -396,6 +433,11 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
     expected_date   = _extract_expected_date(order)
     eta_str         = _format_eta(expected_date)
 
+    # Estimated ship date (orderDate + buildTime) — fallback when no deliveryTime/tracking
+    est_ship_date, est_ship_label = (None, '')
+    if not eta_str and not order.tracking_number:
+        est_ship_date, est_ship_label = _calc_estimated_ship_date(order)
+
     # Product / description
     product_info = ''
     if order.product_id:
@@ -403,8 +445,13 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
     elif order.description:
         product_info = f'\n📄 {order.description[:80]}'
 
-    # ETA
-    eta_line = f'\n📅 Очікувана доставка: <b>{eta_str}</b>' if eta_str else ''
+    # ETA / estimated ship
+    if eta_str:
+        eta_line = f'\n📅 Очікувана доставка: <b>{eta_str}</b>'
+    elif est_ship_label:
+        eta_line = f'\n🏭 Розрахункова відправка: <b>{est_ship_label}</b>'
+    else:
+        eta_line = ''
 
     # Tracking
     tracking_info  = ''
@@ -423,6 +470,8 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
         if new_status == 'shipped':
             tracking_info  += '\n⚠️ Трекінг-номер не вказано — перевір email від JLCPCB'
             tracking_plain += 'Трекінг-номер буде у листі від JLCPCB.\n'
+        elif est_ship_label and not tracking_info:
+            tracking_plain += f'Розрахункова відправка: {est_ship_label}\n'
 
     # Status line for Telegram
     status_line = (
@@ -462,7 +511,7 @@ def notify_jlc_status_change(order, old_status: str, new_status: str,
         if recipients:
             subject   = f'[{company}] JLCPCB {new_label}: {order.jlc_order_id}'
             html_body = _build_jlc_html(
-                order, old_status, new_status, company, eta_str, shipping_method
+                order, old_status, new_status, company, eta_str, shipping_method, est_ship_label
             )
             _send_html_email(subject, html_body, plain_body, recipients)
 
