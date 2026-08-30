@@ -285,6 +285,16 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('<int:pk>/mark-delivered/',
                  self.admin_site.admin_view(self.mark_delivered_view),
                  name='jlcpcb_jlcorder_mark_delivered'),
+            # Gerber workflow
+            path('gerber/',
+                 self.admin_site.admin_view(self.gerber_page_view),
+                 name='jlcpcb_gerber_page'),
+            path('gerber/analyze/',
+                 self.admin_site.admin_view(self.gerber_analyze_view),
+                 name='jlcpcb_gerber_analyze'),
+            path('gerber/create/',
+                 self.admin_site.admin_view(self.gerber_create_view),
+                 name='jlcpcb_gerber_create'),
         ]
         return custom + urls
 
@@ -462,6 +472,161 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.success(request, f'🔔 Сповіщення надіслано: {", ".join(channels)} — {order.jlc_order_id}')
         return redirect('admin:jlcpcb_jlcorder_change', pk)
 
+    # ── Gerber ordering workflow ──────────────────────────────────────────────
+
+    def gerber_page_view(self, request):
+        from django.template.response import TemplateResponse
+        cfg = JLCConfig.get()
+        return TemplateResponse(request, 'admin/jlcpcb/gerber_order.html', {
+            **self.admin_site.each_context(request),
+            'title':        'Нове PCB замовлення',
+            'analyze_url':  reverse('admin:jlcpcb_gerber_analyze'),
+            'create_url':   reverse('admin:jlcpcb_gerber_create'),
+            'orders_url':   reverse('admin:jlcpcb_jlcorder_changelist'),
+            'has_api_keys': bool(cfg.access_key and cfg.secret_key),
+            'opts':         JLCOrder._meta,
+        })
+
+    def gerber_analyze_view(self, request):
+        """AJAX: upload Gerber file → calculate quote. Returns price + gerber preview images."""
+        import tempfile, os
+        from .services.api import JLCAPIClient, JLCAPIError
+
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'error': 'POST only'}, status=405)
+
+        gerber_file = request.FILES.get('gerber_file')
+        if not gerber_file:
+            return JsonResponse({'ok': False, 'error': 'Файл не вибрано'})
+        if not (gerber_file.name.lower().endswith('.zip')
+                or gerber_file.name.lower().endswith('.rar')):
+            return JsonResponse({'ok': False, 'error': 'Тільки .zip або .rar файли підтримуються'})
+
+        try:
+            pcb_param = {
+                'layer':           int(request.POST.get('layer', 2)),
+                'qty':             int(request.POST.get('qty', 5)),
+                'width':           float(request.POST.get('width', 100)),
+                'length':          float(request.POST.get('length', 100)),
+                'thickness':       float(request.POST.get('thickness', 1.6)),
+                'pcbColor':        int(request.POST.get('pcb_color', 0)),
+                'surfaceFinish':   int(request.POST.get('surface_finish', 1)),
+                'copperWeight':    int(request.POST.get('copper_weight', 1)),
+                'panelFlag':       0,
+                'flyingProbeTest': 2,
+            }
+            achieve_date = int(request.POST.get('achieve_date', 120))
+            country      = request.POST.get('country', 'DE')
+        except (ValueError, TypeError) as exc:
+            return JsonResponse({'ok': False, 'error': f'Неправильні параметри: {exc}'})
+
+        suffix   = '.zip' if gerber_file.name.lower().endswith('.zip') else '.rar'
+        tmp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+                for chunk in gerber_file.chunks():
+                    tmp.write(chunk)
+                tmp_path = tmp.name
+
+            client   = JLCAPIClient.from_config()
+            file_key = client.upload_gerber(tmp_path, file_name=gerber_file.name)
+            quote    = client.calculate_quote(
+                file_key=file_key,
+                pcb_param=pcb_param,
+                achieve_date=achieve_date,
+                country=country,
+            )
+            return JsonResponse({
+                'ok':          True,
+                'file_key':    file_key,
+                'pcb_param':   pcb_param,
+                'gerber_top':  quote.get('gerberTop', ''),
+                'gerber_bottom': quote.get('gerberBottom', ''),
+                'price':       quote.get('priceWithoutFreight'),
+                'weight':      quote.get('orderTotalWeight'),
+                'pcb_cost':    quote.get('pcbCostInfo') or {},
+                'ship_list':   quote.get('shipList') or [],
+                'achieve_list': quote.get('achieveDateList') or [],
+            })
+        except JLCAPIError as exc:
+            return JsonResponse({'ok': False, 'error': str(exc)})
+        except Exception as exc:
+            return JsonResponse({'ok': False, 'error': f'Помилка: {exc}'})
+        finally:
+            if tmp_path:
+                try:
+                    os.unlink(tmp_path)
+                except OSError:
+                    pass
+
+    def gerber_create_view(self, request):
+        """AJAX: place real PCB order using fileKey from previous analyze step."""
+        import json as _json
+        from datetime import date
+        from .services.api import JLCAPIClient, JLCAPIError
+
+        if request.method != 'POST':
+            return JsonResponse({'ok': False, 'error': 'POST only'}, status=405)
+
+        try:
+            data = _json.loads(request.body)
+        except Exception:
+            return JsonResponse({'ok': False, 'error': 'Неправильний JSON'})
+
+        file_key = (data.get('file_key') or '').strip()
+        if not file_key:
+            return JsonResponse({
+                'ok': False,
+                'error': 'fileKey відсутній — Gerber сесія закінчилась, завантажте файл знову',
+            })
+
+        shipping_method = (data.get('shipping_method') or '').strip()
+        if not shipping_method:
+            return JsonResponse({'ok': False, 'error': 'Оберіть метод доставки'})
+
+        shipping_address = data.get('shipping_address') or {}
+        if not shipping_address.get('country'):
+            return JsonResponse({'ok': False, 'error': "Вкажіть країну в адресі доставки"})
+
+        pcb_param    = data.get('pcb_param') or {}
+        achieve_date = data.get('achieve_date')
+
+        try:
+            client = JLCAPIClient.from_config()
+            result = client.create_pcb_order(
+                file_key=file_key,
+                pcb_param=pcb_param,
+                shipping_address=shipping_address,
+                shipping_method=shipping_method,
+                achieve_date=achieve_date,
+            )
+            batch_num = result.get('batchNum', '')
+            order_id  = result.get('orderId', batch_num)
+
+            try:
+                order_date = date.fromisoformat((result.get('orderDate') or '')[:10])
+            except (ValueError, TypeError):
+                order_date = date.today()
+
+            jlc_order = JLCOrder.objects.create(
+                jlc_order_id=order_id,
+                jlc_order_number=batch_num,
+                order_type=JLCOrder.OrderType.PCB,
+                quantity=pcb_param.get('qty', 1),
+                local_status=JLCOrder.LocalStatus.ORDERED,
+                order_date=order_date,
+                raw_data=result,
+            )
+            return JsonResponse({
+                'ok':        True,
+                'batch_num': batch_num,
+                'order_url': reverse('admin:jlcpcb_jlcorder_change', args=[jlc_order.pk]),
+            })
+        except JLCAPIError as exc:
+            return JsonResponse({'ok': False, 'error': str(exc)})
+        except Exception as exc:
+            return JsonResponse({'ok': False, 'error': f'Помилка створення замовлення: {exc}'})
+
     # ── List display ──────────────────────────────────────────────────────────
 
     @admin.display(description='Замовлення', ordering='jlc_order_id')
@@ -524,6 +689,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
         extra['jlc_sync_url']        = reverse('admin:jlcpcb_jlcorder_run_sync')
         extra['jlc_sync_period_url'] = reverse('admin:jlcpcb_jlcorder_run_sync_period')
         extra['jlc_match_url']       = reverse('admin:jlcpcb_jlcorder_run_match')
+        extra['gerber_url']          = reverse('admin:jlcpcb_gerber_page')
         extra['today']               = _date.today().isoformat()
         extra['today_minus_90']      = (_date.today() - timedelta(days=90)).isoformat()
         extra['jlc_config_url']     = reverse('admin:jlcpcb_jlcconfig_change', args=[1])

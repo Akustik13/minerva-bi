@@ -44,6 +44,7 @@
 .btn-match  { background: #1565c0; }
 .btn-config { background: #546e7a; }
 .btn-add    { background: #6a1b9a; }
+.btn-gerber { background: #00695c; }
 
 .jlc-pills {
   display: flex;
@@ -148,6 +149,7 @@
     <a href="{{ jlc_match_url }}"  class="jlc-tb-btn btn-match">🔍 Авто-матч</a>
     <a href="{{ jlc_config_url }}" class="jlc-tb-btn btn-config">⚙️ Налаштування</a>
     <a href="add/"                 class="jlc-tb-btn btn-add">➕ Додати замовлення</a>
+    <a href="{{ gerber_url }}"     class="jlc-tb-btn btn-gerber">🔧 Замовити з Gerber</a>
 
     {% if jlc_unmatched_count %}
       <span class="jlc-warn-badge">⚠️ {{ jlc_unmatched_count }} не прив'язано</span>

@@ -14,6 +14,13 @@ PCB endpoints (per official docs):
   POST /overseas/openapi/pcb/audit/get                 — {"key":"..."} → Gerber pre-review
   GET  /overseas/openapi/pcb/getSteelPriceConfig       — health check (GET, no params)
 
+Gerber / ordering workflow (new endpoints):
+  POST /overseas/openapi/pcb/uploadGerber   — multipart: upload .zip/.rar → fileKey string
+  POST /overseas/openapi/pcb/calculate      — price quotation + gerberTop/gerberBottom image URLs
+  POST /overseas/openapi/pcb/create         — place real order (charges JLCPCB account!)
+  GET  /overseas/openapi/pcb/getAvailablePlateBrandAndTg  — available plate brands and Tg values
+  GET  /overseas/openapi/pcb/getImpedanceTemplateSettingList — impedance templates
+
 Response structure for order/detail:
   data.orderItem[0].pcbItem.orderStatus  ← INTEGER (0-5), not string!
   0=Cancelled, 1=Pending Review, 2=Awaiting Confirmation,
@@ -221,6 +228,13 @@ class JLCAPIClient:
     EP_PCB_WIP        = '/overseas/openapi/pcb/wip/get'                      # POST {"orderUUID":"..."}
     EP_PCB_AUDIT      = '/overseas/openapi/pcb/audit/get'                    # POST {"key":"..."} Gerber review
 
+    # Gerber / ordering endpoints
+    EP_PCB_UPLOAD_GERBER = '/overseas/openapi/pcb/uploadGerber'              # POST multipart → fileKey
+    EP_PCB_CALCULATE     = '/overseas/openapi/pcb/calculate'                 # POST JSON → price + gerber images
+    EP_PCB_CREATE        = '/overseas/openapi/pcb/create'                    # POST JSON → orderId/batchNum
+    EP_PCB_PLATE_BRANDS  = '/overseas/openapi/pcb/getAvailablePlateBrandAndTg'        # GET → plate brand list
+    EP_PCB_IMPEDANCE     = '/overseas/openapi/pcb/getImpedanceTemplateSettingList'    # GET → impedance templates
+
     # Always-authorized endpoint (JPay balance) — used to verify credentials
     EP_JPAY_BALANCE = '/overseas/openapi/jpay/customerJpayAccount/getAccountDetail'  # GET
 
@@ -291,6 +305,70 @@ class JLCAPIClient:
             raise JLCAPIError(f'Connection error: {e.reason}') from e
         except Exception as e:
             raise JLCAPIError(f'Request failed: {e}') from e
+
+        try:
+            result = json.loads(raw)
+        except json.JSONDecodeError:
+            raise JLCAPIError(f'Invalid JSON response: {raw[:200]}')
+
+        if isinstance(result, dict):
+            code = result.get('code', 0)
+            if code not in (0, 200, '0', '200'):
+                msg = result.get('message') or result.get('msg') or str(result)
+                raise JLCAPIError(f'API error {code}: {msg}')
+            return result.get('data', result)
+
+        return result
+
+    def _upload_multipart(self, path: str, file_data: bytes,
+                          file_name: str, timeout: int = 120) -> dict:
+        """
+        POST multipart/form-data with a file field.
+        Auth body_str = '' (empty) — JLCPCB docs: no canonical body for multipart.
+        Returns the parsed response data dict.
+        """
+        boundary = 'JLCGerber' + secrets.token_hex(16)
+
+        parts = []
+        if file_name:
+            parts.append(
+                f'--{boundary}\r\n'
+                f'Content-Disposition: form-data; name="fileName"\r\n'
+                f'\r\n'
+                f'{file_name}\r\n'
+            )
+        parts.append(
+            f'--{boundary}\r\n'
+            f'Content-Disposition: form-data; name="file"; filename="{file_name}"\r\n'
+            f'Content-Type: application/octet-stream\r\n'
+            f'\r\n'
+        )
+        body_bytes = (
+            ''.join(parts).encode('utf-8')
+            + file_data
+            + f'\r\n--{boundary}--\r\n'.encode('utf-8')
+        )
+
+        headers = {
+            # Auth uses empty body_str for multipart (no canonical JSON body)
+            'Authorization': self._authorization('POST', path, '', ''),
+            'Content-Type':  f'multipart/form-data; boundary={boundary}',
+            'Accept':        'application/json',
+        }
+        req = urllib.request.Request(
+            self.BASE_URL + path, data=body_bytes, headers=headers, method='POST'
+        )
+
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read().decode('utf-8')
+        except urllib.error.HTTPError as e:
+            body_err = e.read().decode('utf-8', errors='replace')
+            raise JLCAPIError(f'HTTP {e.code} {e.reason} — {body_err[:400]}') from e
+        except urllib.error.URLError as e:
+            raise JLCAPIError(f'Connection error: {e.reason}') from e
+        except Exception as e:
+            raise JLCAPIError(f'Upload failed: {e}') from e
 
         try:
             result = json.loads(raw)
@@ -453,6 +531,133 @@ class JLCAPIClient:
         """Get PCB production progress (WIP stages) by orderUUID (from order detail)."""
         return self._request('POST', self.EP_PCB_WIP,
                               body={'orderUUID': order_uuid})
+
+    # ── Gerber / ordering workflow ────────────────────────────────────────────
+
+    def upload_gerber(self, file_path: str, file_name: Optional[str] = None) -> str:
+        """
+        Upload a Gerber .zip or .rar file.
+        Returns fileKey string (links upload → quotation → order).
+
+        Error codes:
+          2001 — file verification error (invalid Gerber content)
+          2002 — file size exceeds limit
+        """
+        import os
+        if not file_name:
+            file_name = os.path.basename(file_path)
+        with open(file_path, 'rb') as fh:
+            file_data = fh.read()
+        result = self._upload_multipart(
+            self.EP_PCB_UPLOAD_GERBER, file_data, file_name
+        )
+        if isinstance(result, str):
+            return result
+        # data may be the fileKey string directly or a dict with a key field
+        if isinstance(result, dict):
+            key = result.get('fileKey') or result.get('key') or result.get('data')
+            if key:
+                return key
+        raise JLCAPIError(f'uploadGerber: unexpected response shape: {result!r}')
+
+    def get_pcb_audit(self, file_key: str) -> dict:
+        """
+        Get Gerber pre-review (DRC check) result.
+        fileKey is returned by upload_gerber().
+        Response contains board dimensions, layer count, DRC pass/fail.
+        """
+        return self._request('POST', self.EP_PCB_AUDIT, body={'key': file_key})
+
+    def calculate_quote(self, file_key: str, pcb_param: dict,
+                        achieve_date: int = 120,
+                        country: str = 'DE',
+                        post_code: str = '',
+                        shipping_method: Optional[str] = None,
+                        order_type: int = 1) -> dict:
+        """
+        Get price quotation for a Gerber upload.
+
+        pcb_param fields (PcbOrderCraftData):
+          layer, width, length, qty, thickness,
+          pcbColor (0=green,1=red,2=yellow,3=blue,4=white,5=black,6=purple),
+          surfaceFinish (0=HASL lead,1=HASL leadfree,2=ENIG),
+          copperWeight, goldFinger, panelFlag, flyingProbeTest,
+          impedanceFlag, plateType, viaCovering, ...
+
+        achieve_date: build time in hours (e.g. 24, 48, 120)
+        country: ISO-2 ship-to country (affects freight options)
+
+        Returns dict with:
+          priceWithoutFreight, orderTotalWeight,
+          pcbCostInfo: {totalFee, projectFee, spellFee, testsFee, ...},
+          shipList:    [{shippingMethod, freightCost, deliveryDays}, ...],
+          achieveDateList: [{achieveDate, fee}, ...],
+          gerberTop:   image URL (PNG preview — top copper layer),
+          gerberBottom: image URL (PNG preview — bottom copper layer)
+        """
+        body: dict = {
+            'orderType':   order_type,
+            'fileKey':     file_key,
+            'achieveDate': achieve_date,
+            'country':     country,
+            'pcbParam':    pcb_param,
+        }
+        if post_code:
+            body['postCode'] = post_code
+        if shipping_method:
+            body['shippingMethod'] = shipping_method
+        return self._request('POST', self.EP_PCB_CALCULATE, body=body, timeout=30)
+
+    def create_pcb_order(self, file_key: str, pcb_param: dict,
+                         shipping_address: dict, shipping_method: str,
+                         achieve_date: Optional[int] = None,
+                         order_type: int = 1,
+                         tax_vat_number: str = '',
+                         batch_num: Optional[str] = None) -> dict:
+        """
+        Place a PCB order.
+        WARNING: This charges the JLCPCB account and creates a real production order.
+
+        shipping_address (OrderAddressData):
+          firstName, lastName, companyName, streetAddress, addressLine2,
+          city, country, province, postalCode, cellOrMobileNumber
+
+        Returns: {orderId, orderType, orderDate, batchNum}
+
+        Error codes:
+          2500 — fileKey not found (re-upload required)
+          2501 — no audit result yet (call get_pcb_audit first)
+          2000–5006 — various validation / payment errors
+        """
+        body: dict = {
+            'orderType':          order_type,
+            'fileKey':            file_key,
+            'pcbParam':           pcb_param,
+            'shippingAddress':    shipping_address,
+            'shippingMethod':     shipping_method,
+            'billingAddressFlag': 0,   # use shipping address as billing
+            'taxOrVATNumber':     tax_vat_number,
+        }
+        if achieve_date is not None:
+            body['achieveDate'] = achieve_date
+        if batch_num is not None:
+            body['batchNum'] = batch_num
+        return self._request('POST', self.EP_PCB_CREATE, body=body, timeout=30)
+
+    def get_plate_brands(self) -> list:
+        """Return available plate brands and Tg values (for plateType + Tg selection)."""
+        result = self._request('GET', self.EP_PCB_PLATE_BRANDS)
+        if isinstance(result, list):
+            return result
+        return result.get('list') or []
+
+    def get_impedance_templates(self, layer: int = 2) -> list:
+        """Return impedance template settings for a given layer count."""
+        result = self._request('GET', self.EP_PCB_IMPEDANCE,
+                               params={'layer': layer})
+        if isinstance(result, list):
+            return result
+        return result.get('list') or []
 
     def refresh_order(self, jlc_order) -> dict:
         """
