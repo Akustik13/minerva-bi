@@ -298,6 +298,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('gerber/<int:pk>/reorder/',
                  self.admin_site.admin_view(self.gerber_reorder_view),
                  name='jlcpcb_gerber_reorder'),
+            path('gerber/<int:pk>/raw-quote/',
+                 self.admin_site.admin_view(self.gerber_raw_quote_view),
+                 name='jlcpcb_gerber_raw_quote'),
         ]
         return custom + urls
 
@@ -564,17 +567,28 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 achieve_date=achieve_date,
                 country=country,
             )
+            # Try multiple possible field names for gerber preview images
+            _IMG_TOP_FIELDS    = ('gerberTop', 'gerberTopUrl', 'topImageUrl', 'topUrl', 'pcbTopImage')
+            _IMG_BOTTOM_FIELDS = ('gerberBottom', 'gerberBottomUrl', 'bottomImageUrl', 'bottomUrl', 'pcbBottomImage')
+            gerber_top    = next((quote.get(f) for f in _IMG_TOP_FIELDS    if quote.get(f)), '')
+            gerber_bottom = next((quote.get(f) for f in _IMG_BOTTOM_FIELDS if quote.get(f)), '')
+
+            logger.info('JLC calculate quote keys: %s', list(quote.keys()))
+            if gerber_top:
+                logger.info('JLC gerber_top: %s', gerber_top[:100])
+
             return JsonResponse({
                 'ok':          True,
                 'file_key':    file_key,
                 'pcb_param':   pcb_param,
-                'gerber_top':  quote.get('gerberTop', ''),
-                'gerber_bottom': quote.get('gerberBottom', ''),
+                'gerber_top':  gerber_top,
+                'gerber_bottom': gerber_bottom,
                 'price':       quote.get('priceWithoutFreight'),
                 'weight':      quote.get('orderTotalWeight'),
                 'pcb_cost':    quote.get('pcbCostInfo') or {},
                 'ship_list':   quote.get('shipList') or [],
                 'achieve_list': quote.get('achieveDateList') or [],
+                '_debug_quote_keys': list(quote.keys()),
             })
         except JLCAPIError as exc:
             return JsonResponse({'ok': False, 'error': str(exc)})
@@ -664,6 +678,23 @@ class JLCOrderAdmin(admin.ModelAdmin):
             return JsonResponse({'ok': False, 'error': str(exc)})
         except Exception as exc:
             return JsonResponse({'ok': False, 'error': f'Помилка створення замовлення: {exc}'})
+
+    def gerber_raw_quote_view(self, request, pk):
+        """Debug: return raw_data of an order as pretty JSON — helps diagnose image URL issues."""
+        order = get_object_or_404(JLCOrder, pk=pk)
+        raw = order.raw_data if isinstance(order.raw_data, dict) else {}
+        # Highlight image-relevant keys
+        summary = {
+            'gerber_top':    raw.get('gerber_top', '⚠️ not stored'),
+            'gerber_bottom': raw.get('gerber_bottom', '⚠️ not stored'),
+            'pcb_param':     raw.get('pcb_param', '⚠️ not stored'),
+            'all_top_level_keys': list(raw.keys()),
+        }
+        from django.http import HttpResponse
+        return HttpResponse(
+            json.dumps(summary, ensure_ascii=False, indent=2),
+            content_type='application/json; charset=utf-8',
+        )
 
     def gerber_reorder_view(self, request, pk):
         """Open Gerber order form pre-filled with params from an existing order."""
