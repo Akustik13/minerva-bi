@@ -119,7 +119,16 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f'Failed to fetch batch list: {e}'))
                 batch_nums_to_sync = []
 
-            # Always include existing active orders (status refresh regardless of age)
+            # Remove already-closed orders from discovery results (skip useless API calls)
+            closed = set(JLCOrder.objects.filter(
+                local_status__in=[JLCOrder.LocalStatus.DELIVERED, JLCOrder.LocalStatus.CANCELLED],
+                jlc_order_number__in=batch_nums_to_sync,
+            ).values_list('jlc_order_number', flat=True))
+            if closed:
+                batch_nums_to_sync = [b for b in batch_nums_to_sync if b not in closed]
+                self.stdout.write(f'  Skipped {len(closed)} closed order(s) from discovery.')
+
+            # Add active orders from DB (status refresh, regardless of age)
             existing_active = list(
                 JLCOrder.objects.exclude(
                     local_status__in=[JLCOrder.LocalStatus.DELIVERED, JLCOrder.LocalStatus.CANCELLED]
