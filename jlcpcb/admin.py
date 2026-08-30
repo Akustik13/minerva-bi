@@ -68,7 +68,7 @@ class JLCConfigAdmin(admin.ModelAdmin):
             ),
         }),
         ('🔄 Синхронізація', {
-            'fields': ('sync_enabled', 'sync_interval_hours', 'last_synced_at'),
+            'fields': ('sync_enabled', 'sync_interval_hours', 'sync_days_back', 'last_synced_at'),
         }),
         ('📦 Склад', {
             'fields': ('auto_receive_on_delivered', 'default_location'),

@@ -25,8 +25,8 @@ class Command(BaseCommand):
                             help='Only run product matching, skip API sync')
         parser.add_argument('--batch-num', type=str,
                             help='Sync a single order by JLCPCB batch number (e.g. W2025040800001)')
-        parser.add_argument('--days', type=int, default=180,
-                            help='How many days back to look for new orders (default 180)')
+        parser.add_argument('--days', type=int, default=None,
+                            help='How many days back to look for new orders (default: from JLCConfig.sync_days_back)')
         parser.add_argument('--skip-dhl', action='store_true',
                             help='Skip DHL tracking check phase')
 
@@ -93,7 +93,7 @@ class Command(BaseCommand):
             batch_nums_to_sync = [options['batch_num']]
             self.stdout.write(f'Syncing single batch: {options["batch_num"]}')
         else:
-            days      = options['days']
+            days      = options['days'] or cfg.sync_days_back or 30
             date_to   = timezone.now()
             date_from = date_to - timedelta(days=days)
             fmt       = '%Y-%m-%d %H:%M:%S'

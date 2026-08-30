@@ -25,6 +25,11 @@ class JLCConfig(models.Model):
                                                help_text='Автоматично оновлювати статуси замовлень з JLCPCB API')
     sync_interval_hours  = models.PositiveSmallIntegerField('Інтервал (годин)', default=4,
                                                             help_text='Рекомендовано: 2–8 год')
+    sync_days_back       = models.PositiveSmallIntegerField(
+        'Період пошуку нових замовлень (днів)', default=30,
+        help_text='Скільки днів назад шукати нові замовлення при синхронізації. '
+                  'Рекомендовано: 30–90 днів. Більше = повільніше.',
+    )
     last_synced_at       = models.DateTimeField('Остання синхронізація', null=True, blank=True)
 
     # ── Inventory integration ─────────────────────────────────────────────────
