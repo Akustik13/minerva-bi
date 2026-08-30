@@ -152,9 +152,20 @@ class Command(BaseCommand):
             new_status      = map_jlc_status(status_int)
             file_name       = pcb.get('fileName', '')
             quantity        = pcb.get('count', 1) or 1
-            delivery_time   = pcb.get('deliveryTime')   # DHL estimated delivery datetime str
+            delivery_time   = pcb.get('deliveryTime')
             price           = pcb.get('price')
-            shipping_method = raw.get('shippingMethod', '')  # e.g. "DHL EXPRESS"
+            shipping_method = raw.get('shippingMethod', '')
+
+            # Parse order_date from pcbItem.orderDate (actual JLCPCB order time)
+            order_date = None
+            raw_order_date = pcb.get('orderDate')
+            if raw_order_date:
+                try:
+                    order_date = datetime.strptime(
+                        raw_order_date[:10], '%Y-%m-%d'
+                    ).date()
+                except (ValueError, TypeError):
+                    pass
 
             # Parse expected_date from deliveryTime field
             expected_date = None
@@ -175,6 +186,7 @@ class Command(BaseCommand):
                     'description':     file_name,
                     'quantity':        quantity,
                     'total_price':     price,
+                    'order_date':      order_date or timezone.now().date(),
                     'expected_date':   expected_date,
                     'tracking_carrier': shipping_method,
                     'raw_data':        raw,
@@ -208,8 +220,11 @@ class Command(BaseCommand):
                     self.stdout.write(f'  {batch}: delivered (locked) — API says {new_status}, skip')
                     continue
 
-                # Update expected_date / tracking_carrier if now available
+                # Update fields if now available / fix wrong defaults
                 update_fields = ['raw_data', 'jlc_status', 'description', 'updated_at']
+                if order_date and order.order_date != order_date:
+                    order.order_date = order_date
+                    update_fields.append('order_date')
                 if expected_date and not order.expected_date:
                     order.expected_date = expected_date
                     update_fields.append('expected_date')
