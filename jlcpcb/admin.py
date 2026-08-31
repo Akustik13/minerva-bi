@@ -282,6 +282,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('<int:pk>/order-files/',
                  self.admin_site.admin_view(self.order_files_view),
                  name='jlcpcb_jlcorder_order_files'),
+            path('<int:pk>/download-file/',
+                 self.admin_site.admin_view(self.download_file_proxy_view),
+                 name='jlcpcb_jlcorder_download_file'),
             path('run-sync/',
                  self.admin_site.admin_view(self.run_sync_view),
                  name='jlcpcb_jlcorder_run_sync'),
@@ -562,34 +565,41 @@ class JLCOrderAdmin(admin.ModelAdmin):
         try:
             client = JLCAPIClient.from_config()
             files  = client.get_order_files(batch)
-            # Debug: collect all top-level field names + orderItem structure
-            raw = client.get_pcb_order(batch)
-            debug = {
-                'root_keys': list(raw.keys()) if isinstance(raw, dict) else str(type(raw)),
-                'order_item_count': len(raw.get('orderItem', [])) if isinstance(raw, dict) else 0,
-                'order_item_details': [
-                    {
-                        'orderType': it.get('orderType'),
-                        'item_keys': list(it.keys()),
-                        'pcbItem_url_fields': {
-                            k: v for k, v in it.get('pcbItem', {}).items()
-                            if 'url' in k.lower() or 'file' in k.lower() or 'path' in k.lower()
-                        },
-                        'smtItem_keys': list((it.get('smtItem') or {}).keys()),
-                        'smtItem_url_fields': {
-                            k: v for k, v in (it.get('smtItem') or {}).items()
-                            if 'url' in k.lower() or 'file' in k.lower() or 'path' in k.lower()
-                        },
-                    }
-                    for it in (raw.get('orderItem', []) if isinstance(raw, dict) else [])
-                ],
-            }
-            return JsonResponse({'ok': True, 'files': files, 'count': len(files), 'debug': debug})
+            # For files that need auth proxy — replace relative URL with Django proxy URL
+            proxy_base = reverse('admin:jlcpcb_jlcorder_download_file', args=[pk])
+            for f in files:
+                if f.get('needs_proxy'):
+                    import urllib.parse
+                    f['url'] = proxy_base + '?rel=' + urllib.parse.quote(f['url'], safe='')
+            return JsonResponse({'ok': True, 'files': files, 'count': len(files)})
         except JLCAPIError as e:
             return JsonResponse({'ok': False, 'error': str(e)})
         except Exception as e:
             logger.error('order_files_view pk=%s: %s', pk, e, exc_info=True)
             return JsonResponse({'ok': False, 'error': f'Помилка: {e}'})
+
+    def download_file_proxy_view(self, request, pk):
+        """Proxy file download from JLCPCB API — adds authentication headers."""
+        from django.http import HttpResponse, HttpResponseBadRequest
+        get_object_or_404(JLCOrder, pk=pk)
+        rel_url = request.GET.get('rel', '')
+        if not rel_url or not rel_url.startswith('/'):
+            return HttpResponseBadRequest('Invalid rel URL')
+        from .services.api import JLCAPIClient, JLCAPIError
+        try:
+            client = JLCAPIClient.from_config()
+            content, content_type, filename = client.download_file(rel_url)
+            resp = HttpResponse(content, content_type=content_type)
+            safe_name = filename.encode('ascii', 'ignore').decode()
+            resp['Content-Disposition'] = f'attachment; filename="{safe_name}"'
+            resp['Content-Length'] = len(content)
+            return resp
+        except JLCAPIError as e:
+            return HttpResponse(f'❌ {e}', status=502, content_type='text/plain; charset=utf-8')
+        except Exception as e:
+            logger.error('download_file_proxy pk=%s: %s', pk, e, exc_info=True)
+            return HttpResponse(f'❌ Помилка: {e}', status=500,
+                                content_type='text/plain; charset=utf-8')
 
     def run_sync_view(self, request):
         from django.core.management import call_command

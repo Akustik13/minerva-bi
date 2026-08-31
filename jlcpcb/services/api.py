@@ -588,6 +588,45 @@ class JLCAPIClient:
 
         return stages, raw_data
 
+    def download_file(self, relative_url: str, timeout: int = 60) -> tuple:
+        """
+        Download a file from JLCPCB API using authenticated GET.
+        relative_url: e.g. '/file/download?uuid=abc&businessType=example'
+        Returns (bytes_content, content_type, suggested_filename).
+        """
+        parsed   = urllib.parse.urlparse(relative_url)
+        path     = parsed.path          # e.g. '/file/download'
+        query    = parsed.query         # e.g. 'uuid=abc&businessType=example'
+        full_url = self.BASE_URL + path + (f'?{query}' if query else '')
+
+        headers = {
+            'Authorization': self._authorization('GET', path, query, ''),
+            'Accept': '*/*',
+        }
+        req = urllib.request.Request(full_url, headers=headers, method='GET')
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                content      = resp.read()
+                content_type = resp.headers.get('Content-Type', 'application/octet-stream')
+                disp         = resp.headers.get('Content-Disposition', '')
+        except urllib.error.HTTPError as e:
+            body_err = e.read().decode('utf-8', errors='replace')
+            raise JLCAPIError(f'HTTP {e.code} — {body_err[:300]}') from e
+        except urllib.error.URLError as e:
+            raise JLCAPIError(f'Connection error: {e.reason}') from e
+
+        # Extract filename from Content-Disposition or fallback to uuid
+        filename = ''
+        if 'filename=' in disp:
+            filename = disp.split('filename=')[-1].strip().strip('"\'')
+        if not filename:
+            params = urllib.parse.parse_qs(query)
+            uid = params.get('uuid', ['file'])[0][:16]
+            ext = '.zip' if 'zip' in content_type else '.bin'
+            filename = f'jlcpcb_{uid}{ext}'
+
+        return content, content_type, filename
+
     def get_order_files(self, batch_num: str) -> list:
         """
         Fetch fresh order detail and extract all downloadable file URLs.
@@ -614,7 +653,11 @@ class JLCAPIClient:
         files: list = []
 
         def _add(field: str, url, source_label: str = '') -> None:
-            if not isinstance(url, str) or not url.startswith('http'):
+            if not isinstance(url, str) or not url:
+                return
+            # Accept both absolute (https://...) and relative (/file/download?...)
+            is_relative = url.startswith('/')
+            if not url.startswith('http') and not is_relative:
                 return
             if url in seen_urls:
                 return
@@ -622,7 +665,8 @@ class JLCAPIClient:
             label = _LABELS.get(field) or field
             if source_label:
                 label = f'{label} ({source_label})'
-            files.append({'name': label, 'url': url, 'field': field})
+            files.append({'name': label, 'url': url, 'field': field,
+                          'needs_proxy': is_relative})
 
         # Scan orderItem → pcbItem and top-level fields
         for item in (raw.get('orderItem') or []):
