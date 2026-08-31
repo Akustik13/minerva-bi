@@ -1181,10 +1181,11 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 round(len(production_steps) / _TOTAL_STEPS * 100), 99
             ) if production_steps else 0
 
-            # WIP refresh button — show for all orders (tries produceCode for website orders)
-            _wip_uuid, _wip_src = self._get_wip_uuid(obj)
-            extra['has_wip_uuid'] = True   # always show button; server returns useful error if no UUID
-            extra['wip_uuid_source'] = _wip_src or ''
+            # WIP refresh button — always show; server handles UUID resolution
+            _wip_candidates = self._get_wip_candidates(obj)
+            _wip_src = _wip_candidates[0][1] if _wip_candidates else ''
+            extra['has_wip_uuid'] = True
+            extra['wip_uuid_source'] = _wip_src
             extra['wip_url'] = reverse('admin:jlcpcb_jlcorder_wip_refresh', args=[obj.pk])
 
             # Gerber file download URL refresh

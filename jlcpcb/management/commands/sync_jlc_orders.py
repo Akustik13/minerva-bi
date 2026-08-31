@@ -89,6 +89,7 @@ class Command(BaseCommand):
         client = JLCAPIClient.from_config()
 
         # ── Determine which batch numbers to sync ─────────────────────────────
+        order_id_map: dict = {}   # batchNum → orderId (populated from batch list when available)
         if options['batch_num']:
             batch_nums_to_sync = [options['batch_num']]
             self.stdout.write(f'Syncing single batch: {options["batch_num"]}')

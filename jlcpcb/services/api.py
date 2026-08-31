@@ -540,9 +540,15 @@ class JLCAPIClient:
                     logger.warning('pageBatchInfoByOrderType orderType=%s page=%s: %s',
                                    otype, page, e)
                     break
+                if not isinstance(result, dict):
+                    logger.warning('pageBatchInfoByOrderType unexpected result type=%s',
+                                   type(result).__name__)
+                    break
                 items       = result.get('list') or []
                 total_pages = result.get('pages') or 1
                 for item in items:
+                    if not isinstance(item, dict):
+                        continue
                     n = item.get('batchNum')
                     if n and n not in seen:
                         seen.add(n)
