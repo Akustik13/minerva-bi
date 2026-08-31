@@ -630,15 +630,41 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 achieve_date=achieve_date,
                 country=country,
             )
-            # Try multiple possible field names for gerber preview images
-            _IMG_TOP_FIELDS    = ('gerberTop', 'gerberTopUrl', 'topImageUrl', 'topUrl', 'pcbTopImage')
-            _IMG_BOTTOM_FIELDS = ('gerberBottom', 'gerberBottomUrl', 'bottomImageUrl', 'bottomUrl', 'pcbBottomImage')
+            # Try to find gerber preview images — search by known names AND by URL pattern
+            _IMG_TOP_FIELDS    = ('gerberTop', 'gerberTopUrl', 'topImageUrl', 'topUrl',
+                                  'pcbTopImage', 'renderTop', 'imageTop', 'topLayer')
+            _IMG_BOTTOM_FIELDS = ('gerberBottom', 'gerberBottomUrl', 'bottomImageUrl', 'bottomUrl',
+                                  'pcbBottomImage', 'renderBottom', 'imageBottom', 'bottomLayer')
             gerber_top    = next((quote.get(f) for f in _IMG_TOP_FIELDS    if quote.get(f)), '')
             gerber_bottom = next((quote.get(f) for f in _IMG_BOTTOM_FIELDS if quote.get(f)), '')
+            # Fallback: scan all string fields for URL-like values containing image keywords
+            if not gerber_top:
+                for k, v in quote.items():
+                    if isinstance(v, str) and ('http' in v) and any(
+                        x in k.lower() for x in ('top', 'front', 'gerber', 'image', 'render', 'img')
+                    ):
+                        gerber_top = v
+                        logger.info('JLC auto-detected gerber_top field=%s url=%s', k, v[:100])
+                        break
+            if not gerber_bottom:
+                for k, v in quote.items():
+                    if isinstance(v, str) and ('http' in v) and any(
+                        x in k.lower() for x in ('bottom', 'back', 'gerber', 'image', 'render', 'img')
+                    ) and v != gerber_top:
+                        gerber_bottom = v
+                        logger.info('JLC auto-detected gerber_bottom field=%s url=%s', k, v[:100])
+                        break
 
-            logger.info('JLC calculate quote keys: %s', list(quote.keys()))
+            # Log FULL calculate response to find image URL field names
+            import json as _json
+            logger.info('JLC /calculate full response: %s',
+                        _json.dumps(quote, ensure_ascii=False)[:3000])
             if gerber_top:
-                logger.info('JLC gerber_top: %s', gerber_top[:100])
+                logger.info('JLC gerber_top found: %s', gerber_top[:200])
+
+            # Include raw quote keys in debug mode so browser console shows all fields
+            _debug_keys = {k: (v[:120] if isinstance(v, str) else v)
+                          for k, v in quote.items() if not isinstance(v, dict)}
 
             return JsonResponse({
                 'ok':          True,
@@ -649,6 +675,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 'price':       quote.get('priceWithoutFreight'),
                 'weight':      quote.get('orderTotalWeight'),
                 'pcb_cost':    quote.get('pcbCostInfo') or {},
+                '_debug_quote': _debug_keys,
                 'ship_list':   quote.get('shipList') or [],
                 'achieve_list': quote.get('achieveDateList') or [],
                 '_debug_quote_keys': list(quote.keys()),
