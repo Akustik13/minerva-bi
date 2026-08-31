@@ -381,6 +381,39 @@
 /* Coupon row */
 .jq-coupon-row { display: flex; gap: 6px; }
 .jq-coupon-row .jq-input { flex: 1; }
+
+/* ── Tooltip ────────────────────────────────────────────────────────────── */
+.tip-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--text-dim, #57606a); color: #fff;
+  font-size: 10px; font-weight: 700; font-style: normal;
+  cursor: help; margin-left: 5px; flex-shrink: 0; vertical-align: middle;
+  user-select: none; line-height: 1;
+}
+#tip-float {
+  position: fixed;
+  background: var(--bg-card, #fff);
+  border: 1px solid var(--border-strong, #d0d7de);
+  border-radius: 8px;
+  max-width: 280px;
+  z-index: 10000;
+  pointer-events: none;
+  font-size: 12px;
+  color: var(--text, #24292f);
+  line-height: 1.5;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  display: none;
+  overflow: hidden;
+}
+[data-theme="dark"] #tip-float {
+  background: #1c2333;
+  border-color: #30363d;
+  color: #c9d1d9;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+}
+#tip-float img { width: 100%; display: block; border-bottom: 1px solid var(--border-strong, #d0d7de); }
+#tip-float .tip-text { padding: 10px 12px; }
 </style>
 {% endblock %}
 
@@ -417,7 +450,7 @@
 
       {# Base Material #}
       <div class="jq-row">
-        <div class="jq-row-label">Base Material <span class="tip" title="FR4 for most projects. Rogers/PTFE for RF. Aluminum for LEDs.">ⓘ</span></div>
+        <div class="jq-row-label">Base Material <span class="tip-icon" data-tip="base_material">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-material">
             <button type="button" class="jq-pill active" data-val="0">FR-4</button>
@@ -432,7 +465,7 @@
 
       {# Layers #}
       <div class="jq-row">
-        <div class="jq-row-label">Layers <span class="tip" title="Number of copper layers.">ⓘ</span></div>
+        <div class="jq-row-label">Layers <span class="tip-icon" data-tip="layers">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-layer">
             <button type="button" class="jq-pill" data-val="1">1</button>
@@ -448,7 +481,7 @@
 
       {# Dimensions #}
       <div class="jq-row">
-        <div class="jq-row-label">Dimensions (mm) <span class="tip" title="Width × Length. Can be read from Gerber automatically.">ⓘ</span></div>
+        <div class="jq-row-label">Dimensions (mm) <span class="tip-icon" data-tip="dimensions">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-dim-row">
             <input type="number" id="fld-width" class="jq-input" value="100" min="1" step="0.1" style="width:80px">
@@ -462,7 +495,7 @@
 
       {# Quantity #}
       <div class="jq-row">
-        <div class="jq-row-label">PCB Qty <span class="tip" title="Number of boards to produce.">ⓘ</span></div>
+        <div class="jq-row-label">PCB Qty <span class="tip-icon" data-tip="pcb_qty">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-qty">
             <button type="button" class="jq-pill active" data-val="5">5</button>
@@ -488,7 +521,7 @@
 
       {# Different Design #}
       <div class="jq-row">
-        <div class="jq-row-label">Different Design <span class="tip" title="Number of different PCB designs on one panel.">ⓘ</span></div>
+        <div class="jq-row-label">Different Design <span class="tip-icon" data-tip="different_design">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-design">
             <button type="button" class="jq-pill active" data-val="1">1</button>
@@ -501,7 +534,7 @@
 
       {# Delivery Format #}
       <div class="jq-row">
-        <div class="jq-row-label">Delivery Format <span class="tip" title="Single: one board per unit. Panel: multiple boards panelized.">ⓘ</span></div>
+        <div class="jq-row-label">Delivery Format <span class="tip-icon" data-tip="delivery_format">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-panel">
             <button type="button" class="jq-pill active" data-val="0">Single PCB</button>
@@ -513,7 +546,7 @@
 
       {# Thickness #}
       <div class="jq-row">
-        <div class="jq-row-label">PCB Thickness <span class="tip" title="Board thickness in mm. 1.6mm is most common.">ⓘ</span></div>
+        <div class="jq-row-label">PCB Thickness <span class="tip-icon" data-tip="thickness">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-thickness">
             <button type="button" class="jq-pill" data-val="0.4">0.4</button>
@@ -530,7 +563,7 @@
 
       {# PCB Color #}
       <div class="jq-row">
-        <div class="jq-row-label">PCB Color <span class="tip" title="Solder mask color.">ⓘ</span></div>
+        <div class="jq-row-label">PCB Color <span class="tip-icon" data-tip="pcb_color">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-color">
             <button type="button" class="jq-color-pill active" data-val="0"
@@ -553,7 +586,7 @@
 
       {# Silkscreen #}
       <div class="jq-row">
-        <div class="jq-row-label">Silkscreen <span class="tip" title="Silkscreen layer color.">ⓘ</span></div>
+        <div class="jq-row-label">Silkscreen <span class="tip-icon" data-tip="silkscreen">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-silk">
             <button type="button" class="jq-pill active" data-val="0">White</button>
@@ -564,7 +597,7 @@
 
       {# Surface Finish #}
       <div class="jq-row">
-        <div class="jq-row-label">Surface Finish <span class="tip" title="HASL Lead-Free is RoHS compliant. ENIG for fine-pitch components.">ⓘ</span></div>
+        <div class="jq-row-label">Surface Finish <span class="tip-icon" data-tip="surface_finish">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-surface">
             <button type="button" class="jq-pill active" data-val="1">HASL (Lead-Free)</button>
@@ -577,7 +610,7 @@
 
       {# Outer Cu Weight #}
       <div class="jq-row">
-        <div class="jq-row-label">Outer Cu Weight <span class="tip" title="Outer layer copper thickness. 1oz is standard.">ⓘ</span></div>
+        <div class="jq-row-label">Outer Cu Weight <span class="tip-icon" data-tip="copper_weight">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-copper">
             <button type="button" class="jq-pill active" data-val="1">1 oz</button>
@@ -588,7 +621,7 @@
 
       {# Inner Cu Weight (shown for layer > 2) #}
       <div class="jq-row" id="row-inner-copper" style="display:none">
-        <div class="jq-row-label">Inner Cu Weight <span class="tip" title="Inner layer copper thickness (for multilayer boards).">ⓘ</span></div>
+        <div class="jq-row-label">Inner Cu Weight <span class="tip-icon" data-tip="inner_copper">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-inner-copper">
             <button type="button" class="jq-pill active" data-val="1">0.5 oz</button>
@@ -599,7 +632,7 @@
 
       {# Via Covering #}
       <div class="jq-row">
-        <div class="jq-row-label">Via Covering <span class="tip" title="How vias are treated. Tented=covered with mask. Plugged=filled.">ⓘ</span></div>
+        <div class="jq-row-label">Via Covering <span class="tip-icon" data-tip="via_covering">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-via">
             <button type="button" class="jq-pill active" data-val="0">Tented</button>
@@ -613,7 +646,7 @@
 
       {# Flying Probe Test #}
       <div class="jq-row">
-        <div class="jq-row-label">Flying Probe Test <span class="tip" title="Electrical testing. Recommended for production.">ⓘ</span></div>
+        <div class="jq-row-label">Flying Probe Test <span class="tip-icon" data-tip="flying_probe">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-probe">
             <button type="button" class="jq-pill" data-val="0">No</button>
@@ -635,7 +668,7 @@
 
       {# Gold Fingers #}
       <div class="jq-row">
-        <div class="jq-row-label">Gold Fingers <span class="tip" title="Edge connectors plated with gold.">ⓘ</span></div>
+        <div class="jq-row-label">Gold Fingers <span class="tip-icon" data-tip="gold_fingers">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-gold">
             <button type="button" class="jq-pill active" data-val="0">No</button>
@@ -646,18 +679,18 @@
 
       {# Board Outline Tolerance #}
       <div class="jq-row">
-        <div class="jq-row-label">Board Outline Tol. <span class="tip" title="Routing/outline milling accuracy.">ⓘ</span></div>
+        <div class="jq-row-label">Board Outline Tol. <span class="tip-icon" data-tip="board_tolerance">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-tolerance">
-            <button type="button" class="jq-pill active" data-val="1">±0.2mm (Regular)</button>
-            <button type="button" class="jq-pill" data-val="2">±0.1mm (Precision)</button>
+            <button type="button" class="jq-pill active" data-val="0">±0.2mm (Regular)</button>
+            <button type="button" class="jq-pill" data-val="1">±0.1mm (Precision)</button>
           </div>
         </div>
       </div>
 
       {# Impedance Control #}
       <div class="jq-row">
-        <div class="jq-row-label">Impedance Control <span class="tip" title="Controlled impedance for RF/high-speed signals.">ⓘ</span></div>
+        <div class="jq-row-label">Impedance Control <span class="tip-icon" data-tip="impedance">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-impedance">
             <button type="button" class="jq-pill active" data-val="0">No</button>
@@ -668,13 +701,15 @@
 
       {# Min Via Hole Size #}
       <div class="jq-row">
-        <div class="jq-row-label">Min Via Hole Size <span class="tip" title="Smallest via drill size in your design.">ⓘ</span></div>
+        <div class="jq-row-label">Min Via Hole Size <span class="tip-icon" data-tip="min_via">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-viahole">
-            <button type="button" class="jq-pill active" data-val="0">0.3mm</button>
-            <button type="button" class="jq-pill" data-val="1">0.25mm</button>
-            <button type="button" class="jq-pill" data-val="2">0.2mm</button>
+            <button type="button" class="jq-pill active" data-val="0">0.3/0.4mm</button>
+            <button type="button" class="jq-pill" data-val="1">0.25/0.35mm</button>
+            <button type="button" class="jq-pill" data-val="2">0.2/0.3mm</button>
+            <button type="button" class="jq-pill" data-val="3">0.15/0.25mm</button>
           </div>
+          <div class="jq-sub-note">via hole / via diameter — smaller sizes add extra cost</div>
         </div>
       </div>
 
@@ -689,20 +724,21 @@
     </div>
     <div class="jq-section-body collapsed" id="body-advanced">
 
-      {# Mark on PCB #}
+      {# Castellated Holes #}
       <div class="jq-row">
-        <div class="jq-row-label">Mark on PCB <span class="tip" title="JLCPCB order number marking on the PCB.">ⓘ</span></div>
+        <div class="jq-row-label">Castellated Holes <span class="tip-icon" data-tip="castellated">?</span></div>
         <div class="jq-row-ctrl">
-          <div class="jq-pills" id="grp-mark">
-            <button type="button" class="jq-pill active" data-val="0">Accept</button>
-            <button type="button" class="jq-pill" data-val="1">Specify Location</button>
+          <div class="jq-pills" id="grp-castellation">
+            <button type="button" class="jq-pill active" data-val="0">No</button>
+            <button type="button" class="jq-pill" data-val="1">Yes</button>
           </div>
+          <div class="jq-sub-note" id="note-castellation" style="display:none">Min. hole dia. 0.6mm. Requires outer edge plating.</div>
         </div>
       </div>
 
       {# Confirm Production File #}
       <div class="jq-row">
-        <div class="jq-row-label">Confirm Prod. File <span class="tip" title="Auto-confirm production files without manual review.">ⓘ</span></div>
+        <div class="jq-row-label">Confirm Prod. File <span class="tip-icon" data-tip="confirm_file">?</span></div>
         <div class="jq-row-ctrl">
           <div class="jq-pills" id="grp-autoconfirm">
             <button type="button" class="jq-pill active" data-val="1">Yes</button>
@@ -713,7 +749,7 @@
 
       {# PCB Remark #}
       <div class="jq-row">
-        <div class="jq-row-label">PCB Remark <span class="tip" title="Additional notes for the manufacturer.">ⓘ</span></div>
+        <div class="jq-row-label">PCB Remark <span class="tip-icon" data-tip="pcb_remark">?</span></div>
         <div class="jq-row-ctrl">
           <textarea id="fld-remark" class="jq-textarea" rows="2"
                     style="width:100%;resize:vertical"
@@ -934,6 +970,9 @@
 
 </div>{# /jq-page #}
 
+{# Floating tooltip #}
+<div id="tip-float"><div class="tip-text"></div></div>
+
 {# Hidden fields #}
 <input type="hidden" id="jq-file-key">
 <input type="hidden" id="jq-pcb-param-json">
@@ -959,10 +998,10 @@ const p = {
   viaCovering:         0,
   flyingProbeTest:     2,
   goldFinger:          0,
-  boardOutlineTolerance: 1,
+  boardOutlineTolerance: 0,
   impedanceFlag:       0,
   minViaHoleSizeAndDiameter: 0,
-  markOnPcb:           0,
+  castellatedHoles:    0,
   autoConfirmProductionFile: 1,
   achieveDate:         120,
 };
@@ -997,7 +1036,7 @@ function applyPrefill(params) {
     boardOutlineTolerance: ['grp-tolerance', 'numInt'],
     impedanceFlag:       ['grp-impedance','numInt'],
     minViaHoleSizeAndDiameter: ['grp-viahole', 'numInt'],
-    markOnPcb:           ['grp-mark',     'numInt'],
+    castellatedHoles:    ['grp-castellation', 'numInt'],
     autoConfirmProductionFile: ['grp-autoconfirm', 'numInt'],
   };
   for (const [key, [grpId]] of Object.entries(mappings)) {
@@ -1087,9 +1126,12 @@ initPills('grp-probe',       'flyingProbeTest', numInt);
 initPills('grp-gold',        'goldFinger',      numInt);
 initPills('grp-tolerance',   'boardOutlineTolerance', numInt);
 initPills('grp-impedance',   'impedanceFlag',   numInt);
-initPills('grp-viahole',     'minViaHoleSizeAndDiameter', numInt);
-initPills('grp-mark',        'markOnPcb',       numInt);
-initPills('grp-autoconfirm', 'autoConfirmProductionFile', numInt);
+initPills('grp-viahole',       'minViaHoleSizeAndDiameter', numInt);
+initPills('grp-castellation',  'castellatedHoles', numInt);
+document.getElementById('grp-castellation').addEventListener('click', () => {
+  document.getElementById('note-castellation').style.display = p.castellatedHoles ? '' : 'none';
+});
+initPills('grp-autoconfirm',   'autoConfirmProductionFile', numInt);
 
 /* Show/hide inner copper weight for multilayer */
 function onLayerChange() {
@@ -1175,7 +1217,7 @@ async function doAnalyze() {
   fd.append('impedance_flag',    p.impedanceFlag);
   fd.append('min_via_hole',      p.minViaHoleSizeAndDiameter);
   /* Advanced */
-  fd.append('mark_on_pcb',       p.markOnPcb);
+  fd.append('castellated_holes', p.castellatedHoles);
   fd.append('auto_confirm',      p.autoConfirmProductionFile);
   fd.append('remarks',           p.remarks || '');
   /* Build time */
@@ -1379,6 +1421,7 @@ async function doCreate() {
         achieve_date:     achDate,
         gerber_top:       gGerberTop,
         gerber_bottom:    gGerberBottom,
+        auto_confirm:     p.autoConfirmProductionFile,
       }),
     });
     const data = await resp.json();
@@ -1397,6 +1440,133 @@ async function doCreate() {
     btn.disabled = false;
   }
 }
+
+/* ── Tooltip ─────────────────────────────────────────────────────────────── */
+const TIPS = {
+  base_material: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/base-material.png',
+    text: 'PCBs can be manufactured from various base materials. FR-4 is the standard glass-fiber epoxy laminate for most applications. Aluminum is ideal for LED and heat-dissipation boards. Flex (Polyimide) enables bending. Rogers/PTFE are for high-frequency RF designs.',
+  },
+  layers: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/layers.png',
+    text: 'Number of copper layers. 1 layer for simple single-sided boards. 2 layers are the most common for general designs. 4+ layers allow denser routing for complex circuits. Odd layer counts are automatically increased to the next even number.',
+  },
+  dimensions: {
+    img: null,
+    text: 'The dimension of the single PCB or PCB panel you upload. You can leave this as 100×100 — JLCPCB will automatically measure the actual dimensions from your Gerber files.',
+  },
+  pcb_qty: {
+    img: null,
+    text: 'Total quantity of single boards or panels to produce. Larger quantities significantly reduce the price per board. The minimum order is 5 boards.',
+  },
+  different_design: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/different-design.png',
+    text: 'Number of different PCB designs in your Gerber files, separated by V-cuts, mouse bites, or milling slots. For a single design: select 1. If you have 2 or more designs panelized together, select the corresponding number.',
+  },
+  delivery_format: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/delivery-format.png',
+    text: 'Single PCB: Individual boards with no panelization required. Panel by Customer: You designed the panel with V-cuts or tab-routing separating the boards. Panel by JLCPCB: We create the panel layout for you based on your files.',
+  },
+  thickness: {
+    img: null,
+    text: '1.6mm is the industry standard and most cost-effective thickness. Thinner boards (0.4–0.8mm) save weight but are more fragile. Thicker boards (2.0mm) provide extra rigidity. Note: thickness availability varies by layer count.',
+  },
+  pcb_color: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/pcb-color.png',
+    text: 'Green PCBs have a 24-hour production guarantee and the lowest cost. Non-green colors (Red, Blue, Black, White, Yellow, Purple) may add 2+ production days and slight additional cost. White PCBs automatically use black silkscreen. Black PCBs may use white silkscreen.',
+  },
+  silkscreen: {
+    img: null,
+    text: 'Color of the silkscreen (component labels and markings). White is standard for all colors except white solder mask. When white solder mask is selected, the silkscreen is automatically changed to black. Black silkscreen is also available for dark-colored boards.',
+  },
+  surface_finish: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/surface-finish.png',
+    text: 'HASL Lead-Free: RoHS compliant, most cost-effective, slightly uneven surface. HASL (with Lead): Better wettability for hand soldering. ENIG: Flat gold surface — ideal for fine-pitch SMD pads, gold fingers, and press-fit connectors. OSP: Organic coating, lowest cost for high-volume SMT assembly.',
+  },
+  copper_weight: {
+    img: null,
+    text: 'Outer layer copper thickness. 1 oz = 35μm (standard, handles up to ~2A per mm of trace width). 2 oz = 70μm for high-current power traces. Inner layers for multilayer boards default to 0.5 oz.',
+  },
+  inner_copper: {
+    img: null,
+    text: 'Inner layer copper thickness for multilayer PCBs (4 layers and above). 0.5 oz (17μm) is standard for signal routing layers. 1 oz (35μm) provides better current capacity on internal power and ground planes.',
+  },
+  via_covering: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/via-covering.png',
+    text: 'Tented: Vias covered with solder mask (prevents solder bridging during SMT assembly — recommended for most designs). Untented: Open vias (useful for probing). Plugged: Vias filled with resin. Epoxy Filled & Capped: Filled with epoxy and plated over (IPC-4761 Type VII).',
+  },
+  flying_probe: {
+    img: null,
+    text: 'Flying Probe Fully Test: 100% electrical testing of all net connections using a flying probe machine. Detects open circuits and short circuits before shipping. Highly recommended for production orders. The cost is included in the base PCB price.',
+  },
+  gold_fingers: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/gold-fingers.png',
+    text: 'Hard gold plated edge connector pads for insertion into PCIe, PCI, DDR, or similar slot connectors. Only available when ENIG surface finish is selected. The edge fingers receive additional hard gold plating. Adds cost and requires specific design rules for the connector area.',
+  },
+  board_tolerance: {
+    img: null,
+    text: 'Milling accuracy of the PCB outline. Regular ±0.2mm is standard and free — suitable for most applications. Precision ±0.1mm applies when exact board dimensions are critical (e.g., tight-fit enclosures or connector alignment). Additional cost applies for precision tolerance.',
+  },
+  impedance: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/impedance.png',
+    text: 'Controlled impedance traces are required for RF, high-speed digital signals (USB 3.x, HDMI, DDR4, Ethernet). JLCPCB engineers will adjust your trace widths to achieve the target impedance (e.g. 50Ω single-ended, 100Ω differential). Requires an additional engineering review and adds cost and lead time.',
+  },
+  min_via: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/min-via.png',
+    text: 'Minimum drill size for through-hole vias. Hole/Diameter: 0.3/0.4mm = standard (no extra charge). 0.25/0.35mm = extra charge applies. 0.2/0.3mm = higher cost. 0.15/0.25mm = premium cost. The diameter must be at least 0.1mm larger than the drill hole. Smaller vias allow higher PCB density.',
+  },
+  castellated: {
+    img: 'https://static.jlcpcb.com/public/tools/quote/castellated-holes.png',
+    text: 'Half-hole castellation on the PCB edge for soldering modules directly onto a carrier board (e.g. ESP32 modules, wireless modules). Minimum hole diameter: 0.6mm. Minimum hole center-to-edge distance: 0.35mm. Outer copper plating and solder mask opening required on the castellated edge.',
+  },
+  confirm_file: {
+    img: null,
+    text: 'Yes (Auto-confirm): Production starts immediately after JLCPCB\'s engineering DRC review passes — no manual approval needed. No (Manual Review): You receive the production Gerber file for approval before manufacturing begins. This adds 1–2 business days but lets you verify the production file.',
+  },
+  pcb_remark: {
+    img: null,
+    text: 'Special manufacturing notes or requirements not covered by the standard options. Examples: "Add customer order number on silkscreen", "Use specific stackup", "Chamfer edge connectors at 45°". JLCPCB engineers will review and contact you if clarification is needed.',
+  },
+};
+
+(function initTooltips() {
+  const tipFloat = document.getElementById('tip-float');
+  const tipText  = tipFloat.querySelector('.tip-text');
+  let tipImg = null;
+
+  document.querySelectorAll('.tip-icon').forEach(icon => {
+    icon.addEventListener('mouseenter', () => {
+      const key = icon.dataset.tip;
+      const def = TIPS[key];
+      if (!def) return;
+
+      // Image
+      if (tipImg) { tipImg.remove(); tipImg = null; }
+      if (def.img) {
+        tipImg = document.createElement('img');
+        tipImg.src = def.img;
+        tipImg.onerror = () => { if (tipImg) { tipImg.remove(); tipImg = null; } };
+        tipFloat.insertBefore(tipImg, tipText);
+      }
+      tipText.textContent = def.text;
+      tipFloat.style.display = 'block';
+
+      // Position after it's visible so offsetWidth/Height are available
+      requestAnimationFrame(() => {
+        const r  = icon.getBoundingClientRect();
+        const tw = Math.min(tipFloat.offsetWidth || 280, 280);
+        const th = tipFloat.offsetHeight;
+        let left = r.right + 10;
+        let top  = r.top - 4;
+        if (left + tw > window.innerWidth - 8)  left = r.left - tw - 10;
+        if (top + th  > window.innerHeight - 8) top  = window.innerHeight - th - 8;
+        tipFloat.style.left = Math.max(8, left) + 'px';
+        tipFloat.style.top  = Math.max(8, top)  + 'px';
+      });
+    });
+    icon.addEventListener('mouseleave', () => { tipFloat.style.display = 'none'; });
+  });
+})();
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 function setStatus(which, html, cls) {

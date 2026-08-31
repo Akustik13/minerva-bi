@@ -519,28 +519,44 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
         try:
             layer = int(request.POST.get('layer', 2))
+            # Core required params — always send
             pcb_param = {
-                'baseMaterial':               int(request.POST.get('base_material', 0)),
-                'layer':                      layer,
-                'width':                      float(request.POST.get('width', 100)),
-                'length':                     float(request.POST.get('length', 100)),
-                'qty':                        int(request.POST.get('qty', 5)),
-                'differentDesign':            int(request.POST.get('different_design', 1)),
-                'panelFlag':                  int(request.POST.get('panel_flag', 0)),
-                'thickness':                  float(request.POST.get('thickness', 1.6)),
-                'pcbColor':                   int(request.POST.get('pcb_color', 0)),
-                'silkscreenColor':            int(request.POST.get('silkscreen_color', 0)),
-                'surfaceFinish':              int(request.POST.get('surface_finish', 1)),
-                'copperWeight':               int(request.POST.get('copper_weight', 1)),
-                'flyingProbeTest':            int(request.POST.get('flying_probe_test', 2)),
-                'goldFinger':                 int(request.POST.get('gold_finger', 0)),
-                'boardOutlineTolerance':      int(request.POST.get('board_outline_tolerance', 1)),
-                'impedanceFlag':              int(request.POST.get('impedance_flag', 0)),
-                'viaCovering':                int(request.POST.get('via_covering', 0)),
-                'markOnPcb':                  int(request.POST.get('mark_on_pcb', 0)),
-                'autoConfirmProductionFile':  int(request.POST.get('auto_confirm', 1)),
+                'layer':           layer,
+                'width':           float(request.POST.get('width', 100)),
+                'length':          float(request.POST.get('length', 100)),
+                'qty':             int(request.POST.get('qty', 5)),
+                'panelFlag':       int(request.POST.get('panel_flag', 0)),
+                'thickness':       float(request.POST.get('thickness', 1.6)),
+                'pcbColor':        int(request.POST.get('pcb_color', 0)),
+                'surfaceFinish':   int(request.POST.get('surface_finish', 1)),
+                'copperWeight':    int(request.POST.get('copper_weight', 1)),
+                'flyingProbeTest': int(request.POST.get('flying_probe_test', 2)),
+                'viaCovering':     int(request.POST.get('via_covering', 0)),
             }
-            # inner copper only meaningful for multilayer
+            # Optional params — only include when explicitly non-default
+            # to avoid JLCPCB validation errors (e.g. 2603 impedance error)
+            _opt = int(request.POST.get('base_material', 0))
+            if _opt:
+                pcb_param['baseMaterial'] = _opt
+            _opt = int(request.POST.get('silkscreen_color', 0))
+            if _opt:
+                pcb_param['silkscreenColor'] = _opt
+            _opt = int(request.POST.get('different_design', 1))
+            if _opt and _opt != 1:
+                pcb_param['differentDesign'] = _opt
+            _opt = int(request.POST.get('gold_finger', 0))
+            if _opt:
+                pcb_param['goldFinger'] = _opt
+            _opt = int(request.POST.get('board_outline_tolerance', 0))
+            if _opt:
+                pcb_param['boardOutlineTolerance'] = _opt
+            _opt = int(request.POST.get('impedance_flag', 0))
+            if _opt:
+                pcb_param['impedanceFlag'] = _opt
+            _opt = int(request.POST.get('castellated_holes', 0))
+            if _opt:
+                pcb_param['castellatedHoles'] = _opt
+            # Inner copper only meaningful for multilayer
             if layer > 2:
                 pcb_param['innerCopperWeight'] = int(request.POST.get('inner_copper_weight', 1))
             remarks = request.POST.get('remarks', '').strip()
@@ -634,6 +650,10 @@ class JLCOrderAdmin(admin.ModelAdmin):
         achieve_date = data.get('achieve_date')
         gerber_top    = (data.get('gerber_top') or '').strip()
         gerber_bottom = (data.get('gerber_bottom') or '').strip()
+
+        # autoConfirmProductionFile is only relevant for create, not calculate
+        if 'autoConfirmProductionFile' not in pcb_param:
+            pcb_param['autoConfirmProductionFile'] = data.get('auto_confirm', 1)
 
         try:
             client = JLCAPIClient.from_config()
