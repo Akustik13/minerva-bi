@@ -406,25 +406,22 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.error(request, f'❌ Помилка API: {e}')
         return redirect('admin:jlcpcb_jlcorder_change', pk)
 
-    def _get_wip_uuid(self, order) -> tuple:
+    def _get_wip_candidates(self, order) -> list:
         """
-        Determine the best orderUUID candidate for WIP queries.
-        Returns (uuid_or_None, source_label).
-
-        Priority:
-        1. raw_data['order_uuid'] — explicitly saved (API-created orders)
-        2. raw_data['orderId']    — from pageBatchInfoByOrderType list
-        3. jlc_order_id != jlc_order_number — API flow, orderId stored as jlc_order_id
-        4. produceCode (e.g. Y424-2862719A) — extracted from pcbItem — website orders
+        Return ordered list of (uuid_candidate, source_label) to try for WIP.
+        Tries each until one returns non-empty stages.
         """
         raw = order.raw_data if isinstance(order.raw_data, dict) else {}
+        candidates = []
 
         if raw.get('order_uuid'):
-            return raw['order_uuid'], 'order_uuid'
-        if raw.get('orderId'):
-            return raw['orderId'], 'orderId'
-        if order.jlc_order_id and order.jlc_order_id != order.jlc_order_number:
-            return order.jlc_order_id, 'jlc_order_id'
+            candidates.append((raw['order_uuid'], 'order_uuid'))
+        if raw.get('orderId') and raw['orderId'] != raw.get('order_uuid'):
+            candidates.append((raw['orderId'], 'orderId'))
+        if (order.jlc_order_id
+                and order.jlc_order_id != order.jlc_order_number
+                and order.jlc_order_id not in [c[0] for c in candidates]):
+            candidates.append((order.jlc_order_id, 'jlc_order_id'))
 
         # For website-placed orders: try produceCode (e.g. Y424-2862719A)
         produce_code = next(
@@ -434,48 +431,71 @@ class JLCOrderAdmin(admin.ModelAdmin):
             '',
         )
         if produce_code:
-            return produce_code, 'produceCode'
+            candidates.append((produce_code, 'produceCode'))
 
-        return None, None
+        # Last resort: batchNum (jlc_order_number) — website orders may use this
+        batch = order.jlc_order_number or order.jlc_order_id
+        if batch and batch not in [c[0] for c in candidates]:
+            candidates.append((batch, 'batchNum'))
+
+        return candidates
 
     def wip_refresh_view(self, request, pk):
-        """Return WIP production progress via AJAX. Stores result in raw_data."""
-        from django.http import JsonResponse
+        """Return WIP production progress via AJAX. Tries multiple UUID candidates."""
         order = get_object_or_404(JLCOrder, pk=pk)
+        candidates = self._get_wip_candidates(order)
 
-        order_uuid, uuid_source = self._get_wip_uuid(order)
-        if not order_uuid:
+        if not candidates:
             return JsonResponse({
                 'ok': False,
-                'no_uuid': True,
-                'error': (
-                    'orderUUID не знайдено. Для замовлень з сайту JLCPCB '
-                    'клікніть "view progress" на сторінці замовлення і скопіюйте URL — '
-                    'він може містити orderId.'
-                ),
+                'error': 'Немає жодного ідентифікатора для WIP-запиту.',
             })
 
         from .services.api import JLCAPIClient, JLCAPIError
-        try:
-            client = JLCAPIClient.from_config()
-            logger.info('WIP request: orderUUID=%s (source=%s)', order_uuid, uuid_source)
-            wip_data = client.get_pcb_wip(order_uuid)
-        except JLCAPIError as e:
-            err = str(e)
-            # If produceCode failed, tell user what we tried
-            hint = (f' (спробували produceCode={order_uuid})'
-                    if uuid_source == 'produceCode' else '')
-            return JsonResponse({'ok': False, 'error': err + hint,
-                                 'uuid_tried': order_uuid, 'uuid_source': uuid_source})
-        except Exception as e:
-            return JsonResponse({'ok': False, 'error': f'Помилка: {e}'})
+        client = JLCAPIClient.from_config()
+        last_error = ''
+        debug_tries = []
 
-        raw = order.raw_data if isinstance(order.raw_data, dict) else {}
-        stages = wip_data if isinstance(wip_data, list) else []
-        raw['production_steps'] = stages
-        order.raw_data = raw
-        order.save(update_fields=['raw_data'])
-        return JsonResponse({'ok': True, 'stages': stages, 'uuid_source': uuid_source})
+        for order_uuid, uuid_source in candidates:
+            try:
+                logger.info('WIP try: orderUUID=%s (source=%s)', order_uuid, uuid_source)
+                stages, raw_wip = client.get_pcb_wip(order_uuid)
+                debug_tries.append({
+                    'uuid': order_uuid, 'source': uuid_source,
+                    'stages_count': len(stages),
+                    'raw_type': type(raw_wip).__name__,
+                    'raw_preview': str(raw_wip)[:300],
+                })
+                if stages:
+                    # Found real data — save and return
+                    raw = order.raw_data if isinstance(order.raw_data, dict) else {}
+                    raw['production_steps'] = stages
+                    raw['order_uuid'] = order_uuid  # save winning UUID for next time
+                    order.raw_data = raw
+                    order.save(update_fields=['raw_data'])
+                    return JsonResponse({'ok': True, 'stages': stages,
+                                         'uuid_source': uuid_source,
+                                         'debug_tries': debug_tries})
+            except JLCAPIError as e:
+                last_error = str(e)
+                debug_tries.append({'uuid': order_uuid, 'source': uuid_source,
+                                    'error': last_error})
+                logger.warning('WIP %s failed: %s', uuid_source, last_error)
+            except Exception as e:
+                last_error = str(e)
+                debug_tries.append({'uuid': order_uuid, 'source': uuid_source,
+                                    'error': last_error})
+
+        # All candidates tried — return debug info so user can diagnose
+        return JsonResponse({
+            'ok': False,
+            'no_data': True,
+            'error': (
+                'JLCPCB WIP API не повернув даних для жодного ідентифікатора. '
+                'Натисніть "view progress" на сайті JLCPCB і скопіюйте URL сторінки.'
+            ),
+            'debug_tries': debug_tries,
+        })
 
     def gerber_url_refresh_view(self, request, pk):
         """Re-fetch a fresh Gerber file download URL (pre-signed URLs expire in ~1-4h)."""

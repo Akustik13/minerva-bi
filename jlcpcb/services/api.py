@@ -555,10 +555,32 @@ class JLCAPIClient:
 
         return items_out
 
-    def get_pcb_wip(self, order_uuid: str) -> dict:
-        """Get PCB production progress (WIP stages) by orderUUID (from order detail)."""
-        return self._request('POST', self.EP_PCB_WIP,
-                              body={'orderUUID': order_uuid})
+    def get_pcb_wip(self, order_uuid: str) -> tuple:
+        """
+        Get PCB production progress (WIP stages) by orderUUID.
+        Returns (stages_list, raw_data) where raw_data is the full API 'data' field.
+        stages_list may be empty if API returned null/empty/unknown structure.
+        """
+        import logging as _log
+        _logger = _log.getLogger(__name__)
+        raw_data = self._request('POST', self.EP_PCB_WIP,
+                                 body={'orderUUID': order_uuid})
+        _logger.info('WIP raw_data type=%s value=%s', type(raw_data).__name__,
+                     str(raw_data)[:500])
+
+        stages = []
+        if isinstance(raw_data, list):
+            stages = raw_data
+        elif isinstance(raw_data, dict):
+            # Try common wrapper field names
+            for key in ('processList', 'wipList', 'list', 'stages',
+                        'wip', 'data', 'items', 'records'):
+                v = raw_data.get(key)
+                if isinstance(v, list):
+                    stages = v
+                    break
+
+        return stages, raw_data
 
     # ── Gerber / ordering workflow ────────────────────────────────────────────
 
