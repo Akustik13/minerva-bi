@@ -870,10 +870,34 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 'alt="PCB" onerror="this.style.display=\'none\'">',
                 top,
             )
+        # No render available — show PCB specs chip instead
+        pcb_item = {}
+        for item in raw.get('orderItem', []):
+            pcb_item = item.get('pcbItem') or {}
+            if pcb_item:
+                break
+        color_raw = (pcb_item.get('pcbColor') or '').lower()
+        _COLOR_MAP = {
+            'green': '#1a7a1a', 'blue': '#0d47a1', 'red': '#b71c1c',
+            'black': '#1a1a1a', 'white': '#e0e0e0', 'yellow': '#f9a825',
+            'purple': '#6a1b9a', 'matte black': '#1a1a1a',
+        }
+        bg_color = _COLOR_MAP.get(color_raw, '#1e3a2f')
+        txt_color = '#fff' if color_raw not in ('white', 'yellow') else '#333'
+        layers = pcb_item.get('layer', '')
+        label  = f'{layers}L' if layers else 'PCB'
+        size   = ''
+        if pcb_item.get('width') and pcb_item.get('length'):
+            size = f"{pcb_item['width']}×{pcb_item['length']}"
         return format_html(
-            '<span style="display:flex;align-items:center;justify-content:center;'
-            'width:52px;height:52px;border-radius:4px;border:1px dashed #555;'
-            'color:#555;font-size:18px">🔲</span>'
+            '<span style="display:flex;flex-direction:column;align-items:center;'
+            'justify-content:center;width:52px;height:52px;border-radius:4px;'
+            'background:{};color:{};font-size:11px;font-weight:700;gap:2px;'
+            'text-align:center;line-height:1.2">'
+            '<span>{}</span>'
+            '<span style="font-size:9px;font-weight:400;opacity:.8">{}</span>'
+            '</span>',
+            bg_color, txt_color, label, size,
         )
 
     # ── changelist with toolbar ───────────────────────────────────────────────
@@ -999,6 +1023,14 @@ class JLCOrderAdmin(admin.ModelAdmin):
                     'cancel':       cancel,
                 })
             extra['jlc_sub_orders'] = sub_orders
+
+            # Gerber file download URL (from pcbItem.orderFileUrl — may expire after ~24h)
+            extra['gerber_file_url'] = next(
+                (item.get('pcbItem', {}).get('orderFileUrl', '')
+                 for item in raw.get('orderItem', [])
+                 if item.get('pcbItem', {}).get('orderFileUrl')),
+                raw.get('orderFileUrl', ''),
+            )
 
             # DHL tracking events
             extra['dhl_events']      = raw.get('dhl_events') or []

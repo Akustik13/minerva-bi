@@ -523,11 +523,12 @@ class JLCAPIClient:
     def get_all_pcb_batch_numbers(self, date_from: str, date_to: str) -> list:
         """
         Fetch all batch numbers (PCB + stencil) in the given date range.
+        Returns list of (batchNum, orderId_or_None) tuples so callers can
+        capture orderId for WIP queries without a separate API call.
         Paginates using the 'pages' field from the API response.
-        Per docs, orderType must be 'order_pcb' or 'order_steel' (string).
         """
-        seen       = set()
-        batch_nums = []
+        seen  = set()
+        items_out = []
 
         for otype in ('order_pcb', 'order_steel'):
             page = 1
@@ -545,12 +546,14 @@ class JLCAPIClient:
                     n = item.get('batchNum')
                     if n and n not in seen:
                         seen.add(n)
-                        batch_nums.append(n)
+                        # orderId (UUID) may be present in list items — capture for WIP
+                        oid = item.get('orderId') or item.get('orderUUID') or None
+                        items_out.append((n, oid))
                 if not items or page >= total_pages:
                     break
                 page += 1
 
-        return batch_nums
+        return items_out
 
     def get_pcb_wip(self, order_uuid: str) -> dict:
         """Get PCB production progress (WIP stages) by orderUUID (from order detail)."""

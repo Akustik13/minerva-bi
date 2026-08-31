@@ -278,6 +278,24 @@
 </div>
 {% endif %}
 
+{# ── Gerber file download ── #}
+{% if gerber_file_url %}
+<div class="jlc-detail-panel module" style="margin-bottom:16px">
+  <div class="module-title">📦 Gerber файл</div>
+  <div style="padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+    <a href="{{ gerber_file_url }}" target="_blank" download
+       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;
+              background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);
+              border-radius:5px;font-size:13px;font-weight:600;text-decoration:none">
+      ⬇ Завантажити Gerber ZIP
+    </a>
+    <span style="font-size:11px;color:var(--body-quiet-color,#888)">
+      Посилання дійсне ~24 год після синхронізації
+    </span>
+  </div>
+</div>
+{% endif %}
+
 {# ── WIP production progress panel ── #}
 {% if production_steps or has_wip_uuid %}
 <div class="jlc-detail-panel module" id="wip-panel">

@@ -112,12 +112,17 @@ class Command(BaseCommand):
                 f'({date_from.strftime(fmt)} → {date_to.strftime(fmt)})...'
             )
             try:
-                batch_nums_to_sync = client.get_all_pcb_batch_numbers(
+                # Returns list of (batchNum, orderId_or_None) tuples
+                batch_pairs = client.get_all_pcb_batch_numbers(
                     date_from.strftime(fmt), date_to.strftime(fmt)
                 )
             except JLCAPIError as e:
                 self.stdout.write(self.style.ERROR(f'Failed to fetch batch list: {e}'))
-                batch_nums_to_sync = []
+                batch_pairs = []
+
+            # Build orderId map from batch list (may be None for older orders)
+            order_id_map = {b: oid for b, oid in batch_pairs}
+            batch_nums_to_sync = list(order_id_map.keys())
 
             # Remove already-closed orders from discovery results (skip useless API calls)
             closed = set(JLCOrder.objects.filter(
@@ -137,6 +142,8 @@ class Command(BaseCommand):
             for b in existing_active:
                 if b and b not in batch_nums_to_sync:
                     batch_nums_to_sync.append(b)
+                    if b not in order_id_map:
+                        order_id_map[b] = None
 
             self.stdout.write(f'Found {len(batch_nums_to_sync)} batch(es) to process.')
 
@@ -167,9 +174,11 @@ class Command(BaseCommand):
                 self.stdout.write(f'  {batch}: no pcbItem in response, skip')
                 continue
 
-            # Note: JLCPCB order/detail API does NOT return orderUUID for synced orders.
-            # WIP is only available for orders created via Gerber API (jlc_order_id != jlc_order_number).
-            # orderFileUrl contains a Gerber file UUID — NOT an orderUUID — do not use for WIP.
+            # Store orderId from the batch list response if available (enables WIP for synced orders).
+            # JLCPCB /order/detail does NOT return orderId, but /pageBatchInfoByOrderType may.
+            batch_order_id = order_id_map.get(batch)
+            if batch_order_id and not raw.get('order_uuid'):
+                raw['order_uuid'] = batch_order_id
 
             status_int      = pcb.get('orderStatus')
             new_status      = map_jlc_status(status_int)
