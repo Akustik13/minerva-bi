@@ -278,219 +278,6 @@
 </div>
 {% endif %}
 
-{# ── Order files panel ── #}
-{% if order_files_url %}
-<div class="jlc-detail-panel module" style="margin-bottom:16px">
-  <div class="module-title">
-    📎 Файли замовлення
-    <button type="button" id="files-refresh-btn" onclick="loadOrderFiles()"
-      style="float:right;font-size:11px;padding:2px 10px;cursor:pointer;
-             background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);
-             border:none;border-radius:4px;line-height:1.6">
-      🔄 Перевірити файли
-    </button>
-  </div>
-  <div id="files-content" style="padding:10px 16px;min-height:36px">
-    <span style="font-size:12px;color:var(--body-quiet-color,#888)">
-      Натисніть «🔄 Перевірити файли» — API поверне свіжі посилання для завантаження
-    </span>
-  </div>
-</div>
-<script>
-function loadOrderFiles() {
-  const btn     = document.getElementById('files-refresh-btn');
-  const content = document.getElementById('files-content');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ …'; }
-
-  fetch('{{ order_files_url }}', {
-    method: 'POST',
-    headers: {'X-CSRFToken': '{{ csrf_token }}'},
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Перевірити файли'; }
-    if (data.debug) { console.log('📎 Order files debug:', data.debug); }
-    if (!data.ok) {
-      content.innerHTML = '<span style="color:var(--err,#c62828);font-size:12px">❌ ' + data.error + '</span>';
-      return;
-    }
-    if (!data.files || data.files.length === 0) {
-      content.innerHTML = '<span style="font-size:12px;color:var(--body-quiet-color,#888)">⚠️ Файли не знайдено. Відкрийте DevTools (F12) → Console і скопіюйте вивід «Order files debug»</span>';
-      return;
-    }
-    const btnStyle = 'display:inline-flex;align-items:center;gap:5px;padding:6px 14px;' +
-      'background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);' +
-      'border-radius:5px;font-size:12px;font-weight:600;text-decoration:none;margin:3px 4px 3px 0';
-    let html = '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
-    data.files.forEach(f => {
-      html += '<a href="' + f.url + '" target="_blank" style="' + btnStyle + '">⬇ ' + f.name + '</a>';
-    });
-    html += '</div><p style="margin:6px 0 0;font-size:10px;color:var(--body-quiet-color,#888)">⏱ Посилання тимчасові (~1-4 год після запиту). Знайдено файлів: ' + data.count + '</p>';
-    content.innerHTML = html;
-  })
-  .catch(e => {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Перевірити файли'; }
-    content.innerHTML = '<span style="color:var(--err,#c62828);font-size:12px">❌ ' + e + '</span>';
-  });
-}
-</script>
-{% endif %}
-
-{# ── WIP production progress panel ── #}
-{% if wip_url %}
-<div class="jlc-detail-panel module" id="wip-panel">
-  <div class="module-title">
-    🏭 Хід виробництва
-    {% if production_steps %}
-    <span style="font-weight:700;color:#e65100;font-size:13px;margin-left:8px">{{ wip_percent }}%</span>
-    {% endif %}
-    <button type="button" id="wip-refresh-btn"
-      onclick="wipRefresh()"
-      style="float:right;font-size:11px;padding:2px 10px;cursor:pointer;
-             background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);
-             border:none;border-radius:4px;line-height:1.6">
-      🔄 Оновити WIP
-    </button>
-  </div>
-  <div class="jlc-detail-inner">
-    {# Manual orderUUID input — collapsed by default if no UUID known #}
-    <details {% if wip_uuid_source %}open{% endif %} style="margin-bottom:10px">
-      <summary style="font-size:11px;color:var(--body-quiet-color,#888);cursor:pointer;user-select:none">
-        🔑 Ввести orderId вручну
-        {% if wip_uuid_source %}<code style="margin-left:6px;font-size:10px">{{ wip_uuid_source }}</code>{% endif %}
-      </summary>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
-        <input id="wip-uuid-input" type="text"
-          placeholder="orderId (внутрішній UUID від JLCPCB)"
-          value="{{ wip_uuid_source|yesno:',' }}"
-          style="flex:1;min-width:220px;font-size:12px;padding:4px 8px;
-                 background:var(--darkened-bg,#f8f8f8);border:1px solid var(--border-color,#ccc);
-                 border-radius:4px;color:var(--body-fg,#333);font-family:monospace">
-        <button type="button" onclick="wipSaveUuid()"
-          style="font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap;
-                 background:var(--darkened-bg,#f0f0f0);color:var(--body-fg,#333);
-                 border:1px solid var(--border-color,#ccc);border-radius:4px">
-          💾 Зберегти UUID
-        </button>
-      </div>
-    </details>
-    <div id="wip-content">
-      {% if production_steps %}
-      <div style="font-size:11px;color:var(--body-quiet-color,#888);margin-bottom:6px">
-        Завершено {{ production_steps|length }} з 16 кроків виробництва
-      </div>
-      <div class="jlc-wip-bar-wrap">
-        <div class="jlc-wip-bar-fill" id="wip-bar" style="width:{{ wip_percent }}%"></div>
-      </div>
-      <div class="jlc-wip-steps" style="margin-top:12px" id="wip-steps">
-        {% for step in production_steps %}
-        <div class="jlc-wip-step {% if forloop.last %}current{% else %}done{% endif %}">
-          <span class="wip-dot">{% if forloop.last %}▶{% else %}✅{% endif %}</span>
-          <span class="wip-name">{{ step.technicsProcessName }}</span>
-          <span class="wip-time">{{ step.beginTime|slice:":16" }}</span>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div id="wip-empty" style="font-size:12px;color:var(--body-quiet-color,#888);padding:8px 0">
-        ℹ️ Хід виробництва недоступний для цього замовлення.<br>
-        <small>JLCPCB Open API надає WIP лише для замовлень створених через API.
-        Для замовлень зроблених на сайті — <code>orderId</code> відсутній у публічному API.
-        Якщо у вас є orderId (внутрішній UUID) — вставте вище.</small>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-</div>
-<style>
-.jlc-wip-step.current { background: rgba(230,81,0,0.10); }
-.jlc-wip-step.current .wip-dot { color: #e65100; }
-</style>
-<script>
-function wipSaveUuid() {
-  const input = document.getElementById('wip-uuid-input');
-  const uuid = (input ? input.value : '').trim();
-  if (!uuid) { alert('Введіть orderUUID'); return; }
-  fetch('{{ wip_url }}', {
-    method: 'POST',
-    headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
-    body: JSON.stringify({save_uuid: uuid}),
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.ok || data.uuid_saved) {
-      alert('✅ UUID збережено. Натисніть «🔄 Оновити WIP».');
-    } else {
-      alert('Збережено локально. Натисніть «🔄 Оновити WIP».');
-    }
-  }).catch(() => alert('Помилка збереження'));
-}
-
-function wipRefresh() {
-  const btn = document.getElementById('wip-refresh-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ …'; }
-  const manualUuid = (document.getElementById('wip-uuid-input') || {}).value || '';
-  const body = manualUuid.trim() ? {manual_uuid: manualUuid.trim()} : {};
-  fetch('{{ wip_url }}', {
-    method: 'POST',
-    headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
-    body: JSON.stringify(body),
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити WIP'; }
-    // Always log debug info to console for diagnosis
-    if (data.debug_tries) {
-      console.group('WIP debug tries:');
-      data.debug_tries.forEach(t => console.log(t));
-      console.groupEnd();
-    }
-    if (!data.ok) {
-      const container = document.getElementById('wip-content');
-      if (container) {
-        container.innerHTML = '<div style="font-size:11px;color:var(--body-quiet-color,#888);padding:8px 0">'
-          + '⚠️ ' + data.error + '<br>'
-          + '<b>Деталі в консолі браузера (F12 → Console)</b></div>';
-      }
-      return;
-    }
-    renderWip(data.stages);
-  })
-  .catch(e => {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити'; }
-    alert('❌ Помилка: ' + e);
-  });
-}
-
-function renderWip(stages) {
-  const TOTAL = 16;
-  const pct = stages.length ? Math.min(Math.round(stages.length / TOTAL * 100), 99) : 0;
-  const bar = document.getElementById('wip-bar');
-  if (bar) bar.style.width = pct + '%';
-
-  const container = document.getElementById('wip-content');
-  if (!container) return;
-  let html = `<div style="font-size:11px;color:var(--body-quiet-color,#888);margin-bottom:6px">
-    Завершено ${stages.length} з ${TOTAL} кроків виробництва</div>
-    <div class="jlc-wip-bar-wrap"><div class="jlc-wip-bar-fill" id="wip-bar" style="width:${pct}%"></div></div>
-    <div class="jlc-wip-steps" style="margin-top:12px">`;
-  stages.forEach((s, i) => {
-    const last = i === stages.length - 1;
-    const cls  = last ? 'current' : 'done';
-    const dot  = last ? '▶' : '✅';
-    const time = (s.beginTime || '').slice(0, 16);
-    html += `<div class="jlc-wip-step ${cls}">
-      <span class="wip-dot">${dot}</span>
-      <span class="wip-name">${s.technicsProcessName || ''}</span>
-      <span class="wip-time">${time}</span>
-    </div>`;
-  });
-  html += '</div>';
-  container.innerHTML = html;
-}
-</script>
-{% endif %}
-
 {# ── DHL tracking panel ── #}
 {% if dhl_events %}
 <div class="jlc-detail-panel module">
@@ -646,6 +433,217 @@ function renderWip(stages) {
 
   </div>
 </div>
+{% endif %}
+
+{# ── Order files panel ── #}
+{% if order_files_url %}
+<div class="jlc-detail-panel module" style="margin-bottom:16px">
+  <div class="module-title">
+    📎 Файли замовлення
+    <button type="button" id="files-refresh-btn" onclick="loadOrderFiles()"
+      style="float:right;font-size:11px;padding:2px 10px;cursor:pointer;
+             background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);
+             border:none;border-radius:4px;line-height:1.6">
+      🔄 Перевірити файли
+    </button>
+  </div>
+  <div id="files-content" style="padding:10px 16px;min-height:36px">
+    <span style="font-size:12px;color:var(--body-quiet-color,#888)">
+      Натисніть «🔄 Перевірити файли» — API поверне свіжі посилання для завантаження
+    </span>
+  </div>
+</div>
+<script>
+function loadOrderFiles() {
+  const btn     = document.getElementById('files-refresh-btn');
+  const content = document.getElementById('files-content');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ …'; }
+
+  fetch('{{ order_files_url }}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token }}'},
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Перевірити файли'; }
+    if (data.debug) { console.log('📎 Order files debug:', data.debug); }
+    if (!data.ok) {
+      content.innerHTML = '<span style="color:var(--err,#c62828);font-size:12px">❌ ' + data.error + '</span>';
+      return;
+    }
+    if (!data.files || data.files.length === 0) {
+      content.innerHTML = '<span style="font-size:12px;color:var(--body-quiet-color,#888)">⚠️ Файли не знайдено. Відкрийте DevTools (F12) → Console і скопіюйте вивід «Order files debug»</span>';
+      return;
+    }
+    const btnStyle = 'display:inline-flex;align-items:center;gap:5px;padding:6px 14px;' +
+      'background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);' +
+      'border-radius:5px;font-size:12px;font-weight:600;text-decoration:none;margin:3px 4px 3px 0';
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+    data.files.forEach(f => {
+      html += '<a href="' + f.url + '" target="_blank" style="' + btnStyle + '">⬇ ' + f.name + '</a>';
+    });
+    html += '</div><p style="margin:6px 0 0;font-size:10px;color:var(--body-quiet-color,#888)">⏱ Посилання тимчасові (~1-4 год після запиту). Знайдено файлів: ' + data.count + '</p>';
+    content.innerHTML = html;
+  })
+  .catch(e => {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Перевірити файли'; }
+    content.innerHTML = '<span style="color:var(--err,#c62828);font-size:12px">❌ ' + e + '</span>';
+  });
+}
+</script>
+{% endif %}
+
+{# ── WIP production progress panel ── #}
+{% if wip_url %}
+<div class="jlc-detail-panel module" id="wip-panel">
+  <div class="module-title">
+    🏭 Хід виробництва
+    {% if production_steps %}
+    <span style="font-weight:700;color:#e65100;font-size:13px;margin-left:8px">{{ wip_percent }}%</span>
+    {% endif %}
+    <button type="button" id="wip-refresh-btn"
+      onclick="wipRefresh()"
+      style="float:right;font-size:11px;padding:2px 10px;cursor:pointer;
+             background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);
+             border:none;border-radius:4px;line-height:1.6">
+      🔄 Оновити WIP
+    </button>
+  </div>
+  <div class="jlc-detail-inner">
+    <details {% if wip_uuid_source %}open{% endif %} style="margin-bottom:10px">
+      <summary style="font-size:11px;color:var(--body-quiet-color,#888);cursor:pointer;user-select:none">
+        🔑 Ввести orderId вручну
+        {% if wip_uuid_source %}<code style="margin-left:6px;font-size:10px">{{ wip_uuid_source }}</code>{% endif %}
+      </summary>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <input id="wip-uuid-input" type="text"
+          placeholder="orderId (внутрішній UUID від JLCPCB)"
+          value="{{ wip_uuid_source|yesno:',' }}"
+          style="flex:1;min-width:220px;font-size:12px;padding:4px 8px;
+                 background:var(--darkened-bg,#f8f8f8);border:1px solid var(--border-color,#ccc);
+                 border-radius:4px;color:var(--body-fg,#333);font-family:monospace">
+        <button type="button" onclick="wipSaveUuid()"
+          style="font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap;
+                 background:var(--darkened-bg,#f0f0f0);color:var(--body-fg,#333);
+                 border:1px solid var(--border-color,#ccc);border-radius:4px">
+          💾 Зберегти UUID
+        </button>
+      </div>
+    </details>
+    <div id="wip-content">
+      {% if production_steps %}
+      <div style="font-size:11px;color:var(--body-quiet-color,#888);margin-bottom:6px">
+        Завершено {{ production_steps|length }} з 16 кроків виробництва
+      </div>
+      <div class="jlc-wip-bar-wrap">
+        <div class="jlc-wip-bar-fill" id="wip-bar" style="width:{{ wip_percent }}%"></div>
+      </div>
+      <div class="jlc-wip-steps" style="margin-top:12px" id="wip-steps">
+        {% for step in production_steps %}
+        <div class="jlc-wip-step {% if forloop.last %}current{% else %}done{% endif %}">
+          <span class="wip-dot">{% if forloop.last %}▶{% else %}✅{% endif %}</span>
+          <span class="wip-name">{{ step.technicsProcessName }}</span>
+          <span class="wip-time">{{ step.beginTime|slice:":16" }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div id="wip-empty" style="font-size:12px;color:var(--body-quiet-color,#888);padding:8px 0">
+        ℹ️ Хід виробництва недоступний для цього замовлення.<br>
+        <small>JLCPCB Open API надає WIP лише для замовлень створених через API.
+        Для замовлень зроблених на сайті — <code>orderId</code> відсутній у публічному API.
+        Якщо у вас є orderId (внутрішній UUID) — вставте вище.</small>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<style>
+.jlc-wip-step.current { background: rgba(230,81,0,0.10); }
+.jlc-wip-step.current .wip-dot { color: #e65100; }
+</style>
+<script>
+function wipSaveUuid() {
+  const input = document.getElementById('wip-uuid-input');
+  const uuid = (input ? input.value : '').trim();
+  if (!uuid) { alert('Введіть orderUUID'); return; }
+  fetch('{{ wip_url }}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+    body: JSON.stringify({save_uuid: uuid}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok || data.uuid_saved) {
+      alert('✅ UUID збережено. Натисніть «🔄 Оновити WIP».');
+    } else {
+      alert('Збережено локально. Натисніть «🔄 Оновити WIP».');
+    }
+  }).catch(() => alert('Помилка збереження'));
+}
+
+function wipRefresh() {
+  const btn = document.getElementById('wip-refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ …'; }
+  const manualUuid = (document.getElementById('wip-uuid-input') || {}).value || '';
+  const body = manualUuid.trim() ? {manual_uuid: manualUuid.trim()} : {};
+  fetch('{{ wip_url }}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити WIP'; }
+    if (data.debug_tries) {
+      console.group('WIP debug tries:');
+      data.debug_tries.forEach(t => console.log(t));
+      console.groupEnd();
+    }
+    if (!data.ok) {
+      const container = document.getElementById('wip-content');
+      if (container) {
+        container.innerHTML = '<div style="font-size:11px;color:var(--body-quiet-color,#888);padding:8px 0">'
+          + '⚠️ ' + data.error + '<br>'
+          + '<b>Деталі в консолі браузера (F12 → Console)</b></div>';
+      }
+      return;
+    }
+    renderWip(data.stages);
+  })
+  .catch(e => {
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити'; }
+    alert('❌ Помилка: ' + e);
+  });
+}
+
+function renderWip(stages) {
+  const TOTAL = 16;
+  const pct = stages.length ? Math.min(Math.round(stages.length / TOTAL * 100), 99) : 0;
+  const bar = document.getElementById('wip-bar');
+  if (bar) bar.style.width = pct + '%';
+
+  const container = document.getElementById('wip-content');
+  if (!container) return;
+  let html = `<div style="font-size:11px;color:var(--body-quiet-color,#888);margin-bottom:6px">
+    Завершено ${stages.length} з ${TOTAL} кроків виробництва</div>
+    <div class="jlc-wip-bar-wrap"><div class="jlc-wip-bar-fill" id="wip-bar" style="width:${pct}%"></div></div>
+    <div class="jlc-wip-steps" style="margin-top:12px">`;
+  stages.forEach((s, i) => {
+    const last = i === stages.length - 1;
+    const cls  = last ? 'current' : 'done';
+    const dot  = last ? '▶' : '✅';
+    const time = (s.beginTime || '').slice(0, 16);
+    html += `<div class="jlc-wip-step ${cls}">
+      <span class="wip-dot">${dot}</span>
+      <span class="wip-name">${s.technicsProcessName || ''}</span>
+      <span class="wip-time">${time}</span>
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+</script>
 {% endif %}
 
 {% endif %}
