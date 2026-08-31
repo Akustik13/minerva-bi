@@ -556,6 +556,8 @@ class JLCOrderAdmin(admin.ModelAdmin):
             call_command('sync_jlc_orders', '--force', stdout=buf)
             messages.success(request, f'✅ {buf.getvalue()[:300] or "Синхронізацію завершено."}')
         except Exception as e:
+            import traceback
+            logger.error('Sync failed: %s', traceback.format_exc())
             messages.error(request, f'❌ {e}')
         return redirect('admin:jlcpcb_jlcorder_changelist')
 
@@ -1158,12 +1160,13 @@ class JLCOrderAdmin(admin.ModelAdmin):
             extra['jlc_sub_orders'] = sub_orders
 
             # Gerber file download URL (from pcbItem.orderFileUrl — may expire after ~24h)
-            extra['gerber_file_url'] = next(
-                (item.get('pcbItem', {}).get('orderFileUrl', '')
+            _raw_gerber_url = next(
+                (item.get('pcbItem', {}).get('orderFileUrl') or ''
                  for item in raw.get('orderItem', [])
-                 if item.get('pcbItem', {}).get('orderFileUrl')),
-                raw.get('orderFileUrl', ''),
+                 if (item.get('pcbItem', {}).get('orderFileUrl') or '').startswith('http')),
+                raw.get('orderFileUrl') or '',
             )
+            extra['gerber_file_url'] = _raw_gerber_url if _raw_gerber_url.startswith('http') else ''
 
             # DHL tracking events
             extra['dhl_events']      = raw.get('dhl_events') or []

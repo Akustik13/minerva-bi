@@ -348,16 +348,13 @@ class Command(BaseCommand):
                 continue
             for order_uuid in uuids_to_try:
                 try:
-                    wip = client.get_pcb_wip(order_uuid)
-                    steps = wip if isinstance(wip, list) else (
-                        wip.get('date') or wip.get('data') or []
-                    )
-                    if isinstance(steps, list) and steps:
-                        raw['production_steps'] = steps
+                    stages, _raw_wip = client.get_pcb_wip(order_uuid)
+                    if isinstance(stages, list) and stages:
+                        raw['production_steps'] = stages
                         order.raw_data = raw
                         order.save(update_fields=['raw_data', 'updated_at'])
                         self.stdout.write(
-                            f'    {order.jlc_order_id}: {len(steps)} WIP step(s) saved'
+                            f'    {order.jlc_order_id}: {len(stages)} WIP step(s) saved'
                         )
                         break
                 except JLCAPIError as e:
