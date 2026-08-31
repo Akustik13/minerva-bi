@@ -567,10 +567,20 @@ class JLCOrderAdmin(admin.ModelAdmin):
             debug = {
                 'root_keys': list(raw.keys()) if isinstance(raw, dict) else str(type(raw)),
                 'order_item_count': len(raw.get('orderItem', [])) if isinstance(raw, dict) else 0,
-                'order_item_keys': [
-                    {'orderType': it.get('orderType'),
-                     'pcbItem_keys': list(it.get('pcbItem', {}).keys()),
-                     'item_keys': list(it.keys())}
+                'order_item_details': [
+                    {
+                        'orderType': it.get('orderType'),
+                        'item_keys': list(it.keys()),
+                        'pcbItem_url_fields': {
+                            k: v for k, v in it.get('pcbItem', {}).items()
+                            if 'url' in k.lower() or 'file' in k.lower() or 'path' in k.lower()
+                        },
+                        'smtItem_keys': list((it.get('smtItem') or {}).keys()),
+                        'smtItem_url_fields': {
+                            k: v for k, v in (it.get('smtItem') or {}).items()
+                            if 'url' in k.lower() or 'file' in k.lower() or 'path' in k.lower()
+                        },
+                    }
                     for it in (raw.get('orderItem', []) if isinstance(raw, dict) else [])
                 ],
             }
