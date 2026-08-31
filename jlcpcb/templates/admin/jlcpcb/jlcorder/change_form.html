@@ -282,7 +282,7 @@
 {% if gerber_file_url or gerber_url_refresh %}
 <div class="jlc-detail-panel module" style="margin-bottom:16px">
   <div class="module-title">📦 Gerber файл</div>
-  <div style="padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <div id="gerber-dl-row" style="padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
     {% if gerber_file_url %}
     <a id="gerber-dl-link" href="{{ gerber_file_url }}" target="_blank"
        style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;
@@ -292,8 +292,8 @@
     </a>
     <span style="font-size:11px;color:var(--body-quiet-color,#888)">Посилання тимчасове (~1-4 год)</span>
     {% else %}
-    <span id="gerber-dl-link" style="font-size:12px;color:var(--body-quiet-color,#888)">
-      Посилання застаріло або відсутнє
+    <span id="gerber-status-msg" style="font-size:12px;color:var(--body-quiet-color,#888)">
+      Посилання застаріло — натисніть «🔄 Оновити посилання»
     </span>
     {% endif %}
     {% if gerber_url_refresh %}
@@ -317,15 +317,25 @@ function gerberUrlRefresh() {
   .then(data => {
     if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити посилання'; }
     if (!data.ok) { alert('❌ ' + data.error); return; }
-    const link = document.getElementById('gerber-dl-link');
+    // Update or create the download link dynamically
+    let link = document.getElementById('gerber-dl-link');
+    const row  = document.getElementById('gerber-dl-row');
+    if (!link && row) {
+      // Remove stale message
+      const msg = document.getElementById('gerber-status-msg');
+      if (msg) msg.remove();
+      // Create fresh <a> element
+      link = document.createElement('a');
+      link.id = 'gerber-dl-link';
+      link.target = '_blank';
+      link.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:6px 14px;' +
+        'background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);' +
+        'border-radius:5px;font-size:13px;font-weight:600;text-decoration:none';
+      row.insertBefore(link, btn);
+    }
     if (link) {
       link.href = data.url;
       link.textContent = '⬇ Завантажити Gerber ZIP';
-      link.style.background = 'var(--button-bg,#79aec8)';
-      link.style.color = 'var(--button-fg,#fff)';
-      link.style.padding = '6px 14px';
-      link.style.borderRadius = '5px';
-      link.style.fontWeight = '600';
     }
   })
   .catch(e => {
@@ -353,21 +363,27 @@ function gerberUrlRefresh() {
     </button>
   </div>
   <div class="jlc-detail-inner">
-    {# Manual orderUUID input for website-placed orders #}
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
-      <input id="wip-uuid-input" type="text"
-        placeholder="orderUUID (з URL 'view progress' на сайті JLCPCB)"
-        value="{{ wip_uuid_source|yesno:',' }}"
-        style="flex:1;min-width:220px;font-size:12px;padding:4px 8px;
-               background:var(--darkened-bg,#f8f8f8);border:1px solid var(--border-color,#ccc);
-               border-radius:4px;color:var(--body-fg,#333);font-family:monospace">
-      <button type="button" onclick="wipSaveUuid()"
-        style="font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap;
-               background:var(--darkened-bg,#f0f0f0);color:var(--body-fg,#333);
-               border:1px solid var(--border-color,#ccc);border-radius:4px">
-        💾 Зберегти UUID
-      </button>
-    </div>
+    {# Manual orderUUID input — collapsed by default if no UUID known #}
+    <details {% if wip_uuid_source %}open{% endif %} style="margin-bottom:10px">
+      <summary style="font-size:11px;color:var(--body-quiet-color,#888);cursor:pointer;user-select:none">
+        🔑 Ввести orderId вручну
+        {% if wip_uuid_source %}<code style="margin-left:6px;font-size:10px">{{ wip_uuid_source }}</code>{% endif %}
+      </summary>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+        <input id="wip-uuid-input" type="text"
+          placeholder="orderId (внутрішній UUID від JLCPCB)"
+          value="{{ wip_uuid_source|yesno:',' }}"
+          style="flex:1;min-width:220px;font-size:12px;padding:4px 8px;
+                 background:var(--darkened-bg,#f8f8f8);border:1px solid var(--border-color,#ccc);
+                 border-radius:4px;color:var(--body-fg,#333);font-family:monospace">
+        <button type="button" onclick="wipSaveUuid()"
+          style="font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap;
+                 background:var(--darkened-bg,#f0f0f0);color:var(--body-fg,#333);
+                 border:1px solid var(--border-color,#ccc);border-radius:4px">
+          💾 Зберегти UUID
+        </button>
+      </div>
+    </details>
     <div id="wip-content">
       {% if production_steps %}
       <div style="font-size:11px;color:var(--body-quiet-color,#888);margin-bottom:6px">
@@ -387,8 +403,10 @@ function gerberUrlRefresh() {
       </div>
       {% else %}
       <div id="wip-empty" style="font-size:12px;color:var(--body-quiet-color,#888);padding:8px 0">
-        Вставте orderUUID вище або натисніть «🔄 Оновити WIP».
-        <br><small>Знайти UUID: сайт JLCPCB → замовлення → "view progress" → скопіюйте URL</small>
+        ℹ️ Хід виробництва недоступний для цього замовлення.<br>
+        <small>JLCPCB Open API надає WIP лише для замовлень створених через API.
+        Для замовлень зроблених на сайті — <code>orderId</code> відсутній у публічному API.
+        Якщо у вас є orderId (внутрішній UUID) — вставте вище.</small>
       </div>
       {% endif %}
     </div>
