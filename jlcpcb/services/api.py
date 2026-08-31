@@ -588,6 +588,63 @@ class JLCAPIClient:
 
         return stages, raw_data
 
+    def get_order_files(self, batch_num: str) -> list:
+        """
+        Fetch fresh order detail and extract all downloadable file URLs.
+        Returns list of dicts: [{name, url, field}] sorted by priority.
+        Pre-signed URLs from JLCPCB expire in ~1-4h after the API call.
+        """
+        # Human-readable labels for known pcbItem / orderItem URL fields
+        _LABELS = {
+            'orderFileUrl':      'Gerber ZIP',
+            'bomFileUrl':        'BOM файл',
+            'cplFileUrl':        'CPL / Pick & Place',
+            'smtFileUrl':        'SMT файл',
+            'sldFileUrl':        'SLD файл',
+            'gerberFileUrl':     'Gerber ZIP',
+            'pcbFileUrl':        'PCB файл',
+            'productionFileUrl': 'Виробничий файл',
+            'assemblyFileUrl':   'Складальний файл',
+            'configFileUrl':     'Конфігурація',
+            'reportFileUrl':     'Звіт',
+            'testFileUrl':       'Тест-файл',
+        }
+        raw = self.get_pcb_order(batch_num)
+        seen_urls: set = set()
+        files: list = []
+
+        def _add(field: str, url, source_label: str = '') -> None:
+            if not isinstance(url, str) or not url.startswith('http'):
+                return
+            if url in seen_urls:
+                return
+            seen_urls.add(url)
+            label = _LABELS.get(field) or field
+            if source_label:
+                label = f'{label} ({source_label})'
+            files.append({'name': label, 'url': url, 'field': field})
+
+        # Scan orderItem → pcbItem and top-level fields
+        for item in (raw.get('orderItem') or []):
+            order_type = item.get('orderType', '')
+            src = f'тип {order_type}' if order_type != '' else ''
+            pcb = item.get('pcbItem') or {}
+            # Scan all *Url fields in pcbItem
+            for k, v in pcb.items():
+                if k.endswith(('Url', 'URL', 'url')) and isinstance(v, str) and v.startswith('http'):
+                    _add(k, v, src)
+            # Also scan top-level item fields
+            for k, v in item.items():
+                if k.endswith(('Url', 'URL', 'url')) and isinstance(v, str) and v.startswith('http'):
+                    _add(k, v, src)
+
+        # Scan root-level of raw response too
+        for k, v in raw.items():
+            if k.endswith(('Url', 'URL', 'url')) and isinstance(v, str) and v.startswith('http'):
+                _add(k, v)
+
+        return files
+
     # ── Gerber / ordering workflow ────────────────────────────────────────────
 
     def upload_gerber(self, file_path: str, file_name: Optional[str] = None) -> str:

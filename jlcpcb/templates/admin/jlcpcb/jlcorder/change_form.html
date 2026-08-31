@@ -278,69 +278,58 @@
 </div>
 {% endif %}
 
-{# ── Gerber file download ── #}
-{% if gerber_file_url or gerber_url_refresh %}
+{# ── Order files panel ── #}
+{% if order_files_url %}
 <div class="jlc-detail-panel module" style="margin-bottom:16px">
-  <div class="module-title">📦 Gerber файл</div>
-  <div id="gerber-dl-row" style="padding:10px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-    {% if gerber_file_url %}
-    <a id="gerber-dl-link" href="{{ gerber_file_url }}" target="_blank"
-       style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;
-              background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);
-              border-radius:5px;font-size:13px;font-weight:600;text-decoration:none">
-      ⬇ Завантажити Gerber ZIP
-    </a>
-    <span style="font-size:11px;color:var(--body-quiet-color,#888)">Посилання тимчасове (~1-4 год)</span>
-    {% else %}
-    <span id="gerber-status-msg" style="font-size:12px;color:var(--body-quiet-color,#888)">
-      Посилання застаріло — натисніть «🔄 Оновити посилання»
-    </span>
-    {% endif %}
-    {% if gerber_url_refresh %}
-    <button type="button" id="gerber-url-btn" onclick="gerberUrlRefresh()"
-      style="font-size:11px;padding:4px 12px;cursor:pointer;
-             background:var(--darkened-bg,#f0f0f0);color:var(--body-fg,#333);
-             border:1px solid var(--border-color,#ccc);border-radius:4px;line-height:1.6">
-      🔄 Оновити посилання
+  <div class="module-title">
+    📎 Файли замовлення
+    <button type="button" id="files-refresh-btn" onclick="loadOrderFiles()"
+      style="float:right;font-size:11px;padding:2px 10px;cursor:pointer;
+             background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);
+             border:none;border-radius:4px;line-height:1.6">
+      🔄 Перевірити файли
     </button>
-    {% endif %}
+  </div>
+  <div id="files-content" style="padding:10px 16px;min-height:36px">
+    <span style="font-size:12px;color:var(--body-quiet-color,#888)">
+      Натисніть «🔄 Перевірити файли» — API поверне свіжі посилання для завантаження
+    </span>
   </div>
 </div>
 <script>
-function gerberUrlRefresh() {
-  const btn = document.getElementById('gerber-url-btn');
+function loadOrderFiles() {
+  const btn     = document.getElementById('files-refresh-btn');
+  const content = document.getElementById('files-content');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ …'; }
-  fetch('{{ gerber_url_refresh }}', {
-    method: 'POST', headers: {'X-CSRFToken': '{{ csrf_token }}'},
+
+  fetch('{{ order_files_url }}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token }}'},
   })
   .then(r => r.json())
   .then(data => {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити посилання'; }
-    if (!data.ok) { alert('❌ ' + data.error); return; }
-    // Update or create the download link dynamically
-    let link = document.getElementById('gerber-dl-link');
-    const row  = document.getElementById('gerber-dl-row');
-    if (!link && row) {
-      // Remove stale message
-      const msg = document.getElementById('gerber-status-msg');
-      if (msg) msg.remove();
-      // Create fresh <a> element
-      link = document.createElement('a');
-      link.id = 'gerber-dl-link';
-      link.target = '_blank';
-      link.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:6px 14px;' +
-        'background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);' +
-        'border-radius:5px;font-size:13px;font-weight:600;text-decoration:none';
-      row.insertBefore(link, btn);
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Перевірити файли'; }
+    if (!data.ok) {
+      content.innerHTML = '<span style="color:var(--err,#c62828);font-size:12px">❌ ' + data.error + '</span>';
+      return;
     }
-    if (link) {
-      link.href = data.url;
-      link.textContent = '⬇ Завантажити Gerber ZIP';
+    if (!data.files || data.files.length === 0) {
+      content.innerHTML = '<span style="font-size:12px;color:var(--body-quiet-color,#888)">⚠️ Файли не знайдено у відповіді API. Можливо замовлення ще обробляється.</span>';
+      return;
     }
+    const btnStyle = 'display:inline-flex;align-items:center;gap:5px;padding:6px 14px;' +
+      'background:var(--button-bg,#79aec8);color:var(--button-fg,#fff);' +
+      'border-radius:5px;font-size:12px;font-weight:600;text-decoration:none;margin:3px 4px 3px 0';
+    let html = '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+    data.files.forEach(f => {
+      html += '<a href="' + f.url + '" target="_blank" style="' + btnStyle + '">⬇ ' + f.name + '</a>';
+    });
+    html += '</div><p style="margin:6px 0 0;font-size:10px;color:var(--body-quiet-color,#888)">⏱ Посилання тимчасові (~1-4 год після запиту). Знайдено файлів: ' + data.count + '</p>';
+    content.innerHTML = html;
   })
   .catch(e => {
-    if (btn) { btn.disabled = false; btn.textContent = '🔄 Оновити посилання'; }
-    alert('❌ ' + e);
+    if (btn) { btn.disabled = false; btn.textContent = '🔄 Перевірити файли'; }
+    content.innerHTML = '<span style="color:var(--err,#c62828);font-size:12px">❌ ' + e + '</span>';
   });
 }
 </script>

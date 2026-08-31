@@ -279,6 +279,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('<int:pk>/gerber-url/',
                  self.admin_site.admin_view(self.gerber_url_refresh_view),
                  name='jlcpcb_jlcorder_gerber_url'),
+            path('<int:pk>/order-files/',
+                 self.admin_site.admin_view(self.order_files_view),
+                 name='jlcpcb_jlcorder_order_files'),
             path('run-sync/',
                  self.admin_site.admin_view(self.run_sync_view),
                  name='jlcpcb_jlcorder_run_sync'),
@@ -546,6 +549,24 @@ class JLCOrderAdmin(admin.ModelAdmin):
         except JLCAPIError as e:
             return JsonResponse({'ok': False, 'error': str(e)})
         except Exception as e:
+            return JsonResponse({'ok': False, 'error': f'Помилка: {e}'})
+
+    def order_files_view(self, request, pk):
+        """Fetch fresh order files list from JLCPCB API and return as JSON."""
+        from django.http import JsonResponse
+        order = get_object_or_404(JLCOrder, pk=pk)
+        batch = order.jlc_order_number or order.jlc_order_id
+        if not batch:
+            return JsonResponse({'ok': False, 'error': 'Немає номера замовлення'})
+        from .services.api import JLCAPIClient, JLCAPIError
+        try:
+            client = JLCAPIClient.from_config()
+            files  = client.get_order_files(batch)
+            return JsonResponse({'ok': True, 'files': files, 'count': len(files)})
+        except JLCAPIError as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+        except Exception as e:
+            logger.error('order_files_view pk=%s: %s', pk, e, exc_info=True)
             return JsonResponse({'ok': False, 'error': f'Помилка: {e}'})
 
     def run_sync_view(self, request):
@@ -1193,6 +1214,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
             # Gerber file download URL refresh
             extra['gerber_url_refresh'] = reverse('admin:jlcpcb_jlcorder_gerber_url', args=[obj.pk])
+
+            # Order files list (AJAX — fetches fresh pre-signed URLs)
+            extra['order_files_url'] = reverse('admin:jlcpcb_jlcorder_order_files', args=[obj.pk])
 
         return super().change_view(request, object_id, form_url, extra_context=extra)
 
