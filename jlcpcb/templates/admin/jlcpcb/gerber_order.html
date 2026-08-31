@@ -1017,6 +1017,19 @@ let gGerberBottom = '';
 const ANALYZE_URL = '{{ analyze_url }}';
 const CREATE_URL  = '{{ create_url }}';
 
+/* Known JLCPCB API error codes → user-friendly hints */
+const API_ERROR_HINTS = {
+  2108: 'Your Gerber file appears to contain gold finger (edge connector) pads. Please set Gold Fingers → Yes and Surface Finish → ENIG, then re-analyze.',
+  2603: 'Impedance control conflict. If your design does not need controlled impedance, make sure Impedance Control is set to No.',
+  2500: 'File session expired (fileKey not found). Please re-upload your Gerber file and analyze again.',
+  2501: 'Gerber analysis not ready yet. Wait a moment and try again.',
+  2600: 'Via hole size error. Check Min Via Hole Size setting matches your design.',
+  2601: 'Copper weight not supported for selected layer count or thickness.',
+  2602: 'Surface finish not available for this board configuration.',
+  2700: 'Board dimensions are outside the allowed range for the selected options.',
+  2701: 'Layer count not supported for the selected board configuration.',
+};
+
 /* ── Prefill from reorder ───────────────────────────────────────────────── */
 function applyPrefill(params) {
   const mappings = {
@@ -1234,7 +1247,10 @@ async function doAnalyze() {
       setStatus('analyze', '', '');
       showResult(data);
     } else {
-      setStatus('analyze', '❌ ' + data.error, 'err');
+      const msg  = data.error || 'Unknown error';
+      const code = parseInt((msg.match(/\b(\d{4})\b/) || [])[1]);
+      const hint = API_ERROR_HINTS[code] ? `\n💡 ${API_ERROR_HINTS[code]}` : '';
+      setStatus('analyze', `❌ ${msg}${hint ? '<br><span style="font-size:11px;color:var(--text-dim)">' + hint.slice(2) + '</span>' : ''}`, 'err');
       btn.disabled = false;
     }
   } catch(e) {

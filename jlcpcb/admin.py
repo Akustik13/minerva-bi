@@ -531,31 +531,33 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 'surfaceFinish':   int(request.POST.get('surface_finish', 1)),
                 'copperWeight':    int(request.POST.get('copper_weight', 1)),
                 'flyingProbeTest': int(request.POST.get('flying_probe_test', 2)),
-                'viaCovering':     int(request.POST.get('via_covering', 0)),
             }
-            # Optional params — only include when explicitly non-default
-            # to avoid JLCPCB validation errors (e.g. 2603 impedance error)
-            _opt = int(request.POST.get('base_material', 0))
-            if _opt:
-                pcb_param['baseMaterial'] = _opt
-            _opt = int(request.POST.get('silkscreen_color', 0))
-            if _opt:
-                pcb_param['silkscreenColor'] = _opt
-            _opt = int(request.POST.get('different_design', 1))
-            if _opt and _opt != 1:
-                pcb_param['differentDesign'] = _opt
-            _opt = int(request.POST.get('gold_finger', 0))
-            if _opt:
-                pcb_param['goldFinger'] = _opt
-            _opt = int(request.POST.get('board_outline_tolerance', 0))
-            if _opt:
-                pcb_param['boardOutlineTolerance'] = _opt
-            _opt = int(request.POST.get('impedance_flag', 0))
-            if _opt:
-                pcb_param['impedanceFlag'] = _opt
-            _opt = int(request.POST.get('castellated_holes', 0))
-            if _opt:
-                pcb_param['castellatedHoles'] = _opt
+            # Optional params — only include when explicitly non-default.
+            # Sending default values (0) for optional fields triggers JLCPCB
+            # validation errors (2603=impedance, 2108=gold_finger, etc.)
+            def _opt_int(field, default=0, skip_val=None):
+                v = int(request.POST.get(field, default))
+                if v == default or (skip_val is not None and v == skip_val):
+                    return None
+                return v
+
+            for api_key, field in [
+                ('viaCovering',          'via_covering'),
+                ('baseMaterial',         'base_material'),
+                ('silkscreenColor',      'silkscreen_color'),
+                ('goldFinger',           'gold_finger'),
+                ('boardOutlineTolerance','board_outline_tolerance'),
+                ('impedanceFlag',        'impedance_flag'),
+                ('castellatedHoles',     'castellated_holes'),
+            ]:
+                v = _opt_int(field)
+                if v is not None:
+                    pcb_param[api_key] = v
+
+            # differentDesign: default is 1, only send when > 1
+            _dd = int(request.POST.get('different_design', 1))
+            if _dd > 1:
+                pcb_param['differentDesign'] = _dd
             # Inner copper only meaningful for multilayer
             if layer > 2:
                 pcb_param['innerCopperWeight'] = int(request.POST.get('inner_copper_weight', 1))
