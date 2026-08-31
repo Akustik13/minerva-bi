@@ -167,18 +167,9 @@ class Command(BaseCommand):
                 self.stdout.write(f'  {batch}: no pcbItem in response, skip')
                 continue
 
-            # Extract orderUUID from orderFileUrl for WIP progress queries
-            if '_order_uuid' not in raw:
-                order_file_url = pcb.get('orderFileUrl', '')
-                if order_file_url:
-                    try:
-                        import urllib.parse as _up
-                        qs = _up.parse_qs(_up.urlparse(order_file_url).query)
-                        uid = qs.get('uuid', [''])[0]
-                        if uid:
-                            raw['_order_uuid'] = uid
-                    except Exception:
-                        pass
+            # Note: JLCPCB order/detail API does NOT return orderUUID for synced orders.
+            # WIP is only available for orders created via Gerber API (jlc_order_id != jlc_order_number).
+            # orderFileUrl contains a Gerber file UUID — NOT an orderUUID — do not use for WIP.
 
             status_int      = pcb.get('orderStatus')
             new_status      = map_jlc_status(status_int)

@@ -270,6 +270,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('<int:pk>/refresh/',
                  self.admin_site.admin_view(self.refresh_order_view),
                  name='jlcpcb_jlcorder_refresh'),
+            path('<int:pk>/wip-refresh/',
+                 self.admin_site.admin_view(self.wip_refresh_view),
+                 name='jlcpcb_jlcorder_wip_refresh'),
             path('run-sync/',
                  self.admin_site.admin_view(self.run_sync_view),
                  name='jlcpcb_jlcorder_run_sync'),
@@ -396,6 +399,48 @@ class JLCOrderAdmin(admin.ModelAdmin):
         except JLCAPIError as e:
             messages.error(request, f'❌ Помилка API: {e}')
         return redirect('admin:jlcpcb_jlcorder_change', pk)
+
+    def wip_refresh_view(self, request, pk):
+        """Return WIP production progress via AJAX. Stores result in raw_data."""
+        from django.http import JsonResponse
+        order = get_object_or_404(JLCOrder, pk=pk)
+        raw = order.raw_data if isinstance(order.raw_data, dict) else {}
+
+        # Determine orderUUID:
+        # - New API orders: jlc_order_id = orderId (UUID) which differs from jlc_order_number (batchNum)
+        # - Synced orders:  jlc_order_id == jlc_order_number == batchNum — no UUID available
+        order_uuid = (
+            raw.get('order_uuid')
+            or raw.get('orderId')
+            or (order.jlc_order_id
+                if order.jlc_order_id and order.jlc_order_id != order.jlc_order_number
+                else None)
+        )
+        if not order_uuid:
+            return JsonResponse({
+                'ok': False,
+                'no_uuid': True,
+                'error': (
+                    'orderUUID недоступний для цього замовлення. '
+                    'WIP-прогрес доступний лише для замовлень, '
+                    'створених через Gerber API (не синхронізованих).'
+                ),
+            })
+
+        from .services.api import JLCAPIClient, JLCAPIError
+        try:
+            client = JLCAPIClient.from_config()
+            wip_data = client.get_pcb_wip(order_uuid)
+        except JLCAPIError as e:
+            return JsonResponse({'ok': False, 'error': str(e)})
+        except Exception as e:
+            return JsonResponse({'ok': False, 'error': f'Помилка: {e}'})
+
+        stages = wip_data if isinstance(wip_data, list) else []
+        raw['production_steps'] = stages
+        order.raw_data = raw
+        order.save(update_fields=['raw_data'])
+        return JsonResponse({'ok': True, 'stages': stages})
 
     def run_sync_view(self, request):
         from django.core.management import call_command
@@ -677,6 +722,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
             # Augment result with gerber preview images and pcb_param for future use
             stored_raw = dict(result)
             stored_raw['pcb_param']    = pcb_param
+            stored_raw['order_uuid']   = order_id  # orderId = orderUUID for WIP queries
             if gerber_top:
                 stored_raw['gerber_top'] = gerber_top
             if gerber_bottom:
@@ -969,6 +1015,17 @@ class JLCOrderAdmin(admin.ModelAdmin):
             extra['wip_percent'] = min(
                 round(len(production_steps) / _TOTAL_STEPS * 100), 99
             ) if production_steps else 0
+
+            # WIP refresh button availability
+            _order_uuid = (
+                raw.get('order_uuid')
+                or raw.get('orderId')
+                or (obj.jlc_order_id
+                    if obj.jlc_order_id and obj.jlc_order_id != obj.jlc_order_number
+                    else None)
+            )
+            extra['has_wip_uuid'] = bool(_order_uuid)
+            extra['wip_url'] = reverse('admin:jlcpcb_jlcorder_wip_refresh', args=[obj.pk])
 
         return super().change_view(request, object_id, form_url, extra_context=extra)
 

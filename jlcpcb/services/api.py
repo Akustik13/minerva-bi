@@ -236,7 +236,7 @@ class JLCAPIClient:
     PCB order endpoints (POST, JSON body):
       EP_PCB_CONFIG  GET  /overseas/openapi/pcb/getSteelPriceConfig  ← health check
       EP_PCB_DETAIL  POST /overseas/openapi/pcb/order/detail  {"batchNum":"W202501..."}
-      EP_PCB_WIP     POST /overseas/openapi/pcb/wip/get       {"batchNum":"..."}
+      EP_PCB_WIP     POST /overseas/openapi/pcb/wip/get       {"orderUUID":"..."}  ← orderId from create response
       EP_PCB_AUDIT   POST /overseas/openapi/pcb/audit/get     {"batchNum":"..."}
 
     IMPORTANT: There is no PCB order list endpoint.
