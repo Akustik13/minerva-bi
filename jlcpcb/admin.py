@@ -1,5 +1,6 @@
 """jlcpcb/admin.py — JLCPCB order tracking + product matching admin."""
 import json
+import logging
 from django.contrib import admin
 from django.urls import path, reverse
 from django.shortcuts import redirect, get_object_or_404
@@ -8,6 +9,8 @@ from django.utils.html import format_html
 from django.forms import PasswordInput
 from django.http import JsonResponse
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 from .models import JLCConfig, JLCOrder, JLCProductMapping
 
