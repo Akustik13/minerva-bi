@@ -443,7 +443,24 @@ class JLCOrderAdmin(admin.ModelAdmin):
     def wip_refresh_view(self, request, pk):
         """Return WIP production progress via AJAX. Tries multiple UUID candidates."""
         order = get_object_or_404(JLCOrder, pk=pk)
+        raw_order = order.raw_data if isinstance(order.raw_data, dict) else {}
+
+        # Parse JSON body (may contain manual_uuid or save_uuid)
+        manual_uuid = ''
+        try:
+            body = json.loads(request.body or '{}')
+            manual_uuid = (body.get('manual_uuid') or body.get('save_uuid') or '').strip()
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+        # If save_uuid only — persist and return without calling API
+        if manual_uuid and not request.body or (manual_uuid and 'save_uuid' in (request.body or b'').decode(errors='replace')):
+            pass  # fall through to also call WIP with it
+
+        # If manual UUID given, prepend it to the candidate list
         candidates = self._get_wip_candidates(order)
+        if manual_uuid and manual_uuid not in [c[0] for c in candidates]:
+            candidates.insert(0, (manual_uuid, 'manual'))
 
         if not candidates:
             return JsonResponse({
@@ -453,7 +470,6 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
         from .services.api import JLCAPIClient, JLCAPIError
         client = JLCAPIClient.from_config()
-        last_error = ''
         debug_tries = []
 
         for order_uuid, uuid_source in candidates:
@@ -467,32 +483,33 @@ class JLCOrderAdmin(admin.ModelAdmin):
                     'raw_preview': str(raw_wip)[:300],
                 })
                 if stages:
-                    # Found real data — save and return
-                    raw = order.raw_data if isinstance(order.raw_data, dict) else {}
-                    raw['production_steps'] = stages
-                    raw['order_uuid'] = order_uuid  # save winning UUID for next time
-                    order.raw_data = raw
+                    raw_order['production_steps'] = stages
+                    raw_order['order_uuid'] = order_uuid  # save winning UUID
+                    order.raw_data = raw_order
                     order.save(update_fields=['raw_data'])
                     return JsonResponse({'ok': True, 'stages': stages,
                                          'uuid_source': uuid_source,
                                          'debug_tries': debug_tries})
+                # Save manual UUID even if no stages returned
+                if uuid_source == 'manual' and manual_uuid:
+                    raw_order['order_uuid'] = manual_uuid
+                    order.raw_data = raw_order
+                    order.save(update_fields=['raw_data'])
             except JLCAPIError as e:
-                last_error = str(e)
                 debug_tries.append({'uuid': order_uuid, 'source': uuid_source,
-                                    'error': last_error})
-                logger.warning('WIP %s failed: %s', uuid_source, last_error)
+                                    'error': str(e)})
+                logger.warning('WIP %s failed: %s', uuid_source, e)
             except Exception as e:
-                last_error = str(e)
                 debug_tries.append({'uuid': order_uuid, 'source': uuid_source,
-                                    'error': last_error})
+                                    'error': str(e)})
 
-        # All candidates tried — return debug info so user can diagnose
         return JsonResponse({
             'ok': False,
             'no_data': True,
             'error': (
-                'JLCPCB WIP API не повернув даних для жодного ідентифікатора. '
-                'Натисніть "view progress" на сайті JLCPCB і скопіюйте URL сторінки.'
+                'JLCPCB WIP API не повернув даних. '
+                'Знайдіть orderId: сайт JLCPCB → замовлення → "view progress" → '
+                'скопіюйте URL → вставте у поле вище.'
             ),
             'debug_tries': debug_tries,
         })

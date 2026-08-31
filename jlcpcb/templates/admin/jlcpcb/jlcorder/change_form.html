@@ -353,6 +353,21 @@ function gerberUrlRefresh() {
     </button>
   </div>
   <div class="jlc-detail-inner">
+    {# Manual orderUUID input for website-placed orders #}
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <input id="wip-uuid-input" type="text"
+        placeholder="orderUUID (з URL 'view progress' на сайті JLCPCB)"
+        value="{{ wip_uuid_source|yesno:',' }}"
+        style="flex:1;min-width:220px;font-size:12px;padding:4px 8px;
+               background:var(--darkened-bg,#f8f8f8);border:1px solid var(--border-color,#ccc);
+               border-radius:4px;color:var(--body-fg,#333);font-family:monospace">
+      <button type="button" onclick="wipSaveUuid()"
+        style="font-size:11px;padding:4px 10px;cursor:pointer;white-space:nowrap;
+               background:var(--darkened-bg,#f0f0f0);color:var(--body-fg,#333);
+               border:1px solid var(--border-color,#ccc);border-radius:4px">
+        💾 Зберегти UUID
+      </button>
+    </div>
     <div id="wip-content">
       {% if production_steps %}
       <div style="font-size:11px;color:var(--body-quiet-color,#888);margin-bottom:6px">
@@ -372,7 +387,8 @@ function gerberUrlRefresh() {
       </div>
       {% else %}
       <div id="wip-empty" style="font-size:12px;color:var(--body-quiet-color,#888);padding:8px 0">
-        Натисніть «🔄 Оновити» щоб отримати поточний стан виробництва з JLCPCB.
+        Вставте orderUUID вище або натисніть «🔄 Оновити WIP».
+        <br><small>Знайти UUID: сайт JLCPCB → замовлення → "view progress" → скопіюйте URL</small>
       </div>
       {% endif %}
     </div>
@@ -383,12 +399,34 @@ function gerberUrlRefresh() {
 .jlc-wip-step.current .wip-dot { color: #e65100; }
 </style>
 <script>
+function wipSaveUuid() {
+  const input = document.getElementById('wip-uuid-input');
+  const uuid = (input ? input.value : '').trim();
+  if (!uuid) { alert('Введіть orderUUID'); return; }
+  fetch('{{ wip_url }}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+    body: JSON.stringify({save_uuid: uuid}),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok || data.uuid_saved) {
+      alert('✅ UUID збережено. Натисніть «🔄 Оновити WIP».');
+    } else {
+      alert('Збережено локально. Натисніть «🔄 Оновити WIP».');
+    }
+  }).catch(() => alert('Помилка збереження'));
+}
+
 function wipRefresh() {
   const btn = document.getElementById('wip-refresh-btn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ …'; }
+  const manualUuid = (document.getElementById('wip-uuid-input') || {}).value || '';
+  const body = manualUuid.trim() ? {manual_uuid: manualUuid.trim()} : {};
   fetch('{{ wip_url }}', {
     method: 'POST',
-    headers: {'X-CSRFToken': '{{ csrf_token }}'},
+    headers: {'X-CSRFToken': '{{ csrf_token }}', 'Content-Type': 'application/json'},
+    body: JSON.stringify(body),
   })
   .then(r => r.json())
   .then(data => {
