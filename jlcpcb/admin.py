@@ -562,7 +562,19 @@ class JLCOrderAdmin(admin.ModelAdmin):
         try:
             client = JLCAPIClient.from_config()
             files  = client.get_order_files(batch)
-            return JsonResponse({'ok': True, 'files': files, 'count': len(files)})
+            # Debug: collect all top-level field names + orderItem structure
+            raw = client.get_pcb_order(batch)
+            debug = {
+                'root_keys': list(raw.keys()) if isinstance(raw, dict) else str(type(raw)),
+                'order_item_count': len(raw.get('orderItem', [])) if isinstance(raw, dict) else 0,
+                'order_item_keys': [
+                    {'orderType': it.get('orderType'),
+                     'pcbItem_keys': list(it.get('pcbItem', {}).keys()),
+                     'item_keys': list(it.keys())}
+                    for it in (raw.get('orderItem', []) if isinstance(raw, dict) else [])
+                ],
+            }
+            return JsonResponse({'ok': True, 'files': files, 'count': len(files), 'debug': debug})
         except JLCAPIError as e:
             return JsonResponse({'ok': False, 'error': str(e)})
         except Exception as e:
