@@ -298,69 +298,35 @@ def digikey_ship_order(request, order_pk):
             msg.error(request, "Р’РєР°Р¶С–С‚СЊ С‚СЂРµРє-РЅРѕРјРµСЂ РІС–РґРїСЂР°РІР»РµРЅРЅСЏ.")
         else:
             try:
-                # ── STEP 1: AUTO-GENERATE EU INVOICE (before ship API call) ──────
-                if config.auto_invoice_eu and is_eu_post and not order.eu_invoice_number:
-                    try:
-                        import re as _re, pathlib as _pl
-                        from django.conf import settings as _s
-                        from datetime import date as _date
-                        from sales.eu_invoice_pdf import (
-                            generate_eu_invoice as _gen_eu,
-                            get_next_invoice_number as _eu_next,
-                        )
-
-                        # Determine invoice number: use form field if valid int, else auto
-                        _digits = _re.sub(r"\D", "", invoice or "")
-                        _eu_num = int(_digits) if _digits else _eu_next()
-
-                        # Fetch DigiKey order data for buyer info and amounts
-                        _dk_data = None
+                # ── STEP 1: AUTO-GENERATE INVOICE via InvoiceService (before ship API) ──
+                # Uses same /invoices/ system (DOCX → PDF, Invoice model record)
+                if config.auto_invoice_eu and is_eu_post:
+                    from django.db.models import Q as _Q
+                    from shipping.models import Invoice as _Inv
+                    _existing_inv = (
+                        _Inv.objects.filter(
+                            _Q(sales_order=order) | _Q(digikey_order_no=order.order_number)
+                        ).first()
+                    )
+                    if not _existing_inv:
                         try:
-                            _dk_data = fetch_marketplace_order_data(config, order.order_number)
-                        except Exception:
-                            pass
-
-                        # Generate PDF (same algorithm as Invoice button)
-                        _pdf = _gen_eu(
-                            order,
-                            invoice_number=_eu_num,
-                            invoice_date=_date.today(),
-                            dk_order_data=_dk_data,
-                        )
-
-                        # Save PDF alongside order documents
-                        _fname = f"EU_Invoice_{_eu_num}_{order.order_number}.pdf"
-                        _dir = _pl.Path(_s.MEDIA_ROOT) / "orders" / order.source / order.order_number
-                        _dir.mkdir(parents=True, exist_ok=True)
-                        (_dir / _fname).write_bytes(_pdf)
-
-                        # Persist invoice number on order
-                        order.eu_invoice_number = _eu_num
-                        order.eu_invoice_date   = _date.today()
-                        order.save(update_fields=["eu_invoice_number", "eu_invoice_date"])
-
-                        # Feed into ship API call: invoice number + auto net amount
-                        invoice = str(_eu_num)
-                        if net_vat is None and _dk_data:
-                            _sub = sum(
-                                float(it.get("totalPrice") or (
-                                    float(it.get("unitPrice") or 0) * float(it.get("quantity") or 1)
-                                ))
-                                for it in (_dk_data.get("orderDetails") or [])
+                            from shipping.services.invoice_service import InvoiceService
+                            _auto_inv = InvoiceService.generate_from_digikey_order(
+                                order.order_number, request.user,
+                                invoice_number=invoice or None,
                             )
-                            _disc = abs(float(
-                                _dk_data.get("adjustedTotalDiscountFee") or
-                                _dk_data.get("totalDiscountFee") or 0
-                            ))
-                            _ship = float(
-                                _dk_data.get("adjustedShippingPrice") or
-                                _dk_data.get("shippingPrice") or 0
-                            )
-                            net_vat = round(_sub - _disc + _ship, 2)
-
-                        msg.success(request, f"🧾 EU Invoice #{_eu_num} автоматично згенеровано.")
-                    except Exception as _inv_err:
-                        msg.warning(request, f"Авто-генерація EU інвойсу не вдалась: {_inv_err}")
+                            # Feed invoice number and subtotal into ship API call
+                            invoice = _auto_inv.invoice_number
+                            if net_vat is None:
+                                net_vat = float(_auto_inv.subtotal or 0) or None
+                            msg.success(request, f"🧾 Інвойс #{invoice} згенеровано автоматично.")
+                        except Exception as _inv_err:
+                            msg.warning(request, f"Авто-генерація інвойсу не вдалась: {_inv_err}")
+                    else:
+                        # Existing invoice — still fill fields for ship API
+                        invoice = invoice or _existing_inv.invoice_number
+                        if net_vat is None:
+                            net_vat = float(_existing_inv.subtotal or 0) or None
 
                 # ── STEP 2: Optional VAT invoice file upload before shipping ──────
                 vat_file_id = None
