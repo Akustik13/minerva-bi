@@ -3669,8 +3669,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         )
 
         from datetime import date as _date, timedelta as _td
+        from django.utils import timezone as _tz
+        _now       = _tz.localtime()
         _today     = _date.today()
         _tomorrow  = _today + _td(days=1)
+        # UPS cutoff: same-day pickup only before 15:00 local time
+        _pickup_min = _today if _now.hour < 15 else _tomorrow
         # Skip to Monday if tomorrow is weekend
         if _tomorrow.weekday() == 5:   # Saturday → Monday
             _tomorrow += _td(days=2)
@@ -3692,7 +3696,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                      (shipper.get('country') or 'DE').upper()),
             'confirm_url':          reverse('admin:shipping_shipment_ups_confirm', args=[shipment.pk]),
             'back_url':             back_url,
-            'pickup_min_date':      _today.strftime('%Y-%m-%d'),
+            'pickup_min_date':      _pickup_min.strftime('%Y-%m-%d'),
             'pickup_default_date':  _tomorrow.strftime('%Y-%m-%d'),
             # Rate price from rates page (may be empty if navigated directly)
             'rate_price':           rate_price,
@@ -4063,15 +4067,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
     def ups_pickup_standalone_view(self, request, shipment_id):
         """GET — форма замовлення забору UPS; POST — викликає schedule_pickup()."""
         from datetime import date, timedelta
+        from django.utils import timezone as _tz
         from .ups_client import UPSClient, UPSError
 
         shipment = get_object_or_404(Shipment, pk=shipment_id)
         back_url = reverse('admin:shipping_shipment_change', args=[shipment.pk])
 
         # Наступний робочий день як default
-        tomorrow = date.today() + timedelta(days=1)
+        today    = date.today()
+        tomorrow = today + timedelta(days=1)
         while tomorrow.weekday() >= 5:
             tomorrow += timedelta(days=1)
+        # UPS cutoff: same-day pickup only before 15:00 local time
+        now      = _tz.localtime()
+        min_date = today if now.hour < 15 else tomorrow
 
         if request.method == 'POST':
             pickup_date  = request.POST.get('pickup_date', '').strip()
@@ -4130,7 +4139,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'title':          f'🚗 Замовити забір UPS — відправлення #{shipment.pk}',
             'shipment':       shipment,
             'default_date':   tomorrow.strftime('%Y-%m-%d'),
-            'min_date':       date.today().strftime('%Y-%m-%d'),
+            'min_date':       min_date.strftime('%Y-%m-%d'),
             'back_url':       back_url,
         })
 
