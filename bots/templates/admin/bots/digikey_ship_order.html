@@ -268,21 +268,18 @@
     </div>
     {% endif %}
 
-    {% if is_eu %}
-    <!-- Invoice number (EU only) -->
+    <!-- Invoice number -->
     <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
         Номер рахунку постачальника (Supplier Invoice Number)
-        <span style="font-size:10px;background:rgba(33,150,243,.15);color:#42a5f5;
-                     padding:1px 6px;border-radius:3px;margin-left:4px">🇪🇺 ЄС</span>
       </label>
       <input type="text" name="invoice_number" id="inv-num-field"
-             value="{% if existing_invoice %}{{ existing_invoice.invoice_number }}{% elif inv_info %}{{ inv_info.suggested }}{% endif %}"
+             value="{% if existing_invoice %}{{ existing_invoice.invoice_number }}{% elif inv_info and is_eu %}{{ inv_info.suggested }}{% endif %}"
              placeholder="INV-2026-001"
              style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
                     border:1px solid {% if existing_invoice %}rgba(76,175,80,.6){% else %}var(--border-strong){% endif %};
                     border-radius:4px;color:var(--text);font-size:13px;box-sizing:border-box">
-      {% if inv_info and not existing_invoice %}
+      {% if is_eu and inv_info and not existing_invoice %}
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
         {% if inv_info.match and inv_info.dk_ok %}✓ Нумерація синхронізована з DigiKey
         {% elif not inv_info.dk_ok %}⚡ DigiKey API недоступний — використовується нумерація системи
@@ -290,7 +287,6 @@
       </div>
       {% endif %}
     </div>
-    {% endif %}
 
     {% if is_eu %}
     <!-- Net VAT invoice amount (EU only) -->

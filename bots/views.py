@@ -293,8 +293,6 @@ def digikey_ship_order(request, order_pk):
         _EU = {"AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR",
                "HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"}
         is_eu_post = (order.addr_country or "").upper() in _EU
-        if not is_eu_post:
-            invoice = None  # never send supplier invoice for non-EU orders
 
         if not tracking:
             msg.error(request, "Р’РєР°Р¶С–С‚СЊ С‚СЂРµРє-РЅРѕРјРµСЂ РІС–РґРїСЂР°РІР»РµРЅРЅСЏ.")
