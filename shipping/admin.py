@@ -1311,6 +1311,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_ups_pickup",
             ),
             path(
+                "<int:shipment_id>/ups-cancel-pickup/",
+                self.admin_site.admin_view(self.ups_cancel_pickup_view),
+                name="shipping_shipment_ups_cancel_pickup",
+            ),
+            path(
                 "<int:shipment_id>/dhl-dry-run/",
                 self.admin_site.admin_view(self.dhl_dry_run_view),
                 name="shipping_shipment_dhl_dry_run",
@@ -3687,7 +3692,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                                      (shipper.get('country') or 'DE').upper()),
             'confirm_url':          reverse('admin:shipping_shipment_ups_confirm', args=[shipment.pk]),
             'back_url':             back_url,
-            'pickup_min_date':      _tomorrow.strftime('%Y-%m-%d'),
+            'pickup_min_date':      _today.strftime('%Y-%m-%d'),
             'pickup_default_date':  _tomorrow.strftime('%Y-%m-%d'),
             # Rate price from rates page (may be empty if navigated directly)
             'rate_price':           rate_price,
@@ -4128,6 +4133,38 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             'min_date':       date.today().strftime('%Y-%m-%d'),
             'back_url':       back_url,
         })
+
+    # ── UPS Cancel Pickup ─────────────────────────────────────────────────────
+
+    def ups_cancel_pickup_view(self, request, shipment_id):
+        """POST — скасувати забір UPS за PRN збереженим в notes."""
+        from .ups_client import UPSClient, UPSError
+        import re as _re
+
+        if request.method != 'POST':
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment_id]))
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        notes = shipment.notes or ''
+        m = _re.search(r'UPS_PICKUP \| PRN:([^\s|]+)', notes)
+        if not m or m.group(1) == '-':
+            messages.error(request, '❌ PRN не знайдено в нотатках відправлення.')
+            return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+        prn = m.group(1)
+        try:
+            client = UPSClient(carrier=shipment.carrier)
+            client.cancel_pickup(prn)
+            # Strip pickup line from notes
+            shipment.notes = _re.sub(
+                r'\nUPS_PICKUP \| PRN:[^\n]+', '', notes
+            ).strip()
+            shipment.save(update_fields=['notes'])
+            messages.success(request, f'✅ Забір UPS (PRN: {prn}) скасовано.')
+        except UPSError as e:
+            messages.error(request, f'❌ UPS Cancel Pickup: {e}')
+
+        return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
 
     # ── FedEx Confirm / Book ──────────────────────────────────────────────────
 

@@ -10,60 +10,64 @@
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   padding: 24px;
-  max-width: 520px;
+  max-width: 540px;
   margin: 0 auto;
 }
-.pk-title {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 6px;
-}
-.pk-sub {
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-bottom: 20px;
-}
-.pk-label {
-  display: block;
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-bottom: 5px;
-  font-weight: 600;
-}
+.pk-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
+.pk-sub   { font-size: 12px; color: var(--text-dim); margin-bottom: 20px; }
+.pk-label { display:block; font-size:12px; color:var(--text-dim); margin-bottom:5px; font-weight:600; }
 .pk-input, .pk-select {
-  width: 100%;
-  padding: 8px 10px;
-  background: var(--bg-input);
-  border: 1px solid var(--border-strong);
-  border-radius: 4px;
-  color: var(--text);
-  font-size: 13px;
-  box-sizing: border-box;
-  margin-bottom: 14px;
+  width: 100%; padding: 8px 10px;
+  background: var(--bg-input); border: 1px solid var(--border-strong);
+  border-radius: 4px; color: var(--text); font-size: 13px;
+  box-sizing: border-box; margin-bottom: 14px;
 }
-.pk-row { display: flex; gap: 12px; }
-.pk-row > div { flex: 1; }
 .pk-info {
-  background: rgba(255,152,0,.08);
-  border: 1px solid rgba(255,152,0,.25);
-  border-radius: 6px;
-  padding: 10px 14px;
-  font-size: 12px;
-  color: var(--text-dim);
-  margin-bottom: 20px;
+  background: rgba(255,152,0,.08); border: 1px solid rgba(255,152,0,.25);
+  border-radius: 6px; padding: 10px 14px; font-size: 12px;
+  color: var(--text-dim); margin-bottom: 20px;
 }
 .pk-info strong { color: var(--text); }
-.pk-btn-row { display: flex; gap: 10px; margin-top: 4px; }
+.pk-btn-row { display:flex; gap:10px; margin-top:4px; }
 .pk-btn {
-  flex: 1; padding: 10px 0; border: none; border-radius: 6px;
-  font-size: 13px; font-weight: 700; cursor: pointer; text-align: center;
-  text-decoration: none; display: block;
+  flex:1; padding:10px 0; border:none; border-radius:6px;
+  font-size:13px; font-weight:700; cursor:pointer; text-align:center;
+  text-decoration:none; display:block;
 }
-.pk-btn-submit { background: #e65100; color: #fff; }
-.pk-btn-back   { background: transparent; color: var(--text-dim);
-                 border: 1px solid var(--border-strong); }
-.pk-btn:hover { opacity: .85; }
+.pk-btn-submit { background:#e65100; color:#fff; }
+.pk-btn-back   { background:transparent; color:var(--text-dim); border:1px solid var(--border-strong); }
+.pk-btn:hover  { opacity:.85; }
+
+/* Dual-range slider (same as ups_confirm) */
+.dr-wrap  { position:relative; height:48px; user-select:none; margin-top:6px; }
+.dr-track { position:absolute; top:50%; left:10px; right:10px; height:6px;
+            background:var(--border-strong); border-radius:3px; transform:translateY(-50%); }
+.dr-fill  { position:absolute; height:100%; background:#1976d2; border-radius:3px; }
+.dr-bubble { position:absolute; top:-24px; transform:translateX(-50%);
+             background:#1976d2; color:#fff; font-size:11px; font-weight:700;
+             padding:2px 6px; border-radius:4px; white-space:nowrap; pointer-events:none; }
+.dr-input { position:absolute; width:100%; left:0; top:50%; transform:translateY(-50%);
+            -webkit-appearance:none; appearance:none; background:transparent;
+            pointer-events:none; height:48px; outline:none; margin:0; }
+.dr-input::-webkit-slider-thumb {
+  -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%;
+  background:#1976d2; cursor:pointer; pointer-events:all;
+  border:2px solid var(--bg-card); box-shadow:0 1px 5px rgba(0,0,0,.35);
+}
+.dr-input::-moz-range-thumb {
+  width:22px; height:22px; border-radius:50%; background:#1976d2;
+  cursor:pointer; pointer-events:all; border:2px solid var(--bg-card);
+  box-shadow:0 1px 5px rgba(0,0,0,.35); border-style:solid;
+}
+.dr-ticks { display:flex; justify-content:space-between;
+            font-size:10px; color:var(--text-dim); margin-top:4px; padding:0 10px; }
+.dr-time-row { display:flex; gap:10px; margin-top:10px; }
+.dr-time-row > div { flex:1; }
+.dr-time-row input[type=time] {
+  width:100%; padding:6px 10px;
+  background:var(--bg-input); border:1px solid var(--border-strong);
+  border-radius:4px; color:var(--text); font-size:13px; box-sizing:border-box;
+}
 </style>
 
 <div class="pk-card">
@@ -89,18 +93,31 @@
     <input type="date" name="pickup_date" class="pk-input"
            value="{{ default_date }}" min="{{ min_date }}" required>
 
-    <div class="pk-row">
+    <label class="pk-label">Часове вікно готовності</label>
+    <div class="dr-wrap">
+      <div class="dr-track"><div class="dr-fill" id="dr-fill"></div></div>
+      <div class="dr-bubble" id="dr-b1">09:00</div>
+      <div class="dr-bubble" id="dr-b2">18:00</div>
+      <input class="dr-input" type="range" id="dr-from" min="0" max="47" value="6"  step="1">
+      <input class="dr-input" type="range" id="dr-to"   min="0" max="47" value="30" step="1">
+    </div>
+    <div class="dr-ticks">
+      <span>08:00</span><span>11:00</span><span>14:00</span><span>17:00</span><span>19:45</span>
+    </div>
+    <div class="dr-time-row">
       <div>
-        <label class="pk-label">Готові з (час)</label>
-        <input type="time" name="ready_time" class="pk-input" value="09:00" required>
+        <label class="pk-label" style="margin-top:8px">Готові з</label>
+        <input type="time" id="inp-ready" value="09:00">
       </div>
       <div>
-        <label class="pk-label">Готові до (час)</label>
-        <input type="time" name="close_time" class="pk-input" value="18:00" required>
+        <label class="pk-label" style="margin-top:8px">Готові до</label>
+        <input type="time" id="inp-close" value="18:00">
       </div>
     </div>
+    <input type="hidden" name="ready_time" id="fld-ready" value="0900">
+    <input type="hidden" name="close_time" id="fld-close" value="1800">
 
-    <label class="pk-label">Місце забору</label>
+    <label class="pk-label" style="margin-top:14px">Місце забору</label>
     <select name="pickup_point" class="pk-select">
       <option value="RECEPTION">Reception / Приймальна</option>
       <option value="FRONT">Front Door / Вхід</option>
@@ -115,4 +132,60 @@
     </div>
   </form>
 </div>
+
+<script>
+(function(){
+  var BASE=480, STEP=15, MAX=47; // 08:00 base, 15-min steps, 47 slots → 19:45
+  function fmt(slot){
+    var m=BASE+slot*STEP;
+    return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+  }
+  function parseTime(hhmm){
+    // "HH:MM" → slot index
+    var parts=hhmm.split(':'); if(parts.length<2) return 0;
+    var mins=parseInt(parts[0])*60+parseInt(parts[1]);
+    return Math.max(0,Math.min(MAX,Math.round((mins-BASE)/STEP)));
+  }
+  var rF=document.getElementById('dr-from');
+  var rT=document.getElementById('dr-to');
+  if(!rF||!rT) return;
+  var fill=document.getElementById('dr-fill');
+  var b1=document.getElementById('dr-b1');
+  var b2=document.getElementById('dr-b2');
+  var iR=document.getElementById('inp-ready');
+  var iC=document.getElementById('inp-close');
+  var fR=document.getElementById('fld-ready');
+  var fC=document.getElementById('fld-close');
+
+  function updSlider(src){
+    var vf=parseInt(rF.value), vt=parseInt(rT.value);
+    if(vf>=vt){
+      if(src===rF){ vf=vt>0?vt-1:0; rF.value=vf; }
+      else         { vt=vf<MAX?vf+1:MAX; rT.value=vt; }
+    }
+    vf=parseInt(rF.value); vt=parseInt(rT.value);
+    var pf=vf/MAX*100, pt=vt/MAX*100;
+    fill.style.left=pf+'%'; fill.style.width=(pt-pf)+'%';
+    var tf=fmt(vf), tt=fmt(vt);
+    b1.textContent=tf; b1.style.left=(vf/MAX*100).toFixed(2)+'%';
+    b2.textContent=tt; b2.style.left=(vt/MAX*100).toFixed(2)+'%';
+    iR.value=tf; iC.value=tt;
+    fR.value=tf.replace(':',''); fC.value=tt.replace(':','');
+    rF.style.zIndex=(vf>MAX-4)?5:3;
+    rT.style.zIndex=(vf>MAX-4)?3:5;
+  }
+
+  function updFromInputs(){
+    rF.value=parseTime(iR.value);
+    rT.value=parseTime(iC.value);
+    updSlider(null);
+  }
+
+  rF.addEventListener('input',function(){ updSlider(rF); });
+  rT.addEventListener('input',function(){ updSlider(rT); });
+  iR.addEventListener('change', updFromInputs);
+  iC.addEventListener('change', updFromInputs);
+  updSlider(null);
+})();
+</script>
 {% endblock %}

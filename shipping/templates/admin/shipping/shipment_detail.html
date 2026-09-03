@@ -475,6 +475,14 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
             <span class="sd-info-val">{{ pickup_info.point_label }}</span>
           </div>
         </div>
+        <form method="post" action="{% url 'admin:shipping_shipment_ups_cancel_pickup' shipment.pk %}" style="margin-top:10px">
+          {% csrf_token %}
+          <button type="submit"
+            onclick="return confirm('Скасувати забір UPS (PRN: {{ pickup_info.prn }})?')"
+            class="sd-btn-dhl-cancel" style="font-size:12px;padding:7px 12px">
+            ❌ {% trans "Скасувати забір UPS" %}
+          </button>
+        </form>
       </div>
       {% endif %}
 
