@@ -470,17 +470,19 @@ document.addEventListener('DOMContentLoaded', function () {
                 border-radius:5px;text-decoration:none;font-size:12px;font-weight:600">
         🚚 {% trans "Відправлення" %}
       </a>
-      {# Склад chip — clickable, loads stock availability via AJAX #}
+      {# Склад chip — clickable, opens stock detail popup #}
       {% if order.affects_stock %}
         <button type="button"
                 class="sv-stock-chip"
                 data-order-pk="{{ order.pk }}"
                 data-order-id="{{ order.pk }}"
                 onclick="event.stopPropagation();svStockChipClick(this)"
-                style="padding:3px 9px;border-radius:5px;font-size:11px;font-weight:600;
-                       background:rgba(46,125,50,.15);color:#4caf50;border:1px solid #2e7d32;
-                       cursor:pointer;white-space:nowrap;font-family:inherit">
-          <span class="sv-stock-txt">✅ {% trans "Склад" %}</span>
+                style="padding:4px 10px;border-radius:6px;font-size:11px;font-weight:600;
+                       background:var(--bg-hover);color:var(--text-dim);
+                       border:1px solid var(--border-strong);
+                       cursor:pointer;white-space:nowrap;font-family:inherit;
+                       display:inline-flex;align-items:center;gap:5px;line-height:1.3">
+          <span class="sv-stock-txt">📦 {% trans "Склад" %}</span>
         </button>
       {% endif %}
       {% endif %}
@@ -1276,46 +1278,99 @@ function svOpenLabel(url) { svLabelAction('ask', url); }
 })();
 {% endif %}
 
-// ── Stock chip: show actual inventory quantity per order ─────────────────────
+// ── Stock chip + column: fill from batch data ─────────────────────────────
 (function() {
   var stockData = {{ sv_order_stock_json|default:"{}"|safe }};
+
+  // ── Chip badge ────────────────────────────────────────────────────────────
   document.querySelectorAll('.sv-stock-chip').forEach(function(chip) {
-    var oid = String(chip.dataset.orderId || '');
+    var oid   = String(chip.dataset.orderId || '');
     var lines = stockData[oid];
     if (!lines || !lines.length) return;
     var allOk = lines.every(function(l) { return l.stock >= l.need; });
-    var txt = chip.querySelector('.sv-stock-txt');
+    var txt   = chip.querySelector('.sv-stock-txt');
     if (!txt) return;
+
     if (lines.length === 1) {
-      var l = lines[0];
-      txt.textContent = (allOk ? '✅' : '⚠️') + ' ' + l.stock + ' шт.';
+      var l     = lines[0];
+      var after = l.stock - l.need;
+      if (l.stock >= l.need) {
+        txt.innerHTML =
+          '<span style="color:var(--ok)">📦</span> '
+          + '<b style="color:var(--ok)">' + l.stock + '</b>'
+          + '<span style="color:var(--text-dim);font-size:10px"> → ' + after + '</span>';
+      } else if (l.stock > 0) {
+        txt.innerHTML =
+          '<span style="color:var(--warn,#ff9800)">⚠️</span> '
+          + '<b style="color:var(--warn,#ff9800)">' + l.stock + '</b>'
+          + '<span style="color:var(--err);font-size:10px"> → ' + after + '</span>';
+      } else {
+        txt.innerHTML =
+          '<span style="color:var(--err)">🚫</span> '
+          + '<b style="color:var(--err)">0</b>'
+          + '<span style="color:var(--err);font-size:10px"> → −' + l.need + '</span>';
+      }
     } else {
-      var covered = lines.filter(function(l) { return l.stock >= l.need; }).length;
-      txt.textContent = (allOk ? '✅' : '⚠️') + ' Склад: ' + covered + '/' + lines.length;
+      // Multiple lines: one pill per line "now→after", separated by ·
+      var parts = lines.map(function(l) {
+        var after = l.stock - l.need;
+        if (l.stock >= l.need) {
+          return '<b style="color:var(--ok)">' + l.stock + '</b>'
+               + '<span style="color:var(--text-dim);font-size:10px">→' + after + '</span>';
+        } else if (l.stock > 0) {
+          return '<b style="color:var(--warn,#ff9800)">' + l.stock + '</b>'
+               + '<span style="color:var(--err);font-size:10px">→' + after + '</span>';
+        } else {
+          return '<b style="color:var(--err)">0</b>'
+               + '<span style="color:var(--err);font-size:10px">→−' + l.need + '</span>';
+        }
+      });
+      var icon = allOk
+        ? '<span style="color:var(--ok)">📦</span> '
+        : '<span style="color:var(--warn,#ff9800)">⚠️</span> ';
+      txt.innerHTML = icon + parts.join('<span style="color:var(--text-dim);margin:0 3px">·</span>');
     }
-    if (!allOk) {
-      chip.style.background = 'rgba(198,40,40,.15)';
-      chip.style.color      = '#ef5350';
-      chip.style.borderColor = '#c62828';
+
+    // Chip border/background
+    if (allOk) {
+      chip.style.borderColor = 'var(--ok)';
+      chip.style.background  = 'rgba(76,175,80,.1)';
+    } else {
+      chip.style.borderColor = 'var(--err)';
+      chip.style.background  = 'rgba(198,40,40,.1)';
     }
   });
-})();
 
-// ── Stock column: fill per-line stock cells from batch data ─────────────────
-(function() {
-  var stockData = {{ sv_order_stock_json|default:"{}"|safe }};
+  // ── Line-items "Склад" column ─────────────────────────────────────────────
   Object.keys(stockData).forEach(function(oid) {
     (stockData[oid] || []).forEach(function(l) {
       var cell = document.querySelector(
         '[data-sv-stock-ord="' + oid + '"][data-sv-stock-pid="' + l.pid + '"]'
       );
       if (!cell) return;
+      var after = l.stock - l.need;
+
       if (l.stock >= l.need) {
-        cell.innerHTML = '<span style="color:var(--text-dim)">' + l.stock + ' шт.</span>';
+        // Sufficient: green current, dimmed remaining
+        cell.innerHTML =
+          '<div style="line-height:1.4;text-align:center">'
+          + '<div style="font-weight:700;color:var(--ok);font-size:13px">' + l.stock + '</div>'
+          + '<div style="font-size:10px;color:var(--text-dim)">↓ ' + after + '</div>'
+          + '</div>';
       } else if (l.stock > 0) {
-        cell.innerHTML = '<span style="color:#ff9800;font-weight:700" title="Потрібно: ' + l.need + '">⚠️ ' + l.stock + '/' + l.need + '</span>';
+        // Partial: orange current, red deficit
+        cell.innerHTML =
+          '<div style="line-height:1.4;text-align:center">'
+          + '<div style="font-weight:700;color:var(--warn,#ff9800);font-size:13px">⚠ ' + l.stock + '</div>'
+          + '<div style="font-size:10px;color:var(--err)">↓ ' + after + '</div>'
+          + '</div>';
       } else {
-        cell.innerHTML = '<span style="color:#ef5350;font-weight:700" title="Потрібно: ' + l.need + '">❌ 0</span>';
+        // Zero stock: all red
+        cell.innerHTML =
+          '<div style="line-height:1.4;text-align:center">'
+          + '<div style="font-weight:700;color:var(--err);font-size:13px">🚫 0</div>'
+          + '<div style="font-size:10px;color:var(--err)">−' + l.need + '</div>'
+          + '</div>';
       }
     });
   });
@@ -1471,9 +1526,11 @@ if (!window._cexDelDocDef) {
       } else {
         icon = '🚫'; color = '#ef5350';
       }
-      var stockTxt = l.status === 'ok'
-        ? icon + ' ' + l.stock + ' {% trans "шт." %}'
-        : icon + ' ' + l.stock + ' / {% trans "треба" %} ' + l.needed;
+      var after    = l.stock - l.needed;
+      var afterTxt = after >= 0
+        ? '<span style="color:var(--ok)">→ ' + after + ' {% trans "залишок" %}</span>'
+        : '<span style="color:var(--err)">→ ' + after + ' {% trans "дефіцит" %}</span>';
+      var stockTxt = icon + ' <b>' + l.stock + '</b> ' + afterTxt;
 
       /* PO info badge (shown for any line with active PO) or cart-add button */
       var cartBtn = '';
