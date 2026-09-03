@@ -1020,7 +1020,7 @@ class UPSClient:
             return {
                 'earliest_ready':  '09:00',
                 'latest_close':    '18:00',
-                'cutoff_time':     '15:00',
+                'cutoff_time':     '16:00',
                 'no_pickup_days':  sorted(no_pickup),
                 'today_available': True,
                 'error':           None if is_auth_err else err_str,

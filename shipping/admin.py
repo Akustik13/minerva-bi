@@ -3674,7 +3674,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         _today     = _date.today()
         _tomorrow  = _today + _td(days=1)
         # UPS cutoff: same-day pickup only before 15:00 local time
-        _pickup_min = _today if _now.hour < 15 else _tomorrow
+        _pickup_min = _today if _now.hour < 16 else _tomorrow
         # Skip to Monday if tomorrow is weekend
         if _tomorrow.weekday() == 5:   # Saturday → Monday
             _tomorrow += _td(days=2)
@@ -4080,7 +4080,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             tomorrow += timedelta(days=1)
         # UPS cutoff: same-day pickup only before 15:00 local time
         now      = _tz.localtime()
-        min_date = today if now.hour < 15 else tomorrow
+        min_date = today if now.hour < 16 else tomorrow
 
         if request.method == 'POST':
             pickup_date  = request.POST.get('pickup_date', '').strip()
