@@ -1306,6 +1306,11 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_ups_void",
             ),
             path(
+                "<int:shipment_id>/ups-pickup/",
+                self.admin_site.admin_view(self.ups_pickup_standalone_view),
+                name="shipping_shipment_ups_pickup",
+            ),
+            path(
                 "<int:shipment_id>/dhl-dry-run/",
                 self.admin_site.admin_view(self.dhl_dry_run_view),
                 name="shipping_shipment_dhl_dry_run",
@@ -2259,6 +2264,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         # ── Кнопки дій залежно від статусу ────────────────────────────────────
         has_dhl   = Carrier.objects.filter(carrier_type="dhl", is_active=True).exists()
         is_jumingo = bool(shipment.carrier and shipment.carrier.carrier_type == "jumingo")
+        is_ups    = bool(shipment.carrier and shipment.carrier.carrier_type == "ups")
         actions = []
         st = shipment.status
 
@@ -2334,6 +2340,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 actions.append({"label": "📡 DHL Трекінг",
                                  "url": reverse("admin:shipping_shipment_dhl_track", args=[shipment.pk]),
                                  "cls": "yellow"})
+
+        # UPS Pickup (Abholung) — для будь-якого статусу де є трекінг
+        if is_ups and shipment.tracking_number and st not in ("draft", "cancelled", "error"):
+            actions.append({
+                "label": "🚗 Замовити забір UPS",
+                "url":   reverse("admin:shipping_shipment_ups_pickup", args=[shipment.pk]),
+                "cls":   "orange",
+            })
 
         # Скасовано / Помилка — повторна відправка (клонування в новий DRAFT)
         if st in ("cancelled", "error"):
@@ -4038,6 +4052,82 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             messages.error(request, f'❌ UPS Void: {e}')
 
         return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+    # ── UPS Pickup standalone (Abholung для вже існуючого відправлення) ────────
+
+    def ups_pickup_standalone_view(self, request, shipment_id):
+        """GET — форма замовлення забору UPS; POST — викликає schedule_pickup()."""
+        from datetime import date, timedelta
+        from .ups_client import UPSClient, UPSError
+
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        back_url = reverse('admin:shipping_shipment_change', args=[shipment.pk])
+
+        # Наступний робочий день як default
+        tomorrow = date.today() + timedelta(days=1)
+        while tomorrow.weekday() >= 5:
+            tomorrow += timedelta(days=1)
+
+        if request.method == 'POST':
+            pickup_date  = request.POST.get('pickup_date', '').strip()
+            ready_time   = (request.POST.get('ready_time', '0900').strip().replace(':', '') or '0900')[:4]
+            close_time   = (request.POST.get('close_time', '1800').strip().replace(':', '') or '1800')[:4]
+            pickup_point = request.POST.get('pickup_point', 'RECEPTION').strip() or 'RECEPTION'
+
+            if not pickup_date:
+                pickup_date = tomorrow.strftime('%Y%m%d')
+            else:
+                pickup_date = pickup_date.replace('-', '')
+
+            try:
+                client  = UPSClient(carrier=shipment.carrier)
+                shipper = self._ups_extract_shipper(shipment)
+                to_addr = self._ups_extract_address(shipment)
+                pkgs    = self._ups_extract_packages(shipment)
+                result  = client.schedule_pickup(
+                    shipper             = shipper,
+                    pickup_date         = pickup_date,
+                    ready_time          = ready_time,
+                    close_time          = close_time,
+                    service_code        = '11',
+                    packages            = pkgs,
+                    destination_country = (to_addr.get('country') or 'DE').upper(),
+                    pickup_point        = pickup_point,
+                    tracking_number     = shipment.tracking_number or '',
+                )
+                if result.get('success'):
+                    prn = result.get('prn', '')
+                    d_fmt = f'{pickup_date[:4]}-{pickup_date[4:6]}-{pickup_date[6:]}'
+                    note_line = (
+                        f'\nUPS_PICKUP | PRN:{prn or "-"} | DATE:{pickup_date}'
+                        f' | TIME:{ready_time}-{close_time} | POINT:{pickup_point}'
+                    )
+                    shipment.notes = (shipment.notes or '') + note_line
+                    shipment.save(update_fields=['notes', 'updated_at'])
+                    messages.success(
+                        request,
+                        f'🚗 Кур\'єр UPS заплановано на {d_fmt} '
+                        f'({ready_time[:2]}:{ready_time[2:]}–{close_time[:2]}:{close_time[2:]}). '
+                        f'PRN: {prn or "—"}'
+                    )
+                else:
+                    messages.error(request, f'❌ UPS Pickup: {result.get("error", "Невідома помилка")}')
+            except UPSError as e:
+                messages.error(request, f'❌ UPS Pickup: {e}')
+            except Exception as e:
+                messages.error(request, f'❌ Помилка: {e}')
+
+            return redirect(back_url)
+
+        # GET — показати форму
+        from django.template.response import TemplateResponse
+        return TemplateResponse(request, 'admin/shipping/ups_pickup_standalone.html', {
+            'title':          f'🚗 Замовити забір UPS — відправлення #{shipment.pk}',
+            'shipment':       shipment,
+            'default_date':   tomorrow.strftime('%Y-%m-%d'),
+            'min_date':       date.today().strftime('%Y-%m-%d'),
+            'back_url':       back_url,
+        })
 
     # ── FedEx Confirm / Book ──────────────────────────────────────────────────
 

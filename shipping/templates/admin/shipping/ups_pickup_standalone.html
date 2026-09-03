@@ -1,0 +1,118 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<style>
+.pk-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 24px;
+  max-width: 520px;
+  margin: 0 auto;
+}
+.pk-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.pk-sub {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+.pk-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+.pk-input, .pk-select {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  box-sizing: border-box;
+  margin-bottom: 14px;
+}
+.pk-row { display: flex; gap: 12px; }
+.pk-row > div { flex: 1; }
+.pk-info {
+  background: rgba(255,152,0,.08);
+  border: 1px solid rgba(255,152,0,.25);
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+.pk-info strong { color: var(--text); }
+.pk-btn-row { display: flex; gap: 10px; margin-top: 4px; }
+.pk-btn {
+  flex: 1; padding: 10px 0; border: none; border-radius: 6px;
+  font-size: 13px; font-weight: 700; cursor: pointer; text-align: center;
+  text-decoration: none; display: block;
+}
+.pk-btn-submit { background: #e65100; color: #fff; }
+.pk-btn-back   { background: transparent; color: var(--text-dim);
+                 border: 1px solid var(--border-strong); }
+.pk-btn:hover { opacity: .85; }
+</style>
+
+<div class="pk-card">
+  <div class="pk-title">🚗 Замовити забір кур'єром UPS</div>
+  <div class="pk-sub">Відправлення #{{ shipment.pk }}{% if shipment.tracking_number %} · {{ shipment.tracking_number }}{% endif %}</div>
+
+  {% if shipment.tracking_number %}
+  <div class="pk-info">
+    <strong>Трекінг:</strong> {{ shipment.tracking_number }}<br>
+    UPS приїде забрати посилку з вашої адреси у вказаний день та часовий проміжок.
+    Отримаєте PRN — номер запиту на забір.
+  </div>
+  {% else %}
+  <div class="pk-info" style="border-color:rgba(244,67,54,.3);background:rgba(244,67,54,.06)">
+    ⚠️ Відправлення не має трекінг-номера. Кур'єр буде викликаний без прив'язки до конкретної посилки.
+  </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+
+    <label class="pk-label">Дата забору</label>
+    <input type="date" name="pickup_date" class="pk-input"
+           value="{{ default_date }}" min="{{ min_date }}" required>
+
+    <div class="pk-row">
+      <div>
+        <label class="pk-label">Готові з (час)</label>
+        <input type="time" name="ready_time" class="pk-input" value="09:00" required>
+      </div>
+      <div>
+        <label class="pk-label">Готові до (час)</label>
+        <input type="time" name="close_time" class="pk-input" value="18:00" required>
+      </div>
+    </div>
+
+    <label class="pk-label">Місце забору</label>
+    <select name="pickup_point" class="pk-select">
+      <option value="RECEPTION">Reception / Приймальна</option>
+      <option value="FRONT">Front Door / Вхід</option>
+      <option value="REAR">Rear Door / Задній вхід</option>
+      <option value="SIDE">Side Door / Бічний вхід</option>
+      <option value="LOBBY">Lobby / Лобі</option>
+    </select>
+
+    <div class="pk-btn-row">
+      <button type="submit" class="pk-btn pk-btn-submit">🚗 Замовити забір</button>
+      <a href="{{ back_url }}" class="pk-btn pk-btn-back">← Назад</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
