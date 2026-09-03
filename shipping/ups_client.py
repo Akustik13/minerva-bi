@@ -1005,8 +1005,13 @@ class UPSClient:
             return {**result, 'cached': False}
 
         except Exception as e:
-            logger.warning('UPS Pickup Availability API failed: %s', e)
-            # Fallback: safe defaults
+            err_str = str(e)
+            # 401 = Pickup Availability not enabled in UPS app — silent fallback
+            is_auth_err = '401' in err_str or '250002' in err_str
+            if is_auth_err:
+                logger.debug('UPS Pickup Availability: app not enabled (401), using defaults')
+            else:
+                logger.warning('UPS Pickup Availability API failed: %s', e)
             no_pickup = set()
             for i in range(days_ahead + 3):
                 d = today + _td(days=i)
@@ -1018,7 +1023,7 @@ class UPSClient:
                 'cutoff_time':     '15:00',
                 'no_pickup_days':  sorted(no_pickup),
                 'today_available': True,
-                'error':           str(e),
+                'error':           None if is_auth_err else err_str,
                 'cached':          False,
             }
 

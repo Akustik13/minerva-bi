@@ -53,9 +53,9 @@
   <div class="pk-title">🚗 Замовити забір кур'єром UPS</div>
   <div class="pk-sub">Відправлення #{{ shipment.pk }}{% if shipment.tracking_number %} · {{ shipment.tracking_number }}{% endif %}</div>
 
-  {% if avail.error %}
-  <div class="pk-err">⚠️ Не вдалося отримати розклад UPS: {{ avail.error }}<br>Використовуються стандартні значення.</div>
-  {% else %}
+  {% if avail.error and 'auth' not in avail.error|lower and '401' not in avail.error %}
+  <div class="pk-err">⚠️ Не вдалося отримати розклад UPS.<br>Використовуються стандартні значення.</div>
+  {% elif not avail.error %}
   <div class="pk-ok">
     ✅ <strong>Розклад UPS:</strong>
     вікно {{ avail.earliest_ready }}–{{ avail.latest_close }}
@@ -135,11 +135,15 @@
 
   var slotMin = Math.max(0, timeToSlot(avail.earliest_ready || '09:00'));
   var slotMax = Math.max(slotMin+1, timeToSlot(avail.latest_close  || '18:00'));
+  var MIN_WIN = 4; // UPS minimum pickup window = 1 hour = 4 × 15-min slots
 
   var rF = document.getElementById('dr-from');
   var rT = document.getElementById('dr-to');
-  rF.min = slotMin; rF.max = slotMax; rF.value = Math.max(slotMin, timeToSlot('09:00'));
-  rT.min = slotMin; rT.max = slotMax; rT.value = Math.min(slotMax, timeToSlot('18:00'));
+  var initF = Math.max(slotMin, timeToSlot('09:00'));
+  var initT = Math.min(slotMax, timeToSlot('18:00'));
+  if(initT - initF < MIN_WIN) initT = Math.min(slotMax, initF + MIN_WIN);
+  rF.min = slotMin; rF.max = slotMax - MIN_WIN; rF.value = initF;
+  rT.min = slotMin + MIN_WIN; rT.max = slotMax; rT.value = initT;
 
   // Ticks
   var ticks = document.getElementById('dr-ticks');
@@ -160,9 +164,20 @@
 
   function updSlider(src){
     var vf = parseInt(rF.value), vt = parseInt(rT.value);
-    if(vf >= vt){
-      if(src === rF){ vf = vt > slotMin ? vt-1 : slotMin; rF.value = vf; }
-      else           { vt = vf < slotMax ? vf+1 : slotMax; rT.value = vt; }
+    // Enforce minimum 1-hour window (UPS rule)
+    if(vt - vf < MIN_WIN){
+      if(src === rF){
+        // moved "from" forward — push "to" along
+        vt = Math.min(slotMax, vf + MIN_WIN);
+        rT.value = vt;
+        // if "to" hit the wall, pull "from" back
+        if(vt - vf < MIN_WIN){ vf = vt - MIN_WIN; rF.value = vf; }
+      } else {
+        // moved "to" backward — push "from" back
+        vf = Math.max(slotMin, vt - MIN_WIN);
+        rF.value = vf;
+        if(vt - vf < MIN_WIN){ vt = vf + MIN_WIN; rT.value = vt; }
+      }
     }
     vf = parseInt(rF.value); vt = parseInt(rT.value);
     var span = slotMax - slotMin;
@@ -221,8 +236,11 @@
       if(sel && sel.getTime() === today.getTime() && avail.cutoff_time){
         var cutSlot = timeToSlot(avail.cutoff_time);
         rT.max = Math.min(slotMax, cutSlot);
-        if(parseInt(rT.value) > cutSlot) rT.value = cutSlot;
+        rF.max = Math.max(slotMin, rT.max - MIN_WIN);
+        if(parseInt(rT.value) > rT.max) rT.value = rT.max;
+        if(parseInt(rF.value) > rF.max) rF.value = rF.max;
       } else {
+        rF.max = slotMax - MIN_WIN;
         rT.max = slotMax;
       }
       updSlider(null);

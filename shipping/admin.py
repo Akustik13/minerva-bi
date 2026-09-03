@@ -4093,6 +4093,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             else:
                 pickup_date = pickup_date.replace('-', '')
 
+            # Enforce minimum 1-hour window (UPS rule)
+            def _hm_to_min(hhmm):
+                h, m = int(hhmm[:2]), int(hhmm[2:]) if len(hhmm) == 4 else (int(hhmm[:2]), 0)
+                return h * 60 + m
+            r_min = _hm_to_min(ready_time)
+            c_min = _hm_to_min(close_time)
+            if c_min - r_min < 60:
+                close_time = f'{(r_min + 60) // 60:02d}{(r_min + 60) % 60:02d}'
+
             try:
                 client  = UPSClient(carrier=shipment.carrier)
                 shipper = self._ups_extract_shipper(shipment)
