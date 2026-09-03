@@ -552,6 +552,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                             'stock': stock_map.get(lp['product_id'], 0),
                         })
                     response.context_data['sv_order_stock_json'] = _json.dumps(order_stock)
+                    self._stock_cache = order_stock  # per-request cache for stock_warning()
 
                     # Batch-fetch active PO info for deadline warning
                     from inventory.models import PurchaseOrderLine as _POLine
@@ -2040,31 +2041,48 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                            obj.internal_note, truncated)
 
     def stock_warning(self, obj):
-        if obj.shipped_at:
-            return format_html('<span style="color:#999">—</span>')
-        from inventory.models import InventoryTransaction
-        problems, oks = [], 0
-        for line in obj.lines.filter(product__isnull=False):
-            result = InventoryTransaction.objects.filter(
-                product=line.product).aggregate(total=Sum('qty'))
-            stock = float(result['total'] or 0)
-            needed = float(line.qty or 0)
-            if stock <= 0:
-                problems.append(f"🚫 {line.product.sku}: 0")
-            elif stock < needed:
-                problems.append(f"⚠️ {line.product.sku}: {int(stock)}/{int(needed)}")
+        from django.utils.safestring import mark_safe
+
+        # Use batch-fetched cache from changelist_view (0 extra queries)
+        lines_data = []
+        if hasattr(self, '_stock_cache'):
+            lines_data = self._stock_cache.get(str(obj.pk), [])
+
+        if not lines_data:
+            return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
+
+        is_shipped = bool(obj.shipped_at)
+        cells = []
+
+        for item in lines_data:
+            stock = item['stock']
+            need  = item['need']
+            after = stock - need  # negative means deficit
+
+            if is_shipped:
+                # After shipment: show current stock (already deducted)
+                cells.append(
+                    f'<span style="color:var(--text-dim);font-size:11px">{stock}</span>'
+                )
+            elif stock >= need:
+                cells.append(
+                    f'<span style="color:var(--ok);font-weight:600;font-size:12px">{stock}</span>'
+                    f'<span style="color:var(--text-dim);font-size:10px">/{after}</span>'
+                )
+            elif stock > 0:
+                cells.append(
+                    f'<span style="color:var(--warn,#ff9800);font-weight:600;font-size:12px">{stock}</span>'
+                    f'<span style="color:var(--err);font-size:10px">/{after}</span>'
+                )
             else:
-                oks += 1
-        if problems:
-            tip = " | ".join(problems)
-            label = problems[0] if len(problems) == 1 else f"{len(problems)} проблем"
-            return format_html(
-                '<span style="color:#f44336;font-size:11px;font-weight:bold" title="{}">'
-                '🚫 {}</span>', tip, label)
-        if oks:
-            return format_html('<span style="color:#4caf50;font-size:11px">✅ OK</span>')
-        return format_html('<span style="color:#999;font-size:11px">—</span>')
-    stock_warning.short_description = "Склад"
+                cells.append(
+                    f'<span style="color:var(--err);font-weight:600;font-size:12px">0</span>'
+                    f'<span style="color:var(--err);font-size:10px">/−{need}</span>'
+                )
+
+        sep = '<span style="color:var(--text-dim);margin:0 2px">·</span>'
+        return mark_safe(sep.join(cells))
+    stock_warning.short_description = "Склад зараз/залишок"
 
     def customer_link(self, obj):
         if not obj.customer:
