@@ -4134,13 +4134,35 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return redirect(back_url)
 
         # GET — показати форму
+        # Fetch UPS pickup availability (cached 4h)
+        import json as _json
+        avail = {'earliest_ready': '09:00', 'latest_close': '18:00',
+                 'cutoff_time': '15:00', 'no_pickup_days': [], 'error': None}
+        try:
+            shipper_info = self._ups_extract_shipper(shipment)
+            client_avail = UPSClient(carrier=shipment.carrier)
+            avail = client_avail.get_pickup_availability(
+                country    = shipper_info.get('country', 'DE'),
+                postal     = shipper_info.get('postal', ''),
+                days_ahead = 21,
+            )
+            # Re-check today with actual cutoff from API
+            if avail.get('cutoff_time'):
+                ch, cm = map(int, avail['cutoff_time'].split(':'))
+                if now.hour > ch or (now.hour == ch and now.minute >= cm):
+                    min_date = tomorrow
+        except Exception:
+            pass
+
         from django.template.response import TemplateResponse
         return TemplateResponse(request, 'admin/shipping/ups_pickup_standalone.html', {
-            'title':          f'🚗 Замовити забір UPS — відправлення #{shipment.pk}',
-            'shipment':       shipment,
-            'default_date':   tomorrow.strftime('%Y-%m-%d'),
-            'min_date':       min_date.strftime('%Y-%m-%d'),
-            'back_url':       back_url,
+            'title':           f'🚗 Замовити забір UPS — відправлення #{shipment.pk}',
+            'shipment':        shipment,
+            'default_date':    tomorrow.strftime('%Y-%m-%d'),
+            'min_date':        min_date.strftime('%Y-%m-%d'),
+            'back_url':        back_url,
+            'avail':           avail,
+            'avail_json':      _json.dumps(avail),
         })
 
     # ── UPS Cancel Pickup ─────────────────────────────────────────────────────

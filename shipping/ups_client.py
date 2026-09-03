@@ -923,6 +923,105 @@ class UPSClient:
                 'delivered':          False,
             }
 
+    # ── Pickup Availability ───────────────────────────────────────────────────
+
+    def get_pickup_availability(self, country: str, postal: str,
+                                days_ahead: int = 21) -> dict:
+        """
+        GET /api/pickupcreation/v1/pickup/availability
+        Returns availability window and no-pickup days for the next days_ahead days.
+        Result is cached 4 hours per carrier+country+postal.
+
+        Returns dict:
+          earliest_ready  — 'HH:MM'
+          latest_close    — 'HH:MM'
+          cutoff_time     — 'HH:MM' (today's same-day cutoff) or None
+          no_pickup_days  — ['YYYY-MM-DD', ...]  (holidays + weekends)
+          today_available — bool
+          cached          — bool
+          error           — str | None
+        """
+        from datetime import date as _date, timedelta as _td
+        cache_key = f'ups_avail_{self.carrier.pk}_{country.upper()}_{postal}'
+        cached = cache.get(cache_key)
+        if cached:
+            return {**cached, 'cached': True}
+
+        today = _date.today()
+        params = {
+            'pickupDate':          today.strftime('%Y%m%d'),
+            'pickupTypeCode':      '06',   # On-Call / One-Time pickup
+            'countryCode':         country.upper(),
+            'postalCode':          postal,
+            'accountNumber':       self.carrier.connection_uuid,
+            'numberOfBusinessDays': str(days_ahead),
+        }
+        try:
+            data  = self._get('/api/pickupcreation/v1/pickup/availability', params=params)
+            avail = (data.get('PickupAvailabilityResponse', {})
+                        .get('PickupAvailability', {}))
+
+            def _hhmm(raw):
+                raw = (raw or '').replace(':', '')
+                return f'{raw[:2]}:{raw[2:]}' if len(raw) == 4 else None
+
+            cutoff_time    = _hhmm(avail.get('Cutoff', {}).get('Time', ''))
+            tp             = avail.get('PickupTimePeriod', {})
+            earliest_ready = _hhmm(tp.get('EarliestReadyTime', '0800')) or '08:00'
+            latest_close   = _hhmm(tp.get('LatestCloseTime',   '1900')) or '19:00'
+
+            # No-pickup days from API (holidays)
+            raw_nopick = avail.get('NoPickupDay', [])
+            if isinstance(raw_nopick, str):
+                raw_nopick = [raw_nopick]
+            elif isinstance(raw_nopick, dict):
+                raw_nopick = [raw_nopick.get('Date', '')]
+            no_pickup = set()
+            for d in raw_nopick:
+                s = (d or '').replace('-', '')
+                if len(s) == 8:
+                    no_pickup.add(f'{s[:4]}-{s[4:6]}-{s[6:]}')
+
+            # Add weekends for the whole window
+            for i in range(days_ahead + 3):
+                d = today + _td(days=i)
+                if d.weekday() >= 5:
+                    no_pickup.add(d.strftime('%Y-%m-%d'))
+
+            today_avail = (avail.get('DayOfWeekPickup', 'Y') == 'Y'
+                           and today.strftime('%Y-%m-%d') not in no_pickup)
+
+            result = {
+                'earliest_ready':  earliest_ready,
+                'latest_close':    latest_close,
+                'cutoff_time':     cutoff_time,
+                'no_pickup_days':  sorted(no_pickup),
+                'today_available': today_avail,
+                'error':           None,
+            }
+            cache.set(cache_key, result, 4 * 3600)
+            logger.info('UPS availability fetched: cutoff=%s, window=%s-%s, blocked=%d days',
+                        cutoff_time, earliest_ready, latest_close, len(no_pickup))
+            return {**result, 'cached': False}
+
+        except Exception as e:
+            logger.warning('UPS Pickup Availability API failed: %s', e)
+            # Fallback: safe defaults
+            no_pickup = set()
+            for i in range(days_ahead + 3):
+                d = today + _td(days=i)
+                if d.weekday() >= 5:
+                    no_pickup.add(d.strftime('%Y-%m-%d'))
+            return {
+                'earliest_ready':  '09:00',
+                'latest_close':    '18:00',
+                'cutoff_time':     '15:00',
+                'no_pickup_days':  sorted(no_pickup),
+                'today_available': True,
+                'error':           str(e),
+                'cached':          False,
+            }
+
     # ── Pickup scheduling ─────────────────────────────────────────────────────
 
     def schedule_pickup(self, shipper: dict, pickup_date: str,

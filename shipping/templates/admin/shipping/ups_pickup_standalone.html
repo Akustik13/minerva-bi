@@ -1,121 +1,101 @@
 {% extends "admin/base_site.html" %}
 {% load i18n %}
 
-{% block title %}{{ title }}{% endblock %}
+{% block extrahead %}
+{{ block.super }}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<style>
+/* Override flatpickr to match Minerva dark theme */
+.flatpickr-calendar { background:var(--bg-card)!important; border:1px solid var(--border-strong)!important; box-shadow:0 4px 20px rgba(0,0,0,.4)!important; }
+.flatpickr-day { color:var(--text)!important; border-radius:4px!important; }
+.flatpickr-day.selected,.flatpickr-day.selected:hover { background:#1976d2!important; border-color:#1976d2!important; }
+.flatpickr-day.flatpickr-disabled,.flatpickr-day.flatpickr-disabled:hover { color:var(--text-dim)!important; opacity:.35; text-decoration:line-through; }
+.flatpickr-day:hover:not(.flatpickr-disabled):not(.selected) { background:var(--bg-hover)!important; }
+.flatpickr-months,.flatpickr-weekdays,.flatpickr-weekday { background:var(--bg-card)!important; color:var(--text-dim)!important; }
+.flatpickr-current-month input,.flatpickr-current-month .numInputWrapper { color:var(--text)!important; }
+.flatpickr-prev-month svg,.flatpickr-next-month svg { fill:var(--text-dim)!important; }
+.flatpickr-day.today:not(.selected) { border-color:#1976d2!important; }
+</style>
+{% endblock %}
 
 {% block content %}
 <style>
-.pk-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 24px;
-  max-width: 540px;
-  margin: 0 auto;
-}
-.pk-title { font-size: 17px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
-.pk-sub   { font-size: 12px; color: var(--text-dim); margin-bottom: 20px; }
+.pk-card { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:8px; padding:24px; max-width:540px; margin:0 auto; }
+.pk-title { font-size:17px; font-weight:700; color:var(--text); margin-bottom:6px; }
+.pk-sub   { font-size:12px; color:var(--text-dim); margin-bottom:20px; }
 .pk-label { display:block; font-size:12px; color:var(--text-dim); margin-bottom:5px; font-weight:600; }
-.pk-input, .pk-select {
-  width: 100%; padding: 8px 10px;
-  background: var(--bg-input); border: 1px solid var(--border-strong);
-  border-radius: 4px; color: var(--text); font-size: 13px;
-  box-sizing: border-box; margin-bottom: 14px;
-}
-.pk-info {
-  background: rgba(255,152,0,.08); border: 1px solid rgba(255,152,0,.25);
-  border-radius: 6px; padding: 10px 14px; font-size: 12px;
-  color: var(--text-dim); margin-bottom: 20px;
-}
-.pk-info strong { color: var(--text); }
-.pk-btn-row { display:flex; gap:10px; margin-top:4px; }
-.pk-btn {
-  flex:1; padding:10px 0; border:none; border-radius:6px;
-  font-size:13px; font-weight:700; cursor:pointer; text-align:center;
-  text-decoration:none; display:block;
-}
+.pk-input,.pk-select { width:100%; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; color:var(--text); font-size:13px; box-sizing:border-box; margin-bottom:14px; }
+.pk-info  { background:rgba(255,152,0,.08); border:1px solid rgba(255,152,0,.25); border-radius:6px; padding:10px 14px; font-size:12px; color:var(--text-dim); margin-bottom:16px; }
+.pk-info strong { color:var(--text); }
+.pk-ok    { background:rgba(76,175,80,.08); border:1px solid rgba(76,175,80,.25); border-radius:6px; padding:10px 14px; font-size:12px; color:var(--text-dim); margin-bottom:16px; }
+.pk-err   { background:rgba(244,67,54,.07); border:1px solid rgba(244,67,54,.25); border-radius:6px; padding:10px 14px; font-size:12px; color:var(--err); margin-bottom:16px; }
+.pk-btn-row { display:flex; gap:10px; margin-top:8px; }
+.pk-btn   { flex:1; padding:10px 0; border:none; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; text-align:center; text-decoration:none; display:block; }
 .pk-btn-submit { background:#e65100; color:#fff; }
 .pk-btn-back   { background:transparent; color:var(--text-dim); border:1px solid var(--border-strong); }
 .pk-btn:hover  { opacity:.85; }
 
-/* Dual-range slider (same as ups_confirm) */
+/* Dual-range slider */
 .dr-wrap  { position:relative; height:48px; user-select:none; margin-top:6px; }
-.dr-track { position:absolute; top:50%; left:10px; right:10px; height:6px;
-            background:var(--border-strong); border-radius:3px; transform:translateY(-50%); }
+.dr-track { position:absolute; top:50%; left:10px; right:10px; height:6px; background:var(--border-strong); border-radius:3px; transform:translateY(-50%); }
 .dr-fill  { position:absolute; height:100%; background:#1976d2; border-radius:3px; }
-.dr-bubble { position:absolute; top:-24px; transform:translateX(-50%);
-             background:#1976d2; color:#fff; font-size:11px; font-weight:700;
-             padding:2px 6px; border-radius:4px; white-space:nowrap; pointer-events:none; }
-.dr-input { position:absolute; width:100%; left:0; top:50%; transform:translateY(-50%);
-            -webkit-appearance:none; appearance:none; background:transparent;
-            pointer-events:none; height:48px; outline:none; margin:0; }
-.dr-input::-webkit-slider-thumb {
-  -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%;
-  background:#1976d2; cursor:pointer; pointer-events:all;
-  border:2px solid var(--bg-card); box-shadow:0 1px 5px rgba(0,0,0,.35);
-}
-.dr-input::-moz-range-thumb {
-  width:22px; height:22px; border-radius:50%; background:#1976d2;
-  cursor:pointer; pointer-events:all; border:2px solid var(--bg-card);
-  box-shadow:0 1px 5px rgba(0,0,0,.35); border-style:solid;
-}
-.dr-ticks { display:flex; justify-content:space-between;
-            font-size:10px; color:var(--text-dim); margin-top:4px; padding:0 10px; }
+.dr-bubble { position:absolute; top:-24px; transform:translateX(-50%); background:#1976d2; color:#fff; font-size:11px; font-weight:700; padding:2px 6px; border-radius:4px; white-space:nowrap; pointer-events:none; }
+.dr-input { position:absolute; width:100%; left:0; top:50%; transform:translateY(-50%); -webkit-appearance:none; appearance:none; background:transparent; pointer-events:none; height:48px; outline:none; margin:0; }
+.dr-input::-webkit-slider-thumb { -webkit-appearance:none; appearance:none; width:22px; height:22px; border-radius:50%; background:#1976d2; cursor:pointer; pointer-events:all; border:2px solid var(--bg-card); box-shadow:0 1px 5px rgba(0,0,0,.35); }
+.dr-input::-moz-range-thumb { width:22px; height:22px; border-radius:50%; background:#1976d2; cursor:pointer; pointer-events:all; border:2px solid var(--bg-card); box-shadow:0 1px 5px rgba(0,0,0,.35); border-style:solid; }
+.dr-ticks { display:flex; justify-content:space-between; font-size:10px; color:var(--text-dim); margin-top:4px; padding:0 10px; }
 .dr-time-row { display:flex; gap:10px; margin-top:10px; }
 .dr-time-row > div { flex:1; }
-.dr-time-row input[type=time] {
-  width:100%; padding:6px 10px;
-  background:var(--bg-input); border:1px solid var(--border-strong);
-  border-radius:4px; color:var(--text); font-size:13px; box-sizing:border-box;
-}
+.dr-time-row input[type=time] { width:100%; padding:6px 10px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; color:var(--text); font-size:13px; box-sizing:border-box; }
 </style>
 
 <div class="pk-card">
   <div class="pk-title">🚗 Замовити забір кур'єром UPS</div>
   <div class="pk-sub">Відправлення #{{ shipment.pk }}{% if shipment.tracking_number %} · {{ shipment.tracking_number }}{% endif %}</div>
 
-  {% if shipment.tracking_number %}
-  <div class="pk-info">
-    <strong>Трекінг:</strong> {{ shipment.tracking_number }}<br>
-    UPS приїде забрати посилку з вашої адреси у вказаний день та часовий проміжок.
-    Отримаєте PRN — номер запиту на забір.
-  </div>
+  {% if avail.error %}
+  <div class="pk-err">⚠️ Не вдалося отримати розклад UPS: {{ avail.error }}<br>Використовуються стандартні значення.</div>
   {% else %}
-  <div class="pk-info" style="border-color:rgba(244,67,54,.3);background:rgba(244,67,54,.06)">
-    ⚠️ Відправлення не має трекінг-номера. Кур'єр буде викликаний без прив'язки до конкретної посилки.
+  <div class="pk-ok">
+    ✅ <strong>Розклад UPS:</strong>
+    вікно {{ avail.earliest_ready }}–{{ avail.latest_close }}
+    {% if avail.cutoff_time %} · прийом до {{ avail.cutoff_time }}{% endif %}
+    {% if avail.cached %}<span style="color:var(--text-dim);font-size:10px"> (кеш)</span>{% endif %}
   </div>
   {% endif %}
 
-  <form method="post">
+  {% if not shipment.tracking_number %}
+  <div class="pk-info">⚠️ Немає трекінг-номера. Кур'єр буде викликаний без прив'язки до посилки.</div>
+  {% endif %}
+
+  <form method="post" id="pk-form">
     {% csrf_token %}
 
     <label class="pk-label">Дата забору</label>
-    <input type="date" name="pickup_date" class="pk-input"
-           value="{{ default_date }}" min="{{ min_date }}" required>
+    <input type="text" id="pk-date-display" class="pk-input" placeholder="Оберіть дату..." readonly style="cursor:pointer">
+    <input type="hidden" name="pickup_date" id="pk-date-val" value="{{ default_date }}">
 
     <label class="pk-label">Часове вікно готовності</label>
     <div class="dr-wrap">
       <div class="dr-track"><div class="dr-fill" id="dr-fill"></div></div>
-      <div class="dr-bubble" id="dr-b1">09:00</div>
-      <div class="dr-bubble" id="dr-b2">18:00</div>
+      <div class="dr-bubble" id="dr-b1"></div>
+      <div class="dr-bubble" id="dr-b2"></div>
       <input class="dr-input" type="range" id="dr-from" min="0" max="47" value="6"  step="1">
       <input class="dr-input" type="range" id="dr-to"   min="0" max="47" value="30" step="1">
     </div>
-    <div class="dr-ticks">
-      <span>08:00</span><span>11:00</span><span>14:00</span><span>17:00</span><span>19:45</span>
-    </div>
+    <div class="dr-ticks" id="dr-ticks"></div>
     <div class="dr-time-row">
       <div>
         <label class="pk-label" style="margin-top:8px">Готові з</label>
-        <input type="time" id="inp-ready" value="09:00">
+        <input type="time" id="inp-ready">
       </div>
       <div>
         <label class="pk-label" style="margin-top:8px">Готові до</label>
-        <input type="time" id="inp-close" value="18:00">
+        <input type="time" id="inp-close">
       </div>
     </div>
-    <input type="hidden" name="ready_time" id="fld-ready" value="0900">
-    <input type="hidden" name="close_time" id="fld-close" value="1800">
+    <input type="hidden" name="ready_time" id="fld-ready">
+    <input type="hidden" name="close_time" id="fld-close">
 
     <label class="pk-label" style="margin-top:14px">Місце забору</label>
     <select name="pickup_point" class="pk-select">
@@ -133,59 +113,123 @@
   </form>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script>
 (function(){
-  var BASE=480, STEP=15, MAX=47; // 08:00 base, 15-min steps, 47 slots → 19:45
-  function fmt(slot){
-    var m=BASE+slot*STEP;
-    return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+  var avail = {{ avail_json|safe }};
+
+  /* ── Time slider setup ── */
+  // BASE=480 (08:00), STEP=15min
+  // Compute slot bounds from API availability window
+  var BASE = 480, STEP = 15;
+
+  function timeToSlot(hhmm){
+    var p = hhmm.split(':');
+    var mins = parseInt(p[0])*60 + parseInt(p[1]);
+    return Math.round((mins - BASE) / STEP);
   }
-  function parseTime(hhmm){
-    // "HH:MM" → slot index
-    var parts=hhmm.split(':'); if(parts.length<2) return 0;
-    var mins=parseInt(parts[0])*60+parseInt(parts[1]);
-    return Math.max(0,Math.min(MAX,Math.round((mins-BASE)/STEP)));
+  function slotToTime(slot){
+    var m = BASE + slot * STEP;
+    return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
   }
-  var rF=document.getElementById('dr-from');
-  var rT=document.getElementById('dr-to');
-  if(!rF||!rT) return;
-  var fill=document.getElementById('dr-fill');
-  var b1=document.getElementById('dr-b1');
-  var b2=document.getElementById('dr-b2');
-  var iR=document.getElementById('inp-ready');
-  var iC=document.getElementById('inp-close');
-  var fR=document.getElementById('fld-ready');
-  var fC=document.getElementById('fld-close');
+
+  var slotMin = Math.max(0, timeToSlot(avail.earliest_ready || '09:00'));
+  var slotMax = Math.max(slotMin+1, timeToSlot(avail.latest_close  || '18:00'));
+
+  var rF = document.getElementById('dr-from');
+  var rT = document.getElementById('dr-to');
+  rF.min = slotMin; rF.max = slotMax; rF.value = Math.max(slotMin, timeToSlot('09:00'));
+  rT.min = slotMin; rT.max = slotMax; rT.value = Math.min(slotMax, timeToSlot('18:00'));
+
+  // Ticks
+  var ticks = document.getElementById('dr-ticks');
+  var tickSlots = [slotMin,
+    Math.round(slotMin+(slotMax-slotMin)*0.25),
+    Math.round(slotMin+(slotMax-slotMin)*0.5),
+    Math.round(slotMin+(slotMax-slotMin)*0.75),
+    slotMax];
+  ticks.innerHTML = tickSlots.map(function(s){ return '<span>'+slotToTime(s)+'</span>'; }).join('');
+
+  var fill = document.getElementById('dr-fill');
+  var b1   = document.getElementById('dr-b1');
+  var b2   = document.getElementById('dr-b2');
+  var iR   = document.getElementById('inp-ready');
+  var iC   = document.getElementById('inp-close');
+  var fR   = document.getElementById('fld-ready');
+  var fC   = document.getElementById('fld-close');
 
   function updSlider(src){
-    var vf=parseInt(rF.value), vt=parseInt(rT.value);
-    if(vf>=vt){
-      if(src===rF){ vf=vt>0?vt-1:0; rF.value=vf; }
-      else         { vt=vf<MAX?vf+1:MAX; rT.value=vt; }
+    var vf = parseInt(rF.value), vt = parseInt(rT.value);
+    if(vf >= vt){
+      if(src === rF){ vf = vt > slotMin ? vt-1 : slotMin; rF.value = vf; }
+      else           { vt = vf < slotMax ? vf+1 : slotMax; rT.value = vt; }
     }
-    vf=parseInt(rF.value); vt=parseInt(rT.value);
-    var pf=vf/MAX*100, pt=vt/MAX*100;
-    fill.style.left=pf+'%'; fill.style.width=(pt-pf)+'%';
-    var tf=fmt(vf), tt=fmt(vt);
-    b1.textContent=tf; b1.style.left=(vf/MAX*100).toFixed(2)+'%';
-    b2.textContent=tt; b2.style.left=(vt/MAX*100).toFixed(2)+'%';
-    iR.value=tf; iC.value=tt;
-    fR.value=tf.replace(':',''); fC.value=tt.replace(':','');
-    rF.style.zIndex=(vf>MAX-4)?5:3;
-    rT.style.zIndex=(vf>MAX-4)?3:5;
+    vf = parseInt(rF.value); vt = parseInt(rT.value);
+    var span = slotMax - slotMin;
+    var pf = (vf-slotMin)/span*100, pt = (vt-slotMin)/span*100;
+    fill.style.left = pf+'%'; fill.style.width = (pt-pf)+'%';
+    var tf = slotToTime(vf), tt = slotToTime(vt);
+    b1.textContent = tf; b1.style.left = pf.toFixed(1)+'%';
+    b2.textContent = tt; b2.style.left = pt.toFixed(1)+'%';
+    iR.value = tf; iC.value = tt;
+    fR.value = tf.replace(':',''); fC.value = tt.replace(':','');
+    rF.style.zIndex = (vf > slotMax-4) ? 5 : 3;
+    rT.style.zIndex = (vf > slotMax-4) ? 3 : 5;
   }
 
   function updFromInputs(){
-    rF.value=parseTime(iR.value);
-    rT.value=parseTime(iC.value);
+    var sf = timeToSlot(iR.value);
+    var st = timeToSlot(iC.value);
+    rF.value = Math.max(slotMin, Math.min(slotMax, sf));
+    rT.value = Math.max(slotMin, Math.min(slotMax, st));
     updSlider(null);
   }
 
-  rF.addEventListener('input',function(){ updSlider(rF); });
-  rT.addEventListener('input',function(){ updSlider(rT); });
+  rF.addEventListener('input', function(){ updSlider(rF); });
+  rT.addEventListener('input', function(){ updSlider(rT); });
   iR.addEventListener('change', updFromInputs);
   iC.addEventListener('change', updFromInputs);
   updSlider(null);
+
+  /* ── Flatpickr date picker ── */
+  var noPickupDays = avail.no_pickup_days || [];
+  var minDate = '{{ min_date }}';
+
+  flatpickr('#pk-date-display', {
+    dateFormat: 'Y-m-d',
+    altInput: true,
+    altFormat: 'd.m.Y (D)',
+    minDate: minDate,
+    defaultDate: '{{ default_date }}',
+    locale: {
+      firstDayOfWeek: 1,
+      weekdays: {
+        shorthand: ['Нд','Пн','Вт','Ср','Чт','Пт','Сб'],
+        longhand:  ['Неділя','Понеділок','Вівторок','Середа','Четвер','П\'ятниця','Субота']
+      },
+      months: {
+        shorthand: ['Січ','Лют','Бер','Квіт','Трав','Черв','Лип','Серп','Вер','Жовт','Лист','Груд'],
+        longhand:  ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень']
+      }
+    },
+    disable: noPickupDays,
+    onChange: function(selectedDates, dateStr){
+      document.getElementById('pk-date-val').value = dateStr;
+      // If today selected and cutoff exists — adjust slider max
+      var today = new Date(); today.setHours(0,0,0,0);
+      var sel   = selectedDates[0]; sel && sel.setHours(0,0,0,0);
+      if(sel && sel.getTime() === today.getTime() && avail.cutoff_time){
+        var cutSlot = timeToSlot(avail.cutoff_time);
+        rT.max = Math.min(slotMax, cutSlot);
+        if(parseInt(rT.value) > cutSlot) rT.value = cutSlot;
+      } else {
+        rT.max = slotMax;
+      }
+      updSlider(null);
+    },
+  });
+  // Sync hidden field on load
+  document.getElementById('pk-date-val').value = '{{ default_date }}';
 })();
 </script>
 {% endblock %}
