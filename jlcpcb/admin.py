@@ -211,7 +211,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
         'order_date', 'shipped_date',
     )
     list_filter   = ('local_status', 'mapping_status', 'order_type')
-    search_fields = ('jlc_order_id', 'jlc_order_number', 'description',
+    search_fields = ('jlc_order_id', 'jlc_order_number', 'description', 'file_names',
                      'tracking_number', 'product__sku')
     ordering      = ('-order_date', '-created_at')
     date_hierarchy = 'order_date'
@@ -1178,6 +1178,24 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 'ordered': '📋', 'reviewed': '🔍', 'in_production': '🏭',
                 'manufactured': '✅', 'shipped': '📦', 'delivered': '🎉', 'cancelled': '❌',
             }
+            # Pre-fetch all JLCProductMapping entries for product binding column
+            from .models import JLCProductMapping
+            from urllib.parse import quote as _urlencode
+            all_mappings = list(JLCProductMapping.objects.select_related('product').values_list(
+                'jlc_reference', 'product__sku', 'product_id',
+            ))
+
+            def _find_mapped_product(fname):
+                """Return (sku, product_id, mapping_url) or (None, None, None)."""
+                if not fname:
+                    return None, None, None
+                fname_lower = fname.lower()
+                for ref, sku, pid in all_mappings:
+                    ref_l = ref.lower()
+                    if fname_lower.startswith(ref_l) or ref_l.startswith(fname_lower) or ref_l == fname_lower:
+                        return sku, pid, reverse('admin:jlcpcb_jlcproductmapping_changelist')
+                return None, None, None
+
             sub_orders = []
             for item in raw.get('orderItem', []):
                 pcb = item.get('pcbItem') or {}
@@ -1189,8 +1207,14 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 # Strip HTML tags from cancelReason
                 import re
                 cancel = re.sub(r'<[^>]+>', '', cancel).strip()
+                fname = pcb.get('fileName', '—')
+                mapped_sku, mapped_pid, mapping_url = _find_mapped_product(fname)
+                add_mapping_url = (
+                    reverse('admin:jlcpcb_jlcproductmapping_add')
+                    + f'?jlc_reference={_urlencode(fname)}'
+                ) if fname != '—' else ''
                 sub_orders.append({
-                    'file_name':    pcb.get('fileName', '—'),
+                    'file_name':    fname,
                     'produce_code': pcb.get('produceCode', ''),
                     'count':        pcb.get('count', 0),
                     'status_key':   st_key,
@@ -1209,6 +1233,10 @@ class JLCOrderAdmin(admin.ModelAdmin):
                     'half_hole':    pcb.get('halfHole', ''),
                     'build_time':   pcb.get('buildTime', ''),
                     'cancel':       cancel,
+                    'mapped_sku':   mapped_sku,
+                    'mapped_pid':   mapped_pid,
+                    'mapping_url':  mapping_url or '',
+                    'add_mapping_url': add_mapping_url,
                 })
             extra['jlc_sub_orders'] = sub_orders
 

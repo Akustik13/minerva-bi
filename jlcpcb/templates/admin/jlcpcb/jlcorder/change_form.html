@@ -385,6 +385,7 @@
             <th>Замовлено</th>
             <th>ETA доставки</th>
             <th>Ціна</th>
+            <th>Товар (прив'язка)</th>
             <th>Специфікація</th>
           </tr>
         </thead>
@@ -412,6 +413,14 @@
             </td>
             <td style="white-space:nowrap">
               {% if sub.price %}{{ sub.price }} USD{% else %}—{% endif %}
+            </td>
+            <td style="white-space:nowrap;font-size:12px">
+              {% if sub.mapped_sku %}
+                <a href="/admin/inventory/product/{{ sub.mapped_pid }}/change/" style="color:var(--link-fg);font-weight:600">{{ sub.mapped_sku }}</a>
+                <a href="{{ sub.mapping_url }}" style="color:var(--text-dim);font-size:10px;display:block;margin-top:2px">✏️ Прив'язки</a>
+              {% else %}
+                <a href="{{ sub.add_mapping_url }}" style="color:var(--text-dim);font-size:11px">➕ Прив'язати</a>
+              {% endif %}
             </td>
             <td>
               {% if sub.size %}<span class="jlc-spec-pill">📐 {{ sub.size }}</span>{% endif %}

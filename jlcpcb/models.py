@@ -169,6 +169,10 @@ class JLCOrder(models.Model):
                                             blank=True, default='')
 
     # ── Технічні поля ─────────────────────────────────────────────────────────
+    file_names = models.TextField(
+        'Всі файли замовлення', blank=True, default='',
+        help_text='Імена файлів з усіх позицій замовлення (через \\n). Використовується для пошуку.',
+    )
     raw_data   = models.JSONField('Дані API (JSON)', default=dict, blank=True)
     notes      = models.TextField('Нотатки', blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)

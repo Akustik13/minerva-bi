@@ -213,6 +213,13 @@ class Command(BaseCommand):
             # Extract gerber preview images if available in pcbItem
             _extract_gerber_images(pcb, raw)
 
+            # Collect all file names from all orderItems (for search)
+            all_file_names = '\n'.join(
+                item.get('pcbItem', {}).get('fileName', '')
+                for item in raw.get('orderItem', [])
+                if item.get('pcbItem', {}).get('fileName')
+            )
+
             order, is_created = JLCOrder.objects.get_or_create(
                 jlc_order_number=batch,
                 defaults={
@@ -220,6 +227,7 @@ class Command(BaseCommand):
                     'local_status':    new_status,
                     'jlc_status':      str(status_int) if status_int is not None else '',
                     'description':     file_name,
+                    'file_names':      all_file_names,
                     'quantity':        quantity,
                     'total_price':     price,
                     'order_date':      order_date or timezone.now().date(),
@@ -250,9 +258,10 @@ class Command(BaseCommand):
                 # Manually-delivered orders are final — never let API roll them back.
                 # Only update raw API data for audit, skip all status logic.
                 if old_status == JLCOrder.LocalStatus.DELIVERED:
-                    upd = ['raw_data', 'jlc_status', 'updated_at']
-                    order.raw_data   = raw
-                    order.jlc_status = str(status_int) if status_int is not None else ''
+                    upd = ['raw_data', 'jlc_status', 'file_names', 'updated_at']
+                    order.raw_data    = raw
+                    order.jlc_status  = str(status_int) if status_int is not None else ''
+                    order.file_names  = all_file_names
                     # Fix order_date if it was incorrectly set to sync time
                     if order_date and order.order_date != order_date:
                         order.order_date = order_date
@@ -270,7 +279,8 @@ class Command(BaseCommand):
                     continue
 
                 # Update fields if now available / fix wrong defaults
-                update_fields = ['raw_data', 'jlc_status', 'description', 'updated_at']
+                update_fields = ['raw_data', 'jlc_status', 'description', 'file_names', 'updated_at']
+                order.file_names = all_file_names
                 if order_date and order.order_date != order_date:
                     order.order_date = order_date
                     update_fields.append('order_date')
