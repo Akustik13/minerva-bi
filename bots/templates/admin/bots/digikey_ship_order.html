@@ -268,10 +268,13 @@
     </div>
     {% endif %}
 
-    <!-- Invoice number -->
+    {% if is_eu %}
+    <!-- Invoice number (EU only) -->
     <div style="margin-bottom:16px">
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
         Номер рахунку постачальника (Supplier Invoice Number)
+        <span style="font-size:10px;background:rgba(33,150,243,.15);color:#42a5f5;
+                     padding:1px 6px;border-radius:3px;margin-left:4px">🇪🇺 ЄС</span>
       </label>
       <input type="text" name="invoice_number" id="inv-num-field"
              value="{% if existing_invoice %}{{ existing_invoice.invoice_number }}{% elif inv_info %}{{ inv_info.suggested }}{% endif %}"
@@ -287,6 +290,7 @@
       </div>
       {% endif %}
     </div>
+    {% endif %}
 
     {% if is_eu %}
     <!-- Net VAT invoice amount (EU only) -->
