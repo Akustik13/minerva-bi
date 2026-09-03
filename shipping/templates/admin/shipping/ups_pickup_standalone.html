@@ -142,8 +142,9 @@
   var initF = Math.max(slotMin, timeToSlot('09:00'));
   var initT = Math.min(slotMax, timeToSlot('18:00'));
   if(initT - initF < MIN_WIN) initT = Math.min(slotMax, initF + MIN_WIN);
-  rF.min = slotMin; rF.max = slotMax - MIN_WIN; rF.value = initF;
-  rT.min = slotMin + MIN_WIN; rT.max = slotMax; rT.value = initT;
+  // Both inputs share full range — updSlider enforces MIN_WIN via values, not min/max
+  rF.min = slotMin; rF.max = slotMax; rF.value = initF;
+  rT.min = slotMin; rT.max = slotMax; rT.value = initT;
 
   // Ticks
   var ticks = document.getElementById('dr-ticks');
@@ -235,13 +236,9 @@
       var sel   = selectedDates[0]; sel && sel.setHours(0,0,0,0);
       if(sel && sel.getTime() === today.getTime() && avail.cutoff_time){
         var cutSlot = timeToSlot(avail.cutoff_time);
-        rT.max = Math.min(slotMax, cutSlot);
-        rF.max = Math.max(slotMin, rT.max - MIN_WIN);
-        if(parseInt(rT.value) > rT.max) rT.value = rT.max;
-        if(parseInt(rF.value) > rF.max) rF.value = rF.max;
-      } else {
-        rF.max = slotMax - MIN_WIN;
-        rT.max = slotMax;
+        // Cap "to" at cutoff; updSlider will enforce MIN_WIN
+        if(parseInt(rT.value) > cutSlot){ rT.value = cutSlot; }
+        if(parseInt(rF.value) > cutSlot - MIN_WIN){ rF.value = Math.max(slotMin, cutSlot - MIN_WIN); }
       }
       updSlider(null);
     },
