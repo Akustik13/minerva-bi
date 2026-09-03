@@ -290,6 +290,10 @@ def digikey_ship_order(request, order_pk):
                 except ValueError:
                     pass
 
+        _EU = {"AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR",
+               "HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"}
+        is_eu_post = (order.addr_country or "").upper() in _EU
+
         if not tracking:
             msg.error(request, "Р’РєР°Р¶С–С‚СЊ С‚СЂРµРє-РЅРѕРјРµСЂ РІС–РґРїСЂР°РІР»РµРЅРЅСЏ.")
         else:
@@ -338,6 +342,26 @@ def digikey_ship_order(request, order_pk):
                         update_fields.append("tracking_number")
                     order.save(update_fields=update_fields)
                     msg.success(request, result["message"])
+
+                    # Auto-generate invoice for EU orders when feature enabled
+                    if config.auto_invoice_eu and is_eu_post:
+                        from django.db.models import Q as _Q
+                        from shipping.models import Invoice as _Inv
+                        _existing_inv = (
+                            _Inv.objects.filter(
+                                _Q(sales_order=order) | _Q(digikey_order_no=order.order_number)
+                            ).first()
+                        )
+                        if not _existing_inv:
+                            try:
+                                from shipping.services.invoice_service import InvoiceService
+                                _auto_inv = InvoiceService.generate_from_digikey_order(
+                                    order.order_number, request.user,
+                                    invoice_number=invoice or None,
+                                )
+                                msg.success(request, f"🧾 Інвойс #{_auto_inv.invoice_number} автоматично згенеровано.")
+                            except Exception as _inv_err:
+                                msg.warning(request, f"Відправлено, але авто-генерація інвойсу не вдалась: {_inv_err}")
 
                     if vat_file_id:
                         msg.info(request, f"\ud83d\udcce VAT \u0444\u0430\u0439\u043b \u0437\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043e \u043d\u0430 DigiKey (ID: {vat_file_id}). \u041f\u0440\u0438\u0432'\u044f\u0436\u0456\u0442\u044c \u0439\u043e\u0433\u043e \u0432\u0440\u0443\u0447\u043d\u0443 \u0443 DigiKey Marketplace portal.")
@@ -396,6 +420,14 @@ def digikey_ship_order(request, order_pk):
     except Exception:
         pass
 
+    # Invoice number info: compare DB vs DigiKey API, suggest next number
+    inv_info = None
+    try:
+        from shipping.services.invoice_service import get_invoice_number_info
+        inv_info = get_invoice_number_info(config if has_token else None)
+    except Exception:
+        pass
+
     from django.template.response import TemplateResponse
     return TemplateResponse(request, "admin/bots/digikey_ship_order.html", {
         "title":            f"Відправити #{order.order_number} на DigiKey",
@@ -409,6 +441,7 @@ def digikey_ship_order(request, order_pk):
         "preset_carrier_id": preset_carrier_id,
         "existing_invoice": existing_invoice,
         "inv_net_amount":   inv_net_amount,
+        "inv_info":         inv_info,
     })
 
 

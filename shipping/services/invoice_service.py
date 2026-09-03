@@ -70,6 +70,93 @@ def get_next_invoice_number() -> str:
     return str(max(db_max, file_max) + 1)
 
 
+def get_last_dk_invoice_number(config) -> int:
+    """
+    Fetch the last (highest) supplierInvoiceNumber from DigiKey Marketplace Orders API.
+    Returns integer, or 0 if none found / error.
+    """
+    try:
+        from bots.services.dk_marketplace import get_marketplace_token, _base_url, _headers
+        import requests as req
+        token = get_marketplace_token(config)
+        url   = f"{_base_url(config)}/Sales/Marketplace2/Orders/v1/orders"
+        max_num = 0
+        offset  = 0
+        while True:
+            resp = req.get(url, headers=_headers(config, token),
+                           params={"Max": 50, "Offset": offset}, timeout=20)
+            if not resp.ok:
+                break
+            data   = resp.json()
+            orders = data.get("orders") or []
+            for o in orders:
+                inv_no = o.get("supplierInvoiceNumber") or ""
+                digits = re.sub(r"\D", "", str(inv_no))
+                if digits:
+                    max_num = max(max_num, int(digits))
+            total = data.get("total") or len(orders)
+            offset += len(orders)
+            if not orders or offset >= total:
+                break
+        return max_num
+    except Exception as e:
+        logger.warning("get_last_dk_invoice_number error: %s", e)
+        return 0
+
+
+def get_invoice_number_info(config=None) -> dict:
+    """
+    Compare last invoice number in our DB vs DigiKey Marketplace.
+    Returns dict:
+      {
+        sys_last:   int,   # last number in our DB
+        dk_last:    int,   # last number from DigiKey API (0 if unavailable)
+        match:      bool,  # True if sys_last == dk_last
+        suggested:  str,   # suggested next number (str)
+        dk_ok:      bool,  # True if DK API call succeeded
+      }
+    """
+    from shipping.models import Invoice
+
+    sys_last = 0
+    try:
+        last = Invoice.objects.order_by("-invoice_number").first()
+        if last:
+            sys_last = int(re.sub(r"\D", "", last.invoice_number) or 0)
+    except Exception:
+        pass
+
+    # Also check file system
+    file_max = 0
+    output_dir = Path(settings.MEDIA_ROOT) / "invoices"
+    if output_dir.exists():
+        for f in output_dir.glob("Invoice_*.docx"):
+            m = re.search(r"Invoice_(\d+)\.docx", f.name)
+            if m:
+                file_max = max(file_max, int(m.group(1)))
+    sys_last = max(sys_last, file_max)
+
+    dk_last = 0
+    dk_ok   = False
+    if config is not None:
+        try:
+            dk_last = get_last_dk_invoice_number(config)
+            dk_ok   = True
+        except Exception as e:
+            logger.warning("DK invoice number check failed: %s", e)
+
+    match     = (sys_last == dk_last) or not dk_ok
+    suggested = str(max(sys_last, dk_last) + 1)
+
+    return {
+        "sys_last":  sys_last,
+        "dk_last":   dk_last,
+        "match":     match,
+        "suggested": suggested,
+        "dk_ok":     dk_ok,
+    }
+
+
 def _fmt_date(dt_str: str | None) -> str:
     """ISO 8601 datetime string → MM/DD/YYYY for the invoice template."""
     if not dt_str:

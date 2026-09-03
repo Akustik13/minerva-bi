@@ -139,6 +139,15 @@ class DigiKeyConfig(models.Model):
                   "використовується для OAuth Callback та Webhook URL."
     )
 
+    # ── Інвойс / EU ───────────────────────────────────────────────────────────
+    auto_invoice_eu = models.BooleanField(
+        "Авто-генерація інвойсу для ЄС", default=False,
+        help_text=(
+            "Якщо увімкнено — при підтвердженні відправки до ЄС система автоматично "
+            "генерує інвойс (якщо ще не згенеровано). Якщо вимкнено — лише ручний режим."
+        ),
+    )
+
     # ── Webhook ───────────────────────────────────────────────────────────────
     webhook_enabled = models.BooleanField("Webhook увімкнений", default=False)
     webhook_secret  = models.CharField(

@@ -219,7 +219,7 @@ class DigiKeyConfigAdmin(admin.ModelAdmin):
             ),
         }),
         ("🛒 Marketplace API (3-legged OAuth)", {
-            "fields": ("marketplace_auth_status",),
+            "fields": ("marketplace_auth_status", "auto_invoice_eu"),
             "description": (
                 "Marketplace API потребує авторизації користувача (3-legged OAuth). "
                 "Натисніть <b>🔑 Авторизувати Marketplace</b> нижче."

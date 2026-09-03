@@ -186,9 +186,43 @@
     {% elif is_eu %}
     <div style="background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.3);border-radius:6px;
                 padding:10px 14px;margin-bottom:16px;font-size:13px;color:#ffcc80">
-      ⚠️ Для ЄС-замовлення інвойс ще не згенеровано.
-      <a href="/invoices/?auto={{ order.order_number }}" target="_blank"
-         style="color:#c9a84c;font-weight:600">Згенерувати інвойс ↗</a>
+      {% if config.auto_invoice_eu %}
+        🤖 Інвойс буде авто-згенеровано після підтвердження відправлення.
+      {% else %}
+        ⚠️ Для ЄС-замовлення інвойс ще не згенеровано.
+        <a href="/invoices/?auto={{ order.order_number }}" target="_blank"
+           style="color:#c9a84c;font-weight:600">Згенерувати інвойс ↗</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Invoice number mismatch warning -->
+    {% if inv_info and not inv_info.match and inv_info.dk_ok and not existing_invoice %}
+    <div style="background:rgba(255,152,0,.1);border:1px solid rgba(255,152,0,.4);border-radius:6px;
+                padding:12px 16px;margin-bottom:12px">
+      <div style="color:#ffcc80;font-weight:600;margin-bottom:6px;font-size:13px">
+        ⚠️ Розбіжність нумерації інвойсів!
+      </div>
+      <div style="color:var(--text-muted);font-size:12px;margin-bottom:10px">
+        Наша система: останній #{{ inv_info.sys_last }} &nbsp;·&nbsp; DigiKey: останній #{{ inv_info.dk_last }}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text);font-size:13px">
+          <input type="radio" name="inv_num_choice" value="{{ inv_info.dk_last|add:1 }}"
+                 onchange="document.getElementById('inv-num-field').value=this.value" checked>
+          Використати нумерацію DigiKey → #{{ inv_info.dk_last|add:1 }}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text);font-size:13px">
+          <input type="radio" name="inv_num_choice" value="{{ inv_info.sys_last|add:1 }}"
+                 onchange="document.getElementById('inv-num-field').value=this.value">
+          Використати нумерацію системи → #{{ inv_info.sys_last|add:1 }}
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--text);font-size:13px">
+          <input type="radio" name="inv_num_choice" value="custom"
+                 onchange="document.getElementById('inv-num-field').value='';document.getElementById('inv-num-field').focus()">
+          Ввести номер вручну
+        </label>
+      </div>
     </div>
     {% endif %}
 
@@ -197,12 +231,19 @@
       <label style="display:block;color:var(--text-dim);font-size:13px;margin-bottom:6px">
         Номер рахунку постачальника (Supplier Invoice Number)
       </label>
-      <input type="text" name="invoice_number"
-             value="{% if existing_invoice %}{{ existing_invoice.invoice_number }}{% endif %}"
+      <input type="text" name="invoice_number" id="inv-num-field"
+             value="{% if existing_invoice %}{{ existing_invoice.invoice_number }}{% elif inv_info %}{{ inv_info.suggested }}{% endif %}"
              placeholder="INV-2026-001"
              style="width:100%;max-width:400px;padding:8px 12px;background:var(--bg-input);
                     border:1px solid {% if existing_invoice %}rgba(76,175,80,.6){% else %}var(--border-strong){% endif %};
                     border-radius:4px;color:var(--text);font-size:13px;box-sizing:border-box">
+      {% if inv_info and not existing_invoice %}
+      <div style="font-size:11px;color:var(--text-muted);margin-top:4px">
+        {% if inv_info.match and inv_info.dk_ok %}✓ Нумерація синхронізована з DigiKey
+        {% elif not inv_info.dk_ok %}⚡ DigiKey API недоступний — використовується нумерація системи
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
 
     {% if is_eu %}
