@@ -438,20 +438,43 @@ def digikey_ship_order(request, order_pk):
     except Exception:
         pass
 
+    # Auto-generate invoice immediately on GET if conditions are met:
+    # auto_invoice_eu=True + EU order + no discrepancy + no existing invoice
+    auto_generated_now = False
+    if (
+        config.auto_invoice_eu
+        and is_eu
+        and not existing_invoice
+        and inv_info is not None
+        and inv_info["match"]
+    ):
+        try:
+            from shipping.services.invoice_service import InvoiceService
+            existing_invoice = InvoiceService.generate_from_digikey_order(
+                order.order_number, request.user,
+                invoice_number=inv_info["suggested"],
+            )
+            inv_net_amount    = f"{existing_invoice.subtotal:.2f}"
+            auto_generated_now = True
+        except Exception as _e:
+            # Non-fatal: show warning in template via flag
+            inv_info["auto_gen_error"] = str(_e)
+
     from django.template.response import TemplateResponse
     return TemplateResponse(request, "admin/bots/digikey_ship_order.html", {
-        "title":            f"Відправити #{order.order_number} на DigiKey",
-        "order":            order,
-        "config":           config,
-        "has_token":        has_token,
-        "carriers":         carriers,
-        "order_details":    order_details,
-        "supplier_id":      supplier_id,
-        "is_eu":            is_eu,
-        "preset_carrier_id": preset_carrier_id,
-        "existing_invoice": existing_invoice,
-        "inv_net_amount":   inv_net_amount,
-        "inv_info":         inv_info,
+        "title":              f"Відправити #{order.order_number} на DigiKey",
+        "order":              order,
+        "config":             config,
+        "has_token":          has_token,
+        "carriers":           carriers,
+        "order_details":      order_details,
+        "supplier_id":        supplier_id,
+        "is_eu":              is_eu,
+        "preset_carrier_id":  preset_carrier_id,
+        "existing_invoice":   existing_invoice,
+        "inv_net_amount":     inv_net_amount,
+        "inv_info":           inv_info,
+        "auto_generated_now": auto_generated_now,
     })
 
 
