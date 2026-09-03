@@ -258,6 +258,14 @@ class Command(BaseCommand):
                         order.order_date = order_date
                         upd.append('order_date')
                     order.save(update_fields=upd)
+                    # Catch-up: delivered but not yet received (e.g. auto-receive was off at delivery time)
+                    if (cfg.auto_receive_on_delivered and order.product_id
+                            and float(order.received_qty) < order.quantity):
+                        tx = receive_into_inventory(order)
+                        if tx:
+                            self.stdout.write(
+                                self.style.SUCCESS(f'  {batch}: catch-up auto-receive {tx.qty} pcs → inventory')
+                            )
                     self.stdout.write(f'  {batch}: delivered (locked) — API says {new_status}, skip')
                     continue
 
