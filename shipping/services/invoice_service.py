@@ -106,35 +106,26 @@ def get_last_dk_invoice_number(config) -> int:
 
 def get_invoice_number_info(config=None) -> dict:
     """
-    Compare last invoice number in our DB vs DigiKey Marketplace.
+    Compare last EU invoice number (SalesOrder.eu_invoice_number) vs DigiKey supplierInvoiceNumber.
+    Uses the same numbering as the 'Invoice 💾' button in the SalesOrder admin.
     Returns dict:
       {
-        sys_last:   int,   # last number in our DB
-        dk_last:    int,   # last number from DigiKey API (0 if unavailable)
-        match:      bool,  # True if sys_last == dk_last
-        suggested:  str,   # suggested next number (str)
+        sys_last:   int,   # max eu_invoice_number across all SalesOrders
+        dk_last:    int,   # max supplierInvoiceNumber from DigiKey API (0 if unavailable)
+        match:      bool,  # True if sys_last == dk_last (or DK API unavailable)
+        suggested:  str,   # next number: max(sys_last, dk_last) + 1
         dk_ok:      bool,  # True if DK API call succeeded
       }
     """
-    from shipping.models import Invoice
+    from django.db.models import Max
+    from sales.models import SalesOrder
 
     sys_last = 0
     try:
-        last = Invoice.objects.order_by("-invoice_number").first()
-        if last:
-            sys_last = int(re.sub(r"\D", "", last.invoice_number) or 0)
+        result = SalesOrder.objects.aggregate(m=Max("eu_invoice_number"))["m"]
+        sys_last = result or 0
     except Exception:
         pass
-
-    # Also check file system
-    file_max = 0
-    output_dir = Path(settings.MEDIA_ROOT) / "invoices"
-    if output_dir.exists():
-        for f in output_dir.glob("Invoice_*.docx"):
-            m = re.search(r"Invoice_(\d+)\.docx", f.name)
-            if m:
-                file_max = max(file_max, int(m.group(1)))
-    sys_last = max(sys_last, file_max)
 
     dk_last = 0
     dk_ok   = False
