@@ -4103,7 +4103,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                         f' | TIME:{ready_time}-{close_time} | POINT:{pickup_point}'
                     )
                     shipment.notes = (shipment.notes or '') + note_line
-                    shipment.save(update_fields=['notes', 'updated_at'])
+                    shipment.save(update_fields=['notes'])
                     messages.success(
                         request,
                         f'🚗 Кур\'єр UPS заплановано на {d_fmt} '
