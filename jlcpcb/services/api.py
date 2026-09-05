@@ -218,6 +218,41 @@ def receive_into_inventory(jlc_order, location_code: str = None, performed_by=No
     return tx
 
 
+def receive_line_into_inventory(line, location_code: str = None, performed_by=None):
+    """Receive a single JLCOrderLine into inventory. Idempotent via external_key."""
+    from decimal import Decimal
+    from inventory.models import InventoryTransaction, Location
+    from jlcpcb.models import JLCConfig
+
+    if not line.product_id:
+        return None
+
+    cfg = JLCConfig.get()
+    loc_code = location_code or cfg.default_location or 'MAIN'
+    location, _ = Location.objects.get_or_create(code=loc_code, defaults={'name': loc_code})
+
+    ext_key = f'jlc-{line.order.jlc_order_id}-line-{line.pk}'
+    if InventoryTransaction.objects.filter(external_key=ext_key).exists():
+        return None
+
+    qty = line.quantity - float(line.received_qty)
+    if qty <= 0:
+        return None
+
+    tx = InventoryTransaction.objects.create(
+        tx_type=InventoryTransaction.TxType.INCOMING,
+        product=line.product,
+        location=location,
+        qty=Decimal(str(qty)),
+        ref_doc=f'JLC-{line.order.jlc_order_id}',
+        external_key=ext_key,
+        performed_by=performed_by,
+    )
+    line.received_qty = Decimal(str(line.quantity))
+    line.save(update_fields=['received_qty'])
+    return tx
+
+
 # ── API Client ────────────────────────────────────────────────────────────────
 
 _NONCE_CHARS = string.ascii_letters + string.digits

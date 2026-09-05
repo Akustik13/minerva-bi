@@ -1,0 +1,57 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<style>
+.lb-card { background:var(--bg-card); border:1px solid var(--border-strong); border-radius:8px; padding:24px; max-width:520px; margin:0 auto; }
+.lb-title { font-size:16px; font-weight:700; color:var(--text); margin-bottom:4px; }
+.lb-file  { font-family:monospace; font-size:12px; color:var(--text-dim); margin-bottom:20px; word-break:break-all; }
+.lb-label { display:block; font-size:12px; color:var(--text-dim); margin-bottom:5px; font-weight:600; }
+.lb-input { width:100%; padding:8px 10px; background:var(--bg-input); border:1px solid var(--border-strong); border-radius:4px; color:var(--text); font-size:13px; box-sizing:border-box; margin-bottom:14px; }
+.lb-suggest { background:rgba(25,118,210,.08); border:1px solid rgba(25,118,210,.25); border-radius:6px; padding:10px 14px; font-size:12px; color:var(--text-dim); margin-bottom:16px; }
+.lb-suggest strong { color:var(--link-fg); cursor:pointer; text-decoration:underline; }
+.lb-btn-row { display:flex; gap:10px; margin-top:8px; }
+.lb-btn { flex:1; padding:10px 0; border:none; border-radius:6px; font-size:13px; font-weight:700; cursor:pointer; text-align:center; text-decoration:none; display:block; }
+.lb-btn-submit { background:#1976d2; color:#fff; }
+.lb-btn-back   { background:transparent; color:var(--text-dim); border:1px solid var(--border-strong); }
+.lb-btn:hover  { opacity:.85; }
+.lb-products   { margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+.lb-product-chip { padding:3px 10px; background:var(--bg-hover); border:1px solid var(--border-strong); border-radius:12px; font-size:11px; color:var(--text-dim); cursor:pointer; }
+.lb-product-chip:hover { background:rgba(25,118,210,.15); color:var(--link-fg); border-color:rgba(25,118,210,.4); }
+</style>
+
+<div class="lb-card">
+  <div class="lb-title">🔗 Прив'язати товар до позиції</div>
+  <div class="lb-file">{{ line.file_name }}</div>
+
+  {% if suggested %}
+  <div class="lb-suggest">
+    💡 Авто-пропозиція: <strong onclick="document.getElementById('id_sku').value='{{ suggested.sku }}'">{{ suggested.sku }}</strong>
+    {% if suggested.name %} — {{ suggested.name }}{% endif %}
+  </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <label class="lb-label" for="id_sku">SKU товару</label>
+    <input type="text" name="sku" id="id_sku" class="lb-input" placeholder="AN220201-04A"
+           value="{{ suggested.sku|default:'' }}" autocomplete="off" autofocus>
+
+    {% if products %}
+    <div style="margin-bottom:14px">
+      <div class="lb-label" style="margin-bottom:6px">Або оберіть з підказок:</div>
+      <div class="lb-products">
+        {% for p in products %}
+        <span class="lb-product-chip" onclick="document.getElementById('id_sku').value='{{ p.sku }}'">{{ p.sku }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="lb-btn-row">
+      <button type="submit" class="lb-btn lb-btn-submit">✅ Прив'язати</button>
+      <a href="{{ back_url }}" class="lb-btn lb-btn-back">← Назад</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

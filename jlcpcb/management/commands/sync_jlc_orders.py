@@ -15,6 +15,63 @@ from django.core.management.base import BaseCommand
 from django.utils import timezone
 
 
+def _sync_order_lines(order, raw, find_product_for_jlc_name, map_jlc_status):
+    """Create or update JLCOrderLine for every pcbItem in raw orderItem list."""
+    from datetime import datetime
+    from jlcpcb.models import JLCOrderLine
+
+    for item in raw.get('orderItem', []):
+        pcb = item.get('pcbItem') or {}
+        fname = pcb.get('fileName', '')
+        if not fname:
+            continue
+
+        st_key = map_jlc_status(pcb.get('orderStatus'))
+
+        line_order_date = None
+        raw_od = pcb.get('orderDate')
+        if raw_od:
+            try:
+                line_order_date = datetime.strptime(raw_od[:10], '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                pass
+
+        line_expected_date = None
+        raw_dt = pcb.get('deliveryTime')
+        if raw_dt:
+            try:
+                line_expected_date = datetime.strptime(raw_dt[:10], '%Y-%m-%d').date()
+            except (ValueError, TypeError):
+                pass
+
+        line, created = JLCOrderLine.objects.get_or_create(
+            order=order,
+            file_name=fname,
+            defaults={
+                'produce_code':  pcb.get('produceCode', ''),
+                'quantity':      pcb.get('count', 1) or 1,
+                'price':         pcb.get('price'),
+                'status_key':    st_key,
+                'order_date':    line_order_date,
+                'expected_date': line_expected_date,
+            },
+        )
+        if not created:
+            line.status_key    = st_key
+            line.quantity      = pcb.get('count', 1) or 1
+            line.price         = pcb.get('price')
+            if line_expected_date:
+                line.expected_date = line_expected_date
+            line.save(update_fields=['status_key', 'quantity', 'price', 'expected_date'])
+
+        # Auto-match product if not yet bound
+        if created and not line.product_id and fname:
+            product, _ = find_product_for_jlc_name(fname)
+            if product:
+                line.product = product
+                line.save(update_fields=['product'])
+
+
 class Command(BaseCommand):
     help = 'Sync JLCPCB order statuses, auto-match products, and check DHL delivery'
 
@@ -32,11 +89,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from datetime import timedelta, datetime
-        from jlcpcb.models import JLCConfig, JLCOrder
+        from jlcpcb.models import JLCConfig, JLCOrder, JLCOrderLine
         from jlcpcb.services.api import (
             JLCAPIClient, JLCAPIError,
             find_product_for_jlc_name, map_jlc_status, status_can_advance,
-            receive_into_inventory, extract_pcb_item, _extract_gerber_images,
+            receive_into_inventory, receive_line_into_inventory,
+            extract_pcb_item, _extract_gerber_images,
         )
         from jlcpcb.notifications import notify_jlc_status_change
 
@@ -236,6 +294,9 @@ class Command(BaseCommand):
                     'raw_data':        raw,
                 },
             )
+
+            # ── Sync per-file lines from all orderItems ───────────────────────
+            _sync_order_lines(order, raw, find_product_for_jlc_name, map_jlc_status)
 
             if is_created:
                 created += 1

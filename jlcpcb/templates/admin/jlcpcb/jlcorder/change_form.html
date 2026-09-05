@@ -110,6 +110,14 @@
   font-size: 11px; color: #c62828;
   margin-top: 3px; line-height: 1.4;
 }
+.jlc-action-btn {
+  display: block; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+  text-decoration: none; text-align: center; cursor: pointer;
+  background: rgba(25,118,210,.12); color: #1976d2; border: 1px solid rgba(25,118,210,.3);
+}
+.jlc-action-btn:hover { background: rgba(25,118,210,.22); }
+.jlc-action-green { background: rgba(46,125,50,.12); color: #2e7d32; border-color: rgba(46,125,50,.3); }
+.jlc-action-green:hover { background: rgba(46,125,50,.22); }
 
 /* ── DHL tracking events ── */
 .jlc-dhl-events {
@@ -385,7 +393,8 @@
             <th>Замовлено</th>
             <th>ETA доставки</th>
             <th>Ціна</th>
-            <th>Товар (прив'язка)</th>
+            <th>Товар</th>
+            <th>Дії</th>
             <th>Специфікація</th>
           </tr>
         </thead>
@@ -414,12 +423,25 @@
             <td style="white-space:nowrap">
               {% if sub.price %}{{ sub.price }} USD{% else %}—{% endif %}
             </td>
-            <td style="white-space:nowrap;font-size:12px">
-              {% if sub.mapped_sku %}
-                <a href="/admin/inventory/product/{{ sub.mapped_pid }}/change/" style="color:var(--link-fg);font-weight:600">{{ sub.mapped_sku }}</a>
-                <a href="{{ sub.mapping_url }}" style="color:var(--text-dim);font-size:10px;display:block;margin-top:2px">✏️ Прив'язки</a>
+            <td style="white-space:nowrap;font-size:12px;min-width:120px">
+              {% if sub.product %}
+                <a href="/admin/inventory/product/{{ sub.product.pk }}/change/" style="color:var(--link-fg);font-weight:600">{{ sub.product.sku }}</a>
+                {% if sub.is_received %}<span style="color:var(--ok);font-size:10px;display:block">📦 Прийнято {{ sub.received_qty }} шт.</span>{% endif %}
               {% else %}
-                <a href="{{ sub.add_mapping_url }}" style="color:var(--text-dim);font-size:11px">➕ Прив'язати</a>
+                <span style="color:var(--text-dim);font-size:11px">⬜ не прив'язано</span>
+              {% endif %}
+            </td>
+            <td style="white-space:nowrap;min-width:100px">
+              {% if sub.line_pk %}
+                {% if not sub.product %}
+                  <a href="{{ sub.bind_url }}" class="jlc-action-btn">🔗 Прив'язати</a>
+                {% else %}
+                  <a href="{{ sub.bind_url }}" style="color:var(--text-dim);font-size:10px">✏️ Змінити</a>
+                {% endif %}
+                {% if sub.receive_url %}
+                  <a href="{{ sub.receive_url }}" class="jlc-action-btn jlc-action-green" style="margin-top:4px"
+                     onclick="return confirm('Прийняти {{ sub.count }} шт. {{ sub.product.sku }} на склад?')">📥 Прийняти</a>
+                {% endif %}
               {% endif %}
             </td>
             <td>

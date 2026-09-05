@@ -12,7 +12,7 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-from .models import JLCConfig, JLCOrder, JLCProductMapping
+from .models import JLCConfig, JLCOrder, JLCOrderLine, JLCProductMapping
 
 # ── Badge helpers ─────────────────────────────────────────────────────────────
 
@@ -206,8 +206,8 @@ class JLCOrderAdmin(admin.ModelAdmin):
 
     list_display = (
         'gerber_thumb', 'jlc_order_id_link', 'order_type', 'description_short',
-        'quantity', 'status_badge', 'mapping_badge',
-        'product_link', 'tracking_display',
+        'quantity', 'status_badge',
+        'files_summary_col', 'tracking_display',
         'order_date', 'shipped_date',
     )
     list_filter   = ('local_status', 'mapping_status', 'order_type')
@@ -300,6 +300,13 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('<int:pk>/mark-delivered/',
                  self.admin_site.admin_view(self.mark_delivered_view),
                  name='jlcpcb_jlcorder_mark_delivered'),
+            # Per-line operations
+            path('<int:pk>/line/<int:line_pk>/bind/',
+                 self.admin_site.admin_view(self.line_bind_view),
+                 name='jlcpcb_jlcorder_line_bind'),
+            path('<int:pk>/line/<int:line_pk>/receive/',
+                 self.admin_site.admin_view(self.line_receive_view),
+                 name='jlcpcb_jlcorder_line_receive'),
             # Gerber workflow
             path('gerber/',
                  self.admin_site.admin_view(self.gerber_page_view),
@@ -693,6 +700,74 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.success(request, f'🔔 Сповіщення надіслано: {", ".join(channels)} — {order.jlc_order_id}')
         return redirect('admin:jlcpcb_jlcorder_change', pk)
 
+    # ── Per-line bind / receive ───────────────────────────────────────────────
+
+    def line_bind_view(self, request, pk, line_pk):
+        """Bind a product to a specific JLCOrderLine."""
+        from django.template.response import TemplateResponse
+        from inventory.models import Product
+
+        order = get_object_or_404(JLCOrder, pk=pk)
+        line  = get_object_or_404(JLCOrderLine, pk=line_pk, order=order)
+
+        if request.method == 'POST':
+            sku = request.POST.get('sku', '').strip()
+            if sku:
+                product = Product.objects.filter(sku__iexact=sku).first()
+                if product:
+                    line.product = product
+                    line.save(update_fields=['product'])
+                    # Also sync main order product if none set
+                    if not order.product_id:
+                        order.product        = product
+                        order.mapping_status = JLCOrder.MappingStatus.MATCHED
+                        order.auto_matched_sku = product.sku
+                        order.save(update_fields=['product', 'mapping_status', 'auto_matched_sku', 'updated_at'])
+                    messages.success(request, f"✅ {line.file_name[:40]} → {product.sku}")
+                    return redirect('admin:jlcpcb_jlcorder_change', pk)
+                else:
+                    messages.error(request, f'❌ SKU «{sku}» не знайдено в каталозі.')
+            else:
+                messages.error(request, '❌ Введіть SKU товару.')
+
+        # Suggest best match
+        from .services.api import find_product_for_jlc_name
+        suggested, _ = find_product_for_jlc_name(line.file_name)
+        products = list(Product.objects.filter(
+            sku__icontains=line.file_name.split('_')[0]
+        ).values('sku', 'name')[:20]) if line.file_name else []
+
+        return TemplateResponse(request, 'admin/jlcpcb/jlcorder/line_bind.html', {
+            **self.admin_site.each_context(request),
+            'title':     f"Прив'язати товар: {line.file_name[:50]}",
+            'order':     order,
+            'line':      line,
+            'suggested': suggested,
+            'products':  products,
+            'back_url':  reverse('admin:jlcpcb_jlcorder_change', args=[pk]),
+            'opts':      JLCOrder._meta,
+        })
+
+    def line_receive_view(self, request, pk, line_pk):
+        """Receive a specific JLCOrderLine into inventory."""
+        order = get_object_or_404(JLCOrder, pk=pk)
+        line  = get_object_or_404(JLCOrderLine, pk=line_pk, order=order)
+
+        if order.local_status != JLCOrder.LocalStatus.DELIVERED:
+            messages.error(request, '❌ Прийом тільки для доставлених замовлень.')
+            return redirect('admin:jlcpcb_jlcorder_change', pk)
+        if not line.product_id:
+            messages.error(request, "❌ Спочатку прив'яжіть товар до цієї позиції.")
+            return redirect('admin:jlcpcb_jlcorder_change', pk)
+
+        from .services.api import receive_line_into_inventory
+        tx = receive_line_into_inventory(line, performed_by=request.user)
+        if tx:
+            messages.success(request, f'✅ {tx.qty} шт. {line.product.sku} додано на склад.')
+        else:
+            messages.warning(request, '⚠️ Прийом вже виконано або кількість = 0.')
+        return redirect('admin:jlcpcb_jlcorder_change', pk)
+
     # ── Gerber ordering workflow ──────────────────────────────────────────────
 
     def gerber_page_view(self, request):
@@ -1004,11 +1079,81 @@ class JLCOrderAdmin(admin.ModelAdmin):
         )
 
     @admin.display(description='Опис')
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related('lines__product')
+
     def description_short(self, obj):
         txt = obj.description or ''
         if len(txt) > 45:
             return format_html('<span title="{}">{}&hellip;</span>', txt, txt[:45])
         return txt or '—'
+
+    _STATUS_UK_SHORT = {
+        'ordered': 'Замовлено', 'reviewed': 'Перевірено', 'in_production': 'Виробництво',
+        'manufactured': 'Виготовлено', 'shipped': 'Відправлено',
+        'delivered': 'Доставлено', 'cancelled': 'Скасовано',
+    }
+
+    @admin.display(description='Файли / Товари')
+    def files_summary_col(self, obj):
+        from django.utils.html import mark_safe
+        lines = list(obj.lines.all())  # prefetched
+        if not lines:
+            # Fallback to old product_link logic
+            if obj.product_id:
+                return format_html(
+                    '<a href="/admin/inventory/product/{}/change/" style="color:var(--link-fg)">{}</a>',
+                    obj.product_id, obj.product.sku if obj.product else '—',
+                )
+            return mark_safe('<span style="color:var(--text-dim);font-size:11px">—</span>')
+
+        if len(lines) == 1:
+            ln = lines[0]
+            st = self._STATUS_UK_SHORT.get(ln.status_key, ln.status_key)
+            icon = _STATUS_ICONS.get(ln.status_key, '')
+            if ln.product_id:
+                recv = ' 📦' if ln.is_received else ''
+                return format_html(
+                    '<a href="/admin/inventory/product/{}/change/" style="color:var(--link-fg);font-weight:600">{}</a>'
+                    '<span style="color:var(--text-dim);font-size:10px;display:block">{} {}{}</span>',
+                    ln.product_id, ln.product.sku, icon, st, recv,
+                )
+            return format_html(
+                '<span style="color:var(--text-dim);font-size:11px">⬜ {} {}</span>',
+                icon, st,
+            )
+
+        # Multiple files — use <details> for expand/collapse
+        bound    = sum(1 for l in lines if l.product_id)
+        received = sum(1 for l in lines if l.is_received)
+        rows = []
+        for ln in lines:
+            icon = _STATUS_ICONS.get(ln.status_key, '')
+            if ln.product_id:
+                recv_icon = '📦 ' if ln.is_received else ''
+                rows.append(
+                    f'<div style="padding:1px 0;font-size:11px;white-space:nowrap">'
+                    f'✅ {recv_icon}<a href="/admin/inventory/product/{ln.product_id}/change/" '
+                    f'style="color:var(--link-fg)">{ln.product.sku}</a>'
+                    f' <span style="color:var(--text-dim)">{icon}</span>'
+                    f'</div>'
+                )
+            else:
+                short = ln.file_name[:30] + ('…' if len(ln.file_name) > 30 else '')
+                rows.append(
+                    f'<div style="padding:1px 0;font-size:11px;white-space:nowrap;color:var(--text-dim)">'
+                    f'⬜ {short} {icon}'
+                    f'</div>'
+                )
+        summary = f'{len(lines)} файлів · {bound} прив\'язано'
+        if received:
+            summary += f' · {received} прийнято'
+        return mark_safe(
+            f'<details><summary style="cursor:pointer;font-size:11px;list-style:none">'
+            f'▶ {summary}</summary>'
+            f'<div style="padding:4px 0">{"".join(rows)}</div>'
+            f'</details>'
+        )
 
     @admin.display(description='Статус', ordering='local_status')
     def status_badge(self, obj):
@@ -1169,6 +1314,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
             )
 
             from .services.api import map_jlc_status
+            import re as _re
             _STATUS_UK = {
                 'ordered': 'Замовлено', 'reviewed': 'Перевірено',
                 'in_production': 'У виробництві', 'manufactured': 'Виготовлено',
@@ -1178,66 +1324,91 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 'ordered': '📋', 'reviewed': '🔍', 'in_production': '🏭',
                 'manufactured': '✅', 'shipped': '📦', 'delivered': '🎉', 'cancelled': '❌',
             }
-            # Pre-fetch all JLCProductMapping entries for product binding column
-            from .models import JLCProductMapping
-            from urllib.parse import quote as _urlencode
-            all_mappings = list(JLCProductMapping.objects.select_related('product').values_list(
-                'jlc_reference', 'product__sku', 'product_id',
-            ))
 
-            def _find_mapped_product(fname):
-                """Return (sku, product_id, mapping_url) or (None, None, None)."""
-                if not fname:
-                    return None, None, None
-                fname_lower = fname.lower()
-                for ref, sku, pid in all_mappings:
-                    ref_l = ref.lower()
-                    if fname_lower.startswith(ref_l) or ref_l.startswith(fname_lower) or ref_l == fname_lower:
-                        return sku, pid, reverse('admin:jlcpcb_jlcproductmapping_changelist')
-                return None, None, None
-
-            sub_orders = []
+            # Build pcb spec dict from raw_data (keyed by fileName) for rich display
+            pcb_specs = {}
             for item in raw.get('orderItem', []):
                 pcb = item.get('pcbItem') or {}
-                if not pcb:
-                    continue
-                st_int = pcb.get('orderStatus')
-                st_key = map_jlc_status(st_int)
-                cancel = pcb.get('cancelReason') or ''
-                # Strip HTML tags from cancelReason
-                import re
-                cancel = re.sub(r'<[^>]+>', '', cancel).strip()
-                fname = pcb.get('fileName', '—')
-                mapped_sku, mapped_pid, mapping_url = _find_mapped_product(fname)
-                add_mapping_url = (
-                    reverse('admin:jlcpcb_jlcproductmapping_add')
-                    + f'?jlc_reference={_urlencode(fname)}'
-                ) if fname != '—' else ''
+                fname = pcb.get('fileName', '')
+                if fname:
+                    cancel = _re.sub(r'<[^>]+>', '', pcb.get('cancelReason') or '').strip()
+                    pcb_specs[fname] = {
+                        'produce_code':  pcb.get('produceCode', ''),
+                        'status_key':    map_jlc_status(pcb.get('orderStatus')),
+                        'order_date':    (pcb.get('orderDate') or '')[:10],
+                        'delivery_time': (pcb.get('deliveryTime') or '')[:16].replace('T', ' '),
+                        'price':         pcb.get('price'),
+                        'size':          f"{pcb.get('width')}×{pcb.get('length')} мм" if pcb.get('width') else '',
+                        'layers':        pcb.get('layer', ''),
+                        'thickness':     pcb.get('thickness', ''),
+                        'color':         pcb.get('pcbColor', ''),
+                        'surface':       pcb.get('surfaceFinish', ''),
+                        'material':      pcb.get('materialDetails', ''),
+                        'copper':        pcb.get('copperWeight', ''),
+                        'half_hole':     pcb.get('halfHole', ''),
+                        'build_time':    pcb.get('buildTime', ''),
+                        'cancel':        cancel,
+                    }
+
+            # Build sub_orders from JLCOrderLine (with per-line action URLs)
+            db_lines = list(obj.lines.select_related('product').all())
+            is_delivered = obj.local_status == JLCOrder.LocalStatus.DELIVERED
+
+            sub_orders = []
+            for line in db_lines:
+                spec = pcb_specs.get(line.file_name, {})
+                st_key = spec.get('status_key') or line.status_key or 'ordered'
                 sub_orders.append({
-                    'file_name':    fname,
-                    'produce_code': pcb.get('produceCode', ''),
-                    'count':        pcb.get('count', 0),
-                    'status_key':   st_key,
-                    'status_label': _STATUS_UK.get(st_key, st_key),
-                    'status_icon':  _STATUS_ICON.get(st_key, ''),
-                    'order_date':   (pcb.get('orderDate') or '')[:10],
-                    'delivery_time': (pcb.get('deliveryTime') or '')[:16].replace('T', ' '),
-                    'price':        pcb.get('price'),
-                    'size':         f"{pcb.get('width')}×{pcb.get('length')} мм" if pcb.get('width') else '',
-                    'layers':       pcb.get('layer', ''),
-                    'thickness':    pcb.get('thickness', ''),
-                    'color':        pcb.get('pcbColor', ''),
-                    'surface':      pcb.get('surfaceFinish', ''),
-                    'material':     pcb.get('materialDetails', ''),
-                    'copper':       pcb.get('copperWeight', ''),
-                    'half_hole':    pcb.get('halfHole', ''),
-                    'build_time':   pcb.get('buildTime', ''),
-                    'cancel':       cancel,
-                    'mapped_sku':   mapped_sku,
-                    'mapped_pid':   mapped_pid,
-                    'mapping_url':  mapping_url or '',
-                    'add_mapping_url': add_mapping_url,
+                    'line_pk':       line.pk,
+                    'file_name':     line.file_name,
+                    'produce_code':  spec.get('produce_code', line.produce_code),
+                    'count':         line.quantity,
+                    'status_key':    st_key,
+                    'status_label':  _STATUS_UK.get(st_key, st_key),
+                    'status_icon':   _STATUS_ICON.get(st_key, ''),
+                    'order_date':    spec.get('order_date', ''),
+                    'delivery_time': spec.get('delivery_time', ''),
+                    'price':         spec.get('price') or line.price,
+                    'size':          spec.get('size', ''),
+                    'layers':        spec.get('layers', ''),
+                    'thickness':     spec.get('thickness', ''),
+                    'color':         spec.get('color', ''),
+                    'surface':       spec.get('surface', ''),
+                    'material':      spec.get('material', ''),
+                    'copper':        spec.get('copper', ''),
+                    'half_hole':     spec.get('half_hole', ''),
+                    'build_time':    spec.get('build_time', ''),
+                    'cancel':        spec.get('cancel', ''),
+                    # Product binding
+                    'product':       line.product,
+                    'received_qty':  line.received_qty,
+                    'is_received':   line.is_received,
+                    # Action URLs
+                    'bind_url':    reverse('admin:jlcpcb_jlcorder_line_bind', args=[obj.pk, line.pk]),
+                    'receive_url': reverse('admin:jlcpcb_jlcorder_line_receive', args=[obj.pk, line.pk])
+                                   if is_delivered and line.product_id and not line.is_received else '',
                 })
+
+            # Fallback: if no lines in DB yet, show raw pcb_specs
+            if not sub_orders and pcb_specs:
+                for fname, spec in pcb_specs.items():
+                    st_key = spec.get('status_key', 'ordered')
+                    sub_orders.append({
+                        'line_pk': None, 'file_name': fname,
+                        'produce_code': spec.get('produce_code', ''), 'count': 0,
+                        'status_key': st_key, 'status_label': _STATUS_UK.get(st_key, st_key),
+                        'status_icon': _STATUS_ICON.get(st_key, ''),
+                        'order_date': spec.get('order_date', ''), 'delivery_time': spec.get('delivery_time', ''),
+                        'price': spec.get('price'), 'size': spec.get('size', ''),
+                        'layers': spec.get('layers', ''), 'thickness': spec.get('thickness', ''),
+                        'color': spec.get('color', ''), 'surface': spec.get('surface', ''),
+                        'material': spec.get('material', ''), 'copper': spec.get('copper', ''),
+                        'half_hole': spec.get('half_hole', ''), 'build_time': spec.get('build_time', ''),
+                        'cancel': spec.get('cancel', ''),
+                        'product': None, 'received_qty': 0, 'is_received': False,
+                        'bind_url': '', 'receive_url': '',
+                    })
+
             extra['jlc_sub_orders'] = sub_orders
 
             # Gerber file download URL (from pcbItem.orderFileUrl — may expire after ~24h)

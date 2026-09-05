@@ -191,6 +191,39 @@ class JLCOrder(models.Model):
         return self.local_status not in (self.LocalStatus.DELIVERED, self.LocalStatus.CANCELLED)
 
 
+class JLCOrderLine(models.Model):
+    """Per-file line item within a JLCPCB batch order."""
+
+    order        = models.ForeignKey(JLCOrder, on_delete=models.CASCADE, related_name='lines')
+    file_name    = models.CharField('Файл', max_length=500, db_index=True)
+    produce_code = models.CharField('Код виробництва', max_length=100, blank=True, default='')
+    quantity     = models.PositiveIntegerField('К-сть', default=1)
+    price        = models.DecimalField('Ціна (USD)', max_digits=12, decimal_places=2,
+                                       null=True, blank=True)
+    status_key   = models.CharField('Статус JLC', max_length=30, blank=True, default='')
+    product      = models.ForeignKey(
+        'inventory.Product', on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name='Товар', related_name='jlc_lines',
+    )
+    received_qty  = models.DecimalField('Отримано (шт)', max_digits=12, decimal_places=3,
+                                        default=Decimal('0'))
+    order_date    = models.DateField('Дата замовлення', null=True, blank=True)
+    expected_date = models.DateField('ETA доставки', null=True, blank=True)
+
+    class Meta:
+        verbose_name        = 'Позиція замовлення JLCPCB'
+        verbose_name_plural = 'Позиції замовлень JLCPCB'
+        unique_together     = [('order', 'file_name')]
+        ordering            = ['pk']
+
+    def __str__(self):
+        return f'{self.order.jlc_order_number} / {self.file_name[:40]}'
+
+    @property
+    def is_received(self):
+        return float(self.received_qty) >= self.quantity
+
+
 class JLCProductMapping(models.Model):
     """Таблиця відповідностей: JLC reference/назва → Product на складі."""
 
