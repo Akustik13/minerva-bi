@@ -2951,6 +2951,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     tx_type=InventoryTransaction.TxType.ADJUSTMENT,
                     qty=delta, product=product, location=location,
                     ref_doc="manual:set_stock", tx_date=timezone.now(),
+                    performed_by=request.user,
                 )
                 sign = '+' if delta > 0 else ''
                 messages.success(request,
@@ -3184,6 +3185,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                                             location=location,
                                             ref_doc="excel_import",
                                             tx_date=timezone.now(),
+                                            performed_by=request.user,
                                         )
                             except (InvalidOperation, ValueError):
                                 stats["errors"].append(
