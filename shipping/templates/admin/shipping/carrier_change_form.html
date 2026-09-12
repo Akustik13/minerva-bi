@@ -5,6 +5,9 @@
 {{ block.super }}
 {% if ups_carrier_pk %}
 <li>
+  <a href="/admin/shipping/carrier/{{ ups_carrier_pk }}/ups-billing/" class="historylink">💳 UPS Billing</a>
+</li>
+<li>
   <a href="/admin/shipping/carrier/{{ ups_carrier_pk }}/ups-log/" class="historylink" target="_blank">📋 UPS {% trans "Лог" %}</a>
 </li>
 <li>

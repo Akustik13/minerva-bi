@@ -1145,6 +1145,33 @@ class UPSClient:
             self._handle_error(r)
         return resp_body or {}
 
+    # ── Billing ───────────────────────────────────────────────────────────────
+
+    def get_billing_invoices(self, start_date: str, end_date: str,
+                             invoice_number: str = None,
+                             limit: int = 50, offset: int = 0) -> dict:
+        """
+        GET /api/invoice/v1/shipping/invoices
+        UPS Invoice Management API — повертає рахунки за доставку.
+        Потребує підписки "Invoice Management" на акаунті UPS.
+
+        start_date / end_date: 'YYYY-MM-DD' або 'YYYYMMDD'
+        Повертає raw dict: {'invoices': [...], 'totalRecordCount': int}
+        """
+        def _fmt(d: str) -> str:
+            return d.replace('-', '') if len(d) == 10 else d
+
+        params: dict = {
+            'startDate': _fmt(start_date),
+            'endDate':   _fmt(end_date),
+            'limit':     limit,
+            'offset':    offset,
+        }
+        if invoice_number:
+            params['invoiceNumber'] = invoice_number
+
+        return self._get('/api/invoice/v1/shipping/invoices', params=params)
+
     # ── Void ──────────────────────────────────────────────────────────────────
 
     def void_shipment(self, shipment_id: str) -> dict:

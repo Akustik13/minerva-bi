@@ -1,0 +1,260 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}UPS Billing — {{ carrier.name }}{% endblock %}
+
+{% block extrahead %}
+{{ block.super }}
+<style>
+.billing-wrap { max-width: 1100px; margin: 0 auto; padding: 24px 0; }
+
+.billing-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 10px;
+  padding: 24px 28px;
+  margin-bottom: 22px;
+}
+.billing-card h3 {
+  margin: 0 0 18px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.billing-row { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-end; }
+.billing-row .field-group { display: flex; flex-direction: column; gap: 5px; }
+.billing-row label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+.billing-row input[type=date],
+.billing-row input[type=file] {
+  background: var(--bg-input, #141f2b);
+  color: var(--text);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+.billing-row input[type=file] { padding: 5px 10px; }
+
+.btn-ups {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 20px;
+  background: #1565c0;
+  color: #fff;
+  border: none;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .15s;
+  text-decoration: none;
+}
+.btn-ups:hover { opacity: .85; }
+.btn-ups.secondary { background: var(--bg-hover, #1e2d40); color: var(--text); }
+.btn-ups.green  { background: #2e7d32; }
+.btn-ups.danger { background: #c62828; }
+
+.note-box {
+  background: var(--bg-hover, #1e2d40);
+  border-left: 3px solid #1565c0;
+  border-radius: 0 6px 6px 0;
+  padding: 10px 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+.note-box.warn  { border-left-color: #f57c00; }
+.note-box.error { border-left-color: #c62828; color: var(--err, #ef9a9a); }
+.note-box.ok    { border-left-color: #2e7d32; }
+
+/* Preview table */
+.preview-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 16px; }
+.preview-table th {
+  background: var(--bg-hover, #1e2d40);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  text-align: left;
+}
+.preview-table td { padding: 8px 12px; border-bottom: 1px solid var(--border-color, #333); }
+.preview-table tr.dup td { opacity: .45; }
+.preview-table tr.dup td:first-child::before {
+  content: "dup ";
+  color: var(--text-dim);
+  font-size: 10px;
+}
+.badge-skip {
+  display: inline-block; padding: 2px 8px;
+  background: #37474f; color: #90a4ae;
+  border-radius: 10px; font-size: 10px;
+}
+.badge-new {
+  display: inline-block; padding: 2px 8px;
+  background: #1b5e20; color: #a5d6a7;
+  border-radius: 10px; font-size: 10px;
+}
+.stats-row { display: flex; gap: 24px; margin-bottom: 16px; }
+.stat-pill {
+  background: var(--bg-hover);
+  border-radius: 8px;
+  padding: 10px 18px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.stat-pill .val { font-size: 22px; font-weight: 700; color: var(--text); }
+.stat-pill .lbl { font-size: 11px; color: var(--text-muted); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="billing-wrap">
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+    <a href="{{ back_url }}" class="btn-ups secondary">← Назад</a>
+    <h2 style="margin:0;font-size:20px;font-weight:700;color:var(--text)">
+      📦 UPS Billing — {{ carrier.name }}
+    </h2>
+  </div>
+
+  {% if error %}
+  <div class="note-box error">❌ {{ error }}</div>
+  {% endif %}
+  {% if info %}
+  <div class="note-box ok">ℹ️ {{ info }}</div>
+  {% endif %}
+
+  {% if preview %}
+  {# ── Preview / підтвердження імпорту ─────────────────────────────────── #}
+  <div class="billing-card">
+    <h3>📋 Попередній перегляд (dry run)</h3>
+
+    <div class="stats-row">
+      <div class="stat-pill">
+        <span class="val" style="color:#a5d6a7">{{ would_create }}</span>
+        <span class="lbl">Буде додано</span>
+      </div>
+      <div class="stat-pill">
+        <span class="val" style="color:#90a4ae">{{ would_skip }}</span>
+        <span class="lbl">Пропущено (дублі)</span>
+      </div>
+      <div class="stat-pill">
+        <span class="val">{{ preview|length }}</span>
+        <span class="lbl">Всього рядків</span>
+      </div>
+    </div>
+
+    {% if would_create > 0 %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="import">
+      <input type="hidden" name="records_json" value="{{ records_json }}">
+      <button type="submit" class="btn-ups green" style="margin-bottom:16px">
+        ✅ Підтвердити і записати {{ would_create }} витрат в Accounting
+      </button>
+    </form>
+    {% else %}
+    <div class="note-box ok">Всі рядки вже є в базі — нічого імпортувати.</div>
+    {% endif %}
+
+    <table class="preview-table">
+      <thead>
+        <tr>
+          <th>Invoice №</th>
+          <th>Дата</th>
+          <th>Tracking</th>
+          <th>Сервіс</th>
+          <th>Сума</th>
+          <th>Валюта</th>
+          <th>Статус</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in preview %}
+        <tr {% if row.duplicate %}class="dup"{% endif %}>
+          <td>{{ row.invoice_number }}</td>
+          <td>{{ row.invoice_date }}</td>
+          <td style="font-family:monospace;font-size:12px">{{ row.tracking_number|default:"—" }}</td>
+          <td>{{ row.service|default:"—" }}</td>
+          <td style="font-weight:700">{{ row.amount }}</td>
+          <td>{{ row.currency }}</td>
+          <td>
+            {% if row.duplicate %}
+            <span class="badge-skip">дублікат</span>
+            {% else %}
+            <span class="badge-new">новий</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% else %}
+  {# ── Форма вибору методу ──────────────────────────────────────────────── #}
+
+  {# ─── Варіант 1: UPS API ─── #}
+  <div class="billing-card">
+    <h3>🔌 Варіант 1 — UPS Invoice Management API</h3>
+    <div class="note-box warn">
+      Потребує підписки <b>Invoice Management</b> на акаунті UPS.
+      Якщо API повертає 404/403 — використовуйте CSV-імпорт нижче.
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="api">
+      <div class="billing-row">
+        <div class="field-group">
+          <label>Дата від</label>
+          <input type="date" name="start_date" value="{{ start_date }}" required>
+        </div>
+        <div class="field-group">
+          <label>Дата до</label>
+          <input type="date" name="end_date" value="{{ end_date }}" required>
+        </div>
+        <button type="submit" class="btn-ups">🔍 Завантажити з UPS API</button>
+      </div>
+    </form>
+  </div>
+
+  {# ─── Варіант 2: CSV ─── #}
+  <div class="billing-card">
+    <h3>📄 Варіант 2 — Імпорт CSV з billing.ups.com</h3>
+    <div class="note-box">
+      1. Зайди на <b>billing.ups.com</b> → <b>View Invoices</b><br>
+      2. Вибери рахунки → <b>Download</b> → <b>CSV</b><br>
+      3. Завантаж файл сюди — Minerva розпарсить і покаже preview перед записом.
+    </div>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="csv">
+      <div class="billing-row">
+        <div class="field-group">
+          <label>CSV-файл</label>
+          <input type="file" name="csv_file" accept=".csv,.txt" required>
+        </div>
+        <button type="submit" class="btn-ups">📂 Завантажити CSV</button>
+      </div>
+    </form>
+  </div>
+
+  {# ─── Де знайти рахунки ─── #}
+  <div class="billing-card">
+    <h3>📋 Куди потрапляють імпортовані рахунки</h3>
+    <div class="note-box">
+      Кожен рядок записується як <b>Витрата (Expense)</b> в модулі <b>Accounting</b><br>
+      з категорією <b>Доставка → UPS</b>.<br><br>
+      <a href="/admin/accounting/expense/?category__name=UPS" target="_blank" class="btn-ups secondary" style="padding:5px 14px;font-size:12px">
+        Переглянути витрати UPS →
+      </a>
+    </div>
+  </div>
+
+  {% endif %}
+</div>
+{% endblock %}

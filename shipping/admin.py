@@ -238,6 +238,9 @@ class CarrierAdmin(admin.ModelAdmin):
             path('<int:pk>/test-jumingo-rates/',
                  self.admin_site.admin_view(self.test_jumingo_rates_view),
                  name='carrier_test_jumingo_rates'),
+            path('<int:pk>/ups-billing/',
+                 self.admin_site.admin_view(self.ups_billing_view),
+                 name='carrier_ups_billing'),
         ]
         return custom + urls
 
@@ -800,6 +803,114 @@ class CarrierAdmin(admin.ModelAdmin):
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
+
+    def ups_billing_view(self, request, pk):
+        """
+        GET  — показує форму імпорту UPS рахунків (API або CSV).
+        POST action=api  — завантажує з UPS Invoice Management API.
+        POST action=csv  — парсить завантажений CSV-файл.
+        POST action=import — підтверджує dry_run preview та записує в БД.
+        """
+        import json as _json
+        from django.utils.dateformat import format as _fmt
+        from shipping.services.ups_billing import (
+            parse_ups_csv, fetch_from_api, import_billing_records,
+        )
+        from shipping.ups_client import UPSError
+        from datetime import date as _date, timedelta as _td
+
+        carrier = get_object_or_404(Carrier, pk=pk)
+        context = {
+            'carrier': carrier,
+            'title': f'UPS Billing — {carrier.name}',
+            'opts': self.model._meta,
+            'back_url': reverse('admin:shipping_carrier_change', args=[pk]),
+        }
+
+        if request.method == 'POST':
+            action = request.POST.get('action', '')
+
+            # ── CSV-імпорт ────────────────────────────────────────────────────
+            if action == 'csv':
+                f = request.FILES.get('csv_file')
+                if not f:
+                    context['error'] = 'Файл не вибрано.'
+                else:
+                    try:
+                        records = parse_ups_csv(f)
+                        if not records:
+                            context['error'] = 'CSV не містить розпізнаних даних. Перевірте формат файлу.'
+                        else:
+                            result = import_billing_records(records, dry_run=True)
+                            context.update({
+                                'preview':      result['preview'],
+                                'would_create': result['created'],
+                                'would_skip':   result['skipped'],
+                                'records_json': _json.dumps(records, default=str),
+                                'mode':         'csv',
+                            })
+                    except Exception as e:
+                        context['error'] = f'Помилка парсингу: {e}'
+
+            # ── API-імпорт ────────────────────────────────────────────────────
+            elif action == 'api':
+                start = request.POST.get('start_date', '')
+                end   = request.POST.get('end_date', '')
+                if not start or not end:
+                    context['error'] = 'Вкажіть дати початку і кінця.'
+                else:
+                    try:
+                        records = fetch_from_api(carrier, start, end)
+                        if not records:
+                            context['info'] = 'UPS API не повернув рахунків за вказаний період.'
+                        else:
+                            result = import_billing_records(records, dry_run=True)
+                            context.update({
+                                'preview':      result['preview'],
+                                'would_create': result['created'],
+                                'would_skip':   result['skipped'],
+                                'records_json': _json.dumps(records, default=str),
+                                'mode':         'api',
+                                'start_date':   start,
+                                'end_date':     end,
+                            })
+                    except UPSError as e:
+                        context['error'] = f'UPS API помилка: {e}'
+                    except Exception as e:
+                        context['error'] = f'Помилка: {e}'
+
+            # ── Підтвердження імпорту ─────────────────────────────────────────
+            elif action == 'import':
+                raw = request.POST.get('records_json', '[]')
+                try:
+                    records = _json.loads(raw)
+                    # Відновлюємо date-об'єкти
+                    from datetime import date as _date2
+                    from decimal import Decimal as D
+                    for r in records:
+                        if isinstance(r.get('invoice_date'), str):
+                            r['invoice_date'] = _date2.fromisoformat(r['invoice_date'])
+                        if isinstance(r.get('amount'), str):
+                            r['amount'] = D(r['amount'])
+                    result = import_billing_records(records, dry_run=False)
+                    if result['errors']:
+                        messages.error(request, f"❌ Помилки: {'; '.join(result['errors'][:3])}")
+                    else:
+                        messages.success(
+                            request,
+                            f"✅ Імпортовано {result['created']} рахунків UPS, "
+                            f"пропущено {result['skipped']} дублікатів."
+                        )
+                    return redirect(reverse('admin:shipping_carrier_ups_billing', args=[pk]))
+                except Exception as e:
+                    context['error'] = f'Помилка імпорту: {e}'
+
+        # Дефолтні дати для форми (поточний місяць)
+        today = _date.today()
+        context.setdefault('start_date', today.replace(day=1).isoformat())
+        context.setdefault('end_date', today.isoformat())
+
+        return render(request, 'admin/shipping/ups_billing.html', context)
 
 
 # ── ShipmentPackage Inline ────────────────────────────────────────────────────
