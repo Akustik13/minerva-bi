@@ -112,13 +112,23 @@ class JLCScraper(BaseScraper):
 
         await page.wait_for_timeout(2000)
 
-        # Перевіряємо reCAPTCHA модалку ("Security Verification")
-        captcha_modal = page.locator('text=Security Verification, text=I\'m not a robot')
-        if await captcha_modal.count() > 0 or await page.locator('iframe[src*="recaptcha"]').count() > 0:
+        # Перевіряємо reCAPTCHA — якщо сторінка вже навігувала (успішний логін),
+        # locator.count() кине помилку "Execution context was destroyed"
+        has_captcha = False
+        try:
+            captcha_modal = page.locator('text=Security Verification, text=I\'m not a robot')
+            has_captcha = (
+                await captcha_modal.count() > 0
+                or await page.locator('iframe[src*="recaptcha"]').count() > 0
+            )
+        except Exception:
+            # Сторінка вже навігувала — скоріш за все успішний логін без CAPTCHA
+            self.log.info('Page navigated during CAPTCHA check — likely successful login')
+
+        if has_captcha:
             self.log.info('reCAPTCHA detected — trying to click checkbox...')
             try:
-                # Клікаємо чекбокс "I'm not a robot" в iframe
-                frame = page.frame_locator('iframe[title*="reCAPTCHA"], iframe[src*="recaptcha"]').first
+                frame    = page.frame_locator('iframe[title*="reCAPTCHA"], iframe[src*="recaptcha"]').first
                 checkbox = frame.locator('.recaptcha-checkbox-border, #recaptcha-anchor')
                 if await checkbox.count() > 0:
                     await checkbox.click()
