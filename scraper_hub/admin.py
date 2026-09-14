@@ -91,8 +91,9 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
         ('Бухгалтерія', {
             'fields': ('auto_create_expense', 'expense_category', 'supplier'),
             'description': (
-                'Після завантаження PDF автоматично створюється запис Expense '
-                'з сумою 0 — заповніть вручну після перевірки рахунку.'
+                'Після завантаження PDF автоматично створюється Expense. '
+                'Сума береться з JLCPCB API (JLCOrder.total_price) або парситься з PDF. '
+                'Рахунок прив\'язується до JLCOrder за batch номером.'
             ),
         }),
         ('Останній запуск', {
@@ -300,12 +301,12 @@ class ScraperRunAdmin(admin.ModelAdmin):
 
 @admin.register(ScraperDocument)
 class ScraperDocumentAdmin(admin.ModelAdmin):
-    list_display  = ('batch_num', 'site_col', 'invoice_date',
+    list_display  = ('batch_num', 'site_col', 'jlc_order_link', 'invoice_date',
                       'amount_col', 'pdf_link', 'expense_link', 'created_at')
     list_filter   = ('run__config__site_name', 'currency')
     search_fields = ('batch_num',)
-    readonly_fields = ('run', 'batch_num', 'created_at', 'pdf_link', 'expense_link')
-    fields = ('run', 'batch_num', 'invoice_date', 'amount', 'currency',
+    readonly_fields = ('run', 'batch_num', 'jlc_order_link', 'created_at', 'pdf_link', 'expense_link')
+    fields = ('run', 'batch_num', 'jlc_order', 'jlc_order_link', 'invoice_date', 'amount', 'currency',
               'pdf_link', 'expense_link', 'created_at')
 
     def has_add_permission(self, request):
@@ -326,6 +327,13 @@ class ScraperDocumentAdmin(admin.ModelAdmin):
             return '—'
         return format_html('<a href="/media/{}" target="_blank">📄 PDF</a>', obj.file)
     pdf_link.short_description = 'PDF'
+
+    def jlc_order_link(self, obj):
+        if not obj.jlc_order_id:
+            return format_html('<span style="color:var(--text-dim)">—</span>')
+        url = reverse('admin:jlcpcb_jlcorder_change', args=[obj.jlc_order_id])
+        return format_html('<a href="{}">🔧 {}</a>', url, obj.jlc_order.jlc_order_number or obj.jlc_order_id)
+    jlc_order_link.short_description = 'JLCPCB замовлення'
 
     def expense_link(self, obj):
         if not obj.expense_id:

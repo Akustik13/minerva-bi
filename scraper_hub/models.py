@@ -96,7 +96,12 @@ class ScraperDocument(models.Model):
     amount       = models.DecimalField('Сума', max_digits=12, decimal_places=2, null=True, blank=True)
     currency     = models.CharField('Валюта', max_length=3, default='USD')
     file         = models.FileField('PDF', upload_to='scraper/%Y/%m/', blank=True)
-    expense      = models.OneToOneField(
+    jlc_order = models.ForeignKey(
+        'jlcpcb.JLCOrder', null=True, blank=True,
+        on_delete=models.SET_NULL, verbose_name='JLCPCB замовлення',
+        related_name='scraper_documents',
+    )
+    expense = models.OneToOneField(
         'accounting.Expense', null=True, blank=True,
         on_delete=models.SET_NULL, verbose_name='Витрата (бухгалтерія)',
         related_name='scraper_document',

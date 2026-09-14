@@ -152,7 +152,11 @@ def run_site(run, config=None):
                 _log(f'↩ Вже є: {batch}')
                 continue
 
-            doc = ScraperDocument.objects.create(run=run, batch_num=batch, file=str(rel))
+            _, jlc_order = _get_order_amount(batch)
+            doc = ScraperDocument.objects.create(
+                run=run, batch_num=batch, file=str(rel),
+                jlc_order=jlc_order,
+            )
             if config.auto_create_expense:
                 _create_expense(config, doc, p)
 
@@ -285,7 +289,11 @@ def _run_via_worker_api(run):
             if ScraperDocument.objects.filter(batch_num=batch).exists():
                 continue
 
-            doc = ScraperDocument.objects.create(run=run, batch_num=batch, file=str(rel))
+            _, jlc_order = _get_order_amount(batch)
+            doc = ScraperDocument.objects.create(
+                run=run, batch_num=batch, file=str(rel),
+                jlc_order=jlc_order,
+            )
             if config.auto_create_expense and local_p.exists():
                 _create_expense(config, doc, local_p)
 
@@ -312,14 +320,94 @@ def _run_via_worker_api(run):
 
 # ── Бухгалтерія ───────────────────────────────────────────────────────────────
 
+def _extract_pdf_amount(pdf_path: Path):
+    """Extract total invoice amount from a JLCPCB PDF using pypdf. Returns Decimal or None."""
+    import re
+    from decimal import Decimal, InvalidOperation
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(str(pdf_path))
+        text = '\n'.join(page.extract_text() or '' for page in reader.pages)
+        # JLCPCB invoice PDF patterns (grand total / amount due / total amount)
+        patterns = [
+            r'(?:Grand\s+Total|Total\s+Amount|Amount\s+Due)[^\d$]*\$?\s*([\d,]+\.?\d*)',
+            r'(?:Grand\s+Total|Total\s+Amount|Amount\s+Due)[^\n]*?USD\s+([\d,]+\.?\d*)',
+            r'Total[:\s]+USD\s+([\d,]+\.?\d*)',
+            r'Total[:\s]+\$\s*([\d,]+\.?\d*)',
+        ]
+        for pat in patterns:
+            m = re.search(pat, text, re.IGNORECASE)
+            if m:
+                val = m.group(1).replace(',', '')
+                try:
+                    return Decimal(val)
+                except InvalidOperation:
+                    continue
+    except Exception as e:
+        log.debug('PDF parse error for %s: %s', pdf_path.name, e)
+    return None
+
+
+def _get_order_amount(batch_num: str):
+    """
+    Try to get invoice total from JLCOrder.total_price (already stored in DB from API sync).
+    Falls back to calling the API directly if total_price is blank.
+    Returns (Decimal | None, JLCOrder | None).
+    """
+    from decimal import Decimal
+    try:
+        from jlcpcb.models import JLCOrder
+        order = JLCOrder.objects.filter(jlc_order_number=batch_num).first()
+        if not order:
+            return None, None
+
+        if order.total_price:
+            return order.total_price, order
+
+        # total_price not cached — try API
+        try:
+            from jlcpcb.services.api import JLCAPIClient
+            client = JLCAPIClient.from_config()
+            raw    = client.get_pcb_order(batch_num)
+            # Try common top-level amount fields returned by JLCPCB API
+            for field in ('orderAmount', 'totalAmount', 'payAmount', 'totalFee'):
+                val = raw.get(field)
+                if val is not None:
+                    amount = Decimal(str(val))
+                    order.total_price = amount
+                    order.save(update_fields=['total_price'])
+                    return amount, order
+        except Exception as api_err:
+            log.debug('JLCPCB API amount lookup failed for %s: %s', batch_num, api_err)
+
+        return None, order
+    except Exception as e:
+        log.debug('JLCOrder lookup error for %s: %s', batch_num, e)
+        return None, None
+
+
 def _create_expense(config, doc, pdf_path: Path):
     try:
         from accounting.models import Expense
         from django.core.files import File
 
+        # 1. Amount from API (stored on JLCOrder or fetched live)
+        api_amount, jlc_order = _get_order_amount(doc.batch_num)
+
+        # 2. Amount from PDF
+        pdf_amount = _extract_pdf_amount(pdf_path) if pdf_path and pdf_path.exists() else None
+
+        # Choose amount: prefer API; use PDF as fallback; log discrepancy
+        amount = api_amount or pdf_amount or 0
+        if api_amount and pdf_amount and abs(api_amount - pdf_amount) > 1:
+            log.warning(
+                'Amount mismatch for %s: API=%s PDF=%s — using API value',
+                doc.batch_num, api_amount, pdf_amount,
+            )
+
         exp = Expense(
             date=date.today(),
-            amount=0,
+            amount=amount,
             currency='USD',
             supplier=config.supplier,
             category=config.expense_category,
@@ -329,8 +417,17 @@ def _create_expense(config, doc, pdf_path: Path):
         with open(pdf_path, 'rb') as f:
             exp.receipt.save(pdf_path.name, File(f), save=False)
         exp.save()
+
+        update_fields = ['expense']
         doc.expense = exp
-        doc.save(update_fields=['expense'])
+        if jlc_order:
+            doc.jlc_order = jlc_order
+            update_fields.append('jlc_order')
+        if amount:
+            doc.amount = amount
+            update_fields.append('amount')
+        doc.save(update_fields=update_fields)
+
     except Exception as e:
         log.warning('Не вдалося створити Expense для %s: %s', doc.batch_num, e)
 
