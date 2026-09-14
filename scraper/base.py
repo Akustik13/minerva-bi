@@ -94,6 +94,16 @@ class BaseScraper(ABC):
         self.log.info('Platform: %s | Output: %s', platform.system(), self.output_dir)
         self.log.info('Session dir: %s', self.session_dir)
 
+        # Видаляємо stale lock-файли Chromium (залишаються після рестарту контейнера)
+        for lock_name in ('SingletonLock', 'SingletonCookie', 'SingletonSocket'):
+            lock_file = self.session_dir / lock_name
+            if lock_file.exists():
+                try:
+                    lock_file.unlink()
+                    self.log.info('Removed stale lock: %s', lock_name)
+                except Exception:
+                    pass
+
         async with async_playwright() as p:
             if IS_LINUX:
                 # Docker/NAS — Playwright Chromium з Xvfb virtual display
