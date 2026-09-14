@@ -94,10 +94,11 @@ class BaseScraper(ABC):
         self.log.info('Platform: %s | Output: %s', platform.system(), self.output_dir)
         self.log.info('Session dir: %s', self.session_dir)
 
-        # Видаляємо stale lock-файли Chromium (залишаються після рестарту контейнера)
+        # Видаляємо stale lock-файли Chromium (залишаються після рестарту контейнера).
+        # SingletonLock — це symlink, тому перевіряємо is_symlink() а не exists().
         for lock_name in ('SingletonLock', 'SingletonCookie', 'SingletonSocket'):
             lock_file = self.session_dir / lock_name
-            if lock_file.exists():
+            if lock_file.is_symlink() or lock_file.exists():
                 try:
                     lock_file.unlink()
                     self.log.info('Removed stale lock: %s', lock_name)
