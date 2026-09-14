@@ -14,8 +14,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*
 
-# Flask для API та requests для взаємодії
-RUN pip install --no-cache-dir flask requests
+# Flask для API, requests, та playwright Python-пакет
+RUN pip install --no-cache-dir flask requests playwright==1.49.0
 
 WORKDIR /app
 COPY scraper/ /app/
@@ -23,6 +23,7 @@ COPY docker/scraper_worker.py /app/worker.py
 COPY docker/scraper_start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Playwright + Chromium вже є в базовому образі mcr.microsoft.com/playwright/python
+# Встановити Chromium через playwright (браузери в базовому образі вже є, але потрібен Python-пакет)
+RUN python -m playwright install chromium
 
 CMD ["/start.sh"]
