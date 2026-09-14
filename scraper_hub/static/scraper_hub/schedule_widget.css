@@ -1,0 +1,31 @@
+/* schedule_widget.css — weekday checkboxes inline */
+
+/* Render weekday checkboxes in a horizontal row */
+.field-schedule_weekdays_select ul.ul-checkboxes,
+.field-schedule_weekdays_select ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  list-style: none;
+  margin: 4px 0 0 0;
+  padding: 0;
+}
+
+.field-schedule_weekdays_select ul li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.field-schedule_weekdays_select ul li label {
+  font-weight: 500;
+  cursor: pointer;
+  min-width: 0;
+  padding: 0;
+}
+
+/* Time input reasonable width */
+#id_schedule_time {
+  width: 120px;
+}

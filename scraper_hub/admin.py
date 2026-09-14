@@ -1,5 +1,6 @@
 import os
 
+from django import forms
 from django.contrib import admin, messages
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import path, reverse
@@ -27,6 +28,54 @@ def _status_badge(status, label):
         '<span style="color:{};font-weight:600">{} {}</span>',
         color, icon, label,
     )
+
+
+# ── Custom admin form (weekday checkboxes + time picker) ──────────────────────
+
+_WEEKDAY_CHOICES = [
+    ('1', 'Пн'), ('2', 'Вт'), ('3', 'Ср'), ('4', 'Чт'),
+    ('5', 'Пт'), ('6', 'Сб'), ('7', 'Нд'),
+]
+
+
+class ScraperSiteConfigForm(forms.ModelForm):
+    schedule_weekdays_select = forms.MultipleChoiceField(
+        choices=_WEEKDAY_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label='Дні тижня',
+        help_text='Виберіть один або кілька днів тижня.',
+    )
+
+    class Meta:
+        model   = ScraperSiteConfig
+        exclude = ['schedule_weekdays']
+        widgets = {
+            'schedule_time': forms.TimeInput(
+                attrs={'type': 'time', 'class': 'vTimeField'},
+                format='%H:%M',
+            ),
+            'password': PasswordInput(render_value=True),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        obj = self.instance
+        if obj.pk and obj.schedule_weekdays:
+            days = [d.strip() for d in obj.schedule_weekdays.split(',') if d.strip()]
+            self.fields['schedule_weekdays_select'].initial = days
+        # password widget (also set via form Meta widget, belt-and-suspenders)
+        if 'password' in self.fields:
+            self.fields['password'].widget = PasswordInput(render_value=True)
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        days = sorted(self.cleaned_data.get('schedule_weekdays_select') or [])
+        obj.schedule_weekdays = ','.join(days)
+        if commit:
+            obj.save()
+            self.save_m2m()
+        return obj
 
 
 # ── ScraperRun inline ─────────────────────────────────────────────────────────
@@ -69,9 +118,10 @@ class ScraperRunInline(admin.TabularInline):
 
 @admin.register(ScraperSiteConfig)
 class ScraperSiteConfigAdmin(admin.ModelAdmin):
-    list_display  = ('site_name', 'username', 'enabled', 'status_col',
-                      'last_run_at', 'last_run_files', 'run_btn')
-    list_filter   = ('enabled', 'last_run_status', 'site_name')
+    form          = ScraperSiteConfigForm
+    list_display  = ('site_name', 'username', 'enabled', 'schedule_col',
+                      'status_col', 'last_run_at', 'last_run_files', 'run_btn')
+    list_filter   = ('enabled', 'last_run_status', 'site_name', 'schedule_type')
     inlines       = [ScraperRunInline]
 
     fieldsets = (
@@ -79,35 +129,36 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
             'fields': ('site_name', 'enabled', 'username', 'password'),
         }),
         ('Розклад', {
-            'fields': ('cron_schedule', 'lookback_days'),
+            'fields': (
+                'schedule_type', 'schedule_time', 'schedule_weekdays_select',
+                'lookback_days', 'schedule_info',
+            ),
             'description': (
-                'Для автозапуску на сервері додайте в cron:<br>'
-                '<code>python manage.py run_scraper --all</code>'
+                'Для автозапуску на NAS (раз на хвилину) додайте один системний cron:<br>'
+                '<code>* * * * * docker exec tabele_mvp-web-1 python manage.py run_scraper --cron</code><br>'
+                'Або через Synology Task Scheduler.'
             ),
         }),
         ('Посилання', {
             'fields': ('site_url', 'invoice_url_tpl'),
             'description': (
-                'URL сайту використовується для гіперпосилань на рахунки у списку документів. '
-                'Шаблон рахунку має містити <code>{batch}</code> — напр. '
-                '<code>https://jlcpcb.com/order/{batch}</code>.'
+                'Шаблон рахунку має містити <code>{batch}</code> — '
+                'напр. <code>https://jlcpcb.com/order/{batch}</code>.'
             ),
         }),
         ('Сповіщення', {
             'fields': ('notify_email', 'notify_telegram', 'notify_on_error', 'notify_email_to'),
-            'description': (
-                '<b>Успіх</b> — Email/Telegram надсилається після успішного запуску.<br>'
-                '<b>Помилка</b> — якщо увімкнено <em>Сповіщення при помилці</em>, '
-                'повідомлення надсилається навіть якщо notify_email/telegram вимкнено.'
-            ),
         }),
         ('Бухгалтерія', {
             'fields': ('auto_create_expense', 'expense_category', 'supplier'),
-            'description': (
-                'Після завантаження PDF автоматично створюється Expense. '
-                'Сума береться з JLCPCB API (JLCOrder.total_price) або парситься з PDF. '
-                'Рахунок прив\'язується до JLCOrder за batch номером.'
+        }),
+        ('Email / IMAP налаштування', {
+            'fields': (
+                'imap_host', 'imap_port', 'imap_use_ssl', 'imap_folder',
+                'email_from_filter', 'email_subject_kw', 'email_attach_ext', 'email_mark_read',
             ),
+            'classes': ('collapse',),
+            'description': 'Заповнюйте тільки для типу <b>Email (IMAP)</b>.',
         }),
         ('Конфіг власного скрапера', {
             'fields': (
@@ -116,24 +167,20 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
                 'row_selector', 'batch_col_index', 'date_col_index', 'download_selector',
             ),
             'classes': ('collapse',),
-            'description': (
-                'Заповнюйте тільки для <b>Власний сайт (custom)</b>. '
-                'Для JLCPCB та UPS ці поля ігноруються.'
-            ),
+            'description': 'Заповнюйте тільки для типу <b>Власний сайт (custom)</b>.',
         }),
         ('Останній запуск', {
             'fields': ('last_run_at', 'last_run_status', 'last_run_files', 'run_now_btn'),
             'classes': ('collapse',),
         }),
     )
-    readonly_fields     = ('last_run_at', 'last_run_status', 'last_run_files', 'run_now_btn')
+    readonly_fields     = ('last_run_at', 'last_run_status', 'last_run_files',
+                           'run_now_btn', 'schedule_info')
     autocomplete_fields = ('expense_category', 'supplier')
 
-    def get_form(self, request, obj=None, **kwargs):
-        form = super().get_form(request, obj, **kwargs)
-        if 'password' in form.base_fields:
-            form.base_fields['password'].widget = PasswordInput(render_value=True)
-        return form
+    class Media:
+        js = ('scraper_hub/schedule_widget.js',)
+        css = {'all': ('scraper_hub/schedule_widget.css',)}
 
     # ── Custom URLs ───────────────────────────────────────────────────────────
 
@@ -154,10 +201,34 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
 
         from scraper_hub.services import create_and_run_in_thread
         run = create_and_run_in_thread(cfg, triggered_by=f'admin:{request.user.username}')
-        # Редірект на сторінку запуску — там авто-оновлення live-логу
         return redirect(reverse('admin:scraper_hub_scraperrun_change', args=[run.pk]))
 
     # ── Display helpers ───────────────────────────────────────────────────────
+
+    def schedule_col(self, obj):
+        desc = obj.schedule_description
+        if obj.schedule_type == 'manual':
+            return format_html('<span style="color:var(--text-dim)">—</span>')
+        cron = obj.cron_expression
+        return format_html(
+            '<span title="cron: {}">{}</span>',
+            cron, desc,
+        )
+    schedule_col.short_description = 'Розклад'
+
+    def schedule_info(self, obj):
+        if not obj.pk:
+            return '—'
+        desc = obj.schedule_description
+        cron = obj.cron_expression
+        if cron:
+            return format_html(
+                '<strong>{}</strong><br>'
+                '<code style="font-size:11px;color:var(--text-dim)">{}</code>',
+                desc, cron,
+            )
+        return format_html('<span style="color:var(--text-dim)">{}</span>', desc)
+    schedule_info.short_description = 'Підсумок розкладу'
 
     def status_col(self, obj):
         return _status_badge(obj.last_run_status, obj.get_last_run_status_display())
@@ -167,9 +238,7 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
         if not obj.pk:
             return '—'
         url = reverse('admin:scraper_run_now', args=[obj.pk])
-        return format_html(
-            '<a class="button" href="{}">▶ Запустити</a>', url,
-        )
+        return format_html('<a class="button" href="{}">▶ Запустити</a>', url)
     run_btn.short_description = ''
 
     def run_now_btn(self, obj):
@@ -207,14 +276,11 @@ class ScraperRunAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return False
 
-    # ── Live refresh при status=running ───────────────────────────────────────
-
     def change_view(self, request, object_id, form_url='', extra_context=None):
         response = super().change_view(request, object_id, form_url, extra_context)
         try:
             obj = ScraperRun.objects.get(pk=object_id)
             if obj.status == 'running' and hasattr(response, 'content'):
-                # VNC link banner (якщо налаштований SCRAPER_VNC_URL)
                 vnc_banner = b''
                 if _VNC_URL:
                     vnc_html = (
@@ -226,7 +292,6 @@ class ScraperRunAdmin(admin.ModelAdmin):
                         f' &nbsp;— для CAPTCHA або спостереження</div>'
                     )
                     vnc_banner = vnc_html.encode('utf-8')
-                # Авто-оновлення кожні 3 секунди поки виконується
                 script = (
                     b'<script>'
                     b'(function(){'
@@ -238,13 +303,10 @@ class ScraperRunAdmin(admin.ModelAdmin):
                     b'})();'
                     b'</script>'
                 )
-                inject = vnc_banner + script
-                response.content = response.content.replace(b'</body>', inject + b'</body>')
+                response.content = response.content.replace(b'</body>', vnc_banner + script + b'</body>')
         except Exception:
             pass
         return response
-
-    # ── Display helpers ───────────────────────────────────────────────────────
 
     def status_col(self, obj):
         return _status_badge(obj.status, obj.get_status_display())
@@ -300,23 +362,18 @@ class ScraperRunAdmin(admin.ModelAdmin):
                 if d.expense_id else format_html('—')
             )
             rows.append(format_html(
-                '<tr>'
+                '<tr><td style="padding:4px 8px">{}</td>'
                 '<td style="padding:4px 8px">{}</td>'
-                '<td style="padding:4px 8px">{}</td>'
-                '<td style="padding:4px 8px">{}</td>'
-                '</tr>',
+                '<td style="padding:4px 8px">{}</td></tr>',
                 d.batch_num, pdf, exp,
             ))
         rows_html = format_html('{}' * len(rows), *rows)
         return format_html(
             '<table style="border-collapse:collapse">'
-            '<tr>'
-            '<th style="padding:4px 8px;text-align:left">Batch #</th>'
+            '<tr><th style="padding:4px 8px;text-align:left">Batch #</th>'
             '<th style="padding:4px 8px;text-align:left">PDF</th>'
-            '<th style="padding:4px 8px;text-align:left">Витрата</th>'
-            '</tr>'
-            '{}'
-            '</table>',
+            '<th style="padding:4px 8px;text-align:left">Витрата</th></tr>'
+            '{}</table>',
             rows_html,
         )
     documents_inline.short_description = 'Завантажені рахунки'
@@ -375,7 +432,10 @@ class ScraperDocumentAdmin(admin.ModelAdmin):
         if not obj.jlc_order_id:
             return format_html('<span style="color:var(--text-dim)">—</span>')
         url = reverse('admin:jlcpcb_jlcorder_change', args=[obj.jlc_order_id])
-        return format_html('<a href="{}">🔧 {}</a>', url, obj.jlc_order.jlc_order_number or obj.jlc_order_id)
+        return format_html(
+            '<a href="{}">🔧 {}</a>',
+            url, obj.jlc_order.jlc_order_number or obj.jlc_order_id,
+        )
     jlc_order_link.short_description = 'JLCPCB замовлення'
 
     def expense_link(self, obj):

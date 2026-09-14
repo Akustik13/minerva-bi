@@ -43,14 +43,31 @@ def _get_scraper_class(site_name: str):
 
 def _get_scraper_instance(config, out_root: Path, headless: bool = True):
     """Instantiate the right scraper class for the given config."""
-    _ensure_scraper_path()
     common = dict(
         username=config.username,
         password=config.password,
         output_dir=str(out_root),
-        headless=headless,
     )
     site = config.site_name
+
+    if site == 'email':
+        # Pure IMAP — no browser, no scraper path needed
+        from scraper_hub.sites.email_imap import EmailScraper  # noqa: PLC0415
+        return EmailScraper(
+            **common,
+            imap_host=config.imap_host or 'imap.gmail.com',
+            imap_port=config.imap_port or 993,
+            imap_use_ssl=config.imap_use_ssl,
+            imap_folder=config.imap_folder or 'INBOX',
+            email_from_filter=config.email_from_filter,
+            email_subject_kw=config.email_subject_kw,
+            email_attach_ext=config.email_attach_ext or '.pdf',
+            email_mark_read=config.email_mark_read,
+        )
+
+    _ensure_scraper_path()
+    common['headless'] = headless
+
     if site == 'jlcpcb':
         from sites.jlcpcb import JLCScraper   # noqa: PLC0415
         return JLCScraper(**common)
@@ -230,7 +247,8 @@ def create_and_run_in_thread(config, triggered_by: str = 'manual'):
     config.last_run_status = 'running'
     config.save(update_fields=['last_run_at', 'last_run_status'])
 
-    if using_worker():
+    # Email (IMAP) runs directly — no browser/worker needed
+    if using_worker() and config.site_name != 'email':
         target = _run_via_worker_api
     else:
         target = run_site

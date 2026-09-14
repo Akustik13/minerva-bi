@@ -4,6 +4,7 @@ from django.utils import timezone
 SITE_CHOICES = [
     ('jlcpcb', 'JLCPCB'),
     ('ups',    'UPS Billing'),
+    ('email',  'Email (IMAP)'),
     ('custom', 'Власний сайт'),
 ]
 
@@ -15,6 +16,14 @@ STATUS_CHOICES = [
     ('error',   'Помилка'),
 ]
 
+SCHEDULE_TYPES = [
+    ('manual',  'Лише вручну'),
+    ('daily',   'Щодня'),
+    ('weekly',  'По тижнях'),
+]
+
+_DAY_NAMES = {'1': 'Пн', '2': 'Вт', '3': 'Ср', '4': 'Чт', '5': 'Пт', '6': 'Сб', '7': 'Нд'}
+
 
 class ScraperSiteConfig(models.Model):
     site_name  = models.CharField('Сайт', max_length=50, choices=SITE_CHOICES, unique=True)
@@ -22,10 +31,17 @@ class ScraperSiteConfig(models.Model):
     password   = models.CharField('Пароль', max_length=200)
     enabled    = models.BooleanField('Увімкнено', default=True)
 
-    cron_schedule = models.CharField(
-        'Cron-розклад', max_length=100, blank=True, default='0 9 * * 1',
-        help_text='Cron-вираз для автозапуску (напр. "0 9 * * 1" = пн 9:00). '
-                  'Порожньо — лише вручну.',
+    # ── Розклад ───────────────────────────────────────────────────────────────
+    schedule_type = models.CharField(
+        'Тип розкладу', max_length=20, choices=SCHEDULE_TYPES, default='manual',
+    )
+    schedule_time = models.TimeField(
+        'Час запуску', null=True, blank=True,
+        help_text='Година і хвилина запуску (за локальним часом сервера).',
+    )
+    schedule_weekdays = models.CharField(
+        'Дні тижня', max_length=20, blank=True,
+        help_text='Числа через кому: 1=Пн, 2=Вт, ..., 7=Нд. Напр: 1,3,5 = Пн, Ср, Пт',
     )
     lookback_days = models.PositiveIntegerField(
         'Глибина пошуку (днів)', default=30,
@@ -40,8 +56,7 @@ class ScraperSiteConfig(models.Model):
     )
     invoice_url_tpl = models.CharField(
         'Шаблон URL рахунку', max_length=500, blank=True,
-        help_text='URL з {batch} placeholder — напр. https://jlcpcb.com/order/{batch}. '
-                  'Якщо порожньо — посилання на site_url.',
+        help_text='URL з {batch} placeholder — напр. https://jlcpcb.com/order/{batch}.',
     )
 
     # ── Сповіщення ────────────────────────────────────────────────────────────
@@ -72,6 +87,33 @@ class ScraperSiteConfig(models.Model):
         related_name='scraper_configs',
     )
 
+    # ── Email (IMAP) ──────────────────────────────────────────────────────────
+    imap_host = models.CharField(
+        'IMAP сервер', max_length=200, blank=True, default='imap.gmail.com',
+        help_text='Напр. imap.gmail.com, imap.mail.de, mail.example.com',
+    )
+    imap_port = models.PositiveSmallIntegerField('IMAP порт', default=993)
+    imap_use_ssl = models.BooleanField('SSL/TLS', default=True)
+    imap_folder = models.CharField(
+        'Папка / мітка', max_length=100, blank=True, default='INBOX',
+        help_text='Назва папки IMAP. Gmail: INBOX або [Gmail]/All Mail',
+    )
+    email_from_filter = models.CharField(
+        'Фільтр: відправник', max_length=200, blank=True,
+        help_text='Email або домен відправника — напр. billing@jlcpcb.com або @amazon.de',
+    )
+    email_subject_kw = models.CharField(
+        'Фільтр: слова в темі', max_length=200, blank=True,
+        help_text='Слова через пробіл (OR-пошук): Invoice Rechnung Quittung',
+    )
+    email_attach_ext = models.CharField(
+        'Тип вкладень', max_length=50, blank=True, default='.pdf',
+        help_text='Розширення через кому: .pdf або .pdf,.xml',
+    )
+    email_mark_read = models.BooleanField(
+        'Позначати прочитаним після обробки', default=True,
+    )
+
     # ── Конфіг для custom-скрапера ────────────────────────────────────────────
     login_url = models.CharField(
         'URL сторінки логіну', max_length=500, blank=True,
@@ -82,7 +124,7 @@ class ScraperSiteConfig(models.Model):
         help_text='Сторінка де відображається список завантажуваних рахунків.',
     )
     email_selector = models.CharField(
-        'CSS: поле email', max_length=200, blank=True, default='input[type=email]',
+        'CSS: поле email/логіну', max_length=200, blank=True, default='input[type=email]',
     )
     password_selector = models.CharField(
         'CSS: поле пароля', max_length=200, blank=True, default='input[type=password]',
@@ -97,7 +139,6 @@ class ScraperSiteConfig(models.Model):
     row_selector = models.CharField(
         'CSS: рядки таблиці рахунків', max_length=200, blank=True,
         default='table tbody tr',
-        help_text='CSS-selector рядків таблиці зі списком рахунків.',
     )
     batch_col_index = models.PositiveSmallIntegerField(
         'Індекс колонки: batch #', default=0,
@@ -105,7 +146,6 @@ class ScraperSiteConfig(models.Model):
     )
     date_col_index = models.PositiveSmallIntegerField(
         'Індекс колонки: дата', default=2,
-        help_text='Номер колонки (починаючи з 0) де знаходиться дата рахунку.',
     )
     download_selector = models.CharField(
         'CSS: кнопка завантаження', max_length=200, blank=True,
@@ -123,6 +163,47 @@ class ScraperSiteConfig(models.Model):
 
     def __str__(self):
         return f'{self.get_site_name_display()} ({self.username})'
+
+    # ── Розклад: обчислювані властивості ─────────────────────────────────────
+
+    @property
+    def cron_expression(self) -> str:
+        if self.schedule_type == 'manual' or not self.schedule_time:
+            return ''
+        h = self.schedule_time.hour
+        m = self.schedule_time.minute
+        if self.schedule_type == 'daily':
+            return f'{m} {h} * * *'
+        if self.schedule_type == 'weekly':
+            days = self.schedule_weekdays.strip() or '1'
+            return f'{m} {h} * * {days}'
+        return ''
+
+    @property
+    def schedule_description(self) -> str:
+        if self.schedule_type == 'manual' or not self.schedule_time:
+            return 'Лише вручну'
+        t = self.schedule_time.strftime('%H:%M')
+        if self.schedule_type == 'daily':
+            return f'Щодня о {t}'
+        if self.schedule_type == 'weekly':
+            days_str = self.schedule_weekdays or '1'
+            day_labels = [_DAY_NAMES.get(d.strip(), d) for d in days_str.split(',') if d.strip()]
+            return f'Щотижня {", ".join(day_labels)} о {t}'
+        return '—'
+
+    def is_due_now(self) -> bool:
+        if self.schedule_type == 'manual' or not self.schedule_time:
+            return False
+        now = timezone.localtime()
+        if now.hour != self.schedule_time.hour or now.minute != self.schedule_time.minute:
+            return False
+        if self.schedule_type == 'weekly':
+            current_dow = str(now.isoweekday())
+            allowed = {d.strip() for d in self.schedule_weekdays.split(',') if d.strip()}
+            if current_dow not in allowed:
+                return False
+        return True
 
 
 class ScraperRun(models.Model):
