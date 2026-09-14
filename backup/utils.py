@@ -719,6 +719,18 @@ def run_custom_command(cmd_str: str) -> dict:
         parts = [_sys.executable] + parts[1:]
     elif parts[0].endswith("manage.py"):
         parts = [_sys.executable] + parts
+    elif parts[0] in ("docker-compose", "docker", "docker_compose"):
+        return {
+            "ok": False,
+            "error": (
+                "Консоль виконує лише команди manage.py.\n"
+                "docker-compose тут не підтримується — він запускається ззовні контейнера.\n\n"
+                "Щоб збудувати scraper-worker, виконайте на хості (SSH або Synology Task Scheduler):\n"
+                "  docker-compose up -d --build scraper-worker\n\n"
+                "Або скористайтесь кнопками «Оновлення системи» вище."
+            ),
+            "duration": round(time.time() - start, 1),
+        }
     else:
         # bare subcommand: "compilemessages" → python manage.py compilemessages
         parts = [_sys.executable, "manage.py"] + parts
@@ -741,6 +753,67 @@ def run_custom_command(cmd_str: str) -> dict:
         return {"ok": False, "error": "Timeout (>180 с)", "duration": round(time.time() - start, 1)}
     except Exception as exc:
         return {"ok": False, "error": str(exc), "duration": round(time.time() - start, 1)}
+
+
+def docker_compose_build(service: str = "scraper-worker") -> dict:
+    """Run docker-compose up -d --build <service> from the project root.
+
+    Works only on the NAS/Docker host — does NOT work inside the web container
+    (Docker socket must be mounted or docker-compose available on PATH).
+    """
+    import shutil, subprocess as _sp
+    start = time.time()
+
+    # Sanity-check service name (alphanumeric + hyphen only)
+    import re
+    if not re.fullmatch(r'[a-z0-9]([a-z0-9\-]*[a-z0-9])?', service):
+        return {"ok": False, "error": f"Недозволена назва сервісу: {service}"}
+
+    # Find docker-compose executable
+    dc = shutil.which("docker-compose") or shutil.which("docker")
+    if not dc:
+        return {
+            "ok": False,
+            "error": (
+                "docker-compose не знайдено на PATH.\n"
+                "Цей контейнер не має доступу до Docker.\n"
+                "Виконайте на хості (Synology SSH):\n"
+                f"  docker-compose up -d --build {service}"
+            ),
+        }
+
+    if dc.endswith("docker"):
+        cmd = [dc, "compose", "up", "-d", "--build", service]
+    else:
+        cmd = [dc, "up", "-d", "--build", service]
+
+    try:
+        result = _sp.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            cwd=str(settings.BASE_DIR),
+        )
+        output = (result.stdout + result.stderr).strip()
+        ok = result.returncode == 0
+        return {
+            "ok": ok,
+            "output": output or ("✅ Готово" if ok else "❌ Помилка (без деталей)"),
+            "duration": round(time.time() - start, 1),
+        }
+    except FileNotFoundError:
+        return {
+            "ok": False,
+            "error": (
+                "docker-compose недоступний у контейнері.\n"
+                f"Виконайте на хості:\n  docker-compose up -d --build {service}"
+            ),
+        }
+    except _sp.TimeoutExpired:
+        return {"ok": False, "error": "Timeout (>300 с) — build занадто довгий"}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
 
 
 def restart_web() -> dict:

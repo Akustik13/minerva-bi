@@ -311,6 +311,10 @@
                 onclick="restartWeb(this)">
           🔁 Перезапустити воркери
         </button>
+        <button id="btn-build-scraper" class="bk-btn" style="background:#1a5276;"
+                onclick="runDockerBuild(this,'scraper-worker')">
+          🐳 Збудувати scraper-worker
+        </button>
         <hr style="border:none;border-top:1px solid var(--border-strong);margin:2px 0">
         <button id="btn-full-deploy" class="bk-btn" style="background:#7f1d1d;font-weight:700;"
                 onclick="runFullDeploy(this)">
@@ -1084,7 +1088,7 @@ function _updDone(ok, label, logText) {
 
 function _disableUpdateBtns(disabled) {
   ['btn-check-update','btn-apply-update','btn-collectstatic','btn-migrate',
-   'btn-setup-modules','btn-restart-web','btn-full-deploy'].forEach(id => {
+   'btn-setup-modules','btn-restart-web','btn-build-scraper','btn-full-deploy'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = disabled;
   });
@@ -1676,6 +1680,35 @@ async function doRestore() {
     result.textContent = '❌ Помилка з\'єднання: ' + e.message;
     btn.disabled = false;
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   Docker Build — docker-compose up -d --build <service>
+════════════════════════════════════════════════════════════════════ */
+const DOCKER_BUILD_URL = '{% url "admin:backup_docker_build" %}';
+
+async function runDockerBuild(btn, service) {
+  _disableUpdateBtns(true);
+  _updOpen('🐳', `docker-compose up -d --build ${service}… (може тривати 2–5 хв)`);
+  _animBar(0, 85, 120);  // estimate 2 min
+
+  try {
+    var fd = new FormData();
+    fd.append('service', service);
+    const resp = await fetch(DOCKER_BUILD_URL, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': CSRF },
+      body: fd,
+    });
+    const data = await resp.json();
+    const out = (data.output || data.error || '').trim();
+    _updDone(data.ok,
+      data.ok ? `🐳 ${service} збудовано і запущено!` : `❌ Помилка build`,
+      out);
+  } catch(e) {
+    _updDone(false, '❌ ' + e.message);
+  }
+  _disableUpdateBtns(false);
 }
 
 /* ══════════════════════════════════════════════════════════════════

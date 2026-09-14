@@ -106,6 +106,11 @@ class BackupAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.run_command_view),
                 name="backup_run_command",
             ),
+            path(
+                "docker-build/",
+                self.admin_site.admin_view(self.docker_build_view),
+                name="backup_docker_build",
+            ),
         ]
 
     def _ctx(self, request, **extra):
@@ -359,6 +364,15 @@ class BackupAdmin(admin.ModelAdmin):
         if not cmd:
             return JsonResponse({"error": "Команда не вказана"}, status=400)
         return JsonResponse(utils.run_custom_command(cmd))
+
+    def docker_build_view(self, request):
+        """AJAX — docker-compose up -d --build <service> (superadmin only)."""
+        if request.method != "POST":
+            return JsonResponse({"error": "POST only"}, status=405)
+        if not request.user.is_superuser:
+            return JsonResponse({"error": "Тільки для суперадміна"}, status=403)
+        service = request.POST.get("service", "scraper-worker").strip()
+        return JsonResponse(utils.docker_compose_build(service))
 
     def has_add_permission(self, request):              return False
     def has_change_permission(self, request, obj=None): return False
