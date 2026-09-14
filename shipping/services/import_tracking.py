@@ -105,3 +105,66 @@ def ensure_shipment_for_order(
         shipment.pk, order.order_number, tracking_number,
     )
     return shipment, True
+
+
+def ensure_shipment_for_jlc_order(
+    jlc_order,
+    tracking_number: str,
+    carrier_name: str = "",
+) -> Tuple[object, bool]:
+    """
+    Знаходить або створює Shipment для JLCPCB замовлення (incoming shipment).
+    Повертає (shipment, created: bool).
+    """
+    from shipping.models import Carrier, Shipment
+
+    tracking_number = (tracking_number or "").strip()
+    if not tracking_number:
+        raise ValueError("tracking_number обов'язковий")
+
+    carrier_type, display_name = _detect_carrier_type(tracking_number, carrier_name)
+
+    carrier = (
+        Carrier.objects.filter(carrier_type=carrier_type, is_active=True).first()
+        or Carrier.objects.filter(name__iexact=display_name, is_active=True).first()
+    )
+    if not carrier:
+        carrier = Carrier.objects.create(
+            name=display_name,
+            carrier_type=carrier_type,
+            is_active=True,
+        )
+        logger.info("import_tracking: created Carrier '%s' type=%s", display_name, carrier_type)
+
+    existing = Shipment.objects.filter(jlc_order=jlc_order).first()
+    if existing:
+        changed = False
+        if tracking_number and existing.tracking_number != tracking_number:
+            existing.tracking_number = tracking_number
+            changed = True
+        if existing.status in (
+            Shipment.Status.DRAFT,
+            Shipment.Status.SUBMITTED,
+            Shipment.Status.LABEL_READY,
+        ):
+            existing.status = Shipment.Status.IN_TRANSIT
+            changed = True
+        if changed:
+            existing.save()
+        return existing, False
+
+    shipment = Shipment.objects.create(
+        jlc_order=jlc_order,
+        order=None,
+        carrier=carrier,
+        tracking_number=tracking_number,
+        status=Shipment.Status.IN_TRANSIT,
+        carrier_service=carrier_name or display_name,
+        reference=jlc_order.jlc_order_number or jlc_order.jlc_order_id,
+        description="PCB/PCBA from JLCPCB",
+    )
+    logger.info(
+        "import_tracking: created Shipment #%s for JLCOrder %s tracking=%s",
+        shipment.pk, jlc_order.jlc_order_number, tracking_number,
+    )
+    return shipment, True

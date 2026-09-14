@@ -136,6 +136,11 @@ class Shipment(models.Model):
         related_name="shipments", verbose_name="Замовлення",
         null=True, blank=True,
     )
+    jlc_order = models.ForeignKey(
+        "jlcpcb.JLCOrder", on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="shipments", verbose_name="JLCPCB замовлення",
+    )
     carrier = models.ForeignKey(
         Carrier, on_delete=models.PROTECT,
         verbose_name="Перевізник"

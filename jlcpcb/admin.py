@@ -218,7 +218,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
     readonly_fields = (
         'jlc_status', 'auto_matched_sku', 'last_notified_status',
         'received_qty', 'raw_data', 'created_at', 'updated_at',
-        'invoices_display',
+        'invoices_display', 'shipment_display',
     )
 
     fieldsets = (
@@ -240,6 +240,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
         ('💰 Вартість', {
             'fields': ('unit_price', 'total_price', 'currency'),
             'classes': ('collapse',),
+        }),
+        ('🚚 Відстеження посилки', {
+            'fields': ('shipment_display',),
         }),
         ('📄 Рахунки (scraper)', {
             'fields': ('invoices_display',),
@@ -327,6 +330,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
             path('gerber/<int:pk>/raw-quote/',
                  self.admin_site.admin_view(self.gerber_raw_quote_view),
                  name='jlcpcb_gerber_raw_quote'),
+            path('<int:pk>/track-refresh/',
+                 self.admin_site.admin_view(self.track_refresh_view),
+                 name='jlcpcb_jlcorder_track_refresh'),
         ]
         return custom + urls
 
@@ -1137,6 +1143,93 @@ class JLCOrderAdmin(admin.ModelAdmin):
             '</tr>{}</table>',
             rows_html,
         )
+
+    @admin.display(description='🚚 Відстеження посилки')
+    def shipment_display(self, obj):
+        shipment = obj.shipments.select_related('carrier').first()
+        refresh_url = reverse('admin:jlcpcb_jlcorder_track_refresh', args=[obj.pk])
+
+        if not obj.tracking_number:
+            return format_html(
+                '<span style="color:var(--text-dim)">Трекінг-номер не вказаний</span>'
+            )
+
+        if not shipment:
+            return format_html(
+                '<span style="color:var(--text-dim)">Відправлення не створено — '
+                'збережіть замовлення з трекінг-номером</span>'
+            )
+
+        _SHIP_COLORS = {
+            'draft':       ('#607d8b', '📝'),
+            'submitted':   ('#1976d2', '📤'),
+            'label_ready': ('#0288d1', '🏷️'),
+            'in_transit':  ('#f57c00', '🚚'),
+            'delivered':   ('#388e3c', '✅'),
+            'error':       ('#d32f2f', '❌'),
+            'cancelled':   ('#757575', '🚫'),
+        }
+        color, icon = _SHIP_COLORS.get(shipment.status, ('#607d8b', ''))
+        status_label = f'{icon} {shipment.get_status_display()}'
+        if shipment.carrier_status_label:
+            status_label += f' — {shipment.carrier_status_label}'
+
+        eta_str = ''
+        if shipment.eta_to:
+            eta_str = f' · ETA {shipment.eta_to:%d.%m.%Y}'
+        elif shipment.carrier_eta:
+            eta_str = f' · ETA {shipment.carrier_eta:%d.%m.%Y}'
+
+        shipment_link = format_html(
+            '<a href="{}" style="color:var(--link-fg)">Відправлення #{}</a>',
+            reverse('admin:shipping_shipment_change', args=[shipment.pk]),
+            shipment.pk,
+        )
+
+        return format_html(
+            '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+            '<span style="color:{};font-weight:600">{}{}</span>'
+            '{}'
+            '<a class="button" href="{}" style="font-size:12px;padding:3px 10px">'
+            '🔄 Оновити трекінг</a>'
+            '</div>',
+            color, status_label, eta_str, shipment_link, refresh_url,
+        )
+
+    def track_refresh_view(self, request, pk):
+        from django.http import HttpResponseRedirect
+        order = get_object_or_404(JLCOrder, pk=pk)
+        change_url = reverse('admin:jlcpcb_jlcorder_change', args=[pk])
+
+        if not order.tracking_number:
+            messages.error(request, '❌ Трекінг-номер не вказаний.')
+            return HttpResponseRedirect(change_url)
+
+        # Ensure Shipment exists
+        try:
+            from shipping.services.import_tracking import ensure_shipment_for_jlc_order
+            shipment, created = ensure_shipment_for_jlc_order(
+                jlc_order=order,
+                tracking_number=order.tracking_number,
+                carrier_name=order.tracking_carrier,
+            )
+        except Exception as e:
+            messages.error(request, f'❌ Помилка створення відправлення: {e}')
+            return HttpResponseRedirect(change_url)
+
+        # Run tracking engine
+        try:
+            from shipping.services.tracking_engine import track_with_fallback
+            result = track_with_fallback(shipment)
+            if result.get('error'):
+                messages.warning(request, f'⚠️ Трекінг: {result["error"]}')
+            else:
+                status = result.get('status_label') or shipment.get_status_display()
+                messages.success(request, f'✅ Трекінг оновлено: {status}')
+        except Exception as e:
+            messages.warning(request, f'⚠️ Помилка трекінгу: {e}')
+
+        return HttpResponseRedirect(change_url)
 
     @admin.display(description='Файли / Товари')
     def files_summary_col(self, obj):
