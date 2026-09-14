@@ -41,6 +41,40 @@ def _get_scraper_class(site_name: str):
     raise ValueError(f'Невідомий сайт: {site_name}')
 
 
+def _get_scraper_instance(config, out_root: Path, headless: bool = True):
+    """Instantiate the right scraper class for the given config."""
+    _ensure_scraper_path()
+    common = dict(
+        username=config.username,
+        password=config.password,
+        output_dir=str(out_root),
+        headless=headless,
+    )
+    site = config.site_name
+    if site == 'jlcpcb':
+        from sites.jlcpcb import JLCScraper   # noqa: PLC0415
+        return JLCScraper(**common)
+    if site == 'ups':
+        from sites.ups import UPSScraper       # noqa: PLC0415
+        return UPSScraper(**common)
+    if site == 'custom':
+        from sites.generic import GenericScraper   # noqa: PLC0415
+        return GenericScraper(
+            **common,
+            login_url=config.login_url,
+            invoice_list_url=config.invoice_list_url,
+            email_selector=config.email_selector or 'input[type=email]',
+            password_selector=config.password_selector or 'input[type=password]',
+            submit_selector=config.submit_selector or 'button[type=submit]',
+            login_success_url=config.login_success_url,
+            row_selector=config.row_selector or 'table tbody tr',
+            batch_col_index=config.batch_col_index,
+            date_col_index=config.date_col_index,
+            download_selector=config.download_selector,
+        )
+    raise ValueError(f'Невідомий сайт: {site}')
+
+
 def _output_root() -> Path:
     d = Path(settings.MEDIA_ROOT) / 'scraper'
     d.mkdir(parents=True, exist_ok=True)
@@ -115,13 +149,7 @@ def run_site(run, config=None):
         _log(f'▶ Старт [{config.get_site_name_display()}]  {start_dt} → {end_dt}')
         db_handler._flush()
 
-        ScraperCls = _get_scraper_class(config.site_name)
-        scraper    = ScraperCls(
-            username=config.username,
-            password=config.password,
-            output_dir=str(out_root),
-            headless=True,
-        )
+        scraper = _get_scraper_instance(config, out_root)
 
         loop = asyncio.new_event_loop()
         try:
@@ -456,33 +484,60 @@ def _notify(config, run):
         if not ns:
             return
 
-        ok    = run.status in ('ok', 'partial')
-        emoji = '✅' if ok else '❌'
-        site  = config.get_site_name_display()
-        subj  = f'{emoji} {site} Scraper — {run.files_downloaded} рахунків'
-        body  = (
+        ok       = run.status in ('ok', 'partial') and run.files_downloaded > 0
+        is_error = not ok  # error OR partial with 0 files
+        emoji    = '✅' if ok else '❌'
+        site     = config.get_site_name_display()
+        subj     = f'{emoji} {site} Scraper — {run.files_downloaded} рахунків'
+        body     = (
             f'Сайт: {site}\n'
             f'Статус: {run.get_status_display()}\n'
             f'Файлів: {run.files_downloaded}\n'
             f'Час: {run.started_at:%Y-%m-%d %H:%M}\n'
         )
         if run.error_message:
-            body += f'Помилка: {run.error_message[:300]}\n'
+            body += f'Помилка: {run.error_message[:400]}\n'
 
-        if config.notify_email and getattr(ns, 'smtp_host', None) and getattr(ns, 'alert_email', None):
-            _send_email(ns, subj, body)
-        if config.notify_telegram and getattr(ns, 'telegram_bot_token', None):
+        # Determine whether to send at all
+        send_success = ok and (config.notify_email or config.notify_telegram)
+        send_error   = is_error and config.notify_on_error
+
+        if not send_success and not send_error:
+            return
+
+        has_smtp = bool(getattr(ns, 'smtp_host', None))
+        has_tg   = bool(getattr(ns, 'telegram_bot_token', None))
+
+        # Email recipients: custom list → fallback to global alert_email
+        if config.notify_email_to:
+            email_recipients = [e.strip() for e in config.notify_email_to.split(',') if e.strip()]
+        elif getattr(ns, 'alert_email', None):
+            email_recipients = [ns.alert_email]
+        else:
+            email_recipients = []
+
+        if has_smtp and email_recipients and (config.notify_email or (is_error and config.notify_on_error)):
+            _send_email_to(ns, subj, body, email_recipients)
+
+        if has_tg and (config.notify_telegram or (is_error and config.notify_on_error)):
             _send_telegram(ns, f'{subj}\n\n{body}')
+
     except Exception as e:
         log.warning('Notification error: %s', e)
 
 
-def _send_email(ns, subject: str, body: str):
+def _send_email_to(ns, subject: str, body: str, recipients: list):
     from django.core.mail import send_mail
     try:
-        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [ns.alert_email], fail_silently=True)
+        send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, recipients, fail_silently=True)
     except Exception as e:
         log.warning('Email failed: %s', e)
+
+
+def _send_email(ns, subject: str, body: str):
+    """Legacy helper kept for external callers."""
+    if getattr(ns, 'alert_email', None):
+        _send_email_to(ns, subject, body, [ns.alert_email])
 
 
 def _send_telegram(ns, text: str):

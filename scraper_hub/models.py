@@ -4,6 +4,7 @@ from django.utils import timezone
 SITE_CHOICES = [
     ('jlcpcb', 'JLCPCB'),
     ('ups',    'UPS Billing'),
+    ('custom', 'Власний сайт'),
 ]
 
 STATUS_CHOICES = [
@@ -31,9 +32,29 @@ class ScraperSiteConfig(models.Model):
         help_text='Скільки днів назад перевіряти рахунки при кожному запуску.',
     )
 
+    # ── Посилання на сайт ─────────────────────────────────────────────────────
+    site_url = models.URLField(
+        'URL сайту', blank=True,
+        help_text='Базовий URL сайту (напр. https://jlcpcb.com). '
+                  'Буде підставлятися в гіперпосилання на рахунок.',
+    )
+    invoice_url_tpl = models.CharField(
+        'Шаблон URL рахунку', max_length=500, blank=True,
+        help_text='URL з {batch} placeholder — напр. https://jlcpcb.com/order/{batch}. '
+                  'Якщо порожньо — посилання на site_url.',
+    )
+
     # ── Сповіщення ────────────────────────────────────────────────────────────
-    notify_email    = models.BooleanField('Email-сповіщення', default=True)
-    notify_telegram = models.BooleanField('Telegram-сповіщення', default=False)
+    notify_email    = models.BooleanField('Email-сповіщення (успіх)', default=True)
+    notify_telegram = models.BooleanField('Telegram-сповіщення (успіх)', default=False)
+    notify_on_error = models.BooleanField(
+        'Сповіщення при помилці', default=True,
+        help_text='Слати email/Telegram якщо scraper завершився з помилкою або не завантажив жодного файлу.',
+    )
+    notify_email_to = models.CharField(
+        'Email одержувачів (помилка)', max_length=500, blank=True,
+        help_text='Адреси через кому. Порожньо — використовувати alert_email із загальних налаштувань.',
+    )
 
     # ── Бухгалтерія ───────────────────────────────────────────────────────────
     auto_create_expense = models.BooleanField(
@@ -49,6 +70,46 @@ class ScraperSiteConfig(models.Model):
         'inventory.Supplier', null=True, blank=True,
         on_delete=models.SET_NULL, verbose_name='Постачальник',
         related_name='scraper_configs',
+    )
+
+    # ── Конфіг для custom-скрапера ────────────────────────────────────────────
+    login_url = models.CharField(
+        'URL сторінки логіну', max_length=500, blank=True,
+        help_text='Пряме посилання на форму входу.',
+    )
+    invoice_list_url = models.CharField(
+        'URL списку рахунків', max_length=500, blank=True,
+        help_text='Сторінка де відображається список завантажуваних рахунків.',
+    )
+    email_selector = models.CharField(
+        'CSS: поле email', max_length=200, blank=True, default='input[type=email]',
+    )
+    password_selector = models.CharField(
+        'CSS: поле пароля', max_length=200, blank=True, default='input[type=password]',
+    )
+    submit_selector = models.CharField(
+        'CSS: кнопка входу', max_length=200, blank=True, default='button[type=submit]',
+    )
+    login_success_url = models.CharField(
+        'Фрагмент URL після входу', max_length=200, blank=True,
+        help_text='Частина URL, яка з\'являється після успішного логіну (для верифікації).',
+    )
+    row_selector = models.CharField(
+        'CSS: рядки таблиці рахунків', max_length=200, blank=True,
+        default='table tbody tr',
+        help_text='CSS-selector рядків таблиці зі списком рахунків.',
+    )
+    batch_col_index = models.PositiveSmallIntegerField(
+        'Індекс колонки: batch #', default=0,
+        help_text='Номер колонки (починаючи з 0) де знаходиться номер рахунку/партії.',
+    )
+    date_col_index = models.PositiveSmallIntegerField(
+        'Індекс колонки: дата', default=2,
+        help_text='Номер колонки (починаючи з 0) де знаходиться дата рахунку.',
+    )
+    download_selector = models.CharField(
+        'CSS: кнопка завантаження', max_length=200, blank=True,
+        help_text='CSS-selector кнопки/посилання завантаження PDF в рядку таблиці.',
     )
 
     # ── Статус (денормалізовано для швидкого відображення) ────────────────────

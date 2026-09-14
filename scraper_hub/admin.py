@@ -85,8 +85,21 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
                 '<code>python manage.py run_scraper --all</code>'
             ),
         }),
+        ('Посилання', {
+            'fields': ('site_url', 'invoice_url_tpl'),
+            'description': (
+                'URL сайту використовується для гіперпосилань на рахунки у списку документів. '
+                'Шаблон рахунку має містити <code>{batch}</code> — напр. '
+                '<code>https://jlcpcb.com/order/{batch}</code>.'
+            ),
+        }),
         ('Сповіщення', {
-            'fields': ('notify_email', 'notify_telegram'),
+            'fields': ('notify_email', 'notify_telegram', 'notify_on_error', 'notify_email_to'),
+            'description': (
+                '<b>Успіх</b> — Email/Telegram надсилається після успішного запуску.<br>'
+                '<b>Помилка</b> — якщо увімкнено <em>Сповіщення при помилці</em>, '
+                'повідомлення надсилається навіть якщо notify_email/telegram вимкнено.'
+            ),
         }),
         ('Бухгалтерія', {
             'fields': ('auto_create_expense', 'expense_category', 'supplier'),
@@ -94,6 +107,18 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
                 'Після завантаження PDF автоматично створюється Expense. '
                 'Сума береться з JLCPCB API (JLCOrder.total_price) або парситься з PDF. '
                 'Рахунок прив\'язується до JLCOrder за batch номером.'
+            ),
+        }),
+        ('Конфіг власного скрапера', {
+            'fields': (
+                'login_url', 'invoice_list_url',
+                'email_selector', 'password_selector', 'submit_selector', 'login_success_url',
+                'row_selector', 'batch_col_index', 'date_col_index', 'download_selector',
+            ),
+            'classes': ('collapse',),
+            'description': (
+                'Заповнюйте тільки для <b>Власний сайт (custom)</b>. '
+                'Для JLCPCB та UPS ці поля ігноруються.'
             ),
         }),
         ('Останній запуск', {
@@ -301,16 +326,34 @@ class ScraperRunAdmin(admin.ModelAdmin):
 
 @admin.register(ScraperDocument)
 class ScraperDocumentAdmin(admin.ModelAdmin):
-    list_display  = ('batch_num', 'site_col', 'jlc_order_link', 'invoice_date',
+    list_display  = ('batch_num_link', 'site_col', 'jlc_order_link', 'invoice_date',
                       'amount_col', 'pdf_link', 'expense_link', 'created_at')
     list_filter   = ('run__config__site_name', 'currency')
     search_fields = ('batch_num',)
-    readonly_fields = ('run', 'batch_num', 'jlc_order_link', 'created_at', 'pdf_link', 'expense_link')
-    fields = ('run', 'batch_num', 'jlc_order', 'jlc_order_link', 'invoice_date', 'amount', 'currency',
-              'pdf_link', 'expense_link', 'created_at')
+    readonly_fields = ('run', 'batch_num', 'batch_num_link', 'jlc_order_link',
+                       'created_at', 'pdf_link', 'expense_link')
+    fields = ('run', 'batch_num', 'batch_num_link', 'jlc_order', 'jlc_order_link',
+              'invoice_date', 'amount', 'currency', 'pdf_link', 'expense_link', 'created_at')
 
     def has_add_permission(self, request):
         return False
+
+    def batch_num_link(self, obj):
+        cfg = obj.run.config
+        tpl = cfg.invoice_url_tpl
+        base = cfg.site_url
+        if tpl and '{batch}' in tpl:
+            url = tpl.format(batch=obj.batch_num)
+        elif base:
+            url = base
+        else:
+            return obj.batch_num
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener">{} ↗</a>',
+            url, obj.batch_num,
+        )
+    batch_num_link.short_description = 'Batch #'
+    batch_num_link.admin_order_field = 'batch_num'
 
     def site_col(self, obj):
         return obj.run.config.get_site_name_display()
