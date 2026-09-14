@@ -1217,15 +1217,16 @@ class JLCOrderAdmin(admin.ModelAdmin):
             messages.error(request, f'❌ Помилка створення відправлення: {e}')
             return HttpResponseRedirect(change_url)
 
-        # Run tracking engine
+        # Run tracking engine — returns (changed: bool, log_entries: list)
         try:
             from shipping.services.tracking_engine import track_with_fallback
-            result = track_with_fallback(shipment)
-            if result.get('error'):
-                messages.warning(request, f'⚠️ Трекінг: {result["error"]}')
+            changed, log_entries = track_with_fallback(shipment)
+            errors = [e['error'] for e in log_entries if e.get('error')]
+            if errors and not changed:
+                messages.warning(request, f'⚠️ Трекінг: {errors[0]}')
             else:
-                status = result.get('status_label') or shipment.get_status_display()
-                messages.success(request, f'✅ Трекінг оновлено: {status}')
+                shipment.refresh_from_db()
+                messages.success(request, f'✅ Трекінг оновлено: {shipment.get_status_display()}')
         except Exception as e:
             messages.warning(request, f'⚠️ Помилка трекінгу: {e}')
 
