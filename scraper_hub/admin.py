@@ -1,3 +1,5 @@
+import os
+
 from django.contrib import admin, messages
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import path, reverse
@@ -5,6 +7,8 @@ from django.utils.html import format_html
 from django.forms import PasswordInput
 
 from .models import ScraperDocument, ScraperRun, ScraperSiteConfig
+
+_VNC_URL = os.environ.get('SCRAPER_VNC_URL', '')
 
 # ── Статус-бейджі ─────────────────────────────────────────────────────────────
 
@@ -28,14 +32,14 @@ def _status_badge(status, label):
 # ── ScraperRun inline ─────────────────────────────────────────────────────────
 
 class ScraperRunInline(admin.TabularInline):
-    model   = ScraperRun
-    extra   = 0
-    max_num = 0
-    can_delete          = False
-    show_change_link    = True
-    fields  = ('started_at', 'status_badge', 'files_downloaded', 'duration_display',
-                'triggered_by', 'error_short')
-    readonly_fields = fields
+    model            = ScraperRun
+    extra            = 0
+    max_num          = 0
+    can_delete       = False
+    show_change_link = True
+    fields           = ('started_at', 'status_badge', 'files_downloaded',
+                         'duration_display', 'triggered_by', 'error_short')
+    readonly_fields  = fields
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -76,26 +80,28 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
         }),
         ('Розклад', {
             'fields': ('cron_schedule', 'lookback_days'),
-            'description': 'Для автозапуску на сервері: '
-                           '<code>python manage.py run_scraper --all</code> у cron.',
+            'description': (
+                'Для автозапуску на сервері додайте в cron:<br>'
+                '<code>python manage.py run_scraper --all</code>'
+            ),
         }),
         ('Сповіщення', {
             'fields': ('notify_email', 'notify_telegram'),
         }),
         ('Бухгалтерія', {
             'fields': ('auto_create_expense', 'expense_category', 'supplier'),
-            'description': 'Після завантаження PDF автоматично створюється '
-                           'запис Expense з сумою 0 (заповнити вручну).',
+            'description': (
+                'Після завантаження PDF автоматично створюється запис Expense '
+                'з сумою 0 — заповніть вручну після перевірки рахунку.'
+            ),
         }),
         ('Останній запуск', {
             'fields': ('last_run_at', 'last_run_status', 'last_run_files', 'run_now_btn'),
             'classes': ('collapse',),
         }),
     )
-    readonly_fields = ('last_run_at', 'last_run_status', 'last_run_files', 'run_now_btn')
+    readonly_fields     = ('last_run_at', 'last_run_status', 'last_run_files', 'run_now_btn')
     autocomplete_fields = ('expense_category', 'supplier')
-
-    # ── Password field hidden ─────────────────────────────────────────────────
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
@@ -116,15 +122,14 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
 
     def _run_view(self, request, pk):
         cfg = get_object_or_404(ScraperSiteConfig, pk=pk)
-        from scraper_hub.services import run_site_in_thread
-        run_site_in_thread(cfg, triggered_by=f'admin:{request.user.username}')
-        self.message_user(
-            request,
-            f'▶ Запущено {cfg.get_site_name_display()} у фоні — '
-            f'оновіть сторінку через кілька хвилин.',
-            messages.SUCCESS,
-        )
-        return redirect(reverse('admin:scraper_hub_scrapersiteconfig_change', args=[pk]))
+        if cfg.last_run_status == 'running':
+            self.message_user(request, '⚙️ Scraper вже виконується.', messages.WARNING)
+            return redirect(reverse('admin:scraper_hub_scrapersiteconfig_change', args=[pk]))
+
+        from scraper_hub.services import create_and_run_in_thread
+        run = create_and_run_in_thread(cfg, triggered_by=f'admin:{request.user.username}')
+        # Редірект на сторінку запуску — там авто-оновлення live-логу
+        return redirect(reverse('admin:scraper_hub_scraperrun_change', args=[run.pk]))
 
     # ── Display helpers ───────────────────────────────────────────────────────
 
@@ -137,8 +142,7 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
             return '—'
         url = reverse('admin:scraper_run_now', args=[obj.pk])
         return format_html(
-            '<a class="button" href="{}" style="white-space:nowrap">▶ Запустити</a>',
-            url,
+            '<a class="button" href="{}">▶ Запустити</a>', url,
         )
     run_btn.short_description = ''
 
@@ -151,26 +155,145 @@ class ScraperSiteConfigAdmin(admin.ModelAdmin):
 
 @admin.register(ScraperRun)
 class ScraperRunAdmin(admin.ModelAdmin):
-    list_display  = ('__str__', 'status_col', 'files_downloaded',
-                      'duration_col', 'triggered_by', 'started_at')
-    list_filter   = ('status', 'config__site_name')
-    readonly_fields = ('config', 'started_at', 'finished_at', 'status',
-                        'files_downloaded', 'error_message', 'log_output', 'triggered_by')
-    search_fields = ('config__site_name', 'error_message')
+    list_display    = ('__str__', 'status_col', 'files_downloaded',
+                        'duration_col', 'triggered_by', 'started_at')
+    list_filter     = ('status', 'config__site_name')
+    search_fields   = ('config__site_name', 'error_message')
+    readonly_fields = ('config', 'started_at', 'finished_at', 'status_badge_field',
+                        'files_downloaded', 'error_message', 'log_display',
+                        'triggered_by', 'duration_field', 'documents_inline')
+
+    fieldsets = (
+        (None, {
+            'fields': ('config', 'triggered_by', 'started_at',
+                        'finished_at', 'duration_field', 'status_badge_field',
+                        'files_downloaded', 'error_message'),
+        }),
+        ('Лог виконання', {
+            'fields': ('log_display',),
+        }),
+        ('Завантажені рахунки', {
+            'fields': ('documents_inline',),
+            'classes': ('collapse',),
+        }),
+    )
 
     def has_add_permission(self, request):
         return False
+
+    # ── Live refresh при status=running ───────────────────────────────────────
+
+    def change_view(self, request, object_id, form_url='', extra_context=None):
+        response = super().change_view(request, object_id, form_url, extra_context)
+        try:
+            obj = ScraperRun.objects.get(pk=object_id)
+            if obj.status == 'running' and hasattr(response, 'content'):
+                # VNC link banner (якщо налаштований SCRAPER_VNC_URL)
+                vnc_banner = b''
+                if _VNC_URL:
+                    vnc_html = (
+                        f'<div style="background:#1565c0;color:#fff;padding:10px 16px;'
+                        f'border-radius:4px;margin:8px 0;font-size:13px">'
+                        f'\U0001f5a5️  Браузер виконується на сервері. '
+                        f'<a href="{_VNC_URL}/vnc.html" target="_blank" '
+                        f'style="color:#90caf9;font-weight:600">Відкрити noVNC ↗</a>'
+                        f' &nbsp;— для CAPTCHA або спостереження</div>'
+                    )
+                    vnc_banner = vnc_html.encode('utf-8')
+                # Авто-оновлення кожні 3 секунди поки виконується
+                script = (
+                    b'<script>'
+                    b'(function(){'
+                    b'  var t=setTimeout(function(){location.reload()},3000);'
+                    b'  document.addEventListener("visibilitychange",function(){'
+                    b'    if(document.hidden){clearTimeout(t)}'
+                    b'    else{t=setTimeout(function(){location.reload()},3000)}'
+                    b'  });'
+                    b'})();'
+                    b'</script>'
+                )
+                inject = vnc_banner + script
+                response.content = response.content.replace(b'</body>', inject + b'</body>')
+        except Exception:
+            pass
+        return response
+
+    # ── Display helpers ───────────────────────────────────────────────────────
 
     def status_col(self, obj):
         return _status_badge(obj.status, obj.get_status_display())
     status_col.short_description = 'Статус'
 
+    def status_badge_field(self, obj):
+        return _status_badge(obj.status, obj.get_status_display())
+    status_badge_field.short_description = 'Статус'
+
     def duration_col(self, obj):
         s = obj.duration_s
         if s is None:
-            return '—'
+            return '⚙️ …' if obj.status == 'running' else '—'
         return f'{s // 60}хв {s % 60}с' if s >= 60 else f'{s}с'
     duration_col.short_description = 'Тривалість'
+
+    def duration_field(self, obj):
+        return self.duration_col(obj)
+    duration_field.short_description = 'Тривалість'
+
+    def log_display(self, obj):
+        if not obj.log_output:
+            return format_html('<span style="color:var(--text-dim)">Лог порожній</span>')
+        return format_html(
+            '<pre style="'
+            'max-height:500px;overflow-y:auto;'
+            'background:var(--bg-input,#141f2b);'
+            'color:var(--text,#c9d8e4);'
+            'padding:12px;border-radius:4px;'
+            'font-size:12px;line-height:1.5;'
+            'white-space:pre-wrap;word-break:break-all'
+            '">{}</pre>',
+            obj.log_output,
+        )
+    log_display.short_description = 'Лог'
+
+    def documents_inline(self, obj):
+        docs = list(obj.documents.select_related('expense').all())
+        if not docs:
+            return format_html('<span style="color:var(--text-dim)">Немає</span>')
+        rows = []
+        for d in docs:
+            pdf = (
+                format_html('<a href="/media/{}" target="_blank">📄 PDF</a>', d.file)
+                if d.file else format_html('—')
+            )
+            exp = (
+                format_html(
+                    '<a href="{}">💰 #{}</a>',
+                    reverse('admin:accounting_expense_change', args=[d.expense_id]),
+                    d.expense_id,
+                )
+                if d.expense_id else format_html('—')
+            )
+            rows.append(format_html(
+                '<tr>'
+                '<td style="padding:4px 8px">{}</td>'
+                '<td style="padding:4px 8px">{}</td>'
+                '<td style="padding:4px 8px">{}</td>'
+                '</tr>',
+                d.batch_num, pdf, exp,
+            ))
+        rows_html = format_html('{}' * len(rows), *rows)
+        return format_html(
+            '<table style="border-collapse:collapse">'
+            '<tr>'
+            '<th style="padding:4px 8px;text-align:left">Batch #</th>'
+            '<th style="padding:4px 8px;text-align:left">PDF</th>'
+            '<th style="padding:4px 8px;text-align:left">Витрата</th>'
+            '</tr>'
+            '{}'
+            '</table>',
+            rows_html,
+        )
+    documents_inline.short_description = 'Завантажені рахунки'
 
 
 # ── ScraperDocument admin ─────────────────────────────────────────────────────
@@ -181,8 +304,7 @@ class ScraperDocumentAdmin(admin.ModelAdmin):
                       'amount_col', 'pdf_link', 'expense_link', 'created_at')
     list_filter   = ('run__config__site_name', 'currency')
     search_fields = ('batch_num',)
-    readonly_fields = ('run', 'batch_num', 'file', 'expense',
-                        'created_at', 'pdf_link', 'expense_link')
+    readonly_fields = ('run', 'batch_num', 'created_at', 'pdf_link', 'expense_link')
     fields = ('run', 'batch_num', 'invoice_date', 'amount', 'currency',
               'pdf_link', 'expense_link', 'created_at')
 
@@ -195,17 +317,14 @@ class ScraperDocumentAdmin(admin.ModelAdmin):
 
     def amount_col(self, obj):
         if obj.amount is None:
-            return format_html('<span style="color:var(--text-dim)">не вказано</span>')
+            return format_html('<span style="color:var(--text-dim)">—</span>')
         return f'{obj.amount} {obj.currency}'
     amount_col.short_description = 'Сума'
 
     def pdf_link(self, obj):
         if not obj.file:
             return '—'
-        return format_html(
-            '<a href="/media/{}" target="_blank">📄 PDF</a>',
-            obj.file,
-        )
+        return format_html('<a href="/media/{}" target="_blank">📄 PDF</a>', obj.file)
     pdf_link.short_description = 'PDF'
 
     def expense_link(self, obj):

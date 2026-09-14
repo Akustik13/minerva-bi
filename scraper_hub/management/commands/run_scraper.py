@@ -1,7 +1,7 @@
 from django.core.management.base import BaseCommand
 
 from scraper_hub.models import ScraperSiteConfig
-from scraper_hub.services import run_site
+from scraper_hub.services import run_site_sync
 
 
 class Command(BaseCommand):
@@ -28,7 +28,7 @@ class Command(BaseCommand):
 
         for cfg in configs:
             self.stdout.write(f'▶ Запускаємо {cfg.get_site_name_display()}...')
-            run = run_site(cfg, triggered_by='cron')
+            run = run_site_sync(cfg, triggered_by='cron')
             icon = '✅' if run.status == 'ok' else ('⚠️' if run.status == 'partial' else '❌')
             self.stdout.write(
                 f'  {icon} Статус: {run.get_status_display()}, '

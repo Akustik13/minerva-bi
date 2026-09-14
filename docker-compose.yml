@@ -45,6 +45,10 @@ services:
 
       TZ: "Europe/Berlin"
 
+      # Scraper worker (Playwright на окремому контейнері)
+      SCRAPER_WORKER_URL: "http://scraper-worker:8888"
+      SCRAPER_VNC_URL:    "http://192.168.2.123:6080"   # ← змін IP якщо потрібно
+
       # DigiKey OAuth redirect (потрібен для 3-legged auth, якщо активується)
       DIGIKEY_OAUTH_REDIRECT_URI: "https://sevskiy.minerva-bi.com/bots/digikey/oauth-callback/"
     entrypoint: ["sh", "/app/entrypoint.sh"]
@@ -60,6 +64,25 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  # ── Scraper Worker (Playwright + Xvfb + noVNC) ───────────
+  scraper-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.scraper
+    restart: unless-stopped
+    environment:
+      DISPLAY: ":99"
+      TZ: "Europe/Berlin"
+      # Папка сесій (persistent між перезапусками)
+      SCRAPER_SESSION_DIR: "/sessions"
+    volumes:
+      - media_data:/media          # Той самий том що й web — PDF зберігаються в /media/scraper/
+      - scraper_sessions:/sessions # Persistent Chrome/Chromium профілі
+    ports:
+      - "6080:6080"   # noVNC — відкрий в браузері для CAPTCHA
+      # 8888 — internal only (Django → scraper-worker через Docker network)
+    shm_size: 512m    # Потрібно для Chromium
 
   # ── Minerva AI Telegram Bot ──────────────────────────────
   telegram-bot:
@@ -89,7 +112,8 @@ services:
         condition: service_healthy
 
 volumes:
-  pgdata:       # Дані PostgreSQL
-  media_data:   # Завантажені файли (накладні, фото, етикетки)
-  backup_data:  # Резервні копії БД
-  static_data:  # Django static files (collectstatic)
+  pgdata:            # Дані PostgreSQL
+  media_data:        # Завантажені файли (накладні, фото, етикетки)
+  backup_data:       # Резервні копії БД
+  static_data:       # Django static files (collectstatic)
+  scraper_sessions:  # Chromium профілі (сесії JLCPCB, UPS тощо)

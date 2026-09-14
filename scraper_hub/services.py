@@ -3,8 +3,10 @@ scraper_hub/services.py — business logic для запуску scraper'ів.
 """
 import asyncio
 import logging
+import os
 import sys
 import threading
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -13,7 +15,14 @@ from django.utils import timezone
 
 log = logging.getLogger(__name__)
 
-_SCRAPER_DIR = Path(settings.BASE_DIR) / 'scraper'
+_SCRAPER_DIR  = Path(settings.BASE_DIR) / 'scraper'
+_WORKER_URL   = os.environ.get('SCRAPER_WORKER_URL', '').rstrip('/')   # e.g. http://scraper-worker:8888
+_VNC_URL      = os.environ.get('SCRAPER_VNC_URL', '')                  # e.g. http://192.168.2.123:6080
+
+
+def using_worker() -> bool:
+    """True якщо Django запущено в Docker і є scraper-worker сервіс."""
+    return bool(_WORKER_URL)
 
 
 def _ensure_scraper_path():
@@ -33,52 +42,87 @@ def _get_scraper_class(site_name: str):
 
 
 def _output_root() -> Path:
-    """Базова папка для всіх PDF в media/."""
     d = Path(settings.MEDIA_ROOT) / 'scraper'
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
-# ── Основна функція ────────────────────────────────────────────────────────────
+# ── Live log handler — пише в БД кожні 3 секунди ─────────────────────────────
 
-def run_site(config, triggered_by: str = 'manual'):
+class _DBLogHandler(logging.Handler):
+    """Перехоплює логи scraper.* і зберігає їх в ScraperRun.log_output."""
+
+    def __init__(self, run_id: int):
+        super().__init__()
+        self.run_id     = run_id
+        self._buf: list[str] = []
+        self._last_flush = time.monotonic()
+        self.setFormatter(logging.Formatter('%(asctime)s  %(message)s', datefmt='%H:%M:%S'))
+
+    def emit(self, record):
+        try:
+            self._buf.append(self.format(record))
+            if time.monotonic() - self._last_flush >= 3:
+                self._flush()
+        except Exception:
+            pass
+
+    def _flush(self):
+        if not self._buf:
+            return
+        from scraper_hub.models import ScraperRun
+        new_text = '\n'.join(self._buf)
+        self._buf.clear()
+        self._last_flush = time.monotonic()
+        try:
+            run = ScraperRun.objects.get(pk=self.run_id)
+            run.log_output = (run.log_output + '\n' + new_text).lstrip('\n')
+            run.save(update_fields=['log_output'])
+        except Exception:
+            pass
+
+    def flush_final(self):
+        self._flush()
+
+
+# ── Основна функція ───────────────────────────────────────────────────────────
+
+def run_site(run, config=None):
     """
-    Запускає scraper для одного ScraperSiteConfig.
-    Створює ScraperRun + ScraperDocument, сповіщає, повертає ScraperRun.
+    Запускає scraper для вже існуючого ScraperRun.
+    config — береться з run.config якщо не передано явно.
     """
-    from scraper_hub.models import ScraperRun, ScraperDocument
+    from scraper_hub.models import ScraperDocument
 
-    run = ScraperRun.objects.create(
-        config=config,
-        triggered_by=triggered_by,
-        status='running',
-    )
-    config.last_run_at     = run.started_at
-    config.last_run_status = 'running'
-    config.save(update_fields=['last_run_at', 'last_run_status'])
+    if config is None:
+        config = run.config
 
-    log_lines = []
+    # Прикріплюємо live-log handler до scraper-логера
+    db_handler = _DBLogHandler(run.pk)
+    scraper_logger = logging.getLogger('scraper')
+    scraper_logger.addHandler(db_handler)
+    scraper_logger.setLevel(logging.INFO)
 
     def _log(msg):
         log.info(msg)
-        log_lines.append(msg)
+        db_handler._buf.append(f'{time.strftime("%H:%M:%S")}  {msg}')
 
     try:
-        out_root   = _output_root()
-        end_dt     = date.today()
-        start_dt   = end_dt - timedelta(days=config.lookback_days)
+        out_root = _output_root()
+        end_dt   = date.today()
+        start_dt = end_dt - timedelta(days=config.lookback_days)
 
-        _log(f'[{config.get_site_name_display()}] start={start_dt} end={end_dt}')
+        _log(f'▶ Старт [{config.get_site_name_display()}]  {start_dt} → {end_dt}')
+        db_handler._flush()
 
         ScraperCls = _get_scraper_class(config.site_name)
         scraper    = ScraperCls(
             username=config.username,
             password=config.password,
-            output_dir=str(out_root),  # scraper додає site_name сам
+            output_dir=str(out_root),
             headless=True,
         )
 
-        # asyncio.run() всередині потоку — безпечно
         loop = asyncio.new_event_loop()
         try:
             files = loop.run_until_complete(
@@ -90,40 +134,153 @@ def run_site(config, triggered_by: str = 'manual'):
         finally:
             loop.close()
 
-        _log(f'Завантажено {len(files)} файл(ів)')
+        _log(f'✅ Завантажено {len(files)} файл(ів)')
 
         media_root = Path(settings.MEDIA_ROOT)
         for fpath in files:
             p = Path(fpath)
             if not p.exists():
-                _log(f'Файл не знайдено: {p}')
+                _log(f'⚠ Файл не знайдено: {p}')
                 continue
-
-            # Відносний шлях для FileField
             try:
                 rel = p.relative_to(media_root)
             except ValueError:
                 rel = Path('scraper') / config.site_name / p.name
 
             batch = p.stem.replace('invoice_', '')
-
-            # Не створювати дублікат якщо вже є
             if ScraperDocument.objects.filter(batch_num=batch).exists():
-                _log(f'Skip duplicate: {batch}')
+                _log(f'↩ Вже є: {batch}')
                 continue
 
-            doc = ScraperDocument.objects.create(
-                run=run,
-                batch_num=batch,
-                file=str(rel),
-            )
+            doc = ScraperDocument.objects.create(run=run, batch_num=batch, file=str(rel))
             if config.auto_create_expense:
                 _create_expense(config, doc, p)
 
         run.files_downloaded = len(files)
         run.status           = 'ok' if files else 'partial'
         run.finished_at      = timezone.now()
-        run.log_output       = '\n'.join(log_lines)
+
+    except Exception as exc:
+        log.exception('Scraper run failed: %s', exc)
+        _log(f'❌ Помилка: {exc}')
+        run.status        = 'error'
+        run.error_message = str(exc)
+        run.finished_at   = timezone.now()
+
+    finally:
+        db_handler.flush_final()
+        scraper_logger.removeHandler(db_handler)
+        run.save()
+        config.last_run_at     = run.started_at
+        config.last_run_status = run.status
+        config.last_run_files  = run.files_downloaded
+        config.save(update_fields=['last_run_at', 'last_run_status', 'last_run_files'])
+
+    _notify(config, run)
+    return run
+
+
+def create_and_run_in_thread(config, triggered_by: str = 'manual'):
+    """
+    Створює ScraperRun, запускає у фоні, повертає run одразу.
+    На NAS (Docker): викликає scraper-worker API + опитує статус.
+    На Windows (dev): запускає scraper напряму в потоці.
+    """
+    from scraper_hub.models import ScraperRun
+
+    run = ScraperRun.objects.create(
+        config=config,
+        triggered_by=triggered_by,
+        status='running',
+        log_output=f'{time.strftime("%H:%M:%S")}  ⚙️ Ініціалізація...',
+    )
+    config.last_run_at     = run.started_at
+    config.last_run_status = 'running'
+    config.save(update_fields=['last_run_at', 'last_run_status'])
+
+    if using_worker():
+        target = _run_via_worker_api
+    else:
+        target = run_site
+
+    t = threading.Thread(target=target, args=(run,), daemon=True)
+    t.start()
+    return run
+
+
+def _run_via_worker_api(run):
+    """Делегує запуск до scraper-worker Docker сервісу через HTTP API."""
+    import requests as req_lib
+
+    config   = run.config
+    end_dt   = date.today()
+    start_dt = end_dt - timedelta(days=config.lookback_days)
+
+    def _log(msg):
+        run.log_output = (run.log_output + f'\n{time.strftime("%H:%M:%S")}  {msg}').lstrip()
+        run.save(update_fields=['log_output'])
+
+    try:
+        _log(f'▶ Відправляємо запит до scraper-worker...')
+
+        resp = req_lib.post(
+            f'{_WORKER_URL}/run',
+            json={
+                'site':     config.site_name,
+                'username': config.username,
+                'password': config.password,
+                'start':    start_dt.strftime('%Y-%m-%d'),
+                'end':      end_dt.strftime('%Y-%m-%d'),
+                'output':   '/media/scraper',
+            },
+            timeout=15,
+        )
+        if resp.status_code == 409:
+            raise Exception('Scraper вже виконується в контейнері')
+        resp.raise_for_status()
+
+        if _VNC_URL:
+            _log(f'🖥  Браузер доступний: {_VNC_URL}/vnc.html')
+
+        # Опитуємо статус поки виконується
+        while True:
+            time.sleep(3)
+            try:
+                st = req_lib.get(f'{_WORKER_URL}/status', timeout=5).json()
+            except Exception:
+                continue
+
+            run.log_output = st.get('log', run.log_output)
+            run.save(update_fields=['log_output'])
+
+            if not st.get('running'):
+                break
+
+        # Обробляємо завантажені файли
+        from scraper_hub.models import ScraperDocument
+        files      = st.get('files', [])
+        media_root = Path(settings.MEDIA_ROOT)
+
+        for fpath in files:
+            p = Path(fpath)
+            if not p.exists():
+                continue
+            try:
+                rel = p.relative_to(media_root)
+            except ValueError:
+                rel = Path('scraper') / config.site_name / p.name
+
+            batch = p.stem.replace('invoice_', '')
+            if ScraperDocument.objects.filter(batch_num=batch).exists():
+                continue
+
+            doc = ScraperDocument.objects.create(run=run, batch_num=batch, file=str(rel))
+            if config.auto_create_expense:
+                _create_expense(config, doc, p)
+
+        run.files_downloaded = len(files)
+        run.status           = st.get('status', 'ok') if files else 'partial'
+        run.finished_at      = timezone.now()
         run.save()
 
         config.last_run_status = run.status
@@ -131,29 +288,15 @@ def run_site(config, triggered_by: str = 'manual'):
         config.save(update_fields=['last_run_status', 'last_run_files'])
 
     except Exception as exc:
-        log.exception('Scraper run failed: %s', exc)
+        log.exception('Worker API error: %s', exc)
         run.status        = 'error'
         run.error_message = str(exc)
         run.finished_at   = timezone.now()
-        run.log_output    = '\n'.join(log_lines)
         run.save()
         config.last_run_status = 'error'
         config.save(update_fields=['last_run_status'])
 
     _notify(config, run)
-    return run
-
-
-def run_site_in_thread(config, triggered_by: str = 'manual'):
-    """Запускає run_site у фоновому потоці, повертає одразу."""
-    t = threading.Thread(
-        target=run_site,
-        args=(config,),
-        kwargs={'triggered_by': triggered_by},
-        daemon=True,
-    )
-    t.start()
-    return t
 
 
 # ── Бухгалтерія ───────────────────────────────────────────────────────────────
@@ -179,6 +322,21 @@ def _create_expense(config, doc, pdf_path: Path):
         doc.save(update_fields=['expense'])
     except Exception as e:
         log.warning('Не вдалося створити Expense для %s: %s', doc.batch_num, e)
+
+
+# ── Для management command (синхронний запуск) ────────────────────────────────
+
+def run_site_sync(config, triggered_by: str = 'cron'):
+    from scraper_hub.models import ScraperRun
+    run = ScraperRun.objects.create(
+        config=config,
+        triggered_by=triggered_by,
+        status='running',
+    )
+    config.last_run_at     = run.started_at
+    config.last_run_status = 'running'
+    config.save(update_fields=['last_run_at', 'last_run_status'])
+    return run_site(run)
 
 
 # ── Сповіщення ────────────────────────────────────────────────────────────────
