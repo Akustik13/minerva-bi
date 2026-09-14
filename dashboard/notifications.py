@@ -1536,16 +1536,21 @@ def notify_shipment_status(shipment, old_status, new_status):
     if not ns:
         return
 
-    flag_map = {
-        'submitted':   getattr(ns, 'shipment_on_submitted',   False),
-        'label_ready': getattr(ns, 'shipment_on_label_ready', False),
-        'in_transit':  getattr(ns, 'shipment_on_in_transit',  True),
-        'delivered':   getattr(ns, 'shipment_on_delivered',   True),
-        'error':       getattr(ns, 'shipment_on_error',       True),
-        'cancelled':   getattr(ns, 'shipment_on_cancelled',   False),
-    }
-    if not flag_map.get(new_status, False):
-        return
+    # JLC incoming shipments always notify (bypass global flags) — they are inbound
+    # parcels important for production, not outbound customer deliveries.
+    is_jlc = bool(getattr(shipment, 'jlc_order_id', None))
+
+    if not is_jlc:
+        flag_map = {
+            'submitted':   getattr(ns, 'shipment_on_submitted',   False),
+            'label_ready': getattr(ns, 'shipment_on_label_ready', False),
+            'in_transit':  getattr(ns, 'shipment_on_in_transit',  True),
+            'delivered':   getattr(ns, 'shipment_on_delivered',   True),
+            'error':       getattr(ns, 'shipment_on_error',       True),
+            'cancelled':   getattr(ns, 'shipment_on_cancelled',   False),
+        }
+        if not flag_map.get(new_status, False):
+            return
 
     send_email = ns.email_enabled and getattr(ns, 'shipment_email', False)
     send_tg    = ns.telegram_enabled and getattr(ns, 'shipment_telegram', True)
@@ -1562,9 +1567,16 @@ def notify_shipment_status(shipment, old_status, new_status):
     tracking  = getattr(shipment, 'tracking_number', '') or ''
     country   = getattr(shipment, 'recipient_country', '') or ''
     order_num = ''
+    jlc_info  = ''
     try:
         if shipment.order:
             order_num = shipment.order.order_number or ''
+    except Exception:
+        pass
+    try:
+        if is_jlc:
+            jlc = shipment.jlc_order
+            jlc_info = jlc.jlc_order_number or jlc.jlc_order_id or ''
     except Exception:
         pass
 
@@ -1573,8 +1585,10 @@ def notify_shipment_status(shipment, old_status, new_status):
             _cname  = _get_company_name()
             from django.utils import timezone as _tz
             now_str = _tz.now().strftime('%d.%m.%Y %H:%M')
-            subject = f'📦 Відправлення #{shipment.pk}: {new_label}'
+            subject = f'{"🏭 JLCPCB" if jlc_info else "📦"} Відправлення #{shipment.pk}: {new_label}'
             rows = f'<br><b>Статус:</b> {old_label} → <b style="color:{color}">{new_label}</b>'
+            if jlc_info:
+                rows += f'<br><b>🏭 JLCPCB замовлення:</b> <code>{jlc_info}</code>'
             if order_num:
                 rows += f'<br><b>Замовлення:</b> {order_num}'
             rows += f'<br><b>Отримувач:</b> {recipient}'
@@ -1617,6 +1631,8 @@ def notify_shipment_status(shipment, old_status, new_status):
                 '',
                 f'Статус: {old_label} → <b>{new_label}</b>',
             ]
+            if jlc_info:
+                lines.append(f'🏭 JLCPCB: <code>{jlc_info}</code>')
             if order_num:
                 lines.append(f'🛒 Замовлення: <code>{order_num}</code>')
             lines.append(f'👤 {recipient}')
