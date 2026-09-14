@@ -145,11 +145,11 @@ def _build_telegram_text(critical_items, overdue_orders, company_name='Minerva')
     return text
 
 
-def _send_telegram(ns, text):
+def _send_telegram(ns, text, chat_id_override=None):
     """Send a message via Telegram Bot API using stdlib urllib."""
     url  = f'https://api.telegram.org/bot{ns.telegram_bot_token}/sendMessage'
     data = json.dumps({
-        'chat_id':                  ns.telegram_chat_id,
+        'chat_id':                  chat_id_override or ns.telegram_chat_id,
         'text':                     text,
         'parse_mode':               'HTML',
         'disable_web_page_preview': True,
@@ -1536,11 +1536,29 @@ def notify_shipment_status(shipment, old_status, new_status):
     if not ns:
         return
 
-    # JLC incoming shipments always notify (bypass global flags) — they are inbound
-    # parcels important for production, not outbound customer deliveries.
     is_jlc = bool(getattr(shipment, 'jlc_order_id', None))
 
-    if not is_jlc:
+    if is_jlc:
+        # Use JLCConfig notification flags (настроюються в /admin/jlcpcb/jlcconfig/)
+        try:
+            from jlcpcb.models import JLCConfig
+            jlc_cfg = JLCConfig.get()
+        except Exception:
+            jlc_cfg = None
+
+        if jlc_cfg:
+            if new_status == 'delivered' and not jlc_cfg.notify_on_delivered:
+                return
+            if new_status != 'delivered' and not jlc_cfg.notify_on_status_change:
+                return
+            send_email = ns.email_enabled and jlc_cfg.notify_email
+            send_tg    = ns.telegram_enabled and jlc_cfg.notify_telegram
+            jlc_tg_chat = jlc_cfg.telegram_personal_chat_id or None
+        else:
+            send_email = False
+            send_tg    = ns.telegram_enabled
+            jlc_tg_chat = None
+    else:
         flag_map = {
             'submitted':   getattr(ns, 'shipment_on_submitted',   False),
             'label_ready': getattr(ns, 'shipment_on_label_ready', False),
@@ -1551,9 +1569,10 @@ def notify_shipment_status(shipment, old_status, new_status):
         }
         if not flag_map.get(new_status, False):
             return
+        send_email  = ns.email_enabled and getattr(ns, 'shipment_email', False)
+        send_tg     = ns.telegram_enabled and getattr(ns, 'shipment_telegram', True)
+        jlc_tg_chat = None
 
-    send_email = ns.email_enabled and getattr(ns, 'shipment_email', False)
-    send_tg    = ns.telegram_enabled and getattr(ns, 'shipment_telegram', True)
     if not send_email and not send_tg:
         return
 
@@ -1647,7 +1666,10 @@ def notify_shipment_status(shipment, old_status, new_status):
             eta = getattr(shipment, 'carrier_eta', None)
             if eta:
                 lines.append(f'📅 ETA: <b>{eta.strftime("%d.%m.%Y")}</b>')
-            _send_telegram(ns, '\n'.join(lines))
+            if jlc_tg_chat:
+                _send_telegram(ns, '\n'.join(lines), chat_id_override=jlc_tg_chat)
+            else:
+                _send_telegram(ns, '\n'.join(lines))
         except Exception:
             pass
 
