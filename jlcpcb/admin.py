@@ -1226,6 +1226,15 @@ class JLCOrderAdmin(admin.ModelAdmin):
                 messages.warning(request, f'⚠️ Трекінг: {errors[0]}')
             else:
                 shipment.refresh_from_db()
+                # Push ETA back to JLCOrder immediately (signal may miss update_fields)
+                eta = shipment.eta_to or shipment.carrier_eta
+                if eta and order.expected_date != eta:
+                    order.expected_date = eta
+                    order.save(update_fields=['expected_date'])
+                if (shipment.status == 'delivered'
+                        and shipment.delivered_at and not order.delivered_date):
+                    order.delivered_date = shipment.delivered_at.date()
+                    order.save(update_fields=['delivered_date'])
                 messages.success(request, f'✅ Трекінг оновлено: {shipment.get_status_display()}')
         except Exception as e:
             messages.warning(request, f'⚠️ Помилка трекінгу: {e}')
