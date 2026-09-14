@@ -256,27 +256,38 @@ def _run_via_worker_api(run):
             if not st.get('running'):
                 break
 
-        # Обробляємо завантажені файли
+        # Обробляємо завантажені файли.
+        # Worker повертає шляхи як /media/scraper/... (всередині свого контейнера).
+        # Django бачить той самий volume як settings.MEDIA_ROOT (/app/media/ або /media/).
+        # Перетворюємо: /media/scraper/jlcpcb/foo.pdf → <MEDIA_ROOT>/scraper/jlcpcb/foo.pdf
         from scraper_hub.models import ScraperDocument
         files      = st.get('files', [])
         media_root = Path(settings.MEDIA_ROOT)
 
-        for fpath in files:
+        def _resolve_worker_path(fpath: str) -> Path:
+            """Конвертує шлях з worker-контейнера в локальний шлях Django."""
             p = Path(fpath)
-            if not p.exists():
-                continue
+            # Worker монтує volume як /media; Django монтує як MEDIA_ROOT
+            # Шукаємо 'scraper' в компонентах і беремо відносний шлях від нього
+            parts = p.parts
             try:
-                rel = p.relative_to(media_root)
+                idx = parts.index('scraper')
+                rel = Path(*parts[idx:])          # scraper/jlcpcb/invoice_XXX.pdf
+                return media_root / rel
             except ValueError:
-                rel = Path('scraper') / config.site_name / p.name
+                return media_root / p.name        # fallback
 
-            batch = p.stem.replace('invoice_', '')
+        for fpath in files:
+            local_p = _resolve_worker_path(fpath)
+            rel     = local_p.relative_to(media_root) if local_p.is_relative_to(media_root) else Path('scraper') / config.site_name / local_p.name
+
+            batch = local_p.stem.replace('invoice_', '')
             if ScraperDocument.objects.filter(batch_num=batch).exists():
                 continue
 
             doc = ScraperDocument.objects.create(run=run, batch_num=batch, file=str(rel))
-            if config.auto_create_expense:
-                _create_expense(config, doc, p)
+            if config.auto_create_expense and local_p.exists():
+                _create_expense(config, doc, local_p)
 
         run.files_downloaded = len(files)
         run.status           = st.get('status', 'ok') if files else 'partial'
