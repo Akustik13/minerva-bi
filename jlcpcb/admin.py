@@ -218,6 +218,7 @@ class JLCOrderAdmin(admin.ModelAdmin):
     readonly_fields = (
         'jlc_status', 'auto_matched_sku', 'last_notified_status',
         'received_qty', 'raw_data', 'created_at', 'updated_at',
+        'invoices_display',
     )
 
     fieldsets = (
@@ -239,6 +240,9 @@ class JLCOrderAdmin(admin.ModelAdmin):
         ('💰 Вартість', {
             'fields': ('unit_price', 'total_price', 'currency'),
             'classes': ('collapse',),
+        }),
+        ('📄 Рахунки (scraper)', {
+            'fields': ('invoices_display',),
         }),
         ("🏭 Прив'язка до складу", {
             'fields': ('product', 'mapping_status', 'auto_matched_sku',
@@ -1093,6 +1097,46 @@ class JLCOrderAdmin(admin.ModelAdmin):
         'manufactured': 'Виготовлено', 'shipped': 'Відправлено',
         'delivered': 'Доставлено', 'cancelled': 'Скасовано',
     }
+
+    @admin.display(description='📄 Рахунки (scraper)')
+    def invoices_display(self, obj):
+        docs = list(obj.scraper_documents.select_related('expense').all())
+        if not docs:
+            return format_html('<span style="color:var(--text-dim)">Рахунків немає — scraper не завантажував</span>')
+        rows = []
+        for d in docs:
+            amount_str = f'{d.amount} {d.currency}' if d.amount else '—'
+            pdf_link = (
+                format_html('<a href="/media/{}" target="_blank">📄 PDF</a>', d.file)
+                if d.file else '—'
+            )
+            exp_link = (
+                format_html(
+                    '<a href="/admin/accounting/expense/{}/change/" style="color:var(--link-fg)">💰 Витрата #{}</a>',
+                    d.expense_id, d.expense_id,
+                )
+                if d.expense_id else '—'
+            )
+            rows.append(format_html(
+                '<tr>'
+                '<td style="padding:3px 10px;font-family:monospace">{}</td>'
+                '<td style="padding:3px 10px">{}</td>'
+                '<td style="padding:3px 10px">{}</td>'
+                '<td style="padding:3px 10px">{}</td>'
+                '</tr>',
+                d.batch_num, amount_str, pdf_link, exp_link,
+            ))
+        rows_html = format_html('{}' * len(rows), *rows)
+        return format_html(
+            '<table style="border-collapse:collapse;font-size:13px">'
+            '<tr style="color:var(--text-dim);font-size:11px">'
+            '<th style="padding:3px 10px;text-align:left">Batch #</th>'
+            '<th style="padding:3px 10px;text-align:left">Сума</th>'
+            '<th style="padding:3px 10px;text-align:left">PDF</th>'
+            '<th style="padding:3px 10px;text-align:left">Бухгалтерія</th>'
+            '</tr>{}</table>',
+            rows_html,
+        )
 
     @admin.display(description='Файли / Товари')
     def files_summary_col(self, obj):
