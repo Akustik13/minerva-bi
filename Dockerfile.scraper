@@ -23,7 +23,6 @@ COPY docker/scraper_worker.py /app/worker.py
 COPY docker/scraper_start.sh /start.sh
 RUN chmod +x /start.sh
 
-# Playwright Chromium вже в образі — встановлюємо браузер
-RUN playwright install chromium
+# Playwright + Chromium вже є в базовому образі mcr.microsoft.com/playwright/python
 
 CMD ["/start.sh"]
