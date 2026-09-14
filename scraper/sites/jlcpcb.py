@@ -43,10 +43,16 @@ class JLCScraper(BaseScraper):
         """Перевіряємо чи збережена сесія ще дійсна."""
         self.log.info('Checking saved session...')
         await page.goto(_BILLING_URL, wait_until='domcontentloaded', timeout=20_000)
-        await page.wait_for_timeout(3000)  # чекаємо Vue.js auth check
+        # Чекаємо 7с — Vue.js auth check може редіректити із затримкою
+        await page.wait_for_timeout(7000)
         url = page.url
         if 'passport' in url or 'login' in url:
-            self.log.info('Session expired or not found')
+            self.log.info('Session expired or not found. URL: %s', url[:80])
+            return False
+        # Додатково перевіряємо чи є елементи таблиці (не просто URL)
+        has_table = await page.locator('table, .ant-table').count() > 0
+        if not has_table:
+            self.log.info('No billing table found — treating as not logged in')
             return False
         self.log.info('Session valid! URL: %s', url[:60])
         return True
