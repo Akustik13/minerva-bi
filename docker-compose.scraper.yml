@@ -1,0 +1,29 @@
+# docker-compose.scraper.yml — Ізольований контейнер для тестування web-скрейпера.
+#
+# Використання:
+#   docker-compose -f docker-compose.scraper.yml up -d
+#   docker-compose -f docker-compose.scraper.yml exec scraper \
+#     python run.py jlcpcb --username EMAIL --password PASS
+#
+# Зупинити:
+#   docker-compose -f docker-compose.scraper.yml down
+#
+# Файли зберігаються в ./downloads (на хості)
+
+services:
+  scraper:
+    image: mcr.microsoft.com/playwright/python:v1.49.0-noble
+    volumes:
+      # Монтуємо тільки папку scraper/ — решта проекту не потрібна
+      - ./scraper:/app
+      # Файли що завантажуються — на хості в ./downloads
+      - ./downloads:/downloads
+    working_dir: /app
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+    # Контейнер тримається живим для ручного exec
+    command: ["tail", "-f", "/dev/null"]
+    # Обмеження ресурсів (Chromium любить пам'ять)
+    mem_limit: 1g
+    shm_size: 512m

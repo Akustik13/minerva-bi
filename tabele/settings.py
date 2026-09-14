@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'faq',              # ❓ FAQ та підтримка
     'labels_app',       # 🏷️ Етикетки
     'backup',           # 💾 Резервне копіювання
+    'scraper_hub',      # 📥 Scraper рахунків (JLCPCB, UPS)
     # ── REST API ──
     'rest_framework',
     'rest_framework.authtoken',

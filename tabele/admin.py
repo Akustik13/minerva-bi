@@ -31,6 +31,7 @@ def _get_app_list(self, request, app_label=None):
         'inventory',  # 📦 Управління складом
         'tasks',      # 📋 Задачі та нагадування
         'autoimport',    # 🔄 Авто-імпорт
+        'scraper_hub',  # 📥 Scraper рахунків
         'ai_assistant',     # 🏛️ Minerva AI
         'email_assistant',  # 📧 Email Асистент
         'bots',             # 🤖 Боти та AI
@@ -56,7 +57,8 @@ def _get_app_list(self, request, app_label=None):
                       'purchaseorder', 'purchaseorderline'],
         'shipping': ['carrier', 'shippingsettings', 'packagingmaterial', 'shipment', 'orderpackaging'],
         'config':   ['systemsettings', 'documentsettings', 'notificationsettings', 'themesettings'],
-        'api':      ['apikey'],
+        'api':          ['apikey'],
+        'scraper_hub':  ['scrapersiteconfig', 'scraperrun', 'scraperdocument'],
         'bots':      ['digikeyconfig', 'digikeylisting', 'bot', 'botlog'],
         'jlcpcb':    ['jlcconfig', 'jlcorder', 'jlcproductmapping'],
         'documents': ['documenttemplate', 'generateddocument'],

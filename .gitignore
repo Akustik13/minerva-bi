@@ -47,6 +47,10 @@ data/
 app/
 ai/
 
+# ── Web Scraper ───────────────────────────────────────────
+downloads/
+scraper/**/_debug_*.png
+
 # ── Локальна документація / референсні матеріали ─────────
 API_marketplace/
 lending/
