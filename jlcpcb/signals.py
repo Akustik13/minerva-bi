@@ -1,5 +1,5 @@
 """
-jlcpcb/signals.py — auto-create Shipment when tracking_number is set on JLCOrder.
+jlcpcb/signals.py — JLCOrder ↔ Shipment sync signals.
 """
 import logging
 
@@ -28,3 +28,38 @@ def sync_jlc_shipment(sender, instance, **kwargs):
             )
     except Exception as e:
         logger.warning("JLC signal: shipment sync failed for %s: %s", instance.jlc_order_number, e)
+
+
+@receiver(post_save, sender='shipping.Shipment')
+def sync_jlc_order_from_shipment(sender, instance, **kwargs):
+    """
+    When Shipment tracking updates — push ETA and delivered date back to JLCOrder.
+    Runs after every track_shipments cycle.
+    """
+    if not instance.jlc_order_id:
+        return
+    try:
+        order = instance.jlc_order
+        changed = []
+
+        # ETA: prefer eta_to (UPS/DHL real window), fallback to carrier_eta (tariff estimate)
+        eta = instance.eta_to or instance.carrier_eta
+        if eta and order.expected_date != eta:
+            order.expected_date = eta
+            changed.append('expected_date')
+
+        # Delivered: when Shipment is delivered, set JLCOrder.delivered_date
+        if (instance.status == 'delivered'
+                and instance.delivered_at
+                and not order.delivered_date):
+            order.delivered_date = instance.delivered_at.date()
+            changed.append('delivered_date')
+
+        if changed:
+            order.save(update_fields=changed)
+            logger.info(
+                "JLC signal: updated JLCOrder %s fields=%s",
+                order.jlc_order_number, changed,
+            )
+    except Exception as e:
+        logger.warning("JLC signal: date sync failed for shipment #%s: %s", instance.pk, e)
