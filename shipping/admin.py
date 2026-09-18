@@ -4,6 +4,7 @@ shipping/admin.py — Адмін-панель модуля доставки
 import logging
 from django.utils.translation import gettext_lazy as _
 
+from django import forms
 from django.contrib import admin, messages
 from django.db import models
 from core.mixins import AuditableMixin
@@ -955,8 +956,21 @@ class TrackingAttemptLogInline(admin.TabularInline):
 
 # ── Shipment Admin ────────────────────────────────────────────────────────────
 
+class ShipmentForm(forms.ModelForm):
+    def clean(self):
+        cd = super().clean()
+        billing = cd.get('ups_billing', 'shipper')
+        if billing in ('receiver', 'third_party') and not cd.get('ups_billing_account', '').strip():
+            self.add_error(
+                'ups_billing_account',
+                'UPS API вимагає номер акаунту для BillReceiver / BillThirdParty.',
+            )
+        return cd
+
+
 @admin.register(Shipment)
 class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
+    form    = ShipmentForm
     inlines = [ShipmentPackageInline, TrackingAttemptLogInline]
     list_display  = (
         "id_badge", "order_link", "carrier_badge", "status_col",
