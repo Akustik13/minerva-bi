@@ -1003,6 +1003,18 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 "reference",
             )
         }),
+        ("💳 UPS: платник доставки", {
+            "fields": (
+                "ups_billing",
+                ("ups_billing_account", "ups_billing_postal", "ups_billing_country"),
+            ),
+            "classes": ("collapse",),
+            "description": (
+                "За замовчуванням — відправник (BillShipper). "
+                "Для BillReceiver / BillThirdParty вкажіть номер UPS-акаунту, "
+                "поштовий індекс та країну платника."
+            ),
+        }),
         ("🚚 Результат від перевізника", {
             "fields": (
                 "carrier_shipment_id", "tracking_number",
@@ -3940,6 +3952,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if customs and terms_of_shipment:
                 customs['terms_of_shipment'] = terms_of_shipment
 
+            billing = None
+            if shipment.ups_billing != 'shipper':
+                billing = {
+                    'party':   shipment.ups_billing,
+                    'account': shipment.ups_billing_account,
+                    'postal':  shipment.ups_billing_postal,
+                    'country': shipment.ups_billing_country,
+                }
+
             result = client.create_shipment(
                 to_address=to_addr,
                 packages=packages,
@@ -3947,6 +3968,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 from_address=shipper,
                 customs_info=customs or None,
                 reference=shipment.reference or str(shipment.pk),
+                billing=billing,
             )
             # Зберігаємо реальний UPS payload для дебагу
             shipment.raw_request = getattr(client, '_last_payload', {'packages': packages})
@@ -4497,8 +4519,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             return None
 
         reason_map = {
-            'Commercial': 'SALE', 'Gift': 'GIFT', 'Personal': 'GIFT',
-            'Return': 'RETURN', 'Claim': 'OTHER',
+            'Commercial': 'SALE',
+            'Gift':       'GIFT',
+            'Sample':     'SAMPLE',
+            'Return':     'RETURN',
+            'Repair':     'SAMPLE',   # UPS uses SAMPLE for Repair in customs context
+            'Personal':   'OTHER',
+            'Other':      'OTHER',
+            'Claim':      'OTHER',    # legacy compat
         }
         currency = shipment.declared_currency or 'USD'
         contents_type = reason_map.get(shipment.export_reason, 'SALE')

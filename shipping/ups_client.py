@@ -673,6 +673,7 @@ class UPSClient:
     def create_shipment(self, to_address: dict, packages: list,
                         service_code: str = '11', from_address: dict = None,
                         customs_info: dict = None, reference: str = '',
+                        billing: dict = None,
                         dry_run: bool = False) -> dict:
         """
         POST /api/shipments/v2409/ship
@@ -709,7 +710,7 @@ class UPSClient:
                 'Address':       self._fmt_addr(pickup),
             },
             'PaymentInformation': {
-                'ShipmentCharge': {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}},
+                'ShipmentCharge': self._build_payment_charge(billing),
             },
             'ShipmentRatingOptions': {'NegotiatedRatesIndicator': 'X'},
             'Description': (customs_info or {}).get('description', 'Goods')[:50] if customs_info else 'Goods',
@@ -1394,6 +1395,34 @@ class UPSClient:
             p['ReferenceNumber'] = [{'Code': '02', 'Value': pkg['reference'][:35]}]
         return p
 
+    def _build_payment_charge(self, billing: dict | None) -> dict:
+        """Build ShipmentCharge block for PaymentInformation."""
+        party = (billing or {}).get('party', 'shipper')
+        if party == 'receiver':
+            return {
+                'Type': '01',
+                'BillReceiver': {
+                    'AccountNumber': billing.get('account', ''),
+                    'Address': {
+                        'PostalCode':  billing.get('postal', ''),
+                        'CountryCode': (billing.get('country') or 'DE').upper(),
+                    },
+                },
+            }
+        if party == 'third_party':
+            return {
+                'Type': '01',
+                'BillThirdParty': {
+                    'AccountNumber': billing.get('account', ''),
+                    'Address': {
+                        'PostalCode':  billing.get('postal', ''),
+                        'CountryCode': (billing.get('country') or 'DE').upper(),
+                    },
+                },
+            }
+        # default: shipper pays
+        return {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}}
+
     def _build_customs(self, info: dict, invoice_number: str = '', sold_to: dict | None = None, seller: dict | None = None) -> dict:
         """Build InternationalForms payload for UPS Ship API."""
         from datetime import date as _date
@@ -1431,10 +1460,17 @@ class UPSClient:
                 prod['CommodityCode'] = item['hs_code']
             products.append(prod)
 
-        # ReasonForExport: UPS expects text values ("Sale", "Gift", etc.), not codes
+        # ReasonForExport: UPS expects exact text strings
         reason_map = {
-            'SALE': 'Sale', 'GIFT': 'Gift', 'SAMPLE': 'Sample',
-            'RETURN': 'Return', 'OTHER': 'Other',
+            'SALE':       'Sale',
+            'COMMERCIAL': 'Sale',
+            'GIFT':       'Gift',
+            'SAMPLE':     'Sample',
+            'RETURN':     'Return',
+            'REPAIR':     'Repair',
+            'PERSONAL':   'Personal Effects',
+            'OTHER':      'Other',
+            'CLAIM':      'Other',
         }
         reason = reason_map.get(info.get('contents_type', 'SALE').upper(), 'Sale')
 

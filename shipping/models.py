@@ -184,16 +184,45 @@ class Shipment(models.Model):
                                         blank=True, default="",
                                         help_text="Для митниці: напр. 'Electronic components'")
     EXPORT_REASON_CHOICES = [
-        ("Commercial", "Commercial — продаж"),
+        ("Commercial", "Commercial — продаж (Sale)"),
         ("Gift",       "Gift — подарунок"),
-        ("Personal",   "Personal — особисте"),
+        ("Sample",     "Sample — зразок / тестовий виріб"),
         ("Return",     "Return — повернення"),
-        ("Claim",      "Claim — рекламація"),
+        ("Repair",     "Repair — ремонт / гарантія"),
+        ("Personal",   "Personal Effects — особисті речі"),
+        ("Other",      "Other — інше / рекламація"),
     ]
     export_reason    = models.CharField(
         "Причина експорту", max_length=20,
         choices=EXPORT_REASON_CHOICES, default="Commercial",
-        help_text="Для митної декларації CN23",
+        help_text="Для митної декларації (CN23, commercial invoice).",
+    )
+
+    # ── UPS: платник доставки ─────────────────────────────────────────────────
+    UPS_BILLING_SHIPPER     = "shipper"
+    UPS_BILLING_RECEIVER    = "receiver"
+    UPS_BILLING_THIRD_PARTY = "third_party"
+    UPS_BILLING_CHOICES = [
+        ("shipper",     "Відправник (BillShipper) — стандарт"),
+        ("receiver",    "Отримувач (BillReceiver) — акаунт UPS отримувача"),
+        ("third_party", "Третя сторона (BillThirdParty)"),
+    ]
+    ups_billing = models.CharField(
+        "UPS: платник доставки", max_length=15,
+        choices=UPS_BILLING_CHOICES, default="shipper",
+        help_text="Хто оплачує вартість доставки. Застосовується тільки для UPS.",
+    )
+    ups_billing_account = models.CharField(
+        "UPS: акаунт платника", max_length=50, blank=True,
+        help_text="Номер UPS-акаунту отримувача або третьої сторони.",
+    )
+    ups_billing_postal = models.CharField(
+        "UPS: індекс платника", max_length=20, blank=True,
+        help_text="Поштовий індекс адреси платника (потрібен для BillReceiver/BillThirdParty).",
+    )
+    ups_billing_country = models.CharField(
+        "UPS: країна платника", max_length=2, blank=True,
+        help_text="Код країни платника (DE, GB, US...).",
     )
     declared_value   = models.DecimalField("Задекларована вартість", max_digits=10,
                                            decimal_places=2, null=True, blank=True)

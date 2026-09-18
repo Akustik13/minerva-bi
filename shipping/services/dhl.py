@@ -300,9 +300,12 @@ _EU_COUNTRIES = {
 _EXPORT_REASON_MAP = {
     "Commercial": "COMMERCIAL_PURPOSE_OR_SALE",
     "Gift":       "GIFT",
-    "Personal":   "PERSONAL_BELONGINGS_OR_PERSONAL_USE",
+    "Sample":     "COMMERCIAL_PURPOSE_OR_SALE",  # DHL: no Sample, nearest = Commercial
     "Return":     "RETURN",
-    "Claim":      "OTHER",
+    "Repair":     "RETURN",                       # DHL: repair treated as Return
+    "Personal":   "PERSONAL_BELONGINGS_OR_PERSONAL_USE",
+    "Other":      "OTHER",
+    "Claim":      "OTHER",                        # legacy compat
 }
 
 

@@ -621,11 +621,15 @@ class FedExClient:
 
         # ExportDetail reason map: SALE / GIFT / SAMPLE / RETURN / OTHER
         contents_map = {
-            'SALE':   'SOLD',
-            'GIFT':   'GIFT',
-            'SAMPLE': 'SAMPLE',
-            'RETURN': 'RETURNED_GOODS',
-            'OTHER':  'OTHER',
+            'SALE':       'SOLD',
+            'COMMERCIAL': 'SOLD',
+            'GIFT':       'GIFT',
+            'SAMPLE':     'SAMPLE',
+            'RETURN':     'RETURNED_GOODS',
+            'REPAIR':     'RETURNED_GOODS',  # FedEx: no Repair, use RETURNED_GOODS
+            'PERSONAL':   'PERSONAL_BELONGINGS',
+            'OTHER':      'OTHER',
+            'CLAIM':      'OTHER',            # legacy compat
         }
         reason = contents_map.get((info.get('contents_type') or 'SALE').upper(), 'SOLD')
 
