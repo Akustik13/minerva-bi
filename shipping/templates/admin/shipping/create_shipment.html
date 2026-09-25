@@ -1620,12 +1620,21 @@ document.addEventListener('DOMContentLoaded', function() {
             addPkgRow(w, l, wd, h, 1);
           }
 
-          // Sync first row → hidden fields before submit (backend uses these for Shipment model)
+          // Sync package data → hidden fields before submit (backend uses these for Shipment model)
           document.getElementById('shipment-form').addEventListener('submit', function(e) {
-            var firstRow = document.querySelector('#pkg-tbody tr');
-            if (firstRow) {
+            var rows = document.querySelectorAll('#pkg-tbody tr');
+            if (rows.length > 0) {
+              // Синхронізувати СУМУ всех ваг (для mitної декларації)
+              var totalWeight = 0;
+              rows.forEach(function(row) {
+                var weight = parseFloat(row.querySelector('[name="pkg_weight[]"]')?.value || 0);
+                var qty = parseInt(row.querySelector('[name="pkg_qty[]"]')?.value || 1);
+                totalWeight += weight * qty;
+              });
+              // Розміри беруться з першої коробки (як 3D умовна розмірність)
+              var firstRow = rows[0];
               var g = function(n) { return firstRow.querySelector('[name="' + n + '"]')?.value || ''; };
-              document.getElementById('id_weight_kg').value = g('pkg_weight[]');
+              document.getElementById('id_weight_kg').value = totalWeight > 0 ? totalWeight.toFixed(3) : g('pkg_weight[]');
               document.getElementById('id_length_cm').value = g('pkg_length[]');
               document.getElementById('id_width_cm').value  = g('pkg_width[]');
               document.getElementById('id_height_cm').value = g('pkg_height[]');
