@@ -805,11 +805,62 @@ class UPSClient:
         resp         = data.get('ShipmentResponse', {})
         results_data = resp.get('ShipmentResults', {})
         pkg_results  = results_data.get('PackageResults', {})
-        if isinstance(pkg_results, list):
-            pkg_results = pkg_results[0] if pkg_results else {}
 
-        tracking  = results_data.get('ShipmentIdentificationNumber', '') or pkg_results.get('TrackingNumber', '')
-        label_b64 = pkg_results.get('ShippingLabel', {}).get('GraphicImage', '')
+        # Для multi-package: збираємо ВСІ label-и і об'єднуємо їх
+        tracking = results_data.get('ShipmentIdentificationNumber', '')
+        label_b64 = ''
+
+        if isinstance(pkg_results, list):
+            # Кілька пакетів — витягнути label з кожного
+            label_parts_gif = []
+            for pkg in pkg_results:
+                gif_img = pkg.get('ShippingLabel', {}).get('GraphicImage', '')
+                if gif_img:
+                    label_parts_gif.append(gif_img)
+                if not tracking:  # fallback для tracking
+                    tracking = pkg.get('TrackingNumber', '')
+
+            # Об'єднати GIF етикетки в один PDF
+            if label_parts_gif:
+                if len(label_parts_gif) == 1:
+                    label_b64 = label_parts_gif[0]
+                else:
+                    # Для multi-package: об'єднати GIF images в один PDF
+                    try:
+                        from PIL import Image
+                        import io
+                        images = []
+                        for gif_b64_part in label_parts_gif:
+                            try:
+                                img_bytes = base64.b64decode(gif_b64_part)
+                                images.append(Image.open(io.BytesIO(img_bytes)).convert('RGB'))
+                            except Exception:
+                                pass
+
+                        if images:
+                            # Укласти зображення вертикально
+                            total_width = max(img.width for img in images)
+                            total_height = sum(img.height for img in images)
+                            combined = Image.new('RGB', (total_width, total_height), 'white')
+                            y_offset = 0
+                            for img in images:
+                                combined.paste(img, (0, y_offset))
+                                y_offset += img.height
+
+                            # Конвертувати обратно в GIF base64
+                            buf = io.BytesIO()
+                            combined.save(buf, format='GIF')
+                            label_b64 = base64.b64encode(buf.getvalue()).decode()
+                    except Exception:
+                        # Fallback: використовувати першу
+                        label_b64 = label_parts_gif[0]
+        else:
+            # Один пакет
+            pkg_results = pkg_results or {}
+            label_b64 = pkg_results.get('ShippingLabel', {}).get('GraphicImage', '')
+            if not tracking:
+                tracking = pkg_results.get('TrackingNumber', '')
+
         # Prefer negotiated rate (same as Rate API); fall back to retail TotalCharges
         neg_charges = results_data.get('NegotiatedRateCharges', {}).get('TotalCharge', {})
         charges     = neg_charges if neg_charges.get('MonetaryValue') else results_data.get('ShipmentCharges', {}).get('TotalCharges', {})

@@ -595,40 +595,17 @@ def create_shipment(carrier, shipment, product_code: str,
 
     tracking_number = data.get("shipmentTrackingNumber", "")
 
-    # Витягуємо base64 PDF label (можуть бути кілька для multi-package shipment)
+    # Витягуємо base64 PDF label
     label_bytes = None
-    label_parts = []
     for doc in (data.get("documents") or []):
         if doc.get("typeCode") == "label":
             b64 = doc.get("content", "")
             if b64:
                 try:
-                    part_bytes = base64.b64decode(b64)
-                    label_parts.append(part_bytes)
+                    label_bytes = base64.b64decode(b64)
                 except Exception:
                     pass
-
-    # Якщо кілька етикеток — об'єднати їх в одне PDF
-    if label_parts:
-        if len(label_parts) == 1:
-            label_bytes = label_parts[0]
-        else:
-            # Для multi-package: використовуємо pypdf для об'єднання
-            try:
-                from pypdf import PdfMerger
-                import io
-                merger = PdfMerger()
-                for part in label_parts:
-                    merger.append(io.BytesIO(part))
-                output = io.BytesIO()
-                merger.write(output)
-                merger.close()
-                label_bytes = output.getvalue()
-            except ImportError:
-                # Fallback: якщо немає pypdf — використовуємо першу
-                label_bytes = label_parts[0]
-            except Exception:
-                label_bytes = label_parts[0]
+            break
 
     return {
         "success":         True,
