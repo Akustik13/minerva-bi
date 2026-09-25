@@ -495,10 +495,28 @@ def create_shipment(carrier, shipment, product_code: str,
         n_items = len(items) or 1
         weight_per_item = round(max(0.1, total_weight / n_items), 3)
 
+        # Якщо є розподіл товарів по коробках, використати вагу з нього
+        packages = list(shipment.packages.all()) if hasattr(shipment, 'packages') else []
+        pkg_weight_map = {}  # {item_description: weight_per_item}
+
+        if packages:
+            for pkg in packages:
+                if pkg.items_distribution:
+                    dist = pkg.items_distribution
+                    for dist_item in dist.get("items", []):
+                        desc = dist_item.get("description", "")
+                        if desc:
+                            pkg_weight_map[desc] = dist.get("weight_per_item", weight_per_item)
+
         for idx, item in enumerate(items, start=1):
+            # Визначити вагу на товар: з розподілу або з загальної формули
+            item_desc = item.get("description", "")
+            item_weight = pkg_weight_map.get(item_desc, weight_per_item)
+            item_weight = round(max(0.1, item_weight), 3)
+
             li: dict = {
                 "number":      idx,
-                "description": (item.get("description") or "Goods")[:35],
+                "description": (item_desc or "Goods")[:35],
                 "price":       round(float(item.get("value") or 0), 2),
                 "priceCurrency": item.get("currency", "EUR"),
                 "quantity": {
@@ -506,8 +524,8 @@ def create_shipment(carrier, shipment, product_code: str,
                     "value": int(item.get("quantity") or 1),
                 },
                 "weight": {
-                    "netValue":   weight_per_item,
-                    "grossValue": weight_per_item,
+                    "netValue":   item_weight,
+                    "grossValue": item_weight,
                 },
                 "commodityCodes":   [],
                 "exportReasonType": "permanent",

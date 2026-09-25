@@ -393,6 +393,11 @@ class ShipmentPackage(models.Model):
         "Однакових коробок", default=1,
         help_text="Кількість коробок з однаковими розмірами та вагою",
     )
+    items_distribution = models.JSONField(
+        "Розподіл товарів в коробці",
+        null=True, blank=True,
+        help_text="JSON: які товари та кількість в цій коробці",
+    )
 
     class Meta:
         verbose_name        = "Коробка"

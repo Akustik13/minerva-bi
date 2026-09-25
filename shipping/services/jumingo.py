@@ -214,10 +214,32 @@ class JumingoService(BaseCarrierService):
             if items:
                 # currency з форми має пріоритет якщо є
                 inv_currency = stored.get("currency") or currency
+
+                # Якщо є розподіл товарів по коробках, переідентифікувати ваги
+                packages = list(shipment.packages.all()) if hasattr(shipment, 'packages') else []
+                line_items = []
+
+                for it in items:
+                    api_item = self._to_api_item(it)
+
+                    # Якщо є items_distribution у пакетах, шукати правильну вагу
+                    if packages:
+                        for pkg in packages:
+                            if pkg.items_distribution:
+                                dist = pkg.items_distribution
+                                # Шукати цей товар у розподілі
+                                for dist_item in dist.get("items", []):
+                                    if dist_item.get("description") == it.get("description"):
+                                        # Використати вагу з цього пакету
+                                        api_item["netWeight"] = round(dist.get("weight_per_item", 0), 3)
+                                        break
+
+                    line_items.append(api_item)
+
                 return {
                     "currency":     inv_currency,
                     "exportReason": export_reason,
-                    "lineItems":    [self._to_api_item(it) for it in items],
+                    "lineItems":    line_items,
                 }
 
         # ── Пріоритет 2: автогенерація з ліній замовлення ────────────────────

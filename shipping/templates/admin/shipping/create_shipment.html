@@ -1658,6 +1658,129 @@ document.addEventListener('DOMContentLoaded', function() {
       })();
       </script>
 
+      {# ── Розподіл товарів по коробках (новий блок) ── #}
+      <div id="pkg-items-distribution" style="margin-top:16px;padding:16px;background:var(--bg-app);border:1px solid var(--border-strong);border-radius:8px;display:none">
+        <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px">
+          ℹ️ <strong>Розподіл товарів по коробках:</strong> Вказати у кожну коробку яка кількість кожного товару.
+        </div>
+        <div id="pkg-items-accordion" style="display:flex;flex-direction:column;gap:12px">
+          {# Accordion entries will be populated by JS #}
+        </div>
+      </div>
+
+      <script>
+      (function(){
+        window._updatePkgItemsDistribution = function(){
+          const pkgRows = document.querySelectorAll('#pkg-tbody tr');
+          const caRows = document.querySelectorAll('.ca-row');
+          const accordion = document.getElementById('pkg-items-accordion');
+          const card = document.getElementById('pkg-items-distribution');
+
+          if (accordion) accordion.innerHTML = '';
+
+          if (pkgRows.length > 0 && caRows.length > 0) {
+            if (card) card.style.display = 'block';
+
+            pkgRows.forEach((pkgRow, pkgIdx) => {
+              const weight = parseFloat(pkgRow.querySelector('[name="pkg_weight[]"]')?.value || 1);
+              const length = pkgRow.querySelector('[name="pkg_length[]"]')?.value || 30;
+              const width = pkgRow.querySelector('[name="pkg_width[]"]')?.value || 20;
+              const height = pkgRow.querySelector('[name="pkg_height[]"]')?.value || 15;
+
+              let html = `
+                <div style="background:var(--bg-card);border:1px solid var(--border-strong);border-radius:6px;padding:12px">
+                  <div style="cursor:pointer;font-weight:600;font-size:13px;color:var(--text);margin-bottom:10px;user-select:none"
+                       onclick="this.nextElementSibling.style.display = this.nextElementSibling.style.display === 'none' ? 'block' : 'none'">
+                    📦 Коробка ${pkgIdx + 1} (${weight} кг, ${length}×${width}×${height} см)
+                  </div>
+                  <div style="display:${pkgIdx === 0 ? 'block' : 'none'}">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px">
+                      <thead>
+                        <tr style="background:var(--bg-input)">
+                          <th style="padding:6px 8px;text-align:left;border-bottom:1px solid var(--border-strong)">Товар</th>
+                          <th style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border-strong);width:70px">К-сть</th>
+                          <th style="padding:6px 8px;text-align:right;border-bottom:1px solid var(--border-strong);width:90px">Вага/шт</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+              `;
+
+              caRows.forEach((caRow, caIdx) => {
+                const desc = caRow.querySelector('[name="ca_desc"]')?.value || 'N/A';
+                html += `
+                  <tr style="border-bottom:1px solid var(--border)">
+                    <td style="padding:6px 8px">
+                      <label style="display:flex;align-items:center;gap:6px;margin:0">
+                        <input type="checkbox" name="pkg_items_idx_${pkgIdx}" class="pkg_item_check" value="${caIdx}" style="cursor:pointer">
+                        <span style="font-size:11px">${desc.substring(0, 30)}</span>
+                      </label>
+                    </td>
+                    <td style="padding:6px 8px">
+                      <input type="number" name="pkg_item_qty_${pkgIdx}_${caIdx}" class="pkg_item_qty pkg_qty_pkg${pkgIdx}" value="0" min="0" step="1"
+                             style="width:100%;background:var(--bg-input);border:1px solid var(--border-strong);padding:4px;border-radius:3px;font-size:11px"
+                             placeholder="0">
+                    </td>
+                    <td style="padding:6px 8px;text-align:right;font-size:11px;color:var(--text-muted)"
+                        id="weight_per_item_${pkgIdx}_${caIdx}">—</td>
+                  </tr>
+                `;
+              });
+
+              html += `
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              `;
+
+              if (accordion) accordion.insertAdjacentHTML('beforeend', html);
+            });
+
+            _recalcPkgWeights();
+            document.querySelectorAll('[name^="pkg_item_qty_"]').forEach(inp => {
+              inp.addEventListener('change', _recalcPkgWeights);
+              inp.addEventListener('input', _recalcPkgWeights);
+            });
+          } else {
+            if (card) card.style.display = 'none';
+          }
+        };
+
+        window._recalcPkgWeights = function(){
+          const pkgRows = document.querySelectorAll('#pkg-tbody tr');
+          pkgRows.forEach((pkgRow, pkgIdx) => {
+            const weight = parseFloat(pkgRow.querySelector('[name="pkg_weight[]"]')?.value || 1);
+            let totalQty = 0;
+
+            document.querySelectorAll('.pkg_qty_pkg' + pkgIdx).forEach(inp => {
+              totalQty += parseFloat(inp.value || 0);
+            });
+
+            const weightPerItem = totalQty > 0 ? (weight / totalQty).toFixed(5) : 0;
+
+            document.querySelectorAll('[id^="weight_per_item_' + pkgIdx + '_"]').forEach(el => {
+              el.textContent = totalQty > 0 ? weightPerItem : '—';
+            });
+          });
+        };
+
+        document.addEventListener('DOMContentLoaded', function(){
+          _updatePkgItemsDistribution();
+        });
+
+        const observer = new MutationObserver(function(){
+          _updatePkgItemsDistribution();
+        });
+
+        setTimeout(function(){
+          const tbody = document.getElementById('pkg-tbody');
+          const customsRows = document.getElementById('customs-rows');
+          if (tbody) observer.observe(tbody, { childList: true });
+          if (customsRows) observer.observe(customsRows, { childList: true });
+        }, 100);
+      })();
+      </script>
+
       <div class="sh-grid g3">
         <div class="sh-field">
           <label class="sh-label">

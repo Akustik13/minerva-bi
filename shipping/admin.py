@@ -1964,6 +1964,44 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             pkg_widths  = request.POST.getlist("pkg_width[]")
             pkg_heights = request.POST.getlist("pkg_height[]")
             pkg_qtys    = request.POST.getlist("pkg_qty[]")
+
+            # Парсимо розподіл товарів по коробках (новий формат)
+            pkg_items_distribution = {}  # {pkg_idx: {items: [...], weight_per_item: ...}}
+            for pkg_idx in range(len(pkg_weights)):
+                pkg_items_indices = request.POST.getlist(f"pkg_items_idx_{pkg_idx}")
+                items_in_pkg = []
+                total_qty_in_pkg = 0
+
+                for item_idx_str in pkg_items_indices:
+                    try:
+                        item_idx = int(item_idx_str)
+                        qty_val = request.POST.get(f"pkg_item_qty_{pkg_idx}_{item_idx}", "0")
+                        qty = max(0, int(float(qty_val or 0)))
+                        if qty > 0 and item_idx < len(customs_items):
+                            item = customs_items[item_idx]
+                            items_in_pkg.append({
+                                "index": item_idx,
+                                "description": item.get("description", ""),
+                                "quantity": qty,
+                                "customs_number": item.get("customs_number", ""),
+                                "origin_country": item.get("origin_country", ""),
+                                "value": item.get("value", 0),
+                                "currency": item.get("currency", "EUR"),
+                            })
+                            total_qty_in_pkg += qty
+                    except (ValueError, IndexError):
+                        pass
+
+                # Розрахувати вагу на товар для цієї коробки
+                pkg_weight_kg = _D(str(pkg_weights[pkg_idx]).strip()) if pkg_idx < len(pkg_weights) else _D("1")
+                weight_per_item = float(pkg_weight_kg) / total_qty_in_pkg if total_qty_in_pkg > 0 else 0
+
+                if items_in_pkg:
+                    pkg_items_distribution[pkg_idx] = {
+                        "items": items_in_pkg,
+                        "weight_per_item": round(weight_per_item, 5),
+                    }
+
             def _dec(lst, i, default):
                 try:
                     v = _D(str(lst[i]).strip())
@@ -1980,6 +2018,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     w = max(_D("0.1"), _D(str(w_raw).strip()))
                 except (_IE, ValueError):
                     continue
+
+                # Визначити items_distribution для цієї коробки
+                items_dist = pkg_items_distribution.get(i) if pkg_items_distribution else None
+
                 ShipmentPackage.objects.create(
                     shipment  = shipment,
                     weight_kg = w,
@@ -1987,6 +2029,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     width_cm  = _dec(pkg_widths,  i, "20"),
                     height_cm = _dec(pkg_heights, i, "15"),
                     quantity  = _int(pkg_qtys, i),
+                    items_distribution = items_dist,
                 )
 
         action = request.POST.get("action_btn", "save")
