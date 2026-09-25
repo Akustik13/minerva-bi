@@ -2201,8 +2201,12 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 }
                 for p in existing_pkgs
             ]
+            # Також передати items_distribution для кожного пакету при редагуванні
+            # (щоб форма знала яке розподіл товарів був)
+            pkg_items_dist_edit = [p.items_distribution or {} for p in existing_pkgs]
         else:
             pkg_rows_edit = []
+            pkg_items_dist_edit = []
 
         return render(request, "admin/shipping/create_shipment.html", {
             **self.admin_site.each_context(request),
@@ -2224,6 +2228,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "title":                f"{'Виправити помилку' if is_error else 'Редагувати чернетку'} #{shipment.pk}",
             "pkg_rows_json":        _json2.dumps(pkg_rows_edit),
             "pkg_auto":             len(pkg_rows_edit) > 1 or (len(pkg_rows_edit) == 1 and pkg_rows_edit[0]["quantity"] > 1),
+            "pkg_items_dist_json":  _json2.dumps(pkg_items_dist_edit),
             "addr_book_json":       self._build_addr_book_json(request),
         })
 
@@ -2321,6 +2326,54 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         # ── Multi-package: оновлюємо ShipmentPackage рядки ─────────────────────
         pkg_weights = request.POST.getlist("pkg_weight[]")
+        pkg_items_distribution_edit = {}
+
+        if pkg_weights and customs_items:
+            from decimal import Decimal as _D, InvalidOperation as _IE
+
+            # Парсимо розподіл товарів по коробках (новий формат)
+            for pkg_idx in range(len(pkg_weights)):
+                pkg_items_indices = request.POST.getlist(f"pkg_items_idx_{pkg_idx}")
+                items_in_pkg = []
+                total_qty_in_pkg = 0
+
+                for item_idx_str in pkg_items_indices:
+                    try:
+                        item_idx = int(item_idx_str)
+                        qty_val = request.POST.get(f"pkg_item_qty_{pkg_idx}_{item_idx}", "0")
+                        qty = max(0, int(float(qty_val or 0)))
+                        if qty > 0 and item_idx < len(customs_items):
+                            item = customs_items[item_idx]
+                            items_in_pkg.append({
+                                "index": item_idx,
+                                "description": item.get("description", ""),
+                                "quantity": qty,
+                                "customs_number": item.get("customs_number", ""),
+                                "origin_country": item.get("origin_country", ""),
+                                "value": item.get("value", 0),
+                                "currency": item.get("currency", "EUR"),
+                            })
+                            total_qty_in_pkg += qty
+                    except (ValueError, IndexError):
+                        pass
+
+                # Розрахувати вагу на товар для цієї коробки
+                pkg_weight_kg = _D(str(pkg_weights[pkg_idx]).strip()) if pkg_idx < len(pkg_weights) else _D("1")
+                weight_per_item = float(pkg_weight_kg) / total_qty_in_pkg if total_qty_in_pkg > 0 else 0
+
+                if items_in_pkg:
+                    pkg_items_distribution_edit[pkg_idx] = {
+                        "items": items_in_pkg,
+                        "weight_per_item": round(weight_per_item, 5),
+                    }
+
+                    # Оновити вагу в customs_items для цих товарів
+                    for dist_item in items_in_pkg:
+                        item_idx = dist_item["index"]
+                        if item_idx < len(customs_items):
+                            customs_items[item_idx]["weight"] = round(weight_per_item, 5)
+                            customs_items[item_idx]["weight_auto"] = False
+
         if pkg_weights:
             from decimal import Decimal as _D, InvalidOperation as _IE
             shipment.packages.all().delete()
@@ -2344,6 +2397,9 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     w = max(_D("0.1"), _D(str(w_raw).strip()))
                 except (_IE, ValueError):
                     continue
+
+                items_dist = pkg_items_distribution_edit.get(i) if pkg_items_distribution_edit else None
+
                 ShipmentPackage.objects.create(
                     shipment  = shipment,
                     weight_kg = w,
@@ -2351,7 +2407,22 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     width_cm  = _dec2(pkg_widths,  i, "20"),
                     height_cm = _dec2(pkg_heights, i, "15"),
                     quantity  = _int2(pkg_qtys, i),
+                    items_distribution = items_dist,
                 )
+
+            # Оновити ваги в customs_articles на основі розподілу
+            if pkg_items_distribution_edit and shipment.customs_articles:
+                articles = shipment.customs_articles.get("customs_line_items") or []
+                for idx, article in enumerate(articles):
+                    for pkg in shipment.packages.all():
+                        if pkg.items_distribution:
+                            for dist_item in pkg.items_distribution.get("items", []):
+                                if dist_item.get("index") == idx:
+                                    articles[idx]["weight"] = pkg.items_distribution.get("weight_per_item", 0)
+                                    articles[idx]["weight_auto"] = False
+                                    break
+                shipment.customs_articles["customs_line_items"] = articles
+                shipment.save(update_fields=["customs_articles"])
 
         action = request.POST.get("action_btn", "save")
 
