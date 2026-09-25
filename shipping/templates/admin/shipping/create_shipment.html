@@ -1621,6 +1621,23 @@ document.addEventListener('DOMContentLoaded', function() {
             addPkgRow(w, l, wd, h, 1);
           }
 
+          // Синхронізувати вагу відразу (сума всех коробок)
+          setTimeout(function() {
+            var rows = document.querySelectorAll('#pkg-tbody tr');
+            if (rows.length > 0) {
+              var totalWeight = 0;
+              rows.forEach(function(row) {
+                var weight = parseFloat(row.querySelector('[name="pkg_weight[]"]')?.value || 0);
+                var qty = parseInt(row.querySelector('[name="pkg_qty[]"]')?.value || 1);
+                totalWeight += weight * qty;
+              });
+              if (totalWeight > 0) {
+                document.getElementById('id_weight_kg').value = totalWeight.toFixed(3);
+                document.getElementById('ca_pkg_weight_display').textContent = totalWeight.toFixed(3);
+              }
+            }
+          }, 50);
+
           // Заповнити розподіл товарів якщо це редагування чернетки
           if (_PKG_ITEMS_DIST && _PKG_ITEMS_DIST.length > 0) {
             setTimeout(function() {
