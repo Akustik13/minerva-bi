@@ -2032,6 +2032,22 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     items_distribution = items_dist,
                 )
 
+            # Оновити ваги в customs_articles на основі розподілу по коробках
+            if pkg_items_distribution and shipment.customs_articles:
+                articles = shipment.customs_articles.get("customs_line_items") or []
+                for idx, article in enumerate(articles):
+                    # Шукати вагу цього товару у розподілі
+                    for pkg in shipment.packages.all():
+                        if pkg.items_distribution:
+                            for dist_item in pkg.items_distribution.get("items", []):
+                                if dist_item.get("index") == idx:
+                                    # Знайшли — оновити вагу
+                                    articles[idx]["weight"] = pkg.items_distribution.get("weight_per_item", 0)
+                                    articles[idx]["weight_auto"] = False
+                                    break
+                shipment.customs_articles["customs_line_items"] = articles
+                shipment.save(update_fields=["customs_articles"])
+
         action = request.POST.get("action_btn", "save")
         if action == "submit" and carrier:
             return redirect(reverse("admin:shipping_shipment_submit", args=[shipment.pk]))
