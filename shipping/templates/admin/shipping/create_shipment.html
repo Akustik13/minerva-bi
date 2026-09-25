@@ -1566,6 +1566,7 @@ document.addEventListener('DOMContentLoaded', function() {
       <script>
       (function(){
         var _PKG_PRESET = {{ pkg_rows_json|default:"[]"|safe }};
+        var _PKG_ITEMS_DIST = {{ pkg_items_dist_json|default:"[]"|safe }};
 
         window.addPkgRow = function(w, l, wd, h, q) {
           // No args → copy dims from last row (or use hardcoded defaults if table is empty)
@@ -1618,6 +1619,27 @@ document.addEventListener('DOMContentLoaded', function() {
             var wd= document.getElementById('id_width_cm').value  || '20';
             var h = document.getElementById('id_height_cm').value || '15';
             addPkgRow(w, l, wd, h, 1);
+          }
+
+          // Заповнити розподіл товарів якщо це редагування чернетки
+          if (_PKG_ITEMS_DIST && _PKG_ITEMS_DIST.length > 0) {
+            setTimeout(function() {
+              _updatePkgItemsDistribution();
+              // Заповнити checkboxes та кількості на базі збережених даних
+              _PKG_ITEMS_DIST.forEach(function(pkg_dist, pkg_idx) {
+                if (pkg_dist && pkg_dist.items) {
+                  pkg_dist.items.forEach(function(dist_item) {
+                    var itemIdx = dist_item.index;
+                    var qty = dist_item.quantity;
+                    var checkbox = document.querySelector('input[name="pkg_items_idx_' + pkg_idx + '"][value="' + itemIdx + '"]');
+                    var qtyInput = document.querySelector('input[name="pkg_item_qty_' + pkg_idx + '_' + itemIdx + '"]');
+                    if (checkbox) checkbox.checked = true;
+                    if (qtyInput) qtyInput.value = qty;
+                  });
+                }
+              });
+              _recalcPkgWeights();
+            }, 100);
           }
 
           // Sync package data → hidden fields before submit (backend uses these for Shipment model)
