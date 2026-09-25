@@ -2410,17 +2410,31 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     items_distribution = items_dist,
                 )
 
-            # Оновити ваги в customs_articles на основі розподілу
-            if pkg_items_distribution_edit and shipment.customs_articles:
+            # Оновити ваги в customs_articles на основі розподілу або нових пакетів
+            if shipment.customs_articles:
                 articles = shipment.customs_articles.get("customs_line_items") or []
-                for idx, article in enumerate(articles):
-                    for pkg in shipment.packages.all():
-                        if pkg.items_distribution:
-                            for dist_item in pkg.items_distribution.get("items", []):
-                                if dist_item.get("index") == idx:
-                                    articles[idx]["weight"] = pkg.items_distribution.get("weight_per_item", 0)
-                                    articles[idx]["weight_auto"] = False
-                                    break
+                packages = list(shipment.packages.all())
+
+                if pkg_items_distribution_edit and packages:
+                    # Якщо є розподіл товарів — використати його
+                    for idx, article in enumerate(articles):
+                        for pkg in packages:
+                            if pkg.items_distribution:
+                                for dist_item in pkg.items_distribution.get("items", []):
+                                    if dist_item.get("index") == idx:
+                                        articles[idx]["weight"] = pkg.items_distribution.get("weight_per_item", 0)
+                                        articles[idx]["weight_auto"] = False
+                                        break
+                elif packages:
+                    # Якщо розподіл не заповнений — розраховувати як у create_shipment
+                    # Простий розподіл: сума ваг / кількість товарів
+                    total_pkg_weight = sum(float(p.weight_kg) * p.quantity for p in packages)
+                    n_items = len(articles) or 1
+                    weight_per_item = total_pkg_weight / n_items
+                    for idx in range(len(articles)):
+                        articles[idx]["weight"] = round(weight_per_item, 5)
+                        articles[idx]["weight_auto"] = True
+
                 shipment.customs_articles["customs_line_items"] = articles
                 shipment.save(update_fields=["customs_articles"])
 
