@@ -2335,55 +2335,55 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             if not bom_lines:
                 return mark_safe('<em style="color:#607d8b">Замовлення не містить товарів з БОМ</em>')
 
-        rows = []
-        any_issues = False
+            rows = []
+            any_issues = False
 
-        for line in bom_lines:
-            product = line.product
-            qty = int(line.qty or 1)
+            for line in bom_lines:
+                product = line.product
+                qty = int(line.qty or 1)
 
-            status = get_assembly_status(product, qty)
-            analysis = get_bom_analysis(product)
+                status = get_assembly_status(product, qty)
+                analysis = get_bom_analysis(product)
 
-            if status['can_assemble']:
-                icon = "✅"
-                color = "#4caf50"
-                border = "4px solid #4caf50"
-                msg = f"Можна зібрати: {qty} шт. (макс: {status['buildable']} шт.)"
-            else:
-                icon = "❌"
-                color = "#f44336"
-                border = "4px solid #f44336"
-                msg = status['reason']
-                any_issues = True
+                if status['can_assemble']:
+                    icon = "✅"
+                    color = "#4caf50"
+                    border = "4px solid #4caf50"
+                    msg = f"Можна зібрати: {qty} шт. (макс: {status['buildable']} шт.)"
+                else:
+                    icon = "❌"
+                    color = "#f44336"
+                    border = "4px solid #f44336"
+                    msg = status['reason']
+                    any_issues = True
 
-            # Деталь компонентів
-            comp_details = ""
-            if analysis['has_bom']:
-                comp_rows = []
-                for comp_info in analysis['components']:
-                    comp_sku = comp_info['product'].sku
-                    after = comp_info['buildable'] if 'buildable' in comp_info else int(comp_info['stock'] / comp_info['qty_per'])
-                    comp_rows.append(
-                        f"<div style='padding:4px 0;font-size:11px;color:var(--text-muted,#9aafbe)'>"
-                        f"  {comp_sku}: {int(comp_info['stock'])} шт. "
-                        f"({comp_info['qty_per']} шт/одиниця) → макс {after} шт. зібрати"
-                        f"</div>"
-                    )
-                comp_details = "".join(comp_rows)
+                # Деталь компонентів
+                comp_details = ""
+                if analysis['has_bom']:
+                    comp_rows = []
+                    for comp_info in analysis['components']:
+                        comp_sku = comp_info['product'].sku
+                        after = comp_info['buildable'] if 'buildable' in comp_info else int(comp_info['stock'] / comp_info['qty_per'])
+                        comp_rows.append(
+                            f"<div style='padding:4px 0;font-size:11px;color:var(--text-muted,#9aafbe)'>"
+                            f"  {comp_sku}: {int(comp_info['stock'])} шт. "
+                            f"({comp_info['qty_per']} шт/одиниця) → макс {after} шт. зібрати"
+                            f"</div>"
+                        )
+                    comp_details = "".join(comp_rows)
 
-            rows.append(
-                f"<div style='border-left:{border};padding:12px;margin-bottom:8px;border-radius:4px'>"
-                f"<div style='font-weight:bold;color:{color};margin-bottom:6px'>"
-                f"{icon} {product.sku}: {msg}"
-                f"</div>"
-                f"{comp_details}"
-                f"</div>"
-            )
+                rows.append(
+                    f"<div style='border-left:{border};padding:12px;margin-bottom:8px;border-radius:4px'>"
+                    f"<div style='font-weight:bold;color:{color};margin-bottom:6px'>"
+                    f"{icon} {product.sku}: {msg}"
+                    f"</div>"
+                    f"{comp_details}"
+                    f"</div>"
+                )
 
-        summary_icon = "⚠️" if any_issues else "✅"
-        summary_text = "Є проблеми з БОМ!" if any_issues else "БОМ готово до збирання"
-        summary_color = "#f44336" if any_issues else "#4caf50"
+            summary_icon = "⚠️" if any_issues else "✅"
+            summary_text = "Є проблеми з БОМ!" if any_issues else "БОМ готово до збирання"
+            summary_color = "#f44336" if any_issues else "#4caf50"
 
             return mark_safe(
                 f'<div style="border-left:4px solid {summary_color};padding:10px 16px;'
