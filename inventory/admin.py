@@ -364,27 +364,37 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 try:
                     from inventory.utils import get_bom_analysis
                     analysis = get_bom_analysis(p)
-                    if analysis['has_bom']:
+                    if analysis.get('has_bom') and analysis.get('components'):
                         bom_components = []
                         for comp in analysis['components']:
-                            bom_components.append({
-                                'sku': comp['product'].sku,
-                                'name': comp['product'].name,
-                                'qty_per': comp['qty_per'],
-                                'stock': comp['stock'],
-                                'buildable': int(comp['stock'] / comp['qty_per']) if comp['qty_per'] else 0,
-                                'optional': comp['optional'],
-                            })
-                        bottleneck_sku = '—'
-                        if analysis.get('bottleneck'):
-                            bottleneck_sku = analysis['bottleneck'].component.sku if hasattr(analysis['bottleneck'], 'component') else '—'
-                        bom_info = {
-                            'has_bom': True,
-                            'buildable_qty': analysis['buildable_qty'],
-                            'bottleneck': bottleneck_sku,
-                            'components': bom_components,
-                        }
-                except Exception:
+                            try:
+                                bom_components.append({
+                                    'sku': comp['product'].sku,
+                                    'name': comp['product'].name,
+                                    'qty_per': float(comp.get('qty_per', 1)),
+                                    'stock': float(comp.get('stock', 0)),
+                                    'buildable': int(float(comp.get('stock', 0)) / float(comp.get('qty_per', 1))) if comp.get('qty_per') else 0,
+                                    'optional': comp.get('optional', False),
+                                })
+                            except (KeyError, ValueError, TypeError):
+                                continue
+
+                        if bom_components:
+                            bottleneck_sku = '—'
+                            if analysis.get('bottleneck'):
+                                try:
+                                    bottleneck_sku = analysis['bottleneck'].component.sku
+                                except:
+                                    bottleneck_sku = '—'
+                            bom_info = {
+                                'has_bom': True,
+                                'buildable_qty': int(analysis.get('buildable_qty', 0)),
+                                'bottleneck': bottleneck_sku,
+                                'components': bom_components,
+                            }
+                except Exception as e:
+                    import logging
+                    logging.error(f"BOM analysis error for {p.sku}: {e}")
                     pass
 
             rows.append({
