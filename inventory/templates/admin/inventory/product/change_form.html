@@ -9,15 +9,26 @@
 .field-tech_attributes textarea { display: none !important; }
 .field-tech_attributes { display: block !important; }
 
-/* BOM inline — show/hide при виборі bom_type */
+/* BOM inline — переміщення одразу після bom_type + show/hide */
 #productcomponent_set-group {
   margin-top: 24px; border-top: 2px solid var(--border-strong, #243347); padding-top: 12px;
+  order: 4; /* позиціонування після bom_type */
 }
 #productcomponent_set-group.bom-hidden {
   display: none !important;
 }
 #productcomponent_set-group h2 {
-  font-size: 16px; color: var(--text, #c9d8e4); margin-bottom: 8px;
+  font-size: 14px; color: var(--text, #c9d8e4); margin-bottom: 8px; margin-top: 0;
+}
+/* Переміщення inline у форму одразу після bom_type */
+.form-row:has(#id_bom_type) {
+  position: relative;
+}
+.form-row:has(#id_bom_type)::after {
+  content: '';
+  display: block;
+  height: 0;
+  overflow: hidden;
 }
 
 /* Attrs table */
@@ -141,12 +152,18 @@ function _invEsc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* ── BOM inline visibility toggle ──────────────────────────────────────── */
+/* ── BOM inline visibility toggle + переміщення ──────────────────────────── */
 document.addEventListener('DOMContentLoaded', function() {
   var bomTypeSelect = document.querySelector('[name="bom_type"]');
   var bomInline = document.getElementById('productcomponent_set-group');
 
   if (bomTypeSelect && bomInline) {
+    // Перенести inline одразу після bom_type поля
+    var bomTypeRow = bomTypeSelect.closest('.form-row');
+    if (bomTypeRow && bomTypeRow.parentNode) {
+      bomTypeRow.parentNode.insertBefore(bomInline, bomTypeRow.nextSibling);
+    }
+
     function toggleBomInline() {
       if (bomTypeSelect.value === 'key') {
         bomInline.classList.remove('bom-hidden');
