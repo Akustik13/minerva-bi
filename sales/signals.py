@@ -10,10 +10,13 @@ from inventory.utils import deduct_components_for_assembly, get_assembly_status
 @receiver(pre_save, sender=SalesOrder)
 def capture_old_status(sender, instance, **kwargs):
     """Зберегти старий статус для перевірки змін."""
+    if not instance.pk:
+        instance._old_status = None
+        return
     try:
         old = SalesOrder.objects.get(pk=instance.pk)
         instance._old_status = old.status
-    except SalesOrder.DoesNotExist:
+    except (SalesOrder.DoesNotExist, Exception):
         instance._old_status = None
 
 
@@ -22,12 +25,17 @@ def handle_status_change_and_assembly(sender, instance, created, **kwargs):
     """
     При зміні статусу на 'shipped' — автоматично вилучити компоненти за BOM.
     """
-    old_status = getattr(instance, '_old_status', None)
-    new_status = instance.status
+    try:
+        old_status = getattr(instance, '_old_status', None)
+        new_status = instance.status
 
-    # Перевірка: чи статус змінився на "shipped"
-    if old_status != 'shipped' and new_status == 'shipped':
-        _process_assembly_deductions(instance)
+        # Перевірка: чи статус змінився на "shipped"
+        if old_status != 'shipped' and new_status == 'shipped':
+            _process_assembly_deductions(instance)
+    except Exception as e:
+        import logging
+        logging.error(f"Assembly deduction error: {e}")
+        pass
 
 
 def _process_assembly_deductions(order):
