@@ -526,10 +526,10 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
               </div>
 
               <!-- BOM Info -->
-              {% if row.bom_info %}
+              {% if p.bom_type == "key" %}
               <div class="sv-detail-section">
                 <h4>🔧 {% trans "БОМ: компоненти та наявність" %}</h4>
-                {% if row.bom_info.has_bom %}
+                {% if row.bom_info and row.bom_info.has_bom %}
                 <div style="padding:6px 0;margin-bottom:8px">
                   <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">
                     {% trans "Можна зібрати:" %} <span style="color:{% if row.bom_info.buildable_qty > 0 %}#66bb6a{% else %}#ef5350{% endif %};font-weight:700">{{ row.bom_info.buildable_qty }}</span> {% trans "шт." %}
