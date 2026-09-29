@@ -2486,6 +2486,17 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         if not analysis['has_bom']:
             return mark_safe('<em style="color:#607d8b">БОМ пусто</em>')
 
+        # Функція форматування залежно від типу одиниці
+        def format_qty(value, is_whole=False):
+            """Формат числа: якщо цілі - без дробної частини"""
+            if is_whole:
+                return str(int(float(value)))
+            else:
+                v = float(value)
+                return str(int(v)) if v == int(v) else f"{v:.3f}".rstrip('0').rstrip('.')
+
+        is_whole = obj.unit_type == Product.UnitType.PIECE
+
         # Таблиця компонентів
         rows = []
         for comp_info in analysis['components']:
@@ -2493,6 +2504,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             stock = int(comp_info['stock'])
             qty_per = comp_info['qty_per']
             buildable = int(stock / qty_per) if qty_per else 0
+
+            # Форматування чисел
+            qty_per_fmt = format_qty(qty_per, is_whole)
+            stock_fmt = format_qty(stock, is_whole)
+            buildable_fmt = format_qty(buildable, is_whole)
 
             # Колір залежно від статусу
             if stock <= 0:
@@ -2508,10 +2524,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             rows.append(
                 f'<tr style="border-bottom:1px solid var(--border-strong,#243347)">'
                 f'<td style="padding:8px;font-weight:bold">{comp_sku}</td>'
-                f'<td style="padding:8px;text-align:center">{qty_per}</td>'
-                f'<td style="padding:8px;text-align:center">{stock}</td>'
+                f'<td style="padding:8px;text-align:center">{qty_per_fmt}</td>'
+                f'<td style="padding:8px;text-align:center">{stock_fmt}</td>'
                 f'<td style="padding:8px;text-align:center;color:{status_color};font-weight:bold">'
-                f'{status_icon} {buildable}</td>'
+                f'{status_icon} {buildable_fmt}</td>'
                 f'</tr>'
             )
 
