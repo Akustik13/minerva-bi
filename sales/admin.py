@@ -227,8 +227,19 @@ class SalesOrderLineInline(admin.TabularInline):
             if obj.sku_raw:
                 return format_html('<span style="color:#ff9800">⚠️ {} не в базі</span>', obj.sku_raw)
             return "—"
-        from inventory.models import InventoryTransaction
-        result = InventoryTransaction.objects.filter(product=obj.product).aggregate(total=Sum('qty'))
+        from inventory.models import InventoryTransaction, Location
+        # Лічимо тільки готові товари: FINISHED або OTHER склади
+        query = InventoryTransaction.objects.filter(
+            product=obj.product
+        ).exclude(
+            tx_type=InventoryTransaction.TxType.RESERVED
+        ).filter(
+            location__location_type__in=[
+                Location.LocationType.FINISHED,
+                Location.LocationType.OTHER
+            ]
+        )
+        result = query.aggregate(total=Sum('qty'))
         stock = float(result['total'] or 0)
         needed = float(obj.qty or 0)
         if stock <= 0:
@@ -536,9 +547,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     product_ids = list({lp['product_id'] for lp in line_data})
                     stock_map = {}
                     if product_ids:
+                        from inventory.models import Location
+                        # Лічимо тільки готові товари: FINISHED або OTHER склади
                         rows = (
                             InventoryTransaction.objects
                             .filter(product_id__in=product_ids)
+                            .exclude(tx_type=InventoryTransaction.TxType.RESERVED)
+                            .filter(
+                                location__location_type__in=[
+                                    Location.LocationType.FINISHED,
+                                    Location.LocationType.OTHER
+                                ]
+                            )
                             .values('product_id')
                             .annotate(total=Sum('qty'))
                         )
@@ -3228,8 +3248,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         try:
             settings = InventorySettings.get()
             loc_code = settings.default_location or "MAIN"
-            location, _ = Location.objects.get_or_create(
-                code=loc_code, defaults={"name": "Основний склад"})
+            location, created = Location.objects.get_or_create(
+                code=loc_code,
+                defaults={
+                    "name": "Основний склад",
+                    "location_type": Location.LocationType.FINISHED,
+                    "is_active": True,
+                }
+            )
+            # Гарантуємо FINISHED тип для списання готової продукції
+            if not created and location.location_type != Location.LocationType.FINISHED:
+                location.location_type = Location.LocationType.FINISHED
+                location.save(update_fields=['location_type'])
         except Exception as e:
             return JsonResponse({'ok': False, 'error': f'Помилка отримання локації: {e}'})
 

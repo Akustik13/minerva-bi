@@ -55,10 +55,22 @@ def update_inventory_on_purchase_receipt(sender, instance, created, **kwargs):
         return
 
     loc_code = settings.default_location or "MAIN"
-    location, _ = Location.objects.get_or_create(
+    # При надходженні товару - тип залежить від Product.kind
+    product = instance.product
+    location_type = Location.LocationType.COMPONENTS if product and product.kind == product.Kind.COMPONENT else Location.LocationType.FINISHED
+
+    location, created = Location.objects.get_or_create(
         code=loc_code,
-        defaults={"name": "Основний склад"}
+        defaults={
+            "name": "Основний склад",
+            "location_type": location_type,
+            "is_active": True,
+        }
     )
+    # Оновлюємо тип якщо локація вже існує але має неправильний
+    if not created and location.location_type != location_type:
+        location.location_type = location_type
+        location.save(update_fields=['location_type'])
 
     # delta > 0 = receipt → INCOMING with positive qty
     # delta < 0 = return/correction → OUTGOING with negative qty (reduces stock)
@@ -130,11 +142,24 @@ def _deduct_line(line, order, location, tx_type=None):
 
 
 def _get_or_create_location(settings):
+    """
+    Отримати або створити локацію для списання ГОТОВИХ ТОВАРІВ.
+    Завжди FINISHED тип - це склад готової продукції.
+    """
     loc_code = settings.default_location or "MAIN"
-    location, _ = Location.objects.get_or_create(
+    location, created = Location.objects.get_or_create(
         code=loc_code,
-        defaults={"name": "Основний склад"}
+        defaults={
+            "name": "Основний склад",
+            "location_type": Location.LocationType.FINISHED,  # ← ВАЖЛИВО!
+            "is_active": True,
+        }
     )
+    # Якщо локація вже існує але має неправильний тип - оновлюємо
+    if not created and location.location_type != Location.LocationType.FINISHED:
+        location.location_type = Location.LocationType.FINISHED
+        location.save(update_fields=['location_type'])
+
     return location
 
 

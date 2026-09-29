@@ -35,13 +35,41 @@ from shipping.models import ProductPackaging
 
 # ── Утиліти ────────────────────────────────────────────────────────────────────
 
-def _get_stock(product):
-    """Physical on-hand stock — excludes RESERVED transactions."""
-    result = InventoryTransaction.objects.filter(
+def _get_stock(product, for_sale=True):
+    """
+    Physical on-hand stock — excludes RESERVED transactions.
+
+    Args:
+        product: Product instance
+        for_sale: True = готові товари (FINISHED склад),
+                 False = всі товари (незалежно від типу складу)
+    """
+    from inventory.models import Location
+
+    query = InventoryTransaction.objects.filter(
         product=product,
     ).exclude(
         tx_type=InventoryTransaction.TxType.RESERVED,
-    ).aggregate(total=Sum('qty'))
+    )
+
+    # Розділення: готові товари тільки з FINISHED або OTHER складів
+    if for_sale and product.kind == product.Kind.FINISHED:
+        query = query.filter(
+            location__location_type__in=[
+                Location.LocationType.FINISHED,
+                Location.LocationType.OTHER
+            ]
+        )
+    elif for_sale and product.kind == product.Kind.COMPONENT:
+        # Компоненти тільки з COMPONENTS або OTHER складів
+        query = query.filter(
+            location__location_type__in=[
+                Location.LocationType.COMPONENTS,
+                Location.LocationType.OTHER
+            ]
+        )
+
+    result = query.aggregate(total=Sum('qty'))
     return float(result['total'] or 0)
 
 
