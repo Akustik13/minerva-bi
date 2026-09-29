@@ -369,6 +369,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                         for comp in analysis['components']:
                             try:
                                 bom_components.append({
+                                    'id': comp['product'].pk,
                                     'sku': comp['product'].sku,
                                     'name': comp['product'].name,
                                     'qty_per': float(comp.get('qty_per', 1)),

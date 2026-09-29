@@ -557,7 +557,9 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
                   {% for comp in row.bom_info.components %}
                   <tr>
                     <td>
-                      <span style="font-family:monospace;font-weight:600;color:var(--text)">{{ comp.sku }}</span>
+                      <a href="/admin/inventory/product/{{ comp.id }}/change/"
+                         style="font-family:monospace;font-weight:600;color:var(--link-fg);text-decoration:none"
+                         target="_blank">{{ comp.sku }}</a>
                       {% if comp.optional %}<span style="font-size:9px;color:var(--text-dim);margin-left:4px">(optional)</span>{% endif %}
                     </td>
                     <td style="text-align:right;font-weight:600">{{ comp.qty_per }}</td>
