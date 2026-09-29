@@ -2096,7 +2096,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     actions       = ["bulk_sync_digikey_attrs"]
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
-                       "set_stock_link", "reorder_info", "label_detail",
+                       "set_stock_link", "reorder_info", "label_detail", "bom_availability",
                        "image_preview", "datasheet_link", "movement_history")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
@@ -2109,7 +2109,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             )
         }),
         ("📦 Availability", {"fields": ("stock_qty", "reserved_qty", "incoming_qty",
-                                        "buildable_qty", "reorder_info")}),
+                                        "buildable_qty", "bom_availability", "reorder_info")}),
         ("🔗 Медіа та документи", {
             "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview"),
             "classes": ("collapse",),
@@ -2474,6 +2474,81 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             build = possible if build is None else min(build, possible)
         return build if build is not None else "0"
     buildable_qty.short_description = "Buildable"
+
+    def bom_availability(self, obj):
+        """Розширена картка БОМ: компоненти, залишки, скільки можна зібрати."""
+        if obj.bom_type != Product.BomType.KEY:
+            return mark_safe('<em style="color:#607d8b">Товар не має БОМ</em>')
+
+        from inventory.utils import get_bom_analysis
+        analysis = get_bom_analysis(obj)
+
+        if not analysis['has_bom']:
+            return mark_safe('<em style="color:#607d8b">БОМ пусто</em>')
+
+        # Таблиця компонентів
+        rows = []
+        for comp_info in analysis['components']:
+            comp_sku = comp_info['product'].sku
+            stock = int(comp_info['stock'])
+            qty_per = comp_info['qty_per']
+            buildable = int(stock / qty_per) if qty_per else 0
+
+            # Колір залежно від статусу
+            if stock <= 0:
+                status_color = '#f44336'  # red
+                status_icon = '🚫'
+            elif buildable < 1:
+                status_color = '#ff9800'  # orange
+                status_icon = '⚠️'
+            else:
+                status_color = '#4caf50'  # green
+                status_icon = '✅'
+
+            rows.append(
+                f'<tr style="border-bottom:1px solid var(--border-strong,#243347)">'
+                f'<td style="padding:8px;font-weight:bold">{comp_sku}</td>'
+                f'<td style="padding:8px;text-align:center">{qty_per}</td>'
+                f'<td style="padding:8px;text-align:center">{stock}</td>'
+                f'<td style="padding:8px;text-align:center;color:{status_color};font-weight:bold">'
+                f'{status_icon} {buildable}</td>'
+                f'</tr>'
+            )
+
+        # Визначити загальний статус
+        if analysis['buildable_qty'] <= 0:
+            summary_icon = '🚫'
+            summary_color = '#f44336'
+            summary_text = 'Не можна зібрати'
+        elif analysis['buildable_qty'] < 5:
+            summary_icon = '⚠️'
+            summary_color = '#ff9800'
+            summary_text = f'Можна зібрати: {analysis["buildable_qty"]} шт. (мало)'
+        else:
+            summary_icon = '✅'
+            summary_color = '#4caf50'
+            summary_text = f'Можна зібрати: {analysis["buildable_qty"]} шт.'
+
+        bottleneck = ''
+        if analysis['bottleneck']:
+            bottleneck = f'<div style="margin-top:8px;font-size:12px;color:var(--text-muted,#9aafbe)">Обмежено: {analysis["bottleneck"].sku}</div>'
+
+        return mark_safe(
+            f'<div style="border-left:4px solid {summary_color};padding:10px 14px;'
+            f'margin-bottom:12px;border-radius:4px;font-weight:bold;color:{summary_color}">'
+            f'{summary_icon} {summary_text}{bottleneck}</div>'
+            '<table style="border-collapse:collapse;width:100%;border:1px solid rgba(128,128,128,.2);border-radius:6px">'
+            '<thead><tr style="background:rgba(55,71,79,0.9);color:#eceff1">'
+            '<th style="padding:8px;text-align:left">Компонент</th>'
+            '<th style="padding:8px;text-align:center">Кількість/одиниця</th>'
+            '<th style="padding:8px;text-align:center">На складі</th>'
+            '<th style="padding:8px;text-align:center">Можна зібрати</th>'
+            '</tr></thead>'
+            '<tbody style="background:transparent">'
+            + "".join(rows) +
+            '</tbody></table>'
+        )
+    bom_availability.short_description = "🔧 БОМ: статус компонентів"
 
     def label_detail(self, obj):
         from pathlib import Path
