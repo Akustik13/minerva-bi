@@ -166,13 +166,16 @@ def get_assembly_status(product, qty):
     # Розрахувати залишок компонентів після збирання
     leftover = {}
     for comp_info in analysis['components']:
-        after = int(comp_info['stock'] - (comp_info['qty_per'] * qty))
+        stock = Decimal(str(comp_info['stock']))
+        qty_per = Decimal(str(comp_info['qty_per']))
+        used = qty_per * Decimal(str(qty))
+        after = int(stock - used)
         if after < 0:
             after = 0
         leftover[comp_info['product'].sku] = {
             'before': int(comp_info['stock']),
             'after': after,
-            'used': int(comp_info['qty_per'] * qty)
+            'used': int(used)
         }
 
     return {
