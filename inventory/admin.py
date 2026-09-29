@@ -361,25 +361,31 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
             # BOM деталі (якщо товар має BOM)
             bom_info = None
             if p.bom_type == Product.BomType.KEY:
-                from inventory.utils import get_bom_analysis
-                analysis = get_bom_analysis(p)
-                if analysis['has_bom']:
-                    bom_components = []
-                    for comp in analysis['components']:
-                        bom_components.append({
-                            'sku': comp['product'].sku,
-                            'name': comp['product'].name,
-                            'qty_per': comp['qty_per'],
-                            'stock': comp['stock'],
-                            'buildable': int(comp['stock'] / comp['qty_per']) if comp['qty_per'] else 0,
-                            'optional': comp['optional'],
-                        })
-                    bom_info = {
-                        'has_bom': True,
-                        'buildable_qty': analysis['buildable_qty'],
-                        'bottleneck': analysis.get('bottleneck', {}).get('sku', '—'),
-                        'components': bom_components,
-                    }
+                try:
+                    from inventory.utils import get_bom_analysis
+                    analysis = get_bom_analysis(p)
+                    if analysis['has_bom']:
+                        bom_components = []
+                        for comp in analysis['components']:
+                            bom_components.append({
+                                'sku': comp['product'].sku,
+                                'name': comp['product'].name,
+                                'qty_per': comp['qty_per'],
+                                'stock': comp['stock'],
+                                'buildable': int(comp['stock'] / comp['qty_per']) if comp['qty_per'] else 0,
+                                'optional': comp['optional'],
+                            })
+                        bottleneck_sku = '—'
+                        if analysis.get('bottleneck'):
+                            bottleneck_sku = analysis['bottleneck'].component.sku if hasattr(analysis['bottleneck'], 'component') else '—'
+                        bom_info = {
+                            'has_bom': True,
+                            'buildable_qty': analysis['buildable_qty'],
+                            'bottleneck': bottleneck_sku,
+                            'components': bom_components,
+                        }
+                except Exception:
+                    pass
 
             rows.append({
                 'product':               p,
