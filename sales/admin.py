@@ -2093,6 +2093,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     def stock_warning(self, obj):
         from django.utils.safestring import mark_safe
+        from inventory.models import Product
+        from inventory.utils import get_assembly_status
 
         # Use batch-fetched cache from changelist_view (0 extra queries)
         lines_data = []
@@ -2130,6 +2132,23 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     f'<span style="color:var(--err);font-weight:600;font-size:12px">0</span>'
                     f'<span style="color:var(--err);font-size:10px">/−{need}</span>'
                 )
+
+        # Додати БОМ інформацію
+        try:
+            lines = obj.lines.all().select_related('product')
+            bom_lines = [l for l in lines if l.product and l.product.bom_type == Product.BomType.KEY]
+            if bom_lines:
+                bom_parts = []
+                for line in bom_lines:
+                    status = get_assembly_status(line.product, int(line.qty or 1))
+                    if status['can_assemble']:
+                        bom_parts.append(f"✅ {int(line.qty or 1)}")
+                    else:
+                        buildable = status.get('buildable', 0)
+                        bom_parts.append(f"❌ {buildable}/{int(line.qty or 1)}")
+                cells.append(f'<span style="font-size:11px">🔧 {", ".join(bom_parts)}</span>')
+        except Exception:
+            pass
 
         sep = '<span style="color:var(--text-dim);margin:0 2px">·</span>'
         return mark_safe(sep.join(cells))
