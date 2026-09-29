@@ -410,6 +410,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'reservations':          reservations_detail[pk],
                 'po_detail':             po_items,
                 'bom_info':              bom_info,
+                'buildable_qty':         bom_info.get('buildable_qty', 0) if bom_info else 0,
             })
 
         context = {

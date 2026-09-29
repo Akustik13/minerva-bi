@@ -257,6 +257,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
         <th onclick="svSort('stock')" id="th-stock" style="text-align:right">{% trans "На складі" %}</th>
         <th onclick="svSort('reserved')" id="th-reserved" style="text-align:right">{% trans "Резерв" %}</th>
         <th onclick="svSort('avail')" id="th-avail" style="text-align:right">{% trans "Доступно" %}</th>
+        <th onclick="svSort('buildable')" id="th-buildable" style="text-align:right">{% trans "Можна зібрати" %}</th>
         <th onclick="svSort('incoming')" id="th-incoming" style="text-align:right">{% trans "Очікується" %}</th>
         <th onclick="svSort('lastdate')" id="th-lastdate">{% trans "Остання операція" %}</th>
         <th style="width:120px">{% trans "Дія" %}</th>
@@ -271,7 +272,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
           data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
-          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}" data-buildable="{{ row.buildable_qty }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
@@ -281,7 +282,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
           data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
-          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}" data-buildable="{{ row.buildable_qty }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
@@ -291,7 +292,7 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
           data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}"
           data-cat="{{ p.category|lower }}"
           data-stock="{{ stock }}" data-reorder="{{ p.reorder_point }}"
-          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}"
+          data-reserved="{{ reserved }}" data-incoming="{{ incoming }}" data-avail="{{ net }}" data-buildable="{{ row.buildable_qty }}"
           data-lastdate="{% if last_tx %}{{ last_tx.tx_date|date:'U' }}{% else %}0{% endif %}"
           data-ds-ext="{{ p.datasheet_url }}" data-ds-file="{% if p.datasheet_file %}/admin/inventory/product/{{ p.pk }}/datasheet/{% endif %}"
           onclick="svToggleDetail({{ p.pk }})">
@@ -343,6 +344,14 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
             <span class="sv-dim">0</span>
           {% else %}
             <span class="sv-pos">{{ net|floatformat:"0" }}</span>
+          {% endif %}
+        </td>
+        <!-- Buildable (BOM) -->
+        <td style="text-align:right">
+          {% if row.buildable_qty > 0 %}
+            <span style="color:#9c27b0;font-weight:700">🔧 {{ row.buildable_qty|floatformat:"0" }}</span>
+          {% else %}
+            <span class="sv-dim">—</span>
           {% endif %}
         </td>
         <!-- Incoming -->
@@ -753,7 +762,7 @@ var _svi = {
 
   /* ── Sort ── */
   var TH_MAP = {sku:'th-sku', cat:'th-cat', stock:'th-stock',
-                reserved:'th-reserved', avail:'th-avail',
+                reserved:'th-reserved', avail:'th-avail', buildable:'th-buildable',
                 incoming:'th-incoming', lastdate:'th-lastdate'};
 
   function applySort() {
@@ -795,6 +804,7 @@ var _svi = {
     if (col === 'stock')    return parseFloat(row.dataset.stock    || 0);
     if (col === 'reserved') return parseFloat(row.dataset.reserved || 0);
     if (col === 'avail')    return parseFloat(row.dataset.avail    || 0);
+    if (col === 'buildable') return parseFloat(row.dataset.buildable || 0);
     if (col === 'incoming') return parseFloat(row.dataset.incoming || 0);
     if (col === 'lastdate') return parseFloat(row.dataset.lastdate || 0);
     return 0;
