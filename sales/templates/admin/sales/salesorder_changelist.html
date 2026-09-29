@@ -1552,10 +1552,31 @@ if (!window._cexDelDocDef) {
 
       /* БОМ info (if applicable) */
       var bomCol = '';
+      var bomDetailRow = '';
       if (l.bom_status) {
+        var bomId = 'bom-detail-' + escHtml(l.sku);
+        var hasBomComponents = l.bom_components && l.bom_components.length > 0;
+        var bomCellContent = '<span style="margin-left:6px;cursor:' + (hasBomComponents ? 'pointer' : 'default') + '"';
+        if (hasBomComponents) {
+          bomCellContent += ' onclick="var el=document.getElementById(\'' + bomId + '\');el.style.display=el.style.display===\'none\'?\'table-row\':\'none\';this.style.transform=this.style.transform===\'rotate(180deg)\'?\'rotate(0deg)\':\'rotate(180deg)\';this.style.transition=\'transform .15s\'" title="{% trans "Розгорнути БОМ" %}" style="display:inline-block;transform:rotate(0deg);transition:transform .15s"';
+        }
+        bomCellContent += '>🔧 ' + escHtml(l.bom_status) + '</span>';
         bomCol = '<td style="padding:6px 8px;font-size:11px;'
-               + 'font-weight:700;white-space:nowrap">'
-               + '<span style="margin-left:6px">🔧 ' + escHtml(l.bom_status) + '</span></td>';
+               + 'font-weight:700;white-space:nowrap;text-align:center">'
+               + bomCellContent + '</td>';
+
+        /* БОМ деталі (розгортається рядок) */
+        if (hasBomComponents) {
+          var compRows = l.bom_components.map(function(c) {
+            return '• ' + escHtml(c.sku) + ': ' + c.stock + ' шт. (' + c.qty_per + '/од)';
+          }).join('<br>');
+          bomDetailRow = '<tr id="' + bomId + '" style="display:none;background:rgba(63,81,181,.06);border-bottom:1px solid rgba(128,128,128,.07)">'
+                       + '<td colspan="5" style="padding:8px 12px;font-size:11px;color:var(--text-muted);font-family:monospace;line-height:1.6">'
+                       + compRows
+                       + '</td></tr>';
+        }
+      } else {
+        bomCol = '<td style="padding:6px 8px;font-size:11px;color:var(--text-dim);text-align:center">—</td>';
       }
 
       return '<tr style="border-bottom:1px solid rgba(128,128,128,.07)">'
@@ -1568,7 +1589,8 @@ if (!window._cexDelDocDef) {
         + '<td style="padding:6px 8px;font-size:11px;color:' + color + ';'
         +            'font-weight:700;white-space:nowrap">' + stockTxt + cartBtn + '</td>'
         + bomCol
-        + '</tr>';
+        + '</tr>'
+        + bomDetailRow;
     }).join('');
 
     var TH = 'padding:5px 8px;font-size:10px;font-weight:700;color:var(--text-dim);'
@@ -1586,6 +1608,7 @@ if (!window._cexDelDocDef) {
     + '<th style="' + TH + '">{% trans "Назва" %}</th>'
     + '<th style="' + TH + ';text-align:right">{% trans "Потрібно" %}</th>'
     + '<th style="' + TH + '">{% trans "Склад" %}</th>'
+    + '<th style="' + TH + ';text-align:center">🔧 {% trans "БОМ" %}</th>'
     + '</tr></thead>'
     + '<tbody>' + rows + '</tbody>'
     + '</table></div>';

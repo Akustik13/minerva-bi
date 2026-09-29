@@ -2640,16 +2640,34 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             po_qty  = int(po_info.get('qty_ordered') or 0)
             po_ed   = po_info.get('expected_date')
 
-            # Додати БОМ статус
+            # Додати БОМ статус та компоненти
             bom_status = ''
+            bom_components = []
             if p.bom_type == Product.BomType.KEY:
                 try:
+                    from inventory.utils import get_bom_analysis
                     asm_status = get_assembly_status(p, needed)
+                    analysis = get_bom_analysis(p)
+
                     if asm_status['can_assemble']:
                         bom_status = f"✅ {needed}"
                     else:
                         buildable = asm_status.get('buildable', 0)
                         bom_status = f"❌ {buildable}/{needed}"
+
+                    # Додати компоненти
+                    if analysis['has_bom']:
+                        for comp_info in analysis['components']:
+                            comp = comp_info['product']
+                            comp_stock = int(comp_info['stock'])
+                            comp_buildable = comp_info['buildable']
+                            qty_per = int(comp_info['qty_per']) if comp_info['qty_per'] == int(comp_info['qty_per']) else comp_info['qty_per']
+                            bom_components.append({
+                                'sku': comp.sku,
+                                'stock': comp_stock,
+                                'qty_per': qty_per,
+                                'buildable': comp_buildable,
+                            })
                 except Exception:
                     bom_status = ''
 
@@ -2659,6 +2677,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 'po_qty': po_qty,
                 'po_date': po_ed.strftime('%d.%m.%Y') if po_ed else '',
                 'bom_status': bom_status,
+                'bom_components': bom_components,
             })
         return JsonResponse({'ok': True, 'lines': result,
                              'ok_count': ok_count, 'bad_count': bad_count})
