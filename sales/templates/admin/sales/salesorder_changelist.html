@@ -1550,6 +1550,14 @@ if (!window._cexDelDocDef) {
           + 'cursor:pointer;white-space:nowrap">🛒 +' + l.short + '</button>';
       }
 
+      /* БОМ info (if applicable) */
+      var bomCol = '';
+      if (l.bom_status) {
+        bomCol = '<td style="padding:6px 8px;font-size:11px;'
+               + 'font-weight:700;white-space:nowrap">'
+               + '<span style="margin-left:6px">🔧 ' + escHtml(l.bom_status) + '</span></td>';
+      }
+
       return '<tr style="border-bottom:1px solid rgba(128,128,128,.07)">'
         + '<td style="padding:6px 8px;font-family:monospace;font-size:11px;'
         +            'color:var(--text);white-space:nowrap">' + escHtml(l.sku) + '</td>'
@@ -1559,6 +1567,7 @@ if (!window._cexDelDocDef) {
         +            'font-weight:700;white-space:nowrap">' + l.needed + '</td>'
         + '<td style="padding:6px 8px;font-size:11px;color:' + color + ';'
         +            'font-weight:700;white-space:nowrap">' + stockTxt + cartBtn + '</td>'
+        + bomCol
         + '</tr>';
     }).join('');
 

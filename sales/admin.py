@@ -2613,13 +2613,16 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
         result = []
         ok_count = bad_count = 0
+        from inventory.models import Product
+        from inventory.utils import get_assembly_status
+
         for line in lines:
             if not line.product_id:
                 bad_count += 1
                 result.append({
                     'sku': line.sku_raw or '?', 'name': '—', 'product_pk': None,
                     'needed': int(line.qty or 0), 'stock': 0, 'status': 'missing', 'short': 0,
-                    'po_qty': 0, 'po_date': '',
+                    'po_qty': 0, 'po_date': '', 'bom_status': '',
                 })
                 continue
             p = line.product
@@ -2636,11 +2639,26 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             po_info = po_map.get(p.pk, {})
             po_qty  = int(po_info.get('qty_ordered') or 0)
             po_ed   = po_info.get('expected_date')
+
+            # Додати БОМ статус
+            bom_status = ''
+            if p.bom_type == Product.BomType.KEY:
+                try:
+                    asm_status = get_assembly_status(p, needed)
+                    if asm_status['can_assemble']:
+                        bom_status = f"✅ {needed}"
+                    else:
+                        buildable = asm_status.get('buildable', 0)
+                        bom_status = f"❌ {buildable}/{needed}"
+                except Exception:
+                    bom_status = ''
+
             result.append({
                 'sku': p.sku, 'name': p.name, 'product_pk': p.pk,
                 'needed': needed, 'stock': stock, 'status': status, 'short': short,
                 'po_qty': po_qty,
                 'po_date': po_ed.strftime('%d.%m.%Y') if po_ed else '',
+                'bom_status': bom_status,
             })
         return JsonResponse({'ok': True, 'lines': result,
                              'ok_count': ok_count, 'bad_count': bad_count})
