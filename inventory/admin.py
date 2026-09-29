@@ -357,6 +357,30 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 d = inc['expected_date']
                 if d and (earliest_date is None or d < earliest_date):
                     earliest_date = d
+
+            # BOM деталі (якщо товар має BOM)
+            bom_info = None
+            if p.bom_type == Product.BomType.KEY:
+                from inventory.utils import get_bom_analysis
+                analysis = get_bom_analysis(p)
+                if analysis['has_bom']:
+                    bom_components = []
+                    for comp in analysis['components']:
+                        bom_components.append({
+                            'sku': comp['product'].sku,
+                            'name': comp['product'].name,
+                            'qty_per': comp['qty_per'],
+                            'stock': comp['stock'],
+                            'buildable': int(comp['stock'] / comp['qty_per']) if comp['qty_per'] else 0,
+                            'optional': comp['optional'],
+                        })
+                    bom_info = {
+                        'has_bom': True,
+                        'buildable_qty': analysis['buildable_qty'],
+                        'bottleneck': analysis.get('bottleneck', {}).get('sku', '—'),
+                        'components': bom_components,
+                    }
+
             rows.append({
                 'product':               p,
                 'stock':                 stock,
@@ -369,6 +393,7 @@ class ReorderAnalysisAdmin(admin.ModelAdmin):
                 'last_tx':               last_tx_map.get(pk),
                 'reservations':          reservations_detail[pk],
                 'po_detail':             po_items,
+                'bom_info':              bom_info,
             })
 
         context = {
