@@ -2394,8 +2394,9 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
             )
         except Exception as e:
             import logging
-            logging.error(f"BOM assembly status error for order {obj.pk}: {e}")
-            return mark_safe('<em style="color:#f44336">❌ Помилка при обчисленні БОМ</em>')
+            import traceback
+            logging.error(f"BOM assembly status error for order {obj.pk}: {e}\n{traceback.format_exc()}")
+            return mark_safe(f'<em style="color:#f44336">❌ Помилка при обчисленні БОМ: {str(e)[:100]}</em>')
 
     bom_assembly_status.short_description = "🔧 БОМ: готовність до збирання"
 
