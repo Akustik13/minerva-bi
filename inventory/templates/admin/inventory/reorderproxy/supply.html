@@ -538,17 +538,17 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
               {% if row.bom_info %}
               <div class="sv-detail-section">
                 {% if row.bom_info and row.bom_info.has_bom %}
-                <h4>🔧 {% trans "БОМ: компоненти та наявність" %}
-                  <span style="color:{% if row.bom_info.buildable_qty > 0 %}#66bb6a{% else %}#ef5350{% endif %};font-weight:700;font-size:13px">
-                    ({{ row.bom_info.buildable_qty }} {% trans "шт." %})
-                  </span>
-                  {% if row.bom_info.bottleneck %}
-                  <span style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:8px">
-                    {% trans "обм:" %} <span style="font-family:monospace;color:var(--text)">{{ row.bom_info.bottleneck }}</span>
-                  </span>
-                  {% endif %}
+                <h4 style="cursor:pointer;user-select:none" onclick="svToggleBom(event, {{ p.pk }})">
+                  <span id="bom-toggle-{{ p.pk }}" style="display:inline-block;margin-right:6px;transition:transform .15s;transform:rotate(0deg)">▼</span>
+                  🔧 {% trans "БОМ: компоненти та наявність" %}
                 </h4>
-                <div style="padding:6px 0;margin-bottom:8px">
+                <div id="bom-table-{{ p.pk }}" style="padding:6px 0;margin-bottom:8px">
+                  <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">
+                    {% trans "Можна зібрати:" %} <span style="color:{% if row.bom_info.buildable_qty > 0 %}#66bb6a{% else %}#ef5350{% endif %};font-weight:700">{{ row.bom_info.buildable_qty }}</span> {% trans "шт." %}
+                    {% if row.bom_info.bottleneck and row.bom_info.bottleneck != "—" %}
+                    <br><span style="font-size:11px;color:var(--text-muted)">{% trans "Обмежено:" %} <span style="font-family:monospace;color:var(--text)">{{ row.bom_info.bottleneck }}</span></span>
+                    {% endif %}
+                  </div>
                 <table class="sv-sub-table">
                   <tr>
                     <td style="color:var(--text-dim);font-size:10px;font-weight:700">{% trans "КОМПОНЕНТ" %}</td>
@@ -1130,5 +1130,17 @@ var _svi = {
     if (e.key === 'Escape') closePop();
   });
 })();
+
+/* ── BOM section toggle ── */
+window.svToggleBom = function(event, pk) {
+  event.stopPropagation();
+  var table = document.getElementById('bom-table-' + pk);
+  var toggle = document.getElementById('bom-toggle-' + pk);
+  if (!table || !toggle) return;
+
+  var isOpen = table.style.display !== 'none';
+  table.style.display = isOpen ? 'none' : '';
+  toggle.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(-90deg)';
+};
 </script>
 {% endblock %}
