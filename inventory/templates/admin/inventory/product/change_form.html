@@ -222,3 +222,32 @@ document.addEventListener('DOMContentLoaded', function() {
 })();
 </script>
 {% endblock %}
+
+{% block after_field_sets %}
+{{ block.super }}
+<script>
+// Перенести inline ОДРАЗУ після fieldsets, перед inlines
+document.addEventListener('DOMContentLoaded', function(e) {
+  var bomInline = document.getElementById('productcomponent_set-group');
+  var submitRow = document.querySelector('.submit-row');
+
+  if (bomInline && submitRow) {
+    submitRow.parentNode.insertBefore(bomInline, submitRow);
+  }
+
+  // Ховати/показувати inline залежно від bom_type
+  var bomTypeSelect = document.querySelector('[name="bom_type"]');
+  if (bomTypeSelect && bomInline) {
+    function toggleBomInline() {
+      if (bomTypeSelect.value === 'key') {
+        bomInline.classList.remove('bom-hidden');
+      } else {
+        bomInline.classList.add('bom-hidden');
+      }
+    }
+    bomTypeSelect.addEventListener('change', toggleBomInline);
+    toggleBomInline();
+  }
+});
+</script>
+{% endblock %}
