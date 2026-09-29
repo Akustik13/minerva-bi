@@ -2345,8 +2345,12 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     def stock_qty(self, obj):
         if hasattr(obj, '_stock_total'):
-            return obj._stock_total
-        return Decimal(str(_get_stock(obj)))
+            val = obj._stock_total
+        else:
+            val = Decimal(str(_get_stock(obj)))
+        if obj.unit_type == Product.UnitType.PIECE:
+            return int(val)
+        return val
     stock_qty.short_description = _("На складі (точно)")
 
     def reserved_qty(self, obj):
@@ -2357,9 +2361,12 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                  .filter(product=obj, tx_type=InventoryTransaction.TxType.RESERVED)
                  .aggregate(t=Sum("qty")).get("t")) or Decimal("0")
         if r and r < 0:
+            val = abs(r)
+            if obj.unit_type == Product.UnitType.PIECE:
+                val = int(val)
             return format_html(
                 '<span style="color:#FFB300;font-weight:700" title="{}">🔒 {}</span>',
-                _("Зарезервовано під замовлення"), abs(r),
+                _("Зарезервовано під замовлення"), val,
             )
         return format_html('<span style="color:var(--text-dim);font-size:11px">—</span>')
     reserved_qty.short_description = _("🔒 Резерв")
@@ -2450,13 +2457,17 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     def incoming_qty(self, obj):
         if hasattr(obj, '_incoming_total'):
-            return obj._incoming_total
-        q = (PurchaseOrderLine.objects
-             .filter(product=obj,
-                     purchase_order__status__in=['draft', 'ordered', 'partial'])
-             .aggregate(inc=Sum("qty_ordered") - Sum("qty_received"))
-             .get("inc"))
-        return q or Decimal("0")
+            val = obj._incoming_total
+        else:
+            q = (PurchaseOrderLine.objects
+                 .filter(product=obj,
+                         purchase_order__status__in=['draft', 'ordered', 'partial'])
+                 .aggregate(inc=Sum("qty_ordered") - Sum("qty_received"))
+                 .get("inc"))
+            val = q or Decimal("0")
+        if obj.unit_type == Product.UnitType.PIECE:
+            return int(val)
+        return val
     incoming_qty.short_description = "Incoming"
 
     def buildable_qty(self, obj):
@@ -2472,7 +2483,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             cs = float(self.stock_qty(c.component))
             possible = int(Decimal(str(cs)) // Decimal(str(c.qty_per or 1)))
             build = possible if build is None else min(build, possible)
-        return build if build is not None else "0"
+        result = build if build is not None else "0"
+        if obj.unit_type == Product.UnitType.PIECE and result != "-":
+            return int(result)
+        return result
     buildable_qty.short_description = "Buildable"
 
     def bom_availability(self, obj):
