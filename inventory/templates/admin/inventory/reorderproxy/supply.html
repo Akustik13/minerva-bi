@@ -526,7 +526,8 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
               </div>
 
               <!-- BOM Info -->
-              {% if p.bom_type == "key" %}
+              <!-- DEBUG: bom_type={{ p.bom_type }}, has_bom_info={{ row.bom_info|default:"None" }} -->
+              {% if p.bom_type == "key" or row.bom_info %}
               <div class="sv-detail-section">
                 <h4>🔧 {% trans "БОМ: компоненти та наявність" %}</h4>
                 {% if row.bom_info and row.bom_info.has_bom %}
