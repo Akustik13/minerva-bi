@@ -2101,6 +2101,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
+        ("📦 Availability", {"fields": ("stock_qty", "reserved_qty", "incoming_qty",
+                                        "buildable_qty", "bom_availability", "reorder_info")}),
         ("💰 Ціни та закупівля", {
             "fields": (
                 "manufacturer",
@@ -2108,8 +2110,6 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 ("reorder_point", "lead_time_days"),
             )
         }),
-        ("📦 Availability", {"fields": ("stock_qty", "reserved_qty", "incoming_qty",
-                                        "buildable_qty", "bom_availability", "reorder_info")}),
         ("🔗 Медіа та документи", {
             "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview"),
             "classes": ("collapse",),
