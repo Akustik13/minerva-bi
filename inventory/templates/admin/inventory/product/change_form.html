@@ -9,6 +9,17 @@
 .field-tech_attributes textarea { display: none !important; }
 .field-tech_attributes { display: block !important; }
 
+/* BOM inline — show/hide при виборі bom_type */
+#productcomponent_set-group {
+  margin-top: 24px; border-top: 2px solid var(--border-strong, #243347); padding-top: 12px;
+}
+#productcomponent_set-group.bom-hidden {
+  display: none !important;
+}
+#productcomponent_set-group h2 {
+  font-size: 16px; color: var(--text, #c9d8e4); margin-bottom: 8px;
+}
+
 /* Attrs table */
 .inv-attrs-wrap { margin: 4px 0 8px; width: 100%; }
 .inv-attrs-table {
@@ -129,6 +140,28 @@ function _invUpdateEmpty() {
 function _invEsc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+/* ── BOM inline visibility toggle ──────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function() {
+  var bomTypeSelect = document.querySelector('[name="bom_type"]');
+  var bomInline = document.getElementById('productcomponent_set-group');
+
+  if (bomTypeSelect && bomInline) {
+    function toggleBomInline() {
+      if (bomTypeSelect.value === 'key') {
+        bomInline.classList.remove('bom-hidden');
+      } else {
+        bomInline.classList.add('bom-hidden');
+      }
+    }
+
+    // На вибір bom_type
+    bomTypeSelect.addEventListener('change', toggleBomInline);
+
+    // При завантаженні сторінки
+    toggleBomInline();
+  }
+});
 
 /* ── Sync from DigiKey listing ─────────────────────────────────────────── */
 (function() {

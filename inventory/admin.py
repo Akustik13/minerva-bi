@@ -1733,8 +1733,19 @@ class ProductAliasAdmin(admin.ModelAdmin):
 
 @admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
-    list_display  = ("code", "name")
+    list_display  = ("code", "name", "location_type", "is_active")
+    list_filter   = ("location_type", "is_active")
     search_fields = ("code", "name")
+    fieldsets = (
+        (None, {"fields": ("code", "name", "location_type", "is_active")}),
+        ("📝 Інформація", {
+            "fields": (),
+            "description": "Типи складів: Готова продукція (finished) — для готових товарів; "
+                          "Компоненти (components) — для частин та матеріалів; "
+                          "Інше (other) — для змішаних складів.",
+            "classes": ("collapse",),
+        }),
+    )
 
 
 @admin.register(InventoryTransaction)
@@ -1752,6 +1763,33 @@ class InventoryTransactionAdmin(AuditableMixin, admin.ModelAdmin):
         "mark_as_adjustment",
         "fix_outgoing_sign",
     ]
+
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Розумна фільтрація локацій залежно від типу товару."""
+        if db_field.name == "location":
+            product_id = request.GET.get('product_id')
+            if product_id:
+                try:
+                    product = Product.objects.get(pk=product_id)
+                    if product.kind == Product.Kind.COMPONENT:
+                        kwargs['queryset'] = Location.objects.filter(
+                            location_type__in=[
+                                Location.LocationType.COMPONENTS,
+                                Location.LocationType.OTHER
+                            ],
+                            is_active=True,
+                        ).order_by('location_type', 'code')
+                    elif product.kind == Product.Kind.FINISHED:
+                        kwargs['queryset'] = Location.objects.filter(
+                            location_type__in=[
+                                Location.LocationType.FINISHED,
+                                Location.LocationType.OTHER
+                            ],
+                            is_active=True,
+                        ).order_by('location_type', 'code')
+                except Product.DoesNotExist:
+                    pass
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
     @admin.action(description=_("🔒 Змінити тип → Резерв"))
     def mark_as_reserved(self, request, queryset):

@@ -165,11 +165,28 @@ class ProductAlias(models.Model):
 
 
 class Location(models.Model):
+    class LocationType(models.TextChoices):
+        FINISHED = "finished", "Готова продукція 🏭"
+        COMPONENTS = "components", "Компоненти & Матеріали 🔧"
+        OTHER = "other", "Інше (загальний склад)"
+
     code = models.CharField(max_length=50, unique=True)
     name = models.CharField(max_length=255, blank=True, default="")
+    location_type = models.CharField(
+        "Тип складу",
+        max_length=20,
+        choices=LocationType.choices,
+        default=LocationType.OTHER,
+        help_text="Розділяє готову продукцію від компонентів для збирання",
+    )
+    is_active = models.BooleanField("Активна", default=True)
+
+    class Meta:
+        verbose_name = "Локація складу"
+        verbose_name_plural = "📍 Локації складу"
 
     def __str__(self) -> str:
-        return self.code
+        return f"{self.code} ({self.get_location_type_display()})"
 
 
 class InventoryTransaction(models.Model):
@@ -207,7 +224,7 @@ class InventoryTransaction(models.Model):
 
     def clean(self):
         from django.core.exceptions import ValidationError
-        
+
         if self.product and self.qty:
             if not self.product.is_fractional_unit():
                 if self.qty != int(self.qty):
@@ -215,6 +232,28 @@ class InventoryTransaction(models.Model):
                         'qty': f'Товар "{self.product.sku}" вимірюється в штуках. '
                                f'Кількість має бути цілим числом.'
                     })
+
+        # Перевіра: компоненти не мають бути на finished складі
+        if self.product and self.location:
+            is_component = self.product.kind == Product.Kind.COMPONENT
+            is_finished_location = self.location.location_type == Location.LocationType.FINISHED
+
+            if is_component and is_finished_location:
+                raise ValidationError(
+                    f'⚠️ Компонент "{self.product.sku}" не може бути розміщений '
+                    f'на складі готової продукції "{self.location.code}". '
+                    f'Використайте склад компонентів.'
+                )
+
+            # І навпаки: готові товари на компонентному складі (попередження)
+            is_finished_product = self.product.kind == Product.Kind.FINISHED
+            is_components_location = self.location.location_type == Location.LocationType.COMPONENTS
+
+            if is_finished_product and is_components_location:
+                raise ValidationError(
+                    f'⚠️ Готова продукція "{self.product.sku}" не повинна бути на складі компонентів. '
+                    f'Використайте склад готової продукції.'
+                )
 
 
 class ProductComponent(models.Model):
