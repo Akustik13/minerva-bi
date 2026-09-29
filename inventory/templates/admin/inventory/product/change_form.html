@@ -226,13 +226,22 @@ document.addEventListener('DOMContentLoaded', function() {
 {% block after_field_sets %}
 {{ block.super }}
 <script>
-// Перенести inline ОДРАЗУ після fieldsets, перед inlines
+// Перенести inline одразу ПІСЛЯ Availability fieldset
 document.addEventListener('DOMContentLoaded', function(e) {
   var bomInline = document.getElementById('productcomponent_set-group');
-  var submitRow = document.querySelector('.submit-row');
 
-  if (bomInline && submitRow) {
-    submitRow.parentNode.insertBefore(bomInline, submitRow);
+  // Знайти Availability fieldset (який містить stock_qty, buildable_qty)
+  var availabilityFieldset = null;
+  var fieldsets = document.querySelectorAll('fieldset');
+  fieldsets.forEach(function(fs) {
+    if (fs.innerHTML.includes('stock_qty') || fs.innerHTML.includes('buildable_qty')) {
+      availabilityFieldset = fs;
+    }
+  });
+
+  if (bomInline && availabilityFieldset) {
+    // Вставити inline одразу після Availability fieldset
+    availabilityFieldset.parentNode.insertBefore(bomInline, availabilityFieldset.nextSibling);
   }
 
   // Ховати/показувати inline залежно від bom_type
