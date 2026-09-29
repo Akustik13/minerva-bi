@@ -539,10 +539,10 @@ tr.sv-main-row[data-state="critical"] td:nth-child(4) { background: rgba(244,67,
               <div class="sv-detail-section">
                 {% if row.bom_info and row.bom_info.has_bom %}
                 <h4 style="cursor:pointer;user-select:none" onclick="svToggleBom(event, {{ p.pk }})">
-                  <span id="bom-toggle-{{ p.pk }}" style="display:inline-block;margin-right:6px;transition:transform .15s;transform:rotate(0deg)">▼</span>
+                  <span id="bom-toggle-{{ p.pk }}" style="display:inline-block;margin-right:6px;transition:transform .15s;transform:rotate(-90deg)">▼</span>
                   🔧 {% trans "БОМ: компоненти та наявність" %}
                 </h4>
-                <div id="bom-table-{{ p.pk }}" style="padding:6px 0;margin-bottom:8px">
+                <div id="bom-table-{{ p.pk }}" style="padding:6px 0;margin-bottom:8px;display:none">
                   <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px">
                     {% trans "Можна зібрати:" %} <span style="color:{% if row.bom_info.buildable_qty > 0 %}#66bb6a{% else %}#ef5350{% endif %};font-weight:700">{{ row.bom_info.buildable_qty }}</span> {% trans "шт." %}
                     {% if row.bom_info.bottleneck and row.bom_info.bottleneck != "—" %}
