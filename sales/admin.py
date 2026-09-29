@@ -478,7 +478,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         "order_number", "source_badge", "status_badge", "order_date_fmt", 'deadline_display',
         "customer_link_display", "country_display",
         "shipped_badge",
-        "items_count", "items_summary", "order_total",
+        "items_count", "items_summary", "bom_status_summary", "order_total",
         "stock_warning",
         "label_buttons_list",
         # "customer_link",  # disabled - no FK
@@ -2011,6 +2011,37 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         return mark_safe(f'<span style="font-size:12px;font-family:monospace;line-height:1.7">{html}</span>')
     items_summary.short_description = "Товари"
 
+    def bom_status_summary(self, obj):
+        """Короткий БОМ статус на картці замовлення."""
+        try:
+            from inventory.models import Product
+            from inventory.utils import get_assembly_status
+
+            lines = obj.lines.all().select_related('product')
+            bom_lines = [l for l in lines if l.product and l.product.bom_type == Product.BomType.KEY]
+
+            if not bom_lines:
+                return mark_safe('<span style="opacity:.4">—</span>')
+
+            # Перевірить всі BOM товари
+            all_ok = True
+            status_parts = []
+            for line in bom_lines:
+                status = get_assembly_status(line.product, int(line.qty or 1))
+                if not status['can_assemble']:
+                    all_ok = False
+                    buildable = status.get('buildable', 0)
+                    needed = int(line.qty or 1)
+                    status_parts.append(f'<span style="color:#f44336">❌ {line.product.sku}: {buildable}/{needed}</span>')
+                else:
+                    status_parts.append(f'<span style="color:#4caf50">✅ {line.product.sku}: {int(line.qty or 1)} шт.</span>')
+
+            html = '<br>'.join(status_parts)
+            return mark_safe(f'<span style="font-size:12px;line-height:1.7">{html}</span>')
+        except Exception:
+            return mark_safe('<span style="opacity:.4">—</span>')
+    bom_status_summary.short_description = "🔧 БОМ"
+
     def order_total(self, obj):
         """Показує суму з валютою."""
         try:
@@ -2364,10 +2395,11 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                     for comp_info in analysis['components']:
                         comp_sku = comp_info['product'].sku
                         after = comp_info['buildable'] if 'buildable' in comp_info else int(comp_info['stock'] / comp_info['qty_per'])
+                        qty_per = int(comp_info['qty_per']) if comp_info['qty_per'] == int(comp_info['qty_per']) else comp_info['qty_per']
                         comp_rows.append(
                             f"<div style='padding:4px 0;font-size:11px;color:var(--text-muted,#9aafbe)'>"
                             f"  {comp_sku}: {int(comp_info['stock'])} шт. "
-                            f"({comp_info['qty_per']} шт/одиниця) → макс {after} шт. зібрати"
+                            f"({qty_per} шт/одиниця) → макс {after} шт. зібрати"
                             f"</div>"
                         )
                     comp_details = "".join(comp_rows)
