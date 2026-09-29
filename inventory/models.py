@@ -75,8 +75,18 @@ class Product(models.Model):
     )
     category = models.CharField("Категорія", max_length=64, default="other",
                                help_text="Оберіть з довідника або введіть slug вручну")
-    kind = models.CharField(max_length=20, choices=Kind.choices, default=Kind.FINISHED)
-    bom_type = models.CharField(max_length=20, choices=BomType.choices, default=BomType.NONE)
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+        default=Kind.FINISHED,
+        help_text="Finished = готовий виріб для продажу; Component = запчастина для складання в БОМ"
+    )
+    bom_type = models.CharField(
+        max_length=20,
+        choices=BomType.choices,
+        default=BomType.NONE,
+        help_text="Key = має список компонентів (БОМ); None = простий товар без розбірки"
+    )
     
     # НОВЕ ПОЛЕ: тип одиниці виміру
     unit_type = models.CharField(
