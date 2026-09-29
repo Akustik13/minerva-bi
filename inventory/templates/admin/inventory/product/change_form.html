@@ -230,14 +230,9 @@ document.addEventListener('DOMContentLoaded', function() {
 document.addEventListener('DOMContentLoaded', function(e) {
   var bomInline = document.getElementById('productcomponent_set-group');
 
-  // Знайти Availability fieldset (який містить stock_qty, buildable_qty)
-  var availabilityFieldset = null;
+  // Знайти Availability fieldset - другий fieldset (Basic, потім Availability)
   var fieldsets = document.querySelectorAll('fieldset');
-  fieldsets.forEach(function(fs) {
-    if (fs.innerHTML.includes('stock_qty') || fs.innerHTML.includes('buildable_qty')) {
-      availabilityFieldset = fs;
-    }
-  });
+  var availabilityFieldset = fieldsets.length > 1 ? fieldsets[1] : null;
 
   if (bomInline && availabilityFieldset) {
     // Вставити inline одразу після Availability fieldset
