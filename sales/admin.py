@@ -2322,17 +2322,18 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
 
     def bom_assembly_status(self, obj):
         """Показує статус БОМ: чи можна зібрати товари в замовленні."""
-        from inventory.utils import get_bom_analysis, get_assembly_status
-        from inventory.models import Product
+        try:
+            from inventory.utils import get_bom_analysis, get_assembly_status
+            from inventory.models import Product
 
-        if not obj.pk:
-            return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
+            if not obj.pk:
+                return mark_safe('<em style="color:#607d8b">Збережіть замовлення</em>')
 
-        lines = obj.lines.all().select_related('product')
-        bom_lines = [l for l in lines if l.product and l.product.bom_type == Product.BomType.KEY]
+            lines = obj.lines.all().select_related('product')
+            bom_lines = [l for l in lines if l.product and l.product.bom_type == Product.BomType.KEY]
 
-        if not bom_lines:
-            return mark_safe('<em style="color:#607d8b">Замовлення не містить товарів з БОМ</em>')
+            if not bom_lines:
+                return mark_safe('<em style="color:#607d8b">Замовлення не містить товарів з БОМ</em>')
 
         rows = []
         any_issues = False
@@ -2384,13 +2385,17 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         summary_text = "Є проблеми з БОМ!" if any_issues else "БОМ готово до збирання"
         summary_color = "#f44336" if any_issues else "#4caf50"
 
-        return mark_safe(
-            f'<div style="border-left:4px solid {summary_color};padding:10px 16px;'
-            f'margin-bottom:12px;border-radius:4px;font-weight:bold;'
-            f'color:{summary_color}">'
-            f'{summary_icon} {summary_text}</div>'
-            + "".join(rows)
-        )
+            return mark_safe(
+                f'<div style="border-left:4px solid {summary_color};padding:10px 16px;'
+                f'margin-bottom:12px;border-radius:4px;font-weight:bold;'
+                f'color:{summary_color}">'
+                f'{summary_icon} {summary_text}</div>'
+                + "".join(rows)
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"BOM assembly status error for order {obj.pk}: {e}")
+            return mark_safe('<em style="color:#f44336">❌ Помилка при обчисленні БОМ</em>')
 
     bom_assembly_status.short_description = "🔧 БОМ: готовність до збирання"
 
