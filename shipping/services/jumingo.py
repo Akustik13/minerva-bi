@@ -112,6 +112,7 @@ def build_customs_articles(order, sender_country="DE", default_currency="EUR") -
             weight_per_unit = round(float(p.net_weight_g) / 1000.0, 4)
 
         item = {
+            "sku":            (p.sku if p else line.sku_raw) or "",
             "description":    desc,
             "quantity":       qty_int,
             "value":          round(value, 2),

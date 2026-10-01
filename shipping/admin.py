@@ -1937,6 +1937,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             ca_weight_autos = request.POST.getlist("ca_weight_auto[]")
             ca_values       = request.POST.getlist("ca_value")
             ca_curs         = request.POST.getlist("ca_currency")
+            ca_skus         = request.POST.getlist("ca_sku")
 
             customs_items = []
             for i, desc in enumerate(ca_descs):
@@ -1946,6 +1947,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     return lst[idx] if idx < len(lst) else default
                 w_auto = _get(ca_weight_autos, i, "0") == "1"
                 item = {
+                    "sku":            _get(ca_skus, i, "").strip(),
                     "description":    desc.strip()[:35],
                     "quantity":       max(1, int(float(_get(ca_qtys, i, "1") or 1))),
                     "value":          round(float(_get(ca_values, i, "0") or 0), 2),
@@ -1972,6 +1974,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         self._apply_ups_payers_from_post(shipment, request)
         shipment.save()
+        self._save_customs_weights_to_products(request, shipment)
 
         # ── Multi-package: зберігаємо ShipmentPackage рядки якщо є ──────────
         pkg_weights = request.POST.getlist("pkg_weight[]")
@@ -2165,6 +2168,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         inv_type      = (shipment.customs_articles or {}).get("type", "commercial")
         if existing_ca:
             customs_articles = existing_ca
+            if order and any(not it.get("sku") for it in existing_ca):
+                from .services.packing_list_service import order_line_skus
+                skus = order_line_skus(order)
+                if len(skus) == len(existing_ca):
+                    for it, sku in zip(existing_ca, skus):
+                        it.setdefault("sku", sku)
+                        if not it["sku"]:
+                            it["sku"] = sku
         else:
             sender_country   = shipment.carrier.sender_country if shipment.carrier else "DE"
             default_currency = shipment.declared_currency or getattr(order, "currency", None) or "EUR"
@@ -2306,6 +2317,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             ca_weight_autos = request.POST.getlist("ca_weight_auto[]")
             ca_values       = request.POST.getlist("ca_value")
             ca_curs         = request.POST.getlist("ca_currency")
+            ca_skus         = request.POST.getlist("ca_sku")
 
             customs_items = []
             for i, desc in enumerate(ca_descs):
@@ -2315,6 +2327,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     return lst[idx] if idx < len(lst) else default
                 w_auto = _get(ca_weight_autos, i, "0") == "1"
                 item = {
+                    "sku":            _get(ca_skus, i, "").strip(),
                     "description":    desc.strip()[:35],
                     "quantity":       max(1, int(float(_get(ca_qtys, i, "1") or 1))),
                     "value":          round(float(_get(ca_values, i, "0") or 0), 2),
@@ -2341,6 +2354,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         self._apply_ups_payers_from_post(shipment, request)
         shipment.save()
+        self._save_customs_weights_to_products(request, shipment)
 
         # ── Multi-package: оновлюємо ShipmentPackage рядки ─────────────────────
         pkg_weights = request.POST.getlist("pkg_weight[]")
@@ -4674,6 +4688,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             f'| Сервіс: {svc_name} | Вартість: {result.get("total_charge", "—")} {result.get("currency", "EUR")}'
         )
         return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+    @staticmethod
+    def _save_customs_weights_to_products(request, shipment) -> None:
+        if request.POST.get("ca_save_weights") != "1":
+            return
+        from .services.packing_list_service import fill_missing_product_weights
+        items = (shipment.customs_articles or {}).get("customs_line_items") or []
+        pairs = [(it.get("sku"), it.get("weight")) for it in items
+                 if it.get("sku") and it.get("weight") and not it.get("weight_auto")]
+        updated = fill_missing_product_weights(pairs)
+        if updated:
+            messages.info(request, "💾 Вагу нетто записано в картки товарів: " +
+                          ", ".join(f"{sku} — {g.normalize():f} г" for sku, g in updated))
 
     @staticmethod
     def _apply_ups_payers_from_post(shipment, request) -> None:

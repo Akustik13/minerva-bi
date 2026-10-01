@@ -275,7 +275,7 @@ function _caRowHtml(desc,qty,hs,origin,weight,value,currency){
   if(weight==='' || weight===null || weight===undefined) weight = _DEFAULT_CA_WEIGHT;
   var uv = (parseFloat(value)>0 && parseFloat(qty)>0) ? (parseFloat(value)/parseFloat(qty)).toFixed(4) : '—';
   return `<tr class="ca-row" style="border-bottom:1px solid var(--border)">
-    <td style="padding:4px 8px"><input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="${desc}" placeholder="Electronic component" oninput="this.classList.remove('ca-warn')"></td>
+    <td style="padding:4px 8px"><input type="hidden" name="ca_sku" value=""><input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="${desc}" placeholder="Electronic component" oninput="this.classList.remove('ca-warn')"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px" type="number" name="ca_qty" min="1" step="1" value="${qty}" oninput="updateUnitVal(this)"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;font-size:12px;font-family:monospace" type="text" name="ca_hs" value="${hs}" placeholder="8517.62"></td>
     <td style="padding:4px 5px"><input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px;text-transform:uppercase" type="text" name="ca_origin" maxlength="2" value="${origin}" placeholder="DE"></td>
@@ -1967,7 +1967,8 @@ document.addEventListener('DOMContentLoaded', function() {
             {% for a in customs_articles %}
             <tr class="ca-row" style="border-bottom:1px solid var(--border)">
               <td style="padding:4px 8px">
-                <input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="{{ a.description }}" placeholder="Electronic component" oninput="this.classList.remove('ca-warn')">
+                <input type="hidden" name="ca_sku" value="{{ a.sku|default:'' }}">
+                <input class="sh-input" style="width:100%;padding:4px 7px;font-size:12px" type="text" name="ca_desc" maxlength="35" value="{{ a.description }}" placeholder="Electronic component" oninput="this.classList.remove('ca-warn')"{% if a.sku %} title="SKU: {{ a.sku }}"{% endif %}>
               </td>
               <td style="padding:4px 5px">
                 <input class="sh-input" style="width:100%;padding:4px 5px;text-align:center;font-size:12px" type="number" name="ca_qty" min="1" step="1" value="{{ a.quantity }}">
@@ -2021,6 +2022,11 @@ document.addEventListener('DOMContentLoaded', function() {
         <span id="ca-total" style="font-size:12px;color:var(--ok);font-weight:700"></span>
       </div>
       <div id="ca-export-warn" style="margin-top:8px;display:none"></div>
+      <label style="display:flex;align-items:flex-start;gap:8px;margin-top:10px;font-size:12px;color:var(--text-muted);cursor:pointer">
+        <input type="checkbox" name="ca_save_weights" value="1" checked style="margin-top:2px">
+        <span>💾 Записати введену «Вагу/шт» у картки товарів, де ваги ще немає.
+          Наявну вагу не перезаписує; рядки з позначкою «⚠️ авто» (брутто ÷ к-сть) не записуються — тільки вага, введена вручну.</span>
+      </label>
     </div>
 
     <!-- 💳 Хто платить -->

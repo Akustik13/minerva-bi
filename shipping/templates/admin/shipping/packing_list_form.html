@@ -47,6 +47,9 @@
 .pl-check { border: 1px dashed var(--border-strong); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: var(--text); }
 .pl-chip { background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 12px; padding: 2px 10px; font-size: 12px; }
 .pl-warn-txt { color: var(--err); font-size: 12px; font-weight: 600; }
+.pl-meta { display: block; font-size: 10px; color: var(--text-muted); margin-top: 2px; white-space: nowrap; }
+.pl-save { cursor: pointer; color: var(--ok); }
+.pl-save input { margin: 0 3px 0 0; vertical-align: middle; }
 </style>
 {% endblock %}
 
@@ -150,6 +153,18 @@
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
+  function weightMeta(l, i, j){
+    var out = '';
+    if (l.weight_src === 'customs')
+      out += '<div class="pl-meta" title="Вагу взято з митної декларації відправлення">з митної декларації</div>';
+    if (l.product_id && l.weight_src !== 'product' && num(l.unit_net_kg) > 0) {
+      if (l.save_weight === undefined) l.save_weight = true;
+      out += '<label class="pl-meta pl-save" title="Записати цю вагу в картку товару (там її ще немає)">'
+           + '<input type="checkbox" data-p="'+i+'" data-l="'+j+'" data-k="save_weight"' + (l.save_weight ? ' checked' : '') + '> 💾 у товар</label>';
+    }
+    return out;
+  }
+
   function render(){
     var n = parcels.length, html = '';
     parcels.forEach(function(p, i){
@@ -162,8 +177,9 @@
           + '<td><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="description" value="'+esc(l.description)+'" placeholder="Antenna"></td>'
           + '<td><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="part_no" value="'+esc(l.part_no)+'" placeholder="AN240208-01A"></td>'
           + '<td style="width:80px"><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="qty" value="'+esc(l.qty)+'" inputmode="decimal"></td>'
-          + '<td style="width:100px"><input class="pl-input' + (zero ? ' pl-zero' : '') + '" data-p="'+i+'" data-l="'+j+'" data-k="unit_net_kg" value="'+esc(l.unit_net_kg)+'" inputmode="decimal"'
-          + (zero ? ' title="Вага нетто не вказана — заповніть тут або в картці товару (вага нетто, г)"' : '') + '></td>'
+          + '<td style="width:120px"><input class="pl-input' + (zero ? ' pl-zero' : '') + '" data-p="'+i+'" data-l="'+j+'" data-k="unit_net_kg" value="'+esc(l.unit_net_kg)+'" inputmode="decimal"'
+          + (zero ? ' title="Вага нетто не вказана — заповніть тут або в картці товару (вага нетто, г)"' : '') + '>'
+          + weightMeta(l, i, j) + '</td>'
           + '<td class="num">' + fmt(t, 3) + '</td>'
           + '<td><button type="button" class="pl-btn sm danger" onclick="plDelLine('+i+','+j+')" title="Видалити рядок">✕</button></td>'
           + '</tr>';
@@ -243,7 +259,7 @@
   box.addEventListener('input', function(e){
     var el = e.target, p = el.dataset.p, k = el.dataset.k;
     if (p === undefined || !k) return;
-    if (el.dataset.l !== undefined) parcels[p].lines[el.dataset.l][k] = el.value;
+    if (el.dataset.l !== undefined) parcels[p].lines[el.dataset.l][k] = el.type === 'checkbox' ? el.checked : el.value;
     else parcels[p][k] = el.value;
   });
   box.addEventListener('change', function(e){

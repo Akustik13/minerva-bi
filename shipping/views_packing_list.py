@@ -51,9 +51,13 @@ def _parse_parcels(raw: str) -> list:
             pn   = str(ln.get("part_no") or "").strip()
             if not (desc or pn):
                 continue
+            pid = ln.get("product_id")
             lines.append({
                 "description": desc[:200], "part_no": pn[:80],
                 "qty": _num(ln.get("qty")), "unit_net_kg": _num(ln.get("unit_net_kg")),
+                "product_id": pid if isinstance(pid, int) else None,
+                "weight_src": str(ln.get("weight_src") or "")[:10],
+                "save_weight": bool(ln.get("save_weight")),
             })
         parcels.append({
             "dims": str(p.get("dims") or "").strip()[:40],
@@ -90,7 +94,21 @@ def _render_form(request, data, order=None, pl=None):
     ))
 
 
+def _save_weights_to_products(request, parcels):
+    pairs = []
+    for p in parcels:
+        for ln in p["lines"]:
+            if ln.pop("save_weight", False) and ln.get("product_id") and ln["unit_net_kg"] > 0:
+                pairs.append((ln["product_id"], ln["unit_net_kg"]))
+                ln["weight_src"] = "product"
+    updated = svc.fill_missing_product_weights(pairs)
+    if updated:
+        messages.info(request, "💾 Вагу нетто записано в картки товарів: " +
+                      ", ".join(f"{sku} — {g.normalize():f} г" for sku, g in updated))
+
+
 def _save_and_generate(request, pl, data):
+    _save_weights_to_products(request, data["parcels"])
     pl.number          = data["number"] or (pl.sales_order.order_number if pl.sales_order else "")
     pl.pl_date         = data["pl_date"]
     pl.ship_to         = data["ship_to"]

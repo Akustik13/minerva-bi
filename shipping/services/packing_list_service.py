@@ -93,18 +93,91 @@ def _sample_data() -> dict:
     }
 
 
+# ── Вага товарів ──────────────────────────────────────────────────────────────
+
+def fill_missing_product_weights(pairs) -> list:
+    """pairs: [(sku або product_id, кг/шт)]. Записує net_weight_g лише товарам без ваги
+    (наявну вагу не перезаписує). Повертає [(sku, грами)] оновлених."""
+    from decimal import Decimal, InvalidOperation
+    from django.db.models import Q
+    from inventory.models import Product
+
+    updated = []
+    for key, kg in pairs:
+        try:
+            grams = (Decimal(str(kg).replace(",", ".")) * 1000).quantize(Decimal("0.0001"))
+        except (InvalidOperation, TypeError, ValueError):
+            continue
+        if grams <= 0 or not key:
+            continue
+        lookup = Q(pk=key) if isinstance(key, int) else Q(sku=str(key).strip())
+        p = Product.objects.filter(lookup).filter(Q(net_weight_g__isnull=True) | Q(net_weight_g=0)).first()
+        if p:
+            p.net_weight_g = grams
+            p.save(update_fields=["net_weight_g"])
+            updated.append((p.sku, grams))
+    return updated
+
+
 # ── Префіл із замовлення ──────────────────────────────────────────────────────
 
-def _order_lines(order) -> list:
+def order_line_skus(order) -> list:
+    return [(ln.product.sku if ln.product else ln.sku_raw) or ""
+            for ln in order.lines.select_related("product").order_by("pk")]
+
+
+def _customs_by_sku(shipment, order) -> dict:
+    """SKU → {"description", "weight"} з митної декларації відправлення.
+    weight — лише введена вручну (не «авто» брутто÷к-сть)."""
+    items = ((shipment.customs_articles or {}).get("customs_line_items") or []) if shipment else []
+    skus = order_line_skus(order)
+    by_index = len(skus) == len(items)
+    result = {}
+    for i, it in enumerate(items):
+        sku = it.get("sku") or (skus[i] if by_index else "")
+        if not sku:
+            continue
+        entry = {"description": (it.get("description") or "").strip()}
+        if it.get("weight") and not it.get("weight_auto"):
+            try:
+                entry["weight"] = round(float(it["weight"]), 4)
+            except (TypeError, ValueError):
+                pass
+        result[sku] = entry
+    return result
+
+
+def _order_lines(order, shipment=None) -> list:
+    from inventory.models import ProductCategory
+
+    order_lines = list(order.lines.select_related("product").order_by("pk"))
+    cat_slugs = {ln.product.category for ln in order_lines if ln.product and ln.product.category}
+    cats = {c.slug: c for c in ProductCategory.objects.filter(slug__in=cat_slugs)} if cat_slugs else {}
+    customs = _customs_by_sku(shipment, order)
+
     lines = []
-    for ln in order.lines.select_related("product").all():
+    for ln in order_lines:
         p = ln.product
-        desc = ((p.name_export or p.name) if p else "") or ln.sku_raw or ""
+        cat = cats.get(p.category) if p and p.category else None
+        sku = (p.sku if p else ln.sku_raw) or ""
+        c = customs.get(sku, {})
+        # Опис: як у митній декларації відправлення; без неї — той самий пріоритет, що й build_customs_articles
+        desc = (c.get("description") or (p.name_export if p else "")
+                or (cat.customs_description_de if cat else "") or (p.name if p else "") or sku)
+        prod_kg = round(float(p.net_weight_g) / 1000, 4) if p and p.net_weight_g else 0
+        if prod_kg:
+            unit_kg, src = prod_kg, "product"
+        elif c.get("weight"):
+            unit_kg, src = c["weight"], "customs"
+        else:
+            unit_kg, src = 0, ""
         lines.append({
             "description": desc,
-            "part_no":     (p.sku if p else ln.sku_raw) or "",
+            "part_no":     sku,
             "qty":         float(ln.qty or 0),
-            "unit_net_kg": round(float(p.net_weight_g or 0) / 1000, 3) if p else 0,
+            "unit_net_kg": unit_kg,
+            "product_id":  p.pk if p else None,
+            "weight_src":  src,
         })
     return lines
 
@@ -139,6 +212,8 @@ def _parcels_from_shipment(shipment, order_lines: list) -> list:
                     "part_no":     base.get("part_no", ""),
                     "qty":         float(d.get("quantity") or 0),
                     "unit_net_kg": base.get("unit_net_kg", 0),
+                    "product_id":  base.get("product_id"),
+                    "weight_src":  base.get("weight_src", ""),
                 })
         else:
             lines = order_lines if len(pkgs) == 1 and (pkg.quantity or 1) == 1 else []
@@ -174,7 +249,7 @@ def initial_data(order) -> dict:
     from shipping.models import PackingList
 
     shipment = order.shipments.exclude(status="cancelled").order_by("-created_at").first()
-    order_lines = _order_lines(order)
+    order_lines = _order_lines(order, shipment)
 
     if shipment:
         s = shipment
