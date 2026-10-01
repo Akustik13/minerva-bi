@@ -1363,7 +1363,20 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
         source_slug  = (obj.source or 'manual').replace('"', '')
         order_number = (obj.order_number or '').replace('"', '')
 
-        html = (
+        pl_last = obj.packing_lists.order_by('-created_at').first()
+        pl_btn_style = ('display:inline-block;font-size:12px;padding:5px 12px;border-radius:6px;'
+                        'background:var(--bg-hover);border:1px solid var(--border-strong);'
+                        'color:var(--text);text-decoration:none;margin-right:6px')
+        pl_html = (
+            f'<div style="margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-strong)">'
+            f'<a href="/packing-lists/new/?order={obj.pk}" style="{pl_btn_style}">📋 Packing List (свій шаблон)</a>'
+            + (f'<a href="/packing-lists/{pl_last.pk}/edit/" style="{pl_btn_style}">✏️ Останній #{escape(pl_last.number)}</a>'
+               if pl_last else '')
+            + '<span style="font-size:11px;color:var(--text-dim)">форма з коробками → DOCX/PDF у документи замовлення</span>'
+            f'</div>'
+        )
+
+        html = pl_html + (
             f'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'
             f'<div id="doc-templates-list" style="display:flex;gap:8px;flex-wrap:wrap">'
             f'<span style="font-size:12px;color:var(--text-dim)">⏳ Завантаження...</span>'

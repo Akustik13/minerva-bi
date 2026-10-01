@@ -51,6 +51,49 @@ class Invoice(models.Model):
         return f"Invoice #{self.invoice_number} — {self.digikey_order_no}"
 
 
+class PackingList(models.Model):
+    """Пакувальний лист з власного Word-шаблону (shipping/services/packing_list_service.py)."""
+
+    number      = models.CharField("Номер", max_length=30, db_index=True)
+    pl_date     = models.DateField("Дата")
+    sales_order = models.ForeignKey(
+        "sales.SalesOrder", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="packing_lists", verbose_name="Замовлення",
+    )
+    shipment = models.ForeignKey(
+        "shipping.Shipment", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="packing_lists", verbose_name="Відправлення",
+    )
+    # {"company","contact","street","city_line","country","phone","email"}
+    ship_to = models.JSONField("Отримувач", default=dict, blank=True)
+    # [{"dims": "24 x 16 x 5", "gross_kg": 0.39,
+    #   "lines": [{"description","part_no","qty","unit_net_kg"}]}]
+    parcels = models.JSONField("Коробки", default=list, blank=True)
+    signer_name     = models.CharField("Підписант", max_length=120, blank=True, default="")
+    signer_position = models.CharField("Посада", max_length=120, blank=True, default="")
+
+    docx_file  = models.FileField("Файл .docx", upload_to="packing_lists/", null=True, blank=True)
+    pdf_file   = models.FileField("Файл .pdf",  upload_to="packing_lists/", null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="Автор",
+    )
+    created_at = models.DateTimeField("Створено", auto_now_add=True)
+    updated_at = models.DateTimeField("Оновлено", auto_now=True)
+
+    class Meta:
+        verbose_name        = "Пакувальний лист"
+        verbose_name_plural = "Пакувальні листи"
+        ordering            = ["-created_at"]
+
+    def __str__(self):
+        return f"Packing List #{self.number}"
+
+    @property
+    def total_gross_kg(self):
+        return round(sum(float(p.get("gross_kg") or 0) for p in self.parcels or []), 3)
+
+
 class Carrier(models.Model):
     """Перевізник / платформа доставки з API-налаштуваннями."""
 

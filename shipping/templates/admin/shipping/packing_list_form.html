@@ -1,0 +1,198 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; <a href="/packing-lists/">Packing Lists</a>
+  {% if order %}&rsaquo; <a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% endif %}
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.pl-wrap { padding: 24px 32px 60px; max-width: 1100px; }
+@media (max-width: 768px) { .pl-wrap { padding: 16px; } }
+.pl-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 18px 22px; margin-bottom: 20px; }
+.pl-card-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em;
+                 margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-strong); display: flex; align-items: center; gap: 8px; }
+.pl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.pl-field { display: flex; flex-direction: column; gap: 5px; }
+.pl-label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.pl-input { background: var(--bg-input); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px;
+            padding: 7px 10px; font-size: 13px; font-family: inherit; width: 100%; box-sizing: border-box; }
+.pl-input:focus { border-color: var(--link-fg); outline: none; }
+.pl-btn { background: var(--bg-hover); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 8px 14px;
+          font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
+.pl-btn:hover { border-color: var(--link-fg); }
+.pl-btn.primary { background: var(--link-fg); border-color: var(--link-fg); color: var(--bg-card); font-weight: 700; }
+.pl-btn.sm { padding: 3px 9px; font-size: 12px; }
+.pl-btn.danger { color: var(--err); }
+.pl-muted { color: var(--text-muted); font-size: 12px; }
+.pl-parcel { border: 1px solid var(--border-strong); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; background: var(--bg-input); }
+.pl-parcel-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.pl-parcel-head b { color: var(--text); font-size: 14px; margin-right: auto; }
+.pl-scroll { overflow-x: auto; }
+.pl-lines { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 640px; }
+.pl-lines th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 11px; padding: 6px 4px; border-bottom: 1px solid var(--border-strong); }
+.pl-lines td { padding: 4px; vertical-align: middle; }
+.pl-lines td.num { text-align: right; color: var(--text-muted); white-space: nowrap; font-family: monospace; }
+.pl-sum { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+.pl-sum .warn { color: var(--err); font-weight: 600; }
+.pl-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pl-wrap">
+  <h1 style="margin:0 0 6px;color:var(--text)">📋 {{ title }}</h1>
+  <p class="pl-muted" style="margin:0 0 18px">
+    {% if order %}Замовлення <a href="{% url 'admin:sales_salesorder_change' order.pk %}" style="color:var(--link-fg)">{{ order.order_number }}</a>{% endif %}
+    {% if data.shipment %} · дані з відправлення #{{ data.shipment.pk }}{% endif %}
+    · після генерації файли «Packing List_№.docx/pdf» з'являться в «Документи замовлення» (файл з такою ж назвою буде замінено).
+  </p>
+
+  <form method="post" id="pl-form" action="{% if pl %}/packing-lists/{{ pl.pk }}/edit/{% else %}/packing-lists/new/?order={{ order.pk }}{% endif %}">
+    {% csrf_token %}
+    {% if order %}<input type="hidden" name="order_id" value="{{ order.pk }}">{% endif %}
+    {% if data.shipment %}<input type="hidden" name="shipment_id" value="{{ data.shipment.pk }}">{% endif %}
+    <input type="hidden" name="parcels_json" id="parcels_json">
+
+    <div class="pl-card">
+      <div class="pl-card-title">🧾 Документ</div>
+      <div class="pl-grid">
+        <div class="pl-field"><label class="pl-label">Packing List No.</label>
+          <input class="pl-input" name="number" value="{{ data.number }}" required></div>
+        <div class="pl-field"><label class="pl-label">Packing List Date</label>
+          <input class="pl-input" type="date" name="pl_date" value="{{ data.pl_date|date:'Y-m-d' }}" required></div>
+      </div>
+    </div>
+
+    <div class="pl-card">
+      <div class="pl-card-title">📬 Ship to (Receiver/Buyer)</div>
+      <div class="pl-grid">
+        <div class="pl-field"><label class="pl-label">Компанія</label>
+          <input class="pl-input" name="ship_to_company" value="{{ data.ship_to.company }}"></div>
+        <div class="pl-field"><label class="pl-label">Контактна особа</label>
+          <input class="pl-input" name="ship_to_contact" value="{{ data.ship_to.contact }}"></div>
+        <div class="pl-field" style="grid-column:1/-1"><label class="pl-label">Вулиця, будинок</label>
+          <input class="pl-input" name="ship_to_street" value="{{ data.ship_to.street }}"></div>
+        <div class="pl-field"><label class="pl-label">Індекс, місто</label>
+          <input class="pl-input" name="ship_to_city_line" value="{{ data.ship_to.city_line }}"></div>
+        <div class="pl-field"><label class="pl-label">Країна (англійською)</label>
+          <input class="pl-input" name="ship_to_country" value="{{ data.ship_to.country }}"></div>
+        <div class="pl-field"><label class="pl-label">Телефон</label>
+          <input class="pl-input" name="ship_to_phone" value="{{ data.ship_to.phone }}"></div>
+        <div class="pl-field"><label class="pl-label">Email</label>
+          <input class="pl-input" name="ship_to_email" value="{{ data.ship_to.email }}"></div>
+      </div>
+    </div>
+
+    <div class="pl-card">
+      <div class="pl-card-title">📦 Коробки (Parcels)</div>
+      <div id="pl-parcels"></div>
+      <button type="button" class="pl-btn" onclick="plAddParcel()">＋ Додати коробку</button>
+      <div class="pl-sum" id="pl-total"></div>
+    </div>
+
+    <div class="pl-card">
+      <div class="pl-card-title">✍️ Підпис</div>
+      <div class="pl-grid">
+        <div class="pl-field"><label class="pl-label">Name</label>
+          <input class="pl-input" name="signer_name" value="{{ data.signer_name }}" placeholder="Dr. Sergey Sevskiy"></div>
+        <div class="pl-field"><label class="pl-label">Position</label>
+          <input class="pl-input" name="signer_position" value="{{ data.signer_position }}" placeholder="CEO"></div>
+      </div>
+    </div>
+
+    <div class="pl-actions">
+      <button type="submit" class="pl-btn primary">📄 {% if pl %}Перегенерувати{% else %}Згенерувати{% endif %} Packing List</button>
+      {% if pl and pl.pdf_file %}<a class="pl-btn" href="/packing-lists/{{ pl.pk }}/file/pdf/" target="_blank">PDF</a>{% endif %}
+      {% if pl and pl.docx_file %}<a class="pl-btn" href="/packing-lists/{{ pl.pk }}/file/docx/">DOCX</a>{% endif %}
+      <a class="pl-btn" href="{% if order %}{% url 'admin:sales_salesorder_change' order.pk %}{% else %}/packing-lists/{% endif %}">Скасувати</a>
+    </div>
+  </form>
+</div>
+
+{{ parcels|json_script:"pl-parcels-data" }}
+<script>
+(function(){
+  var parcels = JSON.parse(document.getElementById('pl-parcels-data').textContent) || [];
+  if (!parcels.length) parcels.push({dims:'', gross_kg:0, lines:[]});
+  var box = document.getElementById('pl-parcels');
+
+  function num(v){ var f = parseFloat(String(v).replace(',', '.')); return isNaN(f) ? 0 : f; }
+  function fmt(v, d){ return num(v).toFixed(d).replace('.', ','); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  function render(){
+    var n = parcels.length, html = '';
+    parcels.forEach(function(p, i){
+      var rows = '', net = 0;
+      (p.lines || []).forEach(function(l, j){
+        var t = num(l.qty) * num(l.unit_net_kg); net += t;
+        rows += '<tr>'
+          + '<td class="num">' + (j + 1) + '</td>'
+          + '<td><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="description" value="'+esc(l.description)+'" placeholder="Antenna"></td>'
+          + '<td><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="part_no" value="'+esc(l.part_no)+'" placeholder="AN240208-01A"></td>'
+          + '<td style="width:80px"><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="qty" value="'+esc(l.qty)+'" inputmode="decimal"></td>'
+          + '<td style="width:100px"><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="unit_net_kg" value="'+esc(l.unit_net_kg)+'" inputmode="decimal"></td>'
+          + '<td class="num">' + fmt(t, 3) + '</td>'
+          + '<td><button type="button" class="pl-btn sm danger" onclick="plDelLine('+i+','+j+')" title="Видалити рядок">✕</button></td>'
+          + '</tr>';
+      });
+      var gross = num(p.gross_kg);
+      var warn = gross && gross < net ? ' <span class="warn">⚠️ брутто менше нетто</span>' : '';
+      html += '<div class="pl-parcel">'
+        + '<div class="pl-parcel-head"><b>Parcel ' + (i + 1) + ' of ' + n + '</b>'
+        + '<button type="button" class="pl-btn sm" onclick="plDupParcel('+i+')">⧉ Дублювати</button>'
+        + (n > 1 ? '<button type="button" class="pl-btn sm danger" onclick="plDelParcel('+i+')">🗑️ Видалити</button>' : '')
+        + '</div>'
+        + '<div class="pl-grid" style="margin-bottom:10px">'
+        + '<div class="pl-field"><label class="pl-label">Розміри, см (Д x Ш x В)</label>'
+        + '<input class="pl-input" data-p="'+i+'" data-k="dims" value="'+esc(p.dims)+'" placeholder="24 x 16 x 5"></div>'
+        + '<div class="pl-field"><label class="pl-label">Вага брутто коробки, кг</label>'
+        + '<input class="pl-input" data-p="'+i+'" data-k="gross_kg" value="'+esc(p.gross_kg)+'" inputmode="decimal"></div>'
+        + '</div>'
+        + '<div class="pl-scroll"><table class="pl-lines"><thead><tr>'
+        + '<th>Pos.</th><th>Description</th><th>P/N</th><th>Qty</th><th>Нетто 1 шт, кг</th><th style="text-align:right">Нетто, кг</th><th></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
+        + '<button type="button" class="pl-btn sm" style="margin-top:6px" onclick="plAddLine('+i+')">＋ Рядок</button>'
+        + '<div class="pl-sum"><span>Нетто коробки: <b>' + fmt(net, 3) + ' кг</b></span>'
+        + '<span>Брутто: <b>' + fmt(gross, 2) + ' кг</b>' + warn + '</span></div>'
+        + '</div>';
+    });
+    box.innerHTML = html;
+    var tg = parcels.reduce(function(s, p){ return s + num(p.gross_kg); }, 0);
+    document.getElementById('pl-total').innerHTML =
+      '<span>Всього коробок: <b>' + n + '</b></span><span>Total Gross Weight: <b>' + fmt(tg, 2) + ' kg</b></span>';
+  }
+
+  box.addEventListener('input', function(e){
+    var el = e.target, p = el.dataset.p, k = el.dataset.k;
+    if (p === undefined || !k) return;
+    if (el.dataset.l !== undefined) parcels[p].lines[el.dataset.l][k] = el.value;
+    else parcels[p][k] = el.value;
+  });
+  box.addEventListener('change', function(e){
+    var k = e.target.dataset.k;
+    if (k === 'qty' || k === 'unit_net_kg' || k === 'gross_kg') render();
+  });
+
+  window.plAddParcel = function(){ parcels.push({dims:'', gross_kg:0, lines:[{description:'', part_no:'', qty:1, unit_net_kg:0}]}); render(); };
+  window.plDupParcel = function(i){ parcels.splice(i + 1, 0, JSON.parse(JSON.stringify(parcels[i]))); render(); };
+  window.plDelParcel = function(i){ if (confirm('Видалити коробку ' + (i + 1) + '?')) { parcels.splice(i, 1); render(); } };
+  window.plAddLine   = function(i){ parcels[i].lines = parcels[i].lines || []; parcels[i].lines.push({description:'', part_no:'', qty:1, unit_net_kg:0}); render(); };
+  window.plDelLine   = function(i, j){ parcels[i].lines.splice(j, 1); render(); };
+
+  document.getElementById('pl-form').addEventListener('submit', function(){
+    document.getElementById('parcels_json').value = JSON.stringify(parcels);
+  });
+  render();
+})();
+</script>
+{% endblock %}

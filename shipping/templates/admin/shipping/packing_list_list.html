@@ -1,0 +1,132 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Packing Lists | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; Доставка &rsaquo; Packing Lists
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.pl-wrap { padding: 24px 32px 60px; max-width: 1200px; }
+@media (max-width: 768px) { .pl-wrap { padding: 16px; } }
+.pl-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 18px 22px; margin-bottom: 20px; }
+.pl-card-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em;
+                 margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-strong); display: flex; align-items: center; gap: 8px; }
+.pl-input { background: var(--bg-input); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 8px 11px; font-size: 13px; }
+.pl-btn { background: var(--bg-hover); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 8px 14px;
+          font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
+.pl-btn:hover { border-color: var(--link-fg); }
+.pl-btn.primary { background: var(--link-fg); border-color: var(--link-fg); color: var(--bg-card); font-weight: 600; }
+.pl-btn.sm { padding: 3px 9px; font-size: 12px; }
+.pl-btn.danger { color: var(--err); }
+.pl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pl-table th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 11px; text-transform: uppercase; padding: 8px; border-bottom: 1px solid var(--border-strong); }
+.pl-table td { padding: 8px; border-bottom: 1px solid var(--border-strong); color: var(--text); vertical-align: middle; }
+.pl-table a { color: var(--link-fg); }
+.pl-scroll { overflow-x: auto; }
+.pl-muted { color: var(--text-muted); font-size: 12px; }
+.pl-vars td, .pl-vars th { font-size: 12px; padding: 5px 8px; }
+.pl-vars code { color: var(--link-fg); white-space: nowrap; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pl-wrap">
+  <h1 style="margin:0 0 18px;color:var(--text)">📋 Packing Lists</h1>
+
+  <div class="pl-card">
+    <div class="pl-card-title">➕ Новий Packing List</div>
+    <form method="get" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input class="pl-input" name="order" placeholder="Номер замовлення, напр. 17701" required style="min-width:240px">
+      <button class="pl-btn primary" type="submit">Відкрити форму →</button>
+      <span class="pl-muted">Дані підтягнуться із замовлення та його відправлення (отримувач, коробки, вага). Усе можна змінити перед генерацією.</span>
+    </form>
+  </div>
+
+  <div class="pl-card">
+    <div class="pl-card-title">📁 Згенеровані ({{ packing_lists|length }})</div>
+    {% if packing_lists %}
+    <div class="pl-scroll">
+    <table class="pl-table">
+      <thead><tr>
+        <th>№</th><th>Дата</th><th>Замовлення</th><th>Отримувач</th><th>Коробок</th><th>Брутто, кг</th><th>Файли</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for pl in packing_lists %}
+        <tr>
+          <td><b>{{ pl.number }}</b></td>
+          <td>{{ pl.pl_date|date:"Y-m-d" }}</td>
+          <td>{% if pl.sales_order %}<a href="{% url 'admin:sales_salesorder_change' pl.sales_order.pk %}">{{ pl.sales_order.order_number }}</a>{% else %}—{% endif %}</td>
+          <td>{{ pl.ship_to.company|default:"—" }}<div class="pl-muted">{{ pl.ship_to.country }}</div></td>
+          <td>{{ pl.parcels|length }}</td>
+          <td>{{ pl.total_gross_kg }}</td>
+          <td style="white-space:nowrap">
+            {% if pl.pdf_file %}<a class="pl-btn sm" href="/packing-lists/{{ pl.pk }}/file/pdf/" target="_blank">PDF</a>{% endif %}
+            {% if pl.docx_file %}<a class="pl-btn sm" href="/packing-lists/{{ pl.pk }}/file/docx/">DOCX</a>{% endif %}
+          </td>
+          <td style="white-space:nowrap;text-align:right">
+            <a class="pl-btn sm" href="/packing-lists/{{ pl.pk }}/edit/">✏️ Змінити</a>
+            <form method="post" action="/packing-lists/{{ pl.pk }}/delete/" style="display:inline"
+                  onsubmit="return confirm('Видалити Packing List #{{ pl.number|escapejs }}?')">
+              {% csrf_token %}<button class="pl-btn sm danger" type="submit">🗑️</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% else %}
+      <div class="pl-muted">Ще немає жодного. Введіть номер замовлення вище.</div>
+    {% endif %}
+  </div>
+
+  <div class="pl-card">
+    <div class="pl-card-title">📄 Word шаблон</div>
+    <p style="margin:0 0 12px;color:var(--text)">
+      Зараз використовується: <b>{% if has_custom_template %}власний (завантажений){% else %}стандартний (Sevskiy, на основі вашого Packing List_17701){% endif %}</b>.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <a class="pl-btn" href="/packing-lists/template/download/">⬇️ Завантажити поточний шаблон</a>
+      <form method="post" action="/packing-lists/template/upload/" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center">
+        {% csrf_token %}
+        <input type="file" name="template" accept=".docx" required style="color:var(--text);font-size:12px">
+        <button class="pl-btn" type="submit">⬆️ Завантажити свій</button>
+      </form>
+      {% if has_custom_template %}
+      <form method="post" action="/packing-lists/template/reset/" onsubmit="return confirm('Повернути стандартний шаблон?')">
+        {% csrf_token %}<button class="pl-btn" type="submit">↩️ Стандартний</button>
+      </form>
+      {% endif %}
+    </div>
+    <p class="pl-muted" style="margin:12px 0 8px">
+      Як змінити оформлення: завантажте поточний шаблон, відредагуйте у Word (шрифти, логотип, тексти), не чіпаючи змінних у {% verbatim %}<code>{{ … }}</code> і <code>{% … %}</code>{% endverbatim %}, і завантажте назад.
+      Перед збереженням шаблон перевіряється на тестових даних.
+    </p>
+    <details>
+      <summary style="cursor:pointer;color:var(--link-fg);font-size:13px">📚 Довідник змінних</summary>
+      <div class="pl-scroll" style="margin-top:8px">
+      <table class="pl-table pl-vars">
+        <thead><tr><th>Змінна</th><th>Що підставляється</th><th>Приклад</th></tr></thead>
+        <tbody>
+        {% for var, desc, ex in template_vars %}
+          <tr><td><code>{{ var }}</code></td><td>{{ desc }}</td><td class="pl-muted">{{ ex }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <p class="pl-muted" style="margin-top:8px">
+{% verbatim %}
+        Правила: <code>{%p for parcel in parcels %}</code> і <code>{%p endfor %}</code> — окремі абзаци; все між ними (заголовок, таблиця, розмір/вага) повторюється для кожної коробки.
+        У таблиці рядки з <code>{%tr … %}</code> — окремі рядки-маркери над і під рядком даних. Нумерація <code>it.pos</code> починається з 1 у кожній коробці.
+{% endverbatim %}
+      </p>
+    </details>
+  </div>
+</div>
+{% endblock %}

@@ -79,6 +79,7 @@ tabele_mvp/
   - Клієнт: `shipping/ups_client.py` (UPSClient) — флоу: `ups_confirm_view` → `ups_book_view`
   - Свій інвойс: галочка в `ups_confirm.html` → `UPSClient.upload_paperless_document()` → `create_shipment(custom_document_id=…)` → InternationalForms FormType 07
   - Поля `use_custom_invoice`, `custom_invoice_pdf`, `ups_document_id` (migration 0049)
+- **Packing Lists** `/packing-lists/` — модель `PackingList` (migration 0052), `shipping/services/packing_list_service.py` (docxtpl), шаблон `shipping/templates_docx/packing_list_template.docx` (`{%p for parcel in parcels %}` + `{%tr for it in parcel.lines %}`); власний шаблон → `media/packing_list_templates/custom.docx`; копія у `media/orders/{source}/{order}/`
 - `shipping/services/jumingo.py` — Jumingo API інтеграція
 - Admin action: Submit Shipment → create_shipment() → label + tracking
 
