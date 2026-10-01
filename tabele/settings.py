@@ -231,7 +231,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "api.permissions.HasAPIKeyScope",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "api.pagination.APIPagination",
     "PAGE_SIZE": 50,
     "DEFAULT_FILTER_BACKENDS": [
         "django_filters.rest_framework.DjangoFilterBackend",
@@ -245,4 +245,7 @@ REST_FRAMEWORK = {
         if DEBUG
         else ["rest_framework.renderers.JSONRenderer"]
     ),
+    "DEFAULT_THROTTLE_CLASSES": ["api.throttling.APIKeyRateThrottle"],
+    "DEFAULT_THROTTLE_RATES": {"apikey": os.getenv("API_RATE_LIMIT", "120/min")},
+    "COERCE_DECIMAL_TO_STRING": False,
 }

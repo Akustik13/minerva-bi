@@ -28,6 +28,7 @@ echo "   sync_jlc_orders         interval controlled by JLCConfig.sync_interval_
 echo "   sync_digikey_orders     interval controlled by DigiKeyConfig in DB"
 echo "   check_digikey_messages  interval controlled by DigiKeyConfig in DB"
 echo "   poll_dk_status          interval controlled by DigiKeyConfig.poll_interval_minutes in DB"
+echo "   send_webhooks           every loop (~60s) — retries of API webhooks"
 echo "   send_digest             time/frequency controlled by NotificationSettings in DB"
 echo "   morning_briefing        daily at ${BRIEFING_HOUR}:00"
 echo "   send_reminders          every ${REMINDER_INTERVAL}s"
@@ -62,6 +63,9 @@ while true; do
 
   # ── DigiKey poll staged → published — інтервал з БД (poll_interval_minutes) ──
   python manage.py poll_dk_status 2>&1 || true
+
+  # ── Вебхуки API — повтори невдалих доставок (кожен цикл, ~60с) ──
+  python manage.py send_webhooks 2>&1 || true
 
   # ── Digest report — час і частота керуються в NotificationSettings ──
   python manage.py send_digest 2>&1 || true

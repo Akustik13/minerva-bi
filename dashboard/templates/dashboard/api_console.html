@@ -229,6 +229,12 @@
       <div class="con-presets">
         <span class="con-preset" onclick="loadPreset('minerva_orders')">🏠 Minerva Orders</span>
         <span class="con-preset" onclick="loadPreset('minerva_products')">📦 Minerva Products</span>
+        <span class="con-preset" onclick="loadPreset('minerva_ping')">🔌 Ping</span>
+        <span class="con-preset" onclick="loadPreset('minerva_stock')">🏬 Залишки</span>
+        <span class="con-preset" onclick="loadPreset('minerva_stock_check')">🛒 Перевірка кошика</span>
+        <span class="con-preset" onclick="loadPreset('minerva_movement')">📥 Прихід</span>
+        <span class="con-preset" onclick="loadPreset('minerva_order_create')">🧾 Нове замовлення</span>
+        <span class="con-preset" onclick="loadPreset('minerva_shipments')">🚚 Відправлення</span>
         <span class="con-preset" onclick="loadPreset('dhl_test')">🟡 DHL Test</span>
         <span class="con-preset" onclick="loadPreset('dhl_rates')">🟡 DHL Rates</span>
         <span class="con-preset" onclick="loadPreset('dhl_tracking')">📡 DHL Track</span>
@@ -344,6 +350,63 @@ const PRESETS = {
     token:   DJANGO_DATA.activeTokens[0]?.key || '',
     headers: { 'Accept': 'application/json' },
     body:    '',
+  },
+  minerva_ping: {
+    method:  'GET',
+    url:     window.location.origin + '/api/v1/ping/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json' },
+    body:    '',
+  },
+  minerva_stock: {
+    method:  'GET',
+    url:     window.location.origin + '/api/v1/stock/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json' },
+    body:    '',
+    params:  '?in_stock=true&ordering=sku',
+  },
+  minerva_stock_check: {
+    method:  'POST',
+    url:     window.location.origin + '/api/v1/stock/check/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ items: [{ sku: 'YOUR-SKU', qty: 1 }] }, null, 2),
+  },
+  minerva_movement: {
+    method:  'POST',
+    url:     window.location.origin + '/api/v1/stock-movements/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ sku: 'YOUR-SKU', tx_type: 'Incoming', qty: 10,
+                              ref_doc: 'Lieferung 123', external_key: 'grn-123-1' }, null, 2),
+  },
+  minerva_order_create: {
+    method:  'POST',
+    url:     window.location.origin + '/api/v1/orders/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    body:    JSON.stringify({
+      source: 'webshop', order_number: 'TEST-1001', currency: 'EUR',
+      client: 'Max Mustermann', email: 'max@example.com', phone: '+49 30 123456',
+      addr_street: 'Hauptstr. 1', addr_city: 'Berlin', addr_zip: '10115', addr_country: 'DE',
+      shipping_cost: 4.90, check_stock: true,
+      lines: [{ sku: 'YOUR-SKU', qty: 1, unit_price: 19.90 }],
+    }, null, 2),
+  },
+  minerva_shipments: {
+    method:  'GET',
+    url:     window.location.origin + '/api/v1/shipments/',
+    auth:    'token',
+    token:   DJANGO_DATA.activeTokens[0]?.key || '',
+    headers: { 'Accept': 'application/json' },
+    body:    '',
+    params:  '?order_number=TEST-1001',
   },
   dhl_test: {
     method:  'GET',

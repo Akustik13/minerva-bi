@@ -25,3 +25,8 @@ class APIKeyAuthentication(BaseAuthentication):
         APIKey.objects.filter(pk=api_key.pk).update(last_used=timezone.now())
 
         return (api_key, api_key)
+
+    def authenticate_header(self, request):
+        # Без цього DRF повертає 403 замість 401 для запитів без/з невірним ключем
+        return 'Token'
+

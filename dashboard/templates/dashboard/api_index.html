@@ -147,10 +147,18 @@
       </div>
       <div class="api-status ok">🟢 Активний</div>
       <ul class="api-endpoint-list">
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/ping/</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/stock/</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/stock/{sku}/</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/api/v1/stock/check/</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/api/v1/stock/count/</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/api/v1/stock-movements/</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/locations/</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/products/</span></li>
         <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/orders/</span></li>
         <li><span class="api-method m-post">POST</span><span class="api-path">/api/v1/orders/</span></li>
-        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/products/</span></li>
-        <li><span class="api-method m-post">POST</span><span class="api-path">/api/v1/products/</span></li>
+        <li><span class="api-method m-post">POST</span><span class="api-path">/api/v1/orders/{id}/cancel/</span></li>
+        <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/shipments/</span></li>
         <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/customers/</span></li>
       </ul>
       <div class="api-actions">
@@ -175,7 +183,7 @@
       {% endif %}
       <div class="api-meta">
         <b>Авторизація:</b> <code style="color:var(--accent)">Authorization: Token &lt;key&gt;</code><br>
-        <b>Scopes:</b> orders, products, customers (read/write)
+        <b>Scopes:</b> stock, products, orders, customers (read/write), shipments (read)
       </div>
       {% if api_keys %}
       <div style="margin-bottom:10px">

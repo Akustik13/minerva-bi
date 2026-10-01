@@ -84,6 +84,14 @@ tabele_mvp/
 - `shipping/services/jumingo.py` — Jumingo API інтеграція
 - Admin action: Submit Shipment → create_shipment() → label + tracking
 
+### api/ — REST API v1 (`/api/v1/`, документація `api/README.md`)
+- Auth: `Authorization: Token <APIKey.key>`; scopes `{stock|products|orders|customers}:{read|write}`, `shipments:read`; `view.action_scopes` перевизначає read/write для дії
+- Склад: `/stock/` (on_hand/reserved/available/incoming, `changed_since`), `/stock/{sku}/`, `/stock/check/`, `/stock/count/`, `/stock-movements/`, `/locations/`
+- Замовлення з магазину: `POST /orders/` (рядки за SKU, ідемпотентно по source+order_number, `check_stock`), `POST /orders/{id}/cancel/` (повертає товар); `/shipments/` трекінг
+- Бізнес-логіка складу — `inventory/services/stock.py` (не дублювати у views)
+- Вебхуки: `api/webhooks.py` (події stock.changed / order.created / order.status_changed / shipment.updated, HMAC-підпис, повтори через `manage.py send_webhooks` у `cron_runner.sh`); моделі `Webhook`, `WebhookDelivery` (migration 0003)
+- Тести: `python manage.py test api --settings=tabele.settings_test` (SQLite в пам'яті без міграцій)
+
 ### faq/ (placeholder, no DB)
 - `models.py`: `managed = False`
 - `admin.py`: override `get_urls()` → тільки `info_view`

@@ -57,7 +57,7 @@ def _get_app_list(self, request, app_label=None):
                       'purchaseorder', 'purchaseorderline'],
         'shipping': ['carrier', 'shippingsettings', 'packagingmaterial', 'shipment', 'orderpackaging'],
         'config':   ['systemsettings', 'documentsettings', 'notificationsettings', 'themesettings'],
-        'api':          ['apikey'],
+        'api':          ['apikey', 'webhook', 'webhookdelivery'],
         'scraper_hub':  ['scrapersiteconfig', 'scraperrun', 'scraperdocument'],
         'bots':      ['digikeyconfig', 'digikeylisting', 'bot', 'botlog'],
         'jlcpcb':    ['jlcconfig', 'jlcorder', 'jlcproductmapping'],
