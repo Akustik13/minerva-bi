@@ -94,6 +94,13 @@ def _render_form(request, data, order=None, pl=None):
     ))
 
 
+def _weights_invalid(request, data) -> bool:
+    errors = svc.parcel_weight_errors(data["parcels"])
+    if errors:
+        messages.error(request, "❌ Вага нетто перевищує брутто — виправте вагу: " + "; ".join(errors))
+    return bool(errors)
+
+
 def _save_weights_to_products(request, parcels):
     pairs = []
     for p in parcels:
@@ -160,6 +167,9 @@ def pl_new(request):
     if request.method == "POST":
         data = _form_data(request)
         shipment = Shipment.objects.filter(pk=request.POST.get("shipment_id") or None, order=order).first()
+        if _weights_invalid(request, data):
+            data["shipment"] = shipment
+            return _render_form(request, data, order=order)
         pl = PackingList(sales_order=order, shipment=shipment)
         if _save_and_generate(request, pl, data):
             return redirect("/packing-lists/")
@@ -177,7 +187,11 @@ def pl_new(request):
 def pl_edit(request, pk):
     pl = get_object_or_404(PackingList, pk=pk)
     if request.method == "POST":
-        if _save_and_generate(request, pl, _form_data(request)):
+        data = _form_data(request)
+        if _weights_invalid(request, data):
+            data["shipment"] = pl.shipment
+            return _render_form(request, data, order=pl.sales_order, pl=pl)
+        if _save_and_generate(request, pl, data):
             return redirect("/packing-lists/")
         return redirect(f"/packing-lists/{pl.pk}/edit/")
     data = {

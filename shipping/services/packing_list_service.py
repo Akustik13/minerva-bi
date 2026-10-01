@@ -145,7 +145,7 @@ def _customs_by_sku(shipment, order) -> dict:
         entry = {"description": (it.get("description") or "").strip()}
         if it.get("weight") and not it.get("weight_auto"):
             try:
-                entry["weight"] = round(float(it["weight"]), 4)
+                entry["weight"] = float(it["weight"])
             except (TypeError, ValueError):
                 pass
         result[sku] = entry
@@ -173,7 +173,7 @@ def _order_lines(order, shipment=None) -> list:
             c_desc = ""
         desc = (c_desc or (p.name_export if p else "")
                 or (cat.customs_description_de if cat else "") or (p.name if p else "") or sku)
-        prod_kg = round(float(p.net_weight_g) / 1000, 4) if p and p.net_weight_g else 0
+        prod_kg = float((p.net_weight_g / 1000).normalize()) if p and p.net_weight_g else 0
         if prod_kg:
             unit_kg, src = prod_kg, "product"
         elif c.get("weight"):
@@ -302,6 +302,33 @@ def _fmt(v, digits) -> str:
     return f"{float(v or 0):.{digits}f}".replace(".", ",")
 
 
+def _dec(v):
+    from decimal import Decimal, InvalidOperation
+    try:
+        return Decimal(str(v or 0).replace(",", "."))
+    except InvalidOperation:
+        return Decimal(0)
+
+
+def _fmt_exact(v, min_digits) -> str:
+    """Без округлення: усі значущі знаки (до 7), але не менше min_digits після коми."""
+    from decimal import Decimal
+    d = _dec(v).quantize(Decimal("0.0000001")).normalize()
+    exp = -d.as_tuple().exponent if d.as_tuple().exponent < 0 else 0
+    return f"{d:.{max(exp, min_digits)}f}".replace(".", ",")
+
+
+def parcel_weight_errors(parcels) -> list:
+    """Коробки, де нетто перевищує брутто: ['Parcel 1: нетто 0,25 > брутто 0,2']."""
+    errors = []
+    for i, p in enumerate(parcels or [], 1):
+        gross = _dec(p.get("gross_kg"))
+        net = sum((_dec(ln.get("qty")) * _dec(ln.get("unit_net_kg")) for ln in p.get("lines") or []), _dec(0))
+        if gross > 0 and net > gross:
+            errors.append(f"Parcel {i}: нетто {_fmt_exact(net, 3)} кг > брутто {_fmt_exact(gross, 2)} кг")
+    return errors
+
+
 def _fmt_qty(v) -> str:
     f = float(v or 0)
     return str(int(f)) if f == int(f) else _fmt(f, 2)
@@ -309,19 +336,19 @@ def _fmt_qty(v) -> str:
 
 def build_context(data: dict) -> dict:
     parcels_raw = data.get("parcels") or []
-    parcels, total_gross, total_net = [], 0.0, 0.0
+    parcels, total_gross, total_net = [], _dec(0), _dec(0)
     for i, p in enumerate(parcels_raw, 1):
         lines = []
         for j, ln in enumerate(p.get("lines") or [], 1):
-            qty, unit = float(ln.get("qty") or 0), float(ln.get("unit_net_kg") or 0)
+            qty, unit = _dec(ln.get("qty")), _dec(ln.get("unit_net_kg"))
             total_net += qty * unit
             lines.append({
                 "pos": j, "description": ln.get("description", ""), "part_no": ln.get("part_no", ""),
-                "qty": _fmt_qty(qty), "unit_net": _fmt(unit, 3), "total_net": _fmt(qty * unit, 3),
+                "qty": _fmt_qty(qty), "unit_net": _fmt_exact(unit, 3), "total_net": _fmt_exact(qty * unit, 3),
             })
-        gross = float(p.get("gross_kg") or 0)
+        gross = _dec(p.get("gross_kg"))
         total_gross += gross
-        parcels.append({"no": i, "dims": p.get("dims", ""), "gross": _fmt(gross, 2), "lines": lines})
+        parcels.append({"no": i, "dims": p.get("dims", ""), "gross": _fmt_exact(gross, 2), "lines": lines})
 
     pl_date = data.get("pl_date")
     return {
@@ -330,8 +357,8 @@ def build_context(data: dict) -> dict:
         "ship_to":         data.get("ship_to") or {},
         "parcels":         parcels,
         "parcels_count":   len(parcels),
-        "total_gross":     _fmt(total_gross, 2),
-        "total_net":       _fmt(total_net, 2),
+        "total_gross":     _fmt_exact(total_gross, 2),
+        "total_net":       _fmt_exact(total_net, 3),
         "signer_name":     data.get("signer_name", ""),
         "signer_position": data.get("signer_position", ""),
     }

@@ -150,6 +150,19 @@
 
   function num(v){ var f = parseFloat(String(v).replace(',', '.')); return isNaN(f) ? 0 : f; }
   function fmt(v, d){ return num(v).toFixed(d).replace('.', ','); }
+  // Без округлення: усі значущі знаки (до 7), мінімум minD після коми
+  function fmtW(v, minD){
+    var s = num(v).toFixed(7).replace(/0+$/, '');
+    var dec = (s.split('.')[1] || '').length;
+    return num(v).toFixed(Math.max(dec, minD)).replace('.', ',');
+  }
+  function parcelNet(p){
+    return (p.lines || []).reduce(function(s, l){ return s + num(l.qty) * num(l.unit_net_kg); }, 0);
+  }
+  function overweight(p){
+    var g = num(p.gross_kg);
+    return g > 0 && parcelNet(p) - g > 1e-9;
+  }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
@@ -180,12 +193,13 @@
           + '<td style="width:120px"><input class="pl-input' + (zero ? ' pl-zero' : '') + '" data-p="'+i+'" data-l="'+j+'" data-k="unit_net_kg" value="'+esc(l.unit_net_kg)+'" inputmode="decimal"'
           + (zero ? ' title="Вага нетто не вказана — заповніть тут або в картці товару (вага нетто, г)"' : '') + '>'
           + weightMeta(l, i, j) + '</td>'
-          + '<td class="num">' + fmt(t, 3) + '</td>'
+          + '<td class="num">' + fmtW(t, 3) + '</td>'
           + '<td><button type="button" class="pl-btn sm danger" onclick="plDelLine('+i+','+j+')" title="Видалити рядок">✕</button></td>'
           + '</tr>';
       });
       var gross = num(p.gross_kg);
-      var warn = gross && gross < net ? ' <span class="warn">⚠️ брутто менше нетто</span>' : '';
+      var over = overweight(p);
+      var warn = over ? ' <span class="warn">⛔ нетто більше за брутто — генерація заблокована</span>' : '';
       html += '<div class="pl-parcel">'
         + '<div class="pl-parcel-head"><b>Parcel ' + (i + 1) + ' of ' + n + '</b>'
         + '<button type="button" class="pl-btn sm" onclick="plDupParcel('+i+')">⧉ Дублювати</button>'
@@ -195,14 +209,14 @@
         + '<div class="pl-field"><label class="pl-label">Розміри, см (Д x Ш x В)</label>'
         + '<input class="pl-input" data-p="'+i+'" data-k="dims" value="'+esc(p.dims)+'" placeholder="24 x 16 x 5"></div>'
         + '<div class="pl-field"><label class="pl-label">Вага брутто коробки, кг</label>'
-        + '<input class="pl-input" data-p="'+i+'" data-k="gross_kg" value="'+esc(p.gross_kg)+'" inputmode="decimal"></div>'
+        + '<input class="pl-input' + (over ? ' pl-zero' : '') + '" data-p="'+i+'" data-k="gross_kg" value="'+esc(p.gross_kg)+'" inputmode="decimal"></div>'
         + '</div>'
         + '<div class="pl-scroll"><table class="pl-lines"><thead><tr>'
         + '<th>Pos.</th><th>Description</th><th>P/N</th><th>Qty</th><th>Нетто 1 шт, кг</th><th style="text-align:right">Нетто, кг</th><th></th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + '<button type="button" class="pl-btn sm" style="margin-top:6px" onclick="plAddLine('+i+')">＋ Рядок</button>'
-        + '<div class="pl-sum"><span>Нетто коробки: <b>' + fmt(net, 3) + ' кг</b></span>'
-        + '<span>Брутто: <b>' + fmt(gross, 2) + ' кг</b>' + warn + '</span>'
+        + '<div class="pl-sum"><span>Нетто коробки: <b>' + fmtW(net, 3) + ' кг</b></span>'
+        + '<span>Брутто: <b>' + fmtW(gross, 2) + ' кг</b>' + warn + '</span>'
         + (zeros ? '<span class="warn">⚠️ ' + zeros + ' ' + (zeros === 1 ? 'рядок' : 'рядки') + ' без ваги нетто</span>' : '')
         + '</div>'
         + '</div>';
@@ -210,7 +224,7 @@
     box.innerHTML = html;
     var tg = parcels.reduce(function(s, p){ return s + num(p.gross_kg); }, 0);
     document.getElementById('pl-total').innerHTML =
-      '<span>Всього коробок: <b>' + n + '</b></span><span>Total Gross Weight: <b>' + fmt(tg, 2) + ' kg</b></span>';
+      '<span>Всього коробок: <b>' + n + '</b></span><span>Total Gross Weight: <b>' + fmtW(tg, 2) + ' kg</b></span>';
     renderPkgDiff();
   }
 
@@ -275,6 +289,15 @@
   window.plDelLine   = function(i, j){ parcels[i].lines.splice(j, 1); render(); };
 
   document.getElementById('pl-form').addEventListener('submit', function(e){
+    var bad = [];
+    parcels.forEach(function(p, i){
+      if (overweight(p)) bad.push('Parcel ' + (i + 1) + ': нетто ' + fmtW(parcelNet(p), 3) + ' кг > брутто ' + fmtW(p.gross_kg, 2) + ' кг');
+    });
+    if (bad.length) {
+      e.preventDefault();
+      alert('Вага нетто не може перевищувати брутто:\n\n' + bad.join('\n') + '\n\nВиправте вагу брутто коробки або вагу нетто товарів.');
+      return;
+    }
     var zeros = 0;
     parcels.forEach(function(p){ (p.lines || []).forEach(function(l){
       if ((l.description || l.part_no) && num(l.unit_net_kg) <= 0) zeros++;
