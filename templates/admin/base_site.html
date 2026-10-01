@@ -475,6 +475,9 @@
 .mg-link:hover { color: var(--sb-link-hover-text); background: var(--sb-link-hover-bg); }
 .mg-link.mg-red  { color: #ff9492; } .mg-link.mg-red:hover  { color: #ffb3b1; }
 .mg-link.mg-gold { color: var(--gold-l); } .mg-link.mg-gold:hover { color: #f5e9c0; }
+.mg-link-head { padding: 7px 16px 3px 20px; color: var(--sb-link); font-size: 13px; opacity: .75; cursor: default; }
+.mg-link.mg-sub { padding-left: 36px; font-size: 12.5px; }
+.mg-link.mg-sub::before { content: '↳'; margin-right: 6px; opacity: .5; }
 
 /* ── Sub-module collapse arrow ── */
 .mg-mod-arrow {
@@ -892,9 +895,10 @@ window.MV_GROUPS = [
       { href:'/admin/shipping/addressbook/',               icon:'📖', label:'Адресна книга',     app:'shipping' },
       { href:'/admin/shipping/shipment/add-tracking/',     icon:'📡', label:'Додати трекінг',    app:'shipping' },
       { href:'/admin/shipping/carrier/',                   icon:'🚛', label:'Перевізники',       app:'shipping', model:'Carrier' },
-      { href:'/invoices/',                                 icon:'🧾', label:'Інвойси',           app:'shipping' },
+      { heading:true,                                      icon:'🧾', label:'Інвойси',           app:'shipping' },
+      { href:'/invoices/',                                 icon:'🧾', label:'DigiKey',           app:'shipping', cls:'mg-sub' },
+      { href:'/commercial-invoices/',                      icon:'💵', label:'Загальні (Commercial)', app:'shipping', cls:'mg-sub' },
       { href:'/packing-lists/',                            icon:'📋', label:'Packing Lists',     app:'shipping' },
-      { href:'/commercial-invoices/',                      icon:'💵', label:'Commercial Invoices', app:'shipping' },
     ], apps:['shipping'] },
   { id:'inventory', icon:'📦', label:'📦 Склад',
     links:[
@@ -1275,6 +1279,13 @@ document.addEventListener('DOMContentLoaded', function(){
     content.className = 'mg-content';
 
     linksToShow.forEach(function(lnk){
+      if (lnk.heading) {
+        var h = document.createElement('div');
+        h.className = 'mg-link-head';
+        h.textContent = lnk.label;
+        content.appendChild(h);
+        return;
+      }
       var a = document.createElement('a');
       a.href = lnk.href;
       a.className = 'mg-link' + (lnk.cls ? ' ' + lnk.cls : '');
