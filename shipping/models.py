@@ -269,6 +269,21 @@ class Shipment(models.Model):
     customs_articles    = models.JSONField("Митна декларація (артикули)", null=True, blank=True,
                                            help_text="Заповнюється автоматично при створенні відправлення")
 
+    # ── Custom invoice (для UPS Paperless Document API) ─────────────────────────
+    use_custom_invoice  = models.BooleanField(
+        "Використовувати свій інвойс", default=False,
+        help_text="Якщо вкл — завантажити свій PDF інвойс замість UPS автогенерації"
+    )
+    custom_invoice_pdf  = models.FileField(
+        "Файл інвойсу (PDF)", upload_to="shipments/invoices/",
+        null=True, blank=True,
+        help_text="PDF інвойс/CN23/CN22 вашої компанії"
+    )
+    ups_document_id     = models.CharField(
+        "UPS Document ID", max_length=100, blank=True, default="",
+        help_text="ID документу з Paperless Document API (заповнюється автоматично)"
+    )
+
     # ── Розширені поля статусу від перевізника ────────────────────────────────
     carrier_status_label = models.CharField(
         "Статус перевізника", max_length=200, blank=True, default="",

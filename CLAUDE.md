@@ -1,6 +1,6 @@
 # CLAUDE.md — Minerva Business Intelligence System
 
-> Останнє оновлення: 2026-04-07
+> Останнє оновлення: 2026-10-01 (UPS Paperless Custom Invoice)
 
 ---
 
@@ -72,11 +72,16 @@ tabele_mvp/
 - `ReorderProxy` — managed=False, аналіз що замовити
 - `Supplier`, `PurchaseOrder`, `PurchaseOrderLine`
 
-### shipping/ (новий модуль, заготовка)
+### shipping/ 
 - `Carrier` — перевізник (Jumingo/DHL/UPS/FedEx), API credentials, дані відправника
-- `Shipment` — відправлення прив'язане до SalesOrder
-- `shipping/services/jumingo.py` — stub, реальний API не підключений
-- Кнопка «🚚 Створити відправлення» є на change_form замовлення
+- `Shipment` — відправлення прив'язане до SalesOrder; поля: status, дані отримувача/відправника, вага/розміри, export_reason, insurance_type, ups_billing*
+- **UPS интеграция (2026-10):** 
+  - `shipping/services/ups.py` — Shipment API + Paperless Document API (custom invoices)
+  - `use_custom_invoice`, `custom_invoice_pdf`, `ups_document_id` поля (migration 0049)
+  - Користувач може завантажити свій PDF CN23/інвойс замість UPS автогенерації
+  - Admin UI: fieldset "📄 Власний інвойс (Paperless)" з upload та опціями
+- `shipping/services/jumingo.py` — Jumingo API інтеграція
+- Admin action: Submit Shipment → create_shipment() → label + tracking
 
 ### faq/ (placeholder, no DB)
 - `models.py`: `managed = False`
