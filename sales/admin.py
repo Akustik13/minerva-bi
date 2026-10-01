@@ -1,7 +1,7 @@
 from django.contrib import admin
 from core.mixins import AuditableMixin
 from crm.utils import sync_customer_from_order
-from django.utils.html import format_html
+from django.utils.html import escape, format_html
 from django.utils.safestring import mark_safe
 from django.db.models import Sum
 from django.db import transaction
@@ -911,7 +911,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
                 f'{size_kb:.1f} KB</td>'
                 f'<td style="padding:8px 0;text-align:right;white-space:nowrap">'
                 f'<button type="button"'
-                f' onclick="dlDocFile({json.dumps(url)},{json.dumps(file.name)})"'
+                f' data-dl-url="{escape(url)}" data-dl-name="{escape(file.name)}"'
+                f' onclick="dlDocFile(this.dataset.dlUrl,this.dataset.dlName)"'
                 f' style="background:#417690;color:#fff;border:none;padding:5px 10px;'
                 f'border-radius:3px;font-size:11px;margin-right:4px;cursor:pointer" title="Завантажити файл на ПК">⬇️</button>'
                 f'<button type="button"'
