@@ -1024,6 +1024,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 ("ups_billing_account", "ups_billing_postal", "ups_billing_country"),
                 "ups_duties_billing",
                 ("ups_duties_account", "ups_duties_postal", "ups_duties_country"),
+                "ups_payer_addresses",
             ),
             "classes": ("collapse",),
             "description": (
@@ -3747,6 +3748,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             ups_duties_account  = orig.ups_duties_account,
             ups_duties_postal   = orig.ups_duties_postal,
             ups_duties_country  = orig.ups_duties_country,
+            ups_payer_addresses = orig.ups_payer_addresses,
             # Митна декларація
             customs_articles  = orig.customs_articles,
             # Автор
@@ -4679,18 +4681,36 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if 'ups_billing' not in P:
             return
         valid = ('shipper', 'receiver', 'third_party')
-        shipment.ups_billing         = P['ups_billing'] if P['ups_billing'] in valid else 'shipper'
+        addr_keys = ('name', 'company', 'street', 'city', 'state')
+        addresses = {}
+
+        billing = P['ups_billing'] if P['ups_billing'] in valid else 'shipper'
+        shipment.ups_billing         = billing
         shipment.ups_billing_account = P.get('ups_billing_account', '').strip()
-        shipment.ups_billing_postal  = P.get('ups_billing_postal', '').strip()
-        shipment.ups_billing_country = P.get('ups_billing_country', '').strip().upper()[:2]
+        if billing == 'receiver':
+            shipment.ups_billing_postal  = shipment.recipient_zip
+            shipment.ups_billing_country = (shipment.recipient_country or '').upper()[:2]
+        else:
+            shipment.ups_billing_postal  = P.get('ups_billing_postal', '').strip()
+            shipment.ups_billing_country = P.get('ups_billing_country', '').strip().upper()[:2]
+        if billing == 'third_party':
+            addresses['billing'] = {k: P.get(f'ups_billing_tp_{k}', '').strip() for k in addr_keys}
+
         duties = P.get('ups_duties_billing', 'receiver')
-        shipment.ups_duties_billing  = duties if duties in valid else 'receiver'
-        shipment.ups_duties_account  = P.get('ups_duties_account', '').strip()
-        shipment.ups_duties_postal   = P.get('ups_duties_postal', '').strip()
-        shipment.ups_duties_country  = P.get('ups_duties_country', '').strip().upper()[:2]
+        duties = duties if duties in valid else 'receiver'
+        shipment.ups_duties_billing = duties
+        if duties == 'third_party':
+            shipment.ups_duties_account = P.get('ups_duties_account', '').strip()
+            shipment.ups_duties_postal  = P.get('ups_duties_postal', '').strip()
+            shipment.ups_duties_country = P.get('ups_duties_country', '').strip().upper()[:2]
+            addresses['duties'] = {k: P.get(f'ups_duties_tp_{k}', '').strip() for k in addr_keys}
+        else:
+            shipment.ups_duties_account = shipment.ups_duties_postal = shipment.ups_duties_country = ''
+        shipment.ups_payer_addresses = addresses
 
     @staticmethod
     def _ups_payer_dicts(shipment):
+        addrs = shipment.ups_payer_addresses or {}
         billing = None
         if shipment.ups_billing != 'shipper':
             billing = {
@@ -4699,11 +4719,19 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 'postal':  shipment.ups_billing_postal,
                 'country': shipment.ups_billing_country,
             }
+            if shipment.ups_billing == 'receiver':
+                billing.update(street=shipment.recipient_street, city=shipment.recipient_city,
+                               state=shipment.recipient_state,
+                               postal=billing['postal'] or shipment.recipient_zip,
+                               country=billing['country'] or shipment.recipient_country)
+            else:
+                billing.update(addrs.get('billing') or {})
         duties = {
             'party':   shipment.ups_duties_billing,
             'account': shipment.ups_duties_account,
             'postal':  shipment.ups_duties_postal,
             'country': shipment.ups_duties_country,
+            **(addrs.get('duties') or {}),
         }
         return billing, duties
 

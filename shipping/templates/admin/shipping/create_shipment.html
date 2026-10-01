@@ -1960,11 +1960,23 @@ document.addEventListener('DOMContentLoaded', function() {
               <option value="receiver" {% if shipment.ups_billing == 'receiver' %}selected{% endif %}>Отримувач — його UPS-акаунт</option>
               <option value="third_party" {% if shipment.ups_billing == 'third_party' %}selected{% endif %}>Третя сторона — інший UPS-акаунт</option>
             </select>
-            <div id="ups_billing_extra" style="display:grid;grid-template-columns:2fr 1fr 70px;gap:6px;margin-top:6px">
-              <input class="sh-input" name="ups_billing_account" placeholder="UPS акаунт *" value="{{ shipment.ups_billing_account }}">
-              <input class="sh-input" name="ups_billing_postal" placeholder="Індекс" value="{{ shipment.ups_billing_postal }}">
-              <input class="sh-input" name="ups_billing_country" placeholder="DE" maxlength="2" value="{{ shipment.ups_billing_country }}">
+            <div id="ups_billing_acc" style="margin-top:6px">
+              <input class="sh-input" name="ups_billing_account" placeholder="UPS акаунт платника *" value="{{ shipment.ups_billing_account }}">
             </div>
+            <div id="ups_billing_recv_note" style="font-size:11px;color:var(--text-muted);margin-top:4px">
+              📬 Адреса береться з блоку «Отримувач». Без UPS-акаунту отримувача UPS не прийме оплату доставки отримувачем.
+            </div>
+            {% with a=shipment.ups_payer_addresses.billing %}
+            <div id="ups_billing_tp" class="ups-tp-form">
+              <input class="sh-input" name="ups_billing_tp_company" placeholder="Компанія" value="{{ a.company|default:'' }}">
+              <input class="sh-input" name="ups_billing_tp_name" placeholder="Контактна особа" value="{{ a.name|default:'' }}">
+              <input class="sh-input full" name="ups_billing_tp_street" placeholder="Вулиця, будинок" value="{{ a.street|default:'' }}">
+              <input class="sh-input" name="ups_billing_tp_city" placeholder="Місто" value="{{ a.city|default:'' }}">
+              <input class="sh-input" name="ups_billing_postal" placeholder="Індекс" value="{{ shipment.ups_billing_postal }}">
+              <input class="sh-input" name="ups_billing_tp_state" placeholder="Штат / провінція" value="{{ a.state|default:'' }}">
+              <input class="sh-input" name="ups_billing_country" placeholder="Країна (ISO 2) *" maxlength="2" value="{{ shipment.ups_billing_country }}">
+            </div>
+            {% endwith %}
           </div>
 
           <div>
@@ -1974,11 +1986,18 @@ document.addEventListener('DOMContentLoaded', function() {
               <option value="shipper" {% if shipment.ups_duties_billing == 'shipper' %}selected{% endif %}>Відправник (DDP) — наш UPS-акаунт</option>
               <option value="third_party" {% if shipment.ups_duties_billing == 'third_party' %}selected{% endif %}>Третя сторона — інший UPS-акаунт</option>
             </select>
-            <div id="ups_duties_extra" style="display:grid;grid-template-columns:2fr 1fr 70px;gap:6px;margin-top:6px">
-              <input class="sh-input" name="ups_duties_account" placeholder="UPS акаунт *" value="{{ shipment.ups_duties_account }}">
+            {% with a=shipment.ups_payer_addresses.duties %}
+            <div id="ups_duties_tp" class="ups-tp-form">
+              <input class="sh-input full" name="ups_duties_account" placeholder="UPS акаунт платника *" value="{{ shipment.ups_duties_account }}">
+              <input class="sh-input" name="ups_duties_tp_company" placeholder="Компанія" value="{{ a.company|default:'' }}">
+              <input class="sh-input" name="ups_duties_tp_name" placeholder="Контактна особа" value="{{ a.name|default:'' }}">
+              <input class="sh-input full" name="ups_duties_tp_street" placeholder="Вулиця, будинок" value="{{ a.street|default:'' }}">
+              <input class="sh-input" name="ups_duties_tp_city" placeholder="Місто" value="{{ a.city|default:'' }}">
               <input class="sh-input" name="ups_duties_postal" placeholder="Індекс" value="{{ shipment.ups_duties_postal }}">
-              <input class="sh-input" name="ups_duties_country" placeholder="DE" maxlength="2" value="{{ shipment.ups_duties_country }}">
+              <input class="sh-input" name="ups_duties_tp_state" placeholder="Штат / провінція" value="{{ a.state|default:'' }}">
+              <input class="sh-input" name="ups_duties_country" placeholder="Країна (ISO 2) *" maxlength="2" value="{{ shipment.ups_duties_country }}">
             </div>
+            {% endwith %}
           </div>
 
         </div>
@@ -1987,12 +2006,23 @@ document.addEventListener('DOMContentLoaded', function() {
           Incoterm на рахунок не впливає — платника визначає саме це поле.
         </div>
       </div>
+      <style>
+        .ups-tp-form{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+        .ups-tp-form .full{grid-column:1/-1}
+      </style>
       <script>
       function upsPayerToggle(){
         var b = document.getElementById('ups_billing').value;
         var d = document.getElementById('ups_duties_billing').value;
-        document.getElementById('ups_billing_extra').style.display = b === 'shipper' ? 'none' : 'grid';
-        document.getElementById('ups_duties_extra').style.display  = d === 'third_party' ? 'grid' : 'none';
+        var show = function(id, on, disp){
+          var el = document.getElementById(id);
+          el.style.display = on ? (disp || '') : 'none';
+          el.querySelectorAll('input').forEach(function(i){ i.disabled = !on; });
+        };
+        show('ups_billing_acc',       b !== 'shipper');
+        show('ups_billing_recv_note', b === 'receiver');
+        show('ups_billing_tp',        b === 'third_party', 'grid');
+        show('ups_duties_tp',         d === 'third_party', 'grid');
       }
       document.getElementById('ca_incoterm').addEventListener('change', function(){
         var d = document.getElementById('ups_duties_billing');

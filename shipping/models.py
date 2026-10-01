@@ -236,6 +236,10 @@ class Shipment(models.Model):
     ups_duties_account = models.CharField("UPS: акаунт платника мита", max_length=50, blank=True)
     ups_duties_postal  = models.CharField("UPS: індекс платника мита", max_length=20, blank=True)
     ups_duties_country = models.CharField("UPS: країна платника мита", max_length=2, blank=True)
+    ups_payer_addresses = models.JSONField(
+        "UPS: адреси третіх сторін", default=dict, blank=True,
+        help_text='{"billing": {...}, "duties": {...}} — name, company, street, city, state',
+    )
     declared_value   = models.DecimalField("Задекларована вартість", max_digits=10,
                                            decimal_places=2, null=True, blank=True)
     declared_currency = models.CharField("Валюта", max_length=3, default="EUR")

@@ -354,11 +354,11 @@
 
       <div class="uc-row" style="margin-top:12px">
         <span class="uc-lbl">💳 {% trans "Доставку оплачує" %}</span>
-        <span class="uc-val">{{ shipment.get_ups_billing_display }}{% if shipment.ups_billing != 'shipper' %} — {{ shipment.ups_billing_account|default:"⚠️ акаунт не вказано" }}{% endif %}</span>
+        <span class="uc-val">{{ shipment.get_ups_billing_display }}{% if shipment.ups_billing != 'shipper' %} — {{ shipment.ups_billing_account|default:"⚠️ акаунт не вказано" }}{% endif %}{% if shipment.ups_billing == 'third_party' %} · {{ shipment.ups_payer_addresses.billing.company|default:shipment.ups_payer_addresses.billing.name }}, {{ shipment.ups_billing_country }}{% endif %}</span>
       </div>
       <div class="uc-row">
         <span class="uc-lbl">🛃 {% trans "Мито/податки оплачує" %}</span>
-        <span class="uc-val">{{ shipment.get_ups_duties_billing_display }}{% if shipment.ups_duties_billing == 'third_party' %} — {{ shipment.ups_duties_account|default:"⚠️ акаунт не вказано" }}{% endif %}</span>
+        <span class="uc-val">{{ shipment.get_ups_duties_billing_display }}{% if shipment.ups_duties_billing == 'third_party' %} — {{ shipment.ups_duties_account|default:"⚠️ акаунт не вказано" }} · {{ shipment.ups_payer_addresses.duties.company|default:shipment.ups_payer_addresses.duties.name }}, {{ shipment.ups_duties_country }}{% endif %}</span>
       </div>
 
       {# ── Власний інвойс (UPS Paperless) ─────────────────────────────────── #}

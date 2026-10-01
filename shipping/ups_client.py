@@ -1500,27 +1500,20 @@ class UPSClient:
     def _build_payment_charge(self, billing: dict | None, charge_type: str = '01') -> dict:
         """Build ShipmentCharge block for PaymentInformation (01 = transport, 02 = duties/taxes)."""
         party = (billing or {}).get('party', 'shipper')
-        if party == 'receiver':
+        if party in ('receiver', 'third_party'):
+            addr = {'CountryCode': (billing.get('country') or 'DE').upper()}
+            if billing.get('postal'):
+                addr['PostalCode'] = billing['postal']
+            if billing.get('street'):
+                addr['AddressLine'] = self._split_addr_line(billing['street'].replace('\n', ' '))[:3]
+            if billing.get('city'):
+                addr['City'] = billing['city'][:30]
+            if billing.get('state'):
+                addr['StateProvinceCode'] = self._normalize_state(billing['state'], addr['CountryCode'])
+            key = 'BillReceiver' if party == 'receiver' else 'BillThirdParty'
             return {
                 'Type': charge_type,
-                'BillReceiver': {
-                    'AccountNumber': billing.get('account', ''),
-                    'Address': {
-                        'PostalCode':  billing.get('postal', ''),
-                        'CountryCode': (billing.get('country') or 'DE').upper(),
-                    },
-                },
-            }
-        if party == 'third_party':
-            return {
-                'Type': charge_type,
-                'BillThirdParty': {
-                    'AccountNumber': billing.get('account', ''),
-                    'Address': {
-                        'PostalCode':  billing.get('postal', ''),
-                        'CountryCode': (billing.get('country') or 'DE').upper(),
-                    },
-                },
+                key: {'AccountNumber': billing.get('account', ''), 'Address': addr},
             }
         # default: shipper pays
         return {'Type': charge_type, 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}}
