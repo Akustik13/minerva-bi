@@ -352,6 +352,34 @@
       </div>
       {% endif %}
 
+      {# ── Власний інвойс (UPS Paperless) ─────────────────────────────────── #}
+      <div style="margin-top:16px;padding:12px 14px;border:1px dashed var(--border-strong);
+                  border-radius:6px;background:var(--bg-input)">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;
+                      font-size:14px;font-weight:600;color:var(--text)">
+          <input type="checkbox" name="use_custom_invoice" value="1" form="ups-confirm-form"
+                 id="chk_custom_invoice" {% if shipment.use_custom_invoice %}checked{% endif %}
+                 onchange="document.getElementById('custom-invoice-box').style.display=this.checked?'':'none'">
+          📄 {% trans "Використати свій інвойс (PDF) замість інвойсу UPS" %}
+        </label>
+        <div id="custom-invoice-box" style="margin-top:10px;{% if not shipment.use_custom_invoice %}display:none{% endif %}">
+          <input type="file" name="custom_invoice_pdf" accept="application/pdf,.pdf" form="ups-confirm-form"
+                 style="color:var(--text);font-size:13px">
+          {% if shipment.custom_invoice_pdf %}
+          <div style="font-size:12px;color:var(--text-muted);margin-top:6px">
+            {% trans "Вже завантажено" %}:
+            <a href="{{ shipment.custom_invoice_pdf.url }}" target="_blank" style="color:var(--link-fg)">
+              {{ shipment.custom_invoice_pdf.name|cut:"shipments/invoices/" }}
+            </a>
+            — {% trans "залиште поле порожнім, щоб використати його" %}
+          </div>
+          {% endif %}
+          <div style="font-size:12px;color:var(--text-dim);margin-top:6px">
+            ℹ️ {% trans "PDF буде завантажено в UPS Paperless, UPS не генеруватиме свій Commercial Invoice. Дані таблиці вище в UPS не передаються — вони мають бути у вашому PDF." %}
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
   {% endif %}
@@ -437,7 +465,7 @@
         Буде списано кошти з акаунту{% endblocktrans %} <b>{{ shipment.carrier.connection_uuid|default:"UPS" }}</b>.
         {% trans "Скасувати можна через кнопку «Void» на сторінці відправлення." %}
       </p>
-      <form method="post" action="{{ confirm_url }}" id="ups-confirm-form">
+      <form method="post" action="{{ confirm_url }}" id="ups-confirm-form" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="service_code" value="{{ service_code }}">
         <input type="hidden" name="pickup_type" id="fld_pickup_type" value="pickup">

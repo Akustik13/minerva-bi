@@ -76,10 +76,9 @@ tabele_mvp/
 - `Carrier` — перевізник (Jumingo/DHL/UPS/FedEx), API credentials, дані відправника
 - `Shipment` — відправлення прив'язане до SalesOrder; поля: status, дані отримувача/відправника, вага/розміри, export_reason, insurance_type, ups_billing*
 - **UPS интеграция (2026-10):** 
-  - `shipping/services/ups.py` — Shipment API + Paperless Document API (custom invoices)
-  - `use_custom_invoice`, `custom_invoice_pdf`, `ups_document_id` поля (migration 0049)
-  - Користувач може завантажити свій PDF CN23/інвойс замість UPS автогенерації
-  - Admin UI: fieldset "📄 Власний інвойс (Paperless)" з upload та опціями
+  - Клієнт: `shipping/ups_client.py` (UPSClient) — флоу: `ups_confirm_view` → `ups_book_view`
+  - Свій інвойс: галочка в `ups_confirm.html` → `UPSClient.upload_paperless_document()` → `create_shipment(custom_document_id=…)` → InternationalForms FormType 07
+  - Поля `use_custom_invoice`, `custom_invoice_pdf`, `ups_document_id` (migration 0049)
 - `shipping/services/jumingo.py` — Jumingo API інтеграція
 - Admin action: Submit Shipment → create_shipment() → label + tracking
 

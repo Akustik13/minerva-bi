@@ -230,10 +230,10 @@ class UPSClient:
             'transactionSrc': 'minerva-bi',
         }
 
-    def _post(self, endpoint: str, payload: dict) -> dict:
+    def _post(self, endpoint: str, payload: dict, extra_headers: dict = None) -> dict:
         from .ups_logger import log_call
         url = f'{self.base_url}{endpoint}'
-        headers = self._headers()
+        headers = {**self._headers(), **(extra_headers or {})}
         t0 = time.time()
         r = None
         resp_body = None
@@ -244,7 +244,7 @@ class UPSClient:
             if r.status_code == 401:
                 # Token expired mid-session — refresh and retry once
                 cache.delete(f'ups_token_{self.carrier.pk}')
-                headers = self._headers()
+                headers = {**self._headers(), **(extra_headers or {})}
                 r = requests.post(url, headers=headers, json=payload, timeout=60)
             try:
                 resp_body = r.json()
@@ -674,10 +674,12 @@ class UPSClient:
                         service_code: str = '11', from_address: dict = None,
                         customs_info: dict = None, reference: str = '',
                         billing: dict = None,
+                        custom_document_id: str = '',
                         dry_run: bool = False) -> dict:
         """
         POST /api/shipments/v2409/ship
         dry_run=True — build and return the payload dict without sending to UPS.
+        custom_document_id — ID з upload_paperless_document(): UPS бере наш PDF замість генерації інвойсу.
         Повертає: {tracking_number, shipment_id, label_base64, label_format, total_charge, currency}
         """
         pickup  = from_address or self._default_shipper()  # physical pickup (can be US)
@@ -745,10 +747,15 @@ class UPSClient:
             _pickup_country  = pickup.get('country', '').upper()
             _account_country = (account.get('country') or 'DE').upper()
             _seller = pickup if _pickup_country != _account_country else account
-            shipment['ShipmentServiceOptions'] = {
-                'InternationalForms': self._build_customs(
-                    customs_info, invoice_number=reference, sold_to=to_address, seller=_seller),
-            }
+            if custom_document_id:
+                intl_forms = {
+                    'FormType':        '07',
+                    'UserCreatedForm': {'DocumentID': [custom_document_id]},
+                }
+            else:
+                intl_forms = self._build_customs(
+                    customs_info, invoice_number=reference, sold_to=to_address, seller=_seller)
+            shipment['ShipmentServiceOptions'] = {'InternationalForms': intl_forms}
 
         payload = {
             'ShipmentRequest': {
@@ -894,6 +901,41 @@ class UPSClient:
             'service_code':    service_code,
             'service_name':    UPS_SERVICES.get(service_code, ''),
         }
+
+    # ── Paperless Documents ───────────────────────────────────────────────────
+
+    def upload_paperless_document(self, pdf_bytes: bytes, filename: str,
+                                  document_type: str = '002') -> str:
+        """
+        POST /api/paperlessdocuments/v2/upload → DocumentID для InternationalForms.
+        document_type '002' = Commercial Invoice.
+        """
+        payload = {
+            'UploadRequest': {
+                'Request': {'TransactionReference': {'CustomerContext': filename[:35]}},
+                'ShipperNumber': self.carrier.connection_uuid,
+                'UserCreatedForm': {
+                    'UserCreatedFormFileName':     filename[:100],
+                    'UserCreatedFormFileFormat':   'pdf',
+                    'UserCreatedFormDocumentType': document_type,
+                    'UserCreatedFormFile':         base64.b64encode(pdf_bytes).decode(),
+                },
+            },
+        }
+        data = self._post(
+            '/api/paperlessdocuments/v2/upload', payload,
+            extra_headers={'ShipperNumber': self.carrier.connection_uuid},
+        )
+        doc_ids = (
+            (data or {}).get('UploadResponse', {})
+            .get('FormsHistoryDocumentID', {})
+            .get('DocumentID')
+        )
+        if isinstance(doc_ids, list):
+            doc_ids = doc_ids[0] if doc_ids else ''
+        if not doc_ids:
+            raise UPSError(f'UPS Paperless: відповідь без DocumentID: {str(data)[:300]}')
+        return doc_ids
 
     # ── Tracking ──────────────────────────────────────────────────────────────
 

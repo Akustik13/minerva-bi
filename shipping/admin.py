@@ -1038,8 +1038,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             ),
             "classes": ("collapse",),
             "description": (
-                "Вкл <b>«Використовувати свій інвойс»</b> — завантажте свій PDF (CN23, CN22, інвойс) "
-                "замість UPS автогенерації. UPS Paperless Document API завантажить його автоматично."
+                "Зазвичай задається на сторінці підтвердження UPS (картка «🛃 Митна декларація»). "
+                "PDF завантажується в UPS Paperless при бронюванні замість інвойсу UPS."
             ),
         }),
         ("🚚 Результат від перевізника", {
@@ -3921,6 +3921,20 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         # POST — підтверджено, передаємо на ups_book_view
         if request.method == 'POST':
             from urllib.parse import urlencode
+            use_custom = request.POST.get('use_custom_invoice') == '1'
+            pdf = request.FILES.get('custom_invoice_pdf')
+            if use_custom:
+                if pdf:
+                    if not pdf.name.lower().endswith('.pdf'):
+                        messages.error(request, '❌ Власний інвойс має бути PDF-файлом.')
+                        return redirect(request.get_full_path())
+                    shipment.custom_invoice_pdf = pdf
+                elif not shipment.custom_invoice_pdf:
+                    messages.error(request, '❌ Позначено «Свій інвойс», але PDF не завантажено.')
+                    return redirect(request.get_full_path())
+            shipment.use_custom_invoice = use_custom
+            shipment.ups_document_id = ''
+            shipment.save(update_fields=['use_custom_invoice', 'custom_invoice_pdf', 'ups_document_id'])
             qs = urlencode({
                 'service_code':       service_code,
                 'pickup_type':        request.POST.get('pickup_type', 'dropoff'),
@@ -4040,6 +4054,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 from_address = shipper,
                 customs_info = customs or None,
                 reference    = shipment.reference or str(shipment.pk),
+                custom_document_id = (
+                    'DRY-RUN-DOC-ID'
+                    if shipment.use_custom_invoice and shipment.custom_invoice_pdf else ''
+                ),
                 dry_run      = True,
             )
             return JsonResponse({'ok': True, 'payload': payload}, json_dumps_params={'indent': 2, 'ensure_ascii': False})
@@ -4145,6 +4163,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     'country': shipment.ups_billing_country,
                 }
 
+            custom_doc_id = ''
+            if shipment.use_custom_invoice and shipment.custom_invoice_pdf:
+                with shipment.custom_invoice_pdf.open('rb') as fh:
+                    pdf_bytes = fh.read()
+                custom_doc_id = client.upload_paperless_document(
+                    pdf_bytes, os.path.basename(shipment.custom_invoice_pdf.name),
+                )
+                shipment.ups_document_id = custom_doc_id
+                shipment.save(update_fields=['ups_document_id'])
+
             result = client.create_shipment(
                 to_address=to_addr,
                 packages=packages,
@@ -4153,6 +4181,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 customs_info=customs or None,
                 reference=shipment.reference or str(shipment.pk),
                 billing=billing,
+                custom_document_id=custom_doc_id,
             )
             # Зберігаємо реальний UPS payload для дебагу
             shipment.raw_request = getattr(client, '_last_payload', {'packages': packages})
@@ -5172,7 +5201,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         if shipment.carrier and shipment.carrier.carrier_type == "dhl":
             return redirect(reverse("admin:shipping_shipment_dhl_rates", args=[shipment.pk]))
 
-        SUBMIT_SUPPORTED = ("jumingo", "ups")
+        SUBMIT_SUPPORTED = ("jumingo",)
         if shipment.carrier and shipment.carrier.carrier_type not in SUBMIT_SUPPORTED:
             messages.error(
                 request,
@@ -5188,36 +5217,23 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         shipment.raw_response = result.raw_response
 
         if result.success:
-            shipment.status              = Shipment.Status.LABEL_READY
+            shipment.status              = Shipment.Status.SUBMITTED
             shipment.carrier_shipment_id = result.carrier_shipment_id
-            shipment.tracking_number     = result.tracking_number
             shipment.submitted_at        = timezone.now()
             shipment.error_message       = ""
             shipment.save()
-
-            carrier_name = shipment.carrier.get_carrier_type_display() if shipment.carrier else "Перевізник"
-            msg = (
-                f"✅ Відправлення #{shipment.pk} створено! "
-                f"Трекінг: {result.tracking_number}"
+            messages.success(
+                request,
+                f"✅ Відправлення #{shipment.pk} створено в Jumingo! "
+                f"ID: {result.carrier_shipment_id}. Оберіть тариф і оплатіть на Jumingo."
             )
-            if shipment.carrier.carrier_type == "jumingo":
-                msg = (
-                    f"✅ Відправлення #{shipment.pk} створено в Jumingo! "
-                    f"ID: {result.carrier_shipment_id}. Оберіть тариф і оплатіть на Jumingo."
-                )
-
-            messages.success(request, msg)
-
-            # UPS — показуємо етикетку; Jumingo — тарифи
-            if shipment.carrier.carrier_type == "ups":
-                return redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
-            else:
-                return redirect(reverse("admin:shipping_shipment_rates", args=[shipment.pk]))
+            # Перенаправляємо на сторінку тарифів
+            return redirect(reverse("admin:shipping_shipment_rates", args=[shipment.pk]))
         else:
             shipment.status        = Shipment.Status.ERROR
             shipment.error_message = result.error_message
             shipment.save()
-            messages.error(request, f"❌ Помилка створення відправлення: {result.error_message}")
+            messages.error(request, f"❌ Помилка Jumingo API: {result.error_message}")
             return redirect(reverse("admin:shipping_shipment_change", args=[shipment.pk]))
 
     # ── Тарифи ───────────────────────────────────────────────────────────────
