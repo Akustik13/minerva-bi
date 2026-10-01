@@ -315,7 +315,10 @@ function updateCaTotal(){
 function updateCustomsCard(){
   const country=(document.querySelector('[name="recipient_country"]')?.value||'').toUpperCase().trim();
   const card=document.getElementById('customs-card');
-  if(card) card.style.display=(!_EU.has(country)&&country)?'':'none';
+  const intl=(!_EU.has(country)&&country);
+  if(card) card.style.display=intl?'':'none';
+  const dcol=document.getElementById('ups_duties_col');
+  if(dcol) dcol.style.display=intl?'':'none';
 }
 
 /* Country name hint — uses built-in browser Intl API, no dictionary needed */
@@ -1945,94 +1948,6 @@ document.addEventListener('DOMContentLoaded', function() {
 
       </div>
 
-      {# ── 💳 Платники UPS ───────────────────────────────────────────── #}
-      <div id="ups-payers" style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--border-strong);
-                                  border-radius:6px;background:var(--bg-input)">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">
-          💳 Платники <span style="font-weight:400;color:var(--text-dim)">(застосовується тільки для UPS)</span>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
-
-          <div>
-            <label class="sh-label">🚚 Доставку оплачує</label>
-            <select class="sh-input" name="ups_billing" id="ups_billing" onchange="upsPayerToggle()">
-              <option value="shipper" {% if shipment.ups_billing == 'shipper' %}selected{% endif %}>Відправник — наш UPS-акаунт</option>
-              <option value="receiver" {% if shipment.ups_billing == 'receiver' %}selected{% endif %}>Отримувач — його UPS-акаунт</option>
-              <option value="third_party" {% if shipment.ups_billing == 'third_party' %}selected{% endif %}>Третя сторона — інший UPS-акаунт</option>
-            </select>
-            <div id="ups_billing_acc" style="margin-top:6px">
-              <input class="sh-input" name="ups_billing_account" placeholder="UPS акаунт платника *" value="{{ shipment.ups_billing_account }}">
-            </div>
-            <div id="ups_billing_recv_note" style="font-size:11px;color:var(--text-muted);margin-top:4px">
-              📬 Адреса береться з блоку «Отримувач». Без UPS-акаунту отримувача UPS не прийме оплату доставки отримувачем.
-            </div>
-            {% with a=shipment.ups_payer_addresses.billing %}
-            <div id="ups_billing_tp" class="ups-tp-form">
-              <input class="sh-input" name="ups_billing_tp_company" placeholder="Компанія" value="{{ a.company|default:'' }}">
-              <input class="sh-input" name="ups_billing_tp_name" placeholder="Контактна особа" value="{{ a.name|default:'' }}">
-              <input class="sh-input full" name="ups_billing_tp_street" placeholder="Вулиця, будинок" value="{{ a.street|default:'' }}">
-              <input class="sh-input" name="ups_billing_tp_city" placeholder="Місто" value="{{ a.city|default:'' }}">
-              <input class="sh-input" name="ups_billing_postal" placeholder="Індекс" value="{{ shipment.ups_billing_postal }}">
-              <input class="sh-input" name="ups_billing_tp_state" placeholder="Штат / провінція" value="{{ a.state|default:'' }}">
-              <input class="sh-input" name="ups_billing_country" placeholder="Країна (ISO 2) *" maxlength="2" value="{{ shipment.ups_billing_country }}">
-            </div>
-            {% endwith %}
-          </div>
-
-          <div>
-            <label class="sh-label">🛃 Мито та податки оплачує</label>
-            <select class="sh-input" name="ups_duties_billing" id="ups_duties_billing" onchange="upsPayerToggle()">
-              <option value="receiver" {% if shipment.ups_duties_billing == 'receiver' %}selected{% endif %}>Отримувач — стандарт (DAP)</option>
-              <option value="shipper" {% if shipment.ups_duties_billing == 'shipper' %}selected{% endif %}>Відправник (DDP) — наш UPS-акаунт</option>
-              <option value="third_party" {% if shipment.ups_duties_billing == 'third_party' %}selected{% endif %}>Третя сторона — інший UPS-акаунт</option>
-            </select>
-            {% with a=shipment.ups_payer_addresses.duties %}
-            <div id="ups_duties_tp" class="ups-tp-form">
-              <input class="sh-input full" name="ups_duties_account" placeholder="UPS акаунт платника *" value="{{ shipment.ups_duties_account }}">
-              <input class="sh-input" name="ups_duties_tp_company" placeholder="Компанія" value="{{ a.company|default:'' }}">
-              <input class="sh-input" name="ups_duties_tp_name" placeholder="Контактна особа" value="{{ a.name|default:'' }}">
-              <input class="sh-input full" name="ups_duties_tp_street" placeholder="Вулиця, будинок" value="{{ a.street|default:'' }}">
-              <input class="sh-input" name="ups_duties_tp_city" placeholder="Місто" value="{{ a.city|default:'' }}">
-              <input class="sh-input" name="ups_duties_postal" placeholder="Індекс" value="{{ shipment.ups_duties_postal }}">
-              <input class="sh-input" name="ups_duties_tp_state" placeholder="Штат / провінція" value="{{ a.state|default:'' }}">
-              <input class="sh-input" name="ups_duties_country" placeholder="Країна (ISO 2) *" maxlength="2" value="{{ shipment.ups_duties_country }}">
-            </div>
-            {% endwith %}
-          </div>
-
-        </div>
-        <div style="font-size:11px;color:var(--text-dim);margin-top:8px">
-          ℹ️ Без UPS-акаунту отримувача лишайте «Отримувач — стандарт»: UPS сам виставить йому мито при доставці.
-          Incoterm на рахунок не впливає — платника визначає саме це поле.
-        </div>
-      </div>
-      <style>
-        .ups-tp-form{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
-        .ups-tp-form .full{grid-column:1/-1}
-      </style>
-      <script>
-      function upsPayerToggle(){
-        var b = document.getElementById('ups_billing').value;
-        var d = document.getElementById('ups_duties_billing').value;
-        var show = function(id, on, disp){
-          var el = document.getElementById(id);
-          el.style.display = on ? (disp || '') : 'none';
-          el.querySelectorAll('input').forEach(function(i){ i.disabled = !on; });
-        };
-        show('ups_billing_acc',       b !== 'shipper');
-        show('ups_billing_recv_note', b === 'receiver');
-        show('ups_billing_tp',        b === 'third_party', 'grid');
-        show('ups_duties_tp',         d === 'third_party', 'grid');
-      }
-      document.getElementById('ca_incoterm').addEventListener('change', function(){
-        var d = document.getElementById('ups_duties_billing');
-        if (this.value === 'DDP') d.value = 'shipper';
-        else if (d.value === 'shipper') d.value = 'receiver';
-        upsPayerToggle();
-      });
-      upsPayerToggle();
-      </script>
-
       <div style="overflow-x:auto;margin-bottom:10px">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
           <thead>
@@ -2107,6 +2022,152 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
       <div id="ca-export-warn" style="margin-top:8px;display:none"></div>
     </div>
+
+    <!-- 💳 Хто платить -->
+    <div class="sh-card" id="ups-payers">
+      <div class="sh-card-title" style="display:flex;align-items:center;gap:8px">
+        <span>💳 Хто платить <span style="font-weight:400;font-size:12px;color:var(--text-dim)">(тільки UPS)</span></span>
+        <button type="button" class="ups-help-btn" aria-expanded="false" aria-controls="ups-payers-help"
+                onclick="var h=document.getElementById('ups-payers-help'),o=h.hidden;h.hidden=!o;this.setAttribute('aria-expanded',o)">
+          ❓ Довідка
+        </button>
+      </div>
+
+        <div id="ups-payers-help" class="ups-help" hidden>
+          <h4>Incoterm і Платники — у чому різниця</h4>
+          <table>
+            <thead><tr><th></th><th>Incoterm (DAP, DDP…)</th><th>Платники</th></tr></thead>
+            <tbody>
+              <tr><td>Що це</td><td>Умова договору з покупцем</td><td>Інструкція UPS — кому виставити рахунок</td></tr>
+              <tr><td>Куди йде</td><td>Текстом у митну декларацію (TermsOfShipment)</td><td>У PaymentInformation запиту UPS</td></tr>
+              <tr><td>Хто читає</td><td>Митниця, покупець</td><td>Білінг UPS</td></tr>
+              <tr><td>Впливає, хто реально платить?</td><td><b>Ні</b></td><td><b>Так</b></td></tr>
+            </tbody>
+          </table>
+          <p>Раніше було лише поле Incoterm, але UPS його для рахунку ігнорував — мито завжди отримував отримувач.
+             Тепер реального платника визначають саме поля «Платники».</p>
+
+          <h4>Як вони мають збігатися (кур'єрські посилки)</h4>
+          <table>
+            <thead><tr><th>Incoterm</th><th>Доставка</th><th>Мито/податки</th><th>Примітка</th></tr></thead>
+            <tbody>
+              <tr><td><b>DAP</b></td><td>Відправник</td><td>Отримувач</td><td>Стандарт, ~95% випадків</td></tr>
+              <tr><td><b>DDP</b></td><td>Відправник</td><td>Відправник</td><td>Покупець нічого не платить</td></tr>
+              <tr><td><b>EXW / FCA</b></td><td>Отримувач (потрібен його UPS-акаунт)</td><td>Отримувач</td><td>Покупець платить усе</td></tr>
+              <tr><td>CPT / CIP / CFR / CIF</td><td>Відправник</td><td>Отримувач</td><td>Для UPS фактично як DAP</td></tr>
+              <tr><td>FOB</td><td>—</td><td>—</td><td>Морський термін, для кур'єра не підходить</td></tr>
+            </tbody>
+          </table>
+
+          <h4>⚠️ Небезпечні комбінації</h4>
+          <ul>
+            <li><b>DDP + мито «Отримувач»</b> — в інвойсі «все оплачено», а UPS прийде до клієнта з рахунком за мито.</li>
+            <li><b>EXW + доставка «Відправник»</b> — ви платите доставку, хоча за договором не мали. UPS не видасть помилки.</li>
+          </ul>
+
+          <h4>Варіанти платника</h4>
+          <ul>
+            <li><b>Відправник</b> — списується з нашого UPS-акаунту.</li>
+            <li><b>Отримувач</b> — для <i>доставки</i> обов'язковий UPS-акаунт отримувача (адреса береться з блоку «📬 Отримувач»);
+                без акаунту UPS відхилить запит. Для <i>мита</i> акаунт не потрібен — UPS виставить рахунок при доставці.</li>
+            <li><b>Третя сторона</b> — інша компанія з власним UPS-акаунтом; заповніть акаунт і адресу.
+                Назва й контактна особа зберігаються в Minerva, в UPS передаються акаунт і адреса.</li>
+          </ul>
+          <p>Вибір Incoterm DDP автоматично ставить «Мито: Відправник».</p>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+
+          <div>
+            <label class="sh-label">🚚 Доставку оплачує</label>
+            <select class="sh-input" name="ups_billing" id="ups_billing" onchange="upsPayerToggle()">
+              <option value="shipper" {% if shipment.ups_billing == 'shipper' %}selected{% endif %}>Відправник — наш UPS-акаунт</option>
+              <option value="receiver" {% if shipment.ups_billing == 'receiver' %}selected{% endif %}>Отримувач — його UPS-акаунт</option>
+              <option value="third_party" {% if shipment.ups_billing == 'third_party' %}selected{% endif %}>Третя сторона — інший UPS-акаунт</option>
+            </select>
+            <div id="ups_billing_acc" style="margin-top:6px">
+              <input class="sh-input" name="ups_billing_account" placeholder="UPS акаунт платника *" value="{{ shipment.ups_billing_account }}">
+            </div>
+            <div id="ups_billing_recv_note" style="font-size:11px;color:var(--text-muted);margin-top:4px">
+              📬 Адреса береться з блоку «Отримувач». Без UPS-акаунту отримувача UPS не прийме оплату доставки отримувачем.
+            </div>
+            {% with a=shipment.ups_payer_addresses.billing %}
+            <div id="ups_billing_tp" class="ups-tp-form">
+              <input class="sh-input" name="ups_billing_tp_company" placeholder="Компанія" value="{{ a.company|default:'' }}">
+              <input class="sh-input" name="ups_billing_tp_name" placeholder="Контактна особа" value="{{ a.name|default:'' }}">
+              <input class="sh-input full" name="ups_billing_tp_street" placeholder="Вулиця, будинок" value="{{ a.street|default:'' }}">
+              <input class="sh-input" name="ups_billing_tp_city" placeholder="Місто" value="{{ a.city|default:'' }}">
+              <input class="sh-input" name="ups_billing_postal" placeholder="Індекс" value="{{ shipment.ups_billing_postal }}">
+              <input class="sh-input" name="ups_billing_tp_state" placeholder="Штат / провінція" value="{{ a.state|default:'' }}">
+              <input class="sh-input" name="ups_billing_country" placeholder="Країна (ISO 2) *" maxlength="2" value="{{ shipment.ups_billing_country }}">
+            </div>
+            {% endwith %}
+          </div>
+
+          <div id="ups_duties_col"{% if not needs_customs %} style="display:none"{% endif %}>
+            <label class="sh-label">🛃 Мито та податки оплачує</label>
+            <select class="sh-input" name="ups_duties_billing" id="ups_duties_billing" onchange="upsPayerToggle()">
+              <option value="receiver" {% if shipment.ups_duties_billing == 'receiver' %}selected{% endif %}>Отримувач — стандарт (DAP)</option>
+              <option value="shipper" {% if shipment.ups_duties_billing == 'shipper' %}selected{% endif %}>Відправник (DDP) — наш UPS-акаунт</option>
+              <option value="third_party" {% if shipment.ups_duties_billing == 'third_party' %}selected{% endif %}>Третя сторона — інший UPS-акаунт</option>
+            </select>
+            {% with a=shipment.ups_payer_addresses.duties %}
+            <div id="ups_duties_tp" class="ups-tp-form">
+              <input class="sh-input full" name="ups_duties_account" placeholder="UPS акаунт платника *" value="{{ shipment.ups_duties_account }}">
+              <input class="sh-input" name="ups_duties_tp_company" placeholder="Компанія" value="{{ a.company|default:'' }}">
+              <input class="sh-input" name="ups_duties_tp_name" placeholder="Контактна особа" value="{{ a.name|default:'' }}">
+              <input class="sh-input full" name="ups_duties_tp_street" placeholder="Вулиця, будинок" value="{{ a.street|default:'' }}">
+              <input class="sh-input" name="ups_duties_tp_city" placeholder="Місто" value="{{ a.city|default:'' }}">
+              <input class="sh-input" name="ups_duties_postal" placeholder="Індекс" value="{{ shipment.ups_duties_postal }}">
+              <input class="sh-input" name="ups_duties_tp_state" placeholder="Штат / провінція" value="{{ a.state|default:'' }}">
+              <input class="sh-input" name="ups_duties_country" placeholder="Країна (ISO 2) *" maxlength="2" value="{{ shipment.ups_duties_country }}">
+            </div>
+            {% endwith %}
+          </div>
+
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px">
+          ℹ️ Incoterm у митній декларації — лише текст для митниці. Хто реально отримає рахунок від UPS, визначають ці поля.
+        </div>
+      </div>
+      <style>
+        .ups-help-btn{margin-left:auto;background:var(--bg-card);border:1px solid var(--border-strong);color:var(--text-muted);
+                      border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600;cursor:pointer}
+        .ups-help-btn:hover,.ups-help-btn[aria-expanded="true"]{color:var(--text);border-color:var(--link-fg)}
+        .ups-help{margin-bottom:12px;padding:10px 14px;border-radius:6px;background:var(--bg-card);
+                  border:1px solid var(--border-strong);font-size:12px;color:var(--text-muted);line-height:1.5;overflow-x:auto}
+        .ups-help h4{margin:12px 0 6px;font-size:12px;color:var(--text)}
+        .ups-help h4:first-child{margin-top:0}
+        .ups-help p{margin:6px 0}
+        .ups-help ul{margin:4px 0;padding-left:18px}
+        .ups-help b{color:var(--text)}
+        .ups-help table{width:100%;border-collapse:collapse;margin:4px 0}
+        .ups-help th,.ups-help td{padding:4px 6px;border-bottom:1px solid var(--border-strong);text-align:left;vertical-align:top}
+        .ups-help th{color:var(--text-dim);font-weight:600}
+        .ups-tp-form{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+        .ups-tp-form .full{grid-column:1/-1}
+      </style>
+      <script>
+      function upsPayerToggle(){
+        var b = document.getElementById('ups_billing').value;
+        var d = document.getElementById('ups_duties_billing').value;
+        var show = function(id, on, disp){
+          var el = document.getElementById(id);
+          el.style.display = on ? (disp || '') : 'none';
+          el.querySelectorAll('input').forEach(function(i){ i.disabled = !on; });
+        };
+        show('ups_billing_acc',       b !== 'shipper');
+        show('ups_billing_recv_note', b === 'receiver');
+        show('ups_billing_tp',        b === 'third_party', 'grid');
+        show('ups_duties_tp',         d === 'third_party', 'grid');
+      }
+      document.getElementById('ca_incoterm').addEventListener('change', function(){
+        var d = document.getElementById('ups_duties_billing');
+        if (this.value === 'DDP') d.value = 'shipper';
+        else if (d.value === 'shipper') d.value = 'receiver';
+        upsPayerToggle();
+      });
+      upsPayerToggle();
+      </script>
 
     <!-- Кнопки дій -->
     <input type="hidden" name="dhl_product_code"   id="id_dhl_product_code"   value="">
