@@ -121,6 +121,11 @@ def fill_missing_product_weights(pairs) -> list:
 
 # ── Префіл із замовлення ──────────────────────────────────────────────────────
 
+def is_placeholder_description(desc: str, sku: str) -> bool:
+    d = (desc or "").strip().upper()
+    return not d or d == (sku or "").strip().upper()[:35] or d == "GOODS"
+
+
 def order_line_skus(order) -> list:
     return [(ln.product.sku if ln.product else ln.sku_raw) or ""
             for ln in order.lines.select_related("product").order_by("pk")]
@@ -161,8 +166,12 @@ def _order_lines(order, shipment=None) -> list:
         cat = cats.get(p.category) if p and p.category else None
         sku = (p.sku if p else ln.sku_raw) or ""
         c = customs.get(sku, {})
-        # Опис: як у митній декларації відправлення; без неї — той самий пріоритет, що й build_customs_articles
-        desc = (c.get("description") or (p.name_export if p else "")
+        # Опис: з митної декларації відправлення, якщо там не заглушка (SKU / «Goods»);
+        # інакше — пріоритет build_customs_articles: товар → категорія → назва → SKU
+        c_desc = c.get("description", "")
+        if is_placeholder_description(c_desc, sku):
+            c_desc = ""
+        desc = (c_desc or (p.name_export if p else "")
                 or (cat.customs_description_de if cat else "") or (p.name if p else "") or sku)
         prod_kg = round(float(p.net_weight_g) / 1000, 4) if p and p.net_weight_g else 0
         if prod_kg:

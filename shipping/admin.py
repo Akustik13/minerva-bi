@@ -2168,14 +2168,32 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         inv_type      = (shipment.customs_articles or {}).get("type", "commercial")
         if existing_ca:
             customs_articles = existing_ca
-            if order and any(not it.get("sku") for it in existing_ca):
-                from .services.packing_list_service import order_line_skus
-                skus = order_line_skus(order)
-                if len(skus) == len(existing_ca):
-                    for it, sku in zip(existing_ca, skus):
-                        it.setdefault("sku", sku)
-                        if not it["sku"]:
-                            it["sku"] = sku
+            if order:
+                from .services.packing_list_service import order_line_skus, is_placeholder_description
+                if any(not it.get("sku") for it in existing_ca):
+                    skus = order_line_skus(order)
+                    if len(skus) == len(existing_ca):
+                        for it, sku in zip(existing_ca, skus):
+                            if not it.get("sku"):
+                                it["sku"] = sku
+                # Порожні / заглушкові поля доповнюємо з товару → категорії (введене вручну не чіпаємо)
+                fresh = {a.get("sku"): a for a in build_customs_articles(
+                    order,
+                    shipment.carrier.sender_country if shipment.carrier else "DE",
+                    shipment.declared_currency or getattr(order, "currency", None) or "EUR",
+                ) if a.get("sku")}
+                for it in existing_ca:
+                    f = fresh.get(it.get("sku"))
+                    if not f:
+                        continue
+                    sku = it["sku"]
+                    if (is_placeholder_description(it.get("description"), sku)
+                            and not is_placeholder_description(f.get("description"), sku)):
+                        it["description"] = f["description"]
+                    if not it.get("customs_number") and f.get("customs_number"):
+                        it["customs_number"] = f["customs_number"]
+                    if not it.get("origin_country") and f.get("origin_country"):
+                        it["origin_country"] = f["origin_country"]
         else:
             sender_country   = shipment.carrier.sender_country if shipment.carrier else "DE"
             default_currency = shipment.declared_currency or getattr(order, "currency", None) or "EUR"
