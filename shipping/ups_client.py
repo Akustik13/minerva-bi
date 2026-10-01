@@ -674,6 +674,7 @@ class UPSClient:
                         service_code: str = '11', from_address: dict = None,
                         customs_info: dict = None, reference: str = '',
                         billing: dict = None,
+                        duties_billing: dict = None,
                         custom_document_id: str = '',
                         dry_run: bool = False) -> dict:
         """
@@ -756,6 +757,14 @@ class UPSClient:
                 intl_forms = self._build_customs(
                     customs_info, invoice_number=reference, sold_to=to_address, seller=_seller)
             shipment['ShipmentServiceOptions'] = {'InternationalForms': intl_forms}
+
+        # Type 02 = duties & taxes. Omitted → UPS bills the receiver (DAP default).
+        duties_party = (duties_billing or {}).get('party', 'receiver')
+        if is_intl and duties_party in ('shipper', 'third_party'):
+            shipment['PaymentInformation']['ShipmentCharge'] = [
+                shipment['PaymentInformation']['ShipmentCharge'],
+                self._build_payment_charge(duties_billing, charge_type='02'),
+            ]
 
         payload = {
             'ShipmentRequest': {
@@ -1488,12 +1497,12 @@ class UPSClient:
             p['ReferenceNumber'] = [{'Code': '02', 'Value': pkg['reference'][:35]}]
         return p
 
-    def _build_payment_charge(self, billing: dict | None) -> dict:
-        """Build ShipmentCharge block for PaymentInformation."""
+    def _build_payment_charge(self, billing: dict | None, charge_type: str = '01') -> dict:
+        """Build ShipmentCharge block for PaymentInformation (01 = transport, 02 = duties/taxes)."""
         party = (billing or {}).get('party', 'shipper')
         if party == 'receiver':
             return {
-                'Type': '01',
+                'Type': charge_type,
                 'BillReceiver': {
                     'AccountNumber': billing.get('account', ''),
                     'Address': {
@@ -1504,7 +1513,7 @@ class UPSClient:
             }
         if party == 'third_party':
             return {
-                'Type': '01',
+                'Type': charge_type,
                 'BillThirdParty': {
                     'AccountNumber': billing.get('account', ''),
                     'Address': {
@@ -1514,7 +1523,7 @@ class UPSClient:
                 },
             }
         # default: shipper pays
-        return {'Type': '01', 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}}
+        return {'Type': charge_type, 'BillShipper': {'AccountNumber': self.carrier.connection_uuid}}
 
     def _build_customs(self, info: dict, invoice_number: str = '', sold_to: dict | None = None, seller: dict | None = None) -> dict:
         """Build InternationalForms payload for UPS Ship API."""

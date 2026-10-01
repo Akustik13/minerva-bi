@@ -1945,6 +1945,64 @@ document.addEventListener('DOMContentLoaded', function() {
 
       </div>
 
+      {# ── 💳 Платники UPS ───────────────────────────────────────────── #}
+      <div id="ups-payers" style="margin-bottom:14px;padding:12px 14px;border:1px solid var(--border-strong);
+                                  border-radius:6px;background:var(--bg-input)">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px">
+          💳 Платники <span style="font-weight:400;color:var(--text-dim)">(застосовується тільки для UPS)</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px">
+
+          <div>
+            <label class="sh-label">🚚 Доставку оплачує</label>
+            <select class="sh-input" name="ups_billing" id="ups_billing" onchange="upsPayerToggle()">
+              <option value="shipper" {% if shipment.ups_billing == 'shipper' %}selected{% endif %}>Відправник — наш UPS-акаунт</option>
+              <option value="receiver" {% if shipment.ups_billing == 'receiver' %}selected{% endif %}>Отримувач — його UPS-акаунт</option>
+              <option value="third_party" {% if shipment.ups_billing == 'third_party' %}selected{% endif %}>Третя сторона — інший UPS-акаунт</option>
+            </select>
+            <div id="ups_billing_extra" style="display:grid;grid-template-columns:2fr 1fr 70px;gap:6px;margin-top:6px">
+              <input class="sh-input" name="ups_billing_account" placeholder="UPS акаунт *" value="{{ shipment.ups_billing_account }}">
+              <input class="sh-input" name="ups_billing_postal" placeholder="Індекс" value="{{ shipment.ups_billing_postal }}">
+              <input class="sh-input" name="ups_billing_country" placeholder="DE" maxlength="2" value="{{ shipment.ups_billing_country }}">
+            </div>
+          </div>
+
+          <div>
+            <label class="sh-label">🛃 Мито та податки оплачує</label>
+            <select class="sh-input" name="ups_duties_billing" id="ups_duties_billing" onchange="upsPayerToggle()">
+              <option value="receiver" {% if shipment.ups_duties_billing == 'receiver' %}selected{% endif %}>Отримувач — стандарт (DAP)</option>
+              <option value="shipper" {% if shipment.ups_duties_billing == 'shipper' %}selected{% endif %}>Відправник (DDP) — наш UPS-акаунт</option>
+              <option value="third_party" {% if shipment.ups_duties_billing == 'third_party' %}selected{% endif %}>Третя сторона — інший UPS-акаунт</option>
+            </select>
+            <div id="ups_duties_extra" style="display:grid;grid-template-columns:2fr 1fr 70px;gap:6px;margin-top:6px">
+              <input class="sh-input" name="ups_duties_account" placeholder="UPS акаунт *" value="{{ shipment.ups_duties_account }}">
+              <input class="sh-input" name="ups_duties_postal" placeholder="Індекс" value="{{ shipment.ups_duties_postal }}">
+              <input class="sh-input" name="ups_duties_country" placeholder="DE" maxlength="2" value="{{ shipment.ups_duties_country }}">
+            </div>
+          </div>
+
+        </div>
+        <div style="font-size:11px;color:var(--text-dim);margin-top:8px">
+          ℹ️ Без UPS-акаунту отримувача лишайте «Отримувач — стандарт»: UPS сам виставить йому мито при доставці.
+          Incoterm на рахунок не впливає — платника визначає саме це поле.
+        </div>
+      </div>
+      <script>
+      function upsPayerToggle(){
+        var b = document.getElementById('ups_billing').value;
+        var d = document.getElementById('ups_duties_billing').value;
+        document.getElementById('ups_billing_extra').style.display = b === 'shipper' ? 'none' : 'grid';
+        document.getElementById('ups_duties_extra').style.display  = d === 'third_party' ? 'grid' : 'none';
+      }
+      document.getElementById('ca_incoterm').addEventListener('change', function(){
+        var d = document.getElementById('ups_duties_billing');
+        if (this.value === 'DDP') d.value = 'shipper';
+        else if (d.value === 'shipper') d.value = 'receiver';
+        upsPayerToggle();
+      });
+      upsPayerToggle();
+      </script>
+
       <div style="overflow-x:auto;margin-bottom:10px">
         <table style="width:100%;border-collapse:collapse;font-size:12px">
           <thead>

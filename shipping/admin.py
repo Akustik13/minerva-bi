@@ -1022,6 +1022,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "fields": (
                 "ups_billing",
                 ("ups_billing_account", "ups_billing_postal", "ups_billing_country"),
+                "ups_duties_billing",
+                ("ups_duties_account", "ups_duties_postal", "ups_duties_country"),
             ),
             "classes": ("collapse",),
             "description": (
@@ -1967,6 +1969,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     "customs_line_items": customs_items,
                 }
 
+        self._apply_ups_payers_from_post(shipment, request)
         shipment.save()
 
         # ── Multi-package: зберігаємо ShipmentPackage рядки якщо є ──────────
@@ -2335,6 +2338,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                     "customs_line_items": customs_items,
                 }
 
+        self._apply_ups_payers_from_post(shipment, request)
         shipment.save()
 
         # ── Multi-package: оновлюємо ShipmentPackage рядки ─────────────────────
@@ -3735,6 +3739,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             declared_currency = orig.declared_currency,
             insurance_type    = orig.insurance_type,
             reference         = orig.reference,
+            ups_billing         = orig.ups_billing,
+            ups_billing_account = orig.ups_billing_account,
+            ups_billing_postal  = orig.ups_billing_postal,
+            ups_billing_country = orig.ups_billing_country,
+            ups_duties_billing  = orig.ups_duties_billing,
+            ups_duties_account  = orig.ups_duties_account,
+            ups_duties_postal   = orig.ups_duties_postal,
+            ups_duties_country  = orig.ups_duties_country,
             # Митна декларація
             customs_articles  = orig.customs_articles,
             # Автор
@@ -4047,6 +4059,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if customs and terms:
                 customs['terms_of_shipment'] = terms
 
+            billing, duties_billing = self._ups_payer_dicts(shipment)
             payload = client.create_shipment(
                 to_address   = to_addr,
                 packages     = packages,
@@ -4054,6 +4067,8 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 from_address = shipper,
                 customs_info = customs or None,
                 reference    = shipment.reference or str(shipment.pk),
+                billing      = billing,
+                duties_billing = duties_billing,
                 custom_document_id = (
                     'DRY-RUN-DOC-ID'
                     if shipment.use_custom_invoice and shipment.custom_invoice_pdf else ''
@@ -4154,14 +4169,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             if customs and terms_of_shipment:
                 customs['terms_of_shipment'] = terms_of_shipment
 
-            billing = None
-            if shipment.ups_billing != 'shipper':
-                billing = {
-                    'party':   shipment.ups_billing,
-                    'account': shipment.ups_billing_account,
-                    'postal':  shipment.ups_billing_postal,
-                    'country': shipment.ups_billing_country,
-                }
+            billing, duties_billing = self._ups_payer_dicts(shipment)
 
             custom_doc_id = ''
             if shipment.use_custom_invoice and shipment.custom_invoice_pdf:
@@ -4181,6 +4189,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 customs_info=customs or None,
                 reference=shipment.reference or str(shipment.pk),
                 billing=billing,
+                duties_billing=duties_billing,
                 custom_document_id=custom_doc_id,
             )
             # Зберігаємо реальний UPS payload для дебагу
@@ -4663,6 +4672,40 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             f'| Сервіс: {svc_name} | Вартість: {result.get("total_charge", "—")} {result.get("currency", "EUR")}'
         )
         return redirect(reverse('admin:shipping_shipment_change', args=[shipment.pk]))
+
+    @staticmethod
+    def _apply_ups_payers_from_post(shipment, request) -> None:
+        P = request.POST
+        if 'ups_billing' not in P:
+            return
+        valid = ('shipper', 'receiver', 'third_party')
+        shipment.ups_billing         = P['ups_billing'] if P['ups_billing'] in valid else 'shipper'
+        shipment.ups_billing_account = P.get('ups_billing_account', '').strip()
+        shipment.ups_billing_postal  = P.get('ups_billing_postal', '').strip()
+        shipment.ups_billing_country = P.get('ups_billing_country', '').strip().upper()[:2]
+        duties = P.get('ups_duties_billing', 'receiver')
+        shipment.ups_duties_billing  = duties if duties in valid else 'receiver'
+        shipment.ups_duties_account  = P.get('ups_duties_account', '').strip()
+        shipment.ups_duties_postal   = P.get('ups_duties_postal', '').strip()
+        shipment.ups_duties_country  = P.get('ups_duties_country', '').strip().upper()[:2]
+
+    @staticmethod
+    def _ups_payer_dicts(shipment):
+        billing = None
+        if shipment.ups_billing != 'shipper':
+            billing = {
+                'party':   shipment.ups_billing,
+                'account': shipment.ups_billing_account,
+                'postal':  shipment.ups_billing_postal,
+                'country': shipment.ups_billing_country,
+            }
+        duties = {
+            'party':   shipment.ups_duties_billing,
+            'account': shipment.ups_duties_account,
+            'postal':  shipment.ups_duties_postal,
+            'country': shipment.ups_duties_country,
+        }
+        return billing, duties
 
     def _ups_extract_shipper(self, shipment) -> dict:
         """Адреса відправника: shipment.sender_* → fallback carrier.*"""

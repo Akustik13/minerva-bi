@@ -224,6 +224,18 @@ class Shipment(models.Model):
         "UPS: країна платника", max_length=2, blank=True,
         help_text="Код країни платника (DE, GB, US...).",
     )
+    UPS_DUTIES_CHOICES = [
+        ("receiver",    "Отримувач — стандарт (DAP)"),
+        ("shipper",     "Відправник (DDP) — наш UPS-акаунт"),
+        ("third_party", "Третя сторона — інший UPS-акаунт"),
+    ]
+    ups_duties_billing = models.CharField(
+        "UPS: платник мита/податків", max_length=15,
+        choices=UPS_DUTIES_CHOICES, default="receiver",
+    )
+    ups_duties_account = models.CharField("UPS: акаунт платника мита", max_length=50, blank=True)
+    ups_duties_postal  = models.CharField("UPS: індекс платника мита", max_length=20, blank=True)
+    ups_duties_country = models.CharField("UPS: країна платника мита", max_length=2, blank=True)
     declared_value   = models.DecimalField("Задекларована вартість", max_digits=10,
                                            decimal_places=2, null=True, blank=True)
     declared_currency = models.CharField("Валюта", max_length=3, default="EUR")
