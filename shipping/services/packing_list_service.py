@@ -132,7 +132,7 @@ def order_line_skus(order) -> list:
 
 
 def _customs_by_sku(shipment, order) -> dict:
-    """SKU → {"description", "weight"} з митної декларації відправлення.
+    """SKU → {"description", "customs_number", "origin_country", "weight"} з митної декларації відправлення.
     weight — лише введена вручну (не «авто» брутто÷к-сть)."""
     items = ((shipment.customs_articles or {}).get("customs_line_items") or []) if shipment else []
     skus = order_line_skus(order)
@@ -142,7 +142,11 @@ def _customs_by_sku(shipment, order) -> dict:
         sku = it.get("sku") or (skus[i] if by_index else "")
         if not sku:
             continue
-        entry = {"description": (it.get("description") or "").strip()}
+        entry = {
+            "description":    (it.get("description") or "").strip(),
+            "customs_number": (it.get("customs_number") or "").strip(),
+            "origin_country": (it.get("origin_country") or "").strip(),
+        }
         if it.get("weight") and not it.get("weight_auto"):
             try:
                 entry["weight"] = float(it["weight"])
@@ -252,46 +256,64 @@ def order_packaging_rows(order) -> list:
     return rows
 
 
-def initial_data(order) -> dict:
-    """Чернетка форми з даних замовлення та останнього відправлення."""
-    from config.country_utils import country_name_en
-    from shipping.models import PackingList
+def latest_shipment(order):
+    return order.shipments.exclude(status="cancelled").order_by("-created_at").first()
 
-    shipment = order.shipments.exclude(status="cancelled").order_by("-created_at").first()
-    order_lines = _order_lines(order, shipment)
+
+def build_ship_to(order, shipment=None) -> dict:
+    """Отримувач: з відправлення (якщо є), інакше з полів доставки замовлення."""
+    from config.country_utils import country_name_en
 
     if shipment:
         s = shipment
         city_line = " ".join(x for x in (s.recipient_zip, s.recipient_city) if x)
         if s.recipient_state:
             city_line = f"{city_line}, {s.recipient_state}" if city_line else s.recipient_state
-        ship_to = {
+        return {
             "company": s.recipient_company or s.recipient_name, "contact": s.recipient_name,
             "street": s.recipient_street, "city_line": city_line,
             "country": country_name_en(s.recipient_country),
             "phone": s.recipient_phone, "email": s.recipient_email,
         }
+    city_line = " ".join(x for x in (order.addr_zip, order.addr_city) if x)
+    return {
+        "company": order.ship_company or order.client or "",
+        "contact": order.ship_name or order.contact_name or "",
+        "street": order.addr_street or "", "city_line": city_line,
+        "country": country_name_en(order.addr_country or order.shipping_region or ""),
+        "phone": order.ship_phone or order.phone or "",
+        "email": order.ship_email or order.email or "",
+    }
+
+
+def last_signer() -> tuple:
+    """Підписант з останнього пакувального листа або інвойсу."""
+    from shipping.models import CommercialInvoice, PackingList
+    docs = [m.objects.exclude(signer_name="").order_by("-created_at").first()
+            for m in (PackingList, CommercialInvoice)]
+    docs = [d for d in docs if d]
+    if not docs:
+        return "", ""
+    d = max(docs, key=lambda x: x.created_at)
+    return d.signer_name, d.signer_position
+
+
+def initial_data(order) -> dict:
+    """Чернетка форми з даних замовлення та останнього відправлення."""
+    shipment = latest_shipment(order)
+    order_lines = _order_lines(order, shipment)
+    if shipment:
         parcels = _parcels_from_shipment(shipment, order_lines)
     else:
-        city_line = " ".join(x for x in (order.addr_zip, order.addr_city) if x)
-        ship_to = {
-            "company": order.ship_company or order.client or "",
-            "contact": order.ship_name or order.contact_name or "",
-            "street": order.addr_street or "", "city_line": city_line,
-            "country": country_name_en(order.addr_country or order.shipping_region or ""),
-            "phone": order.ship_phone or order.phone or "",
-            "email": order.ship_email or order.email or "",
-        }
         parcels = [{"dims": "", "gross_kg": 0, "lines": order_lines}]
-
-    last = PackingList.objects.exclude(signer_name="").order_by("-created_at").first()
+    signer_name, signer_position = last_signer()
     return {
         "number":          order.order_number or "",
         "pl_date":         date.today(),
-        "ship_to":         ship_to,
+        "ship_to":         build_ship_to(order, shipment),
         "parcels":         parcels,
-        "signer_name":     last.signer_name if last else "",
-        "signer_position": last.signer_position if last else "",
+        "signer_name":     signer_name,
+        "signer_position": signer_position,
         "shipment":        shipment,
     }
 

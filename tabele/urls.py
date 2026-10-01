@@ -116,6 +116,7 @@ urlpatterns = [
     path("documents/", include("documents.urls")),
     path("invoices/", include("shipping.urls_invoices")),
     path("packing-lists/", include("shipping.urls_packing_lists")),
+    path("commercial-invoices/", include("shipping.urls_commercial_invoices")),
     path("api/v1/", include("api.urls")),
     path("api-auth/", include("rest_framework.urls")),
 ] + [

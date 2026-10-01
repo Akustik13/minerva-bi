@@ -94,6 +94,60 @@ class PackingList(models.Model):
         return round(sum(float(p.get("gross_kg") or 0) for p in self.parcels or []), 3)
 
 
+class CommercialInvoice(models.Model):
+    """Комерційний інвойс клієнту з власного Word-шаблону (shipping/services/commercial_invoice_service.py).
+    Не плутати з Invoice (інвойси для DigiKey Marketplace, /invoices/)."""
+
+    number      = models.CharField("Номер", max_length=30, db_index=True)
+    inv_date    = models.DateField("Дата")
+    sales_order = models.ForeignKey(
+        "sales.SalesOrder", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="commercial_invoices", verbose_name="Замовлення",
+    )
+    shipment = models.ForeignKey(
+        "shipping.Shipment", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="commercial_invoices", verbose_name="Відправлення",
+    )
+    ship_to         = models.JSONField("Отримувач", default=dict, blank=True)
+    billing_address = models.TextField("Billing address", blank=True, default="")
+    currency        = models.CharField("Валюта", max_length=3, default="USD")
+    # [{"description","part_no","hs_code","origin","qty","unit_value","product_id"}]
+    lines           = models.JSONField("Позиції", default=list, blank=True)
+    shipping_cost   = models.DecimalField("Пакування і доставка", max_digits=12, decimal_places=2, default=0)
+    incoterm        = models.CharField("Incoterm", max_length=10, blank=True, default="DAP")
+    export_reason   = models.CharField("Reason of export", max_length=100, blank=True, default="commercial sale")
+    payment_terms   = models.CharField("Payment terms", max_length=200, blank=True, default="advance payment.")
+    signer_name     = models.CharField("Підписант", max_length=120, blank=True, default="")
+    signer_position = models.CharField("Посада", max_length=120, blank=True, default="")
+
+    docx_file  = models.FileField("Файл .docx", upload_to="commercial_invoices/", null=True, blank=True)
+    pdf_file   = models.FileField("Файл .pdf",  upload_to="commercial_invoices/", null=True, blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="Автор",
+    )
+    created_at = models.DateTimeField("Створено", auto_now_add=True)
+    updated_at = models.DateTimeField("Оновлено", auto_now=True)
+
+    class Meta:
+        verbose_name        = "Комерційний інвойс"
+        verbose_name_plural = "Комерційні інвойси"
+        ordering            = ["-created_at"]
+
+    def __str__(self):
+        return f"Commercial Invoice #{self.number}"
+
+    @property
+    def goods_total(self):
+        from decimal import Decimal
+        return sum((Decimal(str(l.get("qty") or 0)) * Decimal(str(l.get("unit_value") or 0))
+                    for l in self.lines or []), Decimal(0)).quantize(Decimal("0.01"))
+
+    @property
+    def total_amount(self):
+        return self.goods_total + (self.shipping_cost or 0)
+
+
 class Carrier(models.Model):
     """Перевізник / платформа доставки з API-налаштуваннями."""
 

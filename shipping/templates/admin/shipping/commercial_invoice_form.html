@@ -1,0 +1,227 @@
+{% extends "admin/base_site.html" %}
+{% load i18n l10n %}
+
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo; <a href="/commercial-invoices/">Commercial Invoices</a>
+  {% if order %}&rsaquo; <a href="{% url 'admin:sales_salesorder_change' order.pk %}">{{ order.order_number }}</a>{% endif %}
+  &rsaquo; {{ title }}
+</div>
+{% endblock %}
+
+{% block extrahead %}{{ block.super }}
+<style>
+.ci-wrap { padding: 24px 32px 60px; max-width: 1150px; }
+@media (max-width: 768px) { .ci-wrap { padding: 16px; } }
+.ci-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 18px 22px; margin-bottom: 20px; }
+.ci-card-title { font-size: 12px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em;
+                 margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border-strong); display: flex; align-items: center; gap: 8px; }
+.ci-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.ci-field { display: flex; flex-direction: column; gap: 5px; }
+.ci-label { font-size: 11px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.ci-input { background: var(--bg-input); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px;
+            padding: 7px 10px; font-size: 13px; font-family: inherit; width: 100%; box-sizing: border-box; }
+.ci-input:focus { border-color: var(--link-fg); outline: none; }
+.ci-input.ci-warn { border-color: var(--err); }
+.ci-btn { background: var(--bg-hover); border: 1px solid var(--border-strong); color: var(--text); border-radius: 6px; padding: 8px 14px;
+          font-size: 13px; cursor: pointer; text-decoration: none; display: inline-block; }
+.ci-btn:hover { border-color: var(--link-fg); }
+.ci-btn.primary { background: var(--link-fg); border-color: var(--link-fg); color: var(--bg-card); font-weight: 700; }
+.ci-btn.sm { padding: 3px 9px; font-size: 12px; }
+.ci-btn.danger { color: var(--err); }
+.ci-muted { color: var(--text-muted); font-size: 12px; }
+.ci-note { border: 1px dashed var(--err); color: var(--text); border-radius: 8px; padding: 8px 12px; margin-bottom: 14px; font-size: 13px; }
+.ci-scroll { overflow-x: auto; }
+.ci-lines { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 860px; }
+.ci-lines th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 11px; padding: 6px 4px; border-bottom: 1px solid var(--border-strong); }
+.ci-lines td { padding: 4px; vertical-align: middle; }
+.ci-lines td.num { text-align: right; color: var(--text-muted); white-space: nowrap; font-family: monospace; }
+.ci-totals { display: grid; grid-template-columns: auto 160px; gap: 6px 14px; justify-content: end; align-items: center; margin-top: 12px; font-size: 13px; color: var(--text); }
+.ci-totals .big { font-size: 15px; font-weight: 700; }
+.ci-totals label { font-size: 13px; color: var(--text); font-weight: 400; }
+.ci-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="ci-wrap">
+  <h1 style="margin:0 0 6px;color:var(--text)">💵 {{ title }}</h1>
+  <p class="ci-muted" style="margin:0 0 18px">
+    {% if order %}Замовлення <a href="{% url 'admin:sales_salesorder_change' order.pk %}" style="color:var(--link-fg)">{{ order.order_number }}</a>{% endif %}
+    {% if data.shipment %} · митні дані з відправлення #{{ data.shipment.pk }}{% endif %}
+    · після генерації «Invoice_№.docx/pdf» з'являться в «Документи замовлення» (файл з такою ж назвою буде замінено).
+  </p>
+
+  {% for n in data.notes %}<div class="ci-note">⚠️ {{ n }}</div>{% endfor %}
+
+  <form method="post" id="ci-form" action="{% if ci %}/commercial-invoices/{{ ci.pk }}/edit/{% else %}/commercial-invoices/new/?order={{ order.pk }}{% endif %}">
+    {% csrf_token %}
+    {% if order %}<input type="hidden" name="order_id" value="{{ order.pk }}">{% endif %}
+    {% if data.shipment %}<input type="hidden" name="shipment_id" value="{{ data.shipment.pk }}">{% endif %}
+    <input type="hidden" name="lines_json" id="lines_json">
+
+    <div class="ci-card">
+      <div class="ci-card-title">🧾 Документ</div>
+      <div class="ci-grid">
+        <div class="ci-field"><label class="ci-label">Invoice No.</label>
+          <input class="ci-input" name="number" value="{{ data.number }}" required></div>
+        <div class="ci-field"><label class="ci-label">Invoice Date</label>
+          <input class="ci-input" type="date" name="inv_date" value="{{ data.inv_date|date:'Y-m-d' }}" required></div>
+        <div class="ci-field"><label class="ci-label">Валюта</label>
+          <input class="ci-input" name="currency" id="ci-currency" value="{{ data.currency }}" maxlength="3" style="text-transform:uppercase" required></div>
+      </div>
+    </div>
+
+    <div class="ci-card">
+      <div class="ci-card-title">📬 Ship to (Receiver/Buyer)</div>
+      <div class="ci-grid">
+        <div class="ci-field"><label class="ci-label">Компанія</label>
+          <input class="ci-input" name="ship_to_company" value="{{ data.ship_to.company }}"></div>
+        <div class="ci-field"><label class="ci-label">Контактна особа</label>
+          <input class="ci-input" name="ship_to_contact" value="{{ data.ship_to.contact }}"></div>
+        <div class="ci-field" style="grid-column:1/-1"><label class="ci-label">Вулиця, будинок</label>
+          <input class="ci-input" name="ship_to_street" value="{{ data.ship_to.street }}"></div>
+        <div class="ci-field"><label class="ci-label">Індекс, місто</label>
+          <input class="ci-input" name="ship_to_city_line" value="{{ data.ship_to.city_line }}"></div>
+        <div class="ci-field"><label class="ci-label">Країна (англійською)</label>
+          <input class="ci-input" name="ship_to_country" value="{{ data.ship_to.country }}"></div>
+        <div class="ci-field"><label class="ci-label">Телефон</label>
+          <input class="ci-input" name="ship_to_phone" value="{{ data.ship_to.phone }}"></div>
+        <div class="ci-field"><label class="ci-label">Email</label>
+          <input class="ci-input" name="ship_to_email" value="{{ data.ship_to.email }}"></div>
+        <div class="ci-field" style="grid-column:1/-1">
+          <label class="ci-label" style="display:flex;align-items:center;gap:8px">Billing address
+            <button type="button" class="ci-btn sm" onclick="ciCopyBilling()" title="Зібрати з полів Ship to">⇄ з Ship to</button></label>
+          <textarea class="ci-input" name="billing_address" id="ci-billing" rows="2">{{ data.billing_address }}</textarea></div>
+      </div>
+    </div>
+
+    <div class="ci-card">
+      <div class="ci-card-title">📦 Позиції</div>
+      <div class="ci-scroll"><table class="ci-lines"><thead><tr>
+        <th>Pos.</th><th>Description</th><th>P/N</th><th>HS Code</th><th>Country of Origin</th>
+        <th>Qty</th><th>Unit Value</th><th style="text-align:right">Total</th><th></th>
+      </tr></thead><tbody id="ci-lines"></tbody></table></div>
+      <button type="button" class="ci-btn sm" style="margin-top:6px" onclick="ciAddLine()">＋ Позиція</button>
+      <div class="ci-totals">
+        <span>Сума товарів:</span><b id="ci-goods" style="text-align:right"></b>
+        <label for="ci-shipping">Packaging and shipping costs:</label>
+        {% localize off %}<input class="ci-input" name="shipping_cost" id="ci-shipping" value="{{ data.shipping_cost }}" inputmode="decimal" style="text-align:right">{% endlocalize %}
+        <span class="big">Total invoice amount:</span><b class="big" id="ci-total" style="text-align:right"></b>
+      </div>
+    </div>
+
+    <div class="ci-card">
+      <div class="ci-card-title">📋 Умови</div>
+      <div class="ci-grid">
+        <div class="ci-field"><label class="ci-label">Terms of delivery (Incoterms)</label>
+          <select class="ci-input" name="incoterm">
+            {% for code, text in incoterms %}<option value="{{ code }}" {% if code == data.incoterm %}selected{% endif %}>{{ text }}</option>{% endfor %}
+          </select></div>
+        <div class="ci-field"><label class="ci-label">Reason of export</label>
+          <input class="ci-input" name="export_reason" list="ci-reasons" value="{{ data.export_reason }}">
+          <datalist id="ci-reasons">{% for r in reasons %}<option value="{{ r }}">{% endfor %}</datalist></div>
+        <div class="ci-field"><label class="ci-label">Payment terms</label>
+          <input class="ci-input" name="payment_terms" value="{{ data.payment_terms }}"></div>
+      </div>
+    </div>
+
+    <div class="ci-card">
+      <div class="ci-card-title">✍️ Підпис</div>
+      <div class="ci-grid">
+        <div class="ci-field"><label class="ci-label">Name</label>
+          <input class="ci-input" name="signer_name" value="{{ data.signer_name }}" placeholder="Dr. Sergey Sevskiy"></div>
+        <div class="ci-field"><label class="ci-label">Position</label>
+          <input class="ci-input" name="signer_position" value="{{ data.signer_position }}" placeholder="CEO"></div>
+      </div>
+    </div>
+
+    <div class="ci-actions">
+      <button type="submit" class="ci-btn primary">📄 {% if ci %}Перегенерувати{% else %}Згенерувати{% endif %} Invoice</button>
+      {% if ci and ci.pdf_file %}<a class="ci-btn" href="/commercial-invoices/{{ ci.pk }}/file/pdf/" target="_blank">PDF</a>{% endif %}
+      {% if ci and ci.docx_file %}<a class="ci-btn" href="/commercial-invoices/{{ ci.pk }}/file/docx/">DOCX</a>{% endif %}
+      <a class="ci-btn" href="{% if order %}{% url 'admin:sales_salesorder_change' order.pk %}{% else %}/commercial-invoices/{% endif %}">Скасувати</a>
+    </div>
+  </form>
+</div>
+
+{{ lines|json_script:"ci-lines-data" }}
+<script>
+(function(){
+  var lines = JSON.parse(document.getElementById('ci-lines-data').textContent) || [];
+  var body = document.getElementById('ci-lines');
+  function num(v){ var f = parseFloat(String(v).replace(',', '.')); return isNaN(f) ? 0 : f; }
+  function money(v){ return (Math.round(num(v) * 100) / 100).toFixed(2); }
+  function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function inp(j, k, v, extra){
+    return '<input class="ci-input' + (extra || '') + '" data-l="'+j+'" data-k="'+k+'" value="'+esc(v)+'">';
+  }
+
+  function totals(){
+    var cur = document.getElementById('ci-currency').value.toUpperCase();
+    var goods = lines.reduce(function(s, l){ return s + Math.round(num(l.qty) * num(l.unit_value) * 100) / 100; }, 0);
+    var ship = num(document.getElementById('ci-shipping').value);
+    document.getElementById('ci-goods').textContent = money(goods) + ' ' + cur;
+    document.getElementById('ci-total').textContent = money(goods + ship) + ' ' + cur;
+  }
+
+  function render(){
+    var html = '';
+    lines.forEach(function(l, j){
+      html += '<tr>'
+        + '<td class="num">' + (j + 1) + '</td>'
+        + '<td>' + inp(j, 'description', l.description) + '</td>'
+        + '<td>' + inp(j, 'part_no', l.part_no) + '</td>'
+        + '<td style="width:110px">' + inp(j, 'hs_code', l.hs_code, l.hs_code ? '' : ' ci-warn') + '</td>'
+        + '<td style="width:130px">' + inp(j, 'origin', l.origin, l.origin ? '' : ' ci-warn') + '</td>'
+        + '<td style="width:70px">' + inp(j, 'qty', l.qty, num(l.qty) > 0 ? '' : ' ci-warn') + '</td>'
+        + '<td style="width:100px">' + inp(j, 'unit_value', l.unit_value, num(l.unit_value) > 0 ? '' : ' ci-warn') + '</td>'
+        + '<td class="num">' + money(num(l.qty) * num(l.unit_value)) + '</td>'
+        + '<td><button type="button" class="ci-btn sm danger" onclick="ciDelLine('+j+')" title="Видалити">✕</button></td>'
+        + '</tr>';
+    });
+    body.innerHTML = html;
+    totals();
+  }
+
+  body.addEventListener('input', function(e){
+    var el = e.target; if (el.dataset.l === undefined) return;
+    lines[el.dataset.l][el.dataset.k] = el.value;
+  });
+  body.addEventListener('change', function(e){
+    var k = e.target.dataset.k;
+    if (k) render();
+  });
+  document.getElementById('ci-shipping').addEventListener('input', totals);
+  document.getElementById('ci-currency').addEventListener('input', totals);
+
+  window.ciAddLine = function(){ lines.push({description:'', part_no:'', hs_code:'', origin:'', qty:1, unit_value:0}); render(); };
+  window.ciDelLine = function(j){ lines.splice(j, 1); render(); };
+  window.ciCopyBilling = function(){
+    var f = document.getElementById('ci-form');
+    var parts = ['company', 'street', 'city_line', 'country'].map(function(k){ return f.querySelector('[name=ship_to_' + k + ']').value.trim(); })
+      .filter(function(x){ return x; });
+    document.getElementById('ci-billing').value = parts.length ? parts.join(', ') + '.' : '';
+  };
+
+  document.getElementById('ci-form').addEventListener('submit', function(e){
+    var issues = [];
+    lines.forEach(function(l, j){
+      if (!(l.description || l.part_no)) return;
+      var miss = [];
+      if (!l.hs_code) miss.push('HS-код');
+      if (!l.origin) miss.push('країна');
+      if (num(l.unit_value) <= 0) miss.push('ціна');
+      if (miss.length) issues.push('Позиція ' + (j + 1) + ': немає ' + miss.join(', '));
+    });
+    if (issues.length && !confirm(issues.join('\n') + '\n\nВсе одно згенерувати?')) { e.preventDefault(); return; }
+    document.getElementById('lines_json').value = JSON.stringify(lines);
+  });
+  render();
+})();
+</script>
+{% endblock %}

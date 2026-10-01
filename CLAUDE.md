@@ -80,6 +80,7 @@ tabele_mvp/
   - Свій інвойс: галочка в `ups_confirm.html` → `UPSClient.upload_paperless_document()` → `create_shipment(custom_document_id=…)` → InternationalForms FormType 07
   - Поля `use_custom_invoice`, `custom_invoice_pdf`, `ups_document_id` (migration 0049)
 - **Packing Lists** `/packing-lists/` — модель `PackingList` (migration 0052), `shipping/services/packing_list_service.py` (docxtpl), шаблон `shipping/templates_docx/packing_list_template.docx` (`{%p for parcel in parcels %}` + `{%tr for it in parcel.lines %}`); власний шаблон → `media/packing_list_templates/custom.docx`; копія у `media/orders/{source}/{order}/`
+- **Commercial Invoices** `/commercial-invoices/` — модель `CommercialInvoice` (migration 0053), `shipping/services/commercial_invoice_service.py`, шаблон `shipping/templates_docx/commercial_invoice_template.docx`. ⚠️ НЕ плутати з `/invoices/` (`Invoice`, DigiKey Marketplace) — його не чіпати
 - `shipping/services/jumingo.py` — Jumingo API інтеграція
 - Admin action: Submit Shipment → create_shipment() → label + tracking
 

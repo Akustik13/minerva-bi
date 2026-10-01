@@ -894,6 +894,7 @@ window.MV_GROUPS = [
       { href:'/admin/shipping/carrier/',                   icon:'🚛', label:'Перевізники',       app:'shipping', model:'Carrier' },
       { href:'/invoices/',                                 icon:'🧾', label:'Інвойси',           app:'shipping' },
       { href:'/packing-lists/',                            icon:'📋', label:'Packing Lists',     app:'shipping' },
+      { href:'/commercial-invoices/',                      icon:'💵', label:'Commercial Invoices', app:'shipping' },
     ], apps:['shipping'] },
   { id:'inventory', icon:'📦', label:'📦 Склад',
     links:[
@@ -1196,6 +1197,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/admin/shipping/carrier/':                   'shipping',
     '/invoices/':                                 'shipping',
     '/packing-lists/':                            'shipping',
+    '/commercial-invoices/':                      'shipping',
   };
   var _curPath = window.location.pathname;
   var _activeGroup = null;
