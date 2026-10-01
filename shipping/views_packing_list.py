@@ -85,6 +85,7 @@ def _render_form(request, data, order=None, pl=None):
         title=f"Packing List #{pl.number}" if pl else "Новий Packing List",
         data=data, order=order, pl=pl,
         parcels=data["parcels"],
+        order_pkg=svc.order_packaging_rows(order) if order else [],
         ship_to_keys=SHIP_TO_KEYS,
     ))
 

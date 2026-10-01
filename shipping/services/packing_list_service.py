@@ -151,6 +151,23 @@ def _parcels_from_shipment(shipment, order_lines: list) -> list:
     return parcels
 
 
+def order_packaging_rows(order) -> list:
+    """«Фактична упаковка» замовлення для звірки з коробками форми.
+    actual_weight_g — вага всього рядка (як у shipping/admin.py), ділиться на qty_boxes."""
+    rows = []
+    for op in order.packaging_used.select_related("packaging").order_by("pk"):
+        pm  = op.packaging
+        qty = max(1, op.qty_boxes or 1)
+        rows.append({
+            "label":    str(pm),
+            "dims":     _dims(pm.length_cm, pm.width_cm, pm.height_cm),
+            "qty":      qty,
+            "gross_kg": round(op.actual_weight_g / qty / 1000, 3) if op.actual_weight_g else None,
+            "auto":     "🤖" in (op.notes or ""),
+        })
+    return rows
+
+
 def initial_data(order) -> dict:
     """Чернетка форми з даних замовлення та останнього відправлення."""
     from config.country_utils import country_name_en

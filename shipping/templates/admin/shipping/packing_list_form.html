@@ -43,6 +43,10 @@
 .pl-sum { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
 .pl-sum .warn { color: var(--err); font-weight: 600; }
 .pl-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.pl-input.pl-zero { border-color: var(--err); box-shadow: 0 0 0 2px color-mix(in srgb, var(--err) 25%, transparent); }
+.pl-check { border: 1px dashed var(--border-strong); border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 13px; color: var(--text); }
+.pl-chip { background: var(--bg-input); border: 1px solid var(--border-strong); border-radius: 12px; padding: 2px 10px; font-size: 12px; }
+.pl-warn-txt { color: var(--err); font-size: 12px; font-weight: 600; }
 </style>
 {% endblock %}
 
@@ -93,6 +97,21 @@
 
     <div class="pl-card">
       <div class="pl-card-title">📦 Коробки (Parcels)</div>
+      {% if order_pkg %}
+      <div class="pl-check" id="pl-pkg-check">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <b>📦 Фактична упаковка замовлення:</b>
+          {% for r in order_pkg %}
+            <span class="pl-chip">{{ r.dims|default:r.label }} ×{{ r.qty }}
+              · {% if r.gross_kg %}{{ r.gross_kg }} кг/шт{% else %}вага не вказана{% endif %}
+              {% if r.auto %}<span class="pl-warn-txt" title="Підставлено автоматично з рекомендації, не зважено">🤖 авто — не зважено</span>{% endif %}
+            </span>
+          {% endfor %}
+          <button type="button" class="pl-btn sm" onclick="plApplyOrderPkg()">⇄ Підставити ці коробки</button>
+        </div>
+        <div id="pl-pkg-diff" class="pl-warn-txt" style="margin-top:6px"></div>
+      </div>
+      {% endif %}
       <div id="pl-parcels"></div>
       <button type="button" class="pl-btn" onclick="plAddParcel()">＋ Додати коробку</button>
       <div class="pl-sum" id="pl-total"></div>
@@ -118,9 +137,11 @@
 </div>
 
 {{ parcels|json_script:"pl-parcels-data" }}
+{{ order_pkg|json_script:"pl-order-pkg" }}
 <script>
 (function(){
   var parcels = JSON.parse(document.getElementById('pl-parcels-data').textContent) || [];
+  var orderPkg = JSON.parse(document.getElementById('pl-order-pkg').textContent) || [];
   if (!parcels.length) parcels.push({dims:'', gross_kg:0, lines:[]});
   var box = document.getElementById('pl-parcels');
 
@@ -132,15 +153,17 @@
   function render(){
     var n = parcels.length, html = '';
     parcels.forEach(function(p, i){
-      var rows = '', net = 0;
+      var rows = '', net = 0, zeros = 0;
       (p.lines || []).forEach(function(l, j){
         var t = num(l.qty) * num(l.unit_net_kg); net += t;
+        var zero = num(l.unit_net_kg) <= 0; if (zero) zeros++;
         rows += '<tr>'
           + '<td class="num">' + (j + 1) + '</td>'
           + '<td><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="description" value="'+esc(l.description)+'" placeholder="Antenna"></td>'
           + '<td><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="part_no" value="'+esc(l.part_no)+'" placeholder="AN240208-01A"></td>'
           + '<td style="width:80px"><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="qty" value="'+esc(l.qty)+'" inputmode="decimal"></td>'
-          + '<td style="width:100px"><input class="pl-input" data-p="'+i+'" data-l="'+j+'" data-k="unit_net_kg" value="'+esc(l.unit_net_kg)+'" inputmode="decimal"></td>'
+          + '<td style="width:100px"><input class="pl-input' + (zero ? ' pl-zero' : '') + '" data-p="'+i+'" data-l="'+j+'" data-k="unit_net_kg" value="'+esc(l.unit_net_kg)+'" inputmode="decimal"'
+          + (zero ? ' title="Вага нетто не вказана — заповніть тут або в картці товару (вага нетто, г)"' : '') + '></td>'
           + '<td class="num">' + fmt(t, 3) + '</td>'
           + '<td><button type="button" class="pl-btn sm danger" onclick="plDelLine('+i+','+j+')" title="Видалити рядок">✕</button></td>'
           + '</tr>';
@@ -163,14 +186,59 @@
         + '</tr></thead><tbody>' + rows + '</tbody></table></div>'
         + '<button type="button" class="pl-btn sm" style="margin-top:6px" onclick="plAddLine('+i+')">＋ Рядок</button>'
         + '<div class="pl-sum"><span>Нетто коробки: <b>' + fmt(net, 3) + ' кг</b></span>'
-        + '<span>Брутто: <b>' + fmt(gross, 2) + ' кг</b>' + warn + '</span></div>'
+        + '<span>Брутто: <b>' + fmt(gross, 2) + ' кг</b>' + warn + '</span>'
+        + (zeros ? '<span class="warn">⚠️ ' + zeros + ' ' + (zeros === 1 ? 'рядок' : 'рядки') + ' без ваги нетто</span>' : '')
+        + '</div>'
         + '</div>';
     });
     box.innerHTML = html;
     var tg = parcels.reduce(function(s, p){ return s + num(p.gross_kg); }, 0);
     document.getElementById('pl-total').innerHTML =
       '<span>Всього коробок: <b>' + n + '</b></span><span>Total Gross Weight: <b>' + fmt(tg, 2) + ' kg</b></span>';
+    renderPkgDiff();
   }
+
+  function expandOrderPkg(){
+    var out = [];
+    orderPkg.forEach(function(r){ for (var k = 0; k < r.qty; k++) out.push(r); });
+    return out;
+  }
+  function normDims(s){ return String(s || '').toLowerCase().replace(/\s+/g, '').replace(/,/g, '.'); }
+
+  function renderPkgDiff(){
+    var el = document.getElementById('pl-pkg-diff');
+    if (!el) return;
+    var boxes = expandOrderPkg(), msgs = [];
+    if (boxes.length !== parcels.length) {
+      msgs.push('кількість коробок: в упаковці ' + boxes.length + ', тут ' + parcels.length);
+    } else {
+      boxes.forEach(function(b, i){
+        var p = parcels[i];
+        if (b.dims && normDims(b.dims) !== normDims(p.dims))
+          msgs.push('коробка ' + (i + 1) + ': розміри ' + b.dims + ' ≠ ' + (p.dims || '—'));
+        if (b.gross_kg != null && Math.abs(num(b.gross_kg) - num(p.gross_kg)) > 0.005)
+          msgs.push('коробка ' + (i + 1) + ': вага ' + fmt(b.gross_kg, 2) + ' ≠ ' + fmt(p.gross_kg, 2) + ' кг');
+      });
+    }
+    el.innerHTML = msgs.length ? '⚠️ Відрізняється від коробок нижче: ' + esc(msgs.join('; ')) : '';
+  }
+
+  window.plApplyOrderPkg = function(){
+    var boxes = expandOrderPkg();
+    if (!boxes.length) return;
+    var keepLines = boxes.length === parcels.length;
+    var allLines = [];
+    parcels.forEach(function(p){ allLines = allLines.concat(p.lines || []); });
+    parcels = boxes.map(function(b, i){
+      var old = parcels[i] || {};
+      return {
+        dims: b.dims || old.dims || '',
+        gross_kg: b.gross_kg != null ? b.gross_kg : (old.gross_kg || 0),
+        lines: keepLines ? (old.lines || []) : (i === 0 ? allLines : []),
+      };
+    });
+    render();
+  };
 
   box.addEventListener('input', function(e){
     var el = e.target, p = el.dataset.p, k = el.dataset.k;
@@ -181,6 +249,7 @@
   box.addEventListener('change', function(e){
     var k = e.target.dataset.k;
     if (k === 'qty' || k === 'unit_net_kg' || k === 'gross_kg') render();
+    else if (k === 'dims') renderPkgDiff();
   });
 
   window.plAddParcel = function(){ parcels.push({dims:'', gross_kg:0, lines:[{description:'', part_no:'', qty:1, unit_net_kg:0}]}); render(); };
@@ -189,7 +258,15 @@
   window.plAddLine   = function(i){ parcels[i].lines = parcels[i].lines || []; parcels[i].lines.push({description:'', part_no:'', qty:1, unit_net_kg:0}); render(); };
   window.plDelLine   = function(i, j){ parcels[i].lines.splice(j, 1); render(); };
 
-  document.getElementById('pl-form').addEventListener('submit', function(){
+  document.getElementById('pl-form').addEventListener('submit', function(e){
+    var zeros = 0;
+    parcels.forEach(function(p){ (p.lines || []).forEach(function(l){
+      if ((l.description || l.part_no) && num(l.unit_net_kg) <= 0) zeros++;
+    }); });
+    if (zeros && !confirm(zeros + ' рядк(и) без ваги нетто — у документі буде 0,000 кг.\n\nВсе одно згенерувати?')) {
+      e.preventDefault();
+      return;
+    }
     document.getElementById('parcels_json').value = JSON.stringify(parcels);
   });
   render();
