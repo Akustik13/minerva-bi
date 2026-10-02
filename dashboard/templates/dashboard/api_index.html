@@ -66,7 +66,7 @@
   transition: opacity .15s;
 }
 .api-btn:hover { opacity: .85; }
-.api-btn-prim { background: var(--bg-card-2); color: var(--accent);    border: 1px solid var(--border-strong); }
+.api-btn-prim { background: var(--bg-card-2); color: var(--text);      border: 1px solid var(--accent); }
 .api-btn-sec  { background: transparent;       color: var(--text-muted); border: 1px solid var(--border-strong); }
 .api-btn-cons { background: var(--bg-card-2); color: var(--ok);         border: 1px solid var(--border-strong); }
 
@@ -84,12 +84,14 @@
   font-family: monospace; font-size: 10px; font-weight: 700;
   padding: 1px 5px; border-radius: 3px; min-width: 36px; text-align: center;
 }
-.m-get    { background: var(--bg-card-2); color: var(--ok); }
-.m-post   { background: var(--bg-card-2); color: var(--ok); opacity: .8; }
-.m-put    { background: var(--bg-card-2); color: var(--warn); }
-.m-patch  { background: var(--bg-card-2); color: var(--text-muted); }
-.m-delete { background: var(--bg-card-2); color: var(--err); }
-.api-path { font-family: monospace; color: var(--accent); }
+/* Текст завжди кольором --text (читається в будь-якій темі); метод розрізняє кольорова смужка */
+.api-method { color: var(--text); background: var(--bg-card-2); border: 1px solid var(--border-strong); border-left-width: 3px; }
+.m-get    { border-left-color: var(--ok); }
+.m-post   { border-left-color: var(--accent); }
+.m-put    { border-left-color: var(--warn); }
+.m-patch  { border-left-color: var(--text-muted); }
+.m-delete { border-left-color: var(--err); }
+.api-path { font-family: monospace; color: var(--text); font-weight: 600; }
 
 .api-key-pill {
   display: inline-flex; align-items: center; gap: 5px;
@@ -118,6 +120,17 @@
 </style>
 
 <div class="api-wrap">
+
+  <!-- Docs banner -->
+  <div class="api-console-banner" style="border-left-color:var(--accent)">
+    <div>
+      <strong style="color:var(--text)">📖 Документація інтеграції магазину</strong>
+      <p style="margin-top:4px">Як підключити сайт: залишки складу, замовлення, доставка, вебхуки, приклади коду PHP / Node.js / Python і як усе протестувати.</p>
+    </div>
+    <a href="{% url 'api_docs' %}" class="api-btn api-btn-prim" style="white-space:nowrap;font-size:13px;padding:8px 16px">
+      Відкрити документацію →
+    </a>
+  </div>
 
   <!-- Console banner -->
   <div class="api-console-banner">
@@ -162,7 +175,8 @@
         <li><span class="api-method m-get">GET</span><span class="api-path">/api/v1/customers/</span></li>
       </ul>
       <div class="api-actions">
-        <a href="/api/v1/" class="api-btn api-btn-prim">Browsable API</a>
+        <a href="{% url 'api_docs' %}" class="api-btn api-btn-prim">📖 Документація</a>
+        <a href="/api/v1/" class="api-btn api-btn-sec">Browsable API</a>
         <a href="{% url 'api_console' %}" class="api-btn api-btn-cons">Console</a>
       </div>
     </div>
@@ -182,7 +196,7 @@
       <div class="api-status warn">⚠️ Ключів немає — API недоступний</div>
       {% endif %}
       <div class="api-meta">
-        <b>Авторизація:</b> <code style="color:var(--accent)">Authorization: Token &lt;key&gt;</code><br>
+        <b>Авторизація:</b> <code style="color:var(--text);background:var(--bg-card-2);padding:1px 5px;border-radius:3px">Authorization: Token &lt;key&gt;</code><br>
         <b>Scopes:</b> stock, products, orders, customers (read/write), shipments (read)
       </div>
       {% if api_keys %}
@@ -223,7 +237,7 @@
       <div class="api-meta">
         <b>Акаунт:</b> {{ jumingo_carrier.name }}<br>
         <b>Відправник:</b> {{ jumingo_carrier.sender_city }}, {{ jumingo_carrier.sender_country }}<br>
-        <b>Endpoint:</b> <code style="color:var(--accent)">https://api.jumingo.com/v1</code>
+        <b>Endpoint:</b> <code style="color:var(--text);background:var(--bg-card-2);padding:1px 5px;border-radius:3px">https://api.jumingo.com/v1</code>
       </div>
       {% else %}
       <div class="api-status off">⚪ Не налаштовано</div>
@@ -274,7 +288,7 @@
       <div class="api-status off">⚪ Не налаштовано</div>
       <div class="api-meta">
         Додай Carrier типу DHL з API Key/Secret.<br>
-        Ключі: <code style="color:var(--accent)">developer.dhl.com</code> → MyDHL API
+        Ключі: <code style="color:var(--text);background:var(--bg-card-2);padding:1px 5px;border-radius:3px">developer.dhl.com</code> → MyDHL API
       </div>
       {% endif %}
       <ul class="api-endpoint-list">
@@ -324,7 +338,7 @@
       <div class="api-status off">⚪ Не налаштовано</div>
       <div class="api-meta">
         Додай Carrier типу UPS.<br>
-        Ключі: <code style="color:var(--accent)">developer.ups.com</code> → Apps → Credentials
+        Ключі: <code style="color:var(--text);background:var(--bg-card-2);padding:1px 5px;border-radius:3px">developer.ups.com</code> → Apps → Credentials
       </div>
       {% endif %}
       <ul class="api-endpoint-list">
@@ -374,7 +388,7 @@
       <div class="api-status off">⚪ Не налаштовано</div>
       <div class="api-meta">
         Додай Carrier типу FedEx.<br>
-        Ключі: <code style="color:var(--accent)">developer.fedex.com</code> → My Projects → Credentials
+        Ключі: <code style="color:var(--text);background:var(--bg-card-2);padding:1px 5px;border-radius:3px">developer.fedex.com</code> → My Projects → Credentials
       </div>
       {% endif %}
       <ul class="api-endpoint-list">

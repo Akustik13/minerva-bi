@@ -60,6 +60,44 @@ def api_index(request):
 api_index = staff_member_required(api_index)
 
 
+# ── Документація інтеграції (рендер api/README.md) ────────────────────────────
+
+API_EXAMPLES = {"shop_client.py", "webhook_receiver.py"}
+
+
+def api_docs(request):
+    from pathlib import Path
+    from django.conf import settings
+
+    context = admin.site.each_context(request)
+    base = request.build_absolute_uri('/').rstrip('/')
+    md = (Path(settings.BASE_DIR) / 'api' / 'README.md').read_text(encoding='utf-8')
+    # Підставляємо адресу саме цього сервера замість плейсхолдерів
+    md = md.replace(' (локально `http://localhost:8000/api/v1/`)', '')
+    for placeholder in ('https://<ваш-домен>', 'https://<домен>', 'http://localhost:8000'):
+        md = md.replace(placeholder, base)
+    md = md.replace('](examples/', '](/dashboard/api/docs/examples/')
+    context.update({'readme_md': md, 'api_base': base + '/api/v1/'})
+    return render(request, 'dashboard/api_docs.html', context)
+
+api_docs = staff_member_required(api_docs)
+
+
+def api_docs_example(request, name):
+    from pathlib import Path
+    from django.conf import settings
+    from django.http import FileResponse, Http404
+
+    if name not in API_EXAMPLES:
+        raise Http404
+    path = Path(settings.BASE_DIR) / 'api' / 'examples' / name
+    resp = FileResponse(open(path, 'rb'), content_type='text/plain; charset=utf-8',
+                        as_attachment=request.GET.get('download') == '1', filename=name)
+    return resp
+
+api_docs_example = staff_member_required(api_docs_example)
+
+
 # ── Developer Console ─────────────────────────────────────────────────────────
 
 def api_console(request):

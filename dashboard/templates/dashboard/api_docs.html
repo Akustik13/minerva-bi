@@ -1,0 +1,187 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Документація API | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'api_index' %}">API Інтеграції</a> &rsaquo;
+  Документація
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+#content { padding-bottom: 0 !important; }
+
+.doc-wrap { padding: 16px 20px 60px; }
+
+.doc-top {
+  background: var(--bg-card); border: 1px solid var(--border-strong);
+  border-left: 4px solid var(--accent); border-radius: 8px;
+  padding: 14px 18px; margin-bottom: 18px;
+}
+.doc-top h1 { margin: 0 0 4px; font-size: 20px; color: var(--text); }
+.doc-top p  { margin: 0 0 10px; color: var(--text-muted); font-size: 13px; }
+.doc-base {
+  font-family: monospace; font-size: 13px; color: var(--text);
+  background: var(--bg-card-2); border: 1px solid var(--border-strong);
+  padding: 3px 8px; border-radius: 4px; user-select: all;
+  display: inline-block; max-width: 100%; overflow-wrap: anywhere;
+}
+.doc-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.doc-btn {
+  display: inline-block; font-size: 12px; font-weight: 600; padding: 6px 12px;
+  border-radius: 5px; text-decoration: none !important; color: var(--text) !important;
+  background: var(--bg-card-2); border: 1px solid var(--border-strong);
+}
+.doc-btn:hover { border-color: var(--accent); }
+
+.doc-grid { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .doc-grid { grid-template-columns: 1fr; } .doc-toc { position: static !important; max-height: none !important; } }
+
+.doc-toc {
+  position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto;
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 12px 10px; font-size: 12.5px;
+}
+.doc-toc-title { font-weight: 700; color: var(--text-muted); text-transform: uppercase; font-size: 11px; letter-spacing: .05em; margin: 0 6px 8px; }
+.doc-toc a { display: block; padding: 4px 6px; border-radius: 4px; color: var(--text) !important; text-decoration: none !important; line-height: 1.35; }
+.doc-toc a.h3 { padding-left: 18px; color: var(--text-muted) !important; font-size: 12px; }
+.doc-toc a:hover, .doc-toc a.active { background: var(--bg-card-2); }
+.doc-toc a.active { box-shadow: inset 3px 0 0 var(--accent); }
+
+.doc-body {
+  background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 8px 28px 28px; color: var(--text); font-size: 14px; line-height: 1.6; min-width: 0;
+}
+.doc-body h1 { display: none; }  /* заголовок — у шапці сторінки */
+.doc-body h2 {
+  font-size: 18px; color: var(--text); margin: 30px 0 12px; padding-bottom: 6px;
+  border-bottom: 2px solid var(--border-strong); scroll-margin-top: 12px;
+}
+.doc-body h3 { font-size: 15px; color: var(--text); margin: 22px 0 8px; scroll-margin-top: 12px; }
+.doc-body p, .doc-body li { color: var(--text); }
+.doc-body a { color: var(--accent); }
+.doc-body hr { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+.doc-body code {
+  font-family: Consolas, Monaco, monospace; font-size: 12.5px; color: var(--text);
+  background: var(--bg-card-2); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px;
+}
+.doc-body pre {
+  position: relative; background: var(--bg-card-2); border: 1px solid var(--border-strong);
+  border-radius: 6px; padding: 34px 14px 12px; overflow: auto; font-size: 12.5px; line-height: 1.5;
+}
+.doc-body pre code { background: none; border: none; padding: 0; white-space: pre; }
+.doc-copy {
+  position: absolute; top: 6px; right: 6px; font-size: 11px; padding: 3px 8px; cursor: pointer;
+  background: var(--bg-card); color: var(--text); border: 1px solid var(--border-strong); border-radius: 4px;
+  opacity: .75;
+}
+.doc-copy:hover { opacity: 1; }
+.doc-body table { border-collapse: collapse; width: 100%; margin: 10px 0 16px; font-size: 13px; display: block; overflow-x: auto; }
+.doc-body th, .doc-body td { border: 1px solid var(--border-strong); padding: 6px 10px; text-align: left; vertical-align: top; color: var(--text); }
+.doc-body th { background: var(--bg-card-2); font-weight: 700; }
+.doc-body blockquote {
+  margin: 12px 0; padding: 8px 14px; border-left: 4px solid var(--warn);
+  background: var(--bg-card-2); color: var(--text); border-radius: 0 6px 6px 0;
+}
+.doc-body blockquote p { margin: 4px 0; }
+.doc-body ul.contains-task-list, .doc-body li.task-list-item { list-style: none; }
+.doc-body li.task-list-item { margin-left: -18px; }
+.doc-body input[type=checkbox] { margin-right: 6px; transform: translateY(1px); cursor: pointer; }
+.doc-fallback { white-space: pre-wrap; font-family: monospace; font-size: 12.5px; }
+</style>
+
+<div class="doc-wrap">
+  <div class="doc-top">
+    <h1>📖 Minerva API — інтеграція магазину</h1>
+    <p>Як підключити зовнішній сайт: залишки складу, замовлення з магазину, доставка і трекінг, вебхуки, приклади коду і тестування.</p>
+    <div>Базова адреса API: <span class="doc-base">{{ api_base }}</span></div>
+    <div class="doc-links">
+      <a class="doc-btn" href="/admin/api/apikey/">🔑 API Токени</a>
+      <a class="doc-btn" href="/admin/api/webhook/">📡 Вебхуки</a>
+      <a class="doc-btn" href="/admin/api/webhookdelivery/">📋 Журнал вебхуків</a>
+      <a class="doc-btn" href="{% url 'api_console' %}?preset=minerva_ping">🖥 Консоль (Ping)</a>
+      <a class="doc-btn" href="{% url 'api_docs_example' 'shop_client.py' %}?download=1">⬇ shop_client.py</a>
+      <a class="doc-btn" href="{% url 'api_docs_example' 'webhook_receiver.py' %}?download=1">⬇ webhook_receiver.py</a>
+    </div>
+  </div>
+
+  <div class="doc-grid">
+    <nav class="doc-toc" id="doc-toc"><div class="doc-toc-title">Зміст</div></nav>
+    <article class="doc-body" id="doc-body"></article>
+  </div>
+</div>
+
+{{ readme_md|json_script:"readme-md" }}
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+<script>
+(function () {
+  const md   = JSON.parse(document.getElementById('readme-md').textContent);
+  const body = document.getElementById('doc-body');
+  const toc  = document.getElementById('doc-toc');
+
+  if (typeof marked === 'undefined') {           // CDN недоступний — показуємо як текст
+    const pre = document.createElement('div');
+    pre.className = 'doc-fallback';
+    pre.textContent = md;
+    body.appendChild(pre);
+    return;
+  }
+  body.innerHTML = marked.parse(md, { gfm: true });
+
+  // Зміст із заголовків
+  const slug = (t, i) => 'sec-' + i + '-' + t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40);
+  const links = [];
+  body.querySelectorAll('h2, h3').forEach((h, i) => {
+    h.id = slug(h.textContent, i);
+    const a = document.createElement('a');
+    a.href = '#' + h.id;
+    a.textContent = h.textContent;
+    a.className = h.tagName.toLowerCase();
+    toc.appendChild(a);
+    links.push([h, a]);
+  });
+  const onScroll = () => {
+    let cur = links[0];
+    for (const l of links) { if (l[0].getBoundingClientRect().top < 80) cur = l; }
+    links.forEach(l => l[1].classList.toggle('active', l === cur));
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  // Кнопка «Копіювати» на кожному блоці коду
+  body.querySelectorAll('pre').forEach(pre => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'doc-copy';
+    btn.textContent = 'Копіювати';
+    btn.addEventListener('click', () => {
+      const text = pre.querySelector('code') ? pre.querySelector('code').textContent : pre.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        btn.textContent = 'Скопійовано ✓';
+        setTimeout(() => { btn.textContent = 'Копіювати'; }, 1500);
+      });
+    });
+    pre.appendChild(btn);
+  });
+
+  // Чеклисти: можна відмічати, стан зберігається в цьому браузері
+  body.querySelectorAll('input[type=checkbox]').forEach((cb, i) => {
+    const key = 'minerva-apidocs-cb-' + i;
+    cb.disabled = false;
+    try { cb.checked = localStorage.getItem(key) === '1'; } catch (e) {}
+    cb.addEventListener('change', () => {
+      try { localStorage.setItem(key, cb.checked ? '1' : '0'); } catch (e) {}
+    });
+  });
+
+  if (location.hash) {
+    const el = document.getElementById(location.hash.slice(1));
+    if (el) el.scrollIntoView();
+  }
+})();
+</script>
+{% endblock %}

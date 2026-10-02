@@ -2,6 +2,8 @@
 
 Базовий URL: `https://<ваш-домен>/api/v1/` (локально `http://localhost:8000/api/v1/`)
 
+**Зміст:** 1. Підключення · 2. Склад · 3. Товари · 4. Замовлення · 5. Доставка · 6. Вебхуки · 7. Як протестувати · 8. Як впровадити в магазин · 9. Коди помилок · 10. Безпека і запуск
+
 ## 1. Підключення
 
 1. **Адмін → REST API → API Ключі → Додати.**
@@ -273,23 +275,254 @@ python api/examples/webhook_receiver.py
 
 ---
 
-## 8. Типова схема інтеграції магазину
+## 8. Як впровадити в магазин
+
+Інтеграція — це чотири точки в серверному коді магазину: синхронізація залишків, перевірка кошика, передача замовлення, прийом вебхуків.
 
 | Подія в магазині | Виклик Minerva |
 |---|---|
-| Кожні 5–15 хв (cron) | `GET /stock/?changed_since=<час минулого запуску>` → оновити наявність |
-| Користувач у кошику / checkout | `POST /stock/check/` |
+| Зміна залишку в Minerva | вебхук `stock.changed` → оновити наявність |
+| Кожні 5–15 хв або раз на добу (cron) | `GET /stock/?changed_since=<час минулого запуску>` — страховка, якщо вебхук загубився |
+| Кошик / checkout | `POST /stock/check/` |
 | Замовлення оплачене | `POST /orders/` з `check_stock: true` (при помилці мережі — просто повторити) |
 | Замовлення скасоване в магазині | `POST /orders/{id}/cancel/` |
-| Сторінка «Мої замовлення» | `GET /orders/?order_number=…` + `GET /shipments/?order_number=…` → статус і `tracking_url` |
-| Миттєве оновлення наявності / статусів | вебхуки `stock.changed`, `order.status_changed`, `shipment.updated` |
+| Статус і трекінг для покупця | вебхуки `order.status_changed`, `shipment.updated`, або `GET /shipments/?order_number=…` |
 
-## Коди помилок
-| HTTP | `code` | Причина |
-|---|---|---|
-| 401 | — | немає/невірний/прострочений ключ |
-| 403 | — | у ключа немає потрібного scope (назва scope в `detail`) |
-| 400 | `invalid_lines`, `fractional_qty`, `location_not_found`, `wrong_location_type`, … | невірні дані |
-| 404 | `sku_not_found` | товар не знайдено |
-| 409 | `insufficient_stock`, `already_shipped` | бізнес-конфлікт |
-| 429 | — | перевищено ліміт запитів |
+### План впровадження
+
+1. **SKU.** SKU товару в магазині має збігатися зі SKU в Minerva. Якщо ні — додайте аліас (`/admin/inventory/productalias/`), API розпізнає його сам.
+2. **Ключ.** Окремий ключ для магазину: `stock:read`, `orders:read`, `orders:write`, `shipments:read`, `webhooks:read`, `webhooks:write`; джерело замовлень — `webshop`. Ключ — у змінну оточення `MINERVA_TOKEN` на сервері магазину.
+3. **Перша синхронізація.** Повний `GET /stock/` → записати `available` у товари магазину. Товари без пари — виправити SKU.
+4. **Вебхук.** `POST /webhooks/` (або в адмінці) + обробник із перевіркою підпису. Перевірка: `POST /webhooks/{id}/test/`.
+5. **Checkout.** Перед оплатою — `POST /stock/check/`; якщо `ok: false`, показати покупцю, чого бракує.
+6. **Замовлення.** Після оплати — `POST /orders/`, зберегти `id` замовлення Minerva. При `0` (мережа), `429`, `5xx` — повторити пізніше з тим самим `order_number`: дубля не буде.
+7. **Статуси.** Вебхуки `order.status_changed` і `shipment.updated` оновлюють замовлення в магазині; `tracking_url` — у лист покупцю.
+8. **Страховка.** Щоденний cron з повним `GET /stock/`.
+9. **Запуск.** Пройти тестовий сценарій і чеклист (розділ 10).
+
+### PHP — клієнт API
+
+```php
+<?php
+// minerva.php
+function minerva(string $method, string $path, ?array $body = null): array {
+    $ch = curl_init(getenv('MINERVA_URL') . '/api/v1' . $path);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST  => $method,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_HTTPHEADER     => [
+            'Authorization: Token ' . getenv('MINERVA_TOKEN'),
+            'Content-Type: application/json',
+            'Accept: application/json',
+        ],
+    ]);
+    if ($body !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    }
+    $raw  = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);   // 0 = мережа недоступна
+    curl_close($ch);
+    return [$code, json_decode($raw ?: 'null', true)];
+}
+```
+
+### PHP — синхронізація залишків (cron)
+
+```php
+<?php
+require 'minerva.php';
+$stateFile = __DIR__ . '/minerva_last_sync.txt';
+$since     = @file_get_contents($stateFile) ?: null;   // видаліть файл для повної синхронізації
+$started   = gmdate('c');
+
+$path = '/stock/?page_size=500' . ($since ? '&changed_since=' . urlencode($since) : '');
+while ($path) {
+    [$code, $data] = minerva('GET', $path);
+    if ($code !== 200) { exit("Minerva error $code\n"); }
+    foreach ($data['results'] as $item) {
+        shop_set_stock($item['sku'], $item['available']);   // функція вашого магазину
+    }
+    $path = $data['next'] ? substr($data['next'], strpos($data['next'], '/stock/')) : null;
+}
+file_put_contents($stateFile, $started);
+```
+
+### PHP — замовлення після оплати
+
+```php
+<?php
+require 'minerva.php';
+
+function push_order_to_minerva($order): void {   // $order — замовлення вашого магазину
+    [$code, $res] = minerva('POST', '/orders/', [
+        'order_number'  => (string) $order->number,
+        'currency'      => 'EUR',
+        'client'        => $order->billing_name,
+        'email'         => $order->email,
+        'phone'         => $order->phone,
+        'addr_street'   => $order->street,
+        'addr_city'     => $order->city,
+        'addr_zip'      => $order->zip,
+        'addr_country'  => $order->country,       // ISO-2: DE, AT, UA...
+        'shipping_cost' => $order->shipping_total,
+        'check_stock'   => true,
+        'lines'         => array_map(fn($i) => [
+            'sku' => $i->sku, 'qty' => $i->qty, 'unit_price' => $i->price,
+        ], $order->items),
+    ]);
+
+    if ($code === 201 || $code === 200) {
+        $order->minerva_id = $res['id'];           // 200 = вже було створене раніше
+        $order->save();
+    } elseif ($code === 409) {
+        notify_manager("Немає товару для {$order->number}", $res['items']);
+    } elseif ($code === 400) {
+        notify_manager("Помилка даних {$order->number}", $res);   // невідомий SKU тощо
+    } else {
+        queue_retry('push_order_to_minerva', $order->id);   // 0, 429, 5xx — повторити пізніше
+    }
+}
+```
+
+### PHP — прийом вебхука
+
+```php
+<?php
+// minerva-hook.php — URL цього файлу реєструється в Minerva як вебхук
+$body = file_get_contents('php://input');
+parse_str(str_replace(',', '&', $_SERVER['HTTP_X_MINERVA_SIGNATURE'] ?? ''), $sig);
+$expected = hash_hmac('sha256', ($sig['t'] ?? '') . '.' . $body, getenv('MINERVA_WEBHOOK_SECRET'));
+if (!hash_equals($expected, $sig['v1'] ?? '') || abs(time() - (int) ($sig['t'] ?? 0)) > 300) {
+    http_response_code(401);
+    exit;
+}
+
+$delivery = $_SERVER['HTTP_X_MINERVA_DELIVERY'];
+if (already_processed($delivery)) { http_response_code(200); exit; }   // повтор
+
+$event = json_decode($body, true);
+switch ($event['event']) {
+    case 'stock.changed':
+        foreach ($event['data']['items'] as $item) {
+            shop_set_stock($item['sku'], $item['available']);
+        }
+        break;
+    case 'order.status_changed':
+        shop_set_order_status($event['data']['order_number'], $event['data']['status']);
+        break;
+    case 'shipment.updated':
+        shop_set_tracking($event['data']['order_number'],
+                          $event['data']['tracking_number'], $event['data']['tracking_url']);
+        break;
+}
+mark_processed($delivery);
+http_response_code(200);
+```
+
+### Node.js (Express)
+
+```javascript
+import crypto from 'node:crypto';
+import express from 'express';
+
+const API = `${process.env.MINERVA_URL}/api/v1`;
+
+export async function minerva(method, path, body) {
+  const r = await fetch(API + path, {
+    method,
+    headers: {
+      Authorization: `Token ${process.env.MINERVA_TOKEN}`,
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { status: r.status, data: await r.json().catch(() => null) };
+}
+
+// Перевірка кошика
+export async function cartAvailable(cart) {
+  const { data } = await minerva('POST', '/stock/check/', {
+    items: cart.map(i => ({ sku: i.sku, qty: i.qty })),
+  });
+  return data;   // { ok, items: [{ sku, requested, available, ok }] }
+}
+
+// Вебхук: сире тіло потрібне для підпису — тому express.raw, а не express.json
+const app = express();
+app.post('/minerva-hook', express.raw({ type: 'application/json' }), (req, res) => {
+  const body = req.body.toString('utf8');
+  const sig = Object.fromEntries(
+    (req.get('X-Minerva-Signature') || '').split(',').map(p => p.split('=')));
+  const expected = crypto.createHmac('sha256', process.env.MINERVA_WEBHOOK_SECRET)
+    .update(`${sig.t}.${body}`).digest('hex');
+  const valid = sig.v1?.length === expected.length
+    && crypto.timingSafeEqual(Buffer.from(sig.v1), Buffer.from(expected))
+    && Math.abs(Date.now() / 1000 - Number(sig.t)) < 300;
+  if (!valid) return res.sendStatus(401);
+
+  res.sendStatus(200);                       // відповідаємо одразу, обробляємо після
+  const event = JSON.parse(body);
+  if (event.event === 'stock.changed') {
+    for (const item of event.data.items) setStock(item.sku, item.available);
+  }
+});
+app.listen(3000);
+```
+
+---
+
+## 9. Коди помилок
+
+У тілі помилки є `detail` (текст для людини) і часто `code` (для коду магазину). Повторювати варто лише `429`, `5xx` і помилки мережі.
+
+| HTTP | `code` | Причина | Що робити |
+|---|---|---|---|
+| 400 | `invalid_lines` | невідомий SKU або дробова кількість у рядках замовлення | виправити SKU / додати аліас |
+| 400 | `fractional_qty`, `zero_qty` | невірна кількість | виправити дані |
+| 400 | `location_not_found`, `location_inactive`, `wrong_location_type` | проблема з локацією складу | перевірити `GET /locations/` |
+| 401 | — | немає ключа, ключ невірний, неактивний або прострочений | перевірити ключ в адмінці |
+| 403 | — | у ключа немає права; назва scope — у `detail` | додати scope до ключа |
+| 404 | `sku_not_found` | товар або запис не знайдено | перевірити SKU / id |
+| 405 | — | DELETE не підтримується | для замовлень — `/cancel/` |
+| 409 | `insufficient_stock` | товару не вистачає; перелік — у `items` / `details` | повідомити покупця або менеджера |
+| 409 | `already_shipped` | скасування відправленого замовлення | оформити повернення вручну |
+| 429 | — | перевищено ліміт запитів | чекати `Retry-After` секунд і повторити |
+| 502 | — | тестовий вебхук не доставлено | дивитись `response_code`, `response_body` |
+| 5xx | — | помилка сервера Minerva | повторити пізніше; замовлення не дублюються |
+
+---
+
+## 10. Безпека і чекліст запуску
+
+**Тестовий сценарій (~15 хв)**
+
+- [ ] Створити ключ `webshop-test` з усіма scopes і джерелом замовлень `webshop-test`
+- [ ] Консоль → «Ping»: у відповіді назва ключа і права
+- [ ] «Залишки»: запам'ятати `available` тестового товару
+- [ ] «Прихід» на 10 шт: `available_after` +10; повтор з тим самим `external_key` → `200`, залишок не змінився
+- [ ] «Перевірка кошика» з qty більше залишку → `ok: false`
+- [ ] «Нове замовлення» → `201`, `created: true`; замовлення в адмінці, клієнт у CRM, залишок менший
+- [ ] Те саме замовлення ще раз → `200`, `created: false`
+- [ ] Замовлення з неіснуючим SKU → `400 invalid_lines`
+- [ ] `POST /orders/{id}/cancel/` → `cancelled`, залишок повернувся
+- [ ] Приймач вебхуків + вебхук → прихід → подія `stock.changed` у приймачі
+- [ ] Вимкнути приймач, зробити прихід → у «Журналі вебхуків» «Очікує»; увімкнути → за 1–5 хв «Доставлено»
+- [ ] Прибрати тестові замовлення, вимкнути тестовий ключ і вебхук
+
+**Безпека**
+
+- [ ] Окремий ключ на кожну систему (магазин, тест, скрипти)
+- [ ] Лише потрібні scopes; магазину зазвичай не потрібні `stock:write`, `products:write`, `customers:*`
+- [ ] Ключ і секрет вебхука — у змінних оточення магазину, не в коді, не в git, не в JavaScript сторінки
+- [ ] «Дійсний до» для тимчасових ключів
+- [ ] Вебхук — на HTTPS URL; обробник відхиляє запити без валідного підпису
+- [ ] Ліміт запитів підібрано під магазин (`API_RATE_LIMIT`)
+
+**Запуск магазину**
+
+- [ ] Усі SKU магазину знаходяться в Minerva
+- [ ] Налаштування складу обрано свідомо: коли списувати, чи бронювати, чи дозволяти від'ємний залишок
+- [ ] Магазин повторює невдалі `POST /orders/`
+- [ ] Щоденна повна синхронізація залишків увімкнена
+- [ ] Перший тиждень хтось дивиться «Журнал вебхуків» і стан вебхука
