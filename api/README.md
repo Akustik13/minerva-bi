@@ -543,9 +543,9 @@ app.listen(3000);
 
 | Запит | Scope | Що робить |
 |---|---|---|
-| `GET /shop/products/` | `products:read` | лише активні товари з галочкою і ціною: `sku, name, name_export, category, unit_type, price` (нетто), `available, in_stock, incoming, lead_time_days`, фото, даташит. Закупівельних цін немає. Фільтри як у `/stock/` |
+| `GET /shop/products/` | `products:read` | активні товари з галочкою (без ціни теж, `price: null` — «ціна за запитом»): `sku, name, name_export, category, unit_type, price` (нетто), `available, in_stock, incoming, lead_time_days`, фото, даташит. Закупівельних цін немає. Фільтри як у `/stock/` |
 | `GET /shop/products/{sku}/` | `products:read` | один товар магазину (404, якщо його нема в магазині) |
-| `POST /orders/` з `"shop": true` | `orders:write` | лише товари магазину; **ціни завжди з Мінерви** (`unit_price`, `total_price` з запиту ігноруються); `payment_status` за замовчуванням `unpaid` |
+| `POST /orders/` з `"shop": true` | `orders:write` | лише товари магазину з ціною; **ціни завжди з Мінерви**; `check_stock: false` — замовлення «під замовлення» навіть при нульовому залишку (`unit_price`, `total_price` з запиту ігноруються); `payment_status` за замовчуванням `unpaid` |
 | `PATCH /orders/{id}/` | `orders:write` | `{"payment_status": "paid", "payment_reference": "…"}` — після онлайн-оплати |
 
 Вебхук `stock.changed` надсилається також, коли змінюється галочка, ціна, назва, категорія або фото товару, що є в магазині, — сайт одразу скидає кеш каталогу.

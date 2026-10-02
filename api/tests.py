@@ -307,6 +307,25 @@ class ShopTests(APITestBase):
         self.p1.save()
         self.assertEqual(self.client.get("/api/v1/shop/products/AMP-100/").json()["price"], 99.0)
 
+    def test_product_without_price_listed_but_not_orderable(self):
+        self.p1.shop_price = None
+        self.p1.sale_price = None
+        self.p1.save()
+        self.assertIsNone(self.client.get("/api/v1/shop/products/AMP-100/").json()["price"])
+        r = self.client.post("/api/v1/orders/", dict(OrderTests.ORDER, shop=True), format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("запитом", r.json()["lines"][0]["error"])
+
+    def test_backorder_zero_stock(self):
+        s = InventorySettings.get()
+        s.allow_negative_stock = False
+        s.save()
+        body = dict(OrderTests.ORDER, shop=True, lines=[{"sku": "AMP-100", "qty": 50}])
+        r = self.client.post("/api/v1/orders/", dict(body, check_stock=True), format="json")
+        self.assertEqual(r.status_code, 409)
+        r = self.client.post("/api/v1/orders/", dict(body, order_number="WS-2", check_stock=False), format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+
     def test_shop_order_uses_minerva_prices(self):
         body = dict(OrderTests.ORDER, shop=True, payment_method="prepayment",
                     total_price=1, lines=[{"sku": "AMP-100", "qty": 2, "unit_price": 0.01}])

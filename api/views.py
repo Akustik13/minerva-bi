@@ -1,7 +1,6 @@
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action, api_view
@@ -205,7 +204,8 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
 
 class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
     """
-    Каталог інтернет-магазину: активні товари з «Показувати в магазині» і ціною.
+    Каталог інтернет-магазину: активні товари з «Показувати в магазині».
+    Товар без ціни теж віддається (price = null) — сайт показує «ціна за запитом».
     GET /shop/products/ (фільтри як у /stock/: sku, category, search, in_stock, changed_since)
     GET /shop/products/{sku}/
     """
@@ -217,8 +217,7 @@ class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_value_regex = r"[^/]+"
 
     def get_queryset(self):
-        qs = (Product.objects.filter(shop_visible=True, is_active=True)
-              .filter(Q(shop_price__isnull=False) | Q(sale_price__isnull=False)))
+        qs = Product.objects.filter(shop_visible=True, is_active=True)
         return stock_service.annotate_stock(qs).order_by("category", "sku")
 
 
@@ -315,16 +314,20 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 errors.append({"line": i, "sku": raw, "error": "Товар не знайдено"})
             elif not product.is_fractional_unit() and ln["qty"] != int(ln["qty"]):
                 errors.append({"line": i, "sku": raw, "error": "Кількість має бути цілою (штуки)"})
-            elif is_shop and not (product.shop_visible and product.is_active
-                                  and product.shop_effective_price is not None):
+            elif is_shop and not (product.shop_visible and product.is_active):
                 errors.append({"line": i, "sku": raw, "error": "Товар недоступний в інтернет-магазині"})
+            elif is_shop and product.shop_effective_price is None:
+                errors.append({"line": i, "sku": raw, "error": "Ціна не задана — товар лише за запитом"})
             else:
                 resolved.append((product, raw, ln))
         if errors:
             return Response({"detail": "Помилки в рядках замовлення.", "code": "invalid_lines",
                              "lines": errors}, status=status.HTTP_400_BAD_REQUEST)
 
-        if d.get("affects_stock", True) and (check_stock or not InventorySettings.get().allow_negative_stock):
+        # Магазин сам вирішує (check_stock=false → замовлення «під замовлення» при нульовому залишку);
+        # для інших джерел діє також заборона від'ємного залишку з налаштувань складу.
+        must_check = check_stock or (not is_shop and not InventorySettings.get().allow_negative_stock)
+        if d.get("affects_stock", True) and must_check:
             avail = stock_service.check_availability(
                 [{"sku": p.sku, "qty": ln["qty"]} for p, _, ln in resolved])
             short = [a for a in avail if not a["ok"]]
