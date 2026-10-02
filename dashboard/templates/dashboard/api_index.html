@@ -127,9 +127,14 @@
       <strong style="color:var(--text)">📖 Документація інтеграції магазину</strong>
       <p style="margin-top:4px">Як підключити сайт: залишки складу, замовлення, доставка, вебхуки, приклади коду PHP / Node.js / Python і як усе протестувати.</p>
     </div>
-    <a href="{% url 'api_docs' %}" class="api-btn api-btn-prim" style="white-space:nowrap;font-size:13px;padding:8px 16px">
-      Відкрити документацію →
-    </a>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      <a href="{% url 'api_docs_example' 'api_tester.html' %}?download=1" class="api-btn api-btn-prim" style="white-space:nowrap;font-size:13px;padding:8px 16px">
+        🧪 Завантажити API-тестер
+      </a>
+      <a href="{% url 'api_docs' %}" class="api-btn api-btn-prim" style="white-space:nowrap;font-size:13px;padding:8px 16px">
+        Відкрити документацію →
+      </a>
+    </div>
   </div>
 
   <!-- Console banner -->
