@@ -266,3 +266,20 @@ class WebhookTests(APITestBase):
         Webhook.objects.create(name="admin-hook", url="https://x.example/")
         self.register()
         self.assertEqual([h["name"] for h in self.client.get("/api/v1/webhooks/").json()], ["shop"])
+
+
+class CorsTests(APITestBase):
+    def test_preflight_and_headers(self):
+        r = APIClient().options("/api/v1/stock/", HTTP_ORIGIN="null",
+                                HTTP_ACCESS_CONTROL_REQUEST_METHOD="GET",
+                                HTTP_ACCESS_CONTROL_REQUEST_HEADERS="authorization")
+        self.assertEqual(r.status_code, 204)
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+        self.assertIn("Authorization", r["Access-Control-Allow-Headers"])
+        self.assertNotIn("Access-Control-Allow-Credentials", r)
+        r = self.client.get("/api/v1/ping/", HTTP_ORIGIN="https://shop.example")
+        self.assertEqual(r["Access-Control-Allow-Origin"], "*")
+
+    def test_no_cors_outside_api(self):
+        r = APIClient().get("/admin/login/", HTTP_ORIGIN="https://shop.example")
+        self.assertFalse(r.has_header("Access-Control-Allow-Origin"))

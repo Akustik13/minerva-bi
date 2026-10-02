@@ -62,7 +62,7 @@ api_index = staff_member_required(api_index)
 
 # ── Документація інтеграції (рендер api/README.md) ────────────────────────────
 
-API_EXAMPLES = {"shop_client.py", "webhook_receiver.py"}
+API_EXAMPLES = {"shop_client.py", "webhook_receiver.py", "api_tester.html"}
 
 
 def api_docs(request):

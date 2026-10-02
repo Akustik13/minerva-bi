@@ -69,6 +69,7 @@ INSTALLED_APPS = [
 SITE_ID = 1
 
 _MIDDLEWARE_BASE = [
+    "api.middleware.APICorsMiddleware",   # CORS тільки для /api/v1/ (ключ у заголовку, без cookie)
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
@@ -84,7 +85,7 @@ _MIDDLEWARE_BASE = [
 ]
 # Whitenoise — тільки production (DEBUG=False), щоб не гальмувати локальний dev
 if not DEBUG:
-    _MIDDLEWARE_BASE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+    _MIDDLEWARE_BASE.insert(2, "whitenoise.middleware.WhiteNoiseMiddleware")
 MIDDLEWARE = _MIDDLEWARE_BASE
 
 ROOT_URLCONF = "tabele.urls"

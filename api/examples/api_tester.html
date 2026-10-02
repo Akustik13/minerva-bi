@@ -1,0 +1,358 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minerva API Тестер</title>
+<style>
+:root {
+  --bg: #f4f6f8; --card: #ffffff; --card2: #f7f9fb; --text: #1c2128; --muted: #57606a;
+  --border: #d0d7de; --accent: #0969da; --ok: #1a7f37; --warn: #9a6700; --err: #cf222e;
+  --code-bg: #f6f8fa;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1117; --card: #161b22; --card2: #1c2128; --text: #e6edf3; --muted: #9aa7b4;
+    --border: #30363d; --accent: #58a6ff; --ok: #3fb950; --warn: #d29922; --err: #f85149;
+    --code-bg: #0d1117;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+header { padding: 18px 20px 6px; max-width: 1200px; margin: 0 auto; }
+header h1 { margin: 0; font-size: 20px; }
+header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+main {
+  max-width: 1200px; margin: 0 auto; padding: 12px 20px 40px;
+  display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 16px; align-items: start;
+}
+@media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+.card h2 { margin: 0 0 10px; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+label { display: block; font-size: 12px; color: var(--muted); margin: 8px 0 3px; }
+input, select, textarea {
+  width: 100%; padding: 7px 9px; font: inherit; color: var(--text); background: var(--card2);
+  border: 1px solid var(--border); border-radius: 5px;
+}
+textarea { font-family: Consolas, Monaco, monospace; font-size: 12.5px; min-height: 90px; resize: vertical; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+.row > .narrow { flex: 0 0 90px; }
+.keyrow { display: flex; gap: 6px; }
+.keyrow input { flex: 1; }
+.check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.check input { width: auto; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+button {
+  font: inherit; font-size: 13px; font-weight: 600; padding: 7px 12px; cursor: pointer;
+  color: var(--text); background: var(--card2); border: 1px solid var(--border); border-radius: 5px;
+}
+button:hover { border-color: var(--accent); }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.write { border-left: 3px solid var(--warn); }
+.hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.resp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+.badge { font-weight: 700; padding: 2px 9px; border-radius: 10px; font-size: 13px; color: #fff; }
+.b-ok { background: var(--ok); } .b-warn { background: var(--warn); } .b-err { background: var(--err); } .b-none { background: var(--muted); }
+.req { font-family: Consolas, Monaco, monospace; font-size: 12.5px; color: var(--text); word-break: break-all; }
+.meta { font-size: 12px; color: var(--muted); }
+.explain { padding: 8px 12px; border-radius: 6px; background: var(--card2); border-left: 4px solid var(--border); margin-bottom: 8px; font-size: 13px; }
+.explain.ok { border-left-color: var(--ok); } .explain.warn { border-left-color: var(--warn); } .explain.err { border-left-color: var(--err); }
+pre {
+  margin: 0; background: var(--code-bg); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px; overflow: auto; max-height: 70vh; font: 12.5px/1.5 Consolas, Monaco, monospace; white-space: pre;
+}
+.history { list-style: none; margin: 0; padding: 0; font-size: 12.5px; }
+.history li { display: flex; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.history li:hover { color: var(--accent); }
+.history .s { font-weight: 700; min-width: 34px; }
+.sticky { position: sticky; top: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🧪 Minerva API — тестер</h1>
+  <p>Вставте адресу Minerva і API-ключ, натискайте кнопки — сторінка сама формує запит і показує відповідь сервера. Ключ нікуди, крім вказаного сервера, не надсилається.</p>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Підключення</h2>
+      <label for="base">Адреса Minerva</label>
+      <input id="base" value="https://sevskiy.minerva-bi.com/" placeholder="https://sevskiy.minerva-bi.com/">
+      <label for="key">API-ключ</label>
+      <div class="keyrow">
+        <input id="key" type="password" placeholder="вставте ключ з Адмін → REST API → API Токени" autocomplete="off">
+        <button type="button" id="toggle-key" title="Показати / сховати">👁</button>
+      </div>
+      <label class="check"><input type="checkbox" id="remember"> Запам'ятати ключ у цьому браузері</label>
+      <div class="btns">
+        <button class="primary" data-act="ping">🔌 Перевірити підключення</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Склад</h2>
+      <div class="row">
+        <div><label for="sku">SKU</label><input id="sku" placeholder="напр. AMP-100"></div>
+        <div class="narrow"><label for="qty">Кількість</label><input id="qty" type="number" value="1" min="0" step="any"></div>
+      </div>
+      <label for="search">Пошук / фільтр списку</label>
+      <input id="search" placeholder="частина SKU або назви (необов'язково)">
+      <div class="btns">
+        <button data-act="stock">🏬 Залишки</button>
+        <button data-act="stock_one">📦 Один товар</button>
+        <button data-act="in_stock">✅ В наявності</button>
+        <button data-act="low_stock">⚠️ Мало на складі</button>
+        <button data-act="check">🛒 Перевірка кошика</button>
+        <button data-act="movements">📜 Рухи товару</button>
+        <button data-act="locations">📍 Локації</button>
+        <button class="write" data-act="incoming">📥 Прихід</button>
+      </div>
+      <p class="hint">Кнопки з жовтою смужкою <b>змінюють дані</b> в Minerva і перед відправкою просять підтвердження.</p>
+    </div>
+
+    <div class="card">
+      <h2>Замовлення і доставка</h2>
+      <div class="row">
+        <div><label for="order-number">Номер замовлення магазину</label><input id="order-number" placeholder="заповниться автоматично"></div>
+        <div class="narrow"><label for="order-id">ID Minerva</label><input id="order-id" placeholder="—"></div>
+      </div>
+      <div class="row">
+        <div><label for="client">Покупець</label><input id="client" value="Test Kunde"></div>
+        <div class="narrow"><label for="country">Країна</label><input id="country" value="DE" maxlength="2"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="check-stock" checked> Відхилити, якщо товару не вистачає (check_stock)</label>
+      <div class="btns">
+        <button data-act="orders">🧾 Останні замовлення</button>
+        <button data-act="order_find">🔎 Знайти за номером</button>
+        <button data-act="order_get">📄 Деталі за ID</button>
+        <button data-act="shipments">🚚 Відправлення / трекінг</button>
+        <button class="write" data-act="order_create">➕ Створити тестове замовлення</button>
+        <button class="write" data-act="order_cancel">✖ Скасувати за ID</button>
+      </div>
+      <p class="hint">Тестове замовлення справжнє: списує товар зі складу (SKU і кількість — з блоку «Склад»). Після тесту скасуйте його — товар повернеться.</p>
+    </div>
+
+    <div class="card">
+      <h2>Довільний запит</h2>
+      <div class="row">
+        <div class="narrow"><label for="m">Метод</label>
+          <select id="m"><option>GET</option><option>POST</option><option>PATCH</option><option>DELETE</option></select></div>
+        <div><label for="p">Шлях після /api/v1/</label><input id="p" value="stock/?page_size=5"></div>
+      </div>
+      <label for="b">Тіло (JSON, для POST / PATCH)</label>
+      <textarea id="b" placeholder='{"items": [{"sku": "AMP-100", "qty": 1}]}'></textarea>
+      <div class="btns"><button class="primary" data-act="custom">▶ Надіслати</button></div>
+    </div>
+  </section>
+
+  <section class="sticky">
+    <div class="card">
+      <h2>Відповідь сервера</h2>
+      <div class="resp-head">
+        <span id="status" class="badge b-none">—</span>
+        <span id="req" class="req">Натисніть будь-яку кнопку зліва</span>
+      </div>
+      <div class="meta" id="meta"></div>
+      <div id="explain" class="explain" hidden></div>
+      <div class="btns" style="margin:0 0 8px"><button type="button" id="copy">📋 Копіювати відповідь</button></div>
+      <pre id="out"></pre>
+    </div>
+    <div class="card">
+      <h2>Історія запитів</h2>
+      <ul class="history" id="history"></ul>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const store = {
+    get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} },
+    del: k => { try { localStorage.removeItem(k); } catch (e) {} },
+  };
+
+  // ── Збережені значення ──────────────────────────────────────────────────
+  if (store.get('mt-base')) $('base').value = store.get('mt-base');
+  if (store.get('mt-key')) { $('key').value = store.get('mt-key'); $('remember').checked = true; }
+  if (store.get('mt-sku')) $('sku').value = store.get('mt-sku');
+  $('base').addEventListener('change', () => store.set('mt-base', $('base').value.trim()));
+  $('sku').addEventListener('change', () => store.set('mt-sku', $('sku').value.trim()));
+  const saveKey = () => $('remember').checked ? store.set('mt-key', $('key').value.trim()) : store.del('mt-key');
+  $('remember').addEventListener('change', saveKey);
+  $('key').addEventListener('change', saveKey);
+  $('toggle-key').addEventListener('click', () => {
+    $('key').type = $('key').type === 'password' ? 'text' : 'password';
+  });
+
+  // ── Формування адреси ───────────────────────────────────────────────────
+  function apiBase() {
+    let b = $('base').value.trim();
+    if (!b) throw new Error('Вкажіть адресу Minerva, напр. https://sevskiy.minerva-bi.com/');
+    if (!/^https?:\/\//i.test(b)) b = 'https://' + b;
+    b = b.replace(/\/+$/, '').replace(/\/api\/v1$/i, '').replace(/\/(admin|dashboard)(\/.*)?$/i, '');
+    return b + '/api/v1/';
+  }
+  const enc = encodeURIComponent;
+  const need = (id, what) => {
+    const v = $(id).value.trim();
+    if (!v) { $(id).focus(); throw new Error('Заповніть поле: ' + what); }
+    return v;
+  };
+  const num = id => Number($(id).value || 0);
+
+  // ── Дії кнопок ──────────────────────────────────────────────────────────
+  const ACTIONS = {
+    ping:      () => ['GET', 'ping/'],
+    stock:     () => ['GET', 'stock/?page_size=20' + ($('search').value.trim() ? '&search=' + enc($('search').value.trim()) : '')],
+    stock_one: () => ['GET', 'stock/' + enc(need('sku', 'SKU')) + '/'],
+    in_stock:  () => ['GET', 'stock/?in_stock=true&ordering=-available&page_size=20'],
+    low_stock: () => ['GET', 'stock/?low_stock=true&page_size=20'],
+    check:     () => ['POST', 'stock/check/', { items: [{ sku: need('sku', 'SKU'), qty: num('qty') }] }],
+    movements: () => ['GET', 'stock-movements/?page_size=20' + ($('sku').value.trim() ? '&sku=' + enc($('sku').value.trim()) : '')],
+    locations: () => ['GET', 'locations/'],
+    incoming:  () => ['POST', 'stock-movements/', {
+      sku: need('sku', 'SKU'), tx_type: 'Incoming', qty: num('qty'),
+      ref_doc: 'API тестер', external_key: 'tester-' + Date.now(),
+    }, `Додати ${num('qty')} шт «${$('sku').value.trim()}» на склад?`],
+    orders:      () => ['GET', 'orders/?page_size=10'],
+    order_find:  () => ['GET', 'orders/?order_number=' + enc(need('order-number', 'Номер замовлення'))],
+    order_get:   () => ['GET', 'orders/' + enc(need('order-id', 'ID Minerva')) + '/'],
+    shipments:   () => ['GET', 'shipments/?page_size=10' + ($('order-number').value.trim() ? '&order_number=' + enc($('order-number').value.trim()) : '')],
+    order_create: () => {
+      if (!$('order-number').value.trim()) $('order-number').value = 'TEST-' + Date.now().toString().slice(-8);
+      return ['POST', 'orders/', {
+        order_number: $('order-number').value.trim(),
+        client: $('client').value.trim() || 'Test Kunde',
+        email: 'test@example.com',
+        addr_country: ($('country').value.trim() || 'DE').toUpperCase(),
+        currency: 'EUR',
+        check_stock: $('check-stock').checked,
+        note: 'Створено з API тестера',
+        lines: [{ sku: need('sku', 'SKU'), qty: num('qty') }],
+      }, `Створити СПРАВЖНЄ замовлення ${$('order-number').value.trim()} на ${num('qty')} шт «${$('sku').value.trim()}»?`];
+    },
+    order_cancel: () => ['POST', 'orders/' + enc(need('order-id', 'ID Minerva')) + '/cancel/', { restock: true },
+      `Скасувати замовлення ID ${$('order-id').value.trim()} і повернути товар на склад?`],
+    custom: () => {
+      const m = $('m').value, raw = $('b').value.trim();
+      let body;
+      if (raw && m !== 'GET') {
+        try { body = JSON.parse(raw); } catch (e) { throw new Error('Тіло запиту — невалідний JSON: ' + e.message); }
+      }
+      return [m, $('p').value.trim().replace(/^\/+/, '').replace(/^api\/v1\//, ''), body,
+              m !== 'GET' ? `Надіслати ${m}-запит? Він може змінити дані.` : null];
+    },
+  };
+
+  // ── Пояснення кодів ─────────────────────────────────────────────────────
+  function explain(status, data) {
+    const d = data && typeof data === 'object' ? data : {};
+    if (status === 0) return ['err', 'Сервер не відповів. Перевірте адресу; якщо адреса правильна — на сервері ще не встановлено оновлення з підтримкою CORS (Оновлення системи → 🚀 Повне оновлення).'];
+    if (status === 200 && d.created === false) return ['ok', '200 — таке замовлення вже існувало, дубль не створено (повтор безпечний).'];
+    if (status === 200) return ['ok', '200 — успішно.'];
+    if (status === 201) return ['ok', '201 — створено.'];
+    if (status === 204) return ['ok', '204 — успішно, без вмісту.'];
+    if (status === 400) return ['warn', '400 — невірні дані' + (d.code ? ` (${d.code})` : '') + '. Деталі нижче.'];
+    if (status === 401) return ['err', '401 — ключ не прийнято: невірний, вимкнений або прострочений.'];
+    if (status === 403) return ['err', '403 — у ключа немає потрібного права. ' + (d.detail || '')];
+    if (status === 404) return ['warn', '404 — не знайдено. Якщо це /ping/ — на сервері ще не встановлено оновлення API.'];
+    if (status === 405) return ['warn', '405 — цей метод тут не підтримується.'];
+    if (status === 409) return ['warn', '409 — конфлікт' + (d.code ? ` (${d.code})` : '') + ': ' + (d.detail || '')];
+    if (status === 429) return ['warn', '429 — забагато запитів, зачекайте хвилину.'];
+    if (status >= 500) return ['err', status + ' — помилка на сервері Minerva.'];
+    return ['warn', 'HTTP ' + status];
+  }
+
+  // ── Відправка ───────────────────────────────────────────────────────────
+  const history = [];
+  async function send(method, path, body, confirmText) {
+    const key = $('key').value.trim();
+    if (!key) { $('key').focus(); throw new Error('Вставте API-ключ.'); }
+    if (confirmText && !confirm(confirmText)) return;
+    const url = apiBase() + path;
+
+    $('status').className = 'badge b-none'; $('status').textContent = '…';
+    $('req').textContent = method + ' ' + url;
+    $('meta').textContent = body ? 'Тіло запиту: ' + JSON.stringify(body) : '';
+    $('explain').hidden = true; $('out').textContent = '';
+
+    const t0 = performance.now();
+    let status = 0, data = null, text = '';
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: { Authorization: 'Token ' + key, Accept: 'application/json',
+                   ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      status = r.status;
+      text = await r.text();
+      try { data = JSON.parse(text); } catch (e) { data = null; }
+    } catch (e) {
+      text = String(e);
+    }
+    const ms = Math.round(performance.now() - t0);
+
+    const cls = status >= 200 && status < 300 ? 'b-ok' : status === 0 || status >= 500 || status === 401 || status === 403 ? 'b-err' : 'b-warn';
+    $('status').className = 'badge ' + cls;
+    $('status').textContent = status || 'немає відповіді';
+    $('meta').textContent = `${ms} мс` + (body ? ' · тіло: ' + JSON.stringify(body) : '');
+    const [kind, msg] = explain(status, data);
+    $('explain').className = 'explain ' + kind; $('explain').textContent = msg; $('explain').hidden = false;
+    $('out').textContent = data !== null ? JSON.stringify(data, null, 2) : (text || '(порожньо)').slice(0, 5000);
+
+    // Підхоплюємо ID / номер створеного замовлення для наступних кнопок
+    if (data && data.order_number && data.id && path.startsWith('orders/')) {
+      $('order-id').value = data.id; $('order-number').value = data.order_number;
+    }
+
+    history.unshift({ method, path, body, status });
+    $('history').innerHTML = '';
+    history.slice(0, 15).forEach(h => {
+      const li = document.createElement('li');
+      const s = document.createElement('span'); s.className = 's'; s.textContent = h.status || '—';
+      s.style.color = h.status >= 200 && h.status < 300 ? 'var(--ok)' : 'var(--err)';
+      const t = document.createElement('span'); t.textContent = h.method + ' /api/v1/' + h.path;
+      li.append(s, t);
+      li.title = 'Повторити в «Довільний запит»';
+      li.addEventListener('click', () => {
+        $('m').value = h.method; $('p').value = h.path;
+        $('b').value = h.body ? JSON.stringify(h.body, null, 2) : '';
+        $('p').scrollIntoView({ block: 'center' });
+      });
+      $('history').appendChild(li);
+    });
+  }
+
+  document.querySelectorAll('button[data-act]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      try {
+        const [m, p, b, c] = ACTIONS[btn.dataset.act]();
+        await send(m, p, b, c);
+      } catch (e) {
+        $('status').className = 'badge b-warn'; $('status').textContent = '!';
+        $('req').textContent = 'Запит не відправлено'; $('meta').textContent = ''; $('out').textContent = '';
+        $('explain').className = 'explain warn'; $('explain').textContent = e.message; $('explain').hidden = false;
+      }
+    });
+  });
+
+  $('copy').addEventListener('click', () => {
+    navigator.clipboard.writeText($('out').textContent).then(() => {
+      $('copy').textContent = '✓ Скопійовано';
+      setTimeout(() => { $('copy').textContent = '📋 Копіювати відповідь'; }, 1500);
+    });
+  });
+})();
+</script>
+</body>
+</html>
