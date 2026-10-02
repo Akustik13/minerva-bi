@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action, api_view
@@ -17,7 +18,7 @@ from .serializers import (
     ProductSerializer, ProductWithStockSerializer, CustomerSerializer,
     StockSerializer, StockCheckSerializer, MovementSerializer, MovementCreateSerializer,
     StockCountSerializer, LocationSerializer, CategorySerializer, ShipmentSerializer,
-    WebhookSerializer, WebhookDeliverySerializer,
+    WebhookSerializer, WebhookDeliverySerializer, ShopProductSerializer,
 )
 from sales.models import SalesOrder, SalesOrderLine
 from inventory.models import (
@@ -200,6 +201,27 @@ class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = None
 
 
+# ── Інтернет-магазин ──────────────────────────────────────────────────────────
+
+class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Каталог інтернет-магазину: активні товари з «Показувати в магазині» і ціною.
+    GET /shop/products/ (фільтри як у /stock/: sku, category, search, in_stock, changed_since)
+    GET /shop/products/{sku}/
+    """
+    resource_scope   = "products"
+    serializer_class = ShopProductSerializer
+    filterset_class  = ProductFilter
+    ordering_fields  = ["sku", "name", "category"]
+    lookup_field     = "sku"
+    lookup_value_regex = r"[^/]+"
+
+    def get_queryset(self):
+        qs = (Product.objects.filter(shop_visible=True, is_active=True)
+              .filter(Q(shop_price__isnull=False) | Q(sale_price__isnull=False)))
+        return stock_service.annotate_stock(qs).order_by("category", "sku")
+
+
 # ── Товари ────────────────────────────────────────────────────────────────────
 
 class ProductViewSet(NoDeleteMixin, viewsets.ModelViewSet):
@@ -265,6 +287,10 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
         d = dict(s.validated_data)
         lines_in    = d.pop("lines")
         check_stock = d.pop("check_stock", False)
+        is_shop     = d.pop("shop", False)
+        if is_shop:
+            d.pop("total_price", None)  # магазин: сума рахується лише з цін Minerva
+            d.setdefault("payment_status", "unpaid")
 
         key = request.auth if isinstance(request.auth, APIKey) else None
         d["source"] = (d.get("source") or (key.default_source if key else "") or "api").strip()
@@ -289,6 +315,9 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 errors.append({"line": i, "sku": raw, "error": "Товар не знайдено"})
             elif not product.is_fractional_unit() and ln["qty"] != int(ln["qty"]):
                 errors.append({"line": i, "sku": raw, "error": "Кількість має бути цілою (штуки)"})
+            elif is_shop and not (product.shop_visible and product.is_active
+                                  and product.shop_effective_price is not None):
+                errors.append({"line": i, "sku": raw, "error": "Товар недоступний в інтернет-магазині"})
             else:
                 resolved.append((product, raw, ln))
         if errors:
@@ -309,7 +338,7 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             order.save()
             total = Decimal("0")
             for product, raw, ln in resolved:
-                unit = ln.get("unit_price")
+                unit = product.shop_effective_price if is_shop else ln.get("unit_price")
                 if unit is None:
                     unit = product.sale_price
                 line_total = (unit * ln["qty"]) if unit is not None else None

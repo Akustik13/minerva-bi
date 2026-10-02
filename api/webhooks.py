@@ -223,6 +223,31 @@ def _on_tx_change(sender, instance, **kwargs):
         _queue_stock(instance.product_id)
 
 
+# Поля товару, зміна яких має оновити каталог інтернет-магазину
+_SHOP_FIELDS = ("shop_visible", "shop_price", "sale_price", "is_active", "name", "name_export",
+                "category", "unit_type", "lead_time_days", "image_url", "image", "datasheet_url")
+
+
+def _product_pre_save(sender, instance, **kwargs):
+    instance._wh_shop_old = (sender.objects.filter(pk=instance.pk).values(*_SHOP_FIELDS).first()
+                             if instance.pk else None)
+
+
+def _product_post_save(sender, instance, created, **kwargs):
+    old = getattr(instance, "_wh_shop_old", None)
+    if created:
+        if instance.shop_visible:
+            _queue_stock(instance.pk)
+        return
+    if old is None:
+        return
+    new = {f: getattr(instance, f) for f in _SHOP_FIELDS}
+    new["image"] = instance.image.name if instance.image else ""
+    old["image"] = old.get("image") or ""
+    if (old["shop_visible"] or instance.shop_visible) and any(old[f] != new[f] for f in _SHOP_FIELDS):
+        _queue_stock(instance.pk)
+
+
 def _order_pre_save(sender, instance, **kwargs):
     if not hasattr(instance, "_wh_old_status"):
         instance._wh_old_status = (sender.objects.filter(pk=instance.pk)
@@ -277,12 +302,14 @@ def _shipment_post_save(sender, instance, created, **kwargs):
 
 
 def connect_signals():
-    from inventory.models import InventoryTransaction
+    from inventory.models import InventoryTransaction, Product
     from sales.models import SalesOrder
     from shipping.models import Shipment
 
     post_save.connect(_on_tx_change, sender=InventoryTransaction, dispatch_uid="wh_tx_save")
     post_delete.connect(_on_tx_change, sender=InventoryTransaction, dispatch_uid="wh_tx_delete")
+    pre_save.connect(_product_pre_save, sender=Product, dispatch_uid="wh_product_pre")
+    post_save.connect(_product_post_save, sender=Product, dispatch_uid="wh_product_post")
     pre_save.connect(_order_pre_save, sender=SalesOrder, dispatch_uid="wh_order_pre")
     post_save.connect(_order_post_save, sender=SalesOrder, dispatch_uid="wh_order_post")
     pre_save.connect(_shipment_pre_save, sender=Shipment, dispatch_uid="wh_ship_pre")

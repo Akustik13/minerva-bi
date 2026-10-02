@@ -90,6 +90,7 @@ tabele_mvp/
 - Замовлення з магазину: `POST /orders/` (рядки за SKU, ідемпотентно по source+order_number, `check_stock`), `POST /orders/{id}/cancel/` (повертає товар); `/shipments/` трекінг
 - Бізнес-логіка складу — `inventory/services/stock.py` (не дублювати у views)
 - Вебхуки: `api/webhooks.py` (події stock.changed / order.created / order.status_changed / shipment.updated, HMAC-підпис, повтори через `manage.py send_webhooks` у `cron_runner.sh`); моделі `Webhook`, `WebhookDelivery` (migration 0003)
+- Інтернет-магазин сайту: `Product.shop_visible` / `shop_price` (migration inventory 0035), `SalesOrder.payment_method/status/reference` (sales 0040), `GET /shop/products/`, `POST /orders/` з `shop: true` (ціни лише з Minerva). Сайт: проєкт на WebDAV `Office/Marketing/WEB_SITE/Website_Last_Version/...v005`, `SHOP-ANLEITUNG.md`
 - Тести: `python manage.py test api --settings=tabele.settings_test` (SQLite в пам'яті без міграцій)
 
 ### faq/ (placeholder, no DB)

@@ -111,6 +111,16 @@ class Product(models.Model):
     )
     is_active = models.BooleanField(default=True)
 
+    # ── Інтернет-магазин (сайт, API /api/v1/shop/products/) ──
+    shop_visible = models.BooleanField(
+        "Показувати в інтернет-магазині", default=False, db_index=True,
+        help_text="Товар з'являється в магазині на сайті (через API).",
+    )
+    shop_price = models.DecimalField(
+        "Ціна в магазині (нетто)", max_digits=18, decimal_places=4, null=True, blank=True,
+        help_text="Порожньо — використовується «Ціна продажу».",
+    )
+
     # ── Митне оформлення ─────────────────────────────────────────────────────
     hs_code           = models.CharField("HS-код (митний)", max_length=20, blank=True, default="")
     country_of_origin = models.CharField("Країна виробника", max_length=2, blank=True, default="")
@@ -150,6 +160,11 @@ class Product(models.Model):
             except Exception:
                 pass
         return self.datasheet_url or ""
+
+    @property
+    def shop_effective_price(self):
+        """Ціна для інтернет-магазину: shop_price, інакше sale_price."""
+        return self.shop_price if self.shop_price is not None else self.sale_price
 
     def is_fractional_unit(self) -> bool:
         """Повертає True якщо товар може мати дробну кількість"""

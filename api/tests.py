@@ -283,3 +283,65 @@ class CorsTests(APITestBase):
     def test_no_cors_outside_api(self):
         r = APIClient().get("/admin/login/", HTTP_ORIGIN="https://shop.example")
         self.assertFalse(r.has_header("Access-Control-Allow-Origin"))
+
+
+class ShopTests(APITestBase):
+    def setUp(self):
+        super().setUp()
+        self.p1.shop_visible = True
+        self.p1.shop_price = Decimal("89.00")
+        self.p1.save()
+        self.receive(self.p1, 5)
+
+    def test_catalog_only_shop_products(self):
+        r = self.client.get("/api/v1/shop/products/")
+        self.assertEqual(r.status_code, 200)
+        items = r.json()["results"]
+        self.assertEqual([i["sku"] for i in items], ["AMP-100"])
+        self.assertEqual((items[0]["price"], items[0]["available"], items[0]["in_stock"]), (89.0, 5, True))
+        self.assertNotIn("purchase_price", items[0])
+        self.assertEqual(self.client.get("/api/v1/shop/products/CABLE-M/").status_code, 404)
+
+    def test_price_falls_back_to_sale_price(self):
+        self.p1.shop_price = None
+        self.p1.save()
+        self.assertEqual(self.client.get("/api/v1/shop/products/AMP-100/").json()["price"], 99.0)
+
+    def test_shop_order_uses_minerva_prices(self):
+        body = dict(OrderTests.ORDER, shop=True, payment_method="prepayment",
+                    total_price=1, lines=[{"sku": "AMP-100", "qty": 2, "unit_price": 0.01}])
+        r = self.client.post("/api/v1/orders/", body, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        d = r.json()
+        self.assertEqual(d["lines"][0]["unit_price"], 89.0)
+        self.assertEqual(d["total_price"], 178.0)
+        self.assertEqual((d["payment_method"], d["payment_status"]), ("prepayment", "unpaid"))
+
+    def test_shop_order_rejects_hidden_product(self):
+        body = dict(OrderTests.ORDER, shop=True, lines=[{"sku": "CABLE-M", "qty": 1}])
+        r = self.client.post("/api/v1/orders/", body, format="json")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("магазині", r.json()["lines"][0]["error"])
+
+    def test_payment_status_patch(self):
+        oid = self.client.post("/api/v1/orders/", dict(OrderTests.ORDER, shop=True),
+                               format="json").json()["id"]
+        r = self.client.patch(f"/api/v1/orders/{oid}/", {"payment_status": "paid",
+                                                         "payment_reference": "PAYPAL-123"}, format="json")
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertEqual(r.json()["payment_status"], "paid")
+
+    def test_product_change_fires_webhook(self):
+        Webhook.objects.create(name="shop", url="https://shop.example/hook", events=["stock.changed"])
+        webhooks._local.stock_ids = None  # flush з setUp чекає на commit зовнішньої транзакції тесту
+        sent = []
+        with mock.patch("requests.post", side_effect=lambda url, data, headers, timeout:
+                        sent.append(data) or _Resp(200)), self.captureOnCommitCallbacks(execute=True):
+            self.p1.shop_price = Decimal("79.00")
+            self.p1.save()
+        self.assertEqual(len(sent), 1)
+        with mock.patch("requests.post", side_effect=lambda *a, **k: sent.append(1) or _Resp(200)), \
+                self.captureOnCommitCallbacks(execute=True):
+            self.p2.notes = "irrelevant"
+            self.p2.save()   # не в магазині і поле не магазинне
+        self.assertEqual(len(sent), 1)

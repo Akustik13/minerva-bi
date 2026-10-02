@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
-    LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ping,
+    LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ping,
 )
 
 router = DefaultRouter()
@@ -11,6 +11,7 @@ router.register("stock",           StockViewSet,      basename="stock")
 router.register("stock-movements", MovementViewSet,   basename="stock-movement")
 router.register("locations",       LocationViewSet,   basename="location")
 router.register("categories",      CategoryViewSet,   basename="category")
+router.register("shop/products",   ShopProductViewSet, basename="shop-product")
 router.register("products",        ProductViewSet,    basename="product")
 router.register("orders",          SalesOrderViewSet, basename="order")
 router.register("shipments",       ShipmentViewSet,   basename="shipment")

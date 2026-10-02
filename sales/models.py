@@ -88,6 +88,31 @@ class SalesOrder(models.Model):
         ("cancelled",  "Скасовано"),
     ]
     status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default="received")
+    # ── Оплата (інтернет-магазин; розширюється під онлайн-оплату) ──
+    PAYMENT_METHOD_CHOICES = [
+        ("",           "—"),
+        ("invoice",    "Рахунок (Rechnung)"),
+        ("prepayment", "Передоплата (Vorkasse)"),
+        ("paypal",     "PayPal"),
+        ("stripe",     "Stripe"),
+        ("other",      "Інше"),
+    ]
+    PAYMENT_STATUS_CHOICES = [
+        ("",         "—"),
+        ("unpaid",   "Не оплачено"),
+        ("pending",  "Очікує оплати"),
+        ("paid",     "Оплачено"),
+        ("refunded", "Повернено"),
+        ("failed",   "Помилка оплати"),
+    ]
+    payment_method = models.CharField("Спосіб оплати", max_length=20, blank=True, default="",
+                                      choices=PAYMENT_METHOD_CHOICES)
+    payment_status = models.CharField("Статус оплати", max_length=20, blank=True, default="",
+                                      choices=PAYMENT_STATUS_CHOICES, db_index=True)
+    payment_reference = models.CharField(
+        "Референс оплати", max_length=128, blank=True, default="",
+        help_text="ID транзакції PayPal/Stripe або призначення платежу",
+    )
     status_source   = models.CharField(
         "Джерело статусу", max_length=100, blank=True, default="",
         help_text="Яке API або дія останньо змінила статус замовлення (заповнюється автоматично)"

@@ -90,6 +90,41 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ["slug", "name", "color", "order"]
 
 
+# ── Інтернет-магазин ──────────────────────────────────────────────────────────
+
+class ShopProductSerializer(serializers.ModelSerializer):
+    """Каталог інтернет-магазину: лише те, що потрібно сайту (без закупівельних цін)."""
+    price     = serializers.DecimalField(source="shop_effective_price", max_digits=18,
+                                         decimal_places=4, read_only=True)
+    available = serializers.DecimalField(source="_available", max_digits=18, decimal_places=3, read_only=True)
+    incoming  = serializers.DecimalField(source="_incoming", max_digits=18, decimal_places=3, read_only=True)
+    in_stock  = serializers.SerializerMethodField()
+    image_url     = serializers.SerializerMethodField()
+    datasheet_url = serializers.SerializerMethodField()
+    last_movement_at = serializers.DateTimeField(source="_last_movement", read_only=True)
+
+    class Meta:
+        model  = Product
+        fields = ["sku", "name", "name_export", "category", "unit_type", "manufacturer",
+                  "price", "available", "incoming", "in_stock", "lead_time_days",
+                  "net_weight_g", "image_url", "datasheet_url", "last_movement_at"]
+
+    def get_in_stock(self, obj):
+        return getattr(obj, "_available", 0) > 0
+
+    def _abs(self, url):
+        request = self.context.get("request")
+        if url and request and url.startswith("/"):
+            return request.build_absolute_uri(url)
+        return url or None
+
+    def get_image_url(self, obj):
+        return self._abs(obj.image_display_url)
+
+    def get_datasheet_url(self, obj):
+        return self._abs(obj.datasheet_display_url)
+
+
 # ── Товари ────────────────────────────────────────────────────────────────────
 
 class ProductSerializer(serializers.ModelSerializer):
@@ -217,6 +252,11 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                                            help_text="Відхилити (409), якщо товару недостатньо")
     note        = serializers.CharField(required=False, allow_blank=True, max_length=500,
                                         write_only=True, source="internal_note")
+    shop        = serializers.BooleanField(
+        required=False, default=False, write_only=True,
+        help_text="Замовлення інтернет-магазину: лише товари з «Показувати в магазині», "
+                  "ціни — завжди з Minerva (shop_price / sale_price), unit_price/total_price ігноруються",
+    )
 
     class Meta:
         model  = SalesOrder
@@ -227,7 +267,8 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             "client", "contact_name", "email", "phone", "buyer_vat_id",
             "addr_street", "addr_city", "addr_zip", "addr_state", "addr_country",
             "ship_name", "ship_company", "ship_phone", "ship_email", "ship_vat_id",
-            "shipping_address", "note", "lines", "check_stock",
+            "shipping_address", "note", "lines", "check_stock", "shop",
+            "payment_method", "payment_status", "payment_reference",
         ]
         validators = []  # дублікат (source, order_number) обробляється ідемпотентно у view
 

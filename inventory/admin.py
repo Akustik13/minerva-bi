@@ -2134,9 +2134,28 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
-    list_filter   = ("category", "kind", "bom_type", "is_active")
+    list_filter   = ("category", "kind", "bom_type", "is_active", "shop_visible")
     list_per_page = 50
-    actions       = ["bulk_sync_digikey_attrs"]
+    actions       = ["bulk_sync_digikey_attrs", "action_shop_show", "action_shop_hide"]
+
+    @admin.action(description="🛒 Показувати в інтернет-магазині")
+    def action_shop_show(self, request, queryset):
+        # save() по одному — щоб спрацювали сигнали (вебхук stock.changed для сайту)
+        n = 0
+        for p in queryset.filter(shop_visible=False):
+            p.shop_visible = True
+            p.save(update_fields=["shop_visible"])
+            n += 1
+        self.message_user(request, f"🛒 Додано в магазин: {n}")
+
+    @admin.action(description="🚫 Прибрати з інтернет-магазину")
+    def action_shop_hide(self, request, queryset):
+        n = 0
+        for p in queryset.filter(shop_visible=True):
+            p.shop_visible = False
+            p.save(update_fields=["shop_visible"])
+            n += 1
+        self.message_user(request, f"🚫 Прибрано з магазину: {n}")
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
@@ -2152,6 +2171,11 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 ("purchase_price", "sale_price"),
                 ("reorder_point", "lead_time_days"),
             )
+        }),
+        ("🛒 Інтернет-магазин", {
+            "fields": (("shop_visible", "shop_price"),),
+            "description": "Товари з галочкою показуються в магазині на сайті. "
+                           "Ціна нетто; порожньо — береться «Ціна продажу».",
         }),
         ("🔗 Медіа та документи", {
             "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview"),

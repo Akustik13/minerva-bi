@@ -814,7 +814,8 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     fieldsets = (
         ("📦 Замовлення", {
             "fields": ("source", "status", "status_source", "document_type", "affects_stock",
-                       "order_number", "order_date", "is_flagged", "internal_note")
+                       "order_number", "order_date", "is_flagged", "internal_note",
+                       ("payment_method", "payment_status", "payment_reference"))
         }),
         ("👤 Клієнт (білінг)", {
             "fields": ("crm_link", "client", "contact_name", "email", "phone"),
