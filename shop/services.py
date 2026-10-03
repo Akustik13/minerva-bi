@@ -105,6 +105,21 @@ def adjust_prices(products, percent, rounding: str | None = None, scale_tiers: b
 
 
 @transaction.atomic
+def set_price(products, price, rounding: str | None = None, regenerate_tiers: bool = False) -> int:
+    """Однакова ціна магазину (нетто) для всіх вибраних товарів."""
+    rounding = rounding or ShopSettings.get().rounding
+    value = round_price(Decimal(str(price)), rounding)
+    done = 0
+    for p in products:
+        p.shop_price = value
+        p.save(update_fields=["shop_price"])
+        done += 1
+    if regenerate_tiers:
+        generate_tiers(products)
+    return done
+
+
+@transaction.atomic
 def price_from_purchase(products, markup, rounding: str | None = None) -> tuple[int, list[str]]:
     """Ціна магазину = закупівля × (1 + націнка %). Повертає (к-сть, SKU без закупівельної ціни)."""
     rounding = rounding or ShopSettings.get().rounding

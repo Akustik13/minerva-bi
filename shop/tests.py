@@ -105,6 +105,13 @@ class ShopAdminTests(TestCase):
         self.p.refresh_from_db()
         self.assertEqual(self.p.shop_price, Decimal("18.0000"))
 
+    def test_set_price_action(self):
+        self.client.post("/admin/shop/shopproduct/", {"action": "action_set_price", "_selected_action": [self.p.pk],
+                                                      "apply": "1", "price": "12.5", "regenerate": "on"})
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.shop_price, Decimal("12.5000"))
+        self.assertTrue(self.p.shop_tiers.exists())
+
     def test_custom_tiers_action(self):
         self.client.post("/admin/shop/shopproduct/", {"action": "action_tiers_custom", "_selected_action": [self.p.pk],
                                                       "apply": "1", "schedule": "10: 5\n100: 20"})

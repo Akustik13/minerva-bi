@@ -103,6 +103,12 @@ class PercentForm(forms.Form):
     scale_tiers = forms.BooleanField(label="Змінити й ступені цін на той самий %", required=False, initial=True)
 
 
+class SetPriceForm(forms.Form):
+    price = forms.DecimalField(label="Нова ціна магазину (нетто), за 1 шт.", max_digits=18, decimal_places=4,
+                               min_value=Decimal("0"))
+    regenerate = forms.BooleanField(label="Перегенерувати ступені цін за шаблоном", required=False, initial=True)
+
+
 class MarkupForm(forms.Form):
     markup = forms.DecimalField(label="Націнка на закупівельну ціну, %", max_digits=7, decimal_places=2,
                                 help_text="100 % = закупівля × 2")
@@ -151,7 +157,7 @@ class ShopProductAdmin(admin.ModelAdmin):
                                    "margin_col", "breaks_preview"]}),
     ]
     readonly_fields = ["sku", "name", "category", "is_active", "purchase_price", "margin_col", "breaks_preview"]
-    actions = ["action_publish", "action_unpublish", "action_adjust", "action_markup",
+    actions = ["action_publish", "action_unpublish", "action_set_price", "action_adjust", "action_markup",
                "action_tiers_default", "action_tiers_custom", "action_tiers_clear",
                "action_reset_to_sale", "action_round"]
 
@@ -226,6 +232,12 @@ class ShopProductAdmin(admin.ModelAdmin):
     def action_unpublish(self, request, queryset):
         n = services.set_visibility(queryset, False)
         self.message_user(request, f"Знято з магазину: {n}")
+
+    @admin.action(description="💶 Встановити однакову ціну…")
+    def action_set_price(self, request, queryset):
+        return self._form_action(request, queryset, SetPriceForm, "Встановити ціну магазину для вибраних товарів",
+            lambda qs, d: f"Ціну {d['price']:.2f} встановлено для "
+                          f"{services.set_price(qs, d['price'], regenerate_tiers=d['regenerate'])} товарів")
 
     @admin.action(description="📈 Змінити ціни на ± %%")
     def action_adjust(self, request, queryset):
