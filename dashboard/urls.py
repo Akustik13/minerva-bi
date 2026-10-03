@@ -128,6 +128,7 @@ def download_import_template(request, name):
 download_import_template = staff_member_required(download_import_template)
 
 
+from shop.views import shop_help
 from .api_views import api_index, api_console, api_proxy, api_docs, api_docs_example
 from .views import trends_view
 
@@ -257,6 +258,7 @@ urlpatterns = [
     path("signals-count/", signals_count, name="signals_count"),
     path("import-template/<str:name>/", download_import_template, name="import_template"),
     path("import/", import_hub, name="import_hub"),
+    path("shop/help/",        shop_help,       name="shop_help"),
     path("api/",              api_index,       name="api_index"),
     path("api/console/",      api_console,     name="api_console"),
     path("api/docs/",         api_docs,        name="api_docs"),

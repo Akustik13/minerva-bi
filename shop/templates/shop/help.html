@@ -1,0 +1,388 @@
+{% extends "admin/base_site.html" %}
+{% block title %}Довідка: інтернет-магазин | Minerva{% endblock %}
+{% block content_title %}{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="/admin/shop/">Інтернет-магазин</a> &rsaquo;
+  Довідка
+</div>
+{% endblock %}
+
+{% block content %}
+<style>
+#content-main { max-width: none !important; }
+.sh { padding: 16px 20px 60px; color: var(--text); font-size: 14px; line-height: 1.6; }
+.sh a { color: var(--link-fg, var(--accent)); }
+.sh h2 { font-size: 19px; margin: 34px 0 6px; scroll-margin-top: 12px; color: var(--text); }
+.sh h2 small { font-weight: 400; color: var(--text-muted); font-size: 13px; margin-left: 6px; }
+.sh .lead { color: var(--text-muted); margin: 0 0 14px; max-width: 920px; }
+.sh code { font-family: Consolas, Monaco, monospace; font-size: 12.5px; background: var(--bg-card-2);
+  border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; color: var(--text); }
+.sh-card { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 16px 18px; }
+
+/* Шапка */
+.sh-hero { background: var(--bg-card); border: 1px solid var(--border-strong); border-left: 4px solid var(--accent);
+  border-radius: 10px; padding: 20px 22px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 18px; align-items: center; }
+.sh-hero h1 { margin: 0 0 6px; font-size: 24px; color: var(--text); }
+.sh-hero p { margin: 0; color: var(--text-muted); max-width: 760px; }
+.sh-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.sh-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 7px 12px;
+  border-radius: 6px; text-decoration: none !important; color: var(--text) !important; background: var(--bg-card-2);
+  border: 1px solid var(--border-strong); }
+.sh-btn:hover { border-color: var(--accent); }
+.sh-btn.primary { background: var(--accent-subtle, var(--bg-card-2)); border: 2px solid var(--accent); color: var(--text) !important; }
+.sh-toc { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; }
+.sh-toc a { font-size: 12px; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); text-decoration: none !important; color: var(--text-muted) !important; }
+.sh-toc a:hover { color: var(--text) !important; border-color: var(--accent); }
+.sh-kpis { display: grid; grid-template-columns: repeat(2, minmax(110px, 1fr)); gap: 8px; }
+.sh-kpi { background: var(--bg-card-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; text-align: center; }
+.sh-kpi b { display: block; font-size: 22px; color: var(--text); }
+.sh-kpi span { font-size: 11.5px; color: var(--text-muted); }
+@media (max-width: 900px) { .sh-hero { grid-template-columns: 1fr; } }
+
+/* Сітки карток */
+.sh-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; }
+.sh-feat { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 14px 16px; }
+.sh-feat h3 { margin: 0 0 6px; font-size: 14.5px; color: var(--text); display: flex; gap: 8px; align-items: center; }
+.sh-feat p, .sh-feat li { margin: 0; color: var(--text-muted); font-size: 13px; }
+.sh-feat ul { margin: 6px 0 0; padding-left: 18px; }
+.sh-feat .where { display: block; margin-top: 8px; font-size: 12px; color: var(--text-muted); }
+
+/* Магазини */
+.sh-shops { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.sh-shop h3 { margin: 0; font-size: 15px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.sh-tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border-strong); color: var(--text-muted); }
+.sh-tag.ok { border-color: rgba(80,190,120,.6); color: #4fb878; }
+.sh-tag.off { border-color: rgba(220,90,90,.6); color: #d46a6a; }
+.sh-shop dl { display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; margin: 10px 0 8px; font-size: 13px; }
+.sh-shop dt { color: var(--text-muted); } .sh-shop dd { margin: 0; text-align: right; font-weight: 600; }
+
+/* Процес */
+.sh-flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0; }
+.sh-step { flex: 1 1 120px; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 12px 12px; position: relative; margin: 0 22px 12px 0; }
+.sh-step:not(:last-child)::after { content: "→"; position: absolute; right: -19px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-weight: 700; font-size: 16px; }
+.sh-step b { display: block; font-size: 13px; color: var(--text); margin-bottom: 2px; }
+.sh-step span { font-size: 12px; color: var(--text-muted); }
+.sh-step .n { position: absolute; top: -9px; left: 10px; background: var(--bg-card); border: 2px solid var(--accent); color: var(--text); font-size: 11px; font-weight: 700; border-radius: 999px; padding: 0 7px; }
+
+/* Схема БД */
+.sh-er-wrap { overflow-x: auto; }
+.sh-er { width: 100%; min-width: 820px; height: auto; display: block; }
+.sh-er .box { fill: var(--bg-card-2); stroke: var(--border-strong); stroke-width: 1.2; }
+.sh-er .box.shop { stroke: var(--accent); stroke-width: 2; }
+.sh-er .box.ext { stroke-dasharray: 5 4; }
+.sh-er .hdr { fill: var(--accent); opacity: .16; }
+.sh-er .t { fill: var(--text); font: 700 13.5px system-ui, sans-serif; }
+.sh-er .m { fill: var(--text-muted); font: 11px Consolas, monospace; }
+.sh-er .f { fill: var(--text); font: 12px system-ui, sans-serif; }
+.sh-er .f tspan.k { fill: var(--text); font-weight: 700; text-decoration: underline; }
+.sh-er .ln { stroke: var(--text-muted); stroke-width: 1.5; fill: none; }
+.sh-er .ln.dash { stroke-dasharray: 6 4; }
+.sh-er .ln.acc { stroke: var(--accent); }
+.sh-er .lb { fill: var(--text-muted); font: 600 11px system-ui, sans-serif; }
+.sh-er .lb.acc { fill: var(--text); }
+.sh-er-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 12px; color: var(--text-muted); margin-top: 8px; }
+
+/* Таблиці */
+.sh table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.sh th, .sh td { border-bottom: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; color: var(--text); }
+.sh th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.sh td.num, .sh th.num { text-align: right; white-space: nowrap; }
+
+/* Кроки */
+.sh-steps { counter-reset: s; list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.sh-steps li { counter-increment: s; background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 11px 14px 11px 50px; position: relative; }
+.sh-steps li::before { content: counter(s); position: absolute; left: 14px; top: 11px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent-subtle, var(--bg-card-2)); border: 2px solid var(--accent); color: var(--text); font-weight: 700; font-size: 12.5px; display: grid; place-items: center; }
+.sh-steps li b { color: var(--text); }
+.sh-steps li span { color: var(--text-muted); font-size: 13px; display: block; }
+
+.sh-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 12px; }
+.sh details { background: var(--bg-card); border: 1px solid var(--border-strong); border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; }
+.sh summary { cursor: pointer; font-weight: 600; color: var(--text); }
+.sh details p { margin: 8px 0 2px; color: var(--text-muted); font-size: 13px; }
+</style>
+
+<div class="sh">
+
+  <!-- ── Шапка ─────────────────────────────────────────────────── -->
+  <div class="sh-hero">
+    <div>
+      <h1>🏪 Інтернет-магазин у Minerva</h1>
+      <p>Minerva — єдине джерело правди для магазину: асортимент, ціни, ступені цін, наявність і замовлення живуть тут.
+         Сайт лише показує їх через REST API і повертає замовлення назад. Змінили ціну чи поставили галочку — сайт оновився за секунди,
+         без правок коду сайту. Один склад може обслуговувати кілька магазинів, і в кожного свої товари та ціни.</p>
+      <div class="sh-links">
+        <a class="sh-btn primary" href="/admin/shop/shoplisting/">💶 Асортимент і ціни</a>
+        <a class="sh-btn" href="/admin/shop/shopproduct/">📦 Додати товари в магазин</a>
+        <a class="sh-btn" href="/admin/shop/shop/">🏬 Магазини</a>
+        <a class="sh-btn" href="/admin/shop/shopsettings/">⚙️ Налаштування цін</a>
+        <a class="sh-btn" href="/admin/api/apikey/">🔑 Ключі API</a>
+        <a class="sh-btn" href="/admin/api/webhook/">📡 Вебхуки</a>
+        <a class="sh-btn" href="{% url 'api_docs' %}">📖 Документація API</a>
+      </div>
+      <nav class="sh-toc">
+        <a href="#start">Швидкий старт</a><a href="#features">Можливості</a><a href="#flow">Як проходить замовлення</a>
+        <a href="#db">Зв'язки з БД</a><a href="#prices">Ціни</a><a href="#multi">Кілька магазинів</a>
+        <a href="#site">Що бачить покупець</a><a href="#extend">Розширення</a><a href="#faq">Питання</a>
+      </nav>
+    </div>
+    <div class="sh-kpis">
+      <div class="sh-kpi"><b>{{ shops|length }}</b><span>магазинів</span></div>
+      <div class="sh-kpi"><b>{{ stats.listings }}</b><span>позицій</span></div>
+      <div class="sh-kpi"><b>{{ stats.tiers }}</b><span>ступенів цін</span></div>
+      <div class="sh-kpi"><b>{{ stats.webhooks }}</b><span>активних вебхуків</span></div>
+    </div>
+  </div>
+
+  <!-- ── Магазини зараз ───────────────────────────────────────── -->
+  <h2>Ваші магазини зараз</h2>
+  {% if shops %}
+  <div class="sh-shops">
+    {% for s in shops %}
+    <div class="sh-card sh-shop">
+      <h3>{{ s.name }}
+        <code>{{ s.slug }}</code>
+        {% if s.is_default %}<span class="sh-tag">за замовчуванням</span>{% endif %}
+        {% if s.is_active %}<span class="sh-tag ok">активний</span>{% else %}<span class="sh-tag off">вимкнено</span>{% endif %}
+      </h3>
+      <dl>
+        <dt>Показується / усього позицій</dt><dd>{{ s.n_visible }} / {{ s.n_listings }}</dd>
+        <dt>Замовлення (джерело «{{ s.slug }}»)</dt><dd>{{ s.n_orders }}</dd>
+        <dt>Запити пропозиції</dt><dd>{{ s.n_quotes }}</dd>
+        <dt>Активні ключі API</dt><dd>{{ s.n_keys }}</dd>
+      </dl>
+      <a class="sh-btn" href="/admin/shop/shoplisting/?shop__id__exact={{ s.pk }}">Асортимент →</a>
+      <a class="sh-btn" href="/admin/sales/salesorder/?source={{ s.slug }}">Замовлення →</a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="lead">Магазинів ще немає — <a href="/admin/shop/shop/add/">створіть перший</a>.</p>
+  {% endif %}
+
+  <!-- ── Швидкий старт ────────────────────────────────────────── -->
+  <h2 id="start">Швидкий старт <small>5 кроків від товару на складі до продажу</small></h2>
+  <ol class="sh-steps">
+    <li><b>Створіть магазин</b><span>🏬 Магазини → «Додати». Код (напр. <code>webshop</code>) потім стоїть у кожному замовленні як «Джерело», за ним видно, звідки прийшов продаж.</span></li>
+    <li><b>Додайте товари</b><span>📦 Каталог → позначте товари → дія «➕ Додати в магазин…». Одразу можна задати націнку і згенерувати ступені цін.</span></li>
+    <li><b>Перевірте ціни</b><span>💶 Асортимент і ціни: галочка «Показувати» і ціна редагуються прямо в списку. Порожня ціна означає «Ціну продажу» товару. Без ціни на сайті буде «Ціна за запитом» і кнопка запиту.</span></li>
+    <li><b>Підключіть сайт</b><span>🔑 Ключі API → новий ключ з правами <code>products:read</code>, <code>orders:read</code>, <code>orders:write</code> і полем «Магазин». Ключ вставляється в конфіг сайту.</span></li>
+    <li><b>Увімкніть миттєве оновлення</b><span>📡 Вебхуки → адреса сайту <code>…/api/shop/webhook.php</code>, подія <code>stock.changed</code>. Сайт скидає кеш одразу після будь-якої зміни.</span></li>
+  </ol>
+
+  <!-- ── Можливості ───────────────────────────────────────────── -->
+  <h2 id="features">Можливості <small>що вміє розділ</small></h2>
+  <div class="sh-grid">
+    <div class="sh-feat"><h3>💶 Асортимент і ціни</h3>
+      <p>Один рядок — це один товар в одному магазині. Видно ціну продажу, закупівлю, маржу, ступені, залишок і ціни, які бачить покупець.</p>
+      <span class="where">Фільтри: магазин, видимість, стан ціни, наявність, категорія</span></div>
+    <div class="sh-feat"><h3>⚡ Масові дії</h3>
+      <ul><li>показати / сховати</li><li>однакова ціна для обраних</li><li>ціни ± %</li><li>ціна = закупівля + націнка</li>
+          <li>ступені цін: шаблон, свої, видалити</li><li>ціна = ціна продажу, округлити</li><li>📋 копіювати в інший магазин з коефіцієнтом</li></ul></div>
+    <div class="sh-feat"><h3>📊 Ціни за кількістю</h3>
+      <p>Як на DigiKey: 1 / 10 / 100 / 1000 шт. зі знижкою. Шаблон знижок задається в «Налаштуваннях цін», а вручну можна відкоригувати кожну позицію.</p></div>
+    <div class="sh-feat"><h3>🏬 Кілька магазинів</h3>
+      <p>Сайт, маркетплейс, B2B-портал дилера — кожен зі своїм асортиментом, цінами і своїм ключем API. Склад спільний.</p></div>
+    <div class="sh-feat"><h3>🧾 Замовлення автоматично</h3>
+      <p>Замовлення з сайту одразу з'являється в Продажах: товар списується зі складу, клієнт потрапляє в CRM. Поля оплати «Спосіб», «Статус» і «Референс» заповнені.</p></div>
+    <div class="sh-feat"><h3>📝 Запити пропозиції</h3>
+      <p>Товари без ціни покупець додає «в запит». У Продажах з'являється документ «Запит пропозиції» (QUOTE): без цін, склад не змінюється. Невідомі номери деталей записуються в примітку.</p></div>
+    <div class="sh-feat"><h3>🔒 Ціни лише з Minerva</h3>
+      <p>Сайт не може підмінити ціну: при замовленні Minerva сама рахує ціну за ступенем для замовленої кількості. Закупівельні ціни назовні не віддаються.</p></div>
+    <div class="sh-feat"><h3>📡 Миттєва синхронізація</h3>
+      <p>Зміна галочки, ціни, ступеня, назви, фото або залишку відправляє вебхук <code>stock.changed</code> з підписом HMAC. Невдалі доставки повторює cron.</p></div>
+    <div class="sh-feat"><h3>📦 Під замовлення</h3>
+      <p>Товари з нульовим залишком теж можна продавати: сайт показує «Bestellbar – Lieferzeit …» з терміном постачання товару.</p></div>
+  </div>
+
+  <!-- ── Процес замовлення ────────────────────────────────────── -->
+  <h2 id="flow">Як проходить замовлення</h2>
+  <p class="lead">Ціни й наявність перевіряються двічі: коли сайт показує товар і в момент замовлення. Повторне надсилання (подвійний клік, збій мережі) не створює дубль, бо той самий номер замовлення повертає «вже створено».</p>
+  <div class="sh-flow">
+    <div class="sh-step"><span class="n">1</span><b>Покупець</b><span>обирає товари, кошик, вводить дані, перевіряє і підтверджує</span></div>
+    <div class="sh-step"><span class="n">2</span><b>Сайт (PHP)</b><span>бере свіжі ціни з Minerva, рахує ПДВ і доставку</span></div>
+    <div class="sh-step"><span class="n">3</span><b>REST API</b><span><code>POST /orders/</code> з <code>shop:true</code> або <code>quote:true</code></span></div>
+    <div class="sh-step"><span class="n">4</span><b>Minerva</b><span>замовлення, рядки за ступенем ціни, списання зі складу, клієнт у CRM</span></div>
+    <div class="sh-step"><span class="n">5</span><b>Вебхук</b><span><code>stock.changed</code> → сайт оновлює залишки</span></div>
+    <div class="sh-step"><span class="n">6</span><b>Листи</b><span>вам і покупцю: номер <code>WS-…</code> / <code>AN-…</code>, реквізити оплати</span></div>
+  </div>
+
+  <!-- ── Зв'язки з БД ─────────────────────────────────────────── -->
+  <h2 id="db">Зв'язки магазину з базою даних</h2>
+  <p class="lead">Магазин не дублює товари: позиція магазину лише посилається на товар складу і додає свою видимість та ціну. Тому залишки, назви й фото завжди однакові в усіх магазинах, а ціни в кожного свої.</p>
+  <div class="sh-card sh-er-wrap">
+    <svg class="sh-er" viewBox="0 0 1000 590" role="img" aria-label="Схема зв'язків моделей магазину">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" style="fill: var(--text-muted)"/></marker>
+        <marker id="ara" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" style="fill: var(--accent)"/></marker>
+      </defs>
+
+      <!-- Лінії (під блоками) -->
+      <path class="ln" d="M375,160 V200" marker-end="url(#ar)"/>             <text class="lb" x="382" y="185">1 : N</text>
+      <path class="ln" d="M375,340 V380" marker-end="url(#ar)"/>             <text class="lb" x="382" y="365">1 : N</text>
+      <path class="ln" d="M230,270 H270" marker-end="url(#ar)"/>             <text class="lb" x="234" y="262">1 : N</text>
+      <path class="ln" d="M125,340 V380" marker-end="url(#ar)"/>             <text class="lb" x="132" y="365">рух складу</text>
+      <path class="ln" d="M480,90 H520" marker-end="url(#ar)"/>              <text class="lb" x="484" y="82">1 : N</text>
+      <path class="ln dash acc" d="M480,145 L520,215" marker-end="url(#ara)"/><text class="lb acc" x="440" y="190">slug = source</text>
+      <path class="ln" d="M625,340 V380" marker-end="url(#ar)"/>             <text class="lb" x="632" y="365">1 : N</text>
+      <path class="ln" d="M730,320 L770,410" marker-end="url(#ar)"/>         <text class="lb" x="738" y="392">CRM</text>
+      <path class="ln" d="M625,520 V560 H125 V520" marker-end="url(#ar)"/>   <text class="lb" x="300" y="578">списання / повернення товару на складі (inventory/services/stock.py)</text>
+      <path class="ln acc" d="M770,290 H730" marker-end="url(#ara)"/>        <text class="lb acc" x="735" y="282">POST</text>
+      <path class="ln dash acc" d="M800,200 L700,160" marker-end="url(#ara)"/><text class="lb acc" x="752" y="172">Token</text>
+      <path class="ln dash acc" d="M875,160 V200" marker-end="url(#ara)"/>   <text class="lb acc" x="882" y="185">події</text>
+
+      <!-- ShopSettings -->
+      <rect class="box" x="20" y="20" width="210" height="140" rx="8"/><rect class="hdr" x="20" y="20" width="210" height="44" rx="8"/>
+      <text class="t" x="32" y="40">⚙️ Налаштування цін</text><text class="m" x="32" y="56">ShopSettings (pk=1)</text>
+      <text class="f" x="32" y="86">шаблон ступенів (знижки)</text><text class="f" x="32" y="106">націнка за замовчуванням</text>
+      <text class="f" x="32" y="126">правило округлення</text><text class="m" x="32" y="148">→ використовують масові дії</text>
+
+      <!-- Shop -->
+      <rect class="box shop" x="270" y="20" width="210" height="140" rx="8"/><rect class="hdr" x="270" y="20" width="210" height="44" rx="8"/>
+      <text class="t" x="282" y="40">🏬 Магазин</text><text class="m" x="282" y="56">shop.Shop</text>
+      <text class="f" x="282" y="86"><tspan class="k">slug</tspan> — код / джерело</text><text class="f" x="282" y="106">is_default, is_active</text>
+      <text class="f" x="282" y="126">currency, url</text>
+
+      <!-- APIKey -->
+      <rect class="box" x="520" y="20" width="210" height="140" rx="8"/><rect class="hdr" x="520" y="20" width="210" height="44" rx="8"/>
+      <text class="t" x="532" y="40">🔑 Ключ API</text><text class="m" x="532" y="56">api.APIKey</text>
+      <text class="f" x="532" y="86"><tspan class="k">shop</tspan> → магазин</text><text class="f" x="532" y="106">scopes (права)</text>
+      <text class="f" x="532" y="126">default_source</text>
+
+      <!-- Webhook -->
+      <rect class="box" x="770" y="20" width="210" height="140" rx="8"/><rect class="hdr" x="770" y="20" width="210" height="44" rx="8"/>
+      <text class="t" x="782" y="40">📡 Вебхук</text><text class="m" x="782" y="56">api.Webhook + Delivery</text>
+      <text class="f" x="782" y="86">url, events</text><text class="f" x="782" y="106">secret (HMAC-підпис)</text>
+      <text class="f" x="782" y="126">повтори через cron</text>
+
+      <!-- Product -->
+      <rect class="box" x="20" y="200" width="210" height="140" rx="8"/><rect class="hdr" x="20" y="200" width="210" height="44" rx="8"/>
+      <text class="t" x="32" y="220">📦 Товар складу</text><text class="m" x="32" y="236">inventory.Product</text>
+      <text class="f" x="32" y="266">sku, назва, фото, категорія</text><text class="f" x="32" y="286">ціна продажу, закупівля</text>
+      <text class="f" x="32" y="306">термін постачання</text>
+
+      <!-- ShopListing -->
+      <rect class="box shop" x="270" y="200" width="210" height="140" rx="8"/><rect class="hdr" x="270" y="200" width="210" height="44" rx="8"/>
+      <text class="t" x="282" y="220">💶 Позиція магазину</text><text class="m" x="282" y="236">shop.ShopListing</text>
+      <text class="f" x="282" y="266"><tspan class="k">shop</tspan> + <tspan class="k">product</tspan> (унікально)</text>
+      <text class="f" x="282" y="286">is_visible — показувати</text><text class="f" x="282" y="306">price — нетто за 1 шт.</text>
+      <text class="m" x="282" y="328">порожньо → ціна продажу</text>
+
+      <!-- SalesOrder -->
+      <rect class="box" x="520" y="200" width="210" height="140" rx="8"/><rect class="hdr" x="520" y="200" width="210" height="44" rx="8"/>
+      <text class="t" x="532" y="220">🧾 Замовлення</text><text class="m" x="532" y="236">sales.SalesOrder</text>
+      <text class="f" x="532" y="266"><tspan class="k">source</tspan> = код магазину</text><text class="f" x="532" y="286">тип: SALE / QUOTE</text>
+      <text class="f" x="532" y="306">оплата: спосіб, статус, реф.</text>
+
+      <!-- Website -->
+      <rect class="box ext" x="770" y="200" width="210" height="140" rx="8"/>
+      <text class="t" x="782" y="226">🌐 Сайт магазину</text><text class="m" x="782" y="242">поза Minerva, REST API</text>
+      <text class="f" x="782" y="270">GET /shop/products/</text><text class="f" x="782" y="290">POST /orders/</text>
+      <text class="f" x="782" y="310">кеш каталогу + вебхук</text>
+
+      <!-- ShopPriceTier -->
+      <rect class="box shop" x="270" y="380" width="210" height="140" rx="8"/><rect class="hdr" x="270" y="380" width="210" height="44" rx="8"/>
+      <text class="t" x="282" y="400">📊 Ступінь ціни</text><text class="m" x="282" y="416">shop.ShopPriceTier</text>
+      <text class="f" x="282" y="446"><tspan class="k">listing</tspan> → позиція</text><text class="f" x="282" y="466">min_qty (від 2 шт.)</text>
+      <text class="f" x="282" y="486">unit_price — ціна за шт.</text>
+
+      <!-- InventoryTransaction -->
+      <rect class="box" x="20" y="380" width="210" height="140" rx="8"/><rect class="hdr" x="20" y="380" width="210" height="44" rx="8"/>
+      <text class="t" x="32" y="400">🔄 Рух складу</text><text class="m" x="32" y="416">inventory.Transaction</text>
+      <text class="f" x="32" y="446">прихід / витрата</text><text class="f" x="32" y="466">→ залишок, резерв</text>
+      <text class="f" x="32" y="486">→ вебхук stock.changed</text>
+
+      <!-- SalesOrderLine -->
+      <rect class="box" x="520" y="380" width="210" height="140" rx="8"/><rect class="hdr" x="520" y="380" width="210" height="44" rx="8"/>
+      <text class="t" x="532" y="400">📄 Рядок замовлення</text><text class="m" x="532" y="416">sales.SalesOrderLine</text>
+      <text class="f" x="532" y="446">sku, кількість</text><text class="f" x="532" y="466">ціна = ступінь для к-сті</text>
+      <text class="f" x="532" y="486">total_price → дашборд</text>
+
+      <!-- Customer -->
+      <rect class="box" x="770" y="380" width="210" height="140" rx="8"/><rect class="hdr" x="770" y="380" width="210" height="44" rx="8"/>
+      <text class="t" x="782" y="400">👤 Клієнт</text><text class="m" x="782" y="416">crm.Customer</text>
+      <text class="f" x="782" y="446">створюється сигналом</text><text class="f" x="782" y="466">external_key (SHA256)</text>
+      <text class="f" x="782" y="486">RFM-сегмент</text>
+    </svg>
+    <div class="sh-er-legend">
+      <span>▭ <b style="color:var(--text)">з рамкою кольору акценту</b> — таблиці розділу «Інтернет-магазин»</span>
+      <span>⇢ пунктир — зв'язок за значенням або через API (не зовнішній ключ)</span>
+      <span>1 : N — один до багатьох</span>
+    </div>
+  </div>
+
+  <!-- ── Ціни ─────────────────────────────────────────────────── -->
+  <h2 id="prices">Як рахується ціна</h2>
+  <div class="sh-two">
+    <div class="sh-card">
+      <ol class="sh-steps" style="gap:6px">
+        <li><b>Базова ціна (1 шт.)</b><span>«Ціна» позиції. Якщо порожньо, береться «Ціна продажу» товару. Якщо й її немає — «Ціна за запитом».</span></li>
+        <li><b>Ступені</b><span>Для кількості ≥ min_qty діє ціна ступеня. Діє найбільший ступінь, якого досягла кількість.</span></li>
+        <li><b>Округлення</b><span>За правилом з налаштувань ({% if settings_obj %}{{ settings_obj.get_rounding_display }}{% else %}до 0,01{% endif %}) — під час масових дій.</span></li>
+      </ol>
+    </div>
+    <div class="sh-card">
+      <table>
+        <thead><tr><th>Приклад: базова 10,00 €</th><th class="num">Знижка</th><th class="num">Ціна / шт.</th></tr></thead>
+        <tbody>
+          <tr><td>1–9 шт.</td><td class="num">—</td><td class="num">10,00 €</td></tr>
+          <tr><td>від 10 шт.</td><td class="num">5 %</td><td class="num">9,50 €</td></tr>
+          <tr><td>від 100 шт.</td><td class="num">12 %</td><td class="num">8,80 €</td></tr>
+          <tr><td>від 1000 шт.</td><td class="num">20 %</td><td class="num">8,00 €</td></tr>
+        </tbody>
+      </table>
+      <p class="lead" style="margin:8px 0 0;font-size:12.5px">25 шт. × 9,50 € = 237,50 € нетто. Сайт показує цю ж таблицю і підказку «ще N шт. — і ціна X».</p>
+    </div>
+  </div>
+
+  <!-- ── Кілька магазинів ─────────────────────────────────────── -->
+  <h2 id="multi">Кілька магазинів</h2>
+  <div class="sh-grid">
+    <div class="sh-feat"><h3>🔑 Який магазин бачить ключ</h3>
+      <p>1) поле «Магазин» у ключі API → 2) магазин, код якого збігається з «Джерелом замовлень» ключа → 3) магазин за замовчуванням.</p></div>
+    <div class="sh-feat"><h3>📋 Новий магазин за хвилину</h3>
+      <p>У «Асортимент і ціни» відфільтруйте наявний магазин → «Скопіювати в інший магазин…» з коефіцієнтом (напр. 1,15 для маркетплейсу) разом зі ступенями.</p></div>
+    <div class="sh-feat"><h3>📈 Звідки продажі</h3>
+      <p>Кожне замовлення має «Джерело» = код магазину. Фільтр у Продажах, дашборд і RFM рахують по всіх джерелах разом або окремо.</p></div>
+  </div>
+
+  <!-- ── Сайт ─────────────────────────────────────────────────── -->
+  <h2 id="site">Що бачить покупець на сайті</h2>
+  <div class="sh-grid">
+    <div class="sh-feat"><h3>🔎 Каталог</h3><p>Вкладки категорій, пошук, фільтри (наявність, частота, стандарт, роз'єм, ціна…), картки або таблиця. Посилання з фільтрами можна відправити колезі.</p></div>
+    <div class="sh-feat"><h3>🛒 Кошик</h3><p>При наведенні на значок кошика з'являється вікно з вмістом і сумою. Після додавання товару збоку коротко виїжджає панель. Клік по значку відкриває сторінку кошика зі списком.</p></div>
+    <div class="sh-feat"><h3>✅ Оформлення в 3 кроки</h3><p>Дані → Перевірка (усе ще раз, з підтвердженням) → Готово. ПДВ рахується автоматично: Німеччина 19 %, ЄС з USt-IdNr — reverse charge, решта країн — експорт.</p></div>
+    <div class="sh-feat"><h3>📝 Запит пропозиції</h3><p>Товари без ціни — кнопка «Zur Anfrage hinzufügen». В одному кошику можуть бути і замовлення, і запит; надсилаються разом.</p></div>
+    <div class="sh-feat"><h3>📄 Сторінки товарів</h3><p>На кожній сторінці товару є блок покупки: ціна, ступені, наявність. Блок з'являється, лише коли товар є в магазині.</p></div>
+    <div class="sh-feat"><h3>💳 Оплата</h3><p>Зараз: передоплата і рахунок. PayPal / Stripe вже передбачені в коді сайту як окремі провайдери.</p></div>
+  </div>
+
+  <!-- ── Розширення ───────────────────────────────────────────── -->
+  <h2 id="extend">Розширюваність <small>що можна додати без переробки</small></h2>
+  <div class="sh-grid">
+    <div class="sh-feat"><h3>🧩 Будь-яка платформа</h3><p>Shopify, WooCommerce, свій React-сайт, мобільний застосунок — усі працюють через ті самі <code>/api/v1/shop/products/</code> і <code>/orders/</code>.</p></div>
+    <div class="sh-feat"><h3>💳 Онлайн-оплата</h3><p>Новий провайдер на сайті → після оплати <code>PATCH /orders/{id}/</code> з <code>payment_status: paid</code>. Поля в Minerva вже є.</p></div>
+    <div class="sh-feat"><h3>📡 Більше подій</h3><p>Вебхуки вже мають <code>order.created</code>, <code>order.status_changed</code>, <code>shipment.updated</code> — сайт може показувати статус і трекінг.</p></div>
+    <div class="sh-feat"><h3>🏷 Окремі ціни для клієнтів</h3><p>Модель позицій дозволяє додати B2B-прайси для окремих клієнтів або груп — так само, як для окремих магазинів.</p></div>
+  </div>
+
+  <!-- ── FAQ ──────────────────────────────────────────────────── -->
+  <h2 id="faq">Часті питання</h2>
+  <details><summary>Поставив галочку, а на сайті товару немає</summary>
+    <p>Перевірте, що позиція в правильному магазині (того ключа, яким підключено сайт) і що магазин активний. Без вебхука сайт оновлюється після закінчення кешу (<code>cache_ttl</code> у конфігу сайту, зазвичай 1–5 хв).</p></details>
+  <details><summary>Чим «Ціна продажу» товару відрізняється від ціни в магазині?</summary>
+    <p>«Ціна продажу» — загальна ціна товару на складі. Ціна позиції стосується лише одного магазину; якщо вона порожня, магазин бере ціну продажу.</p></details>
+  <details><summary>Чи можна змінити ціну в замовленні з сайту?</summary>
+    <p>Так, як у будь-якому замовленні в Продажах. Сайт сам ціну передати не може — її завжди ставить Minerva.</p></details>
+  <details><summary>Запит пропозиції — як відповісти клієнту?</summary>
+    <p>Відкрийте документ «Запит пропозиції» в Продажах (фільтр за типом документа): там кількості, контакти і примітка покупця. Запит склад не змінює; коли клієнт погодиться, оформіть звичайне замовлення.</p></details>
+  <details><summary>Тестове замовлення — як прибрати?</summary>
+    <p>Скасуйте замовлення в Продажах — товар повернеться на склад, сайт отримає оновлені залишки.</p></details>
+
+</div>
+{% endblock %}

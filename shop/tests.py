@@ -128,6 +128,12 @@ class ShopAdminTests(TestCase):
         r = self.client.get("/admin/shop/shopsettings/")
         self.assertEqual(self.client.get(r["Location"]).status_code, 200)
 
+    def test_help_page(self):
+        services.add_products(self.shop, [self.p])
+        r = self.client.get("/dashboard/shop/help/")
+        self.assertContains(r, "Зв'язки магазину з базою даних")
+        self.assertContains(r, "webshop")
+
     def test_add_to_shop_action(self):
         r = self.client.post("/admin/shop/shopproduct/", {"action": "action_add_to_shop", "_selected_action": [self.p.pk]})
         self.assertContains(r, "Додати товари в магазин")
