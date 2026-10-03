@@ -1,0 +1,27 @@
+{% extends "admin/base_site.html" %}
+{% block title %}{{ title }} | Minerva{% endblock %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
+  <a href="{% url 'admin:shop_shopproduct_changelist' %}">Товари магазину</a> &rsaquo; {{ title }}
+</div>
+{% endblock %}
+{% block content %}
+<div style="max-width:720px">
+  <p>Вибрано товарів: <strong>{{ count }}</strong></p>
+  <ul style="columns:2;font-family:monospace;font-size:12px;margin-bottom:16px">
+    {% for p in queryset %}<li>{{ p.sku }}</li>{% endfor %}
+    {% if count > 30 %}<li>… ще {{ count|add:"-30" }}</li>{% endif %}
+  </ul>
+  <form method="post">{% csrf_token %}
+    {% for pk in selected %}<input type="hidden" name="_selected_action" value="{{ pk }}">{% endfor %}
+    <input type="hidden" name="action" value="{{ action }}">
+    <input type="hidden" name="apply" value="1">
+    <table>{{ form.as_table }}</table>
+    <div class="submit-row" style="margin-top:16px">
+      <input type="submit" class="default" value="Застосувати">
+      <a href="{% url 'admin:shop_shopproduct_changelist' %}" class="button cancel-link">Скасувати</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

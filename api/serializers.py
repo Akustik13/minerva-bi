@@ -102,12 +102,17 @@ class ShopProductSerializer(serializers.ModelSerializer):
     image_url     = serializers.SerializerMethodField()
     datasheet_url = serializers.SerializerMethodField()
     last_movement_at = serializers.DateTimeField(source="_last_movement", read_only=True)
+    price_breaks  = serializers.SerializerMethodField(help_text="[{min_qty, unit_price}] — ціна за шт. від кількості")
 
     class Meta:
         model  = Product
         fields = ["sku", "name", "name_export", "category", "unit_type", "manufacturer",
-                  "price", "available", "incoming", "in_stock", "lead_time_days",
+                  "price", "price_breaks", "available", "incoming", "in_stock", "lead_time_days",
                   "net_weight_g", "image_url", "datasheet_url", "last_movement_at"]
+
+    def get_price_breaks(self, obj):
+        from shop.services import price_breaks
+        return [{"min_qty": r["min_qty"], "unit_price": float(r["unit_price"])} for r in price_breaks(obj)]
 
     def get_in_stock(self, obj):
         return getattr(obj, "_available", 0) > 0

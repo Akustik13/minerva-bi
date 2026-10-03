@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'sales',            # 🛒 Sales
     'shipping',         # 🚚 Доставка
     'inventory',        # 📦 Управління складом
+    'shop',             # 🏪 Інтернет-магазин (ціни, асортимент сайту)
     'dashboard',        # 📊 Dashboard
     'tasks',            # 📋 Задачі та нагадування
     'autoimport',       # 🔄 Авто-імпорт по розкладу

@@ -887,6 +887,12 @@ window.MV_GROUPS = [
       { href:'/admin/strategy/strategytemplate/',    icon:'📋', label:'Шаблони',    app:'strategy', model:'StrategyTemplate' },
     ], apps:['crm','strategy'] },
   { id:'sales', icon:'🛒', label:'🛒 Продажі', apps:['sales'] },
+  { id:'shop', icon:'🏪', label:'🏪 Інтернет-магазин',
+    links:[
+      { href:'/admin/shop/shopproduct/?shop_visible__exact=1', icon:'🏪', label:'Товари в магазині', app:'shop', model:'ShopProduct' },
+      { href:'/admin/sales/salesorder/?source=webshop',        icon:'🧾', label:'Замовлення з сайту', app:'sales' },
+      { href:'/admin/api/webhook/',                            icon:'📡', label:'Вебхуки сайту',      app:'api',  model:'Webhook' },
+    ], apps:['shop'] },
   { id:'accounting', icon:'💰', label:'💰 Бухгалтерія', apps:['accounting'] },
   { id:'shipping', icon:'🚚', label:'🚚 Доставка',
     links:[
@@ -1196,6 +1202,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/dashboard/signals/':   'analytics',
     '/dashboard/bots/':      'bots',
     '/dashboard/api/':       'bots',
+    '/admin/shop/':          'shop',
     '/dashboard/system/':    'system',
     '/dashboard/import/':    'system',
     '/admin/shipping/shipment/dhl-track-lookup/': 'shipping',

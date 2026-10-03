@@ -217,7 +217,7 @@ class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_value_regex = r"[^/]+"
 
     def get_queryset(self):
-        qs = Product.objects.filter(shop_visible=True, is_active=True)
+        qs = Product.objects.filter(shop_visible=True, is_active=True).prefetch_related("shop_tiers")
         return stock_service.annotate_stock(qs).order_by("category", "sku")
 
 
@@ -341,7 +341,11 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             order.save()
             total = Decimal("0")
             for product, raw, ln in resolved:
-                unit = product.shop_effective_price if is_shop else ln.get("unit_price")
+                if is_shop:
+                    from shop.services import unit_price_for
+                    unit = unit_price_for(product, ln["qty"])  # ступінь ціни за кількістю
+                else:
+                    unit = ln.get("unit_price")
                 if unit is None:
                     unit = product.sale_price
                 line_total = (unit * ln["qty"]) if unit is not None else None

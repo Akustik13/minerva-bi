@@ -29,6 +29,7 @@ def _get_app_list(self, request, app_label=None):
         'accounting', # 💰 Бухгалтерія
         'shipping',   # 🚚 Доставка
         'inventory',  # 📦 Управління складом
+        'shop',       # 🏪 Інтернет-магазин
         'tasks',      # 📋 Задачі та нагадування
         'autoimport',    # 🔄 Авто-імпорт
         'scraper_hub',  # 📥 Scraper рахунків
@@ -58,6 +59,7 @@ def _get_app_list(self, request, app_label=None):
         'shipping': ['carrier', 'shippingsettings', 'packagingmaterial', 'shipment', 'orderpackaging'],
         'config':   ['systemsettings', 'documentsettings', 'notificationsettings', 'themesettings'],
         'api':          ['apikey', 'webhook', 'webhookdelivery'],
+        'shop':         ['shopproduct', 'shopsettings'],
         'scraper_hub':  ['scrapersiteconfig', 'scraperrun', 'scraperdocument'],
         'bots':      ['digikeyconfig', 'digikeylisting', 'bot', 'botlog'],
         'jlcpcb':    ['jlcconfig', 'jlcorder', 'jlcproductmapping'],

@@ -16,6 +16,7 @@ MODULES = [
     {'app_label': 'accounting', 'name': 'Бухгалтерія',          'tier': 'standard', 'order': 21},
     {'app_label': 'shipping',   'name': 'Доставка',             'tier': 'standard', 'order': 30},
     {'app_label': 'inventory',  'name': 'Склад',                'tier': 'standard', 'order': 40},
+    {'app_label': 'shop',       'name': 'Інтернет-магазин',     'tier': 'premium',  'order': 41},
     {'app_label': 'tasks',        'name': 'Задачі',               'tier': 'standard', 'order': 50},
     {'app_label': 'ai_assistant',    'name': 'Minerva AI',      'tier': 'premium',  'order': 55},
     {'app_label': 'email_assistant', 'name': 'Email Асистент', 'tier': 'premium',  'order': 56},
