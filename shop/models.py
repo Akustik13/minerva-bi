@@ -1,12 +1,14 @@
 """
-Інтернет-магазин: ціноутворення і керування асортиментом.
+Інтернет-магазини: кілька магазинів (сайт, маркетплейс …), у кожного свій асортимент і ціни.
 
-Галочка «у магазині» і базова ціна живуть у Product (shop_visible, shop_price);
-тут — ступені цін за кількістю (як на DigiKey: 1 / 10 / 100 …) і налаштування.
+  Shop         — магазин; slug = джерело замовлень (SalesOrder.source); ключ API прив'язується до магазину
+  ShopListing  — товар у конкретному магазині: видимість + ціна (порожньо = «Ціна продажу» товару)
+  ShopPriceTier— ступінь ціни позиції за кількістю (як на DigiKey: від 10 / 100 … шт.)
+  ShopSettings — шаблон ступенів, націнка, округлення (спільні для всіх магазинів)
 """
 from decimal import Decimal
 
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models
 
 from inventory.models import Product
@@ -22,7 +24,7 @@ DEFAULT_PRICE_BREAKS = [
 
 
 class ShopSettings(models.Model):
-    """Налаштування цін магазину — синглтон (pk=1)."""
+    """Налаштування цін — синглтон (pk=1)."""
 
     class Rounding(models.TextChoices):
         NONE   = "none", "Без округлення"
@@ -66,10 +68,68 @@ class ShopSettings(models.Model):
         return obj
 
 
+class Shop(models.Model):
+    name = models.CharField("Назва", max_length=100)
+    slug = models.CharField(
+        "Код (джерело замовлень)", max_length=32, unique=True,
+        validators=[RegexValidator(r"^[a-z0-9][a-z0-9_-]*$", "Лише латиниця в нижньому регістрі, цифри, - і _")],
+        help_text="Записується в замовлення як «Джерело» (напр. webshop) — за ним фільтруються продажі.",
+    )
+    currency = models.CharField("Валюта", max_length=3, default="EUR")
+    is_active = models.BooleanField("Активний", default=True)
+    is_default = models.BooleanField(
+        "За замовчуванням", default=False,
+        help_text="Для ключів API, не прив'язаних до магазину.",
+    )
+    url = models.URLField("Адреса сайту", blank=True, default="")
+    notes = models.TextField("Нотатки", blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Магазин"
+        verbose_name_plural = "🏬 Магазини"
+        ordering = ["-is_default", "name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_default:
+            Shop.objects.exclude(pk=self.pk).filter(is_default=True).update(is_default=False)
+
+
+class ShopListing(models.Model):
+    """Товар у конкретному магазині."""
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="listings", verbose_name="Магазин")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="shop_listings", verbose_name="Товар")
+    is_visible = models.BooleanField("Показувати", default=True)
+    price = models.DecimalField(
+        "Ціна (нетто, 1 шт.)", max_digits=18, decimal_places=4, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+        help_text="Порожньо — «Ціна продажу» товару; без ціни на сайті «Ціна за запитом».",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Позиція магазину"
+        verbose_name_plural = "💶 Асортимент і ціни"
+        ordering = ["shop", "product__sku"]
+        constraints = [models.UniqueConstraint(fields=["shop", "product"], name="uniq_shop_listing")]
+
+    def __str__(self):
+        return f"{self.shop.slug}: {self.product.sku}"
+
+    @property
+    def effective_price(self):
+        return self.price if self.price is not None else self.product.sale_price
+
+
 class ShopPriceTier(models.Model):
-    """Ціна за штуку від певної кількості (1 шт. = базова ціна товару)."""
-    product    = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="shop_tiers",
-                                   verbose_name="Товар")
+    """Ціна за штуку від певної кількості (1 шт. = ціна позиції)."""
+    listing    = models.ForeignKey(ShopListing, on_delete=models.CASCADE, related_name="tiers",
+                                   verbose_name="Позиція")
     min_qty    = models.PositiveIntegerField("Від кількості, шт.", validators=[MinValueValidator(2)])
     unit_price = models.DecimalField("Ціна за шт. (нетто)", max_digits=18, decimal_places=4,
                                      validators=[MinValueValidator(Decimal("0"))])
@@ -77,17 +137,17 @@ class ShopPriceTier(models.Model):
     class Meta:
         verbose_name = "Ступінь ціни"
         verbose_name_plural = "Ступені цін"
-        ordering = ["product", "min_qty"]
-        constraints = [models.UniqueConstraint(fields=["product", "min_qty"], name="uniq_shop_tier_qty")]
+        ordering = ["listing", "min_qty"]
+        constraints = [models.UniqueConstraint(fields=["listing", "min_qty"], name="uniq_listing_tier_qty")]
 
     def __str__(self):
-        return f"{self.product.sku}: від {self.min_qty} шт. — {self.unit_price}"
+        return f"{self.listing}: від {self.min_qty} шт. — {self.unit_price}"
 
 
 class ShopProduct(Product):
-    """Проксі товару для розділу «Інтернет-магазин» (той самий запис, що й у складі)."""
+    """Проксі товару: каталог для додавання товарів у магазини."""
 
     class Meta:
         proxy = True
-        verbose_name = "Товар магазину"
-        verbose_name_plural = "🏪 Товари магазину"
+        verbose_name = "Товар каталогу"
+        verbose_name_plural = "📦 Каталог → додати в магазин"

@@ -17,7 +17,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 from django.utils.safestring import mark_safe
 from django.utils.translation import gettext_lazy as _
 from datetime import timedelta
@@ -2134,32 +2134,28 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
-    list_filter   = ("category", "kind", "bom_type", "is_active", "shop_visible")
+    list_filter   = ("category", "kind", "bom_type", "is_active")
     list_per_page = 50
-    actions       = ["bulk_sync_digikey_attrs", "action_shop_show", "action_shop_hide"]
+    actions       = ["bulk_sync_digikey_attrs"]
 
-    @admin.action(description="🛒 Показувати в інтернет-магазині")
-    def action_shop_show(self, request, queryset):
-        # save() по одному — щоб спрацювали сигнали (вебхук stock.changed для сайту)
-        n = 0
-        for p in queryset.filter(shop_visible=False):
-            p.shop_visible = True
-            p.save(update_fields=["shop_visible"])
-            n += 1
-        self.message_user(request, f"🛒 Додано в магазин: {n}")
-
-    @admin.action(description="🚫 Прибрати з інтернет-магазину")
-    def action_shop_hide(self, request, queryset):
-        n = 0
-        for p in queryset.filter(shop_visible=True):
-            p.shop_visible = False
-            p.save(update_fields=["shop_visible"])
-            n += 1
-        self.message_user(request, f"🚫 Прибрано з магазину: {n}")
+    @admin.display(description="Магазини")
+    def shop_listings_info(self, obj):
+        """Де продається товар (керування — розділ «🏪 Інтернет-магазин»)."""
+        from django.urls import reverse
+        rows = list(obj.shop_listings.select_related("shop")) if obj and obj.pk else []
+        add = reverse("admin:shop_shopproduct_changelist") + f"?q={obj.sku}" if obj and obj.pk else "#"
+        if not rows:
+            return format_html('Не продається в жодному магазині — <a href="{}">додати в магазин →</a>', add)
+        items = format_html_join(
+            "", '<li><a href="{}">{}</a>: {} · {}</li>',
+            ((reverse("admin:shop_shoplisting_change", args=[l.pk]), l.shop.name,
+              "показується" if l.is_visible else "сховано",
+              f"{l.effective_price:.2f}" if l.effective_price is not None else "ціна за запитом") for l in rows))
+        return format_html("<ul style='margin:0'>{}</ul>", items)
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
-                       "image_preview", "datasheet_link", "movement_history")
+                       "image_preview", "datasheet_link", "movement_history", "shop_listings_info")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -2172,10 +2168,9 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 ("reorder_point", "lead_time_days"),
             )
         }),
-        ("🛒 Інтернет-магазин", {
-            "fields": (("shop_visible", "shop_price"),),
-            "description": "Товари з галочкою показуються в магазині на сайті. "
-                           "Ціна нетто; порожньо — береться «Ціна продажу».",
+        ("🏪 Інтернет-магазини", {
+            "fields": ("shop_listings_info",),
+            "description": "Асортимент, ціни і ступені цін кожного магазину — розділ «🏪 Інтернет-магазин».",
         }),
         ("🔗 Медіа та документи", {
             "fields": ("datasheet_url", "datasheet_file", "datasheet_link", "image_url", "image", "image_preview"),

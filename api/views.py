@@ -217,7 +217,15 @@ class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_value_regex = r"[^/]+"
 
     def get_queryset(self):
-        qs = Product.objects.filter(shop_visible=True, is_active=True).prefetch_related("shop_tiers")
+        from django.db.models import Prefetch
+        from shop.models import ShopListing
+        from shop.services import shop_for_key
+        shop = shop_for_key(self.request.auth if isinstance(self.request.auth, APIKey) else None)
+        if shop is None:
+            return Product.objects.none()
+        listings = ShopListing.objects.filter(shop=shop).prefetch_related("tiers")
+        qs = (Product.objects.filter(is_active=True, shop_listings__shop=shop, shop_listings__is_visible=True)
+              .prefetch_related(Prefetch("shop_listings", queryset=listings, to_attr="_listings")))
         return stock_service.annotate_stock(qs).order_by("category", "sku")
 
 
@@ -287,12 +295,25 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
         lines_in    = d.pop("lines")
         check_stock = d.pop("check_stock", False)
         is_shop     = d.pop("shop", False)
-        if is_shop:
+        is_quote    = d.pop("quote", False)
+        key = request.auth if isinstance(request.auth, APIKey) else None
+        shop = None
+        if is_shop or is_quote:
+            from shop.services import shop_for_key
+            shop = shop_for_key(key)
             d.pop("total_price", None)  # магазин: сума рахується лише з цін Minerva
+        if is_quote:
+            is_shop = False
+            d.update(document_type="QUOTE", affects_stock=False, payment_method="", payment_status="")
+            check_stock = False
+        elif is_shop:
+            if shop is None:
+                return Response({"detail": "Для ключа не налаштовано магазин.", "code": "no_shop"},
+                                status=status.HTTP_400_BAD_REQUEST)
             d.setdefault("payment_status", "unpaid")
 
-        key = request.auth if isinstance(request.auth, APIKey) else None
-        d["source"] = (d.get("source") or (key.default_source if key else "") or "api").strip()
+        d["source"] = (d.get("source") or (shop.slug if shop else "") or
+                       (key.default_source if key else "") or "api").strip()
         d.setdefault("order_date", timezone.localdate())
         currency = d.get("currency") or "EUR"
         d["currency"] = currency
@@ -302,7 +323,8 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             return Response(self._detail(existing, created=False), status=status.HTTP_200_OK)
 
         # Розпізнавання SKU
-        resolved, errors = [], []
+        resolved, errors, unknown = [], [], []
+        listings = {}
         for i, ln in enumerate(lines_in):
             if ln.get("product"):
                 product = Product.objects.filter(pk=ln["product"]).first()
@@ -310,16 +332,27 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             else:
                 raw = ln["sku"]
                 product = stock_service.resolve_sku(raw)
+            if not product and is_quote:
+                unknown.append(f"{raw} × {ln['qty']:g}")  # запит може стосуватися товару поза Minerva
+                continue
             if not product:
                 errors.append({"line": i, "sku": raw, "error": "Товар не знайдено"})
-            elif not product.is_fractional_unit() and ln["qty"] != int(ln["qty"]):
+                continue
+            if not product.is_fractional_unit() and ln["qty"] != int(ln["qty"]):
                 errors.append({"line": i, "sku": raw, "error": "Кількість має бути цілою (штуки)"})
-            elif is_shop and not (product.shop_visible and product.is_active):
-                errors.append({"line": i, "sku": raw, "error": "Товар недоступний в інтернет-магазині"})
-            elif is_shop and product.shop_effective_price is None:
-                errors.append({"line": i, "sku": raw, "error": "Ціна не задана — товар лише за запитом"})
-            else:
-                resolved.append((product, raw, ln))
+                continue
+            if is_shop:
+                from shop.models import ShopListing
+                listing = (ShopListing.objects.filter(shop=shop, product=product, is_visible=True)
+                           .select_related("product").prefetch_related("tiers").first())
+                if not (listing and product.is_active):
+                    errors.append({"line": i, "sku": raw, "error": "Товар недоступний в інтернет-магазині"})
+                    continue
+                if listing.effective_price is None:
+                    errors.append({"line": i, "sku": raw, "error": "Ціна не задана — товар лише за запитом"})
+                    continue
+                listings[product.pk] = listing
+            resolved.append((product, raw, ln))
         if errors:
             return Response({"detail": "Помилки в рядках замовлення.", "code": "invalid_lines",
                              "lines": errors}, status=status.HTTP_400_BAD_REQUEST)
@@ -335,6 +368,11 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                 return Response({"detail": "Недостатньо товару на складі.", "code": "insufficient_stock",
                                  "items": short}, status=status.HTTP_409_CONFLICT)
 
+        if unknown:
+            note = (d.get("internal_note") or "").strip()
+            # спершу — товари поза каталогом (нотатка обрізається до 500 символів)
+            d["internal_note"] = ("Поза каталогом Minerva: " + ", ".join(unknown) + (" | " + note if note else ""))[:500]
+
         with transaction.atomic():
             order = SalesOrder(**d)
             order.status_source = _key_label(request)
@@ -343,18 +381,20 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             for product, raw, ln in resolved:
                 if is_shop:
                     from shop.services import unit_price_for
-                    unit = unit_price_for(product, ln["qty"])  # ступінь ціни за кількістю
+                    unit = unit_price_for(listings[product.pk], ln["qty"])  # ступінь ціни за кількістю
+                elif is_quote:
+                    unit = None  # ціну пропонує менеджер
                 else:
                     unit = ln.get("unit_price")
-                if unit is None:
-                    unit = product.sale_price
+                    if unit is None:
+                        unit = product.sale_price
                 line_total = (unit * ln["qty"]) if unit is not None else None
                 SalesOrderLine.objects.create(
                     order=order, product=product, sku_raw=raw, qty=ln["qty"],
                     unit_price=unit, total_price=line_total, currency=currency,
                 )
                 total += line_total or 0
-            if d.get("total_price") is None:
+            if d.get("total_price") is None and not is_quote:
                 order.total_price = total
                 order.save(update_fields=["total_price"])
 

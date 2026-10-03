@@ -3,7 +3,7 @@
 {% block breadcrumbs %}
 <div class="breadcrumbs">
   <a href="{% url 'admin:index' %}">Домівка</a> &rsaquo;
-  <a href="{% url 'admin:shop_shopproduct_changelist' %}">Товари магазину</a> &rsaquo; {{ title }}
+  <a href="{{ back_url }}">{{ back_label }}</a> &rsaquo; {{ title }}
 </div>
 {% endblock %}
 {% block content %}
@@ -20,7 +20,7 @@
     <table>{{ form.as_table }}</table>
     <div class="submit-row" style="margin-top:16px">
       <input type="submit" class="default" value="Застосувати">
-      <a href="{% url 'admin:shop_shopproduct_changelist' %}" class="button cancel-link">Скасувати</a>
+      <a href="{{ back_url }}" class="button cancel-link">Скасувати</a>
     </div>
   </form>
 </div>

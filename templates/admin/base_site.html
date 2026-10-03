@@ -889,7 +889,8 @@ window.MV_GROUPS = [
   { id:'sales', icon:'🛒', label:'🛒 Продажі', apps:['sales'] },
   { id:'shop', icon:'🏪', label:'🏪 Інтернет-магазин',
     links:[
-      { href:'/admin/shop/shopproduct/?shop_visible__exact=1', icon:'🏪', label:'Товари в магазині', app:'shop', model:'ShopProduct' },
+      { href:'/admin/shop/shoplisting/', icon:'💶', label:'Асортимент і ціни', app:'shop', model:'ShopListing' },
+      { href:'/admin/shop/shop/', icon:'🏬', label:'Магазини', app:'shop', model:'Shop' },
       { href:'/admin/sales/salesorder/?source=webshop',        icon:'🧾', label:'Замовлення з сайту', app:'sales' },
       { href:'/admin/api/webhook/',                            icon:'📡', label:'Вебхуки сайту',      app:'api',  model:'Webhook' },
     ], apps:['shop'] },

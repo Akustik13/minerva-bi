@@ -224,7 +224,7 @@ def _on_tx_change(sender, instance, **kwargs):
 
 
 # Поля товару, зміна яких має оновити каталог інтернет-магазину
-_SHOP_FIELDS = ("shop_visible", "shop_price", "sale_price", "is_active", "name", "name_export",
+_SHOP_FIELDS = ("sale_price", "is_active", "name", "name_export",
                 "category", "unit_type", "lead_time_days", "image_url", "image", "datasheet_url")
 
 
@@ -235,16 +235,12 @@ def _product_pre_save(sender, instance, **kwargs):
 
 def _product_post_save(sender, instance, created, **kwargs):
     old = getattr(instance, "_wh_shop_old", None)
-    if created:
-        if instance.shop_visible:
-            _queue_stock(instance.pk)
-        return
-    if old is None:
-        return
+    if created or old is None:
+        return  # новий товар з'являється в магазині лише через позицію (ShopListing → свій сигнал)
     new = {f: getattr(instance, f) for f in _SHOP_FIELDS}
     new["image"] = instance.image.name if instance.image else ""
     old["image"] = old.get("image") or ""
-    if (old["shop_visible"] or instance.shop_visible) and any(old[f] != new[f] for f in _SHOP_FIELDS):
+    if any(old[f] != new[f] for f in _SHOP_FIELDS) and instance.shop_listings.filter(is_visible=True).exists():
         _queue_stock(instance.pk)
 
 

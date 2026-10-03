@@ -24,7 +24,7 @@ class SalesSource(models.Model):
 class SalesOrder(models.Model):
     DOCUMENT_TYPE_CHOICES = [
         ("SALE", "Sale"), ("SAMPLE", "Sample"), ("TRANSFER", "Transfer"),
-        ("WARRANTY", "Warranty"), ("OTHER", "Other"),
+        ("WARRANTY", "Warranty"), ("QUOTE", "Запит пропозиції"), ("OTHER", "Other"),
     ]
     source          = models.CharField(max_length=32, default="digikey")
     document_type   = models.CharField(max_length=16, choices=DOCUMENT_TYPE_CHOICES, default="SALE")

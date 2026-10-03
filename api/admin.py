@@ -17,7 +17,7 @@ class APIKeyForm(forms.ModelForm):
 
     class Meta:
         model = APIKey
-        fields = ['name', 'is_active', 'expires_at', 'default_source']
+        fields = ['name', 'is_active', 'expires_at', 'shop', 'default_source']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -43,7 +43,7 @@ class APIKeyAdmin(admin.ModelAdmin):
 
     fieldsets = [
         ('Загальне', {
-            'fields': ['name', 'is_active', 'expires_at', 'default_source'],
+            'fields': ['name', 'is_active', 'expires_at', 'shop', 'default_source'],
         }),
         ('Права доступу', {
             'fields': ['scopes_input'],

@@ -34,6 +34,12 @@ class APIKey(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     last_used  = models.DateTimeField('Останнє використання', null=True, blank=True)
     expires_at = models.DateField('Дійсний до', null=True, blank=True)
+    shop = models.ForeignKey(
+        'shop.Shop', on_delete=models.SET_NULL, null=True, blank=True, related_name='api_keys',
+        verbose_name='Магазин',
+        help_text='Асортимент і ціни якого магазину бачить цей ключ (/shop/products/) і куди йдуть його замовлення. '
+                  'Порожньо — магазин з кодом = «Джерело замовлень», інакше магазин за замовчуванням.',
+    )
     default_source = models.CharField(
         'Джерело замовлень', max_length=32, blank=True, default='',
         help_text="Slug джерела (SalesSource) для замовлень, створених цим ключем, "

@@ -93,9 +93,9 @@ class CategorySerializer(serializers.ModelSerializer):
 # ── Інтернет-магазин ──────────────────────────────────────────────────────────
 
 class ShopProductSerializer(serializers.ModelSerializer):
-    """Каталог інтернет-магазину: лише те, що потрібно сайту (без закупівельних цін)."""
-    price     = serializers.DecimalField(source="shop_effective_price", max_digits=18,
-                                         decimal_places=4, read_only=True)
+    """Каталог магазину ключа: лише те, що потрібно сайту (без закупівельних цін).
+    Потребує queryset з Prefetch(..., to_attr="_listings") позицій цього магазину."""
+    price     = serializers.SerializerMethodField()
     available = serializers.DecimalField(source="_available", max_digits=18, decimal_places=3, read_only=True)
     incoming  = serializers.DecimalField(source="_incoming", max_digits=18, decimal_places=3, read_only=True)
     in_stock  = serializers.SerializerMethodField()
@@ -110,9 +110,22 @@ class ShopProductSerializer(serializers.ModelSerializer):
                   "price", "price_breaks", "available", "incoming", "in_stock", "lead_time_days",
                   "net_weight_g", "image_url", "datasheet_url", "last_movement_at"]
 
+    @staticmethod
+    def _listing(obj):
+        rows = getattr(obj, "_listings", None)
+        return rows[0] if rows else None
+
+    def get_price(self, obj):
+        listing = self._listing(obj)
+        price = listing.effective_price if listing else None
+        return float(price) if price is not None else None
+
     def get_price_breaks(self, obj):
         from shop.services import price_breaks
-        return [{"min_qty": r["min_qty"], "unit_price": float(r["unit_price"])} for r in price_breaks(obj)]
+        listing = self._listing(obj)
+        if not listing:
+            return []
+        return [{"min_qty": r["min_qty"], "unit_price": float(r["unit_price"])} for r in price_breaks(listing)]
 
     def get_in_stock(self, obj):
         return getattr(obj, "_available", 0) > 0
@@ -259,8 +272,13 @@ class OrderCreateSerializer(serializers.ModelSerializer):
                                         write_only=True, source="internal_note")
     shop        = serializers.BooleanField(
         required=False, default=False, write_only=True,
-        help_text="Замовлення інтернет-магазину: лише товари з «Показувати в магазині», "
-                  "ціни — завжди з Minerva (shop_price / sale_price), unit_price/total_price ігноруються",
+        help_text="Замовлення магазину ключа: лише видимі позиції цього магазину, ціни (зі ступенями) — "
+                  "завжди з Minerva, unit_price/total_price ігноруються",
+    )
+    quote       = serializers.BooleanField(
+        required=False, default=False, write_only=True,
+        help_text="Запит пропозиції: тип документа QUOTE, без списання складу і без цін; "
+                  "невідомі SKU записуються в нотатку",
     )
 
     class Meta:
@@ -272,7 +290,7 @@ class OrderCreateSerializer(serializers.ModelSerializer):
             "client", "contact_name", "email", "phone", "buyer_vat_id",
             "addr_street", "addr_city", "addr_zip", "addr_state", "addr_country",
             "ship_name", "ship_company", "ship_phone", "ship_email", "ship_vat_id",
-            "shipping_address", "note", "lines", "check_stock", "shop",
+            "shipping_address", "note", "lines", "check_stock", "shop", "quote",
             "payment_method", "payment_status", "payment_reference",
         ]
         validators = []  # дублікат (source, order_number) обробляється ідемпотентно у view

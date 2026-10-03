@@ -288,9 +288,9 @@ class CorsTests(APITestBase):
 class ShopTests(APITestBase):
     def setUp(self):
         super().setUp()
-        self.p1.shop_visible = True
-        self.p1.shop_price = Decimal("89.00")
-        self.p1.save()
+        from shop.models import Shop, ShopListing
+        self.shop = Shop.objects.create(name="Website", slug="webshop", is_default=True)
+        self.listing = ShopListing.objects.create(shop=self.shop, product=self.p1, price=Decimal("89.00"))
         self.receive(self.p1, 5)
 
     def test_catalog_only_shop_products(self):
@@ -302,13 +302,19 @@ class ShopTests(APITestBase):
         self.assertNotIn("purchase_price", items[0])
         self.assertEqual(self.client.get("/api/v1/shop/products/CABLE-M/").status_code, 404)
 
+    def test_hidden_listing_not_in_catalog(self):
+        self.listing.is_visible = False
+        self.listing.save()
+        self.assertEqual(self.client.get("/api/v1/shop/products/").json()["count"], 0)
+
     def test_price_falls_back_to_sale_price(self):
-        self.p1.shop_price = None
-        self.p1.save()
+        self.listing.price = None
+        self.listing.save()
         self.assertEqual(self.client.get("/api/v1/shop/products/AMP-100/").json()["price"], 99.0)
 
     def test_product_without_price_listed_but_not_orderable(self):
-        self.p1.shop_price = None
+        self.listing.price = None
+        self.listing.save()
         self.p1.sale_price = None
         self.p1.save()
         self.assertIsNone(self.client.get("/api/v1/shop/products/AMP-100/").json()["price"])
@@ -334,13 +340,40 @@ class ShopTests(APITestBase):
         d = r.json()
         self.assertEqual(d["lines"][0]["unit_price"], 89.0)
         self.assertEqual(d["total_price"], 178.0)
-        self.assertEqual((d["payment_method"], d["payment_status"]), ("prepayment", "unpaid"))
+        self.assertEqual((d["source"], d["payment_method"], d["payment_status"]), ("webshop", "prepayment", "unpaid"))
 
-    def test_shop_order_rejects_hidden_product(self):
+    def test_shop_order_rejects_product_not_in_shop(self):
         body = dict(OrderTests.ORDER, shop=True, lines=[{"sku": "CABLE-M", "qty": 1}])
         r = self.client.post("/api/v1/orders/", body, format="json")
         self.assertEqual(r.status_code, 400)
         self.assertIn("магазині", r.json()["lines"][0]["error"])
+
+    def test_second_shop_own_assortment_prices_and_source(self):
+        from shop.models import Shop, ShopListing
+        market = Shop.objects.create(name="Marketplace", slug="market")
+        ShopListing.objects.create(shop=market, product=self.p1, price=Decimal("120.00"))
+        ShopListing.objects.create(shop=market, product=self.p2, price=Decimal("2.50"))
+        key2 = APIKey.objects.create(name="market", scopes=ALL_SCOPES, shop=market)
+        c2 = APIClient()
+        c2.credentials(HTTP_AUTHORIZATION=f"Token {key2.key}")
+        items = {i["sku"]: i["price"] for i in c2.get("/api/v1/shop/products/").json()["results"]}
+        self.assertEqual(items, {"AMP-100": 120.0, "CABLE-M": 2.5})
+        self.assertEqual([i["sku"] for i in self.client.get("/api/v1/shop/products/").json()["results"]], ["AMP-100"])
+        r = c2.post("/api/v1/orders/", dict(OrderTests.ORDER, order_number="M-1", shop=True), format="json")
+        self.assertEqual((r.status_code, r.json()["source"], r.json()["lines"][0]["unit_price"]), (201, "market", 120.0))
+
+    def test_quote_request(self):
+        body = dict(OrderTests.ORDER, order_number="Q-1", quote=True,
+                    lines=[{"sku": "CABLE-M", "qty": 100}, {"sku": "UNKNOWN-9", "qty": 5}])
+        before = self.client.get("/api/v1/stock/CABLE-M/").json()["on_hand"]
+        r = self.client.post("/api/v1/orders/", body, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        d = r.json()
+        self.assertEqual((d["document_type"], d["affects_stock"], d["total_price"]), ("QUOTE", False, None))
+        self.assertEqual([l["product_sku"] for l in d["lines"]], ["CABLE-M"])
+        self.assertIsNone(d["lines"][0]["unit_price"])
+        self.assertIn("UNKNOWN-9", d["internal_note"])
+        self.assertEqual(self.client.get("/api/v1/stock/CABLE-M/").json()["on_hand"], before)
 
     def test_payment_status_patch(self):
         oid = self.client.post("/api/v1/orders/", dict(OrderTests.ORDER, shop=True),
@@ -350,17 +383,20 @@ class ShopTests(APITestBase):
         self.assertEqual(r.status_code, 200, r.content)
         self.assertEqual(r.json()["payment_status"], "paid")
 
-    def test_product_change_fires_webhook(self):
+    def test_listing_and_product_change_fire_webhook(self):
         Webhook.objects.create(name="shop", url="https://shop.example/hook", events=["stock.changed"])
         webhooks._local.stock_ids = None  # flush з setUp чекає на commit зовнішньої транзакції тесту
         sent = []
         with mock.patch("requests.post", side_effect=lambda url, data, headers, timeout:
                         sent.append(data) or _Resp(200)), self.captureOnCommitCallbacks(execute=True):
-            self.p1.shop_price = Decimal("79.00")
-            self.p1.save()
+            self.listing.price = Decimal("79.00")
+            self.listing.save()
         self.assertEqual(len(sent), 1)
-        with mock.patch("requests.post", side_effect=lambda *a, **k: sent.append(1) or _Resp(200)), \
-                self.captureOnCommitCallbacks(execute=True):
-            self.p2.notes = "irrelevant"
-            self.p2.save()   # не в магазині і поле не магазинне
-        self.assertEqual(len(sent), 1)
+        with mock.patch("requests.post", side_effect=lambda *a, **k: sent.append(1) or _Resp(200)),                 self.captureOnCommitCallbacks(execute=True):
+            self.p1.name = "Amplifier v2"
+            self.p1.save()   # назва товару, що є в магазині
+        self.assertEqual(len(sent), 2)
+        with mock.patch("requests.post", side_effect=lambda *a, **k: sent.append(1) or _Resp(200)),                 self.captureOnCommitCallbacks(execute=True):
+            self.p2.name = "Cable v2"
+            self.p2.save()   # товар не в магазині
+        self.assertEqual(len(sent), 2)
