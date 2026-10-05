@@ -1353,6 +1353,16 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
                 name="shipping_shipment_print_all",
             ),
             path(
+                "<int:shipment_id>/shop-confirm/",
+                self.admin_site.admin_view(self.shop_confirm_view),
+                name="shipping_shipment_shop_confirm",
+            ),
+            path(
+                "<int:shipment_id>/shop-confirm/dismiss/",
+                self.admin_site.admin_view(self.shop_confirm_dismiss_view),
+                name="shipping_shipment_shop_confirm_dismiss",
+            ),
+            path(
                 "<int:shipment_id>/set-status/",
                 self.admin_site.admin_view(self.set_status_view),
                 name="shipping_shipment_set_status",
@@ -2576,6 +2586,80 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
     # ── Деталі відправлення (read-only) ──────────────────────────────────────
 
+    @staticmethod
+    def _shop_confirm_context(shipment):
+        """Банер «Підтвердити відправлення в магазині» або None."""
+        order = shipment.order
+        if not order or shipment.shop_confirm_dismissed:
+            return None
+        if not (shipment.tracking_number or shipment.label_url):
+            return None
+        if shipment.status in (Shipment.Status.CANCELLED, Shipment.Status.ERROR, Shipment.Status.DRAFT):
+            return None
+        if order.status in ("shipped", "delivered", "cancelled"):
+            return None
+        cfg = ShippingSettings.get()
+        if not cfg.shop_confirm_prompt or order.source not in (cfg.shop_confirm_sources or []):
+            return None
+        from sales.models import SalesSource
+        src = SalesSource.objects.filter(slug=order.source).first()
+        is_dk = order.source == "digikey"
+        return {
+            "is_digikey":  is_dk,
+            "source_name": src.name if src else order.source,
+            "tracking":    shipment.tracking_number or order.tracking_number or "",
+            "confirm_url": reverse("admin:shipping_shipment_shop_confirm", args=[shipment.pk]),
+            "dismiss_url": reverse("admin:shipping_shipment_shop_confirm_dismiss", args=[shipment.pk]),
+            "manual_url":  f"/bots/digikey/ship/{order.pk}/" if is_dk else "",
+        }
+
+    def shop_confirm_view(self, request, shipment_id):
+        """POST — підтвердити відправлення в магазині: DigiKey через API, інші — статус «Відправлено»."""
+        if request.method != "POST":
+            return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+        shipment = get_object_or_404(Shipment, pk=shipment_id)
+        order = shipment.order
+        back = redirect(reverse("admin:shipping_shipment_detail", args=[shipment.pk]))
+        if not order:
+            messages.error(request, "Відправлення не пов'язане із замовленням.")
+            return back
+        tracking = shipment.tracking_number or order.tracking_number or ""
+
+        if order.source == "digikey":
+            from bots.models import DigiKeyConfig
+            from bots.views import confirm_digikey_shipment, _match_carrier_id
+            config = DigiKeyConfig.get()
+            carrier_id = None
+            try:
+                from bots.services.digikey import get_shipping_carriers
+                courier = order.shipping_courier or (shipment.carrier.get_carrier_type_display() if shipment.carrier else "")
+                carrier_id = _match_carrier_id(courier, get_shipping_carriers(config))
+            except Exception as e:
+                logger.warning("DigiKey carriers lookup failed: %s", e)
+            if not carrier_id:
+                messages.warning(request, "Перевізника не знайдено у списку DigiKey — "
+                                          "якщо DigiKey відхилить, підтвердіть вручну.")
+            confirm_digikey_shipment(request, order, config, tracking, carrier=carrier_id)
+            return back
+
+        fields = ["status"]
+        order.status = "shipped"
+        if tracking and not order.tracking_number:
+            order.tracking_number = tracking
+            fields.append("tracking_number")
+        if not order.shipped_at:
+            order.shipped_at = timezone.localdate()
+            fields.append("shipped_at")
+        order.save(update_fields=fields)
+        messages.success(request, f"✅ Замовлення {order.order_number} позначено як «Відправлено».")
+        return back
+
+    def shop_confirm_dismiss_view(self, request, shipment_id):
+        if request.method == "POST":
+            Shipment.objects.filter(pk=shipment_id).update(shop_confirm_dismissed=True)
+            messages.info(request, "Пропозицію підтвердження приховано для цього відправлення.")
+        return redirect(reverse("admin:shipping_shipment_detail", args=[shipment_id]))
+
     def shipment_detail_view(self, request, shipment_id):
         import json as _json
         from .services.jumingo import JUMINGO_APP_URL
@@ -2971,6 +3055,7 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             "jumingo_order":             jumingo_order,
             "label_display_url":         _label_display_url,
             "label_a4_url":              _label_a4_url,
+            "shop_confirm":              self._shop_confirm_context(shipment),
         })
 
     # ── Створення SalesOrder з відправлення ──────────────────────────────────
@@ -7182,7 +7267,30 @@ class ShippingSettingsAdmin(admin.ModelAdmin):
         ("📝 Лог спроб трекінгу", {
             "fields": ("tracking_log_max_entries", "tracking_log_link"),
         }),
+        ("🛒 Підтвердження відправлення в магазині", {
+            "fields": ("shop_confirm_prompt", "shop_confirm_sources"),
+            "description": (
+                "Коли у відправлення є етикетка або трек-номер, а замовлення ще не «Відправлено», "
+                "на сторінці відправлення з'являється банер з кнопками: "
+                "<b>Підтвердити автоматично</b> · <b>Вручну</b> (лише DigiKey — форма підтвердження) · <b>Відхилити</b>.<br>"
+                "DigiKey підтверджується через DigiKey Marketplace API; інші джерела — замовлення "
+                "позначається як «Відправлено» в Minerva."
+            ),
+        }),
     ]
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        from sales.models import SalesSource
+        choices = [(s.slug, f"{s.name} ({s.slug})") for s in SalesSource.objects.order_by("order", "name")]
+        current = set((obj.shop_confirm_sources or []) if obj else [])
+        choices += [(slug, slug) for slug in sorted(current - {c[0] for c in choices})]
+        form.base_fields["shop_confirm_sources"] = forms.MultipleChoiceField(
+            label="Для яких джерел (магазинів)", choices=choices, required=False,
+            widget=forms.CheckboxSelectMultiple,
+            help_text=ShippingSettings._meta.get_field("shop_confirm_sources").help_text,
+        )
+        return form
 
     def tracking_actions(self, obj):
         if not obj or not obj.pk:

@@ -255,6 +255,111 @@ def digikey_packlist(request, order_pk):
     return response
 
 
+def confirm_digikey_shipment(request, order, config, tracking, carrier=None, invoice=None,
+                              net_vat=None, shipped_quantities=None) -> bool:
+    """Підтверджує відправлення на DigiKey Marketplace (ShipOrder API) і ставить замовлення в shipped.
+    Використовується формою /bots/digikey/ship/<pk>/ і автопідтвердженням зі сторінки відправлення.
+    Повідомлення — через django.contrib.messages. Повертає True при успіху."""
+    from django.contrib import messages as msg
+    from bots.services.digikey import ship_marketplace_order, upload_vat_invoice, DigiKeyAPIError
+
+    ok = False
+    _EU = {"AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR",
+           "HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"}
+    is_eu_post = (order.addr_country or "").upper() in _EU
+
+    if not tracking:
+        msg.error(request, "Вкажіть трек-номер відправлення.")
+    else:
+        try:
+            # ── STEP 1: AUTO-GENERATE INVOICE via InvoiceService (before ship API) ──
+            # Uses same /invoices/ system (DOCX → PDF, Invoice model record)
+            if config.auto_invoice_eu and is_eu_post:
+                from django.db.models import Q as _Q
+                from shipping.models import Invoice as _Inv
+                _existing_inv = (
+                    _Inv.objects.filter(
+                        _Q(sales_order=order) | _Q(digikey_order_no=order.order_number)
+                    ).first()
+                )
+                if not _existing_inv:
+                    try:
+                        from shipping.services.invoice_service import InvoiceService
+                        _auto_inv = InvoiceService.generate_from_digikey_order(
+                            order.order_number, request.user,
+                            invoice_number=invoice or None,
+                        )
+                        # Feed invoice number and subtotal into ship API call
+                        invoice = _auto_inv.invoice_number
+                        if net_vat is None:
+                            net_vat = float(_auto_inv.subtotal or 0) or None
+                        msg.success(request, f"🧾 Інвойс #{invoice} згенеровано автоматично.")
+                    except Exception as _inv_err:
+                        msg.warning(request, f"Авто-генерація інвойсу не вдалась: {_inv_err}")
+                else:
+                    # Existing invoice — still fill fields for ship API
+                    invoice = invoice or _existing_inv.invoice_number
+                    if net_vat is None:
+                        net_vat = float(_existing_inv.subtotal or 0) or None
+
+            # ── STEP 2: Optional VAT invoice file upload before shipping ──────
+            vat_file_id = None
+            vat_file    = request.FILES.get("vat_invoice_file")
+            supplier_id = request.POST.get("supplier_id", "").strip() or None
+            if vat_file:
+                vat_bytes = vat_file.read()
+
+                # Save to order documents folder on server
+                try:
+                    from django.conf import settings as _s
+                    import pathlib as _pl
+                    docs_dir = _pl.Path(_s.MEDIA_ROOT) / 'orders' / order.source / order.order_number
+                    docs_dir.mkdir(parents=True, exist_ok=True)
+                    (docs_dir / vat_file.name).write_bytes(vat_bytes)
+                    msg.success(request, f"📄 {vat_file.name} збережено в документи замовлення.")
+                except Exception as _e:
+                    msg.warning(request, f"Не вдалося зберегти файл в документи: {_e}")
+
+                # Upload to DigiKey FileDocuments (best-effort)
+                up = upload_vat_invoice(config, vat_bytes, vat_file.name,
+                                        supplier_id=supplier_id)
+                if up["ok"]:
+                    vat_file_id = up.get("file_id")
+                else:
+                    msg.warning(request, f"Файл VAT не завантажено на DigiKey: {up['message']}")
+
+            result = ship_marketplace_order(
+                config, order.order_number,
+                tracking_number=tracking,
+                carrier_id=carrier,
+                invoice_number=invoice,
+                net_vat_invoice_amount=net_vat,
+                shipped_quantities=shipped_quantities or None,
+                vat_file_id=vat_file_id,
+            )
+            if result["ok"]:
+                ok = True
+                update_fields = ["status", "status_source"]
+                order.status        = "shipped"
+                order.status_source = "DigiKey Marketplace"
+                if tracking and not order.tracking_number:
+                    order.tracking_number = tracking
+                    update_fields.append("tracking_number")
+                order.save(update_fields=update_fields)
+                msg.success(request, result["message"])
+
+                if vat_file_id:
+                    msg.info(request, f"\ud83d\udcce VAT \u0444\u0430\u0439\u043b \u0437\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043e \u043d\u0430 DigiKey (ID: {vat_file_id}). \u041f\u0440\u0438\u0432'\u044f\u0436\u0456\u0442\u044c \u0439\u043e\u0433\u043e \u0432\u0440\u0443\u0447\u043d\u0443 \u0443 DigiKey Marketplace portal.")
+            else:
+                msg.error(request, result["message"])
+        except DigiKeyAPIError as e:
+            msg.error(request, f"DigiKey API помилка: {e}")
+        except Exception as e:
+            msg.error(request, f"{type(e).__name__}: {e}")
+
+    return ok
+
+
 @staff_member_required
 def digikey_ship_order(request, order_pk):
     """
@@ -290,97 +395,7 @@ def digikey_ship_order(request, order_pk):
                 except ValueError:
                     pass
 
-        _EU = {"AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR",
-               "HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"}
-        is_eu_post = (order.addr_country or "").upper() in _EU
-
-        if not tracking:
-            msg.error(request, "Р’РєР°Р¶С–С‚СЊ С‚СЂРµРє-РЅРѕРјРµСЂ РІС–РґРїСЂР°РІР»РµРЅРЅСЏ.")
-        else:
-            try:
-                # ── STEP 1: AUTO-GENERATE INVOICE via InvoiceService (before ship API) ──
-                # Uses same /invoices/ system (DOCX → PDF, Invoice model record)
-                if config.auto_invoice_eu and is_eu_post:
-                    from django.db.models import Q as _Q
-                    from shipping.models import Invoice as _Inv
-                    _existing_inv = (
-                        _Inv.objects.filter(
-                            _Q(sales_order=order) | _Q(digikey_order_no=order.order_number)
-                        ).first()
-                    )
-                    if not _existing_inv:
-                        try:
-                            from shipping.services.invoice_service import InvoiceService
-                            _auto_inv = InvoiceService.generate_from_digikey_order(
-                                order.order_number, request.user,
-                                invoice_number=invoice or None,
-                            )
-                            # Feed invoice number and subtotal into ship API call
-                            invoice = _auto_inv.invoice_number
-                            if net_vat is None:
-                                net_vat = float(_auto_inv.subtotal or 0) or None
-                            msg.success(request, f"🧾 Інвойс #{invoice} згенеровано автоматично.")
-                        except Exception as _inv_err:
-                            msg.warning(request, f"Авто-генерація інвойсу не вдалась: {_inv_err}")
-                    else:
-                        # Existing invoice — still fill fields for ship API
-                        invoice = invoice or _existing_inv.invoice_number
-                        if net_vat is None:
-                            net_vat = float(_existing_inv.subtotal or 0) or None
-
-                # ── STEP 2: Optional VAT invoice file upload before shipping ──────
-                vat_file_id = None
-                vat_file    = request.FILES.get("vat_invoice_file")
-                supplier_id = request.POST.get("supplier_id", "").strip() or None
-                if vat_file:
-                    vat_bytes = vat_file.read()
-
-                    # Save to order documents folder on server
-                    try:
-                        from django.conf import settings as _s
-                        import pathlib as _pl
-                        docs_dir = _pl.Path(_s.MEDIA_ROOT) / 'orders' / order.source / order.order_number
-                        docs_dir.mkdir(parents=True, exist_ok=True)
-                        (docs_dir / vat_file.name).write_bytes(vat_bytes)
-                        msg.success(request, f"📄 {vat_file.name} збережено в документи замовлення.")
-                    except Exception as _e:
-                        msg.warning(request, f"Не вдалося зберегти файл в документи: {_e}")
-
-                    # Upload to DigiKey FileDocuments (best-effort)
-                    up = upload_vat_invoice(config, vat_bytes, vat_file.name,
-                                            supplier_id=supplier_id)
-                    if up["ok"]:
-                        vat_file_id = up.get("file_id")
-                    else:
-                        msg.warning(request, f"Файл VAT не завантажено на DigiKey: {up['message']}")
-
-                result = ship_marketplace_order(
-                    config, order.order_number,
-                    tracking_number=tracking,
-                    carrier_id=carrier,
-                    invoice_number=invoice,
-                    net_vat_invoice_amount=net_vat,
-                    shipped_quantities=shipped_quantities or None,
-                    vat_file_id=vat_file_id,
-                )
-                if result["ok"]:
-                    update_fields = ["status", "status_source"]
-                    order.status        = "shipped"
-                    order.status_source = "DigiKey Marketplace"
-                    if tracking and not order.tracking_number:
-                        order.tracking_number = tracking
-                        update_fields.append("tracking_number")
-                    order.save(update_fields=update_fields)
-                    msg.success(request, result["message"])
-
-                    if vat_file_id:
-                        msg.info(request, f"\ud83d\udcce VAT \u0444\u0430\u0439\u043b \u0437\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0435\u043d\u043e \u043d\u0430 DigiKey (ID: {vat_file_id}). \u041f\u0440\u0438\u0432'\u044f\u0436\u0456\u0442\u044c \u0439\u043e\u0433\u043e \u0432\u0440\u0443\u0447\u043d\u0443 \u0443 DigiKey Marketplace portal.")
-                else:
-                    msg.error(request, result["message"])
-            except DigiKeyAPIError as e:
-                msg.error(request, f"DigiKey API РїРѕРјРёР»РєР°: {e}")
-            except Exception as e:
-                msg.error(request, f"{type(e).__name__}: {e}")
+        confirm_digikey_shipment(request, order, config, tracking, carrier, invoice, net_vat, shipped_quantities)
 
         return redirect(f"/admin/sales/salesorder/{order_pk}/change/")
 

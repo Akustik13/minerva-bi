@@ -392,6 +392,10 @@ class Shipment(models.Model):
         null=True, blank=True,
         help_text="PDF інвойс/CN23/CN22 вашої компанії"
     )
+    shop_confirm_dismissed = models.BooleanField(
+        "Не пропонувати підтвердження в магазині", default=False,
+        help_text="Банер «Підтвердити відправлення» відхилено для цього відправлення.",
+    )
     ups_document_id     = models.CharField(
         "UPS Document ID", max_length=100, blank=True, default="",
         help_text="ID документу з Paperless Document API (заповнюється автоматично)"
@@ -663,6 +667,10 @@ class OrderPackaging(models.Model):
 
 
 
+def default_shop_confirm_sources():
+    return ["digikey"]
+
+
 class ShippingSettings(models.Model):
     """Глобальні налаштування доставки — singleton (pk=1)."""
 
@@ -768,6 +776,17 @@ class ShippingSettings(models.Model):
             "маркетплейс не може встановити «Доставлено».<br>"
             "<b>Маркетплейс</b> — статус DigiKey/маркетплейсу завжди в пріоритеті."
         ),
+    )
+
+    shop_confirm_prompt = models.BooleanField(
+        "Пропонувати підтвердити відправлення в магазині", default=True,
+        help_text="На сторінці відправлення з етикеткою/трекінгом показувати банер «Підтвердити відправлення», "
+                  "поки замовлення не позначене як відправлене.",
+    )
+    shop_confirm_sources = models.JSONField(
+        "Для яких джерел (магазинів)", default=default_shop_confirm_sources, blank=True,
+        help_text="DigiKey — підтвердження через DigiKey API (автоматично або вручну). "
+                  "Інші — замовлення позначається як «Відправлено» в Minerva.",
     )
 
     @classmethod

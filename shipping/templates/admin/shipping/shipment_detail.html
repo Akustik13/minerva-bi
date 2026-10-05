@@ -219,6 +219,46 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
 {% block content %}
 <div class="sd-wrap">
 
+  {% if shop_confirm %}
+  <div class="sd-shopconf">
+    <div class="sd-shopconf-text">
+      <b>🛒 Підтвердити відправлення в {{ shop_confirm.source_name }}?</b>
+      <span>Етикетка готова{% if shop_confirm.tracking %}, трек-номер <code>{{ shop_confirm.tracking }}</code>{% endif %},
+        але замовлення <b>{{ order.order_number }}</b> ще не позначене як відправлене{% if shop_confirm.is_digikey %} на DigiKey{% endif %}.</span>
+    </div>
+    <div class="sd-shopconf-actions">
+      <form method="post" action="{{ shop_confirm.confirm_url }}"
+            onsubmit="return confirm('{% if shop_confirm.is_digikey %}Підтвердити відправлення на DigiKey через API?{% else %}Позначити замовлення як «Відправлено»?{% endif %}')">
+        {% csrf_token %}
+        <button type="submit" class="sd-shopconf-btn primary"
+                {% if shop_confirm.is_digikey and not shop_confirm.tracking %}disabled title="Немає трек-номера"{% endif %}>
+          ✅ Підтвердити{% if shop_confirm.is_digikey %} автоматично{% endif %}</button>
+      </form>
+      {% if shop_confirm.manual_url %}
+      <a class="sd-shopconf-btn" href="{{ shop_confirm.manual_url }}">✏️ Вручну</a>
+      {% endif %}
+      <form method="post" action="{{ shop_confirm.dismiss_url }}">
+        {% csrf_token %}
+        <button type="submit" class="sd-shopconf-btn" title="Більше не пропонувати для цього відправлення">✕ Відхилити</button>
+      </form>
+    </div>
+  </div>
+  <style>
+    .sd-shopconf { display:flex; gap:14px; align-items:center; justify-content:space-between; flex-wrap:wrap;
+                   background:var(--bg-card); border:1px solid var(--link-fg); border-left:4px solid var(--link-fg);
+                   border-radius:8px; padding:12px 16px; margin-bottom:16px; color:var(--text); font-size:13px; }
+    .sd-shopconf-text { display:flex; flex-direction:column; gap:3px; }
+    .sd-shopconf-text span { color:var(--text-muted); }
+    .sd-shopconf-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .sd-shopconf-actions form { margin:0; }
+    .sd-shopconf-btn { background:var(--bg-hover); border:1px solid var(--border-strong); color:var(--text);
+                       border-radius:6px; padding:7px 14px; font-size:13px; cursor:pointer; text-decoration:none; display:inline-block; }
+    .sd-shopconf-btn:hover { border-color:var(--link-fg); }
+    .sd-shopconf-btn.primary { background:var(--link-fg); border-color:var(--link-fg); color:var(--bg-card); font-weight:700; }
+    .sd-shopconf-btn:disabled { opacity:.5; cursor:not-allowed; }
+  </style>
+  {% endif %}
+
   <!-- ── Header ── -->
   <div class="sd-header">
     <div>
