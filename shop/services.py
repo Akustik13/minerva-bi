@@ -60,8 +60,8 @@ def round_price(value, mode: str | None = None) -> Decimal | None:
     return ((value / step).quantize(Decimal("1"), rounding=ROUND_HALF_UP) * step).quantize(_Q4)
 
 
-def price_breaks(listing) -> list[dict]:
-    """[{min_qty, unit_price}] починаючи з 1 шт.; порожньо, якщо в позиції немає ціни."""
+def regular_price_breaks(listing) -> list[dict]:
+    """[{min_qty, unit_price}] без акції, починаючи з 1 шт.; порожньо, якщо в позиції немає ціни."""
     base = listing.effective_price
     if base is None:
         return []
@@ -70,6 +70,42 @@ def price_breaks(listing) -> list[dict]:
         if t.min_qty > 1:
             tiers.append({"min_qty": t.min_qty, "unit_price": t.unit_price})
     return tiers
+
+
+def offer_percent(listing, today=None) -> Decimal | None:
+    """Знижка діючої акції (Sonderangebot) або None."""
+    from django.utils import timezone
+    pct = Decimal(listing.discount_percent or 0)
+    if pct <= 0:
+        return None
+    if listing.discount_until and listing.discount_until < (today or timezone.localdate()):
+        return None
+    return pct
+
+
+def is_new(listing, today=None) -> bool:
+    from django.utils import timezone
+    return bool(listing.new_until and listing.new_until >= (today or timezone.localdate()))
+
+
+def price_breaks(listing) -> list[dict]:
+    """Ціни, які платить покупець: ступені з урахуванням діючої акції (округлення до 0,01)."""
+    rows = regular_price_breaks(listing)
+    pct = offer_percent(listing)
+    if pct is None:
+        return rows
+    k = (Decimal(100) - pct) / 100
+    return [{"min_qty": r["min_qty"], "unit_price": round_price(r["unit_price"] * k, "0.01")} for r in rows]
+
+
+def offer_info(listing) -> dict | None:
+    """Для сайту: {percent, until, regular_price, regular_price_breaks} діючої акції або None."""
+    pct = offer_percent(listing)
+    regular = regular_price_breaks(listing)
+    if pct is None or not regular:
+        return None
+    return {"percent": pct, "until": listing.discount_until, "regular_price": regular[0]["unit_price"],
+            "regular_price_breaks": regular}
 
 
 def unit_price_for(listing, qty) -> Decimal | None:
@@ -202,6 +238,29 @@ def round_all(listings, rounding: str | None = None) -> int:
             t.save(update_fields=["unit_price"])
         done += 1
     return done
+
+
+@transaction.atomic
+def set_offer(listings, percent, until=None) -> int:
+    """Акція для вибраних позицій: знижка % до дати (percent=0 — зняти акцію)."""
+    n = 0
+    for l in listings:
+        l.discount_percent = Decimal(str(percent))
+        l.discount_until = until if percent else None
+        l.save(update_fields=["discount_percent", "discount_until", "updated_at"])
+        n += 1
+    return n
+
+
+@transaction.atomic
+def set_new(listings, until=None) -> int:
+    """Позначка «новинка» до дати (None — зняти)."""
+    n = 0
+    for l in listings:
+        l.new_until = until
+        l.save(update_fields=["new_until", "updated_at"])
+        n += 1
+    return n
 
 
 @transaction.atomic

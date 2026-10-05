@@ -103,11 +103,14 @@ class ShopProductSerializer(serializers.ModelSerializer):
     datasheet_url = serializers.SerializerMethodField()
     last_movement_at = serializers.DateTimeField(source="_last_movement", read_only=True)
     price_breaks  = serializers.SerializerMethodField(help_text="[{min_qty, unit_price}] — ціна за шт. від кількості")
+    offer  = serializers.SerializerMethodField(help_text="Діюча акція: {percent, until, regular_price, "
+                                                         "regular_price_breaks} або null")
+    is_new = serializers.SerializerMethodField(help_text="Новинка (бейдж «Neu», угорі каталогу)")
 
     class Meta:
         model  = Product
         fields = ["sku", "name", "name_export", "category", "unit_type", "manufacturer",
-                  "price", "price_breaks", "available", "incoming", "in_stock", "lead_time_days",
+                  "price", "price_breaks", "offer", "is_new", "available", "incoming", "in_stock", "lead_time_days",
                   "net_weight_g", "image_url", "datasheet_url", "last_movement_at"]
 
     @staticmethod
@@ -116,9 +119,25 @@ class ShopProductSerializer(serializers.ModelSerializer):
         return rows[0] if rows else None
 
     def get_price(self, obj):
+        from shop.services import price_breaks
+        rows = price_breaks(self._listing(obj)) if self._listing(obj) else []
+        return float(rows[0]["unit_price"]) if rows else None
+
+    def get_offer(self, obj):
+        from shop.services import offer_info
         listing = self._listing(obj)
-        price = listing.effective_price if listing else None
-        return float(price) if price is not None else None
+        info = offer_info(listing) if listing else None
+        if not info:
+            return None
+        return {"percent": float(info["percent"]), "until": info["until"],
+                "regular_price": float(info["regular_price"]),
+                "regular_price_breaks": [{"min_qty": r["min_qty"], "unit_price": float(r["unit_price"])}
+                                         for r in info["regular_price_breaks"]]}
+
+    def get_is_new(self, obj):
+        from shop.services import is_new
+        listing = self._listing(obj)
+        return bool(listing and is_new(listing))
 
     def get_price_breaks(self, obj):
         from shop.services import price_breaks

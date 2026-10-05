@@ -294,6 +294,25 @@ class CopyForm(forms.Form):
     overwrite = forms.BooleanField(label="Перезаписати позиції, що вже є в цільовому магазині", required=False)
 
 
+def _in_days(n):
+    from datetime import timedelta
+    from django.utils import timezone
+    return timezone.localdate() + timedelta(days=n)
+
+
+class OfferForm(forms.Form):
+    percent = forms.DecimalField(label="Знижка, %", max_digits=5, decimal_places=2, min_value=Decimal("1"),
+                                 max_value=Decimal("90"), initial=Decimal("10"),
+                                 help_text="Діє на ціну за 1 шт. і на всі ступені цін")
+    until = forms.DateField(label="Акція до (включно)", required=False, widget=forms.DateInput(attrs={"type": "date"}),
+                            help_text="Порожньо — без кінцевої дати (знімається дією «Зняти акцію»)")
+
+
+class NewForm(forms.Form):
+    days = forms.IntegerField(label="Новинка, днів", min_value=1, max_value=730, initial=60,
+                              help_text="Стільки днів товар має бейдж «Neu» і стоїть угорі каталогу")
+
+
 class DigiKeyPriceForm(forms.Form):
     factor = forms.DecimalField(label="% від ціни DigiKey", max_digits=7, decimal_places=2, initial=Decimal("100"),
                                 min_value=Decimal("1"),
@@ -357,6 +376,26 @@ class PriceStateFilter(admin.SimpleListFilter):
         return qs
 
 
+class PromoFilter(admin.SimpleListFilter):
+    title = "Акції і новинки"
+    parameter_name = "promo"
+
+    def lookups(self, request, model_admin):
+        return [("offer", "🏷 Діє акція"), ("new", "🆕 Новинки"), ("expired", "Акція закінчилась")]
+
+    def queryset(self, request, qs):
+        from django.utils import timezone
+        today = timezone.localdate()
+        active = Q(discount_percent__gt=0) & (Q(discount_until__isnull=True) | Q(discount_until__gte=today))
+        if self.value() == "offer":
+            return qs.filter(active)
+        if self.value() == "new":
+            return qs.filter(new_until__gte=today)
+        if self.value() == "expired":
+            return qs.filter(discount_percent__gt=0, discount_until__lt=today)
+        return qs
+
+
 class ShopFilter(admin.SimpleListFilter):
     """Фільтр за магазином — видно завжди (стандартний ховається, коли магазин лише один)."""
     title = "Магазин"
@@ -395,21 +434,22 @@ class ShopPriceTierInline(admin.TabularInline):
 
 @admin.register(ShopListing)
 class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
-    list_display = ["sku_col", "name_col", "shop", "is_visible", "price", "source_col", "sale_price_col",
-                    "purchase_col", "margin_col", "tiers_col", "available_col"]
+    list_display = ["sku_col", "name_col", "shop", "is_visible", "price", "promo_col", "source_col",
+                    "sale_price_col", "purchase_col", "margin_col", "tiers_col", "available_col"]
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
-    list_filter = [ShopFilter, "is_visible", "price_source", PriceStateFilter, StockFilter, "product__category"]
+    list_filter = [ShopFilter, "is_visible", PromoFilter, "price_source", PriceStateFilter, StockFilter, "product__category"]
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
     ordering = ["shop", "product__sku"]
     raw_id_fields = ["product"]
     inlines = [ShopPriceTierInline]
-    fields = ["shop", "product", "is_visible", "price", "price_source", "price_factor", "breaks_preview",
-              "dk_prices_preview"]
+    fields = ["shop", "product", "is_visible", "price", "price_source", "price_factor",
+              ("discount_percent", "discount_until"), "new_until", "breaks_preview", "dk_prices_preview"]
     readonly_fields = ["breaks_preview", "dk_prices_preview"]
     actions = ["action_show", "action_hide", "action_set_price", "action_adjust", "action_markup",
+               "action_offer", "action_offer_clear", "action_new", "action_new_clear",
                "action_digikey", "action_manual",
                "action_tiers_default", "action_tiers_custom", "action_tiers_clear",
                "action_reset_to_sale", "action_round", "action_copy", "delete_selected"]
@@ -462,6 +502,22 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     @admin.display(description="Назва", ordering="product__name")
     def name_col(self, obj):
         return (obj.product.name or "")[:45]
+
+    @admin.display(description="Акція / новинка")
+    def promo_col(self, obj):
+        parts = []
+        pct = services.offer_percent(obj)
+        if pct is not None:
+            until = f" до {obj.discount_until:%d.%m}" if obj.discount_until else ""
+            parts.append(format_html('<span title="Sonderangebot" style="padding:1px 6px;border-radius:8px;'
+                                     'background:#e65100;color:#fff">−{} %{}</span>', f"{pct.normalize():f}", until))
+        elif obj.discount_percent and obj.discount_percent > 0:
+            parts.append(format_html('<span style="opacity:.6">акція закінчилась {}</span>',
+                                     f"{obj.discount_until:%d.%m}" if obj.discount_until else ""))
+        if services.is_new(obj):
+            parts.append(format_html('<span title="Neu до {}" style="padding:1px 6px;border-radius:8px;'
+                                     'background:#2e7d32;color:#fff">NEU</span>', f"{obj.new_until:%d.%m.%Y}"))
+        return format_html_join(" ", "{}", ((p,) for p in parts)) if parts else "—"
 
     @admin.display(description="Джерело", ordering="price_source")
     def source_col(self, obj):
@@ -520,6 +576,13 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         rows = services.price_breaks(obj)
         if not rows:
             return "Ціна не задана — на сайті «Ціна за запитом»"
+        info = services.offer_info(obj)
+        if info:
+            regular = {r["min_qty"]: r["unit_price"] for r in info["regular_price_breaks"]}
+            body = format_html_join("", "<tr><td>від {} шт.</td><td><s>{}</s></td><td><b>{}</b></td></tr>", (
+                (r["min_qty"], f'{regular[r["min_qty"]]:.2f}', f'{r["unit_price"]:.2f}') for r in rows))
+            return format_html("<table><tr><th>Кількість</th><th>Звичайна</th><th>Акція −{} %</th></tr>{}</table>",
+                               f"{info['percent'].normalize():f}", body)
         body = format_html_join("", "<tr><td>від {} шт.</td><td>{}</td></tr>",
                                 ((r["min_qty"], f'{r["unit_price"]:.2f}') for r in rows))
         return format_html("<table><tr><th>Кількість</th><th>Ціна/шт. нетто</th></tr>{}</table>", body)
@@ -556,6 +619,27 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
             return f"Ціну розраховано від закупівлі (+{d['markup']} %): {n} позицій"
         return self._form_action(request, queryset, MarkupForm, "Ціна від закупівельної ціни", apply,
                                  initial={"markup": ShopSettings.get().default_markup})
+
+    @admin.action(description="🏷 Акція: знижка %% до дати…")
+    def action_offer(self, request, queryset):
+        return self._form_action(request, queryset, OfferForm, "Акція (Sonderangebot) для вибраних позицій",
+            lambda qs, d: f"Акція −{d['percent']:g} %" + (f" до {d['until']:%d.%m.%Y}" if d["until"] else "") +
+                          f": {services.set_offer(qs, d['percent'], d['until'])} позицій",
+            initial={"until": _in_days(30)})
+
+    @admin.action(description="✖ Зняти акцію")
+    def action_offer_clear(self, request, queryset):
+        self.message_user(request, f"Акцію знято: {services.set_offer(queryset, 0)} позицій")
+
+    @admin.action(description="🆕 Позначити як новинку…")
+    def action_new(self, request, queryset):
+        return self._form_action(request, queryset, NewForm, "Новинки: бейдж «Neu» і місце вгорі каталогу",
+            lambda qs, d: f"Новинка до {_in_days(d['days']):%d.%m.%Y}: "
+                          f"{services.set_new(qs, _in_days(d['days']))} позицій")
+
+    @admin.action(description="✖ Зняти позначку «новинка»")
+    def action_new_clear(self, request, queryset):
+        self.message_user(request, f"Позначку знято: {services.set_new(queryset, None)} позицій")
 
     @admin.action(description="🔗 Ціни з DigiKey (зі ступенями, автоматично)…")
     def action_digikey(self, request, queryset):

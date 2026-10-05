@@ -359,3 +359,61 @@ class ShopCardTests(TestCase):
         r = self.client.post(url)
         self.assertEqual(r.status_code, 302)
         self.assertEqual(self.shop.shipping_zones.count(), 4)
+
+
+class PromoTests(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        self.today = timezone.localdate()
+        self.td = timedelta
+        InventorySettings.get()
+        Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
+        self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        self.p = Product.objects.create(sku="AN-1", name="Antenne", sale_price=Decimal("20.00"))
+        self.l = ShopListing.objects.create(shop=self.shop, product=self.p)
+        ShopPriceTier.objects.create(listing=self.l, min_qty=10, unit_price=Decimal("18.00"))
+        key = APIKey.objects.create(name="site", scopes=["products:read", "orders:write", "orders:read"],
+                                    default_source="webshop")
+        self.c = APIClient()
+        self.c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
+
+    def test_offer_applies_to_api_and_orders(self):
+        services.set_offer([self.l], Decimal("15"), self.today + self.td(days=3))
+        d = self.c.get("/api/v1/shop/products/AN-1/").json()
+        self.assertEqual(d["price"], 17.0)
+        self.assertEqual(d["price_breaks"], [{"min_qty": 1, "unit_price": 17.0}, {"min_qty": 10, "unit_price": 15.3}])
+        self.assertEqual(d["offer"]["percent"], 15.0)
+        self.assertEqual(d["offer"]["regular_price"], 20.0)
+        r = self.c.post("/api/v1/orders/", {"order_number": "WS-P1", "client": "X", "shop": True,
+                                            "lines": [{"sku": "AN-1", "qty": 10}]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()["lines"][0]["unit_price"], 15.3)
+
+    def test_expired_offer_and_new_badge(self):
+        services.set_offer([self.l], Decimal("15"), self.today - self.td(days=1))
+        services.set_new([self.l], self.today + self.td(days=30))
+        d = self.c.get("/api/v1/shop/products/AN-1/").json()
+        self.assertIsNone(d["offer"])
+        self.assertEqual(d["price"], 20.0)
+        self.assertTrue(d["is_new"])
+        services.set_new([self.l], None)
+        self.assertFalse(self.c.get("/api/v1/shop/products/AN-1/").json()["is_new"])
+
+    def test_admin_promo_actions(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("a", "a@x.y", "p"))
+        url = "/admin/shop/shoplisting/"
+        self.client.post(url, {"action": "action_offer", "apply": "1", "_selected_action": [self.l.pk],
+                               "percent": "20", "until": ""})
+        self.client.post(url, {"action": "action_new", "apply": "1", "_selected_action": [self.l.pk], "days": "60"})
+        self.l.refresh_from_db()
+        self.assertEqual(self.l.discount_percent, Decimal("20"))
+        self.assertTrue(services.is_new(self.l))
+        r = self.client.get(url + "?promo=offer")
+        self.assertContains(r, "−20 %")
+        self.assertContains(r, "NEU")
+        self.assertContains(self.client.get(f"{url}{self.l.pk}/change/"), "Акція −20 %")

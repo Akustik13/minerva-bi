@@ -8,7 +8,7 @@
 """
 from decimal import Decimal
 
-from django.core.validators import MinValueValidator, RegexValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
 
 from inventory.models import Product
@@ -135,6 +135,19 @@ class ShopListing(models.Model):
         "% від ціни DigiKey", max_digits=7, decimal_places=2, default=Decimal("100"),
         validators=[MinValueValidator(Decimal("1"))],
         help_text="100 = як на DigiKey, 95 = на 5 % дешевше.",
+    )
+    discount_percent = models.DecimalField(
+        "Акція: знижка, %", max_digits=5, decimal_places=2, default=Decimal("0"),
+        validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("90"))],
+        help_text="Sonderangebot: знижка на ціну і всі ступені. 0 — без акції.",
+    )
+    discount_until = models.DateField(
+        "Акція до (включно)", null=True, blank=True,
+        help_text="Після цієї дати акція сама припиняється. Порожньо — без кінцевої дати.",
+    )
+    new_until = models.DateField(
+        "Новинка до (включно)", null=True, blank=True,
+        help_text="До цієї дати на сайті бейдж «Neu», товар показується вгорі каталогу.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
