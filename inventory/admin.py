@@ -2282,7 +2282,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
         ("♻️ Життєвий цикл", {"fields": ("lifecycle_status", "successor"),
-                             "description": "Показується в інтернет-магазині: NRND і EOL — наліпки та посилання на заміну."}),
+                             "description": "Діє в усіх інтернет-магазинах (NRND і EOL — наліпки та посилання на заміну). "
+                                            "Лише для одного магазину — «Асортимент і ціни» → позиція → «Життєвий цикл у цьому магазині»."}),
         ("📦 Availability", {"fields": ("stock_qty", "reserved_qty", "incoming_qty",
                                         "buildable_qty", "bom_availability", "reorder_info")}),
         ("💰 Ціни та закупівля", {

@@ -149,6 +149,18 @@ class ShopListing(models.Model):
         "Новинка до (включно)", null=True, blank=True,
         help_text="До цієї дати на сайті бейдж «Neu», товар показується вгорі каталогу.",
     )
+    lifecycle_status = models.CharField(
+        "Життєвий цикл у цьому магазині", max_length=16, blank=True, default="",
+        choices=[("", "Як на складі"), ("active", "Активний"),
+                 ("nrnd", "Не рекомендовано для нових розробок (NRND)"),
+                 ("discontinued", "Знято з виробництва (EOL)")],
+        help_text="«Як на складі» — статус товару (діє в усіх магазинах). Інше значення — лише для цього магазину.",
+    )
+    successor = models.ForeignKey(
+        Product, on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+        verbose_name="Заміна в цьому магазині",
+        help_text="Порожньо — рекомендована заміна з картки товару.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -164,6 +176,15 @@ class ShopListing(models.Model):
     @property
     def effective_price(self):
         return self.price if self.price is not None else self.product.sale_price
+
+    @property
+    def effective_lifecycle(self) -> str:
+        """Статус для магазину: власний (якщо задано) або статус товару на складі."""
+        return self.lifecycle_status or self.product.lifecycle_status
+
+    @property
+    def effective_successor(self):
+        return self.successor if self.successor_id else self.product.successor
 
 
 class ShopPriceTier(models.Model):

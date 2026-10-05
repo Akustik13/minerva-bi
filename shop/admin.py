@@ -396,6 +396,33 @@ class PromoFilter(admin.SimpleListFilter):
         return qs
 
 
+class LifecycleFilter(admin.SimpleListFilter):
+    """Життєвий цикл з урахуванням магазину (власний статус позиції або статус товару)."""
+    title = "Життєвий цикл"
+    parameter_name = "life"
+
+    def lookups(self, request, model_admin):
+        return [("active", "Активний"), ("nrnd", "NRND"), ("discontinued", "Знято з виробництва (EOL)"),
+                ("own", "Свій статус у магазині")]
+
+    def queryset(self, request, qs):
+        v = self.value()
+        if v == "own":
+            return qs.exclude(lifecycle_status="")
+        if v:
+            return qs.filter(Q(lifecycle_status=v) | Q(lifecycle_status="", product__lifecycle_status=v))
+        return qs
+
+
+class ShopLifecycleForm(forms.Form):
+    status = forms.ChoiceField(label="Статус у цьому магазині", widget=forms.RadioSelect,
+                               choices=ShopListing._meta.get_field("lifecycle_status").choices)
+    set_successor = forms.BooleanField(label="Змінити заміну", required=False, initial=True)
+    successor = forms.ModelChoiceField(label="Заміна в цьому магазині", required=False,
+                                       queryset=ShopProduct.objects.filter(is_active=True).order_by("sku"),
+                                       help_text="Порожньо — заміна з картки товару")
+
+
 class ShopFilter(admin.SimpleListFilter):
     """Фільтр за магазином — видно завжди (стандартний ховається, коли магазин лише один)."""
     title = "Магазин"
@@ -438,7 +465,7 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
                     "sale_price_col", "purchase_col", "margin_col", "tiers_col", "available_col"]
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
-    list_filter = [ShopFilter, "is_visible", PromoFilter, "product__lifecycle_status", "price_source", PriceStateFilter, StockFilter, "product__category"]
+    list_filter = [ShopFilter, "is_visible", PromoFilter, LifecycleFilter, "price_source", PriceStateFilter, StockFilter, "product__category"]
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
@@ -446,10 +473,12 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     raw_id_fields = ["product"]
     inlines = [ShopPriceTierInline]
     fields = ["shop", "product", "is_visible", "price", "price_source", "price_factor",
-              ("discount_percent", "discount_until"), "new_until", "breaks_preview", "dk_prices_preview"]
+              ("discount_percent", "discount_until"), "new_until", ("lifecycle_status", "successor"),
+              "breaks_preview", "dk_prices_preview"]
+    autocomplete_fields = ["successor"]
     readonly_fields = ["breaks_preview", "dk_prices_preview"]
     actions = ["action_show", "action_hide", "action_set_price", "action_adjust", "action_markup",
-               "action_offer", "action_offer_clear", "action_new", "action_new_clear",
+               "action_offer", "action_offer_clear", "action_new", "action_new_clear", "action_lifecycle",
                "action_digikey", "action_manual",
                "action_tiers_default", "action_tiers_custom", "action_tiers_clear",
                "action_reset_to_sale", "action_round", "action_copy", "delete_selected"]
@@ -514,12 +543,16 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         elif obj.discount_percent and obj.discount_percent > 0:
             parts.append(format_html('<span style="opacity:.6">акція закінчилась {}</span>',
                                      f"{obj.discount_until:%d.%m}" if obj.discount_until else ""))
-        life = obj.product.lifecycle_status
+        life = obj.effective_lifecycle
+        own = bool(obj.lifecycle_status)
         if life != "active":
-            parts.append(format_html('<span title="{}" style="padding:1px 6px;border-radius:8px;background:{};color:{}">{}</span>',
-                                     obj.product.get_lifecycle_status_display(),
+            parts.append(format_html('<span title="{}" style="padding:1px 6px;border-radius:8px;background:{};color:{}">{}{}</span>',
+                                     "Лише в цьому магазині" if own else "Статус товару на складі (усі магазини)",
                                      "#f5b400" if life == "nrnd" else "#616161", "#222" if life == "nrnd" else "#fff",
-                                     "NRND" if life == "nrnd" else "EOL"))
+                                     "NRND" if life == "nrnd" else "EOL", " ·🏬" if own else ""))
+        elif own and obj.product.lifecycle_status != "active":
+            parts.append(format_html('<span title="{}" style="opacity:.75">{}</span>',
+                                     "На складі інший статус, у цьому магазині — активний", "активний ·🏬"))
         if services.is_new(obj):
             parts.append(format_html('<span title="Neu до {}" style="padding:1px 6px;border-radius:8px;'
                                      'background:#2e7d32;color:#fff">NEU</span>', f"{obj.new_until:%d.%m.%Y}"))
@@ -632,6 +665,25 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
             lambda qs, d: f"Акція −{d['percent']:g} %" + (f" до {d['until']:%d.%m.%Y}" if d["until"] else "") +
                           f": {services.set_offer(qs, d['percent'], d['until'])} позицій",
             initial={"until": _in_days(30)})
+
+    @admin.action(description="♻️ Життєвий цикл лише в цьому магазині…")
+    def action_lifecycle(self, request, queryset):
+        def apply(qs, d):
+            n = 0
+            for l in qs:
+                l.lifecycle_status = d["status"]
+                fields = ["lifecycle_status", "updated_at"]
+                if d["set_successor"]:
+                    succ = d["successor"]
+                    l.successor_id = succ.pk if succ and succ.pk != l.product_id else None
+                    fields.append("successor")
+                l.save(update_fields=fields)
+                n += 1
+            label = dict(ShopListing._meta.get_field("lifecycle_status").choices)[d["status"]]
+            return f"Життєвий цикл у магазині «{label}»: {n} позицій (склад не змінено)"
+        return self._form_action(request, queryset, ShopLifecycleForm,
+                                 "Життєвий цикл лише в цьому магазині (склад не змінюється)", apply,
+                                 initial={"status": ""})
 
     @admin.action(description="✖ Зняти акцію")
     def action_offer_clear(self, request, queryset):

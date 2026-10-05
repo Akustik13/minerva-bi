@@ -466,3 +466,62 @@ class LifecycleTests(TestCase):
         self.assertContains(r, "NRND")
         self.assertContains(r, "EOL")
         self.assertEqual(self.client.get(f"/admin/inventory/product/{self.old.pk}/change/").status_code, 200)
+
+
+class ShopLifecycleOverrideTests(TestCase):
+    def setUp(self):
+        InventorySettings.get()
+        Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
+        self.web = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        self.market = Shop.objects.create(name="Market", slug="market")
+        self.p = Product.objects.create(sku="AN-1", name="v1", sale_price=Decimal("10"))
+        self.p2 = Product.objects.create(sku="AN-2", name="v2", sale_price=Decimal("12"))
+        self.lw = ShopListing.objects.create(shop=self.web, product=self.p)
+        self.lm = ShopListing.objects.create(shop=self.market, product=self.p)
+        ShopListing.objects.create(shop=self.market, product=self.p2)
+
+    def _client(self, shop):
+        key = APIKey.objects.create(name=shop.slug, scopes=["products:read", "orders:write"], shop=shop)
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
+        return c
+
+    def test_override_only_in_one_shop(self):
+        self.lm.lifecycle_status = "discontinued"
+        self.lm.successor = self.p2
+        self.lm.save()
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.lifecycle_status, "active")  # склад не змінено
+        m = self._client(self.market).get("/api/v1/shop/products/AN-1/").json()
+        self.assertEqual((m["lifecycle_status"], m["successor"]["sku"]), ("discontinued", "AN-2"))
+        w = self._client(self.web).get("/api/v1/shop/products/AN-1/").json()
+        self.assertEqual((w["lifecycle_status"], w["successor"]), ("active", None))
+        # EOL у магазині Market без залишку — замовити не можна; на сайті — можна (під замовлення)
+        r = self._client(self.market).post("/api/v1/orders/", {"order_number": "M-1", "client": "X", "shop": True,
+                                                               "lines": [{"sku": "AN-1", "qty": 1}]}, format="json")
+        self.assertEqual(r.status_code, 409)
+        r = self._client(self.web).post("/api/v1/orders/", {"order_number": "W-1", "client": "X", "shop": True,
+                                                            "lines": [{"sku": "AN-1", "qty": 1}]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+
+    def test_warehouse_status_applies_everywhere_unless_overridden(self):
+        self.p.lifecycle_status = "nrnd"
+        self.p.save()
+        self.lw.lifecycle_status = "active"  # у цьому магазині — як активний
+        self.lw.save()
+        self.assertEqual(self._client(self.market).get("/api/v1/shop/products/AN-1/").json()["lifecycle_status"], "nrnd")
+        self.assertEqual(self._client(self.web).get("/api/v1/shop/products/AN-1/").json()["lifecycle_status"], "active")
+
+    def test_admin_action(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("a", "a@x.y", "p"))
+        url = "/admin/shop/shoplisting/"
+        self.client.post(url, {"action": "action_lifecycle", "apply": "1", "_selected_action": [self.lm.pk],
+                               "status": "nrnd", "set_successor": "on", "successor": self.p2.pk})
+        self.lm.refresh_from_db()
+        self.assertEqual((self.lm.lifecycle_status, self.lm.successor_id), ("nrnd", self.p2.pk))
+        self.assertContains(self.client.get(url + "?life=own"), "NRND")
+        self.assertEqual(self.client.get(f"{url}{self.lm.pk}/change/").status_code, 200)

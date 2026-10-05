@@ -106,6 +106,7 @@ class ShopProductSerializer(serializers.ModelSerializer):
     offer  = serializers.SerializerMethodField(help_text="Діюча акція: {percent, until, regular_price, "
                                                          "regular_price_breaks} або null")
     is_new = serializers.SerializerMethodField(help_text="Новинка (бейдж «Neu», угорі каталогу)")
+    lifecycle_status = serializers.SerializerMethodField(help_text="active | nrnd | discontinued (з урахуванням магазину)")
     successor = serializers.SerializerMethodField(help_text="Рекомендована заміна {sku, name} для NRND / EOL або null")
 
     class Meta:
@@ -135,8 +136,13 @@ class ShopProductSerializer(serializers.ModelSerializer):
                 "regular_price_breaks": [{"min_qty": r["min_qty"], "unit_price": float(r["unit_price"])}
                                          for r in info["regular_price_breaks"]]}
 
+    def get_lifecycle_status(self, obj):
+        listing = self._listing(obj)
+        return listing.effective_lifecycle if listing else obj.lifecycle_status
+
     def get_successor(self, obj):
-        s = obj.successor if obj.successor_id else None
+        listing = self._listing(obj)
+        s = listing.effective_successor if listing else (obj.successor if obj.successor_id else None)
         return {"sku": s.sku, "name": s.name or s.sku} if s and s.is_active else None
 
     def get_is_new(self, obj):

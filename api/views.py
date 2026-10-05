@@ -224,7 +224,7 @@ class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
         shop = shop_for_key(self.request.auth if isinstance(self.request.auth, APIKey) else None)
         if shop is None:
             return Product.objects.none()
-        listings = ShopListing.objects.filter(shop=shop).prefetch_related("tiers")
+        listings = ShopListing.objects.filter(shop=shop).select_related("successor").prefetch_related("tiers")
         qs = (Product.objects.filter(is_active=True, shop_listings__shop=shop, shop_listings__is_visible=True)
               .select_related("successor")
               .prefetch_related(Prefetch("shop_listings", queryset=listings, to_attr="_listings")))
@@ -395,7 +395,7 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
         # Знятий з виробництва товар (EOL) у магазині — лише із залишку, без «під замовлення»
         if is_shop and d.get("affects_stock", True):
             eol = [{"sku": p.sku, "qty": ln["qty"]} for p, _, ln in resolved
-                   if p.lifecycle_status == Product.Lifecycle.DISCONTINUED]
+                   if listings[p.pk].effective_lifecycle == Product.Lifecycle.DISCONTINUED]
             short = [a for a in stock_service.check_availability(eol) if not a["ok"]] if eol else []
             if short:
                 return Response({"detail": "Товар знято з виробництва — доступний лише залишок на складі.",
