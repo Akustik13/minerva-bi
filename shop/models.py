@@ -83,6 +83,14 @@ class Shop(models.Model):
     )
     url = models.URLField("Адреса сайту", blank=True, default="")
     notes = models.TextField("Нотатки", blank=True, default="")
+    free_shipping_enabled = models.BooleanField(
+        "Безкоштовна доставка", default=False,
+        help_text="Доставка безкоштовна, коли сума товарів (нетто) досягає порогу. Діє в регіонах, де це дозволено.",
+    )
+    free_shipping_threshold = models.DecimalField(
+        "Безкоштовно від (нетто)", max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(Decimal("0"))],
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -92,6 +100,11 @@ class Shop(models.Model):
 
     def __str__(self):
         return self.name
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.free_shipping_enabled and self.free_shipping_threshold is None:
+            raise ValidationError({"free_shipping_threshold": "Вкажіть поріг безкоштовної доставки."})
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -108,6 +121,17 @@ class ShopListing(models.Model):
         "Ціна (нетто, 1 шт.)", max_digits=18, decimal_places=4, null=True, blank=True,
         validators=[MinValueValidator(Decimal("0"))],
         help_text="Порожньо — «Ціна продажу» товару; без ціни на сайті «Ціна за запитом».",
+    )
+    PRICE_MANUAL, PRICE_DIGIKEY = "manual", "digikey"
+    price_source = models.CharField(
+        "Джерело ціни", max_length=10, default=PRICE_MANUAL,
+        choices=[(PRICE_MANUAL, "Вручну"), (PRICE_DIGIKEY, "DigiKey (автоматично)")],
+        help_text="DigiKey — ціна і ступені беруться з цін офера на DigiKey і оновлюються разом з ними.",
+    )
+    price_factor = models.DecimalField(
+        "% від ціни DigiKey", max_digits=7, decimal_places=2, default=Decimal("100"),
+        validators=[MinValueValidator(Decimal("1"))],
+        help_text="100 = як на DigiKey, 95 = на 5 % дешевше.",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -142,6 +166,49 @@ class ShopPriceTier(models.Model):
 
     def __str__(self):
         return f"{self.listing}: від {self.min_qty} шт. — {self.unit_price}"
+
+
+# Країни ЄС (ISO 3166-1 alpha-2) — розгортання токена «EU» у регіонах доставки
+EU_COUNTRIES = ["AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI", "FR", "GR", "HR", "HU", "IE",
+                "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE", "SI", "SK"]
+REST_OF_WORLD = "*"
+
+
+class ShippingZone(models.Model):
+    """Регіон доставки магазину: країни, ціна доставки (нетто), участь у безкоштовній доставці."""
+    shop = models.ForeignKey(Shop, on_delete=models.CASCADE, related_name="shipping_zones", verbose_name="Магазин")
+    name = models.CharField("Регіон", max_length=80)
+    countries = models.JSONField(
+        "Країни", default=list,
+        help_text="Коди ISO через кому: DE, AT, CH. «EU» — усі країни ЄС, «*» — решта світу.",
+    )
+    price = models.DecimalField("Доставка (нетто)", max_digits=10, decimal_places=2, default=Decimal("0"),
+                                validators=[MinValueValidator(Decimal("0"))])
+    free_shipping = models.BooleanField("Діє безкоштовна доставка", default=True,
+                                        help_text="Якщо в магазині увімкнено безкоштовну доставку від порогу.")
+    is_active = models.BooleanField("Активний", default=True)
+    sort_order = models.PositiveSmallIntegerField("Порядок", default=0)
+    dk_code = models.CharField("Код DigiKey", max_length=40, blank=True, default="",
+                               help_text="Заповнюється при імпорті регіонів з DigiKey.")
+
+    class Meta:
+        verbose_name = "Регіон доставки"
+        verbose_name_plural = "🚚 Регіони доставки"
+        ordering = ["shop", "sort_order", "name"]
+
+    def __str__(self):
+        return f"{self.shop.slug}: {self.name}"
+
+    @property
+    def is_rest_of_world(self) -> bool:
+        return REST_OF_WORLD in (self.countries or [])
+
+    def clean(self):
+        # Дублікати країн між регіонами перевіряє формсет в адмінці (ShippingZoneFormSet) —
+        # так можна перенести країну з одного регіону в інший одним збереженням.
+        from django.core.exceptions import ValidationError
+        if not self.countries:
+            raise ValidationError({"countries": "Вкажіть хоча б одну країну."})
 
 
 class ShopProduct(Product):

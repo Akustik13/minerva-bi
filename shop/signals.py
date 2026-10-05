@@ -26,3 +26,14 @@ def _tier_changed(sender, instance, **kwargs):
         _queue(ShopListing.objects.filter(pk=instance.listing_id).values_list("product_id", flat=True).first())
     except Exception:
         pass
+
+
+@receiver(post_save, sender="bots.DigiKeyListing", dispatch_uid="shop_digikey_prices")
+def _digikey_prices_changed(sender, instance, update_fields=None, **kwargs):
+    """Нові ціни офера DigiKey → позиції магазинів з джерелом ціни «DigiKey»."""
+    if not instance.product_id or (update_fields is not None and "dk_prices" not in update_fields):
+        return
+    from .services import apply_digikey_prices
+    for listing in ShopListing.objects.filter(product_id=instance.product_id,
+                                              price_source=ShopListing.PRICE_DIGIKEY).select_related("product"):
+        apply_digikey_prices(listing)

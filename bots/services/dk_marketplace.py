@@ -1446,3 +1446,83 @@ def scan_missing_listings(
 
 # Import model reference after definition to avoid circular import
 from bots.models import DigiKeyListing  # noqa: E402
+
+
+# ── Швидке оновлення цін і регіонів доставки з офферів (один запит GET /offers) ──
+
+def refresh_offer_prices(products=None) -> dict:
+    """Оновлює dk_prices / dk_quantity_available з GET /offers для лістингів (усіх або товарів products).
+
+    На відміну від pull_product_fields не ходить в Products API по кожному товару — швидко навіть
+    для сотень товарів. Позиції магазинів з ціною «DigiKey» оновлюються сигналом (shop/signals.py).
+    Повертає {updated, unchanged, not_found: [sku], no_listing: [sku]}.
+    """
+    from bots.models import DigiKeyConfig, DigiKeyListing
+
+    config = DigiKeyConfig.get()
+    offers = fetch_offers(config, max_count=5000)
+    by_sku = {(o.get('supplierSku') or '').strip(): o for o in offers if o.get('supplierSku')}
+    by_id = {o.get('id'): o for o in offers if o.get('id')}
+
+    qs = DigiKeyListing.objects.select_related('product').filter(product__isnull=False)
+    no_listing: list = []
+    if products is not None:
+        products = list(products)
+        qs = qs.filter(product__in=products)
+        with_listing = set(qs.values_list('product_id', flat=True))
+        no_listing = [p.sku for p in products if p.pk not in with_listing]
+
+    updated = unchanged = 0
+    not_found: list = []
+    for listing in qs:
+        offer = by_id.get(listing.dk_offer_id) or by_sku.get(listing.get_supplier_sku())
+        if not offer:
+            not_found.append(listing.product.sku)
+            continue
+        fields = []
+        tiers = _parse_dk_price_tiers(offer.get('prices') or [])
+        if tiers and tiers != (listing.dk_prices or []):
+            listing.dk_prices = tiers
+            fields.append('dk_prices')
+        qty = offer.get('quantityAvailable')
+        if qty is not None:
+            try:
+                if listing.dk_quantity_available != int(qty):
+                    listing.dk_quantity_available = int(qty)
+                    fields.append('dk_quantity_available')
+            except (TypeError, ValueError):
+                pass
+        if fields:
+            listing.save(update_fields=fields)
+            updated += 1
+        else:
+            unchanged += 1
+    logger.info("DK refresh_offer_prices updated=%d unchanged=%d not_found=%d", updated, unchanged, len(not_found))
+    return {'updated': updated, 'unchanged': unchanged, 'not_found': not_found, 'no_listing': no_listing}
+
+
+def fetch_shipping_rates(config=None) -> list:
+    """Регіони доставки з офферів DigiKey (OfferExpanded.shippingRates).
+
+    DigiKey віддає для кожного регіону: code, countryISO2Codes, minimumShippingPrice.
+    Порогу безкоштовної доставки в API немає. Повертає [{code, countries, price}], без дублікатів.
+    """
+    from bots.models import DigiKeyConfig
+
+    config = config or DigiKeyConfig.get()
+    zones: dict = {}
+    for offer in fetch_offers(config, max_count=200):
+        for rate in offer.get('shippingRates') or []:
+            code = (rate.get('code') or '').strip()
+            if not code:
+                continue
+            z = zones.setdefault(code, {'code': code, 'countries': set(), 'price': None})
+            z['countries'].update(c.upper() for c in rate.get('countryISO2Codes') or [] if c)
+            price = rate.get('minimumShippingPrice')
+            if price is not None:
+                try:
+                    z['price'] = max(z['price'] or 0.0, float(price))
+                except (TypeError, ValueError):
+                    pass
+    return [{'code': z['code'], 'countries': sorted(z['countries']), 'price': z['price']}
+            for z in sorted(zones.values(), key=lambda z: z['code'])]

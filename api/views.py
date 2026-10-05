@@ -5,6 +5,7 @@ from django.utils import timezone
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import APIKey, Webhook
 from . import webhooks as webhook_service
@@ -229,6 +230,24 @@ class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
         return stock_service.annotate_stock(qs).order_by("category", "sku")
 
 
+class ShopShippingView(APIView):
+    """
+    Доставка магазину ключа: регіони (країни), ціни доставки (нетто), безкоштовна доставка від порогу.
+    GET /shop/shipping/  →  {configured, currency, free_shipping{enabled, threshold}, allowed_countries, zones[]}
+    configured=false — у Minerva регіони не задані (сайт використовує власні налаштування).
+    """
+    resource_scope = "products"
+
+    def get(self, request):
+        from shop.services import shop_for_key
+        from shop.shipping import public_config
+        shop = shop_for_key(request.auth if isinstance(request.auth, APIKey) else None)
+        if shop is None:
+            return Response({"detail": "Для ключа не налаштовано магазин.", "code": "no_shop"},
+                            status=status.HTTP_404_NOT_FOUND)
+        return Response(public_config(shop))
+
+
 # ── Товари ────────────────────────────────────────────────────────────────────
 
 class ProductViewSet(NoDeleteMixin, viewsets.ModelViewSet):
@@ -356,6 +375,19 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
         if errors:
             return Response({"detail": "Помилки в рядках замовлення.", "code": "invalid_lines",
                              "lines": errors}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Доставка магазину: країна має входити в регіони доставки, вартість рахує Minerva
+        if is_shop and shop.shipping_zones.filter(is_active=True).exists():
+            from shop.services import unit_price_for
+            from shop.shipping import shipping_cost
+            net = sum((unit_price_for(listings[p.pk], ln["qty"]) * Decimal(str(ln["qty"]))
+                       for p, _, ln in resolved), Decimal("0"))
+            cost = shipping_cost(shop, d.get("addr_country") or "", net)
+            if cost is None:
+                return Response({"detail": f"Доставка в країну «{d.get('addr_country') or '—'}» недоступна.",
+                                 "code": "shipping_not_available"}, status=status.HTTP_400_BAD_REQUEST)
+            d["shipping_cost"] = cost
+            d["shipping_currency"] = shop.currency
 
         # Магазин сам вирішує (check_stock=false → замовлення «під замовлення» при нульовому залишку);
         # для інших джерел діє також заборона від'ємного залишку з налаштувань складу.

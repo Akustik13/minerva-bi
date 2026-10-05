@@ -556,5 +556,10 @@ app.listen(3000);
 | `POST /orders/` з `"shop": true` | `orders:write` | лише позиції магазину з ціною; **ціни завжди з Мінерви** (ступінь для кількості; `unit_price`/`total_price` з запиту ігноруються); `check_stock: false` — під замовлення; `payment_status` за замовчуванням `unpaid` |
 | `POST /orders/` з `"quote": true` | `orders:write` | **запит пропозиції**: тип документа `QUOTE` («Запит пропозиції»), без цін, `affects_stock: false` (склад не змінюється); невідомі SKU не помилка — записуються в примітку «Поза каталогом Minerva: …» |
 | `PATCH /orders/{id}/` | `orders:write` | `{"payment_status": "paid", "payment_reference": "…"}` — після онлайн-оплати |
+| `GET /shop/shipping/` | `products:read` | доставка магазину ключа: `configured`, `currency`, `free_shipping{enabled, threshold}`, `allowed_countries` (null — усі), `zones[{name, countries, price, free_shipping, free_from}]`; `countries` може містити `*` — решта світу |
+
+**Доставка.** Регіони задаються в картці магазину (`ShippingZone`: країни ISO, ціна нетто, участь у безкоштовній доставці) + `Shop.free_shipping_enabled/threshold`. Якщо регіони є, `POST /orders/` з `shop:true` перевіряє `addr_country` (інакше 400 `shipping_not_available`) і сам записує `shipping_cost` (з урахуванням порогу безкоштовної доставки). Регіони можна імпортувати з DigiKey (`GET /offers` → `shippingRates`: країни + мінімальна ціна; порогу в API DigiKey немає).
+
+**Ціни з DigiKey.** `ShopListing.price_source = digikey` + `price_factor` (%): ціна і ступені позиції = ціни офера DigiKey (`bots.DigiKeyListing.dk_prices`) × %, оновлюються сигналом при кожному оновленні цін DigiKey (`pull_dk_listings`, дія «⬇️ Оновити ціни з DigiKey» у товарах — `bots.services.dk_marketplace.refresh_offer_prices`). Ручна зміна ціни/ступенів перемикає позицію на `manual`.
 
 Вебхук `stock.changed` надсилається також, коли змінюється позиція магазину (галочка, ціна, ступені) або назва, категорія, фото товару, що є в магазині, — сайт одразу скидає кеш каталогу.

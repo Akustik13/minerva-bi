@@ -10,7 +10,7 @@
 <div style="max-width:720px">
   <p>Вибрано товарів: <strong>{{ count }}</strong></p>
   <ul style="columns:2;font-family:monospace;font-size:12px;margin-bottom:16px">
-    {% for p in queryset %}<li>{{ p.sku }}</li>{% endfor %}
+    {% for p in queryset %}<li>{{ p.sku|default:p }}</li>{% endfor %}
     {% if count > 30 %}<li>… ще {{ count|add:"-30" }}</li>{% endif %}
   </ul>
   <form method="post">{% csrf_token %}

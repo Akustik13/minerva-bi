@@ -11,7 +11,8 @@ from django.utils.html import format_html, format_html_join
 from inventory.services.stock import annotate_stock
 
 from . import services
-from .models import Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSettings
+from .models import ShippingZone, Shop, ShopListing, ShopPriceTier, ShopProduct, ShopSettings
+from .shipping import format_countries, parse_countries
 
 
 # ── Налаштування цін (синглтон) ──────────────────────────────────────────────
@@ -50,20 +51,109 @@ class ShopSettingsAdmin(admin.ModelAdmin):
 
 # ── Магазини ─────────────────────────────────────────────────────────────────
 
+class ShippingZoneForm(forms.ModelForm):
+    countries = forms.CharField(
+        label="Країни", widget=forms.TextInput(attrs={"size": 46}),
+        help_text="Коди ISO через кому: DE, AT, CH. «EU» — усі країни ЄС, «*» — решта світу.",
+    )
+
+    class Meta:
+        model = ShippingZone
+        fields = ["name", "countries", "price", "free_shipping", "is_active", "sort_order"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.initial["countries"] = format_countries(self.instance.countries)
+
+    def clean_countries(self):
+        try:
+            codes = parse_countries(self.cleaned_data["countries"])
+        except ValueError as e:
+            raise forms.ValidationError(str(e))
+        if not codes:
+            raise forms.ValidationError("Вкажіть хоча б одну країну.")
+        return codes
+
+
+class ShippingZoneFormSet(forms.BaseInlineFormSet):
+    """Країна може бути лише в одному активному регіоні магазину."""
+
+    def clean(self):
+        super().clean()
+        seen = {}
+        for f in self.forms:
+            d = getattr(f, "cleaned_data", None) or {}
+            if not d or d.get("DELETE") or not d.get("is_active"):
+                continue
+            for c in d.get("countries") or []:
+                if c in seen:
+                    label = "«решта світу» (*)" if c == "*" else c
+                    raise forms.ValidationError(f"{label} є і в «{seen[c]}», і в «{d.get('name')}».")
+                seen[c] = d.get("name")
+
+
+class ShippingZoneInline(admin.TabularInline):
+    model = ShippingZone
+    form = ShippingZoneForm
+    formset = ShippingZoneFormSet
+    extra = 0
+    fields = ["name", "countries", "price", "free_shipping", "is_active", "sort_order", "dk_code"]
+    readonly_fields = ["dk_code"]
+    verbose_name = "Регіон доставки"
+    verbose_name_plural = "🚚 Регіони доставки — куди доставляємо і скільки коштує (нетто)"
+
+
 @admin.register(Shop)
 class ShopAdmin(admin.ModelAdmin):
-    list_display = ["name", "slug", "is_default", "is_active", "currency", "listings_col", "orders_col", "keys_col"]
+    list_display = ["name", "slug", "is_default", "is_active", "currency", "listings_col", "shipping_col",
+                    "orders_col", "keys_col"]
     list_editable = ["is_active"]
     readonly_fields = ["created_at", "keys_col"]
+    inlines = [ShippingZoneInline]
+    actions = ["action_import_dk_zones"]
     fieldsets = [
         (None, {"fields": ["name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
+        ("🚚 Доставка", {
+            "fields": ["free_shipping_enabled", "free_shipping_threshold"],
+            "description": "Куди доставляємо — регіони внизу сторінки. Замовити можуть лише покупці з країн цих "
+                           "регіонів; без регіонів сайт використовує власні налаштування доставки. "
+                           "Регіони можна імпортувати з DigiKey (дія в списку магазинів).",
+        }),
         ("Підключення", {"fields": ["keys_col"],
                          "description": "Сайт підключається ключем API, прив'язаним до цього магазину "
                                         "(Адмін → REST API → API Токени → поле «Магазин»)."}),
     ]
 
+    @admin.display(description="Доставка")
+    def shipping_col(self, obj):
+        zones = [z for z in obj.shipping_zones.all() if z.is_active]
+        if not zones:
+            return format_html('<span style="color:#9e9e9e">{}</span>', "не задано")
+        free = (f", безкоштовно від {obj.free_shipping_threshold:.2f}"
+                if obj.free_shipping_enabled and obj.free_shipping_threshold is not None else "")
+        return f"{len(zones)} регіонів{free}"
+
+    @admin.action(description="⬇️ Регіони доставки з DigiKey")
+    def action_import_dk_zones(self, request, queryset):
+        from bots.services.dk_marketplace import fetch_shipping_rates
+        from .shipping import import_digikey_zones
+        try:
+            rates = fetch_shipping_rates()
+        except Exception as e:
+            self.message_user(request, f"DigiKey: {e}", messages.ERROR)
+            return
+        if not rates:
+            self.message_user(request, "DigiKey не повернув регіонів доставки (в оферах немає shippingRates).",
+                              messages.WARNING)
+            return
+        for shop in queryset:
+            created, updated = import_digikey_zones(shop, rates)
+            self.message_user(request, f"«{shop}»: регіонів з DigiKey створено {created}, оновлено {updated}. "
+                                       "Перевірте ціни — DigiKey дає лише мінімальну ціну доставки регіону.")
+
     def get_queryset(self, request):
-        return super().get_queryset(request).annotate(
+        return super().get_queryset(request).prefetch_related("shipping_zones").annotate(
             _n=Count("listings", distinct=True),
             _vis=Count("listings", filter=Q(listings__is_visible=True), distinct=True))
 
@@ -140,12 +230,19 @@ class CopyForm(forms.Form):
     overwrite = forms.BooleanField(label="Перезаписати позиції, що вже є в цільовому магазині", required=False)
 
 
+class DigiKeyPriceForm(forms.Form):
+    factor = forms.DecimalField(label="% від ціни DigiKey", max_digits=7, decimal_places=2, initial=Decimal("100"),
+                                min_value=Decimal("1"),
+                                help_text="100 = як на DigiKey, 95 = на 5 % дешевше, 110 = на 10 % дорожче")
+
+
 class AddToShopForm(forms.Form):
     shop = forms.ModelChoiceField(label="Магазин", queryset=Shop.objects.all())
     visible = forms.BooleanField(label="Одразу показувати", required=False, initial=True)
     price_source = forms.ChoiceField(label="Ціна", choices=[
         ("sale", "«Ціна продажу» товару (можна змінити пізніше)"),
         ("markup", "Закупівля + націнка з налаштувань"),
+        ("digikey", "Ціни DigiKey зі ступенями (оновлюються автоматично)"),
     ], initial="sale", widget=forms.RadioSelect)
     with_tiers = forms.BooleanField(label="Згенерувати ступені цін за шаблоном", required=False, initial=True)
 
@@ -222,22 +319,46 @@ class ShopPriceTierInline(admin.TabularInline):
 
 @admin.register(ShopListing)
 class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
-    list_display = ["sku_col", "name_col", "shop", "is_visible", "price", "sale_price_col", "purchase_col",
-                    "margin_col", "tiers_col", "available_col"]
+    list_display = ["sku_col", "name_col", "shop", "is_visible", "price", "source_col", "sale_price_col",
+                    "purchase_col", "margin_col", "tiers_col", "available_col"]
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
-    list_filter = ["shop", "is_visible", PriceStateFilter, StockFilter, "product__category"]
+    list_filter = ["shop", "is_visible", "price_source", PriceStateFilter, StockFilter, "product__category"]
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
     ordering = ["shop", "product__sku"]
     raw_id_fields = ["product"]
     inlines = [ShopPriceTierInline]
-    fields = ["shop", "product", "is_visible", "price", "breaks_preview"]
-    readonly_fields = ["breaks_preview"]
+    fields = ["shop", "product", "is_visible", "price", "price_source", "price_factor", "breaks_preview",
+              "dk_prices_preview"]
+    readonly_fields = ["breaks_preview", "dk_prices_preview"]
     actions = ["action_show", "action_hide", "action_set_price", "action_adjust", "action_markup",
+               "action_digikey", "action_manual",
                "action_tiers_default", "action_tiers_custom", "action_tiers_clear",
                "action_reset_to_sale", "action_round", "action_copy", "delete_selected"]
+
+    def save_model(self, request, obj, form, change):
+        """Ручна зміна ціни від'єднує позицію від DigiKey; % або перемикання на DigiKey — перерахунок."""
+        changed = set(form.changed_data) if form else set()
+        if (change and obj.price_source == ShopListing.PRICE_DIGIKEY and "price" in changed
+                and "price_source" not in changed):
+            obj.price_source = ShopListing.PRICE_MANUAL
+            self.message_user(request, f"{obj.product.sku}: ціну змінено вручну — позицію від'єднано від DigiKey.",
+                              messages.INFO)
+        super().save_model(request, obj, form, change)
+        if obj.price_source == ShopListing.PRICE_DIGIKEY and changed & {"price_source", "price_factor"}:
+            if not services.apply_digikey_prices(obj):
+                self.message_user(request, f"{obj.product.sku}: у DigiKey немає цін для цього товару.",
+                                  messages.WARNING)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        obj = form.instance
+        if obj.price_source == ShopListing.PRICE_DIGIKEY and any(fs.has_changed() for fs in formsets):
+            services.use_manual_prices([obj])  # ступені змінено вручну
+            self.message_user(request, f"{obj.product.sku}: ступені змінено вручну — позицію від'єднано від DigiKey.",
+                              messages.INFO)
 
     def get_queryset(self, request):
         return super().get_queryset(request).prefetch_related("tiers")
@@ -257,6 +378,24 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     @admin.display(description="Назва", ordering="product__name")
     def name_col(self, obj):
         return (obj.product.name or "")[:45]
+
+    @admin.display(description="Джерело", ordering="price_source")
+    def source_col(self, obj):
+        if obj.price_source == ShopListing.PRICE_DIGIKEY:
+            pct = "" if obj.price_factor == 100 else f" {obj.price_factor.normalize():f} %"
+            return format_html('<span title="Ціна і ступені з DigiKey" style="padding:1px 6px;border-radius:8px;'
+                               'background:#c62828;color:#fff">DigiKey{}</span>', pct)
+        return "вручну"
+
+    @admin.display(description="Ціни DigiKey (офер)")
+    def dk_prices_preview(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        tiers = services.dk_price_tiers(obj.product)
+        if not tiers:
+            return "Немає — товар не пов'язаний з офером DigiKey або ціни ще не стягнуто."
+        body = format_html_join("", "<tr><td>від {} шт.</td><td>{}</td></tr>", ((q, f"{p:.2f}") for q, p in tiers))
+        return format_html("<table><tr><th>Кількість</th><th>Ціна/шт.</th></tr>{}</table>", body)
 
     @admin.display(description="Ціна продажу")
     def sale_price_col(self, obj):
@@ -334,6 +473,21 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         return self._form_action(request, queryset, MarkupForm, "Ціна від закупівельної ціни", apply,
                                  initial={"markup": ShopSettings.get().default_markup})
 
+    @admin.action(description="🔗 Ціни з DigiKey (зі ступенями, автоматично)…")
+    def action_digikey(self, request, queryset):
+        def apply(qs, d):
+            n, missing = services.use_digikey_prices(qs.select_related("product"), d["factor"])
+            if missing:
+                messages.warning(request, "Без цін DigiKey (не змінено): " + ", ".join(missing[:20]) +
+                                 (" …" if len(missing) > 20 else ""))
+            return f"Ціни з DigiKey ({d['factor']:g} %): {n} позицій. Далі оновлюються разом з цінами DigiKey."
+        return self._form_action(request, queryset, DigiKeyPriceForm, "Ціни з DigiKey", apply)
+
+    @admin.action(description="✋ Ціни вручну (від'єднати від DigiKey)")
+    def action_manual(self, request, queryset):
+        self.message_user(request, f"Від'єднано від DigiKey: {services.use_manual_prices(queryset)} "
+                                   "(поточні ціни залишились)")
+
     @admin.action(description="💶 Згенерувати ступені цін (шаблон з налаштувань)")
     def action_tiers_default(self, request, queryset):
         self.message_user(request, f"Ступені цін створено для {services.generate_tiers(queryset)} позицій")
@@ -405,7 +559,9 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
     def action_add_to_shop(self, request, queryset):
         def apply(qs, d):
             markup = ShopSettings.get().default_markup if d["price_source"] == "markup" else None
-            added, existed = services.add_products(d["shop"], qs, d["visible"], markup, d["with_tiers"])
+            dk = d["price_source"] == "digikey"
+            added, existed = services.add_products(d["shop"], qs, d["visible"], markup,
+                                                   d["with_tiers"] and not dk, digikey=dk)
             return f"Додано в «{d['shop']}»: {added}, вже були в магазині: {existed}"
         default = Shop.objects.filter(is_default=True).first()
         return self._form_action(request, queryset, AddToShopForm, "Додати товари в магазин", apply,

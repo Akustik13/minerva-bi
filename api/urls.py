@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     SalesOrderViewSet, ProductViewSet, CustomerViewSet, StockViewSet, MovementViewSet,
-    LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ping,
+    LocationViewSet, CategoryViewSet, ShipmentViewSet, WebhookViewSet, ShopProductViewSet, ShopShippingView, ping,
 )
 
 router = DefaultRouter()
@@ -20,5 +20,6 @@ router.register("webhooks",        WebhookViewSet,    basename="webhook")
 
 urlpatterns = [
     path("ping/", ping, name="api-ping"),
+    path("shop/shipping/", ShopShippingView.as_view(), name="api-shop-shipping"),
     path("", include(router.urls)),
 ]

@@ -2125,6 +2125,20 @@ class ProductPackagingInline(admin.TabularInline):
     verbose_name_plural = '📦 Рекомендована упаковка'
 
 
+class ProductCategoryForm(forms.Form):
+    category = forms.ChoiceField(label="Нова категорія")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import ProductCategory
+        known = list(ProductCategory.objects.order_by("order", "name").values_list("slug", "name"))
+        slugs = {k for k, _ in known}
+        used = (Product.objects.exclude(category__in=slugs).exclude(category="")
+                .values_list("category", flat=True).distinct().order_by("category"))
+        self.fields["category"].choices = [(k, f"{n} ({k})") for k, n in known] + \
+                                          [(c, f"{c} (немає в довіднику)") for c in used]
+
+
 @admin.register(Product)
 class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     change_list_template = "admin/inventory/product/change_list.html"
@@ -2136,7 +2150,86 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     search_fields = ("sku", "sku_short", "name")
     list_filter   = ("category", "kind", "bom_type", "is_active")
     list_per_page = 50
-    actions       = ["bulk_sync_digikey_attrs"]
+    actions       = ["action_set_category", "action_refresh_dk_prices", "action_sale_price_from_dk",
+                     "bulk_sync_digikey_attrs"]
+
+    # ── Масові дії: категорія, ціни DigiKey ──────────────────────────────────
+    @admin.action(description="🏷️ Змінити категорію…")
+    def action_set_category(self, request, queryset):
+        from shop.admin import FormActionMixin
+
+        def apply(qs, d):
+            n = 0
+            for p in qs:
+                if p.category != d["category"]:
+                    p.category = d["category"]
+                    p.save(update_fields=["category"])  # по одному — сигнали (вебхук каталогу магазину)
+                    n += 1
+            return f"Категорію «{d['category']}» встановлено: {n} товарів"
+        return FormActionMixin._form_action(self, request, queryset, ProductCategoryForm,
+                                            "Змінити категорію товарів", apply)
+
+    @admin.action(description="⬇️ Оновити ціни з DigiKey (ступені)")
+    def action_refresh_dk_prices(self, request, queryset):
+        try:
+            from bots.services.dk_marketplace import refresh_offer_prices
+            r = refresh_offer_prices(queryset)
+        except Exception as e:
+            self.message_user(request, f"DigiKey: {e}", messages.ERROR)
+            return
+        self.message_user(request, f"Ціни DigiKey: оновлено {r['updated']}, без змін {r['unchanged']}. "
+                                   "Позиції магазинів з ціною «DigiKey» оновлено автоматично.")
+        if r["not_found"]:
+            self.message_user(request, "Офер на DigiKey не знайдено: " + ", ".join(r["not_found"][:20]),
+                              messages.WARNING)
+        if r["no_listing"]:
+            self.message_user(request, "Не пов'язані з DigiKey (немає лістингу): " + ", ".join(r["no_listing"][:20]),
+                              messages.WARNING)
+
+    @admin.action(description="💲 Ціна продажу = ціна DigiKey за 1 шт.")
+    def action_sale_price_from_dk(self, request, queryset):
+        from shop.services import dk_price_tiers
+        n, missing = 0, []
+        for p in queryset:
+            tiers = dk_price_tiers(p)
+            if not tiers:
+                missing.append(p.sku)
+                continue
+            if p.sale_price != tiers[0][1]:
+                p.sale_price = tiers[0][1]
+                p.save(update_fields=["sale_price"])
+                n += 1
+        self.message_user(request, f"Ціну продажу взято з DigiKey: {n} товарів")
+        if missing:
+            self.message_user(request, "Без цін DigiKey: " + ", ".join(missing[:20]), messages.WARNING)
+
+    @admin.display(description="Ціни DigiKey")
+    def dk_prices_info(self, obj):
+        """Каскадні ціни офера на DigiKey Marketplace (оновлює pull_dk_listings / дія «Оновити ціни з DigiKey»)."""
+        from django.core.exceptions import ObjectDoesNotExist
+        from shop.services import dk_price_tiers
+        if not obj or not obj.pk:
+            return "—"
+        try:
+            listing = obj.dk_listing
+        except ObjectDoesNotExist:
+            listing = None
+        if listing is None:
+            return "Товар не пов'язаний з офером DigiKey."
+        tiers = dk_price_tiers(obj)
+        if not tiers:
+            return "Ціни ще не стягнуто — дія «⬇️ Оновити ціни з DigiKey» у списку товарів."
+        try:
+            from bots.models import DigiKeyConfig
+            cur = DigiKeyConfig.get().locale_currency
+        except Exception:
+            cur = ""
+        body = format_html_join("", "<tr><td>від {} шт.</td><td>{} {}</td></tr>",
+                                ((q, f"{p:.2f}", cur) for q, p in tiers))
+        stamp = listing.last_synced_at.strftime("%d.%m.%Y %H:%M") if listing.last_synced_at else "—"
+        return format_html('<table style="min-width:240px"><tr><th>Кількість</th><th>Ціна/шт.</th></tr>{}</table>'
+                           '<div style="margin-top:4px;opacity:.7;font-size:12px">Офер {} · синхр. {}</div>',
+                           body, listing.dk_offer_id or "—", stamp)
 
     @admin.display(description="Магазини")
     def shop_listings_info(self, obj):
@@ -2155,7 +2248,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     inlines       = (ProductComponentInline, ProductPackagingInline)
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
-                       "image_preview", "datasheet_link", "movement_history", "shop_listings_info")
+                       "image_preview", "datasheet_link", "movement_history", "shop_listings_info",
+                       "dk_prices_info")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -2166,6 +2260,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 "manufacturer",
                 ("purchase_price", "sale_price"),
                 ("reorder_point", "lead_time_days"),
+                "dk_prices_info",
             )
         }),
         ("🏪 Інтернет-магазини", {
