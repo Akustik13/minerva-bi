@@ -2604,14 +2604,68 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         from sales.models import SalesSource
         src = SalesSource.objects.filter(slug=order.source).first()
         is_dk = order.source == "digikey"
-        return {
+        ctx = {
             "is_digikey":  is_dk,
             "source_name": src.name if src else order.source,
             "tracking":    shipment.tracking_number or order.tracking_number or "",
+            "ship_date":   timezone.localdate(),
+            "lines":       [{"sku": (l.product.sku if l.product else l.sku_raw) or "",
+                             "name": ((l.product.name_export or l.product.name) if l.product else "") or "",
+                             "qty": l.qty}
+                            for l in order.lines.select_related("product").order_by("pk")],
             "confirm_url": reverse("admin:shipping_shipment_shop_confirm", args=[shipment.pk]),
             "dismiss_url": reverse("admin:shipping_shipment_shop_confirm_dismiss", args=[shipment.pk]),
             "manual_url":  f"/bots/digikey/ship/{order.pk}/" if is_dk else "",
         }
+        if is_dk:
+            carrier = ShipmentAdmin._dk_carrier_for(shipment)
+            ctx["carrier_label"] = (carrier.get("label") or carrier.get("name") or "") if carrier else ""
+            ctx["courier"] = order.shipping_courier or (shipment.carrier.get_carrier_type_display() if shipment.carrier else "")
+            ctx["invoice_text"] = ShipmentAdmin._dk_invoice_text(order)
+        return ctx
+
+    @staticmethod
+    def _dk_carriers():
+        """Список перевізників DigiKey Marketplace (кеш 12 год)."""
+        from django.core.cache import cache
+        carriers = cache.get("dk_shipping_carriers")
+        if carriers is None:
+            try:
+                from bots.models import DigiKeyConfig
+                from bots.services.digikey import get_shipping_carriers
+                carriers = get_shipping_carriers(DigiKeyConfig.get())
+            except Exception as e:
+                logger.warning("DigiKey carriers lookup failed: %s", e)
+                return []
+            if carriers:
+                cache.set("dk_shipping_carriers", carriers, 12 * 3600)
+        return carriers or []
+
+    @staticmethod
+    def _dk_carrier_for(shipment):
+        from bots.views import _match_carrier_id
+        order = shipment.order
+        courier = order.shipping_courier or (shipment.carrier.get_carrier_type_display() if shipment.carrier else "")
+        carriers = ShipmentAdmin._dk_carriers()
+        cid = _match_carrier_id(courier, carriers)
+        return next((c for c in carriers if (c.get("id") or c.get("carrierId")) == cid), None) if cid else None
+
+    @staticmethod
+    def _dk_invoice_text(order):
+        """Що піде в DigiKey як інвойс (лише ЄС і при auto_invoice_eu — як у confirm_digikey_shipment)."""
+        from bots.models import DigiKeyConfig
+        from django.db.models import Q
+        from shipping.models import Invoice
+        eu = {"AT","BE","BG","CY","CZ","DE","DK","EE","ES","FI","FR","GR","HR",
+              "HU","IE","IT","LT","LU","LV","MT","NL","PL","PT","RO","SE","SI","SK"}
+        if (order.addr_country or "").upper() not in eu:
+            return "не передається (відправлення за межі ЄС)"
+        if not DigiKeyConfig.get().auto_invoice_eu:
+            return "не передається (автоінвойс для ЄС вимкнено в налаштуваннях DigiKey)"
+        inv = Invoice.objects.filter(Q(sales_order=order) | Q(digikey_order_no=order.order_number)).first()
+        if inv:
+            return f"#{inv.invoice_number}, нетто {inv.subtotal:.2f}"
+        return "буде згенеровано автоматично (/invoices/)"
 
     def shop_confirm_view(self, request, shipment_id):
         """POST — підтвердити відправлення в магазині: DigiKey через API, інші — статус «Відправлено»."""
@@ -2627,15 +2681,10 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
 
         if order.source == "digikey":
             from bots.models import DigiKeyConfig
-            from bots.views import confirm_digikey_shipment, _match_carrier_id
+            from bots.views import confirm_digikey_shipment
             config = DigiKeyConfig.get()
-            carrier_id = None
-            try:
-                from bots.services.digikey import get_shipping_carriers
-                courier = order.shipping_courier or (shipment.carrier.get_carrier_type_display() if shipment.carrier else "")
-                carrier_id = _match_carrier_id(courier, get_shipping_carriers(config))
-            except Exception as e:
-                logger.warning("DigiKey carriers lookup failed: %s", e)
+            carrier = self._dk_carrier_for(shipment)
+            carrier_id = (carrier.get("id") or carrier.get("carrierId")) if carrier else None
             if not carrier_id:
                 messages.warning(request, "Перевізника не знайдено у списку DigiKey — "
                                           "якщо DigiKey відхилить, підтвердіть вручну.")

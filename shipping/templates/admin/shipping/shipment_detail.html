@@ -256,7 +256,74 @@ details.sd-card[open] summary.sd-card-title  { margin-bottom: 14px; }
     .sd-shopconf-btn:hover { border-color:var(--link-fg); }
     .sd-shopconf-btn.primary { background:var(--link-fg); border-color:var(--link-fg); color:var(--bg-card); font-weight:700; }
     .sd-shopconf-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .sd-sc-modal { position:fixed; inset:0; z-index:10000; display:none; align-items:center; justify-content:center;
+                   background:rgba(0,0,0,.55); padding:16px; }
+    .sd-sc-modal.open { display:flex; }
+    .sd-sc-box { background:var(--bg-card); color:var(--text); border:1px solid var(--border-strong); border-top:4px solid var(--link-fg);
+                 border-radius:12px; max-width:480px; width:100%; padding:22px 24px; box-shadow:0 12px 40px rgba(0,0,0,.45); }
+    .sd-sc-box h3 { margin:0 0 10px; font-size:17px; color:var(--text); }
+    .sd-sc-box p { margin:0 0 18px; color:var(--text-muted); font-size:13px; line-height:1.5; }
+    .sd-sc-box code { color:var(--text); }
+    .sd-sc-box .sd-shopconf-actions { justify-content:flex-end; }
+    .sd-sc-box { max-width:560px; max-height:90vh; overflow-y:auto; }
+    .sd-sc-info { width:100%; border-collapse:collapse; margin:0 0 18px; font-size:13px; }
+    .sd-sc-info th { text-align:left; color:var(--text-dim); font-weight:600; padding:6px 10px 6px 0; vertical-align:top; white-space:nowrap; width:1%; }
+    .sd-sc-info td { color:var(--text); padding:6px 0; border-bottom:1px solid var(--border-strong); }
+    .sd-sc-info tr:last-child td { border-bottom:none; }
+    .sd-sc-bad { color:var(--err); font-weight:600; }
+    .sd-sc-hint { color:var(--text-muted); font-size:11px; margin-top:4px; }
   </style>
+
+  <div class="sd-sc-modal" id="sd-sc-modal" role="dialog" aria-modal="true" aria-labelledby="sd-sc-title">
+    <div class="sd-sc-box">
+      <h3 id="sd-sc-title">🛒 Підтвердити відправлення в {{ shop_confirm.source_name }}?</h3>
+      <p>Замовлення <b style="color:var(--text)">{{ order.order_number }}</b> ще не позначене як відправлене{% if shop_confirm.is_digikey %} на DigiKey{% endif %}.
+        {% if shop_confirm.is_digikey %}На DigiKey буде передано:{% else %}У Minerva буде записано:{% endif %}</p>
+      <table class="sd-sc-info">
+        <tr><th>Замовлення</th><td>{{ order.order_number }}</td></tr>
+        <tr><th>Трек-номер</th><td>{% if shop_confirm.tracking %}<code>{{ shop_confirm.tracking }}</code>{% else %}<span class="sd-sc-bad">⚠️ немає</span>{% endif %}</td></tr>
+        {% if shop_confirm.is_digikey %}
+        <tr><th>Перевізник</th><td>{% if shop_confirm.carrier_label %}{{ shop_confirm.carrier_label }}{% else %}<span class="sd-sc-bad">⚠️ «{{ shop_confirm.courier|default:"—" }}» не знайдено у списку DigiKey — буде передано без перевізника</span>{% endif %}</td></tr>
+        <tr><th>Інвойс</th><td>{{ shop_confirm.invoice_text }}</td></tr>
+        {% else %}
+        <tr><th>Статус</th><td>Відправлено</td></tr>
+        {% endif %}
+        <tr><th>Дата відправки</th><td>{{ shop_confirm.ship_date|date:"d.m.Y" }}</td></tr>
+        <tr><th>Позиції</th><td>
+          {% for l in shop_confirm.lines %}
+            <div><code>{{ l.sku }}</code>{% if l.name %} · {{ l.name }}{% endif %} — <b>{{ l.qty|floatformat:"-3" }} шт</b></div>
+          {% empty %}—{% endfor %}
+          {% if shop_confirm.is_digikey %}<div class="sd-sc-hint">усі позиції повністю; часткове відправлення — через «Вручну»</div>{% endif %}
+        </td></tr>
+      </table>
+      <div class="sd-shopconf-actions">
+        <form method="post" action="{{ shop_confirm.confirm_url }}">
+          {% csrf_token %}
+          <button type="submit" class="sd-shopconf-btn primary"
+                  {% if shop_confirm.is_digikey and not shop_confirm.tracking %}disabled title="Немає трек-номера"{% endif %}>
+            ✅ Підтвердити{% if shop_confirm.is_digikey %} автоматично{% endif %}</button>
+        </form>
+        {% if shop_confirm.manual_url %}<a class="sd-shopconf-btn" href="{{ shop_confirm.manual_url }}">✏️ Вручну</a>{% endif %}
+        <form method="post" action="{{ shop_confirm.dismiss_url }}">
+          {% csrf_token %}
+          <button type="submit" class="sd-shopconf-btn" title="Більше не пропонувати для цього відправлення">✕ Відхилити</button>
+        </form>
+        <button type="button" class="sd-shopconf-btn" id="sd-sc-later">Пізніше</button>
+      </div>
+    </div>
+  </div>
+  <script>
+  (function(){
+    var m = document.getElementById('sd-sc-modal'), key = 'sd-sc-later-{{ shipment.pk }}';
+    function close(){ m.classList.remove('open'); try { sessionStorage.setItem(key, '1'); } catch(e){} }
+    var later = false;
+    try { later = sessionStorage.getItem(key) === '1'; } catch(e){}
+    if (!later) m.classList.add('open');
+    document.getElementById('sd-sc-later').addEventListener('click', close);
+    m.addEventListener('click', function(e){ if (e.target === m) close(); });
+    document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && m.classList.contains('open')) close(); });
+  })();
+  </script>
   {% endif %}
 
   <!-- ── Header ── -->
