@@ -126,3 +126,37 @@ def import_digikey_zones(shop: Shop, rates: list[dict]) -> tuple[int, int]:
                                         is_active=True, free_shipping=True)
             created += 1
     return created, updated
+
+
+# ── Базові регіони (за зразком правил доставки на DigiKey Marketplace) ───────
+# DigiKey: Standard $19.90 — EUROPE; Express $29.00 — US-CONTINENTAL; Express $49.00 — решта світу.
+# Ціни тут — нетто в EUR, округлені; Німеччина окремо дешевше. Після створення їх можна змінити.
+EUROPE_NON_EU = ["CH", "GB", "NO", "LI", "IS"]
+WORLD_EXPRESS = ["CA", "MX", "BR", "AR", "CL", "CO", "JP", "KR", "CN", "TW", "HK", "SG", "MY", "TH", "VN", "IN",
+                 "AU", "NZ", "IL", "AE", "SA", "QA", "TR", "ZA", "UA", "MA", "EG"]
+DEFAULT_ZONES = [
+    {"name": "Deutschland", "countries": ["DE"], "price": Decimal("6.90"), "free_shipping": True},
+    {"name": "Europa (Standard)", "countries": [c for c in EU_COUNTRIES if c != "DE"] + EUROPE_NON_EU,
+     "price": Decimal("17.00"), "free_shipping": True},
+    {"name": "USA (Express)", "countries": ["US"], "price": Decimal("25.00"), "free_shipping": False},
+    {"name": "Welt (Express)", "countries": WORLD_EXPRESS, "price": Decimal("42.00"), "free_shipping": False},
+]
+
+
+def create_default_zones(shop: Shop) -> int:
+    """Створює базові регіони; країни, що вже є в активних регіонах магазину, пропускаються.
+    Повертає кількість створених регіонів."""
+    taken = {c for z in active_zones(shop) for c in z.countries or []}
+    created = 0
+    for i, z in enumerate(DEFAULT_ZONES):
+        countries = [c for c in z["countries"] if c not in taken]
+        if not countries or shop.shipping_zones.filter(name=z["name"]).exists():
+            continue
+        ShippingZone.objects.create(shop=shop, name=z["name"], countries=countries, price=z["price"],
+                                    free_shipping=z["free_shipping"], sort_order=(i + 1) * 10)
+        taken.update(countries)
+        created += 1
+    if shop.free_shipping_threshold is None:
+        shop.free_shipping_threshold = Decimal("250.00")  # поріг підготовлено, вмикається галочкою
+        shop.save(update_fields=["free_shipping_threshold"])
+    return created

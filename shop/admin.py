@@ -109,16 +109,18 @@ class ShopAdmin(admin.ModelAdmin):
     list_display = ["name", "slug", "is_default", "is_active", "currency", "listings_col", "shipping_col",
                     "orders_col", "keys_col"]
     list_editable = ["is_active"]
+    ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
     readonly_fields = ["created_at", "keys_col"]
     inlines = [ShippingZoneInline]
-    actions = ["action_import_dk_zones"]
+    actions = ["action_default_zones", "action_import_dk_zones"]
     fieldsets = [
         (None, {"fields": ["name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
         ("🚚 Доставка", {
             "fields": ["free_shipping_enabled", "free_shipping_threshold"],
             "description": "Куди доставляємо — регіони внизу сторінки. Замовити можуть лише покупці з країн цих "
                            "регіонів; без регіонів сайт використовує власні налаштування доставки. "
-                           "Регіони можна імпортувати з DigiKey (дія в списку магазинів).",
+                           "Швидкий старт: у списку магазинів позначте магазин → дія «🌍 Створити базові регіони "
+                           "доставки» (Німеччина, Європа, США, світ), або «⬇️ Регіони доставки з DigiKey».",
         }),
         ("Підключення", {"fields": ["keys_col"],
                          "description": "Сайт підключається ключем API, прив'язаним до цього магазину "
@@ -133,6 +135,14 @@ class ShopAdmin(admin.ModelAdmin):
         free = (f", безкоштовно від {obj.free_shipping_threshold:.2f}"
                 if obj.free_shipping_enabled and obj.free_shipping_threshold is not None else "")
         return f"{len(zones)} регіонів{free}"
+
+    @admin.action(description="🌍 Створити базові регіони доставки")
+    def action_default_zones(self, request, queryset):
+        from .shipping import create_default_zones
+        for shop in queryset:
+            n = create_default_zones(shop)
+            self.message_user(request, f"«{shop}»: створено регіонів: {n}. Відкрийте магазин, щоб змінити ціни "
+                                       "або увімкнути безкоштовну доставку (поріг 250,00 уже вписано).")
 
     @admin.action(description="⬇️ Регіони доставки з DigiKey")
     def action_import_dk_zones(self, request, queryset):
@@ -293,6 +303,18 @@ class PriceStateFilter(admin.SimpleListFilter):
         return qs
 
 
+class ShopFilter(admin.SimpleListFilter):
+    """Фільтр за магазином — видно завжди (стандартний ховається, коли магазин лише один)."""
+    title = "Магазин"
+    parameter_name = "shop__id__exact"
+
+    def lookups(self, request, model_admin):
+        return [(str(s.pk), s.name) for s in Shop.objects.all()]
+
+    def queryset(self, request, qs):
+        return qs.filter(shop_id=self.value()) if self.value() else qs
+
+
 class StockFilter(admin.SimpleListFilter):
     title = "Наявність"
     parameter_name = "stock"
@@ -323,7 +345,7 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
                     "purchase_col", "margin_col", "tiers_col", "available_col"]
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
-    list_filter = ["shop", "is_visible", "price_source", PriceStateFilter, StockFilter, "product__category"]
+    list_filter = [ShopFilter, "is_visible", "price_source", PriceStateFilter, StockFilter, "product__category"]
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
@@ -365,6 +387,14 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
 
     def changelist_view(self, request, extra_context=None):
         self._stock = None  # залишки рахуються один раз на сторінку
+        # Вкладки магазинів над списком: видно, з яким магазином зараз працюємо
+        current = request.GET.get("shop__id__exact", "")
+        base = reverse("admin:shop_shoplisting_changelist")
+        shops = Shop.objects.annotate(_n=Count("listings")).order_by("-is_default", "name")
+        tabs = [{"label": "Усі магазини", "url": base, "count": sum(s._n for s in shops), "active": not current}]
+        tabs += [{"label": s.name + (" ★" if s.is_default else ""), "url": f"{base}?shop__id__exact={s.pk}",
+                  "count": s._n, "active": current == str(s.pk)} for s in shops]
+        extra_context = {**(extra_context or {}), "shop_tabs": tabs}
         return super().changelist_view(request, extra_context)
 
     def get_readonly_fields(self, request, obj=None):

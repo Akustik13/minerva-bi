@@ -279,3 +279,33 @@ class ShippingTests(TestCase):
                                                        "_selected_action": [self.p.pk], "category": "antenna"})
         self.p.refresh_from_db()
         self.assertEqual(self.p.category, "antenna")
+
+
+class DefaultZonesTests(TestCase):
+    def test_create_default_zones(self):
+        from .models import ShippingZone
+        from .shipping import create_default_zones, shipping_cost
+        shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        ShippingZone.objects.create(shop=shop, name="Schweiz", countries=["CH"], price=Decimal("20"))
+        self.assertEqual(create_default_zones(shop), 4)
+        self.assertEqual(create_default_zones(shop), 0)  # повторно нічого не дублює
+        self.assertEqual(shipping_cost(shop, "DE", 10), Decimal("6.90"))
+        self.assertEqual(shipping_cost(shop, "FR", 10), Decimal("17.00"))
+        self.assertEqual(shipping_cost(shop, "CH", 10), Decimal("20"))  # ручний регіон не перекрито
+        self.assertEqual(shipping_cost(shop, "US", 10), Decimal("25.00"))
+        self.assertIsNone(shipping_cost(shop, "RU", 10))
+        shop.refresh_from_db()
+        self.assertEqual((shop.free_shipping_enabled, shop.free_shipping_threshold), (False, Decimal("250.00")))
+
+    def test_listing_shop_tabs_and_filter(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("a", "a@x.y", "p"))
+        shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        ShopListing.objects.create(shop=shop, product=Product.objects.create(sku="A-1", name="A"))
+        r = self.client.get("/admin/shop/shoplisting/")
+        self.assertContains(r, "Усі магазини")
+        self.assertContains(r, f"?shop__id__exact={shop.pk}")
+        self.assertContains(self.client.get(f"/admin/shop/shoplisting/?shop__id__exact={shop.pk}"), "A-1")

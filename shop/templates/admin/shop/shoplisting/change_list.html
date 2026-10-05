@@ -1,0 +1,13 @@
+{% extends "admin/change_list.html" %}
+{% block search %}
+<div class="shop-tabs" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px">
+  <span style="opacity:.75;margin-right:4px">Магазин:</span>
+  {% for t in shop_tabs %}
+    <a href="{{ t.url }}" style="padding:5px 12px;border-radius:999px;text-decoration:none;font-weight:600;
+       border:1px solid {% if t.active %}var(--accent, #79aec8){% else %}var(--border-strong, #555){% endif %};
+       {% if t.active %}background:var(--accent-subtle, rgba(121,174,200,.18));{% endif %}">
+      {{ t.label }} <span style="opacity:.7;font-weight:400">({{ t.count }})</span></a>
+  {% endfor %}
+</div>
+{{ block.super }}
+{% endblock %}
