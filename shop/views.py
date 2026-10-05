@@ -4,13 +4,13 @@ from django.db.models import Count, Q
 from django.shortcuts import render
 
 from .models import Shop, ShopListing, ShopPriceTier, ShopSettings
-from .services import shop_for_key
+from .services import KEY_DEFAULT, keys_for_shop
 
 
 @staff_member_required
 def shop_help(request):
     """Довідка розділу «Інтернет-магазин» з живою статистикою."""
-    from api.models import APIKey, Webhook
+    from api.models import Webhook
     from sales.models import SalesOrder
 
     shops = list(Shop.objects.annotate(
@@ -24,10 +24,9 @@ def shop_help(request):
         .annotate(orders=Count("id", filter=~Q(document_type="QUOTE")),
                   quotes=Count("id", filter=Q(document_type="QUOTE")))
     }
-    # Ключ належить магазину за тими ж правилами, що й в API (shop → джерело → за замовчуванням)
-    key_shop = [getattr(shop_for_key(k), "pk", None) for k in APIKey.objects.filter(is_active=True)]
+    # Ключі, прив'язані до магазину (поле «Магазин» або «Джерело замовлень» = код магазину)
     for s in shops:
-        s.n_keys = key_shop.count(s.pk)
+        s.n_keys = sum(1 for _, m in keys_for_shop(s) if m != KEY_DEFAULT)
         row = by_source.get(s.slug, {})
         s.n_orders = row.get("orders", 0)
         s.n_quotes = row.get("quotes", 0)

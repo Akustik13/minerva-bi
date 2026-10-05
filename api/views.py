@@ -331,8 +331,10 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                                 status=status.HTTP_400_BAD_REQUEST)
             d.setdefault("payment_status", "unpaid")
 
-        d["source"] = (d.get("source") or (shop.slug if shop else "") or
-                       (key.default_source if key else "") or "api").strip()
+        if shop is not None:
+            d["source"] = shop.slug  # замовлення магазину: джерело = код магазину (сайт може надсилати старий)
+        else:
+            d["source"] = (d.get("source") or (key.default_source if key else "") or "api").strip()
         d.setdefault("order_date", timezone.localdate())
         currency = d.get("currency") or "EUR"
         d["currency"] = currency

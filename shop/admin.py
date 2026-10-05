@@ -182,17 +182,22 @@ class ShopAdmin(admin.ModelAdmin):
         if not obj or not obj.pk:
             return "—"
         keys = services.keys_for_shop(obj)
-        if not keys:
-            return format_html('немає — <a href="{}">створити ключ</a>', reverse("admin:api_apikey_add"))
-
-        def how(k):
-            if k.shop_id == obj.pk:
-                return "прив'язаний"
-            if k.default_source == obj.slug:
-                return f"за «Джерелом замовлень» {obj.slug}"
-            return "магазин за замовчуванням"
-        return format_html_join(", ", '<a href="{}">{}</a> <span style="opacity:.7">({})</span>',
-                                ((reverse("admin:api_apikey_change", args=[k.pk]), k.name, how(k)) for k in keys))
+        link = lambda k: reverse("admin:api_apikey_change", args=[k.pk])  # noqa: E731
+        bound = [(k, m) for k, m in keys if m != services.KEY_DEFAULT]
+        loose = [k for k, m in keys if m == services.KEY_DEFAULT]
+        if bound:
+            main = format_html_join(", ", '<a href="{}">{}</a> <span style="opacity:.7">({})</span>', (
+                (link(k), k.name, "прив'язаний" if m == services.KEY_LINKED else f"за джерелом «{obj.slug}»")
+                for k, m in bound))
+        else:
+            main = format_html('прив\'язаних немає — у ключі сайту оберіть поле «Магазин» = «{}» '
+                               '(<a href="{}">ключі API</a>)', obj.name, reverse("admin:api_apikey_changelist"))
+        if not loose:
+            return main
+        return format_html(
+            '{}<div style="opacity:.65;margin-top:4px;font-size:12px">Без прив\'язки (поле «Магазин» порожнє), '
+            'тому працюють з магазином за замовчуванням: {}</div>',
+            main, format_html_join(", ", '<a href="{}">{}</a>', ((link(k), k.name) for k in loose)))
 
     # ── Кнопки регіонів доставки в картці магазину ───────────────────────────
     @admin.display(description="Регіони")

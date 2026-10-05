@@ -324,8 +324,34 @@ class ShopCardTests(TestCase):
         APIKey.objects.create(name="site-key", scopes=["products:read"], default_source="webshop")
         r = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
         self.assertContains(r, "site-key")
-        self.assertContains(r, "за «Джерелом замовлень» webshop")
+        self.assertContains(r, "за джерелом «webshop»")
         self.assertContains(r, "Створити базові регіони")
+
+    def test_unlinked_key_shown_separately(self):
+        self.shop.slug = "sevskiyde"
+        self.shop.save()
+        APIKey.objects.create(name="TestKey", scopes=["products:read"])
+        APIKey.objects.create(name="site-key", scopes=["products:read"], default_source="webshop")
+        r = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
+        self.assertContains(r, "прив'язаних немає")
+        self.assertContains(r, "Без прив'язки")
+
+    def test_shop_order_source_is_shop_code(self):
+        InventorySettings.get()
+        Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
+        self.shop.slug = "sevskiyde"
+        self.shop.save()
+        p = Product.objects.create(sku="AN-1", name="A", sale_price=Decimal("5"))
+        ShopListing.objects.create(shop=self.shop, product=p)
+        key = APIKey.objects.create(name="site", scopes=["orders:write", "orders:read"], default_source="webshop")
+        c = APIClient()
+        c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
+        r = c.post("/api/v1/orders/", {"order_number": "WS-1", "client": "X", "shop": True, "source": "webshop",
+                                       "lines": [{"sku": "AN-1", "qty": 1}]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()["source"], "sevskiyde")
+        from sales.models import SalesSource
+        self.assertTrue(SalesSource.objects.filter(slug="sevskiyde").exists())
 
     def test_default_zones_button(self):
         url = f"/admin/shop/shop/{self.shop.pk}/default-zones/"

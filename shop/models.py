@@ -110,6 +110,9 @@ class Shop(models.Model):
         super().save(*args, **kwargs)
         if self.is_default:
             Shop.objects.exclude(pk=self.pk).filter(is_default=True).update(is_default=False)
+        # Код магазину — джерело замовлень: має бути в довіднику джерел (фільтри й назви в «Продажах»)
+        from sales.models import SalesSource
+        SalesSource.objects.get_or_create(slug=self.slug, defaults={"name": self.name})
 
 
 class ShopListing(models.Model):

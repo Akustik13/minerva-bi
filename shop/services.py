@@ -24,11 +24,20 @@ def shop_for_key(api_key) -> Shop | None:
     return Shop.objects.filter(is_default=True, is_active=True).first()
 
 
-def keys_for_shop(shop: Shop) -> list:
-    """Активні ключі API, які працюють з цим магазином (за тими ж правилами, що й shop_for_key)."""
+KEY_LINKED, KEY_SOURCE, KEY_DEFAULT = "linked", "source", "default"
+
+
+def keys_for_shop(shop: Shop) -> list[tuple]:
+    """Активні ключі API, що працюють з магазином: [(ключ, як)] — як = linked (поле «Магазин»),
+    source («Джерело замовлень» = код магазину) або default (без прив'язки → магазин за замовчуванням)."""
     from api.models import APIKey
-    return [k for k in APIKey.objects.filter(is_active=True).order_by("name")
-            if getattr(shop_for_key(k), "pk", None) == shop.pk]
+    out = []
+    for k in APIKey.objects.filter(is_active=True).order_by("name"):
+        if getattr(shop_for_key(k), "pk", None) != shop.pk:
+            continue
+        mode = KEY_LINKED if k.shop_id == shop.pk else KEY_SOURCE if k.default_source == shop.slug else KEY_DEFAULT
+        out.append((k, mode))
+    return out
 
 
 # ── Ціни ─────────────────────────────────────────────────────────────────────
