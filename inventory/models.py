@@ -75,6 +75,21 @@ class Product(models.Model):
     )
     category = models.CharField("Категорія", max_length=64, default="other",
                                help_text="Оберіть з довідника або введіть slug вручну")
+
+    class Lifecycle(models.TextChoices):
+        ACTIVE       = "active", "Активний"
+        NRND         = "nrnd", "Не рекомендовано для нових розробок (NRND)"
+        DISCONTINUED = "discontinued", "Знято з виробництва (EOL)"
+
+    lifecycle_status = models.CharField(
+        "Життєвий цикл", max_length=16, choices=Lifecycle.choices, default=Lifecycle.ACTIVE,
+        help_text="NRND — радимо нову версію; EOL — знято з виробництва, в магазині продається лише залишок.",
+    )
+    successor = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="predecessors",
+        verbose_name="Рекомендована заміна (нова версія)",
+        help_text="Показується на сайті біля NRND / EOL товару як «Nachfolger».",
+    )
     kind = models.CharField(
         max_length=20,
         choices=Kind.choices,

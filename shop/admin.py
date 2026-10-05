@@ -438,7 +438,7 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
                     "sale_price_col", "purchase_col", "margin_col", "tiers_col", "available_col"]
     list_display_links = ["sku_col"]
     list_editable = ["is_visible", "price"]
-    list_filter = [ShopFilter, "is_visible", PromoFilter, "price_source", PriceStateFilter, StockFilter, "product__category"]
+    list_filter = [ShopFilter, "is_visible", PromoFilter, "product__lifecycle_status", "price_source", PriceStateFilter, StockFilter, "product__category"]
     search_fields = ["product__sku", "product__name", "product__name_export", "product__manufacturer"]
     list_select_related = ["shop", "product"]
     list_per_page = 100
@@ -503,7 +503,7 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     def name_col(self, obj):
         return (obj.product.name or "")[:45]
 
-    @admin.display(description="Акція / новинка")
+    @admin.display(description="Позначки")
     def promo_col(self, obj):
         parts = []
         pct = services.offer_percent(obj)
@@ -514,6 +514,12 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         elif obj.discount_percent and obj.discount_percent > 0:
             parts.append(format_html('<span style="opacity:.6">акція закінчилась {}</span>',
                                      f"{obj.discount_until:%d.%m}" if obj.discount_until else ""))
+        life = obj.product.lifecycle_status
+        if life != "active":
+            parts.append(format_html('<span title="{}" style="padding:1px 6px;border-radius:8px;background:{};color:{}">{}</span>',
+                                     obj.product.get_lifecycle_status_display(),
+                                     "#f5b400" if life == "nrnd" else "#616161", "#222" if life == "nrnd" else "#fff",
+                                     "NRND" if life == "nrnd" else "EOL"))
         if services.is_new(obj):
             parts.append(format_html('<span title="Neu до {}" style="padding:1px 6px;border-radius:8px;'
                                      'background:#2e7d32;color:#fff">NEU</span>', f"{obj.new_until:%d.%m.%Y}"))

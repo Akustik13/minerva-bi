@@ -417,3 +417,52 @@ class PromoTests(TestCase):
         self.assertContains(r, "−20 %")
         self.assertContains(r, "NEU")
         self.assertContains(self.client.get(f"{url}{self.l.pk}/change/"), "Акція −20 %")
+
+
+class LifecycleTests(TestCase):
+    def setUp(self):
+        InventorySettings.get()
+        Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
+        self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        self.new = Product.objects.create(sku="AN-2", name="Antenne v2", sale_price=Decimal("12"))
+        self.old = Product.objects.create(sku="AN-1", name="Antenne v1", sale_price=Decimal("10"),
+                                          lifecycle_status=Product.Lifecycle.DISCONTINUED, successor=self.new)
+        create_movement(product=self.old, tx_type="Incoming", qty=3)
+        for p in (self.old, self.new):
+            ShopListing.objects.create(shop=self.shop, product=p)
+        key = APIKey.objects.create(name="site", scopes=["products:read", "orders:write", "orders:read"],
+                                    default_source="webshop")
+        self.c = APIClient()
+        self.c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
+
+    def test_api_and_eol_only_from_stock(self):
+        d = self.c.get("/api/v1/shop/products/AN-1/").json()
+        self.assertEqual(d["lifecycle_status"], "discontinued")
+        self.assertEqual(d["successor"], {"sku": "AN-2", "name": "Antenne v2"})
+        base = {"client": "X", "shop": True}
+        r = self.c.post("/api/v1/orders/", {**base, "order_number": "WS-L1", "lines": [{"sku": "AN-1", "qty": 5}]},
+                        format="json")
+        self.assertEqual(r.status_code, 409)
+        r = self.c.post("/api/v1/orders/", {**base, "order_number": "WS-L2", "lines": [{"sku": "AN-1", "qty": 3}]},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        # активний товар без залишку — як і раніше «під замовлення»
+        r = self.c.post("/api/v1/orders/", {**base, "order_number": "WS-L3", "lines": [{"sku": "AN-2", "qty": 5}]},
+                        format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+
+    def test_admin_lifecycle_action(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("a", "a@x.y", "p"))
+        self.client.post("/admin/inventory/product/", {"action": "action_set_lifecycle", "apply": "1",
+                                                       "_selected_action": [self.new.pk], "status": "nrnd",
+                                                       "set_successor": "on", "successor": ""})
+        self.new.refresh_from_db()
+        self.assertEqual(self.new.lifecycle_status, "nrnd")
+        r = self.client.get("/admin/shop/shoplisting/")
+        self.assertContains(r, "NRND")
+        self.assertContains(r, "EOL")
+        self.assertEqual(self.client.get(f"/admin/inventory/product/{self.old.pk}/change/").status_code, 200)

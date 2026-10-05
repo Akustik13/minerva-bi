@@ -106,11 +106,12 @@ class ShopProductSerializer(serializers.ModelSerializer):
     offer  = serializers.SerializerMethodField(help_text="Діюча акція: {percent, until, regular_price, "
                                                          "regular_price_breaks} або null")
     is_new = serializers.SerializerMethodField(help_text="Новинка (бейдж «Neu», угорі каталогу)")
+    successor = serializers.SerializerMethodField(help_text="Рекомендована заміна {sku, name} для NRND / EOL або null")
 
     class Meta:
         model  = Product
         fields = ["sku", "name", "name_export", "category", "unit_type", "manufacturer",
-                  "price", "price_breaks", "offer", "is_new", "available", "incoming", "in_stock", "lead_time_days",
+                  "price", "price_breaks", "offer", "is_new", "lifecycle_status", "successor", "available", "incoming", "in_stock", "lead_time_days",
                   "net_weight_g", "image_url", "datasheet_url", "last_movement_at"]
 
     @staticmethod
@@ -133,6 +134,10 @@ class ShopProductSerializer(serializers.ModelSerializer):
                 "regular_price": float(info["regular_price"]),
                 "regular_price_breaks": [{"min_qty": r["min_qty"], "unit_price": float(r["unit_price"])}
                                          for r in info["regular_price_breaks"]]}
+
+    def get_successor(self, obj):
+        s = obj.successor if obj.successor_id else None
+        return {"sku": s.sku, "name": s.name or s.sku} if s and s.is_active else None
 
     def get_is_new(self, obj):
         from shop.services import is_new

@@ -225,7 +225,8 @@ def _on_tx_change(sender, instance, **kwargs):
 
 # Поля товару, зміна яких має оновити каталог інтернет-магазину
 _SHOP_FIELDS = ("sale_price", "is_active", "name", "name_export",
-                "category", "unit_type", "lead_time_days", "image_url", "image", "datasheet_url")
+                "category", "unit_type", "lead_time_days", "image_url", "image", "datasheet_url",
+                "lifecycle_status", "successor_id")
 
 
 def _product_pre_save(sender, instance, **kwargs):

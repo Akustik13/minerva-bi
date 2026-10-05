@@ -2125,6 +2125,14 @@ class ProductPackagingInline(admin.TabularInline):
     verbose_name_plural = '📦 Рекомендована упаковка'
 
 
+class LifecycleForm(forms.Form):
+    status = forms.ChoiceField(label="Статус", choices=Product.Lifecycle.choices, widget=forms.RadioSelect)
+    set_successor = forms.BooleanField(label="Змінити рекомендовану заміну", required=False, initial=True)
+    successor = forms.ModelChoiceField(label="Заміна (нова версія)", required=False,
+                                       queryset=Product.objects.filter(is_active=True).order_by("sku"),
+                                       help_text="Порожньо — без заміни")
+
+
 class ProductCategoryForm(forms.Form):
     category = forms.ChoiceField(label="Нова категорія")
 
@@ -2148,9 +2156,10 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
-    list_filter   = ("category", "kind", "bom_type", "is_active")
+    list_filter   = ("category", "lifecycle_status", "kind", "bom_type", "is_active")
     list_per_page = 50
-    actions       = ["action_set_category", "action_refresh_dk_prices", "action_sale_price_from_dk",
+    autocomplete_fields = ("successor",)
+    actions       = ["action_set_category", "action_set_lifecycle", "action_refresh_dk_prices", "action_sale_price_from_dk",
                      "bulk_sync_digikey_attrs"]
 
     # ── Масові дії: категорія, ціни DigiKey ──────────────────────────────────
@@ -2168,6 +2177,25 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             return f"Категорію «{d['category']}» встановлено: {n} товарів"
         return FormActionMixin._form_action(self, request, queryset, ProductCategoryForm,
                                             "Змінити категорію товарів", apply)
+
+    @admin.action(description="♻️ Життєвий цикл (NRND / EOL / активний)…")
+    def action_set_lifecycle(self, request, queryset):
+        from shop.admin import FormActionMixin
+
+        def apply(qs, d):
+            n = 0
+            for p in qs:
+                succ = d["successor"] if d["successor"] and d["successor"].pk != p.pk else None
+                if p.lifecycle_status != d["status"] or (d["set_successor"] and p.successor_id != getattr(succ, "pk", None)):
+                    p.lifecycle_status = d["status"]
+                    fields = ["lifecycle_status"]
+                    if d["set_successor"]:
+                        p.successor = succ
+                        fields.append("successor")
+                    p.save(update_fields=fields)
+                    n += 1
+            return f"Життєвий цикл «{Product.Lifecycle(d['status']).label}»: {n} товарів"
+        return FormActionMixin._form_action(self, request, queryset, LifecycleForm, "Життєвий цикл товарів", apply)
 
     @admin.action(description="⬇️ Оновити ціни з DigiKey (ступені)")
     def action_refresh_dk_prices(self, request, queryset):
@@ -2253,6 +2281,8 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
+        ("♻️ Життєвий цикл", {"fields": ("lifecycle_status", "successor"),
+                             "description": "Показується в інтернет-магазині: NRND і EOL — наліпки та посилання на заміну."}),
         ("📦 Availability", {"fields": ("stock_qty", "reserved_qty", "incoming_qty",
                                         "buildable_qty", "bom_availability", "reorder_info")}),
         ("💰 Ціни та закупівля", {

@@ -560,6 +560,8 @@ app.listen(3000);
 
 **Акції та новинки.** `ShopListing.discount_percent` + `discount_until` (Sonderangebot) і `new_until` (новинка). У `/shop/products/` `price` і `price_breaks` уже зі знижкою; `offer` = `{percent, until, regular_price, regular_price_breaks}` або `null`; `is_new` — bool. Замовлення з `shop:true` рахуються за ціною зі знижкою.
 
+**Життєвий цикл.** `Product.lifecycle_status` (`active` / `nrnd` / `discontinued`) і `Product.successor` (рекомендована заміна). У `/shop/products/`: `lifecycle_status`, `successor` = `{sku, name}` або `null`. Замовлення з `shop:true` для `discontinued` — лише в межах залишку (інакше 409 `insufficient_stock`).
+
 **Доставка.** Регіони задаються в картці магазину (`ShippingZone`: країни ISO, ціна нетто, участь у безкоштовній доставці) + `Shop.free_shipping_enabled/threshold`. Якщо регіони є, `POST /orders/` з `shop:true` перевіряє `addr_country` (інакше 400 `shipping_not_available`) і сам записує `shipping_cost` (з урахуванням порогу безкоштовної доставки). Регіони можна імпортувати з DigiKey (`GET /offers` → `shippingRates`: країни + мінімальна ціна; порогу в API DigiKey немає).
 
 **Ціни з DigiKey.** `ShopListing.price_source = digikey` + `price_factor` (%): ціна і ступені позиції = ціни офера DigiKey (`bots.DigiKeyListing.dk_prices`) × %, оновлюються сигналом при кожному оновленні цін DigiKey (`pull_dk_listings`, дія «⬇️ Оновити ціни з DigiKey» у товарах — `bots.services.dk_marketplace.refresh_offer_prices`). Ручна зміна ціни/ступенів перемикає позицію на `manual`.

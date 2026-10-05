@@ -226,6 +226,7 @@ class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
             return Product.objects.none()
         listings = ShopListing.objects.filter(shop=shop).prefetch_related("tiers")
         qs = (Product.objects.filter(is_active=True, shop_listings__shop=shop, shop_listings__is_visible=True)
+              .select_related("successor")
               .prefetch_related(Prefetch("shop_listings", queryset=listings, to_attr="_listings")))
         return stock_service.annotate_stock(qs).order_by("category", "sku")
 
@@ -390,6 +391,15 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
                                  "code": "shipping_not_available"}, status=status.HTTP_400_BAD_REQUEST)
             d["shipping_cost"] = cost
             d["shipping_currency"] = shop.currency
+
+        # Знятий з виробництва товар (EOL) у магазині — лише із залишку, без «під замовлення»
+        if is_shop and d.get("affects_stock", True):
+            eol = [{"sku": p.sku, "qty": ln["qty"]} for p, _, ln in resolved
+                   if p.lifecycle_status == Product.Lifecycle.DISCONTINUED]
+            short = [a for a in stock_service.check_availability(eol) if not a["ok"]] if eol else []
+            if short:
+                return Response({"detail": "Товар знято з виробництва — доступний лише залишок на складі.",
+                                 "code": "insufficient_stock", "items": short}, status=status.HTTP_409_CONFLICT)
 
         # Магазин сам вирішує (check_stock=false → замовлення «під замовлення» при нульовому залишку);
         # для інших джерел діє також заборона від'ємного залишку з налаштувань складу.
