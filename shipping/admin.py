@@ -3472,7 +3472,15 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
         # ── Customs (non-EU) ─────────────────────────────────────────────────
         if not is_eu:
             _cn_found = False
-            if shipment.customs_url:
+            # Власний інвойс, переданий в UPS Paperless, має пріоритет (і для відправлень, заброньованих раніше)
+            if shipment.use_custom_invoice and shipment.custom_invoice_pdf:
+                _cip = Path(shipment.custom_invoice_pdf.path)
+                log.append(f"[CN] custom invoice path={_cip}  exists={_cip.exists()}")
+                if _cip.exists():
+                    doc_customs = _cip
+                    _cn_found = True
+                    _copy_shipment_file_to_order_docs(str(_cip), shipment)
+            if not _cn_found and shipment.customs_url:
                 _cu = shipment.customs_url
                 _ci = _cu.find("/media/")
                 _cp = Path(_s.MEDIA_ROOT) / (_cu[_ci + 7:] if _ci >= 0 else _cu.lstrip("/"))
@@ -4307,6 +4315,14 @@ class ShipmentAdmin(AuditableMixin, admin.ModelAdmin):
             logger.info('UPS customs form saved: %s', cfpath)
             _copy_shipment_file_local(cfpath, shipment)
             _copy_shipment_file_to_order_docs(cfpath, shipment)
+
+        # Власний інвойс (UPS Paperless): UPS свою декларацію не повертає — митним документом є наш PDF
+        if custom_doc_id and shipment.custom_invoice_pdf:
+            shipment.customs_url = shipment.custom_invoice_pdf.url
+            shipment.save(update_fields=['customs_url'])
+            _copy_shipment_file_local(shipment.custom_invoice_pdf.path, shipment)
+            _copy_shipment_file_to_order_docs(shipment.custom_invoice_pdf.path, shipment)
+            logger.info('Custom invoice attached as customs doc: %s', shipment.custom_invoice_pdf.path)
 
         # Синхронізуємо SalesOrder
         from datetime import date as _date
