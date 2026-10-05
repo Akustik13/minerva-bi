@@ -24,6 +24,13 @@ def shop_for_key(api_key) -> Shop | None:
     return Shop.objects.filter(is_default=True, is_active=True).first()
 
 
+def keys_for_shop(shop: Shop) -> list:
+    """Активні ключі API, які працюють з цим магазином (за тими ж правилами, що й shop_for_key)."""
+    from api.models import APIKey
+    return [k for k in APIKey.objects.filter(is_active=True).order_by("name")
+            if getattr(shop_for_key(k), "pk", None) == shop.pk]
+
+
 # ── Ціни ─────────────────────────────────────────────────────────────────────
 
 def round_price(value, mode: str | None = None) -> Decimal | None:

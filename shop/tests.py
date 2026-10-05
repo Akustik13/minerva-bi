@@ -309,3 +309,27 @@ class DefaultZonesTests(TestCase):
         self.assertContains(r, "Усі магазини")
         self.assertContains(r, f"?shop__id__exact={shop.pk}")
         self.assertContains(self.client.get(f"/admin/shop/shoplisting/?shop__id__exact={shop.pk}"), "A-1")
+
+
+class ShopCardTests(TestCase):
+    def setUp(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("a", "a@x.y", "p"))
+        self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+
+    def test_key_by_source_is_listed(self):
+        APIKey.objects.create(name="site-key", scopes=["products:read"], default_source="webshop")
+        r = self.client.get(f"/admin/shop/shop/{self.shop.pk}/change/")
+        self.assertContains(r, "site-key")
+        self.assertContains(r, "за «Джерелом замовлень» webshop")
+        self.assertContains(r, "Створити базові регіони")
+
+    def test_default_zones_button(self):
+        url = f"/admin/shop/shop/{self.shop.pk}/default-zones/"
+        self.assertEqual(self.client.get(url).status_code, 403)
+        r = self.client.post(url)
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(self.shop.shipping_zones.count(), 4)

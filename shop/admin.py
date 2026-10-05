@@ -110,13 +110,13 @@ class ShopAdmin(admin.ModelAdmin):
                     "orders_col", "keys_col"]
     list_editable = ["is_active"]
     ordering = ["-is_default", "name"]  # з annotate(Count) Meta.ordering не діє
-    readonly_fields = ["created_at", "keys_col"]
+    readonly_fields = ["created_at", "keys_col", "zones_tools"]
     inlines = [ShippingZoneInline]
     actions = ["action_default_zones", "action_import_dk_zones"]
     fieldsets = [
         (None, {"fields": ["name", "slug", "url", "currency", "is_active", "is_default", "notes"]}),
         ("🚚 Доставка", {
-            "fields": ["free_shipping_enabled", "free_shipping_threshold"],
+            "fields": ["free_shipping_enabled", "free_shipping_threshold", "zones_tools"],
             "description": "Куди доставляємо — регіони внизу сторінки. Замовити можуть лише покупці з країн цих "
                            "регіонів; без регіонів сайт використовує власні налаштування доставки. "
                            "Швидкий старт: у списку магазинів позначте магазин → дія «🌍 Створити базові регіони "
@@ -141,8 +141,8 @@ class ShopAdmin(admin.ModelAdmin):
         from .shipping import create_default_zones
         for shop in queryset:
             n = create_default_zones(shop)
-            self.message_user(request, f"«{shop}»: створено регіонів: {n}. Відкрийте магазин, щоб змінити ціни "
-                                       "або увімкнути безкоштовну доставку (поріг 250,00 уже вписано).")
+            self.message_user(request, f"«{shop}»: створено регіонів: {n}. Ціни можна змінити в таблиці регіонів; "
+                                       "безкоштовна доставка — галочка в блоці «🚚 Доставка» (поріг уже вписано).")
 
     @admin.action(description="⬇️ Регіони доставки з DigiKey")
     def action_import_dk_zones(self, request, queryset):
@@ -181,11 +181,60 @@ class ShopAdmin(admin.ModelAdmin):
     def keys_col(self, obj):
         if not obj or not obj.pk:
             return "—"
-        keys = list(obj.api_keys.all())
+        keys = services.keys_for_shop(obj)
         if not keys:
             return format_html('немає — <a href="{}">створити ключ</a>', reverse("admin:api_apikey_add"))
-        return format_html_join(", ", '<a href="{}">{}</a>',
-                                ((reverse("admin:api_apikey_change", args=[k.pk]), k.name) for k in keys))
+
+        def how(k):
+            if k.shop_id == obj.pk:
+                return "прив'язаний"
+            if k.default_source == obj.slug:
+                return f"за «Джерелом замовлень» {obj.slug}"
+            return "магазин за замовчуванням"
+        return format_html_join(", ", '<a href="{}">{}</a> <span style="opacity:.7">({})</span>',
+                                ((reverse("admin:api_apikey_change", args=[k.pk]), k.name, how(k)) for k in keys))
+
+    # ── Кнопки регіонів доставки в картці магазину ───────────────────────────
+    @admin.display(description="Регіони")
+    def zones_tools(self, obj):
+        if not obj or not obj.pk:
+            return "Спершу збережіть магазин."
+        n = obj.shipping_zones.count()
+        # formaction: кнопка надсилає основну форму (з CSRF-токеном) на окрему адресу
+        return format_html(
+            '<span style="margin-right:10px">{}</span>'
+            '<button type="submit" class="button" formaction="{}" formnovalidate>🌍 Створити базові регіони</button> '
+            '<button type="submit" class="button" formaction="{}" formnovalidate>⬇️ Імпортувати з DigiKey</button>'
+            '<div class="help" style="margin-top:6px">Базові: Deutschland 6,90 · Europa 17,00 · USA 25,00 · Welt 42,00 € '
+            '(нетто, за зразком правил на DigiKey). Наявні регіони не змінюються — лише додаються відсутні. '
+            'Незбережені зміни на цій сторінці не зберігаються.</div>',
+            f"Регіонів: {n}." if n else "Регіонів ще немає.",
+            reverse("admin:shop_shop_default_zones", args=[obj.pk]),
+            reverse("admin:shop_shop_dk_zones", args=[obj.pk]))
+
+    def get_urls(self):
+        from django.urls import path
+        return [
+            path("<int:pk>/default-zones/", self.admin_site.admin_view(self._default_zones_view),
+                 name="shop_shop_default_zones"),
+            path("<int:pk>/dk-zones/", self.admin_site.admin_view(self._dk_zones_view),
+                 name="shop_shop_dk_zones"),
+        ] + super().get_urls()
+
+    def _zones_view(self, request, pk, run):
+        from django.core.exceptions import PermissionDenied
+        from django.shortcuts import get_object_or_404
+        shop = get_object_or_404(Shop, pk=pk)
+        if request.method != "POST" or not self.has_change_permission(request, shop):
+            raise PermissionDenied
+        run(request, Shop.objects.filter(pk=shop.pk))
+        return redirect(reverse("admin:shop_shop_change", args=[shop.pk]) + "#shipping_zones-group")
+
+    def _default_zones_view(self, request, pk):
+        return self._zones_view(request, pk, self.action_default_zones)
+
+    def _dk_zones_view(self, request, pk):
+        return self._zones_view(request, pk, self.action_import_dk_zones)
 
 
 # ── Масові дії: форми ────────────────────────────────────────────────────────
