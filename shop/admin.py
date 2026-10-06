@@ -551,6 +551,32 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
                "action_base", "action_manual",
                "action_tiers_default", "action_tiers_custom", "action_tiers_clear",
                "action_reset_to_sale", "action_round", "action_copy", "delete_selected"]
+    # Групи у випадаючому меню «Дія» (optgroup); дії поза групами — в «Інше»
+    ACTION_GROUPS = [
+        ("👁 Видимість", ["action_show", "action_hide"]),
+        ("💶 Ціна", ["action_set_price", "action_adjust", "action_markup", "action_base", "action_manual",
+                    "action_reset_to_sale", "action_round"]),
+        ("📊 Ступені цін", ["action_tiers_default", "action_tiers_custom", "action_tiers_clear"]),
+        ("🏷 Акції та новинки", ["action_offer", "action_offer_clear", "action_new", "action_new_clear"]),
+        ("♻️ Статус", ["action_lifecycle"]),
+        ("📋 Інше", ["action_copy", "delete_selected"]),
+    ]
+
+    def get_action_choices(self, request, default_choices=None):
+        from django.db.models import BLANK_CHOICE_DASH
+        flat = super().get_action_choices(request, BLANK_CHOICE_DASH if default_choices is None else default_choices)
+        blank = [c for c in flat if not c[0]]
+        desc = {name: label for name, label in flat if name}
+        grouped, used = list(blank), set()
+        for title, names in self.ACTION_GROUPS:
+            items = [(n, desc[n]) for n in names if n in desc]
+            if items:
+                grouped.append((title, items))
+                used.update(n for n, _ in items)
+        rest = [(n, d) for n, d in desc.items() if n not in used]
+        if rest:
+            grouped.append(("📋 Інше", rest))
+        return grouped
 
     def save_model(self, request, obj, form, change):
         """Ручна зміна ціни від'єднує позицію від базових цін; % або перемикання — перерахунок."""

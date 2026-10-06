@@ -739,3 +739,22 @@ class ShopSettingsFormTests(TestCase):
         self.assertContains(self._post({"USD": -1}, []), "більше 0")
         self.assertContains(self._post({}, [{"min_qty": 1, "discount": 5}]), "від 2 шт.")
         self.assertContains(self._post({}, [{"min_qty": 10, "discount": 120}]), "від 0 до 99")
+
+
+class ListingActionGroupsTests(TestCase):
+    def setUp(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("boss", "b@x.y", "p"))
+        shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        self.l = ShopListing.objects.create(shop=shop, product=Product.objects.create(sku="AN-1", name="A"))
+
+    def test_grouped_and_working(self):
+        r = self.client.get("/admin/shop/shoplisting/")
+        for g in ("👁 Видимість", "💶 Ціна", "📊 Ступені цін", "🏷 Акції та новинки", "♻️ Статус", "📋 Інше"):
+            self.assertContains(r, f'<optgroup label="{g}">')
+        self.client.post("/admin/shop/shoplisting/", {"action": "action_hide", "_selected_action": [self.l.pk]})
+        self.l.refresh_from_db()
+        self.assertFalse(self.l.is_visible)
