@@ -620,7 +620,8 @@ class ProductApiDigiKeyAttrsTests(TestCase):
         ShopListing.objects.create(shop=shop, product=self.p)
         d = self.c.get("/api/v1/shop/products/AN250202-04C-175-MHF1/").json()
         self.assertEqual(d["tech_attributes"]["Antenna Type"], "PCB Trace")
-        self.assertNotIn("base_prices", d)
+        self.assertEqual(d["base_prices"]["currency"], "USD")  # базові ціни як є, у своїй валюті
+        self.assertIsNone(d["price"])  # курсу USD немає — ціна магазину не підставляється
         self.assertNotIn("compliance", d)
 
 
@@ -668,3 +669,42 @@ class ProductListShopsAndBulkPricesTests(TestCase):
         from inventory.services.base_prices import from_template
         rows = from_template([{"min_qty": 1, "unit_price": "100"}], [{"min_qty": 10, "discount": 5}], "0.01")
         self.assertEqual(rows, [{"min_qty": 1, "unit_price": "100"}, {"min_qty": 10, "unit_price": "95"}])
+
+
+
+class BasePriceFallbackTests(TestCase):
+    def setUp(self):
+        InventorySettings.get()
+        Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
+        self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        self.p = Product.objects.create(sku="LA220102-01A", name="LA", base_price_currency="USD", base_prices=[
+            {"min_qty": 1, "unit_price": "279"}, {"min_qty": 10, "unit_price": "268.39"}])
+        self.l = ShopListing.objects.create(shop=self.shop, product=self.p)
+        key = APIKey.objects.create(name="site", scopes=["products:read", "orders:write"], shop=self.shop)
+        self.c = APIClient()
+        self.c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
+
+    def test_fallback_needs_rate_then_used_in_api_and_orders(self):
+        d = self.c.get("/api/v1/shop/products/LA220102-01A/").json()
+        self.assertEqual((d["price"], d["price_origin"]), (None, None))
+        self.assertEqual(d["base_prices"]["price_breaks"][0], {"min_qty": 1, "unit_price": 279.0})
+        st = ShopSettings.get()
+        st.fx_rates = {"USD": "0.86"}
+        st.save()
+        d = self.c.get("/api/v1/shop/products/LA220102-01A/").json()
+        self.assertEqual((d["price"], d["price_origin"]), (239.94, "base"))
+        self.assertEqual(d["price_breaks"], [{"min_qty": 1, "unit_price": 239.94}, {"min_qty": 10, "unit_price": 230.82}])
+        r = self.c.post("/api/v1/orders/", {"order_number": "WS-F1", "client": "X", "shop": True,
+                                            "lines": [{"sku": "LA220102-01A", "qty": 10}]}, format="json")
+        self.assertEqual(r.status_code, 201, r.content)
+        self.assertEqual(r.json()["lines"][0]["unit_price"], 230.82)
+
+    def test_own_or_sale_price_wins(self):
+        self.p.sale_price = Decimal("250")
+        self.p.save()
+        d = self.c.get("/api/v1/shop/products/LA220102-01A/").json()
+        self.assertEqual((d["price"], d["price_origin"]), (250.0, "sale_price"))
+        self.l.price = Decimal("260")
+        self.l.save()
+        d = self.c.get("/api/v1/shop/products/LA220102-01A/").json()
+        self.assertEqual((d["price"], d["price_origin"]), (260.0, "listing"))

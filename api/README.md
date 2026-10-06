@@ -590,8 +590,11 @@ app.listen(3000);
 
 RAG читає Minerva під час запиту (без індексації товарів у вектори). Ключ: лише `products:read` і `stock:read`.
 
-- `GET /shop/products/` — товари магазину ключа: `price`, `price_breaks`, `offer`, `is_new`, `lifecycle_status`,
-  `successor`, `tech_attributes` (технічні параметри `{назва: значення}`, порожні пропускаються). Закупівельних цін і
+- `GET /shop/products/` — товари магазину ключа: `price`, `price_breaks`, `price_origin`, `offer`, `is_new`,
+  `lifecycle_status`, `successor`, `base_prices`, `tech_attributes` (технічні параметри `{назва: значення}`, порожні пропускаються).
+  Ціна: своя ціна позиції → «Ціна продажу» товару → базові ціни товару за курсом (`price_origin`: `listing` / `sale_price` /
+  `base`; `null` — «за запитом»). `base_prices` = `{currency, price_breaks}` — базові ціни у своїй валюті (напр. USD), навіть
+  якщо курсу немає. Закупівельних цін і
   приватних полів немає. Не використовуйте для RAG `/products/` — там закупівельна ціна і нотатки.
 - `GET /stock/` — `available` (доступно для продажу), `incoming` (очікується).
 - Звуження на боці Minerva: `?sku=A,B`, `?search=…` (SKU, назва, виробник), `?category=…`,

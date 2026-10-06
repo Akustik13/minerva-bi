@@ -107,13 +107,18 @@ class ShopProductSerializer(serializers.ModelSerializer):
                                                          "regular_price_breaks} або null")
     is_new = serializers.SerializerMethodField(help_text="Новинка (бейдж «Neu», угорі каталогу)")
     tech_attributes = serializers.SerializerMethodField(help_text="Технічні параметри {назва: значення}")
+    price_origin = serializers.SerializerMethodField(
+        help_text="Звідки price: listing (ціна позиції) / sale_price (ціна продажу) / base (базові ціни за курсом) / null")
+    base_prices = serializers.SerializerMethodField(
+        help_text="Базові ціни товару у своїй валюті {currency, price_breaks} або null")
     lifecycle_status = serializers.SerializerMethodField(help_text="active | nrnd | discontinued (з урахуванням магазину)")
     successor = serializers.SerializerMethodField(help_text="Рекомендована заміна {sku, name} для NRND / EOL або null")
 
     class Meta:
         model  = Product
         fields = ["sku", "name", "name_export", "category", "unit_type", "manufacturer",
-                  "price", "price_breaks", "offer", "is_new", "lifecycle_status", "successor", "available", "incoming", "in_stock", "lead_time_days",
+                  "price", "price_breaks", "price_origin", "offer", "is_new", "lifecycle_status", "successor",
+                  "base_prices", "available", "incoming", "in_stock", "lead_time_days",
                   "net_weight_g", "image_url", "datasheet_url", "tech_attributes", "last_movement_at"]
 
     @staticmethod
@@ -148,6 +153,19 @@ class ShopProductSerializer(serializers.ModelSerializer):
 
     def get_tech_attributes(self, obj):
         return split_attributes(obj.tech_attributes)[0]
+
+    def get_price_origin(self, obj):
+        from shop.services import price_origin
+        listing = self._listing(obj)
+        return price_origin(listing) if listing else None
+
+    def get_base_prices(self, obj):
+        from inventory.services.base_prices import normalize
+        rows = normalize(obj.base_prices)
+        if not rows:
+            return None
+        return {"currency": obj.base_price_currency,
+                "price_breaks": [{"min_qty": r["min_qty"], "unit_price": float(r["unit_price"])} for r in rows]}
 
     def get_is_new(self, obj):
         from shop.services import is_new

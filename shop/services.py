@@ -60,11 +60,38 @@ def round_price(value, mode: str | None = None) -> Decimal | None:
     return ((value / step).quantize(Decimal("1"), rounding=ROUND_HALF_UP) * step).quantize(_Q4)
 
 
+def price_origin(listing) -> str | None:
+    """Звідки ціна позиції: "listing" (своя / базові, задані в позиції), "sale_price" (ціна продажу товару),
+    "base" (базові ціни товару як запасний варіант) або None — ціни немає («за запитом»)."""
+    if listing.price is not None:
+        return "listing"
+    if listing.product.sale_price is not None:
+        return "sale_price"
+    return "base" if _fallback_base_tiers(listing) else None
+
+
+def _fallback_base_tiers(listing) -> list[dict]:
+    """Базові ціни товару у валюті магазину (за курсом) — коли в позиції немає ні своєї ціни, ні ціни продажу.
+    Порожньо, якщо базових цін немає або не задано курс валюти."""
+    cache = getattr(listing, "_fallback_cache", None)
+    if cache is not None:
+        return cache
+    out = []
+    tiers = base_tiers(listing.product)
+    rate = fx_rate(listing.product.base_price_currency, listing.shop.currency) if tiers else None
+    if tiers and rate is not None:
+        rounding = ShopSettings.get().rounding
+        out = [{"min_qty": q, "unit_price": round_price(p * rate, rounding)} for q, p in tiers]
+    listing._fallback_cache = out
+    return out
+
+
 def regular_price_breaks(listing) -> list[dict]:
-    """[{min_qty, unit_price}] без акції, починаючи з 1 шт.; порожньо, якщо в позиції немає ціни."""
+    """[{min_qty, unit_price}] без акції, починаючи з 1 шт.; порожньо, якщо в позиції немає ціни.
+    Ціна: своя ціна позиції → «Ціна продажу» товару → базові ціни товару (за курсом)."""
     base = listing.effective_price
     if base is None:
-        return []
+        return list(_fallback_base_tiers(listing))
     tiers = [{"min_qty": 1, "unit_price": Decimal(base)}]
     for t in sorted(listing.tiers.all(), key=lambda r: r.min_qty):
         if t.min_qty > 1:

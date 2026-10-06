@@ -224,7 +224,8 @@ class ShopProductViewSet(viewsets.ReadOnlyModelViewSet):
         shop = shop_for_key(self.request.auth if isinstance(self.request.auth, APIKey) else None)
         if shop is None:
             return Product.objects.none()
-        listings = ShopListing.objects.filter(shop=shop).select_related("successor").prefetch_related("tiers")
+        listings = (ShopListing.objects.filter(shop=shop).select_related("successor", "shop")
+                    .prefetch_related("tiers"))
         qs = (Product.objects.filter(is_active=True, shop_listings__shop=shop, shop_listings__is_visible=True)
               .select_related("successor")
               .prefetch_related(Prefetch("shop_listings", queryset=listings, to_attr="_listings")))
@@ -366,11 +367,12 @@ class SalesOrderViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             if is_shop:
                 from shop.models import ShopListing
                 listing = (ShopListing.objects.filter(shop=shop, product=product, is_visible=True)
-                           .select_related("product").prefetch_related("tiers").first())
+                           .select_related("product", "shop").prefetch_related("tiers").first())
                 if not (listing and product.is_active):
                     errors.append({"line": i, "sku": raw, "error": "Товар недоступний в інтернет-магазині"})
                     continue
-                if listing.effective_price is None:
+                from shop.services import regular_price_breaks
+                if not regular_price_breaks(listing):
                     errors.append({"line": i, "sku": raw, "error": "Ціна не задана — товар лише за запитом"})
                     continue
                 listings[product.pk] = listing
