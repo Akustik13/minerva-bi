@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from django.db import transaction
 from django.utils import timezone
-from rest_framework import mixins, serializers, status, viewsets
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -247,60 +247,6 @@ class ShopShippingView(APIView):
             return Response({"detail": "Для ключа не налаштовано магазин.", "code": "no_shop"},
                             status=status.HTTP_404_NOT_FOUND)
         return Response(public_config(shop))
-
-
-# ── RAG / пошук ───────────────────────────────────────────────────────────────
-
-class RagProductViewSet(viewsets.ReadOnlyModelViewSet):
-    """
-    Документи товарів для RAG: {id, sku, title, text (markdown), metadata, updated_at}.
-    GET /rag/products/?lang=en|uk&prices=1&updated_since=…&category=…&attr=Назва:значення
-    GET /rag/products/{sku}/
-    За замовчуванням лише активні товари (?include_inactive=1 — усі). Закупівельних цін немає;
-    базові ціни — лише з ?prices=1.
-    """
-    resource_scope     = "products"
-    filterset_class    = ProductFilter
-    lookup_field       = "sku"
-    lookup_value_regex = r"[^/]+"
-
-    def get_queryset(self):
-        qs = Product.objects.select_related("successor").order_by("sku")
-        if self.request.query_params.get("include_inactive") not in ("1", "true", "yes"):
-            qs = qs.filter(is_active=True)
-        return stock_service.annotate_stock(qs)
-
-    def get_serializer(self, *args, **kwargs):
-        from .rag import build_document
-        from inventory.models import ProductCategory
-        request = self.request
-        lang = "uk" if request.query_params.get("lang") == "uk" else "en"
-        prices = request.query_params.get("prices") in ("1", "true", "yes")
-        cats = dict(ProductCategory.objects.values_list("slug", "name"))
-
-        def absolute(url):
-            return request.build_absolute_uri(url) if url and url.startswith("/") else (url or None)
-
-        class _Doc(serializers.BaseSerializer):
-            def to_representation(self, p):
-                return build_document(p, lang=lang, with_prices=prices, categories=cats,
-                                      datasheet_url=absolute(p.datasheet_display_url),
-                                      image_url=absolute(p.image_display_url))
-        return _Doc(*args, **kwargs)
-
-
-class AttributeFacetsView(APIView):
-    """
-    Які технічні параметри і значення є серед товарів: [{name, products, values: [{value, count}]}].
-    GET /attributes/?category=antenna (ті самі фільтри, що й у /products/, лише активні товари).
-    """
-    resource_scope = "products"
-
-    def get(self, request):
-        from .rag import attribute_facets
-        qs = Product.objects.filter(is_active=True).only("pk", "tech_attributes", "category")
-        qs = ProductFilter(request.query_params, queryset=qs, request=request).qs
-        return Response({"count": qs.count(), "attributes": attribute_facets(qs)})
 
 
 # ── Товари ────────────────────────────────────────────────────────────────────

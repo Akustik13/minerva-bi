@@ -216,8 +216,6 @@ class ProductSerializer(serializers.ModelSerializer):
         help_text="Технічні параметри {назва: значення} — набір різний для різних товарів/категорій")
     compliance = serializers.SerializerMethodField(
         help_text="Службові коди DigiKey {hts, eccnNumber, rohsStatus, …} — лише заповнені")
-    attributes = serializers.SerializerMethodField(
-        help_text="Технічні параметри списками значень {назва: [значення, …]} — для фільтрів / пошуку")
     base_prices = serializers.SerializerMethodField(
         help_text="Базові ціни за кількістю: {currency, price_breaks[], source, updated_at, updated_by} або null")
 
@@ -227,7 +225,7 @@ class ProductSerializer(serializers.ModelSerializer):
                   "kind", "unit_type", "manufacturer", "purchase_price",
                   "sale_price", "reorder_point", "lead_time_days", "is_active",
                   "lifecycle_status", "hs_code", "country_of_origin", "net_weight_g", "notes",
-                  "image_url", "datasheet_url", "tech_attributes", "attributes", "compliance", "base_prices",
+                  "image_url", "datasheet_url", "tech_attributes", "compliance", "base_prices",
                   "updated_at"]
 
     def get_tech_attributes(self, obj):
@@ -235,10 +233,6 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_base_prices(self, obj):
         return base_prices_payload(obj)
-
-    def get_attributes(self, obj):
-        from .rag import attribute_lists
-        return attribute_lists(obj.tech_attributes)
 
     def get_compliance(self, obj):
         return split_attributes(obj.tech_attributes)[1]

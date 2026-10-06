@@ -586,43 +586,14 @@ app.listen(3000);
 
 Вебхук `stock.changed` надсилається також, коли змінюється позиція магазину (галочка, ціна, ступені) або назва, категорія, фото товару, що є в магазині, — сайт одразу скидає кеш каталогу.
 
-## 12. RAG і пошук по товарах
+## 12. Зовнішня RAG-система (читання каталогу і складу)
 
-Для RAG-системи (ембединги + пошук) Minerva віддає готовий документ на кожен товар. Право `products:read`; закупівельних цін немає ніколи.
+RAG читає Minerva під час запиту (без індексації товарів у вектори). Ключ: лише `products:read` і `stock:read`.
 
-| Запит | Що віддає |
-|---|---|
-| `GET /rag/products/` | документи товарів (за замовчуванням лише активні; `?include_inactive=1` — усі) |
-| `GET /rag/products/{sku}/` | один документ |
-| `GET /attributes/` | які технічні параметри і значення є серед товарів (`?category=antenna`, ті самі фільтри) |
-
-Параметри `/rag/products/`:
-- `lang=en` (за замовчуванням) або `lang=uk` — мова підписів у тексті (значення атрибутів — як у DigiKey);
-- `prices=1` — додати базові ціни (ступені) у текст і метадані;
-- `updated_since=2026-10-06T00:00:00Z` — лише товари, змінені після дати (інкрементальна переіндексація; `Product.updated_at` оновлюється при будь-якій зміні картки: атрибути, ціни, статус, назва…);
-- `category=…`, `lifecycle_status=…`, `sku=A,B`, `search=…`, `attr=Назва:значення` (кілька `attr` — усі умови).
-
-Документ:
-```json
-{
-  "id": "product:AN110506-01C-175-MHF1",
-  "sku": "AN110506-01C-175-MHF1",
-  "title": "Dreiband-Antenne",
-  "text": "# AN110506-01C-175-MHF1 — Dreiband-Antenne\nCategory: Антени · Manufacturer: Sevskiy GmbH · Lifecycle: active\n\n## Technical parameters\n- Antenna Type: PCB Trace\n- Frequency Range: 824MHz ~ 960MHz, 2.4GHz ~ 2.5GHz, 5.15GHz ~ 6GHz\n…\n\n## Availability\nIn stock: 25 pcs; lead time 14 days\n\n## Compliance / codes\n- eccnNumber: EAR99\n- hts: 8529.10.9100\n\nDatasheet: https://docs.sevskiy.com/…\n",
-  "metadata": {
-    "sku": "…", "category": "antenna", "category_name": "Антени", "manufacturer": "Sevskiy GmbH",
-    "lifecycle_status": "active", "successor_sku": null, "is_active": true,
-    "in_stock": true, "available": 25.0, "lead_time_days": 14,
-    "attributes": {"RF Family/Standard": ["802.15.4", "Bluetooth", "Cellular", "General ISM"], "Gain": ["0.8dBi", "3dBi", "4.8dBi"], …},
-    "datasheet_url": "…", "image_url": "…"
-  },
-  "updated_at": "2026-10-06T12:00:00Z"
-}
-```
-- `text` — для ембедингів (один товар = один документ, зазвичай достатньо без розбиття на частини);
-- `metadata` — для фільтрів у векторній БД (категорія, статус, наявність, атрибути списками);
-- `id` стабільний — при переіндексації замінюйте документ з тим самим `id`.
-
-Рекомендований цикл синхронізації: перший раз — усі сторінки `/rag/products/?page_size=200`; далі кожні N хвилин — `?updated_since=<час попереднього запуску>` і оновлення лише цих документів; товари, що стали неактивними, видно з `?include_inactive=1&updated_since=…` (`metadata.is_active=false` → видалити з індексу).
-
-Атрибути в `/products/`: `tech_attributes` (рядки як у DigiKey), `attributes` (ті самі параметри списками значень), `compliance` (коди), `updated_at`. Фільтр `?attr=` працює і в `/products/`, `/stock/`, `/shop/products/`.
+- `GET /shop/products/` — товари магазину ключа: `price`, `price_breaks`, `offer`, `is_new`, `lifecycle_status`,
+  `successor`, `tech_attributes` (технічні параметри `{назва: значення}`, порожні пропускаються). Закупівельних цін і
+  приватних полів немає. Не використовуйте для RAG `/products/` — там закупівельна ціна і нотатки.
+- `GET /stock/` — `available` (доступно для продажу), `incoming` (очікується).
+- Звуження на боці Minerva: `?sku=A,B`, `?search=…` (SKU, назва, виробник), `?category=…`,
+  `?attr=Назва:значення` (входження без регістру; кілька `attr` — усі умови), напр.
+  `/shop/products/?attr=RF Family/Standard:Bluetooth&attr=Antenna Type:PCB`.

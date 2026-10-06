@@ -402,73 +402,34 @@ class ShopTests(APITestBase):
         self.assertEqual(len(sent), 2)
 
 
-class RagApiTests(TestCase):
+class AttrFilterTests(TestCase):
     def setUp(self):
-        from inventory.services.stock import create_movement
         from datetime import timedelta
         from django.utils import timezone
-        from inventory.models import ProductCategory
-        InventorySettings.get()
-        Location.objects.create(code="MAIN", location_type=Location.LocationType.FINISHED)
-        ProductCategory.objects.create(slug="antenna", name="Антени")
-        self.ant = Product.objects.create(
-            sku="AN110506-01C-175-MHF1", name="Dreiband-Antenne", category="antenna", manufacturer="Sevskiy GmbH",
-            lead_time_days=14, base_prices=[{"min_qty": 1, "unit_price": "4.99"}, {"min_qty": 10, "unit_price": "4.6"}],
-            base_price_currency="USD", tech_attributes={
-                "Antenna Type": "PCB Trace", "RF Family/Standard": "802.15.4, Bluetooth, Cellular, General ISM",
-                "Frequency Range": "824MHz ~ 960MHz, 2.4GHz ~ 2.5GHz", "hts": "8529.10.9100", "gtin": "",
-                "datasheetUrl": "https://docs.example/ds.pdf"})
-        create_movement(product=self.ant, tx_type="Incoming", qty=25)
-        Product.objects.create(sku="FT-1", name="Filter", category="filter",
-                               tech_attributes={"Filter Type": "Band Pass", "RF Family/Standard": "WiFi"})
-        Product.objects.create(sku="OLD-1", name="Old", is_active=False, tech_attributes={"Antenna Type": "Chip"})
+        self.ant = Product.objects.create(sku="AN-1", name="Antenne", tech_attributes={
+            "Antenna Type": "PCB Trace", "RF Family/Standard": "802.15.4, Bluetooth, Cellular", "gtin": ""})
+        Product.objects.create(sku="FT-1", name="Filter", tech_attributes={"Filter Type": "Band Pass",
+                                                                           "RF Family/Standard": "WiFi"})
         self.since = timezone.now() - timedelta(seconds=1)
-        key = APIKey.objects.create(name="rag", scopes=["products:read"])
+        key = APIKey.objects.create(name="rag", scopes=["products:read", "stock:read"])
         self.c = APIClient()
         self.c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
 
-    def test_rag_document(self):
-        d = self.c.get("/api/v1/rag/products/AN110506-01C-175-MHF1/?prices=1").json()
-        self.assertEqual(d["id"], "product:AN110506-01C-175-MHF1")
-        self.assertIn("# AN110506-01C-175-MHF1 — Dreiband-Antenne", d["text"])
-        self.assertIn("- Antenna Type: PCB Trace", d["text"])
-        self.assertIn("In stock: 25 pcs; lead time 14 days", d["text"])
-        self.assertIn("- from 10 pcs: 4.6", d["text"])
-        self.assertIn("Datasheet: https://docs.example/ds.pdf", d["text"])
-        self.assertNotIn("gtin", d["text"])
-        m = d["metadata"]
-        self.assertEqual(m["category_name"], "Антени")
-        self.assertEqual(m["attributes"]["RF Family/Standard"], ["802.15.4", "Bluetooth", "Cellular", "General ISM"])
-        self.assertEqual((m["in_stock"], m["base_price_1pc"], m["base_price_from"]), (True, 4.99, 4.6))
-        # без ?prices=1 цін немає; українською
-        d = self.c.get("/api/v1/rag/products/AN110506-01C-175-MHF1/?lang=uk").json()
-        self.assertIn("## Технічні параметри", d["text"])
-        self.assertNotIn("base_price_1pc", d["metadata"])
-        self.assertNotIn("Базові ціни", d["text"])
-
-    def test_rag_list_filters(self):
-        r = self.c.get("/api/v1/rag/products/").json()
-        self.assertEqual([x["sku"] for x in r["results"]], ["AN110506-01C-175-MHF1", "FT-1"])  # без неактивних
-        r = self.c.get("/api/v1/rag/products/?attr=RF Family/Standard:bluetooth").json()
-        self.assertEqual([x["sku"] for x in r["results"]], ["AN110506-01C-175-MHF1"])
-        r = self.c.get("/api/v1/products/?attr=Filter Type").json()
+    def test_attr_filter(self):
+        r = self.c.get("/api/v1/products/?attr=RF Family/Standard:bluetooth").json()
+        self.assertEqual([x["sku"] for x in r["results"]], ["AN-1"])
+        r = self.c.get("/api/v1/stock/?attr=Filter Type").json()
         self.assertEqual([x["sku"] for x in r["results"]], ["FT-1"])
-        r = self.c.get("/api/v1/rag/products/", {"updated_since": self.since.isoformat()}).json()
-        self.assertEqual(r["count"], 2)
+        r = self.c.get("/api/v1/products/?attr=Antenna Type:PCB&attr=RF Family/Standard:WiFi").json()
+        self.assertEqual(r["count"], 0)
+        self.assertEqual(self.c.get("/api/v1/rag/products/").status_code, 404)
 
-    def test_updated_at_on_partial_save_and_facets(self):
-        from django.utils import timezone
+    def test_updated_at(self):
         before = self.ant.updated_at
         self.ant.tech_attributes = {"Antenna Type": "Chip"}
         self.ant.save(update_fields=["tech_attributes"])
         self.ant.refresh_from_db()
         self.assertGreater(self.ant.updated_at, before)
-        f = self.c.get("/api/v1/attributes/").json()
-        names = {a["name"]: a for a in f["attributes"]}
-        self.assertEqual(names["RF Family/Standard"]["products"], 1)
-        self.assertEqual(names["Antenna Type"]["values"], [{"value": "Chip", "count": 1}])
-        self.assertEqual(self.c.get("/api/v1/attributes/?category=filter").json()["count"], 1)
-        p = self.c.get("/api/v1/products/?sku=FT-1").json()["results"][0]
-        self.assertEqual(p["attributes"], {"Filter Type": ["Band Pass"], "RF Family/Standard": ["WiFi"]})
-        self.assertIsNotNone(p["updated_at"])
-        self.assertLessEqual(timezone.now().year - 1, int(p["updated_at"][:4]))
+        r = self.c.get("/api/v1/products/", {"updated_since": self.since.isoformat()}).json()
+        self.assertEqual(r["count"], 2)
+        self.assertNotIn("attributes", r["results"][0])
