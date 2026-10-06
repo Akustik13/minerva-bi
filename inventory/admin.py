@@ -2130,7 +2130,8 @@ class ProductAdminForm(forms.ModelForm):
     base_prices_text = forms.CharField(
         label="Базові ціни (ступені)", required=False,
         widget=forms.Textarea(attrs={"rows": 7, "cols": 28, "style": "font-family:monospace"}),
-        help_text="По рядку на ступінь: «кількість: ціна за шт.», напр. «1: 4.89», «10: 4.52». Перший — від 1 шт.",
+        help_text="Перший ступінь — від 1 шт. Рядки без ціни не зберігаються. "
+                  "(Без JavaScript — по рядку «кількість: ціна», напр. «10: 4.52».)",
     )
     base_currency = forms.RegexField(label="Валюта", regex=r"^[A-Za-z]{3}$", max_length=3, initial="EUR",
                                      widget=forms.TextInput(attrs={"size": 4}),

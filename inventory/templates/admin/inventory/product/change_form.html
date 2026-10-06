@@ -221,6 +221,82 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 })();
 </script>
+
+<style>
+/* Базові ціни: таблиця замість текстового поля (textarea лишається носієм даних) */
+.field-base_prices_text textarea { display: none !important; }
+.inv-bp-table { border-collapse: collapse; font-size: 13px; min-width: 460px; }
+.inv-bp-table th {
+  text-align: left; padding: 6px 10px; background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
+  font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 2px solid var(--border-strong, #243347);
+}
+.inv-bp-table td { padding: 4px 6px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; }
+.inv-bp-table input {
+  width: 130px; background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347); border-radius: 3px; padding: 5px 8px; font-size: 13px;
+  text-align: right; box-sizing: border-box;
+}
+.inv-bp-table input:focus { outline: none; border-color: var(--accent, #58a6ff); box-shadow: 0 0 0 2px rgba(88,166,255,.2); }
+.inv-bp-table input.is-bad { border-color: var(--err, #e53935); }
+.inv-bp-disc { color: var(--text-muted, #9aafbe); font-size: 12px; text-align: right; min-width: 90px; }
+</style>
+<script>
+/* Таблиця «Від кількості | Ціна за шт. | Знижка від 1 шт.» → рядки «кількість: ціна» у textarea base_prices_text */
+document.addEventListener('DOMContentLoaded', function () {
+  var ta = document.querySelector('textarea[name="base_prices_text"]');
+  if (!ta) return;
+  var wrap = document.createElement('div');
+  wrap.innerHTML =
+    '<table class="inv-bp-table"><thead><tr><th>Від кількості, шт.</th><th>Ціна за шт.</th>' +
+    '<th style="text-align:right">Знижка від 1 шт.</th><th style="width:36px"></th></tr></thead>' +
+    '<tbody></tbody></table>' +
+    '<div class="inv-attrs-footer"><button type="button" class="inv-add-btn">+ Додати ступінь</button>' +
+    '<span class="inv-sync-status">Порядок за кількістю — автоматично при збереженні</span></div>';
+  ta.parentNode.insertBefore(wrap, ta);
+  var body = wrap.querySelector('tbody');
+
+  function num(v) { v = String(v || '').trim().replace(',', '.'); return v === '' ? NaN : Number(v); }
+  function sync() {
+    var rows = [], base = null;
+    body.querySelectorAll('tr').forEach(function (tr) {
+      var q = tr.querySelector('.bp-q'), p = tr.querySelector('.bp-p');
+      var qn = num(q.value), pn = num(p.value);
+      q.classList.toggle('is-bad', q.value.trim() !== '' && !(qn >= 1 && Math.floor(qn) === qn));
+      p.classList.toggle('is-bad', p.value.trim() !== '' && !(pn > 0));
+      if (p.value.trim()) rows.push({ q: q.value.trim(), p: p.value.trim().replace(',', '.'), qn: qn, pn: pn, tr: tr });
+      if (qn === 1 && pn > 0) base = pn;
+    });
+    rows.forEach(function (r) {
+      var cell = r.tr.querySelector('.inv-bp-disc');
+      cell.textContent = base && r.pn > 0 && r.qn > 1 ? '−' + ((1 - r.pn / base) * 100).toFixed(1).replace('.', ',') + ' %' : '';
+    });
+    rows.sort(function (a, b) { return (a.qn || 0) - (b.qn || 0); });
+    ta.value = rows.map(function (r) { return r.q + ': ' + r.p; }).join('\n');
+  }
+  function addRow(q, p) {
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td><input type="text" inputmode="numeric" class="bp-q" placeholder="напр. 10"></td>' +
+                   '<td><input type="text" inputmode="decimal" class="bp-p" placeholder="0.00"></td>' +
+                   '<td class="inv-bp-disc"></td><td><button type="button" class="inv-del-row" title="Видалити">×</button></td>';
+    tr.querySelector('.bp-q').value = q || '';
+    tr.querySelector('.bp-p').value = p || '';
+    tr.querySelectorAll('input').forEach(function (i) { i.addEventListener('input', sync); });
+    tr.querySelector('.inv-del-row').addEventListener('click', function () { tr.remove(); sync(); });
+    body.appendChild(tr);
+    return tr;
+  }
+  ta.value.split(/\r?\n/).forEach(function (line) {
+    var m = line.match(/^\s*(\d+)\s*[:=;\t ]\s*([\d.,]+)\s*$/);
+    if (m) addRow(m[1], m[2]);
+  });
+  if (!body.children.length) addRow('1', '');
+  wrap.querySelector('.inv-add-btn').addEventListener('click', function () {
+    var tr = addRow('', ''); tr.querySelector('.bp-q').focus(); sync();
+  });
+  sync();
+});
+</script>
 {% endblock %}
 
 {% block after_field_sets %}
