@@ -106,6 +106,7 @@ class ShopProductSerializer(serializers.ModelSerializer):
     offer  = serializers.SerializerMethodField(help_text="Діюча акція: {percent, until, regular_price, "
                                                          "regular_price_breaks} або null")
     is_new = serializers.SerializerMethodField(help_text="Новинка (бейдж «Neu», угорі каталогу)")
+    tech_attributes = serializers.SerializerMethodField(help_text="Технічні параметри {назва: значення}")
     lifecycle_status = serializers.SerializerMethodField(help_text="active | nrnd | discontinued (з урахуванням магазину)")
     successor = serializers.SerializerMethodField(help_text="Рекомендована заміна {sku, name} для NRND / EOL або null")
 
@@ -113,7 +114,7 @@ class ShopProductSerializer(serializers.ModelSerializer):
         model  = Product
         fields = ["sku", "name", "name_export", "category", "unit_type", "manufacturer",
                   "price", "price_breaks", "offer", "is_new", "lifecycle_status", "successor", "available", "incoming", "in_stock", "lead_time_days",
-                  "net_weight_g", "image_url", "datasheet_url", "last_movement_at"]
+                  "net_weight_g", "image_url", "datasheet_url", "tech_attributes", "last_movement_at"]
 
     @staticmethod
     def _listing(obj):
@@ -145,6 +146,9 @@ class ShopProductSerializer(serializers.ModelSerializer):
         s = listing.effective_successor if listing else (obj.successor if obj.successor_id else None)
         return {"sku": s.sku, "name": s.name or s.sku} if s and s.is_active else None
 
+    def get_tech_attributes(self, obj):
+        return split_attributes(obj.tech_attributes)[0]
+
     def get_is_new(self, obj):
         from shop.services import is_new
         listing = self._listing(obj)
@@ -175,17 +179,71 @@ class ShopProductSerializer(serializers.ModelSerializer):
 
 # ── Товари ────────────────────────────────────────────────────────────────────
 
-class ProductSerializer(serializers.ModelSerializer):
+def split_attributes(attrs) -> tuple[dict, dict]:
+    """tech_attributes товару → (технічні параметри, службові коди).
+
+    Набір ключів різний для різних товарів і категорій (стягується з DigiKey), тому віддається як є:
+    параметри — людські назви («Frequency Range», «Gain»…), коди — camelCase-ключі DigiKey
+    (hts, eccnNumber, rohsStatus…). Порожні значення пропускаються."""
+    params, codes = {}, {}
+    for key, value in (attrs or {}).items() if isinstance(attrs, dict) else []:
+        if value is None or (isinstance(value, str) and not value.strip()) or value in ([], {}):
+            continue
+        key = str(key).strip()
+        (codes if key[:1].islower() and " " not in key else params)[key] = value
+    return params, codes
+
+
+class DigiKeyPricesMixin:
+    """Ціни офера DigiKey Marketplace (bots.DigiKeyListing.dk_prices) — поле `digikey`."""
+
+    def get_digikey(self, obj):
+        from django.core.exceptions import ObjectDoesNotExist
+        try:
+            listing = obj.dk_listing
+        except ObjectDoesNotExist:
+            return None
+        if listing is None:
+            return None
+        from shop.services import dk_price_tiers
+        if not hasattr(self, "_dk_currency"):
+            try:
+                from bots.models import DigiKeyConfig
+                self._dk_currency = DigiKeyConfig.get().locale_currency
+            except Exception:
+                self._dk_currency = None
+        return {
+            "offer_id": listing.dk_offer_id or None,
+            "currency": self._dk_currency,
+            "synced_at": listing.last_synced_at,
+            "quantity_available": listing.dk_quantity_available,
+            "price_breaks": [{"min_qty": q, "unit_price": float(p)} for q, p in dk_price_tiers(obj)],
+        }
+
+
+class ProductSerializer(DigiKeyPricesMixin, serializers.ModelSerializer):
     image_url     = serializers.SerializerMethodField()
     datasheet_url = serializers.SerializerMethodField()
+    tech_attributes = serializers.SerializerMethodField(
+        help_text="Технічні параметри {назва: значення} — набір різний для різних товарів/категорій")
+    compliance = serializers.SerializerMethodField(
+        help_text="Службові коди DigiKey {hts, eccnNumber, rohsStatus, …} — лише заповнені")
+    digikey = serializers.SerializerMethodField(
+        help_text="Офер DigiKey: {offer_id, currency, synced_at, quantity_available, price_breaks[]} або null")
 
     class Meta:
         model  = Product
         fields = ["id", "sku", "sku_short", "name", "name_export", "category",
                   "kind", "unit_type", "manufacturer", "purchase_price",
                   "sale_price", "reorder_point", "lead_time_days", "is_active",
-                  "hs_code", "country_of_origin", "net_weight_g", "notes",
-                  "image_url", "datasheet_url"]
+                  "lifecycle_status", "hs_code", "country_of_origin", "net_weight_g", "notes",
+                  "image_url", "datasheet_url", "tech_attributes", "compliance", "digikey"]
+
+    def get_tech_attributes(self, obj):
+        return split_attributes(obj.tech_attributes)[0]
+
+    def get_compliance(self, obj):
+        return split_attributes(obj.tech_attributes)[1]
 
     def _abs(self, url):
         request = self.context.get("request")

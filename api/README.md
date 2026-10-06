@@ -125,6 +125,23 @@
 - `?with_stock=1` — додає поля залишків (як у `/stock/`)
 - Ті ж фільтри, що й у `/stock/`
 - `POST /products/`, `PATCH /products/{id}/` — scope `products:write`
+- `lifecycle_status` — `active` / `nrnd` / `discontinued`
+
+**Технічні атрибути** (стягуються з DigiKey; набір різний для різних товарів і категорій, тому — словник, а не фіксовані поля; порожні значення не віддаються):
+- `tech_attributes` — параметри з людськими назвами: `{"Antenna Type": "PCB Trace", "Frequency Range": "2.4GHz ~ 2.485GHz", "Gain": "2dBi, 4dBi", …}`
+- `compliance` — службові коди DigiKey: `{"hts": "8529.10.9100", "eccnNumber": "EAR99", "packaging": "BULK", …}`
+
+**Ціни DigiKey** (каскадні ціни вашого офера на DigiKey Marketplace, як у картці товару):
+```json
+"digikey": {
+  "offer_id": "f11e32f3-…", "currency": "USD", "synced_at": "2026-06-30T15:57:00+02:00",
+  "quantity_available": 120,
+  "price_breaks": [{"min_qty": 1, "unit_price": 4.89}, {"min_qty": 10, "unit_price": 4.52}, …]
+}
+```
+`null` — товар не пов'язаний з офером DigiKey. Оновлення цін: дія «⬇️ Оновити ціни з DigiKey» у товарах або крон `pull_dk_listings`.
+
+`GET /shop/products/` теж віддає `tech_attributes` (без `compliance` і цін DigiKey — магазин має власні ціни).
 
 ---
 

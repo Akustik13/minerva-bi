@@ -525,3 +525,41 @@ class ShopLifecycleOverrideTests(TestCase):
         self.assertEqual((self.lm.lifecycle_status, self.lm.successor_id), ("nrnd", self.p2.pk))
         self.assertContains(self.client.get(url + "?life=own"), "NRND")
         self.assertEqual(self.client.get(f"{url}{self.lm.pk}/change/").status_code, 200)
+
+
+class ProductApiDigiKeyAttrsTests(TestCase):
+    def setUp(self):
+        from bots.models import DigiKeyListing
+        self.p = Product.objects.create(sku="AN250202-04C-175-MHF1", name="Antenne", tech_attributes={
+            "Antenna Type": "PCB Trace", "Gain": "2dBi, 4dBi", "Frequency Range": "2.4GHz ~ 2.485GHz",
+            "hts": "8529.10.9100", "eccnNumber": "EAR99", "gtin": "", "msl": "  ", "reach": None})
+        DigiKeyListing.objects.create(product=self.p, dk_offer_id="f11e", dk_prices=[
+            {"qty": 1, "price": 4.89}, {"qty": 10, "price": 4.52}, {"qty": 50, "price": 4.18}])
+        Product.objects.create(sku="X-1", name="Без DigiKey")
+        key = APIKey.objects.create(name="erp", scopes=["products:read"])
+        self.c = APIClient()
+        self.c.credentials(HTTP_AUTHORIZATION=f"Token {key.key}")
+
+    def test_product_detail(self):
+        d = self.c.get("/api/v1/products/?sku=AN250202-04C-175-MHF1").json()["results"][0]
+        self.assertEqual(d["tech_attributes"], {"Antenna Type": "PCB Trace", "Gain": "2dBi, 4dBi",
+                                                "Frequency Range": "2.4GHz ~ 2.485GHz"})
+        self.assertEqual(d["compliance"], {"hts": "8529.10.9100", "eccnNumber": "EAR99"})
+        self.assertEqual(d["digikey"]["offer_id"], "f11e")
+        self.assertEqual(d["digikey"]["price_breaks"], [{"min_qty": 1, "unit_price": 4.89},
+                                                        {"min_qty": 10, "unit_price": 4.52},
+                                                        {"min_qty": 50, "unit_price": 4.18}])
+        x = self.c.get("/api/v1/products/?sku=X-1").json()["results"][0]
+        self.assertIsNone(x["digikey"])
+        self.assertEqual((x["tech_attributes"], x["compliance"]), ({}, {}))
+
+    def test_list_with_stock_and_shop(self):
+        r = self.c.get("/api/v1/products/?with_stock=1")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("digikey", r.json()["results"][0])
+        shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        ShopListing.objects.create(shop=shop, product=self.p)
+        d = self.c.get("/api/v1/shop/products/AN250202-04C-175-MHF1/").json()
+        self.assertEqual(d["tech_attributes"]["Antenna Type"], "PCB Trace")
+        self.assertNotIn("digikey", d)
+        self.assertNotIn("compliance", d)

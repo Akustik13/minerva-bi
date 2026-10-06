@@ -264,7 +264,7 @@ class ProductViewSet(NoDeleteMixin, viewsets.ModelViewSet):
             self.request.query_params.get("with_stock") in ("1", "true", "yes")
 
     def get_queryset(self):
-        qs = Product.objects.all().order_by("sku")
+        qs = Product.objects.select_related("dk_listing").order_by("sku")
         # Фільтри in_stock/low_stock/changed_since потребують анотацій
         if self.request.method == "GET":
             qs = stock_service.annotate_stock(qs)
