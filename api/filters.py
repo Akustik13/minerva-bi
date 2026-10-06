@@ -31,11 +31,33 @@ class ProductFilter(django_filters.FilterSet):
         field_name="_last_movement", lookup_expr="gte",
         help_text="Лише товари з рухами після цієї дати (інкрементальна синхронізація)",
     )
+    updated_since = django_filters.IsoDateTimeFilter(
+        field_name="updated_at", lookup_expr="gte",
+        help_text="Лише товари, картку яких змінено після цієї дати (атрибути, ціни, статус…)",
+    )
+    lifecycle_status = django_filters.CharFilter(field_name="lifecycle_status")
+    attr = django_filters.CharFilter(
+        method="filter_attr",
+        help_text="Технічний атрибут: «Назва:значення» (значення — входження, без регістру) або «Назва» "
+                  "(параметр є). Можна кілька: ?attr=Antenna Type:PCB&attr=RF Family/Standard:Bluetooth",
+    )
 
     class Meta:
         model  = Product
         fields = ["sku", "category", "kind", "is_active", "search",
-                  "in_stock", "low_stock", "changed_since"]
+                  "in_stock", "low_stock", "changed_since", "updated_since", "lifecycle_status", "attr"]
+
+    def filter_attr(self, qs, name, value):
+        for item in self.request.GET.getlist("attr") if self.request is not None else [value]:
+            key, sep, val = item.partition(":")
+            key, val = key.strip(), val.strip()
+            if not key or "__" in key:
+                continue
+            if sep and val:
+                qs = qs.filter(**{f"tech_attributes__{key}__icontains": val})
+            else:
+                qs = qs.filter(tech_attributes__has_key=key)
+        return qs
 
     def filter_search(self, qs, name, value):
         return qs.filter(Q(sku__icontains=value) | Q(name__icontains=value)

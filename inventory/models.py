@@ -162,9 +162,18 @@ class Product(models.Model):
     image_url     = models.URLField("Зображення (URL)", blank=True, default="")
     image         = models.ImageField("Зображення (файл)", upload_to="products/images/",
                                       null=True, blank=True)
+    updated_at    = models.DateTimeField("Змінено", auto_now=True, db_index=True,
+                                         help_text="Будь-яка зміна картки товару (для API changed_since / RAG).")
 
     def __str__(self) -> str:
         return self.sku
+
+    def save(self, *args, **kwargs):
+        # auto_now не спрацьовує при save(update_fields=[…]) без updated_at — додаємо його
+        fields = kwargs.get("update_fields")
+        if fields is not None and "updated_at" not in fields:
+            kwargs["update_fields"] = list(fields) + ["updated_at"]
+        super().save(*args, **kwargs)
 
     @property
     def image_display_url(self) -> str:
