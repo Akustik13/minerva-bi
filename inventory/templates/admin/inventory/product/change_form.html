@@ -223,77 +223,206 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 <style>
-/* Базові ціни: таблиця замість текстового поля (textarea лишається носієм даних) */
+/* Базові ціни: таблиця + інструменти (textarea лишається носієм даних для форми) */
 .field-base_prices_text textarea { display: none !important; }
-.inv-bp-table { border-collapse: collapse; font-size: 13px; min-width: 460px; }
-.inv-bp-table th {
-  text-align: left; padding: 6px 10px; background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
-  font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
-  border-bottom: 2px solid var(--border-strong, #243347);
-}
+.inv-bp { max-width: 760px; }
+.inv-bp-tools { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 2px 0 10px;
+  padding: 10px 12px; background: var(--bg-hover, #1e2d40); border: 1px solid var(--border-strong, #243347); border-radius: 6px; }
+.inv-bp-tool { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted, #9aafbe); }
+.inv-bp-tool input, .inv-bp-tool select { background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347); border-radius: 3px; padding: 4px 6px; font-size: 12px; }
+.inv-bp-tool input { width: 74px; text-align: right; }
+.inv-bp-tool input.cur { width: 48px; text-align: center; text-transform: uppercase; }
+.inv-bp-tool button, .inv-bp-btn { background: var(--bg-card, #1a2535); color: var(--text, #c9d8e4); border: 1px solid var(--border-strong, #243347);
+  border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.inv-bp-tool button:hover, .inv-bp-btn:hover { border-color: var(--accent, #58a6ff); }
+.inv-bp-sep { width: 1px; align-self: stretch; background: var(--border-strong, #243347); }
+.inv-bp-table { border-collapse: collapse; font-size: 13px; min-width: 520px; }
+.inv-bp-table th { text-align: left; padding: 6px 10px; background: var(--bg-hover, #1e2d40); color: var(--text-muted, #9aafbe);
+  font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 2px solid var(--border-strong, #243347); }
 .inv-bp-table td { padding: 4px 6px; border-bottom: 1px solid var(--border-strong, #243347); vertical-align: middle; }
-.inv-bp-table input {
-  width: 130px; background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
-  border: 1px solid var(--border-strong, #243347); border-radius: 3px; padding: 5px 8px; font-size: 13px;
-  text-align: right; box-sizing: border-box;
-}
-.inv-bp-table input:focus { outline: none; border-color: var(--accent, #58a6ff); box-shadow: 0 0 0 2px rgba(88,166,255,.2); }
+.inv-bp-table input { width: 120px; background: var(--bg-input, #141f2b); color: var(--text, #c9d8e4);
+  border: 1px solid var(--border-strong, #243347); border-radius: 3px; padding: 5px 8px; font-size: 13px; text-align: right; box-sizing: border-box; }
+.inv-bp-table input.bp-d { width: 90px; }
+.inv-bp-table input:focus, .inv-bp-tool input:focus { outline: none; border-color: var(--accent, #58a6ff); box-shadow: 0 0 0 2px rgba(88,166,255,.2); }
 .inv-bp-table input.is-bad { border-color: var(--err, #e53935); }
-.inv-bp-disc { color: var(--text-muted, #9aafbe); font-size: 12px; text-align: right; min-width: 90px; }
+.inv-bp-table tr.is-changed td:first-child { box-shadow: inset 3px 0 0 var(--accent, #58a6ff); }
+.inv-bp-cv { color: var(--text-muted, #9aafbe); font-size: 12px; text-align: right; white-space: nowrap; min-width: 90px; }
+.inv-bp-foot { display: flex; align-items: center; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--text-muted, #9aafbe); }
+.inv-bp-dirty { color: #ffb74d; font-weight: 600; }
 </style>
+{{ bp_config|json_script:"bp-config" }}
 <script>
-/* Таблиця «Від кількості | Ціна за шт. | Знижка від 1 шт.» → рядки «кількість: ціна» у textarea base_prices_text */
+/* Базові ціни: таблиця «кількість | ціна | знижка | у валюті магазину» + інструменти.
+   Усе рахується на сторінці; зберігається кнопкою «Зберегти» форми (історія змін — на сервері). */
 document.addEventListener('DOMContentLoaded', function () {
   var ta = document.querySelector('textarea[name="base_prices_text"]');
   if (!ta) return;
-  var wrap = document.createElement('div');
-  wrap.innerHTML =
-    '<table class="inv-bp-table"><thead><tr><th>Від кількості, шт.</th><th>Ціна за шт.</th>' +
-    '<th style="text-align:right">Знижка від 1 шт.</th><th style="width:36px"></th></tr></thead>' +
-    '<tbody></tbody></table>' +
-    '<div class="inv-attrs-footer"><button type="button" class="inv-add-btn">+ Додати ступінь</button>' +
-    '<span class="inv-sync-status">Порядок за кількістю — автоматично при збереженні</span></div>';
-  ta.parentNode.insertBefore(wrap, ta);
-  var body = wrap.querySelector('tbody');
+  var cfgEl = document.getElementById('bp-config');
+  var cfg = {}; try { cfg = JSON.parse(cfgEl ? cfgEl.textContent : '{}') || {}; } catch (e) {}
+  var rates = cfg.fx_rates || {}, home = (cfg.home || 'EUR').toUpperCase();
+  rates[home] = 1;
+  var curInp = document.querySelector('input[name="base_currency"]');
+  var buyInp = document.getElementById('id_purchase_price');
 
-  function num(v) { v = String(v || '').trim().replace(',', '.'); return v === '' ? NaN : Number(v); }
-  function sync() {
-    var rows = [], base = null;
-    body.querySelectorAll('tr').forEach(function (tr) {
-      var q = tr.querySelector('.bp-q'), p = tr.querySelector('.bp-p');
-      var qn = num(q.value), pn = num(p.value);
-      q.classList.toggle('is-bad', q.value.trim() !== '' && !(qn >= 1 && Math.floor(qn) === qn));
-      p.classList.toggle('is-bad', p.value.trim() !== '' && !(pn > 0));
-      if (p.value.trim()) rows.push({ q: q.value.trim(), p: p.value.trim().replace(',', '.'), qn: qn, pn: pn, tr: tr });
-      if (qn === 1 && pn > 0) base = pn;
-    });
-    rows.forEach(function (r) {
-      var cell = r.tr.querySelector('.inv-bp-disc');
-      cell.textContent = base && r.pn > 0 && r.qn > 1 ? '−' + ((1 - r.pn / base) * 100).toFixed(1).replace('.', ',') + ' %' : '';
-    });
-    rows.sort(function (a, b) { return (a.qn || 0) - (b.qn || 0); });
-    ta.value = rows.map(function (r) { return r.q + ': ' + r.p; }).join('\n');
+  function num(v) { v = String(v == null ? '' : v).trim().replace(/\s/g, '').replace(',', '.'); return v === '' ? NaN : Number(v); }
+  function fmt(n) { return (Math.round(n * 10000) / 10000).toFixed(4).replace(/\.?0+$/, ''); }
+  function money(n) { return n.toFixed(2).replace('.', ','); }
+  function roundMode(v, mode) {
+    if (!mode || mode === 'none' || !(v > 0)) return v;
+    if (mode === 'x.90' || mode === 'x.99') {
+      var end = Number(mode.slice(1)), r = Math.floor(v) + end;
+      if (r - v > 0.5) r -= 1;
+      return Math.max(r, end);
+    }
+    var step = Number(mode); return Math.round(v / step) * step;
   }
+  function rate(from, to) {
+    from = (from || '').toUpperCase(); to = (to || '').toUpperCase();
+    if (from === to) return 1;
+    var a = rates[from], b = rates[to];
+    return a && b ? a / b : null;
+  }
+
+  // ── Розмітка ──
+  var wrap = document.createElement('div');
+  wrap.className = 'inv-bp';
+  var rOpts = (cfg.roundings || [['0.01', 'До 0,01']]).map(function (r) {
+    return '<option value="' + r[0] + '"' + (r[0] === cfg.rounding ? ' selected' : '') + '>' + r[1] + '</option>';
+  }).join('');
+  wrap.innerHTML =
+    '<div class="inv-bp-tools">' +
+      '<span class="inv-bp-tool">Ціна за 1 шт. <input type="text" class="t-base"><button type="button" class="b-base" title="Нова ціна за 1 шт.; інші ступені перераховуються зі збереженням знижок">Застосувати</button></span>' +
+      '<span class="inv-bp-tool">Усі ціни <input type="text" class="t-pct" placeholder="+5"> % <button type="button" class="b-pct">Змінити</button></span>' +
+      '<span class="inv-bp-tool">Закупівля + <input type="text" class="t-mk" value="' + (cfg.markup != null ? cfg.markup : 100) + '"> % <button type="button" class="b-mk" title="Ціна за 1 шт. = закупівельна × (1 + націнка); знижки ступенів зберігаються">→ ціна 1 шт.</button></span>' +
+      '<span class="inv-bp-sep"></span>' +
+      '<span class="inv-bp-tool"><button type="button" class="b-tpl" title="Ступені від ціни за 1 шт. за шаблоном «Налаштування цін»">Знижки за шаблоном</button></span>' +
+      '<span class="inv-bp-tool">Округлення <select class="t-rnd">' + rOpts + '</select><button type="button" class="b-rnd">Округлити</button></span>' +
+      '<span class="inv-bp-sep"></span>' +
+      '<span class="inv-bp-tool">Конвертувати в <input type="text" class="cur t-to" maxlength="3" value="' + home + '"> курс <input type="text" class="t-rate"> <button type="button" class="b-conv">Конвертувати</button></span>' +
+    '</div>' +
+    '<table class="inv-bp-table"><thead><tr><th>Від кількості, шт.</th><th>Ціна за шт.</th><th>Знижка від 1 шт., %</th>' +
+      '<th class="h-cv" style="text-align:right">≈ у ' + home + '</th><th style="width:36px"></th></tr></thead><tbody></tbody></table>' +
+    '<div class="inv-bp-foot"><button type="button" class="inv-bp-btn b-add">+ Додати ступінь</button>' +
+      '<button type="button" class="inv-bp-btn b-undo" title="Повернути ціни, як були при відкритті сторінки">↶ Скасувати зміни</button>' +
+      '<span class="bp-state">Порядок за кількістю — автоматично при збереженні</span></div>';
+  ta.parentNode.insertBefore(wrap, ta);
+  var body = wrap.querySelector('tbody'), $ = function (c) { return wrap.querySelector(c); };
+  var initial = ta.value, initialCur = curInp ? curInp.value : '';
+
+  // ── Рядки ──
+  function rows() {
+    return Array.prototype.map.call(body.querySelectorAll('tr'), function (tr) {
+      return { tr: tr, q: tr.querySelector('.bp-q'), p: tr.querySelector('.bp-p'), d: tr.querySelector('.bp-d') };
+    });
+  }
+  function baseRow() { return rows().filter(function (r) { return num(r.q.value) === 1; })[0]; }
+  function basePrice() { var b = baseRow(); return b ? num(b.p.value) : NaN; }
   function addRow(q, p) {
     var tr = document.createElement('tr');
     tr.innerHTML = '<td><input type="text" inputmode="numeric" class="bp-q" placeholder="напр. 10"></td>' +
-                   '<td><input type="text" inputmode="decimal" class="bp-p" placeholder="0.00"></td>' +
-                   '<td class="inv-bp-disc"></td><td><button type="button" class="inv-del-row" title="Видалити">×</button></td>';
+      '<td><input type="text" inputmode="decimal" class="bp-p" placeholder="0.00"></td>' +
+      '<td><input type="text" inputmode="decimal" class="bp-d" placeholder="—" title="Введіть знижку — ціна порахується від ціни за 1 шт."></td>' +
+      '<td class="inv-bp-cv"></td><td><button type="button" class="inv-del-row" title="Видалити">×</button></td>';
     tr.querySelector('.bp-q').value = q || '';
     tr.querySelector('.bp-p').value = p || '';
-    tr.querySelectorAll('input').forEach(function (i) { i.addEventListener('input', sync); });
+    tr.querySelector('.bp-q').addEventListener('input', sync);
+    tr.querySelector('.bp-p').addEventListener('input', sync);
+    tr.querySelector('.bp-d').addEventListener('input', function () {   // знижка → ціна
+      var d = num(this.value), b = basePrice();
+      if (d >= 0 && d < 100 && b > 0) tr.querySelector('.bp-p').value = fmt(b * (1 - d / 100));
+      sync(true);
+    });
     tr.querySelector('.inv-del-row').addEventListener('click', function () { tr.remove(); sync(); });
     body.appendChild(tr);
     return tr;
   }
-  ta.value.split(/\r?\n/).forEach(function (line) {
-    var m = line.match(/^\s*(\d+)\s*[:=;\t ]\s*([\d.,]+)\s*$/);
-    if (m) addRow(m[1], m[2]);
+  function load(text) {
+    body.innerHTML = '';
+    String(text || '').split(/\r?\n/).forEach(function (line) {
+      var m = line.match(/^\s*(\d+)\s*[:=;\t ]\s*([\d.,]+)\s*$/);
+      if (m) addRow(m[1], m[2]);
+    });
+    if (!body.children.length) addRow('1', '');
+  }
+
+  // ── Синхронізація: знижки, ≈ у валюті магазину, textarea ──
+  function sync(keepDiscount) {
+    var b = basePrice(), list = [];
+    var r = rate(curInp ? curInp.value : home, home);
+    $('.h-cv').textContent = r === 1 ? '' : '≈ у ' + home + (r ? ' (курс ' + fmt(r) + ')' : ' (немає курсу)');
+    rows().forEach(function (x) {
+      var qn = num(x.q.value), pn = num(x.p.value);
+      x.q.classList.toggle('is-bad', x.q.value.trim() !== '' && !(qn >= 1 && Math.floor(qn) === qn));
+      x.p.classList.toggle('is-bad', x.p.value.trim() !== '' && !(pn > 0));
+      if (keepDiscount !== true || document.activeElement !== x.d) {
+        x.d.value = b > 0 && pn > 0 && qn > 1 ? (Math.round((1 - pn / b) * 1000) / 10).toString().replace('.', ',') : '';
+      }
+      x.d.disabled = qn === 1;
+      x.tr.querySelector('.inv-bp-cv').textContent = r && r !== 1 && pn > 0 ? money(pn * r) + ' ' + home : '';
+      if (x.p.value.trim()) list.push({ q: x.q.value.trim(), p: x.p.value.trim().replace(',', '.'), qn: qn });
+    });
+    list.sort(function (a, c) { return (a.qn || 0) - (c.qn || 0); });
+    ta.value = list.map(function (x) { return x.q + ': ' + x.p; }).join('\n');
+    var initMap = {}; initial.split('\n').forEach(function (l) { var m = l.split(':'); if (m.length === 2) initMap[m[0].trim()] = num(m[1]); });
+    rows().forEach(function (x) { x.tr.classList.toggle('is-changed', initMap[x.q.value.trim()] !== num(x.p.value)); });
+    var dirty = ta.value !== initial;
+    var st = $('.bp-state');
+    st.textContent = dirty ? 'Є незбережені зміни — натисніть «Зберегти» внизу сторінки' : 'Порядок за кількістю — автоматично при збереженні';
+    st.classList.toggle('inv-bp-dirty', dirty);
+    if (document.activeElement !== $('.t-base')) $('.t-base').value = b > 0 ? fmt(b) : '';
+    if (document.activeElement !== $('.t-rate')) {
+      var cr = rate(curInp ? curInp.value : home, $('.t-to').value);
+      $('.t-rate').value = cr ? fmt(cr) : '';
+    }
+  }
+
+  // ── Інструменти ──
+  function eachPrice(fn, noRound) {   // з округленням за вибраним правилом
+    var m = noRound ? null : $('.t-rnd').value;
+    rows().forEach(function (x) { var p = num(x.p.value); if (p > 0) x.p.value = fmt(roundMode(fn(p, num(x.q.value)), m)); });
+  }
+  function setBase(newBase) {          // нова ціна 1 шт., знижки інших ступенів зберігаються
+    var b = basePrice();
+    if (!(newBase > 0)) return;
+    if (b > 0) { eachPrice(function (p) { return p * newBase / b; }); baseRow().p.value = fmt(newBase); }
+    else { var br = baseRow() || addRow('1', ''); br.p.value = fmt(newBase); }
+    sync();
+  }
+  $('.b-base').addEventListener('click', function () { setBase(num($('.t-base').value)); });
+  $('.b-pct').addEventListener('click', function () {
+    var pct = num($('.t-pct').value); if (isNaN(pct)) return $('.t-pct').focus();
+    eachPrice(function (p) { return p * (100 + pct) / 100; }); sync();
   });
-  if (!body.children.length) addRow('1', '');
-  wrap.querySelector('.inv-add-btn').addEventListener('click', function () {
-    var tr = addRow('', ''); tr.querySelector('.bp-q').focus(); sync();
+  $('.b-mk').addEventListener('click', function () {
+    var buy = buyInp ? num(buyInp.value) : NaN, mk = num($('.t-mk').value);
+    if (!(buy > 0)) { alert('Спершу заповніть «Ціна закупки» (у валюті базових цін).'); return; }
+    setBase(roundMode(buy * (100 + (mk || 0)) / 100, $('.t-rnd').value));
   });
+  $('.b-tpl').addEventListener('click', function () {
+    var b = basePrice(), tpl = cfg.template || [];
+    if (!(b > 0)) { alert('Спершу вкажіть ціну за 1 шт.'); return; }
+    if (!tpl.length) { alert('Шаблон знижок порожній («Інтернет-магазин → Налаштування цін»).'); return; }
+    if (!confirm('Замінити всі ступені на шаблон (' + tpl.map(function (t) { return t.min_qty + ' шт. −' + t.discount + ' %'; }).join(', ') + ')?')) return;
+    body.innerHTML = ''; addRow('1', fmt(b));
+    tpl.forEach(function (t) { if (t.min_qty > 1) addRow(String(t.min_qty), fmt(roundMode(b * (100 - t.discount) / 100, $('.t-rnd').value))); });
+    sync();
+  });
+  $('.b-rnd').addEventListener('click', function () { var m = $('.t-rnd').value; eachPrice(function (p) { return roundMode(p, m); }); sync(); });
+  $('.t-to').addEventListener('input', function () { $('.t-rate').value = ''; sync(); });
+  $('.b-conv').addEventListener('click', function () {
+    var to = $('.t-to').value.trim().toUpperCase(), r = num($('.t-rate').value);
+    if (!/^[A-Z]{3}$/.test(to)) return $('.t-to').focus();
+    if (!(r > 0)) { alert('Вкажіть курс: 1 ' + (curInp ? curInp.value : '') + ' = ? ' + to); return $('.t-rate').focus(); }
+    eachPrice(function (p) { return p * r; });
+    if (curInp) curInp.value = to;
+    sync();
+  });
+  if (curInp) curInp.addEventListener('input', function () { sync(); });
+  $('.b-add').addEventListener('click', function () { var tr = addRow('', ''); tr.querySelector('.bp-q').focus(); sync(); });
+  $('.b-undo').addEventListener('click', function () { if (curInp) curInp.value = initialCur; load(initial); sync(); });
+
+  load(ta.value);
   sync();
 });
 </script>

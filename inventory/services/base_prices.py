@@ -104,3 +104,57 @@ def import_from_digikey(product, user=None) -> bool | None:
         currency = "USD"
     return set_base_prices(product, rows, source="digikey", user=user, currency=currency,
                            source_label=digikey_source_label(listing))
+
+
+# ── Масові операції (дія «💰 Базові ціни: масова зміна…» у списку товарів) ──
+
+def _round(value: Decimal, mode: str | None) -> Decimal:
+    from shop.services import round_price
+    return round_price(value, mode) if mode else value.quantize(_Q)
+
+
+def scale(rows, factor, rounding: str | None = None) -> list[dict]:
+    """Усі ступені × factor (напр. 1.05 = +5 %, курс валюти)."""
+    factor = Decimal(str(factor))
+    return normalize([{"min_qty": r["min_qty"], "unit_price": _round(Decimal(r["unit_price"]) * factor, rounding)}
+                      for r in normalize(rows)])
+
+
+def round_all(rows, rounding: str) -> list[dict]:
+    return normalize([{"min_qty": r["min_qty"], "unit_price": _round(Decimal(r["unit_price"]), rounding)}
+                      for r in normalize(rows)])
+
+
+def from_template(rows, schedule, rounding: str | None = None) -> list[dict]:
+    """Ступені від ціни за 1 шт. за шаблоном знижок [{min_qty, discount}] (як «Налаштування цін»)."""
+    rows = normalize(rows)
+    if not rows:
+        return []
+    base = Decimal(rows[0]["unit_price"])
+    out = [{"min_qty": 1, "unit_price": base}]
+    for step in sorted(schedule or [], key=lambda s: int(s["min_qty"])):
+        qty = int(step["min_qty"])
+        if qty >= 2:
+            out.append({"min_qty": qty,
+                        "unit_price": _round(base * (Decimal(100) - Decimal(str(step["discount"]))) / 100, rounding)})
+    return normalize(out)
+
+
+def fx_factor(from_cur: str, to_cur: str) -> Decimal | None:
+    """Курс from→to з «Налаштувань цін» магазину (курси задано відносно валюти магазину)."""
+    from shop.models import Shop, ShopSettings
+    from_cur, to_cur = (from_cur or "").upper(), (to_cur or "").upper()
+    if from_cur == to_cur:
+        return Decimal(1)
+    rates = {k.upper(): v for k, v in (ShopSettings.get().fx_rates or {}).items()}
+    home = (getattr(Shop.objects.filter(is_default=True).first(), "currency", None) or "EUR").upper()
+    rates[home] = 1
+
+    def rate(c):
+        try:
+            r = Decimal(str(rates[c]))
+            return r if r > 0 else None
+        except (KeyError, ValueError, ArithmeticError):
+            return None
+    a, b = rate(from_cur), rate(to_cur)
+    return (a / b) if a and b else None

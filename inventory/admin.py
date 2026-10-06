@@ -2162,6 +2162,62 @@ class ProductAdminForm(forms.ModelForm):
         return (self.cleaned_data.get("base_currency") or "EUR").upper()
 
 
+def _rounding_choices():
+    from shop.models import ShopSettings
+    return [("", "Без округлення (до 0,0001)")] + list(ShopSettings.Rounding.choices)
+
+
+class ProductShopFilter(admin.SimpleListFilter):
+    """У якому інтернет-магазині товар."""
+    title = "Магазин"
+    parameter_name = "in_shop"
+
+    def lookups(self, request, model_admin):
+        from shop.models import Shop
+        return [(str(s.pk), s.name) for s in Shop.objects.all()] + [("none", "Не в жодному магазині")]
+
+    def queryset(self, request, qs):
+        v = self.value()
+        if v == "none":
+            return qs.filter(shop_listings__isnull=True)
+        if v:
+            return qs.filter(shop_listings__shop_id=v).distinct()
+        return qs
+
+
+class BasePricesBulkForm(forms.Form):
+    operation = forms.ChoiceField(label="Що зробити", widget=forms.RadioSelect, initial="percent", choices=[
+        ("percent", "Змінити всі ступені на ±%"),
+        ("convert", "Конвертувати в іншу валюту"),
+        ("template", "Перерахувати ступені за шаблоном знижок (від ціни за 1 шт.)"),
+        ("round", "Лише округлити"),
+    ])
+    percent = forms.DecimalField(label="±%", required=False, max_digits=7, decimal_places=2,
+                                 help_text="Напр. 5 = +5 %, −10 = −10 %")
+    currency = forms.RegexField(label="Нова валюта", required=False, regex=r"^[A-Za-z]{3}$", max_length=3,
+                                help_text="Для конвертації, напр. EUR")
+    rate = forms.DecimalField(label="Курс", required=False, max_digits=12, decimal_places=6, min_value=Decimal("0.000001"),
+                              help_text="1 одиниця поточної валюти = X нової. Порожньо — з «Налаштувань цін → Курси валют»")
+    rounding = forms.ChoiceField(label="Округлення", required=False)
+    note = forms.CharField(label="Примітка в історію", required=False, max_length=150)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from shop.models import ShopSettings
+        self.fields["rounding"].choices = _rounding_choices()
+        self.fields["rounding"].initial = ShopSettings.get().rounding
+
+    def clean(self):
+        d = super().clean()
+        if d.get("operation") == "percent" and d.get("percent") in (None, ""):
+            self.add_error("percent", "Вкажіть відсоток.")
+        if d.get("operation") == "convert" and not d.get("currency"):
+            self.add_error("currency", "Вкажіть валюту.")
+        if d.get("currency"):
+            d["currency"] = d["currency"].upper()
+        return d
+
+
 class BaseFromDigiKeyForm(forms.Form):
     refresh = forms.BooleanField(label="Спершу стягнути актуальні ціни офера з DigiKey API", required=False, initial=True)
     confirm = forms.BooleanField(label="Так, перезаписати базові ціни вибраних товарів цінами DigiKey", required=True,
@@ -2194,16 +2250,17 @@ class ProductCategoryForm(forms.Form):
 class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     change_list_template = "admin/inventory/product/change_list.html"
     list_display = (
-        "sku", "sku_short", "category", "kind", "bom_type", "is_active",
+        "sku", "sku_short", "category", "shops_col", "kind", "bom_type", "is_active",
         "stock_qty", "reserved_qty", "stock_badge", "incoming_qty", "buildable_qty",
         "reorder_badge", "label_btn", "set_stock_link",
     )
     search_fields = ("sku", "sku_short", "name")
-    list_filter   = ("category", "lifecycle_status", "kind", "bom_type", "is_active")
+    list_filter   = ("category", ProductShopFilter, "lifecycle_status", "kind", "bom_type", "is_active")
     list_per_page = 50
     autocomplete_fields = ("successor",)
     form          = ProductAdminForm
-    actions       = ["action_set_category", "action_set_lifecycle", "action_base_from_dk", "action_sale_price_from_base",
+    actions       = ["action_set_category", "action_set_lifecycle", "action_base_bulk", "action_base_from_dk",
+                     "action_sale_price_from_base",
                      "bulk_sync_digikey_attrs"]
 
     def save_model(self, request, obj, form, change):
@@ -2250,6 +2307,45 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     n += 1
             return f"Життєвий цикл «{Product.Lifecycle(d['status']).label}»: {n} товарів"
         return FormActionMixin._form_action(self, request, queryset, LifecycleForm, "Життєвий цикл товарів", apply)
+
+    @admin.action(description="💰 Базові ціни: ±%% / валюта / шаблон / округлення…")
+    def action_base_bulk(self, request, queryset):
+        from shop.admin import FormActionMixin
+        from shop.models import ShopSettings
+        from .services import base_prices as bp
+
+        def apply(qs, d):
+            op, rnd = d["operation"], d.get("rounding") or None
+            changed, skipped, no_rate = 0, [], []
+            for p in qs:
+                rows, cur = bp.normalize(p.base_prices), p.base_price_currency
+                if not rows:
+                    skipped.append(p.sku)
+                    continue
+                if op == "percent":
+                    rows = bp.scale(rows, (Decimal(100) + d["percent"]) / 100, rnd)
+                    label = f"{d['percent']:+g} %"
+                elif op == "convert":
+                    rate = d.get("rate") or bp.fx_factor(cur, d["currency"])
+                    if rate is None:
+                        no_rate.append(f"{p.sku} ({cur}→{d['currency']})")
+                        continue
+                    rows, label, cur = bp.scale(rows, rate, rnd), f"{cur}→{d['currency']} × {rate:g}", d["currency"]
+                elif op == "template":
+                    rows, label = bp.from_template(rows, ShopSettings.get().price_breaks, rnd), "ступені за шаблоном"
+                else:
+                    rows, label = bp.round_all(rows, rnd or "0.01"), "округлення"
+                note = f"Масова зміна: {label}" + (f" · {d['note']}" if d.get("note") else "")
+                if bp.set_base_prices(p, rows, source="manual", user=request.user, currency=cur, note=note):
+                    changed += 1
+            if skipped:
+                messages.warning(request, "Без базових цін (пропущено): " + ", ".join(skipped[:20]))
+            if no_rate:
+                messages.warning(request, "Немає курсу («Інтернет-магазин → Налаштування цін → Курси валют») — "
+                                          "вкажіть курс у формі: " + ", ".join(no_rate[:20]))
+            return f"Базові ціни змінено: {changed} товарів (записано в історію)."
+        return FormActionMixin._form_action(self, request, queryset, BasePricesBulkForm,
+                                            "Базові ціни: масова зміна", apply)
 
     @admin.action(description="⬇️ Базові ціни ← DigiKey (перезаписати)…")
     def action_base_from_dk(self, request, queryset):
@@ -2325,6 +2421,21 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
              fmt(h.old_prices), fmt(h.new_prices) + (f" {h.currency}" if h.currency else ""), h.note) for h in rows))
         return format_html('{}<table style="margin-top:8px;font-size:12px"><tr><th>Коли</th><th>Хто</th><th>Джерело</th>'
                            '<th>Було → стало</th><th>Примітка</th></tr>{}</table>', head, body)
+
+    @admin.display(description="Магазини")
+    def shops_col(self, obj):
+        """У яких магазинах товар: бейдж на магазин (зелений — показується, сірий — сховано)."""
+        rows = list(obj.shop_listings.all())
+        if not rows:
+            return format_html('<span style="opacity:.45">{}</span>', "—")
+        return format_html_join(" ", '<a href="{}" title="{}" style="display:inline-block;padding:1px 7px;'
+                                     'border-radius:9px;background:{};color:#fff;font-size:11px;'
+                                     'text-decoration:none;white-space:nowrap">{}</a>', (
+            (reverse("admin:shop_shoplisting_change", args=[l.pk]),
+             f"{l.shop.name} · {'показується' if l.is_visible else 'сховано'} · "
+             + (f"{l.effective_price:.2f} {l.shop.currency}" if l.effective_price is not None else "ціна за запитом")
+             + (" · базові ціни" if l.price_source == "base" else ""),
+             "#2e7d32" if l.is_visible else "#757575", l.shop.slug) for l in rows))
 
     @admin.display(description="Магазини")
     def shop_listings_info(self, obj):
@@ -2515,6 +2626,20 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
 
     def changeform_view(self, request, object_id=None, form_url='', extra_context=None):
         extra_context = extra_context or {}
+        try:
+            from shop.models import Shop, ShopSettings
+            st = ShopSettings.get()
+            extra_context["bp_config"] = {
+                "fx_rates": {k.upper(): float(v) for k, v in (st.fx_rates or {}).items() if v},
+                "home": getattr(Shop.objects.filter(is_default=True).first(), "currency", None) or "EUR",
+                "rounding": st.rounding,
+                "roundings": [[k, str(v)] for k, v in st.Rounding.choices],
+                "template": [{"min_qty": int(r["min_qty"]), "discount": float(r["discount"])}
+                             for r in (st.price_breaks or [])],
+                "markup": float(st.default_markup),
+            }
+        except Exception:
+            extra_context["bp_config"] = {}
         if object_id:
             try:
                 from bots.models import DigiKeyListing
@@ -2574,7 +2699,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                     order__order_date__gte=since_3m,
                 ).values('product').annotate(t=Sum('qty')).values('t')
             )
-            return super().get_queryset(request).annotate(
+            return super().get_queryset(request).prefetch_related("shop_listings__shop").annotate(
                 _stock_total=Coalesce(Subquery(stock_subq), Value(Decimal('0'))),
                 _reserved_total=Coalesce(Subquery(reserved_subq), Value(Decimal('0'))),
                 _incoming_total=Coalesce(Subquery(incoming_subq), Value(Decimal('0'))),

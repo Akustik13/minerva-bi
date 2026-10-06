@@ -622,3 +622,49 @@ class ProductApiDigiKeyAttrsTests(TestCase):
         self.assertEqual(d["tech_attributes"]["Antenna Type"], "PCB Trace")
         self.assertNotIn("base_prices", d)
         self.assertNotIn("compliance", d)
+
+
+class ProductListShopsAndBulkPricesTests(TestCase):
+    def setUp(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("boss", "b@x.y", "p"))
+        self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        self.p = Product.objects.create(sku="AN-1", name="A", base_price_currency="USD",
+                                        base_prices=[{"min_qty": 1, "unit_price": "10"},
+                                                     {"min_qty": 10, "unit_price": "9"}])
+        ShopListing.objects.create(shop=self.shop, product=self.p)
+        st = ShopSettings.get()
+        st.fx_rates = {"USD": "0.8"}
+        st.save()
+
+    def test_changelist_shows_shops(self):
+        r = self.client.get("/admin/inventory/product/")
+        self.assertEqual(r.status_code, 200)
+        self.assertContains(r, ">webshop</a>")
+        self.assertContains(r, "Базові ціни: ±% / валюта")
+        Product.objects.create(sku="NO-SHOP", name="X")
+        r = self.client.get("/admin/inventory/product/?in_shop=none")
+        self.assertContains(r, "NO-SHOP")
+        self.assertNotContains(r, ">AN-1<")
+        self.assertContains(self.client.get(f"/admin/inventory/product/?in_shop={self.shop.pk}"), "AN-1")
+
+    def test_bulk_percent_and_convert(self):
+        url = "/admin/inventory/product/"
+        self.client.post(url, {"action": "action_base_bulk", "apply": "1", "_selected_action": [self.p.pk],
+                               "operation": "percent", "percent": "10", "rounding": "0.01"})
+        self.p.refresh_from_db()
+        self.assertEqual([r["unit_price"] for r in self.p.base_prices], ["11", "9.9"])
+        self.client.post(url, {"action": "action_base_bulk", "apply": "1", "_selected_action": [self.p.pk],
+                               "operation": "convert", "currency": "eur", "rounding": "0.01"})
+        self.p.refresh_from_db()
+        self.assertEqual((self.p.base_price_currency, self.p.base_prices[0]["unit_price"]), ("EUR", "8.8"))
+        h = self.p.price_history.first()
+        self.assertEqual((h.user_label, h.note[:17]), ("boss", "Масова зміна: USD"))
+
+    def test_template(self):
+        from inventory.services.base_prices import from_template
+        rows = from_template([{"min_qty": 1, "unit_price": "100"}], [{"min_qty": 10, "discount": 5}], "0.01")
+        self.assertEqual(rows, [{"min_qty": 1, "unit_price": "100"}, {"min_qty": 10, "unit_price": "95"}])
