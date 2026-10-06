@@ -158,12 +158,12 @@ class ShopAdminTests(TestCase):
         self.assertEqual(ShopListing.objects.get(shop=market).price, Decimal("22.5000"))
 
 
-class DigiKeyPriceTests(TestCase):
+class BasePriceTests(TestCase):
     def setUp(self):
         from bots.models import DigiKeyListing
         self.shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
         self.p = Product.objects.create(sku="3228-AN-1-ND", name="Antenne", sale_price=Decimal("20.00"))
-        self.dk = DigiKeyListing.objects.create(product=self.p, dk_prices=[
+        self.dk = DigiKeyListing.objects.create(product=self.p, dk_offer_id="f11e", dk_prices=[
             {"qty": 1, "price": 10.0}, {"qty": 10, "price": 9.0}, {"qty": 100, "price": 8.0}])
         self.l = ShopListing.objects.create(shop=self.shop, product=self.p, price=Decimal("25"))
         ShopSettings.get()
@@ -171,33 +171,85 @@ class DigiKeyPriceTests(TestCase):
     def _tiers(self):
         return [(t.min_qty, t.unit_price) for t in self.l.tiers.order_by("min_qty")]
 
-    def test_use_digikey_prices_with_factor(self):
-        n, missing = services.use_digikey_prices([self.l], Decimal("90"))
-        self.assertEqual((n, missing), (1, []))
+    def _set(self, rows, currency="EUR", user=None):
+        from inventory.services.base_prices import set_base_prices
+        self.p.refresh_from_db()
+        return set_base_prices(self.p, rows, currency=currency, user=user)
+
+    def test_import_from_digikey_with_history(self):
+        from inventory.services.base_prices import import_from_digikey
+        self.assertTrue(import_from_digikey(self.p))
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.base_prices[0], {"min_qty": 1, "unit_price": "10"})
+        self.assertIn("DigiKey · офер f11e", self.p.base_prices_source)
+        h = self.p.price_history.get()
+        self.assertEqual((h.source, h.old_prices, len(h.new_prices)), ("digikey", [], 3))
+        self.assertFalse(import_from_digikey(self.p))  # без змін — без запису в історію
+        self.assertEqual(self.p.price_history.count(), 1)
+
+    def test_listing_follows_base_prices_with_factor(self):
+        self._set([{"min_qty": 1, "unit_price": "10"}, {"min_qty": 10, "unit_price": "9"},
+                   {"min_qty": 100, "unit_price": "8"}])
+        n, missing, no_rate = services.use_base_prices([self.l], Decimal("90"))
+        self.assertEqual((n, missing, no_rate), (1, [], []))
         self.l.refresh_from_db()
-        self.assertEqual(self.l.price_source, ShopListing.PRICE_DIGIKEY)
-        self.assertEqual(self.l.price, Decimal("9.0000"))
+        self.assertEqual((self.l.price_source, self.l.price), (ShopListing.PRICE_BASE, Decimal("9.0000")))
         self.assertEqual(self._tiers(), [(10, Decimal("8.1000")), (100, Decimal("7.2000"))])
-
-    def test_digikey_update_propagates_and_manual_detaches(self):
-        services.use_digikey_prices([self.l])
-        self.dk.dk_prices = [{"qty": 1, "price": 11.0}, {"qty": 50, "price": 9.5}]
-        self.dk.save(update_fields=["dk_prices"])
+        # зміна базових цін → позиція оновлюється сама
+        user = User.objects.create_user("anna")
+        self._set([{"min_qty": 1, "unit_price": "11"}, {"min_qty": 50, "unit_price": "9.5"}], user=user)
         self.l.refresh_from_db()
-        self.assertEqual(self.l.price, Decimal("11.0000"))
-        self.assertEqual(self._tiers(), [(50, Decimal("9.5000"))])
+        self.assertEqual(self.l.price, Decimal("9.9000"))
+        self.assertEqual(self._tiers(), [(50, Decimal("8.5500"))])
+        self.p.refresh_from_db()
+        self.assertEqual(self.p.base_prices_source, "Змінено вручну: anna")
+        self.assertEqual(self.p.price_history.first().user_label, "anna")
+        # ручна ціна від'єднує
         services.set_price([self.l], Decimal("12"))
+        self._set([{"min_qty": 1, "unit_price": "5"}])
         self.l.refresh_from_db()
-        self.assertEqual(self.l.price_source, ShopListing.PRICE_MANUAL)
-        self.dk.dk_prices = [{"qty": 1, "price": 5.0}]
-        self.dk.save(update_fields=["dk_prices"])
-        self.l.refresh_from_db()
-        self.assertEqual(self.l.price, Decimal("12.0000"))  # ручна ціна не перезаписується
+        self.assertEqual((self.l.price_source, self.l.price), (ShopListing.PRICE_MANUAL, Decimal("12.0000")))
 
-    def test_no_digikey_prices(self):
-        other = Product.objects.create(sku="X-1", name="X")
-        l2 = ShopListing.objects.create(shop=self.shop, product=other)
-        self.assertEqual(services.use_digikey_prices([l2]), (0, ["X-1"]))
+    def test_currency_conversion_needs_rate(self):
+        self._set([{"min_qty": 1, "unit_price": "10"}, {"min_qty": 10, "unit_price": "9"}], currency="USD")
+        self.assertEqual(services.use_base_prices([self.l])[2], ["3228-AN-1-ND (USD)"])
+        st = ShopSettings.get()
+        st.fx_rates = {"USD": "0.8"}
+        st.save()
+        n, _, _ = services.use_base_prices([self.l])
+        self.l.refresh_from_db()
+        self.assertEqual((n, self.l.price), (1, Decimal("8.0000")))
+        st.fx_rates = {"USD": "0.9"}
+        st.save()  # новий курс → перерахунок
+        self.l.refresh_from_db()
+        self.assertEqual(self.l.price, Decimal("9.0000"))
+
+    def test_admin_edit_records_user(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        admin_user = User.objects.create_superuser("boss", "b@x.y", "p")
+        self.client.force_login(admin_user)
+        url = f"/admin/inventory/product/{self.p.pk}/change/"
+        r = self.client.get(url)
+        self.assertContains(r, "Базові ціни (ступені)")
+        form = r.context["adminform"].form
+        data = {k: v for k, v in form.initial.items() if isinstance(v, (str, int, Decimal)) and not isinstance(v, bool)}
+        data.update({"sku": self.p.sku, "category": "other", "kind": self.p.kind, "unit_type": self.p.unit_type,
+                     "bom_type": self.p.bom_type, "lifecycle_status": "active", "reorder_point": "0",
+                     "is_active": "on", "base_prices_text": "1: 4,89\n10: 4.52", "base_currency": "usd",
+                     "base_note": "нова ціна від постачальника", "tech_attributes": "{}"})
+        for fs in r.context["inline_admin_formsets"]:
+            mf = fs.formset.management_form
+            for f in mf:
+                data[f.html_name] = f.value() if f.value() is not None else 0
+        resp = self.client.post(url, data)
+        self.assertEqual(resp.status_code, 302, getattr(resp, "context", None) and resp.context["adminform"].form.errors)
+        self.p.refresh_from_db()
+        self.assertEqual((self.p.base_price_currency, self.p.base_prices[1]["unit_price"]), ("USD", "4.52"))
+        h = self.p.price_history.first()
+        self.assertEqual((h.user_label, h.source, h.note), ("boss", "manual", "нова ціна від постачальника"))
 
 
 class ShippingTests(TestCase):
@@ -535,6 +587,12 @@ class ProductApiDigiKeyAttrsTests(TestCase):
             "hts": "8529.10.9100", "eccnNumber": "EAR99", "gtin": "", "msl": "  ", "reach": None})
         DigiKeyListing.objects.create(product=self.p, dk_offer_id="f11e", dk_prices=[
             {"qty": 1, "price": 4.89}, {"qty": 10, "price": 4.52}, {"qty": 50, "price": 4.18}])
+        from bots.models import DigiKeyConfig
+        cfg = DigiKeyConfig.get()
+        cfg.locale_currency = "USD"
+        cfg.save()
+        from inventory.services.base_prices import import_from_digikey
+        import_from_digikey(self.p)
         Product.objects.create(sku="X-1", name="Без DigiKey")
         key = APIKey.objects.create(name="erp", scopes=["products:read"])
         self.c = APIClient()
@@ -545,21 +603,22 @@ class ProductApiDigiKeyAttrsTests(TestCase):
         self.assertEqual(d["tech_attributes"], {"Antenna Type": "PCB Trace", "Gain": "2dBi, 4dBi",
                                                 "Frequency Range": "2.4GHz ~ 2.485GHz"})
         self.assertEqual(d["compliance"], {"hts": "8529.10.9100", "eccnNumber": "EAR99"})
-        self.assertEqual(d["digikey"]["offer_id"], "f11e")
-        self.assertEqual(d["digikey"]["price_breaks"], [{"min_qty": 1, "unit_price": 4.89},
-                                                        {"min_qty": 10, "unit_price": 4.52},
-                                                        {"min_qty": 50, "unit_price": 4.18}])
+        self.assertEqual(d["base_prices"]["price_breaks"], [{"min_qty": 1, "unit_price": 4.89},
+                                                            {"min_qty": 10, "unit_price": 4.52},
+                                                            {"min_qty": 50, "unit_price": 4.18}])
+        self.assertEqual(d["base_prices"]["currency"], "USD")
+        self.assertIn("DigiKey · офер f11e", d["base_prices"]["source"])
         x = self.c.get("/api/v1/products/?sku=X-1").json()["results"][0]
-        self.assertIsNone(x["digikey"])
+        self.assertIsNone(x["base_prices"])
         self.assertEqual((x["tech_attributes"], x["compliance"]), ({}, {}))
 
     def test_list_with_stock_and_shop(self):
         r = self.c.get("/api/v1/products/?with_stock=1")
         self.assertEqual(r.status_code, 200)
-        self.assertIn("digikey", r.json()["results"][0])
+        self.assertIn("base_prices", r.json()["results"][0])
         shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
         ShopListing.objects.create(shop=shop, product=self.p)
         d = self.c.get("/api/v1/shop/products/AN250202-04C-175-MHF1/").json()
         self.assertEqual(d["tech_attributes"]["Antenna Type"], "PCB Trace")
-        self.assertNotIn("digikey", d)
+        self.assertNotIn("base_prices", d)
         self.assertNotIn("compliance", d)

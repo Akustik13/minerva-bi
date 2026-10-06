@@ -120,6 +120,16 @@ class Product(models.Model):
                                                  help_text="При залишку нижче цього значення — дозамовити")
     lead_time_days = models.PositiveSmallIntegerField("Термін поставки (дні)", null=True, blank=True)
     notes = models.TextField(blank=True, default="")
+    # ── Базові ціни за кількістю (ступені) — власні ціни Minerva ──
+    # Початково можуть бути імпортовані з DigiKey; далі змінюються вручну. Кожна зміна — у ProductPriceHistory.
+    base_prices = models.JSONField(
+        "Базові ціни (ступені)", default=list, blank=True,
+        help_text='[{"min_qty": 1, "unit_price": "4.89"}, {"min_qty": 10, "unit_price": "4.52"}, …]',
+    )
+    base_price_currency = models.CharField("Валюта базових цін", max_length=3, default="EUR")
+    base_prices_source = models.CharField("Звідки базові ціни", max_length=200, blank=True, default="")
+    base_prices_updated_at = models.DateTimeField("Базові ціни змінено", null=True, blank=True)
+    base_prices_updated_by = models.CharField("Ким змінено базові ціни", max_length=150, blank=True, default="")
     tech_attributes = models.JSONField(
         "Технічні атрибути", default=dict, blank=True,
         help_text="Технічні параметри компонента (частота, смуга, тип тощо). Синхронізується з DigiKey лістингом."
@@ -588,3 +598,33 @@ class IncomingShipment(models.Model):
         if self.purchase_order_id:
             parts.append(f'← {self.purchase_order}')
         return ' '.join(parts) or f'#{self.pk}'
+
+
+
+class ProductPriceHistory(models.Model):
+    """Історія змін базових цін товару: хто, коли, звідки, було → стало."""
+    SOURCE_CHOICES = [
+        ("digikey", "Імпорт з DigiKey"),
+        ("manual", "Вручну"),
+        ("api", "API"),
+        ("migration", "Перенесення даних"),
+    ]
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="price_history",
+                                verbose_name="Товар")
+    created_at = models.DateTimeField("Коли", auto_now_add=True)
+    user = models.ForeignKey("auth.User", on_delete=models.SET_NULL, null=True, blank=True,
+                             related_name="+", verbose_name="Користувач")
+    user_label = models.CharField("Хто", max_length=150, blank=True, default="")
+    source = models.CharField("Джерело", max_length=12, choices=SOURCE_CHOICES, default="manual")
+    currency = models.CharField("Валюта", max_length=3, blank=True, default="")
+    old_prices = models.JSONField("Було", default=list, blank=True)
+    new_prices = models.JSONField("Стало", default=list, blank=True)
+    note = models.CharField("Примітка", max_length=255, blank=True, default="")
+
+    class Meta:
+        verbose_name = "Зміна базових цін"
+        verbose_name_plural = "Історія базових цін"
+        ordering = ["-created_at", "-pk"]
+
+    def __str__(self):
+        return f"{self.product.sku}: {self.get_source_display()} {self.created_at:%d.%m.%Y %H:%M}"

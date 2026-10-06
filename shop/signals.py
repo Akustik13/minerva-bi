@@ -2,7 +2,7 @@
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from .models import ShopListing, ShopPriceTier
+from .models import ShopListing, ShopPriceTier, ShopSettings
 
 
 def _queue(product_id):
@@ -28,12 +28,22 @@ def _tier_changed(sender, instance, **kwargs):
         pass
 
 
-@receiver(post_save, sender="bots.DigiKeyListing", dispatch_uid="shop_digikey_prices")
-def _digikey_prices_changed(sender, instance, update_fields=None, **kwargs):
-    """Нові ціни офера DigiKey → позиції магазинів з джерелом ціни «DigiKey»."""
-    if not instance.product_id or (update_fields is not None and "dk_prices" not in update_fields):
+_BASE_FIELDS = {"base_prices", "base_price_currency"}
+
+
+@receiver(post_save, sender="inventory.Product", dispatch_uid="shop_base_prices")
+def _base_prices_changed(sender, instance, update_fields=None, created=False, **kwargs):
+    """Змінено базові ціни товару → позиції магазинів з джерелом «Базові ціни»."""
+    if created or (update_fields is not None and not (_BASE_FIELDS & set(update_fields))):
         return
-    from .services import apply_digikey_prices
-    for listing in ShopListing.objects.filter(product_id=instance.product_id,
-                                              price_source=ShopListing.PRICE_DIGIKEY).select_related("product"):
-        apply_digikey_prices(listing)
+    from .services import reapply_base_prices
+    reapply_base_prices(instance.pk)
+
+
+@receiver(post_save, sender=ShopSettings, dispatch_uid="shop_fx_rates")
+def _settings_changed(sender, instance, update_fields=None, **kwargs):
+    """Змінено курси / округлення → перерахувати всі позиції з базовими цінами."""
+    if update_fields is not None and not ({"fx_rates", "rounding"} & set(update_fields)):
+        return
+    from .services import reapply_base_prices
+    reapply_base_prices()

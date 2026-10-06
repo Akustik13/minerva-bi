@@ -119,7 +119,7 @@ def unit_price_for(listing, qty) -> Decimal | None:
 
 
 # ── Масові дії над позиціями ─────────────────────────────────────────────────
-# Ручні зміни цін від'єднують позицію від DigiKey, інакше наступна синхронізація їх перезапише.
+# Ручні зміни цін від'єднують позицію від базових цін, інакше наступна зміна базових їх перезапише.
 
 def _save_manual(listing, *fields):
     listing.price_source = ShopListing.PRICE_MANUAL
@@ -278,9 +278,9 @@ def set_visibility(listings, visible: bool) -> int:
 
 @transaction.atomic
 def add_products(shop: Shop, products, visible: bool = True, markup=None, with_tiers: bool = False,
-                 digikey: bool = False) -> tuple[int, int]:
+                 base: bool = False) -> tuple[int, int]:
     """Додає товари в магазин. markup=None — ціна = «Ціна продажу»; інакше від закупівлі;
-    digikey=True — ціни з DigiKey (де є). Повертає (додано, вже були)."""
+    base=True — базові ціни товару (де є). Повертає (додано, вже були)."""
     added, existed = 0, 0
     new = []
     for p in products:
@@ -290,9 +290,10 @@ def add_products(shop: Shop, products, visible: bool = True, markup=None, with_t
             continue
         added += 1
         new.append(listing)
-    if digikey:
-        _, missing = use_digikey_prices(new)
-        new = [l for l in new if l.product.sku in missing]  # без цін DigiKey — як «Ціна продажу»
+    if base:
+        use_base_prices(new)
+        done_ids = {l.pk for l in new if l.price_source == ShopListing.PRICE_BASE}
+        new = [l for l in new if l.pk not in done_ids]  # без базових цін / курсу — як «Ціна продажу»
     if markup is not None:
         price_from_purchase(new, markup)
     if with_tiers:
@@ -331,37 +332,42 @@ def copy_listings(listings, target: Shop, factor=Decimal("1"), with_tiers: bool 
     return copied, skipped
 
 
-# ── Ціни з DigiKey ───────────────────────────────────────────────────────────
-# Ціни офера на DigiKey Marketplace (bots.DigiKeyListing.dk_prices, [{qty, price}]) оновлюються
-# командою pull_dk_listings / дією «Оновити ціни з DigiKey»; позиції з price_source=digikey
-# підхоплюють їх автоматично (сигнал у shop/signals.py).
+# ── Базові ціни товару ───────────────────────────────────────────────────────
+# Базові ціни (Product.base_prices, ступені за кількістю) — власні ціни Minerva; початково можуть бути
+# імпортовані з DigiKey. Позиції з price_source=base підхоплюють їх зміни автоматично (shop/signals.py),
+# з переведенням у валюту магазину за курсом із «Налаштувань цін».
 
-def dk_price_tiers(product) -> list[tuple[int, Decimal]]:
-    """[(кількість, ціна за шт.)] з офера DigiKey, від найменшої кількості; порожньо — цін немає."""
-    from django.core.exceptions import ObjectDoesNotExist
+def fx_rate(currency: str, shop_currency: str) -> Decimal | None:
+    """Скільки одиниць валюти магазину за 1 одиницю currency; None — курс не задано."""
+    currency, shop_currency = (currency or "").upper(), (shop_currency or "").upper()
+    if not currency or currency == shop_currency:
+        return Decimal(1)
+    rate = (ShopSettings.get().fx_rates or {}).get(currency)
     try:
-        listing = product.dk_listing
-    except (ObjectDoesNotExist, AttributeError):
-        return []
-    out = {}
-    for row in (listing.dk_prices or []) if listing else []:
-        try:
-            qty, price = int(row.get("qty")), Decimal(str(row.get("price")))
-        except (TypeError, ValueError, ArithmeticError, AttributeError):
-            continue
-        if qty >= 1 and price > 0:
-            out[qty] = price
-    return sorted(out.items())
+        rate = Decimal(str(rate))
+    except (TypeError, ValueError, ArithmeticError):
+        return None
+    return rate if rate > 0 else None
 
 
-def apply_digikey_prices(listing, rounding: str | None = None) -> bool:
-    """Ціна позиції = найменший ступінь DigiKey × %, ступені — решта. False — у DigiKey цін немає.
+def base_tiers(product) -> list[tuple[int, Decimal]]:
+    """[(кількість, ціна)] базових цін товару (у валюті товару)."""
+    from inventory.services.base_prices import tiers
+    return tiers(product)
+
+
+def apply_base_prices(listing, rounding: str | None = None) -> str:
+    """Ціна позиції = базовий ступінь 1 шт. × курс × %, ступені — решта.
+    Повертає "ok", "no_prices" (у товару немає базових цін) або "no_rate" (немає курсу валюти).
     Пише в БД лише те, що змінилось (щоб не надсилати зайвих вебхуків)."""
-    tiers = dk_price_tiers(listing.product)
+    tiers = base_tiers(listing.product)
     if not tiers:
-        return False
+        return "no_prices"
+    rate = fx_rate(listing.product.base_price_currency, listing.shop.currency)
+    if rate is None:
+        return "no_rate"
     rounding = rounding or ShopSettings.get().rounding
-    factor = Decimal(listing.price_factor) / 100
+    factor = rate * Decimal(listing.price_factor) / 100
     price = round_price(tiers[0][1] * factor, rounding)
     want = {qty: round_price(p * factor, rounding) for qty, p in tiers[1:] if qty >= 2}
     if listing.price != price:
@@ -377,28 +383,39 @@ def apply_digikey_prices(listing, rounding: str | None = None) -> bool:
             want.pop(t.min_qty)
     for qty, p in sorted(want.items()):
         ShopPriceTier.objects.create(listing=listing, min_qty=qty, unit_price=p)
-    return True
+    return "ok"
 
 
 @transaction.atomic
-def use_digikey_prices(listings, factor=Decimal("100")) -> tuple[int, list[str]]:
-    """Перемикає позиції на ціни DigiKey. Повертає (к-сть, SKU без цін на DigiKey)."""
-    done, missing = 0, []
+def use_base_prices(listings, factor=Decimal("100")) -> tuple[int, list[str], list[str]]:
+    """Перемикає позиції на базові ціни товару. Повертає (к-сть, SKU без базових цін, SKU без курсу)."""
+    done, missing, no_rate = 0, [], []
     for l in listings:
-        if not dk_price_tiers(l.product):
+        if not base_tiers(l.product):
             missing.append(l.product.sku)
             continue
-        l.price_source = ShopListing.PRICE_DIGIKEY
+        if fx_rate(l.product.base_price_currency, l.shop.currency) is None:
+            no_rate.append(f"{l.product.sku} ({l.product.base_price_currency})")
+            continue
+        l.price_source = ShopListing.PRICE_BASE
         l.price_factor = Decimal(str(factor))
         l.save(update_fields=["price_source", "price_factor", "updated_at"])
-        apply_digikey_prices(l)
+        apply_base_prices(l)
         done += 1
-    return done, missing
+    return done, missing, no_rate
+
+
+def reapply_base_prices(product_id=None) -> int:
+    """Перерахувати позиції з базовими цінами (товару або всі — напр. після зміни курсу)."""
+    qs = ShopListing.objects.filter(price_source=ShopListing.PRICE_BASE).select_related("product", "shop")
+    if product_id is not None:
+        qs = qs.filter(product_id=product_id)
+    return sum(1 for l in qs if apply_base_prices(l) == "ok")
 
 
 @transaction.atomic
 def use_manual_prices(listings) -> int:
-    """Від'єднує від DigiKey: поточні ціни залишаються, далі змінюються лише вручну."""
+    """Від'єднує від базових цін: поточні ціни залишаються, далі змінюються лише вручну."""
     n = 0
     for l in listings:
         if l.price_source != ShopListing.PRICE_MANUAL:

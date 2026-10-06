@@ -47,6 +47,11 @@ class ShopSettings(models.Model):
     )
     rounding = models.CharField("Округлення цін", max_length=8, choices=Rounding.choices,
                                 default=Rounding.CENT)
+    fx_rates = models.JSONField(
+        "Курси валют", default=dict, blank=True,
+        help_text='Для базових цін в іншій валюті: скільки одиниць валюти магазину за 1 одиницю, '
+                  'напр. {"USD": 0.86} — 1 USD = 0,86 EUR.',
+    )
 
     class Meta:
         verbose_name = "Налаштування цін магазину"
@@ -125,16 +130,16 @@ class ShopListing(models.Model):
         validators=[MinValueValidator(Decimal("0"))],
         help_text="Порожньо — «Ціна продажу» товару; без ціни на сайті «Ціна за запитом».",
     )
-    PRICE_MANUAL, PRICE_DIGIKEY = "manual", "digikey"
+    PRICE_MANUAL, PRICE_BASE = "manual", "base"
     price_source = models.CharField(
         "Джерело ціни", max_length=10, default=PRICE_MANUAL,
-        choices=[(PRICE_MANUAL, "Вручну"), (PRICE_DIGIKEY, "DigiKey (автоматично)")],
-        help_text="DigiKey — ціна і ступені беруться з цін офера на DigiKey і оновлюються разом з ними.",
+        choices=[(PRICE_MANUAL, "Вручну"), (PRICE_BASE, "Базові ціни товару (автоматично)")],
+        help_text="Базові ціни — ціна і ступені беруться з базових цін товару (склад) і оновлюються разом з ними.",
     )
     price_factor = models.DecimalField(
-        "% від ціни DigiKey", max_digits=7, decimal_places=2, default=Decimal("100"),
+        "% від базової ціни", max_digits=7, decimal_places=2, default=Decimal("100"),
         validators=[MinValueValidator(Decimal("1"))],
-        help_text="100 = як на DigiKey, 95 = на 5 % дешевше.",
+        help_text="100 = як базова ціна, 95 = на 5 % дешевше.",
     )
     discount_percent = models.DecimalField(
         "Акція: знижка, %", max_digits=5, decimal_places=2, default=Decimal("0"),

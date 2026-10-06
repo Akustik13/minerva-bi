@@ -21,6 +21,12 @@ from .shipping import format_countries, parse_countries
 class ShopSettingsAdmin(admin.ModelAdmin):
     fieldsets = [
         ("Ціноутворення", {"fields": ["default_markup", "rounding"]}),
+        ("Курси валют (для базових цін)", {
+            "fields": ["fx_rates"],
+            "description": "Якщо базові ціни товару в іншій валюті, ніж магазин (напр. USD з DigiKey, а магазин EUR): "
+                           '{"USD": 0.86} — 1 USD = 0,86 EUR. Після збереження позиції з базовими цінами '
+                           "перераховуються автоматично.",
+        }),
         ("Шаблон ступенів цін (як на DigiKey)", {
             "fields": ["price_breaks", "price_breaks_preview"],
             "description": "Знижка у % від ціни за 1 шт. Застосовується дією «Згенерувати ступені цін» "
@@ -313,10 +319,10 @@ class NewForm(forms.Form):
                               help_text="Стільки днів товар має бейдж «Neu» і стоїть угорі каталогу")
 
 
-class DigiKeyPriceForm(forms.Form):
-    factor = forms.DecimalField(label="% від ціни DigiKey", max_digits=7, decimal_places=2, initial=Decimal("100"),
+class BasePriceForm(forms.Form):
+    factor = forms.DecimalField(label="% від базової ціни", max_digits=7, decimal_places=2, initial=Decimal("100"),
                                 min_value=Decimal("1"),
-                                help_text="100 = як на DigiKey, 95 = на 5 % дешевше, 110 = на 10 % дорожче")
+                                help_text="100 = як базова ціна, 95 = на 5 % дешевше, 110 = на 10 % дорожче")
 
 
 class AddToShopForm(forms.Form):
@@ -325,7 +331,7 @@ class AddToShopForm(forms.Form):
     price_source = forms.ChoiceField(label="Ціна", choices=[
         ("sale", "«Ціна продажу» товару (можна змінити пізніше)"),
         ("markup", "Закупівля + націнка з налаштувань"),
-        ("digikey", "Ціни DigiKey зі ступенями (оновлюються автоматично)"),
+        ("base", "Базові ціни товару зі ступенями (оновлюються автоматично)"),
     ], initial="sale", widget=forms.RadioSelect)
     with_tiers = forms.BooleanField(label="Згенерувати ступені цін за шаблоном", required=False, initial=True)
 
@@ -474,35 +480,38 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     inlines = [ShopPriceTierInline]
     fields = ["shop", "product", "is_visible", "price", "price_source", "price_factor",
               ("discount_percent", "discount_until"), "new_until", ("lifecycle_status", "successor"),
-              "breaks_preview", "dk_prices_preview"]
+              "breaks_preview", "base_prices_preview"]
     autocomplete_fields = ["successor"]
-    readonly_fields = ["breaks_preview", "dk_prices_preview"]
+    readonly_fields = ["breaks_preview", "base_prices_preview"]
     actions = ["action_show", "action_hide", "action_set_price", "action_adjust", "action_markup",
                "action_offer", "action_offer_clear", "action_new", "action_new_clear", "action_lifecycle",
-               "action_digikey", "action_manual",
+               "action_base", "action_manual",
                "action_tiers_default", "action_tiers_custom", "action_tiers_clear",
                "action_reset_to_sale", "action_round", "action_copy", "delete_selected"]
 
     def save_model(self, request, obj, form, change):
-        """Ручна зміна ціни від'єднує позицію від DigiKey; % або перемикання на DigiKey — перерахунок."""
+        """Ручна зміна ціни від'єднує позицію від базових цін; % або перемикання — перерахунок."""
         changed = set(form.changed_data) if form else set()
-        if (change and obj.price_source == ShopListing.PRICE_DIGIKEY and "price" in changed
+        if (change and obj.price_source == ShopListing.PRICE_BASE and "price" in changed
                 and "price_source" not in changed):
             obj.price_source = ShopListing.PRICE_MANUAL
-            self.message_user(request, f"{obj.product.sku}: ціну змінено вручну — позицію від'єднано від DigiKey.",
+            self.message_user(request, f"{obj.product.sku}: ціну змінено вручну — позицію від'єднано від базових цін.",
                               messages.INFO)
         super().save_model(request, obj, form, change)
-        if obj.price_source == ShopListing.PRICE_DIGIKEY and changed & {"price_source", "price_factor"}:
-            if not services.apply_digikey_prices(obj):
-                self.message_user(request, f"{obj.product.sku}: у DigiKey немає цін для цього товару.",
-                                  messages.WARNING)
+        if obj.price_source == ShopListing.PRICE_BASE and changed & {"price_source", "price_factor"}:
+            res = services.apply_base_prices(obj)
+            if res == "no_prices":
+                self.message_user(request, f"{obj.product.sku}: у товару немає базових цін.", messages.WARNING)
+            elif res == "no_rate":
+                self.message_user(request, f"{obj.product.sku}: немає курсу {obj.product.base_price_currency} → "
+                                           f"{obj.shop.currency} («Налаштування цін» → «Курси валют»).", messages.WARNING)
 
     def save_related(self, request, form, formsets, change):
         super().save_related(request, form, formsets, change)
         obj = form.instance
-        if obj.price_source == ShopListing.PRICE_DIGIKEY and any(fs.has_changed() for fs in formsets):
+        if obj.price_source == ShopListing.PRICE_BASE and any(fs.has_changed() for fs in formsets):
             services.use_manual_prices([obj])  # ступені змінено вручну
-            self.message_user(request, f"{obj.product.sku}: ступені змінено вручну — позицію від'єднано від DigiKey.",
+            self.message_user(request, f"{obj.product.sku}: ступені змінено вручну — позицію від'єднано від базових цін.",
                               messages.INFO)
 
     def get_queryset(self, request):
@@ -560,21 +569,25 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
 
     @admin.display(description="Джерело", ordering="price_source")
     def source_col(self, obj):
-        if obj.price_source == ShopListing.PRICE_DIGIKEY:
+        if obj.price_source == ShopListing.PRICE_BASE:
             pct = "" if obj.price_factor == 100 else f" {obj.price_factor.normalize():f} %"
-            return format_html('<span title="Ціна і ступені з DigiKey" style="padding:1px 6px;border-radius:8px;'
-                               'background:#c62828;color:#fff">DigiKey{}</span>', pct)
+            return format_html('<span title="Ціна і ступені з базових цін товару" style="padding:1px 6px;'
+                               'border-radius:8px;background:#1565c0;color:#fff">базові{}</span>', pct)
         return "вручну"
 
-    @admin.display(description="Ціни DigiKey (офер)")
-    def dk_prices_preview(self, obj):
+    @admin.display(description="Базові ціни товару")
+    def base_prices_preview(self, obj):
         if not obj or not obj.pk:
             return "—"
-        tiers = services.dk_price_tiers(obj.product)
+        tiers = services.base_tiers(obj.product)
         if not tiers:
-            return "Немає — товар не пов'язаний з офером DigiKey або ціни ще не стягнуто."
-        body = format_html_join("", "<tr><td>від {} шт.</td><td>{}</td></tr>", ((q, f"{p:.2f}") for q, p in tiers))
-        return format_html("<table><tr><th>Кількість</th><th>Ціна/шт.</th></tr>{}</table>", body)
+            return "Немає — задайте в картці товару (Склад → Товари → «💰 Базові ціни»)."
+        cur = obj.product.base_price_currency
+        body = format_html_join("", "<tr><td>від {} шт.</td><td>{} {}</td></tr>",
+                                ((q, f"{p:.2f}", cur) for q, p in tiers))
+        return format_html('<table><tr><th>Кількість</th><th>Ціна/шт.</th></tr>{}</table>'
+                           '<div style="margin-top:4px;opacity:.7;font-size:12px">{}</div>',
+                           body, obj.product.base_prices_source or "")
 
     @admin.display(description="Ціна продажу")
     def sale_price_col(self, obj):
@@ -699,19 +712,22 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
     def action_new_clear(self, request, queryset):
         self.message_user(request, f"Позначку знято: {services.set_new(queryset, None)} позицій")
 
-    @admin.action(description="🔗 Ціни з DigiKey (зі ступенями, автоматично)…")
-    def action_digikey(self, request, queryset):
+    @admin.action(description="🔗 Базові ціни товару (зі ступенями, автоматично)…")
+    def action_base(self, request, queryset):
         def apply(qs, d):
-            n, missing = services.use_digikey_prices(qs.select_related("product"), d["factor"])
+            n, missing, no_rate = services.use_base_prices(qs.select_related("product", "shop"), d["factor"])
             if missing:
-                messages.warning(request, "Без цін DigiKey (не змінено): " + ", ".join(missing[:20]) +
+                messages.warning(request, "Без базових цін (не змінено): " + ", ".join(missing[:20]) +
                                  (" …" if len(missing) > 20 else ""))
-            return f"Ціни з DigiKey ({d['factor']:g} %): {n} позицій. Далі оновлюються разом з цінами DigiKey."
-        return self._form_action(request, queryset, DigiKeyPriceForm, "Ціни з DigiKey", apply)
+            if no_rate:
+                messages.warning(request, "Немає курсу валюти («Налаштування цін» → «Курси валют»), не змінено: " +
+                                 ", ".join(no_rate[:20]) + (" …" if len(no_rate) > 20 else ""))
+            return f"Базові ціни ({d['factor']:g} %): {n} позицій. Далі оновлюються разом з базовими цінами товару."
+        return self._form_action(request, queryset, BasePriceForm, "Базові ціни товару", apply)
 
-    @admin.action(description="✋ Ціни вручну (від'єднати від DigiKey)")
+    @admin.action(description="✋ Ціни вручну (від'єднати від базових цін)")
     def action_manual(self, request, queryset):
-        self.message_user(request, f"Від'єднано від DigiKey: {services.use_manual_prices(queryset)} "
+        self.message_user(request, f"Від'єднано від базових цін: {services.use_manual_prices(queryset)} "
                                    "(поточні ціни залишились)")
 
     @admin.action(description="💶 Згенерувати ступені цін (шаблон з налаштувань)")
@@ -785,9 +801,9 @@ class ShopProductAdmin(FormActionMixin, admin.ModelAdmin):
     def action_add_to_shop(self, request, queryset):
         def apply(qs, d):
             markup = ShopSettings.get().default_markup if d["price_source"] == "markup" else None
-            dk = d["price_source"] == "digikey"
+            base = d["price_source"] == "base"
             added, existed = services.add_products(d["shop"], qs, d["visible"], markup,
-                                                   d["with_tiers"] and not dk, digikey=dk)
+                                                   d["with_tiers"] and not base, base=base)
             return f"Додано в «{d['shop']}»: {added}, вже були в магазині: {existed}"
         default = Shop.objects.filter(is_default=True).first()
         return self._form_action(request, queryset, AddToShopForm, "Додати товари в магазин", apply,

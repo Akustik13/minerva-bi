@@ -194,42 +194,30 @@ def split_attributes(attrs) -> tuple[dict, dict]:
     return params, codes
 
 
-class DigiKeyPricesMixin:
-    """Ціни офера DigiKey Marketplace (bots.DigiKeyListing.dk_prices) — поле `digikey`."""
-
-    def get_digikey(self, obj):
-        from django.core.exceptions import ObjectDoesNotExist
-        try:
-            listing = obj.dk_listing
-        except ObjectDoesNotExist:
-            return None
-        if listing is None:
-            return None
-        from shop.services import dk_price_tiers
-        if not hasattr(self, "_dk_currency"):
-            try:
-                from bots.models import DigiKeyConfig
-                self._dk_currency = DigiKeyConfig.get().locale_currency
-            except Exception:
-                self._dk_currency = None
-        return {
-            "offer_id": listing.dk_offer_id or None,
-            "currency": self._dk_currency,
-            "synced_at": listing.last_synced_at,
-            "quantity_available": listing.dk_quantity_available,
-            "price_breaks": [{"min_qty": q, "unit_price": float(p)} for q, p in dk_price_tiers(obj)],
-        }
+def base_prices_payload(product):
+    """Базові ціни товару для API: {currency, price_breaks, source, updated_at, updated_by} або None."""
+    from inventory.services.base_prices import normalize
+    rows = normalize(product.base_prices)
+    if not rows:
+        return None
+    return {
+        "currency": product.base_price_currency,
+        "price_breaks": [{"min_qty": r["min_qty"], "unit_price": float(r["unit_price"])} for r in rows],
+        "source": product.base_prices_source or None,
+        "updated_at": product.base_prices_updated_at,
+        "updated_by": product.base_prices_updated_by or None,
+    }
 
 
-class ProductSerializer(DigiKeyPricesMixin, serializers.ModelSerializer):
+class ProductSerializer(serializers.ModelSerializer):
     image_url     = serializers.SerializerMethodField()
     datasheet_url = serializers.SerializerMethodField()
     tech_attributes = serializers.SerializerMethodField(
         help_text="Технічні параметри {назва: значення} — набір різний для різних товарів/категорій")
     compliance = serializers.SerializerMethodField(
         help_text="Службові коди DigiKey {hts, eccnNumber, rohsStatus, …} — лише заповнені")
-    digikey = serializers.SerializerMethodField(
-        help_text="Офер DigiKey: {offer_id, currency, synced_at, quantity_available, price_breaks[]} або null")
+    base_prices = serializers.SerializerMethodField(
+        help_text="Базові ціни за кількістю: {currency, price_breaks[], source, updated_at, updated_by} або null")
 
     class Meta:
         model  = Product
@@ -237,10 +225,13 @@ class ProductSerializer(DigiKeyPricesMixin, serializers.ModelSerializer):
                   "kind", "unit_type", "manufacturer", "purchase_price",
                   "sale_price", "reorder_point", "lead_time_days", "is_active",
                   "lifecycle_status", "hs_code", "country_of_origin", "net_weight_g", "notes",
-                  "image_url", "datasheet_url", "tech_attributes", "compliance", "digikey"]
+                  "image_url", "datasheet_url", "tech_attributes", "compliance", "base_prices"]
 
     def get_tech_attributes(self, obj):
         return split_attributes(obj.tech_attributes)[0]
+
+    def get_base_prices(self, obj):
+        return base_prices_payload(obj)
 
     def get_compliance(self, obj):
         return split_attributes(obj.tech_attributes)[1]

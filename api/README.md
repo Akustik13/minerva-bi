@@ -131,17 +131,18 @@
 - `tech_attributes` — параметри з людськими назвами: `{"Antenna Type": "PCB Trace", "Frequency Range": "2.4GHz ~ 2.485GHz", "Gain": "2dBi, 4dBi", …}`
 - `compliance` — службові коди DigiKey: `{"hts": "8529.10.9100", "eccnNumber": "EAR99", "packaging": "BULK", …}`
 
-**Ціни DigiKey** (каскадні ціни вашого офера на DigiKey Marketplace, як у картці товару):
+**Базові ціни** (власні ціни за кількістю з картки товару; можуть бути імпортовані з DigiKey, далі змінюються вручну, кожна зміна — в історії товару):
 ```json
-"digikey": {
-  "offer_id": "f11e32f3-…", "currency": "USD", "synced_at": "2026-06-30T15:57:00+02:00",
-  "quantity_available": 120,
-  "price_breaks": [{"min_qty": 1, "unit_price": 4.89}, {"min_qty": 10, "unit_price": 4.52}, …]
+"base_prices": {
+  "currency": "USD",
+  "price_breaks": [{"min_qty": 1, "unit_price": 4.89}, {"min_qty": 10, "unit_price": 4.52}, …],
+  "source": "DigiKey · офер f11e32f3-… · синхр. 30.06.2026 15:57",
+  "updated_at": "2026-10-06T10:12:00+02:00", "updated_by": "admin"
 }
 ```
-`null` — товар не пов'язаний з офером DigiKey. Оновлення цін: дія «⬇️ Оновити ціни з DigiKey» у товарах або крон `pull_dk_listings`.
+`source` — звідки ціни («DigiKey · офер … · синхр. …» або «Змінено вручну: <користувач>»); `null` — базових цін немає.
 
-`GET /shop/products/` теж віддає `tech_attributes` (без `compliance` і цін DigiKey — магазин має власні ціни).
+`GET /shop/products/` теж віддає `tech_attributes` (без `compliance` і базових цін — у магазину ціни позиції).
 
 ---
 
@@ -581,6 +582,6 @@ app.listen(3000);
 
 **Доставка.** Регіони задаються в картці магазину (`ShippingZone`: країни ISO, ціна нетто, участь у безкоштовній доставці) + `Shop.free_shipping_enabled/threshold`. Якщо регіони є, `POST /orders/` з `shop:true` перевіряє `addr_country` (інакше 400 `shipping_not_available`) і сам записує `shipping_cost` (з урахуванням порогу безкоштовної доставки). Регіони можна імпортувати з DigiKey (`GET /offers` → `shippingRates`: країни + мінімальна ціна; порогу в API DigiKey немає).
 
-**Ціни з DigiKey.** `ShopListing.price_source = digikey` + `price_factor` (%): ціна і ступені позиції = ціни офера DigiKey (`bots.DigiKeyListing.dk_prices`) × %, оновлюються сигналом при кожному оновленні цін DigiKey (`pull_dk_listings`, дія «⬇️ Оновити ціни з DigiKey» у товарах — `bots.services.dk_marketplace.refresh_offer_prices`). Ручна зміна ціни/ступенів перемикає позицію на `manual`.
+**Базові ціни в магазині.** `ShopListing.price_source = base` + `price_factor` (%): ціна і ступені позиції = базові ціни товару (`Product.base_prices`) × курс (`ShopSettings.fx_rates`, якщо валюта товару інша) × %, оновлюються сигналом при зміні базових цін або курсу. Ручна зміна ціни/ступенів перемикає позицію на `manual`. Історія змін базових цін — `inventory.ProductPriceHistory`; імпорт з DigiKey — `inventory/services/base_prices.import_from_digikey`.
 
 Вебхук `stock.changed` надсилається також, коли змінюється позиція магазину (галочка, ціна, ступені) або назва, категорія, фото товару, що є в магазині, — сайт одразу скидає кеш каталогу.

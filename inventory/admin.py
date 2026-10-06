@@ -2125,6 +2125,48 @@ class ProductPackagingInline(admin.TabularInline):
     verbose_name_plural = '📦 Рекомендована упаковка'
 
 
+class ProductAdminForm(forms.ModelForm):
+    """Форма товару + редагування базових цін (ступенів) з записом в історію."""
+    base_prices_text = forms.CharField(
+        label="Базові ціни (ступені)", required=False,
+        widget=forms.Textarea(attrs={"rows": 7, "cols": 28, "style": "font-family:monospace"}),
+        help_text="По рядку на ступінь: «кількість: ціна за шт.», напр. «1: 4.89», «10: 4.52». Перший — від 1 шт.",
+    )
+    base_currency = forms.RegexField(label="Валюта", regex=r"^[A-Za-z]{3}$", max_length=3, initial="EUR",
+                                     widget=forms.TextInput(attrs={"size": 4}),
+                                     error_messages={"invalid": "Код валюти з 3 літер, напр. EUR або USD"})
+    base_note = forms.CharField(label="Примітка до зміни", required=False, max_length=200,
+                                help_text="Необов'язково — потрапить в історію змін базових цін.")
+
+    class Meta:
+        model = Product
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .services.base_prices import format_text
+        inst = self.instance
+        if inst and inst.pk:
+            self.initial["base_prices_text"] = format_text(inst.base_prices)
+            self.initial["base_currency"] = inst.base_price_currency
+
+    def clean_base_prices_text(self):
+        from .services.base_prices import parse_text
+        try:
+            return parse_text(self.cleaned_data.get("base_prices_text", ""))
+        except ValueError as e:
+            raise forms.ValidationError(str(e))
+
+    def clean_base_currency(self):
+        return (self.cleaned_data.get("base_currency") or "EUR").upper()
+
+
+class BaseFromDigiKeyForm(forms.Form):
+    refresh = forms.BooleanField(label="Спершу стягнути актуальні ціни офера з DigiKey API", required=False, initial=True)
+    confirm = forms.BooleanField(label="Так, перезаписати базові ціни вибраних товарів цінами DigiKey", required=True,
+                                 help_text="Поточні базові ціни збережуться в історії змін.")
+
+
 class LifecycleForm(forms.Form):
     status = forms.ChoiceField(label="Статус", choices=Product.Lifecycle.choices, widget=forms.RadioSelect)
     set_successor = forms.BooleanField(label="Змінити рекомендовану заміну", required=False, initial=True)
@@ -2159,8 +2201,19 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     list_filter   = ("category", "lifecycle_status", "kind", "bom_type", "is_active")
     list_per_page = 50
     autocomplete_fields = ("successor",)
-    actions       = ["action_set_category", "action_set_lifecycle", "action_refresh_dk_prices", "action_sale_price_from_dk",
+    form          = ProductAdminForm
+    actions       = ["action_set_category", "action_set_lifecycle", "action_base_from_dk", "action_sale_price_from_base",
                      "bulk_sync_digikey_attrs"]
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        if form is None or "base_prices_text" not in getattr(form, "cleaned_data", {}):
+            return
+        from .services.base_prices import set_base_prices
+        d = form.cleaned_data
+        if set_base_prices(obj, d["base_prices_text"], source="manual", user=request.user,
+                           currency=d.get("base_currency"), note=d.get("base_note", "")):
+            self.message_user(request, f"{obj.sku}: базові ціни змінено (записано в історію).")
 
     # ── Масові дії: категорія, ціни DigiKey ──────────────────────────────────
     @admin.action(description="🏷️ Змінити категорію…")
@@ -2197,67 +2250,80 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
             return f"Життєвий цикл «{Product.Lifecycle(d['status']).label}»: {n} товарів"
         return FormActionMixin._form_action(self, request, queryset, LifecycleForm, "Життєвий цикл товарів", apply)
 
-    @admin.action(description="⬇️ Оновити ціни з DigiKey (ступені)")
-    def action_refresh_dk_prices(self, request, queryset):
-        try:
-            from bots.services.dk_marketplace import refresh_offer_prices
-            r = refresh_offer_prices(queryset)
-        except Exception as e:
-            self.message_user(request, f"DigiKey: {e}", messages.ERROR)
-            return
-        self.message_user(request, f"Ціни DigiKey: оновлено {r['updated']}, без змін {r['unchanged']}. "
-                                   "Позиції магазинів з ціною «DigiKey» оновлено автоматично.")
-        if r["not_found"]:
-            self.message_user(request, "Офер на DigiKey не знайдено: " + ", ".join(r["not_found"][:20]),
-                              messages.WARNING)
-        if r["no_listing"]:
-            self.message_user(request, "Не пов'язані з DigiKey (немає лістингу): " + ", ".join(r["no_listing"][:20]),
-                              messages.WARNING)
+    @admin.action(description="⬇️ Базові ціни ← DigiKey (перезаписати)…")
+    def action_base_from_dk(self, request, queryset):
+        from shop.admin import FormActionMixin
+        from .services.base_prices import import_from_digikey
 
-    @admin.action(description="💲 Ціна продажу = ціна DigiKey за 1 шт.")
-    def action_sale_price_from_dk(self, request, queryset):
-        from shop.services import dk_price_tiers
-        n, missing = 0, []
+        def apply(qs, d):
+            if d["refresh"]:
+                try:
+                    from bots.services.dk_marketplace import refresh_offer_prices
+                    refresh_offer_prices(qs)
+                except Exception as e:
+                    messages.warning(request, f"DigiKey API: {e} — використано останні збережені ціни DigiKey.")
+            changed, same, missing = 0, 0, []
+            for p in qs:
+                r = import_from_digikey(p, user=request.user)
+                if r is None:
+                    missing.append(p.sku)
+                elif r:
+                    changed += 1
+                else:
+                    same += 1
+            if missing:
+                messages.warning(request, "Немає цін DigiKey (не змінено): " + ", ".join(missing[:20]))
+            return f"Базові ціни з DigiKey: змінено {changed}, без змін {same}. Записано в історію."
+        return FormActionMixin._form_action(self, request, queryset, BaseFromDigiKeyForm,
+                                            "Базові ціни ← DigiKey", apply)
+
+    @admin.action(description="💲 Ціна продажу = базова ціна за 1 шт.")
+    def action_sale_price_from_base(self, request, queryset):
+        from shop.models import Shop
+        from shop.services import fx_rate
+        from .services.base_prices import tiers
+        target = getattr(Shop.objects.filter(is_default=True).first(), "currency", None) or "EUR"
+        n, missing, no_rate = 0, [], []
         for p in queryset:
-            tiers = dk_price_tiers(p)
-            if not tiers:
+            t = tiers(p)
+            if not t:
                 missing.append(p.sku)
                 continue
-            if p.sale_price != tiers[0][1]:
-                p.sale_price = tiers[0][1]
+            rate = fx_rate(p.base_price_currency, target)
+            if rate is None:
+                no_rate.append(f"{p.sku} ({p.base_price_currency})")
+                continue
+            price = (t[0][1] * rate).quantize(Decimal("0.01"))
+            if p.sale_price != price:
+                p.sale_price = price
                 p.save(update_fields=["sale_price"])
                 n += 1
-        self.message_user(request, f"Ціну продажу взято з DigiKey: {n} товарів")
+        self.message_user(request, f"Ціна продажу = базова ціна ({target}): {n} товарів")
         if missing:
-            self.message_user(request, "Без цін DigiKey: " + ", ".join(missing[:20]), messages.WARNING)
+            self.message_user(request, "Без базових цін: " + ", ".join(missing[:20]), messages.WARNING)
+        if no_rate:
+            self.message_user(request, f"Немає курсу до {target} («Інтернет-магазин → Налаштування цін → Курси валют»): "
+                              + ", ".join(no_rate[:20]), messages.WARNING)
 
-    @admin.display(description="Ціни DigiKey")
-    def dk_prices_info(self, obj):
-        """Каскадні ціни офера на DigiKey Marketplace (оновлює pull_dk_listings / дія «Оновити ціни з DigiKey»)."""
-        from django.core.exceptions import ObjectDoesNotExist
-        from shop.services import dk_price_tiers
+    @admin.display(description="Джерело та історія")
+    def base_prices_info(self, obj):
+        """Звідки базові ціни + останні зміни (хто, коли, було → стало)."""
         if not obj or not obj.pk:
             return "—"
-        try:
-            listing = obj.dk_listing
-        except ObjectDoesNotExist:
-            listing = None
-        if listing is None:
-            return "Товар не пов'язаний з офером DigiKey."
-        tiers = dk_price_tiers(obj)
-        if not tiers:
-            return "Ціни ще не стягнуто — дія «⬇️ Оновити ціни з DigiKey» у списку товарів."
-        try:
-            from bots.models import DigiKeyConfig
-            cur = DigiKeyConfig.get().locale_currency
-        except Exception:
-            cur = ""
-        body = format_html_join("", "<tr><td>від {} шт.</td><td>{} {}</td></tr>",
-                                ((q, f"{p:.2f}", cur) for q, p in tiers))
-        stamp = listing.last_synced_at.strftime("%d.%m.%Y %H:%M") if listing.last_synced_at else "—"
-        return format_html('<table style="min-width:240px"><tr><th>Кількість</th><th>Ціна/шт.</th></tr>{}</table>'
-                           '<div style="margin-top:4px;opacity:.7;font-size:12px">Офер {} · синхр. {}</div>',
-                           body, listing.dk_offer_id or "—", stamp)
+        fmt = lambda rows: ", ".join(f'{r["min_qty"]}+: {r["unit_price"]}' for r in rows or []) or "—"  # noqa: E731
+        label = obj.base_prices_source or "Базових цін ще немає"
+        if obj.base_prices_updated_at and label.startswith("Змінено"):
+            label += " · " + timezone.localtime(obj.base_prices_updated_at).strftime("%d.%m.%Y %H:%M")
+        head = format_html('<div style="opacity:.8">{}</div>', label)
+        rows = list(obj.price_history.all()[:10])
+        if not rows:
+            return head
+        body = format_html_join("", '<tr><td style="white-space:nowrap">{}</td><td>{}</td><td>{}</td>'
+                                    '<td style="font-family:monospace;font-size:11px">{} → {}</td><td>{}</td></tr>', (
+            (timezone.localtime(h.created_at).strftime("%d.%m.%Y %H:%M"), h.user_label or "—", h.get_source_display(),
+             fmt(h.old_prices), fmt(h.new_prices) + (f" {h.currency}" if h.currency else ""), h.note) for h in rows))
+        return format_html('{}<table style="margin-top:8px;font-size:12px"><tr><th>Коли</th><th>Хто</th><th>Джерело</th>'
+                           '<th>Було → стало</th><th>Примітка</th></tr>{}</table>', head, body)
 
     @admin.display(description="Магазини")
     def shop_listings_info(self, obj):
@@ -2277,7 +2343,7 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
     readonly_fields = ("stock_qty", "reserved_qty", "incoming_qty", "buildable_qty",
                        "set_stock_link", "reorder_info", "label_detail", "bom_availability",
                        "image_preview", "datasheet_link", "movement_history", "shop_listings_info",
-                       "dk_prices_info")
+                       "base_prices_info")
     fieldsets = (
         (None, {"fields": ("sku", "sku_short", "name", "category",
                             "kind", "bom_type", "unit_type", "is_active")}),
@@ -2291,8 +2357,13 @@ class ProductAdmin(AuditableMixin, admin.ModelAdmin):
                 "manufacturer",
                 ("purchase_price", "sale_price"),
                 ("reorder_point", "lead_time_days"),
-                "dk_prices_info",
             )
+        }),
+        ("💰 Базові ціни (ступені)", {
+            "fields": (("base_prices_text", "base_currency"), "base_note", "base_prices_info"),
+            "description": "Власні ціни за кількістю. Можна один раз взяти з DigiKey (дія «⬇️ Базові ціни ← DigiKey» "
+                           "у списку товарів), далі змінювати тут — кожна зміна записується в історію. "
+                           "Магазини з джерелом ціни «базові» оновлюються автоматично.",
         }),
         ("🏪 Інтернет-магазини", {
             "fields": ("shop_listings_info",),
