@@ -708,3 +708,34 @@ class BasePriceFallbackTests(TestCase):
         self.l.save()
         d = self.c.get("/api/v1/shop/products/LA220102-01A/").json()
         self.assertEqual((d["price"], d["price_origin"]), (260.0, "listing"))
+
+
+class ShopSettingsFormTests(TestCase):
+    def setUp(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("boss", "b@x.y", "p"))
+        self.st = ShopSettings.get()
+        self.url = f"/admin/shop/shopsettings/{self.st.pk}/change/"
+
+    def _post(self, fx, breaks):
+        import json
+        return self.client.post(self.url, {"default_markup": "100", "rounding": "0.01",
+                                           "fx_rates": json.dumps(fx), "price_breaks": json.dumps(breaks)})
+
+    def test_page_and_valid_save(self):
+        r = self.client.get(self.url)
+        self.assertContains(r, "+ Додати валюту")
+        r = self._post({"usd": "0,86"}, [{"min_qty": 100, "discount": 12}, {"min_qty": 10, "discount": "5,5"}])
+        self.assertEqual(r.status_code, 302)
+        self.st.refresh_from_db()
+        self.assertEqual(self.st.fx_rates, {"USD": 0.86})
+        self.assertEqual(self.st.price_breaks, [{"min_qty": 10, "discount": 5.5}, {"min_qty": 100, "discount": 12.0}])
+
+    def test_invalid_values_rejected(self):
+        self.assertContains(self._post({"US": 1}, []), "3 латинських літер")
+        self.assertContains(self._post({"USD": -1}, []), "більше 0")
+        self.assertContains(self._post({}, [{"min_qty": 1, "discount": 5}]), "від 2 шт.")
+        self.assertContains(self._post({}, [{"min_qty": 10, "discount": 120}]), "від 0 до 99")

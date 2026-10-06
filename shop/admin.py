@@ -17,23 +17,86 @@ from .shipping import format_countries, parse_countries
 
 # ── Налаштування цін (синглтон) ──────────────────────────────────────────────
 
+class ShopSettingsForm(forms.ModelForm):
+    """Курси й шаблон ступенів зберігаються як JSON; на сторінці — таблиці (shopsettings/change_form.html).
+    Тут — перевірка значень, щоб у налаштування не потрапило сміття."""
+
+    class Meta:
+        model = ShopSettings
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if "fx_rates" in self.fields:
+            self.fields["fx_rates"].help_text = "Курс — скільки одиниць валюти магазину коштує 1 одиниця іншої валюти."
+        if "price_breaks" in self.fields:
+            self.fields["price_breaks"].help_text = "Ступінь 1 шт. — базова ціна; тут лише ступені від 2 шт."
+
+    def clean_fx_rates(self):
+        import re
+        raw = self.cleaned_data.get("fx_rates") or {}
+        if not isinstance(raw, dict):
+            raise forms.ValidationError("Очікується список «валюта → курс».")
+        out = {}
+        for cur, rate in raw.items():
+            cur = str(cur).strip().upper()
+            if not re.fullmatch(r"[A-Z]{3}", cur):
+                raise forms.ValidationError(f"«{cur}»: код валюти з 3 латинських літер, напр. USD.")
+            try:
+                rate = Decimal(str(rate).replace(",", "."))
+            except (InvalidOperation, ValueError):
+                raise forms.ValidationError(f"{cur}: курс має бути числом.")
+            if rate <= 0:
+                raise forms.ValidationError(f"{cur}: курс має бути більше 0.")
+            out[cur] = float(rate)
+        return out
+
+    def clean_price_breaks(self):
+        raw = self.cleaned_data.get("price_breaks") or []
+        if not isinstance(raw, list):
+            raise forms.ValidationError("Очікується список ступенів.")
+        out, seen = [], set()
+        for row in raw:
+            try:
+                qty = int(row["min_qty"])
+                disc = Decimal(str(row["discount"]).replace(",", "."))
+            except (KeyError, TypeError, ValueError, InvalidOperation):
+                raise forms.ValidationError("Кожен ступінь: кількість (ціле число) і знижка у %.")
+            if qty < 2:
+                raise forms.ValidationError("Кількість у ступені — від 2 шт. (1 шт. — це базова ціна).")
+            if not (0 <= disc < 100):
+                raise forms.ValidationError(f"Від {qty} шт.: знижка має бути від 0 до 99 %.")
+            if qty in seen:
+                raise forms.ValidationError(f"Кількість {qty} шт. повторюється.")
+            seen.add(qty)
+            out.append({"min_qty": qty, "discount": float(disc)})
+        return sorted(out, key=lambda r: r["min_qty"])
+
+
 @admin.register(ShopSettings)
 class ShopSettingsAdmin(admin.ModelAdmin):
+    form = ShopSettingsForm
+    change_form_template = "admin/shop/shopsettings/change_form.html"
     fieldsets = [
         ("Ціноутворення", {"fields": ["default_markup", "rounding"]}),
         ("Курси валют (для базових цін)", {
             "fields": ["fx_rates"],
-            "description": "Якщо базові ціни товару в іншій валюті, ніж магазин (напр. USD з DigiKey, а магазин EUR): "
-                           '{"USD": 0.86} — 1 USD = 0,86 EUR. Після збереження позиції з базовими цінами '
-                           "перераховуються автоматично.",
+            "description": "Якщо базові ціни товару в іншій валюті, ніж магазин (напр. USD з DigiKey, а магазин EUR). "
+                           "Після збереження позиції з базовими цінами перераховуються автоматично.",
         }),
         ("Шаблон ступенів цін (як на DigiKey)", {
             "fields": ["price_breaks", "price_breaks_preview"],
             "description": "Знижка у % від ціни за 1 шт. Застосовується дією «Згенерувати ступені цін» "
-                           "в «Асортимент і ціни». Спільний для всіх магазинів.",
+                           "в «Асортимент і ціни» і кнопкою «Знижки за шаблоном» у базових цінах товару. "
+                           "Спільний для всіх магазинів.",
         }),
     ]
     readonly_fields = ["price_breaks_preview"]
+
+    def changeform_view(self, request, object_id=None, form_url="", extra_context=None):
+        home = getattr(Shop.objects.filter(is_default=True).first(), "currency", None) or "EUR"
+        extra_context = {**(extra_context or {}), "home_currency": home}
+        return super().changeform_view(request, object_id, form_url, extra_context)
 
     def has_add_permission(self, request):
         return not ShopSettings.objects.exists()
