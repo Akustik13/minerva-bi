@@ -671,12 +671,21 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         tiers = services.base_tiers(obj.product)
         if not tiers:
             return "Немає — задайте в картці товару (Склад → Товари → «💰 Базові ціни»)."
-        cur = obj.product.base_price_currency
-        body = format_html_join("", "<tr><td>від {} шт.</td><td>{} {}</td></tr>",
-                                ((q, f"{p:.2f}", cur) for q, p in tiers))
-        return format_html('<table><tr><th>Кількість</th><th>Ціна/шт.</th></tr>{}</table>'
-                           '<div style="margin-top:4px;opacity:.7;font-size:12px">{}</div>',
-                           body, obj.product.base_prices_source or "")
+        cur, shop_cur = obj.product.base_price_currency, obj.shop.currency
+        rate = services.fx_rate(cur, shop_cur) if cur != shop_cur else None
+        if rate is not None:   # колонка «≈ у валюті магазину» — щоб було видно, звідки різниця
+            body = format_html_join("", "<tr><td>від {} шт.</td><td>{} {}</td><td>≈ {} {}</td></tr>", (
+                (q, f"{p:.2f}", cur, f"{p * rate:.2f}", shop_cur) for q, p in tiers))
+            head = format_html("<tr><th>Кількість</th><th>Ціна/шт.</th><th>≈ у {}</th></tr>", shop_cur)
+        else:
+            body = format_html_join("", "<tr><td>від {} шт.</td><td>{} {}</td></tr>",
+                                    ((q, f"{p:.2f}", cur) for q, p in tiers))
+            head = format_html("<tr><th>Кількість</th><th>Ціна/шт.</th></tr>")
+        rate_note = self._rate_note(obj)
+        return format_html('<table>{}{}</table>'
+                           '<div style="margin-top:4px;font-size:12px">{}</div>'
+                           '<div style="margin-top:2px;opacity:.7;font-size:12px">{}</div>',
+                           head, body, rate_note or "", obj.product.base_prices_source or "")
 
     @admin.display(description="Ціна продажу")
     def sale_price_col(self, obj):
@@ -710,6 +719,43 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         v = self._stock.get(obj.product_id) or 0
         return format_html('<span style="color:{}">{}</span>', "#43a047" if v > 0 else "#9e9e9e", f"{v:g}")
 
+    # ── Пояснення, звідки ціна (курс валюти, %, округлення) ─────────────────
+    @staticmethod
+    def _num(v):
+        return f"{v:.4f}".rstrip("0").rstrip(".").replace(".", ",")
+
+    def _rate_note(self, obj):
+        """«1 USD = 0,86 EUR» + посилання на курси; None — валюта та сама."""
+        cur, shop_cur = obj.product.base_price_currency, obj.shop.currency
+        if (cur or "").upper() == (shop_cur or "").upper():
+            return None
+        url = reverse("admin:shop_shopsettings_change", args=[ShopSettings.get().pk])
+        rate = services.fx_rate(cur, shop_cur)
+        if rate is None:
+            return format_html('<span style="color:#e57373">⚠ Немає курсу {} → {}</span> — '
+                               '<a href="{}">задати в «Налаштування цін → Курси валют»</a>', cur, shop_cur, url)
+        return format_html('курс 1 {} = {} {} (<a href="{}">змінити курс</a>)', cur, self._num(rate), shop_cur, url)
+
+    def _origin_note(self, obj):
+        origin = services.price_origin(obj)
+        st = ShopSettings.get()
+        rounding = st.get_rounding_display()
+        if obj.price_source == ShopListing.PRICE_BASE or origin == "base":
+            how = ("Розраховано з базових цін товару" if obj.price_source == ShopListing.PRICE_BASE
+                   else "У позиції немає своєї ціни й «Ціни продажу» — взято базові ціни товару"
+                        + (" (ступені нижче не використовуються)" if obj.tiers.exists() else ""))
+            parts = [how]
+            rate = self._rate_note(obj)
+            if rate:
+                parts.append(rate)
+            if obj.price_source == ShopListing.PRICE_BASE and obj.price_factor != 100:
+                parts.append(f"× {self._num(obj.price_factor)} %")
+            parts.append(f"округлення «{rounding}»")
+            return format_html_join(" · ", "{}", ((x,) for x in parts))
+        if origin == "sale_price":
+            return "Ціна = «Ціна продажу» з картки товару (ступені — з цієї позиції)."
+        return "Ціна задана в цій позиції вручну."
+
     @admin.display(description="Ціни, як бачить покупець")
     def breaks_preview(self, obj):
         if not obj or not obj.pk:
@@ -717,16 +763,18 @@ class ShopListingAdmin(FormActionMixin, admin.ModelAdmin):
         rows = services.price_breaks(obj)
         if not rows:
             return "Ціна не задана — на сайті «Ціна за запитом»"
+        note = format_html('<div style="margin-top:6px;font-size:12px;opacity:.85">{} Валюта магазину: {}.</div>',
+                           self._origin_note(obj), obj.shop.currency)
         info = services.offer_info(obj)
         if info:
             regular = {r["min_qty"]: r["unit_price"] for r in info["regular_price_breaks"]}
             body = format_html_join("", "<tr><td>від {} шт.</td><td><s>{}</s></td><td><b>{}</b></td></tr>", (
                 (r["min_qty"], f'{regular[r["min_qty"]]:.2f}', f'{r["unit_price"]:.2f}') for r in rows))
-            return format_html("<table><tr><th>Кількість</th><th>Звичайна</th><th>Акція −{} %</th></tr>{}</table>",
-                               f"{info['percent'].normalize():f}", body)
-        body = format_html_join("", "<tr><td>від {} шт.</td><td>{}</td></tr>",
-                                ((r["min_qty"], f'{r["unit_price"]:.2f}') for r in rows))
-        return format_html("<table><tr><th>Кількість</th><th>Ціна/шт. нетто</th></tr>{}</table>", body)
+            return format_html("<table><tr><th>Кількість</th><th>Звичайна</th><th>Акція −{} %</th></tr>{}</table>{}",
+                               f"{info['percent'].normalize():f}", body, note)
+        body = format_html_join("", "<tr><td>від {} шт.</td><td>{} {}</td></tr>",
+                                ((r["min_qty"], f'{r["unit_price"]:.2f}', obj.shop.currency) for r in rows))
+        return format_html("<table><tr><th>Кількість</th><th>Ціна/шт. нетто</th></tr>{}</table>{}", body, note)
 
     # ── Дії ──────────────────────────────────────────────────────────────────
     @admin.action(description="🏪 Показувати в магазині")

@@ -758,3 +758,29 @@ class ListingActionGroupsTests(TestCase):
         self.client.post("/admin/shop/shoplisting/", {"action": "action_hide", "_selected_action": [self.l.pk]})
         self.l.refresh_from_db()
         self.assertFalse(self.l.is_visible)
+
+
+class ListingRateInfoTests(TestCase):
+    def setUp(self):
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(User.objects.create_superuser("boss", "b@x.y", "p"))
+        shop = Shop.objects.create(name="Web", slug="webshop", is_default=True)
+        p = Product.objects.create(sku="AN-1", name="A", base_price_currency="USD",
+                                   base_prices=[{"min_qty": 1, "unit_price": "4.69"}])
+        self.l = ShopListing.objects.create(shop=shop, product=p)
+        self.url = f"/admin/shop/shoplisting/{self.l.pk}/change/"
+
+    def test_rate_shown_with_link(self):
+        r = self.client.get(self.url)
+        self.assertContains(r, "Немає курсу USD → EUR")
+        st = ShopSettings.get()
+        st.fx_rates = {"USD": 0.86}
+        st.save()
+        r = self.client.get(self.url)
+        self.assertContains(r, "курс 1 USD = 0,86 EUR")
+        self.assertContains(r, f'href="/admin/shop/shopsettings/{st.pk}/change/"')
+        self.assertContains(r, "≈ 4.03 EUR")
+        self.assertContains(r, "взято базові ціни товару")
