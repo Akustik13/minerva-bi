@@ -110,6 +110,7 @@ urlpatterns = [
     path("labels/", include("labels_app.urls")),
     path("accounting/", include("accounting.urls")),
     path("ai/", include("ai_assistant.urls")),
+    path("rag/", include("rag_assistant.urls")),
     path("email/", include("email_assistant.urls")),
     path("calendar/", include("calendar_app.urls")),
     path("bots/", include("bots.urls")),

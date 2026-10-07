@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'tasks',            # 📋 Задачі та нагадування
     'autoimport',       # 🔄 Авто-імпорт по розкладу
     'ai_assistant',     # 🏛️ Minerva AI
+    'rag_assistant',    # 📚 Помічник по продукції (зовнішній RAG: даташити + склад)
     'email_assistant',  # 📧 Email Асистент
     'calendar_app',     # 📅 Календар
     'bots',             # 🤖 Боти та AI

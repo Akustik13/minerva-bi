@@ -1,0 +1,382 @@
+{# Помічник по продукції і складу (RAG). Окремо від «Minerva AI» (#mv-fab). Вбудовано inline — без static-маніфесту. #}
+<style>
+#rg-pill { position: fixed; bottom: 24px; right: 88px; z-index: 10000; display: none; align-items: center; gap: 10px;
+  height: 52px; padding: 4px 18px 4px 4px; border-radius: 30px; border: none; cursor: pointer;
+  background: #fff; color: #1d2b3a; font: 600 15px/1 system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35); transition: transform .2s, box-shadow .2s; }
+#rg-pill:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0,0,0,.45); }
+#rg-pill img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; }
+#rg-pill .rg-dot { position: absolute; top: 6px; left: 38px; width: 10px; height: 10px; border-radius: 50%;
+  background: #f5b400; border: 2px solid #fff; display: none; }
+#rg-pill.is-busy .rg-dot { display: block; animation: rgPulse 1.2s infinite; }
+@keyframes rgPulse { 50% { opacity: .35; } }
+
+#rg-panel { position: fixed; top: 0; right: 0; bottom: 0; z-index: 10002; width: 460px; max-width: 100vw;
+  display: flex; flex-direction: column; background: var(--bg-card, #16212e); color: var(--text, #c9d8e4);
+  border-left: 1px solid var(--border-strong, #243347); box-shadow: -10px 0 36px rgba(0,0,0,.45);
+  transform: translateX(105%); transition: transform .25s ease; font-size: 14px; }
+#rg-panel.open { transform: none; }
+.rg-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; flex-shrink: 0;
+  background: var(--bg-card-2, var(--bg-hover, #1e2d40)); border-bottom: 1px solid var(--border, #243347); }
+.rg-head img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; }
+.rg-head .rg-title { flex: 1; line-height: 1.2; }
+.rg-head .rg-title b { display: block; font-size: 15px; color: var(--text, #e3edf5); }
+.rg-head .rg-title small { color: var(--text-muted, #9aafbe); font-size: 12px; }
+.rg-hbtn { background: none; border: 1px solid transparent; color: var(--text-muted, #9aafbe); cursor: pointer;
+  font-size: 16px; padding: 4px 8px; border-radius: 6px; }
+.rg-hbtn:hover { border-color: var(--border-strong, #243347); color: var(--text, #e3edf5); }
+
+.rg-convs { display: none; flex-direction: column; overflow-y: auto; border-bottom: 1px solid var(--border, #243347);
+  max-height: 45vh; flex-shrink: 0; }
+.rg-convs.open { display: flex; }
+.rg-conv { display: flex; align-items: center; gap: 6px; padding: 8px 14px; cursor: pointer;
+  border-bottom: 1px solid var(--border, #243347); }
+.rg-conv:hover, .rg-conv.is-active { background: var(--bg-hover, #1e2d40); }
+.rg-conv span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rg-conv small { color: var(--text-muted, #9aafbe); font-size: 11px; white-space: nowrap; }
+.rg-conv button { background: none; border: none; color: var(--text-dim, #607d8b); cursor: pointer; font-size: 15px; }
+.rg-conv button:hover { color: var(--err, #e53935); }
+
+.rg-msgs { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+.rg-empty { margin: auto; text-align: center; color: var(--text-muted, #9aafbe); max-width: 320px; line-height: 1.5; }
+.rg-empty img { width: 72px; height: 72px; border-radius: 50%; display: block; margin: 0 auto 10px; }
+.rg-empty .rg-hints { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+.rg-empty .rg-hints button { background: var(--bg-hover, #1e2d40); color: var(--text, #c9d8e4); text-align: left;
+  border: 1px solid var(--border-strong, #243347); border-radius: 8px; padding: 7px 10px; cursor: pointer; font-size: 13px; }
+.rg-empty .rg-hints button:hover { border-color: var(--accent, #58a6ff); }
+.rg-m { display: flex; gap: 8px; align-items: flex-start; }
+.rg-m.user { flex-direction: row-reverse; }
+.rg-m > img { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.rg-b { max-width: 88%; padding: 9px 12px; border-radius: 12px; line-height: 1.5; overflow-wrap: anywhere;
+  background: var(--bg-hover, #1e2d40); border: 1px solid var(--border, #243347); }
+.rg-m.user .rg-b { background: var(--accent, #2f6fb3); color: #fff; border-color: transparent; white-space: pre-wrap; }
+.rg-m.failed .rg-b { border-color: var(--err, #e53935); }
+.rg-b p { margin: 0 0 8px; } .rg-b p:last-child { margin-bottom: 0; }
+.rg-b h4 { margin: 8px 0 6px; font-size: 14px; color: var(--text, #e3edf5); }
+.rg-b ul, .rg-b ol { margin: 4px 0 8px 18px; padding: 0; }
+.rg-b code { background: rgba(0,0,0,.25); padding: 1px 4px; border-radius: 3px; font-size: 12.5px; }
+.rg-b .rg-tbl { overflow-x: auto; margin: 6px 0; }
+.rg-b table { border-collapse: collapse; font-size: 12.5px; }
+.rg-b th, .rg-b td { border: 1px solid var(--border-strong, #243347); padding: 4px 7px; text-align: left; vertical-align: top; }
+.rg-b th { background: rgba(255,255,255,.05); }
+.rg-cite { display: inline-block; min-width: 16px; padding: 0 4px; margin: 0 1px; border-radius: 4px; font-size: 11px;
+  line-height: 16px; text-align: center; background: rgba(88,166,255,.18); color: var(--accent, #79b8ff); cursor: pointer; }
+.rg-stage { color: var(--text-muted, #9aafbe); font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.rg-spin { width: 14px; height: 14px; border: 2px solid var(--border-strong, #3a4d63); border-top-color: var(--accent, #58a6ff);
+  border-radius: 50%; animation: rgSpin .8s linear infinite; flex-shrink: 0; }
+@keyframes rgSpin { to { transform: rotate(360deg); } }
+.rg-steps { margin: 8px 0 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-muted, #9aafbe); }
+.rg-steps li { padding: 2px 0; }
+.rg-extra { margin-top: 8px; font-size: 12.5px; }
+.rg-extra details { margin-top: 6px; }
+.rg-extra summary { cursor: pointer; color: var(--text-muted, #9aafbe); }
+.rg-src { margin: 6px 0 0; padding: 6px 8px; border-left: 3px solid var(--accent, #58a6ff); background: rgba(0,0,0,.15); border-radius: 0 6px 6px 0; }
+.rg-src b { color: var(--text, #e3edf5); }
+.rg-src div { color: var(--text-muted, #9aafbe); margin-top: 3px; white-space: pre-wrap; max-height: 120px; overflow: auto; }
+.rg-src.is-hl { outline: 2px solid var(--accent, #58a6ff); }
+.rg-prods { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.rg-prod { display: inline-flex; flex-direction: column; gap: 1px; padding: 5px 9px; border-radius: 8px; text-decoration: none !important;
+  border: 1px solid var(--border-strong, #243347); background: rgba(0,0,0,.15); color: var(--text, #e3edf5) !important; font-size: 12px; }
+.rg-prod:hover { border-color: var(--accent, #58a6ff); }
+.rg-prod small { color: var(--text-muted, #9aafbe); }
+.rg-prod .ok { color: #66bb6a; } .rg-prod .no { color: #9e9e9e; } .rg-prod .warn { color: #f5b400; }
+
+.rg-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border, #243347); flex-shrink: 0; }
+.rg-input textarea { flex: 1; resize: none; max-height: 140px; min-height: 40px; padding: 9px 11px; border-radius: 10px;
+  background: var(--bg-input, #0f1923); color: var(--text, #e3edf5); border: 1px solid var(--border-strong, #243347); font: inherit; }
+.rg-input textarea:focus { outline: none; border-color: var(--accent, #58a6ff); }
+.rg-input button { width: 42px; border-radius: 10px; border: none; background: var(--accent, #2f6fb3); color: #fff;
+  font-size: 18px; cursor: pointer; }
+.rg-input button:disabled { opacity: .45; cursor: default; }
+.rg-note { padding: 0 12px 8px; font-size: 11px; color: var(--text-muted, #9aafbe); }
+@media (max-width: 600px) { #rg-pill { right: 84px; padding-right: 12px; font-size: 14px; } #rg-panel { width: 100vw; } }
+</style>
+
+<button type="button" id="rg-pill" title="Помічник по продукції і складу"
+        data-state="{% url 'rag_assistant:state' %}" data-base="/rag/api/" data-csrf="{{ csrf_token }}"
+        data-avatar="{% url 'rag_assistant:avatar' %}" data-settings="{% url 'admin:rag_assistant_ragsettings_changelist' %}"
+        data-admin="{% if user.is_superuser %}1{% endif %}">
+  <img src="{% url 'rag_assistant:avatar' %}" alt=""><span class="rg-name">Minerva</span><span class="rg-dot"></span>
+</button>
+
+<aside id="rg-panel" aria-label="Помічник по продукції" role="dialog">
+  <div class="rg-head">
+    <img src="{% url 'rag_assistant:avatar' %}" alt="">
+    <div class="rg-title"><b class="rg-hname">Minerva</b><small>продукція, даташити і склад</small></div>
+    <button type="button" class="rg-hbtn rg-b-list" title="Розмови">☰</button>
+    <button type="button" class="rg-hbtn rg-b-new" title="Нова розмова">＋</button>
+    <button type="button" class="rg-hbtn rg-b-close" title="Закрити">✕</button>
+  </div>
+  <div class="rg-convs"></div>
+  <div class="rg-msgs"></div>
+  <div class="rg-input">
+    <textarea rows="1" placeholder="Запитайте про товар, характеристики, наявність…" maxlength="3000"></textarea>
+    <button type="button" title="Надіслати (Enter)">↑</button>
+  </div>
+  <div class="rg-note">Відповіді — за даташитами і каталогом. Перевіряйте важливі дані в джерелах.</div>
+</aside>
+
+<script>
+(function () {
+  var pill = document.getElementById('rg-pill'), panel = document.getElementById('rg-panel');
+  if (!pill || !panel) return;
+  var BASE = pill.dataset.base, CSRF = pill.dataset.csrf, AVATAR = pill.dataset.avatar;
+  var msgsEl = panel.querySelector('.rg-msgs'), convsEl = panel.querySelector('.rg-convs');
+  var input = panel.querySelector('textarea'), sendBtn = panel.querySelector('.rg-input button');
+  var LS = { open: 'rg-open', conv: 'rg-conv' };
+  var state = { conv: null, convs: [], pending: null, sending: false, configured: true, name: 'Minerva' };
+
+  function ls(k, v) { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } }
+  function el(tag, cls, text) { var n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; }
+  function api(path, opts) {
+    opts = opts || {};
+    var init = { method: opts.method || 'GET', credentials: 'same-origin', headers: { 'Accept': 'application/json' } };
+    if (init.method !== 'GET') { init.headers['X-CSRFToken'] = CSRF; init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(opts.body || {}); }
+    return fetch(BASE + path, init).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) { d._status = r.status; return d; });
+    });
+  }
+
+  // ── Безпечний Markdown (лише DOM-вузли, без innerHTML тексту моделі) ──
+  function inline(text, parent, onCite) {
+    var re = /(\*\*[^*]+\*\*|`[^`]+`|\[\d+\]|\*[^*\s][^*]*\*)/g, last = 0, m;
+    while ((m = re.exec(text))) {
+      if (m.index > last) parent.appendChild(document.createTextNode(text.slice(last, m.index)));
+      var t = m[0], node;
+      if (t.indexOf('**') === 0) node = el('strong', null, t.slice(2, -2));
+      else if (t[0] === '`') node = el('code', null, t.slice(1, -1));
+      else if (t[0] === '[') { node = el('span', 'rg-cite', t.slice(1, -1)); (function (n) { node.onclick = function () { onCite && onCite(n); }; })(+t.slice(1, -1)); }
+      else node = el('em', null, t.slice(1, -1));
+      parent.appendChild(node); last = m.index + t.length;
+    }
+    if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
+  }
+  function markdown(src, onCite) {
+    var root = el('div'), lines = String(src || '').replace(/\r/g, '').split('\n'), i = 0, list = null, para = [];
+    function flush() { if (para.length) { var p = el('p'); inline(para.join(' '), p, onCite); root.appendChild(p); para = []; } list = null; }
+    function cells(l) { return l.trim().replace(/^\||\|$/g, '').split('|').map(function (c) { return c.trim(); }); }
+    while (i < lines.length) {
+      var l = lines[i];
+      if (/^\s*\|.*\|\s*$/.test(l) && i + 1 < lines.length && /^\s*\|?\s*:?-{2,}/.test(lines[i + 1])) {
+        flush(); var wrap = el('div', 'rg-tbl'), tbl = el('table'), tr = el('tr');
+        cells(l).forEach(function (c) { var th = el('th'); inline(c, th, onCite); tr.appendChild(th); }); tbl.appendChild(tr); i += 2;
+        while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+          tr = el('tr'); cells(lines[i]).forEach(function (c) { var td = el('td'); inline(c, td, onCite); tr.appendChild(td); });
+          tbl.appendChild(tr); i++;
+        }
+        wrap.appendChild(tbl); root.appendChild(wrap); continue;
+      }
+      var h = l.match(/^#{1,6}\s+(.*)$/), li = l.match(/^\s*[-*•]\s+(.*)$/), ol = l.match(/^\s*\d+[.)]\s+(.*)$/);
+      if (h) { flush(); var hh = el('h4'); inline(h[1], hh, onCite); root.appendChild(hh); }
+      else if (li || ol) {
+        if (para.length) { var keep = list; flush(); list = keep; }
+        var tag = li ? 'ul' : 'ol';
+        if (!list || list.tagName.toLowerCase() !== tag) { list = el(tag); root.appendChild(list); }
+        var item = el('li'); inline((li || ol)[1], item, onCite); list.appendChild(item);
+      }
+      else if (!l.trim()) flush();
+      else { list = null; para.push(l.trim()); }
+      i++;
+    }
+    flush();
+    return root;
+  }
+
+  // ── Відображення ──
+  function fmtNum(n) { return n == null ? '' : (Math.round(n * 100) / 100).toString().replace('.', ','); }
+  function productChip(p) {
+    var m = p.minerva, a = el(m ? 'a' : 'span', 'rg-prod');
+    if (m) { a.href = m.url; a.target = '_blank'; a.rel = 'noopener'; a.title = 'Відкрити товар у Minerva'; }
+    a.appendChild(el('b', null, p.sku));
+    var info = el('small');
+    if (m) {
+      var st = el('span', m.available > 0 ? 'ok' : 'no', m.available > 0 ? 'склад: ' + fmtNum(m.available) : 'немає на складі');
+      info.appendChild(st);
+      if (m.lifecycle_status && m.lifecycle_status !== 'active') info.appendChild(el('span', 'warn', ' · ' + (m.lifecycle_status === 'nrnd' ? 'NRND' : 'EOL')));
+    } else info.textContent = 'не знайдено в Minerva';
+    if (p.price != null) info.appendChild(document.createTextNode(' · ' + fmtNum(p.price) + ' ' + (p.currency || '')));
+    a.appendChild(info);
+    return a;
+  }
+  function renderMsg(m) {
+    var row = el('div', 'rg-m ' + m.role + (m.status === 'failed' ? ' failed' : '')), bubble = el('div', 'rg-b');
+    row.dataset.id = m.id;
+    if (m.role === 'assistant') { var av = el('img'); av.src = AVATAR; av.alt = ''; row.appendChild(av); }
+    row.appendChild(bubble);
+    if (m.role === 'user') { bubble.textContent = m.content; return row; }
+    if (m.status === 'pending') {
+      var st = el('div', 'rg-stage'); st.appendChild(el('span', 'rg-spin')); st.appendChild(el('span', null, m.stage || 'Обробляю запит…'));
+      bubble.appendChild(st);
+      if (m.trace && m.trace.length) {
+        var ul = el('ul', 'rg-steps');
+        m.trace.forEach(function (s) {
+          var icon = s.status === 'completed' ? '✓' : s.status === 'running' ? '…' : s.status === 'skipped' ? '–' : s.status === 'failed' ? '✕' : '·';
+          ul.appendChild(el('li', null, icon + ' ' + s.title + (s.elapsed != null && s.status !== 'running' ? ' · ' + fmtNum(s.elapsed) + ' с' : '')));
+        });
+        bubble.appendChild(ul);
+      }
+      return row;
+    }
+    if (m.status === 'failed') { bubble.textContent = '⚠ ' + (m.error || 'Не вдалося отримати відповідь.'); return row; }
+    var srcBox = null;
+    function cite(n) {
+      if (!srcBox) return; srcBox.open = true;
+      var t = srcBox.querySelector('[data-n="' + n + '"]');
+      if (t) { t.classList.add('is-hl'); t.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); setTimeout(function () { t.classList.remove('is-hl'); }, 1600); }
+    }
+    bubble.appendChild(markdown(m.content, cite));
+    var extra = el('div', 'rg-extra');
+    if (m.products && m.products.length) {
+      var pr = el('div', 'rg-prods'); m.products.forEach(function (p) { pr.appendChild(productChip(p)); });
+      extra.appendChild(el('div', null, 'Товари з відповіді:')); extra.appendChild(pr);
+    }
+    if (m.sources && m.sources.length) {
+      srcBox = el('details'); srcBox.appendChild(el('summary', null, 'Джерела (' + m.sources.length + ')'));
+      m.sources.forEach(function (s) {
+        var d = el('div', 'rg-src'); d.dataset.n = s.id;
+        d.appendChild(el('b', null, '[' + s.id + '] ' + s.source + (s.page != null ? ', с. ' + s.page : '')));
+        if (s.text) d.appendChild(el('div', null, s.text));
+        srcBox.appendChild(d);
+      });
+      extra.appendChild(srcBox);
+    }
+    if (m.trace && m.trace.length) {
+      var tr = el('details'); tr.appendChild(el('summary', null, 'Хід запиту'));
+      var ul2 = el('ul', 'rg-steps');
+      m.trace.forEach(function (s) { ul2.appendChild(el('li', null, (s.status === 'completed' ? '✓ ' : s.status === 'skipped' ? '– ' : '· ') + s.title + (s.elapsed != null ? ' · ' + fmtNum(s.elapsed) + ' с' : ''))); });
+      tr.appendChild(ul2); extra.appendChild(tr);
+    }
+    if (extra.childNodes.length) bubble.appendChild(extra);
+    return row;
+  }
+  function renderEmpty() {
+    msgsEl.innerHTML = '';
+    var box = el('div', 'rg-empty'), img = el('img'); img.src = AVATAR; img.alt = '';
+    box.appendChild(img);
+    if (!state.configured) {
+      box.appendChild(el('div', null, 'Помічник ще не налаштований.'));
+      if (pill.dataset.admin) { var a = el('a', null, 'Відкрити налаштування →'); a.href = pill.dataset.settings; box.appendChild(a); }
+      msgsEl.appendChild(box); return;
+    }
+    box.appendChild(el('div', null, 'Привіт! Я ' + state.name + ' — допоможу з характеристиками товарів, даташитами та наявністю на складі.'));
+    var hints = el('div', 'rg-hints');
+    ['Які антени підтримують Bluetooth і є на складі?', 'Яка потужність AN050201-01C-175-MHF1?', 'Порівняй частотні діапазони антен для LoRa']
+      .forEach(function (q) { var b = el('button', null, q); b.type = 'button'; b.onclick = function () { input.value = q; send(); }; hints.appendChild(b); });
+    box.appendChild(hints);
+    msgsEl.appendChild(box);
+  }
+  function renderMessages(list) {
+    msgsEl.innerHTML = '';
+    if (!list.length) return renderEmpty();
+    list.forEach(function (m) { msgsEl.appendChild(renderMsg(m)); });
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+  function replaceMsg(m) {
+    var old = msgsEl.querySelector('.rg-m[data-id="' + m.id + '"]'), node = renderMsg(m);
+    var atBottom = msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight < 60;
+    if (old) old.replaceWith(node); else msgsEl.appendChild(node);
+    if (atBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+  function renderConvs() {
+    convsEl.innerHTML = '';
+    if (!state.convs.length) { convsEl.appendChild(el('div', 'rg-conv', 'Розмов ще немає')); return; }
+    state.convs.forEach(function (c) {
+      var row = el('div', 'rg-conv' + (state.conv === c.id ? ' is-active' : ''));
+      row.appendChild(el('span', null, c.title));
+      row.appendChild(el('small', null, new Date(c.updated_at).toLocaleDateString()));
+      var del = el('button', null, '🗑'); del.type = 'button'; del.title = 'Видалити розмову';
+      del.onclick = function (e) {
+        e.stopPropagation();
+        if (!confirm('Видалити розмову «' + c.title + '»?')) return;
+        api('conversations/' + c.id + '/delete/', { method: 'POST' }).then(function () {
+          state.convs = state.convs.filter(function (x) { return x.id !== c.id; });
+          if (state.conv === c.id) { state.conv = null; ls(LS.conv, null); renderEmpty(); }
+          renderConvs();
+        });
+      };
+      row.appendChild(del);
+      row.onclick = function () { openConv(c.id); convsEl.classList.remove('open'); };
+      convsEl.appendChild(row);
+    });
+  }
+
+  // ── Логіка ──
+  function setBusy(b) { pill.classList.toggle('is-busy', !!b); sendBtn.disabled = !!b; }
+  function openConv(id) {
+    state.conv = id; ls(LS.conv, id);
+    return api('conversations/' + id + '/').then(function (d) {
+      if (d._status !== 200) { state.conv = null; ls(LS.conv, null); renderEmpty(); return; }
+      renderMessages(d.messages || []); renderConvs();
+      var p = (d.messages || []).filter(function (m) { return m.status === 'pending'; })[0];
+      if (p) poll(p.id);
+    });
+  }
+  function poll(id) {
+    state.pending = id; setBusy(true);
+    api('messages/' + id + '/').then(function (d) {
+      var m = d.message;
+      if (!m) { setTimeout(function () { poll(id); }, 3000); return; }
+      replaceMsg(m);
+      if (m.status === 'pending') setTimeout(function () { poll(id); }, 1500);
+      else { state.pending = null; setBusy(false); }
+    }).catch(function () { setTimeout(function () { poll(id); }, 3000); });
+  }
+  function ensureConv() {
+    if (state.conv) return Promise.resolve(state.conv);
+    return api('conversations/new/', { method: 'POST' }).then(function (d) {
+      state.conv = d.conversation.id; ls(LS.conv, state.conv);
+      state.convs.unshift(d.conversation); msgsEl.innerHTML = ''; return state.conv;
+    });
+  }
+  function send(retry) {
+    var q = input.value.trim();
+    if (!q || state.pending || (state.sending && !retry)) return;
+    state.sending = true; setBusy(true);
+    ensureConv().then(function (cid) {
+      return api('conversations/' + cid + '/ask/', { method: 'POST', body: { question: q } });
+    }).then(function (d) {
+      if (d._status === 429 && (retry || 0) < 40) {   // зайнято іншим запитом — запит не прийнято, повторюємо
+        showWait('Помічник зайнятий іншим запитом — зачекайте, надішлю автоматично…');
+        setTimeout(function () { send((retry || 0) + 1); }, 3000); return;
+      }
+      state.sending = false; hideWait();
+      if (d._status !== 202) { setBusy(false); showError(d.error || 'Помилка запиту.'); return; }
+      input.value = ''; autosize();
+      var empty = msgsEl.querySelector('.rg-empty'); if (empty) empty.remove();
+      msgsEl.appendChild(renderMsg(d.user)); msgsEl.appendChild(renderMsg(d.assistant));
+      msgsEl.scrollTop = msgsEl.scrollHeight;
+      var c = d.conversation; state.convs = [c].concat(state.convs.filter(function (x) { return x.id !== c.id; }));
+      poll(d.assistant.id);
+    }).catch(function () { state.sending = false; setBusy(false); hideWait(); showError('Немає зв\'язку з Minerva.'); });
+  }
+  var waitEl = null;
+  function showWait(t) { if (!waitEl) { waitEl = el('div', 'rg-stage'); waitEl.appendChild(el('span', 'rg-spin')); waitEl.appendChild(el('span')); msgsEl.appendChild(waitEl); } waitEl.lastChild.textContent = t; msgsEl.scrollTop = msgsEl.scrollHeight; }
+  function hideWait() { if (waitEl) { waitEl.remove(); waitEl = null; } }
+  function showError(t) { var e = el('div', 'rg-m assistant failed'), b = el('div', 'rg-b', '⚠ ' + t); e.appendChild(b); msgsEl.appendChild(e); msgsEl.scrollTop = msgsEl.scrollHeight; }
+  function autosize() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 140) + 'px'; }
+
+  function openPanel() { panel.classList.add('open'); ls(LS.open, '1'); setTimeout(function () { input.focus(); }, 250); }
+  function closePanel() { panel.classList.remove('open'); ls(LS.open, null); }
+  pill.onclick = function () { panel.classList.contains('open') ? closePanel() : openPanel(); };
+  panel.querySelector('.rg-b-close').onclick = closePanel;
+  panel.querySelector('.rg-b-list').onclick = function () { renderConvs(); convsEl.classList.toggle('open'); };
+  panel.querySelector('.rg-b-new').onclick = function () { state.conv = null; ls(LS.conv, null); convsEl.classList.remove('open'); renderEmpty(); input.focus(); };
+  sendBtn.onclick = function () { send(); };
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+  input.addEventListener('input', autosize);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && panel.classList.contains('open')) closePanel(); });
+
+  // ── Старт: показуємо кнопку лише якщо помічник увімкнений і є доступ ──
+  fetch(pill.dataset.state, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d || !d.enabled) { pill.remove(); panel.remove(); return; }
+      state.configured = d.configured; state.name = d.name || 'Minerva'; state.convs = d.conversations || [];
+      pill.querySelector('.rg-name').textContent = state.name; panel.querySelector('.rg-hname').textContent = state.name;
+      pill.style.display = 'inline-flex';
+      var saved = +ls(LS.conv);
+      if (saved && state.convs.some(function (c) { return c.id === saved; })) openConv(saved); else renderEmpty();
+      if (ls(LS.open)) panel.classList.add('open');
+    }).catch(function () { pill.remove(); panel.remove(); });
+})();
+</script>

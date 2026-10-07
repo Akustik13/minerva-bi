@@ -94,6 +94,12 @@ tabele_mvp/
 - Зовнішня RAG читає `/shop/products/` (+`tech_attributes`) і `/stock/` під час запиту; фільтр `?attr=Назва:значення` (ProductFilter), `?updated_since` за `Product.updated_at` (inventory 0039, оновлюється і при `update_fields`)
 - Тести: `python manage.py test api --settings=tabele.settings_test` (SQLite в пам'яті без міграцій)
 
+### rag_assistant/ — помічник по продукції (зовнішній RAG)
+- Окрема кнопка «Minerva» (аватар) поруч із 🏛 Minerva AI — НЕ об'єднувати з ai_assistant
+- `RagSettings` (синглтон: base_url, api_key лише на сервері, language, latest_only), `RagConversation`/`RagMessage` (історія в Minerva, власник = user)
+- `client.py` (RAG API v1: /v1/ask → job, /v1/jobs/{id}, 429 = зайнято), `views.py` (/rag/api/…), віджет `templates/rag_assistant/widget.html` (inline, include у base_site.html), README у застосунку
+- Тести: `python manage.py test rag_assistant --settings=tabele.settings_test` (mock RAG)
+
 ### faq/ (placeholder, no DB)
 - `models.py`: `managed = False`
 - `admin.py`: override `get_urls()` → тільки `info_view`

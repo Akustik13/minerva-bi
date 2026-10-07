@@ -927,7 +927,9 @@ window.MV_GROUPS = [
       { href:'/admin/ai_assistant/aibudgetlog/',           icon:'💰', label:'Бюджет AI',          app:'ai_assistant', model:'AIBudgetLog' },
       { href:'/admin/strategy/aisettings/',                icon:'⚙️', label:'Налаштування AI',    app:'strategy',     model:'AISettings' },
       { href:'/ai/diagnostic/',                            icon:'🔧', label:'Діагностика',        app:'ai_assistant' },
-    ], apps:['ai_assistant'] },
+      { href:'/admin/rag_assistant/ragsettings/',          icon:'📚', label:'Помічник по продукції', app:'rag_assistant' },
+      { href:'/admin/rag_assistant/ragconversation/',      icon:'🗂️', label:'Розмови помічника',  app:'rag_assistant', model:'RagConversation' },
+    ], apps:['ai_assistant', 'rag_assistant'] },
   { id:'email', icon:'📧', label:'📧 Email', href:'/email/',
     links:[
       { href:'/email/',                                         icon:'📥', label:'Вхідні',        app:'email_assistant' },
@@ -1173,6 +1175,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/strategy/':             'crm',
     '/ai/':                   'ai',
     '/admin/ai_assistant/':   'ai',
+    '/admin/rag_assistant/':  'ai',
     '/dashboard/ai/':         'ai',
     '/email/':                'email',
     '/admin/email_assistant/': 'email',
@@ -2009,6 +2012,10 @@ window.addEventListener('appinstalled', function() {
   if (localStorage.getItem('mv-chat-open') === '1') openPanel();
 })();
 </script>
+{% endif %}
+
+{% if user.is_authenticated and user.is_staff %}
+{% include "rag_assistant/widget.html" %}
 {% endif %}
 
 {% if user.is_authenticated %}
