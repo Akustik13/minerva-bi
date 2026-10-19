@@ -126,6 +126,29 @@
 .em-reply-to-row{display:flex;gap:6px;align-items:center;min-width:0}
 .em-reply-cc-btn{flex-shrink:0;border:none;background:none;color:var(--link-fg,#3b82f6);font-size:12px;cursor:pointer;padding:2px 4px}
 .em-reply-cc{display:none}
+/* Підказки адрес (Кому / Копія) */
+.em-ac-wrap{position:relative;flex:1;min-width:0}
+.em-ac-list{display:none;position:absolute;left:0;right:0;top:100%;z-index:60;margin-top:2px;max-height:240px;overflow-y:auto;
+  background:var(--bg-card);border:1px solid var(--border-strong);border-radius:7px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.em-ac-list.open{display:block}
+.em-ac-opt{display:flex;gap:8px;align-items:baseline;padding:6px 9px;font-size:12px;cursor:pointer}
+.em-ac-opt .em{color:var(--text)} .em-ac-opt .nm{color:var(--text-muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.em-ac-opt .src{color:var(--text-dim);font-size:10px;flex-shrink:0}
+.em-ac-opt.active,.em-ac-opt:hover{background:var(--bg-hover,#1e2d40)}
+/* Вкладення відповіді */
+.em-reply-atts{margin-top:8px}
+.em-att-chips{display:flex;flex-wrap:wrap;gap:6px}
+.em-att-chip{display:inline-flex;align-items:center;gap:6px;padding:3px 8px;border-radius:12px;font-size:12px;
+  background:var(--bg-card);border:1px solid var(--border-strong);color:var(--text)}
+.em-att-chip button{border:none;background:none;color:var(--text-dim);cursor:pointer;padding:0;font-size:12px}
+.em-att-chip button:hover{color:var(--err,#e53935)}
+.em-att-pick{display:none;margin-top:6px;padding:8px 10px;border-radius:8px;border:1px solid var(--border-strong);background:var(--bg-card)}
+.em-att-pick.open{display:block}
+.em-att-pick h5{margin:6px 0 4px;font-size:11px;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.em-att-opt{display:flex;gap:8px;align-items:center;padding:4px 6px;border-radius:5px;font-size:12px;cursor:pointer;color:var(--text)}
+.em-att-opt:hover{background:var(--bg-hover,#1e2d40)}
+.em-att-opt .sz{color:var(--text-dim);font-size:11px;margin-left:auto;white-space:nowrap}
+.em-att-opt.added{opacity:.45;cursor:default}
 .em-reply-sig{margin-top:8px;font-size:12px;color:var(--text-muted)}
 .em-reply-sig summary{cursor:pointer;user-select:none;list-style:none}
 .em-reply-sig summary::-webkit-details-marker{display:none}
@@ -356,12 +379,18 @@
       <div class="em-reply-fields">
         <label for="pv-reply-to">{% trans "Кому" %}</label>
         <div class="em-reply-to-row">
-          <input id="pv-reply-to" class="em-reply-inp" type="text" autocomplete="off" placeholder="email@example.com">
+          <div class="em-ac-wrap">
+            <input id="pv-reply-to" class="em-reply-inp" type="text" autocomplete="off" placeholder="email@example.com">
+            <div class="em-ac-list" id="pv-reply-to-ac"></div>
+          </div>
           <button type="button" class="em-reply-cc-btn" id="pv-reply-cc-btn" onclick="pvShowCc()">+ {% trans "Копія" %}</button>
         </div>
         <label for="pv-reply-cc" class="em-reply-cc">{% trans "Копія" %}</label>
-        <input id="pv-reply-cc" class="em-reply-inp em-reply-cc" type="text" autocomplete="off"
-               placeholder="{% trans "адреси через кому" %}">
+        <div class="em-ac-wrap em-reply-cc">
+          <input id="pv-reply-cc" class="em-reply-inp" type="text" autocomplete="off"
+                 placeholder="{% trans "адреси через кому" %}">
+          <div class="em-ac-list" id="pv-reply-cc-ac"></div>
+        </div>
         <label for="pv-reply-subj">{% trans "Тема" %}</label>
         <input id="pv-reply-subj" class="em-reply-inp" type="text" autocomplete="off">
       </div>
@@ -376,6 +405,7 @@
           <button class="em-tb-btn" onmousedown="return fmt(event,'removeFormat')" title="{% trans "Очистити" %}">✕</button>
           <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
           <button class="em-tb-btn ai" onclick="pvReplyAI({{ last.pk }})" title="{% trans "Написати листа з AI" %}" style="color:rgba(0,212,170,.8)">🏛️ AI</button>
+          <button class="em-tb-btn" onclick="pvAttToggle()" title="{% trans "Вкладення: файл, документи замовлення, файли з листування" %}">📎</button>
           <button class="em-tb-btn" onclick="pvReplyTranslate()" title="{% trans "Перекласти текст відповіді на вибрану мову" %}">🌐</button>
           <select class="em-lang-sel" id="pv-reply-lang" title="{% trans "Мова, на яку перекласти відповідь" %}"
                   onchange="try{localStorage.setItem('em-reply-lang',this.value)}catch(e){}"><option value="uk">🇺🇦 UA</option><option value="en">🇬🇧 EN</option><option value="de">🇩🇪 DE</option><option value="pl">🇵🇱 PL</option><option value="fr">🇫🇷 FR</option><option value="es">🇪🇸 ES</option><option value="it">🇮🇹 IT</option><option value="cs">🇨🇿 CS</option></select>
@@ -398,6 +428,27 @@
         </div>
         <div class="em-reply-editor" id="pv-reply-editor" contenteditable="true"
              placeholder="{% trans "Текст відповіді..." %}"></div>
+        <div class="em-reply-atts">
+          <div class="em-att-chips" id="pv-att-chips"></div>
+          <div class="em-att-pick" id="pv-att-pick">
+            <label class="em-att-opt">💻 {% trans "Файл з комп'ютера…" %}
+              <input type="file" multiple style="display:none" onchange="pvAttFiles(this)"></label>
+            {% if attach_options.order_docs %}
+            <h5>📄 {% trans "Документи замовлення" %}</h5>
+            {% for d in attach_options.order_docs %}
+            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="pvAttRef(this)">
+              📄 {{ d.name }}<span class="sz">{{ d.group }} · {{ d.size|filesizeformat }}</span></div>
+            {% endfor %}
+            {% endif %}
+            {% if attach_options.thread_files %}
+            <h5>📎 {% trans "Вкладення з цього листування" %}</h5>
+            {% for d in attach_options.thread_files %}
+            <div class="em-att-opt" data-ref="{{ d.ref }}" data-name="{{ d.name }}" onclick="pvAttRef(this)">
+              📎 {{ d.name }}<span class="sz">{{ d.group }}{% if d.size %} · {{ d.size|filesizeformat }}{% endif %}</span></div>
+            {% endfor %}
+            {% endif %}
+          </div>
+        </div>
         {% if reply_signature %}
         <details class="em-reply-sig">
           <summary>✍️ {% trans "Підпис додається автоматично" %} ▸</summary>
@@ -566,18 +617,107 @@ window.pvSendReply2 = async function() {
   fd.append('subject',   (subjInp && subjInp.value.trim()) || _pvReplySubj);
   fd.append('to', toEmail);
   if (ccInp && ccInp.value.trim()) fd.append('cc', ccInp.value.trim());
+  _pvAtt.forEach(function(a) {
+    if (a.file) fd.append('attachments', a.file, a.file.name);
+    else fd.append('att_ref', a.ref);
+  });
   try {
     var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
     var d = await r.json();
     status.textContent = d.ok ? '✓ {% trans "Відправлено" %}' + (d.via ? ' · {% trans "через" %} ' + d.via : '') : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
-    if (d.ok) { editor.innerHTML = ''; if (btn) { btn.disabled = false; btn.style.opacity = '1'; } }
+    if (d.ok) { editor.innerHTML = ''; _pvAtt = []; _pvAttRender(); if (btn) { btn.disabled = false; btn.style.opacity = '1'; } }
     else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   } catch {
     status.textContent = '✗ {% trans "Помилка мережі" %}'; status.style.color = 'var(--err,#e53935)';
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
 };
+
+// ── Вкладення відповіді: файли з комп'ютера + документи замовлення / файли з листування (посилання) ──
+var _pvAtt = [];
+function _pvAttRender() {
+  var box = document.getElementById('pv-att-chips');
+  if (!box) return;
+  box.innerHTML = '';
+  _pvAtt.forEach(function(a, i) {
+    var chip = document.createElement('span');
+    chip.className = 'em-att-chip';
+    chip.appendChild(document.createTextNode((a.file ? '💻 ' : '📎 ') + a.name));
+    var x = document.createElement('button');
+    x.type = 'button'; x.textContent = '✕'; x.title = '{% trans "Прибрати" %}';
+    x.onclick = function() { _pvAtt.splice(i, 1); _pvAttRender(); };
+    chip.appendChild(x);
+    box.appendChild(chip);
+  });
+  document.querySelectorAll('#pv-att-pick .em-att-opt[data-ref]').forEach(function(o) {
+    o.classList.toggle('added', _pvAtt.some(function(a){ return a.ref === o.dataset.ref; }));
+  });
+}
+window.pvAttToggle = function() {
+  var p = document.getElementById('pv-att-pick');
+  if (p) p.classList.toggle('open');
+};
+window.pvAttFiles = function(input) {
+  Array.from(input.files || []).forEach(function(f){ _pvAtt.push({file: f, name: f.name}); });
+  input.value = '';
+  _pvAttRender();
+};
+window.pvAttRef = function(el) {
+  if (_pvAtt.some(function(a){ return a.ref === el.dataset.ref; })) return;
+  _pvAtt.push({ref: el.dataset.ref, name: el.dataset.name});
+  _pvAttRender();
+};
+
+// ── Підказки адрес у «Кому» / «Копія»: адресна книга, клієнти CRM, усі, з ким листувались ──
+function _pvAutocomplete(inputId, listId) {
+  var inp = document.getElementById(inputId), list = document.getElementById(listId);
+  if (!inp || !list) return;
+  var timer = null, active = -1, items = [];
+  function token() { var parts = inp.value.split(','); return parts[parts.length - 1].trim(); }
+  function close() { list.classList.remove('open'); active = -1; }
+  function pick(c) {
+    var parts = inp.value.split(',');
+    parts[parts.length - 1] = ' ' + c.email;
+    inp.value = parts.join(',').replace(/^\s+/, '') + ', ';
+    close(); inp.focus();
+  }
+  function render() {
+    list.innerHTML = '';
+    items.forEach(function(c, i) {
+      var o = document.createElement('div');
+      o.className = 'em-ac-opt' + (i === active ? ' active' : '');
+      o.innerHTML = '<span class="em"></span><span class="nm"></span><span class="src"></span>';
+      o.children[0].textContent = c.email; o.children[1].textContent = c.name || ''; o.children[2].textContent = c.source || '';
+      o.onmousedown = function(e) { e.preventDefault(); pick(c); };
+      list.appendChild(o);
+    });
+    list.classList.toggle('open', items.length > 0);
+  }
+  inp.addEventListener('input', function() {
+    clearTimeout(timer);
+    var q = token();
+    if (q.length < 2) { close(); return; }
+    timer = setTimeout(async function() {
+      try {
+        var d = await (await fetch('/email/crm-contacts/?q=' + encodeURIComponent(q), {credentials: 'same-origin'})).json();
+        items = d.contacts || []; active = items.length ? 0 : -1; render();
+      } catch(e) { close(); }
+    }, 150);
+  });
+  inp.addEventListener('keydown', function(e) {
+    if (!list.classList.contains('open')) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      active = (active + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length; render();
+    } else if ((e.key === 'Enter' || e.key === 'Tab') && active >= 0) {
+      e.preventDefault(); pick(items[active]);
+    } else if (e.key === 'Escape') { close(); }
+  });
+  inp.addEventListener('blur', function() { setTimeout(close, 150); });
+}
+_pvAutocomplete('pv-reply-to', 'pv-reply-to-ac');
+_pvAutocomplete('pv-reply-cc', 'pv-reply-cc-ac');
 
 window.pvShowCc = function() {
   document.querySelectorAll('.em-reply-cc').forEach(function(el){ el.style.display = 'block'; });

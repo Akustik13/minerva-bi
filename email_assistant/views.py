@@ -492,9 +492,11 @@ def thread_preview_view(request, thread_pk):
     # Minerva → сервер у фоні: прев'ю відкривається без очікування IMAP
     set_read(account, emails, True)
 
+    links = _mail_links(emails)
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
-        'links':           _mail_links(emails),
+        'links':           links,
+        'attach_options':  _attach_options(emails, links),
         'thread':          thread,
         'emails':          _thread_display_order(request, emails),
         'first_msg':       emails[0] if emails else None,
@@ -514,14 +516,26 @@ def message_preview_view(request, message_pk):
     msg.fix_html_body()
     set_read(account, [msg], True)
 
+    links = _mail_links([msg])
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
-        'links':           _mail_links([msg]),
+        'links':           links,
+        'attach_options':  _attach_options([msg], links),
         'thread':          msg.thread,
         'emails':          [msg],
         'last_msg':        msg,
         'reply_signature': _get_signature(account),
     }))
+
+
+def _attach_options(emails, links):
+    """Документи замовлень і вкладення гілки для кнопки «📎 Вкладення» у відповіді."""
+    from email_assistant.attachments import reply_options
+    try:
+        return reply_options(emails, links)
+    except Exception as e:
+        logger.warning('attach options: %s', e)
+        return {'order_docs': [], 'thread_files': []}
 
 
 def _mail_links(emails):
@@ -863,6 +877,13 @@ def _handle_send(request, account, reply_to=None):
     attachments = []
     for f in request.FILES.getlist('attachments'):
         attachments.append({'name': f.name, 'content': f.read(), 'content_type': f.content_type})
+    # Документи замовлення / вкладення з гілки — браузер передає лише посилання, файли читаємо тут
+    from email_assistant.attachments import load_ref
+    for ref in request.POST.getlist('att_ref'):
+        att = load_ref(account, ref)
+        if att is None:
+            return JsonResponse({'ok': False, 'error': f'Вкладення недоступне: {ref.split(":")[-1]}'})
+        attachments.append(att)
 
     result = SMTPClient(account).send(
         to_emails=to_list, subject=subject, body_text=body,
@@ -879,6 +900,8 @@ def _handle_send(request, account, reply_to=None):
                 subject=subject, from_email=account.email_address,
                 from_name=account.display_name, to_emails=to_list, cc_emails=cc_list,
                 body_text=body, is_read=True, sent_at=timezone.now(),
+                attachments=[{'name': a['name'], 'content_type': a['content_type'],
+                              'size': len(a['content'])} for a in attachments],
             )
         except Exception as e:
             logger.warning('store sent message: %s', e)
@@ -1265,8 +1288,53 @@ def ai_grammar_check(request):
 
 @staff_member_required
 def crm_contacts_view(request):
-    """Return merged CRM + address-book contacts as JSON."""
+    """Return merged CRM + address-book contacts as JSON; ?q= — пошук для підказок у полях Кому/Копія."""
+    q = request.GET.get('q', '').strip()
+    if q:
+        return JsonResponse({'contacts': _search_contacts(request, q)})
     return JsonResponse({'contacts': _crm_contacts(request.user)})
+
+
+def _search_contacts(request, q: str, limit: int = 15) -> list:
+    """
+    Адреси для підказки: адресна книга (кому вже писали), клієнти CRM (ім'я, email, компанія)
+    і всі, від кого приходили листи. Спершу ті, у кого email/ім'я починається з введеного.
+    """
+    from django.db.models import Q
+    from email.utils import parseaddr
+    from crm.models import Customer
+    from email_assistant.models import EmailContact, EmailMessage
+
+    found = {}
+
+    def add(email, name, source):
+        email = parseaddr(email or '')[1].strip()
+        if '@' not in email:
+            return
+        key = email.lower()
+        if key not in found:
+            found[key] = {'email': email, 'name': (name or '').strip(), 'source': source}
+
+    for c in (EmailContact.objects.filter(user=request.user)
+              .filter(Q(email__icontains=q) | Q(name__icontains=q))
+              .order_by('-use_count')[:limit]):
+        add(c.email, c.name, 'адресна книга')
+    for c in (Customer.objects.exclude(email='')
+              .filter(Q(email__icontains=q) | Q(name__icontains=q) | Q(company__icontains=q))[:limit]):
+        add(c.email, c.name if not c.company or c.company == c.name else f'{c.name} ({c.company})', 'клієнт CRM')
+    account = _get_account(request)
+    if account:
+        for row in (EmailMessage.objects.filter(account=account, is_spam=False)
+                    .filter(Q(from_email__icontains=q) | Q(from_name__icontains=q))
+                    .values('from_email', 'from_name').order_by('-sent_at')[:limit * 4]):
+            add(row['from_email'], row['from_name'], 'листувались')
+
+    ql = q.lower()
+
+    def rank(c):
+        email, name = c['email'].lower(), c['name'].lower()
+        return (0 if email.startswith(ql) or name.startswith(ql) else 1, email)
+    return sorted(found.values(), key=rank)[:limit]
 
 
 @staff_member_required
@@ -1356,8 +1424,6 @@ def _is_previewable(content_type: str) -> bool:
 @staff_member_required
 def attachment_download_view(request, message_pk, index):
     """Serve an email attachment: from saved file or fetched live from IMAP."""
-    import os
-    from django.conf import settings
     from email_assistant.models import EmailMessage
 
     account = _get_account(request)
@@ -1371,52 +1437,17 @@ def attachment_download_view(request, message_pk, index):
     content_type = att.get('content_type', 'application/octet-stream')
     force_dl     = request.GET.get('download') == '1'
 
-    # Try saved file first
-    file_path = att.get('file_path', '')
-    if file_path:
-        abs_path = os.path.join(settings.MEDIA_ROOT, file_path)
-        if os.path.exists(abs_path):
-            with open(abs_path, 'rb') as fh:
-                data = fh.read()
-            disp = 'attachment' if force_dl else ('inline' if _is_previewable(content_type) else 'attachment')
-            resp = HttpResponse(data, content_type=content_type)
-            resp['Content-Disposition'] = f'{disp}; filename="{name}"'
-            return resp
-
-    # Fall back: fetch from IMAP using stored UID
-    imap_uid    = msg.imap_uid
-    imap_folder = msg.imap_folder_name or account.imap_folder_inbox
-    if imap_uid:
-        try:
-            import email as email_lib
-            from email_assistant.imap_client import IMAPClient, _get_attachments_raw, persist_attachments
-            data = None
-            with IMAPClient(account) as imap:
-                imap.select_folder(imap_folder)
-                _, raw_data = imap.conn.uid('fetch', str(imap_uid).encode(), '(RFC822)')
-                if raw_data and isinstance(raw_data[0], tuple):
-                    parsed_msg = email_lib.message_from_bytes(raw_data[0][1])
-                    parts = _get_attachments_raw(parsed_msg)
-                    if index < len(parts):
-                        data = parts[index].get('_data', b'')
-                        # Cache to disk for next request
-                        try:
-                            saved = persist_attachments(account.pk, imap_uid, imap_folder,
-                                                        [dict(parts[index])])
-                            if saved and saved[0].get('file_path'):
-                                att_list = list(msg.attachments)
-                                att_list[index] = {**att_list[index], 'file_path': saved[0]['file_path']}
-                                msg.attachments = att_list
-                                msg.save(update_fields=['attachments'])
-                        except Exception:
-                            pass
-            if data:
-                disp = 'attachment' if force_dl else ('inline' if _is_previewable(content_type) else 'attachment')
-                resp = HttpResponse(data, content_type=content_type)
-                resp['Content-Disposition'] = f'{disp}; filename="{name}"'
-                return resp
-        except Exception as e:
-            logger.warning('attachment IMAP fetch msg=%s idx=%s: %s', message_pk, index, e)
+    from email_assistant.attachments import attachment_bytes
+    try:
+        data = attachment_bytes(account, msg, index)
+    except Exception as e:
+        logger.warning('attachment fetch msg=%s idx=%s: %s', message_pk, index, e)
+        data = None
+    if data:
+        disp = 'attachment' if force_dl else ('inline' if _is_previewable(content_type) else 'attachment')
+        resp = HttpResponse(data, content_type=content_type)
+        resp['Content-Disposition'] = f'{disp}; filename="{name}"'
+        return resp
 
     return HttpResponse('Файл не знайдено. Пересинхронізуйте пошту.', status=404)
 

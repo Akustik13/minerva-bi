@@ -117,6 +117,7 @@ tabele_mvp/
 - AI-модель пошти — `EmailSettings.ai_model` (email_assistant 0017; «Автоматично» = роутер Minerva AI `ai_assistant/router.py`), вибір у скриньці «🤖» і в адмінці; `ai_helper._call_ai_direct(user=…)`: для 5.x — max_tokens≥16000 (роздуми), server-side fallbacks для Opus/Sonnet 5.5 і Fable 5.1, refusal → порожня відповідь; фонове `extract_deadlines` — завжди авто
 - Відповідь адресується співрозмовнику, а для внутрішнього пересилання — клієнту з досьє (`views._reply_recipient`); у «📜 Історії» — «✍️ Чернетка листа»; у гілці нові листи зверху (cookie `em_thread_order`, перемикач «⇅»)
 - Форма відповіді в прев'ю: Кому / Копія / Тема, підпис згорнутий; переклад листа й тексту відповіді на вибрану мову (`translate_email`, мова в `?lang=`/JSON); AI-чернетка без прощання — `ai_helper.strip_signoff` (підпис додається сам). «📜 Історія» в прокручуваній частині: `history_events` → scope `order` (ця переписка/замовлення) і `customer` (решта, згорнуто)
+- Вкладення у відповіді — `email_assistant/attachments.py`: файли з компʼютера + документи замовлення (`media/orders/{source}/{order}/`) і вкладення гілки; браузер шле лише посилання `att_ref` (`order:<pk>:<файл>` / `msg:<pk>:<idx>`), файл читає сервер (лише basename). Підказки адрес у Кому/Копія — `/email/crm-contacts/?q=` (адресна книга, клієнти CRM, відправники листів)
 - Групування по гілці (⎘) — на сервері (`_group_by_thread`, cookie `em_group`), дії рядка й масові дії — над усією гілкою
 - Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
 

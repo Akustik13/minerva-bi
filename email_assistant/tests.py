@@ -1134,3 +1134,79 @@ class SMTPSSLMismatchTests(SyncTestBase):
             r = SMTPClient(self.account).send(['a@b.example'], 'S', 'T')
         self.assertFalse(r['ok'])
         self.assertIn('587 — TLS (STARTTLS) без SSL', r['error'])
+
+
+class ReplyAttachmentsAndContactsTests(MailLinksTests):
+    """Вкладення у відповіді (документи замовлення, файли з листування) і підказки адрес."""
+
+    def setUp(self):
+        super().setUp()
+        import os
+        import tempfile
+        from django.test import override_settings
+        self._media = tempfile.mkdtemp()
+        self._override = override_settings(MEDIA_ROOT=self._media)
+        self._override.enable()
+        folder = os.path.join(self._media, 'orders', 'digikey', '102037400')
+        os.makedirs(folder)
+        with open(os.path.join(folder, 'Invoice_102037400.pdf'), 'wb') as fh:
+            fh.write(b'%PDF-1.4 invoice')
+        with open(os.path.join(self._media, 'secret.txt'), 'w') as fh:
+            fh.write('do not send')
+
+    def tearDown(self):
+        import shutil
+        self._override.disable()
+        shutil.rmtree(self._media, ignore_errors=True)
+        super().tearDown()
+
+    def _send(self, **extra):
+        sent = {}
+
+        def fake_send(client, **kw):
+            sent.update(kw)
+            return {'ok': True, 'message_id': '<x@sevskiy.de>', 'via': 'test'}
+        data = {'to': 'ifejzic@aevex.com', 'subject': 'Invoice', 'body': 'Please find attached.'}
+        data.update(extra)
+        with patch('email_assistant.smtp_client.SMTPClient.send', fake_send):
+            r = self.client.post('/email/send/', data)
+        return r.json(), sent
+
+    def test_order_document_and_thread_file_are_attached(self):
+        import os
+        att_dir = os.path.join(self._media, 'email_attachments')
+        os.makedirs(att_dir)
+        with open(os.path.join(att_dir, 'cn23.pdf'), 'wb') as fh:
+            fh.write(b'%PDF cn23')
+        mail = self._em(subject='CN23', from_email='ifejzic@aevex.com',
+                        attachments=[{'name': 'cn23.pdf', 'content_type': 'application/pdf', 'size': 9,
+                                      'file_path': 'email_attachments/cn23.pdf'}])
+        d, sent = self._send(att_ref=[f'order:{self.order.pk}:Invoice_102037400.pdf', f'msg:{mail.pk}:0'])
+        self.assertTrue(d['ok'], d)
+        names = {a['name']: a['content'] for a in sent['attachments']}
+        self.assertEqual(names['Invoice_102037400.pdf'], b'%PDF-1.4 invoice')
+        self.assertEqual(names['cn23.pdf'], b'%PDF cn23')
+        stored = EmailMessage.objects.filter(folder='sent', subject='Invoice').first()
+        self.assertEqual([a['name'] for a in stored.attachments], ['Invoice_102037400.pdf', 'cn23.pdf'])
+
+    def test_refs_cannot_escape_order_folder(self):
+        d, sent = self._send(att_ref=[f'order:{self.order.pk}:../../secret.txt'])
+        self.assertFalse(d['ok'])
+        self.assertEqual(sent, {})
+
+    def test_preview_lists_order_documents(self):
+        fwd = self._em(from_email='sergey@sevskiy.de', subject='WG: UPS', body_text=UPS_TEXT)
+        r = self.client.get(f'/email/message/{fwd.pk}/preview/')
+        self.assertContains(r, f'data-ref="order:{self.order.pk}:Invoice_102037400.pdf"')
+        self.assertContains(r, 'id="pv-reply-to-ac"')
+
+    def test_contact_suggestions(self):
+        from email_assistant.models import EmailContact
+        EmailContact.objects.create(user=self.user, email='tthreatts@aevex.com', name='Travis Threatts', use_count=3)
+        self._em(from_email='martin.dobler@iot-invent.com', from_name='Martin Dobler', subject='Testboards')
+        found = lambda q: self.client.get('/email/crm-contacts/', {'q': q}).json()['contacts']
+        self.assertEqual(found('mart')[0]['email'], 'martin.dobler@iot-invent.com')
+        emails = [c['email'] for c in found('aevex')]
+        self.assertIn('tthreatts@aevex.com', emails)                 # адресна книга
+        self.assertIn('ifejzic@aevex.com', emails)                   # клієнт CRM
+        self.assertEqual(found('Travis')[0]['source'], 'адресна книга')
