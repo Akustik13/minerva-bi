@@ -2,7 +2,8 @@
 Тести пошти ↔ CRM.  Запуск:  python manage.py test email_assistant --settings=tabele.settings_test
 """
 import email as email_lib
-from datetime import datetime, timezone as dt_tz
+import json
+from datetime import datetime, timedelta, timezone as dt_tz
 from io import StringIO
 from unittest.mock import patch
 
@@ -542,3 +543,80 @@ class InboxFilterTests(CategoryBase):
             r = self.client.post(f'/email/message/{em.pk}/delete/')
         self.assertTrue(r.json()['ok'])
         self.assertEqual(calls, [(self.account.pk, 'Meine Order', 5, 'trash')])
+
+
+# ── Групування по гілці (⎘) і дії над усією гілкою ───────────────────────────
+
+class FakeIMAPMoves(FakeIMAP):
+    def __init__(self, folders):
+        super().__init__(folders)
+        self.moves = []
+
+    def move_to_trash(self, folder, uid):
+        self.moves.append(('trash', folder, uid))
+        return True
+
+    def move_to_spam(self, folder, uid):
+        self.moves.append(('spam', folder, uid))
+        return True
+
+
+@patch('email_assistant.sync._start_background', lambda fn: fn())
+class ThreadGroupingTests(SyncTestBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+        self.thread = EmailThread.objects.create(account=self.account, subject='Long thread')
+        # 35 листів у Вхідних + 1 наша відповідь у Надісланих — більше ніж одна сторінка (30)
+        for i in range(1, 36):
+            self._em(i, 'INBOX', 'inbox', read=(i != 1), thread=self.thread)
+        self._em(100, 'Gesendete Objekte', 'sent', read=True, thread=self.thread)
+        other = EmailThread.objects.create(account=self.account, subject='Other')
+        self.other = self._em(200, 'INBOX', 'inbox', read=False, thread=other)
+
+    def _em(self, uid, imap_folder, folder, read, thread):
+        return EmailMessage.objects.create(
+            account=self.account, thread=thread, imap_uid=uid, imap_folder_name=imap_folder,
+            folder=folder, subject=f'{thread.subject} {uid}', from_email='partner@example.org',
+            to_emails=['viacheslav.pryimak@sevskiy.de'], is_read=read,
+            sent_at=datetime(2026, 10, 1, tzinfo=dt_tz.utc) + timedelta(minutes=uid))
+
+    def test_grouped_list_counts_all_messages_of_thread(self):
+        r = self.client.get('/email/?folder=inbox')
+        self.assertEqual(r.context['total'], 36)                 # без групування — кожен лист
+
+        self.client.cookies['em_group'] = '1'
+        r = self.client.get('/email/?folder=inbox')
+        self.assertTrue(r.context['grouped'])
+        self.assertEqual(r.context['total'], 2)                  # дві гілки — два рядки
+        rows = {m.thread_id: m for m in r.context['emails']}
+        long_row = rows[self.thread.pk]
+        self.assertEqual(long_row.imap_uid, 35)                  # найновіший лист гілки у Вхідних
+        self.assertEqual(long_row.thread_total, 36)              # усі листи гілки, і Надіслані теж
+        self.assertEqual(long_row.thread_unread, 1)              # непрочитаний найстаріший → рядок «непрочитаний»
+        self.assertEqual(len(long_row.thread_pks.split(',')), 36)
+        self.assertContains(r, 'class="em-thread-count"')
+        self.assertContains(r, f'id="row-{long_row.pk}"')
+        self.assertFalse(hasattr(rows[self.other.thread_id], 'thread_total') and
+                         rows[self.other.thread_id].thread_total > 1)
+
+    def test_bulk_thread_delete_and_read(self):
+        pks = list(self.thread.messages.values_list('pk', flat=True))
+        server = FakeIMAPMoves({'INBOX': {}, 'Gesendete Objekte': {}})
+        with patch('email_assistant.imap_client.IMAPClient', server):
+            r = self.client.post('/email/messages/bulk/', data=json.dumps({'action': 'read', 'pks': pks}),
+                                 content_type='application/json')
+            self.assertTrue(r.json()['ok'])
+            self.assertFalse(self.thread.messages.filter(is_read=False).exists())
+            self.assertEqual(server.stored, [('INBOX', [1], True)])   # \Seen — лише тому, що був непрочитаний
+
+            r = self.client.post('/email/messages/bulk/', data=json.dumps({'action': 'delete', 'pks': pks}),
+                                 content_type='application/json')
+        self.assertTrue(r.json()['ok'])
+        self.assertEqual(self.thread.messages.filter(folder='trash', is_deleted=False).count(), 36)
+        self.assertIn(('trash', 'Gesendete Objekte', 100), server.moves)   # кожен лист — зі своєї папки
+        self.assertEqual(len(server.moves), 36)

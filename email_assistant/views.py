@@ -39,6 +39,28 @@ def _imap_bg(account_pk: int, imap_folder: str, uid: int, action: str):
     threading.Thread(target=_run, daemon=True).start()
 
 
+def _imap_bg_many(account, items, action: str):
+    """Перемістити кілька листів [(папка, uid)] у Кошик/Спам на сервері — одне підключення, у фоні."""
+    items = [(f, u) for f, u in items if f and u]
+    if not items:
+        return
+
+    def _run():
+        from email_assistant.imap_client import IMAPClient
+        try:
+            with IMAPClient(account) as imap:
+                for folder, uid in items:
+                    if action == 'trash':
+                        imap.move_to_trash(folder, uid)
+                    elif action == 'spam':
+                        imap.move_to_spam(folder, uid)
+        except Exception as ex:
+            logger.warning('_imap_bg_many %s %s: %s', action, items[:3], ex)
+
+    from email_assistant.sync import _start_background
+    _start_background(_run)
+
+
 def _get_account(request):
     from email_assistant.models import EmailAccount
     return (EmailAccount.objects
@@ -214,6 +236,32 @@ def _category_filter(request, qs):
     return cat, customer, categories, customers
 
 
+def _group_by_thread(qs):
+    """Залишити по одному листу на гілку — найновіший серед листів поточного списку."""
+    from django.db.models import OuterRef, Q, Subquery
+    latest = qs.filter(thread_id=OuterRef('thread_id')).order_by('-sent_at', '-pk').values('pk')[:1]
+    return qs.filter(Q(thread__isnull=True) | Q(pk=Subquery(latest)))
+
+
+def _attach_thread_stats(emails):
+    """Скільки листів у гілці (усі, як у прев'ю: і Вхідні, і Надіслані), скільки непрочитаних, їхні pk."""
+    from collections import defaultdict
+    from email_assistant.models import EmailMessage
+    thread_ids = {m.thread_id for m in emails if m.thread_id}
+    pks, unread = defaultdict(list), defaultdict(int)
+    for tid, pk, is_read in (EmailMessage.objects
+                             .filter(thread_id__in=thread_ids, is_deleted=False)
+                             .values_list('thread_id', 'pk', 'is_read')):
+        pks[tid].append(pk)
+        if not is_read:
+            unread[tid] += 1
+    for m in emails:
+        if m.thread_id in pks:
+            m.thread_total = len(pks[m.thread_id])
+            m.thread_unread = unread[m.thread_id]
+            m.thread_pks = ','.join(map(str, pks[m.thread_id]))
+
+
 def _filter_qs(cat, customer) -> str:
     from urllib.parse import urlencode
     params = {}
@@ -254,12 +302,19 @@ def inbox_view(request):
         qs = qs.filter(category=cat_filter)
     if customer_filter:
         from django.db.models import Q as _CQ
-        qs = qs.filter(_CQ(thread__crm_customer_id=customer_filter.pk) |
-                       _CQ(crm_events__customer_id=customer_filter.pk)).distinct()
+        qs = qs.filter(pk__in=EmailMessage.objects.filter(
+            _CQ(thread__crm_customer_id=customer_filter.pk) |
+            _CQ(crm_events__customer_id=customer_filter.pk)).values('pk'))
+    # «Групувати по гілці» (⎘, cookie): один рядок на гілку — її найновіший лист у цьому списку
+    grouped = request.COOKIES.get('em_group') == '1'
+    if grouped:
+        qs = _group_by_thread(qs)
     total = qs.count()
     start = (page - 1) * per_page
     # rename key to `emails` to avoid shadowing Django messages framework
     emails = list(qs.select_related('thread')[start:start + per_page])
+    if grouped:
+        _attach_thread_stats(emails)
 
     from email_assistant.models import EmailThread as _ET
     from django.db.models import Q as _Q
@@ -292,6 +347,7 @@ def inbox_view(request):
         'categories':            categories,
         'mail_customers':        mail_customers,
         'filter_qs':             _filter_qs(cat_filter, customer_filter),
+        'grouped':               grouped,
         'emails':                emails,
         'folder':                folder,
         'folders':               FOLDERS,
@@ -1442,15 +1498,27 @@ def bulk_action_view(request):
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
     action = data.get('action', '')
     pks = [int(p) for p in (data.get('pks') or []) if str(p).isdigit()]
-    if not pks or action not in ('read', 'unread', 'delete', 'archive', 'spam'):
+    if not pks or action not in ('read', 'unread', 'delete', 'archive', 'spam', 'unspam'):
         return JsonResponse({'ok': False, 'error': 'Невірні параметри'})
     msgs = EmailMessage.objects.filter(pk__in=pks, account=account)
     if action in ('read', 'unread'):
         set_read(account, list(msgs), action == 'read')
     elif action == 'delete':
-        msgs.update(folder=EmailMessage.FOLDER_TRASH, is_deleted=True)
+        # Як одиночне видалення: спершу в Кошик (і в Кошик на сервері), з Кошика — назовсім
+        from email_assistant.sync import default_imap_folder
+        to_trash = list(msgs.exclude(folder=EmailMessage.FOLDER_TRASH))
+        _imap_bg_many(account, [(default_imap_folder(account, m), m.imap_uid)
+                                for m in to_trash if m.imap_uid], 'trash')
+        msgs.filter(folder=EmailMessage.FOLDER_TRASH).update(is_deleted=True)
+        EmailMessage.objects.filter(pk__in=[m.pk for m in to_trash]).update(folder=EmailMessage.FOLDER_TRASH)
     elif action == 'spam':
+        from email_assistant.sync import default_imap_folder
+        new_spam = list(msgs.filter(is_spam=False))
+        _imap_bg_many(account, [(default_imap_folder(account, m), m.imap_uid)
+                                for m in new_spam if m.imap_uid], 'spam')
         msgs.update(is_spam=True, folder=EmailMessage.FOLDER_SPAM)
+    elif action == 'unspam':
+        msgs.filter(is_spam=True).update(is_spam=False, folder=EmailMessage.FOLDER_INBOX)
     elif action == 'archive':
         tpk_set = set(msgs.exclude(thread=None).values_list('thread_id', flat=True))
         if tpk_set:

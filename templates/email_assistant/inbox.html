@@ -142,6 +142,9 @@
 .em-row-body{flex:1;min-width:0}
 .em-row-top{display:flex;align-items:center;justify-content:space-between;gap:4px;margin-bottom:2px}
 .em-row-sender{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+/* Кількість листів у гілці (режим ⎘) */
+.em-thread-count{flex-shrink:0;margin-left:5px;padding:0 6px;border-radius:9px;font-size:10px;font-weight:700;line-height:16px;
+  background:rgba(26,115,232,.14);color:#1a73e8}
 .em-row-date{font-size:10px;color:var(--text-muted);flex-shrink:0;white-space:nowrap}
 .em-row-subj{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .em-row-prev{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -333,8 +336,9 @@
              oninput="filterP2(this.value)" autocomplete="off">
       <button class="em-p2-group-btn" id="em-unread-btn"
               onclick="toggleUnreadOnly()" title="{% trans "Тільки непрочитані" %}">●</button>
-      <button class="em-p2-group-btn" id="em-group-btn"
-              onclick="toggleGrouping()" title="{% trans "Групувати по гілці листування" %}">⎘</button>
+      <button class="em-p2-group-btn{% if grouped %} on{% endif %}" id="em-group-btn"
+              onclick="toggleGrouping()"
+              title="{% if grouped %}{% trans "Гілки листування: увімкнено — кожна гілка одним рядком з кількістю листів" %}{% else %}{% trans "Групувати по гілці листування" %}{% endif %}">⎘</button>
     </div>
 
     <!-- Category / customer filter -->
@@ -380,7 +384,7 @@
 
       {% for msg in emails %}
       {% with tpk=msg.thread.pk|default:0 %}
-      <div class="em-row{% if not msg.is_read %} unread{% endif %}"
+      <div class="em-row{% if not msg.is_read or msg.thread_unread %} unread{% endif %}"
            id="row-{{ msg.pk }}"
            data-pk="{{ msg.pk }}"
            data-tpk="{{ tpk }}"
@@ -388,7 +392,8 @@
            data-sender="{{ msg.sender_display|lower|escapejs }}"
            data-subject="{{ msg.subject|lower|escapejs }}"
            data-from="{{ msg.from_email|escapejs }}"
-           data-read="{{ msg.is_read|yesno:'1,0' }}"
+           data-read="{% if msg.thread_unread %}0{% else %}{{ msg.is_read|yesno:'1,0' }}{% endif %}"
+           data-pks="{{ msg.thread_pks|default:msg.pk }}"
            onclick="previewMsg({{ msg.pk }}, {{ tpk }}, this)"
            oncontextmenu="showCtxMenu(event, {{ msg.pk }}, {{ tpk }}, this)">
 
@@ -405,7 +410,7 @@
 
         <div class="em-row-body">
           <div class="em-row-top">
-            <span class="em-row-sender">{{ msg.sender_display|truncatechars:22 }}</span>
+            <span style="display:flex;align-items:center;min-width:0"><span class="em-row-sender">{{ msg.sender_display|truncatechars:22 }}</span>{% if msg.thread_total > 1 %}<span class="em-thread-count" title="{% trans "Листів у гілці" %}: {{ msg.thread_total }}{% if msg.thread_unread %}, {% trans "непрочитаних" %}: {{ msg.thread_unread }}{% endif %}">{{ msg.thread_total }}</span>{% endif %}</span>
             <span class="em-row-date">{{ msg.sent_at|date:"d.m H:i" }}</span>
           </div>
           <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
@@ -423,7 +428,7 @@
           <button class="em-row-act" onclick="rowSpam(event, {{ msg.pk }})"
                   title="{% if folder == 'spam' %}{% trans "Не спам" %}{% else %}{% trans "Спам" %}{% endif %}">{% if folder == 'spam' %}✅{% else %}🚫{% endif %}</button>
           {% endif %}
-          <button class="em-row-act danger" onclick="deleteMsg(event, {{ msg.pk }})"
+          <button class="em-row-act danger" onclick="rowDelete(event, {{ msg.pk }})"
                   title="{% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}">🗑️</button>
         </div>
       </div>
@@ -885,15 +890,29 @@ function clearMailFilter() {
 }
 
 /* ── Row hover actions ── */
+// pk листів рядка: у режимі гілок — усі листи гілки, інакше — один лист
+function _rowPks(row) {
+  return (row.dataset.pks || row.dataset.pk).split(',').filter(Boolean).map(Number);
+}
+async function _rowBulk(row, action) {
+  var r = await fetch('/email/messages/bulk/', {
+    method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+    body: JSON.stringify({action: action, pks: _rowPks(row)})
+  });
+  return r.json();
+}
+
 async function rowToggleRead(ev, pk) {
   ev.stopPropagation();
   var row = document.getElementById('row-' + pk);
   if (!row) return;
   var makeRead = row.classList.contains('unread');
   try {
-    var r = await fetch('/email/message/' + pk + '/' + (makeRead ? 'read' : 'unread') + '/',
-                        {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    if (!(await r.json()).ok) return;
+    var d = _rowPks(row).length > 1
+      ? await _rowBulk(row, makeRead ? 'read' : 'unread')
+      : await (await fetch('/email/message/' + pk + '/' + (makeRead ? 'read' : 'unread') + '/',
+                           {method:'POST', headers:{'X-CSRFToken':CSRF}})).json();
+    if (!d.ok) return;
   } catch(e) { return; }
   row.classList.toggle('unread', !makeRead);
   row.dataset.read = makeRead ? '1' : '0';
@@ -906,8 +925,15 @@ async function rowSpam(ev, pk) {
   ev.stopPropagation();
   var row = document.getElementById('row-' + pk);
   try {
-    var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
-    var d = await r.json();
+    var d;
+    if (row && _rowPks(row).length > 1) {
+      var toSpam = '{{ folder|escapejs }}' !== 'spam';
+      d = await _rowBulk(row, toSpam ? 'spam' : 'unspam');
+      d.spam = toSpam;
+    } else {
+      var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+      d = await r.json();
+    }
   } catch(e) { return; }
   if (!d.ok) return;
   // у Спамі кнопка повертає лист у Вхідні; в інших папках — переносить у Спам
@@ -916,6 +942,18 @@ async function rowSpam(ev, pk) {
   _showToast(d.spam
     ? '🚫 {% trans "Переміщено до Спаму" %}' + (d.auto_rule ? ' · {% trans "Правило додано для" %} ' + d.auto_rule : '')
     : '✅ {% trans "Повернуто у Вхідні" %}');
+  window.refreshBadges && window.refreshBadges();
+}
+
+async function rowDelete(ev, pk) {
+  var row = document.getElementById('row-' + pk);
+  if (!row || _rowPks(row).length < 2) return deleteMsg(ev, pk);
+  ev.stopPropagation();
+  var n = _rowPks(row).length;
+  if (!confirm('{% trans "Видалити всю гілку" %} (' + n + ' {% trans "листів" %})?')) return;
+  try { if (!(await _rowBulk(row, 'delete')).ok) return; } catch(e) { return; }
+  row.remove();
+  if (_activeRow === row) { _activeRow = null; resetPreview(); }
   window.refreshBadges && window.refreshBadges();
 }
 
@@ -1055,7 +1093,6 @@ window.sortRows = function(key) {
 
 /* ── Panel 2 local filter ── */
 var _p2Filter = '';
-var _p2Grouping = false;
 var _p2UnreadOnly = false;
 
 window.filterP2 = function(q) {
@@ -1063,11 +1100,13 @@ window.filterP2 = function(q) {
   _applyP2Visibility();
 };
 
+// Групування робить сервер (усі листи папки, не лише поточна сторінка); вибір пам'ятає cookie
 window.toggleGrouping = function() {
-  _p2Grouping = !_p2Grouping;
-  var btn = document.getElementById('em-group-btn');
-  if (btn) btn.classList.toggle('on', _p2Grouping);
-  _applyP2Visibility();
+  var on = !document.getElementById('em-group-btn').classList.contains('on');
+  document.cookie = 'em_group=' + (on ? '1' : '0') + ';path=/;max-age=31536000;SameSite=Lax';
+  var params = new URLSearchParams(location.search);
+  params.delete('page');
+  location.href = location.pathname + (params.toString() ? '?' + params.toString() : '');
 };
 
 window.toggleUnreadOnly = function() {
@@ -1079,7 +1118,6 @@ window.toggleUnreadOnly = function() {
 
 function _applyP2Visibility() {
   var rows  = document.querySelectorAll('#em-p2-list .em-row');
-  var seen  = {};
   rows.forEach(function(row) {
     // 1. text filter
     var sender  = (row.dataset.sender  || '').toLowerCase();
@@ -1089,15 +1127,6 @@ function _applyP2Visibility() {
     // 2. unread only
     if (pass && _p2UnreadOnly) {
       pass = row.dataset.read === '0' || row.classList.contains('unread');
-    }
-
-    // 3. thread grouping — hide duplicates, keep first (=newest) per thread
-    if (pass && _p2Grouping) {
-      var tpk = row.dataset.tpk;
-      if (tpk && tpk !== '0') {
-        if (seen[tpk]) { pass = false; }
-        else { seen[tpk] = true; }
-      }
     }
 
     row.style.display = pass ? '' : 'none';
