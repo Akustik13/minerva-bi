@@ -6,7 +6,34 @@ from django.http import JsonResponse
 from django.urls import path
 from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
-from .models import EmailAccount, EmailMessage, EmailThread, EmailDraft, EmailSettings, ScheduledEmail, EmailRule
+from .models import (EmailAccount, EmailCategoryRule, EmailMessage, EmailThread, EmailDraft, EmailSettings,
+                     ScheduledEmail, EmailRule)
+
+
+@admin.register(EmailCategoryRule)
+class EmailCategoryRuleAdmin(admin.ModelAdmin):
+    """Категорії, задані правим кліком по листу; видалення повертає автовизначення."""
+    list_display  = ('key', 'category', 'account', 'created_at')
+    list_filter   = ('category', 'account')
+    search_fields = ('key',)
+
+    def save_model(self, request, obj, form, change):
+        obj.key = obj.key.strip().lower()
+        super().save_model(request, obj, form, change)
+        from .categorize import recategorize_contact
+        recategorize_contact(obj.account, obj.key)
+
+    def delete_model(self, request, obj):
+        super().delete_model(request, obj)
+        from .categorize import recategorize_contact
+        recategorize_contact(obj.account, obj.key)
+
+    def delete_queryset(self, request, queryset):
+        rules = [(r.account, r.key) for r in queryset.select_related('account')]
+        super().delete_queryset(request, queryset)
+        from .categorize import recategorize_contact
+        for account, key in rules:
+            recategorize_contact(account, key)
 
 
 class ScheduledEmailComposeForm(forms.ModelForm):

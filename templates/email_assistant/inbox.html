@@ -148,16 +148,30 @@
 .em-row-date{font-size:10px;color:var(--text-muted);flex-shrink:0;white-space:nowrap}
 .em-row-subj{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .em-row-prev{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Мітки рядка: клієнт і категорія (клік — фільтр списку) */
+.em-row-meta{display:flex;align-items:center;gap:4px;min-width:0;margin-bottom:2px}
+.em-tag{flex-shrink:0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  padding:0 6px;border-radius:9px;font-size:10px;font-weight:600;line-height:16px;cursor:pointer;
+  border:none;font-family:inherit;--c:#9aa0a6;color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent)}
+.em-tag:hover{background:color-mix(in srgb,var(--c) 28%,transparent)}
+.em-tag.cust{--c:#3b82f6;max-width:150px}
+.em-tag.cat-customer{--c:#3b82f6}
+.em-tag.cat-supplier{--c:#d97706}
+.em-tag.cat-service{--c:#0d9488}
+.em-tag.cat-newsletter{--c:#9333ea}
+.em-tag.cat-internal{--c:#64748b}
+.em-tag.cat-other{--c:#8b9197}
 
-/* Hover actions on a row: прочитано/непрочитано, спам, видалити */
-.em-row-acts{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;align-items:center;gap:2px;
-  padding:2px;border-radius:8px;background:var(--bg-card);border:1px solid var(--border-strong);box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2}
+/* Кнопки рядка (прочитано/непрочитано, спам, видалити): при наведенні стають на місце дати,
+   у самій картці — без спливаючого вікна */
+.em-row-acts{display:none;align-items:center;gap:1px;flex-shrink:0;margin:-4px -4px -4px 0}
 .em-row:hover .em-row-acts{display:flex}
-.em-row-act{border:none;background:none;cursor:pointer;width:28px;height:28px;border-radius:6px;font-size:14px;line-height:1;
+.em-row:hover .em-row-date{display:none}
+.em-row-act{border:none;background:none;cursor:pointer;width:22px;height:22px;border-radius:5px;font-size:12px;line-height:1;
   color:var(--text-muted);display:flex;align-items:center;justify-content:center;padding:0;transition:background .1s,color .1s}
 .em-row-act:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .em-row-act.danger:hover{color:var(--err,#e53935);background:rgba(229,57,53,.1)}
-.em-read-dot{width:10px;height:10px;border-radius:50%;border:2px solid #1a73e8;box-sizing:border-box}
+.em-read-dot{width:9px;height:9px;border-radius:50%;border:2px solid #1a73e8;box-sizing:border-box}
 .em-row.unread .em-read-dot{background:#1a73e8}
 @media (hover:none){.em-row-acts{display:none!important}}
 
@@ -201,6 +215,16 @@
 .em-ctx-item:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .em-ctx-item.danger:hover{background:rgba(229,57,53,.1);color:#ef5350}
 .em-ctx-sep{height:1px;background:var(--border);margin:3px 0}
+/* Підменю «Віднести до категорії» */
+.em-ctx-item.has-sub{position:relative}
+.em-ctx-sub{display:none;position:absolute;left:100%;top:-5px;min-width:230px;padding:4px 0;background:var(--bg-card);
+  border:1px solid var(--border-strong);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.35);cursor:default}
+.em-ctx-item.has-sub:hover > .em-ctx-sub{display:block}
+#em-ctx.sub-left .em-ctx-sub{left:auto;right:100%}
+.em-ctx-sub-hd{padding:4px 14px 6px;font-size:11px;color:var(--text-dim);white-space:nowrap;max-width:280px;
+  overflow:hidden;text-overflow:ellipsis}
+.em-ctx-item.current{color:#3b82f6;font-weight:600}
+.em-ctx-item.current::after{content:'✓';margin-left:auto}
 
 /* ── Rule modal ── */
 #em-rule-modal{display:none;position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,.5);
@@ -394,6 +418,8 @@
            data-from="{{ msg.from_email|escapejs }}"
            data-read="{% if msg.thread_unread %}0{% else %}{{ msg.is_read|yesno:'1,0' }}{% endif %}"
            data-pks="{{ msg.thread_pks|default:msg.pk }}"
+           data-cat="{{ msg.category }}"
+           data-contact="{{ msg.contact }}"
            onclick="previewMsg({{ msg.pk }}, {{ tpk }}, this)"
            oncontextmenu="showCtxMenu(event, {{ msg.pk }}, {{ tpk }}, this)">
 
@@ -412,25 +438,36 @@
           <div class="em-row-top">
             <span style="display:flex;align-items:center;min-width:0"><span class="em-row-sender">{{ msg.sender_display|truncatechars:22 }}</span>{% if msg.thread_total > 1 %}<span class="em-thread-count" title="{% trans "Листів у гілці" %}: {{ msg.thread_total }}{% if msg.thread_unread %}, {% trans "непрочитаних" %}: {{ msg.thread_unread }}{% endif %}">{{ msg.thread_total }}</span>{% endif %}</span>
             <span class="em-row-date">{{ msg.sent_at|date:"d.m H:i" }}</span>
+            <div class="em-row-acts" onclick="event.stopPropagation()">
+              <button class="em-row-act" onclick="rowToggleRead(event, {{ msg.pk }})"
+                      title="{% if msg.is_read %}{% trans "Позначити непрочитаним" %}{% else %}{% trans "Позначити прочитаним" %}{% endif %}">
+                <span class="em-read-dot"></span>
+              </button>
+              {% if folder != 'trash' %}
+              <button class="em-row-act" onclick="rowSpam(event, {{ msg.pk }})"
+                      title="{% if folder == 'spam' %}{% trans "Не спам" %}{% else %}{% trans "Спам" %}{% endif %}">{% if folder == 'spam' %}✅{% else %}🚫{% endif %}</button>
+              {% endif %}
+              <button class="em-row-act danger" onclick="rowDelete(event, {{ msg.pk }})"
+                      title="{% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}">🗑️</button>
+            </div>
           </div>
           <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
+          {% if msg.crm_customer_tag or msg.category_short %}
+          <div class="em-row-meta">
+            {% if msg.crm_customer_tag %}
+            <button class="em-tag cust" onclick="filterMailBy(event, 'customer', {{ msg.crm_customer_tag.pk }})"
+                    title="{% trans "Клієнт" %}: {{ msg.crm_customer_tag.name }} — {% trans "показати всі його листи" %}">👤 {{ msg.crm_customer_tag.name }}</button>
+            {% endif %}
+            {% if msg.category_short and not msg.crm_customer_tag or msg.category_short and msg.category != 'customer' %}
+            <button class="em-tag cat-{{ msg.category }}" onclick="filterMailBy(event, 'cat', '{{ msg.category }}')"
+                    title="{% trans "Категорія" %}: {{ msg.get_category_display }} — {% trans "показати всі листи категорії" %}">{{ msg.category_short }}</button>
+            {% endif %}
+          </div>
+          {% endif %}
           <div class="em-row-prev">{{ msg.body_text|truncatechars:55 }}</div>
         </div>
 
         {% if msg.has_attachments %}<span style="font-size:12px;color:var(--text-dim);flex-shrink:0">📎</span>{% endif %}
-
-        <div class="em-row-acts" onclick="event.stopPropagation()">
-          <button class="em-row-act" onclick="rowToggleRead(event, {{ msg.pk }})"
-                  title="{% if msg.is_read %}{% trans "Позначити непрочитаним" %}{% else %}{% trans "Позначити прочитаним" %}{% endif %}">
-            <span class="em-read-dot"></span>
-          </button>
-          {% if folder != 'trash' %}
-          <button class="em-row-act" onclick="rowSpam(event, {{ msg.pk }})"
-                  title="{% if folder == 'spam' %}{% trans "Не спам" %}{% else %}{% trans "Спам" %}{% endif %}">{% if folder == 'spam' %}✅{% else %}🚫{% endif %}</button>
-          {% endif %}
-          <button class="em-row-act danger" onclick="rowDelete(event, {{ msg.pk }})"
-                  title="{% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}">🗑️</button>
-        </div>
       </div>
       {% endwith %}
       {% endfor %}
@@ -485,6 +522,22 @@
   <div class="em-ctx-item" onclick="ctxAction('unread')">📩 Позначити непрочитаним</div>
   <div class="em-ctx-item" onclick="ctxAction('star')">⭐ Важливе</div>
   <div class="em-ctx-sep"></div>
+  <div class="em-ctx-item has-sub" onclick="event.stopPropagation()">
+    🗂 {% trans "Віднести до категорії" %} <span style="margin-left:auto;padding-left:12px">▸</span>
+    <div class="em-ctx-sub" onclick="event.stopPropagation()">
+      <div class="em-ctx-sub-hd" id="em-ctx-cat-hd"></div>
+      {% for key, label in category_choices %}
+      <div class="em-ctx-item" data-cat="{{ key }}" onclick="ctxSetCategory('{{ key }}')">{{ label }}</div>
+      {% endfor %}
+      <div class="em-ctx-sep"></div>
+      <label class="em-ctx-item" style="font-size:12px">
+        <input type="checkbox" id="em-ctx-cat-domain" style="margin:0;accent-color:#1a73e8">
+        <span>{% trans "Для всього домену" %} <b id="em-ctx-cat-domain-name"></b></span>
+      </label>
+      <div class="em-ctx-item" onclick="ctxSetCategory('')"
+           title="{% trans "Забути вибір для цього контакту — категорію знову визначає система" %}">↺ {% trans "Автоматично" %}</div>
+    </div>
+  </div>
   <div class="em-ctx-item" onclick="ctxAction('rule')">📋 Правило з відправника</div>
   <div class="em-ctx-item" onclick="ctxAction('task')">📅 Завдання в календар</div>
   <div class="em-ctx-sep"></div>
@@ -880,6 +933,13 @@ function applyMailFilter() {
   var cust = document.getElementById('em-cust-sel').value;
   if (cat) params.set('cat', cat); else params.delete('cat');
   if (cust) params.set('customer', cust); else params.delete('customer');
+  params.delete('page');
+  location.search = params.toString();
+}
+function filterMailBy(ev, key, value) {
+  ev.stopPropagation();
+  var params = new URLSearchParams(location.search);
+  params.set(key, value);
   params.delete('page');
   location.search = params.toString();
 }
@@ -1343,9 +1403,20 @@ function showCtxMenu(ev, pk, tpk, rowEl) {
   ev.preventDefault();
   ev.stopPropagation();
   _ctxMsg = {pk: pk, tpk: tpk, rowEl: rowEl, from: rowEl.dataset.from || ''};
+  // Підменю категорій: поточна категорія, для кого запам'ятовується, домен
+  var contact = rowEl.dataset.contact || '';
+  var domain  = contact.indexOf('@') > 0 ? '@' + contact.split('@')[1] : '';
+  document.getElementById('em-ctx-cat-hd').textContent =
+    contact ? '{% trans "Запам’ятати для" %} ' + contact : '{% trans "Внутрішній лист" %}';
+  document.getElementById('em-ctx-cat-domain-name').textContent = domain;
+  document.getElementById('em-ctx-cat-domain').checked = false;
+  _ctx.querySelectorAll('.em-ctx-sub [data-cat]').forEach(function(el) {
+    el.classList.toggle('current', el.dataset.cat === rowEl.dataset.cat);
+  });
   var x = ev.clientX, y = ev.clientY;
   if (x + 200 > window.innerWidth) x = window.innerWidth - 205;
-  if (y + 280 > window.innerHeight) y = window.innerHeight - 285;
+  if (y + 320 > window.innerHeight) y = window.innerHeight - 325;
+  _ctx.classList.toggle('sub-left', x + 200 + 240 > window.innerWidth);
   _ctx.style.left = x + 'px';
   _ctx.style.top  = y + 'px';
   _ctx.classList.add('open');
@@ -1353,6 +1424,24 @@ function showCtxMenu(ev, pk, tpk, rowEl) {
 
 document.addEventListener('click', function() { _ctx.classList.remove('open'); });
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') _ctx.classList.remove('open'); });
+
+async function ctxSetCategory(cat) {
+  _ctx.classList.remove('open');
+  if (!_ctxMsg) return;
+  var scope = document.getElementById('em-ctx-cat-domain').checked ? 'domain' : 'sender';
+  try {
+    var r = await fetch('/email/message/' + _ctxMsg.pk + '/category/', {
+      method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+      body: JSON.stringify({category: cat, scope: scope})
+    });
+    var d = await r.json();
+  } catch(e) { _showToast('⚠️ ' + _i18n.помилка); return; }
+  if (!d.ok) { _showToast('⚠️ ' + (d.error || _i18n.помилка)); return; }
+  _showToast((cat ? '🗂 ' + d.label : '↺ {% trans "Автоматично" %}')
+    + ' · {% trans "запам’ятовано для" %} ' + d.key
+    + (d.changed ? ' · {% trans "оновлено листів" %}: ' + d.changed : ''));
+  setTimeout(function(){ location.reload(); }, 900);
+}
 
 async function ctxAction(action) {
   _ctx.classList.remove('open');

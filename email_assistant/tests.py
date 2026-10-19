@@ -14,7 +14,7 @@ from django.test import TestCase
 from crm.models import Customer, CustomerTimeline
 from email_assistant.crm_link import find_order, resolve, own_addresses
 from email_assistant.imap_client import IMAPClient, _get_body, decode_mutf7, html_to_text, parse_addresses
-from email_assistant.models import EmailAccount, EmailMessage, EmailSettings, EmailThread
+from email_assistant.models import EmailAccount, EmailCategoryRule, EmailMessage, EmailSettings, EmailThread
 from email_assistant.sync import folders_to_sync, pull_read_flags, set_read, sync_folder
 from sales.models import SalesOrder
 
@@ -620,3 +620,65 @@ class ThreadGroupingTests(SyncTestBase):
         self.assertEqual(self.thread.messages.filter(folder='trash', is_deleted=False).count(), 36)
         self.assertIn(('trash', 'Gesendete Objekte', 100), server.moves)   # кожен лист — зі своєї папки
         self.assertEqual(len(server.moves), 36)
+
+
+# ── Категорія вручну (правий клік) запам'ятовується; мітки в рядках ───────────
+
+@patch('email_assistant.sync._start_background', lambda fn: fn())
+class CategoryRuleTests(CategoryBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+
+    def _set(self, em, category, scope='sender'):
+        return self.client.post(f'/email/message/{em.pk}/category/',
+                                data=json.dumps({'category': category, 'scope': scope}),
+                                content_type='application/json').json()
+
+    def _cat(self, em):
+        em.refresh_from_db()
+        return em.category
+
+    def test_sender_rule_is_remembered_and_applied(self):
+        first = self._em(from_email='pkginfo@ups.com', subject='Delivered')
+        older = self._em(from_email='pkginfo@ups.com', subject='Older one')
+        mine = self._em(folder='sent', imap_folder_name='Gesendete Objekte', subject='Question to UPS',
+                        from_email='viacheslav.pryimak@sevskiy.de', to_emails=['pkginfo@ups.com'])
+        other_ups = self._em(from_email='billing@ups.com', subject='Invoice')
+        self.assertEqual(self._cat(first), 'service')
+
+        d = self._set(first, 'supplier')
+        self.assertEqual((d['ok'], d['key'], d['category']), (True, 'pkginfo@ups.com', 'supplier'))
+        self.assertEqual(self._cat(older), 'supplier')        # усі листи цього контакту
+        self.assertEqual(self._cat(mine), 'supplier')         # і мої листи йому
+        self.assertEqual(self._cat(other_ups), 'service')     # інша адреса домену — без змін
+
+        new = self._em(from_email='pkginfo@ups.com', subject='Tomorrow')
+        self.assertEqual(self._cat(new), 'supplier')          # нові листи — за правилом
+
+        self._set(first, 'newsletter', scope='domain')
+        self.assertEqual(self._cat(other_ups), 'newsletter')  # правило на весь @ups.com
+        self.assertEqual(self._cat(first), 'supplier')        # точна адреса важливіша за домен
+
+        self._set(first, '')                                  # ↺ Автоматично — забути обидва
+        self.assertFalse(EmailCategoryRule.objects.exists())
+        self.assertEqual(self._cat(first), 'service')
+        self.assertEqual(self._cat(other_ups), 'service')
+
+    def test_internal_mail_has_no_contact(self):
+        em = self._em(from_email='sergey@sevskiy.de', subject='Lunch')
+        d = self._set(em, 'customer')
+        self.assertFalse(d['ok'])
+
+    def test_rows_show_customer_and_category_tags(self):
+        self._em(from_email='buyer@client.com', subject='PO 7')
+        self._em(from_email='pkginfo@ups.com', subject='Delivered 7')
+        r = self.client.get('/email/?folder=inbox')
+        self.assertContains(r, '👤 Client Co')
+        self.assertContains(r, 'class="em-tag cat-service"')
+        self.assertContains(r, 'data-contact="pkginfo@ups.com"')
+        self.assertContains(r, "ctxSetCategory('supplier')")       # підменю правого кліку

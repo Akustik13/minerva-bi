@@ -107,7 +107,9 @@ tabele_mvp/
 - Ремонт історії: `python manage.py relink_email_crm [--dry-run] [--days N]`
 - Синхронізація — `email_assistant/sync.py`: `save_message` (єдиний шлях збереження), `sync_folder` (нові листи папки за UID, без вікна в днях; `full=True` — добрати старі), `pull_read_flags` (\Seen із сервера), `set_read` (усі позначки «прочитано» в Minerva → \Seen у папку листа, якщо `EmailSettings.mark_read_on_server`, перемикач у скриньці). Крон: `sync_email --folders` (усі папки сервера)
 - `IMAPClient.list_folders()` віддає `name` (сира IMAP-назва для команд) і `label`/`path` (декодований modified UTF-7)
-- Категорії листів `EmailMessage.category` (email_assistant 0015): `email_assistant/categorize.py` (internal → customer → supplier → service → newsletter → other), ставиться сигналом при збереженні; історію дозаповнює `sync_email` порціями або `manage.py categorize_emails [--all]`. Фільтр у скриньці `?cat=…&customer=<pk>`
+- Категорії листів `EmailMessage.category` (email_assistant 0015): `email_assistant/categorize.py` (internal → customer → supplier → service → newsletter → other), ставиться сигналом при збереженні; історію дозаповнює `sync_email` порціями або `manage.py categorize_emails [--all]`. Фільтр у скриньці `?cat=…&customer=<pk>`; мітки клієнта/категорії в рядку списку
+- Ручна категорія: правий клік → «Віднести до категорії» → `EmailCategoryRule` (email_assistant 0016, ключ — адреса співрозмовника або `@домен`), має пріоритет над автовизначенням і перераховує листи контакту (`categorize.remember_category`); список/видалення правил — адмінка «Категорії контактів»
+- Групування по гілці (⎘) — на сервері (`_group_by_thread`, cookie `em_group`), дії рядка й масові дії — над усією гілкою
 - Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
 
 ### faq/ (placeholder, no DB)

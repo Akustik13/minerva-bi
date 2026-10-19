@@ -243,6 +243,29 @@ def _group_by_thread(qs):
     return qs.filter(Q(thread__isnull=True) | Q(pk=Subquery(latest)))
 
 
+def _attach_crm_customers(emails):
+    """Клієнт для мітки в рядку: клієнт гілки, інакше — з події CRM-хронології цього листа."""
+    from crm.models import CustomerTimeline
+    missing = [m.pk for m in emails if not (m.thread_id and m.thread.crm_customer_id)]
+    by_message = {}
+    if missing:
+        for ev in CustomerTimeline.objects.filter(email_message_id__in=missing).select_related('customer'):
+            by_message.setdefault(ev.email_message_id, ev.customer)
+    for m in emails:
+        m.crm_customer_tag = (m.thread.crm_customer if m.thread_id and m.thread.crm_customer_id
+                              else by_message.get(m.pk))
+
+
+def _attach_contacts(emails):
+    """Співрозмовник рядка (для «Віднести до категорії» в меню правого кліку)."""
+    from email_assistant.categorize import counterparts
+    from email_assistant.crm_link import own_addresses
+    own = own_addresses()
+    for m in emails:
+        contacts = counterparts(m, own)
+        m.contact = contacts[0] if contacts else ''
+
+
 def _attach_thread_stats(emails):
     """Скільки листів у гілці (усі, як у прев'ю: і Вхідні, і Надіслані), скільки непрочитаних, їхні pk."""
     from collections import defaultdict
@@ -312,9 +335,11 @@ def inbox_view(request):
     total = qs.count()
     start = (page - 1) * per_page
     # rename key to `emails` to avoid shadowing Django messages framework
-    emails = list(qs.select_related('thread')[start:start + per_page])
+    emails = list(qs.select_related('thread', 'thread__crm_customer')[start:start + per_page])
     if grouped:
         _attach_thread_stats(emails)
+    _attach_crm_customers(emails)
+    _attach_contacts(emails)
 
     from email_assistant.models import EmailThread as _ET
     from django.db.models import Q as _Q
@@ -348,6 +373,7 @@ def inbox_view(request):
         'mail_customers':        mail_customers,
         'filter_qs':             _filter_qs(cat_filter, customer_filter),
         'grouped':               grouped,
+        'category_choices':      EmailMessage.CATEGORY_CHOICES,
         'emails':                emails,
         'folder':                folder,
         'folders':               FOLDERS,
@@ -1410,6 +1436,30 @@ def mark_unread_api(request, message_pk):
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
     set_read(account, [msg], False)
     return JsonResponse({'ok': True})
+
+
+@staff_member_required
+@require_POST
+def set_category_view(request, message_pk):
+    """POST {category, scope: sender|domain}: віднести лист до категорії й запам'ятати для контакту."""
+    import json as _json
+    from email_assistant.categorize import remember_category
+    from email_assistant.models import EmailMessage
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    try:
+        data = _json.loads(request.body or b'{}')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
+    category = data.get('category') or ''
+    if category and category not in dict(EmailMessage.CATEGORY_CHOICES):
+        return JsonResponse({'ok': False, 'error': 'Невідома категорія'})
+    key, changed = remember_category(msg, category, 'domain' if data.get('scope') == 'domain' else 'sender')
+    if key is None:
+        return JsonResponse({'ok': False, 'error': 'Внутрішній лист — немає зовнішнього співрозмовника'})
+    msg.refresh_from_db(fields=['category'])
+    return JsonResponse({'ok': True, 'key': key, 'changed': changed,
+                         'category': msg.category, 'label': msg.get_category_display()})
 
 
 _SETTINGS_TOGGLES = {'mark_read_on_server'}

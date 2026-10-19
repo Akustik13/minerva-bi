@@ -178,9 +178,23 @@ class EmailMessage(models.Model):
     def sender_display(self):
         return self.from_name or self.from_email
 
+    CATEGORY_SHORT = {
+        'customer':   '👤 Клієнт',
+        'supplier':   '🏭 Постачальник',
+        'service':    '📦 Сервіс',
+        'newsletter': '📰 Розсилка',
+        'internal':   '🏢 Внутрішній',
+        'other':      '❓ Інше',
+    }
+
     @property
     def has_attachments(self):
         return bool(self.attachments)
+
+    @property
+    def category_short(self):
+        """Коротка мітка категорії для рядка в списку листів."""
+        return self.CATEGORY_SHORT.get(self.category, '')
 
     def fix_html_body(self, save=True) -> bool:
         """Листи лише з text/html раніше зберігались як текст — перенести розмітку в body_html."""
@@ -455,3 +469,27 @@ class EmailContact(models.Model):
 
     def __str__(self):
         return f'{self.name} <{self.email}>' if self.name else self.email
+
+
+class EmailCategoryRule(models.Model):
+    """
+    Запам'ятована категорія контакту: правий клік по листу → «Віднести до категорії».
+    key — адреса співрозмовника (a@b.com) або весь домен (@b.com); має пріоритет над автовизначенням.
+    """
+    account    = models.ForeignKey(EmailAccount, on_delete=models.CASCADE,
+                                   related_name='category_rules', verbose_name='Акаунт')
+    key        = models.CharField(max_length=254, verbose_name='Адреса або @домен')
+    category   = models.CharField(max_length=20, choices=EmailMessage.CATEGORY_CHOICES,
+                                  verbose_name='Категорія')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Категорія контакту'
+        verbose_name_plural = 'Категорії контактів'
+        ordering            = ['key']
+        constraints         = [
+            models.UniqueConstraint(fields=['account', 'key'], name='unique_account_category_key'),
+        ]
+
+    def __str__(self):
+        return f'{self.key} → {self.get_category_display()}'

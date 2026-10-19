@@ -2,6 +2,7 @@
 email_assistant/categorize.py — автоматична категорія листа для фільтра в скриньці.
 
 Порядок (перша, що підходить):
+  ✋ правило    — категорія, яку користувач задав для контакту (адреса або @домен), EmailCategoryRule
   🏢 internal   — усі учасники з власних адрес/домену
   👤 customer   — співрозмовник є в CRM (Customer.email) або гілку прив'язано до клієнта
   🏭 supplier   — співрозмовник є серед постачальників (Supplier.email або його домен)
@@ -33,7 +34,9 @@ class CategoryContext:
 
     def __init__(self, preload_customers=False):
         from inventory.models import Supplier
+        from email_assistant.models import EmailCategoryRule
         self.own = own_addresses()
+        self.rules = {(r.account_id, r.key): r.category for r in EmailCategoryRule.objects.all()}
         emails = {_addr(e) for e in Supplier.objects.exclude(email='').values_list('email', flat=True)}
         self.supplier_emails = {e for e in emails if e}
         self.supplier_domains = {e.split('@', 1)[1] for e in self.supplier_emails} - FREE_MAIL_DOMAINS
@@ -55,6 +58,17 @@ class CategoryContext:
             cond |= Q(email__iexact=a)
         return Customer.objects.filter(cond).exists()
 
+    def rule_for(self, account_id, addresses):
+        """Запам'ятована категорія: спершу точна адреса, потім домен."""
+        for a in addresses:
+            if (account_id, a) in self.rules:
+                return self.rules[(account_id, a)]
+        for a in addresses:
+            key = (account_id, '@' + a.split('@', 1)[1])
+            if key in self.rules:
+                return self.rules[key]
+        return None
+
     def is_supplier(self, addresses) -> bool:
         return any(a in self.supplier_emails or a.split('@', 1)[1] in self.supplier_domains
                    for a in addresses)
@@ -65,31 +79,83 @@ def _is_service(address: str) -> bool:
     return any(part in domain for part in SERVICE_DOMAIN_PARTS) or bool(NOREPLY_RE.match(local))
 
 
-def categorize(em, ctx=None, list_unsubscribe=False) -> str:
-    ctx = ctx or CategoryContext()
+def counterparts(em, own) -> list:
+    """Співрозмовники листа: для вхідних — відправник, для своїх — зовнішні отримувачі."""
     participants = []
     for a in [em.from_email] + list(em.to_emails or []) + list(em.cc_emails or []):
         a = _addr(a)
         if a and a not in participants:
             participants.append(a)
-    external = [a for a in participants if not is_own(a, ctx.own)]
-    if not external:
+    external = [a for a in participants if not is_own(a, own)]
+    sender = _addr(em.from_email)
+    return [sender] if sender in external else external
+
+
+def categorize(em, ctx=None, list_unsubscribe=False) -> str:
+    ctx = ctx or CategoryContext()
+    contacts = counterparts(em, ctx.own)
+    if not contacts:
         return 'internal'
 
-    # Співрозмовник: для вхідних — відправник, для своїх листів — отримувачі
-    sender = _addr(em.from_email)
-    counterparts = [sender] if sender in external else external
+    remembered = ctx.rule_for(em.account_id, contacts)
+    if remembered:
+        return remembered
 
-    if ctx.is_customer(external) or (em.thread_id and em.thread.crm_customer_id):
+    if ctx.is_customer(contacts) or (em.thread_id and em.thread.crm_customer_id):
         return 'customer'
-    if ctx.is_supplier(external):
+    if ctx.is_supplier(contacts):
         return 'supplier'
-    if any(_is_service(a) for a in counterparts):
+    if any(_is_service(a) for a in contacts):
         return 'service'
     text = (em.body_text or '')[-4000:] + ' ' + (em.subject or '')
     if list_unsubscribe or NEWSLETTER_RE.search(text):
         return 'newsletter'
     return 'other'
+
+
+def _matches(address: str, key: str) -> bool:
+    return address.endswith(key) if key.startswith('@') else address == key
+
+
+def recategorize_contact(account, key: str) -> int:
+    """Перерахувати категорії всіх листів, де співрозмовник = key (адреса або @домен)."""
+    from email_assistant.models import EmailMessage
+    ctx = CategoryContext(preload_customers=True)
+    matched = []
+    for pk, frm, to, cc in (EmailMessage.objects.filter(account=account)
+                            .values_list('pk', 'from_email', 'to_emails', 'cc_emails')):
+        addresses = [_addr(a) for a in [frm] + list(to or []) + list(cc or [])]
+        if any(a and _matches(a, key) for a in addresses):
+            matched.append(pk)
+    changed = 0
+    for em in EmailMessage.objects.filter(pk__in=matched).select_related('thread'):
+        category = categorize(em, ctx)
+        if category != em.category:
+            EmailMessage.objects.filter(pk=em.pk).update(category=category)
+            changed += 1
+    return changed
+
+
+def remember_category(em, category: str, scope: str = 'sender'):
+    """
+    Запам'ятати категорію для співрозмовника листа (scope='sender' — адреса, 'domain' — весь домен)
+    і перерахувати його листи. category='' — забути правило (повернути автовизначення).
+    Повертає (ключ правила, скільки листів змінило категорію) або (None, 0) для внутрішніх листів.
+    """
+    from email_assistant.models import EmailCategoryRule
+    contacts = counterparts(em, own_addresses())
+    if not contacts:
+        return None, 0
+    address = contacts[0]
+    domain_key = '@' + address.split('@', 1)[1]
+    key = domain_key if scope == 'domain' else address
+    if category:
+        EmailCategoryRule.objects.update_or_create(
+            account=em.account, key=key, defaults={'category': category})
+        return key, recategorize_contact(em.account, key)
+    # «Автоматично»: забути правила адреси й домену — перерахувати весь домен
+    EmailCategoryRule.objects.filter(account=em.account, key__in=[address, domain_key]).delete()
+    return key, recategorize_contact(em.account, domain_key)
 
 
 def categorize_pending(account=None, limit=1000, ctx=None, force=False) -> int:
