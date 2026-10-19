@@ -73,6 +73,22 @@ def build_context(msg) -> dict:
                      .exclude(event_type__in=['email_in', 'email_out', 'order'])
                      .order_by('-created_at')[:MAX_NOTES])
 
+    # Що з іншого стосується саме цих замовлень: згадано номер замовлення чи трек-номер
+    keys = set()
+    for link in links:
+        keys.add(link['order'].order_number.lower())
+        keys.update(s['tracking'].lower() for s in link['shipments'] if s['tracking'])
+    keys.discard('')
+
+    def mentions(*parts):
+        text = ' '.join(p or '' for p in parts).lower()
+        return any(k in text for k in keys)
+
+    for t in other_threads:
+        t['related'] = mentions(t['thread'].subject, t['last'].subject, (t['last'].body_text or '')[:20000])
+    for n in notes:
+        n.related = mentions(n.title, n.body)
+
     return {
         'message':       msg,
         'thread_msgs':   thread_msgs,
@@ -116,12 +132,16 @@ def state_lines(ctx) -> list:
 
 
 def history_events(ctx) -> list:
-    """Хронологія фактів: [(дата, іконка, текст)] від старих до нових."""
+    """
+    Хронологія фактів: [(дата, іконка, текст, scope)] від старих до нових.
+    scope='order' — ця переписка, її замовлення й відправлення, листування з тим самим номером;
+    scope='customer' — решта по клієнту (інші замовлення/листування, нотатки), в інтерфейсі згорнуто.
+    """
     events = []
 
-    def add(when, icon, text):
+    def add(when, icon, text, scope='order'):
         if when:
-            events.append((_day(when), icon, text))
+            events.append((_day(when), icon, text, scope))
 
     for order in ctx['orders']:
         label = f'{order.source}:{order.order_number}'
@@ -145,10 +165,12 @@ def history_events(ctx) -> list:
         add(m.sent_at, icon, f'{who}: {m.subject or "(без теми)"}')
 
     for t in ctx['other_threads']:
-        add(t['last'].sent_at, '✉️', f'Інша переписка: «{t["thread"].subject}» ({t["count"]} лист.)')
+        add(t['last'].sent_at, '✉️', f'Інша переписка: «{t["thread"].subject}» ({t["count"]} лист.)',
+            'order' if t.get('related') else 'customer')
 
     for n in ctx['notes']:
-        add(n.created_at, '📝', f'{n.get_event_type_display()}: {n.title}')
+        add(n.created_at, '📝', f'{n.get_event_type_display()}: {n.title}',
+            'order' if getattr(n, 'related', False) else 'customer')
 
     events.sort(key=lambda e: e[0] or date.min)
     return events
@@ -179,7 +201,9 @@ def context_text(ctx, limit=6000) -> str:
         parts.append('ПОТОЧНИЙ СТАН:\n' + '\n'.join(state))
     history = history_events(ctx)
     if history:
-        parts.append('ХРОНОЛОГІЯ:\n' + '\n'.join(f'{_fmt(d)} {icon} {text}' for d, icon, text in history[-25:]))
+        parts.append('ХРОНОЛОГІЯ:\n' + '\n'.join(
+            f'{_fmt(d)} {icon} {text}' + ('' if scope == 'order' else ' [інше по клієнту]')
+            for d, icon, text, scope in history[-25:]))
     if ctx['other_threads']:
         snippets = []
         for t in ctx['other_threads']:

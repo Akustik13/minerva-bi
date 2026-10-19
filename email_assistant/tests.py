@@ -324,6 +324,12 @@ class SyncTestBase(TestCase):
         es = EmailSettings.get_for_user(self.user)
         es.deadline_detection = False
         es.telegram_notify_new = False
+        es.mark_read_on_server = False   # без справжніх IMAP-підключень у фоні; тести «прочитано» вмикають самі
+        es.save()
+
+    def _push_read_on(self):
+        es = EmailSettings.get_for_user(self.user)
+        es.mark_read_on_server = True
         es.save()
 
 
@@ -373,6 +379,7 @@ class SetReadTests(SyncTestBase):
         return list(EmailMessage.objects.filter(imap_folder_name=self.FOLDER).order_by('imap_uid'))
 
     def test_pushes_seen_to_the_message_folder(self):
+        self._push_read_on()
         server = FakeIMAP({self.FOLDER: {5: False, 6: False}})
         msgs = self._saved(server)
         with patch('email_assistant.imap_client.IMAPClient', server):
@@ -403,6 +410,7 @@ class MailViewsTests(SyncTestBase):
         self.client.force_login(self.user)
 
     def test_preview_marks_read_on_server(self):
+        self._push_read_on()
         server = FakeIMAP({'INBOX': {11: False}})
         with patch('email_assistant.imap_client.IMAPClient', server):
             call_command('sync_email', stdout=StringIO())
@@ -605,6 +613,7 @@ class ThreadGroupingTests(SyncTestBase):
                          rows[self.other.thread_id].thread_total > 1)
 
     def test_bulk_thread_delete_and_read(self):
+        self._push_read_on()
         pks = list(self.thread.messages.values_list('pk', flat=True))
         server = FakeIMAPMoves({'INBOX': {}, 'Gesendete Objekte': {}})
         with patch('email_assistant.imap_client.IMAPClient', server):
@@ -809,7 +818,13 @@ class MailContextTests(MailLinksTests):
         state = '\n'.join(state_lines(ctx))
         self.assertIn('🛒 digikey:102037400 від 06.10.2026', state)
         self.assertIn('🚚 UPS 1Z0R6B300426098447 — В дорозі', state)
-        texts = [t for _, _, t in history_events(ctx)]
+        events = history_events(ctx)
+        texts = [t for _, _, t, _ in events]
+        scopes = {t: scope for _, _, t, scope in events}
+        self.assertEqual(scopes['Замовлення digikey:102037400 відправлено'], 'order')
+        # інша переписка про ЦЕ замовлення — основне; дзвінок без номера — «ще по клієнту»
+        self.assertEqual(scopes['Інша переписка: «Your order #102037400 has been shipped» (1 лист.)'], 'order')
+        self.assertEqual(scopes['📞 Дзвінок: Travis promised to pay fees'], 'customer')
         self.assertIn('Замовлення digikey:102037400 відправлено', texts)
         self.assertTrue(any(t.startswith('Інша переписка: «Your order #102037400') for t in texts))
         self.assertTrue(any('Travis promised to pay fees' in t for t in texts))
@@ -1012,3 +1027,36 @@ class ReplyRecipientTests(MailContextTests):
                    lambda prompt, max_tokens=1024, user=None: 'Thank you'):
             d = self.client.get(f'/email/message/{incoming.pk}/ai-reply/').json()
         self.assertEqual(d['to'], 'ifejzic@aevex.com')
+
+
+class DraftAndTranslateTests(SyncTestBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+
+    def test_strip_signoff(self):
+        from email_assistant.ai_helper import strip_signoff
+        self.assertEqual(strip_signoff('Dear Travis,\n\nPlease pay.\n\nBest regards,\nViacheslav'),
+                         'Dear Travis,\n\nPlease pay.')
+        self.assertEqual(strip_signoff('Hallo,\nbitte zahlen.\n\nMit freundlichen Grüßen\nViacheslav Pryimak'),
+                         'Hallo,\nbitte zahlen.')
+        self.assertEqual(strip_signoff('Thank you for your assistance.\nPlease confirm.'),
+                         'Thank you for your assistance.\nPlease confirm.')
+
+    def test_translate_to_chosen_language(self):
+        prompts = []
+        with patch('email_assistant.ai_helper._call_ai_direct',
+                   lambda prompt, max_tokens=1024, user=None: prompts.append(prompt) or 'Sehr geehrter Herr'):
+            r = self.client.post('/email/translate-text/', data=json.dumps({'text': 'Шановний пане', 'lang': 'de'}),
+                                 content_type='application/json').json()
+        self.assertEqual((r['ok'], r['lang']), (True, 'de'))
+        self.assertIn('німецьку', prompts[0])
+
+    def test_model_label(self):
+        from email_assistant.views import _model_label
+        self.assertEqual(_model_label('claude-opus-5-5'), 'Claude Opus 5.5')
+        self.assertEqual(_model_label('claude-haiku-4-5-20251001'), 'Claude Haiku 4.5')

@@ -967,8 +967,8 @@ def history_view(request, message_pk):
     data = {
         'ok':     True,
         'state':  state_lines(ctx),
-        'events': [{'date': d.strftime('%d.%m.%Y') if d else '', 'icon': icon, 'text': text}
-                   for d, icon, text in history_events(ctx)],
+        'events': [{'date': d.strftime('%d.%m.%Y') if d else '', 'icon': icon, 'text': text, 'scope': scope}
+                   for d, icon, text, scope in history_events(ctx)],
         'links':  [{'label': l['label'], 'url': l['url']} for l in ctx['links']],
     }
     if request.GET.get('ai') == '1':
@@ -1587,7 +1587,12 @@ def _model_label(model_id: str) -> str:
     """Назва моделі для інтерфейсу: «Claude Opus 5.5» замість claude-opus-5-5."""
     from email_assistant.models import EmailSettings
     label = dict(EmailSettings.AI_MODEL_CHOICES).get(model_id, '')
-    return label.split(' — ')[0] if label else model_id
+    if label:
+        return label.split(' — ')[0]
+    # моделі роутера «Автоматично»: claude-haiku-4-5-20251001 → Claude Haiku 4.5
+    import re as _re
+    m = _re.match(r'claude-(opus|sonnet|haiku|fable)-(\d+)-(\d+)', model_id or '')
+    return f'Claude {m.group(1).title()} {m.group(2)}.{m.group(3)}' if m else model_id
 
 
 @staff_member_required

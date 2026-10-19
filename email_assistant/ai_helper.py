@@ -1,5 +1,6 @@
 """email_assistant/ai_helper.py — AI helpers for email operations."""
 import logging
+import re
 import threading
 
 logger = logging.getLogger('email_assistant')
@@ -85,6 +86,25 @@ def _thread_text(thread_messages, account, per_message=1500, last=8, newest_char
     return '\n\n---\n'.join(parts)
 
 
+# Прощальна фраза наприкінці чернетки: підпис користувача з прощанням додається сам
+_CLOSING_RE = re.compile(
+    r'^((best|kind|warm|warmest)\s+)?(regards|wishes)\b|^sincerely|^yours (truly|sincerely|faithfully)|^cheers\b'
+    r'|^thanks? (you )?(and|&) (best |kind )?regards|^mit (freundlichen|besten) grüßen|^(freundliche|viele|beste|liebe) grüße'
+    r'|^mfg\b|^з повагою|^з найкращими побажаннями|^cordialement|^saludos|^pozdrawiam|^distinti saluti',
+    re.IGNORECASE)
+
+
+def strip_signoff(text: str) -> str:
+    """Прибрати «Best regards,\nViacheslav» в кінці (якщо після прощання лише коротке ім'я/посада)."""
+    lines = (text or '').rstrip().split('\n')
+    for i in range(max(0, len(lines) - 4), len(lines)):
+        if _CLOSING_RE.match(lines[i].strip()):
+            tail = [ln for ln in lines[i + 1:] if ln.strip()]
+            if all(len(ln.split()) <= 5 for ln in tail):
+                return '\n'.join(lines[:i]).rstrip()
+    return (text or '').rstrip()
+
+
 def generate_reply(thread_messages: list, account, user_profile=None, instruction: str = '',
                    facts: str = '', recipient: str = '') -> str:
     """
@@ -104,6 +124,8 @@ def generate_reply(thread_messages: list, account, user_profile=None, instructio
         f'- Факти з Minerva новіші за переписку: якщо статус змінився, спирайся на Minerva.\n'
         f'- Пиши коротко, ввічливо, по суті; без внутрішніх подробиць, які клієнту не потрібні.\n'
         f'- Звичайний текст листа, без Markdown (без #, **, таблиць).\n'
+        f'- НЕ пиши прощальну фразу (Best regards, Mit freundlichen Grüßen, З повагою) та ім\'я відправника '
+        f'в кінці: підпис із прощанням додається автоматично.\n'
         f'- Терміни (дедлайни) бери з тексту листів, а не з часу подій перевізника.\n\n'
         + (f'АДРЕСАТ ЛИСТА: {recipient}. Пиши саме йому (якщо останній лист — внутрішнє '
            f'пересилання від колеги, звертайся не до колеги, а до цього адресата).\n\n' if recipient else '')
@@ -111,7 +133,7 @@ def generate_reply(thread_messages: list, account, user_profile=None, instructio
         + f'ПЕРЕПИСКА (від старих до нових):\n{_thread_text(thread_messages, account)}\n\n'
         f'ЗАВДАННЯ: {task}\n\nТекст відповіді:'
     )
-    return _call_ai_direct(prompt, max_tokens=1500, user=_user(account, user_profile)) or ''
+    return strip_signoff(_call_ai_direct(prompt, max_tokens=1500, user=_user(account, user_profile)) or '')
 
 
 def summarize_history(thread_messages: list, account, facts: str = '') -> str:
@@ -139,13 +161,18 @@ def translate_email(text: str, target_lang: str, user_profile=None) -> str:
         'de': 'німецьку',
         'en': 'англійську',
         'pl': 'польську',
+        'fr': 'французьку',
+        'es': 'іспанську',
+        'it': 'італійську',
+        'cs': 'чеську',
         'ru': 'російську',
     }
     lang_name = lang_names.get(target_lang, target_lang)
     prompt = (
-        f'Перекладі цей email на {lang_name}. '
-        f'Поверни ТІЛЬКИ переклад, збережи форматування.\n\n'
-        f'{text[:4000]}'
+        f'Переклади цей email на {lang_name} мову (ділове листування). '
+        f'Поверни ТІЛЬКИ переклад: без пояснень і без Markdown, збережи абзаци, '
+        f'імена, номери замовлень, трек-номери, суми й дати без змін.\n\n'
+        f'{text[:12000]}'
     )
     return _call_ai_direct(prompt, user=_user(user_profile=user_profile)) or ''
 

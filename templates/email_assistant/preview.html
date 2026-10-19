@@ -13,8 +13,13 @@
 .em-pv-link a:hover{text-decoration:underline}
 .em-pv-link .why{font-size:10px;color:var(--text-dim);margin-left:auto}
 /* «📜 Історія»: факти з Minerva + підсумок AI за бажанням */
-.em-history{display:none;margin-top:8px;border:1px solid var(--border-strong);border-left:3px solid #f59e0b;border-radius:8px;
-  background:var(--bg-card);max-height:38vh;overflow-y:auto;padding:10px 12px}
+.em-history{display:none;flex-shrink:0;border:1px solid var(--border-strong);border-left:3px solid #f59e0b;border-radius:8px;
+  background:var(--bg-card);padding:10px 12px}
+.em-history-tl summary{cursor:pointer;font-size:12px;color:var(--text-muted);margin-top:8px;user-select:none}
+/* Решта по клієнту (інші замовлення, листування, нотатки) — приглушено й згорнуто */
+.em-history-other{margin-top:8px;border-radius:7px;background:rgba(148,163,184,.06);padding:2px 8px 6px}
+.em-history-other summary{cursor:pointer;font-size:12px;color:var(--text-dim);padding-top:4px;user-select:none}
+.em-history-other .em-history-ev .t,.em-history-other .em-history-ev .d{color:var(--text-dim);opacity:.8}
 .em-history-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .em-history-hd b{font-size:12px;color:var(--text)}
 .em-history-state div{font-size:12px;color:var(--text);line-height:1.6}
@@ -101,6 +106,9 @@
 .em-ai-lbl{font-size:10px;font-weight:700;color:#00d4aa;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0}
 .em-ai-ctx{font-size:11px;color:var(--text-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .em-ai-close{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:13px;padding:2px 6px;border-radius:5px;flex-shrink:0}
+/* Мова перекладу */
+.em-lang-sel{padding:2px 4px;border-radius:5px;border:1px solid var(--border-strong);background:var(--bg-card);
+  color:var(--text);font-size:11px;cursor:pointer;outline:none;flex-shrink:0}
 .em-ai-close:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .em-ai-txt{font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);max-height:45vh;overflow-y:auto}
 .em-ai-txt:empty{display:none}
@@ -108,7 +116,21 @@
 .em-ai-prompt-inp{flex:1;padding:5px 9px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;outline:none}
 .em-ai-prompt-inp:focus{border-color:#1a73e8}
 /* Reply box */
-.em-reply{flex-shrink:0;border-top:1px solid var(--border-strong);background:var(--bg-input)}
+.em-reply{flex-shrink:0;border-top:1px solid var(--border-strong);background:var(--bg-input);max-height:58vh;overflow-y:auto}
+/* Поля відповіді: Кому / Копія / Тема — компактна сітка */
+.em-reply-fields{display:grid;grid-template-columns:48px 1fr;gap:6px 8px;align-items:center;padding:8px 18px 0}
+.em-reply-fields label{font-size:12px;color:var(--text-muted)}
+.em-reply-inp{width:100%;box-sizing:border-box;padding:5px 9px;border-radius:6px;border:1px solid var(--border-strong);
+  background:var(--bg-card);color:var(--text);font-size:13px;outline:none}
+.em-reply-inp:focus{border-color:#1a73e8}
+.em-reply-to-row{display:flex;gap:6px;align-items:center;min-width:0}
+.em-reply-cc-btn{flex-shrink:0;border:none;background:none;color:var(--link-fg,#3b82f6);font-size:12px;cursor:pointer;padding:2px 4px}
+.em-reply-cc{display:none}
+.em-reply-sig{margin-top:8px;font-size:12px;color:var(--text-muted)}
+.em-reply-sig summary{cursor:pointer;user-select:none;list-style:none}
+.em-reply-sig summary::-webkit-details-marker{display:none}
+.em-reply-sig[open] summary{margin-bottom:6px}
+.em-reply-sig > div{padding-top:6px;border-top:1px dashed var(--border-strong)}
 .em-reply-toggle-hd{display:flex;align-items:center;justify-content:space-between;padding:9px 18px;cursor:pointer;font-size:13px;font-weight:600;color:var(--text-muted);user-select:none;transition:color .1s}
 .em-reply-toggle-hd:hover{color:var(--text)}
 #pv-reply-body{padding:10px 18px 12px}
@@ -181,6 +203,10 @@
          class="em-pv-btn" target="_blank" title="{% trans "Відкрити на повній сторінці" %}">↗ {% trans "Окремо" %}</a>
       {% endif %}
     </div>
+  </div>
+
+  <!-- Messages (Gmail-style: collapsed except last) -->
+  <div class="em-msgs">
     <div class="em-history" id="pv-history">
       <div class="em-history-hd">
         <b>📜 {% trans "Історія" %}</b>
@@ -205,10 +231,6 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Messages (Gmail-style: collapsed except last) -->
-  <div class="em-msgs">
     {% for msg in emails %}
     {% with is_last=forloop.last %}
     {# розгорнутий — найновіший лист, хоч би де він стояв (нові зверху чи знизу) #}
@@ -248,6 +270,8 @@
       <div class="em-ai-box" id="pv-ai-{{ msg.pk }}" data-mode="">
         <div class="em-ai-hd">
           <span class="em-ai-lbl" id="pv-ai-lbl-{{ msg.pk }}"></span>
+          <select class="em-lang-sel" id="pv-ai-lang-{{ msg.pk }}" style="display:none"
+                  title="{% trans "Мова перекладу" %}" onchange="pvAiTranslate({{ msg.pk }}, true)"><option value="uk">🇺🇦 UA</option><option value="en">🇬🇧 EN</option><option value="de">🇩🇪 DE</option><option value="pl">🇵🇱 PL</option><option value="fr">🇫🇷 FR</option><option value="es">🇪🇸 ES</option><option value="it">🇮🇹 IT</option><option value="cs">🇨🇿 CS</option></select>
           <span class="em-ai-ctx">↳ {{ msg.from_name|default:msg.from_email }} · {{ msg.sent_at|date:"d.m.Y H:i" }}</span>
           <button class="em-ai-close" onclick="pvAiClose({{ msg.pk }})" title="{% trans "Закрити" %}">✕</button>
         </div>
@@ -329,12 +353,17 @@
     </div>
     <!-- Collapsible body -->
     <div id="pv-reply-body" style="display:none">
-      <!-- To field -->
-      <div style="padding:6px 18px 0;display:flex;align-items:center;gap:8px">
-        <label style="font-size:12px;color:var(--text-muted);min-width:40px">{% trans "Кому" %}:</label>
-        <input id="pv-reply-to" type="email" autocomplete="off"
-               style="flex:1;padding:5px 9px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:13px;outline:none"
-               placeholder="email@example.com">
+      <div class="em-reply-fields">
+        <label for="pv-reply-to">{% trans "Кому" %}</label>
+        <div class="em-reply-to-row">
+          <input id="pv-reply-to" class="em-reply-inp" type="text" autocomplete="off" placeholder="email@example.com">
+          <button type="button" class="em-reply-cc-btn" id="pv-reply-cc-btn" onclick="pvShowCc()">+ {% trans "Копія" %}</button>
+        </div>
+        <label for="pv-reply-cc" class="em-reply-cc">{% trans "Копія" %}</label>
+        <input id="pv-reply-cc" class="em-reply-inp em-reply-cc" type="text" autocomplete="off"
+               placeholder="{% trans "адреси через кому" %}">
+        <label for="pv-reply-subj">{% trans "Тема" %}</label>
+        <input id="pv-reply-subj" class="em-reply-inp" type="text" autocomplete="off">
       </div>
       <div id="pv-reply-body-inner" style="padding:10px 18px 12px">
         <div class="em-reply-toolbar">
@@ -347,7 +376,11 @@
           <button class="em-tb-btn" onmousedown="return fmt(event,'removeFormat')" title="{% trans "Очистити" %}">✕</button>
           <span style="width:1px;background:var(--border-strong);margin:2px 4px;align-self:stretch"></span>
           <button class="em-tb-btn ai" onclick="pvReplyAI({{ last.pk }})" title="{% trans "Написати листа з AI" %}" style="color:rgba(0,212,170,.8)">🏛️ AI</button>
-          <button class="em-tb-btn" onclick="pvReplyTranslate()" title="{% trans "Перекласти текст на UA" %}">🌐</button>
+          <button class="em-tb-btn" onclick="pvReplyTranslate()" title="{% trans "Перекласти текст відповіді на вибрану мову" %}">🌐</button>
+          <select class="em-lang-sel" id="pv-reply-lang" title="{% trans "Мова, на яку перекласти відповідь" %}"
+                  onchange="try{localStorage.setItem('em-reply-lang',this.value)}catch(e){}"><option value="uk">🇺🇦 UA</option><option value="en">🇬🇧 EN</option><option value="de">🇩🇪 DE</option><option value="pl">🇵🇱 PL</option><option value="fr">🇫🇷 FR</option><option value="es">🇪🇸 ES</option><option value="it">🇮🇹 IT</option><option value="cs">🇨🇿 CS</option></select>
+          <button class="em-tb-btn" id="pv-reply-untranslate" style="display:none" onclick="pvReplyUntranslate()"
+                  title="{% trans "Повернути текст до перекладу" %}">↶</button>
         </div>
         <!-- AI write panel inside reply -->
         <div id="pv-reply-ai-box" style="display:none;padding:8px 0 10px">
@@ -366,7 +399,10 @@
         <div class="em-reply-editor" id="pv-reply-editor" contenteditable="true"
              placeholder="{% trans "Текст відповіді..." %}"></div>
         {% if reply_signature %}
-        <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:12px" id="pv-reply-sig">{{ reply_signature|safe }}</div>
+        <details class="em-reply-sig">
+          <summary>✍️ {% trans "Підпис додається автоматично" %} ▸</summary>
+          <div id="pv-reply-sig">{{ reply_signature|safe }}</div>
+        </details>
         {% endif %}
         <div class="em-reply-footer">
           <button class="em-reply-send" onclick="pvSendReply2()">
@@ -498,7 +534,9 @@ window.pvOpenReply = function(mode, toEmail, subj) {
   var toInp = document.getElementById('pv-reply-to');
   var arrow = document.getElementById('pv-reply-arrow');
   if (toInp) toInp.value = toEmail || '';
-  _pvReplySubj = (mode === 'forward' ? 'Fwd: ' : 'Re: ') + subj.replace(/^(Re:|Fwd:)\s*/i, '');
+  _pvReplySubj = (mode === 'forward' ? 'Fwd: ' : 'Re: ') + subj.replace(/^(Re|AW|Aw|Fwd|WG|FW):\s*/i, '');
+  var subjInp = document.getElementById('pv-reply-subj');
+  if (subjInp) subjInp.value = _pvReplySubj;
   body.style.display = 'block';
   if (arrow) arrow.style.transform = '';
   var ed = document.getElementById('pv-reply-editor');
@@ -523,8 +561,11 @@ window.pvSendReply2 = async function() {
   fd.append('reply_to_pk', _pvReplyPk);
   fd.append('body',      textBody);
   fd.append('body_html', htmlBody);
-  fd.append('subject',   _pvReplySubj);
+  var subjInp = document.getElementById('pv-reply-subj');
+  var ccInp   = document.getElementById('pv-reply-cc');
+  fd.append('subject',   (subjInp && subjInp.value.trim()) || _pvReplySubj);
   fd.append('to', toEmail);
+  if (ccInp && ccInp.value.trim()) fd.append('cc', ccInp.value.trim());
   try {
     var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
     var d = await r.json();
@@ -536,6 +577,14 @@ window.pvSendReply2 = async function() {
     status.textContent = '✗ {% trans "Помилка мережі" %}'; status.style.color = 'var(--err,#e53935)';
     if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
   }
+};
+
+window.pvShowCc = function() {
+  document.querySelectorAll('.em-reply-cc').forEach(function(el){ el.style.display = 'block'; });
+  var btn = document.getElementById('pv-reply-cc-btn');
+  if (btn) btn.style.display = 'none';
+  var cc = document.getElementById('pv-reply-cc');
+  if (cc) cc.focus();
 };
 
 window.pvReplyAI = function(pk) {
@@ -575,9 +624,20 @@ window.pvReplyAIUse = function() {
   document.getElementById('pv-reply-ai-box').style.display = 'none';
 };
 
+// Мова перекладу відповіді — остання вибрана (за замовчуванням англійська)
+(function() {
+  var sel = document.getElementById('pv-reply-lang');
+  if (!sel) return;
+  var saved = null;
+  try { saved = localStorage.getItem('em-reply-lang'); } catch(e) {}
+  sel.value = saved || 'en';
+})();
+
+var _pvReplyBeforeTr = null;
 window.pvReplyTranslate = async function() {
   var ed = document.getElementById('pv-reply-editor');
   var status = document.getElementById('pv-reply-status');
+  var lang = (document.getElementById('pv-reply-lang') || {}).value || 'en';
   var text = (ed.innerText || ed.textContent).trim();
   if (!text) { status.textContent = '{% trans "Введіть текст для перекладу" %}'; return; }
   status.textContent = '⏳ {% trans "Перекладаю..." %}'; status.style.color = 'var(--text-muted)';
@@ -585,17 +645,30 @@ window.pvReplyTranslate = async function() {
     var r = await fetch('/email/translate-text/', {
       method: 'POST',
       headers: {'X-CSRFToken': CSRF, 'Content-Type': 'application/json'},
-      body: JSON.stringify({text: text, lang: 'uk'})
+      body: JSON.stringify({text: text, lang: lang})
     });
     var d = await r.json();
-    if (d.ok) { ed.innerText = d.translation; status.textContent = '✓ {% trans "Перекладено" %}'; status.style.color = 'var(--ok)'; }
+    if (d.ok) {
+      _pvReplyBeforeTr = ed.innerHTML;          // можна повернути оригінал кнопкою ↶
+      ed.innerText = d.translation;
+      document.getElementById('pv-reply-untranslate').style.display = '';
+      status.textContent = '✓ {% trans "Перекладено" %} → ' + lang.toUpperCase(); status.style.color = 'var(--ok)';
+    }
     else { status.textContent = '⚠️ ' + d.error; status.style.color = 'var(--err)'; }
   } catch { status.textContent = '⚠️ {% trans "Помилка" %}'; status.style.color = 'var(--err)'; }
+};
+window.pvReplyUntranslate = function() {
+  var ed = document.getElementById('pv-reply-editor');
+  if (_pvReplyBeforeTr === null || !ed) return;
+  ed.innerHTML = _pvReplyBeforeTr;
+  _pvReplyBeforeTr = null;
+  document.getElementById('pv-reply-untranslate').style.display = 'none';
+  document.getElementById('pv-reply-status').textContent = '↶ {% trans "Повернуто оригінал" %}';
 };
 
 var _PV_AI_LABELS = {
   reply:     '🏛️ {% trans "Minerva пропонує відповідь" %}',
-  translate: '🌐 {% trans "Переклад українською" %}'
+  translate: '🌐 {% trans "Переклад" %}'
 };
 
 // Відкрити панель листа в режимі reply/translate; повторний клік тим самим режимом — закрити.
@@ -613,6 +686,8 @@ function _pvAiOpen(pk, mode) {
   document.getElementById('pv-ai-lbl-' + pk).textContent = _PV_AI_LABELS[mode];
   document.getElementById('pv-ai-prompt-row-' + pk).style.display = mode === 'reply' ? 'flex' : 'none';
   document.getElementById('pv-ai-use-' + pk).style.display = mode === 'reply' ? '' : 'none';
+  var langSel = document.getElementById('pv-ai-lang-' + pk);
+  if (langSel) langSel.style.display = mode === 'translate' ? '' : 'none';
   box.style.display = 'block';
   if (card) card.querySelectorAll('.em-hd-btn[data-ai]').forEach(function(b) {
     b.classList.toggle('on', b.dataset.ai === mode);
@@ -675,6 +750,7 @@ window.pvHistory = async function(pk) {
   var open = box.style.display === 'block';
   box.style.display = open ? 'none' : 'block';
   if (btn) btn.classList.toggle('ai', !open);
+  if (!open) setTimeout(function(){ box.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 30);
   if (open || box.dataset.loaded) return;
   body.innerHTML = '<div style="font-size:12px;color:var(--text-dim)">⏳ {% trans "Збираю історію..." %}</div>';
   try {
@@ -684,10 +760,22 @@ window.pvHistory = async function(pk) {
     if (d.state && d.state.length) {
       html += '<div class="em-history-state">' + d.state.map(function(s){ return '<div>' + _pvEsc(s) + '</div>'; }).join('') + '</div>';
     }
-    if (d.events && d.events.length) {
-      html += '<div class="em-history-ev">' + d.events.map(function(e) {
+    var rows = function(list) {
+      return '<div class="em-history-ev">' + list.map(function(e) {
         return '<span class="d">' + _pvEsc(e.date) + '</span><span>' + _pvEsc(e.icon) + '</span><span class="t">' + _pvEsc(e.text) + '</span>';
       }).join('') + '</div>';
+    };
+    var main  = (d.events || []).filter(function(e){ return e.scope !== 'customer'; });
+    var other = (d.events || []).filter(function(e){ return e.scope === 'customer'; });
+    if (main.length) {
+      // хронологія цієї переписки й замовлення; довга — згорнута
+      html += '<details class="em-history-tl"' + (main.length > 10 ? '' : ' open') + '>'
+            + '<summary>🗓 {% trans "Ця переписка й замовлення" %} · ' + main.length + '</summary>'
+            + rows(main) + '</details>';
+    }
+    if (other.length) {
+      html += '<details class="em-history-other"><summary>👤 {% trans "Ще по клієнту (інші замовлення, листування, нотатки)" %} · '
+            + other.length + ' ▸</summary>' + rows(other) + '</details>';
     }
     body.innerHTML = html || '<div style="font-size:12px;color:var(--text-dim)">{% trans "Пов’язаних замовлень, відправлень і нотаток не знайдено — лише ця переписка." %}</div>';
   } catch(e) {
@@ -734,13 +822,15 @@ window.pvHistoryAI = async function(pk) {
   } catch(e) { out.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
 
-window.pvAiTranslate = async function(pk) {
-  if (!_pvAiOpen(pk, 'translate')) return;
+// force — зміна мови у випадному списку: перекласти заново, панель не закривати
+window.pvAiTranslate = async function(pk, force) {
+  if (!force && !_pvAiOpen(pk, 'translate')) return;
   var txt = document.getElementById('pv-ai-txt-' + pk);
-  if (txt.textContent && txt.textContent.indexOf('⏳') !== 0 && txt.textContent.indexOf('⚠️') !== 0) return;  // вже перекладено
+  var lang = (document.getElementById('pv-ai-lang-' + pk) || {}).value || 'uk';
+  if (!force && txt.textContent && txt.textContent.indexOf('⏳') !== 0 && txt.textContent.indexOf('⚠️') !== 0) return;  // вже перекладено
   txt.textContent = '⏳ {% trans "Перекладаю..." %}';
   try {
-    var r = await fetch('/email/message/' + pk + '/ai-translate/?lang=uk');
+    var r = await fetch('/email/message/' + pk + '/ai-translate/?lang=' + encodeURIComponent(lang));
     var d = await r.json();
     txt.textContent = d.ok ? d.translation : '⚠️ ' + d.error;
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
