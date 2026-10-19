@@ -109,6 +109,8 @@ tabele_mvp/
 - `IMAPClient.list_folders()` віддає `name` (сира IMAP-назва для команд) і `label`/`path` (декодований modified UTF-7)
 - Категорії листів `EmailMessage.category` (email_assistant 0015): `email_assistant/categorize.py` (internal → customer → supplier → service → newsletter → other), ставиться сигналом при збереженні; історію дозаповнює `sync_email` порціями або `manage.py categorize_emails [--all]`. Фільтр у скриньці `?cat=…&customer=<pk>`; мітки клієнта/категорії в рядку списку
 - Ручна категорія: правий клік → «Віднести до категорії» → `EmailCategoryRule` (email_assistant 0016, ключ — адреса співрозмовника або `@домен`), має пріоритет над автовизначенням і перераховує листи контакту (`categorize.remember_category`); список/видалення правил — адмінка «Категорії контактів»
+- Пошук (`q`) і фільтри категорії/клієнта діють по всіх папках (`ALL_FOLDERS` у `_build_qs`, крім Спаму/Кошика), рядки з міткою папки; клієнт — пошук за першими літерами (`em-customers-data`)
+- Зв'язки листа — `email_assistant/links.py`: номери замовлень і трек-номери (SalesOrder.tracking_number, Shipment.tracking_number) у темі/тексті → блок «🔗 замовлення · клієнт · відправлення» у прев'ю; трек-номер також прив'язує лист перевізника до клієнта в CRM (`crm_link.find_order`)
 - Групування по гілці (⎘) — на сервері (`_group_by_thread`, cookie `em_group`), дії рядка й масові дії — над усією гілкою
 - Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
 

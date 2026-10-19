@@ -682,3 +682,101 @@ class CategoryRuleTests(CategoryBase):
         self.assertContains(r, 'class="em-tag cat-service"')
         self.assertContains(r, 'data-contact="pkginfo@ups.com"')
         self.assertContains(r, "ctxSetCategory('supplier')")       # підменю правого кліку
+
+
+# ── Зв'язки листа (замовлення / трек-номер), пошук по всіх папках, копіювання адрес ──
+
+UPS_TEXT = (
+    'Von: deern1@ups.com\nBetreff: **Reminder** UPS [E-BGF489] Tracking Number: 1Z0R6B300426098447\n'
+    'REF: 102037400 SHIPPER : 0R6B30 SEVSKIY GMBH\nREF: CONSIGNEE : AEVEX 8514 SUNSTATE ST TAMPA'
+)
+
+
+@patch('email_assistant.sync._start_background', lambda fn: fn())
+class MailLinksTests(CategoryBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        from shipping.models import Carrier, Shipment
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+        self.aevex = Customer.objects.create(name='AEVEX', email='ifejzic@aevex.com')
+        self.order = SalesOrder.objects.create(
+            source='digikey', order_number='102037400', customer_key=self.aevex.external_key,
+            email=self.aevex.email, affects_stock=False)
+        carrier = Carrier.objects.create(name='UPS', carrier_type='ups')
+        self.shipment = Shipment.objects.create(order=self.order, carrier=carrier, status='in_transit',
+                                                tracking_number='1Z0R6B300426098447')
+
+    def test_find_links_by_order_and_tracking(self):
+        from email_assistant.links import find_links
+        links = find_links(['Exception', UPS_TEXT])
+        self.assertEqual(len(links), 1)
+        link = links[0]
+        self.assertEqual((link['label'], link['customer'], link['reason']),
+                         ('digikey:102037400', self.aevex, 'номер замовлення'))
+        self.assertEqual(link['shipments'][0]['tracking'], '1Z0R6B300426098447')
+        self.assertEqual(link['shipments'][0]['status'], 'В дорозі')
+
+        only_tracking = find_links(['Your parcel 1z0r6b300426098447 is delayed'])   # регістр не важливий
+        self.assertEqual((only_tracking[0]['order'], only_tracking[0]['reason']), (self.order, 'трек-номер'))
+        self.assertEqual(find_links(['Hello, nothing here 2026']), [])
+
+    def test_forwarded_ups_mail_shows_links_in_preview(self):
+        fwd = self._em(from_email='sergey@sevskiy.de', to_emails=['viacheslav.pryimak@sevskiy.de'],
+                       subject='WG: **Reminder** UPS [E-BGF489] Exception Notification', body_text=UPS_TEXT)
+        r = self.client.get(f'/email/message/{fwd.pk}/preview/')
+        self.assertContains(r, '🛒 digikey:102037400')
+        self.assertContains(r, '👤 AEVEX')
+        self.assertContains(r, '🚚 1Z0R6B300426098447 · В дорозі')
+        self.assertContains(r, 'class="em-addr" data-addr="viacheslav.pryimak@sevskiy.de"')   # адресу можна скопіювати
+
+    def test_carrier_mail_with_tracking_only_goes_to_customer_timeline(self):
+        self._em(from_email='deern1@ups.com', subject='UPS Exception',
+                 body_text='Tracking Number: 1Z0R6B300426098447 — import fees unpaid')
+        ev = CustomerTimeline.objects.get(customer=self.aevex, title='UPS Exception')
+        self.assertEqual(ev.related_order_id, self.order.pk)
+
+
+@patch('email_assistant.sync._start_background', lambda fn: fn())
+class SearchAllFoldersTests(CategoryBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+        self._em(from_email='li@polecoz.com', subject='Polecoz PO in inbox')
+        self._em(folder='sent', imap_folder_name='Gesendete Objekte', from_email='viacheslav.pryimak@sevskiy.de',
+                 to_emails=['li@polecoz.com'], subject='Polecoz reply sent')
+        self._em(imap_folder_name='Meine Order', from_email='li@polecoz.com', subject='Polecoz in custom folder')
+        self._em(folder='spam', is_spam=True, from_email='x@spam.example', subject='Polecoz spam')
+        sent_thread = EmailThread.objects.create(account=self.account, subject='Offer', crm_customer=self.client_c)
+        self._em(folder='sent', imap_folder_name='Gesendete Objekte', thread=sent_thread,
+                 from_email='viacheslav.pryimak@sevskiy.de', to_emails=['buyer@client.com'], subject='Offer')
+
+    def test_search_covers_all_folders_except_spam(self):
+        r = self.client.get('/email/?folder=inbox&q=Polecoz')
+        self.assertTrue(r.context['search_all'])
+        self.assertEqual({m.subject for m in r.context['emails']},
+                         {'Polecoz PO in inbox', 'Polecoz reply sent', 'Polecoz in custom folder'})
+        tags = {m.subject: m.folder_tag for m in r.context['emails']}
+        self.assertEqual(tags['Polecoz reply sent'], '📤 Надіслані')
+        self.assertEqual(tags['Polecoz in custom folder'], '📁 Meine Order')
+        self.assertContains(r, '🔎 Усі папки')
+
+        r = self.client.get('/email/?folder=inbox')                 # без пошуку — лише папка
+        self.assertFalse(r.context['search_all'])
+        self.assertNotIn('Polecoz reply sent', {m.subject for m in r.context['emails']})
+
+    def test_customer_filter_and_list_cover_all_folders(self):
+        r = self.client.get('/email/?folder=inbox')
+        names = {c['name'] for c in r.context['mail_customers']}
+        self.assertIn('Client Co', names)                           # клієнт лише з «Надісланих»
+        self.assertContains(r, 'id="em-customers-data"')
+
+        r = self.client.get(f'/email/?folder=inbox&customer={self.client_c.pk}')
+        self.assertEqual({m.subject for m in r.context['emails']}, {'Offer'})

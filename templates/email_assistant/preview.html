@@ -5,6 +5,13 @@
 .em-pv-subj{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px;line-height:1.3}
 .em-pv-meta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .em-pv-acts{display:flex;gap:6px;flex-wrap:wrap}
+/* Зв'язки листа: замовлення, клієнт, відправлення (знайдені за номером/трек-номером у тексті) */
+.em-pv-links{display:flex;flex-direction:column;gap:4px;margin-top:6px}
+.em-pv-link{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;font-size:12px;color:var(--text-muted);
+  padding:5px 9px;border-radius:7px;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.18)}
+.em-pv-link a{color:var(--link-fg,#3b82f6);text-decoration:none;font-weight:600}
+.em-pv-link a:hover{text-decoration:underline}
+.em-pv-link .why{font-size:10px;color:var(--text-dim);margin-left:auto}
 .em-pv-btn{padding:5px 12px;border-radius:6px;font-size:12px;border:1px solid var(--border-strong);background:none;color:var(--text-muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;transition:background .1s}
 .em-pv-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .em-pv-btn.ai{background:rgba(0,212,170,.08);color:#00d4aa;border-color:rgba(0,212,170,.3)}
@@ -28,6 +35,13 @@
 .em-card-to-line{font-size:11px;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none}
 .em-card.expanded .em-card-snippet{display:none}
 .em-card.expanded .em-card-to-line{display:block}
+/* Адреси можна виділити або скопіювати кліком */
+.em-card-from,.em-card-to-line{user-select:text}
+.em-addr{cursor:copy;border-radius:3px;padding:0 1px}
+.em-addr:hover{background:rgba(59,130,246,.15);color:var(--text)}
+#pv-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:99999;display:none;
+  background:var(--bg-card);border:1px solid var(--border-strong);border-radius:8px;padding:8px 16px;
+  font-size:12px;color:var(--text-muted);box-shadow:0 4px 14px rgba(0,0,0,.3);white-space:nowrap}
 .em-card-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
 .em-card-date{font-size:11px;color:var(--text-muted);white-space:nowrap}
 /* Action buttons in header */
@@ -92,6 +106,8 @@
 .em-reply-status{font-size:12px;color:var(--text-muted)}
 </style>
 
+<div id="pv-toast"></div>
+
 <!-- Attachment hover preview tooltip (singleton, shared across all cards) -->
 <div id="em-att-tip"></div>
 
@@ -109,6 +125,21 @@
       </a>
       {% endif %}
     </div>
+    {% if links %}
+    <div class="em-pv-links">
+      {% for l in links %}
+      <div class="em-pv-link">
+        <span>🔗</span>
+        <a href="{{ l.url }}" target="_blank" title="{% trans "Відкрити замовлення" %}">🛒 {{ l.label }}</a>
+        {% if l.customer %}<a href="{{ l.customer_url }}" target="_blank" title="{% trans "Картка клієнта в CRM" %}">👤 {{ l.customer.name }}</a>{% endif %}
+        {% for s in l.shipments %}
+        <a href="{{ s.url }}" target="_blank" title="{{ s.carrier }}">🚚 {{ s.tracking|default:"—" }} · {{ s.status }}</a>
+        {% endfor %}
+        <span class="why">{% trans "знайдено" %}: {{ l.reason }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
     <div class="em-pv-acts" style="margin-top:8px">
       {% if last %}
       <a href="/email/compose/?reply_to={{ last.pk }}" class="em-pv-btn">↩ {% trans "Відповісти" %}</a>
@@ -138,11 +169,14 @@
         <div class="em-card-av">{{ msg.sender_display|first|upper }}</div>
         <div class="em-card-info">
           <div class="em-card-row1">
-            <span class="em-card-from">{{ msg.from_name|default:msg.from_email }}</span>
+            <span class="em-card-from" title="{{ msg.from_email }}">{{ msg.from_name|default:msg.from_email }}</span>
             <span class="em-card-snippet">{{ msg.body_text|truncatechars:60 }}</span>
           </div>
+          {% trans "Клік — скопіювати адресу" as copy_tip %}
           <div class="em-card-to-line">
-            {{ msg.from_email }}{% if msg.to_emails %} → {{ msg.to_emails|join:", " }}{% endif %}
+            <span class="em-addr" data-addr="{{ msg.from_email }}" title="{{ copy_tip }}">{{ msg.from_email }}</span>{% if msg.to_emails %} →
+            {% for a in msg.to_emails %}<span class="em-addr" data-addr="{{ a }}" title="{{ copy_tip }}">{{ a }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}{% if msg.cc_emails %}
+            · {% trans "копія" %}: {% for a in msg.cc_emails %}<span class="em-addr" data-addr="{{ a }}" title="{{ copy_tip }}">{{ a }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}
           </div>
         </div>
         <div class="em-card-right">
@@ -341,6 +375,10 @@ window.fmt = fmt; window.fmtBlock = fmtBlock;
 
 window.pvToggleCard = function(pk, e) {
   if (e && e.target && e.target.closest('.em-card-actions')) return;
+  // Клік по адресі — копіювання; виділення тексту не згортає картку
+  var addr = e && e.target && e.target.closest('.em-addr');
+  if (addr) { e.stopPropagation(); pvCopyText(addr.dataset.addr); return; }
+  if (window.getSelection && String(window.getSelection()).length) return;
   var card = document.getElementById('pv-card-' + pk);
   if (!card) return;
   var msgs = card.closest('.em-msgs');
@@ -557,6 +595,27 @@ window.pvAiTranslate = async function(pk) {
     txt.textContent = d.ok ? d.translation : '⚠️ ' + d.error;
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
+
+window.pvCopyText = function(text) {
+  var done = function() {
+    var t = document.getElementById('pv-toast');
+    if (!t) return;
+    t.textContent = '📋 {% trans "Скопійовано" %}: ' + text;
+    t.style.display = 'block';
+    clearTimeout(t._hide);
+    t._hide = setTimeout(function(){ t.style.display = 'none'; }, 1800);
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done, function(){ _pvCopyFallback(text); done(); });
+  } else { _pvCopyFallback(text); done(); }
+};
+function _pvCopyFallback(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); } catch(e) {}
+  ta.remove();
+}
 
 window.pvCopyAI = function(pk) {
   var t = document.getElementById('pv-ai-txt-' + pk);

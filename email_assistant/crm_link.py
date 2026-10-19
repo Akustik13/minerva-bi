@@ -129,7 +129,9 @@ def find_order(subject, body, customer=None, orders=None, global_search=True):
         hit = _first_mentioned(found, text)
         if hit:
             return hit
-    return None
+    # Трек-номер замовлення чи відправлення (листи перевізника: UPS 1Z…, DHL…)
+    from email_assistant.links import find_order_by_tracking, tokens_in
+    return find_order_by_tracking(tokens_in(texts))
 
 
 def resolve(*, from_email, to_emails, cc_emails=(), subject='', body='',

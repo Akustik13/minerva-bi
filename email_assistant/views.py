@@ -165,6 +165,9 @@ def _page_range(page, total_pages):
     return pages
 
 
+ALL_FOLDERS = '__all__'
+
+
 def _build_qs(account, folder, q=''):
     from email_assistant.models import EmailMessage, EmailThread
 
@@ -189,6 +192,10 @@ def _build_qs(account, folder, q=''):
         ).filter(
             Q(imap_folder_name='') | Q(imap_folder_name__iexact=account.imap_folder_inbox)
         ).exclude(thread_id__in=archived_ids)
+    elif folder == ALL_FOLDERS:
+        # Пошук/фільтр по всіх папках: усе, крім Спаму, Кошика й видаленого
+        qs = EmailMessage.objects.filter(account=account, is_deleted=False, is_spam=False).exclude(
+            folder__in=[EmailMessage.FOLDER_TRASH, EmailMessage.FOLDER_SPAM])
     elif folder not in _STANDARD_FOLDERS:
         # Custom IMAP folder (e.g. "Meine Order")
         qs = EmailMessage.objects.filter(
@@ -211,9 +218,8 @@ def _build_qs(account, folder, q=''):
     return qs.order_by('-sent_at')
 
 
-def _category_filter(request, qs):
-    """(категорія, клієнт, [(ключ, назва, листів, непрочитаних)], клієнти з листами в папці)."""
-    from django.db.models import Count, Q
+def _parse_mail_filter(request):
+    """(категорія, клієнт) з ?cat=…&customer=<pk>."""
     from crm.models import Customer
     from email_assistant.models import EmailMessage
 
@@ -223,17 +229,41 @@ def _category_filter(request, qs):
     customer = None
     if str(request.GET.get('customer', '')).isdigit():
         customer = Customer.objects.filter(pk=int(request.GET['customer'])).first()
+    return cat, customer
+
+
+def _category_counts(qs):
+    """[(ключ, назва, листів, непрочитаних)] і клієнти з листами — для меню фільтра (усі папки)."""
+    from django.db.models import Count, Q
+    from email_assistant.models import EmailMessage
 
     base = qs.order_by()
     counts = {r['category']: r for r in base.values('category').annotate(
         n=Count('id'), unread=Count('id', filter=Q(is_read=False)))}
     categories = [(key, label, counts.get(key, {}).get('n', 0), counts.get(key, {}).get('unread', 0))
                   for key, label in EmailMessage.CATEGORY_CHOICES]
-    customers = list(base.exclude(thread__crm_customer=None)
-                     .values('thread__crm_customer', 'thread__crm_customer__name')
-                     .annotate(n=Count('id'), unread=Count('id', filter=Q(is_read=False)))
-                     .order_by('-unread', '-n')[:200])
-    return cat, customer, categories, customers
+    customers = [
+        {'id': r['thread__crm_customer'], 'name': r['thread__crm_customer__name'],
+         'email': r['thread__crm_customer__email'], 'n': r['n'], 'unread': r['unread']}
+        for r in (base.exclude(thread__crm_customer=None)
+                  .values('thread__crm_customer', 'thread__crm_customer__name', 'thread__crm_customer__email')
+                  .annotate(n=Count('id'), unread=Count('id', filter=Q(is_read=False)))
+                  .order_by('-unread', '-n')[:1000])
+    ]
+    return categories, customers
+
+
+def _attach_folder_tags(account, emails):
+    """У пошуку по всіх папках — де лежить лист."""
+    from email_assistant.imap_client import decode_mutf7
+    inbox = (account.imap_folder_inbox or 'INBOX').lower()
+    for m in emails:
+        if m.folder == 'sent':
+            m.folder_tag = '📤 Надіслані'
+        elif m.imap_folder_name and m.imap_folder_name.lower() != inbox:
+            m.folder_tag = '📁 ' + decode_mutf7(m.imap_folder_name).replace('.', '/').rsplit('/', 1)[-1]
+        else:
+            m.folder_tag = '📥 Вхідні'
 
 
 def _group_by_thread(qs):
@@ -318,9 +348,12 @@ def inbox_view(request):
     page     = max(1, int(request.GET.get('page', 1)))
     per_page = 30
 
-    qs    = _build_qs(account, folder, q)
-    # Фільтр «Категорія / Клієнт» (лічильники — по поточній папці до фільтра)
-    cat_filter, customer_filter, categories, mail_customers = _category_filter(request, qs)
+    cat_filter, customer_filter = _parse_mail_filter(request)
+    # Пошук і фільтри «Категорія / Клієнт» діють по всіх папках (у Спамі й Кошику — лише в них)
+    search_all = bool(q or cat_filter or customer_filter) and folder not in ('spam', 'trash')
+    qs = _build_qs(account, ALL_FOLDERS if search_all else folder, q)
+    counts_qs = qs if folder in ('spam', 'trash') else _build_qs(account, ALL_FOLDERS, q)
+    categories, mail_customers = _category_counts(counts_qs)
     if cat_filter:
         qs = qs.filter(category=cat_filter)
     if customer_filter:
@@ -340,6 +373,8 @@ def inbox_view(request):
         _attach_thread_stats(emails)
     _attach_crm_customers(emails)
     _attach_contacts(emails)
+    if search_all:
+        _attach_folder_tags(account, emails)
 
     from email_assistant.models import EmailThread as _ET
     from django.db.models import Q as _Q
@@ -374,6 +409,7 @@ def inbox_view(request):
         'filter_qs':             _filter_qs(cat_filter, customer_filter),
         'grouped':               grouped,
         'category_choices':      EmailMessage.CATEGORY_CHOICES,
+        'search_all':            search_all,
         'emails':                emails,
         'folder':                folder,
         'folders':               FOLDERS,
@@ -448,6 +484,7 @@ def thread_preview_view(request, thread_pk):
 
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
+        'links':           _mail_links(emails),
         'thread':          thread,
         'emails':          emails,
         'last_msg':        emails[-1] if emails else None,
@@ -467,11 +504,25 @@ def message_preview_view(request, message_pk):
 
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
+        'links':           _mail_links([msg]),
         'thread':          msg.thread,
         'emails':          [msg],
         'last_msg':        msg,
         'reply_signature': _get_signature(account),
     }))
+
+
+def _mail_links(emails):
+    """Замовлення / клієнти / відправлення, згадані в листах гілки (номер замовлення, трек-номер)."""
+    from email_assistant.links import find_links
+    texts = []
+    for m in emails:
+        texts += [m.subject or '', (m.body_text or '')[:50000]]
+    try:
+        return find_links(texts)
+    except Exception as e:
+        logger.warning('mail links: %s', e)
+        return []
 
 
 def _inject_email_css(html: str) -> str:

@@ -83,11 +83,24 @@
 
 /* ── Panel 2 search ── */
 .em-p2-search-row{padding:5px 10px 4px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
-.em-p2-filter-row{padding:4px 10px 5px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
+.em-p2-filter-row{padding:4px 10px 5px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border);position:relative}
 .em-p2-filter-sel{flex:1;min-width:0;padding:4px 6px;border-radius:6px;border:1px solid var(--border-strong);
   background:var(--bg-input);color:var(--text);font-size:11px;cursor:pointer;outline:none}
 .em-p2-filter-sel.on{border-color:#1a73e8;color:#1a73e8}
 .em-p2-filter-clear{border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:2px 4px;flex-shrink:0}
+/* Пошук клієнта за першими літерами */
+.em-cust-box{flex:1;min-width:0;display:flex}
+.em-cust-box .em-p2-filter-sel{width:100%;box-sizing:border-box;cursor:text}
+.em-cust-list{display:none;position:absolute;top:100%;left:10px;right:10px;z-index:50;margin-top:-2px;max-height:300px;overflow-y:auto;
+  background:var(--bg-card);border:1px solid var(--border-strong);border-radius:7px;box-shadow:0 6px 18px rgba(0,0,0,.3)}
+.em-cust-list.open{display:block}
+.em-cust-opt{display:flex;align-items:center;gap:6px;padding:6px 9px;font-size:12px;color:var(--text-muted);cursor:pointer}
+.em-cust-opt .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.em-cust-opt .ct{font-size:10px;color:var(--text-dim);flex-shrink:0}
+.em-cust-opt.active,.em-cust-opt:hover{background:var(--bg-hover,#1e2d40)}
+.em-cust-opt mark{background:rgba(250,204,21,.35);color:inherit;border-radius:2px;padding:0}
+.em-cust-empty{padding:8px 10px;font-size:12px;color:var(--text-dim)}
+.em-tag.fold{--c:#94a3b8;cursor:default}
 .em-p2-search-inp{flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:11px;outline:none;min-width:0}
 .em-p2-search-inp:focus{border-color:#1a73e8}
 .em-p2-group-btn{border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);padding:4px 7px;border-radius:6px;font-size:12px;flex-shrink:0;transition:background .1s,color .1s;line-height:1}
@@ -337,8 +350,10 @@
   <div class="em-p2" id="em-p2">
     <div class="em-p2-header">
       <span class="em-p2-title">
+        {% if search_all %}🔎 {% trans "Усі папки" %}{% else %}
         {% for fkey,flabel,ficon in folders %}{% if folder == fkey %}{{ ficon }} {{ flabel }}{% endif %}{% endfor %}
         {% if not folder in "inbox sent starred spam archived trash" %}📁 {{ folder_label }}{% endif %}
+        {% endif %}
         {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
       </span>
       <span class="em-p2-count" style="display:flex;align-items:center;gap:6px">
@@ -368,7 +383,7 @@
     <!-- Category / customer filter -->
     <div class="em-p2-filter-row">
       <select class="em-p2-filter-sel{% if cat_filter %} on{% endif %}" id="em-cat-sel"
-              onchange="applyMailFilter()" title="{% trans "Показати листи певної категорії" %}">
+              onchange="applyMailFilter()" title="{% trans "Показати листи певної категорії (по всіх папках)" %}">
         <option value="">🗂 {% trans "Усі категорії" %}</option>
         {% for key, label, n, unread in categories %}
         <option value="{{ key }}"{% if cat_filter == key %} selected{% endif %}{% if not n %} disabled{% endif %}>
@@ -376,14 +391,15 @@
         </option>
         {% endfor %}
       </select>
-      <select class="em-p2-filter-sel{% if customer_filter %} on{% endif %}" id="em-cust-sel"
-              onchange="applyMailFilter()" title="{% trans "Листи конкретного клієнта" %}">
-        <option value="">👤 {% trans "Усі клієнти" %}</option>
-        {% if customer_filter %}<option value="{{ customer_filter.pk }}" selected>{{ customer_filter.name }}</option>{% endif %}
-        {% for c in mail_customers %}{% if c.thread__crm_customer != customer_filter.pk %}
-        <option value="{{ c.thread__crm_customer }}">{{ c.thread__crm_customer__name }} · {{ c.n }}{% if c.unread %} ({{ c.unread }}){% endif %}</option>
-        {% endif %}{% endfor %}
-      </select>
+      <div class="em-cust-box">
+        <input class="em-p2-filter-sel{% if customer_filter %} on{% endif %}" id="em-cust-inp" type="search"
+               autocomplete="off" placeholder="👤 {% trans "Клієнт: почніть вводити…" %}"
+               value="{{ customer_filter.name|default:'' }}"
+               oninput="custSuggest(this.value)" onfocus="custSuggest(this.value)" onkeydown="custKey(event)"
+               onblur="setTimeout(custHide, 150)" title="{% trans "Листи конкретного клієнта (по всіх папках)" %}">
+        <input type="hidden" id="em-cust-sel" value="{{ customer_filter.pk|default:'' }}">
+        <div class="em-cust-list" id="em-cust-list"></div>
+      </div>
       {% if cat_filter or customer_filter %}
       <button class="em-p2-filter-clear" onclick="clearMailFilter()" title="{% trans "Скинути фільтр" %}">✕</button>
       {% endif %}
@@ -452,8 +468,9 @@
             </div>
           </div>
           <div class="em-row-subj">{% if msg.subject %}{{ msg.subject|truncatechars:40 }}{% else %}{% trans "(без теми)" %}{% endif %}</div>
-          {% if msg.crm_customer_tag or msg.category_short %}
+          {% if msg.crm_customer_tag or msg.category_short or msg.folder_tag %}
           <div class="em-row-meta">
+            {% if msg.folder_tag %}<span class="em-tag fold" title="{% trans "Папка" %}">{{ msg.folder_tag }}</span>{% endif %}
             {% if msg.crm_customer_tag %}
             <button class="em-tag cust" onclick="filterMailBy(event, 'customer', {{ msg.crm_customer_tag.pk }})"
                     title="{% trans "Клієнт" %}: {{ msg.crm_customer_tag.name }} — {% trans "показати всі його листи" %}">👤 {{ msg.crm_customer_tag.name }}</button>
@@ -514,6 +531,8 @@
   </div>
 
 </div>
+
+{{ mail_customers|json_script:"em-customers-data" }}
 
 <!-- Context menu -->
 <div id="em-ctx">
@@ -936,6 +955,71 @@ function applyMailFilter() {
   params.delete('page');
   location.search = params.toString();
 }
+/* ── Клієнт: пошук за першими літерами з підсвіткою збігу ── */
+var _custData = JSON.parse(document.getElementById('em-customers-data').textContent || '[]');
+var _custActive = -1;
+
+function _custEsc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function _custMark(text, q) {
+  var i = text.toLowerCase().indexOf(q);
+  if (!q || i < 0) return _custEsc(text);
+  return _custEsc(text.slice(0, i)) + '<mark>' + _custEsc(text.slice(i, i + q.length)) + '</mark>'
+       + _custEsc(text.slice(i + q.length));
+}
+function custSuggest(value) {
+  var list = document.getElementById('em-cust-list');
+  var q = (value || '').trim().toLowerCase();
+  // Спершу ті, у кого назва починається з введеного, потім — слово в назві, потім — будь-де / email
+  var scored = [];
+  _custData.forEach(function(c) {
+    var name = (c.name || '').toLowerCase(), email = (c.email || '').toLowerCase();
+    var score = !q ? 3
+      : name.indexOf(q) === 0 ? 0
+      : (' ' + name).indexOf(' ' + q) >= 0 ? 1
+      : (name.indexOf(q) >= 0 || email.indexOf(q) >= 0) ? 2 : -1;
+    if (score >= 0) scored.push([score, c]);
+  });
+  scored.sort(function(a, b) { return a[0] - b[0]; });
+  var shown = scored.slice(0, 40);
+  _custActive = shown.length ? 0 : -1;
+  list.innerHTML = shown.length
+    ? shown.map(function(s, i) {
+        var c = s[1];
+        var label = (c.name || '').toLowerCase().indexOf(q) >= 0 || !q
+          ? _custMark(c.name, q)
+          : _custEsc(c.name) + ' <span class="ct">' + _custMark(c.email, q) + '</span>';
+        return '<div class="em-cust-opt' + (i === 0 ? ' active' : '') + '" data-id="' + c.id + '"'
+             + ' onmousedown="custPick(' + c.id + ')"><span class="nm">' + label + '</span>'
+             + '<span class="ct">' + c.n + (c.unread ? ' · ' + c.unread + ' {% trans "нових" %}' : '') + '</span></div>';
+      }).join('')
+    : '<div class="em-cust-empty">{% trans "Немає клієнтів з такими літерами" %}</div>';
+  list.classList.add('open');
+}
+function custHide() { document.getElementById('em-cust-list').classList.remove('open'); }
+function custPick(id) {
+  document.getElementById('em-cust-sel').value = id;
+  custHide();
+  applyMailFilter();
+}
+function custKey(ev) {
+  var opts = document.querySelectorAll('#em-cust-list .em-cust-opt');
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+    ev.preventDefault();
+    if (!opts.length) return;
+    _custActive = (_custActive + (ev.key === 'ArrowDown' ? 1 : -1) + opts.length) % opts.length;
+    opts.forEach(function(o, i) { o.classList.toggle('active', i === _custActive); });
+    opts[_custActive].scrollIntoView({block: 'nearest'});
+  } else if (ev.key === 'Enter') {
+    ev.preventDefault();
+    if (_custActive >= 0 && opts[_custActive]) custPick(+opts[_custActive].dataset.id);
+    else if (!ev.target.value.trim()) { document.getElementById('em-cust-sel').value = ''; applyMailFilter(); }
+  } else if (ev.key === 'Escape') {
+    custHide();
+  }
+}
+
 function filterMailBy(ev, key, value) {
   ev.stopPropagation();
   var params = new URLSearchParams(location.search);
