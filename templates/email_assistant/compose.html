@@ -416,9 +416,9 @@ async function sendNow() {
   try {
     var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:data});
     var d = await r.json();
-    status.textContent = d.ok ? '✓ Відправлено!' : '✗ ' + d.error;
+    status.textContent = d.ok ? '✓ Відправлено!' + (d.via ? ' · через ' + d.via : '') : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
-    if (d.ok) setTimeout(function(){ window.location = '/email/'; }, 1000);
+    if (d.ok) setTimeout(function(){ window.location = '/email/'; }, d.mode_fixed ? 6000 : 2500);
     else { btn.disabled = false; btn.style.opacity = '1'; }
   } catch {
     status.textContent = '✗ Помилка мережі'; status.style.color = 'var(--err,#e53935)';

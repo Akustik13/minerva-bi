@@ -569,7 +569,7 @@ window.pvSendReply2 = async function() {
   try {
     var r = await fetch('/email/send/', {method:'POST', headers:{'X-CSRFToken':CSRF}, body:fd});
     var d = await r.json();
-    status.textContent = d.ok ? '✓ {% trans "Відправлено" %}' : '✗ ' + d.error;
+    status.textContent = d.ok ? '✓ {% trans "Відправлено" %}' + (d.via ? ' · {% trans "через" %} ' + d.via : '') : '✗ ' + d.error;
     status.style.color = d.ok ? 'var(--ok,#2e7d32)' : 'var(--err,#e53935)';
     if (d.ok) { editor.innerHTML = ''; if (btn) { btn.disabled = false; btn.style.opacity = '1'; } }
     else if (btn) { btn.disabled = false; btn.style.opacity = '1'; }

@@ -1114,6 +1114,17 @@ class SMTPSSLMismatchTests(SyncTestBase):
         calls = _FakeSMTP.instances[0].calls
         self.assertEqual(calls[0], 'starttls')
         self.assertIn(('sendmail', ('tthreatts@aevex.com', 'sergey@sevskiy.de')), calls)
+        self.assertTrue(r['mode_fixed'])
+        self.assertTrue(r['via'].startswith('viacheslav.pryimak@sevskiy.de · smtp.ionos.de:587 · STARTTLS'))
+
+    def test_correct_settings_report_route(self):
+        from email_assistant.smtp_client import SMTPClient
+        self.account.smtp_port, self.account.smtp_use_ssl, self.account.smtp_use_tls = 587, False, True
+        with patch('email_assistant.smtp_client.smtplib.SMTP', _FakeSMTP), \
+                patch('email_assistant.imap_client.IMAPClient', _FakeImapAppend()):
+            r = SMTPClient(self.account).send(['tthreatts@aevex.com'], 'Re: order', 'Dear Travis')
+        self.assertEqual((r['ok'], r['mode_fixed']), (True, False))
+        self.assertEqual(r['via'], 'viacheslav.pryimak@sevskiy.de · smtp.ionos.de:587 · STARTTLS')
 
     def test_both_modes_fail_gives_clear_hint(self):
         from email_assistant.smtp_client import SMTPClient

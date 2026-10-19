@@ -14,8 +14,12 @@ SSL_MISMATCH_HINT = ('Порт SMTP і режим шифрування не зб
 
 
 class SMTPClient:
+    """Відправка через SMTP email-акаунта скриньки (EmailAccount) — тих самих налаштувань, що й IMAP."""
+
     def __init__(self, account):
         self.account = account
+        self.mode = ''          # SSL / STARTTLS / без шифрування — яким режимом реально підключились
+        self.mode_fixed = False # True — режим із налаштувань не підійшов до порту, використано інший
 
     def _open(self):
         """
@@ -27,10 +31,13 @@ class SMTPClient:
 
         def connect(implicit_tls):
             if implicit_tls:
-                return smtplib.SMTP_SSL(host, port, timeout=30)
+                conn = smtplib.SMTP_SSL(host, port, timeout=30)
+                self.mode = 'SSL'
+                return conn
             conn = smtplib.SMTP(host, port, timeout=30)
             if encrypted:
                 conn.starttls()
+            self.mode = 'STARTTLS' if encrypted else 'без шифрування'
             return conn
 
         implicit = bool(self.account.smtp_use_ssl)
@@ -41,7 +48,17 @@ class SMTPClient:
                 raise
             logger.warning('SMTP %s:%s: SSL/TLS не відповідає порту (%s) — пробую %s',
                            host, port, e, 'STARTTLS' if implicit else 'SSL')
-            return connect(not implicit)
+            conn = connect(not implicit)
+            self.mode_fixed = True
+            return conn
+
+    def via(self) -> str:
+        """Через що пішов лист: «viacheslav.pryimak@sevskiy.de · smtp.ionos.de:587 · STARTTLS»."""
+        text = f'{self.account.email_address} · {self.account.smtp_host}:{self.account.smtp_port} · {self.mode}'
+        if self.mode_fixed:
+            text += (' (у налаштуваннях акаунта для цього порту вказано інший режим — '
+                     'Minerva виправила автоматично; варто виправити в налаштуваннях)')
+        return text
 
     def send(self, to_emails: list, subject: str, body_text: str,
              body_html: str = '', cc_emails: list = None,
@@ -142,8 +159,9 @@ class SMTPClient:
             except Exception as e:
                 logger.warning('Could not save to IMAP sent: %s', e)
 
-            logger.info('Email sent: %s → %s', subject[:50], to_emails)
-            return {'ok': True, 'message_id': message_id}
+            logger.info('Email sent: %s → %s via %s', subject[:50], to_emails, self.via())
+            return {'ok': True, 'message_id': message_id, 'via': self.via(),
+                    'mode_fixed': self.mode_fixed}
 
         except smtplib.SMTPAuthenticationError:
             return {'ok': False, 'error': 'Помилка автентифікації SMTP. Перевір логін і пароль.'}
