@@ -127,6 +127,14 @@ class Command(BaseCommand):
                         errors += 1
                         logger.warning('sync folder %s: %s', f['name'], e)
 
+        if not dry_run:
+            # Листи без категорії (історія до появи категорій) — порціями при кожній синхронізації
+            try:
+                from email_assistant.categorize import categorize_pending
+                categorize_pending(account, limit=1000)
+            except Exception as e:
+                logger.warning('categorize_pending %s: %s', account.pk, e)
+
         return created, errors
 
     def _notify_new_email(self, email_msg, account):

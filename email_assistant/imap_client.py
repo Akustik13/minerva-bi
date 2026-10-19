@@ -415,6 +415,7 @@ class IMAPClient:
                 'attachments': _get_attachments_raw(msg),
                 'is_read':     '\\Seen' in flags_str,
                 'sent_at':     sent_at,
+                'list_unsubscribe': bool(msg.get('List-Unsubscribe')),
             }
         except Exception as e:
             logger.error('Error parsing message: %s', e)

@@ -70,6 +70,18 @@ def link_email_to_crm(sender, instance, created, **kwargs):
         return
     from email_assistant.crm_link import link_message_to_crm
     link_message_to_crm(instance)
+    _set_category(instance)
+
+
+def _set_category(em):
+    """Категорія для фільтра скриньки (клієнти, постачальники, сервіси…); після прив'язки до CRM."""
+    try:
+        from email_assistant.categorize import categorize
+        from email_assistant.models import EmailMessage
+        em.category = categorize(em, list_unsubscribe=getattr(em, '_list_unsubscribe', False))
+        EmailMessage.objects.filter(pk=em.pk).update(category=em.category)
+    except Exception as exc:
+        logger.error('categorize email pk=%s: %s', em.pk, exc)
 
 
 @receiver(post_save, sender='email_assistant.EmailMessage')

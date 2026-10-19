@@ -83,6 +83,11 @@
 
 /* ── Panel 2 search ── */
 .em-p2-search-row{padding:5px 10px 4px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
+.em-p2-filter-row{padding:4px 10px 5px;display:flex;gap:5px;align-items:center;flex-shrink:0;border-bottom:1px solid var(--border)}
+.em-p2-filter-sel{flex:1;min-width:0;padding:4px 6px;border-radius:6px;border:1px solid var(--border-strong);
+  background:var(--bg-input);color:var(--text);font-size:11px;cursor:pointer;outline:none}
+.em-p2-filter-sel.on{border-color:#1a73e8;color:#1a73e8}
+.em-p2-filter-clear{border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:13px;padding:2px 4px;flex-shrink:0}
 .em-p2-search-inp{flex:1;padding:4px 8px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:11px;outline:none;min-width:0}
 .em-p2-search-inp:focus{border-color:#1a73e8}
 .em-p2-group-btn{border:1px solid var(--border-strong);background:none;cursor:pointer;color:var(--text-muted);padding:4px 7px;border-radius:6px;font-size:12px;flex-shrink:0;transition:background .1s,color .1s;line-height:1}
@@ -140,6 +145,18 @@
 .em-row-date{font-size:10px;color:var(--text-muted);flex-shrink:0;white-space:nowrap}
 .em-row-subj{font-size:12px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
 .em-row-prev{font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Hover actions on a row: прочитано/непрочитано, спам, видалити */
+.em-row-acts{position:absolute;right:8px;top:50%;transform:translateY(-50%);display:none;align-items:center;gap:2px;
+  padding:2px;border-radius:8px;background:var(--bg-card);border:1px solid var(--border-strong);box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2}
+.em-row:hover .em-row-acts{display:flex}
+.em-row-act{border:none;background:none;cursor:pointer;width:28px;height:28px;border-radius:6px;font-size:14px;line-height:1;
+  color:var(--text-muted);display:flex;align-items:center;justify-content:center;padding:0;transition:background .1s,color .1s}
+.em-row-act:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.em-row-act.danger:hover{color:var(--err,#e53935);background:rgba(229,57,53,.1)}
+.em-read-dot{width:10px;height:10px;border-radius:50%;border:2px solid #1a73e8;box-sizing:border-box}
+.em-row.unread .em-read-dot{background:#1a73e8}
+@media (hover:none){.em-row-acts{display:none!important}}
 
 /* Checkbox */
 .em-row-check{width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:#1a73e8;margin-top:3px}
@@ -229,6 +246,8 @@
 
     <form class="em-search" method="get" action="">
       <input type="hidden" name="folder" value="{{ folder }}">
+      {% if cat_filter %}<input type="hidden" name="cat" value="{{ cat_filter }}">{% endif %}
+      {% if customer_filter %}<input type="hidden" name="customer" value="{{ customer_filter.pk }}">{% endif %}
       <input class="em-search-inp" type="search" name="q" value="{{ q }}" placeholder="🔍 {% trans "Пошук..." %}" id="em-q">
     </form>
 
@@ -318,6 +337,30 @@
               onclick="toggleGrouping()" title="{% trans "Групувати по гілці листування" %}">⎘</button>
     </div>
 
+    <!-- Category / customer filter -->
+    <div class="em-p2-filter-row">
+      <select class="em-p2-filter-sel{% if cat_filter %} on{% endif %}" id="em-cat-sel"
+              onchange="applyMailFilter()" title="{% trans "Показати листи певної категорії" %}">
+        <option value="">🗂 {% trans "Усі категорії" %}</option>
+        {% for key, label, n, unread in categories %}
+        <option value="{{ key }}"{% if cat_filter == key %} selected{% endif %}{% if not n %} disabled{% endif %}>
+          {{ label }} · {{ n }}{% if unread %} ({{ unread }} {% trans "нових" %}){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+      <select class="em-p2-filter-sel{% if customer_filter %} on{% endif %}" id="em-cust-sel"
+              onchange="applyMailFilter()" title="{% trans "Листи конкретного клієнта" %}">
+        <option value="">👤 {% trans "Усі клієнти" %}</option>
+        {% if customer_filter %}<option value="{{ customer_filter.pk }}" selected>{{ customer_filter.name }}</option>{% endif %}
+        {% for c in mail_customers %}{% if c.thread__crm_customer != customer_filter.pk %}
+        <option value="{{ c.thread__crm_customer }}">{{ c.thread__crm_customer__name }} · {{ c.n }}{% if c.unread %} ({{ c.unread }}){% endif %}</option>
+        {% endif %}{% endfor %}
+      </select>
+      {% if cat_filter or customer_filter %}
+      <button class="em-p2-filter-clear" onclick="clearMailFilter()" title="{% trans "Скинути фільтр" %}">✕</button>
+      {% endif %}
+    </div>
+
     <!-- Bulk actions bar (visible when rows are selected) -->
     <div class="em-bulk-bar" id="em-bulk-bar">
       <input type="checkbox" id="em-check-all" class="em-row-check"
@@ -370,6 +413,19 @@
         </div>
 
         {% if msg.has_attachments %}<span style="font-size:12px;color:var(--text-dim);flex-shrink:0">📎</span>{% endif %}
+
+        <div class="em-row-acts" onclick="event.stopPropagation()">
+          <button class="em-row-act" onclick="rowToggleRead(event, {{ msg.pk }})"
+                  title="{% if msg.is_read %}{% trans "Позначити непрочитаним" %}{% else %}{% trans "Позначити прочитаним" %}{% endif %}">
+            <span class="em-read-dot"></span>
+          </button>
+          {% if folder != 'trash' %}
+          <button class="em-row-act" onclick="rowSpam(event, {{ msg.pk }})"
+                  title="{% if folder == 'spam' %}{% trans "Не спам" %}{% else %}{% trans "Спам" %}{% endif %}">{% if folder == 'spam' %}✅{% else %}🚫{% endif %}</button>
+          {% endif %}
+          <button class="em-row-act danger" onclick="deleteMsg(event, {{ msg.pk }})"
+                  title="{% if folder == 'trash' %}{% trans "Видалити назавжди" %}{% else %}{% trans "Видалити" %}{% endif %}">🗑️</button>
+        </div>
       </div>
       {% endwith %}
       {% endfor %}
@@ -378,7 +434,7 @@
     {% if total_pages > 1 %}
     <div class="em-pagination">
       {% if has_prev %}
-      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'-1' }}{% if q %}&q={{ q }}{% endif %}">← {% trans "Назад" %}</a>
+      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'-1' }}{% if q %}&q={{ q }}{% endif %}{{ filter_qs }}">← {% trans "Назад" %}</a>
       {% else %}<span></span>{% endif %}
 
       <!-- Smart page numbers from server-computed page_range -->
@@ -390,13 +446,13 @@
             <span style="padding:2px 8px;border-radius:4px;background:#1a73e8;color:#fff;font-weight:700;font-size:12px">{{ p }}</span>
           {% else %}
             <a class="em-page-link" style="padding:2px 8px"
-               href="?folder={{ folder }}&page={{ p }}{% if q %}&q={{ q }}{% endif %}">{{ p }}</a>
+               href="?folder={{ folder }}&page={{ p }}{% if q %}&q={{ q }}{% endif %}{{ filter_qs }}">{{ p }}</a>
           {% endif %}
         {% endfor %}
       </span>
 
       {% if has_next %}
-      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'1' }}{% if q %}&q={{ q }}{% endif %}">{% trans "Далі" %} →</a>
+      <a class="em-page-link" href="?folder={{ folder }}&page={{ page|add:'1' }}{% if q %}&q={{ q }}{% endif %}{{ filter_qs }}">{% trans "Далі" %} →</a>
       {% else %}<span></span>{% endif %}
     </div>
     {% endif %}
@@ -811,6 +867,57 @@ window.spamRow = function(pk) {
   _showToast('🚫 {% trans "Переміщено до Спаму" %}');
   window.refreshBadges && window.refreshBadges();
 };
+
+/* ── Category / customer filter (server-side, зберігається в URL) ── */
+function applyMailFilter() {
+  var params = new URLSearchParams(location.search);
+  var cat  = document.getElementById('em-cat-sel').value;
+  var cust = document.getElementById('em-cust-sel').value;
+  if (cat) params.set('cat', cat); else params.delete('cat');
+  if (cust) params.set('customer', cust); else params.delete('customer');
+  params.delete('page');
+  location.search = params.toString();
+}
+function clearMailFilter() {
+  var params = new URLSearchParams(location.search);
+  params.delete('cat'); params.delete('customer'); params.delete('page');
+  location.search = params.toString();
+}
+
+/* ── Row hover actions ── */
+async function rowToggleRead(ev, pk) {
+  ev.stopPropagation();
+  var row = document.getElementById('row-' + pk);
+  if (!row) return;
+  var makeRead = row.classList.contains('unread');
+  try {
+    var r = await fetch('/email/message/' + pk + '/' + (makeRead ? 'read' : 'unread') + '/',
+                        {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    if (!(await r.json()).ok) return;
+  } catch(e) { return; }
+  row.classList.toggle('unread', !makeRead);
+  row.dataset.read = makeRead ? '1' : '0';
+  var btn = ev.currentTarget || ev.target.closest('.em-row-act');
+  if (btn) btn.title = makeRead ? '{% trans "Позначити непрочитаним" %}' : '{% trans "Позначити прочитаним" %}';
+  window.refreshBadges && window.refreshBadges();
+}
+
+async function rowSpam(ev, pk) {
+  ev.stopPropagation();
+  var row = document.getElementById('row-' + pk);
+  try {
+    var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+    var d = await r.json();
+  } catch(e) { return; }
+  if (!d.ok) return;
+  // у Спамі кнопка повертає лист у Вхідні; в інших папках — переносить у Спам
+  if (row) row.remove();
+  if (_activeRow === row) { _activeRow = null; resetPreview(); }
+  _showToast(d.spam
+    ? '🚫 {% trans "Переміщено до Спаму" %}' + (d.auto_rule ? ' · {% trans "Правило додано для" %} ' + d.auto_rule : '')
+    : '✅ {% trans "Повернуто у Вхідні" %}');
+  window.refreshBadges && window.refreshBadges();
+}
 
 async function spamMsg(pk, rowEl) {
   var r = await fetch('/email/message/' + pk + '/spam/', {method:'POST', headers:{'X-CSRFToken':CSRF}});

@@ -138,6 +138,18 @@ class EmailMessage(models.Model):
     bcc_emails  = models.JSONField(default=list)
     body_text   = models.TextField(blank=True)
     body_html   = models.TextField(blank=True)
+    CATEGORY_CHOICES = [
+        ('customer',   '👤 Клієнти'),
+        ('supplier',   '🏭 Постачальники'),
+        ('service',    '📦 Сервіси та доставка'),
+        ('newsletter', '📰 Розсилки'),
+        ('internal',   '🏢 Внутрішні'),
+        ('other',      '❓ Інше'),
+    ]
+    category = models.CharField(
+        max_length=20, blank=True, default='', db_index=True, choices=CATEGORY_CHOICES,
+        verbose_name='Категорія',
+        help_text='Визначається автоматично (email_assistant/categorize.py); порожньо — ще не визначено')
     imap_folder_name = models.CharField(max_length=200, blank=True, default='', db_index=True,
         verbose_name='Папка IMAP',
         help_text='Оригінальна назва папки на IMAP-сервері (напр. "Meine Order")')

@@ -13,7 +13,7 @@ from django.test import TestCase
 from crm.models import Customer, CustomerTimeline
 from email_assistant.crm_link import find_order, resolve, own_addresses
 from email_assistant.imap_client import IMAPClient, _get_body, decode_mutf7, html_to_text, parse_addresses
-from email_assistant.models import EmailAccount, EmailMessage, EmailSettings
+from email_assistant.models import EmailAccount, EmailMessage, EmailSettings, EmailThread
 from email_assistant.sync import folders_to_sync, pull_read_flags, set_read, sync_folder
 from sales.models import SalesOrder
 
@@ -438,3 +438,107 @@ class SyncCommandTests(SyncTestBase):
         self.assertEqual(
             sorted(EmailMessage.objects.filter(imap_folder_name=self.FOLDER).values_list('imap_uid', flat=True)),
             [3, 4])
+
+
+# ── Категорії листів, фільтр у скриньці, дії в рядку ─────────────────────────
+
+class CategoryBase(SyncTestBase):
+    def setUp(self):
+        super().setUp()
+        from inventory.models import Supplier
+        self.client_c = Customer.objects.create(name='Client Co', email='buyer@client.com')
+        Supplier.objects.create(name='Polecoz', email='sales@polecoz.com')
+
+    def _em(self, **kw):
+        self._uid = getattr(self, '_uid', 1000) + 1
+        data = dict(account=self.account, folder='inbox', imap_folder_name='INBOX', imap_uid=self._uid,
+                    to_emails=['viacheslav.pryimak@sevskiy.de'], cc_emails=[], body_text='Hi',
+                    sent_at=datetime(2026, 10, 2, tzinfo=dt_tz.utc))
+        data.update(kw)
+        return EmailMessage.objects.create(**data)
+
+
+class CategoryTests(CategoryBase):
+    def test_categories(self):
+        cases = {
+            'customer':   dict(from_email='buyer@client.com', subject='PO'),
+            'supplier':   dict(from_email='li@polecoz.com', subject='new po'),    # домен постачальника
+            'service':    dict(from_email='pkginfo@ups.com', subject='Delivered'),
+            'newsletter': dict(from_email='news@shop.example', subject='Deals',
+                               body_text='Big sale… To stop receiving, unsubscribe here'),
+            'internal':   dict(from_email='sergey@sevskiy.de', subject='Lunch'),
+            'other':      dict(from_email='someone@unknown.example', subject='Question'),
+        }
+        for expected, kw in cases.items():
+            em = self._em(**kw)
+            em.refresh_from_db()
+            self.assertEqual(em.category, expected, kw)
+
+        sent = self._em(folder='sent', imap_folder_name='Gesendete Objekte',
+                        from_email='viacheslav.pryimak@sevskiy.de', to_emails=['buyer@client.com'],
+                        subject='Offer')
+        sent.refresh_from_db()
+        self.assertEqual(sent.category, 'customer')       # наш лист клієнту — теж «клієнти»
+
+    def test_noreply_service_and_list_unsubscribe_hint(self):
+        em = self._em(from_email='noreply@random-portal.example', subject='Your code')
+        em.refresh_from_db()
+        self.assertEqual(em.category, 'service')
+        server = FakeIMAP({'INBOX': {21: False}})
+        with patch('email_assistant.imap_client.IMAPClient', server), \
+                patch.object(FakeIMAP, 'fetch_messages',
+                             lambda self, folder, **kw: [dict(_msg(21), list_unsubscribe=True)]
+                             if folder == 'INBOX' else []):
+            call_command('sync_email', stdout=StringIO())
+        self.assertEqual(EmailMessage.objects.get(imap_uid=21).category, 'newsletter')
+
+    def test_categorize_pending_fills_history(self):
+        em = self._em(from_email='buyer@client.com', subject='Old')
+        EmailMessage.objects.filter(pk=em.pk).update(category='')
+        out = StringIO()
+        call_command('categorize_emails', stdout=out)
+        em.refresh_from_db()
+        self.assertEqual(em.category, 'customer')
+        self.assertIn('👤 Клієнти: 1', out.getvalue())
+
+
+@patch('email_assistant.sync._start_background', lambda fn: fn())
+class InboxFilterTests(CategoryBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+        self.customer_mail = self._em(from_email='buyer@client.com', subject='PO 1')
+        self.ups_mail = self._em(from_email='pkginfo@ups.com', subject='Delivered 1')
+        # гілку прив'язано до клієнта, хоча пише інша людина з компанії
+        thread = EmailThread.objects.create(account=self.account, subject='PO', crm_customer=self.client_c)
+        self.colleague = self._em(from_email='boss@client-group.com', subject='Escalation', thread=thread)
+
+    def _subjects(self, url):
+        r = self.client.get(url)
+        self.assertEqual(r.status_code, 200)
+        return {m.subject for m in r.context['emails']}, r
+
+    def test_filter_by_category_and_customer(self):
+        subjects, r = self._subjects('/email/?folder=inbox&cat=service')
+        self.assertEqual(subjects, {'Delivered 1'})
+        counts = {key: n for key, _, n, _ in r.context['categories']}
+        self.assertEqual(counts['service'], 1)
+        self.assertGreaterEqual(counts['customer'], 1)
+
+        subjects, r = self._subjects(f'/email/?folder=inbox&customer={self.client_c.pk}')
+        self.assertEqual(subjects, {'PO 1', 'Escalation'})
+        self.assertIn(f'customer={self.client_c.pk}', r.context['filter_qs'])
+        self.assertContains(r, 'em-row-acts')              # кнопки при наведенні
+
+    def test_delete_moves_from_the_messages_own_folder(self):
+        em = self._em(from_email='a@b.example', subject='In custom folder',
+                      imap_folder_name='Meine Order', imap_uid=5)
+        calls = []
+        with patch('email_assistant.views._imap_bg', lambda *a: calls.append(a)):
+            r = self.client.post(f'/email/message/{em.pk}/delete/')
+        self.assertTrue(r.json()['ok'])
+        self.assertEqual(calls, [(self.account.pk, 'Meine Order', 5, 'trash')])

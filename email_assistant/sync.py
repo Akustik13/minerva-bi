@@ -94,7 +94,7 @@ def save_message(account, msg_data, imap_folder, folder_type=None, persist_files
             att.pop('_data', None)
 
     thread = get_or_create_thread(account, msg_data)
-    em = EmailMessage.objects.create(
+    em = EmailMessage(
         account=account,
         thread=thread,
         imap_uid=msg_data['uid'],
@@ -113,6 +113,8 @@ def save_message(account, msg_data, imap_folder, folder_type=None, persist_files
         is_read=msg_data['is_read'],
         sent_at=msg_data['sent_at'],
     )
+    em._list_unsubscribe = msg_data.get('list_unsubscribe', False)  # підказка для категорії (сигнал)
+    em.save()
     thread.message_count = thread.messages.count()
     if not thread.last_message_at or (msg_data['sent_at'] and msg_data['sent_at'] > thread.last_message_at):
         thread.last_message_at = msg_data['sent_at']

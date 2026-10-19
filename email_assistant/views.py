@@ -31,6 +31,8 @@ def _imap_bg(account_pk: int, imap_folder: str, uid: int, action: str):
                     imap.mark_unseen(imap_folder, uid)
                 elif action == 'spam':
                     imap.move_to_spam(imap_folder, uid)
+                elif action == 'trash':
+                    imap.move_to_trash(imap_folder, uid)
         except Exception as ex:
             logger.warning('_imap_bg %s uid=%s: %s', action, uid, ex)
 
@@ -187,6 +189,41 @@ def _build_qs(account, folder, q=''):
     return qs.order_by('-sent_at')
 
 
+def _category_filter(request, qs):
+    """(категорія, клієнт, [(ключ, назва, листів, непрочитаних)], клієнти з листами в папці)."""
+    from django.db.models import Count, Q
+    from crm.models import Customer
+    from email_assistant.models import EmailMessage
+
+    cat = request.GET.get('cat', '')
+    if cat not in dict(EmailMessage.CATEGORY_CHOICES):
+        cat = ''
+    customer = None
+    if str(request.GET.get('customer', '')).isdigit():
+        customer = Customer.objects.filter(pk=int(request.GET['customer'])).first()
+
+    base = qs.order_by()
+    counts = {r['category']: r for r in base.values('category').annotate(
+        n=Count('id'), unread=Count('id', filter=Q(is_read=False)))}
+    categories = [(key, label, counts.get(key, {}).get('n', 0), counts.get(key, {}).get('unread', 0))
+                  for key, label in EmailMessage.CATEGORY_CHOICES]
+    customers = list(base.exclude(thread__crm_customer=None)
+                     .values('thread__crm_customer', 'thread__crm_customer__name')
+                     .annotate(n=Count('id'), unread=Count('id', filter=Q(is_read=False)))
+                     .order_by('-unread', '-n')[:200])
+    return cat, customer, categories, customers
+
+
+def _filter_qs(cat, customer) -> str:
+    from urllib.parse import urlencode
+    params = {}
+    if cat:
+        params['cat'] = cat
+    if customer:
+        params['customer'] = customer.pk
+    return ('&' + urlencode(params)) if params else ''
+
+
 FOLDERS = [
     ('inbox',    'Вхідні',    '📥'),
     ('sent',     'Надіслані', '📤'),
@@ -211,6 +248,14 @@ def inbox_view(request):
     per_page = 30
 
     qs    = _build_qs(account, folder, q)
+    # Фільтр «Категорія / Клієнт» (лічильники — по поточній папці до фільтра)
+    cat_filter, customer_filter, categories, mail_customers = _category_filter(request, qs)
+    if cat_filter:
+        qs = qs.filter(category=cat_filter)
+    if customer_filter:
+        from django.db.models import Q as _CQ
+        qs = qs.filter(_CQ(thread__crm_customer_id=customer_filter.pk) |
+                       _CQ(crm_events__customer_id=customer_filter.pk)).distinct()
     total = qs.count()
     start = (page - 1) * per_page
     # rename key to `emails` to avoid shadowing Django messages framework
@@ -242,6 +287,11 @@ def inbox_view(request):
         'account':               account,
         'email_settings':        EmailSettings.get_for_user(request.user),
         'folder_label':          decode_mutf7(folder),
+        'cat_filter':            cat_filter,
+        'customer_filter':       customer_filter,
+        'categories':            categories,
+        'mail_customers':        mail_customers,
+        'filter_qs':             _filter_qs(cat_filter, customer_filter),
         'emails':                emails,
         'folder':                folder,
         'folders':               FOLDERS,
@@ -923,21 +973,13 @@ def delete_message_view(request, message_pk):
         msg.is_deleted = True
         msg.save(update_fields=['is_deleted'])
     else:
-        old_folder = msg.folder
+        # Папка на сервері — та, де лежить саме цей лист (UID унікальний лише в межах папки)
+        from email_assistant.sync import default_imap_folder
+        imap_folder = default_imap_folder(account, msg)
         msg.folder = EmailMessage.FOLDER_TRASH
         msg.save(update_fields=['folder'])
-        if msg.imap_uid:
-            try:
-                from email_assistant.imap_client import IMAPClient
-                folder_map = {
-                    EmailMessage.FOLDER_INBOX: account.imap_folder_inbox,
-                    EmailMessage.FOLDER_SENT:  account.imap_folder_sent,
-                }
-                imap_folder = folder_map.get(old_folder, account.imap_folder_inbox)
-                with IMAPClient(account) as imap:
-                    imap.move_to_trash(imap_folder, msg.imap_uid)
-            except Exception as e:
-                logger.warning('IMAP delete failed: %s', e)
+        if msg.imap_uid and imap_folder:
+            _imap_bg(account.pk, imap_folder, msg.imap_uid, 'trash')
 
     return JsonResponse({'ok': True})
 
@@ -965,8 +1007,8 @@ def toggle_spam_view(request, message_pk):
     msg.folder  = EmailMessage.FOLDER_SPAM if msg.is_spam else EmailMessage.FOLDER_INBOX
     msg.save(update_fields=['is_spam', 'folder'])
     if msg.is_spam and not was_spam and msg.imap_uid:
-        _imap_bg(account.pk, msg.imap_folder_name or account.imap_folder_inbox,
-                 msg.imap_uid, 'spam')
+        from email_assistant.sync import default_imap_folder
+        _imap_bg(account.pk, default_imap_folder(account, msg), msg.imap_uid, 'spam')
 
     auto_rule = None
     if msg.is_spam and msg.from_email and '@' in msg.from_email:
