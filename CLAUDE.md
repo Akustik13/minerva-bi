@@ -112,6 +112,8 @@ tabele_mvp/
 - Пошук (`q`) і фільтри категорії/клієнта діють по всіх папках (`ALL_FOLDERS` у `_build_qs`, крім Спаму/Кошика), рядки з міткою папки; клієнт — пошук за першими літерами (`em-customers-data`)
 - Зв'язки листа — `email_assistant/links.py`: номери замовлень і трек-номери (SalesOrder.tracking_number, Shipment.tracking_number) у темі/тексті → блок «🔗 замовлення · клієнт · відправлення» у прев'ю; трек-номер також прив'язує лист перевізника до клієнта в CRM (`crm_link.find_order`)
 - Досьє листа — `email_assistant/context.py` (`build_context`: замовлення з листа, позиції, відправлення й статус перевізника, клієнт, нотатки CRM, інші гілки з клієнтом): `context_text` іде в AI-відповідь (`ai_helper.generate_reply(instruction, facts)`, endpoint `ai-reply/?prompt=`), `history_events`/`state_lines` — кнопка «📜 Історія» (`/email/message/<pk>/history/`, `?ai=1` — підсумок `summarize_history`)
+- AI-модель пошти — `EmailSettings.ai_model` (email_assistant 0017; «Автоматично» = роутер Minerva AI `ai_assistant/router.py`), вибір у скриньці «🤖» і в адмінці; `ai_helper._call_ai_direct(user=…)`: для 5.x — max_tokens≥16000 (роздуми), server-side fallbacks для Opus/Sonnet 5.5 і Fable 5.1, refusal → порожня відповідь; фонове `extract_deadlines` — завжди авто
+- Відповідь адресується співрозмовнику, а для внутрішнього пересилання — клієнту з досьє (`views._reply_recipient`); у «📜 Історії» — «✍️ Чернетка листа»; у гілці нові листи зверху (cookie `em_thread_order`, перемикач «⇅»)
 - Групування по гілці (⎘) — на сервері (`_group_by_thread`, cookie `em_group`), дії рядка й масові дії — над усією гілкою
 - Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
 

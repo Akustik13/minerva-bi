@@ -14,7 +14,7 @@
 .em-pv-link .why{font-size:10px;color:var(--text-dim);margin-left:auto}
 /* «📜 Історія»: факти з Minerva + підсумок AI за бажанням */
 .em-history{display:none;margin-top:8px;border:1px solid var(--border-strong);border-left:3px solid #f59e0b;border-radius:8px;
-  background:var(--bg-card);max-height:42vh;overflow-y:auto;padding:10px 12px}
+  background:var(--bg-card);max-height:38vh;overflow-y:auto;padding:10px 12px}
 .em-history-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
 .em-history-hd b{font-size:12px;color:var(--text)}
 .em-history-state div{font-size:12px;color:var(--text);line-height:1.6}
@@ -25,6 +25,10 @@
   border-radius:7px;background:rgba(0,212,170,.06);border:1px solid rgba(0,212,170,.25)}
 .em-history-ai:empty{display:none}
 .em-ai-used{font-size:11px;color:var(--text-dim);margin-top:6px}
+.em-history-draft{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-strong)}
+.em-history-draft-row{display:flex;gap:6px}
+.em-history-draft-txt{white-space:pre-wrap;font-size:13px;line-height:1.6;color:var(--text);margin-top:8px}
+.em-history-draft-txt:empty{display:none}
 .em-ai-used:empty{display:none}
 .em-pv-btn{padding:5px 12px;border-radius:6px;font-size:12px;border:1px solid var(--border-strong);background:none;color:var(--text-muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;transition:background .1s}
 .em-pv-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
@@ -130,7 +134,7 @@
 
   <!-- Header -->
   <div class="em-pv-hd">
-    {% trans "(без теми)" as no_subject %}<div class="em-pv-subj">{{ emails.0.subject|default:no_subject }}</div>
+    {% trans "(без теми)" as no_subject %}<div class="em-pv-subj">{% if first_msg %}{{ first_msg.subject|default:no_subject }}{% else %}{{ emails.0.subject|default:no_subject }}{% endif %}</div>
     <div class="em-pv-meta">
       {% if thread and thread.crm_customer %}
       <a href="/admin/crm/customer/{{ thread.crm_customer.pk }}/change/"
@@ -165,6 +169,11 @@
         <button class="em-pv-btn" onclick="pvArchive({{ thread.pk }})">📦 {% trans "В архів" %}</button>
         {% endif %}
       {% endif %}
+      {% if emails|length > 1 %}
+      <button class="em-pv-btn" id="pv-order-btn" data-order="{% if newest_first %}new{% else %}old{% endif %}"
+              onclick="pvToggleOrder()" title="{% trans "Порядок листів у гілці" %}">
+        {% if newest_first %}⇅ {% trans "Нові зверху" %}{% else %}⇅ {% trans "Старі зверху" %}{% endif %}</button>
+      {% endif %}
       <button class="em-pv-btn" id="pv-history-btn" onclick="pvHistory({{ last.pk }})"
               title="{% trans "Що було з цим замовленням і перепискою: дати, доставка, листи, нотатки CRM" %}">📜 {% trans "Історія" %}</button>
       <button class="em-pv-btn danger" onclick="pvDelete({{ last.pk }})">🗑️</button>
@@ -181,6 +190,20 @@
       </div>
       <div class="em-history-ai" id="pv-history-ai"></div>
       <div id="pv-history-body"></div>
+      <div class="em-history-draft">
+        <div class="em-history-draft-row">
+          <input class="em-ai-prompt-inp" id="pv-history-prompt" type="text"
+                 placeholder="{% trans "Що написати? Напр.: попроси клієнта оплатити мито до 27.10" %}"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();pvHistoryDraft({{ last.pk|default:0 }});}">
+          <button class="em-pv-btn ai" onclick="pvHistoryDraft({{ last.pk|default:0 }})">✍️ {% trans "Чернетка листа" %}</button>
+        </div>
+        <div class="em-history-draft-txt" id="pv-history-draft"></div>
+        <div class="em-ai-used" id="pv-history-draft-used"></div>
+        <div id="pv-history-draft-acts" style="display:none;gap:6px;margin-top:8px">
+          <button class="em-pv-btn" onclick="pvCopyText(document.getElementById('pv-history-draft').textContent)">📋 {% trans "Копіювати" %}</button>
+          <button class="em-pv-btn ai" onclick="pvHistoryDraftUse()">✉️ {% trans "Відкрити як відповідь" %}</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -188,7 +211,8 @@
   <div class="em-msgs">
     {% for msg in emails %}
     {% with is_last=forloop.last %}
-    <div class="em-card{% if is_last %} expanded{% endif %}" id="pv-card-{{ msg.pk }}">
+    {# розгорнутий — найновіший лист, хоч би де він стояв (нові зверху чи знизу) #}
+    <div class="em-card{% if msg.pk == last_msg.pk %} expanded{% endif %}" id="pv-card-{{ msg.pk }}">
 
       <!-- Header: always visible, clickable to expand/collapse -->
       <div class="em-card-hd" onclick="pvToggleCard({{ msg.pk }}, event)">
@@ -401,6 +425,20 @@ function fmtBlock(e, cmd) {
 }
 window.fmt = fmt; window.fmtBlock = fmtBlock;
 
+// Перемкнути порядок листів гілки (без перезавантаження) і запам'ятати вибір
+window.pvToggleOrder = function() {
+  var btn  = document.getElementById('pv-order-btn');
+  var msgs = document.querySelector('.em-msgs');
+  if (!btn || !msgs) return;
+  Array.from(msgs.querySelectorAll(':scope > .em-card')).reverse().forEach(function(c){ msgs.appendChild(c); });
+  var next = btn.dataset.order === 'new' ? 'old' : 'new';
+  btn.dataset.order = next;
+  btn.textContent = next === 'new' ? '⇅ {% trans "Нові зверху" %}' : '⇅ {% trans "Старі зверху" %}';
+  document.cookie = 'em_thread_order=' + next + ';path=/;max-age=31536000;SameSite=Lax';
+  var exp = msgs.querySelector('.em-card.expanded');
+  if (exp) setTimeout(function(){ exp.scrollIntoView({block: 'nearest'}); }, 30);
+};
+
 window.pvToggleCard = function(pk, e) {
   if (e && e.target && e.target.closest('.em-card-actions')) return;
   // Клік по адресі — копіювання; виділення тексту не згортає картку
@@ -612,7 +650,9 @@ window.pvAiGenerate = async function(pk) {
     var r = await fetch(url);
     var d = await r.json();
     txt.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
-    _pvUsed('pv-ai-used-' + pk, d.used);
+    var aiBox = document.getElementById('pv-ai-' + pk);
+    if (aiBox) aiBox._to = d.to || '';
+    _pvUsed('pv-ai-used-' + pk, (d.to ? ['{% trans "кому" %}: ' + d.to] : []).concat(d.used || []));
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
 
@@ -655,13 +695,42 @@ window.pvHistory = async function(pk) {
   }
 };
 
+// Чернетка листа з досьє: адресат — клієнт (не колега, що переслав лист), текст — у форму відповіді
+var _pvDraft = null;
+window.pvHistoryDraft = async function(pk) {
+  var out  = document.getElementById('pv-history-draft');
+  var acts = document.getElementById('pv-history-draft-acts');
+  var inp  = document.getElementById('pv-history-prompt');
+  if (!out || !pk) return;
+  out.textContent = '⏳ {% trans "Minerva пише лист..." %}';
+  acts.style.display = 'none';
+  _pvUsed('pv-history-draft-used', null);
+  var q = inp && inp.value.trim() ? '?prompt=' + encodeURIComponent(inp.value.trim()) : '';
+  try {
+    var d = await (await fetch('/email/message/' + pk + '/ai-reply/' + q)).json();
+    if (!d.ok) { out.textContent = '⚠️ ' + (d.error || '{% trans "Помилка" %}'); return; }
+    _pvDraft = d;
+    out.textContent = d.reply;
+    _pvUsed('pv-history-draft-used', (d.to ? ['{% trans "кому" %}: ' + d.to] : []).concat(d.used || []));
+    acts.style.display = 'flex';
+  } catch(e) { out.textContent = '⚠️ {% trans "Помилка" %}'; }
+};
+window.pvHistoryDraftUse = function() {
+  if (!_pvDraft) return;
+  pvOpenReply('reply', _pvDraft.to || '', _pvDraft.subject || _pvReplySubj || '');
+  var ed = document.getElementById('pv-reply-editor');
+  if (ed) { ed.innerText = _pvDraft.reply; ed.scrollIntoView({behavior: 'smooth'}); }
+};
+
 window.pvHistoryAI = async function(pk) {
   var out = document.getElementById('pv-history-ai');
   if (!out || !pk) return;
   out.textContent = '⏳ {% trans "Minerva аналізує переписку і дані..." %}';
   try {
     var d = await (await fetch('/email/message/' + pk + '/history/?ai=1')).json();
-    out.textContent = d.summary || ('⚠️ ' + (d.summary_error || '{% trans "Помилка" %}'));
+    out.textContent = d.summary
+      ? d.summary + (d.model ? '\n\n🤖 ' + d.model : '')
+      : ('⚠️ ' + (d.summary_error || '{% trans "Помилка" %}'));
   } catch(e) { out.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
 
@@ -711,6 +780,10 @@ window.pvUseAsReply = function(pk) {
   var body = document.getElementById('pv-reply-body');
   if (body && body.style.display === 'none') pvToggleReply();
   ed.innerText = txt.textContent;
+  // адресат від Minerva (клієнт, якщо лист — внутрішнє пересилання)
+  var toInp = document.getElementById('pv-reply-to');
+  var box = document.getElementById('pv-ai-' + pk);
+  if (toInp && box && box._to && !toInp.value) toInp.value = box._to;
   ed.scrollIntoView({behavior:'smooth'});
   ed.focus();
 };

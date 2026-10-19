@@ -401,6 +401,7 @@ def inbox_view(request):
         'title':                 'Email Асистент',
         'account':               account,
         'email_settings':        EmailSettings.get_for_user(request.user),
+        'ai_model_choices':      EmailSettings.AI_MODEL_CHOICES,
         'folder_label':          decode_mutf7(folder),
         'cat_filter':            cat_filter,
         'customer_filter':       customer_filter,
@@ -444,9 +445,18 @@ def thread_view(request, thread_pk):
         'title':    thread.subject,
         'account':  account,
         'thread':   thread,
-        'emails':   emails,
+        'emails':   _thread_display_order(request, emails),
         'last_msg': emails[-1] if emails else None,
     }))
+
+
+def _newest_first(request) -> bool:
+    """Порядок листів у гілці: за замовчуванням нові зверху; перемикач «⇅» пише cookie em_thread_order."""
+    return request.COOKIES.get('em_thread_order') != 'old'
+
+
+def _thread_display_order(request, emails):
+    return list(reversed(emails)) if _newest_first(request) else emails
 
 
 @staff_member_required
@@ -486,7 +496,9 @@ def thread_preview_view(request, thread_pk):
         'account':         account,
         'links':           _mail_links(emails),
         'thread':          thread,
-        'emails':          emails,
+        'emails':          _thread_display_order(request, emails),
+        'first_msg':       emails[0] if emails else None,
+        'newest_first':    _newest_first(request),
         'last_msg':        emails[-1] if emails else None,
         'reply_signature': _get_signature(account),
     }))
@@ -909,12 +921,37 @@ def ai_suggest_reply(request, message_pk):
     ctx = build_context(msg)
     thread_messages = [m for m in ctx['thread_msgs'] if not m.sent_at or not msg.sent_at
                        or m.sent_at <= msg.sent_at] or [msg]
+    to_email, to_label = _reply_recipient(thread_messages[-1], ctx)
     reply = generate_reply(thread_messages, account, profile,
-                           instruction=request.GET.get('prompt', ''), facts=context_text(ctx))
+                           instruction=request.GET.get('prompt', ''), facts=context_text(ctx),
+                           recipient=to_label)
     msg.ai_reply_draft = reply
     msg.save(update_fields=['ai_reply_draft'])
-    return JsonResponse({'ok': bool(reply), 'reply': reply, 'used': used_summary(ctx),
+    from email_assistant.ai_helper import last_model
+    used = used_summary(ctx) + ([f'модель {_model_label(last_model())}'] if last_model() else [])
+    return JsonResponse({'ok': bool(reply), 'reply': reply, 'used': used,
+                         'to': to_email, 'subject': (ctx['thread_msgs'][0].subject if ctx['thread_msgs'] else msg.subject),
                          'error': '' if reply else 'AI не повернув відповідь'})
+
+
+def _reply_recipient(msg, ctx):
+    """(email, «Ім'я <email>») — кому відповідати: співрозмовник листа, а для внутрішнього
+    пересилання (колега переслав лист UPS) — клієнт із досьє."""
+    from email_assistant.categorize import counterparts
+    from email_assistant.crm_link import own_addresses
+    own = own_addresses()
+    sender = (msg.from_email or '').lower()
+    contacts = counterparts(msg, own)
+    if contacts and (sender in contacts or msg.folder == 'sent'):
+        email = contacts[0]
+        name = msg.from_name if sender == email else ''
+    elif ctx.get('customer') is not None and ctx['customer'].email:
+        email, name = ctx['customer'].email, ctx['customer'].name
+    elif contacts:
+        email, name = contacts[0], ''
+    else:
+        return '', ''
+    return email, (f'{name} <{email}>' if name else email)
 
 
 @staff_member_required
@@ -936,6 +973,8 @@ def history_view(request, message_pk):
     }
     if request.GET.get('ai') == '1':
         data['summary'] = summarize_history(ctx['thread_msgs'], account, facts=context_text(ctx))
+        from email_assistant.ai_helper import last_model
+        data['model'] = _model_label(last_model()) if last_model() else ''
         if not data['summary']:
             data['summary_error'] = 'AI не відповів — перевірте ключ Anthropic у налаштуваннях AI'
     return JsonResponse(data)
@@ -1541,6 +1580,14 @@ def set_category_view(request, message_pk):
 
 
 _SETTINGS_TOGGLES = {'mark_read_on_server'}
+_SETTINGS_CHOICES = {'ai_model'}
+
+
+def _model_label(model_id: str) -> str:
+    """Назва моделі для інтерфейсу: «Claude Opus 5.5» замість claude-opus-5-5."""
+    from email_assistant.models import EmailSettings
+    label = dict(EmailSettings.AI_MODEL_CHOICES).get(model_id, '')
+    return label.split(' — ')[0] if label else model_id
 
 
 @staff_member_required
@@ -1554,9 +1601,16 @@ def settings_toggle_view(request):
     except ValueError:
         return JsonResponse({'ok': False, 'error': 'Invalid JSON'})
     field = data.get('field')
+    es = EmailSettings.get_for_user(request.user)
+    if field in _SETTINGS_CHOICES:
+        value = str(data.get('value') or '')
+        if value not in dict(es._meta.get_field(field).choices):
+            return JsonResponse({'ok': False, 'error': 'Невідоме значення'})
+        setattr(es, field, value)
+        es.save(update_fields=[field])
+        return JsonResponse({'ok': True, field: value})
     if field not in _SETTINGS_TOGGLES:
         return JsonResponse({'ok': False, 'error': 'Невідоме налаштування'})
-    es = EmailSettings.get_for_user(request.user)
     setattr(es, field, bool(data.get('value')))
     es.save(update_fields=[field])
     return JsonResponse({'ok': True, field: getattr(es, field)})

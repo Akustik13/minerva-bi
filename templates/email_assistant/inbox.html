@@ -338,6 +338,16 @@
                onchange="toggleEmailSetting('mark_read_on_server', this)">
         {% trans "Прочитане ↔ сервер" %}
       </label>
+      <label class="em-sync-btn" style="cursor:pointer;gap:6px"
+             title="{% trans "AI модель для відповідей, перекладу, історії, граматики й нових листів" %}">
+        🤖
+        <select id="em-ai-model" onchange="setEmailSetting('ai_model', this.value, this)"
+                style="flex:1;min-width:0;border:none;background:transparent;color:inherit;font-size:12px;font-family:inherit;cursor:pointer;outline:none">
+          {% for key, label in ai_model_choices %}
+          <option value="{{ key }}"{% if email_settings.ai_model == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
       <div id="sync-countdown"></div>
     </div>
@@ -1176,6 +1186,20 @@ async function toggleEmailSetting(field, el) {
     var d = await r.json();
     if (!d.ok) { el.checked = !el.checked; }
   } catch(e) { el.checked = !el.checked; }
+}
+
+async function setEmailSetting(field, value, el) {
+  var prev = el.dataset.prev !== undefined ? el.dataset.prev : null;
+  try {
+    var r = await fetch('{% url "email_assistant:settings_toggle" %}', {
+      method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+      body: JSON.stringify({field: field, value: value})
+    });
+    var d = await r.json();
+    if (!d.ok) { if (prev !== null) el.value = prev; return; }
+    el.dataset.prev = value;
+    _showToast('🤖 {% trans "AI модель" %}: ' + el.options[el.selectedIndex].text.split(' — ')[0]);
+  } catch(e) { if (prev !== null) el.value = prev; }
 }
 
 /* ── Sync ── */

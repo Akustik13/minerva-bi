@@ -820,7 +820,7 @@ class MailContextTests(MailLinksTests):
     def test_ai_reply_gets_instruction_and_facts(self):
         prompts = []
         with patch('email_assistant.ai_helper._call_ai_direct',
-                   lambda prompt, max_tokens=1024: prompts.append(prompt) or 'Dear Travis, …'):
+                   lambda prompt, max_tokens=1024, user=None: prompts.append(prompt) or 'Dear Travis, …'):
             r = self.client.get(f'/email/message/{self.fwd.pk}/ai-reply/',
                                 {'prompt': 'Попроси клієнта оплатити мито до 27.10'})
         d = r.json()
@@ -838,9 +838,177 @@ class MailContextTests(MailLinksTests):
         self.assertTrue(any(e['icon'] == '📦' for e in d['events']))
         self.assertNotIn('summary', d)                                    # без ?ai=1 — лише факти, без AI
 
-        with patch('email_assistant.ai_helper._call_ai_direct', lambda prompt, max_tokens=1024: '1) Мито 35 USD…'):
+        with patch('email_assistant.ai_helper._call_ai_direct', lambda prompt, max_tokens=1024, user=None: '1) Мито 35 USD…'):
             d = self.client.get(f'/email/message/{self.fwd.pk}/history/', {'ai': '1'}).json()
         self.assertEqual(d['summary'], '1) Мито 35 USD…')
 
         r = self.client.get(f'/email/message/{self.fwd.pk}/preview/')
         self.assertContains(r, '📜 Історія')
+
+
+# ── Вибір AI-моделі пошти, параметри запиту, порядок листів у гілці ─────────────
+
+class _FakeBadRequest(Exception):
+    pass
+
+
+class _FakeAnthropicModule:
+    """Підміна пакета anthropic: записує параметри messages.create і віддає задану відповідь."""
+    BadRequestError = _FakeBadRequest
+
+    def __init__(self, response=None, reject_fallbacks=False):
+        self.calls = []
+        self.response = response
+        self.reject_fallbacks = reject_fallbacks
+        module = self
+
+        class _Messages:
+            def create(self, **kw):
+                module.calls.append(kw)
+                if module.reject_fallbacks and 'extra_body' in kw:
+                    raise _FakeBadRequest('fallbacks not allowed')
+                return module.response
+
+        class _Client:
+            def __init__(self, api_key=None):
+                self.messages = _Messages()
+
+        self.Anthropic = _Client
+
+
+def _response(text='Draft', stop_reason='end_turn', model='claude-opus-5-5'):
+    from types import SimpleNamespace as NS
+    return NS(model=model, stop_reason=stop_reason, stop_details=None,
+              content=[NS(type='thinking', thinking=''), NS(type='text', text=text)])
+
+
+class AIModelTests(SyncTestBase):
+    def setUp(self):
+        super().setUp()
+        from strategy.models import AISettings
+        s = AISettings.get()
+        s.anthropic_api_key = 'test-key'
+        s.save()
+
+    def _set_model(self, model):
+        es = EmailSettings.get_for_user(self.user)
+        es.ai_model = model
+        es.save()
+
+    def test_resolve_model(self):
+        from email_assistant.ai_helper import resolve_model
+        self.assertEqual(resolve_model('Привіт', self.user), 'claude-haiku-4-5-20251001')   # авто = роутер
+        self.assertEqual(resolve_model('Зроби аналіз', self.user), 'claude-sonnet-4-6')
+        self._set_model('claude-opus-5-5')
+        self.assertEqual(resolve_model('Привіт', self.user), 'claude-opus-5-5')
+        self.assertEqual(resolve_model('Привіт', None), 'claude-haiku-4-5-20251001')        # фонові задачі
+
+    def test_new_model_request_params_and_fallbacks(self):
+        import sys
+        from email_assistant import ai_helper
+        self._set_model('claude-opus-5-5')
+        fake = _FakeAnthropicModule(_response('Dear Travis'))
+        with patch.dict(sys.modules, {'anthropic': fake}):
+            text = ai_helper._call_ai_direct('Напиши', max_tokens=700, user=self.user)
+        self.assertEqual(text, 'Dear Travis')                         # лише текст, без блоків роздумів
+        call = fake.calls[0]
+        self.assertEqual(call['model'], 'claude-opus-5-5')
+        self.assertEqual(call['max_tokens'], 16000)                   # роздуми не з'їдають відповідь
+        self.assertEqual(call['extra_body'], {'fallbacks': 'default'})
+        self.assertEqual(call['extra_headers'], {'anthropic-beta': 'server-side-fallback-2026-07-01'})
+        self.assertEqual(ai_helper.last_model(), 'claude-opus-5-5')
+
+    def test_fallbacks_rejected_retry_and_refusal(self):
+        import sys
+        from email_assistant import ai_helper
+        self._set_model('claude-sonnet-5-5')
+        fake = _FakeAnthropicModule(_response('OK', model='claude-sonnet-5-5'), reject_fallbacks=True)
+        with patch.dict(sys.modules, {'anthropic': fake}):
+            self.assertEqual(ai_helper._call_ai_direct('x', user=self.user), 'OK')
+        self.assertEqual(len(fake.calls), 2)
+        self.assertNotIn('extra_body', fake.calls[1])
+
+        self._set_model('claude-haiku-5-5')                           # Haiku: без fallbacks
+        fake = _FakeAnthropicModule(_response('', stop_reason='refusal', model='claude-haiku-5-5'))
+        with patch.dict(sys.modules, {'anthropic': fake}):
+            self.assertEqual(ai_helper._call_ai_direct('x', user=self.user), '')
+        self.assertNotIn('extra_body', fake.calls[0])
+
+    def test_auto_keeps_old_behaviour(self):
+        import sys
+        from email_assistant import ai_helper
+        fake = _FakeAnthropicModule(_response('Hi', model='claude-haiku-4-5-20251001'))
+        with patch.dict(sys.modules, {'anthropic': fake}):
+            ai_helper._call_ai_direct('Привіт', max_tokens=1024, user=self.user)
+        self.assertEqual(fake.calls[0]['model'], 'claude-haiku-4-5-20251001')
+        self.assertEqual(fake.calls[0]['max_tokens'], 1024)
+        self.assertNotIn('extra_body', fake.calls[0])
+
+
+@patch('email_assistant.sync._start_background', lambda fn: fn())
+class MailSettingsAndOrderTests(SyncTestBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+
+    def test_ai_model_setting(self):
+        post = lambda value: self.client.post(
+            '/email/settings/toggle/', data=json.dumps({'field': 'ai_model', 'value': value}),
+            content_type='application/json').json()
+        self.assertEqual(post('claude-sonnet-5-5'), {'ok': True, 'ai_model': 'claude-sonnet-5-5'})
+        self.assertEqual(EmailSettings.get_for_user(self.user).ai_model, 'claude-sonnet-5-5')
+        self.assertFalse(post('gpt-4')['ok'])
+        r = self.client.get('/email/')
+        self.assertContains(r, 'id="em-ai-model"')
+        self.assertContains(r, '<option value="claude-sonnet-5-5" selected>')
+
+    def test_thread_newest_first_with_toggle(self):
+        thread = EmailThread.objects.create(account=self.account, subject='Neue Testboards')
+        for i, day in enumerate([25, 1, 7], 1):
+            EmailMessage.objects.create(
+                account=self.account, thread=thread, imap_uid=i, imap_folder_name='INBOX', folder='inbox',
+                subject=f'Neue Testboards {i}', from_email='martin@iot.example', is_read=True,
+                sent_at=datetime(2026, 9 if day == 25 else 10, day, 12, tzinfo=dt_tz.utc))
+        r = self.client.get(f'/email/thread/{thread.pk}/preview/')
+        subjects = [m.subject for m in r.context['emails']]
+        self.assertEqual(subjects, ['Neue Testboards 3', 'Neue Testboards 2', 'Neue Testboards 1'])  # нові зверху
+        self.assertContains(r, '⇅ Нові зверху')
+        self.assertContains(r, 'Neue Testboards 1</div>')            # заголовок — тема першого листа
+        newest = EmailMessage.objects.get(imap_uid=3)
+        self.assertContains(r, f'class="em-card expanded" id="pv-card-{newest.pk}"')
+
+        self.client.cookies['em_thread_order'] = 'old'
+        r = self.client.get(f'/email/thread/{thread.pk}/preview/')
+        self.assertEqual([m.subject for m in r.context['emails']][0], 'Neue Testboards 1')
+        self.assertContains(r, '⇅ Старі зверху')
+        self.assertContains(r, f'class="em-card expanded" id="pv-card-{newest.pk}"')  # розгорнутий — найновіший
+
+
+class ReplyRecipientTests(MailContextTests):
+    def test_forwarded_mail_reply_goes_to_customer(self):
+        long_tail = UPS_TEXT + '\n' + ('x' * 3000) + '\nAntwort erforderlich bis 10/27/2026'
+        EmailMessage.objects.filter(pk=self.fwd.pk).update(body_text=long_tail)
+        type(self.shipment).objects.filter(pk=self.shipment.pk).update(
+            carrier_status_label="2026-10-14 06:25 — We'll contact the sender or receiver")
+        prompts = []
+        with patch('email_assistant.ai_helper._call_ai_direct',
+                   lambda prompt, max_tokens=1024, user=None: prompts.append(prompt) or 'Dear Ida, …'):
+            d = self.client.get(f'/email/message/{self.fwd.pk}/ai-reply/').json()
+            s = self.client.get(f'/email/message/{self.fwd.pk}/history/', {'ai': '1'}).json()
+        self.assertEqual(d['to'], 'ifejzic@aevex.com')                  # не колега, що переслав, а клієнт
+        self.assertIn('АДРЕСАТ ЛИСТА: AEVEX <ifejzic@aevex.com>', prompts[0])
+        self.assertIn('Antwort erforderlich bis 10/27/2026', prompts[0])  # найновіший лист — не обрізаний
+        self.assertIn('без Markdown', prompts[1])
+        self.assertIn('остання подія перевізника', '\n'.join(s['state']))  # час події ≠ термін
+
+    def test_reply_to_customer_mail_goes_to_sender(self):
+        incoming = self._em(thread=self.thread, from_email='ifejzic@aevex.com', from_name='Ida Fejzic',
+                            subject='RE: UPS fee', body_text='We paid the fee.')
+        with patch('email_assistant.ai_helper._call_ai_direct',
+                   lambda prompt, max_tokens=1024, user=None: 'Thank you'):
+            d = self.client.get(f'/email/message/{incoming.pk}/ai-reply/').json()
+        self.assertEqual(d['to'], 'ifejzic@aevex.com')

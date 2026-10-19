@@ -103,7 +103,7 @@ def state_lines(ctx) -> list:
         for s in _shipments(order):
             parts = [f'🚚 {s.carrier.name} {s.tracking_number or "без трек-номера"} — {s.get_status_display()}']
             if s.carrier_status_label:
-                parts.append(f'«{s.carrier_status_label}»')
+                parts.append(f'остання подія перевізника: «{s.carrier_status_label}»')
             if s.carrier_delayed:
                 parts.append('⚠️ затримка')
             if s.delivered_at:

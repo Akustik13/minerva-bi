@@ -234,6 +234,19 @@ class EmailSettings(models.Model):
         choices=[('uk', 'Українська'), ('de', 'Deutsch'), ('en', 'English')],
         verbose_name='Мова перекладу')
     deadline_detection = models.BooleanField(default=True, verbose_name='Визначати дедлайни в листах')
+    AI_MODEL_AUTO = 'auto'
+    AI_MODEL_CHOICES = [
+        (AI_MODEL_AUTO,       'Автоматично (як Minerva AI: Haiku 4.5, для аналітики — Sonnet 4.6)'),
+        ('claude-opus-5-5',   'Claude Opus 5.5 — найкраща якість · $4 / $20 за 1 млн токенів'),
+        ('claude-sonnet-5-5', 'Claude Sonnet 5.5 — швидко й якісно · $2 / $10'),
+        ('claude-haiku-5-5',  'Claude Haiku 5.5 — найдешевша й найшвидша · $0.10 / $0.50'),
+        ('claude-fable-5-1',  'Claude Fable 5.1 — найпотужніша, найдорожча · $10 / $50'),
+    ]
+    ai_model = models.CharField(
+        max_length=40, default=AI_MODEL_AUTO, choices=AI_MODEL_CHOICES,
+        verbose_name='AI модель пошти',
+        help_text='Для відповідей, перекладу, історії, граматики й нових листів. '
+                  'Фонове визначення дедлайнів у кожному листі завжди «Автоматично» (дешево).')
     sync_to_crm_timeline = models.BooleanField(
         default=True, verbose_name='Синхронізувати з CRM хронологією',
         help_text='Листи від/до CRM клієнтів додаються в CustomerTimeline')

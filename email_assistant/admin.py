@@ -413,7 +413,7 @@ class EmailSettingsAdmin(admin.ModelAdmin):
     list_display = ('user', 'ai_auto_suggest_reply', 'sync_to_crm_timeline', 'mark_read_on_server', 'telegram_notify_new')
     fieldsets = (
         ("🤖 AI функції", {
-            'fields': ('ai_auto_suggest_reply', 'ai_auto_translate', 'ai_translate_to',
+            'fields': ('ai_model', 'ai_auto_suggest_reply', 'ai_auto_translate', 'ai_translate_to',
                        'deadline_detection'),
         }),
         ("🔄 Автовідповідь", {
