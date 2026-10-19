@@ -98,6 +98,7 @@ tabele_mvp/
 - Окрема кнопка «Minerva» (аватар) поруч із 🏛 Minerva AI — НЕ об'єднувати з ai_assistant
 - `RagSettings` (синглтон: base_url, api_key лише на сервері, language, latest_only), `RagConversation`/`RagMessage` (історія в Minerva, власник = user)
 - `client.py` (RAG API v1: /v1/ask → job, /v1/jobs/{id}, 429 = зайнято), `views.py` (/rag/api/…), віджет `templates/rag_assistant/widget.html` (inline, include у base_site.html), README у застосунку
+- Якщо в запитанні є артикул з каталогу, а RAG його не показав (або не відповів) — картка з Minerva (`views._catalog_cards`: склад, ціна продажу, tech_attributes без службових кодів, даташит, посилання)
 - Тести: `python manage.py test rag_assistant --settings=tabele.settings_test` (mock RAG)
 
 ### email_assistant/ — пошта ↔ CRM
@@ -105,6 +106,7 @@ tabele_mvp/
 - Хронологія клієнта групує листи по замовленню / темі (`crm/views.py customer_timeline_json` + JS у `crm/templates/admin/crm/customer/change_form.html`)
 - Листи лише з `text/html` → `body_html` + текст через `imap_client.html_to_text`; старі записи лагодить `EmailMessage.fix_html_body()`
 - Ремонт історії: `python manage.py relink_email_crm [--dry-run] [--days N]`
+- SMTP (`SMTPClient._open`): при `WRONG_VERSION_NUMBER` (SSL на порту STARTTLS або навпаки) пробує інший режим; інакше — зрозуміла підказка про порт 587/465
 - Синхронізація — `email_assistant/sync.py`: `save_message` (єдиний шлях збереження), `sync_folder` (нові листи папки за UID, без вікна в днях; `full=True` — добрати старі), `pull_read_flags` (\Seen із сервера), `set_read` (усі позначки «прочитано» в Minerva → \Seen у папку листа, якщо `EmailSettings.mark_read_on_server`, перемикач у скриньці). Крон: `sync_email --folders` (усі папки сервера)
 - `IMAPClient.list_folders()` віддає `name` (сира IMAP-назва для команд) і `label`/`path` (декодований modified UTF-7)
 - Категорії листів `EmailMessage.category` (email_assistant 0015): `email_assistant/categorize.py` (internal → customer → supplier → service → newsletter → other), ставиться сигналом при збереженні; історію дозаповнює `sync_email` порціями або `manage.py categorize_emails [--all]`. Фільтр у скриньці `?cat=…&customer=<pk>`; мітки клієнта/категорії в рядку списку

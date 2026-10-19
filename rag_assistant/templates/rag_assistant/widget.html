@@ -100,6 +100,21 @@
 .rg-prod:hover { border-color: var(--rg-accent); }
 .rg-prod small { color: var(--rg-muted); }
 .rg-prod .ok { color: var(--rg-ok); } .rg-prod .no { color: var(--rg-no); } .rg-prod .warn { color: var(--rg-warn); }
+/* Картка товару з каталогу Minerva (артикул із запитання) */
+.rg-card-title { color: var(--rg-muted); margin-top: 4px; }
+.rg-card { margin-top: 6px; padding: 8px 10px; border-radius: 9px; border: 1px solid var(--rg-border-strong); background: var(--rg-bg); }
+.rg-card-hd { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rg-card-hd a { font-weight: 700; color: var(--rg-strong) !important; text-decoration: none !important; }
+.rg-card-hd a:hover { color: var(--rg-link) !important; }
+.rg-card-name { color: var(--rg-muted); font-size: 12px; }
+.rg-card-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 12px; color: var(--rg-muted); margin-top: 3px; }
+.rg-card-meta .ok { color: var(--rg-ok); } .rg-card-meta .no { color: var(--rg-no); } .rg-card-meta .warn { color: var(--rg-warn); }
+.rg-card-attrs { display: grid; grid-template-columns: minmax(90px, 40%) 1fr; gap: 2px 10px; margin-top: 7px; font-size: 12px; }
+.rg-card-attrs .k { color: var(--rg-dim); }
+.rg-card-attrs .v { color: var(--rg-text); word-break: break-word; }
+.rg-card-empty { margin-top: 6px; font-size: 12px; color: var(--rg-dim); }
+.rg-card-links { display: flex; gap: 12px; margin-top: 7px; font-size: 12px; }
+.rg-card-links a { color: var(--rg-link) !important; }
 
 .rg-input { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--rg-border); flex-shrink: 0; }
 .rg-input textarea { flex: 1; resize: none; max-height: 140px; min-height: 40px; padding: 9px 11px; border-radius: 10px;
@@ -236,6 +251,40 @@
     a.appendChild(info);
     return a;
   }
+  // Картка товару з каталогу Minerva (артикул із запитання): склад, ціна, характеристики, даташит
+  function catalogCard(p) {
+    var m = p.minerva || {}, card = el('div', 'rg-card');
+    var hd = el('div', 'rg-card-hd');
+    var a = el('a', null, p.sku); a.href = m.url; a.target = '_blank'; a.rel = 'noopener'; a.title = 'Відкрити товар у Minerva';
+    hd.appendChild(a);
+    if (p.name) hd.appendChild(el('span', 'rg-card-name', p.name));
+    card.appendChild(hd);
+    var meta = el('div', 'rg-card-meta');
+    meta.appendChild(el('span', m.available > 0 ? 'ok' : 'no', m.available > 0 ? 'склад: ' + fmtNum(m.available) : 'немає на складі'));
+    if (m.sale_price != null) meta.appendChild(el('span', null, 'ціна продажу: ' + fmtNum(m.sale_price)));
+    if (m.lifecycle_status && m.lifecycle_status !== 'active') meta.appendChild(el('span', 'warn', m.lifecycle_status === 'nrnd' ? 'NRND' : 'EOL'));
+    card.appendChild(meta);
+    if (p.attributes && p.attributes.length) {
+      var tbl = el('div', 'rg-card-attrs');
+      p.attributes.forEach(function (kv) { tbl.appendChild(el('span', 'k', kv[0])); tbl.appendChild(el('span', 'v', kv[1])); });
+      card.appendChild(tbl);
+    } else {
+      card.appendChild(el('div', 'rg-card-empty', 'Технічних характеристик у каталозі немає.'));
+    }
+    var links = el('div', 'rg-card-links');
+    var open = el('a', null, 'Відкрити в Minerva →'); open.href = m.url; open.target = '_blank'; open.rel = 'noopener';
+    links.appendChild(open);
+    if (p.datasheet) { var ds = el('a', null, '📄 Даташит'); ds.href = p.datasheet; ds.target = '_blank'; ds.rel = 'noopener'; links.appendChild(ds); }
+    card.appendChild(links);
+    return card;
+  }
+  function catalogBlock(list) {
+    var box = el('div', 'rg-extra');
+    box.appendChild(el('div', 'rg-card-title', '📦 З каталогу Minerva:'));
+    list.forEach(function (p) { box.appendChild(catalogCard(p)); });
+    return box;
+  }
+
   function renderMsg(m) {
     var row = el('div', 'rg-m ' + m.role + (m.status === 'failed' ? ' failed' : '')), bubble = el('div', 'rg-b');
     row.dataset.id = m.id;
@@ -255,7 +304,13 @@
       }
       return row;
     }
-    if (m.status === 'failed') { bubble.textContent = '⚠ ' + (m.error || 'Не вдалося отримати відповідь.'); return row; }
+    var catalog = (m.products || []).filter(function (p) { return p.from_catalog; });
+    var ragProducts = (m.products || []).filter(function (p) { return !p.from_catalog; });
+    if (m.status === 'failed') {
+      bubble.appendChild(el('div', null, '⚠ ' + (m.error || 'Не вдалося отримати відповідь.')));
+      if (catalog.length) bubble.appendChild(catalogBlock(catalog));
+      return row;
+    }
     var srcBox = null;
     function cite(n) {
       if (!srcBox) return; srcBox.open = true;
@@ -264,10 +319,11 @@
     }
     bubble.appendChild(markdown(m.content, cite));
     var extra = el('div', 'rg-extra');
-    if (m.products && m.products.length) {
-      var pr = el('div', 'rg-prods'); m.products.forEach(function (p) { pr.appendChild(productChip(p)); });
+    if (ragProducts.length) {
+      var pr = el('div', 'rg-prods'); ragProducts.forEach(function (p) { pr.appendChild(productChip(p)); });
       extra.appendChild(el('div', null, 'Товари з відповіді:')); extra.appendChild(pr);
     }
+    if (catalog.length) bubble.appendChild(catalogBlock(catalog));
     if (m.sources && m.sources.length) {
       srcBox = el('details'); srcBox.appendChild(el('summary', null, 'Джерела (' + m.sources.length + ')'));
       m.sources.forEach(function (s) {

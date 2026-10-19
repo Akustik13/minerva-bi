@@ -172,3 +172,45 @@ class RagAssistantTests(TestCase):
         self.assertEqual((st.api_key, st.base_url), ("secret-key-1234", "https://app.example"))
         self.client.post(url, {**data, "api_key": "new-key-9999"})
         self.assertEqual(RagSettings.get().api_key, "new-key-9999")
+
+    def _ask_and_finish(self, question, job_payload):
+        cid = self._new_conv()
+        req, _ = fake_rag({("POST", "/v1/ask"): (202, {"job_id": "jx"}),
+                           ("GET", "/v1/jobs/jx"): (200, job_payload)})
+        with mock.patch("rag_assistant.client.requests.request", req):
+            mid = self.client.post(f"/rag/api/conversations/{cid}/ask/", {"question": question},
+                                   content_type="application/json").json()["assistant"]["id"]
+            return self.client.get(f"/rag/api/messages/{mid}/").json()["message"]
+
+    def test_not_found_shows_minerva_catalog_card(self):
+        self.p.tech_attributes = {"Power - Max": "5 W", "Frequency Range": "2.4GHz ~ 5.8GHz",
+                                  "hts": "8529.10.2190", "Gain": ""}
+        self.p.save()
+        m = self._ask_and_finish("Яка потужність AN050201-01C-175-MHF1?", {
+            "id": "jx", "status": "completed",
+            "result": {"answer": "Не знайшла підтверджених даних.", "products": [], "sources": [],
+                       "warnings": ["Даташити недоступні"]}})
+        self.assertEqual(m["status"], "done")
+        card = m["products"][0]
+        self.assertTrue(card["from_catalog"])
+        self.assertEqual((card["sku"], card["minerva"]["available"], card["minerva"]["sale_price"]),
+                         ("AN050201-01C-175-MHF1", 12.0, 10.0))
+        self.assertEqual(card["minerva"]["url"], f"/admin/inventory/product/{self.p.pk}/change/")
+        self.assertEqual(dict(card["attributes"]), {"Power - Max": "5 W", "Frequency Range": "2.4GHz ~ 5.8GHz"})
+
+    def test_no_duplicate_card_when_rag_shows_product(self):
+        m = self._ask_and_finish("Яка вага AN050201-01C-175-MHF1", {
+            "id": "jx", "status": "completed",
+            "result": {"answer": "12 g", "products": [{"product": "AN050201-01C-175-MHF1"}], "sources": []}})
+        self.assertEqual(len(m["products"]), 1)
+        self.assertNotIn("from_catalog", m["products"][0])
+
+    def test_failed_rag_still_shows_catalog_card_and_alias(self):
+        from inventory.models import ProductAlias
+        ProductAlias.objects.create(alias="AN0502-ALT-01", product=self.p)
+        m = self._ask_and_finish("Дані по AN0502-ALT-01, будь ласка", {"id": "jx", "status": "failed",
+                                                                     "error": "Даташити недоступні"})
+        self.assertEqual(m["status"], "failed")
+        self.assertEqual([p["sku"] for p in m["products"]], ["AN050201-01C-175-MHF1"])
+        self.assertEqual(self._ask_and_finish("Що таке LoRa?", {"id": "jx", "status": "completed",
+                         "result": {"answer": "…", "products": []}})["products"], [])

@@ -1060,3 +1060,66 @@ class DraftAndTranslateTests(SyncTestBase):
         from email_assistant.views import _model_label
         self.assertEqual(_model_label('claude-opus-5-5'), 'Claude Opus 5.5')
         self.assertEqual(_model_label('claude-haiku-4-5-20251001'), 'Claude Haiku 4.5')
+
+
+class _FakeSMTP:
+    instances = []
+
+    def __init__(self, host, port, timeout=None):
+        self.host, self.port, self.calls = host, port, []
+        _FakeSMTP.instances.append(self)
+
+    def starttls(self, **kw):
+        self.calls.append('starttls')
+
+    def login(self, user, password):
+        self.calls.append('login')
+
+    def sendmail(self, frm, to, data):
+        self.calls.append(('sendmail', tuple(to)))
+
+    def quit(self):
+        self.calls.append('quit')
+
+
+class _FakeImapAppend:
+    def __call__(self, account):
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
+
+    def append_to_sent(self, data):
+        return True
+
+
+class SMTPSSLMismatchTests(SyncTestBase):
+    def _wrong_version(self, *a, **kw):
+        import ssl
+        raise ssl.SSLError(1, '[SSL: WRONG_VERSION_NUMBER] wrong version number (_ssl.c:1016)')
+
+    def test_ssl_on_starttls_port_falls_back_to_starttls(self):
+        from email_assistant.smtp_client import SMTPClient
+        self.account.smtp_port, self.account.smtp_use_ssl, self.account.smtp_use_tls = 587, True, False
+        _FakeSMTP.instances = []
+        with patch('email_assistant.smtp_client.smtplib.SMTP_SSL', self._wrong_version), \
+                patch('email_assistant.smtp_client.smtplib.SMTP', _FakeSMTP), \
+                patch('email_assistant.imap_client.IMAPClient', _FakeImapAppend()):
+            r = SMTPClient(self.account).send(['tthreatts@aevex.com'], 'Re: order', 'Dear Travis',
+                                              cc_emails=['sergey@sevskiy.de'])
+        self.assertTrue(r['ok'], r)
+        calls = _FakeSMTP.instances[0].calls
+        self.assertEqual(calls[0], 'starttls')
+        self.assertIn(('sendmail', ('tthreatts@aevex.com', 'sergey@sevskiy.de')), calls)
+
+    def test_both_modes_fail_gives_clear_hint(self):
+        from email_assistant.smtp_client import SMTPClient
+        self.account.smtp_port, self.account.smtp_use_ssl = 587, True
+        with patch('email_assistant.smtp_client.smtplib.SMTP_SSL', self._wrong_version), \
+                patch('email_assistant.smtp_client.smtplib.SMTP', self._wrong_version):
+            r = SMTPClient(self.account).send(['a@b.example'], 'S', 'T')
+        self.assertFalse(r['ok'])
+        self.assertIn('587 — TLS (STARTTLS) без SSL', r['error'])

@@ -2,15 +2,46 @@
 import email.utils
 import logging
 import smtplib
+import ssl
 from email.message import EmailMessage
 from email.policy import SMTP as SMTP_POLICY
 
 logger = logging.getLogger('email_assistant')
 
 
+SSL_MISMATCH_HINT = ('Порт SMTP і режим шифрування не збігаються: 587 — TLS (STARTTLS) без SSL, '
+                     '465 — SSL без TLS. Виправте в налаштуваннях email-акаунта.')
+
+
 class SMTPClient:
     def __init__(self, account):
         self.account = account
+
+    def _open(self):
+        """
+        SMTP-з'єднання за налаштуваннями акаунта. Якщо SSL увімкнено для порту STARTTLS (587/25)
+        або навпаки — сервер відповідає «WRONG_VERSION_NUMBER»; тоді пробуємо інший режим.
+        """
+        host, port = self.account.smtp_host, int(self.account.smtp_port or 587)
+        encrypted = bool(self.account.smtp_use_ssl or self.account.smtp_use_tls)
+
+        def connect(implicit_tls):
+            if implicit_tls:
+                return smtplib.SMTP_SSL(host, port, timeout=30)
+            conn = smtplib.SMTP(host, port, timeout=30)
+            if encrypted:
+                conn.starttls()
+            return conn
+
+        implicit = bool(self.account.smtp_use_ssl)
+        try:
+            return connect(implicit)
+        except ssl.SSLError as e:
+            if 'WRONG_VERSION_NUMBER' not in str(e).upper():
+                raise
+            logger.warning('SMTP %s:%s: SSL/TLS не відповідає порту (%s) — пробую %s',
+                           host, port, e, 'STARTTLS' if implicit else 'SSL')
+            return connect(not implicit)
 
     def send(self, to_emails: list, subject: str, body_text: str,
              body_html: str = '', cc_emails: list = None,
@@ -97,12 +128,7 @@ class SMTPClient:
             all_recipients = to_emails + cc_emails + bcc_emails
             msg_bytes = msg.as_bytes(policy=SMTP_POLICY)
 
-            if self.account.smtp_use_ssl:
-                conn = smtplib.SMTP_SSL(self.account.smtp_host, self.account.smtp_port)
-            else:
-                conn = smtplib.SMTP(self.account.smtp_host, self.account.smtp_port)
-                if self.account.smtp_use_tls:
-                    conn.starttls()
+            conn = self._open()
 
             conn.login(self.account.smtp_username, self.account.smtp_password)
             conn.sendmail(self.account.email_address, all_recipients, msg_bytes)
@@ -121,6 +147,9 @@ class SMTPClient:
 
         except smtplib.SMTPAuthenticationError:
             return {'ok': False, 'error': 'Помилка автентифікації SMTP. Перевір логін і пароль.'}
+        except ssl.SSLError as e:
+            logger.error('SMTP SSL error: %s', e)
+            return {'ok': False, 'error': f'SMTP SSL/TLS: {e}. {SSL_MISMATCH_HINT}'}
         except smtplib.SMTPConnectError:
             return {'ok': False, 'error': f'Не вдалось підключитись до {self.account.smtp_host}'}
         except Exception as e:

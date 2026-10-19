@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import timedelta
 
 from django.http import FileResponse, Http404, JsonResponse
@@ -126,6 +127,60 @@ def _products(raw) -> list:
     return rows
 
 
+# Артикул у запитанні: AN050201-01C-175-MHF1, CA-MHF4-MC1.13-040-MHF4 (літери/цифри/-./, є цифра)
+_SKU_TOKEN_RE = re.compile(r"(?<![\w./-])([A-Za-z0-9][A-Za-z0-9._/-]{2,62}[A-Za-z0-9])(?![\w-])")
+MAX_CATALOG_CARDS = 5
+MAX_CARD_ATTRIBUTES = 14
+
+
+def _question_of(m: RagMessage) -> str:
+    """Запитання, на яке відповідає повідомлення асистента."""
+    q = (RagMessage.objects.filter(conversation_id=m.conversation_id, role=RagMessage.ROLE_USER,
+                                   created_at__lte=m.created_at)
+         .exclude(pk=m.pk).order_by("-created_at", "-pk").first())
+    return q.content if q else ""
+
+
+def _catalog_cards(question: str, shown_skus=()) -> list:
+    """
+    Картки товарів з каталогу Minerva для артикулів, названих у запитанні, яких RAG не показав сам:
+    наявність на складі, ціна продажу, статус, технічні характеристики, даташит, посилання.
+    """
+    from api.serializers import split_attributes
+    from inventory.models import Product
+    from inventory.services.stock import annotate_stock, resolve_sku
+
+    shown = {str(s).lower() for s in shown_skus if s}
+    cards, seen = [], set()
+    for token in _SKU_TOKEN_RE.findall(question or ""):
+        if not any(ch.isdigit() for ch in token) or token.lower() in shown:
+            continue
+        product = resolve_sku(token)
+        if product is None or product.pk in seen or product.sku.lower() in shown:
+            continue
+        seen.add(product.pk)
+        q = annotate_stock(Product.objects.filter(pk=product.pk)).values("_available").first() or {}
+        params, _codes = split_attributes(product.tech_attributes)
+        attributes = [[str(k), v if isinstance(v, str) else json.dumps(v, ensure_ascii=False)]
+                      for k, v in list(params.items())[:MAX_CARD_ATTRIBUTES]]
+        cards.append({
+            "sku": product.sku, "source": "Каталог Minerva", "from_catalog": True,
+            "name": product.name or "",
+            "attributes": attributes,
+            "datasheet": product.datasheet_display_url or "",
+            "minerva": {
+                "id": product.pk, "sku": product.sku, "name": product.name or "",
+                "url": reverse("admin:inventory_product_change", args=[product.pk]),
+                "available": float(q.get("_available") or 0),
+                "sale_price": float(product.sale_price) if product.sale_price is not None else None,
+                "lifecycle_status": product.lifecycle_status,
+            },
+        })
+        if len(cards) >= MAX_CATALOG_CARDS:
+            break
+    return cards
+
+
 def _refresh(m: RagMessage, client: RagClient | None) -> None:
     """Опитати RAG для повідомлення, що виконується, і зберегти результат."""
     if m.status != RagMessage.PENDING or not m.rag_job_id:
@@ -158,6 +213,9 @@ def _refresh(m: RagMessage, client: RagClient | None) -> None:
             answer += "\n\n" + "\n".join("⚠ " + w for w in warnings[:5])
         m.content = answer or "Знайдено джерела, але відповідь не сформовано."
         m.sources, m.products = _sources(res.get("sources")), _products(res.get("products"))
+        # Артикул із запитання, якого RAG не показав (зокрема коли «не знайшла даних»), — картка з Minerva
+        shown = [p.get("sku") for p in m.products] + [(p.get("minerva") or {}).get("sku") for p in m.products]
+        m.products += _catalog_cards(_question_of(m), shown)
         m.trace = _short_trace(res.get("trace") or job.get("trace"))
         m.usage = res.get("usage") or {}
         m.status, m.finished_at = RagMessage.DONE, timezone.now()
@@ -165,7 +223,8 @@ def _refresh(m: RagMessage, client: RagClient | None) -> None:
     elif status == "failed":
         m.status, m.finished_at = RagMessage.FAILED, timezone.now()
         m.error = str(job.get("error") or "Обробка не вдалася.")[:255]
-        fields += ["status", "error", "finished_at"]
+        m.products = _catalog_cards(_question_of(m))   # RAG не відповів — хоча б дані з каталогу
+        fields += ["status", "error", "finished_at", "products"]
     m.save(update_fields=fields)
 
 
