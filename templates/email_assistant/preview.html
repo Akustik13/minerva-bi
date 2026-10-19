@@ -63,9 +63,16 @@
 #em-att-tip .att-tip-name{font-size:12px;font-weight:600;color:var(--text);word-break:break-all}
 #em-att-tip .att-tip-meta{font-size:11px;color:var(--text-muted)}
 #em-att-tip .att-tip-icon{font-size:36px;text-align:center;padding:14px 0 6px}
-.em-ai-box{display:none;padding:12px 14px;border-top:1px solid var(--border);background:rgba(0,212,170,.04)}
-.em-ai-lbl{font-size:10px;font-weight:700;color:#00d4aa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-.em-ai-txt{font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text)}
+.em-ai-box{display:none;padding:10px 14px 12px;border-bottom:1px solid var(--border);border-left:3px solid #00d4aa;background:rgba(0,212,170,.05)}
+/* Панель AI/перекладу — одразу під заголовком свого листа, видно і в згорнутій картці */
+.em-ai-hd{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.em-ai-lbl{font-size:10px;font-weight:700;color:#00d4aa;text-transform:uppercase;letter-spacing:.06em;flex-shrink:0}
+.em-ai-ctx{font-size:11px;color:var(--text-dim);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.em-ai-close{border:none;background:none;cursor:pointer;color:var(--text-dim);font-size:13px;padding:2px 6px;border-radius:5px;flex-shrink:0}
+.em-ai-close:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
+.em-ai-txt{font-size:13px;line-height:1.7;white-space:pre-wrap;color:var(--text);max-height:45vh;overflow-y:auto}
+.em-ai-txt:empty{display:none}
+.em-hd-btn.on{background:rgba(0,212,170,.14);color:#00d4aa}
 .em-ai-prompt-inp{flex:1;padding:5px 9px;border-radius:6px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text);font-size:12px;outline:none}
 .em-ai-prompt-inp:focus{border-color:#1a73e8}
 /* Reply box */
@@ -143,13 +150,34 @@
           <span class="em-card-date">{{ msg.sent_at|date:"d.m.Y H:i" }}</span>
           <!-- Action buttons always in header -->
           <div class="em-card-actions" onclick="event.stopPropagation()">
-            <button class="em-hd-btn ai" onclick="pvAiReply({{ msg.pk }})" title="{% trans "AI відповідь" %}">🏛️</button>
-            <button class="em-hd-btn" onclick="pvAiTranslate({{ msg.pk }})" title="{% trans "Перекласти UA" %}">🌐</button>
+            <button class="em-hd-btn ai" data-ai="reply" onclick="pvAiReply({{ msg.pk }})" title="{% trans "AI відповідь" %}">🏛️</button>
+            <button class="em-hd-btn" data-ai="translate" onclick="pvAiTranslate({{ msg.pk }})" title="{% trans "Перекласти UA" %}">🌐</button>
             <button class="em-hd-btn{% if msg.is_spam %} spam-on{% endif %}"
                     id="pv-spam-btn-{{ msg.pk }}"
                     onclick="pvToggleSpam({{ msg.pk }}, this)" title="{% trans "Спам" %}">🚫</button>
             <button class="em-hd-btn danger" onclick="pvDelete({{ msg.pk }})" title="{% trans "Видалити" %}">🗑️</button>
           </div>
+        </div>
+      </div>
+
+      <!-- AI-відповідь / переклад саме цього листа -->
+      <div class="em-ai-box" id="pv-ai-{{ msg.pk }}" data-mode="">
+        <div class="em-ai-hd">
+          <span class="em-ai-lbl" id="pv-ai-lbl-{{ msg.pk }}"></span>
+          <span class="em-ai-ctx">↳ {{ msg.from_name|default:msg.from_email }} · {{ msg.sent_at|date:"d.m.Y H:i" }}</span>
+          <button class="em-ai-close" onclick="pvAiClose({{ msg.pk }})" title="{% trans "Закрити" %}">✕</button>
+        </div>
+        <div id="pv-ai-prompt-row-{{ msg.pk }}" style="display:flex;gap:6px;margin-bottom:8px">
+          <input class="em-ai-prompt-inp" type="text"
+                 id="pv-ai-prompt-{{ msg.pk }}"
+                 placeholder="{% trans "Що відповісти? (залиш порожнім для авто-відповіді)" %}"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();pvAiGenerate({{ msg.pk }});}">
+          <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">{% trans "Генерувати" %} →</button>
+        </div>
+        <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 {% trans "Копіювати" %}</button>
+          <button class="em-pv-btn ai" id="pv-ai-use-{{ msg.pk }}" onclick="pvUseAsReply({{ msg.pk }})">{% trans "Вставити у відповідь" %} →</button>
         </div>
       </div>
 
@@ -197,21 +225,6 @@
         </div>
         {% endif %}
 
-        <!-- AI box (prompt + result) -->
-        <div class="em-ai-box" id="pv-ai-{{ msg.pk }}">
-          <div class="em-ai-lbl">🏛️ {% trans "Minerva пропонує" %}</div>
-          <div style="display:flex;gap:6px;margin-bottom:8px">
-            <input class="em-ai-prompt-inp" type="text"
-                   id="pv-ai-prompt-{{ msg.pk }}"
-                   placeholder="{% trans "Що відповісти? (залиш порожнім для авто-відповіді)" %}">
-            <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">{% trans "Генерувати" %} →</button>
-          </div>
-          <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
-          <div style="display:flex;gap:6px;margin-top:8px">
-            <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 {% trans "Копіювати" %}</button>
-            <button class="em-pv-btn ai" onclick="pvUseAsReply({{ msg.pk }})">{% trans "Вставити у відповідь" %} →</button>
-          </div>
-        </div>
       </div>
     </div>
     {% endwith %}
@@ -474,14 +487,50 @@ window.pvReplyTranslate = async function() {
   } catch { status.textContent = '⚠️ {% trans "Помилка" %}'; status.style.color = 'var(--err)'; }
 };
 
-window.pvAiReply = function(pk) {
-  // Expand card first if collapsed
+var _PV_AI_LABELS = {
+  reply:     '🏛️ {% trans "Minerva пропонує відповідь" %}',
+  translate: '🌐 {% trans "Переклад українською" %}'
+};
+
+// Відкрити панель листа в режимі reply/translate; повторний клік тим самим режимом — закрити.
+// Текст кожного режиму зберігається, тож перемикання не губить згенеровану відповідь.
+function _pvAiOpen(pk, mode) {
+  var box  = document.getElementById('pv-ai-' + pk);
+  var txt  = document.getElementById('pv-ai-txt-' + pk);
   var card = document.getElementById('pv-card-' + pk);
-  if (card && !card.classList.contains('expanded')) card.classList.add('expanded');
-  var box = document.getElementById('pv-ai-' + pk);
-  if (box) box.style.display = 'block';
+  if (!box || !txt) return false;
+  if (box.style.display === 'block' && box.dataset.mode === mode) { pvAiClose(pk); return false; }
+  box._texts = box._texts || {};
+  if (box.dataset.mode) box._texts[box.dataset.mode] = txt.textContent;
+  box.dataset.mode = mode;
+  txt.textContent = box._texts[mode] || '';
+  document.getElementById('pv-ai-lbl-' + pk).textContent = _PV_AI_LABELS[mode];
+  document.getElementById('pv-ai-prompt-row-' + pk).style.display = mode === 'reply' ? 'flex' : 'none';
+  document.getElementById('pv-ai-use-' + pk).style.display = mode === 'reply' ? '' : 'none';
+  box.style.display = 'block';
+  if (card) card.querySelectorAll('.em-hd-btn[data-ai]').forEach(function(b) {
+    b.classList.toggle('on', b.dataset.ai === mode);
+  });
+  setTimeout(function(){ box.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 30);
+  return true;
+}
+
+window.pvAiClose = function(pk) {
+  var box  = document.getElementById('pv-ai-' + pk);
+  var card = document.getElementById('pv-card-' + pk);
+  if (!box) return;
+  var txt = document.getElementById('pv-ai-txt-' + pk);
+  box._texts = box._texts || {};
+  if (box.dataset.mode && txt) box._texts[box.dataset.mode] = txt.textContent;
+  box.style.display = 'none';
+  box.dataset.mode = '';
+  if (card) card.querySelectorAll('.em-hd-btn[data-ai]').forEach(function(b){ b.classList.remove('on'); });
+};
+
+window.pvAiReply = function(pk) {
+  if (!_pvAiOpen(pk, 'reply')) return;
   var inp = document.getElementById('pv-ai-prompt-' + pk);
-  if (inp) { setTimeout(function(){ inp.focus(); }, 50); }
+  if (inp) { setTimeout(function(){ inp.focus({preventScroll: true}); }, 50); }
 };
 
 window.pvAiGenerate = async function(pk) {
@@ -498,9 +547,10 @@ window.pvAiGenerate = async function(pk) {
 };
 
 window.pvAiTranslate = async function(pk) {
-  var box = document.getElementById('pv-ai-' + pk);
+  if (!_pvAiOpen(pk, 'translate')) return;
   var txt = document.getElementById('pv-ai-txt-' + pk);
-  box.style.display = 'block'; txt.textContent = '⏳ {% trans "Перекладаю..." %}';
+  if (txt.textContent && txt.textContent.indexOf('⏳') !== 0 && txt.textContent.indexOf('⚠️') !== 0) return;  // вже перекладено
+  txt.textContent = '⏳ {% trans "Перекладаю..." %}';
   try {
     var r = await fetch('/email/message/' + pk + '/ai-translate/?lang=uk');
     var d = await r.json();
