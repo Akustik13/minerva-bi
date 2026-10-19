@@ -77,6 +77,10 @@ def on_email_received(sender, instance, created, **kwargs):
     """When a new inbox email arrives, try to auto-advance the customer's active strategy."""
     if not created or instance.folder != 'inbox':
         return
+    # Лише справжні Вхідні: синхронізація інших папок підтягує й старі листи
+    inbox = (instance.account.imap_folder_inbox or 'INBOX').lower()
+    if instance.imap_folder_name and instance.imap_folder_name.lower() != inbox:
+        return
     try:
         _try_advance_strategy(instance)
     except Exception as exc:

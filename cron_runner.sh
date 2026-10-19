@@ -81,7 +81,7 @@ while true; do
 
   # ── Email синхронізація — кожні EMAIL_SYNC_INTERVAL секунд ──
   if [ $((NOW - LAST_EMAIL_SYNC)) -ge "$EMAIL_SYNC_INTERVAL" ]; then
-    python manage.py sync_email 2>&1 || true
+    python manage.py sync_email --folders 2>&1 || true
     LAST_EMAIL_SYNC=$(date +%s)
   fi
 

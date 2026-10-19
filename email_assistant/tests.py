@@ -4,6 +4,7 @@
 import email as email_lib
 from datetime import datetime, timezone as dt_tz
 from io import StringIO
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
@@ -11,8 +12,9 @@ from django.test import TestCase
 
 from crm.models import Customer, CustomerTimeline
 from email_assistant.crm_link import find_order, resolve, own_addresses
-from email_assistant.imap_client import _get_body, html_to_text, parse_addresses
-from email_assistant.models import EmailAccount, EmailMessage
+from email_assistant.imap_client import IMAPClient, _get_body, decode_mutf7, html_to_text, parse_addresses
+from email_assistant.models import EmailAccount, EmailMessage, EmailSettings
+from email_assistant.sync import folders_to_sync, pull_read_flags, set_read, sync_folder
 from sales.models import SalesOrder
 
 # Лист з веб-пошти IONOS/OX: лише text/html, без multipart
@@ -216,3 +218,223 @@ class TimelineApiTests(CrmLinkTestBase):
         self.assertIsNone(by_title['Called about order 99823894']['order'])  # нотатки не групуються
         order_event = by_title['Замовлення #99823894']  # подія з сигналу створення замовлення
         self.assertEqual(order_event['order']['id'], self.order2.pk)
+
+
+# ── Синхронізація папок і прапорця «прочитано» ───────────────────────────────
+
+class FakeListConn:
+    def list(self):
+        return 'OK', [
+            b'(\\HasNoChildren) "/" "INBOX"',
+            b'(\\HasNoChildren \\Sent) "/" "Gesendete Objekte"',
+            b'(\\HasChildren \\Noselect) "/" "Projekte"',
+            b'(\\HasNoChildren) "/" "Projekte/Entw&APw-rfe"',
+            b'(\\HasNoChildren) NIL Flat',
+            (b'(\\HasNoChildren) "/" {10}', b'Say "hi" x'),
+            b'',
+        ]
+
+
+class FolderListTests(TestCase):
+    def test_list_folders_handles_nil_literal_and_utf7(self):
+        client = IMAPClient.__new__(IMAPClient)
+        client.conn = FakeListConn()
+        folders = {f['name']: f for f in client.list_folders()}
+        self.assertEqual(folders['Projekte/Entw&APw-rfe']['label'], 'Entwürfe')
+        self.assertEqual(folders['Projekte/Entw&APw-rfe']['level'], 1)
+        self.assertFalse(folders['Projekte']['selectable'])
+        self.assertIn('Flat', folders)                      # роздільник NIL
+        self.assertIn('Say "hi" x', folders)                # назва-літерал
+        self.assertEqual(folders['Gesendete Objekte']['special'], '\\Sent')
+        synced = [f['name'] for f in folders_to_sync(folders.values())]
+        self.assertEqual(sorted(synced), ['Flat', 'Projekte/Entw&APw-rfe', 'Say "hi" x'])
+
+    def test_decode_mutf7(self):
+        self.assertEqual(decode_mutf7('Entw&APw-rfe &-'), 'Entwürfe &')
+
+
+def _msg(uid, subject='Hello', seen=False, from_email='partner@example.org'):
+    return {
+        'uid': uid, 'message_id': f'<m{uid}@example.org>', 'in_reply_to': '',
+        'subject': f'{subject} {uid}', 'from_email': from_email, 'from_name': '',
+        'to_emails': ['viacheslav.pryimak@sevskiy.de'], 'cc_emails': [],
+        'body_text': 'text', 'body_html': '', 'attachments': [],
+        'is_read': seen, 'sent_at': datetime(2026, 10, 1, 9, uid % 60, tzinfo=dt_tz.utc),
+    }
+
+
+class FakeIMAP:
+    """Сервер у пам'яті: {папка: {uid: прочитано?}}; записує виклики set_seen."""
+
+    def __init__(self, folders):
+        self.folders = folders
+        self.stored = []
+        self._selected = None
+
+    def __call__(self, account):      # підміна класу IMAPClient(account)
+        return self
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        pass
+
+    def list_folders(self):
+        return [{'name': n, 'label': n, 'path': n, 'selectable': True, 'level': 0, 'special': ''}
+                for n in self.folders]
+
+    def search_uids_after(self, folder, after_uid=0):
+        if folder not in self.folders:
+            return None
+        self._selected = folder
+        return [str(u).encode() for u in sorted(self.folders[folder]) if u > after_uid]
+
+    def fetch_by_uids_iter(self, uids):
+        for u in uids:
+            uid = int(u)
+            yield _msg(uid, seen=self.folders[self._selected][uid])
+
+    def fetch_messages(self, folder, days_back=30, since_uid=0, limit=None):
+        return [_msg(u, seen=seen) for u, seen in sorted(self.folders.get(folder, {}).items()) if u > since_uid]
+
+    def search_unseen(self, folder):
+        if folder not in self.folders:
+            return None
+        return {u for u, seen in self.folders[folder].items() if not seen}
+
+    def set_seen(self, folder, uids, seen=True):
+        self.stored.append((folder, sorted(uids), seen))
+        for u in uids:
+            self.folders[folder][u] = seen
+        return True
+
+
+class SyncTestBase(TestCase):
+    FOLDER = 'Projekte/Entw&APw-rfe'
+
+    def setUp(self):
+        self.user = User.objects.create_superuser('slava', 's@x.y', 'p')
+        self.account = EmailAccount.objects.create(
+            user=self.user, email_address='viacheslav.pryimak@sevskiy.de',
+            imap_username='viacheslav.pryimak@sevskiy.de', imap_password='x',
+            smtp_username='viacheslav.pryimak@sevskiy.de', smtp_password='x',
+            imap_folder_inbox='INBOX', imap_folder_sent='Gesendete Objekte')
+        es = EmailSettings.get_for_user(self.user)
+        es.deadline_detection = False
+        es.telegram_notify_new = False
+        es.save()
+
+
+class SyncFolderTests(SyncTestBase):
+    def test_incremental_then_full(self):
+        server = FakeIMAP({self.FOLDER: {1: True, 2: False, 3: False}})
+        new = sync_folder(server, self.account, self.FOLDER, limit=2)
+        self.assertEqual(sorted(m.imap_uid for m in new), [2, 3])   # перший раз — останні N, без вікна в днях
+
+        server.folders[self.FOLDER][4] = False
+        new = sync_folder(server, self.account, self.FOLDER, limit=2)
+        self.assertEqual([m.imap_uid for m in new], [4])            # далі — лише новіші
+
+        new = sync_folder(server, self.account, self.FOLDER, full=True)
+        self.assertEqual([m.imap_uid for m in new], [1])            # «Всі папки» — добирає старіші
+        self.assertEqual(EmailMessage.objects.filter(imap_folder_name=self.FOLDER).count(), 4)
+
+    def test_missing_folder(self):
+        self.assertIsNone(sync_folder(FakeIMAP({}), self.account, 'Nope'))
+
+    def test_pull_read_flags(self):
+        server = FakeIMAP({self.FOLDER: {1: False, 2: False}})
+        sync_folder(server, self.account, self.FOLDER)
+        m1 = EmailMessage.objects.get(imap_uid=1)
+        m2 = EmailMessage.objects.get(imap_uid=2)
+
+        server.folders[self.FOLDER][1] = True              # прочитав на телефоні
+        EmailMessage.objects.filter(pk=m2.pk).update(is_read=True)   # прочитав у Minerva, сервер не знає
+
+        pull_read_flags(server, self.account, self.FOLDER, two_way=False)
+        m1.refresh_from_db(); m2.refresh_from_db()
+        self.assertTrue(m1.is_read)
+        self.assertTrue(m2.is_read)                        # one-way: локальне «прочитано» не чіпаємо
+
+        pull_read_flags(server, self.account, self.FOLDER, two_way=True)
+        m2.refresh_from_db()
+        self.assertFalse(m2.is_read)                       # two-way: сервер — джерело правди
+        self.assertTrue(m2.thread.messages.filter(is_read=False).exists())
+        m2.thread.refresh_from_db()
+        self.assertTrue(m2.thread.has_unread)
+
+
+@patch('email_assistant.sync._start_background', lambda fn: fn())
+class SetReadTests(SyncTestBase):
+    def _saved(self, server):
+        sync_folder(server, self.account, self.FOLDER)
+        return list(EmailMessage.objects.filter(imap_folder_name=self.FOLDER).order_by('imap_uid'))
+
+    def test_pushes_seen_to_the_message_folder(self):
+        server = FakeIMAP({self.FOLDER: {5: False, 6: False}})
+        msgs = self._saved(server)
+        with patch('email_assistant.imap_client.IMAPClient', server):
+            self.assertEqual(set_read(self.account, msgs, True), 2)
+        self.assertEqual(server.stored, [(self.FOLDER, [5, 6], True)])
+        self.assertFalse(msgs[0].thread.messages.filter(is_read=False).exists())
+
+    def test_no_push_when_setting_off(self):
+        es = EmailSettings.get_for_user(self.user)
+        es.mark_read_on_server = False
+        es.save()
+        server = FakeIMAP({self.FOLDER: {7: False}})
+        msgs = self._saved(server)
+        with patch('email_assistant.imap_client.IMAPClient', server):
+            set_read(self.account, msgs, True)
+        self.assertEqual(server.stored, [])
+        self.assertTrue(EmailMessage.objects.get(imap_uid=7).is_read)
+
+
+@patch('email_assistant.sync._start_background', lambda fn: fn())
+class MailViewsTests(SyncTestBase):
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+
+    def test_preview_marks_read_on_server(self):
+        server = FakeIMAP({'INBOX': {11: False}})
+        with patch('email_assistant.imap_client.IMAPClient', server):
+            call_command('sync_email', stdout=StringIO())
+            em = EmailMessage.objects.get(imap_uid=11)
+            r = self.client.get(f'/email/message/{em.pk}/preview/')
+        self.assertEqual(r.status_code, 200)
+        em.refresh_from_db()
+        self.assertTrue(em.is_read)
+        self.assertEqual(server.stored, [('INBOX', [11], True)])
+
+    def test_settings_toggle(self):
+        r = self.client.post('/email/settings/toggle/', data='{"field": "mark_read_on_server", "value": false}',
+                             content_type='application/json')
+        self.assertEqual(r.json(), {'ok': True, 'mark_read_on_server': False})
+        self.assertFalse(EmailSettings.get_for_user(self.user).mark_read_on_server)
+        r = self.client.post('/email/settings/toggle/', data='{"field": "auto_reply_enabled", "value": true}',
+                             content_type='application/json')
+        self.assertFalse(r.json()['ok'])
+
+
+class SyncCommandTests(SyncTestBase):
+    def test_folders_and_flags(self):
+        server = FakeIMAP({'INBOX': {1: False, 2: False}, 'Gesendete Objekte': {}, self.FOLDER: {3: False}})
+        with patch('email_assistant.imap_client.IMAPClient', server):
+            call_command('sync_email', stdout=StringIO())
+            self.assertFalse(EmailMessage.objects.filter(imap_folder_name=self.FOLDER).exists())
+
+            server.folders['INBOX'][1] = True               # прочитано на сервері
+            server.folders[self.FOLDER][4] = False
+            call_command('sync_email', '--folders', stdout=StringIO())
+
+        self.assertTrue(EmailMessage.objects.get(imap_uid=1, imap_folder_name='INBOX').is_read)
+        self.assertFalse(EmailMessage.objects.get(imap_uid=2, imap_folder_name='INBOX').is_read)
+        self.assertEqual(
+            sorted(EmailMessage.objects.filter(imap_folder_name=self.FOLDER).values_list('imap_uid', flat=True)),
+            [3, 4])

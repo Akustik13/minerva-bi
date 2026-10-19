@@ -52,6 +52,8 @@ urlpatterns = [
     # Mark read / unread
     path('message/<int:message_pk>/read/',               views.mark_read_api,           name='mark_read'),
     path('message/<int:message_pk>/unread/',             views.mark_unread_api,         name='mark_unread'),
+    # Quick settings toggles (e.g. mark read on server)
+    path('settings/toggle/',                             views.settings_toggle_view,    name='settings_toggle'),
     # Email rules
     path('rules/',                                       views.rules_list,              name='rules_list'),
     path('rules/create/',                                views.create_rule_api,         name='create_rule'),

@@ -1,4 +1,5 @@
 """email_assistant/imap_client.py — IMAP читання пошти."""
+import base64
 import email as email_lib
 import imaplib
 import logging
@@ -202,6 +203,44 @@ def persist_attachments(account_pk, imap_uid, folder_name, attachments: list) ->
     return saved
 
 
+# LIST-відповідь: (\HasNoChildren \Sent) "/" "INBOX/Meine Order"  |  (...) NIL Name
+_LIST_RE = re.compile(r'^\((?P<flags>[^)]*)\)\s+(?P<delim>"(?:[^"\\]|\\.)*"|NIL)\s+(?P<name>.+)$', re.I)
+_SPECIAL_USE = ('\\Sent', '\\Trash', '\\Junk', '\\Drafts', '\\Archive', '\\All', '\\Flagged')
+
+
+def _unquote(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        return re.sub(r'\\(.)', r'\1', value[1:-1])
+    return value
+
+
+def _list_line(item) -> str:
+    """Рядок LIST; назви з особливими символами сервер шле літералом: (b'(...) "/" {12}', b'name')."""
+    if isinstance(item, tuple):
+        head = item[0].decode('utf-8', errors='replace') if isinstance(item[0], bytes) else str(item[0])
+        name = item[1].decode('utf-8', errors='replace') if isinstance(item[1], bytes) else str(item[1])
+        name = name.replace('\\', '\\\\').replace('"', '\\"')
+        return re.sub(r'\{\d+\}\s*$', '', head).rstrip() + ' "' + name + '"'
+    if isinstance(item, bytes):
+        item = item.decode('utf-8', errors='replace')
+    return (item or '').strip()
+
+
+def decode_mutf7(name: str) -> str:
+    """Назви IMAP-папок у modified UTF-7 (RFC 3501): «Entw&APw-rfe» → «Entwürfe»."""
+    def _dec(m):
+        chunk = m.group(1)
+        if not chunk:
+            return '&'
+        b64 = chunk.replace(',', '/')
+        try:
+            return base64.b64decode(b64 + '=' * (-len(b64) % 4)).decode('utf-16-be')
+        except Exception:
+            return m.group(0)
+    return re.sub(r'&([A-Za-z0-9+,]*)-', _dec, name or '')
+
+
 class IMAPClient:
     def __init__(self, account):
         self.account = account
@@ -237,29 +276,36 @@ class IMAPClient:
         self.disconnect()
 
     def list_folders(self) -> list:
-        """Return list of dicts {name, selectable, level} for all IMAP folders."""
-        import re
+        """
+        Папки сервера: {name (сирa IMAP-назва для команд), label (читабельна, остання частина),
+        path (читабельний повний шлях), selectable, level, special (\\Sent, \\Trash…)}.
+        """
         try:
             _, data = self.conn.list()
         except Exception as e:
             logger.warning('IMAP list() failed: %s', e)
             return []
         folders = []
-        for item in data:
-            if not item:
+        for item in data or []:
+            line = _list_line(item)
+            if not line:
                 continue
-            if isinstance(item, bytes):
-                item = item.decode('utf-8', errors='replace')
-            # Format: (\flags) "delimiter" "folder_name" or (\flags) "delimiter" folder_name
-            m = re.match(r'\(([^)]*)\)\s+"([^"]+)"\s+(.+)', item.strip())
+            m = _LIST_RE.match(line)
             if not m:
+                logger.info('IMAP LIST: не розібрано рядок %r', line)
                 continue
-            flags_str = m.group(1)
-            delimiter = m.group(2)
-            raw_name  = m.group(3).strip().strip('"')
-            noselect  = 'Noselect' in flags_str or 'noselect' in flags_str
-            level     = raw_name.count(delimiter) if delimiter else 0
-            folders.append({'name': raw_name, 'selectable': not noselect, 'level': level})
+            flags = m.group('flags').lower()
+            delim = _unquote(m.group('delim')) if m.group('delim').upper() != 'NIL' else ''
+            raw = _unquote(m.group('name').strip())
+            path = decode_mutf7(raw)
+            folders.append({
+                'name':       raw,
+                'label':      path.rsplit(delim, 1)[-1] if delim else path,
+                'path':       path,
+                'selectable': '\\noselect' not in flags and '\\nonexistent' not in flags,
+                'level':      raw.count(delim) if delim else 0,
+                'special':    next((f for f in _SPECIAL_USE if f.lower() in flags), ''),
+            })
         return folders
 
     def select_folder(self, folder: str) -> bool:
@@ -277,6 +323,42 @@ class IMAPClient:
             except Exception:
                 continue
         return False
+
+    def search_uids_after(self, folder: str, after_uid: int = 0):
+        """UID листів папки, новіших за after_uid (0 — усі). None — папку не вдалось вибрати."""
+        if not self.select_folder(folder):
+            logger.warning('Cannot select folder: %s', folder)
+            return None
+        criteria = f'UID {after_uid + 1}:*' if after_uid else 'ALL'
+        _, data = self.conn.uid('search', None, criteria)
+        if not data or not data[0]:
+            return []
+        # «UID n:*» завжди повертає останній лист, навіть якщо його UID < n
+        return [u for u in data[0].split() if int(u) > after_uid]
+
+    def search_unseen(self, folder: str):
+        """Множина UID непрочитаних (без \\Seen) листів папки; None — папку не вдалось вибрати."""
+        if not self.select_folder(folder):
+            return None
+        _, data = self.conn.uid('search', None, 'UNSEEN')
+        return {int(u) for u in (data[0].split() if data and data[0] else [])}
+
+    def set_seen(self, folder: str, uids, seen: bool = True) -> bool:
+        """Поставити/зняти \\Seen для кількох листів однією командою."""
+        uids = [str(int(u)) for u in uids if u]
+        if not uids:
+            return True
+        if not self._select_writable(folder):
+            logger.warning('IMAP set_seen: cannot select %s', folder)
+            return False
+        try:
+            for start in range(0, len(uids), 200):
+                self.conn.uid('STORE', ','.join(uids[start:start + 200]),
+                              '+FLAGS' if seen else '-FLAGS', '(\\Seen)')
+            return True
+        except Exception as e:
+            logger.warning('IMAP set_seen %s %s: %s', folder, uids[:5], e)
+            return False
 
     def search_uids(self, folder: str, days_back: int = 30,
                     since_uid: int = 0, limit=None) -> list:

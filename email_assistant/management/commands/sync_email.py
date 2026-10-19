@@ -14,6 +14,8 @@ class Command(BaseCommand):
         parser.add_argument('--account', type=int,           help='Тільки для цього EmailAccount pk')
         parser.add_argument('--dry-run', action='store_true', help='Показати без збереження')
         parser.add_argument('--all',     action='store_true', help='Повна синхронізація (ігнорує last_seen_uid, days_back=3650)')
+        parser.add_argument('--folders', action='store_true',
+                            help='Також усі інші папки сервера (нові листи за UID) — для крону')
 
     def handle(self, *args, **options):
         from email_assistant.models import EmailAccount
@@ -33,7 +35,8 @@ class Command(BaseCommand):
         for account in qs:
             self.stdout.write(f'--- {account.user.username} / {account.email_address} ---')
             try:
-                new, err = self._sync_account(account, options['dry_run'], sync_all=sync_all)
+                new, err = self._sync_account(account, options['dry_run'], sync_all=sync_all,
+                                              with_folders=options['folders'])
                 total_new += new
                 total_err += err
                 self.stdout.write(f'  +{new} нових, {err} помилок')
@@ -44,13 +47,16 @@ class Command(BaseCommand):
 
         self.stdout.write(f'\nРезультат: +{total_new} нових листів, {total_err} помилок')
 
-    def _sync_account(self, account, dry_run: bool, sync_all: bool = False):
-        from email_assistant.models import EmailMessage, EmailThread
+    def _sync_account(self, account, dry_run: bool, sync_all: bool = False, with_folders: bool = False):
         from email_assistant.imap_client import IMAPClient
+        from email_assistant.models import EmailMessage, EmailSettings
+        from email_assistant.sync import folders_to_sync, pull_read_flags, save_message, sync_folder
 
         created = errors = 0
         days_back = 3650 if sync_all else account.sync_days_back
         limit = None if account.sync_no_limit else account.sync_limit
+        # Minerva сама пише \Seen на сервер → сервер джерело правди і для «непрочитано»
+        two_way = EmailSettings.get_for_user(account.user).mark_read_on_server
 
         with IMAPClient(account) as client:
             for folder, folder_type in [
@@ -72,50 +78,22 @@ class Command(BaseCommand):
 
                 for msg_data in messages:
                     try:
-                        if EmailMessage.objects.filter(
-                                account=account,
-                                imap_uid=msg_data['uid'],
-                                imap_folder_name=folder).exists():
-                            continue
-
                         if dry_run:
-                            self.stdout.write(
-                                f'  [DRY] {folder_type} uid={msg_data["uid"]} | {msg_data["subject"][:50]}')
-                            created += 1
+                            if not EmailMessage.objects.filter(
+                                    account=account, imap_uid=msg_data['uid'],
+                                    imap_folder_name=folder).exists():
+                                self.stdout.write(
+                                    f'  [DRY] {folder_type} uid={msg_data["uid"]} | {msg_data["subject"][:50]}')
+                                created += 1
                             continue
-
-                        thread = self._get_or_create_thread(account, msg_data)
 
                         # CRM-хронологія і клієнт гілки — сигнал email_assistant.signals.link_email_to_crm
-                        em = EmailMessage.objects.create(
-                            account=account,
-                            thread=thread,
-                            imap_uid=msg_data['uid'],
-                            imap_folder_name=folder,
-                            message_id=msg_data['message_id'],
-                            in_reply_to=msg_data['in_reply_to'],
-                            folder=folder_type,
-                            subject=msg_data['subject'],
-                            from_email=msg_data['from_email'],
-                            from_name=msg_data['from_name'],
-                            to_emails=msg_data['to_emails'],
-                            cc_emails=msg_data['cc_emails'],
-                            body_text=msg_data['body_text'],
-                            body_html=msg_data['body_html'],
-                            attachments=msg_data['attachments'],
-                            is_read=msg_data['is_read'],
-                            sent_at=msg_data['sent_at'],
-                        )
-
-                        if thread:
-                            thread.message_count  = thread.messages.count()
-                            thread.last_message_at = msg_data['sent_at']
-                            if not msg_data['is_read']:
-                                thread.has_unread = True
-                            thread.save(update_fields=['message_count', 'last_message_at', 'has_unread'])
+                        em = save_message(account, msg_data, folder, folder_type)
+                        if em is None:
+                            continue
 
                         if folder_type == EmailMessage.FOLDER_INBOX:
-                            self._post_process_inbox(em, account, thread)
+                            self._post_process_inbox(em, account, em.thread)
                             em.refresh_from_db(fields=['is_spam', 'folder'])
                             if not em.is_spam and not msg_data['is_read']:
                                 self._notify_new_email(em, account)
@@ -133,30 +111,23 @@ class Command(BaseCommand):
                         account.last_sync_at  = timezone.now()
                         account.save(update_fields=['last_seen_uid', 'last_sync_at'])
 
+                if not dry_run:
+                    try:
+                        pull_read_flags(client, account, folder, two_way=two_way)
+                    except Exception as e:
+                        logger.warning('pull_read_flags %s: %s', folder, e)
+
+            if with_folders and not dry_run:
+                for f in folders_to_sync(client.list_folders()):
+                    try:
+                        new = sync_folder(client, account, f['name'], limit=limit)
+                        created += len(new or [])
+                        pull_read_flags(client, account, f['name'], two_way=two_way)
+                    except Exception as e:
+                        errors += 1
+                        logger.warning('sync folder %s: %s', f['name'], e)
+
         return created, errors
-
-    def _get_or_create_thread(self, account, msg_data):
-        from email_assistant.models import EmailThread
-
-        thread_key = (msg_data.get('in_reply_to') or
-                      msg_data.get('message_id') or
-                      msg_data['subject'])
-
-        thread = EmailThread.objects.filter(account=account, thread_id=thread_key[:500]).first()
-        if not thread:
-            clean = msg_data['subject']
-            for prefix in ('Re: ', 'Fwd: ', 'FW: ', 'RE: ', 'AW: ', 'WG: '):
-                clean = clean.replace(prefix, '')
-            thread = EmailThread.objects.filter(account=account, subject=clean.strip()).first()
-
-        if not thread:
-            thread = EmailThread.objects.create(
-                account=account,
-                thread_id=thread_key[:500] if thread_key else '',
-                subject=msg_data['subject'][:500],
-                participants=[msg_data['from_email']] + msg_data['to_emails'],
-            )
-        return thread
 
     def _notify_new_email(self, email_msg, account):
         """Send Telegram notification for a new unread inbox email."""

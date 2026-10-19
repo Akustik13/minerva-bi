@@ -12,7 +12,8 @@
 .em-pv-btn.spam-on{background:rgba(229,57,53,.1);color:var(--err,#e53935);border-color:rgba(229,57,53,.3)}
 .em-msgs{flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:8px;min-height:0}
 /* Card */
-.em-card{border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;background:var(--bg-card);transition:box-shadow .15s}
+/* flex-shrink:0 — у прокручуваному flex-стовпці картки інакше стискаються і обрізають лист */
+.em-card{border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;background:var(--bg-card);transition:box-shadow .15s;flex-shrink:0}
 .em-card.expanded{box-shadow:0 2px 12px rgba(0,0,0,.18)}
 /* Card header — clickable, always visible */
 .em-card-hd{padding:9px 12px;background:var(--bg-input);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;min-height:48px}
@@ -299,6 +300,14 @@ function _pvIframeH(f) {
 
 function emResizeIframe(f) {
   _pvIframeH(f);
+  // Картинки/шрифти довантажуються пізніше — стежимо за висотою тіла листа
+  try {
+    var doc = f.contentDocument || f.contentWindow.document;
+    if (window.ResizeObserver && doc && doc.body && f._emBody !== doc.body) {
+      f._emBody = doc.body;
+      new ResizeObserver(function(){ _pvIframeH(f); }).observe(doc.body);
+    }
+  } catch(e) {}
   setTimeout(function(){ _pvIframeH(f); }, 400);
   setTimeout(function(){ _pvIframeH(f); }, 1200);
   setTimeout(function(){ _pvIframeH(f); }, 3500);
@@ -340,11 +349,13 @@ window.pvToggleCard = function(pk, e) {
     if (expandedCard) setTimeout(function(){ expandedCard.scrollIntoView({behavior:'smooth', block:'nearest'}); }, 80);
   }
 
-  // Load iframe lazily when first expanded
+  // Load iframe lazily when first expanded; у згорнутій картці висоту не виміряти — перерахувати
   if (!wasExpanded) {
     var iframe = document.getElementById('pv-iframe-' + pk);
     if (iframe && !iframe.src) {
       iframe.src = '/email/message/' + pk + '/html/';
+    } else if (iframe) {
+      setTimeout(function(){ emResizeIframe(iframe); }, 0);
     }
   }
 };

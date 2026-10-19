@@ -272,6 +272,13 @@
       <button class="em-sync-btn" onclick="openSpamFilter()" title="{% trans "Фільтри спаму" %}">
         🚫 {% trans "Фільтри спаму" %}
       </button>
+      <label class="em-sync-btn" style="cursor:pointer;gap:6px"
+             title="{% trans "Прочитав у Minerva — прочитано і на сервері (телефон, веб-пошта); прочитав там — прочитано в Minerva" %}">
+        <input type="checkbox" id="em-mark-read-server" style="margin:0;accent-color:#1a73e8"
+               {% if email_settings.mark_read_on_server %}checked{% endif %}
+               onchange="toggleEmailSetting('mark_read_on_server', this)">
+        {% trans "Прочитане ↔ сервер" %}
+      </label>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
       <div id="sync-countdown"></div>
     </div>
@@ -285,7 +292,7 @@
     <div class="em-p2-header">
       <span class="em-p2-title">
         {% for fkey,flabel,ficon in folders %}{% if folder == fkey %}{{ ficon }} {{ flabel }}{% endif %}{% endfor %}
-        {% if not folder in "inbox sent starred spam archived trash" %}📁 {{ folder }}{% endif %}
+        {% if not folder in "inbox sent starred spam archived trash" %}📁 {{ folder_label }}{% endif %}
         {% if q %}<span style="font-weight:400;color:var(--text-muted)"> · "{{ q }}"</span>{% endif %}
       </span>
       <span class="em-p2-count" style="display:flex;align-items:center;gap:6px">
@@ -870,6 +877,18 @@ function resetPreview() {
   document.getElementById('em-p3-content').innerHTML = '';
 }
 
+/* ── Quick settings ── */
+async function toggleEmailSetting(field, el) {
+  try {
+    var r = await fetch('{% url "email_assistant:settings_toggle" %}', {
+      method:'POST', headers:{'X-CSRFToken':CSRF, 'Content-Type':'application/json'},
+      body: JSON.stringify({field: field, value: el.checked})
+    });
+    var d = await r.json();
+    if (!d.ok) { el.checked = !el.checked; }
+  } catch(e) { el.checked = !el.checked; }
+}
+
 /* ── Sync ── */
 async function syncNow(btn, full) {
   var st = document.getElementById('sync-status');
@@ -1086,7 +1105,10 @@ function _applyP2Visibility() {
     try {
       var r = await fetch('/email/imap-folders/', {credentials:'same-origin'});
       var d = await r.json();
-      var extra = (d.folders || []).filter(function(f){ return f.selectable && !SKIP.has(f.name); });
+      var SKIP_SPECIAL = new Set(['\\Sent', '\\Trash', '\\Junk', '\\Drafts', '\\All']);
+      var extra = (d.folders || []).filter(function(f){
+        return f.selectable && !SKIP.has(f.name) && !SKIP_SPECIAL.has(f.special || '');
+      });
       extra.sort(function(a, b) {
         var af = _sfFavs.has(a.name), bf = _sfFavs.has(b.name);
         return (af && !bf) ? -1 : (!af && bf) ? 1 : 0;
@@ -1103,7 +1125,7 @@ function _applyP2Visibility() {
         extra.forEach(function(f){
           var paddingLeft = 12 + (f.level > 0 ? f.level * 14 : 0);
           var active   = (currentFolder === f.name) ? ' active' : '';
-          var label    = f.name.replace(/.*[\/\.]/, '');
+          var label    = (f.label || f.name).replace(/&/g,'&amp;').replace(/</g,'&lt;');
           var nameAttr = f.name.replace(/&/g,'&amp;').replace(/"/g,'&quot;');
           var icon     = _sfFavs.has(f.name) ? '⭐' : '📁';
           html += '<div class="em-server-folder' + active + '" data-folder="' + nameAttr + '"'

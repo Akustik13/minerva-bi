@@ -105,6 +105,8 @@ tabele_mvp/
 - Хронологія клієнта групує листи по замовленню / темі (`crm/views.py customer_timeline_json` + JS у `crm/templates/admin/crm/customer/change_form.html`)
 - Листи лише з `text/html` → `body_html` + текст через `imap_client.html_to_text`; старі записи лагодить `EmailMessage.fix_html_body()`
 - Ремонт історії: `python manage.py relink_email_crm [--dry-run] [--days N]`
+- Синхронізація — `email_assistant/sync.py`: `save_message` (єдиний шлях збереження), `sync_folder` (нові листи папки за UID, без вікна в днях; `full=True` — добрати старі), `pull_read_flags` (\Seen із сервера), `set_read` (усі позначки «прочитано» в Minerva → \Seen у папку листа, якщо `EmailSettings.mark_read_on_server`, перемикач у скриньці). Крон: `sync_email --folders` (усі папки сервера)
+- `IMAPClient.list_folders()` віддає `name` (сира IMAP-назва для команд) і `label`/`path` (декодований modified UTF-7)
 - Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
 
 ### faq/ (placeholder, no DB)
