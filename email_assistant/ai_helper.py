@@ -26,25 +26,57 @@ def _call_ai_direct(prompt: str, max_tokens: int = 1024) -> str:
         return ''
 
 
-def generate_reply(thread_messages: list, account, user_profile=None) -> str:
-    """Generate a reply draft based on thread context."""
-    context_parts = []
-    for msg in thread_messages[-8:]:
-        direction = '← ОТРИМАНО' if msg.folder == 'inbox' else '→ НАДІСЛАНО'
-        date_str = msg.sent_at.strftime('%d.%m.%Y') if msg.sent_at else '?'
-        context_parts.append(
-            f'{direction} від {msg.from_email} ({date_str}):\n'
-            f'{(msg.body_text or "")[:800]}'
-        )
+def _thread_text(thread_messages, account, per_message=1500, last=8) -> str:
+    parts = []
+    own = (account.email_address or '').lower()
+    for msg in thread_messages[-last:]:
+        outgoing = msg.folder == 'sent' or (msg.from_email or '').lower() == own
+        direction = '→ НАДІСЛАЛИ МИ' if outgoing else '← ОТРИМАЛИ'
+        date_str = msg.sent_at.strftime('%d.%m.%Y %H:%M') if msg.sent_at else '?'
+        parts.append(f'{direction} · {date_str} · від {msg.from_email} · тема: {msg.subject or "—"}\n'
+                     f'{(msg.body_text or "")[:per_message]}')
+    return '\n\n---\n'.join(parts)
 
-    context = '\n\n---\n'.join(context_parts)
+
+def generate_reply(thread_messages: list, account, user_profile=None, instruction: str = '',
+                   facts: str = '') -> str:
+    """
+    Чернетка відповіді на останній лист гілки.
+    facts — досьє з Minerva (email_assistant/context.py): замовлення, відправлення, клієнт, інші листування;
+    instruction — що саме написати (поле «Що відповісти?»).
+    """
+    task = instruction.strip() or 'Склади доречну відповідь на останній лист співрозмовника.'
     prompt = (
-        f'Ти — email асистент {account.from_header}.\n'
-        f'Прочитай переписку і склади ТІЛЬКИ текст відповіді на останній лист. '
-        f'Без теми, без підпису, тільки текст тіла листа.\n\n'
-        f'ПЕРЕПИСКА:\n{context}\n\nВідповідь:'
+        f'Ти — email-асистент {account.from_header} (компанія відправника листів «→ НАДІСЛАЛИ МИ»).\n'
+        f'Напиши ТІЛЬКИ текст тіла листа-відповіді: без теми, без підпису.\n\n'
+        f'ПРАВИЛА:\n'
+        f'- Мова відповіді — та сама, якою написав співрозмовник в останньому листі, '
+        f'якщо в завданні не сказано інакше.\n'
+        f'- Номери замовлень, трек-номери, дати, статуси, суми бери ЛИШЕ з розділу «ФАКТИ З MINERVA» '
+        f'або з переписки. Нічого не вигадуй; якщо потрібного факту немає — напиши [уточнити].\n'
+        f'- Факти з Minerva новіші за переписку: якщо статус змінився, спирайся на Minerva.\n'
+        f'- Пиши коротко, ввічливо, по суті; без внутрішніх подробиць, які клієнту не потрібні.\n\n'
+        + (f'ФАКТИ З MINERVA (достовірні дані з бази):\n{facts}\n\n' if facts else '')
+        + f'ПЕРЕПИСКА (від старих до нових):\n{_thread_text(thread_messages, account)}\n\n'
+        f'ЗАВДАННЯ: {task}\n\nТекст відповіді:'
     )
-    return _call_ai_direct(prompt) or ''
+    return _call_ai_direct(prompt, max_tokens=1500) or ''
+
+
+def summarize_history(thread_messages: list, account, facts: str = '') -> str:
+    """Коротко (українською): про що мова, що вже зроблено, що зараз потрібно зробити."""
+    prompt = (
+        'Ти допомагаєш менеджеру швидко зрозуміти ситуацію за листуванням і даними з системи Minerva.\n'
+        'Напиши українською 3–6 коротких пунктів:\n'
+        '1) про що мова (клієнт, замовлення, товар);\n'
+        '2) що вже відбулося (ключові дати й дії);\n'
+        '3) поточний стан (статус замовлення/доставки);\n'
+        '4) що зараз потрібно зробити нам і до якого терміну, якщо він є.\n'
+        'Спирайся лише на факти нижче; нічого не вигадуй.\n\n'
+        + (f'ФАКТИ З MINERVA:\n{facts}\n\n' if facts else '')
+        + f'ПЕРЕПИСКА:\n{_thread_text(thread_messages, account, per_message=1000)}'
+    )
+    return _call_ai_direct(prompt, max_tokens=700) or ''
 
 
 def translate_email(text: str, target_lang: str, user_profile=None) -> str:

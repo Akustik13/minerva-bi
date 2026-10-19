@@ -899,19 +899,46 @@ def ai_suggest_reply(request, message_pk):
     from email_assistant.models import EmailMessage
     from email_assistant.ai_helper import generate_reply
 
+    from email_assistant.context import build_context, context_text, used_summary
+
     account = _get_account(request)
     msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
     profile = getattr(request.user, 'profile', None)
 
-    thread_messages = [msg]
-    if msg.thread:
-        thread_messages = list(msg.thread.messages.order_by('sent_at')[:10])
-
-    reply = generate_reply(thread_messages, account, profile)
+    # Досьє з Minerva (замовлення, відправлення, клієнт, інші листування) + інструкція користувача
+    ctx = build_context(msg)
+    thread_messages = [m for m in ctx['thread_msgs'] if not m.sent_at or not msg.sent_at
+                       or m.sent_at <= msg.sent_at] or [msg]
+    reply = generate_reply(thread_messages, account, profile,
+                           instruction=request.GET.get('prompt', ''), facts=context_text(ctx))
     msg.ai_reply_draft = reply
     msg.save(update_fields=['ai_reply_draft'])
-    return JsonResponse({'ok': bool(reply), 'reply': reply,
+    return JsonResponse({'ok': bool(reply), 'reply': reply, 'used': used_summary(ctx),
                          'error': '' if reply else 'AI не повернув відповідь'})
+
+
+@staff_member_required
+def history_view(request, message_pk):
+    """GET: хронологія фактів по листу (замовлення, доставка, листи, CRM); ?ai=1 — ще й підсумок AI."""
+    from email_assistant.ai_helper import summarize_history
+    from email_assistant.context import build_context, context_text, history_events, state_lines
+    from email_assistant.models import EmailMessage
+
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    ctx = build_context(msg)
+    data = {
+        'ok':     True,
+        'state':  state_lines(ctx),
+        'events': [{'date': d.strftime('%d.%m.%Y') if d else '', 'icon': icon, 'text': text}
+                   for d, icon, text in history_events(ctx)],
+        'links':  [{'label': l['label'], 'url': l['url']} for l in ctx['links']],
+    }
+    if request.GET.get('ai') == '1':
+        data['summary'] = summarize_history(ctx['thread_msgs'], account, facts=context_text(ctx))
+        if not data['summary']:
+            data['summary_error'] = 'AI не відповів — перевірте ключ Anthropic у налаштуваннях AI'
+    return JsonResponse(data)
 
 
 @staff_member_required

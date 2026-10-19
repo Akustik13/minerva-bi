@@ -111,6 +111,7 @@ tabele_mvp/
 - Ручна категорія: правий клік → «Віднести до категорії» → `EmailCategoryRule` (email_assistant 0016, ключ — адреса співрозмовника або `@домен`), має пріоритет над автовизначенням і перераховує листи контакту (`categorize.remember_category`); список/видалення правил — адмінка «Категорії контактів»
 - Пошук (`q`) і фільтри категорії/клієнта діють по всіх папках (`ALL_FOLDERS` у `_build_qs`, крім Спаму/Кошика), рядки з міткою папки; клієнт — пошук за першими літерами (`em-customers-data`)
 - Зв'язки листа — `email_assistant/links.py`: номери замовлень і трек-номери (SalesOrder.tracking_number, Shipment.tracking_number) у темі/тексті → блок «🔗 замовлення · клієнт · відправлення» у прев'ю; трек-номер також прив'язує лист перевізника до клієнта в CRM (`crm_link.find_order`)
+- Досьє листа — `email_assistant/context.py` (`build_context`: замовлення з листа, позиції, відправлення й статус перевізника, клієнт, нотатки CRM, інші гілки з клієнтом): `context_text` іде в AI-відповідь (`ai_helper.generate_reply(instruction, facts)`, endpoint `ai-reply/?prompt=`), `history_events`/`state_lines` — кнопка «📜 Історія» (`/email/message/<pk>/history/`, `?ai=1` — підсумок `summarize_history`)
 - Групування по гілці (⎘) — на сервері (`_group_by_thread`, cookie `em_group`), дії рядка й масові дії — над усією гілкою
 - Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
 

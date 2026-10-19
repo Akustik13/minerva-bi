@@ -12,6 +12,20 @@
 .em-pv-link a{color:var(--link-fg,#3b82f6);text-decoration:none;font-weight:600}
 .em-pv-link a:hover{text-decoration:underline}
 .em-pv-link .why{font-size:10px;color:var(--text-dim);margin-left:auto}
+/* «📜 Історія»: факти з Minerva + підсумок AI за бажанням */
+.em-history{display:none;margin-top:8px;border:1px solid var(--border-strong);border-left:3px solid #f59e0b;border-radius:8px;
+  background:var(--bg-card);max-height:42vh;overflow-y:auto;padding:10px 12px}
+.em-history-hd{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.em-history-hd b{font-size:12px;color:var(--text)}
+.em-history-state div{font-size:12px;color:var(--text);line-height:1.6}
+.em-history-ev{display:grid;grid-template-columns:78px 20px 1fr;gap:2px 6px;font-size:12px;line-height:1.5;margin-top:8px}
+.em-history-ev .d{color:var(--text-dim);white-space:nowrap}
+.em-history-ev .t{color:var(--text-muted)}
+.em-history-ai{white-space:pre-wrap;font-size:12.5px;line-height:1.6;color:var(--text);margin:8px 0 2px;padding:8px 10px;
+  border-radius:7px;background:rgba(0,212,170,.06);border:1px solid rgba(0,212,170,.25)}
+.em-history-ai:empty{display:none}
+.em-ai-used{font-size:11px;color:var(--text-dim);margin-top:6px}
+.em-ai-used:empty{display:none}
 .em-pv-btn{padding:5px 12px;border-radius:6px;font-size:12px;border:1px solid var(--border-strong);background:none;color:var(--text-muted);cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:4px;transition:background .1s}
 .em-pv-btn:hover{background:var(--bg-hover,#1e2d40);color:var(--text)}
 .em-pv-btn.ai{background:rgba(0,212,170,.08);color:#00d4aa;border-color:rgba(0,212,170,.3)}
@@ -151,10 +165,22 @@
         <button class="em-pv-btn" onclick="pvArchive({{ thread.pk }})">📦 {% trans "В архів" %}</button>
         {% endif %}
       {% endif %}
+      <button class="em-pv-btn" id="pv-history-btn" onclick="pvHistory({{ last.pk }})"
+              title="{% trans "Що було з цим замовленням і перепискою: дати, доставка, листи, нотатки CRM" %}">📜 {% trans "Історія" %}</button>
       <button class="em-pv-btn danger" onclick="pvDelete({{ last.pk }})">🗑️</button>
       <a href="{% if thread %}/email/thread/{{ thread.pk }}/{% else %}/email/message/{{ last.pk }}/{% endif %}"
          class="em-pv-btn" target="_blank" title="{% trans "Відкрити на повній сторінці" %}">↗ {% trans "Окремо" %}</a>
       {% endif %}
+    </div>
+    <div class="em-history" id="pv-history">
+      <div class="em-history-hd">
+        <b>📜 {% trans "Історія" %}</b>
+        <button class="em-pv-btn ai" style="margin-left:auto;padding:3px 10px"
+                onclick="pvHistoryAI({{ last.pk|default:0 }})">🏛️ {% trans "Коротко від Minerva" %}</button>
+        <button class="em-ai-close" onclick="pvHistory({{ last.pk|default:0 }})" title="{% trans "Закрити" %}">✕</button>
+      </div>
+      <div class="em-history-ai" id="pv-history-ai"></div>
+      <div id="pv-history-body"></div>
     </div>
   </div>
 
@@ -209,6 +235,7 @@
           <button class="em-pv-btn ai" onclick="pvAiGenerate({{ msg.pk }})">{% trans "Генерувати" %} →</button>
         </div>
         <div class="em-ai-txt" id="pv-ai-txt-{{ msg.pk }}"></div>
+        <div class="em-ai-used" id="pv-ai-used-{{ msg.pk }}"></div>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="em-pv-btn" onclick="pvCopyAI({{ msg.pk }})">📋 {% trans "Копіювати" %}</button>
           <button class="em-pv-btn ai" id="pv-ai-use-{{ msg.pk }}" onclick="pvUseAsReply({{ msg.pk }})">{% trans "Вставити у відповідь" %} →</button>
@@ -307,6 +334,7 @@
             <button class="em-pv-btn ai" onclick="pvReplyAIGenerate({{ last.pk }})">{% trans "Генерувати" %} →</button>
           </div>
           <div id="pv-reply-ai-result" style="margin-top:8px;font-size:13px;color:var(--text);white-space:pre-wrap;line-height:1.6"></div>
+          <div class="em-ai-used" id="pv-reply-ai-used"></div>
           <div id="pv-reply-ai-actions" style="display:none;margin-top:6px;display:flex;gap:6px">
             <button class="em-pv-btn" onclick="pvReplyAIUse()">{% trans "Вставити" %} →</button>
           </div>
@@ -490,10 +518,12 @@ window.pvReplyAIGenerate = async function(pk) {
   var query  = inp ? encodeURIComponent(inp.value.trim()) : '';
   result.textContent = '⏳ {% trans "Minerva думає..." %}';
   if (acts) acts.style.display = 'none';
+  _pvUsed('pv-reply-ai-used', null);
   try {
     var r = await fetch('/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : ''));
     var d = await r.json();
     result.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
+    _pvUsed('pv-reply-ai-used', d.used);
     if (d.ok && acts) acts.style.display = 'flex';
   } catch { result.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
@@ -576,12 +606,63 @@ window.pvAiGenerate = async function(pk) {
   var inp   = document.getElementById('pv-ai-prompt-' + pk);
   var query = inp ? encodeURIComponent(inp.value.trim()) : '';
   txt.textContent = '⏳ {% trans "Minerva думає..." %}';
+  _pvUsed('pv-ai-used-' + pk, null);
   var url = '/email/message/' + pk + '/ai-reply/' + (query ? '?prompt=' + query : '');
   try {
     var r = await fetch(url);
     var d = await r.json();
     txt.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
+    _pvUsed('pv-ai-used-' + pk, d.used);
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
+};
+
+// «Minerva врахувала: …» — які дані з бази пішли в AI
+function _pvUsed(id, used) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = used && used.length ? '🧩 {% trans "Minerva врахувала" %}: ' + used.join(' · ') : '';
+}
+
+function _pvEsc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.pvHistory = async function(pk) {
+  var box  = document.getElementById('pv-history');
+  var btn  = document.getElementById('pv-history-btn');
+  var body = document.getElementById('pv-history-body');
+  if (!box || !pk) return;
+  var open = box.style.display === 'block';
+  box.style.display = open ? 'none' : 'block';
+  if (btn) btn.classList.toggle('ai', !open);
+  if (open || box.dataset.loaded) return;
+  body.innerHTML = '<div style="font-size:12px;color:var(--text-dim)">⏳ {% trans "Збираю історію..." %}</div>';
+  try {
+    var d = await (await fetch('/email/message/' + pk + '/history/')).json();
+    box.dataset.loaded = '1';
+    var html = '';
+    if (d.state && d.state.length) {
+      html += '<div class="em-history-state">' + d.state.map(function(s){ return '<div>' + _pvEsc(s) + '</div>'; }).join('') + '</div>';
+    }
+    if (d.events && d.events.length) {
+      html += '<div class="em-history-ev">' + d.events.map(function(e) {
+        return '<span class="d">' + _pvEsc(e.date) + '</span><span>' + _pvEsc(e.icon) + '</span><span class="t">' + _pvEsc(e.text) + '</span>';
+      }).join('') + '</div>';
+    }
+    body.innerHTML = html || '<div style="font-size:12px;color:var(--text-dim)">{% trans "Пов’язаних замовлень, відправлень і нотаток не знайдено — лише ця переписка." %}</div>';
+  } catch(e) {
+    body.innerHTML = '<div style="font-size:12px;color:var(--err,#e53935)">⚠️ {% trans "Помилка" %}</div>';
+  }
+};
+
+window.pvHistoryAI = async function(pk) {
+  var out = document.getElementById('pv-history-ai');
+  if (!out || !pk) return;
+  out.textContent = '⏳ {% trans "Minerva аналізує переписку і дані..." %}';
+  try {
+    var d = await (await fetch('/email/message/' + pk + '/history/?ai=1')).json();
+    out.textContent = d.summary || ('⚠️ ' + (d.summary_error || '{% trans "Помилка" %}'));
+  } catch(e) { out.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
 
 window.pvAiTranslate = async function(pk) {

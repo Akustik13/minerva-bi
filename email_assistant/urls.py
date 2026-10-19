@@ -20,6 +20,7 @@ urlpatterns = [
     # AI
     path('message/<int:message_pk>/ai-reply/',           views.ai_suggest_reply,     name='ai_reply'),
     path('message/<int:message_pk>/ai-translate/',       views.ai_translate,         name='ai_translate'),
+    path('message/<int:message_pk>/history/',            views.history_view,         name='history'),
     # Actions
     path('message/<int:message_pk>/star/',               views.toggle_star_view,     name='toggle_star'),
     path('message/<int:message_pk>/spam/',               views.toggle_spam_view,     name='toggle_spam'),

@@ -780,3 +780,67 @@ class SearchAllFoldersTests(CategoryBase):
 
         r = self.client.get(f'/email/?folder=inbox&customer={self.client_c.pk}')
         self.assertEqual({m.subject for m in r.context['emails']}, {'Offer'})
+
+
+# ── Досьє листа: AI-відповідь з фактами Minerva та «📜 Історія» ─────────────────
+
+class MailContextTests(MailLinksTests):
+    def setUp(self):
+        super().setUp()
+        from datetime import date
+        SalesOrder.objects.filter(pk=self.order.pk).update(order_date=date(2026, 10, 6),
+                                                          shipped_at=date(2026, 10, 6))
+        self.thread = EmailThread.objects.create(account=self.account, subject='UPS exception')
+        self.fwd = self._em(thread=self.thread, from_email='sergey@sevskiy.de',
+                            to_emails=['viacheslav.pryimak@sevskiy.de'],
+                            subject='WG: **Reminder** UPS [E-BGF489] Exception Notification', body_text=UPS_TEXT)
+        old = EmailThread.objects.create(account=self.account, subject='Your order #102037400 has been shipped',
+                                         crm_customer=self.aevex)
+        self._em(thread=old, folder='sent', imap_folder_name='Gesendete Objekte',
+                 from_email='viacheslav.pryimak@sevskiy.de', to_emails=['ifejzic@aevex.com'],
+                 subject='Your order #102037400 has been shipped', body_text='Dear IDA, your order has been shipped.')
+        CustomerTimeline.objects.create(customer=self.aevex, event_type='call', title='Travis promised to pay fees')
+
+    def test_context_collects_order_shipment_customer_and_history(self):
+        from email_assistant.context import build_context, context_text, history_events, state_lines
+        ctx = build_context(self.fwd)
+        self.assertEqual(ctx['customer'], self.aevex)
+        self.assertEqual(ctx['orders'], [self.order])
+        state = '\n'.join(state_lines(ctx))
+        self.assertIn('🛒 digikey:102037400 від 06.10.2026', state)
+        self.assertIn('🚚 UPS 1Z0R6B300426098447 — В дорозі', state)
+        texts = [t for _, _, t in history_events(ctx)]
+        self.assertIn('Замовлення digikey:102037400 відправлено', texts)
+        self.assertTrue(any(t.startswith('Інша переписка: «Your order #102037400') for t in texts))
+        self.assertTrue(any('Travis promised to pay fees' in t for t in texts))
+        facts = context_text(ctx)
+        self.assertIn('ІНШІ ЛИСТУВАННЯ З ЦИМ КЛІЄНТОМ', facts)
+        self.assertIn('Dear IDA, your order has been shipped.', facts)
+
+    def test_ai_reply_gets_instruction_and_facts(self):
+        prompts = []
+        with patch('email_assistant.ai_helper._call_ai_direct',
+                   lambda prompt, max_tokens=1024: prompts.append(prompt) or 'Dear Travis, …'):
+            r = self.client.get(f'/email/message/{self.fwd.pk}/ai-reply/',
+                                {'prompt': 'Попроси клієнта оплатити мито до 27.10'})
+        d = r.json()
+        self.assertTrue(d['ok'])
+        self.assertIn('замовлення digikey:102037400', d['used'])
+        prompt = prompts[0]
+        self.assertIn('ЗАВДАННЯ: Попроси клієнта оплатити мито до 27.10', prompt)   # інструкція більше не губиться
+        self.assertIn('ФАКТИ З MINERVA', prompt)
+        self.assertIn('1Z0R6B300426098447', prompt)
+        self.assertIn('Нічого не вигадуй', prompt)
+
+    def test_history_endpoint(self):
+        d = self.client.get(f'/email/message/{self.fwd.pk}/history/').json()
+        self.assertTrue(any('digikey:102037400' in s for s in d['state']))
+        self.assertTrue(any(e['icon'] == '📦' for e in d['events']))
+        self.assertNotIn('summary', d)                                    # без ?ai=1 — лише факти, без AI
+
+        with patch('email_assistant.ai_helper._call_ai_direct', lambda prompt, max_tokens=1024: '1) Мито 35 USD…'):
+            d = self.client.get(f'/email/message/{self.fwd.pk}/history/', {'ai': '1'}).json()
+        self.assertEqual(d['summary'], '1) Мито 35 USD…')
+
+        r = self.client.get(f'/email/message/{self.fwd.pk}/preview/')
+        self.assertContains(r, '📜 Історія')
