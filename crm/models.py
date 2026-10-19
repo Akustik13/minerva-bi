@@ -396,6 +396,16 @@ class CustomerTimeline(models.Model):
     related_email_id = models.PositiveIntegerField(
                          null=True, blank=True,
                          verbose_name='ID email')
+    email_message    = models.ForeignKey(
+                         'email_assistant.EmailMessage',
+                         null=True, blank=True,
+                         on_delete=models.SET_NULL,
+                         related_name='crm_events',
+                         verbose_name='Лист у пошті')
+    message_id       = models.CharField(
+                         max_length=500, blank=True, default='', db_index=True,
+                         verbose_name='Message-ID листа',
+                         help_text='Один лист (копія у Вхідних і в Надісланих) — одна подія')
 
     remind_at   = models.DateTimeField(
                     null=True, blank=True,

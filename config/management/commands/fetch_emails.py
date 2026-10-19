@@ -3,7 +3,8 @@ config/management/commands/fetch_emails.py
 
 Читає листи з IMAP (inbox + sent) і зберігає в CustomerTimeline.
 Кожен користувач має власні IMAP налаштування (UserProfile).
-Матчинг по Customer.email. Дублікати відфільтровуються по IMAP UID + user.
+Клієнт і напрям — email_assistant.crm_link (To/Cc, власні адреси, номер замовлення).
+Дублікати відфільтровуються по IMAP UID + user і по Message-ID.
 Запускається автоматично кожні 15 хв через cron_runner.sh.
 """
 import email
@@ -34,21 +35,10 @@ def _decode_str(raw) -> str:
 
 
 def _get_body(msg) -> str:
-    """Витягуємо text/plain частину листа."""
-    if msg.is_multipart():
-        for part in msg.walk():
-            ct = part.get_content_type()
-            cd = str(part.get('Content-Disposition', ''))
-            if ct == 'text/plain' and 'attachment' not in cd:
-                payload = part.get_payload(decode=True)
-                charset = part.get_content_charset() or 'utf-8'
-                return payload.decode(charset, errors='replace')[:2000]
-    else:
-        payload = msg.get_payload(decode=True)
-        if payload:
-            charset = msg.get_content_charset() or 'utf-8'
-            return payload.decode(charset, errors='replace')[:2000]
-    return ''
+    """Текст листа; для листів лише з HTML — текст, витягнутий з розмітки."""
+    from email_assistant.imap_client import _get_body as _bodies
+    text_body, _ = _bodies(msg)
+    return text_body[:2000]
 
 
 class Command(BaseCommand):
@@ -211,14 +201,15 @@ class Command(BaseCommand):
 
     def _process_folder(self, profile, folder, event_type, lookback_days, dry_run, customer_filter):
         from crm.models import Customer, CustomerTimeline
+        from email_assistant.crm_link import link_to_crm, own_addresses, resolve
+        from email_assistant.imap_client import parse_addresses
 
-        # Побудувати карту email → customer (нижній регістр)
-        customer_qs = Customer.objects.exclude(email='').only('pk', 'name', 'email')
+        customer_qs = Customer.objects.exclude(email='')
         if customer_filter:
             customer_qs = customer_qs.filter(email__iexact=customer_filter)
-        email_map = {c.email.lower(): c for c in customer_qs}
-        if not email_map:
+        if not customer_qs.exists():
             return 0, 0, 0
+        own = own_addresses()
 
         # UIDs вже збережених листів: скоуп по user + event_type (кожен юзер — свій mailbox)
         existing_uids = set(
@@ -259,28 +250,22 @@ class Command(BaseCommand):
                     raw = msg_data[0][1]
                     msg = email.message_from_bytes(raw)
 
-                    subject  = _decode_str(msg.get('Subject', ''))
-                    from_raw = msg.get('From', '')
-                    to_raw   = msg.get('To', '')
-                    _, from_email = parseaddr(from_raw)
-                    _, to_email   = parseaddr(to_raw)
-                    from_email = from_email.lower()
-                    to_email   = to_email.lower()
-
-                    # Пропустити листи від самого себе в inbox (власний відправлений)
-                    own_email = profile.imap_user.lower()
-                    if event_type == 'email_in' and from_email == own_email:
-                        skipped += 1
-                        continue
-
-                    # Знайти клієнта
-                    customer = None
-                    if event_type == 'email_in':
-                        customer = email_map.get(from_email)
-                    else:  # email_out
-                        customer = email_map.get(to_email)
-
-                    if not customer:
+                    subject = _decode_str(msg.get('Subject', ''))
+                    _, from_email = parseaddr(msg.get('From', ''))
+                    body = _get_body(msg)
+                    # Клієнт і напрям — спільна логіка email_assistant.crm_link
+                    # (копія власного листа у Вхідних через CC = відправлений, а не отриманий)
+                    params = dict(
+                        from_email=from_email,
+                        to_emails=parse_addresses(msg.get('To', '')),
+                        cc_emails=parse_addresses(msg.get('Cc', '')),
+                        subject=subject,
+                        body=body,
+                        is_sent_folder=event_type == 'email_out',
+                        own=own,
+                    )
+                    customer, direction, _ = resolve(**params)
+                    if not customer or (customer_filter and customer.email.lower() != customer_filter):
                         skipped += 1
                         continue
 
@@ -293,26 +278,22 @@ class Command(BaseCommand):
                     except Exception:
                         msg_date = timezone.now()
 
-                    body = _get_body(msg)
-
                     if dry_run:
                         self.stdout.write(
-                            f'[DRY] {event_type} uid={uid} | '
+                            f'[DRY] email_{direction} uid={uid} | '
                             f'{customer.name} | {subject[:60]}'
                         )
                         created += 1
                         continue
 
-                    obj = CustomerTimeline(
-                        customer=customer,
+                    # Дублікат того ж листа (інша копія / sync_email) знаходиться за Message-ID
+                    link_to_crm(
                         user=profile.user,
-                        event_type=event_type,
-                        title=subject[:300] or '(без теми)',
-                        body=body,
-                        related_email_id=uid,
-                        created_at=msg_date,
+                        message_id=msg.get('Message-ID', ''),
+                        sent_at=msg_date,
+                        imap_uid=uid,
+                        **params,
                     )
-                    obj.save()
                     existing_uids.add(uid)
                     created += 1
 

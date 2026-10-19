@@ -262,6 +262,8 @@ def thread_view(request, thread_pk):
     account = _get_account(request)
     thread  = get_object_or_404(EmailThread, pk=thread_pk, account=account)
     emails  = list(thread.messages.filter(is_deleted=False).order_by('sent_at'))
+    for m in emails:
+        m.fix_html_body()
 
     if any(not m.is_read for m in emails):
         thread.messages.filter(is_read=False).update(is_read=True)
@@ -284,6 +286,7 @@ def message_view(request, message_pk):
 
     account = _get_account(request)
     msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    msg.fix_html_body()
     if not msg.is_read:
         msg.is_read = True
         msg.save(update_fields=['is_read'])
@@ -305,6 +308,8 @@ def thread_preview_view(request, thread_pk):
     account = _get_account(request)
     thread  = get_object_or_404(EmailThread, pk=thread_pk, account=account)
     emails  = list(thread.messages.filter(is_deleted=False).order_by('sent_at'))
+    for m in emails:
+        m.fix_html_body()
 
     unread = [m for m in emails if not m.is_read]
     if unread:
@@ -340,6 +345,7 @@ def message_preview_view(request, message_pk):
 
     account = _get_account(request)
     msg     = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    msg.fix_html_body()
     if not msg.is_read:
         msg.is_read = True
         msg.save(update_fields=['is_read'])
@@ -392,6 +398,7 @@ def message_html_view(request, message_pk):
     from email_assistant.models import EmailMessage
     account = _get_account(request)
     msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    msg.fix_html_body()
     if msg.body_html:
         html = msg.body_html
         if 'cid:' in html.lower():
@@ -700,6 +707,7 @@ def _handle_send(request, account, reply_to=None):
             thread = reply_to.thread if reply_to else None
             EmailMessage.objects.create(
                 account=account, thread=thread, folder='sent',
+                message_id=result.get('message_id', ''),
                 subject=subject, from_email=account.email_address,
                 from_name=account.display_name, to_emails=to_list, cc_emails=cc_list,
                 body_text=body, is_read=True, sent_at=timezone.now(),
@@ -1621,8 +1629,9 @@ def import_emails_view(request):
             from_name, from_email = parseaddr(msg.get('From', ''))
             from_name  = _ds(from_name)
             from_email = from_email.lower()
-            to_raw     = msg.get('To', '')
-            to_list    = [e for _, e in [parseaddr(a) for a in to_raw.split(',') if a.strip()] if e]
+            from email_assistant.imap_client import parse_addresses
+            to_list    = parse_addresses(msg.get('To', ''))
+            cc_list    = parse_addresses(msg.get('Cc', ''))
             try:
                 from django.utils import timezone as tz
                 from datetime import timezone as dt_tz
@@ -1647,7 +1656,7 @@ def import_emails_view(request):
                 account=account, thread=thread, folder='inbox',
                 message_id=msg_id, subject=subject,
                 from_email=from_email, from_name=from_name,
-                to_emails=to_list, body_text=text_body, body_html=html_body,
+                to_emails=to_list, cc_emails=cc_list, body_text=text_body, body_html=html_body,
                 is_read=True, sent_at=sent_at,
             )
             return True

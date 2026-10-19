@@ -6,7 +6,8 @@ import re
 import time
 from datetime import datetime, timedelta, timezone as dt_tz
 from email.header import decode_header
-from email.utils import parseaddr, parsedate_to_datetime
+from email.utils import getaddresses, parseaddr, parsedate_to_datetime
+from html.parser import HTMLParser
 
 from django.utils import timezone
 
@@ -26,6 +27,73 @@ def _decode_str(raw) -> str:
     return ' '.join(result).strip()
 
 
+class _HTMLText(HTMLParser):
+    """Мінімальний HTML → текст: блоки → нові рядки, script/style відкидаються."""
+    _BLOCK = {'p', 'div', 'tr', 'table', 'ul', 'ol', 'blockquote', 'hr', 'section',
+              'article', 'header', 'footer', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'pre'}
+    _SKIP = {'script', 'style', 'head', 'title'}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.parts = []
+        self._skip = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in self._SKIP:
+            self._skip += 1
+        elif tag == 'br':
+            self.parts.append('\n')
+        elif tag == 'li':
+            self.parts.append('\n• ')
+        elif tag in self._BLOCK:
+            self.parts.append('\n')
+
+    def handle_startendtag(self, tag, attrs):
+        if tag in ('br', 'hr'):
+            self.parts.append('\n')
+
+    def handle_endtag(self, tag):
+        if tag in self._SKIP:
+            self._skip = max(0, self._skip - 1)
+        elif tag in self._BLOCK:
+            self.parts.append('\n')
+
+    def handle_data(self, data):
+        if not self._skip:
+            self.parts.append(re.sub(r'\s+', ' ', data))
+
+
+def html_to_text(html: str) -> str:
+    """Читабельний текст з HTML-листа (для прев'ю, пошуку, AI і CRM)."""
+    if not html:
+        return ''
+    parser = _HTMLText()
+    try:
+        parser.feed(html)
+        parser.close()
+    except Exception:
+        return re.sub(r'<[^>]+>', ' ', html)
+    lines = [ln.replace('\xa0', ' ').strip() for ln in ''.join(parser.parts).split('\n')]
+    text = '\n'.join(lines)
+    return re.sub(r'\n{3,}', '\n\n', text).strip()
+
+
+def looks_like_html(text: str) -> bool:
+    """Чи це HTML-розмітка, збережена як текст (старі однокомпонентні text/html листи)."""
+    head = (text or '').lstrip()[:2000].lower()
+    if not head.startswith('<'):
+        return False
+    return bool(re.search(r'</(html|body|div|p|table|span|font)>|<br\s*/?>', head))
+
+
+def _decode_payload(part, payload: bytes) -> str:
+    charset = part.get_content_charset() or 'utf-8'
+    try:
+        return payload.decode(charset, errors='replace')
+    except LookupError:  # невідоме кодування в заголовку (напр. unknown-8bit)
+        return payload.decode('utf-8', errors='replace')
+
+
 def _get_body(msg) -> tuple:
     text_body = html_body = ''
     if msg.is_multipart():
@@ -37,8 +105,7 @@ def _get_body(msg) -> tuple:
             payload = part.get_payload(decode=True)
             if not payload:
                 continue
-            charset = part.get_content_charset() or 'utf-8'
-            decoded = payload.decode(charset, errors='replace')
+            decoded = _decode_payload(part, payload)
             if ct == 'text/plain' and not text_body:
                 text_body = decoded[:200000]
             elif ct == 'text/html' and not html_body:
@@ -46,9 +113,20 @@ def _get_body(msg) -> tuple:
     else:
         payload = msg.get_payload(decode=True)
         if payload:
-            charset   = msg.get_content_charset() or 'utf-8'
-            text_body = payload.decode(charset, errors='replace')[:200000]
+            decoded = _decode_payload(msg, payload)
+            # Веб-пошта (IONOS/OX, GMX…) часто шле лише text/html без multipart
+            if msg.get_content_type() == 'text/html':
+                html_body = decoded[:1000000]
+            else:
+                text_body = decoded[:200000]
+    if html_body and not text_body:
+        text_body = html_to_text(html_body)[:200000]
     return text_body, html_body
+
+
+def parse_addresses(*headers) -> list:
+    """Адреси з заголовків To/Cc (коми в іменах "Прізвище, Ім'я" не ламають розбір)."""
+    return [addr.lower() for _, addr in getaddresses([str(h) for h in headers if h]) if '@' in addr]
 
 
 def _get_attachments(msg) -> list:
@@ -229,10 +307,8 @@ class IMAPClient:
             from_name, from_email = parseaddr(msg.get('From', ''))
             from_name = _decode_str(from_name)
 
-            to_raw  = msg.get('To', '')
-            cc_raw  = msg.get('Cc', '')
-            to_list = [e for _, e in [parseaddr(a) for a in to_raw.split(',') if a.strip()] if e]
-            cc_list = [e for _, e in [parseaddr(a) for a in cc_raw.split(',') if a.strip()] if e]
+            to_list = parse_addresses(msg.get('To', ''))
+            cc_list = parse_addresses(msg.get('Cc', ''))
 
             try:
                 sent_at = parsedate_to_datetime(msg.get('Date', ''))

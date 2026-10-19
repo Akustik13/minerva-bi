@@ -1608,7 +1608,7 @@ class CustomerTimelineAdmin(admin.ModelAdmin):
     list_filter     = ('event_type', 'is_pinned',
                        ('created_at', admin.DateFieldListFilter))
     search_fields   = ('customer__name', 'title', 'body')
-    readonly_fields = ('created_at', 'ai_summary')
+    readonly_fields = ('created_at', 'ai_summary', 'email_message', 'message_id')
     date_hierarchy  = 'created_at'
 
     def event_type_icon(self, obj):

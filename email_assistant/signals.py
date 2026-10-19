@@ -64,6 +64,15 @@ def order_email_draft(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender='email_assistant.EmailMessage')
+def link_email_to_crm(sender, instance, created, **kwargs):
+    """Кожен новий лист (будь-яка синхронізація, імпорт, відправка) → хронологія CRM-клієнта."""
+    if not created:
+        return
+    from email_assistant.crm_link import link_message_to_crm
+    link_message_to_crm(instance)
+
+
+@receiver(post_save, sender='email_assistant.EmailMessage')
 def on_email_received(sender, instance, created, **kwargs):
     """When a new inbox email arrives, try to auto-advance the customer's active strategy."""
     if not created or instance.folder != 'inbox':

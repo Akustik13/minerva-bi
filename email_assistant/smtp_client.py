@@ -29,6 +29,10 @@ class SMTPClient:
             )
             msg['To']      = ', '.join(to_emails)
             msg['Subject'] = subject
+            # Власний Message-ID: копія в «Надісланих» і запис у Minerva — один і той самий лист
+            message_id = email.utils.make_msgid(
+                domain=self.account.email_address.rpartition('@')[2] or None)
+            msg['Message-ID'] = message_id
             if cc_emails:
                 msg['Cc'] = ', '.join(cc_emails)
 
@@ -113,7 +117,7 @@ class SMTPClient:
                 logger.warning('Could not save to IMAP sent: %s', e)
 
             logger.info('Email sent: %s → %s', subject[:50], to_emails)
-            return {'ok': True}
+            return {'ok': True, 'message_id': message_id}
 
         except smtplib.SMTPAuthenticationError:
             return {'ok': False, 'error': 'Помилка автентифікації SMTP. Перевір логін і пароль.'}

@@ -483,6 +483,11 @@ def send_customer_email(request, customer_pk):
         + sig_html
     )
 
+    # Один Message-ID для відправленого листа і його копії в IMAP «Надіслані»
+    # (інакше message() генерує новий при кожному виклику) — CRM не дублює подію
+    from email.utils import make_msgid
+    message_id = make_msgid(domain=from_email.rpartition('@')[2] or None)
+
     try:
         connection = get_connection(
             backend='django.core.mail.backends.smtp.EmailBackend',
@@ -496,6 +501,7 @@ def send_customer_email(request, customer_pk):
             to=to_list,
             cc=cc_list or None,
             connection=connection,
+            headers={'Message-ID': message_id},
         )
         msg.attach_alternative(html_body, 'text/html')
         msg.send()
@@ -519,13 +525,17 @@ def send_customer_email(request, customer_pk):
         logger.exception("CRM send_customer_email error: %s", e)
         return JsonResponse({'error': f'Помилка відправки: {e}'}, status=500)
 
+    from email_assistant.crm_link import find_order
+    order = find_order(subject, body_text, customer)
     CustomerTimeline.objects.create(
         customer=customer,
         user=request.user,
         event_type='email_out',
-        title=subject or f'Лист клієнту {customer.name}',
+        title=(subject or f'Лист клієнту {customer.name}')[:300],
         body=full_body,
         ai_summary='',
+        message_id=message_id,
+        related_order_id=order.pk if order else None,
     )
     # Auto-link to active strategy (best-effort, never blocks response)
     _link_email_to_strategy(customer, subject or '', body_text[:300], request.user)
@@ -559,10 +569,35 @@ def customer_timeline_json(request, customer_pk):
             return JsonResponse({'ok': False, 'error': str(e)})
 
     # GET
-    events = (CustomerTimeline.objects
-              .filter(customer_id=customer_pk)
-              .select_related('user')
-              .order_by('-is_pinned', '-created_at')[:50])
+    from django.urls import reverse
+    from email_assistant.crm_link import customer_orders, find_order
+    from sales.models import SalesOrder
+
+    events = list(CustomerTimeline.objects
+                  .filter(customer_id=customer_pk)
+                  .select_related('user')
+                  .order_by('-is_pinned', '-created_at')[:200])
+
+    # Замовлення для гілок листування: збережене related_order_id або номер у темі/тексті
+    customer = Customer.objects.filter(pk=customer_pk).first()
+    orders = customer_orders(customer) if customer else []
+    orders_by_pk = {o.pk: o for o in orders}
+    missing = {e.related_order_id for e in events if e.related_order_id} - orders_by_pk.keys()
+    if missing:
+        orders_by_pk.update(
+            (o.pk, o) for o in SalesOrder.objects.filter(pk__in=missing).only('pk', 'order_number', 'source'))
+
+    def _order_json(e):
+        order = orders_by_pk.get(e.related_order_id) if e.related_order_id else None
+        if order is None and e.event_type in ('email_in', 'email_out'):
+            order = find_order(e.title, e.body, orders=orders, global_search=False)
+        if order is None:
+            return None
+        return {
+            'id':     order.pk,
+            'number': order.order_number,
+            'url':    reverse('admin:sales_salesorder_change', args=[order.pk]),
+        }
 
     return JsonResponse({'events': [
         {
@@ -578,9 +613,28 @@ def customer_timeline_json(request, customer_pk):
             'is_pinned':  e.is_pinned,
             'remind_at':  (e.remind_at.strftime('%d.%m.%Y %H:%M')
                            if e.remind_at else None),
+            'order':      _order_json(e),
+            'thread':     (_thread_subject(e.title)
+                           if e.event_type in ('email_in', 'email_out') else ''),
+            'email_url':  (reverse('email_assistant:message', args=[e.email_message_id])
+                           if e.email_message_id else ''),
         }
         for e in events
     ]})
+
+
+_REPLY_PREFIX_RE = re.compile(r'^\s*(re|aw|antw|fwd?|wg|fw|sv|vs)\s*(\[\d+\])?\s*:\s*', re.IGNORECASE)
+
+
+def _thread_subject(subject: str) -> str:
+    """Тема без Re:/AW:/Fwd:/WG: — ключ гілки листування без номера замовлення."""
+    s = subject or ''
+    while True:
+        stripped = _REPLY_PREFIX_RE.sub('', s, count=1)
+        if stripped == s:
+            break
+        s = stripped
+    return ' '.join(s.split()).lower()
 
 
 @staff_member_required

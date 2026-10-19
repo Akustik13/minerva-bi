@@ -366,13 +366,23 @@
               style="font-size:11px;color:var(--text-dim);margin-left:6px;
                      transition:transform .2s">▾</span>
       </div>
-      <button type="button"
-              onclick="event.stopPropagation();loadTimeline()"
-              style="padding:4px 10px;border-radius:5px;font-size:11px;
-                     border:1px solid var(--border-strong);
-                     background:transparent;cursor:pointer;color:var(--text-dim)">
-        {% trans "Оновити" %}
-      </button>
+      <div style="display:flex;gap:6px">
+        <button type="button" id="tl-group-btn"
+                onclick="event.stopPropagation();toggleTimelineGrouping()"
+                title="{% trans "Групувати листи по замовленнях" %}"
+                style="padding:4px 10px;border-radius:5px;font-size:11px;
+                       border:1px solid var(--border-strong);
+                       background:transparent;cursor:pointer;color:var(--text-dim)">
+          🗂 {% trans "По замовленнях" %}
+        </button>
+        <button type="button"
+                onclick="event.stopPropagation();loadTimeline()"
+                style="padding:4px 10px;border-radius:5px;font-size:11px;
+                       border:1px solid var(--border-strong);
+                       background:transparent;cursor:pointer;color:var(--text-dim)">
+          {% trans "Оновити" %}
+        </button>
+      </div>
     </div>
 
     <div id="timeline-body">
@@ -458,6 +468,11 @@ const _crm = {
   more:           '▾ {% trans "більше" %}',
   less:           '▴ {% trans "менше" %}',
   no_events:      '{% trans "Поки немає подій" %}',
+  order_thread:   '🛒 {% trans "Замовлення" %}',
+  mail_thread:    '✉️ {% trans "Листування" %}',
+  last_item:      '{% trans "Останнє" %}',
+  open_order:     '{% trans "Відкрити замовлення" %}',
+  open_mail:      '{% trans "Відкрити лист у пошті" %}',
   load_error:     '{% trans "Помилка завантаження" %}',
   gen_strategy:   '⏳ {% trans "Генерую..." %}',
   minerva_strategy: '{% trans "Minerva думає..." %}',
@@ -836,33 +851,150 @@ function _renderBody(text, color, idx) {
   </div>`;
 }
 
+const _EMAIL_TYPES = ['email_in', 'email_out'];
+const _TL_GROUP_KEY = 'mv-tl-group-orders';
+let _tlGroupByOrder = true;
+try { _tlGroupByOrder = localStorage.getItem(_TL_GROUP_KEY) !== '0'; } catch(e) {}
+const _tlOpen = {};      // ключ гілки → розгорнута (вибір користувача до перезавантаження)
+let _tlEvents = [];
+
+function _renderEvent(e, idx) {
+  const bodyHtml = e.ai_summary
+    ? _renderBody(e.ai_summary, '#00d4aa', idx)
+    : _renderBody(e.body, 'var(--text-dim)', idx);
+  const mailLink = e.email_url
+    ? ` · <a href="${e.email_url}" target="_blank" rel="noopener" style="color:var(--link-fg)">✉️ ${_escHtml(_crm.open_mail)}</a>`
+    : '';
+  return `
+  <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-strong)">
+    <div style="flex-shrink:0;width:4px;border-radius:2px;background:${EVENT_COLORS[e.type]||'var(--text-dim)'}"></div>
+    <div style="flex:1;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div style="font-size:13px;font-weight:500;color:var(--text)">${e.is_pinned?'📌 ':''}${_escHtml(e.type_label)} — ${_escHtml(e.title)}</div>
+        <div style="font-size:11px;color:var(--text-dim);flex-shrink:0">${e.date}</div>
+      </div>
+      ${bodyHtml}
+      ${e.remind_at?`<div style="margin-top:4px;font-size:11px;color:#fd7e14">🔔 ${e.remind_at}</div>`:''}
+      <div style="font-size:11px;color:var(--text-dim);margin-top:2px">${_escHtml(e.user)}${mailLink}</div>
+    </div>
+  </div>`;
+}
+
+// Листи одного замовлення → одна гілка (разом з подією створення замовлення);
+// без замовлення — гілка за темою листа, якщо листів хоча б 2.
+// Гілка стоїть там, де її найновіша подія (сервер віддає від нових до старих).
+function _groupTimeline(events) {
+  const keyOf = e => {
+    if (e.is_pinned) return null;
+    if (e.order && (_EMAIL_TYPES.includes(e.type) || e.type === 'order')) return 'o' + e.order.id;
+    if (_EMAIL_TYPES.includes(e.type) && e.thread) return 's' + e.thread;
+    return null;
+  };
+  const mails = {};
+  events.forEach(e => {
+    const k = keyOf(e);
+    if (k && _EMAIL_TYPES.includes(e.type)) mails[k] = (mails[k] || 0) + 1;
+  });
+  const out = [], groups = {};
+  events.forEach(e => {
+    const k = keyOf(e);
+    if (!k || !(mails[k] >= (k[0] === 'o' ? 1 : 2))) { out.push({event: e}); return; }
+    if (!groups[k]) {
+      groups[k] = {key: k, order: e.order, items: []};
+      out.push({group: groups[k]});
+    }
+    groups[k].items.push(e);
+  });
+  return out;
+}
+
+function _renderGroup(g, open, startIdx) {
+  const newest = g.items[0];
+  const first  = g.items[g.items.length - 1];  // тема гілки — з першого листа, без «Re:»
+  const nIn  = g.items.filter(e => e.type === 'email_in').length;
+  const nOut = g.items.filter(e => e.type === 'email_out').length;
+  const title = g.order
+    ? `${_crm.order_thread} #${_escHtml(g.order.number)}`
+    : `${_crm.mail_thread}: ${_escHtml(first.title)}`;
+  const orderLink = g.order
+    ? ` <a href="${g.order.url}" target="_blank" rel="noopener" title="${_escHtml(_crm.open_order)}"
+          onclick="event.stopPropagation()" style="color:var(--link-fg);text-decoration:none">↗</a>`
+    : '';
+  const counts = [nIn ? `📨 ${nIn}` : '', nOut ? `📤 ${nOut}` : ''].filter(Boolean).join(' · ');
+  // всередині гілки — як у пошті: від старих до нових
+  const items = g.items.slice().reverse().map((e, i) => _renderEvent(e, startIdx + i)).join('');
+  return `
+  <div style="border:1px solid var(--border-strong);border-left:3px solid ${g.order ? EVENT_COLORS.order : EVENT_COLORS.email_in};
+              border-radius:8px;margin:8px 0;overflow:hidden">
+    <div onclick="tlToggleGroup('${encodeURIComponent(g.key)}')"
+         style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;
+                background:var(--bg-input);user-select:none">
+      <span style="font-size:11px;color:var(--text-dim);width:10px;flex-shrink:0">${open ? '▾' : '▸'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${title}${orderLink}</div>
+        ${open ? '' : `<div style="font-size:11px;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_escHtml(_crm.last_item)}: ${_escHtml(newest.type_label)} — ${_escHtml(newest.title)}</div>`}
+      </div>
+      <span style="font-size:11px;color:var(--text-dim);flex-shrink:0">${counts}</span>
+      <span style="font-size:11px;color:var(--text-dim);flex-shrink:0">${newest.date}</span>
+    </div>
+    <div style="display:${open ? 'block' : 'none'};padding:0 10px 0 14px">${items}</div>
+  </div>`;
+}
+
+function _firstGroupKey(rows) {
+  const row = rows.find(r => r.group);
+  return row ? row.group.key : null;
+}
+
+function _renderTimeline() {
+  const list = document.getElementById('timeline-list');
+  const btn  = document.getElementById('tl-group-btn');
+  if (btn) {
+    btn.style.color       = _tlGroupByOrder ? 'var(--accent)' : 'var(--text-dim)';
+    btn.style.borderColor = _tlGroupByOrder ? 'var(--accent)' : 'var(--border-strong)';
+  }
+  if (!_tlEvents.length) {
+    list.innerHTML = `<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:20px">${_crm.no_events}</div>`;
+    return;
+  }
+  if (!_tlGroupByOrder) {
+    list.innerHTML = _tlEvents.map((e, idx) => _renderEvent(e, idx)).join('');
+    return;
+  }
+  const rows = _groupTimeline(_tlEvents);
+  const firstKey = _firstGroupKey(rows);
+  let idx = 0;
+  list.innerHTML = rows.map(row => {
+    if (row.event) return _renderEvent(row.event, idx++);
+    const g = row.group;
+    // за замовчуванням розгорнута лише найновіша гілка
+    const open = (g.key in _tlOpen) ? _tlOpen[g.key] : g.key === firstKey;
+    const html = _renderGroup(g, open, idx);
+    idx += g.items.length;
+    return html;
+  }).join('');
+}
+
+function tlToggleGroup(encKey) {
+  const key = decodeURIComponent(encKey);
+  const open = (key in _tlOpen) ? _tlOpen[key] : key === _firstGroupKey(_groupTimeline(_tlEvents));
+  _tlOpen[key] = !open;
+  _renderTimeline();
+}
+
+function toggleTimelineGrouping() {
+  _tlGroupByOrder = !_tlGroupByOrder;
+  try { localStorage.setItem(_TL_GROUP_KEY, _tlGroupByOrder ? '1' : '0'); } catch(e) {}
+  _renderTimeline();
+}
+
 async function loadTimeline() {
   const list = document.getElementById('timeline-list');
   try {
     const r = await fetch(`/crm/customer/${CUSTOMER_PK}/timeline/`);
     const d = await r.json();
-    if (!d.events || d.events.length === 0) {
-      list.innerHTML = `<div style="text-align:center;color:var(--text-dim);font-size:13px;padding:20px">${_crm.no_events}</div>`;
-      return;
-    }
-    list.innerHTML = d.events.map((e, idx) => {
-      const bodyHtml = e.ai_summary
-        ? _renderBody(e.ai_summary, '#00d4aa', idx)
-        : _renderBody(e.body, 'var(--text-dim)', idx);
-      return `
-      <div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-strong)">
-        <div style="flex-shrink:0;width:4px;border-radius:2px;background:${EVENT_COLORS[e.type]||'var(--text-dim)'}"></div>
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
-            <div style="font-size:13px;font-weight:500;color:var(--text)">${e.is_pinned?'📌 ':''}${_escHtml(e.type_label)} — ${_escHtml(e.title)}</div>
-            <div style="font-size:11px;color:var(--text-dim);flex-shrink:0">${e.date}</div>
-          </div>
-          ${bodyHtml}
-          ${e.remind_at?`<div style="margin-top:4px;font-size:11px;color:#fd7e14">🔔 ${e.remind_at}</div>`:''}
-          <div style="font-size:11px;color:var(--text-dim);margin-top:2px">${_escHtml(e.user)}</div>
-        </div>
-      </div>`;
-    }).join('');
+    _tlEvents = d.events || [];
+    _renderTimeline();
   } catch(e) {
     list.innerHTML = `<div style="color:var(--err);font-size:13px;padding:10px">${_crm.load_error}</div>`;
   }

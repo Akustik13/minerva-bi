@@ -100,6 +100,13 @@ tabele_mvp/
 - `client.py` (RAG API v1: /v1/ask → job, /v1/jobs/{id}, 429 = зайнято), `views.py` (/rag/api/…), віджет `templates/rag_assistant/widget.html` (inline, include у base_site.html), README у застосунку
 - Тести: `python manage.py test rag_assistant --settings=tabele.settings_test` (mock RAG)
 
+### email_assistant/ — пошта ↔ CRM
+- Прив'язка листа до клієнта — ТІЛЬКИ `email_assistant/crm_link.py` (сигнал post_save `EmailMessage` → `link_message_to_crm`; legacy `fetch_emails` теж через нього): напрям за відправником (власні адреси/домен = 📤), клієнт серед To/Cc без власних адрес, номер замовлення з теми/тексту → `CustomerTimeline.related_order_id`, дедуплікація за `CustomerTimeline.message_id` (crm 0015, + FK `email_message`)
+- Хронологія клієнта групує листи по замовленню / темі (`crm/views.py customer_timeline_json` + JS у `crm/templates/admin/crm/customer/change_form.html`)
+- Листи лише з `text/html` → `body_html` + текст через `imap_client.html_to_text`; старі записи лагодить `EmailMessage.fix_html_body()`
+- Ремонт історії: `python manage.py relink_email_crm [--dry-run] [--days N]`
+- Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
+
 ### faq/ (placeholder, no DB)
 - `models.py`: `managed = False`
 - `admin.py`: override `get_urls()` → тільки `info_view`

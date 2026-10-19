@@ -170,6 +170,17 @@ class EmailMessage(models.Model):
     def has_attachments(self):
         return bool(self.attachments)
 
+    def fix_html_body(self, save=True) -> bool:
+        """Листи лише з text/html раніше зберігались як текст — перенести розмітку в body_html."""
+        from email_assistant.imap_client import html_to_text, looks_like_html
+        if self.body_html or not looks_like_html(self.body_text):
+            return False
+        self.body_html = self.body_text
+        self.body_text = html_to_text(self.body_html)
+        if save and self.pk:
+            self.save(update_fields=['body_html', 'body_text'])
+        return True
+
 
 class EmailDraft(models.Model):
     account    = models.ForeignKey(EmailAccount, on_delete=models.CASCADE, related_name='drafts')

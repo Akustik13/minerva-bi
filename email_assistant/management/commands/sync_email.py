@@ -84,12 +84,9 @@ class Command(BaseCommand):
                             created += 1
                             continue
 
-                        thread       = self._get_or_create_thread(account, msg_data)
-                        crm_customer = self._find_crm_customer(msg_data)
-                        if crm_customer and thread and not thread.crm_customer_id:
-                            thread.crm_customer = crm_customer
-                            thread.save(update_fields=['crm_customer'])
+                        thread = self._get_or_create_thread(account, msg_data)
 
+                        # CRM-хронологія і клієнт гілки — сигнал email_assistant.signals.link_email_to_crm
                         em = EmailMessage.objects.create(
                             account=account,
                             thread=thread,
@@ -116,9 +113,6 @@ class Command(BaseCommand):
                             if not msg_data['is_read']:
                                 thread.has_unread = True
                             thread.save(update_fields=['message_count', 'last_message_at', 'has_unread'])
-
-                        if crm_customer:
-                            self._sync_to_crm(em, crm_customer, account)
 
                         if folder_type == EmailMessage.FOLDER_INBOX:
                             self._post_process_inbox(em, account, thread)
@@ -163,19 +157,6 @@ class Command(BaseCommand):
                 participants=[msg_data['from_email']] + msg_data['to_emails'],
             )
         return thread
-
-    def _find_crm_customer(self, msg_data):
-        try:
-            from crm.models import Customer
-            for e in [msg_data['from_email']] + msg_data['to_emails']:
-                if not e:
-                    continue
-                c = Customer.objects.filter(email__iexact=e).first()
-                if c:
-                    return c
-        except Exception:
-            pass
-        return None
 
     def _notify_new_email(self, email_msg, account):
         """Send Telegram notification for a new unread inbox email."""
@@ -342,24 +323,3 @@ class Command(BaseCommand):
                 trigger='auto_reply',
             )
             logger.info('Auto-reply scheduled for uid=%s', em.imap_uid)
-
-    def _sync_to_crm(self, email_msg, customer, account):
-        try:
-            from crm.models import CustomerTimeline
-            event_type = 'email_out' if email_msg.folder == 'sent' else 'email_in'
-            if CustomerTimeline.objects.filter(
-                    customer=customer,
-                    related_email_id=email_msg.imap_uid,
-                    event_type=event_type).exists():
-                return
-            CustomerTimeline.objects.create(
-                customer=customer,
-                user=account.user,
-                event_type=event_type,
-                title=email_msg.subject or '(без теми)',
-                body=(email_msg.body_text or '')[:1000],
-                related_email_id=email_msg.imap_uid,
-                created_at=email_msg.sent_at or timezone.now(),
-            )
-        except Exception as e:
-            logger.error('CRM sync error: %s', e)
