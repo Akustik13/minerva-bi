@@ -198,8 +198,9 @@ class FeedTests(KnowledgeBase):
         self.assertEqual((r.status_code, r.json()["code"]), (404, "document_not_found"))
         self.assertSchema("error", r.json())
         self.assertFalse(self.doc_state(a).fed)
-        self.client.post("/email/messages/bulk/", json.dumps({"action": "spam", "pks": [b.pk]}),
-                         content_type="application/json")
+        with patch("email_assistant.views._imap_bg_many"):        # без справжнього IMAP у тесті
+            self.client.post("/email/messages/bulk/", json.dumps({"action": "spam", "pks": [b.pk]}),
+                             content_type="application/json")
         self.assertFalse(self.doc_state(b).fed)
 
     def test_project_link_creates_new_revision(self):
@@ -407,3 +408,50 @@ class CommitOrderPostgresTests(TransactionTestCase):
         self.assertEqual(visible, [])                           # нічого не закомічено, поки перша тримає lock
         self.assertEqual([who for who, _ in order], ["first", "second"])
         self.assertLess(order[0][1], order[1][1])
+
+    def test_without_lock_lower_seq_can_appear_later(self):
+        """Контроль: без блокування подія з меншим seq стає видимою ПІСЛЯ більшої — читач «перестрибнув» би її.
+        Саме тому записувачі журналу серіалізовані (journal_writer)."""
+        from django.db import connections, transaction
+        started, release, seqs = threading.Event(), threading.Event(), {}
+
+        def first():
+            try:
+                with transaction.atomic():                       # без advisory-lock
+                    seqs["first"] = KnowledgeChange.objects.create(obj_id=1, action="upsert").id
+                    started.set()
+                    release.wait(5)
+            finally:
+                connections.close_all()
+
+        def second():
+            try:
+                with transaction.atomic():
+                    seqs["second"] = KnowledgeChange.objects.create(obj_id=2, action="upsert").id
+            finally:
+                connections.close_all()
+
+        t1 = threading.Thread(target=first)
+        t1.start()
+        started.wait(5)
+        t2 = threading.Thread(target=second)
+        t2.start()
+        t2.join(10)
+        visible = list(KnowledgeChange.objects.order_by("id").values_list("id", flat=True))
+        release.set()
+        t1.join(10)
+        self.assertLess(seqs["first"], seqs["second"])
+        self.assertEqual(visible, [seqs["second"]])              # менший seq ще не видно → небезпека без блокування
+
+    def test_snapshot_uses_repeatable_read(self):
+        """create_snapshot поза транзакцією вмикає REPEATABLE READ і фіксує межу seq разом зі складом."""
+        from rag_assistant.models import KnowledgeDoc
+        for pk in (5, 6, 7):
+            KnowledgeDoc.objects.create(obj_id=pk, revision=1, fed=True, feed_version="sha256:" + "a" * 64)
+            KnowledgeChange.objects.create(obj_id=pk, action="upsert")
+        KnowledgeDoc.objects.create(obj_id=8, revision=2, fed=False)          # tombstone — не в знімку
+        snap = knowledge.create_snapshot()
+        self.assertEqual((snap["total"], snap["snapshot_seq"]),
+                         (3, KnowledgeChange.objects.order_by("-id").first().id))
+        page = knowledge.snapshot_page(snap["snapshot_id"], limit=10)
+        self.assertEqual([i["document_id"] for i in page["items"]], ["email:5", "email:6", "email:7"])
