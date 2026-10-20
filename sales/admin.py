@@ -469,6 +469,24 @@ class SalesOrderDocumentsForm(forms.ModelForm):
         model = SalesOrder
         fields = '__all__'
 
+@admin.action(description="📝 Створити Angebot із запиту пропозиції")
+def create_offer_from_quote(modeladmin, request, queryset):
+    """Запит пропозиції з магазину (QUOTE) → Angebot з поточними цінами Minerva (offers/services.py)."""
+    from django.contrib import messages
+    from django.urls import reverse
+    from offers.services import create_from_quote
+    quotes = list(queryset.filter(document_type="QUOTE"))
+    if not quotes:
+        modeladmin.message_user(request, "Виберіть запити пропозиції (тип документа «Запит пропозиції»).",
+                                messages.WARNING)
+        return None
+    made = [create_from_quote(q, request.user) for q in quotes]
+    modeladmin.message_user(request, "Створено Angebote: " + ", ".join(o.number for o in made))
+    if len(made) == 1:
+        return redirect(reverse("admin:offers_offer_change", args=[made[0].pk]))
+    return None
+
+
 @admin.register(SalesOrder)
 class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     form = SalesOrderDocumentsForm
@@ -635,6 +653,7 @@ class SalesOrderAdmin(AuditableMixin, admin.ModelAdmin):
     date_hierarchy = "order_date"
     actions        = [
         export_sales_excel,
+        create_offer_from_quote,
         # Статус
         "action_set_status_received",
         "action_set_status_processing",

@@ -56,6 +56,7 @@ _MODULE_CAPS = {
     'ai_assistant':    'AI-асистент (Minerva AI)',
     'email_assistant': 'Email-асистент',
     'projects':        'Проєкти з листування',
+    'offers':          'Angebote (комерційні пропозиції)',
     'bots':            'Боти та автоматизація',
     'api':             'REST API',
     'labels_app':      'Друк етикеток DYMO',
@@ -69,7 +70,7 @@ _MODULE_CAPS = {
 # Ordered display sequence (controls order in email)
 _MODULE_ORDER = [
     'dashboard', 'crm', 'strategy', 'sales', 'accounting', 'shipping',
-    'inventory', 'tasks', 'autoimport', 'email_assistant', 'projects', 'ai_assistant',
+    'inventory', 'tasks', 'autoimport', 'email_assistant', 'projects', 'offers', 'ai_assistant',
     'bots', 'api', 'labels_app', 'config', 'backup', 'auth', 'core', 'faq',
 ]
 

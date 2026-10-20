@@ -184,6 +184,30 @@ tabele_mvp/
 - У документах бази знань для RAG проєкти підуть полем `projects` — після погодження контракту.
 - Тести: `python manage.py test projects --settings=tabele.settings_test`
 
+### offers/ — Angebote (комерційні пропозиції)
+- **Моделі (offers 0001):**
+  - `OfferSettings` — синглтон: префікс номера, строк дії, валюта, ПДВ, мова, тексти, реквізити `company_block` / `footer_text`, власний шаблон DOCX;
+  - `Offer` — номер `A-РРРР-NNN`, `revision`, статуси draft → review → approved → sent → accepted / rejected / expired / cancelled; клієнт, проєкт, джерело (лист / запит QUOTE), замовлення;
+  - `OfferLine` — товар або довільна позиція, `price_source` / `price_note`, знижка, строк поставки;
+  - `OfferRevision` — незмінний `snapshot` версії + DOCX/PDF.
+- **Логіка лише в `offers/services.py`:**
+  - `new_offer`, `add_line` / `fill_line`, `recalculate`, `generate_document`, `new_version`, `set_status`, `mark_sent`, `accept` (→ `SalesOrder`, джерело `angebot`; позиції без товару пропускаються), `expire_overdue`;
+  - створення: `create_from_thread` (артикули й кількості з листа — `detect_items`), `create_from_quote`;
+  - відправка: `compose_initial` / `mark_sent_refs`.
+- **Ціни — `offers/pricing.py`** (Decimal, ціна за одиницю — 4 знаки, суми — 2, ROUND_HALF_UP). Порядок: магазин за замовчуванням (ступені, акція, та сама валюта) → `Product.sale_price` (валюта Minerva) → базові ціни × курс `ShopSettings.fx_rates` → інакше «на запит». LLM ціни не визначає.
+- **Надіслана версія незмінна:** `Offer.is_locked`; адмінка стає лише для читання; змінити можна тільки через «♻ Нова версія». Чернетка нічого не резервує на складі.
+- **Документ — `offers/document.py`:** docxtpl + `documents.service._convert_to_pdf` (LibreOffice; без нього — лише DOCX). Підписи de / en / uk. Стандартний шаблон `offers/templates_docx/offer_template.docx` створює `manage.py build_offer_template`.
+- **Інтеграції:**
+  - пошта: кнопка «📝 Angebot» у прев'ю (`/offers/api/from-thread/<pk>/`); «✉️ Надіслати клієнту» → `/email/compose/?offer=<pk>`;
+  - вкладення-посилання `offer:<revision_pk>` (`email_assistant/attachments.load_ref`): після відправки версія позначається надісланою;
+  - проєкт: панель «📝 Angebote»;
+  - продажі: дія «📝 Створити Angebot із запиту пропозиції» (QUOTE);
+  - прийнятий Angebot → документ копіюється в `media/orders/angebot/<номер>/`.
+- **Адмінка:** компактна таблиця позицій (`offers/templates/admin/offers/offer/change_form.html`); маржа видна лише в адмінці.
+- **Меню:** група «Продажі»; роль manager має доступ до `offers`.
+- **Тести:** `python manage.py test offers --settings=tabele.settings_test`. Локально потрібні `docxtpl` і `python-docx` з `requirements.txt`.
+- ⚠️ `.gitignore` ігнорує `*.json` і `test_*.py`: тестові модулі називати `tests*.py`, JSON — додавати винятком.
+
 ### faq/ (placeholder, no DB)
 - `models.py`: `managed = False`
 - `admin.py`: override `get_urls()` → тільки `info_view`

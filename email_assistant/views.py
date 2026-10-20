@@ -862,6 +862,7 @@ def compose_view(request):
     account     = _get_account(request)
     reply_to_pk = request.GET.get('reply_to')
     forward_pk  = request.GET.get('forward')
+    offer_pk    = request.GET.get('offer')
     reply_to    = None
     initial     = {}
 
@@ -899,6 +900,11 @@ def compose_view(request):
                 fwd.body_text,
             ),
         }
+
+    elif offer_pk and str(offer_pk).isdigit() and request.method != 'POST':
+        # «✉️ Надіслати клієнту» з Angebot: адреса, тема, короткий текст і PDF версії як вкладення-посилання
+        from offers.services import compose_initial
+        initial = compose_initial(int(offer_pk), request.user)
 
     if request.method == 'POST':
         return _handle_send(request, account, reply_to)
@@ -982,6 +988,10 @@ def _handle_send(request, account, reply_to=None):
         except Exception as e:
             logger.warning('store sent message: %s', e)
         _save_contacts(request.user, to_list + cc_list)
+        offer_refs = [r for r in request.POST.getlist('att_ref') if r.startswith('offer:')]
+        if offer_refs:   # надіслано документ Angebot → версія «надіслана» (незмінна)
+            from offers.services import mark_sent_refs
+            mark_sent_refs(offer_refs, result.get('message_id', ''))
 
     return JsonResponse(result)
 

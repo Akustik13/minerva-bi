@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     'ai_assistant',     # 🏛️ Minerva AI
     'email_assistant',  # 📧 Email Асистент
     'projects',         # 📁 Проєкти з пошти (після email_assistant: сигнали після прив'язки до CRM)
+    'offers',           # 📝 Angebote — комерційні пропозиції
     'rag_assistant',    # 📚 Помічник по продукції + база знань для RAG (ПІСЛЯ email_assistant і projects:
                         #    сигнал журналу бачить уже категорію, клієнта й проєкти листа)
     'calendar_app',     # 📅 Календар
