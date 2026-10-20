@@ -126,6 +126,15 @@ class KnowledgeSettings(models.Model):
     private_api_key = models.CharField(
         "Ключ приватного пошуку RAG", max_length=200, blank=True, default="",
         help_text="Окремий Bearer-ключ RAG для /v2/* (не ключ магазину). Лише на сервері Minerva.")
+    private_base_url = models.URLField(
+        "Адреса приватного API RAG", blank=True, default="",
+        help_text="Без /v2 у кінці. Порожньо — та сама адреса, що в «Налаштуваннях помічника».")
+    rag_failures = models.PositiveSmallIntegerField(default=0, editable=False,
+                                                    help_text="Збоїв поспіль (запобіжник).")
+    rag_down_until = models.DateTimeField(null=True, blank=True, editable=False,
+                                          help_text="До цього часу Minerva не звертається до RAG.")
+    last_capabilities = models.JSONField(default=dict, blank=True, editable=False)
+    last_capabilities_at = models.DateTimeField(null=True, blank=True, editable=False)
     generation = models.UUIDField(
         "Покоління журналу", default=uuid.uuid4, editable=False,
         help_text="Змінюється дією «Нове покоління» після відновлення БД — RAG тоді робить повну звірку.")
@@ -243,3 +252,47 @@ class KnowledgeSnapshotItem(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["snapshot", "position"], name="unique_snapshot_position")]
         ordering = ["position"]
+
+
+class RetrievalJob(models.Model):
+    """
+    Пошук у приватному індексі RAG (/v2/retrieval/jobs) від імені користувача Minerva.
+    Браузер бачить лише id цього запису; job_id RAG і повторні звернення — тільки на сервері.
+    hits — уже перевірені Minerva (права, допуск до індексу, ревізія), dropped — скільки відкинуто.
+    """
+    PENDING, QUEUED, RUNNING, COMPLETED = "pending", "queued", "running", "completed"
+    FAILED, CANCELLED, UNAVAILABLE = "failed", "cancelled", "unavailable"
+    STATUSES = [(PENDING, "очікує"), (QUEUED, "у черзі RAG"), (RUNNING, "виконується"),
+                (COMPLETED, "готово"), (FAILED, "помилка"), (CANCELLED, "скасовано"),
+                (UNAVAILABLE, "RAG недоступний")]
+    TERMINAL = (COMPLETED, FAILED, CANCELLED, UNAVAILABLE)
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="retrieval_jobs")
+    purpose = models.CharField(max_length=20, default="history")
+    thread = models.ForeignKey("email_assistant.EmailThread", null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="+")
+    idempotency_key = models.CharField(max_length=128, unique=True)
+    rag_job_id = models.CharField(max_length=32, blank=True, default="")
+    resubmit = models.BooleanField(default=False, help_text="Результат POST невідомий — повторити тим самим ключем.")
+    request = models.JSONField(default=dict)
+    status = models.CharField(max_length=12, choices=STATUSES, default=PENDING, db_index=True)
+    hits = models.JSONField(default=list, blank=True)
+    dropped = models.PositiveSmallIntegerField(default=0)
+    index = models.JSONField(default=dict, blank=True)
+    message = models.CharField(max_length=300, blank=True, default="")
+    poll_after_ms = models.PositiveIntegerField(default=1000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Пошук у RAG"
+        verbose_name_plural = "Пошуки в RAG"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.purpose} {self.status} ({self.user})"
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.status in self.TERMINAL

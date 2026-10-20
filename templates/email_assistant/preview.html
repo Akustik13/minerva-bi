@@ -48,6 +48,13 @@
 .em-history-ai:empty{display:none}
 .em-ai-used{font-size:11px;color:var(--text-dim);margin-top:6px}
 .em-history-draft{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-strong)}
+/* «🔎 Доповнити через RAG» — фрагменти з інших листувань (перевірені Minerva) */
+.em-history-rag{margin-top:8px;padding-top:8px;border-top:1px dashed var(--border-strong)}
+.em-rag-status{font-size:11px;color:var(--text-dim);margin-top:4px}
+.em-rag-hit{font-size:12px;line-height:1.5;margin-top:6px;padding:5px 8px;border-radius:6px;background:rgba(124,58,237,.06);
+  border:1px solid rgba(124,58,237,.18)}
+.em-rag-hit a{color:var(--link-fg,#3b82f6);text-decoration:none;font-weight:600}
+.em-rag-hit .m{color:var(--text-dim);font-size:11px}
 .em-history-draft-row{display:flex;gap:6px}
 .em-history-draft-txt{white-space:pre-wrap;font-size:13px;line-height:1.6;color:var(--text);margin-top:8px}
 .em-history-draft-txt:empty{display:none}
@@ -274,6 +281,12 @@
       </div>
       <div class="em-history-ai" id="pv-history-ai"></div>
       <div id="pv-history-body"></div>
+      <div class="em-history-rag">
+        <button class="em-pv-btn" onclick="pvRagSearch({{ last.pk|default:0 }}, this)"
+                title="{% trans "Знайти в інших листуваннях (база знань RAG): обіцянки, домовленості, попередні пропозиції. Без RAG усе інше працює." %}">🔎 {% trans "Доповнити через RAG" %}</button>
+        <div class="em-rag-status" id="pv-rag-status"></div>
+        <div id="pv-rag-hits"></div>
+      </div>
       <div class="em-history-draft">
         <div class="em-history-draft-row">
           <input class="em-ai-prompt-inp" id="pv-history-prompt" type="text"
@@ -998,9 +1011,39 @@ window.pvHistoryAI = async function(pk) {
   try {
     var d = await (await fetch('/email/message/' + pk + '/history/?ai=1')).json();
     out.textContent = d.summary
-      ? d.summary + (d.model ? '\n\n🤖 ' + d.model : '')
+      ? d.summary + (d.rag ? '\n\n🔎 ' + d.rag : '') + (d.model ? '\n🤖 ' + d.model : '')
       : ('⚠️ ' + (d.summary_error || '{% trans "Помилка" %}'));
   } catch(e) { out.textContent = '⚠️ {% trans "Помилка" %}'; }
+};
+
+// «🔎 Доповнити через RAG»: старт пошуку, далі опитування стану (бюджет ~20 с); job_id RAG браузер не бачить
+window.pvRagSearch = async function(pk, btn) {
+  var st = document.getElementById('pv-rag-status'), box = document.getElementById('pv-rag-hits');
+  if (!st || !pk) return;
+  if (btn) btn.disabled = true;
+  st.textContent = '⏳ {% trans "Шукаю в базі знань…" %}';
+  box.innerHTML = '';
+  var render = function(d) {
+    st.textContent = (d.status === 'completed' ? '🔎 ' : (d.terminal ? '⚠️ ' : '⏳ ')) + (d.message || '');
+    box.innerHTML = (d.hits || []).map(function(h) {
+      var when = (h.sent_at || '').slice(0, 10);
+      return '<div class="em-rag-hit"><a href="' + _pvEsc(h.url) + '" target="_blank">' + _pvEsc(h.subject || '(без теми)') + '</a>'
+           + ' <span class="m">' + _pvEsc(when) + ' · ' + _pvEsc(h.from_email)
+           + (h.attachment ? ' · 📎 ' + _pvEsc(h.attachment.name) : '') + '</span><br>' + _pvEsc(h.text) + '</div>';
+    }).join('');
+  };
+  try {
+    var d = await (await fetch('/email/message/' + pk + '/rag-search/', {method: 'POST', headers: {'X-CSRFToken': CSRF}})).json();
+    var deadline = Date.now() + 20000;
+    render(d);
+    while (!d.terminal && Date.now() < deadline) {
+      await new Promise(function(r) { setTimeout(r, Math.min(Math.max(d.poll_after_ms || 1000, 500), 3000)); });
+      d = await (await fetch('/email/rag-search/' + d.id + '/')).json();
+      render(d);
+    }
+    if (!d.terminal) st.textContent = '⚠️ {% trans "RAG не встиг — працюємо з даними Minerva" %}';
+  } catch (e) { st.textContent = '⚠️ {% trans "RAG недоступний — працюємо з даними Minerva" %}'; }
+  finally { if (btn) btn.disabled = false; }
 };
 
 // force — зміна мови у випадному списку: перекласти заново, панель не закривати

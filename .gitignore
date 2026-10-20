@@ -40,6 +40,8 @@ exports.py
 !static/manifest.json
 # JSON-схеми контракту бази знань (api/schemas/knowledge) — дозволити
 !api/schemas/**/*.json
+# Закріплена копія RAG-схем для контрактних тестів (rag_assistant/contract)
+!rag_assistant/contract/**/*.json
 jumingo_rates_raw.json
 redmei.txt
 

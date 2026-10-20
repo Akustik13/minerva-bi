@@ -437,6 +437,7 @@ def inbox_view(request):
         'account':               account,
         'email_settings':        EmailSettings.get_for_user(request.user),
         'ai_model_choices':      EmailSettings.AI_MODEL_CHOICES,
+        'rag_mode_choices':      EmailSettings.RAG_MODE_CHOICES,
         'folder_label':          decode_mutf7(folder),
         'cat_filter':            cat_filter,
         'customer_filter':       customer_filter,
@@ -1047,19 +1048,70 @@ def ai_suggest_reply(request, message_pk):
     thread_messages = [m for m in ctx['thread_msgs'] if not m.sent_at or not msg.sent_at
                        or m.sent_at <= msg.sent_at] or [msg]
     to_email, to_label = _reply_recipient(thread_messages[-1], ctx)
+    instruction = request.GET.get('prompt', '')
+    rag = _rag_for_ai(request.user, ctx, 'reply', instruction)
+    facts = context_text(ctx) + (('\n\n' + rag['facts']) if rag['facts'] else '')
     reply = generate_reply(thread_messages, account, profile,
-                           instruction=request.GET.get('prompt', ''), facts=context_text(ctx),
-                           recipient=to_label)
+                           instruction=instruction, facts=facts, recipient=to_label)
     msg.ai_reply_draft = reply
     msg.save(update_fields=['ai_reply_draft'])
     from email_assistant.ai_helper import last_model
-    used = used_summary(ctx) + ([f'модель {_model_label(last_model())}'] if last_model() else [])
+    used = used_summary(ctx) + ([rag['note']] if rag['note'] else []) + \
+        ([f'модель {_model_label(last_model())}'] if last_model() else [])
     _to, reply_cc = _reply_addresses(account, thread_messages[-1])
     if (to_email or '').lower() != (_to or '').lower():
         reply_cc = []   # внутрішнє пересилання → пишемо клієнту, колег у копію не тягнемо
     return JsonResponse({'ok': bool(reply), 'reply': reply, 'used': used,
                          'to': to_email, 'cc': reply_cc, 'subject': (ctx['thread_msgs'][0].subject if ctx['thread_msgs'] else msg.subject),
                          'error': '' if reply else 'AI не повернув відповідь'})
+
+
+def _rag_for_ai(user, ctx, purpose, instruction=''):
+    """
+    Пошук у базі знань RAG для AI (режим — EmailSettings.rag_mode). Ніколи не ламає AI-функцію:
+    без RAG — лише дані Minerva і чесна примітка про охоплення.
+    """
+    from email_assistant.models import EmailSettings
+    try:
+        from rag_assistant import retrieval
+        mode = EmailSettings.get_for_user(user).rag_mode
+        res = retrieval.search_for_context(user, ctx, purpose=purpose, mode=mode, instruction=instruction)
+    except Exception as e:  # noqa: BLE001
+        logger.warning('RAG for AI (%s): %s', purpose, e)
+        return {'facts': '', 'note': 'RAG недоступний — лише дані Minerva'}
+    if not res['used']:
+        return {'facts': '', 'note': ''}
+    job = res['job']
+    if job.status != job.COMPLETED:
+        return {'facts': '', 'note': (job.message or 'RAG не встиг') + ' — лише дані Minerva'}
+    return {'facts': retrieval.facts_text(job), 'note': retrieval.coverage(job)}
+
+
+@staff_member_required
+@require_POST
+def rag_search_view(request, message_pk):
+    """«🔎 Доповнити через RAG»: пошук в інших листуваннях (явний запит = розширений режим)."""
+    from email_assistant.context import build_context
+    from email_assistant.models import EmailMessage
+    from rag_assistant import retrieval
+    account = _get_account(request)
+    msg = get_object_or_404(EmailMessage, pk=message_pk, account=account)
+    ctx = build_context(msg)
+    customer = ctx.get('customer')
+    job = retrieval.start(request.user, retrieval.query_for(ctx), purpose='history', thread=msg.thread,
+                          customer_id=customer.pk if customer is not None else None,
+                          exclude_thread_ids=[msg.thread_id] if msg.thread_id else [],
+                          wait_ms=retrieval.WAIT_EXTENDED_MS)
+    return JsonResponse(retrieval.job_json(job))
+
+
+@staff_member_required
+def rag_search_poll_view(request, job_id):
+    """Стан пошуку — лише власник (чужий / невідомий → 404)."""
+    from rag_assistant import retrieval
+    from rag_assistant.models import RetrievalJob
+    job = get_object_or_404(RetrievalJob, pk=job_id, user=request.user)
+    return JsonResponse(retrieval.job_json(retrieval.poll(job)))
 
 
 def _reply_addresses(account, msg):
@@ -1122,7 +1174,10 @@ def history_view(request, message_pk):
         'links':  [{'label': l['label'], 'url': l['url']} for l in ctx['links']],
     }
     if request.GET.get('ai') == '1':
-        data['summary'] = summarize_history(ctx['thread_msgs'], account, facts=context_text(ctx))
+        rag = _rag_for_ai(request.user, ctx, 'history')
+        data['rag'] = rag['note']
+        facts = context_text(ctx) + (('\n\n' + rag['facts']) if rag['facts'] else '')
+        data['summary'] = summarize_history(ctx['thread_msgs'], account, facts=facts)
         from email_assistant.ai_helper import last_model
         data['model'] = _model_label(last_model()) if last_model() else ''
         if not data['summary']:
@@ -1734,7 +1789,7 @@ def set_category_view(request, message_pk):
 
 
 _SETTINGS_TOGGLES = {'mark_read_on_server'}
-_SETTINGS_CHOICES = {'ai_model'}
+_SETTINGS_CHOICES = {'ai_model', 'rag_mode'}
 
 
 def _model_label(model_id: str) -> str:

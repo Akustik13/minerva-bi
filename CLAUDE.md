@@ -129,6 +129,28 @@ tabele_mvp/
   - **v1:** `text_new_mode = full` — цитати не обрізаються. Вкладення дають `indexable` лише зі збереженим файлом і `sha256`, який кешується в `EmailMessage.attachments`.
   - **Тести:** `rag_assistant/tests_knowledge.py`. Відповіді API перевіряються тими самими схемами; тест порядку commit — лише на PostgreSQL.
   - `api/KNOWLEDGE_API.md` — перша прозова пропозиція, замінена схемами.
+- **Приватний пошук RAG (/v2) — клієнт Minerva `rag_assistant/retrieval.py`.** Контракт accepted: candidate 0.4, `rag-private/2.0-draft.1`; закріплена копія схем — `rag_assistant/contract/`.
+  - **Запити:**
+    - `start()` → `POST /v2/retrieval/jobs` з `Idempotency-Key` `minerva:<user>:<uuid>`; якщо результат невідомий (ReadTimeout) — повтор тим самим ключем;
+    - `poll()` → `GET /v2/jobs/{id}` з контекстом `source_instance_id` / `generation` / `user_id`;
+    - `cancel()`, `capabilities()` (кеш 60 с).
+  - **Завдання** — `RetrievalJob` (rag_assistant 0003). Браузер бачить лише його uuid; чужий → 404.
+  - **Відмови не зупиняють Minerva:** будь-яка відмова → статус `unavailable` і зрозуміле повідомлення. Запобіжник у `KnowledgeSettings` (`rag_failures` / `rag_down_until`): 3 с на з'єднання, після 3 збоїв поспіль (мережа, 5xx, не-JSON, редирект) — 5 хв без звернень. 4xx (зокрема `409 generation_mismatch`) збоєм не вважаються.
+  - **Перевірка кожного фрагмента** (`verify_hits`), не перевіривши — не показувати й не передавати в LLM:
+    - збігаються джерело й покоління;
+    - власна скринька користувача;
+    - документ досі допущений (`scope_reason`);
+    - `document_revision` і `content_version` дорівнюють чинним (`KnowledgeDoc`).
+  - **Режими** — `EmailSettings.rag_mode` (email_assistant 0019; вибір «🔎» у скриньці):
+    - `local` — RAG не викликається;
+    - `auto` — «Історія» лише коли є інші листування з клієнтом; AI-відповідь — лише коли інструкція питає про попередні домовленості;
+    - `extended` — завжди.
+    - Рішення приймає `decide()` за простими правилами, без окремого виклику LLM.
+  - **Пошта:**
+    - AI-підсумок і AI-відповідь отримують `facts_text` (фрагменти позначено як дані, а не інструкції) і рядок охоплення `coverage()`;
+    - кнопка «🔎 Доповнити через RAG» в «Історії» (`/email/message/<pk>/rag-search/`, опитування `/email/rag-search/<uuid>/`).
+  - **Адмінка «База знань»:** адреса приватного API, стан запобіжника, кнопка «Перевірити пошук RAG».
+  - **Тести:** `rag_assistant/tests_retrieval.py` — двійник RAG перевіряє кожен запит і відповідь закріпленими схемами.
 
 ### email_assistant/ — пошта ↔ CRM
 - Прив'язка листа до клієнта — ТІЛЬКИ `email_assistant/crm_link.py` (сигнал post_save `EmailMessage` → `link_message_to_crm`; legacy `fetch_emails` теж через нього): напрям за відправником (власні адреси/домен = 📤), клієнт серед To/Cc без власних адрес, номер замовлення з теми/тексту → `CustomerTimeline.related_order_id`, дедуплікація за `CustomerTimeline.message_id` (crm 0015, + FK `email_message`)

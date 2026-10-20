@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.sevskiy.com/rag/v2/job.response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "request_id",
+    "source_instance_id",
+    "generation",
+    "user_id",
+    "job_id",
+    "status",
+    "stage",
+    "created_at",
+    "updated_at",
+    "expires_at"
+  ],
+  "properties": {
+    "contract_version": {
+      "$ref": "common.schema.json#/$defs/contract_version"
+    },
+    "request_id": {
+      "$ref": "common.schema.json#/$defs/request_id"
+    },
+    "source_instance_id": {
+      "$ref": "common.schema.json#/$defs/source_instance_id"
+    },
+    "generation": {
+      "$ref": "common.schema.json#/$defs/generation"
+    },
+    "user_id": {
+      "$ref": "common.schema.json#/$defs/pk"
+    },
+    "job_id": {
+      "$ref": "common.schema.json#/$defs/job_id"
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "stage": {
+      "enum": [
+        "queued",
+        "embedding",
+        "search",
+        "rerank",
+        "completed",
+        "failed",
+        "cancelled"
+      ]
+    },
+    "created_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "updated_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "expires_at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "result": {
+      "$ref": "retrieval.response.schema.json"
+    },
+    "error": {
+      "$ref": "error.schema.json"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "result"
+        ],
+        "not": {
+          "required": [
+            "error"
+          ]
+        }
+      },
+      "else": {
+        "not": {
+          "required": [
+            "result"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "error"
+        ]
+      },
+      "else": {
+        "not": {
+          "required": [
+            "error"
+          ]
+        }
+      }
+    }
+  ]
+}

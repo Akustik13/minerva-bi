@@ -250,6 +250,16 @@ class EmailSettings(models.Model):
         verbose_name='AI модель пошти',
         help_text='Для відповідей, перекладу, історії, граматики й нових листів. '
                   'Фонове визначення дедлайнів у кожному листі завжди «Автоматично» (дешево).')
+    RAG_LOCAL, RAG_AUTO, RAG_EXTENDED = 'local', 'auto', 'extended'
+    RAG_MODE_CHOICES = [
+        (RAG_LOCAL,    'Лише Minerva — без звернень до RAG'),
+        (RAG_AUTO,     'Автоматично — RAG, коли потрібна історія інших листувань'),
+        (RAG_EXTENDED, 'Розширений — завжди шукати в базі знань RAG'),
+    ]
+    rag_mode = models.CharField(
+        max_length=10, default=RAG_AUTO, choices=RAG_MODE_CHOICES,
+        verbose_name='Пошук у базі знань (RAG)',
+        help_text='Для «📜 Історії» й AI-відповіді. Переклад і граматика RAG ніколи не використовують.')
     sync_to_crm_timeline = models.BooleanField(
         default=True, verbose_name='Синхронізувати з CRM хронологією',
         help_text='Листи від/до CRM клієнтів додаються в CustomerTimeline')

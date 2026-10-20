@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.sevskiy.com/rag/v2/retrieval.request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_instance_id",
+    "generation",
+    "query",
+    "filters"
+  ],
+  "properties": {
+    "source_instance_id": {
+      "$ref": "common.schema.json#/$defs/source_instance_id"
+    },
+    "generation": {
+      "$ref": "common.schema.json#/$defs/generation"
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 3000,
+      "pattern": "\\S"
+    },
+    "types": {
+      "type": "array",
+      "items": {
+        "const": "email"
+      },
+      "minItems": 1,
+      "maxItems": 1,
+      "uniqueItems": true
+    },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mailbox_ids",
+        "user_id"
+      ],
+      "properties": {
+        "mailbox_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/pk"
+          },
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true
+        },
+        "user_id": {
+          "$ref": "common.schema.json#/$defs/pk"
+        },
+        "customer_id": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/pk"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project_id": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/pk"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "exclude_thread_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/pk"
+          },
+          "minItems": 0,
+          "maxItems": 100,
+          "uniqueItems": true
+        },
+        "since": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "limit": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 8
+    },
+    "wait_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8000,
+      "default": 0
+    }
+  }
+}

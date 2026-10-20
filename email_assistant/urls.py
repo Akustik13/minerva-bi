@@ -8,6 +8,8 @@ urlpatterns = [
     # Full-page standalone views (open separately)
     path('thread/<int:thread_pk>/',                      views.thread_view,          name='thread'),
     path('thread/<int:thread_pk>/knowledge/',            views.thread_knowledge_view, name='thread_knowledge'),
+    path('message/<int:message_pk>/rag-search/',         views.rag_search_view,      name='rag_search'),
+    path('rag-search/<uuid:job_id>/',                    views.rag_search_poll_view, name='rag_search_poll'),
     path('message/<int:message_pk>/',                    views.message_view,         name='message'),
     # AJAX preview fragments (3-panel inbox)
     path('thread/<int:thread_pk>/preview/',              views.thread_preview_view,  name='thread_preview'),

@@ -349,6 +349,16 @@
           {% endfor %}
         </select>
       </label>
+      <label class="em-sync-btn" style="cursor:pointer;gap:6px"
+             title="{% trans "Пошук в інших листуваннях (база знань RAG) для «Історії» й AI-відповіді. Без RAG Minerva працює як звичайно." %}">
+        🔎
+        <select id="em-rag-mode" onchange="setEmailSetting('rag_mode', this.value, this)"
+                style="flex:1;min-width:0;border:none;background:transparent;color:inherit;font-size:12px;font-family:inherit;cursor:pointer;outline:none">
+          {% for key, label in rag_mode_choices %}
+          <option value="{{ key }}"{% if email_settings.rag_mode == key %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <div id="sync-status">{% if account.last_sync_at %}{{ account.last_sync_at|date:"d.m H:i" }}{% endif %}</div>
       <div id="sync-countdown"></div>
     </div>

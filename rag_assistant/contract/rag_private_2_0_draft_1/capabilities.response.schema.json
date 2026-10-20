@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.sevskiy.com/rag/v2/capabilities.response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "request_id",
+    "source_instance_id",
+    "generation",
+    "operations",
+    "readiness",
+    "limits",
+    "index"
+  ],
+  "properties": {
+    "contract_version": {
+      "$ref": "common.schema.json#/$defs/contract_version"
+    },
+    "request_id": {
+      "$ref": "common.schema.json#/$defs/request_id"
+    },
+    "source_instance_id": {
+      "$ref": "common.schema.json#/$defs/source_instance_id"
+    },
+    "generation": {
+      "$ref": "common.schema.json#/$defs/generation"
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "retrieval",
+          "jobs",
+          "cancel",
+          "pull_index"
+        ]
+      },
+      "minItems": 1,
+      "maxItems": 4,
+      "uniqueItems": true
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retrieval",
+        "indexing"
+      ],
+      "properties": {
+        "retrieval": {
+          "enum": [
+            "ready",
+            "degraded",
+            "unavailable"
+          ]
+        },
+        "indexing": {
+          "enum": [
+            "ready",
+            "paused",
+            "unavailable"
+          ]
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_chars",
+        "hits",
+        "wait_ms",
+        "job_retention_seconds",
+        "job_deadline_seconds",
+        "max_pending_jobs"
+      ],
+      "properties": {
+        "query_chars": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3000
+        },
+        "hits": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "wait_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8000
+        },
+        "job_retention_seconds": {
+          "type": "integer",
+          "minimum": 60
+        },
+        "job_deadline_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_pending_jobs": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "docs",
+        "chunks",
+        "received_seq",
+        "applied_seq",
+        "last_sync_at",
+        "embedding_model",
+        "embedding_dimensions",
+        "last_error"
+      ],
+      "properties": {
+        "docs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chunks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "received_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "applied_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_sync_at": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "embedding_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "embedding_dimensions": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "last_error": {
+          "anyOf": [
+            {
+              "$ref": "error.schema.json"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

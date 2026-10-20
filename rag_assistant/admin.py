@@ -157,7 +157,7 @@ class KnowledgeSettingsForm(forms.ModelForm):
     class Meta:
         model = KnowledgeSettings
         fields = ["enabled", "accounts", "categories", "index_from", "include_attachments", "attachment_max_mb",
-                  "private_api_key"]
+                  "private_base_url", "private_api_key"]
         widgets = {"accounts": forms.CheckboxSelectMultiple}
 
     def __init__(self, *args, **kwargs):
@@ -190,7 +190,7 @@ class KnowledgeSettingsForm(forms.ModelForm):
 @admin.register(KnowledgeSettings)
 class KnowledgeSettingsAdmin(admin.ModelAdmin):
     form = KnowledgeSettingsForm
-    readonly_fields = ["status_panel", "connection_help", "key_status"]
+    readonly_fields = ["status_panel", "connection_help", "key_status", "search_status"]
     fieldsets = [
         ("Стан", {"fields": ["status_panel"]}),
         ("Що індексувати", {
@@ -199,7 +199,8 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
             "description": "Minerva вирішує, які листи можна передати в RAG; RAG сам забирає зміни (pull) і звітує. "
                            "Вектори створюються локально на ПК RAG. Після збереження стрічка звіряється у фоні.",
         }),
-        ("Підключення RAG", {"fields": ["connection_help", "private_api_key", "key_status", "clear_key"]}),
+        ("Підключення RAG", {"fields": ["connection_help", "private_base_url", "private_api_key", "key_status",
+                                        "clear_key", "search_status"]}),
     ]
 
     def has_add_permission(self, request):
@@ -266,6 +267,33 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
                            format_html('<div style="margin-top:8px"><b>Останні помилки RAG:</b><ul>{}</ul></div>', errors)
                            if errors else "", buttons)
 
+    @admin.display(description="Приватний пошук (/v2)")
+    def search_status(self, obj):
+        """Стан запобіжника й останні capabilities — без звернення до RAG при відкритті сторінки."""
+        from . import retrieval
+        reason = retrieval.not_configured_reason(obj)
+        until = retrieval.breaker_until(obj)
+        lines = []
+        if reason:
+            lines.append(format_html('<span style="color:#e57373">не налаштовано: {}</span>', reason))
+        elif until:
+            lines.append(format_html('<span style="color:#e57373">⏸ запобіжник: Minerva не звертається до RAG до {}</span>',
+                                     timezone.localtime(until).strftime("%H:%M")))
+        else:
+            lines.append(f"адреса: {retrieval.base_url(obj)}")
+        caps = obj.last_capabilities or {}
+        if caps:
+            ready, idx = caps.get("readiness") or {}, caps.get("index") or {}
+            lines.append(format_html(
+                "останнє: пошук <b>{}</b>, індексація <b>{}</b> · документів {} · отримано seq {}, застосовано {} · {}",
+                ready.get("retrieval", "?"), ready.get("indexing", "?"), idx.get("docs", "?"),
+                idx.get("received_seq", "?"), idx.get("applied_seq", "?"),
+                timezone.localtime(obj.last_capabilities_at).strftime("%d.%m %H:%M") if obj.last_capabilities_at else ""))
+        button = format_html('<button type="submit" class="button" formaction="{}" formnovalidate>'
+                             '🔌 Перевірити пошук RAG</button>', reverse("admin:rag_assistant_knowledgesettings_check"))
+        return format_html("{}<div style='margin-top:6px'>{}</div>",
+                           format_html_join("", "<div>{}</div>", ((l,) for l in lines)), button)
+
     @admin.display(description="Як підключити RAG")
     def connection_help(self, obj):
         return format_html(
@@ -284,6 +312,7 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
             path("clear/", self.admin_site.admin_view(self.clear_view), name="rag_assistant_knowledgesettings_clear"),
             path("generation/", self.admin_site.admin_view(self.generation_view),
                  name="rag_assistant_knowledgesettings_generation"),
+            path("check/", self.admin_site.admin_view(self.check_view), name="rag_assistant_knowledgesettings_check"),
         ] + super().get_urls()
 
     def _back(self):
@@ -300,6 +329,18 @@ class KnowledgeSettingsAdmin(admin.ModelAdmin):
             n = knowledge.clear_index()
             self.message_user(request, f"Індексацію поставлено на паузу; на видалення з RAG передано документів: {n}.",
                               messages.WARNING)
+        return self._back()
+
+    def check_view(self, request):
+        from . import retrieval
+        if request.method == "POST":
+            res = retrieval.capabilities(request.user, force=True)
+            if res["ok"]:
+                ready = res["data"].get("readiness") or {}
+                self.message_user(request, f"✅ RAG відповів: пошук — {ready.get('retrieval')}, "
+                                           f"індексація — {ready.get('indexing')}.")
+            else:
+                self.message_user(request, f"❌ {res['message']}", messages.ERROR)
         return self._back()
 
     def generation_view(self, request):

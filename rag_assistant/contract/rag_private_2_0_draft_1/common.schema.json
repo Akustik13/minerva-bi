@@ -1,0 +1,260 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.sevskiy.com/rag/v2/common.schema.json",
+  "description": "Standalone copies of Minerva common types; validate.py --minerva checks exact compatibility. No network schema resolution.",
+  "$defs": {
+    "source_instance_id": {
+      "description": "Стале позначення середовища/БД Minerva (env MINERVA_INSTANCE_ID), напр. sevskiy-prod, dev-claude.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+    },
+    "generation": {
+      "description": "UUID покоління журналу; змінюється адміністратором після відновлення БД. Інше покоління → повна звірка через snapshot.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "document_type": {
+      "description": "v1: лише email. project і offer зарезервовані для наступних версій.",
+      "enum": [
+        "email"
+      ]
+    },
+    "document_id": {
+      "description": "<document_type>:<pk>. Стабільний у межах source_instance_id + generation.",
+      "type": "string",
+      "pattern": "^email:[1-9][0-9]{0,18}$"
+    },
+    "document_revision": {
+      "description": "Монотонна ревізія документа (кожна зміна content_version, ACL, tombstone, повернення після tombstone → +1). Ніколи не зменшується.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "pk": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "contract_version": {
+      "const": "rag-private/2.0-draft.1"
+    },
+    "job_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{32}$"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 64
+    },
+    "index": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "docs",
+        "chunks",
+        "received_seq",
+        "applied_seq",
+        "last_sync_at",
+        "embedding_model",
+        "embedding_dimensions"
+      ],
+      "properties": {
+        "docs": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "chunks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "received_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "applied_seq": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "last_sync_at": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "embedding_model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "embedding_dimensions": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "name",
+        "page"
+      ],
+      "properties": {
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "page": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "hit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_instance_id",
+        "generation",
+        "document_id",
+        "document_type",
+        "document_revision",
+        "content_version",
+        "chunk",
+        "score",
+        "text",
+        "subject",
+        "sent_at",
+        "from_email",
+        "thread_id",
+        "mailbox_id",
+        "customer_id",
+        "project_ids",
+        "attachment",
+        "text_truncated"
+      ],
+      "properties": {
+        "source_instance_id": {
+          "$ref": "common.schema.json#/$defs/source_instance_id"
+        },
+        "generation": {
+          "$ref": "common.schema.json#/$defs/generation"
+        },
+        "document_id": {
+          "$ref": "common.schema.json#/$defs/document_id"
+        },
+        "document_type": {
+          "$ref": "common.schema.json#/$defs/document_type"
+        },
+        "document_revision": {
+          "$ref": "common.schema.json#/$defs/document_revision"
+        },
+        "content_version": {
+          "$ref": "common.schema.json#/$defs/sha256"
+        },
+        "chunk": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "score": {
+          "type": "number"
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8000
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "sent_at": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "from_email": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500
+        },
+        "thread_id": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/pk"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mailbox_id": {
+          "$ref": "common.schema.json#/$defs/pk"
+        },
+        "customer_id": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/pk"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "project_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "common.schema.json#/$defs/pk"
+          },
+          "minItems": 0,
+          "maxItems": 50,
+          "uniqueItems": true
+        },
+        "attachment": {
+          "anyOf": [
+            {
+              "$ref": "common.schema.json#/$defs/attachment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "text_truncated": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

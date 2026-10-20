@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.sevskiy.com/rag/v2/error.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "code",
+    "message",
+    "retryable",
+    "request_id"
+  ],
+  "properties": {
+    "code": {
+      "enum": [
+        "invalid_request",
+        "access_filter_required",
+        "unauthorized",
+        "forbidden_scope",
+        "shop_key_forbidden",
+        "source_not_allowed",
+        "generation_mismatch",
+        "not_found",
+        "rate_limited",
+        "unavailable",
+        "deadline_exceeded",
+        "idempotency_conflict",
+        "internal_error"
+      ]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    },
+    "retryable": {
+      "type": "boolean"
+    },
+    "request_id": {
+      "$ref": "common.schema.json#/$defs/request_id"
+    }
+  }
+}

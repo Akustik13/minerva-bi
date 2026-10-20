@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.sevskiy.com/rag/v2/accepted.response.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract_version",
+    "request_id",
+    "job_id",
+    "status",
+    "status_url",
+    "poll_after_ms"
+  ],
+  "properties": {
+    "contract_version": {
+      "$ref": "common.schema.json#/$defs/contract_version"
+    },
+    "request_id": {
+      "$ref": "common.schema.json#/$defs/request_id"
+    },
+    "job_id": {
+      "$ref": "common.schema.json#/$defs/job_id"
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "running"
+      ]
+    },
+    "status_url": {
+      "type": "string",
+      "pattern": "^/v2/jobs/[a-f0-9]{32}$"
+    },
+    "poll_after_ms": {
+      "type": "integer",
+      "minimum": 250,
+      "maximum": 10000
+    }
+  }
+}

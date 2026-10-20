@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.sevskiy.com/rag/v2/cancel.request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "source_instance_id",
+    "generation",
+    "user_id"
+  ],
+  "properties": {
+    "source_instance_id": {
+      "$ref": "common.schema.json#/$defs/source_instance_id"
+    },
+    "generation": {
+      "$ref": "common.schema.json#/$defs/generation"
+    },
+    "user_id": {
+      "$ref": "common.schema.json#/$defs/pk"
+    }
+  }
+}
