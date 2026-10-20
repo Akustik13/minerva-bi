@@ -405,6 +405,7 @@ class IMAPClient:
                 'uid':         uid,
                 'message_id':  msg.get('Message-ID', '').strip(),
                 'in_reply_to': msg.get('In-Reply-To', '').strip(),
+                'references':  re.findall(r'<[^<>\s]+>', str(msg.get('References', '') or '')),
                 'subject':     subject,
                 'from_email':  from_email.lower(),
                 'from_name':   from_name,

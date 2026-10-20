@@ -182,37 +182,9 @@ class EmailAccountAdmin(admin.ModelAdmin):
 
         def _save_msg(account, msg_data, folder_name, folder_type):
             """Save one message to DB. Returns True if created, False if duplicate."""
-            if EmailMessage.objects.filter(
-                    account=account, imap_uid=msg_data['uid'],
-                    imap_folder_name=folder_name).exists():
-                return False
-            from email_assistant.imap_client import persist_attachments
-            saved_atts = persist_attachments(
-                account.pk, msg_data['uid'], folder_name,
-                msg_data.get('attachments', []))
-            tk = (msg_data.get('in_reply_to') or
-                  msg_data.get('message_id') or msg_data['subject'])
-            thread = EmailThread.objects.filter(
-                account=account, thread_id=tk[:500]).first()
-            if not thread:
-                thread = EmailThread.objects.create(
-                    account=account,
-                    thread_id=tk[:500] if tk else '',
-                    subject=msg_data['subject'][:500],
-                    participants=[msg_data['from_email']] + msg_data['to_emails'],
-                )
-            EmailMessage.objects.create(
-                account=account, thread=thread,
-                imap_uid=msg_data['uid'], imap_folder_name=folder_name,
-                message_id=msg_data['message_id'], in_reply_to=msg_data['in_reply_to'],
-                folder=folder_type,
-                subject=msg_data['subject'], from_email=msg_data['from_email'],
-                from_name=msg_data['from_name'], to_emails=msg_data['to_emails'],
-                cc_emails=msg_data['cc_emails'], body_text=msg_data['body_text'],
-                body_html=msg_data['body_html'], attachments=saved_atts,
-                is_read=msg_data['is_read'], sent_at=msg_data['sent_at'],
-            )
-            return True
+            # єдиний шлях збереження: гілки за ланцюжком Message-ID, без дублів надісланого з Minerva
+            from email_assistant.sync import save_message
+            return save_message(account, msg_data, folder_name, folder_type, persist_files=True) is not None
 
         def generate(account):
             import time as _time

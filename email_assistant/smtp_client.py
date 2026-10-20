@@ -85,8 +85,10 @@ class SMTPClient:
                 msg['Cc'] = ', '.join(cc_emails)
 
             if reply_to_message and reply_to_message.message_id:
+                # Відповідь, а не новий лист: поштові програми клієнта ставлять її в ту саму гілку
                 msg['In-Reply-To'] = reply_to_message.message_id
-                msg['References']  = reply_to_message.message_id
+                chain = [reply_to_message.in_reply_to, reply_to_message.message_id]
+                msg['References']  = ' '.join(r for r in chain if r)
 
             # Account signature > UserProfile.smtp_signature ({name} placeholder)
             # Appended to plain-text body only (HTML body already contains sig from frontend)

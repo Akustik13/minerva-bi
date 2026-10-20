@@ -369,7 +369,7 @@
     <!-- Toggle header — always visible -->
     <div class="em-reply-toggle-hd" id="pv-reply-hd" title="{% trans "Натисни щоб відповісти" %}">
       <div style="display:flex;gap:6px">
-        <button class="em-tb-btn" onclick="pvOpenReply('reply','{{ last.from_email|escapejs }}','{{ last.subject|escapejs }}')" title="{% trans "Відповісти" %}" style="padding:4px 10px;border:1px solid var(--border-strong);border-radius:5px">↩ {% trans "Відповісти" %}</button>
+        <button class="em-tb-btn" onclick="pvOpenReply('reply','{{ reply_to_addr|default:last.from_email|escapejs }}','{{ last.subject|escapejs }}','{{ reply_cc|escapejs }}')" title="{% trans "Відповісти" %}" style="padding:4px 10px;border:1px solid var(--border-strong);border-radius:5px">↩ {% trans "Відповісти" %}</button>
         <button class="em-tb-btn" onclick="pvOpenReply('forward','','{{ last.subject|escapejs }}')" title="{% trans "Переслати" %}" style="padding:4px 10px;border:1px solid var(--border-strong);border-radius:5px">→ {% trans "Переслати" %}</button>
       </div>
       <span id="pv-reply-arrow" style="transition:transform .15s;cursor:pointer" onclick="pvToggleReply()">▲</span>
@@ -580,12 +580,18 @@ window.pvToggleReply = function() {
   }
 };
 
-window.pvOpenReply = function(mode, toEmail, subj) {
+window.pvOpenReply = function(mode, toEmail, subj, cc) {
   var body  = document.getElementById('pv-reply-body');
   var toInp = document.getElementById('pv-reply-to');
   var arrow = document.getElementById('pv-reply-arrow');
   if (toInp) toInp.value = toEmail || '';
-  _pvReplySubj = (mode === 'forward' ? 'Fwd: ' : 'Re: ') + subj.replace(/^(Re|AW|Aw|Fwd|WG|FW):\s*/i, '');
+  // копія: інші учасники листа (колеги в копії лишаються в копії); при пересиланні — порожньо
+  var ccInp = document.getElementById('pv-reply-cc');
+  if (ccInp) {
+    ccInp.value = mode === 'reply' ? (cc || '') : '';
+    if (ccInp.value) pvShowCc(true);
+  }
+  _pvReplySubj = (mode === 'forward' ? 'Fwd: ' : 'Re: ') + (subj || '').replace(/^(\s*(re|aw|antw|wg|fw|fwd|sv|vs|tr)\s*(\[\d+\])?\s*:\s*)+/i, '');
   var subjInp = document.getElementById('pv-reply-subj');
   if (subjInp) subjInp.value = _pvReplySubj;
   body.style.display = 'block';
@@ -719,12 +725,12 @@ function _pvAutocomplete(inputId, listId) {
 _pvAutocomplete('pv-reply-to', 'pv-reply-to-ac');
 _pvAutocomplete('pv-reply-cc', 'pv-reply-cc-ac');
 
-window.pvShowCc = function() {
+window.pvShowCc = function(noFocus) {
   document.querySelectorAll('.em-reply-cc').forEach(function(el){ el.style.display = 'block'; });
   var btn = document.getElementById('pv-reply-cc-btn');
   if (btn) btn.style.display = 'none';
   var cc = document.getElementById('pv-reply-cc');
-  if (cc) cc.focus();
+  if (cc && !noFocus) cc.focus();
 };
 
 window.pvReplyAI = function(pk) {
@@ -866,7 +872,7 @@ window.pvAiGenerate = async function(pk) {
     var d = await r.json();
     txt.textContent = d.ok ? d.reply : '⚠️ ' + d.error;
     var aiBox = document.getElementById('pv-ai-' + pk);
-    if (aiBox) aiBox._to = d.to || '';
+    if (aiBox) { aiBox._to = d.to || ''; aiBox._cc = (d.cc || []).join(', '); }
     _pvUsed('pv-ai-used-' + pk, (d.to ? ['{% trans "кому" %}: ' + d.to] : []).concat(d.used || []));
   } catch { txt.textContent = '⚠️ {% trans "Помилка" %}'; }
 };
@@ -945,7 +951,7 @@ window.pvHistoryDraft = async function(pk) {
 };
 window.pvHistoryDraftUse = function() {
   if (!_pvDraft) return;
-  pvOpenReply('reply', _pvDraft.to || '', _pvDraft.subject || _pvReplySubj || '');
+  pvOpenReply('reply', _pvDraft.to || '', _pvDraft.subject || _pvReplySubj || '', (_pvDraft.cc || []).join(', '));
   var ed = document.getElementById('pv-reply-editor');
   if (ed) { ed.innerText = _pvDraft.reply; ed.scrollIntoView({behavior: 'smooth'}); }
 };
@@ -1014,6 +1020,8 @@ window.pvUseAsReply = function(pk) {
   var toInp = document.getElementById('pv-reply-to');
   var box = document.getElementById('pv-ai-' + pk);
   if (toInp && box && box._to && !toInp.value) toInp.value = box._to;
+  var ccInp = document.getElementById('pv-reply-cc');
+  if (ccInp && box && box._cc && !ccInp.value) { ccInp.value = box._cc; pvShowCc(true); }
   ed.scrollIntoView({behavior:'smooth'});
   ed.focus();
 };

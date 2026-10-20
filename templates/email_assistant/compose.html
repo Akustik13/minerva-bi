@@ -107,6 +107,7 @@
 
   <div class="em-compose-card">
     <form id="compose-form" enctype="multipart/form-data">
+      {% if reply_to %}<input type="hidden" name="reply_to_pk" value="{{ reply_to.pk }}">{% endif %}
       {% csrf_token %}
 
       <div class="em-field">
@@ -117,7 +118,8 @@
       </div>
       <div class="em-field">
         <span class="em-field-label">CC</span>
-        <input type="text" name="cc" id="cc-field" placeholder="{% trans "Копія..." %}" autocomplete="off">
+        <input type="text" name="cc" id="cc-field" placeholder="{% trans "Копія..." %}" autocomplete="off"
+               value="{{ initial.cc|default:'' }}">
       </div>
       <div class="em-field">
         <span class="em-field-label">{% trans "Тема" %}</span>

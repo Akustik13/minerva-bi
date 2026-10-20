@@ -1,6 +1,7 @@
 """email_assistant/views.py — Email клієнт інтерфейс."""
 import json
 import logging
+import re
 from django.contrib.admin.views.decorators import staff_member_required
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, get_object_or_404
@@ -168,6 +169,16 @@ def _page_range(page, total_pages):
 ALL_FOLDERS = '__all__'
 
 
+EML_FOLDER_PREFIX = 'eml:'   # імпортовані .eml (без UID) — кожен зі своєю «папкою», показуються у Вхідних
+
+
+def _inbox_q(account):
+    """Листи «Вхідних»: папка INBOX, старі листи без папки і імпортовані .eml."""
+    from django.db.models import Q
+    return (Q(imap_folder_name='') | Q(imap_folder_name__iexact=account.imap_folder_inbox)
+            | Q(imap_folder_name__startswith=EML_FOLDER_PREFIX))
+
+
 def _build_qs(account, folder, q=''):
     from email_assistant.models import EmailMessage, EmailThread
 
@@ -189,9 +200,7 @@ def _build_qs(account, folder, q=''):
         ).values_list('id', flat=True)
         qs = EmailMessage.objects.filter(
             account=account, folder='inbox', is_deleted=False
-        ).filter(
-            Q(imap_folder_name='') | Q(imap_folder_name__iexact=account.imap_folder_inbox)
-        ).exclude(thread_id__in=archived_ids)
+        ).filter(_inbox_q(account)).exclude(thread_id__in=archived_ids)
     elif folder == ALL_FOLDERS:
         # Пошук/фільтр по всіх папках: усе, крім Спаму, Кошика й видаленого
         qs = EmailMessage.objects.filter(account=account, is_deleted=False, is_spam=False).exclude(
@@ -212,6 +221,7 @@ def _build_qs(account, folder, q=''):
             Q(subject__icontains=q) |
             Q(from_email__icontains=q) |
             Q(from_name__icontains=q) |
+            Q(to_emails__icontains=q) |
             Q(body_text__icontains=q)
         )
 
@@ -377,14 +387,11 @@ def inbox_view(request):
         _attach_folder_tags(account, emails)
 
     from email_assistant.models import EmailThread as _ET
-    from django.db.models import Q as _Q
     _archived_ids = _ET.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
     unread_inbox = EmailMessage.objects.filter(
         account=account, folder='inbox',
         is_read=False, is_deleted=False,
-    ).filter(
-        _Q(imap_folder_name='') | _Q(imap_folder_name__iexact=account.imap_folder_inbox)
-    ).exclude(thread_id__in=_archived_ids).count()
+    ).filter(_inbox_q(account)).exclude(thread_id__in=_archived_ids).count()
     unread_counts = {
         'inbox':    unread_inbox,
         'starred':  EmailMessage.objects.filter(account=account, is_starred=True, is_read=False, is_deleted=False).count(),
@@ -493,10 +500,13 @@ def thread_preview_view(request, thread_pk):
     set_read(account, emails, True)
 
     links = _mail_links(emails)
+    reply_to_addr, reply_cc = _reply_addresses(account, emails[-1]) if emails else ('', [])
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
         'links':           links,
         'attach_options':  _attach_options(emails, links),
+        'reply_to_addr':   reply_to_addr,
+        'reply_cc':        ', '.join(reply_cc),
         'thread':          thread,
         'emails':          _thread_display_order(request, emails),
         'first_msg':       emails[0] if emails else None,
@@ -517,10 +527,13 @@ def message_preview_view(request, message_pk):
     set_read(account, [msg], True)
 
     links = _mail_links([msg])
+    reply_to_addr, reply_cc = _reply_addresses(account, msg)
     return render(request, 'email_assistant/preview.html', _ctx(request, {
         'account':         account,
         'links':           links,
         'attach_options':  _attach_options([msg], links),
+        'reply_to_addr':   reply_to_addr,
+        'reply_cc':        ', '.join(reply_cc),
         'thread':          msg.thread,
         'emails':          [msg],
         'last_msg':        msg,
@@ -812,10 +825,12 @@ def compose_view(request):
         from email_assistant.models import EmailMessage
         reply_to = get_object_or_404(EmailMessage, pk=reply_to_pk, account=account)
         subj = reply_to.subject
-        if not subj.lower().startswith('re:'):
+        if not re.match(r'\s*(re|aw|antw|sv)\s*:', subj, re.IGNORECASE):
             subj = f'Re: {subj}'
+        reply_to_addr, reply_cc = _reply_addresses(account, reply_to)
         initial = {
-            'to':         reply_to.from_email,
+            'to':         reply_to_addr,
+            'cc':         ', '.join(reply_cc),
             'subject':    subj,
             'quote':      f'\n\n--- Оригінальний лист ---\nВід: {reply_to.from_email}\n{reply_to.body_text[:2000]}',
             'quote_html': _build_quote_html(
@@ -893,16 +908,33 @@ def _handle_send(request, account, reply_to=None):
 
     if result['ok']:
         try:
-            thread = reply_to.thread if reply_to else None
+            from email_assistant.sync import get_or_create_thread
+            now = timezone.now()
+            # відповідь — у гілку листа; новий лист — у свою гілку, щоб відповідь клієнта лягла до нього
+            thread = reply_to.thread if reply_to and reply_to.thread_id else get_or_create_thread(account, {
+                'subject': subject, 'from_email': account.email_address,
+                'to_emails': to_list, 'cc_emails': cc_list, 'sent_at': now,
+                'message_id': result.get('message_id', ''),
+                'in_reply_to': reply_to.message_id if reply_to else '',
+            })
+            if reply_to and not reply_to.thread_id:
+                reply_to.thread = thread           # лист без гілки — тепер вони разом
+                reply_to.save(update_fields=['thread'])
             EmailMessage.objects.create(
                 account=account, thread=thread, folder='sent',
+                # без UID поки копія з «Надісланих» не синхронізується (sync.save_message допише UID)
+                imap_folder_name=('minerva:' + result.get('message_id', ''))[:200],
+                in_reply_to=(reply_to.message_id if reply_to else '')[:500],
                 message_id=result.get('message_id', ''),
                 subject=subject, from_email=account.email_address,
                 from_name=account.display_name, to_emails=to_list, cc_emails=cc_list,
-                body_text=body, is_read=True, sent_at=timezone.now(),
+                body_text=body, body_html=body_html or '', is_read=True, sent_at=now,
                 attachments=[{'name': a['name'], 'content_type': a['content_type'],
                               'size': len(a['content'])} for a in attachments],
             )
+            thread.message_count = thread.messages.count()
+            thread.last_message_at = now
+            thread.save(update_fields=['message_count', 'last_message_at'])
         except Exception as e:
             logger.warning('store sent message: %s', e)
         _save_contacts(request.user, to_list + cc_list)
@@ -952,9 +984,34 @@ def ai_suggest_reply(request, message_pk):
     msg.save(update_fields=['ai_reply_draft'])
     from email_assistant.ai_helper import last_model
     used = used_summary(ctx) + ([f'модель {_model_label(last_model())}'] if last_model() else [])
+    _to, reply_cc = _reply_addresses(account, thread_messages[-1])
+    if (to_email or '').lower() != (_to or '').lower():
+        reply_cc = []   # внутрішнє пересилання → пишемо клієнту, колег у копію не тягнемо
     return JsonResponse({'ok': bool(reply), 'reply': reply, 'used': used,
-                         'to': to_email, 'subject': (ctx['thread_msgs'][0].subject if ctx['thread_msgs'] else msg.subject),
+                         'to': to_email, 'cc': reply_cc, 'subject': (ctx['thread_msgs'][0].subject if ctx['thread_msgs'] else msg.subject),
                          'error': '' if reply else 'AI не повернув відповідь'})
+
+
+def _reply_addresses(account, msg):
+    """
+    (кому, [копія]) для «Відповісти»: відправнику, а решту учасників листа — у копію
+    (колега в копії лишається в копії). Відповідь на власний лист — тим самим отримувачам.
+    """
+    me = (account.email_address or '').lower()
+    sender = (msg.from_email or '').lower()
+    if sender == me or msg.folder == 'sent':
+        to_list = [a for a in (msg.to_emails or []) if a.lower() != me]
+        to_addr = to_list[0] if to_list else ''
+        rest = to_list[1:] + list(msg.cc_emails or [])
+    else:
+        to_addr = msg.from_email or ''
+        rest = list(msg.to_emails or []) + list(msg.cc_emails or [])
+    cc, seen = [], {me, to_addr.lower()}
+    for a in rest:
+        if a and a.lower() not in seen:
+            seen.add(a.lower())
+            cc.append(a)
+    return to_addr, cc
 
 
 def _reply_recipient(msg, ctx):
@@ -1163,11 +1220,7 @@ def unread_count_view(request):
     from django.db.models import Q
     base = EmailMessage.objects.filter(account=account, is_deleted=False, is_read=False)
     archived_ids = EmailThread.objects.filter(account=account, is_archived=True).values_list('id', flat=True)
-    inbox = base.filter(
-        folder='inbox',
-    ).filter(
-        Q(imap_folder_name='') | Q(imap_folder_name__iexact=account.imap_folder_inbox)
-    ).exclude(thread_id__in=archived_ids).count()
+    inbox = base.filter(folder='inbox').filter(_inbox_q(account)).exclude(thread_id__in=archived_ids).count()
     starred = base.filter(is_starred=True).count()
     spam    = base.filter(is_spam=True).count()
     return JsonResponse({'count': inbox, 'inbox': inbox, 'starred': starred, 'spam': spam})
@@ -1832,7 +1885,7 @@ def import_emails_view(request):
     import zipfile, io, email as email_lib
     from email.utils import parseaddr, parsedate_to_datetime
     from email.header import decode_header as _dh
-    from email_assistant.models import EmailMessage, EmailThread
+    from email_assistant.models import EmailMessage
 
     account = _get_account(request)
     if not account:
@@ -1874,16 +1927,20 @@ def import_emails_view(request):
                 return False
             from email_assistant.imap_client import _get_body
             text_body, html_body = _get_body(msg)
-            thread_key = msg.get('In-Reply-To', '').strip() or msg_id or subject
-            thread = EmailThread.objects.filter(account=account, thread_id=thread_key[:500]).first()
-            if not thread:
-                thread = EmailThread.objects.create(
-                    account=account, thread_id=thread_key[:500] if thread_key else '',
-                    subject=subject[:500], participants=[from_email] + to_list,
-                )
+            import hashlib
+            import re as _re
+            from email_assistant.sync import get_or_create_thread
+            in_reply_to = (msg.get('In-Reply-To') or '').strip()
+            thread = get_or_create_thread(account, {
+                'subject': subject, 'from_email': from_email, 'to_emails': to_list, 'cc_emails': cc_list,
+                'message_id': msg_id, 'in_reply_to': in_reply_to, 'sent_at': sent_at,
+                'references': _re.findall(r'<[^<>\s]+>', str(msg.get('References', '') or '')),
+            })
             EmailMessage.objects.create(
                 account=account, thread=thread, folder='inbox',
-                message_id=msg_id, subject=subject,
+                # без UID: унікальна «папка» на кожен файл (інакше другий імпорт конфліктує з першим)
+                imap_folder_name=(EML_FOLDER_PREFIX + (msg_id or hashlib.sha1(raw_bytes).hexdigest()))[:200],
+                message_id=msg_id, in_reply_to=in_reply_to[:500], subject=subject,
                 from_email=from_email, from_name=from_name,
                 to_emails=to_list, cc_emails=cc_list, body_text=text_body, body_html=html_body,
                 is_read=True, sent_at=sent_at,

@@ -1210,3 +1210,171 @@ class ReplyAttachmentsAndContactsTests(MailLinksTests):
         self.assertIn('tthreatts@aevex.com', emails)                 # адресна книга
         self.assertIn('ifejzic@aevex.com', emails)                   # клієнт CRM
         self.assertEqual(found('Travis')[0]['source'], 'адресна книга')
+
+
+class ReplyThreadingTests(MailLinksTests):
+    """Відповідь лягає в ту саму гілку (In-Reply-To/References), Копія підставляється, «Надіслані» не дублюються."""
+
+    def _data(self, uid, **kw):
+        d = _msg(uid)
+        d.update(kw)
+        return d
+
+    def test_references_chain_joins_thread(self):
+        from email_assistant.sync import save_message
+        first = save_message(self.account, self._data(1, subject='Anfrage Boards', message_id='<a@x>'), 'INBOX')
+        # третій лист посилається на перший лише через References (другого в Minerva нема)
+        third = save_message(self.account, self._data(3, subject='AW: AW: Anfrage Boards', message_id='<c@x>',
+                                                      in_reply_to='<b@x>', references=['<a@x>', '<b@x>']),
+                             'INBOX')
+        self.assertEqual(third.thread_id, first.thread_id)
+        self.assertEqual(third.thread.message_count, 2)
+
+    def test_subject_fallback_needs_same_counterpart(self):
+        from email_assistant.sync import normalize_subject, save_message
+        self.assertEqual(normalize_subject('AW: Re[2]: WG:  Anfrage   Boards'), 'anfrage boards')
+        a = save_message(self.account, self._data(1, subject='Anfrage', from_email='one@client.com'), 'INBOX')
+        reply = save_message(self.account, self._data(2, subject='AW: Anfrage', from_email='one@client.com'), 'INBOX')
+        other = save_message(self.account, self._data(3, subject='Anfrage', from_email='two@other.com'), 'INBOX')
+        self.assertEqual(reply.thread_id, a.thread_id)          # без заголовків, але та сама людина й тема
+        self.assertNotEqual(other.thread_id, a.thread_id)       # однакова тема від іншої людини — окремо
+
+    def test_reply_sends_headers_and_sent_copy_is_not_duplicated(self):
+        from email_assistant.sync import save_message
+        orig = self._em(from_email='tthreatts@aevex.com', subject='RE: DigiKey order 102037400',
+                        to_emails=['viacheslav.pryimak@sevskiy.de', 'sergey@sevskiy.de'],
+                        cc_emails=['ifejzic@aevex.com'], message_id='<orig@aevex.com>',
+                        in_reply_to='<prev@sevskiy.de>')
+        sent = {}
+
+        def fake_send(client, **kw):
+            sent.update(kw)
+            return {'ok': True, 'message_id': '<reply1@sevskiy.de>', 'via': 'test'}
+        with patch('email_assistant.smtp_client.SMTPClient.send', fake_send):
+            d = self.client.post('/email/send/', {'reply_to_pk': orig.pk, 'to': 'tthreatts@aevex.com',
+                                                  'cc': 'sergey@sevskiy.de, ifejzic@aevex.com',
+                                                  'subject': 'RE: DigiKey order 102037400', 'body': 'Hi'}).json()
+        self.assertTrue(d['ok'], d)
+        self.assertEqual(sent['reply_to_message'], orig)
+        orig.refresh_from_db()
+        self.assertIsNotNone(orig.thread_id)
+        local = EmailMessage.objects.get(message_id='<reply1@sevskiy.de>')
+        self.assertEqual((local.thread_id, local.in_reply_to), (orig.thread_id, '<orig@aevex.com>'))
+
+        # копія з «Надісланих» приходить синхронізацією — дописує UID, а не створює другий лист
+        copy = self._data(77, message_id='<reply1@sevskiy.de>', subject='RE: DigiKey order 102037400',
+                          from_email='viacheslav.pryimak@sevskiy.de', to_emails=['tthreatts@aevex.com'],
+                          in_reply_to='<orig@aevex.com>', is_read=True)
+        self.assertIsNone(save_message(self.account, copy, 'Gesendete Objekte', 'sent'))
+        local.refresh_from_db()
+        self.assertEqual((local.imap_uid, local.imap_folder_name), (77, 'Gesendete Objekte'))
+        self.assertEqual(EmailMessage.objects.filter(message_id='<reply1@sevskiy.de>').count(), 1)
+
+        # відповідь клієнта на наш лист — у ту саму гілку
+        answer = save_message(self.account, self._data(78, message_id='<ans@aevex.com>', subject='RE: RE: x',
+                                                       from_email='tthreatts@aevex.com',
+                                                       in_reply_to='<reply1@sevskiy.de>'), 'INBOX')
+        self.assertEqual(answer.thread_id, orig.thread_id)
+
+    def test_two_sends_without_sync_do_not_collide(self):
+        n = iter(range(1, 10))
+
+        def fake_send(client, **kw):
+            return {'ok': True, 'message_id': f'<new{next(n)}@sevskiy.de>', 'via': 'test'}
+        with patch('email_assistant.smtp_client.SMTPClient.send', fake_send):
+            for _ in range(2):
+                self.assertTrue(self.client.post('/email/send/', {
+                    'to': 'buyer@client.com', 'subject': 'Angebot', 'body': 'Hi'}).json()['ok'])
+        sent = EmailMessage.objects.filter(folder='sent', subject='Angebot')
+        self.assertEqual(sent.count(), 2)
+        self.assertTrue(all(m.thread_id for m in sent))          # новий лист теж має гілку
+
+    def test_smtp_references_chain(self):
+        from email_assistant.smtp_client import SMTPClient
+        orig = self._em(from_email='tthreatts@aevex.com', subject='RE: order', message_id='<orig@aevex.com>',
+                        in_reply_to='<prev@sevskiy.de>')
+        captured = {}
+
+        class _Capture(_FakeSMTP):
+            def sendmail(self, frm, to, data):
+                captured['data'] = data
+        self.account.smtp_port, self.account.smtp_use_ssl, self.account.smtp_use_tls = 587, False, True
+        with patch('email_assistant.smtp_client.smtplib.SMTP', _Capture), \
+                patch('email_assistant.imap_client.IMAPClient', _FakeImapAppend()):
+            r = SMTPClient(self.account).send(['tthreatts@aevex.com'], 'RE: order', 'Hi', reply_to_message=orig)
+        self.assertTrue(r['ok'], r)
+        raw = captured['data'] if isinstance(captured['data'], str) else captured['data'].decode()
+        self.assertIn('In-Reply-To: <orig@aevex.com>', raw)
+        self.assertIn('References: <prev@sevskiy.de> <orig@aevex.com>', raw)
+
+    def test_reply_cc_prefilled(self):
+        orig = self._em(from_email='tthreatts@aevex.com', subject='AW: Boards',
+                        to_emails=['viacheslav.pryimak@sevskiy.de', 'sergey@sevskiy.de'],
+                        cc_emails=['ifejzic@aevex.com', 'Viacheslav.Pryimak@sevskiy.de'])
+        r = self.client.get('/email/compose/', {'reply_to': orig.pk})
+        self.assertContains(r, f'name="reply_to_pk" value="{orig.pk}"')
+        self.assertContains(r, 'value="sergey@sevskiy.de, ifejzic@aevex.com"')
+        self.assertContains(r, 'value="AW: Boards"')              # без «Re: AW:»
+        p = self.client.get(f'/email/message/{orig.pk}/preview/')
+        self.assertContains(p, "pvOpenReply('reply','tthreatts@aevex.com','AW: Boards',"
+                               "'sergey@sevskiy.de, ifejzic@aevex.com')")
+
+        # відповідь на власний лист — тим самим отримувачам
+        mine = self._em(from_email='viacheslav.pryimak@sevskiy.de', folder='sent', subject='Offer',
+                        to_emails=['buyer@client.com', 'boss@client.com'], cc_emails=['sergey@sevskiy.de'])
+        from email_assistant.views import _reply_addresses
+        self.assertEqual(_reply_addresses(self.account, mine),
+                         ('buyer@client.com', ['boss@client.com', 'sergey@sevskiy.de']))
+
+
+class QuickFilterAllMailTests(CategoryBase):
+    """Фільтр над списком шукає по всіх листах, а не лише на поточній сторінці."""
+
+    def setUp(self):
+        super().setUp()
+        from config.models import SystemSettings
+        s = SystemSettings.objects.get_or_create(pk=1)[0]
+        s.is_onboarding_complete = True
+        s.save()
+        self.client.force_login(self.user)
+
+    def test_old_mail_beyond_first_page_is_found(self):
+        old = self._em(from_email='rare@vendor.com', subject='Kalibrierung',
+                       sent_at=datetime(2025, 1, 1, tzinfo=dt_tz.utc))
+        for i in range(60):
+            self._em(from_email=f'p{i}@example.org', subject=f'News {i}')
+        first_page = self.client.get('/email/', {'folder': 'inbox'})
+        self.assertNotContains(first_page, f'id="row-{old.pk}"')
+        r = self.client.get('/email/', {'folder': 'inbox', 'q': 'kalibrier'})
+        self.assertContains(r, f'id="row-{old.pk}"')
+        self.assertContains(r, 'id="em-p2-q" value="kalibrier"')
+        self.assertContains(r, 'id="em-p2-pag"')
+        # отримувач теж ключ пошуку (Надіслані)
+        sent = self._em(folder='sent', imap_folder_name='Gesendete Objekte', from_email='viacheslav.pryimak@sevskiy.de',
+                        to_emails=['orders@zulieferer.de'], subject='Bestellung')
+        self.assertContains(self.client.get('/email/', {'q': 'zulieferer'}), f'id="row-{sent.pk}"')
+
+
+class EmlImportTests(QuickFilterAllMailTests):
+    """Імпорт .eml: кілька файлів без UID не конфліктують, видно у Вхідних, відповідь лягає в гілку."""
+
+    def _eml(self, mid, subject, in_reply_to=''):
+        head = f'Message-ID: {mid}\r\nFrom: Buyer <buyer@client.com>\r\nTo: viacheslav.pryimak@sevskiy.de\r\n'
+        if in_reply_to:
+            head += f'In-Reply-To: {in_reply_to}\r\nReferences: {in_reply_to}\r\n'
+        return (head + f'Subject: {subject}\r\nDate: Mon, 5 Oct 2026 10:00:00 +0200\r\n\r\nHello\r\n').encode()
+
+    def test_zip_of_two_emls(self):
+        import io
+        import zipfile
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, 'w') as zf:
+            zf.writestr('a.eml', self._eml('<e1@client.com>', 'Quote request'))
+            zf.writestr('b.eml', self._eml('<e2@client.com>', 'AW: Quote request', in_reply_to='<e1@client.com>'))
+        r = self.client.post('/email/import/', {'file': SimpleUploadedFile('mails.zip', buf.getvalue())})
+        self.assertEqual(r.json(), {'ok': True, 'created': 2})
+        a, b = (EmailMessage.objects.get(message_id=m) for m in ('<e1@client.com>', '<e2@client.com>'))
+        self.assertEqual(a.thread_id, b.thread_id)
+        inbox = self.client.get('/email/', {'folder': 'inbox'})
+        self.assertContains(inbox, f'data-pk="{b.pk}"')

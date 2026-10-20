@@ -368,7 +368,7 @@
       </span>
       <span class="em-p2-count" style="display:flex;align-items:center;gap:6px">
         <button class="em-layout-btn" id="em-layout-btn" onclick="toggleLayout()" title="{% trans "Вертикальне / горизонтальне розміщення" %}">⬒</button>
-        <span>{{ total }}</span>
+        <span id="em-total">{{ total }}</span>
         <select id="sort-sel" onchange="sortRows(this.value)"
                 style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border-strong);background:var(--bg-input);color:var(--text-muted);cursor:pointer;max-width:90px">
           <option value="date-desc">{% trans "Дата ↓" %}</option>
@@ -378,10 +378,11 @@
         </select>
       </span>
     </div>
-    <!-- Quick local filter + thread grouping -->
+    <!-- Quick filter (усі листи на сервері, не лише ця сторінка) + thread grouping -->
     <div class="em-p2-search-row">
-      <input class="em-p2-search-inp" type="search" id="em-p2-q"
+      <input class="em-p2-search-inp" type="search" id="em-p2-q" value="{{ q }}"
              placeholder="🔍 {% trans "Фільтр по відправнику, темі…" %}"
+             title="{% trans "Шукає по всіх листах (усі сторінки й папки, крім спаму й кошика): відправник, отримувач, тема, текст" %}"
              oninput="filterP2(this.value)" autocomplete="off">
       <button class="em-p2-group-btn" id="em-unread-btn"
               onclick="toggleUnreadOnly()" title="{% trans "Тільки непрочитані" %}">●</button>
@@ -500,6 +501,7 @@
       {% endfor %}
     </div>
 
+    <div id="em-p2-pag" style="flex-shrink:0">
     {% if total_pages > 1 %}
     <div class="em-pagination">
       {% if has_prev %}
@@ -525,6 +527,7 @@
       {% else %}<span></span>{% endif %}
     </div>
     {% endif %}
+    </div>
   </div>
 
   <!-- Drag handle 2: resize P2 -->
@@ -1263,10 +1266,54 @@ window.sortRows = function(key) {
 var _p2Filter = '';
 var _p2UnreadOnly = false;
 
+// Миттєво ховаємо рядки цієї сторінки, а за мить підставляємо результат сервера — по всіх листах
+var _p2Timer = null, _p2Seq = 0;
 window.filterP2 = function(q) {
   _p2Filter = (q || '').toLowerCase().trim();
   _applyP2Visibility();
+  clearTimeout(_p2Timer);
+  _p2Timer = setTimeout(function() { _p2ServerFilter((q || '').trim()); }, 400);
 };
+
+async function _p2ServerFilter(q) {
+  var params = new URLSearchParams(location.search);
+  if ((params.get('q') || '') === q) return;
+  if (q) params.set('q', q); else params.delete('q');
+  params.delete('page');
+  var url = location.pathname + (params.toString() ? '?' + params.toString() : '');
+  var seq = ++_p2Seq;
+  var list = document.getElementById('em-p2-list');
+  list.style.opacity = '.55';
+  try {
+    var r = await fetch(url, {credentials: 'same-origin'});
+    var html = await r.text();
+    if (seq !== _p2Seq) return;               // уже набрали далі — цей результат застарів
+    var doc = new DOMParser().parseFromString(html, 'text/html');
+    var newList = doc.getElementById('em-p2-list');
+    if (!r.ok || !newList) return;
+    list.innerHTML = newList.innerHTML;
+    [['em-p2-pag'], ['em-total']].forEach(function(ids) {
+      var cur = document.getElementById(ids[0]), fresh = doc.getElementById(ids[0]);
+      if (cur && fresh) cur.innerHTML = fresh.innerHTML;
+    });
+    history.replaceState(null, '', url);
+    var top = document.getElementById('em-q');
+    if (top) top.value = q;
+    // сервер уже відфільтрував (і по тексту листа) — локальний фільтр лише заважав би
+    _p2Filter = '';
+    _activeRow = null;
+    var all = document.getElementById('em-check-all');
+    if (all) all.checked = false;
+    _updateBulkBar();
+    var sortSel = document.getElementById('sort-sel');
+    if (sortSel && sortSel.value !== 'date-desc') sortRows(sortSel.value);
+    _applyP2Visibility();
+  } catch (e) {
+    /* мережа — лишається локальний фільтр */
+  } finally {
+    if (seq === _p2Seq) list.style.opacity = '';
+  }
+}
 
 // Групування робить сервер (усі листи папки, не лише поточна сторінка); вибір пам'ятає cookie
 window.toggleGrouping = function() {

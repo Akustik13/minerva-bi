@@ -7,8 +7,10 @@ email_assistant/sync.py — спільна логіка синхронізаці
 - set_read: прочитане в Minerva → прапорець \\Seen на сервері (у ту папку, де лежить лист).
 """
 import logging
+import re
 import threading
 from collections import defaultdict
+from datetime import timedelta
 
 from django.db.models import Max, Q
 
@@ -53,28 +55,74 @@ def folders_to_sync(folders) -> list:
             and f['name'].lower() not in SKIP_FOLDER_NAMES]
 
 
+# Префікси відповідей/пересилань різними мовами: Re:, AW:, Aw:, WG:, Fwd:, FW:, SV:, VS:, TR:, Antw:, Re[2]:
+_REPLY_PREFIX_RE = re.compile(r'^\s*(re|aw|antw|wg|fw|fwd|sv|vs|tr)\s*(\[\d+\])?\s*:\s*', re.IGNORECASE)
+SUBJECT_THREAD_DAYS = 180
+
+
+def normalize_subject(subject: str) -> str:
+    """Тема без «Re: AW: Aw: WG: …» і зайвих пробілів, у нижньому регістрі — ключ гілки за темою."""
+    s = subject or ''
+    while True:
+        stripped = _REPLY_PREFIX_RE.sub('', s, count=1)
+        if stripped == s:
+            break
+        s = stripped
+    return ' '.join(s.split()).lower()
+
+
+def _addresses(msg_data) -> set:
+    return {a.lower() for a in [msg_data.get('from_email')] + list(msg_data.get('to_emails') or [])
+            + list(msg_data.get('cc_emails') or []) if a}
+
+
 def get_or_create_thread(account, msg_data):
-    from email_assistant.models import EmailThread
+    """
+    Гілка листа:
+    1) ланцюжок Message-ID — лист, на який відповідають (In-Reply-To) або будь-який із References,
+       уже є в Minerva → його гілка; так само інша копія цього ж листа (Вхідні/Надіслані);
+    2) запасний варіант — та сама тема без Re:/AW:/WG: і спільний зовнішній співрозмовник
+       (однакові «Anfrage» від різних людей не зливаються);
+    3) інакше — нова гілка.
+    """
+    from email_assistant.crm_link import is_own, own_addresses
+    from email_assistant.models import EmailMessage, EmailThread
 
-    thread_key = (msg_data.get('in_reply_to') or
-                  msg_data.get('message_id') or
-                  msg_data['subject'])
+    refs = [r for r in [msg_data.get('in_reply_to')] + list(msg_data.get('references') or []) if r]
+    mid = msg_data.get('message_id') or ''
 
-    thread = EmailThread.objects.filter(account=account, thread_id=thread_key[:500]).first()
-    if not thread:
-        clean = msg_data['subject']
-        for prefix in ('Re: ', 'Fwd: ', 'FW: ', 'RE: ', 'AW: ', 'WG: '):
-            clean = clean.replace(prefix, '')
-        thread = EmailThread.objects.filter(account=account, subject=clean.strip()).first()
+    ids = [r[:500] for r in refs] + ([mid[:500]] if mid else [])
+    if ids:
+        known = (EmailMessage.objects.filter(account=account, message_id__in=ids[-60:])
+                 .exclude(thread=None).order_by('-sent_at').values_list('thread_id', flat=True).first())
+        if known:
+            return EmailThread.objects.get(pk=known)
+        thread = EmailThread.objects.filter(account=account, thread_id__in=ids[-60:]).first()
+        if thread:
+            return thread
 
-    if not thread:
-        thread = EmailThread.objects.create(
-            account=account,
-            thread_id=thread_key[:500] if thread_key else '',
-            subject=msg_data['subject'][:500],
-            participants=[msg_data['from_email']] + msg_data['to_emails'],
-        )
-    return thread
+    core = normalize_subject(msg_data.get('subject'))
+    own = own_addresses()
+    external = {a for a in _addresses(msg_data) if not is_own(a, own)}
+    if len(core) >= 3 and external:
+        since = (msg_data.get('sent_at') or timezone_now()) - timedelta(days=SUBJECT_THREAD_DAYS)
+        candidates = (EmailThread.objects.filter(account=account, subject__icontains=core[:120])
+                      .filter(last_message_at__gte=since).order_by('-last_message_at')[:30])
+        for t in candidates:
+            if normalize_subject(t.subject) == core and external & {p.lower() for p in (t.participants or [])}:
+                return t
+
+    return EmailThread.objects.create(
+        account=account,
+        thread_id=(refs[0] if refs else mid or msg_data['subject'] or '')[:500],
+        subject=msg_data['subject'][:500],
+        participants=sorted(_addresses(msg_data))[:50],
+    )
+
+
+def timezone_now():
+    from django.utils import timezone
+    return timezone.now()
 
 
 def save_message(account, msg_data, imap_folder, folder_type=None, persist_files=False):
@@ -85,6 +133,20 @@ def save_message(account, msg_data, imap_folder, folder_type=None, persist_files
     if EmailMessage.objects.filter(account=account, imap_uid=msg_data['uid'],
                                    imap_folder_name=imap_folder).exists():
         return None
+
+    # Лист, надісланий із Minerva, уже збережений локально (без UID) — це його копія з «Надісланих»:
+    # дописуємо UID/папку замість дубліката
+    if msg_data.get('message_id'):
+        local = EmailMessage.objects.filter(account=account, imap_uid=0,
+                                            message_id=msg_data['message_id']).first()
+        if local is not None:
+            local.imap_uid, local.imap_folder_name = msg_data['uid'], imap_folder
+            fields = ['imap_uid', 'imap_folder_name']
+            if not local.body_html and msg_data.get('body_html'):
+                local.body_html = msg_data['body_html']
+                fields.append('body_html')
+            local.save(update_fields=fields)
+            return None
 
     attachments = msg_data.get('attachments', [])
     if persist_files:
@@ -120,7 +182,10 @@ def save_message(account, msg_data, imap_folder, folder_type=None, persist_files
         thread.last_message_at = msg_data['sent_at']
     if not msg_data['is_read']:
         thread.has_unread = True
-    thread.save(update_fields=['message_count', 'last_message_at', 'has_unread'])
+    # учасники гілки (для запасного зв'язування за темою)
+    participants = sorted({p.lower() for p in (thread.participants or [])} | _addresses(msg_data))[:50]
+    thread.participants = participants
+    thread.save(update_fields=['message_count', 'last_message_at', 'has_unread', 'participants'])
     return em
 
 

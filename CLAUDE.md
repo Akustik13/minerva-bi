@@ -119,6 +119,9 @@ tabele_mvp/
 - Форма відповіді в прев'ю: Кому / Копія / Тема, підпис згорнутий; переклад листа й тексту відповіді на вибрану мову (`translate_email`, мова в `?lang=`/JSON); AI-чернетка без прощання — `ai_helper.strip_signoff` (підпис додається сам). «📜 Історія» в прокручуваній частині: `history_events` → scope `order` (ця переписка/замовлення) і `customer` (решта, згорнуто)
 - Вкладення у відповіді — `email_assistant/attachments.py`: файли з компʼютера + документи замовлення (`media/orders/{source}/{order}/`) і вкладення гілки; браузер шле лише посилання `att_ref` (`order:<pk>:<файл>` / `msg:<pk>:<idx>`), файл читає сервер (лише basename). Підказки адрес у Кому/Копія — `/email/crm-contacts/?q=` (адресна книга, клієнти CRM, відправники листів)
 - Групування по гілці (⎘) — на сервері (`_group_by_thread`, cookie `em_group`), дії рядка й масові дії — над усією гілкою
+- Гілки — `sync.get_or_create_thread` (єдине місце, також для .eml-імпорту, адмін-синхронізації й надісланого): ланцюжок Message-ID (In-Reply-To + References) → інакше та сама тема без Re:/AW:/WG: (`normalize_subject`) і спільний зовнішній учасник за 180 днів → нова гілка
+- Відповідь: `reply_to_pk` (inline і compose) → In-Reply-To/References у SMTP; Кому/Копія — `views._reply_addresses` (reply-all, на власний лист — тим самим отримувачам). Локальна копія надісланого: `imap_uid=0`, `imap_folder_name='minerva:<Message-ID>'`; копія з «Надісланих» при синхронізації дописує їй UID (`save_message`), без дубля. .eml-імпорт — `imap_folder_name='eml:…'`, у Вхідних через `views._inbox_q`
+- Швидкий фільтр над списком (`filterP2`) — миттєво по сторінці, потім сервер (`?q=`, усі листи й папки, крім спаму/кошика; шукає й отримувача), список і пагінація підміняються без перезавантаження
 - Тести: `python manage.py test email_assistant --settings=tabele.settings_test`
 
 ### faq/ (placeholder, no DB)
