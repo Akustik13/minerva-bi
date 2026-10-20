@@ -63,12 +63,13 @@ class ProjectAdmin(admin.ModelAdmin):
     list_filter = ("status", "owner")
     search_fields = ("code", "name", "customer__name", "participants__email")
     autocomplete_fields = ("customer",)
-    readonly_fields = ("code", "mail_link", "timeline_html", "source_thread_link", "created_by",
+    readonly_fields = ("code", "mail_link", "timeline_html", "offers_panel", "source_thread_link", "created_by",
                        "created_at", "updated_at")
     fieldsets = [
         (None, {"fields": ["code", "name", "status", "customer", "owner", "due_date", "next_action"]}),
         ("Опис і вимоги", {"fields": ["description"]}),
         ("Листування й хронологія", {"fields": ["mail_link", "timeline_html"]}),
+        ("📝 Angebote", {"fields": ["offers_panel"]}),
         ("Службове", {"fields": ["source_thread_link", "created_by", "created_at", "updated_at"],
                       "classes": ["collapse"]}),
     ]
@@ -110,6 +111,23 @@ class ProjectAdmin(admin.ModelAdmin):
             ((timezone.localtime(e["date"]).strftime("%d.%m.%Y %H:%M") if e["date"] else "—",
               e["icon"], e["url"], e["title"], e["who"]) for e in events))
         return format_html('<table style="width:100%">{}</table>', rows)
+
+    @admin.display(description="Пропозиції")
+    def offers_panel(self, obj):
+        if not obj or not obj.pk:
+            return "—"
+        try:
+            offers = list(obj.offers.order_by("-created_at"))
+        except AttributeError:
+            return "—"
+        rows = format_html_join("", '<tr><td style="padding:1px 12px 1px 0"><a href="{}">{}</a></td><td>{}</td>'
+                                    '<td style="text-align:right;padding-left:12px">{} {}</td></tr>',
+                                ((reverse("admin:offers_offer_change", args=[o.pk]), o.display_number,
+                                  o.get_status_display(), f"{o.gross_total:,.2f}".replace(",", " "), o.currency)
+                                 for o in offers))
+        add = reverse("admin:offers_offer_add") + f"?project={obj.pk}" + \
+            (f"&customer={obj.customer_id}" if obj.customer_id else "")
+        return format_html('<table>{}</table><a class="button" href="{}">📝 Новий Angebot</a>', rows, add)
 
     @admin.display(description="Створено з листування")
     def source_thread_link(self, obj):

@@ -253,6 +253,8 @@
       {% if thread %}
       <button class="em-pv-btn" id="pv-proj-btn" onclick="pvProjOpen()"
               title="{% trans "Додати цю переписку до проєкту або створити новий проєкт" %}">📁 {% trans "До проєкту" %}</button>
+      <button class="em-pv-btn" onclick="pvOfferFromThread({{ thread.pk }}, this)"
+              title="{% trans "Створити чернетку Angebot: клієнт і проєкт листування, артикули й кількості з листа, ціни з Minerva" %}">📝 Angebot</button>
       {% endif %}
       <button class="em-pv-btn danger" onclick="pvDelete({{ last.pk }})">🗑️</button>
       <a href="{% if thread %}/email/thread/{{ thread.pk }}/{% else %}/email/message/{{ last.pk }}/{% endif %}"
@@ -1097,6 +1099,22 @@ window.pvAiTranslate = async function(pk, force) {
   };
   try { render(JSON.parse(box.dataset.state || '{}')); } catch (e) {}
 })();
+
+// «📝 Angebot» — чернетка з листування відкривається в новій вкладці
+window.pvOfferFromThread = async function(tpk, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    var r = await fetch('/offers/api/from-thread/' + tpk + '/', {method: 'POST', headers: {'X-CSRFToken': CSRF}});
+    var d = await r.json();
+    if (d.ok) {
+      var t = document.getElementById('pv-toast');
+      if (t) { t.textContent = '📝 ' + d.number + ' · {% trans "позицій з листа" %}: ' + d.lines; t.style.display = 'block';
+               clearTimeout(t._hide); t._hide = setTimeout(function(){ t.style.display = 'none'; }, 2500); }
+      window.open(d.url, '_blank');
+    }
+  } catch (e) { /* мережа */ }
+  finally { if (btn) btn.disabled = false; }
+};
 
 window.pvCopyText = function(text) {
   var done = function() {

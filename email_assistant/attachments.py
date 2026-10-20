@@ -92,6 +92,9 @@ def load_ref(account, ref: str):
 
     kind, _, rest = (ref or '').partition(':')
     try:
+        if kind == 'offer':   # документ версії Angebot (PDF / DOCX)
+            from offers.services import revision_attachment
+            return revision_attachment(int(rest))
         if kind == 'order':
             pk, _, name = rest.partition(':')
             order = SalesOrder.objects.filter(pk=int(pk)).first()

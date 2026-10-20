@@ -888,7 +888,7 @@ window.MV_GROUPS = [
       { href:'/admin/projects/project/',             icon:'📁', label:'Проєкти',    app:'projects', model:'Project' },
       { href:'/admin/projects/project/triage/',      icon:'📥', label:'Розбір пошти', app:'projects', model:'Project' },
     ], apps:['crm','strategy','projects'] },
-  { id:'sales', icon:'🛒', label:'🛒 Продажі', apps:['sales'] },
+  { id:'sales', icon:'🛒', label:'🛒 Продажі', apps:['sales','offers'] },
   { id:'shop', icon:'🏪', label:'🏪 Інтернет-магазин',
     links:[
       { href:'/admin/shop/shoplisting/', icon:'💶', label:'Асортимент і ціни', app:'shop', model:'ShopListing' },
@@ -1174,6 +1174,7 @@ document.addEventListener('DOMContentLoaded', function(){
     '/dashboard/':       'analytics',
     '/admin/crm/':            'crm',
     '/admin/projects/':       'crm',
+    '/admin/offers/':         'sales',
     '/admin/strategy/':       'crm',
     '/strategy/':             'crm',
     '/ai/':                   'ai',

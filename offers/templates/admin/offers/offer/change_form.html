@@ -1,0 +1,24 @@
+{% extends "admin/change_form.html" %}
+{# Angebot: компактна таблиця позицій — усі колонки (ціна, знижка, сума, маржа) видно без прокрутки #}
+{% block extrastyle %}{{ block.super }}
+<style>
+#lines-group table { width: 100%; }
+#lines-group td, #lines-group th { padding: 4px 2px; vertical-align: top; }
+#lines-group td.original p { display: none; }   /* «1. ANT-100» — дублює № і товар */
+#lines-group td.field-position input { width: 30px !important; }
+#lines-group td.field-product .select2-container { width: 135px !important; }
+#lines-group td.field-product .related-widget-wrapper-link { display: none; }
+#lines-group td.field-sku input { width: 80px !important; }
+#lines-group td.field-description textarea { width: 140px !important; min-height: 34px; }
+#lines-group td.field-qty input,
+#lines-group td.field-unit_price input { width: 70px !important; }
+#lines-group td.field-discount_percent input { width: 48px !important; }
+#lines-group td.field-unit input { width: 42px !important; }
+#lines-group td.field-lead_time input { width: 62px !important; }
+#lines-group td.field-price_info,
+#lines-group td.field-line_total { font-size: 12px; white-space: nowrap; }
+#lines-group td.field-line_total { text-align: right; font-weight: 600; }
+.form-row.field-customer .select2-container,
+.form-row.field-project .select2-container { width: 340px !important; }
+</style>
+{% endblock %}

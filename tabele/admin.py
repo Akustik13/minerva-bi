@@ -37,6 +37,7 @@ def _get_app_list(self, request, app_label=None):
         'rag_assistant',    # 📚 Помічник по продукції (RAG)
         'email_assistant',  # 📧 Email Асистент
         'projects',         # 📁 Проєкти з пошти
+        'offers',           # 📝 Angebote
         'bots',             # 🤖 Боти та AI
         'jlcpcb',           # 🔬 JLCPCB виробництво
         'documents',        # 📄 Документи
@@ -55,6 +56,7 @@ def _get_app_list(self, request, app_label=None):
         'ai_assistant':    ['aiconversation', 'aibudgetlog'],
         'rag_assistant':   ['ragsettings', 'ragconversation'],
         'projects':        ['project', 'dismissedthread'],
+        'offers':          ['offer', 'offersettings', 'offerrevision'],
         'email_assistant': ['emailaccount', 'emailsettings', 'emailmessage', 'emailthread'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],
         'inventory': ['product', 'productcategory', 'productalias', 'location',

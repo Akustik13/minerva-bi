@@ -177,7 +177,7 @@
         </div>
 
         <div id="body-editor" class="em-body-editor" contenteditable="true"
-             placeholder="Текст листа...">{% if signature and account.signature_position == 'after_reply' and initial.quote %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div><br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% elif initial.quote %}<br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% if signature %}<br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% else %}{% if signature %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% endif %}</div>
+             placeholder="Текст листа...">{% if signature and account.signature_position == 'after_reply' and initial.quote %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div><br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% elif initial.quote %}<br><br>{% if initial.quote_html %}{{ initial.quote_html|safe }}{% else %}<pre style="color:var(--text-muted);font-size:12px;white-space:pre-wrap;border-left:3px solid var(--border-strong);padding-left:10px;margin:0">{{ initial.quote }}</pre>{% endif %}{% if signature %}<br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% else %}{% if initial.body_html %}{{ initial.body_html|safe }}{% endif %}{% if signature %}<br><br><div class="em-sig-in" style="color:var(--text-muted);font-size:13px;margin-top:4px">--&nbsp;<br>{{ signature|safe }}</div>{% endif %}{% endif %}</div>
       </div>
 
       <textarea name="body"      id="body-hidden"      style="display:none"></textarea>
@@ -191,6 +191,14 @@
         <input type="file" id="att-input" name="attachments" multiple
                style="display:none" onchange="showFiles(this)">
         <div id="files-list" class="em-att-list"></div>
+        {% if initial.att_refs %}
+        <div class="em-att-list" style="margin-top:6px">
+          {% for a in initial.att_refs %}
+          <input type="hidden" name="att_ref" value="{{ a.ref }}">
+          <span class="em-att-chip" title="{% trans "Документ Minerva — додається на сервері" %}">📎 {{ a.name }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
       </div>
 
       <!-- Footer -->

@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'rag_assistant',    # 📚 Помічник по продукції (зовнішній RAG: даташити + склад)
     'email_assistant',  # 📧 Email Асистент
     'projects',         # 📁 Проєкти з пошти (після email_assistant: сигнали після прив'язки до CRM)
+    'offers',           # 📝 Angebote — комерційні пропозиції
     'calendar_app',     # 📅 Календар
     'bots',             # 🤖 Боти та AI
     'jlcpcb',           # 🔬 JLCPCB виробництво
