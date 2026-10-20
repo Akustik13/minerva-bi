@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/changes.response.schema.json",
+  "title": "GET /api/v1/knowledge/changes/?after=<seq>&limit=<1..200>[&generation=<uuid>]",
+  "description": "Події журналу після курсора за зростанням seq. Гарантія: після того як подію N видно, подія з seq <= N вже не з'явиться (записувачі серіалізовані, seq = порядок commit). У межах сторінки кожен document_id трапляється не більше одного разу (остання подія). upsert несе поточний стан документа на момент читання; якщо документ уже не допущений — подія віддається як delete з ревізією tombstone.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "source_instance_id", "generation", "enabled", "last_seq", "next_after", "has_more", "items"],
+  "properties": {
+    "contract_version": {"$ref": "common.schema.json#/$defs/contract_version"},
+    "source_instance_id": {"$ref": "common.schema.json#/$defs/source_instance_id"},
+    "generation": {"$ref": "common.schema.json#/$defs/generation"},
+    "enabled": {"type": "boolean", "description": "false — пауза: нові документи не додаються, але tombstone і зміни ACL/вмісту вже переданих документів продовжують надходити."},
+    "last_seq": {"$ref": "common.schema.json#/$defs/cursor", "description": "Остання закомічена подія журналу на момент відповіді."},
+    "next_after": {"$ref": "common.schema.json#/$defs/cursor", "description": "Курсор для наступного запиту: seq останньої події сторінки (або after, якщо подій немає). RAG зсуває received_seq лише після сталого локального запису завдань."},
+    "has_more": {"type": "boolean"},
+    "items": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {"oneOf": [{"$ref": "#/$defs/upsert"}, {"$ref": "#/$defs/delete"}]}
+    }
+  },
+  "$defs": {
+    "base": {
+      "type": "object",
+      "required": ["seq", "document_id", "document_type", "action", "changed_at", "document_revision"],
+      "properties": {
+        "seq": {"$ref": "common.schema.json#/$defs/seq"},
+        "document_id": {"$ref": "common.schema.json#/$defs/document_id"},
+        "document_type": {"$ref": "common.schema.json#/$defs/document_type"},
+        "changed_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+        "document_revision": {"$ref": "common.schema.json#/$defs/document_revision",
+                              "description": "Чинна ревізія документа на момент ЧИТАННЯ (не ревізія в момент події)."}
+      }
+    },
+    "upsert": {
+      "allOf": [{"$ref": "#/$defs/base"}],
+      "required": ["document"],
+      "properties": {
+        "seq": true, "document_id": true, "document_type": true, "changed_at": true, "document_revision": true,
+        "action": {"const": "upsert"},
+        "document": {"$ref": "document.schema.json"}
+      },
+      "unevaluatedProperties": false
+    },
+    "delete": {
+      "allOf": [{"$ref": "#/$defs/base"}],
+      "properties": {
+        "seq": true, "document_id": true, "document_type": true, "changed_at": true, "document_revision": true,
+        "action": {"const": "delete"},
+        "reason": {"enum": ["deleted", "excluded", "out_of_scope", "access_revoked", "index_cleared"],
+                   "description": "Інформативно; RAG видаляє всі фрагменти document_id незалежно від причини."}
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

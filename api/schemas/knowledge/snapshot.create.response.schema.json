@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/snapshot.create.response.schema.json",
+  "title": "POST /api/v1/knowledge/manifest/snapshots/ → 201",
+  "description": "Узгоджений знімок набору документів, що мають бути в індексі. snapshot_seq і склад читаються в одній транзакції REPEATABLE READ; завдяки серіалізації записувачів склад = стан після подій <= snapshot_seq. Знімок незмінний і живе 24 години.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "snapshot_id", "snapshot_seq", "source_instance_id", "generation", "created_at", "expires_at", "total"],
+  "properties": {
+    "contract_version": {"$ref": "common.schema.json#/$defs/contract_version"},
+    "snapshot_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "snapshot_seq": {"$ref": "common.schema.json#/$defs/cursor"},
+    "source_instance_id": {"$ref": "common.schema.json#/$defs/source_instance_id"},
+    "generation": {"$ref": "common.schema.json#/$defs/generation"},
+    "created_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "expires_at": {"$ref": "common.schema.json#/$defs/timestamp"},
+    "total": {"type": "integer", "minimum": 0}
+  }
+}

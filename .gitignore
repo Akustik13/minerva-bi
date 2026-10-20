@@ -38,6 +38,8 @@ exports.py
 *.json
 # PWA — дозволити
 !static/manifest.json
+# JSON-схеми контракту бази знань (api/schemas/knowledge) — дозволити
+!api/schemas/**/*.json
 jumingo_rates_raw.json
 redmei.txt
 

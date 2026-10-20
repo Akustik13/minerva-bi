@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/status.request.schema.json",
+  "title": "POST /api/v1/knowledge/status/ (потрібно knowledge:write)",
+  "description": "Звіт RAG про обробку документів, до 200 записів. Статус стосується конкретної ревізії й спроби: indexed/failed/skipped — з content_version цієї ревізії; deleted — для ревізії tombstone, без content_version.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source_instance_id", "generation", "items"],
+  "properties": {
+    "source_instance_id": {"$ref": "common.schema.json#/$defs/source_instance_id"},
+    "generation": {"$ref": "common.schema.json#/$defs/generation"},
+    "items": {"type": "array", "minItems": 1, "maxItems": 200, "items": {"$ref": "#/$defs/item"}}
+  },
+  "$defs": {
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["document_id", "document_revision", "attempt_id", "state", "reported_at"],
+      "properties": {
+        "document_id": {"$ref": "common.schema.json#/$defs/document_id"},
+        "document_revision": {"$ref": "common.schema.json#/$defs/document_revision"},
+        "attempt_id": {"$ref": "common.schema.json#/$defs/attempt_id"},
+        "state": {"enum": ["indexed", "failed", "skipped", "deleted"]},
+        "content_version": {"$ref": "common.schema.json#/$defs/sha256"},
+        "chunks": {"type": "integer", "minimum": 0},
+        "attachments": {
+          "type": "array", "maxItems": 100,
+          "items": {"type": "object", "additionalProperties": false, "required": ["index", "state"],
+                    "properties": {"index": {"type": "integer", "minimum": 0},
+                                   "content_hash": {"$ref": "common.schema.json#/$defs/sha256"},
+                                   "state": {"enum": ["indexed", "skipped", "failed"]},
+                                   "reason": {"type": "string", "maxLength": 200}}}
+        },
+        "warnings": {"type": "array", "maxItems": 20, "items": {"type": "string", "maxLength": 200}},
+        "error": {"type": "object", "additionalProperties": false, "required": ["code", "message"],
+                  "properties": {"code": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,63}$"},
+                                 "message": {"type": "string", "maxLength": 500}}},
+        "reported_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+      },
+      "allOf": [
+        {"if": {"properties": {"state": {"enum": ["indexed", "failed", "skipped"]}}},
+         "then": {"required": ["content_version"]}},
+        {"if": {"properties": {"state": {"const": "indexed"}}}, "then": {"required": ["chunks"]}},
+        {"if": {"properties": {"state": {"const": "failed"}}}, "then": {"required": ["error"]}},
+        {"if": {"properties": {"state": {"const": "deleted"}}},
+         "then": {"not": {"anyOf": [{"required": ["content_version"]}, {"required": ["chunks"]}, {"required": ["attachments"]}]}}}
+      ]
+    }
+  }
+}

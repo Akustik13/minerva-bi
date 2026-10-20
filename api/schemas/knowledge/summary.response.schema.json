@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/summary.response.schema.json",
+  "title": "GET /api/v1/knowledge/summary/",
+  "description": "Стан бази знань з боку Minerva (за статусами від RAG). Minerva не звертається до RAG, щоб показати прогрес.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "source_instance_id", "generation", "enabled", "last_seq", "documents", "settings_version", "last_status_at"],
+  "properties": {
+    "contract_version": {"$ref": "common.schema.json#/$defs/contract_version"},
+    "source_instance_id": {"$ref": "common.schema.json#/$defs/source_instance_id"},
+    "generation": {"$ref": "common.schema.json#/$defs/generation"},
+    "enabled": {"type": "boolean"},
+    "last_seq": {"$ref": "common.schema.json#/$defs/cursor"},
+    "settings_version": {"type": "integer", "minimum": 1},
+    "last_status_at": {"oneOf": [{"type": "null"}, {"$ref": "common.schema.json#/$defs/timestamp"}]},
+    "documents": {
+      "type": "object", "additionalProperties": false,
+      "required": ["eligible", "indexed", "failed", "skipped", "pending", "pending_delete"],
+      "properties": {
+        "eligible": {"type": "integer", "minimum": 0, "description": "Мають бути в індексі зараз."},
+        "indexed": {"type": "integer", "minimum": 0, "description": "Підтверджено indexed для чинної ревізії."},
+        "failed": {"type": "integer", "minimum": 0},
+        "skipped": {"type": "integer", "minimum": 0},
+        "pending": {"type": "integer", "minimum": 0, "description": "Чинна ревізія ще без статусу."},
+        "pending_delete": {"type": "integer", "minimum": 0, "description": "Tombstone ще без підтвердження deleted."}
+      }
+    }
+  }
+}

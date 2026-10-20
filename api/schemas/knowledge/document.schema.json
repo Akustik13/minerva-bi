@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/document.schema.json",
+  "title": "Документ email для індексації",
+  "description": "GET /api/v1/knowledge/documents/{document_id}/ і поле document у подіях upsert. Поточний стан на момент читання; document_revision — чинна ревізія цього стану.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "document_id", "document_type", "document_revision", "content_version",
+    "source_instance_id", "generation", "url", "mailbox", "thread", "message_id", "in_reply_to",
+    "direction", "category", "sent_at", "subject", "from", "to", "cc",
+    "text", "text_truncated", "text_new", "text_new_mode", "text_new_truncated",
+    "customer", "projects", "orders", "attachments", "access", "updated_at"
+  ],
+  "properties": {
+    "document_id": {"$ref": "common.schema.json#/$defs/document_id"},
+    "document_type": {"$ref": "common.schema.json#/$defs/document_type"},
+    "document_revision": {"$ref": "common.schema.json#/$defs/document_revision"},
+    "content_version": {
+      "$ref": "common.schema.json#/$defs/sha256",
+      "description": "sha256 полів, що індексуються (текст, адреси, дата, категорія, гілка, клієнт, проєкти, замовлення, вкладення з content_hash, access). Рівність — не порядок."
+    },
+    "source_instance_id": {"$ref": "common.schema.json#/$defs/source_instance_id"},
+    "generation": {"$ref": "common.schema.json#/$defs/generation"},
+    "url": {"type": "string", "pattern": "^/email/(message|thread)/[1-9][0-9]*/$", "description": "Відносне посилання на лист у Minerva (для джерела в UI Minerva)."},
+    "mailbox": {
+      "type": "object", "additionalProperties": false, "required": ["id", "address"],
+      "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"}, "address": {"$ref": "common.schema.json#/$defs/email_address"}}
+    },
+    "thread": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "object", "additionalProperties": false, "required": ["id", "subject"],
+         "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"}, "subject": {"type": "string", "maxLength": 500}}}
+      ]
+    },
+    "message_id": {"type": "string", "maxLength": 500, "description": "RFC Message-ID — лише метадані, не ідентифікатор документа."},
+    "in_reply_to": {"type": "string", "maxLength": 500},
+    "direction": {"enum": ["in", "out", "internal"]},
+    "category": {"enum": ["customer", "supplier", "internal", "other", "service", "newsletter"]},
+    "sent_at": {"oneOf": [{"type": "null"}, {"$ref": "common.schema.json#/$defs/timestamp"}]},
+    "subject": {"type": "string", "maxLength": 500},
+    "from": {
+      "type": "object", "additionalProperties": false, "required": ["email", "name"],
+      "properties": {"email": {"type": "string", "maxLength": 500}, "name": {"type": "string", "maxLength": 200}}
+    },
+    "to": {"type": "array", "maxItems": 200, "items": {"type": "string", "maxLength": 500}},
+    "cc": {"type": "array", "maxItems": 200, "items": {"type": "string", "maxLength": 500}},
+    "text": {"type": "string", "maxLength": 100000, "description": "Повний текст (HTML → текст). Включно з цитатами."},
+    "text_truncated": {"type": "boolean", "description": "true — text обрізано до 100 000 символів; не вважати повною обробкою."},
+    "text_new": {"type": "string", "maxLength": 20000, "description": "Основа для векторів. v1: той самий текст, що й text (з цитатами), у межах 20 000."},
+    "text_new_mode": {"enum": ["full", "reply_trimmed"], "description": "v1 завжди full. reply_trimmed зарезервовано: лише після перевірки indexed-стану оригіналу та переіндексації залежних листів."},
+    "text_new_truncated": {"type": "boolean"},
+    "customer": {
+      "oneOf": [
+        {"type": "null"},
+        {"type": "object", "additionalProperties": false, "required": ["id", "name"],
+         "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"}, "name": {"type": "string", "maxLength": 300}}}
+      ]
+    },
+    "projects": {
+      "type": "array", "maxItems": 50,
+      "items": {"type": "object", "additionalProperties": false, "required": ["id", "code", "name"],
+                "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"},
+                               "code": {"type": "string", "pattern": "^P-\\d{4}-\\d{3,}$"},
+                               "name": {"type": "string", "maxLength": 200}}}
+    },
+    "orders": {
+      "type": "array", "maxItems": 50,
+      "items": {"type": "object", "additionalProperties": false, "required": ["id", "number"],
+                "properties": {"id": {"$ref": "common.schema.json#/$defs/pk"}, "number": {"type": "string", "maxLength": 200}}}
+    },
+    "attachments": {
+      "type": "array", "maxItems": 100,
+      "items": {"$ref": "#/$defs/attachment"}
+    },
+    "access": {
+      "type": "object", "additionalProperties": false, "required": ["scope", "mailbox_id", "user_ids"],
+      "properties": {
+        "scope": {"const": "mailbox"},
+        "mailbox_id": {"$ref": "common.schema.json#/$defs/pk"},
+        "user_ids": {"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true,
+                     "items": {"$ref": "common.schema.json#/$defs/pk"}}
+      }
+    },
+    "updated_at": {"$ref": "common.schema.json#/$defs/timestamp"}
+  },
+  "$defs": {
+    "attachment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "name", "content_type", "size", "content_hash", "indexable"],
+      "properties": {
+        "index": {"type": "integer", "minimum": 0},
+        "name": {"type": "string", "maxLength": 300},
+        "content_type": {"type": "string", "maxLength": 200},
+        "size": {"type": "integer", "minimum": 0},
+        "content_hash": {"oneOf": [{"type": "null"}, {"$ref": "common.schema.json#/$defs/sha256"}]},
+        "indexable": {"type": "boolean"},
+        "reason": {"enum": ["not_downloaded", "type_not_allowed", "too_large", "attachments_disabled"],
+                   "description": "Чому вкладення не indexable."},
+        "url": {"type": "string", "pattern": "^/api/v1/knowledge/documents/email:[1-9][0-9]*/attachments/[0-9]+/\\?revision=[1-9][0-9]*$",
+                "description": "Лише для indexable; прив'язано до ревізії документа (412 revision_mismatch при зміні)."}
+      },
+      "if": {"properties": {"indexable": {"const": true}}},
+      "then": {"required": ["url"], "properties": {"content_hash": {"$ref": "common.schema.json#/$defs/sha256"}}, "not": {"required": ["reason"]}},
+      "else": {"required": ["reason"], "not": {"required": ["url"]}}
+    }
+  }
+}

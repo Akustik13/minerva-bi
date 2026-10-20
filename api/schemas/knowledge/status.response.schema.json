@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/status.response.schema.json",
+  "title": "POST /api/v1/knowledge/status/ → 200",
+  "description": "Результат по кожному запису в тому самому порядку. accepted — прийнято; duplicate — той самий attempt_id повторно (ідемпотентно); stale — ревізія менша за чинну; revision_ahead — ревізія більша за чинну (помилка узгодженості, логується); stale_attempt — attempt_id менший за прийнятий для цієї ревізії; instance_mismatch — інший source_instance_id/generation; unknown_document — такого документа не було в стрічці. Переходи для однієї ревізії визначає лише attempt_id: новіша спроба перекриває старішу будь-яким станом.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request_id", "results", "accepted"],
+  "properties": {
+    "request_id": {"type": "string", "minLength": 8, "maxLength": 64},
+    "accepted": {"type": "integer", "minimum": 0},
+    "results": {
+      "type": "array", "maxItems": 200,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["document_id", "document_revision", "attempt_id", "result"],
+        "properties": {
+          "document_id": {"$ref": "common.schema.json#/$defs/document_id"},
+          "document_revision": {"$ref": "common.schema.json#/$defs/document_revision"},
+          "attempt_id": {"$ref": "common.schema.json#/$defs/attempt_id"},
+          "result": {"enum": ["accepted", "duplicate", "stale", "revision_ahead", "stale_attempt",
+                              "instance_mismatch", "unknown_document"]},
+          "current_revision": {"$ref": "common.schema.json#/$defs/document_revision"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "code": "rate_limited",
+  "message": "Забагато запитів.",
+  "retryable": true,
+  "request_id": "req-5e6f7081",
+  "details": {
+    "retry_after_seconds": 30
+  }
+}

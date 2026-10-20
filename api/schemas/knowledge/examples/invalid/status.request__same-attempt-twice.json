@@ -1,0 +1,68 @@
+{
+  "source_instance_id": "dev-synthetic",
+  "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+  "items": [
+    {
+      "document_id": "email:5531",
+      "document_revision": 3,
+      "attempt_id": 4,
+      "state": "indexed",
+      "content_version": "sha256:be1b5ed38bf79d3a8023ad52b6cc04e8343d0df89413f0787170adacff423ea8",
+      "chunks": 4,
+      "attachments": [
+        {
+          "index": 0,
+          "content_hash": "sha256:e65b9dd6e2a03378dd9b4faf240d0a781d1ed0069e2dd2cdfd31c95c0c09e644",
+          "state": "indexed"
+        }
+      ],
+      "reported_at": "2026-10-20T08:15:09Z"
+    },
+    {
+      "document_id": "email:5532",
+      "document_revision": 1,
+      "attempt_id": 1,
+      "state": "failed",
+      "content_version": "sha256:6220b303a7d895e416a9f0816f12531d6e7e8754013db7de1c4173359aca7e52",
+      "error": {
+        "code": "embedding_unavailable",
+        "message": "Ollama timeout"
+      },
+      "reported_at": "2026-10-20T08:15:10Z"
+    },
+    {
+      "document_id": "email:5533",
+      "document_revision": 2,
+      "attempt_id": 2,
+      "state": "skipped",
+      "content_version": "sha256:29b72132c16974cc52c0c7d3f643261a74a62e9e2bdfb52b5129f6f14c5e3e25",
+      "warnings": [
+        "empty text after extraction"
+      ],
+      "reported_at": "2026-10-20T08:15:11Z"
+    },
+    {
+      "document_id": "email:77",
+      "document_revision": 5,
+      "attempt_id": 3,
+      "state": "deleted",
+      "reported_at": "2026-10-20T08:16:45Z"
+    },
+    {
+      "document_id": "email:5531",
+      "document_revision": 3,
+      "attempt_id": 4,
+      "state": "indexed",
+      "content_version": "sha256:be1b5ed38bf79d3a8023ad52b6cc04e8343d0df89413f0787170adacff423ea8",
+      "chunks": 4,
+      "attachments": [
+        {
+          "index": 0,
+          "content_hash": "sha256:e65b9dd6e2a03378dd9b4faf240d0a781d1ed0069e2dd2cdfd31c95c0c09e644",
+          "state": "indexed"
+        }
+      ],
+      "reported_at": "2026-10-20T08:15:09Z"
+    }
+  ]
+}

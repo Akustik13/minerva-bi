@@ -1,0 +1,177 @@
+{
+  "contract_version": "minerva-knowledge/1.0-draft",
+  "source_instance_id": "dev-synthetic",
+  "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+  "enabled": true,
+  "last_seq": 1060,
+  "next_after": 1045,
+  "has_more": true,
+  "items": [
+    {
+      "seq": 1042,
+      "document_id": "email:5531",
+      "document_type": "email",
+      "action": "upsert",
+      "changed_at": "2026-10-20T08:15:02Z",
+      "document_revision": 2,
+      "document": {
+        "document_id": "email:5531",
+        "document_type": "email",
+        "document_revision": 3,
+        "content_version": "sha256:be1b5ed38bf79d3a8023ad52b6cc04e8343d0df89413f0787170adacff423ea8",
+        "source_instance_id": "dev-synthetic",
+        "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+        "url": "/email/message/5531/",
+        "mailbox": {
+          "id": 1,
+          "address": "sales@minerva.example"
+        },
+        "thread": {
+          "id": 812,
+          "subject": "RE: Antenna quote"
+        },
+        "message_id": "<5531@client.example>",
+        "in_reply_to": "",
+        "direction": "in",
+        "category": "customer",
+        "sent_at": "2026-10-02T09:00:00Z",
+        "subject": "RE: Antenna quote",
+        "from": {
+          "email": "buyer@client.example",
+          "name": "Alex Buyer"
+        },
+        "to": [
+          "sales@minerva.example"
+        ],
+        "cc": [],
+        "text": "Hello,\nplease send the quote for 500 pcs of the antenna, delivery in week 46.\n\nOn 01.10.2026 sales@minerva.example wrote:\n> Thank you for your request.",
+        "text_truncated": false,
+        "text_new": "Hello,\nplease send the quote for 500 pcs of the antenna, delivery in week 46.\n\nOn 01.10.2026 sales@minerva.example wrote:\n> Thank you for your request.",
+        "text_new_mode": "full",
+        "text_new_truncated": false,
+        "customer": {
+          "id": 15,
+          "name": "Client GmbH"
+        },
+        "projects": [
+          {
+            "id": 3,
+            "code": "P-2026-003",
+            "name": "Antennen Client"
+          }
+        ],
+        "orders": [
+          {
+            "id": 77,
+            "number": "shop:100200"
+          }
+        ],
+        "attachments": [
+          {
+            "index": 0,
+            "name": "Specification.pdf",
+            "content_type": "application/pdf",
+            "size": 48211,
+            "content_hash": "sha256:e65b9dd6e2a03378dd9b4faf240d0a781d1ed0069e2dd2cdfd31c95c0c09e644",
+            "indexable": true,
+            "url": "/api/v1/knowledge/documents/email:5531/attachments/0/?revision=3"
+          },
+          {
+            "index": 1,
+            "name": "photo.heic",
+            "content_type": "image/heic",
+            "size": 2400000,
+            "content_hash": null,
+            "indexable": false,
+            "reason": "type_not_allowed"
+          },
+          {
+            "index": 2,
+            "name": "Drawing.pdf",
+            "content_type": "application/pdf",
+            "size": 120000,
+            "content_hash": null,
+            "indexable": false,
+            "reason": "not_downloaded"
+          }
+        ],
+        "access": {
+          "scope": "mailbox",
+          "mailbox_id": 1,
+          "user_ids": [
+            1
+          ]
+        },
+        "updated_at": "2026-10-20T08:15:02Z"
+      }
+    },
+    {
+      "seq": 1043,
+      "document_id": "email:77",
+      "document_type": "email",
+      "action": "delete",
+      "changed_at": "2026-10-20T08:16:40Z",
+      "document_revision": 5,
+      "reason": "deleted"
+    },
+    {
+      "seq": 1045,
+      "document_id": "email:5601",
+      "document_type": "email",
+      "action": "upsert",
+      "changed_at": "2026-10-20T08:17:00Z",
+      "document_revision": 2,
+      "document": {
+        "document_id": "email:5601",
+        "document_type": "email",
+        "document_revision": 2,
+        "content_version": "sha256:fbb0cb4a303b233380b8630c75046f6434497ab8ea264de04ead43b55b7c292a",
+        "source_instance_id": "dev-synthetic",
+        "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+        "url": "/email/message/5601/",
+        "mailbox": {
+          "id": 1,
+          "address": "sales@minerva.example"
+        },
+        "thread": {
+          "id": 812,
+          "subject": "AW: Antenna quote"
+        },
+        "message_id": "<5601@client.example>",
+        "in_reply_to": "",
+        "direction": "in",
+        "category": "customer",
+        "sent_at": "2026-10-02T09:00:00Z",
+        "subject": "AW: Antenna quote",
+        "from": {
+          "email": "buyer@client.example",
+          "name": "Alex Buyer"
+        },
+        "to": [
+          "sales@minerva.example"
+        ],
+        "cc": [],
+        "text": "Thanks, received.",
+        "text_truncated": false,
+        "text_new": "Thanks, received.",
+        "text_new_mode": "full",
+        "text_new_truncated": false,
+        "customer": {
+          "id": 15,
+          "name": "Client GmbH"
+        },
+        "projects": [],
+        "orders": [],
+        "attachments": [],
+        "access": {
+          "scope": "mailbox",
+          "mailbox_id": 1,
+          "user_ids": [
+            1
+          ]
+        },
+        "updated_at": "2026-10-20T08:15:02Z"
+      }
+    }
+  ]
+}

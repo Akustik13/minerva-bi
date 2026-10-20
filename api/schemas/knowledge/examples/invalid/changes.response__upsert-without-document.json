@@ -1,0 +1,87 @@
+{
+  "contract_version": "minerva-knowledge/1.0-draft",
+  "source_instance_id": "dev-synthetic",
+  "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+  "enabled": true,
+  "last_seq": 1060,
+  "next_after": 1045,
+  "has_more": true,
+  "items": [
+    {
+      "seq": 1042,
+      "document_id": "email:5531",
+      "document_type": "email",
+      "action": "upsert",
+      "changed_at": "2026-10-20T08:15:02Z",
+      "document_revision": 3
+    },
+    {
+      "seq": 1043,
+      "document_id": "email:77",
+      "document_type": "email",
+      "action": "delete",
+      "changed_at": "2026-10-20T08:16:40Z",
+      "document_revision": 5,
+      "reason": "deleted"
+    },
+    {
+      "seq": 1045,
+      "document_id": "email:5601",
+      "document_type": "email",
+      "action": "upsert",
+      "changed_at": "2026-10-20T08:17:00Z",
+      "document_revision": 2,
+      "document": {
+        "document_id": "email:5601",
+        "document_type": "email",
+        "document_revision": 2,
+        "content_version": "sha256:fbb0cb4a303b233380b8630c75046f6434497ab8ea264de04ead43b55b7c292a",
+        "source_instance_id": "dev-synthetic",
+        "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+        "url": "/email/message/5601/",
+        "mailbox": {
+          "id": 1,
+          "address": "sales@minerva.example"
+        },
+        "thread": {
+          "id": 812,
+          "subject": "AW: Antenna quote"
+        },
+        "message_id": "<5601@client.example>",
+        "in_reply_to": "",
+        "direction": "in",
+        "category": "customer",
+        "sent_at": "2026-10-02T09:00:00Z",
+        "subject": "AW: Antenna quote",
+        "from": {
+          "email": "buyer@client.example",
+          "name": "Alex Buyer"
+        },
+        "to": [
+          "sales@minerva.example"
+        ],
+        "cc": [],
+        "text": "Thanks, received.",
+        "text_truncated": false,
+        "text_new": "Thanks, received.",
+        "text_new_mode": "full",
+        "text_new_truncated": false,
+        "customer": {
+          "id": 15,
+          "name": "Client GmbH"
+        },
+        "projects": [],
+        "orders": [],
+        "attachments": [],
+        "access": {
+          "scope": "mailbox",
+          "mailbox_id": 1,
+          "user_ids": [
+            1
+          ]
+        },
+        "updated_at": "2026-10-20T08:15:02Z"
+      }
+    }
+  ]
+}

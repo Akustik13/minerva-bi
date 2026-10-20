@@ -1,0 +1,38 @@
+{
+  "request_id": "req-7f3a9c21",
+  "accepted": 3,
+  "results": [
+    {
+      "document_id": "email:5531",
+      "document_revision": 3,
+      "attempt_id": 4,
+      "result": "accepted"
+    },
+    {
+      "document_id": "email:5532",
+      "document_revision": 1,
+      "attempt_id": 1,
+      "result": "stale",
+      "current_revision": 2
+    },
+    {
+      "document_id": "email:5533",
+      "document_revision": 2,
+      "attempt_id": 2,
+      "result": "duplicate"
+    },
+    {
+      "document_id": "email:77",
+      "document_revision": 5,
+      "attempt_id": 3,
+      "result": "revision_ahead",
+      "current_revision": 4
+    },
+    {
+      "document_id": "email:5534",
+      "document_revision": 1,
+      "attempt_id": 1,
+      "result": "stale_attempt"
+    }
+  ]
+}

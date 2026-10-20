@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/error.schema.json",
+  "title": "Помилка knowledge API",
+  "description": "Будь-яка не-2xx відповідь маршрутів /api/v1/knowledge/ (крім байтів вкладення) має цей формат і Content-Type application/json. Відповідь іншого формату (HTML 404 проксі тощо) НЕ є підставою для видалення з індексу.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message", "retryable", "request_id"],
+  "properties": {
+    "code": {"$ref": "common.schema.json#/$defs/error_code"},
+    "message": {"type": "string", "minLength": 1, "maxLength": 500, "description": "Безпечне повідомлення без секретів і сирих трасувань."},
+    "retryable": {"type": "boolean"},
+    "request_id": {"type": "string", "minLength": 8, "maxLength": 64},
+    "details": {
+      "type": "object",
+      "description": "Структуровані подробиці для окремих кодів.",
+      "additionalProperties": false,
+      "properties": {
+        "resume_after": {"$ref": "common.schema.json#/$defs/cursor", "description": "cursor_expired: звідки продовжити ПІСЛЯ повної звірки через snapshot."},
+        "last_seq": {"$ref": "common.schema.json#/$defs/cursor", "description": "cursor_ahead: остання подія журналу."},
+        "current_revision": {"$ref": "common.schema.json#/$defs/document_revision", "description": "revision_mismatch: чинна ревізія документа."},
+        "generation": {"$ref": "common.schema.json#/$defs/generation", "description": "generation_mismatch: чинне покоління."},
+        "retry_after_seconds": {"type": "integer", "minimum": 1}
+      }
+    }
+  },
+  "allOf": [
+    {"if": {"properties": {"code": {"const": "cursor_expired"}}}, "then": {"required": ["details"], "properties": {"details": {"required": ["resume_after"]}}}},
+    {"if": {"properties": {"code": {"const": "cursor_ahead"}}}, "then": {"required": ["details"], "properties": {"details": {"required": ["last_seq"]}}}},
+    {"if": {"properties": {"code": {"const": "revision_mismatch"}}}, "then": {"required": ["details"], "properties": {"details": {"required": ["current_revision"]}}}},
+    {"if": {"properties": {"code": {"const": "generation_mismatch"}}}, "then": {"required": ["details"], "properties": {"details": {"required": ["generation"]}}}}
+  ]
+}

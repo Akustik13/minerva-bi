@@ -1,0 +1,17 @@
+{
+  "contract_version": "minerva-knowledge/1.0-draft",
+  "source_instance_id": "dev-synthetic",
+  "generation": "3f6c9a1e-5b2d-4c8e-9f10-2a3b4c5d6e7f",
+  "enabled": true,
+  "last_seq": 1060,
+  "settings_version": 7,
+  "last_status_at": "2026-10-20T08:16:45Z",
+  "documents": {
+    "eligible": 1500,
+    "indexed": 320,
+    "failed": 3,
+    "skipped": 5,
+    "pending": 1172,
+    "pending_delete": 2
+  }
+}

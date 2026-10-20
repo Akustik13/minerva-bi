@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/snapshot.page.response.schema.json",
+  "title": "GET /api/v1/knowledge/manifest/snapshots/{snapshot_id}/?cursor=<opaque>&limit=<1..5000>",
+  "description": "Сторінка незмінного складу знімка (default 500, max 5000). Порядок стабільний, cursor непрозорий. Видаляти з індексу відсутні документи дозволено лише після сторінки з complete=true, лише для того самого source_instance_id + generation і не чіпаючи документи, ревізія яких у RAG прийшла з події seq > snapshot_seq. Прострочений знімок → 410 snapshot_expired: нічого не видаляти, створити новий.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "snapshot_id", "snapshot_seq", "source_instance_id", "generation", "items", "next_cursor", "complete"],
+  "properties": {
+    "contract_version": {"$ref": "common.schema.json#/$defs/contract_version"},
+    "snapshot_id": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"},
+    "snapshot_seq": {"$ref": "common.schema.json#/$defs/cursor"},
+    "source_instance_id": {"$ref": "common.schema.json#/$defs/source_instance_id"},
+    "generation": {"$ref": "common.schema.json#/$defs/generation"},
+    "items": {
+      "type": "array",
+      "maxItems": 5000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["document_id", "document_type", "document_revision", "content_version"],
+        "properties": {
+          "document_id": {"$ref": "common.schema.json#/$defs/document_id"},
+          "document_type": {"$ref": "common.schema.json#/$defs/document_type"},
+          "document_revision": {"$ref": "common.schema.json#/$defs/document_revision"},
+          "content_version": {"$ref": "common.schema.json#/$defs/sha256"}
+        }
+      }
+    },
+    "next_cursor": {"oneOf": [{"type": "null"}, {"type": "string", "minLength": 1, "maxLength": 200}]},
+    "complete": {"type": "boolean"}
+  },
+  "if": {"properties": {"complete": {"const": true}}},
+  "then": {"properties": {"next_cursor": {"type": "null"}}},
+  "else": {"properties": {"next_cursor": {"type": "string"}}}
+}

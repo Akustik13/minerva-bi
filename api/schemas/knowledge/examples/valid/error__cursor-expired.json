@@ -1,0 +1,9 @@
+{
+  "code": "cursor_expired",
+  "message": "Курсор старший за журнал; звірка через snapshot.",
+  "retryable": false,
+  "request_id": "req-1a2b3c4d",
+  "details": {
+    "resume_after": 900
+  }
+}

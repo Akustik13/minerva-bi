@@ -1,0 +1,9 @@
+{
+  "code": "cursor_ahead",
+  "message": "Курсор новіший за журнал (відновлення БД?).",
+  "retryable": false,
+  "request_id": "req-2b3c4d5e",
+  "details": {
+    "last_seq": 1060
+  }
+}

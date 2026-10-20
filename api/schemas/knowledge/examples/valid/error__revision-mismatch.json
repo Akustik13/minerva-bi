@@ -1,0 +1,9 @@
+{
+  "code": "revision_mismatch",
+  "message": "Документ змінився; перечитайте.",
+  "retryable": true,
+  "request_id": "req-3c4d5e6f",
+  "details": {
+    "current_revision": 4
+  }
+}

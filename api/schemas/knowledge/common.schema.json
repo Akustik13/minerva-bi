@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.minerva-bi.com/knowledge/v1/common.schema.json",
+  "title": "Minerva knowledge API v1 — спільні визначення",
+  "description": "Proposal MIN-002 (M8). Спільні типи для маршрутів /api/v1/knowledge/. Споживачі МАЮТЬ ігнорувати невідомі поля майбутніх версій; виробник (Minerva) валідує власні відповіді цими схемами.",
+  "$defs": {
+    "contract_version": {
+      "description": "Версія wire-контракту Minerva knowledge API.",
+      "const": "minerva-knowledge/1.0-draft"
+    },
+    "source_instance_id": {
+      "description": "Стале позначення середовища/БД Minerva (env MINERVA_INSTANCE_ID), напр. sevskiy-prod, dev-claude.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{1,63}$"
+    },
+    "generation": {
+      "description": "UUID покоління журналу; змінюється адміністратором після відновлення БД. Інше покоління → повна звірка через snapshot.",
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "document_type": {
+      "description": "v1: лише email. project і offer зарезервовані для наступних версій.",
+      "enum": ["email"]
+    },
+    "document_id": {
+      "description": "<document_type>:<pk>. Стабільний у межах source_instance_id + generation.",
+      "type": "string",
+      "pattern": "^email:[1-9][0-9]{0,18}$"
+    },
+    "document_revision": {
+      "description": "Монотонна ревізія документа (кожна зміна content_version, ACL, tombstone, повернення після tombstone → +1). Ніколи не зменшується.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "seq": {
+      "description": "Номер події журналу. Порядок seq = порядок commit (записувачі серіалізовані).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "cursor": {
+      "description": "Курсор після події (0 — з початку журналу).",
+      "type": "integer",
+      "minimum": 0
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "attempt_id": {
+      "description": "Номер спроби обробки документа в RAG; зростає для кожного документа. Новіша спроба перекриває старішу, рівна — duplicate.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "pk": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "email_address": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 254,
+      "pattern": "^[^@\\s]+@[^@\\s]+$"
+    },
+    "error_code": {
+      "enum": [
+        "instance_not_configured",
+        "cursor_expired",
+        "cursor_ahead",
+        "generation_mismatch",
+        "snapshot_expired",
+        "snapshot_not_found",
+        "document_not_found",
+        "attachment_not_found",
+        "revision_mismatch",
+        "forbidden_scope",
+        "shop_key_forbidden",
+        "unauthorized",
+        "invalid_request",
+        "rate_limited",
+        "internal_error"
+      ]
+    }
+  }
+}
