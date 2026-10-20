@@ -49,9 +49,10 @@ INSTALLED_APPS = [
     'tasks',            # 📋 Задачі та нагадування
     'autoimport',       # 🔄 Авто-імпорт по розкладу
     'ai_assistant',     # 🏛️ Minerva AI
-    'rag_assistant',    # 📚 Помічник по продукції (зовнішній RAG: даташити + склад)
     'email_assistant',  # 📧 Email Асистент
     'projects',         # 📁 Проєкти з пошти (після email_assistant: сигнали після прив'язки до CRM)
+    'rag_assistant',    # 📚 Помічник по продукції + база знань для RAG (ПІСЛЯ email_assistant і projects:
+                        #    сигнал журналу бачить уже категорію, клієнта й проєкти листа)
     'calendar_app',     # 📅 Календар
     'bots',             # 🤖 Боти та AI
     'jlcpcb',           # 🔬 JLCPCB виробництво
@@ -250,6 +251,11 @@ REST_FRAMEWORK = {
         else ["rest_framework.renderers.JSONRenderer"]
     ),
     "DEFAULT_THROTTLE_CLASSES": ["api.throttling.APIKeyRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"apikey": os.getenv("API_RATE_LIMIT", "120/min")},
+    "DEFAULT_THROTTLE_RATES": {"apikey": os.getenv("API_RATE_LIMIT", "120/min"),
+                               "knowledge": os.getenv("KNOWLEDGE_RATE_LIMIT", "600/min")},
     "COERCE_DECIMAL_TO_STRING": False,
 }
+
+# База знань для RAG: стале позначення цього середовища/БД (напр. sevskiy-prod, dev-claude).
+# Без нього маршрути /api/v1/knowledge/ відповідають 503 instance_not_configured.
+MINERVA_INSTANCE_ID = os.getenv("MINERVA_INSTANCE_ID", "")

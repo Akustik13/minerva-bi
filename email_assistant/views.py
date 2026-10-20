@@ -988,6 +988,22 @@ def _handle_send(request, account, reply_to=None):
 
 @staff_member_required
 @require_POST
+def thread_knowledge_view(request, thread_pk):
+    """🔒 Приватна переписка: не передавати гілку в базу знань RAG (або повернути). Сигнал гілки оновить журнал."""
+    from email_assistant.models import EmailThread
+    account = _get_account(request)
+    thread = get_object_or_404(EmailThread, pk=thread_pk, account=account)
+    try:
+        body = json.loads(request.body or b'{}')
+    except ValueError:
+        body = {}
+    thread.knowledge_excluded = bool(body['excluded']) if 'excluded' in body else not thread.knowledge_excluded
+    thread.save(update_fields=['knowledge_excluded'])
+    return JsonResponse({'ok': True, 'excluded': thread.knowledge_excluded})
+
+
+@staff_member_required
+@require_POST
 def send_api(request):
     account = _get_account(request)
     if not account:
@@ -1838,6 +1854,9 @@ def bulk_action_view(request):
         tpk_set = set(msgs.exclude(thread=None).values_list('thread_id', flat=True))
         if tpk_set:
             EmailThread.objects.filter(pk__in=tpk_set, account=account).update(is_archived=True)
+    if action in ('delete', 'spam', 'unspam'):
+        from email_assistant.knowledge_hook import touch
+        touch(pks)   # масовий .update() без сигналів → база знань
     return JsonResponse({'ok': True})
 
 

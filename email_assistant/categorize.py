@@ -127,13 +127,15 @@ def recategorize_contact(account, key: str) -> int:
         addresses = [_addr(a) for a in [frm] + list(to or []) + list(cc or [])]
         if any(a and _matches(a, key) for a in addresses):
             matched.append(pk)
-    changed = 0
+    changed = []
     for em in EmailMessage.objects.filter(pk__in=matched).select_related('thread'):
         category = categorize(em, ctx)
         if category != em.category:
             EmailMessage.objects.filter(pk=em.pk).update(category=category)
-            changed += 1
-    return changed
+            changed.append(em.pk)
+    from email_assistant.knowledge_hook import touch
+    touch(changed)   # категорія визначає, чи лист іде в базу знань
+    return len(changed)
 
 
 def remember_category(em, category: str, scope: str = 'sender'):
@@ -170,10 +172,13 @@ def categorize_pending(account=None, limit=1000, ctx=None, force=False) -> int:
     if limit:
         qs = qs[:limit]
     ctx = ctx or CategoryContext(preload_customers=True)
-    done = 0
+    done, changed = 0, []
     for em in qs:
         category = categorize(em, ctx)
         if category != em.category:
             EmailMessage.objects.filter(pk=em.pk).update(category=category)
+            changed.append(em.pk)
         done += 1
+    from email_assistant.knowledge_hook import touch
+    touch(changed)
     return done

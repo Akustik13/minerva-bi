@@ -3,6 +3,8 @@
 Окремо від «Minerva AI» (ai_assistant): власні налаштування, розмови й історія.
 Ключ RAG API зберігається лише на сервері Minerva; браузер його не отримує.
 """
+import uuid
+
 from django.conf import settings
 from django.db import models
 
@@ -87,3 +89,157 @@ class RagMessage(models.Model):
 
     def __str__(self):
         return f"{self.get_role_display()}: {self.content[:60]}"
+
+
+# ── База знань: пошта Minerva → приватний індекс RAG (api/schemas/knowledge, integration/API_CONTRACT.md) ──
+
+KNOWLEDGE_DEFAULT_CATEGORIES = ["customer", "supplier", "internal", "other"]
+
+
+def _default_categories():
+    return list(KNOWLEDGE_DEFAULT_CATEGORIES)
+
+
+def _default_attachment_types():
+    return ["pdf", "docx", "txt", "csv"]
+
+
+class KnowledgeSettings(models.Model):
+    """Що з пошти можна передавати в RAG — синглтон (pk=1). До першого ввімкнення стрічка порожня."""
+
+    enabled = models.BooleanField(
+        "Індексувати пошту", default=False,
+        help_text="Вимкнення — пауза: нові листи не додаються; видалення, зміни доступу й вмісту вже "
+                  "переданих листів надходять далі. Повне очищення індексу — окрема кнопка.")
+    accounts = models.ManyToManyField(
+        "email_assistant.EmailAccount", blank=True, verbose_name="Скриньки",
+        help_text="Порожньо — усі активні скриньки.")
+    categories = models.JSONField(
+        "Категорії листів", default=_default_categories, blank=True,
+        help_text="Розсилки й сервісні сповіщення за замовчуванням не індексуються.")
+    index_from = models.DateField(
+        "Листи починаючи з", null=True, blank=True,
+        help_text="Почніть з короткого періоду (напр. 30 днів) і розширюйте після перевірки.")
+    include_attachments = models.BooleanField("Індексувати вкладення", default=True)
+    attachment_types = models.JSONField("Типи вкладень", default=_default_attachment_types, blank=True)
+    attachment_max_mb = models.PositiveSmallIntegerField("Макс. розмір вкладення, МБ", default=15)
+    private_api_key = models.CharField(
+        "Ключ приватного пошуку RAG", max_length=200, blank=True, default="",
+        help_text="Окремий Bearer-ключ RAG для /v2/* (не ключ магазину). Лише на сервері Minerva.")
+    generation = models.UUIDField(
+        "Покоління журналу", default=uuid.uuid4, editable=False,
+        help_text="Змінюється дією «Нове покоління» після відновлення БД — RAG тоді робить повну звірку.")
+    settings_version = models.PositiveIntegerField(default=1, editable=False)
+    pruned_seq = models.BigIntegerField(
+        default=0, editable=False, help_text="Журнал до цього seq очищено: старші курсори → 410 cursor_expired.")
+    last_refresh_at = models.DateTimeField("Остання звірка стрічки", null=True, blank=True, editable=False)
+    last_refresh_result = models.CharField(max_length=255, blank=True, default="", editable=False)
+
+    class Meta:
+        verbose_name = "База знань (пошта → RAG)"
+        verbose_name_plural = "🧠 База знань (пошта → RAG)"
+
+    def __str__(self):
+        return "База знань"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+
+class KnowledgeChange(models.Model):
+    """Журнал змін (id = seq). Записувачі серіалізовані (knowledge.journal_writer): порядок seq = порядок commit."""
+    UPSERT, DELETE = "upsert", "delete"
+
+    id = models.BigAutoField(primary_key=True)
+    doc_type = models.CharField(max_length=20, default="email")
+    obj_id = models.PositiveIntegerField()
+    action = models.CharField(max_length=10, choices=[(UPSERT, "upsert"), (DELETE, "delete")])
+    reason = models.CharField(max_length=20, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = "Подія бази знань"
+        verbose_name_plural = "Журнал бази знань"
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"#{self.id} {self.action} {self.doc_type}:{self.obj_id}"
+
+    @property
+    def document_id(self) -> str:
+        return f"{self.doc_type}:{self.obj_id}"
+
+
+class KnowledgeDoc(models.Model):
+    """
+    Стан документа для RAG. revision — монотонна (кожна зміна content_version, tombstone, повернення → +1);
+    рядок ніколи не видаляється. Статус RAG (state) стосується status_revision і спроби attempt_id.
+    """
+    PENDING, INDEXED, FAILED, SKIPPED, DELETED = "pending", "indexed", "failed", "skipped", "deleted"
+    STATES = [(PENDING, "очікує"), (INDEXED, "у індексі"), (FAILED, "помилка"),
+              (SKIPPED, "пропущено"), (DELETED, "видалено")]
+
+    doc_type = models.CharField(max_length=20, default="email")
+    obj_id = models.PositiveIntegerField()
+    revision = models.PositiveIntegerField(default=0)
+    fed = models.BooleanField(default=False, help_text="Має бути в індексі зараз (не tombstone).")
+    feed_version = models.CharField(max_length=80, blank=True, default="", help_text="content_version чинної ревізії")
+    fed_at = models.DateTimeField(null=True, blank=True)
+    state = models.CharField(max_length=10, choices=STATES, default=PENDING, db_index=True)
+    status_revision = models.PositiveIntegerField(default=0)
+    attempt_id = models.PositiveBigIntegerField(default=0)
+    chunks = models.PositiveIntegerField(default=0)
+    error = models.CharField(max_length=500, blank=True, default="")
+    indexed_at = models.DateTimeField(null=True, blank=True)
+    last_status_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Документ бази знань"
+        verbose_name_plural = "Документи бази знань"
+        constraints = [models.UniqueConstraint(fields=["doc_type", "obj_id"], name="unique_knowledge_doc")]
+        indexes = [models.Index(fields=["doc_type", "fed"])]
+
+    def __str__(self):
+        return f"{self.document_id} r{self.revision} [{self.current_state}]"
+
+    @property
+    def document_id(self) -> str:
+        return f"{self.doc_type}:{self.obj_id}"
+
+    @property
+    def current_state(self) -> str:
+        """Стан чинної ревізії: статус старшої ревізії не рахується."""
+        return self.state if self.status_revision == self.revision else self.PENDING
+
+
+class KnowledgeSnapshot(models.Model):
+    """Узгоджений знімок набору документів індексу (REPEATABLE READ разом із snapshot_seq). Живе 24 год."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    snapshot_seq = models.BigIntegerField()
+    generation = models.UUIDField()
+    total = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        verbose_name = "Знімок бази знань"
+        verbose_name_plural = "Знімки бази знань"
+
+
+class KnowledgeSnapshotItem(models.Model):
+    snapshot = models.ForeignKey(KnowledgeSnapshot, on_delete=models.CASCADE, related_name="items")
+    position = models.PositiveIntegerField()
+    doc_type = models.CharField(max_length=20, default="email")
+    obj_id = models.PositiveIntegerField()
+    revision = models.PositiveIntegerField()
+    content_version = models.CharField(max_length=80)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["snapshot", "position"], name="unique_snapshot_position")]
+        ordering = ["position"]

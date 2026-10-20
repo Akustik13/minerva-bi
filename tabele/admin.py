@@ -53,7 +53,7 @@ def _get_app_list(self, request, app_label=None):
         'core':     ['auditlog', 'userprofile', 'modulebundle', 'moduleregistry'],
         'strategy': ['aisettings', 'strategytemplate', 'customerstrategy', 'customerstep', 'steplog'],
         'ai_assistant':    ['aiconversation', 'aibudgetlog'],
-        'rag_assistant':   ['ragsettings', 'ragconversation'],
+        'rag_assistant':   ['ragsettings', 'ragconversation', 'knowledgesettings', 'knowledgedoc'],
         'projects':        ['project', 'dismissedthread'],
         'email_assistant': ['emailaccount', 'emailsettings', 'emailmessage', 'emailthread'],
         'sales': ['salesorder', 'salesorderline', 'salessource', 'salescategory', 'salessettings'],

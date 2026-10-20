@@ -96,6 +96,9 @@ class EmailThread(models.Model):
     last_message_at = models.DateTimeField(null=True, blank=True)
     is_starred    = models.BooleanField(default=False)
     is_archived   = models.BooleanField(default=False)
+    knowledge_excluded = models.BooleanField(
+        default=False, verbose_name='Не індексувати в базі знань',
+        help_text='Приватна переписка: не передавати в RAG (rag_assistant/knowledge.py)')
     crm_customer  = models.ForeignKey(
         'crm.Customer', null=True, blank=True,
         on_delete=models.SET_NULL, related_name='email_threads',

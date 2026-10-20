@@ -586,6 +586,8 @@
     </div>
   </div>
   <div class="em-ctx-item" onclick="ctxAction('project')">📁 {% trans "До проєкту…" %}</div>
+  <div class="em-ctx-item" onclick="ctxAction('kb')"
+       title="{% trans "Приватна переписка: не передавати в базу знань RAG (повторне натискання — повернути)" %}">🔒 {% trans "Приватне — не в базу знань" %}</div>
   <div class="em-ctx-item" onclick="ctxAction('rule')">📋 Правило з відправника</div>
   <div class="em-ctx-item" onclick="ctxAction('task')">📅 Завдання в календар</div>
   <div class="em-ctx-sep"></div>
@@ -1644,6 +1646,14 @@ async function ctxAction(action) {
     if (!tpk) { _showToast('⚠️ {% trans "Лист без гілки листування" %}'); return; }
     await previewMsg(pk, tpk, rowEl);
     if (window.pvProjOpen) window.pvProjOpen();
+  } else if (action === 'kb') {
+    if (!tpk) { _showToast('⚠️ {% trans "Лист без гілки листування" %}'); return; }
+    try {
+      var r = await fetch('/email/thread/' + tpk + '/knowledge/', {method:'POST', headers:{'X-CSRFToken':CSRF}});
+      var d = await r.json();
+      _showToast(d.excluded ? '🔒 {% trans "Переписку виключено з бази знань" %}'
+                            : '🔓 {% trans "Переписку знову можна індексувати" %}');
+    } catch(e) { _showToast('⚠️ ' + _i18n.помилка); }
   } else if (action === 'rule') {
     openRuleModal();
   } else if (action === 'task') {

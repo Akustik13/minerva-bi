@@ -3,7 +3,7 @@ from django.contrib import admin, messages
 from django.shortcuts import redirect
 from django.urls import path, reverse
 from django.utils import timezone
-from django.utils.html import format_html
+from django.utils.html import format_html, format_html_join
 
 from .client import RagClient, RagError
 from .models import RagConversation, RagMessage, RagSettings
@@ -131,3 +131,201 @@ class RagConversationAdmin(admin.ModelAdmin):
     @admin.display(description="Повідомлень")
     def messages_count(self, obj):
         return obj.messages.count()
+
+
+# ── 🧠 База знань (пошта → RAG) ───────────────────────────────────────────────
+
+from email_assistant.models import EmailMessage as _EmailMessage  # noqa: E402
+
+from . import knowledge  # noqa: E402
+from .models import KnowledgeDoc, KnowledgeSettings  # noqa: E402
+
+
+class KnowledgeSettingsForm(forms.ModelForm):
+    categories = forms.MultipleChoiceField(
+        label="Категорії листів", required=False, choices=_EmailMessage.CATEGORY_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        help_text="Розсилки й сервісні сповіщення за замовчуванням не індексуються.")
+    attachment_types_text = forms.CharField(
+        label="Типи вкладень", required=False, help_text="Через кому: pdf, docx, txt, csv")
+    private_api_key = forms.CharField(
+        label="Ключ приватного пошуку RAG", required=False, max_length=200,
+        widget=forms.PasswordInput(render_value=False, attrs={"autocomplete": "new-password", "size": 50}),
+        help_text="Окремий Bearer-ключ RAG для /v2/* (не ключ магазину). Порожньо — залишити збережений.")
+    clear_key = forms.BooleanField(label="Видалити збережений ключ", required=False)
+
+    class Meta:
+        model = KnowledgeSettings
+        fields = ["enabled", "accounts", "categories", "index_from", "include_attachments", "attachment_max_mb",
+                  "private_api_key"]
+        widgets = {"accounts": forms.CheckboxSelectMultiple}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk:
+            self.fields["attachment_types_text"].initial = ", ".join(self.instance.attachment_types or [])
+
+    def clean_private_api_key(self):
+        value = (self.cleaned_data.get("private_api_key") or "").strip()
+        if not value and self.instance and self.instance.pk and not self.data.get("clear_key"):
+            return self.instance.private_api_key
+        return value
+
+    def clean(self):
+        d = super().clean()
+        if d.get("clear_key"):
+            d["private_api_key"] = ""
+        return d
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        obj.attachment_types = [t.strip().lower().lstrip(".") for t in
+                                (self.cleaned_data.get("attachment_types_text") or "").split(",") if t.strip()]
+        if commit:
+            obj.save()
+            self.save_m2m()
+        return obj
+
+
+@admin.register(KnowledgeSettings)
+class KnowledgeSettingsAdmin(admin.ModelAdmin):
+    form = KnowledgeSettingsForm
+    readonly_fields = ["status_panel", "connection_help", "key_status"]
+    fieldsets = [
+        ("Стан", {"fields": ["status_panel"]}),
+        ("Що індексувати", {
+            "fields": ["enabled", "accounts", "categories", "index_from", "include_attachments",
+                       "attachment_types_text", "attachment_max_mb"],
+            "description": "Minerva вирішує, які листи можна передати в RAG; RAG сам забирає зміни (pull) і звітує. "
+                           "Вектори створюються локально на ПК RAG. Після збереження стрічка звіряється у фоні.",
+        }),
+        ("Підключення RAG", {"fields": ["connection_help", "private_api_key", "key_status", "clear_key"]}),
+    ]
+
+    def has_add_permission(self, request):
+        return not KnowledgeSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def changelist_view(self, request, extra_context=None):
+        return redirect(reverse("admin:rag_assistant_knowledgesettings_change", args=[KnowledgeSettings.get().pk]))
+
+    def save_model(self, request, obj, form, change):
+        if change:
+            obj.settings_version += 1
+        super().save_model(request, obj, form, change)
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)   # скриньки (M2M) збережено — тепер звірка
+        knowledge.start_refresh()
+        self.message_user(request, "Налаштування збережено; стрічка бази знань звіряється у фоні.")
+
+    @admin.display(description="Збережений ключ")
+    def key_status(self, obj):
+        if not obj or not obj.private_api_key:
+            return format_html('<span style="color:#e57373">{}</span>', "не задано (потрібен для пошуку, не для індексації)")
+        return f"задано (…{obj.private_api_key[-4:]})"
+
+    @admin.display(description="Стан індексації")
+    def status_panel(self, obj):
+        inst = knowledge.instance_id()
+        s = knowledge.summary()
+        d = s["documents"]
+        rows = [
+            ("Середовище (MINERVA_INSTANCE_ID)", inst or format_html(
+                '<b style="color:#e57373">не задано — маршрути для RAG вимкнені (503)</b>')),
+            ("Покоління журналу", s["generation"]),
+            ("Остання подія журналу (seq)", s["last_seq"]),
+            ("Мають бути в індексі", d["eligible"]),
+            ("✅ Проіндексовано (чинна ревізія)", d["indexed"]),
+            ("⏳ Очікують RAG", d["pending"]),
+            ("⚠️ Помилки / пропущено", f"{d['failed']} / {d['skipped']}"),
+            ("🗑 Видалення ще не підтверджено", d["pending_delete"]),
+            ("Останній звіт RAG", timezone.localtime(knowledge._parse_ts(s["last_status_at"])).strftime("%d.%m.%Y %H:%M")
+             if s["last_status_at"] else "ще не було"),
+            ("Остання звірка стрічки", obj.last_refresh_result or "ще не було"),
+        ]
+        table = format_html_join("", "<tr><td style='padding:2px 12px 2px 0;color:var(--body-quiet-color)'>{}</td>"
+                                     "<td style='padding:2px 0'><b>{}</b></td></tr>", rows)
+        failed = (KnowledgeDoc.objects.filter(fed=True, state=KnowledgeDoc.FAILED).order_by("-last_status_at")[:10])
+        errors = format_html_join("", '<li><a href="/email/message/{}/" target="_blank">{}</a>: {}</li>',
+                                  ((f.obj_id, f.document_id, f.error) for f in failed if f.status_revision == f.revision))
+        buttons = format_html(
+            '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">'
+            '<button type="submit" class="button" formaction="{}" formnovalidate>🔄 Звірити стрічку зараз</button>'
+            '<button type="submit" class="button" formaction="{}" formnovalidate '
+            'onclick="return confirm(\'Прибрати всі листи з індексу RAG і поставити на паузу?\')">🧹 Прибрати все з індексу</button>'
+            '<button type="submit" class="button" formaction="{}" formnovalidate '
+            'onclick="return confirm(\'Нове покоління — лише після відновлення БД з бекапу. RAG зробить повну звірку. Продовжити?\')">'
+            '♻ Нове покоління (після відновлення БД)</button></div>',
+            reverse("admin:rag_assistant_knowledgesettings_refresh"),
+            reverse("admin:rag_assistant_knowledgesettings_clear"),
+            reverse("admin:rag_assistant_knowledgesettings_generation"))
+        return format_html('<table>{}</table>{}{}', table,
+                           format_html('<div style="margin-top:8px"><b>Останні помилки RAG:</b><ul>{}</ul></div>', errors)
+                           if errors else "", buttons)
+
+    @admin.display(description="Як підключити RAG")
+    def connection_help(self, obj):
+        return format_html(
+            "<ol style='margin:0;padding-left:18px'>"
+            "<li>На сервері задайте змінну середовища <code>MINERVA_INSTANCE_ID</code> (напр. <code>sevskiy-prod</code>).</li>"
+            "<li><a href='{}' target='_blank'>Адмін → REST API → API Ключі</a>: новий ключ <b>без магазину</b> з правами "
+            "<code>knowledge:read</code> і <code>knowledge:write</code> — передайте його адміністратору RAG.</li>"
+            "<li>RAG сам забирає зміни з <code>/api/v1/knowledge/changes/</code> і звітує статуси — прогрес видно вище.</li>"
+            "<li>Почніть з короткого періоду однієї скриньки; масову індексацію архіву — лише після перевірки.</li>"
+            "</ol><div class='help'>Контракт: api/schemas/knowledge/README.md</div>",
+            reverse("admin:api_apikey_add"))
+
+    def get_urls(self):
+        return [
+            path("refresh/", self.admin_site.admin_view(self.refresh_view), name="rag_assistant_knowledgesettings_refresh"),
+            path("clear/", self.admin_site.admin_view(self.clear_view), name="rag_assistant_knowledgesettings_clear"),
+            path("generation/", self.admin_site.admin_view(self.generation_view),
+                 name="rag_assistant_knowledgesettings_generation"),
+        ] + super().get_urls()
+
+    def _back(self):
+        return redirect(reverse("admin:rag_assistant_knowledgesettings_change", args=[KnowledgeSettings.get().pk]))
+
+    def refresh_view(self, request):
+        if request.method == "POST":
+            knowledge.start_refresh()
+            self.message_user(request, "Звірку стрічки запущено у фоні — оновіть сторінку за хвилину.")
+        return self._back()
+
+    def clear_view(self, request):
+        if request.method == "POST":
+            n = knowledge.clear_index()
+            self.message_user(request, f"Індексацію поставлено на паузу; на видалення з RAG передано документів: {n}.",
+                              messages.WARNING)
+        return self._back()
+
+    def generation_view(self, request):
+        if request.method == "POST":
+            gen = knowledge.new_generation()
+            self.message_user(request, f"Нове покоління журналу: {gen}. RAG зробить повну звірку.", messages.WARNING)
+        return self._back()
+
+
+@admin.register(KnowledgeDoc)
+class KnowledgeDocAdmin(admin.ModelAdmin):
+    list_display = ["document_id_col", "revision", "fed", "state_col", "chunks", "error", "last_status_at"]
+    list_filter = ["fed", "state"]
+    search_fields = ["obj_id", "error"]
+    readonly_fields = [f.name for f in KnowledgeDoc._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Документ")
+    def document_id_col(self, obj):
+        return format_html('<a href="/email/message/{}/" target="_blank">{}</a>', obj.obj_id, obj.document_id)
+
+    @admin.display(description="Стан чинної ревізії")
+    def state_col(self, obj):
+        return dict(KnowledgeDoc.STATES).get(obj.current_state, obj.current_state)

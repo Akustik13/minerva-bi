@@ -82,6 +82,7 @@ while true; do
   # ── Email синхронізація — кожні EMAIL_SYNC_INTERVAL секунд ──
   if [ $((NOW - LAST_EMAIL_SYNC)) -ge "$EMAIL_SYNC_INTERVAL" ]; then
     python manage.py sync_email --folders 2>&1 || true
+    python manage.py knowledge_refresh --if-due 2>&1 || true   # база знань RAG: раз на добу, якщо використовується
     LAST_EMAIL_SYNC=$(date +%s)
   fi
 

@@ -160,13 +160,18 @@ def decide(link, accept: bool, user=None) -> ProjectLink:
     link.save(update_fields=["status", "decided_by", "decided_at"])
     if accept and link.thread_id:
         _on_confirmed(link.project, link.thread)
+    elif link.thread_id:
+        _knowledge_touch(link.thread_id)
     return link
 
 
 def unlink(link):
     """Прибрати зв'язок. Автоматичний — лишається відхиленим, щоб система не запропонувала його знову."""
     if link.source == ProjectLink.MANUAL:
+        thread_id = link.thread_id
         link.delete()
+        if thread_id:
+            _knowledge_touch(thread_id)
     else:
         decide(link, False)
 
@@ -179,7 +184,14 @@ def dismiss_threads(threads, user=None) -> int:
     return n
 
 
+def _knowledge_touch(thread_id):
+    """Проєкти гілки входять у документ бази знань (поле projects) → нова ревізія для RAG."""
+    from email_assistant.knowledge_hook import touch
+    touch(thread_id=thread_id)
+
+
 def _on_confirmed(project, thread):
+    _knowledge_touch(thread.pk)
     add_participants(project, list(_thread_messages(thread)))
     DismissedThread.objects.filter(thread=thread).delete()
     fields = ["updated_at"]

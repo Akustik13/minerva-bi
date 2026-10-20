@@ -1,5 +1,7 @@
 # Minerva ↔ RAG: база знань (пропозиція Minerva v1)
 
+> **Застаріло.** Чинна специфікація Minerva — JSON-схеми й README в `api/schemas/knowledge/` (proposal MIN-002, MSG-20261020-CLAUDE-004); авторитетний контракт — `integration/API_CONTRACT.md`. Нижче — історична перша пропозиція.
+
 Статус: **proposal від Minerva, 2026-10-20 — не реалізовано.** Авторитетний контракт — `integration/API_CONTRACT.md` у спільній папці
 `C:\Users\prymv\Desktop\програми славік\Codex\AI_models\integration` (координує Codex). Цей файл деталізує пропозицію
 pull-моделі (поправка A у MSG-20261020-CLAUDE-001); після погодження ревізії його буде приведено у відповідність до неї.
